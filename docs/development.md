@@ -30,6 +30,9 @@ service integrations in this slice requiring Fakes.
 | `make lint` | `gofmt` check, `go vet`, module checksum verification |
 | `make verify` | Real CLI launch, help, diagnostics, stored state, stop/restart, kill/restart, future-schema rejection, local logs/spans, and cleanup |
 
+GitHub Actions runs all four checks on Ubuntu for pull requests and pushes to
+`main`. The workflow reads the Go version from `go.mod`.
+
 `make verify` writes `evidence/verification.json`. It removes an old report
 before running, launches only its exact child binary, uses an isolated temporary
 data root and working directory, and reaps children and removes temporary state
