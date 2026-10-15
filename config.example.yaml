@@ -1,0 +1,5 @@
+version: 1
+app:
+  # Must be absolute. ERII_DATA_ROOT can override this for deployment.
+  data_root: /tmp/erii-local
+  log_level: info
