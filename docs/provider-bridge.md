@@ -89,7 +89,7 @@ Frames are bounded to 1 MiB; generation output to the smaller of 64 KiB and four
 bytes per requested output token, on a UTF-8 boundary. This is a byte safety bound,
 not tokenization or a context-limit estimate. There are at most 4096 distinct
 sequence events and 32 Tool Calls (64 KiB of arguments per call). Host RPC calls
-have a five-second bound, including writer admission and pipe I/O; behavioral
+have a five-second bound per wire exchange, including writer admission and pipe I/O; behavioral
 Probe has a ten-second bound. Writer admission observes cancellation, and pipe
 deadlines interrupt a blocked write without leaking a writer goroutine. A partial
 frame terminates and reaps that Bridge instead of reusing a corrupted stream.
@@ -97,6 +97,13 @@ Cancellation and cleanup have independent one-second contexts. Close can abandon
 its graceful shutdown attempt and terminate a peer that is not reading.
 Cancellation after complete dispatch sends `generation.cancel` even before the
 start acknowledgement. A late acknowledgement cannot revive that generation.
+Waiting for a shared restart/handshake observes each caller's context. The
+lifecycle state lock never covers process I/O or reap; Close can terminate an
+initializing child immediately and waits for its initializer to finish cleanup.
+If an internal acknowledgement deadline expires while the caller remains live,
+the dispatched start/continuation is cancelled with an independent cleanup
+context. Failed cleanup forces termination. The caller receives
+`PROVIDER_UNAVAILABLE`, and the generation is never replayed automatically.
 Failed cancellation cleanup terminates the Bridge and returns the cancellation
 cause together with the sanitized cleanup error; it cannot certify a successful
 Probe. Oversized/malformed frames,

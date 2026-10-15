@@ -50,12 +50,19 @@ type process struct {
 }
 
 type Client struct {
-	mu     sync.Mutex
-	path   string
-	args   []string
-	p      *process
-	closed bool
-	next   atomic.Uint64
+	mu           sync.Mutex
+	path         string
+	args         []string
+	p            *process
+	closed       bool
+	initializing *initialization
+	closeDone    chan struct{}
+	next         atomic.Uint64
+}
+
+type initialization struct {
+	done chan struct{}
+	err  error // published by closing done
 }
 
 // Open takes a Host-selected executable and arguments, never model input.
@@ -71,19 +78,74 @@ func Open(ctx context.Context, path string, args ...string) (*Client, error) {
 }
 
 func (c *Client) ensure(ctx context.Context) (*process, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closed {
-		return nil, llm.ProviderUnavailable
-	}
-	if c.p != nil {
-		select {
-		case <-c.p.done:
-			c.stop(c.p)
-			c.p = nil
-		default:
-			return c.p, nil
+	for {
+		if ctx.Err() != nil {
+			return nil, llm.ProviderUnavailable
 		}
+		c.mu.Lock()
+		if c.closed {
+			c.mu.Unlock()
+			return nil, llm.ProviderUnavailable
+		}
+		if pending := c.initializing; pending != nil {
+			c.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				return nil, llm.ProviderUnavailable
+			case <-pending.done:
+			}
+			if ctx.Err() != nil {
+				return nil, llm.ProviderUnavailable
+			}
+			if pending.err != nil {
+				return nil, pending.err
+			}
+			continue
+		}
+		if c.p != nil {
+			select {
+			case <-c.p.done:
+			default:
+				p := c.p
+				c.mu.Unlock()
+				return p, nil
+			}
+		}
+		previous := c.p
+		pending := &initialization{done: make(chan struct{})}
+		c.p = nil
+		c.initializing = pending
+		c.mu.Unlock()
+		// No process I/O or reap runs under the lifecycle state lock. Waiters can
+		// abandon this initialization independently, and Close can stop its child.
+		if previous != nil {
+			c.stop(previous)
+		}
+		p, err := c.startProcess(ctx)
+		c.mu.Lock()
+		if c.closed {
+			err = llm.ProviderUnavailable
+		}
+		if err != nil {
+			c.p = nil
+		}
+		pending.err = err
+		c.initializing = nil
+		close(pending.done)
+		c.mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+}
+
+func (c *Client) startProcess(ctx context.Context) (*process, error) {
+	c.mu.Lock()
+	closed := c.closed
+	c.mu.Unlock()
+	if closed || ctx.Err() != nil {
+		return nil, llm.ProviderUnavailable
 	}
 	cmd := exec.Command(c.path, c.args...)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
@@ -112,6 +174,15 @@ func (c *Client) ensure(ctx context.Context) (*process, error) {
 	go p.read(out)
 	// Wait only after read has consumed stdout. Close always reaps this child.
 	go func() { <-p.done; _ = cmd.Wait(); close(p.wait) }()
+	// Publish before handshake I/O so forced shutdown can reach this process.
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		c.stop(p)
+		return nil, llm.ProviderUnavailable
+	}
+	c.p = p
+	c.mu.Unlock()
 	var hello struct {
 		ProtocolVersion int `json:"protocol_version"`
 	}
@@ -119,7 +190,6 @@ func (c *Client) ensure(ctx context.Context) (*process, error) {
 		c.stop(p)
 		return nil, llm.ModelIncompatible
 	}
-	c.p = p
 	return p, nil
 }
 
@@ -186,21 +256,40 @@ func (c *Client) stop(p *process) {
 
 func (c *Client) Close() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.closed {
-		c.closed = true
-		if c.p != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			_ = c.callProcess(ctx, c.p, "bridge.shutdown", struct{}{}, nil)
-			cancel()
-			c.stop(c.p)
-		}
+	if c.closed {
+		done := c.closeDone
+		c.mu.Unlock()
+		<-done
+		return nil
 	}
+	c.closed = true
+	c.closeDone = make(chan struct{})
+	done, p, pending := c.closeDone, c.p, c.initializing
+	c.mu.Unlock()
+	if p != nil {
+		// An initializer cannot process shutdown before its handshake completes.
+		// Force it immediately; established peers receive bounded graceful close.
+		if pending == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			_ = c.callProcess(ctx, p, "bridge.shutdown", struct{}{}, nil)
+			cancel()
+		}
+		c.stop(p)
+	}
+	if pending != nil {
+		<-pending.done
+	}
+	close(done)
 	return nil
 }
 
+var errAcknowledgementTimeout = errors.New("provider RPC acknowledgement timeout")
+
 func (c *Client) callProcess(ctx context.Context, p *process, method string, params, out any) error {
 	_, err := c.exchange(ctx, p, method, params, out)
+	if err == errAcknowledgementTimeout {
+		return llm.ProviderUnavailable
+	}
 	return err
 }
 
@@ -246,7 +335,7 @@ func (c *Client) exchange(ctx context.Context, p *process, method string, params
 	select {
 	case f = <-ch:
 	case <-ctx.Done():
-		return true, llm.ProviderUnavailable
+		return true, errAcknowledgementTimeout
 	case <-p.done:
 		select {
 		case f = <-ch:
@@ -288,12 +377,18 @@ func (c *Client) write(ctx context.Context, p *process, wire []byte) error {
 	return nil
 }
 
-func (c *Client) cancelGeneration(ctx context.Context, p *process, id string) error {
+func (c *Client) cleanupGeneration(ctx context.Context, p *process, id string) error {
 	cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	defer stop()
 	err := c.callProcess(cleanup, p, "generation.cancel", map[string]string{"generation_id": id}, nil)
 	if err != nil {
 		c.stop(p)
+	}
+	return err
+}
+
+func (c *Client) cancelGeneration(ctx context.Context, p *process, id string) error {
+	if err := c.cleanupGeneration(ctx, p, id); err != nil {
 		return errors.Join(llm.GenerationCancelled, err)
 	}
 	return llm.GenerationCancelled
@@ -345,6 +440,12 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, llm.GenerationCancelled
 	}
 	if err != nil {
+		if dispatched && err == errAcknowledgementTimeout {
+			if cleanupErr := c.cleanupGeneration(ctx, p, r.GenerationID); cleanupErr != nil {
+				return llm.GenerationResult{}, errors.Join(llm.ProviderUnavailable, cleanupErr)
+			}
+			return llm.GenerationResult{}, llm.ProviderUnavailable
+		}
 		return llm.GenerationResult{}, err
 	}
 	result := llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
