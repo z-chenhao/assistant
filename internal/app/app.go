@@ -11,6 +11,7 @@ import (
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
 )
 
@@ -47,6 +48,8 @@ func Open(ctx context.Context, cfg config.Config) (*App, error) {
 func (a *App) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 	return a.store.Diagnostics(ctx)
 }
+
+func (a *App) Models() *llmsqlite.Store { return a.store.Models() }
 
 func (a *App) Close() error {
 	err := a.store.Close()

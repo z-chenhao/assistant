@@ -16,6 +16,7 @@ lint:
 
 verify: build
 	@mkdir -p evidence
-	rm -f evidence/events.json evidence/relay.json
+	rm -f evidence/events.json evidence/relay.json evidence/models.jsonl
 	python3 scripts/verify.py --binary bin/personal-agent --evidence evidence/verification.json
+	go test -count=5 -json ./internal/llm/... ./internal/agent/sqlite > evidence/models.jsonl || { cat evidence/models.jsonl; exit 1; }
 	ERII_TEST_BINARY="$(CURDIR)/bin/personal-agent" ERII_EVENT_EVIDENCE="$(CURDIR)/evidence/events.json" go test -count=1 -v ./internal/event/integration
