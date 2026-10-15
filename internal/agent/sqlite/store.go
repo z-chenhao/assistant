@@ -14,6 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/event"
+	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -21,7 +23,10 @@ import (
 //go:embed migrations/001_bootstrap.sql
 var bootstrapSQL string
 
-var migrations = []string{bootstrapSQL}
+//go:embed migrations/002_events.sql
+var eventsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL}
 
 type Store struct {
 	db   *sql.DB
@@ -148,6 +153,13 @@ func (s *Store) bootstrap(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("initialize agent configuration: %w", err)
 		}
+		e, err := event.New("/erii/agents/"+id.String(), "ai.erii.agent.initialized.v1", id.String(), map[string]any{"agent_id": id.String(), "config_version": 1})
+		if err != nil {
+			return err
+		}
+		if err := eventsqlite.Enqueue(ctx, tx, e); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -166,3 +178,20 @@ func (s *Store) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+// Events shares the domain state.db connection and its lifecycle.
+func (s *Store) Events() *eventsqlite.Store { return eventsqlite.New(s.db) }
+
+// Transaction is the domain write boundary. Enqueue events using its tx before
+// returning. Commit/rollback errors are not automatically retried.
+func (s *Store) Transaction(ctx context.Context, write func(*sql.Tx) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := write(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

@@ -15,4 +15,7 @@ lint:
 	go mod verify
 
 verify: build
+	@mkdir -p evidence
+	rm -f evidence/events.json evidence/relay.json
 	python3 scripts/verify.py --binary bin/personal-agent --evidence evidence/verification.json
+	ERII_TEST_BINARY="$(CURDIR)/bin/personal-agent" ERII_EVENT_EVIDENCE="$(CURDIR)/evidence/events.json" go test -count=1 -v ./internal/event/integration

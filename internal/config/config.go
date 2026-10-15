@@ -8,13 +8,16 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
+	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
-	Version int `yaml:"version"`
-	App     App `yaml:"app"`
+	Version int               `yaml:"version"`
+	App     App               `yaml:"app"`
+	NATS    eventnats.Options `yaml:"nats"`
 }
 
 type App struct {
@@ -29,7 +32,11 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if err != nil {
 		return Config{}, errors.New("resolve home directory")
 	}
-	cfg := Config{Version: 1, App: App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"}}
+	cfg := Config{
+		Version: 1,
+		App:     App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
+		NATS:    eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
+	}
 	if path != "" {
 		f, err := os.Open(path)
 		if err != nil {
@@ -53,6 +60,15 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if value, ok := lookupEnv("ERII_LOG_LEVEL"); ok {
 		cfg.App.LogLevel = value
+	}
+	if value, ok := lookupEnv("ERII_NATS_URL"); ok {
+		cfg.NATS.URL = value
+	}
+	if value, ok := lookupEnv("ERII_NATS_STREAM_PREFIX"); ok {
+		cfg.NATS.StreamPrefix = value
+	}
+	if err := cfg.NATS.Validate(); err != nil {
+		return Config{}, err
 	}
 	if cfg.Version != 1 {
 		return Config{}, errors.New("unsupported configuration version (expected 1)")

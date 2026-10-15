@@ -9,6 +9,8 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
 	"github.com/z-chenhao/erii/internal/config"
+	"github.com/z-chenhao/erii/internal/event"
+	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"github.com/z-chenhao/erii/internal/observability"
 )
 
@@ -50,4 +52,15 @@ func (a *App) Close() error {
 	err := a.store.Close()
 	a.telemetry.Logger.Info("application stopped")
 	return errors.Join(err, a.telemetry.Close())
+}
+
+// Relay runs infrastructure only. It never enables Agent ingress or a model.
+func (a *App) Relay(ctx context.Context, cfg config.Config) error {
+	return event.Relay(ctx, a.store.Events(), func(ctx context.Context) (event.EventBus, error) {
+		bus, err := eventnats.Open(ctx, cfg.NATS)
+		if err != nil {
+			return nil, err
+		}
+		return bus, nil
+	}, cfg.NATS.RetryInterval, a.telemetry.Logger)
 }

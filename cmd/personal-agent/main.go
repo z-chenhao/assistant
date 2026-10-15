@@ -29,7 +29,7 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) (err error) 
 	flags.SetOutput(errOut)
 	configPath := flags.String("config", "", "versioned YAML configuration file (optional)")
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [status]\nWithout status, print startup diagnostics and wait for SIGINT/SIGTERM.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [status|relay]\nWithout a command, print startup diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -38,8 +38,8 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) (err error) 
 		}
 		return err
 	}
-	if flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status") {
-		return errors.New("expected status or no command (see -help)")
+	if flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay") {
+		return errors.New("expected status, relay, or no command (see -help)")
 	}
 	cfg, err := config.Load(*configPath, os.LookupEnv)
 	if err != nil {
@@ -56,6 +56,9 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) (err error) 
 	}
 	if err := json.NewEncoder(out).Encode(diagnostics); err != nil {
 		return err
+	}
+	if flags.NArg() == 1 && flags.Arg(0) == "relay" {
+		return application.Relay(ctx, cfg)
 	}
 	if flags.NArg() == 0 {
 		<-ctx.Done()
