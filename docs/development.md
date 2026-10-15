@@ -1,10 +1,11 @@
-# Runnable M0 foundation, events, and model metadata
+# Runnable M0 foundation and Provider Bridge
 
 This slice provides startup, strict versioned YAML, local logs/spans, SQLite
 migrations, transactional Outbox/Inbox, a CloudEvents EventBus, and a thin NATS
 JetStream adapter, unverified model metadata, immutable snapshots, and a test-only
-SecretStore Fake. **M0 remains incomplete.** Model Probe/activation, real authentication,
-Main/Worker Runs, Tasks, Agent Loop, tools, UI, and Durable Replay are deferred.
+SecretStore Fake, versioned stdio Provider Bridge, behavioral Probe and atomic
+test-profile activation. Real authentication/providers, Main/Worker Runs, Tasks,
+Agent Loop, tools, UI, and Durable Replay are deferred to their later slices.
 Product Golden Cases and SC-01–SC-12 are `not_applicable`, not passed.
 
 ## Commands and evidence
@@ -20,7 +21,7 @@ accounts, installed broker executable, containers, or fixed ports.
 | `make test` | Real temporary SQLite, migrations, transaction rollback, duplicate/late/out-of-order events, Fake and real EventBus contracts, broker restart, process kills |
 | `make test-race` | Those tests with Go's race detector |
 | `make lint` | `gofmt`, `go vet`, module checksums |
-| `make verify` | Real CLI model add/list/kill/restart, metadata/security tests five times, relay outage recovery, JetStream wire contract, seven SIGKILL boundaries, independent state readback |
+| `make verify` | Real CLI metadata/probe/select/restart and cancelled setup, Bridge and metadata/security contracts five times, relay outage recovery, JetStream wire contract, seven SIGKILL boundaries, independent state readback |
 
 GitHub Actions runs all four checks on Ubuntu for PRs and pushes to `main`.
 The integration tests own an embedded file-backed JetStream server bound to
@@ -33,9 +34,10 @@ isolated from user configuration and removed on success or failure.
 
 - `evidence/verification.json`: diagnostics, persisted Agent/profile rows,
   canonical JSON, rejected metadata, logs/spans, bootstrap/model kill/restart,
-  future-schema rejection, and cleanup assertions.
-- `evidence/models.jsonl`: Go test events for five runs of metadata contracts,
-  migration/rollback, CAS, immutable snapshots, and credential safety assertions.
+  future-schema rejection, Provider Probe/activation/degraded states, and cleanup assertions.
+- `evidence/models.jsonl`: Go test events for five runs of Bridge/auth/catalog/
+  generation/cancellation/error contracts, migration/rollback, activation CAS,
+  immutable snapshots, and credential safety assertions.
 - `evidence/events.json`: seven process-kill boundaries and SQLite state after
   reopening, before recovery handling.
 - `evidence/relay.json`: CLI launch during broker outage, frozen event identity,
@@ -65,7 +67,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":3,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":4,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,
@@ -128,13 +130,16 @@ paths are metadata: never put credentials in them. Output contains a UUIDv7,
 UTC timestamps at microsecond precision, version 1 and `unverified` status.
 Optional generation defaults support temperature [0,2] and top_p [0,1]; output
 tokens must be positive and not exceed the context window. These are candidate
-metadata, not verified capability claims or permission to exceed future Host
+metadata, not verified capability claims or permission to exceed Host
 execution limits. `openai_account` metadata requires `openai_responses`, an
 existing OAuth connection, and no custom endpoint.
 
 `model list` returns an array and never creates a default profile. `status`
-continues to report `setup_required`, null Active Profile and closed ingress.
-There is no select/activate/Probe command or user authentication command yet.
+reports `setup_required`, null Active Profile and closed ingress until selection.
+`model test` and `model select` require explicit M0 test Bridge injection. See
+[Provider Bridge operations](provider-bridge.md) for the versioned protocol,
+Probe and activation flow, readiness states and remaining real-provider work.
+There is no real user authentication command yet.
 No paid, local, or Fake model is connected by adding metadata.
 
 Trusted storage provides profile CAS updates that increment version and clear
@@ -142,8 +147,9 @@ verification. Auth state CAS preserves stable connection/provider/credential
 identity. Writes enqueue only IDs/versions in the same SQLite transaction.
 The snapshot API accepts the caller's transaction so the future Run owner can
 commit a Run and its snapshot together. It requires a ready, verified profile
-and connected authentication when referenced. Ready profiles in current tests
-are explicit storage fixtures, not a successful Probe or runnable Agent Run.
+and connected authentication when referenced. Storage-only fixtures mark a
+profile ready directly; Bridge contracts and the CLI harness separately exercise
+the real Probe/selection boundary. No test creates a runnable Agent Run yet.
 Snapshots freeze profile version, model, wire API, compatibility, capabilities,
 generation parameters, token limits and canonical endpoint hash. They reference
 the AuthConnection ID, never CredentialRef or secret material; update, delete
@@ -179,15 +185,18 @@ immediate transactions. Only connection initialization retries `SQLITE_BUSY`;
 domain commits and migrations are never automatically replayed.
 
 Forward migrations and `PRAGMA user_version` commit together. Empty databases
-apply v1 (Agent config), v2 (Outbox/Inbox), and v3 (model metadata). Real v1/v2
-databases upgrade to v3 without rewriting Agent config/timestamps or existing
-Outbox/Inbox history. Failed v3 DDL rolls back to the actual prior version. Newer schema
+apply v1 (Agent config), v2 (Outbox/Inbox), v3 (model metadata), and v4 (Provider
+Probe and activation). Real v1/v2/v3 databases upgrade without changing identity,
+prior metadata/snapshots or existing Outbox/Inbox history. Failed DDL rolls back
+to the actual prior version. Newer schema
 versions fail closed; failed DDL rolls back. There is no downgrade or deletion.
 
 Fresh bootstrap commits its singleton Agent and `ai.erii.agent.initialized.v1`
 Outbox event in one transaction. Repeated startup preserves all rows, timestamps,
-and identity. Agent config constraints still allow only `setup_required`, null
-active profile, and config version >=1.
+and identity. Schema v4 preserves v3 metadata/snapshots and replaces the original
+closed-only Agent config. `model_probe` binds observed results to profile/auth
+versions and Bridge identity. Only verified selection may set a ready active
+profile; stale config/profile/auth versions roll back the entire activation.
 
 Domain modules use `Store.Transaction(ctx, func(tx *sql.Tx) error)` and call
 `event/sqlite.Enqueue(ctx, tx, cloudEvent)` on that **same** transaction before

@@ -35,7 +35,7 @@ def diagnostics(value):
     require(value["readiness"] == "setup_required", "incorrect readiness")
     require(value["agent_ingress_enabled"] is False, "ingress enabled without a model")
     require(value["active_model_profile_id"] is None, "implicit model enabled")
-    require(value["schema_version"] == 3, "incorrect schema version")
+    require(value["schema_version"] == 4, "incorrect schema version")
 
 
 class Harness:
@@ -60,8 +60,8 @@ class Harness:
         return subprocess.run([str(self.binary), "-config", str(self.config), *args], cwd=self.root, env=self.env,
                               input=input, text=True, capture_output=True, timeout=15, check=False)
 
-    def launch(self):
-        self.process = subprocess.Popen([str(self.binary), "-config", str(self.config)], cwd=self.root, env=self.env,
+    def launch(self, *args, readiness="setup_required"):
+        self.process = subprocess.Popen([str(self.binary), "-config", str(self.config), *args], cwd=self.root, env=self.env,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         with selectors.DefaultSelector() as selector:
             selector.register(self.process.stdout, selectors.EVENT_READ)
@@ -69,7 +69,11 @@ class Harness:
         line = self.process.stdout.readline()
         require(bool(line), "process exited before startup diagnostics")
         value = json.loads(line)
-        diagnostics(value)
+        if readiness == "setup_required":
+            diagnostics(value)
+        else:
+            require(value["readiness"] == readiness, "incorrect launch readiness")
+            require(value["agent_ingress_enabled"] == (readiness == "ready"), "incorrect ingress gate")
         require(self.process.poll() is None, "default command did not remain running")
         return value
 
@@ -147,6 +151,107 @@ def verify_models(harness):
             "readiness": baseline_status, "result": "passed"}
 
 
+def verify_provider(binary):
+    """Exercise explicit Bridge injection through real CLI processes and SQL."""
+    with tempfile.TemporaryDirectory(prefix="erii-provider-") as temp:
+        harness = Harness(binary, Path(temp))
+        try:
+            harness.doctor()
+            initial = harness.command("status")
+            require(initial.returncode == 0, "initial status failed")
+            diagnostics(json.loads(initial.stdout))
+            empty = snapshot(harness.data_root)
+            cancelled = harness.command("model", "cancel")
+            require(cancelled.returncode == 0 and json.loads(cancelled.stdout) == json.loads(initial.stdout),
+                    "cancelled setup changed readiness")
+            require(snapshot(harness.data_root) == empty, "cancelled setup changed persistent state")
+            fixture = {
+                "name": "Explicit test candidate", "provider_kind": "openai_compatible",
+                "endpoint": "http://127.0.0.1:8000/v1", "wire_api": "openai_completions",
+                "model_id": "fixture-model", "context_window": 8192, "max_output_tokens": 1024,
+                "compatibility": {"tool_result_format": "openai"}, "capabilities": {"text_input": True},
+            }
+            added = harness.command("model", "add", input=json.dumps(fixture))
+            require(added.returncode == 0, "candidate add failed")
+            profile = json.loads(added.stdout)
+            profile_id = profile["profile_id"]
+            candidate = snapshot(harness.data_root)
+            def bridge(*args, fixture="success"):
+                return harness.command("-test-bridge", fixture, *args)
+            unprobed = bridge("model", "select", profile_id, "1", "1")
+            require(unprobed.returncode != 0 and snapshot(harness.data_root) == candidate,
+                    "unprobed profile activated")
+            implicit = harness.command("model", "test", profile_id)
+            require(implicit.returncode != 0 and snapshot(harness.data_root) == candidate,
+                    "implicit provider selected")
+            catalog = bridge("model", "catalog")
+            require(catalog.returncode == 0 and json.loads(catalog.stdout)[0]["model_id"] == "fixture-model",
+                    "Bridge catalog failed")
+            incompatible = bridge("model", "test", profile_id, fixture="incompatible")
+            require(incompatible.returncode != 0 and "MODEL_INCOMPATIBLE" in incompatible.stderr,
+                    "incompatible Bridge accepted")
+            no_tools = bridge("model", "test", profile_id, fixture="no-tools")
+            require(no_tools.returncode != 0 and "MODEL_INCOMPATIBLE" in no_tools.stderr,
+                    "tool-less model passed Probe")
+            tested = bridge("model", "test", profile_id)
+            require(tested.returncode == 0, "behavioral Probe failed: " + tested.stderr)
+            probe = json.loads(tested.stdout)
+            require(all(probe["result"].values()) and probe["bridge_identity"] == "test-bridge-v1:success",
+                    "Probe did not exercise mandatory behavior")
+            tested_state = snapshot(harness.data_root)
+            stale = bridge("model", "select", profile_id, "1", "999")
+            require(stale.returncode != 0 and snapshot(harness.data_root) == tested_state,
+                    "stale AgentConfig changed state")
+            wrong_bridge = bridge("model", "select", profile_id, "1", "1", fixture="no-tools")
+            require(wrong_bridge.returncode != 0 and snapshot(harness.data_root) == tested_state,
+                    "Probe provenance was ignored")
+            selected = bridge("model", "select", profile_id, "1", "1")
+            require(selected.returncode == 0, "atomic activation failed: " + selected.stderr)
+            ready = json.loads(selected.stdout)
+            require(ready["readiness"] == "ready" and ready["agent_ingress_enabled"] is True
+                    and ready["config_version"] == 2 and ready["active_model_profile_id"] == profile_id,
+                    "activation did not open readiness gate")
+            with closing(sqlite3.connect(harness.data_root / "state.db")) as db:
+                row = db.execute("SELECT status,verified_at,version FROM model_profile WHERE profile_id=?", (profile_id,)).fetchone()
+                require(row[0] == "ready" and row[1] > 10**15 and row[2] == 2, "profile activation not stored")
+                config = db.execute("SELECT active_model_profile_id,setup_status,config_version FROM agent_config").fetchone()
+                require(config == (profile_id, "ready", 2), "AgentConfig disagrees with profile")
+                events = db.execute("SELECT type FROM event_outbox WHERE type IN ('ai.erii.model_profile.activated.v1','ai.erii.agent.model_selected.v1') ORDER BY type").fetchall()
+                require(len(events) == 2, "activation event pair missing")
+            committed = snapshot(harness.data_root)
+            require(harness.launch("-test-bridge", "success", readiness="ready") == ready, "ready launch changed state")
+            require(harness.stop(signal.SIGKILL) == -signal.SIGKILL, "ready process kill failed")
+            restarted = bridge("status")
+            require(restarted.returncode == 0 and json.loads(restarted.stdout) == ready,
+                    "activation not recovered after SIGKILL")
+            no_injection = harness.command("status")
+            degraded = json.loads(no_injection.stdout)
+            require(no_injection.returncode == 0 and degraded["readiness"] == "degraded"
+                    and degraded["agent_ingress_enabled"] is False, "saved Fake enabled implicit ingress")
+            incompatible_status = bridge("status", fixture="incompatible")
+            require(incompatible_status.returncode == 0
+                    and json.loads(incompatible_status.stdout)["readiness"] == "degraded"
+                    and json.loads(incompatible_status.stdout)["agent_ingress_enabled"] is False,
+                    "incompatible Bridge prevented repair diagnostics or opened ingress")
+            require(snapshot(harness.data_root) == committed, "restart rewrote committed activation")
+            with closing(sqlite3.connect(harness.data_root / "state.db")) as db:
+                db.execute("UPDATE model_profile SET status='unavailable',version=version+1 WHERE profile_id=?", (profile_id,))
+                db.commit()
+            invalid = bridge("status")
+            require(invalid.returncode == 0 and json.loads(invalid.stdout)["readiness"] == "degraded"
+                    and json.loads(invalid.stdout)["agent_ingress_enabled"] is False,
+                    "invalid active profile did not report closed degraded readiness: " + invalid.stderr + invalid.stdout)
+            return {"result": "passed", "initial": json.loads(initial.stdout), "cancelled_setup": "unchanged SQLite dump",
+                    "probe": probe, "activated": ready, "stored_profile": row, "stored_config": config,
+                    "activation_events": events, "restart": "SIGKILL; fresh Bridge handshake; same SQLite dump",
+                    "without_test_injection": degraded, "incompatible_bridge": json.loads(incompatible_status.stdout),
+                    "invalid_profile": json.loads(invalid.stdout),
+                    "rejected": [unprobed.stderr.strip(), implicit.stderr.strip(), incompatible.stderr.strip(),
+                                 no_tools.stderr.strip(), stale.stderr.strip(), wrong_bridge.stderr.strip()]}
+        finally:
+            harness.cleanup()
+
+
 def verify(binary):
     with tempfile.TemporaryDirectory(prefix="erii-verify-") as temp:
         harness = Harness(binary, Path(temp))
@@ -157,7 +262,7 @@ def verify(binary):
             first = harness.launch()
             stored = snapshot(harness.data_root)
             require(not harness.yaml_root.exists(), "environment did not override YAML data root")
-            require(stored["schema_version"] == 3 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
+            require(stored["schema_version"] == 4 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
             require(len(stored["rows"]) == 1, "bootstrap is not a singleton")
             require(stored["rows"][0][1] == first["agent_id"], "CLI disagrees with stored identity")
             live_status = harness.command("status")
@@ -191,6 +296,7 @@ def verify(binary):
             checks.append("evidence: valid JSON logs and correlated startup/database spans")
 
             models = verify_models(harness)
+            provider = verify_provider(binary)
             checks.append("models: add/list/readback; canonical JSON; SIGKILL/restart; unverified, closed ingress; invalid input and credential redaction")
             # Include the metadata commands' startup spans in failure-span checks.
             traces = [json.loads(line) for line in (harness.data_root / "logs/traces.jsonl").read_text().splitlines()]
@@ -216,9 +322,9 @@ def verify(binary):
             require(rejected.returncode != 0 and not rejected.stdout, "invalid YAML was accepted")
             require("SECRET_SENTINEL" not in rejected.stderr, "config value leaked in error")
             checks.append("drive: unknown configuration rejected without echoing values")
-            return {"result": "passed", "scope": "M0 foundation, events, model metadata; M0 incomplete",
+            return {"result": "passed", "scope": "M0 foundation, events, model metadata and test Provider Bridge; no M1 claim",
                     "checks": checks, "diagnostics": first, "stored_rows": stored["rows"],
-                    "models": models, "golden_cases": "not_applicable: first product cases are due at M1",
+                    "models": models, "provider": provider, "golden_cases": "not_applicable: first product cases are due at M1",
                     "log_records": len(logs), "trace_records": len(traces),
                     "logs": logs, "traces": traces}
         finally:

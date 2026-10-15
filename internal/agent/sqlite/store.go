@@ -30,7 +30,10 @@ var eventsSQL string
 //go:embed migrations/003_models.sql
 var modelsSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL}
+//go:embed migrations/004_provider.sql
+var providerSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL}
 
 type Store struct {
 	db   *sql.DB
@@ -175,8 +178,11 @@ func (s *Store) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 	if err != nil {
 		return agent.Diagnostics{}, fmt.Errorf("read agent configuration: %w", err)
 	}
-	if d.Readiness != agent.SetupRequired || d.ActiveModelProfileID != nil {
-		return agent.Diagnostics{}, errors.New("unsupported agent configuration: model setup is not implemented")
+	if d.ActiveModelProfileID != nil {
+		p, err := s.Models().Profile(ctx, *d.ActiveModelProfileID)
+		if err != nil || p.Status != "ready" || p.VerifiedAt == nil {
+			d.Readiness = agent.Degraded
+		}
 	}
 	return d, nil
 }

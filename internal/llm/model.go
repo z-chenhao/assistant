@@ -1,5 +1,5 @@
-// Package llm owns model and authentication metadata. No provider is enabled by
-// storing metadata; only a future successful Probe may make a profile ready.
+// Package llm owns model metadata and the private provider control contracts.
+// Storing metadata alone never enables a provider.
 package llm
 
 import (
@@ -110,6 +110,9 @@ func (p ProfileInput) Validate() error {
 	}
 	if p.ContextWindow <= 0 || p.MaxOutputTokens <= 0 || p.MaxOutputTokens > p.ContextWindow {
 		return errors.New("token limits must be positive and max_output_tokens must not exceed context_window")
+	}
+	if p.ContextWindow > 1048576 || p.MaxOutputTokens > 65536 {
+		return errors.New("token limits exceed Host safety bounds (context 1048576, output 65536)")
 	}
 	if !p.Capabilities.TextInput || (p.Compatibility.ToolResultFormat != "openai" && p.Compatibility.ToolResultFormat != "provider_specific") {
 		return errors.New("invalid capabilities or tool_result_format")

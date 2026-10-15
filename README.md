@@ -3,8 +3,11 @@ A durable Personal Agent named Erii with tools, memory, task delegation, and rec
 
 The runnable foundation initializes SQLite and reports `setup_required`. It
 includes transactional Outbox/Inbox, CloudEvents, and an optional NATS relay.
-It persists unverified model metadata through `model add` / `model list`.
-It does not connect to a model or accept agent work. **M0 is not complete.**
+It persists model metadata and provides a versioned stdio Provider Bridge with
+deterministic fixtures. Explicit `-test-bridge success` enables CLI capability
+tests and atomic model selection without an account. Saved test profiles cannot
+enable ingress without that injection. Real providers, login and Agent Runs are
+M1 work; this build does not accept conversations or tasks.
 
 With Go 1.26.2+ and Python 3.10+:
 
