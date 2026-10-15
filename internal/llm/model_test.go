@@ -91,6 +91,31 @@ func TestCanonicalJSONBeforeEndpointHash(t *testing.T) {
 	}
 }
 
+func TestActivationLimitsDoNotRestrictDiagnosticMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		context, output int64
+		allowed         bool
+	}{
+		{"boundary", 1048576, 65536, true},
+		{"context", 1048577, 65536, false},
+		{"output", 1048576, 65537, false},
+		{"legacy", 2097152, 131072, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := validInput()
+			p.ContextWindow = tc.context
+			p.MaxOutputTokens = tc.output
+			if err := p.Validate(); err != nil {
+				t.Fatal("candidate metadata is not readable", err)
+			}
+			if err := p.ValidateActivation(); (err == nil) != tc.allowed {
+				t.Fatalf("activation boundary: %v", err)
+			}
+		})
+	}
+}
+
 type canceledAuthWriter struct{ cancel context.CancelFunc }
 
 func (w canceledAuthWriter) InsertAuth(context.Context, AuthConnection) error {

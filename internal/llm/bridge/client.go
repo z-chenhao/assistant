@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -36,15 +37,16 @@ type frame struct {
 }
 
 type process struct {
-	cmd     *exec.Cmd
-	in      io.WriteCloser
-	write   sync.Mutex
-	mu      sync.Mutex
-	pending map[uint64]chan frame
-	events  map[string]chan llm.GenerationEvent
-	done    chan struct{}
-	wait    chan struct{}
-	failure error
+	cmd      *exec.Cmd
+	in       *os.File
+	write    chan struct{}
+	stopOnce sync.Once
+	mu       sync.Mutex
+	pending  map[uint64]chan frame
+	events   map[string]chan llm.GenerationEvent
+	done     chan struct{}
+	wait     chan struct{}
+	failure  error
 }
 
 type Client struct {
@@ -87,8 +89,13 @@ func (c *Client) ensure(ctx context.Context) (*process, error) {
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
 	cmd.Dir = os.TempDir()
 	cmd.Stderr = io.Discard
-	in, err := cmd.StdinPipe()
+	input, err := cmd.StdinPipe()
 	if err != nil {
+		return nil, llm.ProviderUnavailable
+	}
+	in, ok := input.(*os.File)
+	if !ok {
+		_ = input.Close()
 		return nil, llm.ProviderUnavailable
 	}
 	out, err := cmd.StdoutPipe()
@@ -101,7 +108,7 @@ func (c *Client) ensure(ctx context.Context) (*process, error) {
 		_ = out.Close()
 		return nil, llm.ProviderUnavailable
 	}
-	p := &process{cmd: cmd, in: in, pending: map[uint64]chan frame{}, events: map[string]chan llm.GenerationEvent{}, done: make(chan struct{}), wait: make(chan struct{})}
+	p := &process{cmd: cmd, in: in, write: make(chan struct{}, 1), pending: map[uint64]chan frame{}, events: map[string]chan llm.GenerationEvent{}, done: make(chan struct{}), wait: make(chan struct{})}
 	go p.read(out)
 	// Wait only after read has consumed stdout. Close always reaps this child.
 	go func() { <-p.done; _ = cmd.Wait(); close(p.wait) }()
@@ -173,8 +180,7 @@ func (p *process) err() error {
 }
 
 func (c *Client) stop(p *process) {
-	_ = p.in.Close()
-	_ = p.cmd.Process.Kill()
+	p.stopOnce.Do(func() { _ = p.in.Close(); _ = p.cmd.Process.Kill() })
 	<-p.wait
 }
 
@@ -194,46 +200,103 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) callProcess(ctx context.Context, p *process, method string, params, out any) error {
+	_, err := c.exchange(ctx, p, method, params, out)
+	return err
+}
+
+// exchange reports complete dispatch separately from acknowledgement. A timed
+// out response does not mean a generation request was never accepted by the peer.
+func (c *Client) exchange(ctx context.Context, p *process, method string, params, out any) (bool, error) {
 	if ctx.Err() != nil {
-		return llm.ProviderUnavailable
+		return false, llm.ProviderUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	id := c.next.Add(1)
 	data, err := json.Marshal(params)
 	if err != nil {
-		return llm.InvalidProviderResponse
+		return false, llm.InvalidProviderResponse
 	}
+	wire, err := json.Marshal(frame{JSONRPC: "2.0", ID: id, Method: method, Params: data})
+	if err != nil || len(wire) >= MaxFrameBytes {
+		return false, llm.InvalidProviderResponse
+	}
+	wire = append(wire, '\n')
 	ch := make(chan frame, 1)
 	p.mu.Lock()
 	p.pending[id] = ch
 	p.mu.Unlock()
 	defer func() { p.mu.Lock(); delete(p.pending, id); p.mu.Unlock() }()
-	p.write.Lock()
-	err = json.NewEncoder(p.in).Encode(frame{JSONRPC: "2.0", ID: id, Method: method, Params: data})
-	p.write.Unlock()
+	select {
+	case p.write <- struct{}{}:
+	case <-ctx.Done():
+		return false, llm.ProviderUnavailable
+	case <-p.done:
+		return false, p.err()
+	}
+	// One writer owns pipe deadlines. Cancellation interrupts the actual Write,
+	// including a peer that has stopped reading. Join the callback before the next
+	// writer can reset the deadline, so it cannot interrupt a subsequent request.
+	err = c.write(ctx, p, wire)
+	<-p.write
 	if err != nil {
-		return llm.ProviderUnavailable
+		return false, err
 	}
 	var f frame
 	select {
 	case f = <-ch:
 	case <-ctx.Done():
-		return llm.ProviderUnavailable
+		return true, llm.ProviderUnavailable
 	case <-p.done:
 		select {
 		case f = <-ch:
 		default:
-			return p.err()
+			return true, p.err()
 		}
 	}
 	if f.Error != nil {
-		return llm.NormalizeError(f.Error.Message)
+		return true, llm.NormalizeError(f.Error.Message)
 	}
 	if out != nil && json.Unmarshal(f.Result, out) != nil {
-		return llm.InvalidProviderResponse
+		return true, llm.InvalidProviderResponse
+	}
+	return true, nil
+}
+
+func (c *Client) write(ctx context.Context, p *process, wire []byte) error {
+	if ctx.Err() != nil {
+		return llm.ProviderUnavailable
+	}
+	deadline, _ := ctx.Deadline()
+	if err := p.in.SetWriteDeadline(deadline); err != nil {
+		c.stop(p)
+		return llm.ProviderUnavailable
+	}
+	interrupted := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { _ = p.in.SetWriteDeadline(time.Now()); close(interrupted) })
+	_, err := p.in.Write(wire)
+	if !stop() {
+		<-interrupted
+	}
+	_ = p.in.SetWriteDeadline(time.Time{})
+	if err != nil {
+		// A partial JSON frame makes the stream unusable. Terminate this process;
+		// do not replay this request or let another writer append to its prefix.
+		c.stop(p)
+		return llm.ProviderUnavailable
 	}
 	return nil
+}
+
+func (c *Client) cancelGeneration(ctx context.Context, p *process, id string) error {
+	cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+	defer stop()
+	err := c.callProcess(cleanup, p, "generation.cancel", map[string]string{"generation_id": id}, nil)
+	if err != nil {
+		c.stop(p)
+		return errors.Join(llm.GenerationCancelled, err)
+	}
+	return llm.GenerationCancelled
 }
 
 func (c *Client) call(ctx context.Context, method string, params, out any) error {
@@ -260,6 +323,9 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	}
 	p, err := c.ensure(ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			return llm.GenerationResult{}, llm.GenerationCancelled
+		}
 		return llm.GenerationResult{}, err
 	}
 	ch := make(chan llm.GenerationEvent, 64)
@@ -271,7 +337,14 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	p.events[r.GenerationID] = ch
 	p.mu.Unlock()
 	defer func() { p.mu.Lock(); delete(p.events, r.GenerationID); p.mu.Unlock() }()
-	if err := c.callProcess(ctx, p, method, r, nil); err != nil {
+	dispatched, err := c.exchange(ctx, p, method, r, nil)
+	if ctx.Err() != nil {
+		if dispatched {
+			return llm.GenerationResult{}, c.cancelGeneration(ctx, p, r.GenerationID)
+		}
+		return llm.GenerationResult{}, llm.GenerationCancelled
+	}
+	if err != nil {
 		return llm.GenerationResult{}, err
 	}
 	result := llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
@@ -283,13 +356,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	}
 	for {
 		if ctx.Err() != nil {
-			cancelCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
-			err := c.callProcess(cancelCtx, p, "generation.cancel", map[string]string{"generation_id": r.GenerationID}, nil)
-			stop()
-			if err != nil {
-				return llm.GenerationResult{}, err
-			}
-			return llm.GenerationResult{}, llm.GenerationCancelled
+			return llm.GenerationResult{}, c.cancelGeneration(ctx, p, r.GenerationID)
 		}
 		var e llm.GenerationEvent
 		select {

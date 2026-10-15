@@ -66,6 +66,9 @@ func (c Control) Test(ctx context.Context, id string) (ProbeRecord, error) {
 	if p.ReasoningEffort != "" {
 		return ProbeRecord{}, ModelIncompatible
 	}
+	if err := p.ValidateActivation(); err != nil {
+		return ProbeRecord{}, err
+	}
 	version, err := c.CheckAuth(ctx, p)
 	if err != nil {
 		return ProbeRecord{}, err
@@ -109,6 +112,9 @@ func (c Control) Select(ctx context.Context, id string, profileVersion, configVe
 	if p.Version != profileVersion {
 		return ErrConflict
 	}
+	if err := p.ValidateActivation(); err != nil {
+		return err
+	}
 	version, err := c.CheckAuth(ctx, p)
 	if err != nil {
 		return err
@@ -130,7 +136,7 @@ func (c Control) Available(ctx context.Context, id string) bool {
 		return false
 	}
 	p, err := c.Store.Profile(ctx, id)
-	if err != nil || p.Status != "ready" || p.VerifiedAt == nil {
+	if err != nil || p.Status != "ready" || p.VerifiedAt == nil || p.ValidateActivation() != nil {
 		return false
 	}
 	version, err := c.CheckAuth(ctx, p)

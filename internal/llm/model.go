@@ -111,9 +111,6 @@ func (p ProfileInput) Validate() error {
 	if p.ContextWindow <= 0 || p.MaxOutputTokens <= 0 || p.MaxOutputTokens > p.ContextWindow {
 		return errors.New("token limits must be positive and max_output_tokens must not exceed context_window")
 	}
-	if p.ContextWindow > 1048576 || p.MaxOutputTokens > 65536 {
-		return errors.New("token limits exceed Host safety bounds (context 1048576, output 65536)")
-	}
 	if !p.Capabilities.TextInput || (p.Compatibility.ToolResultFormat != "openai" && p.Compatibility.ToolResultFormat != "provider_specific") {
 		return errors.New("invalid capabilities or tool_result_format")
 	}
@@ -138,6 +135,19 @@ func (p ProfileInput) Validate() error {
 		if v.value != nil && (math.IsNaN(*v.value) || math.IsInf(*v.value, 0) || *v.value < 0 || *v.value > v.max) {
 			return errors.New("invalid generation defaults")
 		}
+	}
+	return nil
+}
+
+// ValidateActivation applies current execution policy without changing the
+// persisted metadata format. Older candidates remain readable for diagnostics
+// and can be edited before testing/selecting them under today's Host limits.
+func (p ProfileInput) ValidateActivation() error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if p.ContextWindow > 1048576 || p.MaxOutputTokens > 65536 {
+		return errors.New("token limits exceed Host safety bounds (context 1048576, output 65536)")
 	}
 	return nil
 }

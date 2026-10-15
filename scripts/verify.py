@@ -146,7 +146,27 @@ def verify_models(harness):
     for path in harness.data_root.rglob("*"):
         if path.is_file():
             require(b"SYNTHETIC_REDACTION_MARKER" not in path.read_bytes(), "rejected secret persisted")
+
+    # Execution policy must not turn structurally valid diagnostic metadata
+    # into an unreadable row that blocks listing every other candidate.
+    large = dict(fixture, name="Over-limit diagnostic candidate", context_window=2097152, max_output_tokens=131072)
+    added = harness.command("model", "add", input=json.dumps(large))
+    require(added.returncode == 0, "over-limit diagnostic candidate rejected")
+    large_profile = json.loads(added.stdout)
+    listed = harness.command("model", "list")
+    require(listed.returncode == 0 and json.loads(listed.stdout) == [profile, large_profile],
+            "over-limit metadata prevented diagnostic listing")
+    preserved = snapshot(harness.data_root)
+    bounds_rejections = []
+    for args in [("test", large_profile["profile_id"]), ("select", large_profile["profile_id"], "1", "1")]:
+        rejected = harness.command("-test-bridge", "success", "model", *args)
+        require(rejected.returncode != 0 and "Host safety bounds" in rejected.stderr and not rejected.stdout,
+                "over-limit diagnostic profile reached activation")
+        bounds_rejections.append(rejected.stderr.strip())
+    require(snapshot(harness.data_root) == preserved, "rejected over-limit activation changed metadata")
     return {"profile": profile, "canonical_json": canonical, "rejections": rejections,
+            "over_limit_metadata": {"profile": large_profile, "rejections": bounds_rejections,
+                                    "readback": "both profiles listed; bounds enforced only at activation; SQLite unchanged"},
             "restart": "SIGKILL, new model list process, identical SQLite dump",
             "readiness": baseline_status, "result": "passed"}
 

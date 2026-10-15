@@ -9,6 +9,9 @@ import (
 )
 
 func (s *Store) RecordProbe(ctx context.Context, p llm.Profile, r llm.ProbeRecord) error {
+	if err := p.ValidateActivation(); err != nil {
+		return err
+	}
 	if r.Result.Validate() != nil || r.ProfileVersion != p.Version || r.BridgeIdentity == "" {
 		return llm.ErrUnverified
 	}
@@ -117,6 +120,9 @@ func (s *Store) Select(ctx context.Context, id string, profileVersion, configVer
 		}
 		if p.Version != profileVersion {
 			return llm.ErrConflict
+		}
+		if err := p.ValidateActivation(); err != nil {
+			return err
 		}
 		if p.AuthConnectionID != "" {
 			var version int64

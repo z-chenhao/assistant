@@ -352,3 +352,52 @@ func TestV3MigrationRollbackPreservesMetadata(t *testing.T) {
 		t.Fatal("v3 snapshot/events changed", err)
 	}
 }
+
+func TestV3OverLimitMetadataRemainsReadable(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	db, err := sql.Open("sqlite", filepath.Join(root, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	if err := migrate(ctx, db, migrations[:3]); err != nil {
+		t.Fatal(err)
+	}
+	legacy := &Store{db: db, path: filepath.Join(root, "state.db")}
+	p, err := legacy.Models().AddProfile(ctx, modelInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// These values satisfy the v3 schema and the released v3 CLI validation.
+	if _, err := db.Exec(`UPDATE model_profile SET context_window=2097152,max_output_tokens=131072,version=version+1 WHERE profile_id=?`, p.ProfileID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	profiles, err := s.Models().ListProfiles(ctx)
+	if err != nil || len(profiles) != 1 {
+		t.Fatalf("legacy diagnostic list failed: %+v %v", profiles, err)
+	}
+	stored, err := s.Models().Profile(ctx, p.ProfileID)
+	if err != nil || stored.ContextWindow != 2097152 || stored.MaxOutputTokens != 131072 || stored.Version != 2 {
+		t.Fatal("legacy metadata rewritten or unreadable", stored, err)
+	}
+	c := control(s)
+	if _, err := c.Test(ctx, p.ProfileID); err == nil {
+		t.Fatal("over-limit profile passed activation Probe")
+	}
+	if err := c.Select(ctx, p.ProfileID, 2, 1); err == nil {
+		t.Fatal("over-limit profile selected")
+	}
+	d, err := s.Diagnostics(ctx)
+	if err != nil || d.Readiness != "setup_required" || d.AgentIngressEnabled {
+		t.Fatal("legacy profile enabled ingress", d, err)
+	}
+}

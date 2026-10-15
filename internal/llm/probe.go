@@ -3,7 +3,6 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
@@ -82,7 +81,10 @@ func (p Prober) Run(ctx context.Context, profile Profile) (ProbeResult, error) {
 		}
 	})
 	stop()
-	result.Cancellation = errors.Is(err, GenerationCancelled)
+	// The normalized cancellation outcome means the peer acknowledged it. A
+	// joined cleanup/transport error still cancels the caller, but cannot certify
+	// provider cancellation support for activation.
+	result.Cancellation = err == GenerationCancelled
 	if !result.Cancellation {
 		if err != nil {
 			return result, err

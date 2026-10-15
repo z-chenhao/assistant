@@ -89,8 +89,17 @@ Frames are bounded to 1 MiB; generation output to the smaller of 64 KiB and four
 bytes per requested output token, on a UTF-8 boundary. This is a byte safety bound,
 not tokenization or a context-limit estimate. There are at most 4096 distinct
 sequence events and 32 Tool Calls (64 KiB of arguments per call). Host RPC calls
-have a five-second bound; behavioral Probe has a ten-second bound. Cancellation
-and cleanup have independent one-second contexts. Oversized/malformed frames,
+have a five-second bound, including writer admission and pipe I/O; behavioral
+Probe has a ten-second bound. Writer admission observes cancellation, and pipe
+deadlines interrupt a blocked write without leaking a writer goroutine. A partial
+frame terminates and reaps that Bridge instead of reusing a corrupted stream.
+Cancellation and cleanup have independent one-second contexts. Close can abandon
+its graceful shutdown attempt and terminate a peer that is not reading.
+Cancellation after complete dispatch sends `generation.cancel` even before the
+start acknowledgement. A late acknowledgement cannot revive that generation.
+Failed cancellation cleanup terminates the Bridge and returns the cancellation
+cause together with the sanitized cleanup error; it cannot certify a successful
+Probe. Oversized/malformed frames,
 unknown event kinds and sequence drift fail closed. Transport failure is
 `PROVIDER_UNAVAILABLE`; invalid wire data is `INVALID_PROVIDER_RESPONSE`.
 
@@ -105,7 +114,11 @@ The Host tests one streamed reply, an actual `probe_echo` Tool Call with valid
 arguments, a Tool Result continuation, acknowledged cancellation, and clipping
 of long output. This test Tool has no executor or external effect. Failure of any
 mandatory behavior prevents selection. The catalog and user claims cannot mark
-a profile ready. Context/output limits are bounded to 1,048,576/65,536 tokens.
+a profile ready. Probe, selection and readiness enforce context/output limits
+of 1,048,576/65,536 tokens. These are execution limits, not the persisted metadata
+format: valid v3 candidates above these limits still migrate, list and read back
+unchanged, alongside all other candidates. They cannot be probed or selected
+until replaced or edited within limits. No profile is silently clamped.
 Activation retains only observed text/tool/streaming capabilities and conservative
 compatibility. Unprobed image/audio/reasoning/parallel/usage claims and optional
 sampling defaults are cleared. Explicit reasoning effort is rejected until a
