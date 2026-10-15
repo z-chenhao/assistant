@@ -35,7 +35,7 @@ def diagnostics(value):
     require(value["readiness"] == "setup_required", "incorrect readiness")
     require(value["agent_ingress_enabled"] is False, "ingress enabled without a model")
     require(value["active_model_profile_id"] is None, "implicit model enabled")
-    require(value["schema_version"] == 2, "incorrect schema version")
+    require(value["schema_version"] == 3, "incorrect schema version")
 
 
 class Harness:
@@ -56,9 +56,9 @@ class Harness:
         require(result.returncode == 0 and "Usage:" in result.stderr, "CLI help unavailable")
         require(not self.data_root.exists(), "doctor unexpectedly created application state")
 
-    def command(self, *args):
+    def command(self, *args, input=None):
         return subprocess.run([str(self.binary), "-config", str(self.config), *args], cwd=self.root, env=self.env,
-                              text=True, capture_output=True, timeout=15, check=False)
+                              input=input, text=True, capture_output=True, timeout=15, check=False)
 
     def launch(self):
         self.process = subprocess.Popen([str(self.binary), "-config", str(self.config)], cwd=self.root, env=self.env,
@@ -89,6 +89,64 @@ class Harness:
             self.process = None
 
 
+def verify_models(harness):
+    """Use the metadata CLI, then read its authoritative SQLite state."""
+    empty = harness.command("model", "list")
+    require(empty.returncode == 0 and json.loads(empty.stdout) == [], "implicit profile created")
+    fixture = {
+        "name": "Local candidate", "provider_kind": "openai_compatible",
+        "endpoint": "http://127.0.0.1:8000/v1", "wire_api": "openai_completions",
+        "model_id": "fixture-model", "context_window": 8192, "max_output_tokens": 1024,
+        "generation_defaults": {"top_p": 1, "temperature": 0},
+        "compatibility": {"tool_result_format": "openai"},
+        "capabilities": {"text_input": True},
+    }
+    created = harness.command("model", "add", input=json.dumps(fixture))
+    require(created.returncode == 0 and not created.stderr, "model add failed")
+    profile = json.loads(created.stdout)
+    require(profile["version"] == 1 and profile["status"] == "unverified" and "verified_at" not in profile,
+            "metadata gained verification")
+    listed = harness.command("model", "list")
+    require(listed.returncode == 0 and json.loads(listed.stdout) == [profile], "new process lost profile")
+    before = snapshot(harness.data_root)
+    with closing(sqlite3.connect(harness.data_root / "state.db")) as db:
+        row = db.execute("SELECT profile_id, status, verified_at, version, created_at, updated_at, generation_defaults_json, compatibility_json, capabilities_json FROM model_profile").fetchone()
+        require(row[:4] == (profile["profile_id"], "unverified", None, 1), "SQLite disagrees with CLI")
+        require(row[4] == row[5] and row[4] > 10**15, "timestamps are not UTC microseconds")
+        canonical = list(row[6:])
+        for value in canonical:
+            require(value == json.dumps(json.loads(value), sort_keys=True, separators=(",", ":")),
+                    "stored model JSON is not canonical")
+    baseline_status = harness.launch()
+    require(harness.stop(signal.SIGKILL) == -signal.SIGKILL, "metadata kill injection failed")
+    restarted = harness.command("model", "list")
+    require(restarted.returncode == 0 and json.loads(restarted.stdout) == [profile], "kill/restart lost metadata")
+    status = harness.command("status")
+    require(status.returncode == 0 and json.loads(status.stdout) == baseline_status, "metadata changed readiness")
+    require(snapshot(harness.data_root) == before, "restart rewrote committed metadata")
+
+    rejections = []
+    candidates = [dict(fixture, api_key="SYNTHETIC_REDACTION_MARKER"),
+                  dict(fixture, endpoint="https://user:SYNTHETIC_REDACTION_MARKER@host/v1"),
+                  dict(fixture, endpoint="https://host/v1?key=SYNTHETIC_REDACTION_MARKER"),
+                  dict(fixture, status="ready"), dict(fixture, verified_at="2026-10-15T00:00:00Z"),
+                  dict(fixture, provider_kind="fake"), dict(fixture, auth_connection_id="missing")]
+    for candidate in candidates:
+        result = harness.command("model", "add", input=json.dumps(candidate))
+        require(result.returncode != 0 and not result.stdout, "invalid profile was accepted")
+        require("SYNTHETIC_REDACTION_MARKER" not in result.stderr, "secret value echoed")
+        rejections.append(result.stderr.strip())
+    activate = harness.command("model", "select")
+    require(activate.returncode != 0 and not activate.stdout, "activation exposed before Probe")
+    require(snapshot(harness.data_root) == before, "rejected metadata changed SQLite")
+    for path in harness.data_root.rglob("*"):
+        if path.is_file():
+            require(b"SYNTHETIC_REDACTION_MARKER" not in path.read_bytes(), "rejected secret persisted")
+    return {"profile": profile, "canonical_json": canonical, "rejections": rejections,
+            "restart": "SIGKILL, new model list process, identical SQLite dump",
+            "readiness": baseline_status, "result": "passed"}
+
+
 def verify(binary):
     with tempfile.TemporaryDirectory(prefix="erii-verify-") as temp:
         harness = Harness(binary, Path(temp))
@@ -99,7 +157,7 @@ def verify(binary):
             first = harness.launch()
             stored = snapshot(harness.data_root)
             require(not harness.yaml_root.exists(), "environment did not override YAML data root")
-            require(stored["schema_version"] == 2 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
+            require(stored["schema_version"] == 3 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
             require(len(stored["rows"]) == 1, "bootstrap is not a singleton")
             require(stored["rows"][0][1] == first["agent_id"], "CLI disagrees with stored identity")
             live_status = harness.command("status")
@@ -132,6 +190,12 @@ def verify(binary):
                 require(any(log.get("trace_id") == parent["trace_id"] for log in logs), "missing log correlation")
             checks.append("evidence: valid JSON logs and correlated startup/database spans")
 
+            models = verify_models(harness)
+            checks.append("models: add/list/readback; canonical JSON; SIGKILL/restart; unverified, closed ingress; invalid input and credential redaction")
+            # Include the metadata commands' startup spans in failure-span checks.
+            traces = [json.loads(line) for line in (harness.data_root / "logs/traces.jsonl").read_text().splitlines()]
+            logs = [json.loads(line) for line in (harness.data_root / "logs/app.jsonl").read_text().splitlines()]
+
             with closing(sqlite3.connect(harness.data_root / "state.db")) as db:
                 db.execute("PRAGMA user_version = 99")
             future_before = snapshot(harness.data_root)
@@ -152,8 +216,9 @@ def verify(binary):
             require(rejected.returncode != 0 and not rejected.stdout, "invalid YAML was accepted")
             require("SECRET_SENTINEL" not in rejected.stderr, "config value leaked in error")
             checks.append("drive: unknown configuration rejected without echoing values")
-            return {"result": "passed", "scope": "M0 foundation and event slice; M0 incomplete",
+            return {"result": "passed", "scope": "M0 foundation, events, model metadata; M0 incomplete",
                     "checks": checks, "diagnostics": first, "stored_rows": stored["rows"],
+                    "models": models, "golden_cases": "not_applicable: first product cases are due at M1",
                     "log_records": len(logs), "trace_records": len(traces),
                     "logs": logs, "traces": traces}
         finally:

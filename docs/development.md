@@ -1,8 +1,9 @@
-# Runnable M0 foundation and events
+# Runnable M0 foundation, events, and model metadata
 
 This slice provides startup, strict versioned YAML, local logs/spans, SQLite
 migrations, transactional Outbox/Inbox, a CloudEvents EventBus, and a thin NATS
-JetStream adapter. **M0 remains incomplete.** Model setup, authentication,
+JetStream adapter, unverified model metadata, immutable snapshots, and a test-only
+SecretStore Fake. **M0 remains incomplete.** Model Probe/activation, real authentication,
 Main/Worker Runs, Tasks, Agent Loop, tools, UI, and Durable Replay are deferred.
 Product Golden Cases and SC-01–SC-12 are `not_applicable`, not passed.
 
@@ -19,7 +20,7 @@ accounts, installed broker executable, containers, or fixed ports.
 | `make test` | Real temporary SQLite, migrations, transaction rollback, duplicate/late/out-of-order events, Fake and real EventBus contracts, broker restart, process kills |
 | `make test-race` | Those tests with Go's race detector |
 | `make lint` | `gofmt`, `go vet`, module checksums |
-| `make verify` | Real CLI startup/kill/restart and relay outage recovery, real JetStream wire contract, seven SIGKILL boundaries, independent state readback |
+| `make verify` | Real CLI model add/list/kill/restart, metadata/security tests five times, relay outage recovery, JetStream wire contract, seven SIGKILL boundaries, independent state readback |
 
 GitHub Actions runs all four checks on Ubuntu for PRs and pushes to `main`.
 The integration tests own an embedded file-backed JetStream server bound to
@@ -30,8 +31,11 @@ isolated from user configuration and removed on success or failure.
 
 `make verify` removes old reports and writes ignored JSON evidence:
 
-- `evidence/verification.json`: diagnostics, persisted Agent row, logs/spans,
-  bootstrap restart, future-schema rejection, and cleanup assertions.
+- `evidence/verification.json`: diagnostics, persisted Agent/profile rows,
+  canonical JSON, rejected metadata, logs/spans, bootstrap/model kill/restart,
+  future-schema rejection, and cleanup assertions.
+- `evidence/models.jsonl`: Go test events for five runs of metadata contracts,
+  migration/rollback, CAS, immutable snapshots, and credential safety assertions.
 - `evidence/events.json`: seven process-kill boundaries and SQLite state after
   reopening, before recovery handling.
 - `evidence/relay.json`: CLI launch during broker outage, frozen event identity,
@@ -61,7 +65,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":2,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":3,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,
@@ -90,12 +94,84 @@ empty overrides are invalid.
 
 Use a dedicated stream prefix per data root on a shared broker. Broker
 credentials are not supported in this slice; never put secrets in URLs or YAML.
-Model profiles and credentials remain absent. An unavailable broker cannot turn
+No provider or credential backend is implicitly enabled. An unavailable broker cannot turn
 `setup_required` into `ready` or replace the persisted Agent identity.
+
+## Unverified model metadata
+
+Add a candidate through stdin, then read it from a new process using the same
+configured data root. These commands do not contact the endpoint or NATS:
+
+```sh
+./bin/personal-agent -config config.example.yaml model add <<'JSON'
+{
+  "name": "Local candidate",
+  "provider_kind": "openai_compatible",
+  "endpoint": "http://127.0.0.1:8000/v1",
+  "wire_api": "openai_completions",
+  "model_id": "local-model",
+  "context_window": 8192,
+  "max_output_tokens": 1024,
+  "compatibility": {"tool_result_format": "openai"},
+  "capabilities": {"text_input": true}
+}
+JSON
+./bin/personal-agent -config config.example.yaml model list
+./bin/personal-agent -config config.example.yaml status
+```
+
+`model add` accepts exactly one metadata JSON object, at most 64 KiB, with
+snake_case fields. Unknown fields (including credential fields and user-supplied
+status/verification/IDs/versions) fail without echoing values. HTTP(S) endpoints
+must omit userinfo, queries and fragments. Names, labels, model IDs, and endpoint
+paths are metadata: never put credentials in them. Output contains a UUIDv7,
+UTC timestamps at microsecond precision, version 1 and `unverified` status.
+Optional generation defaults support temperature [0,2] and top_p [0,1]; output
+tokens must be positive and not exceed the context window. These are candidate
+metadata, not verified capability claims or permission to exceed future Host
+execution limits. `openai_account` metadata requires `openai_responses`, an
+existing OAuth connection, and no custom endpoint.
+
+`model list` returns an array and never creates a default profile. `status`
+continues to report `setup_required`, null Active Profile and closed ingress.
+There is no select/activate/Probe command or user authentication command yet.
+No paid, local, or Fake model is connected by adding metadata.
+
+Trusted storage provides profile CAS updates that increment version and clear
+verification. Auth state CAS preserves stable connection/provider/credential
+identity. Writes enqueue only IDs/versions in the same SQLite transaction.
+The snapshot API accepts the caller's transaction so the future Run owner can
+commit a Run and its snapshot together. It requires a ready, verified profile
+and connected authentication when referenced. Ready profiles in current tests
+are explicit storage fixtures, not a successful Probe or runnable Agent Run.
+Snapshots freeze profile version, model, wire API, compatibility, capabilities,
+generation parameters, token limits and canonical endpoint hash. They reference
+the AuthConnection ID, never CredentialRef or secret material; update, delete
+and SQL REPLACE fail. Profile changes and auth refresh metadata leave them intact.
+
+Model JSON uses sorted object keys, compact Go JSON string escaping, finite
+IEEE-754 numbers with negative zero normalized, and snake_case keys. The typed
+generation/compatibility/capability documents contain no large integers or
+arbitrary extensions. Endpoint hashes are SHA-256 over canonical
+`{"endpoint":"<exact validated URL>"}`; URL spelling changes change the hash.
+This is a restricted metadata encoding, not a general RFC 8785 implementation.
+
+`llm.SecretStore.Get/Put/Delete` is a trusted Host interface. The deterministic,
+copy-owning `llm/memory` implementation is used only in tests, never wired into
+the executable. `llm.RegisterAuth` writes a new secret first, then atomically
+stores the connection reference/event; database failure deletes that newly
+generated credential using a bounded context independent of request cancellation.
+Backend error text never escapes. Cleanup failure is explicit and requires
+reconciliation. Connection metadata serialization omits CredentialRef. Actual
+OAuth, refresh/logout side effects and OS keychain integration are later slices.
+A crash between SecretStore and SQLite can leave an orphan credential; these
+stores cannot commit atomically, and crash-time orphan reconciliation is not
+implemented here. No startup path claims working authentication.
 
 ## SQLite migrations and transaction ownership
 
-`state.db` owns Agent config, `event_outbox`, and `event_inbox`. Database paths
+`state.db` owns Agent config, Outbox/Inbox, `auth_connection`, `model_profile`,
+and `model_snapshot`. Database paths
 are absolute and URL-escaped. New directories use `0700`, new DB/log files use
 `0600`; existing permissions remain unchanged. Each connection enables WAL,
 foreign keys, and a 5-second busy timeout. The store has one connection and uses
@@ -103,8 +179,9 @@ immediate transactions. Only connection initialization retries `SQLITE_BUSY`;
 domain commits and migrations are never automatically replayed.
 
 Forward migrations and `PRAGMA user_version` commit together. Empty databases
-apply v1 (Agent config) and v2 (Outbox/Inbox). A real v1 database upgrades to v2
-without rewriting its Agent row or manufacturing historical events. Newer schema
+apply v1 (Agent config), v2 (Outbox/Inbox), and v3 (model metadata). Real v1/v2
+databases upgrade to v3 without rewriting Agent config/timestamps or existing
+Outbox/Inbox history. Failed v3 DDL rolls back to the actual prior version. Newer schema
 versions fail closed; failed DDL rolls back. There is no downgrade or deletion.
 
 Fresh bootstrap commits its singleton Agent and `ai.erii.agent.initialized.v1`

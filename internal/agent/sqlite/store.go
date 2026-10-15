@@ -16,6 +16,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
+	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -26,7 +27,10 @@ var bootstrapSQL string
 //go:embed migrations/002_events.sql
 var eventsSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL}
+//go:embed migrations/003_models.sql
+var modelsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL}
 
 type Store struct {
 	db   *sql.DB
@@ -181,6 +185,9 @@ func (s *Store) Close() error { return s.db.Close() }
 
 // Events shares the domain state.db connection and its lifecycle.
 func (s *Store) Events() *eventsqlite.Store { return eventsqlite.New(s.db) }
+
+// Models shares state.db, including its migration and transaction lifecycle.
+func (s *Store) Models() *llmsqlite.Store { return llmsqlite.New(s.db) }
 
 // Transaction is the domain write boundary. Enqueue events using its tx before
 // returning. Commit/rollback errors are not automatically retried.
