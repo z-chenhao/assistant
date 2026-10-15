@@ -35,7 +35,7 @@ def diagnostics(value):
     require(value["readiness"] == "setup_required", "incorrect readiness")
     require(value["agent_ingress_enabled"] is False, "ingress enabled without a model")
     require(value["active_model_profile_id"] is None, "implicit model enabled")
-    require(value["schema_version"] == 1, "incorrect schema version")
+    require(value["schema_version"] == 2, "incorrect schema version")
 
 
 class Harness:
@@ -99,7 +99,7 @@ def verify(binary):
             first = harness.launch()
             stored = snapshot(harness.data_root)
             require(not harness.yaml_root.exists(), "environment did not override YAML data root")
-            require(stored["schema_version"] == 1 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
+            require(stored["schema_version"] == 2 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
             require(len(stored["rows"]) == 1, "bootstrap is not a singleton")
             require(stored["rows"][0][1] == first["agent_id"], "CLI disagrees with stored identity")
             live_status = harness.command("status")
@@ -152,7 +152,7 @@ def verify(binary):
             require(rejected.returncode != 0 and not rejected.stdout, "invalid YAML was accepted")
             require("SECRET_SENTINEL" not in rejected.stderr, "config value leaked in error")
             checks.append("drive: unknown configuration rejected without echoing values")
-            return {"result": "passed", "scope": "first runnable M0 slice; M0 incomplete",
+            return {"result": "passed", "scope": "M0 foundation and event slice; M0 incomplete",
                     "checks": checks, "diagnostics": first, "stored_rows": stored["rows"],
                     "log_records": len(logs), "trace_records": len(traces),
                     "logs": logs, "traces": traces}

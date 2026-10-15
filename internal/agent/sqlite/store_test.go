@@ -30,7 +30,7 @@ func TestFreshAndRepeatedStartupPreserveConfiguration(t *testing.T) {
 	if err != nil || id.Version() != 7 {
 		t.Fatalf("agent identity: %q (%v)", d.AgentID, err)
 	}
-	if d.Readiness != agent.SetupRequired || d.AgentIngressEnabled || d.ActiveModelProfileID != nil || d.ConfigVersion != 1 || d.SchemaVersion != 1 {
+	if d.Readiness != agent.SetupRequired || d.AgentIngressEnabled || d.ActiveModelProfileID != nil || d.ConfigVersion != 1 || d.SchemaVersion != 2 {
 		t.Fatalf("diagnostics: %+v", d)
 	}
 	var created, updated int64
@@ -42,7 +42,7 @@ func TestFreshAndRepeatedStartupPreserveConfiguration(t *testing.T) {
 	}
 	// Force replacement connections so PRAGMA settings cannot rely on one initial connection.
 	s.db.SetConnMaxLifetime(time.Nanosecond)
-	for pragma, want := range map[string]string{"journal_mode": "wal", "foreign_keys": "1", "busy_timeout": "5000", "user_version": "1"} {
+	for pragma, want := range map[string]string{"journal_mode": "wal", "foreign_keys": "1", "busy_timeout": "5000", "user_version": "2"} {
 		var got string
 		if err := s.db.QueryRow("PRAGMA " + pragma).Scan(&got); err != nil {
 			t.Fatal(err)
@@ -203,5 +203,72 @@ func TestConcurrentBootstrapHasOneIdentity(t *testing.T) {
 		if !reflect.DeepEqual(first, r.diagnostics) {
 			t.Errorf("concurrent startups disagree: %+v, %+v", first, r.diagnostics)
 		}
+	}
+}
+
+func TestRealV1UpgradePreservesIdentityWithoutRetroactiveEvents(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", filepath.Join(dir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db, migrations[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO agent_config VALUES (1,'existing-agent',NULL,'setup_required',1,100,100)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	d, err := s.Diagnostics(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.AgentID != "existing-agent" || d.SchemaVersion != 2 || d.Readiness != "setup_required" {
+		t.Fatalf("upgrade: %+v", d)
+	}
+	var created, events int
+	if err := s.db.QueryRow(`SELECT created_at FROM agent_config`).Scan(&created); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.QueryRow(`SELECT count(*) FROM event_outbox`).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	if created != 100 || events != 0 {
+		t.Fatal("upgrade rewrote domain state or fabricated an event")
+	}
+}
+
+func TestBootstrapAndEventRollBackTogether(t *testing.T) {
+	ctx := context.Background()
+	db, err := sql.Open("sqlite", "file::memory:?_txlock=immediate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	if err := migrate(ctx, db, migrations); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TRIGGER fail_event BEFORE INSERT ON event_outbox BEGIN SELECT RAISE(ABORT,'injected failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	s := &Store{db: db}
+	if err := s.bootstrap(ctx); err == nil {
+		t.Fatal("expected event persistence fault")
+	}
+	var rows int
+	if err := db.QueryRow(`SELECT count(*) FROM agent_config`).Scan(&rows); err != nil {
+		t.Fatal(err)
+	}
+	if rows != 0 {
+		t.Fatal("domain bootstrap committed without event")
 	}
 }

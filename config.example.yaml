@@ -3,3 +3,11 @@ app:
   # Must be absolute. ERII_DATA_ROOT can override this for deployment.
   data_root: /tmp/erii-local
   log_level: info
+# Only the explicit `relay` command connects. status/startup work without a broker.
+nats:
+  url: nats://127.0.0.1:4222
+  # Use a dedicated prefix per data root on a shared broker. Never embed credentials.
+  stream_prefix: erii
+  timeout: 2s
+  ack_wait: 30s
+  retry_interval: 1s
