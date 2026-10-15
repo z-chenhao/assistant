@@ -1,4 +1,4 @@
-# Personal Agent 技术方案基线（已确认设计）
+# Erii 技术方案基线（已确认设计）
 
 > 版本：Baseline v1.0  
 > 日期：2026-10-15  
@@ -7,14 +7,14 @@
 
 ## 0. 文档效力与实现规则
 
-本文是 Personal Agent MVP 的实现源文件。Coding Agent 开工时遵循以下优先级：
+本文是 Erii MVP 的实现源文件。Coding Agent 开工时遵循以下优先级：
 
 1. 本文中的状态机、权限边界、持久化时序、模型可见 Tool Schema 与验收场景属于规范性要求。
 2. TypeScript、Go 和表结构片段用于定义协议与最小字段，不要求逐字采用命名，但实现必须保持同等语义，并用测试证明兼容。
 3. “一期不做”与“后置决策事项”不得被擅自扩展为首期功能；内部可以预留接口，但不得为假设中的未来需求建立第二套领域模型。
 4. 若实现细节存在歧义，优先选择能够保持数据可恢复、权限不扩大、外部副作用不重复的最小方案，并提交 ADR；不得以猜测修改模型可见协议。
 5. 任何协议变更先更新本文及契约测试，再修改实现。数据库内部字段可以向后兼容地增加，模型可见 Tool Schema、事件版本和 Artifact 引用格式必须显式版本化。
-6. 《Personal Agent Baseline Golden Cases》是本文的配套产品验收规范。本文定义协议与不变量，Golden Cases 定义端到端用户场景、测试夹具、评分和发布门禁；两者冲突时先停止实现并更新文档，不得由代码自行选择解释。
+6. 《Erii Baseline Golden Cases》是本文的配套产品验收规范。本文定义协议与不变量，Golden Cases 定义端到端用户场景、测试夹具、评分和发布门禁；两者冲突时先停止实现并更新文档，不得由代码自行选择解释。
 
 MVP 的启动门禁与首条纵向链路是：
 
@@ -24,7 +24,7 @@ Code Mode、Durable Replay、Approval、Artifact 与 Outbox 必须沿这条链�
 
 ## 1. 产品定位
 
-Personal Agent 是一个通用私人助理，目标能力对标 Muse、dots、Manus Cue、Grok Bot、Hermes Agent，并参考 Pi 1.2.0 的 Agent Harness 设计。
+Erii 是一个通用私人助理，目标能力对标 Muse、dots、Manus Cue、Grok Bot、Hermes Agent，并参考 Pi 1.2.0 的 Agent Harness 设计。
 
 ### 1.1 当前阶段
 
@@ -202,7 +202,7 @@ Prompt 使用可组合片段，不为三种 Run 维护三份彼此分叉的完�
 | `agent.run()` 能力说明 | 无 | 有 | 按 Capability Policy 提供 |
 
 - Main 面向用户，对用户关系、意图协调和最终表达负责。
-- Root Worker 面向 Task，保持该 Personal Agent 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
+- Root Worker 面向 Task，保持该 Erii 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
 - Child 面向直接 Parent，是无独立人格的通用执行单元；它不得凭空假设未显式提供的用户背景。
 - Prompt 片段由 Context Builder 按 Run 位置组装；是否暴露 `agent.run()` 由 Tool Exposure/Capability Policy 决定，而不是通过复制或分叉 Agent Loop 实现。
 - Main 与 Root 共享同一份 Agent 基础能力配置，包括普通 Tool、CUA、Skill、数据作用域和 Security Policy；Host 再按 Run Role 自动派生能力表面。Main 额外拥有 Task 控制和用户交付能力且默认没有 `agent.run()`；Root 不拥有 Task 控制或用户交付能力，但拥有 `agent.run()`。
@@ -512,13 +512,13 @@ model_id: Qwen3.8-27B-Splash
 auth_connection_id: null
 ```
 
-- `endpoint` 支持用户明确配置的 `http/https` URL，默认建议 `http://127.0.0.1:8000/v1`；`localhost` 从 Personal Agent Go 主进程所在网络命名空间解析，不指向 Computer macOS Guest。
+- `endpoint` 支持用户明确配置的 `http/https` URL，默认建议 `http://127.0.0.1:8000/v1`；`localhost` 从 Erii Go 主进程所在网络命名空间解析，不指向 Computer macOS Guest。
 - API Key 可为空；需要认证时创建 `AuthConnection{auth_kind: api_key}` 并只把值保存到 SecretStore。不得为了满足 SDK 校验向网络发送伪造 Key；若上游要求任意 Bearer 值，可由用户显式配置。
 - 模型目录通过 `GET /models` 最佳努力发现；端点不支持目录时允许手动输入 `model_id`，但仍必须通过实际推理 Probe。
 - Compatibility 不能仅因服务声称“OpenAI compatible”就推断。至少显式记录 `developer_role`、`reasoning_effort`、`parallel_tool_calls`、`stream_usage` 和 Tool Result 格式；未知项通过 Probe 或保守默认确定。
 - MVP 必须支持常见 Qwen/vLLM/SGLang/LM Studio 风格 Chat Completions；Responses API 只有在实际端点通过契约测试后才启用。
 - 可选 `temperature/top_p` 只在模型声明支持时发送；未设置时使用 Provider 默认值。Reasoning 模型拒绝的采样参数不得强行注入。
-- Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Personal Agent 主模型。
+- Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Erii 主模型。
 - URL、Header、响应 Body 和模型输出都按不可信外部输入处理；禁止跨 Origin 自动携带 Authorization，禁止把凭据或完整 Provider 响应写入日志。
 
 ### 5.4 OpenAI — Sign in with ChatGPT
@@ -533,7 +533,7 @@ auth_connection_id: null
 - 登录后从 OpenAI Provider 获取该账号当前可用的模型目录，只允许选择实际返回且适用于当前客户端的模型。模型上线、下线和账号权益由目录决定，不在代码中硬编码具体 Codex 型号。
 - ChatGPT 登录表示使用账号订阅权益；它与 OpenAI Platform API Key 是不同的认证和计费路径。MVP 的该入口不接受 API Key，也不把二者静默互相回退。
 - Logout 删除 SecretStore 中的 refresh/access token、清理 Provider Session/Prompt Cache，并将关联 Profile 置为 `reauth_required`；不删除历史 Run、Conversation 或用量记录。
-- 不读取或修改用户现有 `~/.codex/auth.json`，不调用 `codex login` 后复制凭据，也不让多个产品争用同一凭据文件。Personal Agent 拥有独立的 AuthConnection 生命周期。
+- 不读取或修改用户现有 `~/.codex/auth.json`，不调用 `codex login` 后复制凭据，也不让多个产品争用同一凭据文件。Erii 拥有独立的 AuthConnection 生命周期。
 
 ### 5.5 Provider Bridge 与安全边界
 
@@ -556,7 +556,7 @@ MVP 使用独立的 Model Provider Bridge 复用 Pi AI 的 Provider、OAuth、�
 ### 5.6 切换、故障与隐私语义
 
 - 系统不在本地 Qwen 与 OpenAI 账号模型之间自动 fallback。切换 Provider 会改变费用、隐私和能力边界，必须由用户控制面显式选择。
-- Personal Agent 不负责启动、下载或升级本地 Qwen/vLLM 进程；它只保存连接并报告可操作的健康诊断。端点恢复后可以重新 Test 并恢复同一 Profile。
+- Erii 不负责启动、下载或升级本地 Qwen/vLLM 进程；它只保存连接并报告可操作的健康诊断。端点恢复后可以重新 Test 并恢复同一 Profile。
 - Active Profile 暂时不可用时，新 Run 进入可恢复等待或返回设置级错误；后台已有 Task 不自动换模型。用户选择新 Profile 后，由 Main 决定对受影响工作创建新 Run。
 - Root 的后代树始终继承 Root ModelSnapshot；同一 Durable Replay 不允许换 model ID、endpoint、Wire API、兼容性或 Tool Schema。需要换模型时创建新业务 Run。
 - 本地模型请求只发送到配置的 endpoint；OpenAI Account 请求只发送到 Provider 固定的受信端点。模型连接的隐私说明在激活前展示一次，并可在设置中查看。
@@ -1422,7 +1422,7 @@ interface Tab extends Surface {
 
 - App 与 Tab 复用相同观察和指针操作协议；输入方法单独定义，因为 Browser 可能需要先聚焦具体元素，而原生 App 通常对当前焦点输入。
 - 导航、关闭等方法为可选能力；Provider 不支持时不伪造实现，而是在 `documentation()` 与 Capability Inventory 中明确缺失。
-- 不复制 Codex 的 `markDeliverable/markHandoff` 到 CUA 核心协议。Personal Agent 的长期 Tab 生命周期属于 Run/Computer 的资源保留策略，而不是 UI Driver 方法。
+- 不复制 Codex 的 `markDeliverable/markHandoff` 到 CUA 核心协议。Erii 的长期 Tab 生命周期属于 Run/Computer 的资源保留策略，而不是 UI Driver 方法。
 - Agent 创建的临时 Tab 默认属于当前 Run Lease；需要跨 Run 保留时，由上层 Resource Policy 持久化稳定 Tab Reference，不能依赖 JavaScript Handle。
 
 #### 9.6.4 等待模型
@@ -2142,7 +2142,7 @@ Go 测试必须运行 race detector；Sidecar 必须包含协议 fixture、资�
 
 ### 18.4 产品级 Golden Case 门禁
 
-产品效果不以单轮 Prompt 展示或主观 Demo 作为验收依据。实现必须运行配套文档《Personal Agent Baseline Golden Cases》中定义的 20 个端到端场景，并保存版本化 fixture、断言、评分、Artifact 和 Trace。
+产品效果不以单轮 Prompt 展示或主观 Demo 作为验收依据。实现必须运行配套文档《Erii Baseline Golden Cases》中定义的 20 个端到端场景，并保存版本化 fixture、断言、评分、Artifact 和 Trace。
 
 - 单 Case 必须达到 80 分且没有硬失败；全套平均不低于 85，最低 Case 不低于 80。
 - 安全、审批、取消、Durable Replay 和 Coding 工作区保护场景必须连续 5 次通过；文字质量不能抵消未授权副作用、重复执行、越权读取、虚假完成或覆盖用户数据。

@@ -1,2 +1,2 @@
-# erii
-A durable personal agent with tools, memory, task delegation, and recoverable execution.
+# Erii
+A durable Personal Agent named Erii with tools, memory, task delegation, and recoverable execution.

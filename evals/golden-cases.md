@@ -1,8 +1,8 @@
-# Personal Agent Baseline Golden Cases
+# Erii Baseline Golden Cases
 
 > 版本：v2.0  
 > 日期：2026-10-15  
-> 作用：Personal Agent 一期能力的产品级验收集；与《Personal Agent 技术方案基线》共同构成实现与发布门禁。  
+> 作用：Erii 一期能力的产品级验收集；与《Erii 技术方案基线》共同构成实现与发布门禁。
 > 范围：20 个端到端 Golden Case，覆盖日常对话、个人上下文、研究决策、跨应用行动、长任务、故障恢复与 Coding。
 
 ## 1. 这套 Golden Cases 要回答什么
@@ -366,7 +366,7 @@ Golden Case 应描述一段有持续状态的用户旅程，而不是一句 Prom
 
 ### GC-16 深度研究与决策报告
 
-**旅程**：研究 Personal Agent 竞品、Agent Harness、公开 benchmark 或技术方案；要求优先一手来源，区分事实、推断和未知，并形成可评审报告。
+**旅程**：研究 Erii 竞品、Agent Harness、公开 benchmark 或技术方案；要求优先一手来源，区分事实、推断和未知，并形成可评审报告。
 
 **必须断言**：
 
@@ -831,7 +831,7 @@ clock: 2026-10-15T10:00:00+08:00
 contacts:
   - {name: Alex Chen, email: alex.chen@example.test, relation: 当前项目设计师}
   - {name: Alex Wang, email: alex.wang@example.test, relation: 两年前候选人}
-recent_thread: {participants: [user_eval_001, alex.chen@example.test], subject: Personal Agent review}
+recent_thread: {participants: [user_eval_001, alex.chen@example.test], subject: Erii review}
 free_slots:
   user: [2026-10-19T10:00, 2026-10-19T15:00, 2026-10-20T11:00]
   alex_chen: [2026-10-19T15:00, 2026-10-20T11:00]
@@ -839,7 +839,7 @@ free_slots:
 
 **脚本**
 
-1. 用户：“和 Alex 约下周 30 分钟聊 Personal Agent，邮件简洁一点。”
+1. 用户：“和 Alex 约下周 30 分钟聊 Erii，邮件简洁一点。”
 2. Approval 出现前注入：“不要周一。”
 3. 用户批准新的草稿。
 
@@ -1216,9 +1216,9 @@ trace_ref: string
 
 ## 16. 当前不纳入这 20 个 Case 的内容
 
-- 纯模型知识问答、数学竞赛和没有工具/上下文的单轮写作：可作为模型能力 smoke test，但不能代表 Personal Agent 产品效果。
+- 纯模型知识问答、数学竞赛和没有工具/上下文的单轮写作：可作为模型能力 smoke test，但不能代表 Erii 产品效果。
 - 真实付款、真实对外发布、真实医疗诊断和金融交易：Golden Case 只在 Fake/沙箱中执行，Live Shadow 停在最终审批前。
-- 多个平等 Personal Agent 之间的组织协作：属于长期形态；一期只测一个 Agent 内的 Root/Child Run 树。
+- 多个平等 Erii 之间的组织协作：属于长期形态；一期只测一个 Agent 内的 Root/Child Run 树。
 - 依靠隐藏 Chain-of-Thought 打分：只评可观察的结果、状态、证据与轨迹事件。
 
 这 20 个 Case 是 Baseline v1 的最小产品能力面。新增功能应优先作为现有 Case 的变体；只有引入新的用户价值、权限边界或故障模式时，才新增 Golden Case，避免套件无限扩张而失去发布门禁作用。

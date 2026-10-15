@@ -1,4 +1,4 @@
-# Personal Agent — Repository Instructions
+# Erii — Repository Instructions
 
 Build the smallest complete change that satisfies the request, prove it with inspectable evidence, and continue through verification without waiting for routine approval.
 
@@ -10,8 +10,8 @@ Do not read every design document before every edit. Start with the target code,
 
 | Task | Read |
 |---|---|
-| Architecture, protocol, state, storage, security, replay, or milestone work | Relevant sections of `Personal_Agent_Technical_Design_Baseline.md` |
-| Product behavior, eval fixtures, user-visible claims, or release gates | Relevant cases plus scoring and hard-failure rules in `Personal_Agent_Golden_Cases.md` |
+| Architecture, protocol, state, storage, security, replay, or milestone work | Relevant sections of `docs/technical-design.md` |
+| Product behavior, eval fixtures, user-visible claims, or release gates | Relevant cases plus scoring and hard-failure rules in `evals/golden-cases.md` |
 | Model-visible Tool changes | Baseline Tool, Security, Coding Agent Contract, and Definition of Done sections |
 | Small local refactor or bug fix | Target implementation, callers, tests, and only the specification needed to resolve intent |
 
