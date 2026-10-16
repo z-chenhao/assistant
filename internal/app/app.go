@@ -96,11 +96,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		_ = t.Close()
 		return nil, err
 	}
-	a.terminalInbox, err = deliveryterminal.Open(ctx, cfg.App.DataRoot)
-	if err != nil {
-		a.Close()
-		return nil, err
-	}
+	a.terminalInbox = store.TerminalInbox()
 	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := artifacttools.Definitions()
@@ -204,11 +200,7 @@ func (a *App) Close() error {
 	if a.provider != nil {
 		_ = a.provider.Close()
 	}
-	var terminalErr error
-	if a.terminalInbox != nil {
-		terminalErr = a.terminalInbox.Close()
-	}
-	err := errors.Join(a.store.Close(), terminalErr)
+	err := a.store.Close()
 	err = errors.Join(err, a.history.Close())
 	a.telemetry.Logger.Info("application stopped")
 	return errors.Join(err, a.telemetry.Close())

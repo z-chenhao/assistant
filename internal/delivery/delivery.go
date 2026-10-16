@@ -29,6 +29,7 @@ type Request struct {
 	LastError      string `json:"last_error,omitempty"`
 	CreatedAt      int64  `json:"created_at"`
 	UpdatedAt      int64  `json:"updated_at"`
+	Version        int64  `json:"version"`
 }
 
 func (r Request) Validate() error {

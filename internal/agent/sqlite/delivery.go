@@ -10,7 +10,10 @@ import (
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/delivery"
 	deliverysqlite "github.com/z-chenhao/erii/internal/delivery/sqlite"
+	deliveryterminal "github.com/z-chenhao/erii/internal/delivery/terminal"
 )
+
+func (s *Store) TerminalInbox() *deliveryterminal.Adapter { return deliveryterminal.New(s.db) }
 
 func (s *Store) Deliveries() deliverysqlite.Store { return deliverysqlite.Store{DB: s.db} }
 

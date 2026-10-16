@@ -1,8 +1,8 @@
 # Recoverable semantic delivery (ERII-15)
 
 Main replies reach the local terminal through a durable Delivery Outbox. The
-Conversation stores semantic content; `state.db` stores delivery intent and
-transport state; `terminal.db` stores the terminal's immutable accepted messages.
+Conversation stores semantic content; `state.db` stores delivery intent,
+transport state, and the terminal's immutable accepted-message projection.
 No online accounts, broker, or model inference are needed to drain accepted
 deliveries. Web/Feishu adapters and UISpec composition remain M7 work.
 
@@ -11,7 +11,7 @@ sequenceDiagram
     participant Main
     participant Conversation as conversation.db
     participant State as state.db
-    participant Terminal as terminal.db / TUI
+    participant Terminal as terminal projection / TUI
     Main->>State: Frozen reply intent (reply:exchange ID)
     Main->>Conversation: Idempotent Append
     Main->>State: DeliveryRequest + delivery_outbox + domain event
@@ -45,7 +45,8 @@ HTML or executable UI enters the protocol.
 | failed | Definitive rejection or exhausted known-safe retries | Terminal |
 | unknown | Outcome cannot be established | Query only; sent/failed on authoritative evidence |
 
-Each claim has a fresh Host token and expiry. A late acknowledgement cannot
+Each claim has a fresh Host token and expiry, plus a version checked by CAS.
+A late acknowledgement cannot
 change a newer owner's row or a terminal receipt. Delivery state and its internal
 CloudEvent commit together. `delivery_outbox` owns transport work and is distinct
 from `event_outbox`, which propagates internal domain events.
@@ -58,8 +59,9 @@ remains unknown. An unknown row is never automatically resent, even when a later
 query reports absence. Raw provider errors are replaced with bounded codes.
 
 The local terminal adapter implements acceptance as an immutable unique-key
-insert into `terminal.db`. The TUI reads that retained projection rather than
-displaying pending assistant intents. Physical stdout has no acknowledgement
+insert into `terminal_message` in `state.db`, with an internal acceptance event.
+Acceptance and acknowledgement use separate transactions. The TUI reads that
+retained projection rather than displaying pending assistant intents. Physical stdout has no acknowledgement
 protocol: reconnect and `/history` can show accepted history again. This is one
 stored semantic message, not generic exactly-once rendering or external delivery.
 
@@ -96,9 +98,9 @@ State migration v12 preserves v11 requests, keys, status, attempts and history;
 it renames the old local channel `local_cli` to `tui` and creates outbox rows only
 for pending requests. Prior sent messages remain visible as retained history,
 without being resent. Empty/prior schemas and failed-DDL rollback are tested.
-`terminal.db` starts at v1 and rejects future versions. Keep `state.db`,
-`conversation.db`, `terminal.db`, and their SQLite WAL files together during
-operational backup. New database files use mode 0600 in the private data root.
+The terminal projection is part of state schema v12. Keep `state.db`,
+`conversation.db`, and their SQLite WAL files together during operational backup.
+New database files use mode 0600 in the private data root.
 
 ## Inspectable verification
 

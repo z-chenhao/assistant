@@ -33,6 +33,7 @@ def state(h):
     for filename, queries in {
         "state.db": {
             "requests": "SELECT * FROM delivery_request ORDER BY created_at,delivery_id",
+            "terminal": "SELECT * FROM terminal_message ORDER BY rowid",
             "outbox": "SELECT * FROM delivery_outbox ORDER BY delivery_id",
             "runs": "SELECT run_id,kind,status,checkpoint_json FROM run ORDER BY created_at",
             "generations": "SELECT generation_id,status,attempt_count FROM model_generation ORDER BY created_at",
@@ -43,7 +44,6 @@ def state(h):
             "task_updates": "SELECT * FROM task_update ORDER BY occurred_at",
         },
         "conversation.db": {"history": "SELECT * FROM conversation_message ORDER BY sequence"},
-        "terminal.db": {"terminal": "SELECT * FROM terminal_message ORDER BY rowid"},
     }.items():
         with sqlite3.connect(root / filename) as db:
             db.row_factory = sqlite3.Row

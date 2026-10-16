@@ -27,12 +27,12 @@ func changed(ctx context.Context, tx *sql.Tx, id, status string) error {
 	return eventsqlite.Enqueue(ctx, tx, e)
 }
 
-const columns = `d.delivery_id,d.message_id,d.conversation_id,d.channel,d.destination_ref,d.intent,d.status,d.idempotency_key,d.attempt_count,coalesce(d.last_error,''),d.created_at,d.updated_at`
+const columns = `d.delivery_id,d.message_id,d.conversation_id,d.channel,d.destination_ref,d.intent,d.status,d.idempotency_key,d.attempt_count,coalesce(d.last_error,''),d.created_at,d.updated_at,d.version`
 
 type scanner interface{ Scan(...any) error }
 
 func read(row scanner) (r delivery.Request, err error) {
-	err = row.Scan(&r.DeliveryID, &r.MessageID, &r.ConversationID, &r.Channel, &r.DestinationRef, &r.Intent, &r.Status, &r.IdempotencyKey, &r.AttemptCount, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
+	err = row.Scan(&r.DeliveryID, &r.MessageID, &r.ConversationID, &r.Channel, &r.DestinationRef, &r.Intent, &r.Status, &r.IdempotencyKey, &r.AttemptCount, &r.LastError, &r.CreatedAt, &r.UpdatedAt, &r.Version)
 	return
 }
 
@@ -52,7 +52,7 @@ func Enqueue(ctx context.Context, tx *sql.Tx, r delivery.Request) error {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return delivery.ErrStorage
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO delivery_request(delivery_id,message_id,conversation_id,channel,destination_ref,intent,status,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,'pending',?,?,?)`, r.DeliveryID, r.MessageID, r.ConversationID, r.Channel, r.DestinationRef, r.Intent, r.IdempotencyKey, r.CreatedAt, r.CreatedAt)
+	_, err = tx.ExecContext(ctx, `INSERT INTO delivery_request(delivery_id,message_id,conversation_id,channel,destination_ref,intent,status,idempotency_key,created_at,updated_at,version) VALUES(?,?,?,?,?,?,'pending',?,?,?,1)`, r.DeliveryID, r.MessageID, r.ConversationID, r.Channel, r.DestinationRef, r.Intent, r.IdempotencyKey, r.CreatedAt, r.CreatedAt)
 	if err != nil {
 		return delivery.ErrStorage
 	}
@@ -94,8 +94,12 @@ func (s Store) Claim(ctx context.Context, channel, destination string, excluded 
 		status = "unknown"
 		increment = 0
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE delivery_request SET status=?,attempt_count=attempt_count+?,updated_at=? WHERE delivery_id=?`, status, increment, now.UnixMicro(), r.DeliveryID); err != nil {
+	updated, err := tx.ExecContext(ctx, `UPDATE delivery_request SET status=?,attempt_count=attempt_count+?,updated_at=?,version=version+1 WHERE delivery_id=? AND version=?`, status, increment, now.UnixMicro(), r.DeliveryID, r.Version)
+	if err != nil {
 		return c, delivery.ErrStorage
+	}
+	if n, _ := updated.RowsAffected(); n != 1 {
+		return c, delivery.ErrConflict
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE delivery_outbox SET claim_token=?,claim_expires_at=? WHERE delivery_id=?`, c.Token, now.Add(lease).UnixMicro(), r.DeliveryID); err != nil {
 		return c, delivery.ErrStorage
@@ -107,6 +111,7 @@ func (s Store) Claim(ctx context.Context, channel, destination string, excluded 
 		return c, delivery.ErrStorage
 	}
 	c.Request.AttemptCount += increment
+	c.Request.Version++
 	return c, nil
 }
 
@@ -136,8 +141,12 @@ func (s Store) Settle(ctx context.Context, c delivery.Claim, o delivery.Observat
 	if valid != 1 {
 		return delivery.ErrConflict
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE delivery_request SET status=?,last_error=nullif(?,''),updated_at=? WHERE delivery_id=?`, o.Outcome, code, now.UnixMicro(), c.Request.DeliveryID); err != nil {
+	updated, err := tx.ExecContext(ctx, `UPDATE delivery_request SET status=?,last_error=nullif(?,''),updated_at=?,version=version+1 WHERE delivery_id=? AND version=?`, o.Outcome, code, now.UnixMicro(), c.Request.DeliveryID, c.Request.Version)
+	if err != nil {
 		return delivery.ErrStorage
+	}
+	if n, _ := updated.RowsAffected(); n != 1 {
+		return delivery.ErrConflict
 	}
 	if o.Outcome == delivery.Delivered || o.Outcome == delivery.Failed {
 		_, err = tx.ExecContext(ctx, `DELETE FROM delivery_outbox WHERE delivery_id=?`, c.Request.DeliveryID)

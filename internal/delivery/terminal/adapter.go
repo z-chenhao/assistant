@@ -7,78 +7,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"net/url"
-	"os"
-	"path/filepath"
-	"sort"
 
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/delivery"
+	"github.com/z-chenhao/erii/internal/event"
+	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
-	_ "modernc.org/sqlite"
 )
 
 type Adapter struct{ db *sql.DB }
 
 func (*Adapter) Idempotent() bool { return true }
 
-func Open(ctx context.Context, root string) (*Adapter, error) {
-	if !filepath.IsAbs(root) {
-		return nil, delivery.ErrStorage
-	}
-	path := filepath.Join(root, "terminal.db")
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		return nil, delivery.ErrStorage
-	}
-	if f.Close() != nil {
-		return nil, delivery.ErrStorage
-	}
-	u := url.URL{Scheme: "file", Path: path}
-	q := u.Query()
-	for _, p := range []string{"busy_timeout(5000)", "journal_mode(WAL)"} {
-		q.Add("_pragma", p)
-	}
-	q.Set("_txlock", "immediate")
-	u.RawQuery = q.Encode()
-	db, err := sql.Open("sqlite", u.String())
-	if err != nil {
-		return nil, delivery.ErrStorage
-	}
-	db.SetMaxOpenConns(1)
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		db.Close()
-		return nil, delivery.ErrStorage
-	}
-	defer tx.Rollback()
-	var version int
-	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 1 {
-		tx.Rollback()
-		db.Close()
-		return nil, delivery.ErrStorage
-	}
-	if version == 0 {
-		_, err = tx.ExecContext(ctx, `CREATE TABLE terminal_message (
- idempotency_key TEXT PRIMARY KEY, delivery_id TEXT NOT NULL UNIQUE, message_id TEXT NOT NULL UNIQUE,
- destination_ref TEXT NOT NULL, envelope_json TEXT NOT NULL CHECK(json_valid(envelope_json))
-) STRICT;
-CREATE TRIGGER terminal_immutable BEFORE UPDATE ON terminal_message BEGIN SELECT RAISE(ABORT,'immutable terminal receipt'); END;
-CREATE TRIGGER terminal_retained BEFORE DELETE ON terminal_message BEGIN SELECT RAISE(ABORT,'terminal history retained'); END;
-CREATE TRIGGER terminal_no_replace BEFORE INSERT ON terminal_message WHEN EXISTS(SELECT 1 FROM terminal_message WHERE idempotency_key=NEW.idempotency_key OR delivery_id=NEW.delivery_id OR message_id=NEW.message_id) BEGIN SELECT RAISE(ABORT,'terminal identity exists'); END;
-PRAGMA user_version=1;`)
-	}
-	if err != nil {
-		tx.Rollback()
-		db.Close()
-		return nil, delivery.ErrStorage
-	}
-	if tx.Commit() != nil {
-		db.Close()
-		return nil, delivery.ErrStorage
-	}
-	return &Adapter{db: db}, nil
-}
+func New(db *sql.DB) *Adapter { return &Adapter{db: db} }
 
 // freeze removes delivery bookkeeping, which can change between retries.
 func freeze(e delivery.Envelope) delivery.Envelope {
@@ -86,6 +27,7 @@ func freeze(e delivery.Envelope) delivery.Envelope {
 	e.Request.AttemptCount = 0
 	e.Request.LastError = ""
 	e.Request.UpdatedAt = 0
+	e.Request.Version = 0
 	return e
 }
 func (a *Adapter) Query(ctx context.Context, e delivery.Envelope) delivery.Observation {
@@ -114,10 +56,29 @@ func (a *Adapter) Send(ctx context.Context, e delivery.Envelope) delivery.Observ
 	if err != nil {
 		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
 	}
-	_, err = a.db.ExecContext(ctx, `INSERT INTO terminal_message VALUES(?,?,?,?,?)`, e.Request.IdempotencyKey, e.Request.DeliveryID, e.Request.MessageID, e.Request.DestinationRef, string(raw))
+	tx, err := a.db.BeginTx(ctx, nil)
+	if err != nil {
+		return delivery.Observation{Outcome: delivery.Retry, Code: "unavailable"}
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `INSERT INTO terminal_message VALUES(?,?,?,?,?)`, e.Request.IdempotencyKey, e.Request.DeliveryID, e.Request.MessageID, e.Request.DestinationRef, string(raw))
 	// A concurrent sender or commit error requires authoritative readback,
 	// never an assumption that the write failed before taking effect.
 	if err != nil {
+		tx.Rollback()
+		return a.Query(ctx, e)
+	}
+	accepted, err := event.New("/erii/delivery", "ai.erii.delivery.accepted.v1", e.Request.DeliveryID, struct {
+		ID string `json:"delivery_id"`
+	}{e.Request.DeliveryID})
+	if err == nil {
+		err = eventsqlite.Enqueue(ctx, tx, accepted)
+	}
+	if err != nil {
+		tx.Rollback()
+		return delivery.Observation{Outcome: delivery.Retry, Code: "unavailable"}
+	}
+	if tx.Commit() != nil {
 		return a.Query(ctx, e)
 	}
 	return delivery.Observation{Outcome: delivery.Delivered}
@@ -142,11 +103,10 @@ func (a *Adapter) Messages(ctx context.Context, destination string) ([]delivery.
 	}
 	return result, nil
 }
-func (a *Adapter) Close() error { return a.db.Close() }
 
-// History is the terminal projection, including retained pre-v12 sent messages
-// whose original receipt predates terminal.db. Unsent semantic intents stay
-// hidden until this destination accepts them. Input remains visible immediately.
+// History includes retained pre-v12 sent messages without projection rows.
+// Unsent semantic intents stay hidden until this destination accepts them.
+// Input remains visible immediately.
 func (a *Adapter) History(ctx context.Context, destination string, messages []conversation.Message, requests []delivery.Request) ([]conversation.Message, error) {
 	inbox, err := a.Messages(ctx, destination)
 	if err != nil {
@@ -167,6 +127,5 @@ func (a *Adapter) History(ctx context.Context, destination string, messages []co
 			result = append(result, m)
 		}
 	}
-	sort.SliceStable(result, func(i, j int) bool { return result[i].Sequence < result[j].Sequence })
 	return result, nil
 }

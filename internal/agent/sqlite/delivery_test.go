@@ -22,11 +22,7 @@ func terminalFixture(t *testing.T) (*Store, delivery.Service, *deliveryterminal.
 	s, _, h, a, _ := loopFixture(t)
 	mustSubmit(t, a, "one", "A durable reply")
 	mustDrain(t, a)
-	adapter, err := deliveryterminal.Open(context.Background(), filepath.Dir(s.path))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { adapter.Close() })
+	adapter := s.TerminalInbox()
 	service := delivery.Service{Store: s.Deliveries(), History: h, Adapter: adapter, Channel: "tui", Destination: idAgent(t, s), Policy: delivery.DefaultPolicy()}
 	return s, service, adapter
 }
@@ -126,6 +122,11 @@ func TestDeliveryClaimFencesLateAckAndQueriesAcceptedSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	stale := c
+	stale.Request.Version--
+	if err = s.Deliveries().Settle(ctx, stale, delivery.Observation{Outcome: delivery.Failed}, time.Now(), time.Now()); !errors.Is(err, delivery.ErrConflict) {
+		t.Fatal("stale version accepted", err)
+	}
 	if _, err = s.Deliveries().Claim(ctx, "tui", service.Destination, nil, now, time.Second); !errors.Is(err, delivery.ErrEmpty) {
 		t.Fatal("duplicate owner", err)
 	}
@@ -206,6 +207,32 @@ func TestDeliveryAckEventFailureRecoversAcceptedReceipt(t *testing.T) {
 	inbox, _ = adapter.Messages(ctx, service.Destination)
 	if len(inbox) != 1 || deliveryRows(t, s)[0].Status != "sent" || deliveryRows(t, s)[0].AttemptCount != 1 {
 		t.Fatal("ack recovery repeated send")
+	}
+}
+
+func TestTerminalAcceptanceRollsBackWithItsEvent(t *testing.T) {
+	s, service, adapter := terminalFixture(t)
+	ctx := context.Background()
+	if _, err := s.db.Exec(`CREATE TRIGGER reject_accepted_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.delivery.accepted.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	inbox, _ := adapter.Messages(ctx, service.Destination)
+	if len(inbox) != 0 || deliveryRows(t, s)[0].Status != "retry" {
+		t.Fatal("partial terminal acceptance")
+	}
+	if _, err := s.db.Exec(`DROP TRIGGER reject_accepted_event`); err != nil {
+		t.Fatal(err)
+	}
+	wakeDelivery(t, s)
+	if err := service.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	inbox, _ = adapter.Messages(ctx, service.Destination)
+	if len(inbox) != 1 || deliveryRows(t, s)[0].Status != "sent" || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.delivery.accepted.v1'`) != 1 {
+		t.Fatal("terminal acceptance did not recover atomically")
 	}
 }
 
@@ -445,7 +472,7 @@ func TestTerminalProjectionHidesUnsentAndRetainsPriorSentHistory(t *testing.T) {
 		t.Fatal("unaccepted output visible", projected, err)
 	}
 	requests := deliveryRows(t, s)
-	requests[0].Status = "sent" // retained v11 receipt, no terminal.db row
+	requests[0].Status = "sent" // retained v11 receipt, no projection row
 	projected, err = adapter.History(ctx, service.Destination, messages, requests)
 	if err != nil || len(projected) != 2 {
 		t.Fatal("prior accepted history disappeared", projected, err)
