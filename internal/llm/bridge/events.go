@@ -23,15 +23,16 @@ type eventDelivery struct {
 // deliveries cross to the sink goroutine. The mailbox holds every allowed distinct event
 // plus one rejection, so a slow sink never blocks the shared RPC reader.
 type eventStream struct {
-	events    chan eventDelivery
-	id        string
-	seen      map[int64][32]byte
-	last      int64
-	remaining int
-	toolCalls int
-	terminal  bool
-	cancelled chan struct{}
-	interrupt context.CancelFunc
+	events       chan eventDelivery
+	id           string
+	seen         map[int64][32]byte
+	last         int64
+	remaining    int
+	toolCalls    int
+	terminal     bool
+	cancelled    chan struct{}
+	dispatchDone chan struct{} // closed after start/continuation write, or failed admission
+	interrupt    context.CancelFunc
 }
 
 func newEventStream(id string, maxOutputTokens int64) *eventStream {
@@ -39,7 +40,7 @@ func newEventStream(id string, maxOutputTokens int64) *eventStream {
 	if maxOutputTokens < int64(limit/4) {
 		limit = int(maxOutputTokens * 4)
 	}
-	return &eventStream{events: make(chan eventDelivery, maxGenerationEvents+1), cancelled: make(chan struct{}), id: id, seen: map[int64][32]byte{}, remaining: limit}
+	return &eventStream{events: make(chan eventDelivery, maxGenerationEvents+1), cancelled: make(chan struct{}), dispatchDone: make(chan struct{}), id: id, seen: map[int64][32]byte{}, remaining: limit}
 }
 
 func (s *eventStream) reject(err error) {

@@ -278,7 +278,7 @@ func (c *Client) Close() error {
 var errAcknowledgementTimeout = errors.New("provider RPC acknowledgement timeout")
 
 func (c *Client) callProcess(ctx context.Context, p *process, method string, params, out any) error {
-	_, err := c.exchange(ctx, p, method, params, out)
+	_, err := c.exchange(ctx, p, method, params, out, nil)
 	if err == errAcknowledgementTimeout {
 		return llm.ProviderUnavailable
 	}
@@ -287,7 +287,13 @@ func (c *Client) callProcess(ctx context.Context, p *process, method string, par
 
 // exchange reports complete dispatch separately from acknowledgement. A timed
 // out response does not mean a generation request was never accepted by the peer.
-func (c *Client) exchange(ctx context.Context, p *process, method string, params, out any) (bool, error) {
+// dispatchDone, when provided, also releases cancellation after failed admission.
+func (c *Client) exchange(ctx context.Context, p *process, method string, params, out any, dispatchDone chan struct{}) (bool, error) {
+	defer func() {
+		if dispatchDone != nil {
+			close(dispatchDone)
+		}
+	}()
 	if ctx.Err() != nil {
 		return false, llm.ProviderUnavailable
 	}
@@ -320,6 +326,10 @@ func (c *Client) exchange(ctx context.Context, p *process, method string, params
 	// writer can reset the deadline, so it cannot interrupt a subsequent request.
 	err = c.write(ctx, p, wire)
 	<-p.write
+	if dispatchDone != nil {
+		close(dispatchDone)
+		dispatchDone = nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -438,7 +448,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		delete(p.events, r.GenerationID)
 		p.mu.Unlock()
 	}()
-	dispatched, err := c.exchange(dispatchCtx, p, method, r, nil)
+	dispatched, err := c.exchange(dispatchCtx, p, method, r, nil, stream.dispatchDone)
 	if stream.wasCancelled() {
 		return llm.GenerationResult{}, llm.GenerationCancelled
 	}
@@ -517,6 +527,8 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 }
 
 func (c *Client) Cancel(ctx context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	p, err := c.ensure(ctx)
 	if err != nil {
 		return err
@@ -524,6 +536,17 @@ func (c *Client) Cancel(ctx context.Context, id string) error {
 	p.mu.Lock()
 	stream := p.events[id]
 	p.mu.Unlock()
+	if stream != nil {
+		// Registration precedes serialization and writer admission. Cancel must
+		// follow that registration's write, but must not wait for its start ack.
+		select {
+		case <-stream.dispatchDone:
+		case <-ctx.Done():
+			return llm.ProviderUnavailable
+		case <-p.done:
+			return p.err()
+		}
+	}
 	if err := c.callProcess(ctx, p, "generation.cancel", map[string]string{"generation_id": id}, nil); err != nil {
 		return err
 	}

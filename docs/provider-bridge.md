@@ -111,6 +111,11 @@ Continue call with `GENERATION_CANCELLED`, without requiring a second terminal
 notification. It interrupts a pending start acknowledgement and fences queued
 and late events. Cancellation and final result publication share the process
 registry lock; an old acknowledgement cannot settle a different registration.
+Cancel for a registered generation waits for its start/continuation write to
+finish or fail before sending the cancellation RPC. Registration alone never
+permits cancellation to overtake dispatch. This wait observes the caller's
+deadline and the five-second Cancel bound, holds no process lock, and does not
+wait for the start acknowledgement. Close can still retire the peer independently.
 Waiting for a shared restart/handshake observes each caller's context. The
 lifecycle state lock never covers process I/O or reap; Close can terminate an
 initializing child immediately and waits for its initializer to finish cleanup.
