@@ -16,6 +16,9 @@ import (
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
+	"github.com/z-chenhao/erii/internal/delivery"
+	deliveryfake "github.com/z-chenhao/erii/internal/delivery/fake"
+	deliveryterminal "github.com/z-chenhao/erii/internal/delivery/terminal"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"github.com/z-chenhao/erii/internal/llm"
@@ -32,16 +35,20 @@ import (
 )
 
 type App struct {
-	store        *sqlite.Store
-	artifacts    artifactStore
-	telemetry    *observability.Telemetry
-	provider     *bridge.Client
-	control      llm.Control
-	accounts     *account.Manager
-	history      *conversationsqlite.Store
-	runs         *sqlite.Runs
-	registry     *tool.Registry
-	testBoundary func(string)
+	store          *sqlite.Store
+	artifacts      artifactStore
+	telemetry      *observability.Telemetry
+	provider       *bridge.Client
+	control        llm.Control
+	accounts       *account.Manager
+	history        *conversationsqlite.Store
+	runs           *sqlite.Runs
+	registry       *tool.Registry
+	terminalInbox  *deliveryterminal.Adapter
+	deliveryPolicy delivery.Policy
+	deliveryFake   *deliveryfake.Adapter
+	testDelivery   string
+	testBoundary   func(string)
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
@@ -89,6 +96,8 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		_ = t.Close()
 		return nil, err
 	}
+	a.terminalInbox = store.TerminalInbox()
+	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := artifacttools.Definitions()
 	if fixture == "artifacts" {
@@ -233,8 +242,8 @@ func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
 }
 
 func (a *App) Terminal() tui.Session {
-	return tui.Session{State: a, Models: a.Models(), Accounts: a.accounts,
-		Control: a.control, Actor: a.Actor(nil), Discover: a.Discover,
+	return tui.Session{State: a, Models: a.Models(), Accounts: a.accounts, DecideApproval: a.DecideApproval,
+		Messages: a.TerminalHistory, Control: a.control, Actor: a.Actor(nil), Discover: a.Discover,
 		AccountCatalog: a.AccountCatalog, LoginEnvironment: a.LoginEnvironment}
 }
 

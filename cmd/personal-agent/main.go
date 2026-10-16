@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-isatty"
@@ -21,6 +22,7 @@ import (
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/tui"
@@ -44,9 +46,10 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	configPath := flags.String("config", "", "versioned YAML configuration file (optional)")
 	testSecrets := flags.String("test-secret-store", "", "explicit in-memory CI Unix socket; never a production credential backend")
 	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
+	testDelivery := flags.String("test-delivery", "", "explicit test Bridge only: retry-once, unavailable, ambiguous, unknown")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|delivery list|delivery work|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -76,12 +79,13 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	chatCommand := flags.Arg(0) == "chat" && (((flags.Arg(1) == "send" || flags.Arg(1) == "send-parts") && (flags.NArg() == 2 || flags.NArg() == 3)) || ((flags.Arg(1) == "work" || flags.Arg(1) == "history") && flags.NArg() == 2))
 	artifactCommand := flags.Arg(0) == "artifact" && ((flags.NArg() == 4 && (flags.Arg(1) == "save" || flags.Arg(1) == "delete")) || (flags.NArg() == 3 && (flags.Arg(1) == "open" || flags.Arg(1) == "describe")) || (flags.Arg(1) == "cleanup" && (flags.NArg() == 2 || (flags.NArg() == 3 && flags.Arg(2) == "apply"))))
+	deliveryCommand := flags.Arg(0) == "delivery" && flags.NArg() == 2 && (flags.Arg(1) == "work" || flags.Arg(1) == "list")
 	approvalCommand := flags.Arg(0) == "approval" && ((flags.NArg() == 2 && (flags.Arg(1) == "list" || flags.Arg(1) == "reconcile")) || (flags.NArg() == 4 && (flags.Arg(1) == "approve" || flags.Arg(1) == "deny")))
 	terminalCommand := flags.NArg() == 1 && flags.Arg(0) == "tui"
 	if f, ok := in.(*os.File); ok && flags.NArg() == 0 && isatty.IsTerminal(f.Fd()) {
 		terminalCommand = true
 	}
-	if !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	if !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -128,6 +132,14 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return err
 	}
 	defer func() { err = errors.Join(err, application.Close()) }()
+	if *testDelivery != "" {
+		if *testBridge == "" {
+			return errors.New("test-delivery requires explicit test-bridge")
+		}
+		if err := application.SetTestDelivery(*testDelivery); err != nil {
+			return err
+		}
+	}
 	if *testMainHold != "" {
 		if *testBridge == "" {
 			return errors.New("test-main-hold requires explicit test-bridge")
@@ -140,6 +152,29 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 				<-ctx.Done()
 			}
 		})
+	}
+	if deliveryCommand {
+		if flags.Arg(1) == "work" {
+			if err := application.Deliver(ctx); err != nil {
+				return err
+			}
+		}
+		requests, err := application.DeliveryRequests(ctx)
+		if err != nil {
+			return err
+		}
+		// The CLI protocol uses RFC 3339 UTC; SQLite keeps UTC microseconds.
+		views := make([]struct {
+			delivery.Request
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+		}, len(requests))
+		for i, r := range requests {
+			views[i].Request = r
+			views[i].CreatedAt = time.UnixMicro(r.CreatedAt).UTC()
+			views[i].UpdatedAt = time.UnixMicro(r.UpdatedAt).UTC()
+		}
+		return json.NewEncoder(out).Encode(views)
 	}
 	if artifactCommand {
 		switch flags.Arg(1) {
@@ -253,7 +288,9 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			}
 			return json.NewEncoder(out).Encode(receipt)
 		case "work":
-			if err := application.Actor(nil).Drain(ctx); err != nil {
+			workErr := application.Actor(nil).Drain(ctx)
+			deliveryErr := application.Deliver(ctx)
+			if err := errors.Join(workErr, deliveryErr); err != nil {
 				return err
 			}
 			return json.NewEncoder(out).Encode(struct {

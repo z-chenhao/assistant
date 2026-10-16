@@ -9,6 +9,8 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
+	deliverysqlite "github.com/z-chenhao/erii/internal/delivery/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
 )
 
@@ -174,7 +176,8 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		if version != run.Version {
 			return agent.ErrConflict
 		}
-		messageID, deliveryID := newID(), newID()
+		messageID := "reply:" + run.Checkpoint.ExchangeID
+		deliveryID := "delivery:" + messageID
 		message := conversation.Message{MessageID: messageID, ConversationID: run.ConversationID, Role: "assistant", Content: conversation.Text(run.Checkpoint.Result.Text), Source: "main", SourceEventID: run.Checkpoint.ExchangeID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
 		refs, err := published(ctx, tx, run.ID)
 		if err != nil {
@@ -215,16 +218,31 @@ func (r *Runs) DeliverReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
-		var deliveryID, messageID string
+		var deliveryID, messageID, raw string
 		var flushed int
-		if err := tx.QueryRowContext(ctx, `SELECT p.delivery_id,p.message_id,i.flushed FROM main_reply p JOIN conversation_intent i USING(message_id) WHERE exchange_id=? AND run_id=?`, run.Checkpoint.ExchangeID, run.ID).Scan(&deliveryID, &messageID, &flushed); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT p.delivery_id,p.message_id,i.flushed,i.message_json FROM main_reply p JOIN conversation_intent i USING(message_id) WHERE exchange_id=? AND run_id=?`, run.Checkpoint.ExchangeID, run.ID).Scan(&deliveryID, &messageID, &flushed, &raw); err != nil {
 			return err
 		}
 		if flushed != 1 {
 			return agent.ErrConflict
 		}
-		now := time.Now().UnixMicro()
-		if _, err := tx.ExecContext(ctx, `INSERT INTO delivery_request(delivery_id,message_id,channel,destination_ref,status,idempotency_key,created_at,updated_at) VALUES(?,?,'local_cli',?,'pending',?,?,?) ON CONFLICT(delivery_id) DO NOTHING`, deliveryID, messageID, run.ConversationID, deliveryID, now, now); err != nil {
+		var message conversation.Message
+		if json.Unmarshal([]byte(raw), &message) != nil {
+			return agent.ErrStorage
+		}
+		request := delivery.Request{DeliveryID: deliveryID, MessageID: messageID, ConversationID: run.ConversationID, Channel: "tui", DestinationRef: run.ConversationID, Intent: replyIntent(run), IdempotencyKey: deliveryID, CreatedAt: message.CreatedAt.UnixMicro()}
+		if err := deliverysqlite.Enqueue(ctx, tx, request); err != nil {
+			return err
+		}
+		r.host.boundary("before_delivery_commit")
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	r.host.boundary("after_delivery_commit")
+	err = r.write(ctx, func(tx *sql.Tx) error {
+		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
 		cp := run.Checkpoint
@@ -277,4 +295,22 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 		return err
 	})
 	return e, err
+}
+
+// Runtime follow-up semantics determine notification intent. Ordinary progress
+// never enters Main context and cannot reach this composer boundary.
+func replyIntent(run agent.Run) string {
+	intent := "completion"
+	for _, m := range run.Checkpoint.Messages {
+		if m.Type != "custom" || m.Origin != "runtime" || m.Details == nil {
+			continue
+		}
+		switch m.Details.Kind {
+		case "needs_input", "unknown":
+			return "needs_input"
+		case "failed":
+			intent = "failure"
+		}
+	}
+	return intent
 }

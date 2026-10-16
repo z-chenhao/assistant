@@ -459,7 +459,7 @@ func TestV5AccountMigrationPreservesStateAndRollsBack(t *testing.T) {
 			}
 			var v int
 			_ = db.QueryRow(`PRAGMA user_version`).Scan(&v)
-			if broken && v != 5 || !broken && v != 11 {
+			if broken && v != 5 || !broken && v != 12 {
 				t.Fatal("schema version", v)
 			}
 			var value string

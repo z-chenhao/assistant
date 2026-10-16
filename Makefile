@@ -28,6 +28,7 @@ verify: build
 	@for attempt in 1 2 3 4 5; do python3 scripts/verify_task_control.py --binary bin/personal-agent --evidence evidence/task-control-$$attempt.json || exit 1; done
 	@for attempt in 1 2 3 4 5; do python3 scripts/verify_tools.py --binary bin/personal-agent --evidence evidence/tools-$$attempt.json || exit 1; done
 	@for attempt in 1 2 3 4 5; do python3 scripts/verify_artifacts.py --binary bin/personal-agent --evidence evidence/artifacts-$$attempt.json || exit 1; done
+	@for attempt in 1 2 3 4 5; do python3 scripts/verify_delivery.py --binary bin/personal-agent --evidence evidence/delivery-$$attempt.json || exit 1; done
 	python3 scripts/run_cases.py --binary bin/personal-agent --evidence evidence/cases.json
 	python3 scripts/run_task_cases.py --binary bin/personal-agent --evidence evidence/task-cases.json
 	python3 scripts/verify_tui.py --binary bin/personal-agent --evidence evidence/tui.json
