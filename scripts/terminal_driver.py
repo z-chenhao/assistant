@@ -15,13 +15,16 @@ import time
 
 
 class Terminal:
-    def __init__(self, args, env, cwd):
+    def __init__(self, args, env, cwd, echo=False):
         self.master, slave = pty.openpty()
         settings = termios.tcgetattr(slave)
-        settings[3] &= ~termios.ECHO
+        if not echo:
+            settings[3] &= ~termios.ECHO
         termios.tcsetattr(slave, termios.TCSANOW, settings)
         self.input_observer = os.dup(slave)
         self.original_flags = fcntl.fcntl(self.input_observer, fcntl.F_GETFL)
+        self.original_settings = termios.tcgetattr(self.input_observer)
+        os.set_blocking(self.master, False)
         try:
             self.process = subprocess.Popen(args, stdin=slave, stdout=slave,
                                             stderr=slave, env=env, cwd=cwd)
@@ -54,23 +57,51 @@ class Terminal:
     def send(self, text):
         if "\n" in text or "\r" in text:
             raise ValueError("send exactly one terminal line")
-        os.write(self.master, (text + "\n").encode())
+        self.send_bytes((text + "\n").encode())
+
+    def send_bytes(self, data):
+        # Large pastes may be partially written. Drain concurrent terminal echo
+        # while sending so neither PTY direction can deadlock the other.
+        remaining = memoryview(data)
+        deadline = time.monotonic() + 20
+        while remaining:
+            timeout = deadline - time.monotonic()
+            if timeout <= 0:
+                raise RuntimeError("terminal input write timed out")
+            readable, writable, _ = select.select([self.master], [self.master], [], timeout)
+            if readable:
+                self.output += os.read(self.master, 65536)
+            if writable:
+                try:
+                    written = os.write(self.master, remaining[:4096])
+                    remaining = remaining[written:]
+                except BlockingIOError:
+                    pass
 
     def transcript(self):
         text = self.output.decode(errors="replace").replace("\r\n", "\n")
         return re.sub(r"https://auth\.openai\.com/[^\s]+", "[private-login-url]", text)
 
     def stop(self, sig=None):
-        if sig is None:
-            self.send("/quit")
-        else:
-            self.process.send_signal(sig)
+        if self.process.poll() is None:
+            if sig is None:
+                self.send("/quit")
+            else:
+                self.process.send_signal(sig)
         code = self.process.wait(timeout=20)
         final_flags = fcntl.fcntl(self.input_observer, fcntl.F_GETFL)
         # Darwin also sets a status bit during ordinary PTY writes (a plain
         # Python input/print reproduces it). The adapter owns O_NONBLOCK only.
         if code == 0 and (final_flags & os.O_NONBLOCK) != (self.original_flags & os.O_NONBLOCK):
             raise RuntimeError(f"terminal changed the invoking shell's input flags: {self.original_flags:#x} -> {final_flags:#x}")
+        final_settings = termios.tcgetattr(self.input_observer)
+        # Darwin sets PENDIN when canonical input is restored, including with
+        # stdlib tcsetattr alone. It is a transient retype status, not a mode.
+        final_settings[3] &= ~termios.PENDIN
+        original_settings = self.original_settings.copy()
+        original_settings[3] &= ~termios.PENDIN
+        if code == 0 and final_settings != original_settings:
+            raise RuntimeError(f"terminal did not restore its original termios settings: {original_settings!r} -> {final_settings!r}")
         return code
 
     def close(self):

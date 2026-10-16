@@ -3,7 +3,6 @@
 package tui
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -50,32 +49,33 @@ var cancelled = errors.New("setup cancelled")
 // supplies stdin; tests supply a disposable pipe. Output stays on this terminal;
 // private login URLs are never copied to history, traces or an evidence log.
 func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (result error) {
-	lines := make(chan string)
+	lines := make(chan inputEvent)
 	readerDone := make(chan error, 1)
 	readCtx, stop := context.WithCancel(ctx)
 	defer func() {
 		stop()
-		_ = input.Close()
+		closeErr := input.Close()
 		if err := <-readerDone; err != nil && ctx.Err() == nil {
-			result = errors.New("terminal input failed or exceeded 16 KiB")
+			result = errors.New("terminal input failed")
 		}
 		if ctx.Err() != nil {
 			result = nil
 		}
+		result = errors.Join(result, closeErr)
 	}()
 	go func() {
-		scanner := bufio.NewScanner(input)
-		scanner.Buffer(make([]byte, 4096), 16<<10+1)
-		for scanner.Scan() {
-			select {
-			case lines <- scanner.Text():
-			case <-readCtx.Done():
-				readerDone <- nil
-				close(lines)
-				return
-			}
+		interactive, echo := false, false
+		if terminal, ok := input.(*terminalInput); ok && terminal.settings != nil {
+			interactive, echo = true, terminal.echoEnabled()
 		}
-		err := scanner.Err()
+		err := readInput(readCtx, input, interactive, echo, func(event inputEvent) bool {
+			select {
+			case lines <- event:
+				return true
+			case <-readCtx.Done():
+				return false
+			}
+		})
 		if readCtx.Err() != nil {
 			err = nil
 		}
@@ -148,7 +148,7 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 
 type terminal struct {
 	Session
-	lines      <-chan string
+	lines      <-chan inputEvent
 	out        io.Writer
 	seen       int64
 	work       context.Context
@@ -196,11 +196,21 @@ func (u *terminal) read(ctx context.Context, prompt string) (string, error) {
 				u.print("Erii: idle")
 			}
 			fmt.Fprint(u.out, prompt)
-		case line, ok := <-u.lines:
+		case event, ok := <-u.lines:
 			if !ok {
 				return "", io.EOF
 			}
-			return strings.TrimSpace(line), nil
+			switch event.kind {
+			case inputEcho:
+				fmt.Fprint(u.out, event.text)
+			case inputRedraw:
+				fmt.Fprint(u.out, "\r\x1b[2K", prompt, plain(event.text))
+			case inputRejected:
+				u.print("Input rejected: " + event.err.Error())
+				fmt.Fprint(u.out, prompt)
+			case inputLine:
+				return strings.TrimSpace(event.text), nil
+			}
 		}
 	}
 }

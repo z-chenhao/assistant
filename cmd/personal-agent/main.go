@@ -20,6 +20,7 @@ import (
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
+	"github.com/z-chenhao/erii/internal/tui"
 )
 
 func main() {
@@ -141,28 +142,10 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			input = io.NopCloser(in)
 		}
 		if file, ok := in.(*os.File); ok {
-			// A pollable duplicate lets Close interrupt a pending terminal read
-			// on both Darwin and Linux. Never leave a blocked stdin goroutine.
-			inputFD := file.Fd()
-			originalFlags, _, errno := syscall.Syscall(syscall.SYS_FCNTL, inputFD, syscall.F_GETFL, 0)
-			if errno != 0 {
-				return errors.New("inspect terminal input")
-			}
-			fd, err := syscall.Dup(int(inputFD))
+			input, err = tui.OpenInput(file)
 			if err != nil {
-				return errors.New("open terminal input")
+				return err
 			}
-			syscall.CloseOnExec(fd)
-			if err := syscall.SetNonblock(fd, true); err != nil {
-				_ = syscall.Close(fd)
-				return errors.New("configure terminal input")
-			}
-			input = os.NewFile(uintptr(fd), "terminal input")
-			// dup shares the underlying file description with the invoking shell.
-			// Restore its original mode after the adapter closes its duplicate.
-			defer func() {
-				err = errors.Join(err, syscall.SetNonblock(int(inputFD), originalFlags&syscall.O_NONBLOCK != 0))
-			}()
 		}
 		return application.Terminal().Run(ctx, input, out)
 	}

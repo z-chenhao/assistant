@@ -18,7 +18,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -105,6 +105,16 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
+			if fixture == "terminal-input" && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
+				// A short model reply isolates the terminal byte boundary from
+				// the separate Tool argument/output limits. Probe still runs below.
+				e.Text = "Input received."
+				if err = event(e); err != nil {
+					return err
+				}
+				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 2, Kind: "completed"})
+				break
+			}
 			if (fixture == "main" || fixture == "golden") && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
 				// Same call IDs on distinct exchanges deliberately exercise the
 				// (run, exchange, call) association, never global call-ID dedup.

@@ -50,10 +50,10 @@ func TestPromptCancellationClosesAndJoinsReader(t *testing.T) {
 	}
 }
 
-func TestOversizeInputFailsWithoutEcho(t *testing.T) {
+func TestOversizeInputRejectsWholeLineAndRecoversWithoutEcho(t *testing.T) {
 	var out bytes.Buffer
-	err := (Session{State: setupState{}}).Run(context.Background(), io.NopCloser(strings.NewReader(strings.Repeat("PRIVATE_INPUT", 2000))), &out)
-	if err == nil || strings.Contains(out.String()+err.Error(), "PRIVATE_INPUT") {
+	err := (Session{State: setupState{}}).Run(context.Background(), io.NopCloser(strings.NewReader("/cancel\n"+strings.Repeat("PRIVATE_INPUT", 2000)+"\n/status\n/quit\n")), &out)
+	if err != nil || strings.Contains(out.String(), "PRIVATE_INPUT") || !strings.Contains(out.String(), "Input rejected: line exceeds 16 KiB") || strings.Count(out.String(), "State: setup_required") != 2 {
 		t.Fatalf("unsafe result: %v %s", err, &out)
 	}
 }
@@ -61,8 +61,9 @@ func TestOversizeInputFailsWithoutEcho(t *testing.T) {
 func TestLineSizeBoundary(t *testing.T) {
 	for _, size := range []int{16384, 16385} {
 		input := "/cancel\n" + strings.Repeat("x", size) + "\n/quit\n"
-		err := (Session{State: setupState{}}).Run(context.Background(), io.NopCloser(strings.NewReader(input)), io.Discard)
-		if (err == nil) != (size == 16384) {
+		var out bytes.Buffer
+		err := (Session{State: setupState{}}).Run(context.Background(), io.NopCloser(strings.NewReader(input)), &out)
+		if err != nil || strings.Contains(out.String(), "Input rejected:") != (size > maxLineBytes) {
 			t.Fatalf("size %d: %v", size, err)
 		}
 	}

@@ -11,6 +11,16 @@ Actor. It adds no provider, Tool, execution loop, database, or migration.
 Existing state v7 and Conversation v1 open unchanged; the prior migration tests
 continue to cover empty and older databases. No schema bump is required.
 
+Terminal input uses a noncanonical, bounded reader on macOS and Linux; it does
+not depend on the kernel's smaller canonical line buffer. A line may contain up
+to **16,384 UTF-8 bytes**. Oversized or malformed UTF-8 lines are rejected in
+full, drained to the delimiter, and followed by a fresh prompt. Their prefixes
+never reach Main or settings. Backspace/Delete removes a rune; Ctrl-U clears the
+line (including an overflow); Ctrl-D on an empty line exits. Echo follows the
+terminal's original setting. Normal exit, Ctrl-C and SIGTERM restore terminal
+flags, control characters and timing settings. Polling and bounded reads allow
+cancellation without changing the shared stdin/stdout nonblocking flag.
+
 ## Setup and repair
 
 Fresh state opens a blocking connection picker:
@@ -66,6 +76,7 @@ rules; this is not a Task pause/cancel feature.
 
 ```sh
 python3 scripts/verify_tui.py --binary bin/personal-agent --evidence evidence/tui.json
+python3 scripts/verify_terminal_input.py --binary bin/personal-agent --evidence evidence/terminal-input.json
 python3 scripts/run_cases.py --binary bin/personal-agent --evidence evidence/cases.json
 ```
 
@@ -79,6 +90,17 @@ ingress, SIGKILL/reopen, busy Steering and model freezing. Every child, PTY,
 server, and disposable database is cleaned up before returning. Authentication
 URLs and credentials never enter the evidence artifact. `make verify` repeats
 the terminal cancellation/security/recovery boundaries five times.
+
+The input harness adds 12 real PTY scenarios: the macOS review reproduction,
+ASCII and multibyte byte boundaries, large overflow and next-line recovery,
+malformed input, echo on/off, rune editing, Ctrl-U/Ctrl-D, partial-line signal
+shutdown, unchanged shared file flags, and terminal settings readback. The
+kernel's transient `PENDIN` retype status is excluded from the settings comparison;
+all configuration flags, control characters and speeds are compared. The test
+driver handles partial writes and drains output while pasting, so terminal echo
+cannot hide dropped input or block the harness. The explicit `terminal-input`
+Fake gives a short reply to isolate input limits from Tool argument/output limits;
+the original Main Fake and both real Bridge fixtures retain their existing coverage.
 
 `scripts/terminal_driver.py` owns terminal mechanics; `verify_main.py` owns
 durable state readback. `case_runner.py` owns provider-independent variants,
