@@ -11,3 +11,9 @@ nats:
   timeout: 2s
   ack_wait: 30s
   retry_interval: 1s
+
+# Optional real local-model Bridge. Install pinned dependencies first; use an absolute path.
+# llm:
+#   provider_bridge_command: node
+#   provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
+#   provider_bridge_version: pi-ai-1.3.0-v1

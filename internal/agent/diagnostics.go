@@ -3,8 +3,6 @@ package agent
 
 import (
 	"context"
-
-	"github.com/z-chenhao/erii/internal/llm"
 )
 
 // Diagnostics is the local CLI's inspectable startup result, not AgentStatus.
@@ -26,7 +24,7 @@ type ModelAvailability interface {
 	Available(context.Context, string) bool
 }
 type ProviderHealth interface {
-	List(context.Context) ([]llm.CatalogModel, error)
+	Health(context.Context) error
 }
 
 // EffectiveReadiness is evaluated after persistence, credentials and Bridge
@@ -35,7 +33,7 @@ func EffectiveReadiness(ctx context.Context, d Diagnostics, models ModelAvailabi
 	if d.ActiveModelProfileID != nil {
 		d.Readiness = Degraded
 		if models != nil && provider != nil && models.Available(ctx, *d.ActiveModelProfileID) {
-			if _, err := provider.List(ctx); err == nil {
+			if err := provider.Health(ctx); err == nil {
 				d.Readiness = Ready
 			}
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/bridge"
 	"github.com/z-chenhao/erii/internal/llm/fake"
+	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
 )
@@ -60,7 +61,7 @@ func open(ctx context.Context, cfg config.Config, fixture string) (*App, error) 
 		return nil, errors.Join(err, t.Close())
 	}
 	a := &App{store: store, telemetry: t}
-	a.control = llm.Control{Store: store.Models()}
+	a.control = llm.Control{Store: store.Models(), Secrets: secret.Store{}}
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {
@@ -71,6 +72,15 @@ func open(ctx context.Context, cfg config.Config, fixture string) (*App, error) 
 		} else {
 			a.control.Probe = a.provider
 			a.control.BridgeIdentity = "test-bridge-v1:" + fixture
+		}
+	}
+	if fixture == "" && cfg.LLM.ProviderBridgeCommand != "" {
+		a.provider, err = bridge.OpenLocal(ctx, cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, store.Models().Resolver(a.control.Secrets), store.Models().RecordUsage)
+		if err != nil {
+			a.control.BridgeError = llm.NormalizeError(err.Error())
+		} else {
+			a.control.Probe = a.provider
+			a.control.BridgeIdentity = cfg.LLM.ProviderBridgeVersion
 		}
 	}
 	startup.Logger.Info("application started")
@@ -116,4 +126,34 @@ func (a *App) Relay(ctx context.Context, cfg config.Config) error {
 		}
 		return bus, nil
 	}, cfg.NATS.RetryInterval, a.telemetry.Logger)
+}
+
+func (a *App) CatalogProfile(ctx context.Context, id string) ([]llm.CatalogModel, error) {
+	if a.provider == nil {
+		return nil, llm.ErrNoBridge
+	}
+	p, err := a.Models().Profile(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return a.provider.CatalogForProfile(ctx, p)
+}
+
+// LoginKey consumes only stdin bytes; credentials never enter arguments or metadata.
+func (a *App) LoginKey(ctx context.Context, value []byte) (llm.AuthConnection, error) {
+	return llm.RegisterAuth(ctx, a.Models(), a.control.Secrets, llm.AuthInput{Provider: "openai_compatible", AuthKind: "api_key"}, value)
+}
+func (a *App) LoginEnvironment(ctx context.Context, name string) (llm.AuthConnection, error) {
+	return secret.RegisterEnvironment(ctx, a.Models(), name)
+}
+
+func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.CatalogModel, error) {
+	if a.provider == nil {
+		return nil, llm.ErrNoBridge
+	}
+	connection, err := a.Models().Connection(ctx, endpoint, authID, a.control.Secrets)
+	if err != nil {
+		return nil, err
+	}
+	return a.provider.CatalogAt(ctx, connection)
 }

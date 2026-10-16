@@ -112,6 +112,13 @@ func (s *eventStream) accept(e llm.GenerationEvent) {
 		s.toolCalls++
 		d.event.ToolCall = e.ToolCall
 	case "completed":
+		if e.Usage != nil {
+			if e.Usage.InputTokens < 0 || e.Usage.OutputTokens < 0 || e.Usage.CacheReadTokens < 0 || e.Usage.CacheWriteTokens < 0 {
+				s.reject(llm.InvalidProviderResponse)
+				return
+			}
+			d.event.Usage = e.Usage
+		}
 		s.terminal = true
 	case "error":
 		s.terminal = true

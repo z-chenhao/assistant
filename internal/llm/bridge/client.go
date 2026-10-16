@@ -56,6 +56,8 @@ type Client struct {
 	initializing *initialization
 	closeDone    chan struct{}
 	next         atomic.Uint64
+	resolver     Resolver
+	observer     Observer
 }
 
 type initialization struct {
@@ -412,6 +414,26 @@ func (c *Client) Continue(ctx context.Context, r llm.GenerationRequest, sink fun
 }
 
 func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (result llm.GenerationResult, err error) {
+	started := time.Now()
+	defer func() {
+		if c.observer != nil {
+			if recordErr := c.observer(context.WithoutCancel(ctx), r, result, time.Since(started), err); recordErr != nil {
+				result = llm.GenerationResult{}
+				err = recordErr
+			}
+		}
+	}()
+	var params any = r
+	if c.resolver != nil {
+		connection, resolveErr := c.resolver(ctx, r.Snapshot)
+		if resolveErr != nil {
+			return llm.GenerationResult{}, resolveErr
+		}
+		params = struct {
+			llm.GenerationRequest
+			Connection Connection `json:"connection"`
+		}{r, connection}
+	}
 	if ctx.Err() != nil {
 		return llm.GenerationResult{}, llm.GenerationCancelled
 	}
@@ -426,6 +448,9 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, err
 	}
 	stream := newEventStream(r.GenerationID, r.Snapshot.MaxOutputTokens)
+	if r.OutputLimitBytes > 0 && r.OutputLimitBytes < stream.remaining {
+		stream.remaining = r.OutputLimitBytes
+	}
 	dispatchCtx, stopDispatch := context.WithCancel(ctx)
 	defer stopDispatch()
 	stream.interrupt = stopDispatch
@@ -448,7 +473,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		delete(p.events, r.GenerationID)
 		p.mu.Unlock()
 	}()
-	dispatched, err := c.exchange(dispatchCtx, p, method, r, nil, stream.dispatchDone)
+	dispatched, err := c.exchange(dispatchCtx, p, method, params, nil, stream.dispatchDone)
 	if stream.wasCancelled() {
 		return llm.GenerationResult{}, llm.GenerationCancelled
 	}
@@ -515,6 +540,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		case "tool_call":
 			result.ToolCalls = append(result.ToolCalls, *e.ToolCall)
 		case "completed":
+			result.Usage = e.Usage
 			if sink != nil {
 				sink(e)
 			}

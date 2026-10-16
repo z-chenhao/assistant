@@ -18,6 +18,13 @@ type Config struct {
 	Version int               `yaml:"version"`
 	App     App               `yaml:"app"`
 	NATS    eventnats.Options `yaml:"nats"`
+	LLM     LLM               `yaml:"llm"`
+}
+
+type LLM struct {
+	ProviderBridgeCommand string `yaml:"provider_bridge_command"`
+	ProviderBridgeScript  string `yaml:"provider_bridge_script"`
+	ProviderBridgeVersion string `yaml:"provider_bridge_version"`
 }
 
 type App struct {
@@ -66,6 +73,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if value, ok := lookupEnv("ERII_NATS_STREAM_PREFIX"); ok {
 		cfg.NATS.StreamPrefix = value
+	}
+	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
+		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
 	}
 	if err := cfg.NATS.Validate(); err != nil {
 		return Config{}, err

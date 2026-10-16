@@ -1,18 +1,19 @@
-# Runnable M0 foundation and Provider Bridge
+# Runnable foundation and local Provider Bridge
 
-This slice provides startup, strict versioned YAML, local logs/spans, SQLite
-migrations, transactional Outbox/Inbox, a CloudEvents EventBus, and a thin NATS
-JetStream adapter, unverified model metadata, immutable snapshots, and a test-only
-SecretStore Fake, versioned stdio Provider Bridge, behavioral Probe and atomic
-test-profile activation. Real authentication/providers, Main/Worker Runs, Tasks,
-Agent Loop, tools, UI, and Durable Replay are deferred to their later slices.
-Product Golden Cases and SC-01–SC-12 are `not_applicable`, not passed.
+The foundation includes strict YAML, SQLite, Outbox/Inbox, CloudEvents/NATS,
+model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
+The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
+through the CLI, with native Keychain or explicit environment credentials.
+See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
+local path. ChatGPT OAuth, Main/Worker Runs, Tasks, Agent Loop, UI, and Durable
+Replay remain later slices. Product Golden Cases and SC-01–SC-12 are
+`not_applicable` until those capabilities arrive, not passed.
 
 ## Commands and evidence
 
-Use Go 1.26.2+, Python 3.10+ with standard-library SQLite, and a C compiler for
+Use Go 1.26.2+, Node 24.21.0, Python 3.10+ with standard-library SQLite, and a C compiler for
 the Go race detector. The application uses pure Go SQLite. Initial module
-fetching needs network access; checks subsequently need no online services,
+fetching and `npm ci --prefix provider-bridge --ignore-scripts` need network access; checks subsequently need no online services,
 accounts, installed broker executable, containers, or fixed ports.
 
 | Command | Evidence |
@@ -35,6 +36,8 @@ isolated from user configuration and removed on success or failure.
 - `evidence/verification.json`: diagnostics, persisted Agent/profile rows,
   canonical JSON, rejected metadata, logs/spans, bootstrap/model kill/restart,
   future-schema rejection, Provider Probe/activation/degraded states, and cleanup assertions.
+- `evidence/local-provider.json`: real Node/Pi HTTP CLI setup, credential safety, failed re-test and usage readback.
+- `evidence/pi-bridge.tap`: owned endpoint contract results.
 - `evidence/models.jsonl`: Go test events for five runs of Bridge/auth/catalog/
   generation/cancellation/error contracts, migration/rollback, activation CAS,
   immutable snapshots, and credential safety assertions.
@@ -67,7 +70,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":4,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":5,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,
@@ -122,7 +125,8 @@ JSON
 ./bin/personal-agent -config config.example.yaml status
 ```
 
-`model add` accepts exactly one metadata JSON object, at most 64 KiB, with
+`model add URL MODEL_ID [AUTH_ID]` provides a concise local setup path.
+With no arguments, `model add` accepts exactly one metadata JSON object, at most 64 KiB, with
 snake_case fields. Unknown fields (including credential fields and user-supplied
 status/verification/IDs/versions) fail without echoing values. HTTP(S) endpoints
 must omit userinfo, queries and fragments. Names, labels, model IDs, and endpoint
@@ -136,10 +140,10 @@ existing OAuth connection, and no custom endpoint.
 
 `model list` returns an array and never creates a default profile. `status`
 reports `setup_required`, null Active Profile and closed ingress until selection.
-`model test` and `model select` require explicit M0 test Bridge injection. See
+`model test` and `model select` use an explicitly configured real Bridge or explicit test injection. See
 [Provider Bridge operations](provider-bridge.md) for the versioned protocol,
 Probe and activation flow, readiness states and remaining real-provider work.
-There is no real user authentication command yet.
+`model login [ENV_NAME]` registers an API key through Keychain or an environment reference.
 No paid, local, or Fake model is connected by adding metadata.
 
 Trusted storage provides profile CAS updates that increment version and clear
@@ -169,10 +173,10 @@ stores the connection reference/event; database failure deletes that newly
 generated credential using a bounded context independent of request cancellation.
 Backend error text never escapes. Cleanup failure is explicit and requires
 reconciliation. Connection metadata serialization omits CredentialRef. Actual
-OAuth, refresh/logout side effects and OS keychain integration are later slices.
+OAuth and refresh/logout side effects are later slices; native macOS Keychain is implemented.
 A crash between SecretStore and SQLite can leave an orphan credential; these
 stores cannot commit atomically, and crash-time orphan reconciliation is not
-implemented here. No startup path claims working authentication.
+implemented here. No startup path claims working OAuth.
 
 ## SQLite migrations and transaction ownership
 
@@ -186,7 +190,7 @@ domain commits and migrations are never automatically replayed.
 
 Forward migrations and `PRAGMA user_version` commit together. Empty databases
 apply v1 (Agent config), v2 (Outbox/Inbox), v3 (model metadata), and v4 (Provider
-Probe and activation). Real v1/v2/v3 databases upgrade without changing identity,
+Probe and activation), and v5 (immutable endpoint bindings and snapshot usage). Real v1/v2/v3/v4 databases upgrade without changing identity,
 prior metadata/snapshots or existing Outbox/Inbox history. Failed DDL rolls back
 to the actual prior version. Newer schema
 versions fail closed; failed DDL rolls back. There is no downgrade or deletion.

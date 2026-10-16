@@ -33,7 +33,10 @@ var modelsSQL string
 //go:embed migrations/004_provider.sql
 var providerSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL}
+//go:embed migrations/005_local_provider.sql
+var localProviderSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL}
 
 type Store struct {
 	db   *sql.DB

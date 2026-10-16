@@ -50,27 +50,37 @@ type ToolSpec struct {
 }
 
 type GenerationRequest struct {
-	GenerationID string     `json:"generation_id"`
-	RunID        string     `json:"run_id"`
-	SessionID    string     `json:"session_id"`
-	Snapshot     Snapshot   `json:"model_snapshot"`
-	Messages     []Message  `json:"messages"`
-	Tools        []ToolSpec `json:"tools,omitempty"`
+	GenerationID     string     `json:"generation_id"`
+	OutputLimitBytes int        `json:"output_limit_bytes,omitempty"`
+	RunID            string     `json:"run_id"`
+	SessionID        string     `json:"session_id"`
+	Snapshot         Snapshot   `json:"model_snapshot"`
+	Messages         []Message  `json:"messages"`
+	Tools            []ToolSpec `json:"tools,omitempty"`
+}
+
+type TokenUsage struct {
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
 }
 
 type GenerationEvent struct {
-	GenerationID string    `json:"generation_id"`
-	Sequence     int64     `json:"sequence"`
-	Kind         string    `json:"kind"`
-	Text         string    `json:"text,omitempty"`
-	ToolCall     *ToolCall `json:"tool_call,omitempty"`
-	ErrorCode    string    `json:"error_code,omitempty"`
+	Usage        *TokenUsage `json:"usage,omitempty"`
+	GenerationID string      `json:"generation_id"`
+	Sequence     int64       `json:"sequence"`
+	Kind         string      `json:"kind"`
+	Text         string      `json:"text,omitempty"`
+	ToolCall     *ToolCall   `json:"tool_call,omitempty"`
+	ErrorCode    string      `json:"error_code,omitempty"`
 }
 
 type GenerationResult struct {
-	Text      string     `json:"text"`
-	ToolCalls []ToolCall `json:"tool_calls"`
-	Clipped   bool       `json:"clipped"`
+	Usage     *TokenUsage `json:"usage,omitempty"`
+	Text      string      `json:"text"`
+	ToolCalls []ToolCall  `json:"tool_calls"`
+	Clipped   bool        `json:"clipped"`
 }
 
 type LLMProvider interface {

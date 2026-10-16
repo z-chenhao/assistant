@@ -51,7 +51,7 @@ func (p Prober) Run(ctx context.Context, profile Profile) (ProbeResult, error) {
 	if strings.TrimSpace(connection.Text) == "" {
 		return result, ModelIncompatible
 	}
-	r := request("Call probe_echo with value OK.")
+	r := request("Call probe_echo with value OK. After its result, reply exactly with the tool result text.")
 	r.Tools = []ToolSpec{{Name: "probe_echo", InputSchema: `{"type":"object","properties":{"value":{"type":"string"}},"required":["value"]}`}}
 	called, err := p.Provider.Generate(ctx, r, nil)
 	if err != nil {
@@ -91,7 +91,9 @@ func (p Prober) Run(ctx context.Context, profile Profile) (ProbeResult, error) {
 		}
 		return result, ModelIncompatible
 	}
-	long, err := p.Provider.Generate(ctx, request("Produce a long output for clipping."), nil)
+	clipRequest := request("Produce a long output for clipping. Repeat ABCDEFGHIJKLMNOPQRSTUVWXYZ 100 times.")
+	clipRequest.OutputLimitBytes = 8
+	long, err := p.Provider.Generate(ctx, clipRequest, nil)
 	if err != nil {
 		return result, err
 	}
