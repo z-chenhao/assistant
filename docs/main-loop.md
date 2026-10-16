@@ -62,7 +62,7 @@ The Main foundation reserves the baseline's cancelled state.
 [The Task slice](tasks.md) now supplies create/search/append; controlled user
 pause/cancel uses the controlled [Task stop path](tasks.md). Waiting reasons use the baseline enum. Resource waits
 are recoverable; user-input waits become eligible when new steering arrives.
-Approval/external-event wake mechanics arrive with their respective slices.
+Approval wakes and resource waits use the durable Tool path in `docs/tools.md`; other external-event integrations arrive with their respective slices.
 
 Claims use an opaque token, monotonic epoch and five-second lease, renewed once
 per second. All Run, generation-acceptance and Tool mutations verify ownership;
@@ -108,9 +108,9 @@ state is authoritative, and Outbox notifications remain available to the relay.
 | --- | --- | --- | --- | --- | --- |
 | `builtin__text__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Main only in this slice | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
 
-The registry describes the frozen schema and resolves only Host-registered pure
+The registry describes the frozen schema and resolves only Host-registered
 definitions. The single Executor accepts/persists each invocation before
-execution, validates arguments, bounds concurrency to four, and commits each
+execution, validates arguments, applies bounded Host quotas and conflict keys, and commits each
 completion immediately. Model results use original declaration order even when
 calls finish in a different order. Direct calls are unique by Run, provider
 exchange and call ID; a provider may reuse a call ID in a later exchange.
@@ -118,8 +118,8 @@ Each invocation has its own Host-generated ID and idempotency key.
 
 Invalid echo arguments return `INVALID_ARGUMENT`. Unavailable tools return
 `NOT_FOUND`; these safe error objects contain only code/message/retryable.
-The registry rejects effectful definitions until the M3 policy/approval path
-exists. No `agent.run()`, Task tools, generic external execution, or approval
+The registry requires explicit effect metadata and the durable approval path
+for external effects (see `docs/tools.md`). No `agent.run()`, generic external transport, or
 bypass is exposed here. Unknown tools retain replay policy `never`; recovery
 can finish their rejection without executing a provider.
 

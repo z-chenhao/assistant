@@ -141,6 +141,16 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 			emit(r, "message_end", "", "")
 		case "tools":
 			results, err := o.Tools.Execute(execution, cp.ExchangeID, cp.Result.ToolCalls)
+			if errors.Is(err, tool.ErrSuspended) {
+				reason, waitErr := o.Tools.Store.WaitReason(work)
+				if waitErr != nil {
+					return waitErr
+				}
+				if err = o.Store.Wait(work, claim, r.Version, reason); err != nil {
+					return err
+				}
+				return nil
+			}
 			if err != nil {
 				return err
 			}

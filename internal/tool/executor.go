@@ -1,6 +1,5 @@
 // Package tool owns the single ToolSpec -> ToolInvocation -> Executor path.
-// Pure Tools and trusted internal Task controls are available. External effects
-// remain closed until the M3 policy/approval pipeline.
+// Direct calls and future Runtime facades share this durable boundary.
 package tool
 
 import (
@@ -40,27 +39,37 @@ func (r Result) ModelText() string {
 }
 
 type Spec struct {
-	Name         string `json:"name"`
-	Version      int    `json:"version"`
-	InputSchema  string `json:"input_schema"`
-	ReplayPolicy string `json:"replay_policy"`
-	Permission   string `json:"permission"`
+	Name           string `json:"name"`
+	Version        int    `json:"version"`
+	InputSchema    string `json:"input_schema"`
+	ReplayPolicy   string `json:"replay_policy"`
+	Permission     string `json:"permission"`
+	Risk           string `json:"risk,omitempty"`
+	TimeoutMS      int    `json:"timeout_ms,omitempty"`
+	OutputBytes    int    `json:"output_bytes,omitempty"`
+	Provider       string `json:"provider,omitempty"`
+	ConflictPolicy string `json:"conflict_policy,omitempty"`
 }
 
 type Definition struct {
-	Spec    Spec
-	Host    bool // Trusted Host builtins receive the accepted invocation, never model-supplied IDs.
-	Execute func(context.Context, string) Result
+	Spec         Spec
+	Host         bool // Trusted Host builtins receive the accepted invocation, never model-supplied IDs.
+	Execute      func(context.Context, string) Result
+	Invoke       func(context.Context, Request) Outcome
+	Query        func(context.Context, Request) Evidence
+	ConflictKeys func(string) []string
 }
 type Registry struct{ definitions map[string]Definition }
 
 func NewRegistry(definitions []Definition) (*Registry, error) {
 	r := &Registry{definitions: map[string]Definition{}}
 	for _, d := range definitions {
-		// Until M3 policy/approval exists, external effects remain closed.
-		// Task control is an internal transaction, bound to an accepted call.
-		if d.Spec.Name == "" || d.Spec.Version != 1 || d.Spec.ReplayPolicy != "safe" || !validDefinition(d) || !json.Valid([]byte(d.Spec.InputSchema)) {
+		// Policy is frozen at admission; providers cannot choose retry safety.
+		if d.Spec.Name == "" || d.Spec.Version != 1 || !validPolicy(d) || !validDefinition(d) || !json.Valid([]byte(d.Spec.InputSchema)) {
 			return nil, errors.New("invalid tool definition")
+		}
+		if _, valid := parseSchema(d.Spec.InputSchema); !valid {
+			return nil, errors.New("unsupported tool schema")
 		}
 		if _, exists := r.definitions[d.Spec.Name]; exists {
 			return nil, errors.New("duplicate tool definition")
@@ -73,7 +82,7 @@ func validDefinition(d Definition) bool {
 	if d.Host {
 		return d.Execute == nil && ((d.Spec.Name == "builtin__task__search" && d.Spec.Permission == "read_only") || (d.Spec.Name == "builtin__task__manage" && d.Spec.Permission == "task_control"))
 	}
-	return d.Execute != nil && d.Spec.Permission == "read_only"
+	return (d.Execute != nil && d.Invoke == nil && d.Spec.Permission == "read_only") || (d.Invoke != nil && d.Spec.Permission == "external_effect")
 }
 
 // Select verifies every frozen spec before constructing the role-specific view.
@@ -131,14 +140,18 @@ func (r *Registry) Resolve(name string) (Definition, bool) {
 }
 
 type Invocation struct {
-	ID     string
-	Call   llm.ToolCall
-	Status string
-	Result Result
+	ID         string
+	Call       llm.ToolCall
+	Status     string
+	WaitReason string
+	Key        string
+	Attempts   int
+	Result     Result
 }
 
 // Store is bound by the Host to an opaque Run claim. Every mutation fences.
 type Store interface {
+	PolicyStore
 	Accept(context.Context, string, []llm.ToolCall, []Spec) ([]Invocation, error)
 	Start(context.Context, string) error
 	Finish(context.Context, string, Result) error
@@ -180,66 +193,7 @@ func (e Executor) Execute(ctx context.Context, exchange string, calls []llm.Tool
 		go func() {
 			defer wg.Done()
 			for i := range jobs {
-				inv := invocations[i]
-				if inv.Status == "succeeded" || inv.Status == "failed" {
-					results[i] = inv.Result
-					continue
-				}
-				if ctx.Err() != nil {
-					errs[i] = ctx.Err()
-					continue
-				}
-				_, known := e.Registry.Resolve(inv.Call.Name)
-				// A missing Tool has no external execution to replay. A crash after
-				// its rejection admission can still finish the same denied record.
-				if inv.Status != "running" || known {
-					if err := e.Store.Start(ctx, inv.ID); err != nil {
-						errs[i] = err
-						continue
-					}
-				}
-				if e.Sink != nil {
-					e.Sink(Event{Kind: "tool_execution_start", InvocationID: inv.ID, Call: inv.Call})
-				}
-				result := Failure("NOT_FOUND")
-				if d, ok := e.Registry.Resolve(inv.Call.Name); ok {
-					callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-					if d.Host {
-						host, ok := e.Store.(HostStore)
-						if !ok {
-							result = Failure("PERMISSION_DENIED")
-						} else {
-							var hostErr error
-							result, hostErr = host.ExecuteBuiltin(callCtx, inv)
-							if hostErr != nil {
-								cancel()
-								errs[i] = hostErr
-								continue
-							}
-						}
-					} else {
-						result = d.Execute(callCtx, inv.Call.Arguments)
-					}
-					if callCtx.Err() != nil && !d.Host {
-						result = Failure("TIMEOUT")
-					}
-					cancel()
-				}
-				limitBytes := 16 << 10
-				if inv.Call.Name == "builtin__task__search" {
-					limitBytes = 64 << 10
-				}
-				if len(result.Text) > limitBytes {
-					result = Failure("RESOURCE_LIMIT")
-				}
-				if err := e.Store.Finish(ctx, inv.ID, result); err != nil {
-					errs[i] = err
-					continue
-				}
-				results[i] = result
-				if e.Sink != nil {
-					e.Sink(Event{Kind: "tool_execution_end", InvocationID: inv.ID, Call: inv.Call, Result: result})
-				}
+				results[i], errs[i] = e.executeOne(ctx, invocations[i])
 			}
 		}()
 	}
@@ -248,10 +202,154 @@ func (e Executor) Execute(ctx context.Context, exchange string, calls []llm.Tool
 	}
 	close(jobs)
 	wg.Wait()
+	// Return coordination failures before suspension; every independent result
+	// has already committed, regardless of original delivery order.
+	for _, err := range errs {
+		if err != nil && !errors.Is(err, ErrSuspended) {
+			return nil, err
+		}
+	}
 	for _, err := range errs {
 		if err != nil {
 			return nil, err
 		}
 	}
 	return results, nil
+}
+func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error) {
+	policyStore := e.Store
+	var err error
+	inv, err = policyStore.Prepare(ctx, inv.ID)
+	if err != nil {
+		return Result{}, err
+	}
+
+	switch inv.Status {
+	case "succeeded", "failed", "cancelled":
+		return inv.Result, nil
+	case "waiting":
+		return Result{}, ErrSuspended
+	}
+	if ctx.Err() != nil {
+		return Result{}, ctx.Err()
+	}
+	d, known := e.Registry.Resolve(inv.Call.Name)
+	if !known {
+		d.Spec = Spec{Permission: "read_only", ReplayPolicy: "safe"}
+	}
+	p := d.Spec.Policy()
+	request := Request{Arguments: inv.Call.Arguments, IdempotencyKey: inv.Key}
+	if inv.Status == "unknown" || (inv.Status == "running" && p.Replay != "safe") {
+
+		if inv.Status != "unknown" && p.Replay == "never" {
+			if err := policyStore.Unknown(ctx, inv.ID); err != nil {
+				return Result{}, err
+			}
+			return Failure("UNKNOWN_SIDE_EFFECT"), nil
+		}
+		if d.Query == nil {
+			return Failure("UNKNOWN_SIDE_EFFECT"), nil
+		}
+		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
+		evidence := d.Query(queryCtx, request)
+		cancel()
+		if evidence.State == "succeeded" || evidence.State == "failed" {
+			result := Normalize(evidence.Result)
+			if (evidence.State == "succeeded") != (result.Error == nil) || !result.terminal() || len(result.Text) > p.OutputBytes {
+				return Failure("UNKNOWN_SIDE_EFFECT"), nil
+			}
+			if err := policyStore.Reconcile(ctx, inv.ID, result); err != nil {
+				return Result{}, err
+			}
+			return result, nil
+		}
+		// unknown is terminal for retry purposes. Only an incomplete running
+		// query-before-retry call may proceed after authoritative absence.
+		if evidence.State != "absent" || inv.Status == "unknown" {
+			if inv.Status != "unknown" {
+				if err := policyStore.Unknown(ctx, inv.ID); err != nil {
+					return Result{}, err
+				}
+			}
+			return Failure("UNKNOWN_SIDE_EFFECT"), nil
+		}
+	}
+	if err := e.Store.Start(ctx, inv.ID); err != nil {
+		if errors.Is(err, ErrApprovalDenied) {
+			result := Failure("APPROVAL_DENIED")
+			if err = policyStore.Reject(ctx, inv.ID, result); err != nil {
+				return Result{}, err
+			}
+			return result, nil
+		}
+		if errors.Is(err, ErrResource) {
+			if err = policyStore.Defer(ctx, inv.ID, "resource", time.Time{}); err == nil {
+				err = ErrSuspended
+			}
+			return Result{}, err
+		}
+		return Result{}, err
+	}
+	if e.Sink != nil {
+		e.Sink(Event{Kind: "tool_execution_start", InvocationID: inv.ID, Call: inv.Call})
+	}
+	result := Failure("NOT_FOUND")
+	outcome := Outcome{}
+	if known {
+		callCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
+		if d.Host {
+			host, ok := e.Store.(HostStore)
+			if !ok {
+				result = Failure("PERMISSION_DENIED")
+			} else {
+				var err error
+				result, err = host.ExecuteBuiltin(callCtx, inv)
+				if err != nil {
+					cancel()
+					return Result{}, err
+				}
+			}
+		} else if d.Invoke != nil {
+			outcome = d.Invoke(callCtx, request)
+			result = outcome.Result
+		} else {
+			result = d.Execute(callCtx, inv.Call.Arguments)
+		}
+		if callCtx.Err() != nil && !d.Host {
+			if d.Spec.Permission == "external_effect" {
+				outcome.Ambiguous = true
+			} else if ctx.Err() != nil {
+				result = Failure("CANCELLED")
+			} else {
+				result = Failure("TIMEOUT")
+			}
+		}
+		cancel()
+	}
+	result = Normalize(result)
+	if outcome.Ambiguous || (result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT") {
+
+		if err := policyStore.Unknown(context.WithoutCancel(ctx), inv.ID); err != nil {
+			return Result{}, err
+		}
+		return Failure("UNKNOWN_SIDE_EFFECT"), nil
+	}
+	// Providers may mark only a known pre-effect infrastructure failure as
+	// transient. Timeout, business and ambiguous outcomes never enter retry.
+	if outcome.Transient && result.Error != nil && result.Error.Code == "PROVIDER_UNAVAILABLE" && inv.Attempts < 2 {
+		if err := policyStore.Defer(ctx, inv.ID, "retry_backoff", time.Now().Add(time.Duration(50<<inv.Attempts)*time.Millisecond)); err != nil {
+			return Result{}, err
+		}
+		return Result{}, ErrSuspended
+	}
+	if len(result.Text) > p.OutputBytes {
+		result = Failure("RESOURCE_LIMIT")
+	}
+	if err := e.Store.Finish(context.WithoutCancel(ctx), inv.ID, result); err != nil {
+		return Result{}, err
+	}
+	if e.Sink != nil {
+		e.Sink(Event{Kind: "tool_execution_end", InvocationID: inv.ID, Call: inv.Call, Result: result})
+	}
+	return result, nil
 }

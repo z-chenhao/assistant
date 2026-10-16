@@ -18,7 +18,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -129,6 +129,23 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 				}
 				if value.Text != "" {
 					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: value.Text}); err != nil {
+						return err
+					}
+					sequence++
+				}
+				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "completed"})
+				break
+			}
+			if (fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__send") {
+				sequence := int64(1)
+				if last.Role == "user" {
+					call := llm.ToolCall{ID: "effect", Name: "mcp__fixture__send", Arguments: last.Text}
+					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "tool_call", ToolCall: &call}); err != nil {
+						return err
+					}
+					sequence++
+				} else {
+					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: "Observed effect result: " + last.Text}); err != nil {
 						return err
 					}
 					sequence++

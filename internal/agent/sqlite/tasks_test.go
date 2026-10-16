@@ -264,7 +264,7 @@ func TestTaskMigrationFromEveryPriorVersion(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer store.Close()
-			if scalar(t, store, `PRAGMA user_version`) != 9 {
+			if scalar(t, store, `PRAGMA user_version`) != 10 {
 				t.Fatal("migration version")
 			}
 		})

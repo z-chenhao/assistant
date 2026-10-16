@@ -27,7 +27,7 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	id, capID := newID(), newID()
 	specs, _ := encoded(r.registry.Describe())
 	now := time.Now().UnixMicro()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot VALUES(?,?,'main',?,?,?,0,?,?)`, capID, configVersion, digest(specs), digest("[]"), agentID, specs, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), digest("[]"), agentID, specs, now); err != nil {
 		return "", err
 	}
 	cp, _ := encoded(agent.Checkpoint{Phase: "model", Messages: append(agent.MainContext(nil), updates...)})
@@ -59,7 +59,7 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	raw, _ := encoded(specs)
 	id, capID := newID(), newID()
 	now := time.Now().UnixMicro()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot VALUES(?,?,'worker',?,?,?,0,?,?)`, capID, config, digest(raw), digest("[]"), agentID, raw, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,0,?,?,2)`, capID, config, digest(raw), digest("[]"), agentID, raw, now); err != nil {
 		return err
 	}
 	// Prior instructions remain part of the durable Task context on continuation;
@@ -311,6 +311,13 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 							return err
 						}
 					} else {
+						var rootID string
+						if err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE task_id=? AND worker_position='root' AND status IN ('queued','running','waiting')`, taskID).Scan(&rootID); err != nil {
+							return err
+						}
+						if err = invalidateApprovals(ctx, tx, rootID); err != nil {
+							return err
+						}
 						if err = runEvent(ctx, tx, taskID, "task.steering", epoch); err != nil {
 							return err
 						}

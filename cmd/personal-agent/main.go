@@ -43,7 +43,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|chat send [REQUEST_KEY]|chat work|chat history|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|chat send [REQUEST_KEY]|chat work|chat history|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -72,11 +72,12 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		}
 	}
 	chatCommand := flags.Arg(0) == "chat" && ((flags.Arg(1) == "send" && (flags.NArg() == 2 || flags.NArg() == 3)) || ((flags.Arg(1) == "work" || flags.Arg(1) == "history") && flags.NArg() == 2))
+	approvalCommand := flags.Arg(0) == "approval" && ((flags.NArg() == 2 && (flags.Arg(1) == "list" || flags.Arg(1) == "reconcile")) || (flags.NArg() == 4 && (flags.Arg(1) == "approve" || flags.Arg(1) == "deny")))
 	terminalCommand := flags.NArg() == 1 && flags.Arg(0) == "tui"
 	if f, ok := in.(*os.File); ok && flags.NArg() == 0 && isatty.IsTerminal(f.Fd()) {
 		terminalCommand = true
 	}
-	if !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	if !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -136,6 +137,34 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			}
 		})
 	}
+	if approvalCommand {
+		switch flags.Arg(1) {
+		case "list":
+			values, err := application.Approvals(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(values)
+		case "reconcile":
+			values, err := application.ReconcileTools(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(values)
+		default:
+			decision := "approved"
+			if flags.Arg(1) == "deny" {
+				decision = "denied"
+			}
+			if err := application.DecideApproval(ctx, flags.Arg(2), flags.Arg(3), decision); err != nil {
+				return err
+			}
+		}
+		return json.NewEncoder(out).Encode(struct {
+			Status string `json:"status"`
+		}{"recorded"})
+	}
+
 	if terminalCommand {
 		input, ok := in.(io.ReadCloser)
 		if !ok {

@@ -647,7 +647,7 @@ func TestV6MainMigrationPreservesDataAndRollsBack(t *testing.T) {
 			}
 			defer s.Close()
 			d, err := s.Diagnostics(context.Background())
-			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 9 {
+			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 10 {
 				t.Fatal("prior identity changed", d, err)
 			}
 		})

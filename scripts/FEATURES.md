@@ -140,3 +140,19 @@ are cleaned up. See [Task operations](../docs/tasks.md) for transitions and limi
 | Epoch/owner fencing | Current Task tools and Host persistence boundary | `fence`, `Claim`, `AcceptGeneration`, `Trace` | Go contracts repeated five times: old checkpoint/progress/generation/Tool/reply/terminal/trace writes rejected; usage rollback; out-of-order response cannot change new Task |
 | Tree stop and completion | Internal stored tree relationships | `recoverStopsTx`, `finishTask` | Go synthetic-tree contracts: leaf-before-parent, waiting descendants, safe cancellation/unsafe unknown, no unknown replay, last descendant releases one-shot completion, ongoing stays active; Child admission remains M4 |
 | Shutdown versus user stop | SIGTERM/context cancellation; later `chat work` | Shared Loop, Actor release | Current generation retained and same Root reclaimed after shutdown; Task/epoch untouched; user stop gives terminal Root and explicit reason |
+
+| Unified Tool feature | Reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Frozen approval and decision recovery | `approval list`, `approval approve/deny ID HASH`, `chat work` | `tool.Executor`, `sqlite.tools.Prepare/Start`, `Runs.Decide` | `evidence/tools-{1..5}.json`: persisted waiting with no active claim, CLI restart, exact hash, duplicate callback, denial and no early effect |
+| Steering invalidates granted/unexecuted action | `chat send` or `task_manage(append)` while approval waits | `Runs.Submit`, `tools.ExecuteBuiltin`, `invalidateApprovals` | CLI GC-12 fragment changes Monday to Tuesday; only new frozen Tuesday action executes; Go expiry/wrong principal/hash/immutability regressions |
+| External effect recovery and reconciliation | `chat work`, `approval reconcile` | `Executor.executeOne`, `Runs.ReconcileUnknown` | Eight real SIGKILL/restart scenarios per harness run; separate Fake ledger, stable keys, query-before-retry and never; unknown absence does not authorize retry |
+| Tool capacity and independent results | Parallel model Tool batch | `sqlite.tools.Start/Defer/Finish`, `Executor.Execute` | `TestToolQuotasAndDynamicConflictKeys` (all five scopes and intersecting keys), `TestToolResultsCommitIndependentlyAndDeliverInDeclarationOrder`, race detector |
+| Host errors and schema/policy boundary | Direct Tool results | `tool.NewRegistry/Validate/Normalize` | Strict schema, forged fields/duplicate keys rejected; bounded transient retry and sanitized raw provider errors; no model credentials available to adapters |
+
+Tool harness lifecycle: **Launch** `MainHarness` with explicit Fake provider/tool;
+**Doctor** model add/test/select and ingress readback; **Drive** ordinary chat and
+approval CLI commands; **Evidence** domain state, approval records, Outbox and
+separate external ledger plus kill checkpoints; **Cleanup** join every child and
+remove isolated roots. `make verify` runs five consecutive repetitions. Full
+GC-11/12/13 product scenarios, Code Mode and Artifact spillover are not claimed by
+these Tool fragments. Operational details: `docs/tools.md`.
