@@ -106,6 +106,14 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
 			if fixture == "tasks" && hasTool(request.Tools, "builtin__text__echo") {
+				// Hold an actual accepted Worker generation while keeping the RPC
+				// peer responsive to cancellation. A new Root gets the appended
+				// instruction as its last message and can finish normally.
+				if strings.Contains(last.Text, "Task anchor:") && strings.Contains(last.Text, "Hold worker") {
+					err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "Worker waiting for cancellation"})
+					waiting[request.GenerationID] = 2
+					break
+				}
 				value, cause := tasksReply(request)
 				sequence := int64(1)
 				if cause != nil {

@@ -1,6 +1,6 @@
 # Task delegation and Root recovery
 
-ERII-11 is the first M2 slice. It adds Main-only Task discovery, create/append,
+The M2 slices add Main-only Task discovery, create/append/pause/cancel,
 independent Root execution and durable Main follow-ups. Use a selected, probed
 model through the existing TUI or `chat send` / `chat work` commands. There is
 one shared Agent Loop and one ToolInvocation pipeline.
@@ -22,12 +22,46 @@ Artifact references return `NOT_FOUND`. Responses expose no Run/invocation IDs,
 credentials, SQL, budgets or internal traces. Infrastructure write failures stop
 at a recoverable boundary instead of becoming a misleading Tool success.
 
-`pause` and `cancel` retain their canonical schema arms but return
-`PERMISSION_DENIED` in this internal slice. Controlled pause/cancel, desired-state
-recovery and ongoing-Task end policy belong to ERII-12. No nonempty ArtifactRef
-is admitted before M3 supplies an authoritative ArtifactStore. No Child/JS Tool,
+No nonempty ArtifactRef is admitted before M3 supplies an authoritative
+ArtifactStore. No Child/JS Tool,
 external effect, Approval or external channel delivery is enabled here. This is
-not a claim that the full M2 or Durable Replay milestone is complete.
+not a claim of full Security or Durable Replay semantics.
+
+## Controlled stop and continuation
+
+| Current Task | pause | cancel | append |
+| --- | --- | --- | --- |
+| active | paused, epoch +1 | cancelled, epoch +1 | Stable Steering if a Root is active; otherwise new Root, epoch +1 |
+| paused | Same receipt state, no epoch change | cancelled, epoch +1 | active, new Root, epoch +1 |
+| completed | INVALID_ARGUMENT | INVALID_ARGUMENT | active, new Root, epoch +1 |
+| cancelled | INVALID_ARGUMENT | Same receipt state, no epoch change | active, new Root, epoch +1 |
+
+Stop acceptance atomically persists Task status/epoch, Run and invocation desired
+state, receipt and Outbox. This immediately closes business-write and new-work
+admission. The owner observes intent every 100 ms, cancels its safe provider/Tool
+context, joins the current step, then settles the old Run as `cancelled` with
+`task_paused` or `task_cancelled`. Already committed exchanges, Tool results,
+instructions and progress remain available to the new Root as framed Task data.
+An in-flight response arriving after acceptance is rejected, including its usage
+write. Stop/progress events do not wake Main with a Worker business result.
+
+Cancellation covers all current Task tree members and their invocations. The
+scanner settles leaves before parents; live owners retain only lease/stop
+authority, while expired or unclaimed work settles without a business claim.
+Every claim-bound business write checks both ownership and the Task epoch.
+An append racing stop waits outside the database transaction for the old tree
+boundary, then atomically saves instruction/reactivation/new Root. The database
+retains its one nonterminal Root constraint. A call interrupted during admission
+remains recoverable under its frozen ToolInvocation and creates no partial append.
+
+Only the same terminal Root's result is reported after its last descendant ends.
+Host-owned `completion_policy` defaults to `once`; `ongoing` keeps the Task active
+when one Root ends. The current model-visible create Tool makes one-shot Tasks;
+no new policy argument is exposed. Future Automation uses the Host policy.
+M2 admits only safe pure Tools. Synthetic unsafe-invocation tests prove the
+conservative `unknown` stop fallback and no replay, but do not establish M3
+approval, external reconciliation or exactly-once side effects. Child topology
+tests exercise stored relationships; actual Child admission remains M4 work.
 
 ## Ownership and acceptance
 
@@ -107,9 +141,10 @@ independently of the retained anchors, so all 50 rows fit the Tool result limit.
 
 ## Migration and verification
 
-State schema v8 extends v7 without rewriting existing Runs, snapshots or
-Conversation. Frozen v7 capability views continue through the same registry's
-spec-checked selection. Forward tests cover empty and every v1–v7 database;
+State schema v9 extends v8 with immutable completion policy, invocation stop
+intent and legal stop/epoch transitions, without rewriting existing Runs,
+snapshots or Conversation. Frozen capabilities retain their exact schemas.
+Forward tests cover empty and every v1–v8 database, including v8 rollback;
 existing identity/config/event checks remain in place. Future schemas fail fast.
 
 `make test`, `make test-race`, `make lint`, and `make verify` run the deterministic
@@ -120,9 +155,15 @@ model reuse, one completion per Root and delivery dedup. `evidence/tasks.json`
 contains before/after state and terminal output. `evidence/local-provider.json`
 also drives Task creation, independent Root execution and runtime-framed Main
 follow-up through the actual Node/Pi Bridge and owned HTTP peer. `evidence/task-cases.json`
-contains 24 locked GC-02/04/08/18 Task fragments across wording, noise and key
-order variants. SC-01/10/12 receive the applicable contracts; SC-04/05 remain
-ERII-12 work. Scripted fragments receive no semantic score. Live-model quality,
+contains 24 locked `m2-v2` GC-02/04/08/18 Task fragments across wording, noise and
+key order variants, including GC-04 pause/continuation and GC-08 cancel/continuation.
+SC-01/04/05/10/12 receive applicable contracts. `verify_task_control.py` adds live
+PTY cancellation and three real SIGKILL boundaries around stop acceptance and
+settlement, repeated five times by `make verify`; evidence is
+`evidence/task-control-{1..5}.json`. Go contracts cover transition rejection,
+duplicate and concurrent append/pause/cancel, stale results/claims, synthetic
+descendant propagation, retained results, one-shot/ongoing policy and shutdown.
+Scripted fragments receive no semantic score. Live-model quality,
 online accounts and full product Golden Case gates remain unexecuted.
 
 Shutdown joins the currently owned work at a stable boundary. SIGKILL recovery

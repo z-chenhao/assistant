@@ -264,7 +264,7 @@ func TestTaskMigrationFromEveryPriorVersion(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer store.Close()
-			if scalar(t, store, `PRAGMA user_version`) != 8 {
+			if scalar(t, store, `PRAGMA user_version`) != 9 {
 				t.Fatal("migration version")
 			}
 		})
@@ -617,7 +617,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rows.Close()
-	expected := []string{"INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "PERMISSION_DENIED", "PERMISSION_DENIED"}
+	expected := []string{"INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
 	i := 0
 	for rows.Next() {
 		var raw string

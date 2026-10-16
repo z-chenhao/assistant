@@ -235,6 +235,18 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 			if err := fence(ctx, tx, c); err != nil {
 				return err
 			}
+		} else {
+			owner, ok := c.(*claim)
+			if !ok {
+				return agent.ErrClaimLost
+			}
+			var valid int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run r JOIN run_claim c USING(run_id) WHERE r.run_id=? AND c.epoch=? AND r.status IN ('completed','failed') AND r.desired_state='running' AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch))`, owner.id, owner.epoch).Scan(&valid); err != nil {
+				return err
+			}
+			if valid != 1 {
+				return agent.ErrClaimLost
+			}
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT coalesce(max(sequence),0)+1 FROM run_trace WHERE run_id=?`, c.RunID()).Scan(&e.Sequence); err != nil {
 			return err

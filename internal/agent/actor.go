@@ -23,6 +23,8 @@ type ActorStore interface {
 	Claim(context.Context, string) (RunClaim, error)
 	Renew(context.Context, RunClaim) error
 	Release(context.Context, RunClaim) error
+	StopRequested(context.Context, RunClaim) (bool, error)
+	SettleStop(context.Context, RunClaim) (bool, error)
 	Initialize(context.Context, RunClaim) error
 	ToolStore(RunClaim) tool.Store
 	Trace(context.Context, RunClaim, Event) (Event, error)
@@ -121,22 +123,35 @@ func (a Actor) Drain(ctx context.Context) error {
 }
 func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 	work, stop := context.WithCancel(ctx)
+	execution, cancelExecution := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelExecution()
 	done := make(chan struct{})
 	var heartbeat sync.WaitGroup
 	heartbeat.Add(1)
 	go func() {
 		defer heartbeat.Done()
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
+		lastRenewed := time.Now()
 		for {
 			select {
 			case <-done:
 				return
 			case <-ticker.C:
+				requested, err := a.Store.StopRequested(context.WithoutCancel(work), claim)
+				if requested || err != nil {
+					cancelExecution()
+					stop()
+				}
+				if time.Since(lastRenewed) < time.Second {
+					continue
+				}
 				if a.Store.Renew(context.WithoutCancel(work), claim) != nil {
+					cancelExecution()
 					stop()
 					return
 				}
+				lastRenewed = time.Now()
 			}
 		}
 	}()
@@ -158,13 +173,22 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 				executor := tool.Executor{Registry: registry, Store: a.Store.ToolStore(claim), Concurrency: 4, Sink: func(e tool.Event) {
 					emit(Event{Kind: e.Kind, RunID: id, OccurredAt: time.Now().UTC(), ToolCallID: e.Call.ID})
 				}}
-				err = RunAgentLoop(work, claim, LoopOptions{Store: a.Store, Provider: a.Provider, Tools: executor, Sink: emit})
+				err = RunAgentLoop(work, claim, LoopOptions{Store: a.Store, Provider: a.Provider, Tools: executor, Sink: emit, Execution: execution})
 			}
 		}
 	}
 	close(done)
 	heartbeat.Wait()
 	stop()
+	// Only the matching owner can acknowledge that its current step has joined.
+	// A scanner may do this after lease expiry when the owner died.
+	settled, settleErr := a.Store.SettleStop(context.WithoutCancel(ctx), claim)
+	if settleErr != nil && !errors.Is(settleErr, ErrClaimLost) {
+		return settleErr
+	}
+	if settled {
+		return nil
+	}
 	// Terminal Runs have already relinquished ownership. Boundary stops
 	// release the lease and keep the nonterminal Run recoverable.
 	releaseErr := a.Store.Release(context.WithoutCancel(ctx), claim)

@@ -1,0 +1,539 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/erii/internal/tool"
+)
+
+func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.GenerationResult, error)) (*Store, *Runs, agent.Actor) {
+	t.Helper()
+	s, r, a, p := taskFixture(t)
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if isRoot(req) {
+			if root != nil {
+				return root(req)
+			}
+			return llm.GenerationResult{Text: "committed business result"}, nil
+		}
+		last := req.Messages[len(req.Messages)-1]
+		if last.Role == "tool" || isFollowup(req) {
+			return llm.GenerationResult{Text: "Main acknowledgement"}, nil
+		}
+		op := strings.Fields(last.Text)[0]
+		request := task.ManageRequest{Operation: op}
+		if op == "create" {
+			request.Task = "Wedding plan with stable progress"
+		} else {
+			if err := s.db.QueryRow(`SELECT task_ref FROM task LIMIT 1`).Scan(&request.TaskRef); err != nil {
+				return llm.GenerationResult{}, err
+			}
+			if op == "append" {
+				request.Instruction = "Continue with the new date"
+			}
+		}
+		if op == "race" {
+			args := []string{}
+			for _, action := range []string{"pause", "append", "cancel"} {
+				q := task.ManageRequest{Operation: action, TaskRef: request.TaskRef}
+				if action == "append" {
+					q.Instruction = "Concurrent new date"
+				}
+				raw, _ := json.Marshal(q)
+				args = append(args, string(raw))
+			}
+			return calls(task.ManageName, args...), nil
+		}
+		raw, _ := json.Marshal(request)
+		args := []string{string(raw)}
+		if strings.Contains(last.Text, "duplicate") {
+			args = append(args, string(raw))
+		}
+		return calls(task.ManageName, args...), nil
+	}
+	return s, r, a
+}
+
+func controlMain(t *testing.T, r *Runs, a agent.Actor, key, text string) {
+	t.Helper()
+	receipt := mustSubmit(t, a, key, text)
+	c, err := r.Claim(context.Background(), receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = executeTaskRun(t, a, r, context.Background(), c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func rootClaim(t *testing.T, s *Store, r *Runs) agent.RunClaim {
+	t.Helper()
+	var id string
+	if err := s.db.QueryRow(`SELECT run_id FROM run WHERE kind='worker' AND worker_position='root' AND status IN ('queued','running','waiting')`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	c, err := r.Claim(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func TestTaskControlPauseFencesLateWritesAndContinueNewRoot(t *testing.T) {
+	s, r, a := controlFixture(t, nil)
+	ctx := context.Background()
+	controlMain(t, r, a, "create", "create")
+	c := rootClaim(t, s, r)
+	if err := r.Progress(ctx, c, "Venue comparison saved"); err != nil {
+		t.Fatal(err)
+	}
+	run, err := r.Load(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen, err := r.Generation(ctx, c, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controlMain(t, r, a, "pause", "pause duplicate")
+	if scalar(t, s, `SELECT count(*) FROM task WHERE status='paused' AND task_epoch=2`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='running' AND desired_state='task_paused'`, c.RunID()) != 1 {
+		t.Fatal("pause did not persist intent before settling the live owner")
+	}
+	for name, check := range map[string]func() error{
+		"checkpoint": func() error { return r.Checkpoint(ctx, c, run.Version, run.Checkpoint) },
+		"progress":   func() error { return r.Progress(ctx, c, "late") },
+		"generation": func() error { _, e := r.Generation(ctx, c, run); return e },
+		"acceptance": func() error {
+			return s.Models().RecordUsageAnd(ctx, gen.Request, llm.GenerationResult{Text: "late"}, 0, nil, s.AcceptGeneration)
+		},
+		"tool admission": func() error { _, e := r.ToolStore(c).Accept(ctx, gen.Request.GenerationID, nil, run.Tools); return e },
+		"tool start":     func() error { return r.ToolStore(c).Start(ctx, "late") },
+		"tool finish":    func() error { return r.ToolStore(c).Finish(ctx, "late", tool.Result{Text: "late"}) },
+		"reply":          func() error { _, e := r.PrepareReply(ctx, c, run); return e },
+		"complete":       func() error { _, e := r.Complete(ctx, c, run.Version); return e },
+		"fail":           func() error { return r.Fail(ctx, c, run.Version, "PROVIDER_UNAVAILABLE") },
+		"trace":          func() error { _, e := r.Trace(ctx, c, agent.Event{Kind: "agent_end"}); return e },
+	} {
+		if err := check(); !errors.Is(err, agent.ErrClaimLost) {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	if scalar(t, s, `SELECT count(*) FROM provider_usage u JOIN model_generation g USING(generation_id) WHERE g.run_id=?`, c.RunID()) != 0 {
+		t.Fatal("late usage accepted")
+	}
+	if _, err = r.Claim(ctx, c.RunID()); !errors.Is(err, agent.ErrBusy) {
+		t.Fatal("stopped run claimed", err)
+	}
+	if ok, err := r.SettleStop(ctx, c); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='cancelled' AND error_code='task_paused'`, c.RunID()) != 1 {
+		t.Fatal("old root not cancelled with reason")
+	}
+	before := scalar(t, s, `SELECT count(*) FROM event_outbox`)
+	for range 3 {
+		if err := r.recoverStops(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if scalar(t, s, `SELECT count(*) FROM event_outbox`) != before {
+		t.Fatal("duplicate recovery changed state")
+	}
+	controlMain(t, r, a, "continue", "append")
+	if scalar(t, s, `SELECT count(*) FROM task WHERE status='active' AND task_epoch=3 AND progress_summary='Venue comparison saved'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker'`) != 2 {
+		t.Fatal("continue lost context/epoch/new root")
+	}
+	if err := s.Models().RecordUsageAnd(ctx, gen.Request, llm.GenerationResult{Text: "out of order"}, 0, nil, s.AcceptGeneration); !errors.Is(err, agent.ErrClaimLost) {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status='completed'`) != 1 {
+		t.Fatal("stale result reported")
+	}
+}
+
+func TestTaskControlTransitionsAndIdempotentReceipts(t *testing.T) {
+	for _, end := range []string{"completed", "cancelled", "paused"} {
+		t.Run(end, func(t *testing.T) {
+			s, r, a := controlFixture(t, nil)
+			controlMain(t, r, a, "create", "create")
+			if end == "completed" {
+				mustDrain(t, a)
+			} else if end == "paused" {
+				controlMain(t, r, a, "pause", "pause duplicate")
+			} else {
+				controlMain(t, r, a, "cancel", "cancel duplicate")
+			}
+			epoch := scalar(t, s, `SELECT task_epoch FROM task`)
+			if end != "completed" {
+				controlMain(t, r, a, "same", ""+map[string]string{"paused": "pause", "cancelled": "cancel"}[end])
+				if scalar(t, s, `SELECT task_epoch FROM task`) != epoch {
+					t.Fatal("duplicate stop incremented epoch")
+				}
+			}
+			if end == "paused" {
+				controlMain(t, r, a, "cancel-after-pause", "cancel")
+				epoch++
+			}
+			controlMain(t, r, a, "illegal", "pause")
+			if scalar(t, s, `SELECT task_epoch FROM task`) != epoch {
+				t.Fatal("illegal stop mutated task")
+			}
+			controlMain(t, r, a, "append", "append duplicate")
+			if scalar(t, s, `SELECT task_epoch FROM task`) != epoch+1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 {
+				t.Fatal("reactivation/dedup")
+			}
+			mustDrain(t, a)
+		})
+	}
+}
+
+func TestTaskControlAppendWaitsOutsideTransactionForPauseBoundary(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	s, r, a := controlFixture(t, func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		once.Do(func() { close(entered); <-release })
+		return llm.GenerationResult{Text: "late held response"}, nil
+	})
+	waiting := make(chan struct{})
+	var waitingOnce sync.Once
+	s.MainBoundary = func(name string) {
+		if name == "before_append_stop_wait" {
+			waitingOnce.Do(func() { close(waiting) })
+		}
+	}
+	controlMain(t, r, a, "create", "create")
+	finished := make(chan error, 1)
+	go func() { finished <- a.Drain(context.Background()) }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("root never started")
+	}
+	controlMain(t, r, a, "pause", "pause")
+	receipt := mustSubmit(t, a, "append", "append")
+	c, err := r.Claim(context.Background(), receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appended := make(chan error, 1)
+	go func() { appended <- executeTaskRun(t, a, r, context.Background(), c) }()
+	select {
+	case <-waiting:
+	case <-time.After(5 * time.Second):
+		t.Fatal("append did not wait")
+	}
+	if scalar(t, s, `SELECT count(*) FROM task_instruction`) != 0 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker'`) != 1 {
+		t.Fatal("append created another live Root")
+	}
+	close(release)
+	for _, done := range []chan error{appended, finished} {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("stop/append did not converge")
+		}
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled' AND error_code='task_paused'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status='completed' AND task_epoch=3`) != 1 {
+		t.Fatal("race did not converge to new completed Root")
+	}
+}
+
+func addControlChild(t *testing.T, s *Store, parent, id string) {
+	t.Helper()
+	if _, err := s.db.Exec(`INSERT INTO run(run_id,agent_id,conversation_id,task_id,parent_run_id,root_run_id,kind,worker_position,status,task_epoch,depth,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) SELECT ?,agent_id,conversation_id,task_id,run_id,root_run_id,'worker','child','queued',task_epoch,depth+1,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at+1,updated_at+1,1 FROM run WHERE run_id=?`, id, parent); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskControlCancelTreeAndInvocationOutcomes(t *testing.T) {
+	s, r, a := controlFixture(t, nil)
+	ctx := context.Background()
+	controlMain(t, r, a, "create", "create")
+	c := rootClaim(t, s, r)
+	run, err := r.Load(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen, err := r.Generation(ctx, c, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := calls("builtin__text__echo", `{"text":"saved"}`, `{"text":"in flight"}`, `{"text":"queued"}`)
+	response.ToolCalls = append(response.ToolCalls, llm.ToolCall{ID: "unsafe-fixture", Name: "unavailable_external", Arguments: `{}`})
+	if err = s.Models().RecordUsageAnd(ctx, gen.Request, response, 0, nil, s.AcceptGeneration); err != nil {
+		t.Fatal(err)
+	}
+	ts := r.ToolStore(c)
+	invs, err := ts.Accept(ctx, gen.Request.GenerationID, response.ToolCalls, run.Tools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, i := range []int{0, 1, 3} {
+		if err = ts.Start(ctx, invs[i].ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = ts.Finish(ctx, invs[0].ID, tool.Result{Text: "saved result"}); err != nil {
+		t.Fatal(err)
+	}
+	addControlChild(t, s, c.RunID(), "child")
+	addControlChild(t, s, "child", "grandchild")
+	grand, err := r.Claim(ctx, "grandchild")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gr, err := r.Load(ctx, grand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.Wait(ctx, grand, gr.Version, "external_event"); err != nil {
+		t.Fatal(err)
+	}
+	controlMain(t, r, a, "cancel", "cancel duplicate")
+	if scalar(t, s, `SELECT count(*) FROM run WHERE parent_run_id IS NOT NULL AND status='cancelled' AND error_code='task_cancelled'`) != 2 {
+		t.Fatal("descendant/wait cancellation missing")
+	}
+	if stopped, err := r.SettleStop(ctx, c); err != nil || !stopped {
+		t.Fatal(stopped, err)
+	}
+	for i, want := range []string{"succeeded", "cancelled", "cancelled", "unknown"} {
+		if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND status=?`, invs[i].ID, want) != 1 {
+			t.Fatal("invocation outcome", i, want)
+		}
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled'`) != 3 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+		t.Fatal("tree cancel produced followup or left work")
+	}
+	controlMain(t, r, a, "continue", "append")
+	var contextJSON string
+	if err = s.db.QueryRow(`SELECT checkpoint_json FROM run WHERE kind='worker' AND status='queued'`).Scan(&contextJSON); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(contextJSON, "saved result") {
+		t.Fatal("committed tool context lost")
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND status='unknown' AND attempt_count=1`, invs[3].ID) != 1 {
+		t.Fatal("unknown replayed")
+	}
+}
+
+func TestTaskControlCompletesOnlyFinishedOneShotTree(t *testing.T) {
+	s, r, a := controlFixture(t, nil)
+	ctx := context.Background()
+	controlMain(t, r, a, "create", "create")
+	c := rootClaim(t, s, r)
+	addControlChild(t, s, c.RunID(), "child")
+	if err := executeTaskRun(t, a, r, ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM task WHERE status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+		t.Fatal("Task completed before descendant")
+	}
+	child, err := r.Claim(ctx, "child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = executeTaskRun(t, a, r, ctx, child); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM task WHERE status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update WHERE root_run_id=?`, c.RunID()) != 1 {
+		t.Fatal("final descendant did not complete Task/root result")
+	}
+	mustDrain(t, a)
+	// Ongoing is Host-owned policy; no extra model-visible creation parameter.
+	if err = r.write(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) SELECT 'ongoing','task:ongoing',agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,'active',1,created_at+1,updated_at+1,1,'ongoing' FROM task LIMIT 1`)
+		if err != nil {
+			return err
+		}
+		return r.createRoot(ctx, tx, "ongoing")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM task WHERE task_id='ongoing' AND status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE task_id='ongoing' AND status='completed'`) != 1 {
+		t.Fatal("ongoing Task ended with one Root")
+	}
+}
+
+func TestTaskControlV8MigrationPreservesStateAndRollsBack(t *testing.T) {
+	dir := t.TempDir()
+	ctx := context.Background()
+	db, err := sql.Open("sqlite", filepath.Join(dir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err = migrate(ctx, db, migrations[:8]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version) VALUES('prior','task:prior','agent','conversation','title','immutable anchor','[]','active',1,100,100,1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err = migrate(ctx, db, append(append([]string{}, migrations[:8]...), taskControlSQL+"; INVALID DDL")); err == nil {
+		t.Fatal("invalid migration accepted")
+	}
+	var version, columns int
+	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('task') WHERE name='completion_policy'`).Scan(&columns); err != nil {
+		t.Fatal(err)
+	}
+	if version != 8 || columns != 0 {
+		t.Fatal("partial migration persisted", version, columns)
+	}
+	if err = migrate(ctx, db, migrations); err != nil {
+		t.Fatal(err)
+	}
+	var anchor, policy string
+	if err = db.QueryRow(`SELECT anchor_task,completion_policy FROM task WHERE task_id='prior'`).Scan(&anchor, &policy); err != nil || anchor != "immutable anchor" || policy != "once" {
+		t.Fatal(anchor, policy, err)
+	}
+	for _, query := range []string{
+		`UPDATE task SET status='paused',version=version+1 WHERE task_id='prior'`,
+		`UPDATE task SET task_epoch=task_epoch+2,version=version+1 WHERE task_id='prior'`,
+		`UPDATE task SET status='failed',version=version+1 WHERE task_id='prior'`,
+		`UPDATE task SET completion_policy='ongoing',version=version+1 WHERE task_id='prior'`,
+	} {
+		if _, err = db.Exec(query); err == nil {
+			t.Fatal("illegal transition accepted", query)
+		}
+	}
+	if _, err = db.Exec(`UPDATE task SET status='paused',task_epoch=2,version=version+1 WHERE task_id='prior'`); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskControlAppendPauseCancelRace(t *testing.T) {
+	for range 10 {
+		s, r, a := controlFixture(t, nil)
+		controlMain(t, r, a, "create", "create")
+		controlMain(t, r, a, "race", "race")
+		if scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 {
+			t.Fatal("concurrent append lost/duplicated")
+		}
+		if scalar(t, s, `SELECT count(*) FROM run r JOIN task t USING(task_id) WHERE r.status IN ('queued','running','waiting') AND (r.task_epoch!=t.task_epoch OR t.status!='active')`) != 0 {
+			t.Fatal("stale runnable root after racing controls")
+		}
+		if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status IN ('queued','running','waiting')`) > 1 {
+			t.Fatal("two live Roots")
+		}
+		mustDrain(t, a)
+		if scalar(t, s, `SELECT count(*) FROM run WHERE status IN ('queued','running','waiting')`) != 0 {
+			t.Fatal("race stranded work")
+		}
+	}
+}
+
+func TestTaskControlShutdownPreservesRootAndAcceptedStep(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	s, r, a := controlFixture(t, func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		once.Do(func() { close(entered); <-release })
+		return llm.GenerationResult{Text: "saved on shutdown"}, nil
+	})
+	controlMain(t, r, a, "create", "create")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- a.Drain(ctx) }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("root did not start")
+	}
+	cancel()
+	close(release)
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("shutdown did not join")
+	}
+	if scalar(t, s, `SELECT count(*) FROM task WHERE status='active' AND task_epoch=1`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='running' AND desired_state='running'`) != 1 || scalar(t, s, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE r.kind='worker' AND c.token IS NULL`) != 1 {
+		t.Fatal("shutdown became business cancellation")
+	}
+	if scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker' AND g.status='completed'`) != 1 {
+		t.Fatal("current step lost during shutdown")
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker'`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker' AND g.attempt_count=1`) != 1 {
+		t.Fatal("shutdown recovery created/replayed Root")
+	}
+}
+
+func TestTaskControlPauseCancelsSafeToolBeforeNextStep(t *testing.T) {
+	entered, cancelled := make(chan struct{}), make(chan struct{})
+	s, r, a := controlFixture(t, func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "must not reach next model step"}, nil
+		}
+		return calls("builtin__text__echo", `{"text":"safe read"}`), nil
+	})
+	defs := []tool.Definition{}
+	for _, spec := range a.Registry.Describe() {
+		d, _ := a.Registry.Resolve(spec.Name)
+		if spec.Name == "builtin__text__echo" {
+			d.Execute = func(ctx context.Context, _ string) tool.Result {
+				close(entered)
+				<-ctx.Done()
+				close(cancelled)
+				return tool.Failure("CANCELLED")
+			}
+		}
+		defs = append(defs, d)
+	}
+	registry, err := tool.NewRegistry(defs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Registry = registry
+	r.registry = registry
+	controlMain(t, r, a, "create", "create")
+	done := make(chan error, 1)
+	go func() { done <- a.Drain(context.Background()) }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Tool did not start")
+	}
+	controlMain(t, r, a, "pause", "pause")
+	select {
+	case <-cancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Tool cancellation missing")
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Actor did not join Tool")
+	}
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation i JOIN run r USING(run_id) WHERE r.kind='worker' AND i.status='cancelled'`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+		t.Fatal("safe Tool stop admitted new work or failed settlement")
+	}
+}

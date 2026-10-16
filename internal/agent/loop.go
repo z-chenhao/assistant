@@ -22,6 +22,9 @@ type LoopOptions struct {
 	Provider llm.LLMProvider
 	Tools    tool.Executor
 	Sink     EventSink
+	// Execution is cancelled for business stop or lost ownership. Shutdown
+	// still waits for the current step to persist at its stable boundary.
+	Execution context.Context
 }
 
 // RunAgentLoop and ContinueAgentLoop use exactly the same stateless kernel.
@@ -32,6 +35,10 @@ func RunAgentLoop(ctx context.Context, claim RunClaim, options LoopOptions) erro
 
 func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error {
 	work := context.WithoutCancel(ctx)
+	execution := o.Execution
+	if execution == nil {
+		execution = work
+	}
 	emit := func(r Run, kind, text, call string) {
 		if o.Sink != nil {
 			o.Sink(Event{Kind: kind, RunID: r.ID, AgentID: r.AgentID, Step: r.Checkpoint.Step, OccurredAt: time.Now().UTC(), Text: text, ToolCallID: call})
@@ -92,7 +99,7 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 			if result == nil {
 				emit(r, "turn_start", "", "")
 				emit(r, "message_start", "", "")
-				callCtx, cancel := context.WithTimeout(work, 45*time.Second)
+				callCtx, cancel := context.WithTimeout(execution, 45*time.Second)
 				generate := o.Provider.Generate
 				if cp.Step > 0 {
 					generate = o.Provider.Continue
@@ -103,6 +110,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 					}
 				})
 				cancel()
+				if execution.Err() != nil {
+					return execution.Err()
+				}
 				if callErr != nil {
 					// Storage/claim rejection is infrastructure, not a failed model.
 					if callErr == ErrClaimLost || callErr == ErrStorage || callErr == llm.ErrStorage {
@@ -130,7 +140,7 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 			}
 			emit(r, "message_end", "", "")
 		case "tools":
-			results, err := o.Tools.Execute(work, cp.ExchangeID, cp.Result.ToolCalls)
+			results, err := o.Tools.Execute(execution, cp.ExchangeID, cp.Result.ToolCalls)
 			if err != nil {
 				return err
 			}

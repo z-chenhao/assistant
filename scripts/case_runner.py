@@ -69,7 +69,7 @@ def variants(dataset, case):
             if not .1 <= len(noise) / length <= .3:
                 raise ValueError("noise ratio outside normative bounds")
             text += " 无关Conversation：" + noise
-        events = [{"at": e["at"], "text": e["wordings"][variant["wording"]]} for e in case["events"]]
+        events = [{**{k: v for k, v in e.items() if k != "wordings"}, "text": e["wordings"][variant["wording"]]} for e in case["events"]]
         yield {"variant_id": variant["id"], "seed": 0, "clock": case["clock"],
                "context": text, "noise_characters": len(noise), "events": events,
                "fixture_digest": digest({"case": case, "common": dataset["common"], "variant": variant, "context": text, "events": events})}

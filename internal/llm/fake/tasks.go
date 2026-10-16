@@ -56,6 +56,16 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 			if json.Unmarshal([]byte(last.Text), &results) != nil {
 				return llm.GenerationResult{Text: "Search was not available."}, nil
 			}
+			if strings.HasPrefix(user, "Pause: ") || strings.HasPrefix(user, "Cancel: ") {
+				if len(results) != 1 {
+					return llm.GenerationResult{Text: "Please clarify which work you mean."}, nil
+				}
+				op := "pause"
+				if strings.HasPrefix(user, "Cancel: ") {
+					op = "cancel"
+				}
+				return call(task.ManageName, task.ManageRequest{Operation: op, TaskRef: results[0].TaskRef}), nil
+			}
 			if strings.HasPrefix(user, "Continue: ") {
 				if len(results) != 1 {
 					return llm.GenerationResult{Text: fmt.Sprintf("Please clarify which of the %d matching works you mean.", len(results))}, nil
@@ -94,6 +104,8 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 	case strings.HasPrefix(user, "Continue: "):
 		query := strings.SplitN(strings.TrimPrefix(user, "Continue: "), " | ", 2)[0]
 		return call(task.SearchName, task.SearchRequest{Query: query}), nil
+	case strings.HasPrefix(user, "Pause: "), strings.HasPrefix(user, "Cancel: "):
+		return call(task.SearchName, task.SearchRequest{Query: strings.TrimPrefix(strings.TrimPrefix(user, "Pause: "), "Cancel: ")}), nil
 	default:
 		return llm.GenerationResult{Text: "Main synchronous answer."}, nil
 	}
