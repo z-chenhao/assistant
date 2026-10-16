@@ -33,7 +33,8 @@ function transport(connection, signal, state) {
     for (let attempt = 0; attempt < 3; attempt++) {
       let response;
       try {
-        response = await fetch(u, { ...init, headers, signal, redirect: 'manual' });
+        const requestSignal=init.signal ? AbortSignal.any([signal,init.signal]) : signal;
+        response = await fetch(u, { ...init, headers, signal:requestSignal, redirect: 'manual' });
       } catch (error) {
         if (signal.aborted) fail('GENERATION_CANCELLED');
         if (attempt < 2 && ['ECONNRESET','ECONNREFUSED','EPIPE','ETIMEDOUT','EAI_AGAIN','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET'].includes(error.cause?.code)) { await delay(50 * 2 ** attempt, undefined, { signal }); continue; }
