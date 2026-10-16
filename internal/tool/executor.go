@@ -1,5 +1,6 @@
 // Package tool owns the single ToolSpec -> ToolInvocation -> Executor path.
-// M1 exposes only a pure echo Tool; effectful providers remain unavailable.
+// Pure Tools and trusted internal Task controls are available. External effects
+// remain closed until the M3 policy/approval pipeline.
 package tool
 
 import (
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -47,6 +49,7 @@ type Spec struct {
 
 type Definition struct {
 	Spec    Spec
+	Host    bool // Trusted Host builtins receive the accepted invocation, never model-supplied IDs.
 	Execute func(context.Context, string) Result
 }
 type Registry struct{ definitions map[string]Definition }
@@ -54,9 +57,10 @@ type Registry struct{ definitions map[string]Definition }
 func NewRegistry(definitions []Definition) (*Registry, error) {
 	r := &Registry{definitions: map[string]Definition{}}
 	for _, d := range definitions {
-		// Until M3 policy/approval exists, admitting an effectful Tool is closed.
-		if d.Spec.Name == "" || d.Spec.Version != 1 || d.Spec.ReplayPolicy != "safe" || d.Spec.Permission != "read_only" || !json.Valid([]byte(d.Spec.InputSchema)) || d.Execute == nil {
-			return nil, errors.New("invalid read-only tool definition")
+		// Until M3 policy/approval exists, external effects remain closed.
+		// Task control is an internal transaction, bound to an accepted call.
+		if d.Spec.Name == "" || d.Spec.Version != 1 || d.Spec.ReplayPolicy != "safe" || !validDefinition(d) || !json.Valid([]byte(d.Spec.InputSchema)) {
+			return nil, errors.New("invalid tool definition")
 		}
 		if _, exists := r.definitions[d.Spec.Name]; exists {
 			return nil, errors.New("duplicate tool definition")
@@ -65,6 +69,32 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 	}
 	return r, nil
 }
+func validDefinition(d Definition) bool {
+	if d.Host {
+		return d.Execute == nil && ((d.Spec.Name == "builtin__task__search" && d.Spec.Permission == "read_only") || (d.Spec.Name == "builtin__task__manage" && d.Spec.Permission == "task_control"))
+	}
+	return d.Execute != nil && d.Spec.Permission == "read_only"
+}
+
+// Select verifies every frozen spec before constructing the role-specific view.
+func (r *Registry) Select(specs []Spec) (*Registry, error) {
+	defs := make([]Definition, 0, len(specs))
+	for _, s := range specs {
+		d, ok := r.Resolve(s.Name)
+		if !ok || !reflect.DeepEqual(d.Spec, s) {
+			return nil, llm.ModelIncompatible
+		}
+		defs = append(defs, d)
+	}
+	return NewRegistry(defs)
+}
+
+// HostStore executes registered internal controls under the same accepted,
+// fenced ToolInvocation. It is not an alternative invocation lifecycle.
+type HostStore interface {
+	ExecuteBuiltin(context.Context, Invocation) (Result, error)
+}
+
 func EchoRegistry() *Registry {
 	r, err := NewRegistry([]Definition{{Spec: Spec{Name: "builtin__text__echo", Version: 1, InputSchema: `{"type":"object","properties":{"text":{"type":"string","maxLength":4096}},"required":["text"],"additionalProperties":false}`, ReplayPolicy: "safe", Permission: "read_only"}, Execute: func(ctx context.Context, args string) Result {
 		var value struct {
@@ -174,13 +204,32 @@ func (e Executor) Execute(ctx context.Context, exchange string, calls []llm.Tool
 				result := Failure("NOT_FOUND")
 				if d, ok := e.Registry.Resolve(inv.Call.Name); ok {
 					callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-					result = d.Execute(callCtx, inv.Call.Arguments)
-					if callCtx.Err() != nil {
+					if d.Host {
+						host, ok := e.Store.(HostStore)
+						if !ok {
+							result = Failure("PERMISSION_DENIED")
+						} else {
+							var hostErr error
+							result, hostErr = host.ExecuteBuiltin(callCtx, inv)
+							if hostErr != nil {
+								cancel()
+								errs[i] = hostErr
+								continue
+							}
+						}
+					} else {
+						result = d.Execute(callCtx, inv.Call.Arguments)
+					}
+					if callCtx.Err() != nil && !d.Host {
 						result = Failure("TIMEOUT")
 					}
 					cancel()
 				}
-				if len(result.Text) > 16<<10 {
+				limitBytes := 16 << 10
+				if inv.Call.Name == "builtin__task__search" {
+					limitBytes = 64 << 10
+				}
+				if len(result.Text) > limitBytes {
 					result = Failure("RESOURCE_LIMIT")
 				}
 				if err := e.Store.Finish(ctx, inv.ID, result); err != nil {

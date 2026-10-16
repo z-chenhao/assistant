@@ -15,6 +15,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/task"
 )
 
 // These private-to-the-repository seams are consumed by this adapter; app wires
@@ -154,6 +155,7 @@ type terminal struct {
 	work       context.Context
 	workDone   chan error
 	drainAgain bool
+	updates    chan struct{}
 }
 
 // Keep accepting input while Main is busy. Actor.Submit routes Steering to the
@@ -165,7 +167,19 @@ func (u *terminal) startDrain() {
 	}
 	done := make(chan error, 1)
 	u.workDone = done
-	go func() { done <- u.Actor.Drain(u.work) }()
+	if u.updates == nil {
+		u.updates = make(chan struct{}, 1)
+	}
+	actor := u.Actor
+	actor.Sink = func(e agent.Event) {
+		if e.RunKind == "main" && (e.Kind == "turn_end" || e.Kind == "agent_end") {
+			select {
+			case u.updates <- struct{}{}:
+			default:
+			}
+		}
+	}
+	go func() { done <- actor.Drain(u.work) }()
 }
 
 // Provider and model text are untrusted terminal data. Preserve plain text,
@@ -185,6 +199,9 @@ func (u *terminal) read(ctx context.Context, prompt string) (string, error) {
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
+		case <-u.updates:
+			u.report(u.history(ctx))
+			fmt.Fprint(u.out, prompt)
 		case err := <-u.workDone:
 			u.workDone = nil
 			u.report(err)
@@ -290,6 +307,17 @@ func (u *terminal) command(ctx context.Context, line string) error {
 		d, err := u.State.Diagnostics(ctx)
 		if err == nil {
 			u.print("State: " + d.Readiness)
+			if activity, ok := u.State.(interface {
+				Activity(context.Context) ([]task.Summary, error)
+			}); ok {
+				items, readErr := activity.Activity(ctx)
+				if readErr != nil {
+					return readErr
+				}
+				for _, item := range items {
+					u.print(item.Title + ": " + item.Status + " " + item.ProgressSummary)
+				}
+			}
 		}
 		return err
 	case line == "/models":

@@ -18,7 +18,13 @@ type Config struct {
 	Version int               `yaml:"version"`
 	App     App               `yaml:"app"`
 	NATS    eventnats.Options `yaml:"nats"`
+	Tasks   Tasks             `yaml:"tasks"`
 	LLM     LLM               `yaml:"llm"`
+}
+
+type Tasks struct {
+	RecentDays  int `yaml:"recent_days"`
+	RecentLimit int `yaml:"recent_limit"`
 }
 
 type LLM struct {
@@ -41,6 +47,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg := Config{
 		Version: 1,
+		Tasks:   Tasks{RecentDays: 30, RecentLimit: 200},
 		App:     App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
 		NATS:    eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
@@ -79,6 +86,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if err := cfg.NATS.Validate(); err != nil {
 		return Config{}, err
+	}
+	if cfg.Tasks.RecentDays < 1 || cfg.Tasks.RecentDays > 3650 || cfg.Tasks.RecentLimit < 1 || cfg.Tasks.RecentLimit > 10000 {
+		return Config{}, errors.New("tasks requires recent_days 1..3650 and recent_limit 1..10000")
 	}
 	if cfg.Version != 1 {
 		return Config{}, errors.New("unsupported configuration version (expected 1)")
