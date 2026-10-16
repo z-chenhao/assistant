@@ -225,6 +225,15 @@ func Definitions(ctx context.Context, c Config) ([]tool.Definition, error) {
 		if !ok {
 			continue
 		}
+		// MCP Tool inputSchema must describe an object. The common registry
+		// also supports other schemas for trusted builtins, so enforce this
+		// protocol-specific constraint at the adapter boundary.
+		var input struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(a.InputSchema, &input) != nil || input.Type != "object" {
+			return nil, invalid
+		}
 		spec := tool.Spec{Name: "mcp__" + c.Name + "__" + a.Name, Description: a.Description, ResourceHash: hash(struct {
 			Config Config
 			Tool   advertised

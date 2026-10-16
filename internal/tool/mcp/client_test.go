@@ -25,6 +25,9 @@ func (w rewrite) Write(b []byte) (int, error) {
 	if w.mode == "malformed" {
 		text = strings.ReplaceAll(text, `"maxLength":4096`, `"unsupported":4096`)
 	}
+	if w.mode == "scalar" {
+		text = strings.ReplaceAll(text, `"type":"object"`, `"type":"string"`)
+	}
 	if w.mode == "drift" {
 		text = strings.ReplaceAll(text, "Read structured fixture data", "Changed tool")
 	}
@@ -114,11 +117,11 @@ func TestDiscoveryFreezesHostPolicyAndNormalizesErrors(t *testing.T) {
 	}
 }
 func TestMalformedDiscoveryAndMissingAllowlistFailClosed(t *testing.T) {
-	for _, mode := range []string{"malformed", "missing", "permission", "name"} {
+	for _, mode := range []string{"malformed", "scalar", "missing", "permission", "name"} {
 		t.Run(mode, func(t *testing.T) {
 			c := config(t)
 			switch mode {
-			case "malformed":
+			case "malformed", "scalar":
 				if err := os.WriteFile(filepath.Join(c.Args[len(c.Args)-1], "mode"), []byte(mode), 0600); err != nil {
 					t.Fatal(err)
 				}
