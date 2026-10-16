@@ -49,6 +49,8 @@ def prepare(binary, root, mode='edit'):
     skills = root / 'skills/review'
     skills.mkdir(parents=True)
     (skills / 'SKILL.md').write_text('---\nname: review\ndescription: Inspect code and preserve user files.\n---\nPRIVATE_BODY_MARKER: Read AGENTS.md and cite symbols.\n')
+    (skills / 'assets').mkdir()
+    (skills / 'assets/opaque.bin').write_bytes(b'\x00\xffSKILL_ASSET')
     (root / 'provider').mkdir()
     shutil.copyfile(Path(__file__).resolve().parents[1] / 'evals/fixtures/m3-capabilities-v1.json',
                     root / 'provider/mcp-data.json')
@@ -177,6 +179,12 @@ def run(binary):
             require(len(summaries) == 1 and 'PRIVATE_BODY_MARKER' not in listed['text'], 'Skill list exposed body')
             viewed = content(call(h, 'view', 'builtin__skill__view', {'name': 'review', 'version': summaries[0]['version']}))
             require('PRIVATE_BODY_MARKER' in viewed['text'], 'Skill view missing actual body')
+            asset = content(call(h, 'asset', 'builtin__skill__view',
+                                 {'name': 'review', 'version': summaries[0]['version'], 'path': 'assets/opaque.bin'}))
+            opened = subprocess.run(h.args('artifact', 'open', asset['artifact_refs'][0]), capture_output=True,
+                                    env=h.env, cwd=h.root, timeout=20)
+            require(opened.returncode == 0 and opened.stdout == b'\x00\xffSKILL_ASSET',
+                    'binary Skill asset was corrupted or bypassed ArtifactStore')
             denied = content(call(h, 'manage', 'builtin__skill__manage', {}, worker=True))
             require(denied['error']['code'] == 'NOT_FOUND', 'ordinary Worker got Skill management')
             denied = content(call(h, 'task-control', 'builtin__task__manage', {'operation': 'cancel', 'taskRef': 'forged'}, worker=True))

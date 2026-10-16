@@ -63,6 +63,8 @@ not only the summary. No full body is embedded in the startup description.
 `builtin__skill__view({name, version, path?})` defaults to `SKILL.md`; relative
 references must already exist in the catalog. A wrong version or changed file
 returns `NON_DETERMINISTIC_REPLAY`; paths cannot escape the configured root.
+Non-UTF-8 assets use the common binary-result Artifact path, preserving bytes
+without placing invalid text in model history.
 Changing a reference or scope changes the frozen set hash. A restarted old Run
 fails compatibility selection if its catalog no longer matches. Restore the old
 catalog to continue it; do not silently switch versions. Ordinary Main/Worker

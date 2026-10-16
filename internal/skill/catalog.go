@@ -3,6 +3,7 @@
 package skill
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/z-chenhao/erii/internal/tool"
 	"go.yaml.in/yaml/v3"
@@ -185,6 +187,9 @@ func Definitions(c Config) ([]tool.Definition, error) {
 				b, err := readFile(root, e.Name+"/"+a.Path)
 				if err != nil || len(b) > 65536 || sum(b) != expected {
 					return tool.Failure("NON_DETERMINISTIC_REPLAY")
+				}
+				if !utf8.Valid(b) {
+					return tool.Result{Output: &tool.BinaryOutput{Name: filepath.Base(a.Path), MediaType: "application/octet-stream", Reader: bytes.NewReader(b)}}
 				}
 				return tool.Result{Text: string(b)}
 			}
