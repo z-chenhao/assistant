@@ -251,7 +251,17 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 		if inv.Status == "succeeded" || inv.Status == "failed" || inv.Status == "cancelled" || inv.Status == "unknown" {
 			return nil
 		}
-		d, known := t.runs.registry.Resolve(inv.Call.Name)
+		// Resolve only within the immutable Run capability. A hidden Tool
+		// must not reveal its schema through a validation error.
+		var visible bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id,json_each(c.tools_json) s WHERE r.run_id=? AND json_extract(s.value,'$.name')=?)`, t.claim.RunID(), inv.Call.Name).Scan(&visible); err != nil {
+			return err
+		}
+		var d tool.Definition
+		known := false
+		if visible {
+			d, known = t.runs.registry.Resolve(inv.Call.Name)
+		}
 		rejection := ""
 		if !known {
 			rejection = "NOT_FOUND"

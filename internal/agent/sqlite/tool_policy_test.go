@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -618,5 +619,36 @@ func TestToolWorkerUnknownReturnsUnknownUpdateAndKeepsTaskActive(t *testing.T) {
 	mustDrain(t, a)
 	if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 || scalar(t, s, `SELECT count(*) FROM main_inbox`) != 1 {
 		t.Fatal("unknown report duplicated")
+	}
+}
+
+func TestToolHiddenFromWorkerIsNotResolvedOrValidated(t *testing.T) {
+	s, _, a, p := taskFixture(t)
+	sawHiddenResult := false
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		last := req.Messages[len(req.Messages)-1]
+		if isFollowup(req) {
+			return llm.GenerationResult{Text: "Main received Worker result"}, nil
+		}
+		if isRoot(req) {
+			if last.Role == "tool" {
+				var failure tool.Error
+				if err := json.Unmarshal([]byte(last.Text), &failure); err != nil || failure.Code != "NOT_FOUND" {
+					t.Errorf("hidden Tool was resolved/validated: %s (%v)", last.Text, err)
+				}
+				sawHiddenResult = true
+				return llm.GenerationResult{Text: "Tool unavailable"}, nil
+			}
+			return calls("builtin__task__manage", `{"forged":"invalid arguments for a hidden Tool"}`), nil
+		}
+		if last.Role == "tool" {
+			return llm.GenerationResult{Text: "Delegated"}, nil
+		}
+		return calls("builtin__task__manage", `{"operation":"create","task":"Attempt an unavailable Tool without gaining Task control"}`), nil
+	}
+	mustSubmit(t, a, "hidden-tool", "delegate work")
+	mustDrain(t, a)
+	if !sawHiddenResult || scalar(t, s, `SELECT count(*) FROM task`) != 1 || scalar(t, s, `SELECT count(*) FROM approval`) != 0 {
+		t.Fatal("hidden Tool obtained authority")
 	}
 }

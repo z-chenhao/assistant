@@ -77,6 +77,8 @@ retry. Uncertain external timeout/cancellation becomes `unknown`.
 | query_before_retry | Query by key; reuse a confirmed result, retry only confirmed absence, otherwise persist unknown |
 | never (including omitted) | Persist unknown without dispatch; later query-only reconciliation may settle it |
 
+Tool preparation checks the frozen Run capability before argument validation;
+inaccessible Tool names return `NOT_FOUND` without revealing their schema.
 Provider errors are reduced to the documented Host codes. Messages contain only
 the safe code; no raw provider message/details, internal IDs, credentials, paths
 or SQL cross this boundary. Only `PROVIDER_UNAVAILABLE` has `retryable=true`.
