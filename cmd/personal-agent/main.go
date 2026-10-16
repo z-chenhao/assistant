@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-isatty"
@@ -21,6 +22,7 @@ import (
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/tui"
@@ -161,7 +163,18 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		if err != nil {
 			return err
 		}
-		return json.NewEncoder(out).Encode(requests)
+		// The CLI protocol uses RFC 3339 UTC; SQLite keeps UTC microseconds.
+		views := make([]struct {
+			delivery.Request
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+		}, len(requests))
+		for i, r := range requests {
+			views[i].Request = r
+			views[i].CreatedAt = time.UnixMicro(r.CreatedAt).UTC()
+			views[i].UpdatedAt = time.UnixMicro(r.UpdatedAt).UTC()
+		}
+		return json.NewEncoder(out).Encode(views)
 	}
 	if artifactCommand {
 		switch flags.Arg(1) {

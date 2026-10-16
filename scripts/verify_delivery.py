@@ -178,6 +178,7 @@ def run(binary):
             command = [str(h.binary), "-config", str(h.config), "delivery", "work"]
             result = subprocess.run(command, env=h.env, cwd=h.root, capture_output=True, text=True, timeout=15)
             require(result.returncode == 0 and json.loads(result.stdout)[0]["status"] == "sent", "delivery required model readiness")
+            require(all(isinstance(json.loads(result.stdout)[0][key], str) and json.loads(result.stdout)[0][key].endswith("Z") for key in ("created_at", "updated_at")), "CLI timestamps are not RFC3339 UTC")
             value = state(h)
             require(len(value["terminal"]) == 1 and len(value["generations"]) == 2, "transport inferred or lost accepted message")
             return {"requests": json.loads(result.stdout), "state": value}
