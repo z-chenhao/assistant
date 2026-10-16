@@ -167,6 +167,25 @@ def run(binary):
                     'sources': sources, 'output': output, 'report': raw, 'transcript': transcript, 'state': value}
         report['checks'].append(scenario('visa', visa))
 
+        def media(h):
+            outputs = []
+            for kind, mime in (('image', 'image/png'), ('audio', 'audio/wav'), ('video', 'video/mp4')):
+                # This fragment proves reference/semantic routing, not decoding.
+                content = (repo / 'evals/fixtures/artifact-v1/visa_front.png').read_bytes() if kind == 'image' else b'opaque media transport fixture'
+                source = h.save('media.bin', mime, content)
+                ref = source['artifact_ref']
+                parts = [{'type': 'text', 'text': json.dumps({'operation': 'publish', 'artifactRefs': [ref]})},
+                         {'type': kind, 'artifact_ref': ref}]
+                h.command('chat', 'send-parts', kind, text=json.dumps(parts))
+                h.command('chat', 'work')
+                value = h.state()
+                final = value['conversation'][-1]
+                require(final['role'] == 'assistant' and any(p.get('artifact_ref') == ref and p['type'] == kind for p in final['content']), 'final media semantic type lost')
+                require(h.output(ref) == content, 'media bytes changed')
+                outputs.append({'kind': kind, 'descriptor': source, 'final_message': final})
+            return {'name': 'media_semantic_parts_remain_opaque_refs', 'outputs': outputs, 'state': h.state()}
+        report['checks'].append(scenario('media', media))
+
         def concurrent(h):
             def save(i):
                 d = h.save('same.bin', 'application/octet-stream', str(i).encode() * 10000)

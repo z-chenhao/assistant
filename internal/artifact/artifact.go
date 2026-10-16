@@ -3,6 +3,8 @@ package artifact
 
 import (
 	"errors"
+	"mime"
+	"strings"
 	"time"
 )
 
@@ -65,4 +67,17 @@ type CleanupReport struct {
 	DryRun    bool     `json:"dry_run"`
 	Artifacts []string `json:"artifacts"`
 	Objects   int      `json:"orphan_objects"`
+}
+
+// Main delivery needs one text part in the 128-part Conversation envelope.
+const MaxPublished = 127
+
+func ContentType(mediaType string) string {
+	media, _, _ := mime.ParseMediaType(mediaType)
+	for _, kind := range []string{"image", "audio", "video"} {
+		if strings.HasPrefix(media, kind+"/") {
+			return kind
+		}
+	}
+	return "file"
 }

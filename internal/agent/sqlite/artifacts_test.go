@@ -659,3 +659,36 @@ func TestArtifactExternalStreamTimeoutRetainsUnknownWithoutRetry(t *testing.T) {
 		t.Fatal("lost uncertainty or retried external stream", invoked)
 	}
 }
+
+func TestArtifactFinalSelectionFitsConversationEnvelope(t *testing.T) {
+	ctx := context.Background()
+	s, _, _, a, _ := loopFixture(t)
+	receipt := mustSubmit(t, a, "publication-limit", "publish bounded outputs")
+	scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: receipt.RunID}
+	refs := []string{}
+	for i := 0; i < artifact.MaxPublished+1; i++ {
+		refs = append(refs, putArtifact(t, s, scope, ""))
+	}
+	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scope, refs[:artifact.MaxPublished]) }); err != nil {
+		t.Fatal(err)
+	}
+	// A later independent publication cannot grow an invalid final envelope.
+	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scope, refs[artifact.MaxPublished:]) }); !errors.Is(err, artifact.ErrLimit) {
+		t.Fatal("aggregate selection grew beyond Conversation", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM artifact_publication`) != artifact.MaxPublished {
+		t.Fatal("limit rejection changed selection")
+	}
+	parts := conversation.Text("final text")
+	for _, ref := range refs[:artifact.MaxPublished] {
+		parts = append(parts, conversation.ContentPart{Type: "file", ArtifactRef: ref})
+	}
+	if _, err := conversation.Normalize(parts); err != nil {
+		t.Fatal("legal maximum cannot be delivered", err)
+	}
+	for media, kind := range map[string]string{"IMAGE/PNG": "image", "audio/wav; rate=16000": "audio", "video/mp4": "video", "application/pdf": "file", "text/markdown": "file"} {
+		if artifact.ContentType(media) != kind {
+			t.Fatal(media, artifact.ContentType(media), kind)
+		}
+	}
+}

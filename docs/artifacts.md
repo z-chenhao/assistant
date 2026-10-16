@@ -60,7 +60,7 @@ Task controls and user delivery.
 | `builtin__artifact__read` | `artifactRef`, optional byte `offset`, `limit` 1–4096 | bounded text range; binary content returns a ref | `read_only` |
 | `builtin__artifact__describe` | `artifactRef` | name, MIME, hash, size, dates, version | `read_only` |
 | `builtin__artifact__list` | empty object | newest 50 accessible descriptors | `read_only` |
-| `builtin__artifact__publish` | `artifactRefs` (0–128) | selected refs | `artifact_write` |
+| `builtin__artifact__publish` | `artifactRefs` (0–127) | selected refs | `artifact_write` |
 
 Unknown fields, ownership/Run IDs, URLs and path inputs are rejected. Inaccessible,
 forged, expired, deleted or corrupt references return `NOT_FOUND`; invalid
@@ -84,9 +84,13 @@ retries the effect. A published reference
 is a resource address; it grants no external upload permission or approval.
 
 `publish` explicitly adds selected final outputs for that Run; it is idempotent
-and additive. Intermediate saves are excluded. Root results carry only the
+and additive. Intermediate saves are excluded. The union of final selections is bounded to
+127 refs, leaving one text part in the 128-part Conversation envelope. A call
+exceeding that aggregate limit returns `RESOURCE_LIMIT` without changing the
+selection. Root results carry only the
 Root's explicit publications in Task updates; Main explicitly selects outputs
-for final Conversation file parts. Child orchestration itself remains M4 work.
+for final Conversation parts, preserving image/audio/video semantic types and
+using file parts for other MIME types. Child orchestration itself remains M4 work.
 Changing content creates a new ref; no overwrite operation exists.
 
 ## Recovery, quota and retention

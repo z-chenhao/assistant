@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
 )
@@ -180,7 +181,13 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 			return err
 		}
 		for _, ref := range refs {
-			message.Content = append(message.Content, conversation.ContentPart{Type: "file", ArtifactRef: ref})
+			// The selected resource was authorized by publish. Read only its immutable
+			// semantic type here; media bytes never enter the Conversation intent.
+			var media string
+			if err = tx.QueryRowContext(ctx, `SELECT media_type FROM artifact WHERE artifact_ref=?`, ref).Scan(&media); err != nil {
+				return err
+			}
+			message.Content = append(message.Content, conversation.ContentPart{Type: artifact.ContentType(media), ArtifactRef: ref})
 		}
 		raw, _ := encoded(message)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO main_reply VALUES(?,?,?,?)`, run.Checkpoint.ExchangeID, run.ID, messageID, deliveryID); err != nil {

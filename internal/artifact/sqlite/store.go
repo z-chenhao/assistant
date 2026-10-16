@@ -367,11 +367,38 @@ func (s *Store) PinTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref, ki
 // PublishTx validates the complete immutable set, including content integrity,
 // before any mutation. Expected validation failures leave the transaction clean.
 func (s *Store) PublishTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, refs []string) error {
-	if len(refs) > 128 || a.RunID == "" {
+	if a.RunID == "" {
 		return artifact.ErrInvalid
+	}
+	if len(refs) > artifact.MaxPublished {
+		return artifact.ErrLimit
 	}
 	if err := s.scope(ctx, tx, a); err != nil {
 		return err
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref FROM artifact_publication WHERE run_id=?`, a.RunID)
+	if err != nil {
+		return artifact.ErrStorage
+	}
+	selected := map[string]bool{}
+	for rows.Next() {
+		var ref string
+		if err = rows.Scan(&ref); err != nil {
+			rows.Close()
+			return artifact.ErrStorage
+		}
+		selected[ref] = true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return artifact.ErrStorage
+	}
+	for _, ref := range refs {
+		selected[ref] = true
+	}
+	if len(selected) > artifact.MaxPublished {
+		return artifact.ErrLimit
 	}
 	for _, ref := range refs {
 		f, err := s.OpenTx(ctx, tx, a, ref)

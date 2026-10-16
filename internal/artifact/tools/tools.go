@@ -17,7 +17,7 @@ func Definitions() []tool.Definition {
 		{Read, `{"type":"object","properties":{"artifactRef":{"type":"string","maxLength":256},"offset":{"type":"integer","minimum":0,"maximum":1073741824},"limit":{"type":"integer","minimum":1,"maximum":4096}},"required":["artifactRef"],"additionalProperties":false}`, "read_only"},
 		{Describe, `{"type":"object","properties":{"artifactRef":{"type":"string","maxLength":256}},"required":["artifactRef"],"additionalProperties":false}`, "read_only"},
 		{List, `{"type":"object","properties":{},"additionalProperties":false}`, "read_only"},
-		{Publish, `{"type":"object","properties":{"artifactRefs":{"type":"array","maxItems":128,"items":{"type":"string","maxLength":256}}},"required":["artifactRefs"],"additionalProperties":false}`, "artifact_write"},
+		{Publish, `{"type":"object","properties":{"artifactRefs":{"type":"array","maxItems":127,"items":{"type":"string","maxLength":256}}},"required":["artifactRefs"],"additionalProperties":false}`, "artifact_write"},
 	} {
 		defs = append(defs, tool.Definition{Host: true, Spec: tool.Spec{Name: v.name, InputSchema: v.schema, Version: 1, Permission: v.permission, ReplayPolicy: "safe", OutputBytes: 65536}})
 	}
