@@ -416,14 +416,27 @@ func (c *Client) Continue(ctx context.Context, r llm.GenerationRequest, sink fun
 
 func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (result llm.GenerationResult, err error) {
 	started := time.Now()
+	r.Finalize = nil // only this registration may install the Host commit gate
 	var connection Connection
 	var completed *llm.GenerationEvent
+	var stream *eventStream
+	var retire func()
+	hostRejected := false
 	defer func() {
+		if retire != nil {
+			defer retire() // also retire if a Host callback panics
+		}
+		if stream != nil && stream.wasCancelled() && !hostRejected {
+			result, err = llm.GenerationResult{}, llm.GenerationCancelled
+		}
 		if c.observer != nil {
 			if recordErr := c.observer(context.WithoutCancel(ctx), r, connection, result, time.Since(started), err); recordErr != nil {
 				result = llm.GenerationResult{}
 				err = recordErr
 			}
+		}
+		if retire != nil {
+			retire()
 		}
 		// Account completion is provisional until Host persistence accepts it.
 		// In particular, auth loss must not publish a completed event.
@@ -456,7 +469,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		}
 		return llm.GenerationResult{}, err
 	}
-	stream := newEventStream(r.GenerationID, r.Snapshot.MaxOutputTokens)
+	stream = newEventStream(r.GenerationID, r.Snapshot.MaxOutputTokens)
 	if r.OutputLimitBytes > 0 && r.OutputLimitBytes < stream.remaining {
 		stream.remaining = r.OutputLimitBytes
 	}
@@ -479,18 +492,28 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	p.events[r.GenerationID] = stream
 	p.mu.Unlock()
 	c.mu.Unlock()
-	hostRejected := false
-	defer func() {
+	retire = func() {
 		p.mu.Lock()
-		// Final result publication and acknowledged Cancel share the registry
-		// lock. Once this entry is removed, a late Cancel cannot alter its result
-		// or settle a different registration with the same ID.
-		if stream.wasCancelled() && !hostRejected {
-			result, err = llm.GenerationResult{}, llm.GenerationCancelled
+		<-stream.settleGate
+		// Persistence may already have accepted or rejected the result. Without
+		// persistence, retirement is the acceptance point (including Fake peers).
+		if !stream.settled {
+			if stream.wasCancelled() && !hostRejected && err == nil {
+				result, err = llm.GenerationResult{}, llm.GenerationCancelled
+			}
+			stream.settled = true
 		}
-		delete(p.events, r.GenerationID)
+		if p.events[r.GenerationID] == stream {
+			delete(p.events, r.GenerationID)
+		}
+		stream.settleGate <- struct{}{}
 		p.mu.Unlock()
-	}()
+	}
+	r.Finalize = func(commit func(bool) error) error {
+		return stream.finalize(func(cancelled bool) error {
+			return commit((cancelled || ctx.Err() != nil) && !hostRejected)
+		})
+	}
 	dispatched, err := c.exchange(dispatchCtx, p, method, params, nil, stream.dispatchDone)
 	if stream.wasCancelled() {
 		return llm.GenerationResult{}, llm.GenerationCancelled
@@ -613,11 +636,9 @@ func (c *Client) Cancel(ctx context.Context, id string) error {
 	if err := c.callProcess(ctx, p, "generation.cancel", map[string]string{"generation_id": id}, nil); err != nil {
 		return err
 	}
-	p.mu.Lock()
-	if stream != nil && p.events[id] == stream {
-		stream.cancel()
+	if stream != nil {
+		return stream.cancel(ctx)
 	}
-	p.mu.Unlock()
 	return nil
 }
 
@@ -659,13 +680,12 @@ func (c *Client) Dispose(ctx context.Context, id string) error {
 		c.stop(p) // Failed cleanup cannot leave a suppressed, unobservable generation.
 		return err
 	}
-	p.mu.Lock()
-	for key, stream := range targets {
-		if p.events[key] == stream {
-			stream.cancel()
+	for _, stream := range targets {
+		if err := stream.cancel(ctx); err != nil {
+			c.stop(p)
+			return err
 		}
 	}
-	p.mu.Unlock()
 	return nil
 }
 func (c *Client) Start(ctx context.Context) (llm.AuthState, error) {

@@ -87,6 +87,18 @@ the observer Guard and persistence rejects the old text with `AUTH_REQUIRED`;
 successful same-identity refresh preserves acceptance. Remote history/cache
 deletion is not promised. Account-provider 401/403 closes readiness without switching model.
 
+Generation registrations remain cancellable while the observer or SQLite writer
+admission is pending. A private Host-only `Finalize` callback joins the existing
+usage transaction to the registration's acceptance lock. Cancel/Dispose ack first
+means `GENERATION_CANCELLED`, empty final output and no completion; commit first
+preserves the accepted result. Auth loss is still checked in that same SQLite
+transaction and rejects with `AUTH_REQUIRED`. The lock excludes observer waits,
+RPC and sink callbacks; the shared RPC reader is not locked during persistence.
+Waiting Cancel/Dispose calls retain their own deadlines; failed local disposal
+cleanup retires the peer. An already admitted commit is allowed to settle.
+No new wire field, stored schema, migration or alternate generation path is
+needed. Peers and immutable snapshots retain protocol v1 compatibility.
+
 ## Verification and remaining requirements
 
 `make test`, `make test-race`, `make lint` and `make verify` include deterministic

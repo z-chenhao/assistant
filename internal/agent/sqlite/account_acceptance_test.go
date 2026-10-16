@@ -162,12 +162,13 @@ func TestAccountFinalAcceptanceRequiresHostEpoch(t *testing.T) {
 	}
 	// Neither the Bridge nor a serialized request can supply the Host fence.
 	r.AuthEpoch = 99
+	r.Finalize = func(func(bool) error) error { return llm.InvalidProviderResponse }
 	encoded, err := json.Marshal(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var decoded llm.GenerationRequest
-	if err := json.Unmarshal(encoded, &decoded); err != nil || decoded.AuthEpoch != 0 {
-		t.Fatal("Host epoch crossed Bridge protocol", err)
+	if err := json.Unmarshal(encoded, &decoded); err != nil || decoded.AuthEpoch != 0 || decoded.Finalize != nil {
+		t.Fatal("Host acceptance state crossed Bridge protocol", err)
 	}
 }

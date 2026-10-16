@@ -97,6 +97,20 @@ auth through a second Host/DB handle. It covers logout, reauthorization, auth lo
 same-identity refresh and storage failure. Node contracts also capture the actual
 Tool continuation wire and require the fixed `erii` namespace on replay.
 
+`go test -race ./internal/agent/sqlite -run TestAccountCancellationAtFinalAcceptance -v`
+checks Generate and Continue with Cancel, Dispose and caller-context cancellation
+at observer, open-transaction and post-commit barriers. Registrations remain
+active through persistence. A Host-only acceptance gate serializes acknowledged
+cancellation with the actual usage commit; it does not lock an observer wait,
+RPC or sink. SQLite writer admission precedes this gate. A pre-commit ack rejects
+success, records `GENERATION_CANCELLED` with no accepted token counts and emits
+no completed event. A post-commit cancellation preserves the committed result.
+Auth transaction rejection keeps `AUTH_REQUIRED`. No database migration or RPC
+version change is required; the gate is excluded from JSON and snapshots.
+`TestCancellationDeadlineDuringUsageCommit` holds an admitted commit, verifies
+Cancel/Dispose respect their caller deadline, then drives an independent catalog
+RPC before releasing storage. Failed disposal reaps its peer as usual.
+
 [ADR 001](adr/001-current-openai-account-auth.md) records approved Device
 Authorization deferral. It remains a future requirement, not a passing check.
 Real interactive login/Keychain/provider Live Shadow remains **inconclusive**
