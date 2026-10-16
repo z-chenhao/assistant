@@ -69,6 +69,8 @@ create another update, Main entry or delivery. Old epochs are consumed without
 injection. Current available updates are assigned together to one new Main only
 after its predecessor ends. If user input overtakes a queued follow-up before
 its first generation, the runtime defers that batch and handles the user first.
+The final idle scan also rechecks durable updates and pending Inbox entries,
+so a Root/Main commit between scans cannot strand a completion.
 Once a generation has been accepted, its context stays frozen; later user input
 uses the shared Loop's normal stable Steering boundary.
 

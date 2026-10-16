@@ -736,3 +736,60 @@ func TestAppendWakesRootWaitingForTaskInstruction(t *testing.T) {
 		t.Fatal("waiting Root was stranded or replaced")
 	}
 }
+
+func TestCompletionAtIdleBoundaryCannotStrandFollowup(t *testing.T) {
+	for _, boundary := range []string{"root_commit", "main_commit"} {
+		t.Run(boundary, func(t *testing.T) {
+			s, r, a, p := taskFixture(t)
+			ctx := context.Background()
+			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" || strings.Contains(req.Messages[len(req.Messages)-1].Text, "urgent") {
+					return llm.GenerationResult{Text: "Business result"}, nil
+				}
+				return calls(task.ManageName, `{"operation":"create","task":"Independent report"}`), nil
+			}
+			receipt := mustSubmit(t, a, "create", "delegate")
+			c, err := r.Claim(ctx, receipt.RunID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = executeTaskRun(t, a, r, ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			var rootID string
+			if err = s.db.QueryRow(`SELECT run_id FROM run WHERE kind='worker'`).Scan(&rootID); err != nil {
+				t.Fatal(err)
+			}
+			root, err := r.Claim(ctx, rootID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			late := root
+			if boundary == "main_commit" {
+				if err = executeTaskRun(t, a, r, ctx, root); err != nil {
+					t.Fatal(err)
+				}
+				receipt = mustSubmit(t, a, "urgent", "urgent synchronous question")
+				late, err = r.Claim(ctx, receipt.RunID)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			var once sync.Once
+			s.MainBoundary = func(name string) {
+				if name == "before_next_scan" {
+					once.Do(func() {
+						if err := executeTaskRun(t, a, r, ctx, late); err != nil {
+							t.Fatal(err)
+						}
+					})
+				}
+			}
+			mustDrain(t, a)
+			s.MainBoundary = nil
+			if scalar(t, s, `SELECT count(*) FROM main_inbox WHERE run_id IS NOT NULL`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 1 {
+				t.Fatal("completion did not reach Main")
+			}
+		})
+	}
+}
