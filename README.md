@@ -35,3 +35,5 @@ cleanup, and the precise limits of this slice.
 See [local provider setup](docs/provider-bridge.md#connect-a-local-model) for the actual model path.
 
 Task delegation, discovery, append and durable follow-up: [operations and limits](docs/tasks.md).
+
+Tool policy, frozen approvals, recovery and deterministic CLI evidence: [docs/tools.md](docs/tools.md).

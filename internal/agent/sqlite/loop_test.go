@@ -647,9 +647,106 @@ func TestV6MainMigrationPreservesDataAndRollsBack(t *testing.T) {
 			}
 			defer s.Close()
 			d, err := s.Diagnostics(context.Background())
-			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 9 {
+			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 10 {
 				t.Fatal("prior identity changed", d, err)
 			}
 		})
 	}
+}
+
+// Force shutdown between the scheduler's context check and its next database
+// scan, while the already-owned generation reaches its durable boundary.
+type shutdownScanStore struct {
+	agent.ActorStore
+	calls     int
+	cancelled <-chan struct{}
+	entering  chan struct{}
+}
+
+func (s *shutdownScanStore) Next(ctx context.Context) (string, error) {
+	s.calls++
+	if s.calls == 2 {
+		close(s.entering)
+		<-s.cancelled
+	}
+	return s.ActorStore.Next(ctx)
+}
+func TestLoopShutdownDuringSchedulerScanPreservesAcceptedGeneration(t *testing.T) {
+	s, r, _, a, p := loopFixture(t)
+	receipt := mustSubmit(t, a, "shutdown-scan", "hello")
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	cancelled := make(chan struct{})
+	entering := make(chan struct{})
+	original := p.respond
+	p.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {
+		<-entering
+		stop()
+		close(cancelled)
+		return original(request)
+	}
+	a.Store = &shutdownScanStore{ActorStore: r, cancelled: cancelled, entering: entering}
+	if err := a.Drain(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatal("scheduler shutdown surfaced as infrastructure failure", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='running'`, receipt.RunID) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation WHERE status='completed'`) != 1 {
+		t.Fatal("shutdown lost accepted generation")
+	}
+	a.Store = r
+	p.respond = original
+	mustDrain(t, a)
+	if len(p.requests) != 2 {
+		t.Fatal("accepted generation repeated", len(p.requests))
+	}
+}
+
+type shutdownClaimStore struct {
+	agent.ActorStore
+	stop context.CancelFunc
+}
+
+func (s shutdownClaimStore) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
+	s.stop()
+	return s.ActorStore.Claim(ctx, id)
+}
+func TestLoopShutdownDuringSchedulerClaimDoesNotStartWork(t *testing.T) {
+	s, r, _, a, _ := loopFixture(t)
+	receipt := mustSubmit(t, a, "shutdown-claim", "hello")
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	a.Store = shutdownClaimStore{ActorStore: r, stop: stop}
+	if err := a.Drain(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatal("cancelled claim surfaced as storage failure", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='queued'`, receipt.RunID) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation`) != 0 {
+		t.Fatal("cancelled scheduler started work")
+	}
+	a.Store = r
+	mustDrain(t, a)
+}
+
+type acceptedShutdownClaimStore struct {
+	agent.ActorStore
+	stop context.CancelFunc
+}
+
+func (s acceptedShutdownClaimStore) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
+	c, err := s.ActorStore.Claim(ctx, id)
+	s.stop()
+	return c, err
+}
+func TestLoopShutdownImmediatelyAfterClaimReleasesOwnedWork(t *testing.T) {
+	s, r, _, a, _ := loopFixture(t)
+	receipt := mustSubmit(t, a, "shutdown-after-claim", "hello")
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	a.Store = acceptedShutdownClaimStore{ActorStore: r, stop: stop}
+	if err := a.Drain(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatal("shutdown lost stable ownership boundary", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='running'`, receipt.RunID) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation`) != 0 || scalar(t, s, `SELECT count(*) FROM run_claim WHERE token IS NOT NULL`) != 0 {
+		t.Fatal("shutdown leaked owned work or started model")
+	}
+	a.Store = r
+	mustDrain(t, a)
 }

@@ -26,6 +26,8 @@ type Runs struct {
 	registry    *tool.Registry
 	recentAge   time.Duration
 	recentLimit int
+	limits      ToolLimits
+	approvalTTL time.Duration
 }
 
 func (s *Store) Runs(history conversation.Store, registry *tool.Registry) *Runs {
@@ -73,7 +75,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, llm.ModelIncompatible, llm.ContextLengthExceeded} {
+	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -137,6 +139,9 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 			return err
 		}
 		receipt.MessageID = newID()
+		if err := invalidateApprovals(ctx, tx, receipt.RunID); err != nil {
+			return err
+		}
 		message := conversation.Message{MessageID: receipt.MessageID, ConversationID: agentID, Role: "user", Content: parts, Source: "cli", SourceEventID: key, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
 		raw, _ := encoded(message)
 		if _, err = tx.ExecContext(ctx, `INSERT INTO main_input(agent_id,request_key,run_id,message_id,message_json) VALUES(?,?,?,?,?)`, agentID, key, receipt.RunID, receipt.MessageID, raw); err != nil {
@@ -151,6 +156,12 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 }
 
 func (r *Runs) Next(ctx context.Context) (string, error) {
+	if err := r.recoverApprovals(ctx); err != nil {
+		return "", err
+	}
+	if err := r.ReconcileUnknown(ctx); err != nil {
+		return "", err
+	}
 	if err := r.recoverStops(ctx); err != nil {
 		return "", err
 	}
@@ -164,7 +175,7 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 	var id string
 	// Four worker leases plus a reserved Main slot. The database enforces this
 	// host bound across concurrent CLI processes as well as within one Actor.
-	err := r.host.db.QueryRowContext(ctx, `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) WHERE (r.status IN ('queued','running') OR (r.status='waiting' AND (r.wait_reason='resource' OR (r.wait_reason='user_input' AND (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))))))) AND (c.token IS NULL OR c.expires_at<=?) AND (r.kind='main' OR (SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>?)<4) ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,r.created_at,r.run_id LIMIT 1`, time.Now().UnixMicro(), time.Now().UnixMicro()).Scan(&id)
+	err := r.host.db.QueryRowContext(ctx, `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) WHERE (r.status IN ('queued','running') OR (r.status='waiting' AND (r.wait_reason='resource' OR (r.wait_reason='user_input' AND (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))))))) AND (c.token IS NULL OR c.expires_at<=?) AND (r.kind='main' OR (SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>?)<4) AND NOT (r.status='waiting' AND r.wait_reason='resource' AND EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') AND NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason='resource' OR (i.wait_reason='retry_backoff' AND i.next_wake_at<=?) OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending'))))) ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,r.created_at,r.run_id LIMIT 1`, time.Now().UnixMicro(), time.Now().UnixMicro(), time.Now().UnixMicro()).Scan(&id)
 	if err == sql.ErrNoRows {
 		var active int
 		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE status IN ('queued','running') OR (status='waiting' AND wait_reason='resource')`).Scan(&active); err != nil {
@@ -553,6 +564,15 @@ func (r *Runs) Wait(ctx context.Context, c agent.RunClaim, v int64, reason strin
 	return r.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, c); err != nil {
 			return err
+		}
+		if reason == "approval" {
+			var ready int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM approval a JOIN tool_invocation i USING(invocation_id) WHERE i.run_id=? AND i.status='waiting' AND i.wait_reason='approval' AND a.status!='pending'`, c.RunID()).Scan(&ready); err != nil {
+				return err
+			}
+			if ready > 0 {
+				reason = "resource"
+			}
 		}
 		res, err := tx.ExecContext(ctx, `UPDATE run SET status='waiting',wait_reason=?,updated_at=?,version=version+1 WHERE run_id=? AND version=?`, reason, time.Now().UnixMicro(), c.RunID(), v)
 		if err != nil {

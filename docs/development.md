@@ -73,7 +73,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":9,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":10,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,
@@ -301,3 +301,7 @@ and `nats-server/v2` (Apache-2.0, test harness only). The SDK avoids a custom wi
 format parser; the official client avoids a second broker protocol. The test
 server and its dependencies add build/download cost but no service/account cost;
 they are absent from the product executable. Checksums live in `go.sum`.
+
+Unified Tool policy, local approval commands, effect recovery and the five-run security harness are documented in [tools.md](tools.md).
+
+The Ubuntu job has a bounded 25-minute timeout for the five-run Tool recovery gate and the existing Bridge/account/restart checks. The Tool gate adds 40 real SIGKILL/restarts; it retains every assertion and repetition.

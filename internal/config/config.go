@@ -18,8 +18,18 @@ type Config struct {
 	Version int               `yaml:"version"`
 	App     App               `yaml:"app"`
 	NATS    eventnats.Options `yaml:"nats"`
+	Tools   ToolLimits        `yaml:"tools"`
 	Tasks   Tasks             `yaml:"tasks"`
 	LLM     LLM               `yaml:"llm"`
+}
+
+type ToolLimits struct {
+	ApprovalTTLSeconds int `yaml:"approval_ttl_seconds"`
+	Global             int `yaml:"global_concurrency"`
+	Agent              int `yaml:"agent_concurrency"`
+	Run                int `yaml:"run_concurrency"`
+	Provider           int `yaml:"provider_concurrency"`
+	Tool               int `yaml:"tool_concurrency"`
 }
 
 type Tasks struct {
@@ -47,6 +57,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg := Config{
 		Version: 1,
+		Tools:   ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
 		Tasks:   Tasks{RecentDays: 30, RecentLimit: 200},
 		App:     App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
 		NATS:    eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
@@ -86,6 +97,14 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if err := cfg.NATS.Validate(); err != nil {
 		return Config{}, err
+	}
+	if cfg.Tools.ApprovalTTLSeconds < 1 || cfg.Tools.ApprovalTTLSeconds > 86400 {
+		return Config{}, errors.New("tools approval_ttl_seconds must be 1..86400")
+	}
+	for _, limit := range []int{cfg.Tools.Global, cfg.Tools.Agent, cfg.Tools.Run, cfg.Tools.Provider, cfg.Tools.Tool} {
+		if limit < 1 || limit > 1024 {
+			return Config{}, errors.New("tools concurrency limits must be 1..1024")
+		}
 	}
 	if cfg.Tasks.RecentDays < 1 || cfg.Tasks.RecentDays > 3650 || cfg.Tasks.RecentLimit < 1 || cfg.Tasks.RecentLimit > 10000 {
 		return Config{}, errors.New("tasks requires recent_days 1..3650 and recent_limit 1..10000")

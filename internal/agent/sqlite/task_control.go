@@ -109,6 +109,9 @@ func (r *Runs) recoverStopsTx(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		now := time.Now().UnixMicro()
+		if err = invalidateApprovals(ctx, tx, id); err != nil {
+			return err
+		}
 		changed, err := tx.ExecContext(ctx, `UPDATE model_generation SET status='failed',error_code='GENERATION_CANCELLED',completed_at=? WHERE run_id=? AND status='pending'`, now, id)
 		if err != nil {
 			return err
@@ -118,9 +121,9 @@ func (r *Runs) recoverStopsTx(ctx context.Context, tx *sql.Tx) error {
 				return err
 			}
 		}
-		// Unsafe executions have no authoritative outcome after their owner is
-		// gone. Keep them unknown, never retry. M2 only admits pure/safe tools.
-		rows, err := tx.QueryContext(ctx, `UPDATE tool_invocation SET status=CASE WHEN status='queued' OR replay_policy='safe' THEN 'cancelled' ELSE 'unknown' END,wait_reason=NULL,result_ready_at=?,updated_at=?,version=version+1 WHERE run_id=? AND status IN ('queued','running','waiting') RETURNING status,version`, now, now, id)
+		// Dispatched unsafe executions lack authoritative outcomes after their
+		// owner is gone. Unexecuted approval/resource waiters can cancel safely.
+		rows, err := tx.QueryContext(ctx, `UPDATE tool_invocation SET status=CASE WHEN attempt_count=0 OR replay_policy='safe' THEN 'cancelled' ELSE 'unknown' END,wait_reason=NULL,result_ready_at=?,updated_at=?,version=version+1 WHERE run_id=? AND status IN ('queued','running','waiting') RETURNING status,version`, now, now, id)
 		if err != nil {
 			return err
 		}

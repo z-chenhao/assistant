@@ -105,6 +105,16 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 			return err
 		}
 	}
+	// A completed model loop cannot establish an unconfirmed external effect.
+	// Keep the Task active and report the existing unknown result kind to Main.
+	var unknown int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM tool_invocation i JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch=? AND i.status='unknown'`, taskID.String, epoch).Scan(&unknown); err != nil {
+		return err
+	}
+	if unknown > 0 {
+		status = "unknown"
+		content = "External effect outcome is unconfirmed. " + content
+	}
 	next := "active"
 	var completed any
 	var policy string

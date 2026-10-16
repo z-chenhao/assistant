@@ -26,18 +26,20 @@ import (
 	"github.com/z-chenhao/erii/internal/observability"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
+	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
 	"github.com/z-chenhao/erii/internal/tui"
 )
 
 type App struct {
-	store     *sqlite.Store
-	telemetry *observability.Telemetry
-	provider  *bridge.Client
-	control   llm.Control
-	accounts  *account.Manager
-	history   *conversationsqlite.Store
-	runs      *sqlite.Runs
-	registry  *tool.Registry
+	store        *sqlite.Store
+	telemetry    *observability.Telemetry
+	provider     *bridge.Client
+	control      llm.Control
+	accounts     *account.Manager
+	history      *conversationsqlite.Store
+	runs         *sqlite.Runs
+	registry     *tool.Registry
+	testBoundary func(string)
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
@@ -85,7 +87,30 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, err
 	}
 	a.registry = task.Registry()
+	if fixture == "approval" || fixture == "approval-never" {
+		defs := []tool.Definition{}
+		for _, spec := range a.registry.Describe() {
+			d, _ := a.registry.Resolve(spec.Name)
+			defs = append(defs, d)
+		}
+		policy := "query_before_retry"
+		if fixture == "approval-never" {
+			policy = "never"
+		}
+		defs = append(defs, toolfake.Definition(cfg.App.DataRoot, policy, func(name string) {
+			if a.testBoundary != nil {
+				a.testBoundary(name)
+			}
+		}))
+		a.registry, err = tool.NewRegistry(defs)
+		if err != nil {
+			a.Close()
+			return nil, err
+		}
+	}
 	a.runs = store.Runs(a.history, a.registry)
+	a.runs.ConfigureApprovalTTL(time.Duration(cfg.Tools.ApprovalTTLSeconds) * time.Second)
+	a.runs.ConfigureToolLimits(sqlite.ToolLimits{Global: cfg.Tools.Global, Agent: cfg.Tools.Agent, Run: cfg.Tools.Run, Provider: cfg.Tools.Provider, Tool: cfg.Tools.Tool})
 	a.runs.ConfigureRecentTasks(time.Duration(cfg.Tasks.RecentDays)*24*time.Hour, cfg.Tasks.RecentLimit)
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
@@ -166,7 +191,10 @@ func (a *App) recordGeneration(ctx context.Context, r llm.GenerationRequest, res
 	return err
 }
 
-func (a *App) SetTestMainBoundary(boundary func(string)) { a.store.MainBoundary = boundary }
+func (a *App) SetTestMainBoundary(boundary func(string)) {
+	a.store.MainBoundary = boundary
+	a.testBoundary = boundary
+}
 func (a *App) Actor(sink agent.EventSink) agent.Actor {
 	var provider llm.LLMProvider
 	if a.provider != nil {
@@ -246,3 +274,20 @@ func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.Cata
 }
 
 func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.runs.Activity(ctx) }
+
+func (a *App) Approvals(ctx context.Context) ([]sqlite.ApprovalView, error) {
+	return a.runs.Approvals(ctx)
+}
+func (a *App) DecideApproval(ctx context.Context, id, hash, decision string) error {
+	d, err := a.store.Diagnostics(ctx)
+	if err != nil {
+		return err
+	}
+	return a.runs.Decide(ctx, d.AgentID, id, hash, decision)
+}
+func (a *App) ReconcileTools(ctx context.Context) ([]sqlite.ToolOutcome, error) {
+	if err := a.runs.ReconcileUnknown(ctx); err != nil {
+		return nil, err
+	}
+	return a.runs.ToolOutcomes(ctx)
+}
