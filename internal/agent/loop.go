@@ -10,6 +10,13 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
+// runFailure proves the terminal failure transaction committed. Provider errors
+// encountered before that boundary remain recoverable infrastructure failures.
+type runFailure struct{ cause error }
+
+func (e *runFailure) Error() string { return e.cause.Error() }
+func (e *runFailure) Unwrap() error { return e.cause }
+
 type LoopOptions struct {
 	Store    RunStore
 	Provider llm.LLMProvider
@@ -39,7 +46,7 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 		if err := o.Store.Fail(work, claim, r.Version, code); err != nil {
 			return err
 		}
-		return llm.NormalizeError(code)
+		return &runFailure{cause: llm.NormalizeError(code)}
 	}
 	for {
 		// Shutdown is a boundary stop. It never mutates business cancellation.
@@ -54,6 +61,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 		switch cp.Phase {
 		case "model":
 			inputs, err := o.Store.Steering(work, claim, cp.InputSequence)
+			if errors.Is(err, ErrConflict) {
+				continue
+			}
 			if err != nil {
 				return err
 			}

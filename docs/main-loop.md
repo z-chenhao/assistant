@@ -58,8 +58,9 @@ future version fails startup. Memory storage remains a later slice.
 | `waiting` | `running` on an eligible wake/Claim |
 | `completed`, `failed` | Terminal; another request creates another Run |
 
-The schema reserves the baseline's cancelled state; this slice exposes no user
-cancel or Task controls. Waiting reasons use the baseline enum. Resource waits
+The Main foundation reserves the baseline's cancelled state.
+[The Task slice](tasks.md) now supplies create/search/append; controlled user
+pause/cancel remains ERII-12. Waiting reasons use the baseline enum. Resource waits
 are recoverable; user-input waits become eligible when new steering arrives.
 Approval/external-event wake mechanics arrive with their respective slices.
 

@@ -30,7 +30,7 @@ func TestFreshAndRepeatedStartupPreserveConfiguration(t *testing.T) {
 	if err != nil || id.Version() != 7 {
 		t.Fatalf("agent identity: %q (%v)", d.AgentID, err)
 	}
-	if d.Readiness != agent.SetupRequired || d.AgentIngressEnabled || d.ActiveModelProfileID != nil || d.ConfigVersion != 1 || d.SchemaVersion != 7 {
+	if d.Readiness != agent.SetupRequired || d.AgentIngressEnabled || d.ActiveModelProfileID != nil || d.ConfigVersion != 1 || d.SchemaVersion != 8 {
 		t.Fatalf("diagnostics: %+v", d)
 	}
 	var created, updated int64
@@ -42,7 +42,7 @@ func TestFreshAndRepeatedStartupPreserveConfiguration(t *testing.T) {
 	}
 	// Force replacement connections so PRAGMA settings cannot rely on one initial connection.
 	s.db.SetConnMaxLifetime(time.Nanosecond)
-	for pragma, want := range map[string]string{"journal_mode": "wal", "foreign_keys": "1", "busy_timeout": "5000", "user_version": "7"} {
+	for pragma, want := range map[string]string{"journal_mode": "wal", "foreign_keys": "1", "busy_timeout": "5000", "user_version": "8"} {
 		var got string
 		if err := s.db.QueryRow("PRAGMA " + pragma).Scan(&got); err != nil {
 			t.Fatal(err)
@@ -231,7 +231,7 @@ func TestRealV1UpgradePreservesIdentityWithoutRetroactiveEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.AgentID != "existing-agent" || d.SchemaVersion != 7 || d.Readiness != "setup_required" {
+	if d.AgentID != "existing-agent" || d.SchemaVersion != 8 || d.Readiness != "setup_required" {
 		t.Fatalf("upgrade: %+v", d)
 	}
 	var created, events int

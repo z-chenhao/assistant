@@ -1,0 +1,277 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"time"
+
+	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/event"
+	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
+	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/erii/internal/tool"
+)
+
+func (r *Runs) searchTasks(ctx context.Context, tx *sql.Tx, runID string, request task.SearchRequest) (tool.Result, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT t.task_ref,t.title,t.anchor_task,t.status,t.progress_summary,t.updated_at,coalesce((SELECT group_concat(i.instruction,char(10)) FROM task_instruction i WHERE i.task_id=t.task_id),'') FROM task t JOIN run r ON t.agent_id=r.agent_id AND t.conversation_id=r.conversation_id WHERE r.run_id=? ORDER BY t.updated_at DESC,t.task_ref`, runID)
+	if err != nil {
+		return tool.Result{}, err
+	}
+	defer rows.Close()
+	candidates := []task.Candidate{}
+	recent := 0
+	for rows.Next() {
+		var s task.Summary
+		var instructions string
+		var updated int64
+		if err = rows.Scan(&s.TaskRef, &s.Title, &s.GoalSummary, &s.Status, &s.ProgressSummary, &updated, &instructions); err != nil {
+			return tool.Result{}, err
+		}
+		if request.Scope == "active" && s.Status != "active" {
+			continue
+		}
+		if request.Scope == "recent" {
+			if updated < time.Now().Add(-r.recentAge).UnixMicro() || recent >= r.recentLimit {
+				continue
+			}
+			recent++
+		}
+		match := len(request.Status) == 0
+		for _, status := range request.Status {
+			if status == s.Status {
+				match = true
+			}
+		}
+		if !match {
+			continue
+		}
+		s.UpdatedAt = time.UnixMicro(updated).UTC().Format("2006-01-02T15:04:05.000000Z")
+		text := s.Title + "\n" + s.GoalSummary + "\n" + instructions
+		// Search returns a bounded goal summary, not the full private execution context.
+		rs := []rune(s.GoalSummary)
+		if len(rs) > 240 {
+			s.GoalSummary = string(rs[:240]) + "…"
+		}
+		candidates = append(candidates, task.Candidate{Summary: task.BoundSummary(s), Text: text})
+	}
+	if err = rows.Err(); err != nil {
+		return tool.Result{}, err
+	}
+	raw, err := encoded(task.Rank(candidates, request.Query, request.Limit))
+	return tool.Result{Text: raw}, err
+}
+
+// finishTask participates in the terminal Run transaction. Progress never enters
+// this table, and a failed Root leaves its Task active for an explicit append.
+func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason string) error {
+	var kind string
+	var taskID sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT kind,task_id FROM run WHERE run_id=?`, runID).Scan(&kind, &taskID); err != nil {
+		return err
+	}
+	if kind != "worker" {
+		return nil
+	}
+	var position string
+	var epoch int64
+	if err := tx.QueryRowContext(ctx, `SELECT worker_position,task_epoch FROM run WHERE run_id=?`, runID).Scan(&position, &epoch); err != nil {
+		return err
+	}
+	if position != "root" {
+		return agent.ErrConflict
+	}
+	var pending int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND task_epoch=? AND run_id!=? AND status IN ('queued','running','waiting')`, taskID.String, epoch, runID).Scan(&pending); err != nil {
+		return err
+	}
+	if status == "completed" && pending > 0 {
+		return agent.ErrConflict
+	}
+	now := time.Now().UnixMicro()
+	content := "Worker execution failed: " + reason
+	if status == "completed" {
+		if err := tx.QueryRowContext(ctx, `SELECT content FROM worker_result WHERE run_id=? ORDER BY created_at DESC,exchange_id DESC LIMIT 1`, runID).Scan(&content); err != nil {
+			return err
+		}
+	}
+	next := "active"
+	var completed any
+	if status == "completed" {
+		next = "completed"
+		completed = now
+	}
+	var version int64
+	if err := tx.QueryRowContext(ctx, `SELECT version FROM task WHERE task_id=? AND task_epoch=? AND status='active'`, taskID.String, epoch).Scan(&version); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE task SET status=?,completed_at=?,updated_at=?,version=version+1 WHERE task_id=? AND task_epoch=? AND version=? AND status='active'`, next, completed, now, taskID.String, epoch, version)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n != 1 {
+		return agent.ErrClaimLost
+	}
+	return r.taskUpdate(ctx, tx, taskID.String, runID, epoch, status, content)
+}
+func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string, epoch int64, kind, content string) error {
+	e, err := event.New("/erii/tasks", "ai.erii.task_update.v1", taskID, struct {
+		TaskID    string `json:"task_id"`
+		RootRunID string `json:"root_run_id"`
+		Epoch     int64  `json:"task_epoch"`
+		Kind      string `json:"kind"`
+	}{taskID, runID, epoch, kind})
+	if err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO task_update VALUES(?,?,?,?,?,?,'[]',?)`, e.ID(), taskID, runID, epoch, kind, content, e.Time().UnixMicro()); err != nil {
+		return err
+	}
+	return eventsqlite.Enqueue(ctx, tx, e)
+}
+
+// Report reconstructs from authoritative updates, even if a queue wake was
+// lost. Inbox and consumer dedup commit together; repeating it is harmless.
+// Stale epochs are consumed but never injected into a new Main.
+func (r *Runs) Report(ctx context.Context) error {
+	changed := false
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		changed = false
+		rows, err := tx.QueryContext(ctx, `SELECT u.event_id,u.task_id,u.root_run_id,u.task_epoch,u.kind,u.content,u.artifact_refs,u.occurred_at,t.agent_id,t.task_ref,t.task_epoch FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id) ORDER BY u.occurred_at,u.event_id`)
+		if err != nil {
+			return err
+		}
+		type update struct {
+			eventID, taskID, rootID, kind, content, refs, agentID, taskRef string
+			epoch, current, at                                             int64
+		}
+		updates := []update{}
+		for rows.Next() {
+			var u update
+			if err = rows.Scan(&u.eventID, &u.taskID, &u.rootID, &u.epoch, &u.kind, &u.content, &u.refs, &u.at, &u.agentID, &u.taskRef, &u.current); err != nil {
+				rows.Close()
+				return err
+			}
+			updates = append(updates, u)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		for _, u := range updates {
+			if u.current == u.epoch {
+				at := time.UnixMicro(u.at).UTC()
+				var refs []string
+				if json.Unmarshal([]byte(u.refs), &refs) != nil {
+					return agent.ErrStorage
+				}
+				message := taskMessage(u.eventID, u.taskRef, u.kind, u.content, refs, at)
+				raw, err := encoded(message)
+				if err != nil {
+					return err
+				}
+				if _, err = tx.ExecContext(ctx, `INSERT INTO main_inbox(event_id,request_id,agent_id,message_json,created_at) VALUES(?,?,?,?,?) ON CONFLICT(event_id) DO NOTHING`, u.eventID, message.MessageID, u.agentID, raw, at.UnixMicro()); err != nil {
+					return err
+				}
+			}
+			if _, err = tx.ExecContext(ctx, `INSERT INTO event_inbox VALUES('task_reporter',?,?) ON CONFLICT DO NOTHING`, u.eventID, time.Now().UnixMicro()); err != nil {
+				return err
+			}
+		}
+		if len(updates) > 0 {
+			changed = true
+			r.host.boundary("before_report_commit")
+		}
+		return nil
+	})
+	if err == nil && changed {
+		r.host.boundary("after_report_commit")
+	}
+	return err
+}
+
+// promoteFollowups drains every currently available update into one new Main,
+// only after the active Main has ended. No progress or Worker text enters the
+// user Conversation; only Main's eventual answer uses the normal delivery path.
+func (r *Runs) promoteFollowups(ctx context.Context) error {
+	created := false
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		var active int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE kind='main' AND status IN ('queued','running','waiting')`).Scan(&active); err != nil {
+			return err
+		}
+		if active > 0 {
+			return nil
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch ORDER BY b.sequence`)
+		if err != nil {
+			return err
+		}
+		ids := []int64{}
+		messages := []agent.AgentMessage{}
+		for rows.Next() {
+			var id int64
+			var raw string
+			var message agent.AgentMessage
+			if err = rows.Scan(&id, &raw); err != nil {
+				rows.Close()
+				return err
+			}
+			if json.Unmarshal([]byte(raw), &message) != nil {
+				rows.Close()
+				return agent.ErrStorage
+			}
+			ids = append(ids, id)
+			messages = append(messages, message)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		var agentID, profile string
+		var config int64
+		if err = tx.QueryRowContext(ctx, `SELECT agent_id,coalesce(active_model_profile_id,''),config_version FROM agent_config WHERE singleton=1 AND setup_status='ready'`).Scan(&agentID, &profile, &config); err != nil {
+			return agent.ErrSetup
+		}
+		id, err := r.createMain(ctx, tx, agentID, profile, config, messages)
+		if err != nil {
+			return err
+		}
+
+		for _, seq := range ids {
+			if _, err = tx.ExecContext(ctx, `UPDATE main_inbox SET run_id=? WHERE sequence=? AND run_id IS NULL`, id, seq); err != nil {
+				return err
+			}
+		}
+		created = true
+		r.host.boundary("before_followup_commit")
+		return runEvent(ctx, tx, id, "main_followup.accepted", 1)
+	})
+	if err == nil && created {
+		r.host.boundary("after_followup_commit")
+	}
+	return err
+}
+
+// ConfigureRecentTasks is composition-time policy. Run execution never changes
+// it; recent is a search window, not a deletion or retention job.
+func (r *Runs) ConfigureRecentTasks(age time.Duration, limit int) {
+	r.recentAge = age
+	r.recentLimit = limit
+}
+
+func taskMessage(eventID, ref, kind, content string, refs []string, at time.Time) agent.AgentMessage {
+	message := agent.TextMessage("custom", content)
+	message.MessageID = "report:" + eventID
+	message.CustomType = "task_update"
+	message.Origin = "runtime"
+	message.CreatedAt = &at
+	message.Details = &task.UpdateDetails{TaskRef: ref, Kind: kind, ArtifactRefs: refs}
+	return message
+}

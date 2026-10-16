@@ -33,3 +33,5 @@ See [local development and storage notes](docs/development.md) and the
 cleanup, and the precise limits of this slice.
 
 See [local provider setup](docs/provider-bridge.md#connect-a-local-model) for the actual model path.
+
+Task delegation, discovery, append and durable follow-up: [operations and limits](docs/tasks.md).

@@ -24,6 +24,7 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
 	"github.com/z-chenhao/erii/internal/tui"
 )
@@ -83,8 +84,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		_ = t.Close()
 		return nil, err
 	}
-	a.registry = tool.EchoRegistry()
+	a.registry = task.Registry()
 	a.runs = store.Runs(a.history, a.registry)
+	a.runs.ConfigureRecentTasks(time.Duration(cfg.Tasks.RecentDays)*24*time.Hour, cfg.Tasks.RecentLimit)
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
@@ -242,3 +244,5 @@ func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.Cata
 	}
 	return a.provider.CatalogAt(ctx, connection)
 }
+
+func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.runs.Activity(ctx) }
