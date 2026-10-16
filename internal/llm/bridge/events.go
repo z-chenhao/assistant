@@ -25,6 +25,7 @@ type eventDelivery struct {
 type eventStream struct {
 	events       chan eventDelivery
 	id           string
+	sessionID    string
 	seen         map[int64][32]byte
 	last         int64
 	remaining    int
@@ -57,7 +58,7 @@ func (s *eventStream) wasCancelled() bool {
 	}
 }
 
-// Called under the process mutex only after a matching cancellation ack. This
+// Called under the process mutex only after a matching cancellation or disposal ack. This
 // signal takes priority over queued events, including a queued completion.
 func (s *eventStream) cancel() {
 	if s.wasCancelled() {

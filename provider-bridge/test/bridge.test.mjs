@@ -29,6 +29,16 @@ async function fixture(t, mode='success') {
   if(mode==='oversized-frame'){chunk({content:'\n'.repeat(600000)});chunk({},'stop');res.end('data: [DONE]\n\n');return;}
   if(mode==='oversized-stream'){res.end('data: '+JSON.stringify({choices:[{index:0,delta:{content:'x'.repeat(5<<20)},finish_reason:null}]})+'\n\n');return;}
   if(mode==='oversized-tool'){chunk({tool_calls:[{index:0,id:'call_big',type:'function',function:{name:'probe_echo',arguments:JSON.stringify({value:'x'.repeat(70000)})}}]});chunk({},'tool_calls');res.end('data: [DONE]\n\n');return;}
+  if(mode.startsWith('arguments-')) {
+   const args=({'arguments-incomplete':'{"value":','arguments-array':'[]','arguments-null':'null','arguments-number':'1','arguments-string':'"unsafe-secret"','arguments-boolean':'true','arguments-empty':'{}'})[mode];
+   chunk({tool_calls:[{index:0,id:'call_bad',type:'function',function:{name:'probe_echo',arguments:args}}]});chunk({},'tool_calls');res.end('data: [DONE]\n\n');return;
+  }
+  if(mode==='deadline') {
+   chunk({content:'partial'});
+   const interval=setInterval(()=>chunk({content:'still streaming'}),1000);
+   res.on('close',()=>{closed++;clearInterval(interval);});
+   return;
+  }
   if(mode==='malformed'){res.end('data: {oops}\n\n');return;}
   if(mode==='cancel'||mode==='partial') {
    chunk({content:'partial'});
@@ -56,7 +66,7 @@ async function fixture(t, mode='success') {
   if(f.error)throw new Error(f.error.message);
   return f.result;
  };
- const wait=async predicate=>{for(let i=0;i<400;i++){const e=events.find(predicate);if(e)return e;await new Promise(r=>setTimeout(r,5));}throw new Error('event timeout');};
+ const wait=async (predicate,timeoutMs=2000)=>{for(let i=0;i<Math.ceil(timeoutMs/5);i++){const e=events.find(predicate);if(e)return e;await new Promise(r=>setTimeout(r,5));}throw new Error('event timeout');};
  t.after(async()=>{if(child.exitCode===null){child.kill();await once(child,'exit');} lines.close();server.closeAllConnections();await new Promise(r=>server.close(r));assert.equal(stderr,'');});
  await rpc('bridge.initialize',{protocol_version:1});
  const snapshot={snapshot_id:'s',profile_id:'p',profile_version:1,provider_kind:'openai_compatible',endpoint_hash:createHash('sha256').update(JSON.stringify({endpoint}).replace(/[<>&\u2028\u2029]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'))).digest('hex'),wire_api:'openai_completions',model_id:'fixture-model',context_window:8192,max_output_tokens:1024,compatibility:{tool_result_format:'openai'},capabilities:{text_input:true}};
@@ -121,4 +131,27 @@ test('known transient disconnects retry at most twice',{timeout:10000},async t=>
 });
 test('missing provider usage stays unknown',{timeout:10000},async t=>{
  const f=await fixture(t,'no-usage');await f.rpc('generation.start',f.request());const e=await f.wait(e=>e.kind==='completed');assert.equal(e.usage,undefined);
+});
+
+for(const mode of ['arguments-incomplete','arguments-array','arguments-null','arguments-number','arguments-string','arguments-boolean'])test(`${mode} rejects unsafe tool arguments`,{timeout:10000},async t=>{
+ const f=await fixture(t,mode);
+ await f.rpc('generation.start',f.request({tools:[{name:'probe_echo',input_schema:'{"type":"object"}'}]}));
+ const error=await f.wait(e=>e.kind==='error');
+ assert.equal(error.error_code,'INVALID_PROVIDER_RESPONSE');
+ assert(!f.events.some(e=>e.kind==='tool_call'||e.kind==='completed'));
+ assert(!JSON.stringify(f.events).includes('unsafe-secret'));assert.equal(f.requests.length,1);
+});
+test('an explicit empty argument object remains valid',{timeout:10000},async t=>{
+ const f=await fixture(t,'arguments-empty');await f.rpc('generation.start',f.request());
+ const call=await f.wait(e=>e.kind==='tool_call');assert.equal(call.tool_call.arguments,'{}');await f.wait(e=>e.kind==='completed');
+});
+test('absolute generation deadline aborts a trickling response body',{timeout:40000},async t=>{
+ const f=await fixture(t,'deadline');const started=performance.now();
+ await f.rpc('generation.start',f.request());await f.wait(e=>e.kind==='text_delta');
+ const error=await f.wait(e=>e.kind==='error',35000);
+ assert.equal(error.error_code,'PROVIDER_UNAVAILABLE');assert(performance.now()-started>=29000);
+ assert(!f.events.some(e=>e.kind==='completed'));assert.equal(f.requests.length,1);
+ for(let i=0;i<200 && !f.stats().closed;i++)await new Promise(r=>setTimeout(r,5));
+ assert.equal(f.stats().closed,1);
+ await f.rpc('models.list',{connection:{endpoint:f.endpoint}});
 });

@@ -67,7 +67,7 @@ function transport(connection, signal, state) {
             received+=value.byteLength;
             if(received>4<<20){state.code='INVALID_PROVIDER_RESPONSE';await reader.cancel();controller.error(new Error(state.code));return;}
             controller.enqueue(value);
-          } catch {state.code='INVALID_PROVIDER_RESPONSE';controller.error(new Error(state.code));}
+          } catch {state.code ??= 'INVALID_PROVIDER_RESPONSE';controller.error(new Error(state.code));}
         },
         cancel(reason){return reader.cancel(reason);}
       }),{status:response.status,headers:response.headers});
@@ -96,6 +96,8 @@ async function generate(r, job, send) {
   const event = (kind, rest = {}) => { if (!job.cancelled) { send({jsonrpc:'2.0',method:'generation.event',params:{generation_id:r.generation_id,sequence:sequence+1,kind,...rest}}); sequence++; } };
   const s = r.model_snapshot;
   const state = {};
+  // The SDK timer ends at response headers. This deadline owns the entire generation.
+  const deadline = setTimeout(()=>{state.code='PROVIDER_UNAVAILABLE';job.controller.abort();},30000);
   try {
     if (r.session_id !== r.run_id || !r.run_id || !s.snapshot_id || s.provider_kind !== 'openai_compatible' || s.wire_api !== 'openai_completions' || s.endpoint_hash !== hash(r.connection.endpoint) || s.max_output_tokens < 1 || s.max_output_tokens > 65536 || s.context_window > 1048576) fail('MODEL_INCOMPATIBLE');
     if (s.max_output_tokens > s.context_window || s.context_window < 1 || s.reasoning_effort || Object.keys(s.generation_defaults ?? {}).length || ['developer_role','reasoning_effort','parallel_tool_calls','stream_usage'].some(k=>s.compatibility?.[k]) || s.compatibility?.tool_result_format !== 'openai') fail('MODEL_INCOMPATIBLE');
@@ -105,12 +107,15 @@ async function generate(r, job, send) {
     let terminal = false;
     let count = 0, bytes = 0, tools = 0;
     for await (const e of events) {
+      if(job.controller.signal.aborted && !job.cancelled) fail(state.code ?? 'GENERATION_CANCELLED');
       if (++count > 4096) fail('INVALID_PROVIDER_RESPONSE');
       if (e.type === 'text_delta') {
         bytes += Buffer.byteLength(e.delta);
         if (bytes > 1 << 20) fail('INVALID_PROVIDER_RESPONSE');
         event('text_delta',{text:e.delta});
       } else if (e.type === 'toolcall_end') {
+        // Pi substitutes {} on parse failure; its diagnostic includes unsafe raw input.
+        if(e.toolCall.argumentsError !== undefined || e.toolCall.arguments === null || typeof e.toolCall.arguments !== 'object' || Array.isArray(e.toolCall.arguments)) fail('INVALID_PROVIDER_RESPONSE');
         const argumentsJSON=JSON.stringify(e.toolCall.arguments);
         if(++tools>32 || Buffer.byteLength(argumentsJSON)>65536) fail('INVALID_PROVIDER_RESPONSE');
         event('tool_call',{tool_call:{id:e.toolCall.id,name:e.toolCall.name,arguments:argumentsJSON}});
@@ -121,13 +126,14 @@ async function generate(r, job, send) {
         event('completed',{...(state.usageSeen ? {usage:{input_tokens:u.input,output_tokens:u.output,cache_read_tokens:u.cacheRead,cache_write_tokens:u.cacheWrite}} : {}),latency_ms:Math.ceil(performance.now()-started)});
       } else if (e.type === 'error') {
         terminal = true;
-        event('error',{error_code:job.controller.signal.aborted ? 'GENERATION_CANCELLED' : state.code ?? 'INVALID_PROVIDER_RESPONSE'});
+        event('error',{error_code:state.code ?? (job.controller.signal.aborted ? 'GENERATION_CANCELLED' : 'INVALID_PROVIDER_RESPONSE')});
       }
     }
     if (!terminal) fail('INVALID_PROVIDER_RESPONSE');
   } catch (e) {
     event('error',{error_code:state.code ?? safe(e)});
   } finally {
+    clearTimeout(deadline);
     job.controller.abort();
     active.delete(r.generation_id);
     r.connection = undefined;

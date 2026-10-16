@@ -48,16 +48,17 @@ type process struct {
 }
 
 type Client struct {
-	mu           sync.Mutex
-	path         string
-	args         []string
-	p            *process
-	closed       bool
-	initializing *initialization
-	closeDone    chan struct{}
-	next         atomic.Uint64
-	resolver     Resolver
-	observer     Observer
+	mu               sync.Mutex
+	path             string
+	args             []string
+	p                *process
+	closed           bool
+	initializing     *initialization
+	closeDone        chan struct{}
+	disposedSessions map[string]bool
+	next             atomic.Uint64
+	resolver         Resolver
+	observer         Observer
 }
 
 type initialization struct {
@@ -454,13 +455,22 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	dispatchCtx, stopDispatch := context.WithCancel(ctx)
 	defer stopDispatch()
 	stream.interrupt = stopDispatch
+	stream.sessionID = r.SessionID
+	// Admission and terminal session disposal share the lifecycle lock.
+	c.mu.Lock()
+	if c.disposedSessions[r.SessionID] {
+		c.mu.Unlock()
+		return llm.GenerationResult{}, llm.GenerationCancelled
+	}
 	p.mu.Lock()
 	if p.events[r.GenerationID] != nil {
 		p.mu.Unlock()
+		c.mu.Unlock()
 		return llm.GenerationResult{}, llm.InvalidProviderResponse
 	}
 	p.events[r.GenerationID] = stream
 	p.mu.Unlock()
+	c.mu.Unlock()
 	hostRejected := false
 	defer func() {
 		p.mu.Lock()
@@ -583,8 +593,53 @@ func (c *Client) Cancel(ctx context.Context, id string) error {
 	p.mu.Unlock()
 	return nil
 }
+
+// Dispose is terminal for this Run's session. An acknowledgement settles all
+// matching registrations, including pending start acks and queued completions.
 func (c *Client) Dispose(ctx context.Context, id string) error {
-	return c.call(ctx, "session.dispose", map[string]string{"session_id": id}, nil)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	p, err := c.ensure(ctx)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	if c.disposedSessions == nil {
+		c.disposedSessions = map[string]bool{}
+	}
+	c.disposedSessions[id] = true
+	p.mu.Lock()
+	targets := map[string]*eventStream{}
+	for key, stream := range p.events {
+		if stream.sessionID == id {
+			targets[key] = stream
+		}
+	}
+	p.mu.Unlock()
+	c.mu.Unlock()
+	// Every admitted write must precede the disposal RPC. Do not await start acks.
+	for _, stream := range targets {
+		select {
+		case <-stream.dispatchDone:
+		case <-ctx.Done():
+			c.stop(p)
+			return llm.ProviderUnavailable
+		case <-p.done:
+			return p.err()
+		}
+	}
+	if err := c.callProcess(ctx, p, "session.dispose", map[string]string{"session_id": id}, nil); err != nil {
+		c.stop(p) // Failed cleanup cannot leave a suppressed, unobservable generation.
+		return err
+	}
+	p.mu.Lock()
+	for key, stream := range targets {
+		if p.events[key] == stream {
+			stream.cancel()
+		}
+	}
+	p.mu.Unlock()
+	return nil
 }
 func (c *Client) Start(ctx context.Context) (llm.AuthState, error) {
 	var s llm.AuthState

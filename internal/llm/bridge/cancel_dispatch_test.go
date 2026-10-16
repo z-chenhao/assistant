@@ -23,6 +23,7 @@ func TestCancelDispatchPeer(t *testing.T) {
 	enc := json.NewEncoder(os.Stdout)
 	var cancelID uint64
 	active, starts, cancels := 0, 0, 0
+	disposes := 0
 	for scanner.Scan() {
 		var r struct {
 			ID     uint64 `json:"id"`
@@ -39,6 +40,10 @@ func TestCancelDispatchPeer(t *testing.T) {
 		switch r.Method {
 		case "bridge.initialize":
 			reply(r.ID, map[string]int{"protocol_version": 1})
+		case "session.dispose":
+			disposes++
+			active = 0
+			reply(r.ID, struct{}{})
 		case "generation.cancel":
 			cancels++
 			if active == 0 {
@@ -56,7 +61,7 @@ func TestCancelDispatchPeer(t *testing.T) {
 				cancelID = 0
 			}
 		case "models.list":
-			reply(r.ID, []llm.CatalogModel{{ModelID: "peer:" + strconv.Itoa(starts), ContextWindow: int64(active), MaxOutputTokens: int64(cancels)}})
+			reply(r.ID, []llm.CatalogModel{{ModelID: "peer:" + strconv.Itoa(starts), ContextWindow: int64(active), MaxOutputTokens: int64(cancels + disposes)}})
 		case "bridge.shutdown":
 			reply(r.ID, struct{}{})
 			os.Exit(0)

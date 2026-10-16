@@ -70,13 +70,19 @@ and sends a Bearer header only when the user supplied an actual key.
 The transport retries connection failures or HTTP 429/502/503/504 at most twice,
 with 50/100 ms delays, before a response stream is accepted. It does not retry
 partial streams, malformed events, auth errors, or model incompatibility. Requests
-use a 30-second SDK bound and the Host Probe a ten-second total bound; cancellation
-and cleanup retain the existing one-second bound. The error body is discarded,
+use a 30-second absolute Bridge deadline across fetch, retries, and response-body
+consumption, independently of the SDK header timeout. A deadline aborts HTTP and
+returns PROVIDER_UNAVAILABLE, with no completed result or stream retry. The Host
+Probe retains its ten-second total bound and independent one-second cleanup
+contexts. Direct Cancel/Dispose RPCs have a five-second bound. The error body is discarded,
 except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
 context-length classification. SDK console sinks are disabled because malformed
 SSE parsing can otherwise print provider chunks. Raw response streams are limited
 to 4 MiB before SDK parsing, and normalized Tool Calls retain the Host bounds
-of 32 calls and 64 KiB of arguments. Errors contain stable codes only.
+of 32 calls and 64 KiB of arguments. Pi argument parse errors and non-object
+arguments fail with INVALID_PROVIDER_RESPONSE before any Tool Call is forwarded.
+Pi raw parse diagnostics are never exposed. An explicit empty object remains valid.
+Errors contain stable codes only.
 
 Readiness checks the saved proof, current credential availability, and Bridge RPC
 health. It does not require catalog support or certify current endpoint health;
@@ -191,7 +197,7 @@ Tool, Computer, domain database or network operations.
 | `generation.start`, `generation.continue` | Real calls additionally carry a transient connection envelope; accepted request with immutable ModelSnapshot, Host-created generation/run IDs, and `session_id = run_id` |
 | `generation.event` | Notification with generation ID, monotonic sequence and text/tool/completion/error kind |
 | `generation.cancel` | Cancellation acknowledgement; Host discards partial accumulated result |
-| `session.dispose` | Explicit end of the isolated provider session |
+| `session.dispose` | Terminal session cleanup; Host fences new admission and settles matching Generate/Continue calls with GENERATION_CANCELLED after acknowledgement |
 
 The Host accepts a matching duplicate sequence once, rejects changed content under
 one sequence and rejects gaps/out-of-order new events. A completion is delivered
@@ -276,3 +282,13 @@ RPC/cancellation and independent SQLite activation contenders. See
 `scripts/FEATURES.md` for exact entries and `evidence/verification.json` for the
 CLI evidence. No account, installed broker, persistent test process or human
 observation relay is required.
+
+Session disposal waits for admitted writes before sending its RPC, without waiting
+for generation start acknowledgements. Its acknowledgement fences queued/late
+completion and settles only captured matching registrations. A result published
+before disposal remains complete. Failed disposal retires the peer instead of
+leaving suppressed work unobservable. Terminal session admission fences remain
+for the lifetime of the Host client, including Bridge restarts; new Runs use new
+session IDs. `make verify` covers ack-only/pre-ack/late/completion races, matching
+Generate/Continue calls against actual Node/HTTP, dispatch ordering, failed cleanup,
+and the full 30-second trickling-body deadline (not a shortened test-only timer).
