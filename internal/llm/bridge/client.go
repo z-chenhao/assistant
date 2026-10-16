@@ -416,9 +416,10 @@ func (c *Client) Continue(ctx context.Context, r llm.GenerationRequest, sink fun
 
 func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (result llm.GenerationResult, err error) {
 	started := time.Now()
+	var connection Connection
 	defer func() {
 		if c.observer != nil {
-			if recordErr := c.observer(context.WithoutCancel(ctx), r, result, time.Since(started), err); recordErr != nil {
+			if recordErr := c.observer(context.WithoutCancel(ctx), r, connection, result, time.Since(started), err); recordErr != nil {
 				result = llm.GenerationResult{}
 				err = recordErr
 			}
@@ -426,10 +427,11 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	}()
 	var params any = r
 	if c.resolver != nil {
-		connection, resolveErr := c.resolver(ctx, r.Snapshot)
+		resolved, resolveErr := c.resolver(ctx, r.Snapshot)
 		if resolveErr != nil {
 			return llm.GenerationResult{}, resolveErr
 		}
+		connection = resolved
 		params = struct {
 			llm.GenerationRequest
 			Connection Connection `json:"connection"`
@@ -508,7 +510,22 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, err
 	}
 	result = llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
+	var authTick <-chan time.Time
+	if connection.Guard != nil {
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+		authTick = ticker.C
+	}
 	for {
+		if connection.Guard != nil {
+			if authErr := connection.Guard(ctx); authErr != nil {
+				hostRejected = true
+				if cleanupErr := c.cleanupGeneration(ctx, p, r.GenerationID); cleanupErr != nil {
+					return llm.GenerationResult{}, errors.Join(authErr, cleanupErr)
+				}
+				return llm.GenerationResult{}, authErr
+			}
+		}
 		if stream.wasCancelled() {
 			return llm.GenerationResult{}, llm.GenerationCancelled
 		}
@@ -517,6 +534,8 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		}
 		var d eventDelivery
 		select {
+		case <-authTick:
+			continue
 		case <-stream.cancelled:
 			return llm.GenerationResult{}, llm.GenerationCancelled
 		case <-ctx.Done():

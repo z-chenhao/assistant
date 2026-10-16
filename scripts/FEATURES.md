@@ -12,7 +12,7 @@ real boundary, records evidence, and always reaps its processes/removes state.
 | Startup diagnostics | `bin/personal-agent [-config path]` | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
 | Configuration | `-config`, `ERII_*` overrides | `config.Load` | Invalid fields/URLs/durations rejected without value echo |
-| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v5, WAL, one Agent, one atomic fresh-bootstrap event |
+| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v6, WAL, one Agent, one atomic fresh-bootstrap event |
 | Migration safety | Empty, real v1/v2/v3/v4, future schema | `agent/sqlite.migrate` | Prior Agent/config/timestamps, model metadata/snapshots and Outbox/Inbox preserved; future rejected; failed v3/v4/v5 DDL rolls back |
 | Model metadata | `bin/personal-agent model add` (stdin JSON), `model list`, `status` | `llm/sqlite.Store.AddProfile/ListProfiles` | New process and SIGKILL/restart preserve profile; unverified/version 1; independent SQLite/canonical JSON readback; ingress stays closed |
 | Metadata validation | `model add` | `llm.ProfileInput.Validate`, CLI decoder | Unknown/credential fields, credential-bearing URLs, invalid enums, dangling/mismatched auth and pre-Probe activation rejected without value echo or writes |
@@ -55,3 +55,8 @@ Reports: `evidence/verification.json`, `evidence/models.jsonl`, `evidence/events
 `evidence/relay.json`. `make test-race` separately checks shared-memory access;
 SQL uniqueness/transaction and protocol tests prove their respective invariants.
 This includes the local-provider M1 slice, with no general Durable Replay or exactly-once claim.
+
+| Current ChatGPT sign-in | `model login-chatgpt [ACCOUNT_ID]`, `model accounts` | `account.Manager.Login`, `provider-bridge/account.mjs` | `evidence/account.json`: actual CLI Browser OAuth, PKCE, random loopback, identity validation, separate account/client registration, masked labels and stable private device ID |
+| Account model discovery | `model account-catalog ACCOUNT_ID`, `model account-add ACCOUNT_ID MODEL_ID` | `accountCatalog`, existing Pi Responses generation/Probe | Dynamic account catalog/visibility, rejected hidden IDs, actual Tool continuation/cancel/clipping, current trusted endpoint only |
+| Credential lifecycle | `model refresh ACCOUNT_ID`, `model logout ACCOUNT_ID`, startup recovery | `account.Manager`, `llm/sqlite.AccountState`, schema v6 | Six-process single-flight, rotation failure, stale CAS, logout/proof/readiness revocation, owned Keychain or explicit memory-socket fixture, SIGKILL/restart, no rotating replay |
+| Deferred account device login | Not offered | ADR 001 / baseline §5.4 | Explicitly deferred by user; never counted as passing |

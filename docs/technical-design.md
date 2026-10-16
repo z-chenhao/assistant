@@ -525,7 +525,7 @@ auth_connection_id: null
 
 第二条路径采用 Pi 当前 OpenAI Provider 的 “Sign in with ChatGPT” 语义，而不是 legacy `openai-codex` Provider：
 
-- Setup Wizard 启动带 PKCE/state 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。无法使用本地浏览器回调时提供 Device Authorization fallback。
+- Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不作为当前 M1/ERII-8 里程碑阻塞条件，不得记为已交付或已测试（2026-10-16 用户批准方案 A，见 [ADR 001](adr/001-current-openai-account-auth.md)）。
 - 登录完成后创建 `AuthConnection{provider: openai, auth_kind: chatgpt_oauth}`，刷新凭据进入 SecretStore；`state.db` 只保存 credential ref、账号/Workspace 的脱敏显示信息、过期状态和版本。
 - `AuthConnection.status = connected | refreshing | reauth_required | logged_out`。状态迁移由 Auth 层持久化；模型和 Run 只引用 Connection ID，不能读取 CredentialRef。
 - Access token 到期前由 Provider Auth 层自动刷新；同一 Credential 使用单飞锁，避免多个并发 Run 同时刷新。刷新失败或服务返回确定的授权失效时，连接进入 `reauth_required`，停止接收新 Run 并提示用户重新登录。
@@ -2049,7 +2049,7 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 - Model Provider Bridge 固定复用 Pi AI 行为；Provider 未配置或真实登录不可用时仍可用 Fake 完成自动化测试。
 - 先支持无副作用 Direct Tool，验证 ToolInvocation、RunTrace 与稳定结果投递顺序。
 
-完成条件：`http://127.0.0.1:8000/v1` 的测试端点可完成模型发现/手填、Tool Call Probe 和对话；ChatGPT 浏览器或 Device Code 登录可列出账号可用模型并完成对话；切换 Profile 只影响新 Run；进程在模型调用前后崩溃均不会重复消息。
+完成条件：`http://127.0.0.1:8000/v1` 的测试端点可完成模型发现/手填、Tool Call Probe 和对话；ChatGPT Browser OAuth + PKCE 登录可列出账号可用模型并完成对话；切换 Profile 只影响新 Run；进程在模型调用前后崩溃均不会重复消息。Device Authorization 按 §5.4/ADR 001 明确延后，不计为当前 M1 阻塞条件或已通过的验收项。
 
 ### M2：Task 与 Root Worker
 

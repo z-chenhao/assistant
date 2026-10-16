@@ -36,7 +36,10 @@ var providerSQL string
 //go:embed migrations/005_local_provider.sql
 var localProviderSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL}
+//go:embed migrations/006_account_auth.sql
+var accountAuthSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL}
 
 type Store struct {
 	db   *sql.DB

@@ -2,11 +2,96 @@
 
 The Go Host runs a separate Node stdio Bridge using exact dependency
 `@earendil-works/pi-ai@1.3.0` (MIT), with a checked-in transitive lockfile.
-Only Pi's Chat Completions adapter is imported. Installation downloads the Pi
+Pi's Chat Completions and Responses adapters are imported. Installation downloads the Pi
 SDK dependency tree; it adds no hosted service or account cost. Its SDK still
 brings other provider packages transitively, although Erii does not enable them.
-OAuth, Main/Worker Runs, Conversation recovery, and general Durable Replay
-remain later slices. This is the local-provider part of M1, not complete M1.
+Current OpenAI account OAuth is also implemented; see the account lifecycle below.
+Main/Worker Runs, Conversation recovery, and general Durable Replay remain later
+slices. This is not complete M1.
+
+## ChatGPT account lifecycle
+
+Use the same explicit Bridge configuration shown below. On macOS with cgo,
+OAuth credentials use Erii's own Keychain service. Other platforms fail closed
+without a writable OS SecretStore; environment API keys cannot authenticate this
+entry point. No Codex credential file is read or written.
+
+```sh
+bin/personal-agent -config local.yaml model login-chatgpt
+bin/personal-agent -config local.yaml model accounts
+bin/personal-agent -config local.yaml model account-catalog ACCOUNT_ID
+bin/personal-agent -config local.yaml model account-add ACCOUNT_ID RETURNED_MODEL_ID
+bin/personal-agent -config local.yaml model test PROFILE_ID
+bin/personal-agent -config local.yaml model select PROFILE_ID PROFILE_VERSION CONFIG_VERSION
+bin/personal-agent -config local.yaml model refresh ACCOUNT_ID
+bin/personal-agent -config local.yaml model logout ACCOUNT_ID
+```
+
+`login-chatgpt` prints a private `open_url` JSON event. Open that URL in your
+system browser to **Continue with ChatGPT**, select the account/workspace and
+grant plan usage. Keep this foreground CLI running while the browser returns to
+its `127.0.0.1` random-port callback. Login expires after five minutes; Ctrl-C
+cancels it and closes the listener. The final JSON object contains safe account
+metadata. Do not redirect login output into logs, evidence or bug reports: the
+URL includes private authorization state and installation identity, and returning
+sign-in may include an ID-token hint. The URL is an interaction, not diagnostics.
+
+`accounts` is the local account picker: masked account/workspace labels and
+connection IDs identify each registration. Multiple accounts have separate
+credentials. For reauthorization use `model login-chatgpt ACCOUNT_ID`; it reuses
+that registration's issued client ID and validates the same identity before
+replacement. Logout retains this non-secret mapping and history for later login.
+
+`account-catalog` requests the current account's `/v1/models`; only server-returned
+`visibility=list` slugs can be chosen. Unknown/hidden IDs are rejected before
+inference. `account-add` uses conservative text/token defaults when the catalog
+omits optional metadata. Existing Test/Select still require streaming, actual
+Tool Call/Result continuation, cancellation and clipping before activation.
+Requests use Pi's current `openai-responses` transport to the fixed public API,
+with `store=false`, `stream=true` and namespace-wrapped function tools. Unsupported
+sampling, reasoning and modalities stay disabled; `response.completed` is required.
+
+`refresh` ensures the token is fresh; it makes no network call if comfortably
+before expiry. Every account request also performs this check. Kernel locks
+serialize rotation and logout across local Host processes. Refresh failure or an
+interrupted rotation closes readiness, removes credentials and requires explicit
+reauthorization; an unknown rotating call is never replayed. Startup reconciles
+interrupted auth state after obtaining the same lock. Keep all processes for one
+installation on a local filesystem supporting advisory locks.
+
+| Persisted auth state | Legal next states | Runtime behavior |
+| --- | --- | --- |
+| `connected` | `refreshing`, `reauth_required`, `logged_out` (metadata-only self-update is allowed) | Fresh credentials admit requests |
+| `refreshing` | `connected`, `reauth_required`, `logged_out` | One lock owner rotates; new callers wait |
+| `reauth_required` | `connected`, `logged_out` | Explicit validated login is required |
+| `logged_out` | `connected` | Only explicit same-registration login reopens admission |
+
+Every state transition uses version CAS and an atomic Outbox event. Auth loss
+increments a persistent account epoch; old generations remain fenced even after
+the same account signs in again. A successful same-account refresh changes auth
+version without changing that epoch. A stale token's 401 cannot revoke a newer
+credential version. Failed SecretStore/metadata commits do not reopen admission.
+
+Logout persists closed admission, aborts the connection's Bridge work, clears
+local credentials and reaps the Bridge, while retaining snapshots/history/usage.
+The output reports `remote_revocation_confirmed`; if false, disconnect the app in
+ChatGPT Settings to confirm remote revocation. A SecretStore deletion failure is
+an error, retried on startup or another logout. Other Host processes reject final
+results after observing auth loss; HTTP provider-side history/cache deletion is
+not promised. Account requests disable provider cache retention.
+
+`scripts/verify_account.py` drives this path with an owned local OAuth/Responses
+server and an explicit `-test-secret-store SOCKET` in-memory fixture. This flag
+is never inferred from configuration, saved metadata or missing Keychain. It
+creates no credential file. `make verify` repeats the full account harness five
+times and repeats Node/Go security cases. `evidence/account*.json` contains safe
+observations, not tokens or authorization URLs.
+
+[ADR 001](adr/001-current-openai-account-auth.md) records approved Device
+Authorization deferral. It remains a future requirement, not a passing check.
+Real interactive login/Keychain/provider Live Shadow remains **inconclusive**
+until explicitly performed; deterministic fixtures do not establish account
+eligibility or real service availability. Main/Conversation execution is later.
 
 ## Connect a local model
 
@@ -191,7 +276,7 @@ Tool, Computer, domain database or network operations.
 | RPC | Semantics |
 | --- | --- |
 | `bridge.initialize`, `bridge.shutdown` | Protocol handshake; orderly shutdown followed by bounded forced cleanup and process reap |
-| `auth.start`, `auth.continue`, `auth.refresh`, `auth.logout`, `auth.status` | Fake auth lifecycle; UI-neutral URL, device-code, progress, workspace and input events; no actual credentials |
+| `auth.start`, `auth.continue`, `auth.refresh`, `auth.logout`, `auth.status` | Fake auth lifecycle; real account start/poll/refresh/logout use a private Secret RPC envelope and UI-neutral browser/progress events |
 | `models.list`, `models.refresh` | Candidate catalog, never proof of capability; real calls carry a transient Host connection envelope |
 | `model.probe` | Provider-side connection check; the Host also runs behavioral generation checks |
 | `generation.start`, `generation.continue` | Real calls additionally carry a transient connection envelope; accepted request with immutable ModelSnapshot, Host-created generation/run IDs, and `session_id = run_id` |
