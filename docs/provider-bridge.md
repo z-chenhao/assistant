@@ -106,6 +106,11 @@ Cancellation and cleanup have independent one-second contexts. Close can abandon
 its graceful shutdown attempt and terminate a peer that is not reading.
 Cancellation after complete dispatch sends `generation.cancel` even before the
 start acknowledgement. A late acknowledgement cannot revive that generation.
+Explicit Cancel acknowledgement also settles the matching local Generate or
+Continue call with `GENERATION_CANCELLED`, without requiring a second terminal
+notification. It interrupts a pending start acknowledgement and fences queued
+and late events. Cancellation and final result publication share the process
+registry lock; an old acknowledgement cannot settle a different registration.
 Waiting for a shared restart/handshake observes each caller's context. The
 lifecycle state lock never covers process I/O or reap; Close can terminate an
 initializing child immediately and waits for its initializer to finish cleanup.
@@ -118,6 +123,11 @@ cause together with the sanitized cleanup error; it cannot certify a successful
 Probe. Oversized/malformed frames,
 unknown event kinds and sequence drift fail closed. Transport failure is
 `PROVIDER_UNAVAILABLE`; invalid wire data is `INVALID_PROVIDER_RESPONSE`.
+Host validation rejection of accepted work sends bounded independent cancellation
+before returning; failed cleanup retires the peer and preserves the original
+sanitized rejection together with the cleanup error. An unusable reader forces
+retirement. Provider terminal errors are distinct and require no extra cancel.
+These paths never replay a generation automatically.
 
 Provider errors normalize only to the baseline's eight stable error codes. No
 raw response body, token, endpoint or child stderr enters error messages. The

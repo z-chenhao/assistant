@@ -401,7 +401,7 @@ func (c *Client) Continue(ctx context.Context, r llm.GenerationRequest, sink fun
 	return c.generate(ctx, "generation.continue", r, sink)
 }
 
-func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (llm.GenerationResult, error) {
+func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (result llm.GenerationResult, err error) {
 	if ctx.Err() != nil {
 		return llm.GenerationResult{}, llm.GenerationCancelled
 	}
@@ -416,6 +416,9 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, err
 	}
 	stream := newEventStream(r.GenerationID, r.Snapshot.MaxOutputTokens)
+	dispatchCtx, stopDispatch := context.WithCancel(ctx)
+	defer stopDispatch()
+	stream.interrupt = stopDispatch
 	p.mu.Lock()
 	if p.events[r.GenerationID] != nil {
 		p.mu.Unlock()
@@ -423,8 +426,22 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 	}
 	p.events[r.GenerationID] = stream
 	p.mu.Unlock()
-	defer func() { p.mu.Lock(); delete(p.events, r.GenerationID); p.mu.Unlock() }()
-	dispatched, err := c.exchange(ctx, p, method, r, nil)
+	hostRejected := false
+	defer func() {
+		p.mu.Lock()
+		// Final result publication and acknowledged Cancel share the registry
+		// lock. Once this entry is removed, a late Cancel cannot alter its result
+		// or settle a different registration with the same ID.
+		if stream.wasCancelled() && !hostRejected {
+			result, err = llm.GenerationResult{}, llm.GenerationCancelled
+		}
+		delete(p.events, r.GenerationID)
+		p.mu.Unlock()
+	}()
+	dispatched, err := c.exchange(dispatchCtx, p, method, r, nil)
+	if stream.wasCancelled() {
+		return llm.GenerationResult{}, llm.GenerationCancelled
+	}
 	if ctx.Err() != nil {
 		if dispatched {
 			return llm.GenerationResult{}, c.cancelGeneration(ctx, p, r.GenerationID)
@@ -438,26 +455,46 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 			}
 			return llm.GenerationResult{}, llm.ProviderUnavailable
 		}
+		select {
+		case <-p.done:
+			c.stop(p) // a failed reader cannot acknowledge further cleanup RPCs
+		default:
+		}
 		return llm.GenerationResult{}, err
 	}
-	result := llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
+	result = llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
 	for {
+		if stream.wasCancelled() {
+			return llm.GenerationResult{}, llm.GenerationCancelled
+		}
 		if ctx.Err() != nil {
 			return llm.GenerationResult{}, c.cancelGeneration(ctx, p, r.GenerationID)
 		}
 		var d eventDelivery
 		select {
+		case <-stream.cancelled:
+			return llm.GenerationResult{}, llm.GenerationCancelled
 		case <-ctx.Done():
 			continue
 		case <-p.done:
 			select {
 			case d = <-stream.events:
 			default:
+				c.stop(p)
 				return llm.GenerationResult{}, p.err()
 			}
 		case d = <-stream.events:
 		}
+		if stream.wasCancelled() {
+			return llm.GenerationResult{}, llm.GenerationCancelled
+		}
 		if d.err != nil {
+			if d.rejected {
+				hostRejected = true
+				if cleanupErr := c.cleanupGeneration(ctx, p, r.GenerationID); cleanupErr != nil {
+					return llm.GenerationResult{}, errors.Join(d.err, cleanupErr)
+				}
+			}
 			return llm.GenerationResult{}, d.err
 		}
 		e := d.event
@@ -480,7 +517,22 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 }
 
 func (c *Client) Cancel(ctx context.Context, id string) error {
-	return c.call(ctx, "generation.cancel", map[string]string{"generation_id": id}, nil)
+	p, err := c.ensure(ctx)
+	if err != nil {
+		return err
+	}
+	p.mu.Lock()
+	stream := p.events[id]
+	p.mu.Unlock()
+	if err := c.callProcess(ctx, p, "generation.cancel", map[string]string{"generation_id": id}, nil); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	if stream != nil && p.events[id] == stream {
+		stream.cancel()
+	}
+	p.mu.Unlock()
+	return nil
 }
 func (c *Client) Dispose(ctx context.Context, id string) error {
 	return c.call(ctx, "session.dispose", map[string]string{"session_id": id}, nil)

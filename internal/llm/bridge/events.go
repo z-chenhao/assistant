@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"strings"
@@ -12,13 +13,14 @@ import (
 const maxGenerationEvents = 4096
 
 type eventDelivery struct {
-	event   llm.GenerationEvent
-	clipped bool
-	err     error
+	event    llm.GenerationEvent
+	clipped  bool
+	err      error
+	rejected bool // Host validation, rather than a provider terminal error
 }
 
-// The single process reader owns validation state. Only normalized deliveries
-// cross to the sink goroutine. The mailbox holds every allowed distinct event
+// The process mutex protects validation and cancellation state. Only normalized
+// deliveries cross to the sink goroutine. The mailbox holds every allowed distinct event
 // plus one rejection, so a slow sink never blocks the shared RPC reader.
 type eventStream struct {
 	events    chan eventDelivery
@@ -28,6 +30,8 @@ type eventStream struct {
 	remaining int
 	toolCalls int
 	terminal  bool
+	cancelled chan struct{}
+	interrupt context.CancelFunc
 }
 
 func newEventStream(id string, maxOutputTokens int64) *eventStream {
@@ -35,12 +39,34 @@ func newEventStream(id string, maxOutputTokens int64) *eventStream {
 	if maxOutputTokens < int64(limit/4) {
 		limit = int(maxOutputTokens * 4)
 	}
-	return &eventStream{events: make(chan eventDelivery, maxGenerationEvents+1), id: id, seen: map[int64][32]byte{}, remaining: limit}
+	return &eventStream{events: make(chan eventDelivery, maxGenerationEvents+1), cancelled: make(chan struct{}), id: id, seen: map[int64][32]byte{}, remaining: limit}
 }
 
 func (s *eventStream) reject(err error) {
 	s.terminal = true
-	s.events <- eventDelivery{err: err}
+	s.events <- eventDelivery{err: err, rejected: true}
+}
+
+func (s *eventStream) wasCancelled() bool {
+	select {
+	case <-s.cancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Called under the process mutex only after a matching cancellation ack. This
+// signal takes priority over queued events, including a queued completion.
+func (s *eventStream) cancel() {
+	if s.wasCancelled() {
+		return
+	}
+	s.terminal = true
+	close(s.cancelled)
+	if s.interrupt != nil {
+		s.interrupt()
+	}
 }
 
 func (s *eventStream) accept(e llm.GenerationEvent) {
@@ -87,7 +113,8 @@ func (s *eventStream) accept(e llm.GenerationEvent) {
 	case "completed":
 		s.terminal = true
 	case "error":
-		s.reject(llm.NormalizeError(e.ErrorCode))
+		s.terminal = true
+		s.events <- eventDelivery{err: llm.NormalizeError(e.ErrorCode)}
 		return
 	default:
 		s.reject(llm.InvalidProviderResponse)
