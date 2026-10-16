@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -199,6 +200,74 @@ func TestFailedRetestRevokesOnlyCurrentProof(t *testing.T) {
 	}
 	if err := c.Select(ctx, p.ProfileID, 3, 3); err != nil {
 		t.Fatal("repaired profile cannot be selected", err)
+	}
+}
+
+type probeFunc func(context.Context, llm.Profile) (llm.ProbeResult, error)
+
+func (f probeFunc) Run(ctx context.Context, p llm.Profile) (llm.ProbeResult, error) {
+	return f(ctx, p)
+}
+
+func TestRetestCancellationUsesCallerContext(t *testing.T) {
+	for _, callerCancelled := range []bool{false, true} {
+		for _, cause := range []error{llm.GenerationCancelled, errors.Join(llm.GenerationCancelled, llm.ProviderUnavailable)} {
+			t.Run(fmt.Sprintf("caller_cancelled=%v/cleanup_failed=%v", callerCancelled, errors.Is(cause, llm.ProviderUnavailable)), func(t *testing.T) {
+				ctx := context.Background()
+				s := openModels(t)
+				c := control(s)
+				p, err := s.Models().AddProfile(ctx, modelInput())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = c.Test(ctx, p.ProfileID); err != nil {
+					t.Fatal(err)
+				}
+				if err = c.Select(ctx, p.ProfileID, 1, 1); err != nil {
+					t.Fatal(err)
+				}
+				before, err := s.Models().Profile(ctx, p.ProfileID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				configBefore, err := s.Diagnostics(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				proofBefore, err := s.Models().Probe(ctx, p.ProfileID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				events := countRows(t, s, "event_outbox")
+				caller, cancel := context.WithCancel(ctx)
+				defer cancel()
+				c.Probe = probeFunc(func(context.Context, llm.Profile) (llm.ProbeResult, error) {
+					if callerCancelled {
+						cancel()
+					}
+					return llm.ProbeResult{}, cause
+				})
+				if _, err = c.Test(caller, p.ProfileID); !errors.Is(err, cause) {
+					t.Fatal("lost cancellation error contract", err)
+				}
+				after, err := s.Models().Profile(ctx, p.ProfileID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				configAfter, err := s.Diagnostics(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				proofAfter, proofErr := s.Models().Probe(ctx, p.ProfileID)
+				if callerCancelled {
+					if !reflect.DeepEqual(before, after) || !reflect.DeepEqual(configBefore, configAfter) || proofErr != nil || !reflect.DeepEqual(proofBefore, proofAfter) || countRows(t, s, "event_outbox") != events || !c.Available(ctx, p.ProfileID) {
+						t.Fatal("caller cancellation changed prior state", after, configAfter, proofErr)
+					}
+				} else if after.Status != "unavailable" || after.Version != before.Version+1 || after.VerifiedAt != nil || configAfter.Readiness != "degraded" || configAfter.ConfigVersion != configBefore.ConfigVersion+1 || !errors.Is(proofErr, llm.ErrNotFound) || countRows(t, s, "event_outbox") != events+2 || c.Available(ctx, p.ProfileID) {
+					t.Fatal("internal cancellation failure retained readiness proof", after, configAfter, proofErr)
+				}
+			})
+		}
 	}
 }
 

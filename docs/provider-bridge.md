@@ -27,9 +27,11 @@ both activation Outbox events. Test alone stores Probe evidence and opens no
 ingress. Concurrent selections have one config-CAS winner. Metadata edits or auth
 version changes invalidate the prior Probe. A failed re-test revokes only the
 tested version's existing proof, marks it invalid/unavailable/reauth_required,
-and degrades an active config atomically with events. Cancelled tests preserve
-prior state. A failed commit changes neither the
-profile, Probe version, config nor events. Existing SecretStore registration
+and degrades an active config atomically with events. Cancellation by the Test
+caller preserves prior state. Failure of the Probe's internal cancellation check
+revokes prior proof even when the error includes `GENERATION_CANCELLED`; a
+responsive replacement Bridge alone cannot restore readiness. A failed commit
+changes neither the profile, Probe version, config nor events. Existing SecretStore registration
 writes credentials first and removes a new orphan on failed metadata commit.
 SecretStore/SQLite still have no distributed transaction: a hard crash between
 those commits can orphan a credential; reconciliation is later work.

@@ -85,7 +85,10 @@ func (c Control) Test(ctx context.Context, id string) (ProbeRecord, error) {
 }
 
 func (c Control) failedProbe(ctx context.Context, p Profile, cause error) error {
-	if ctx.Err() != nil || errors.Is(cause, GenerationCancelled) {
+	// Only the Test caller can cancel the test. Probe's internal cancellation
+	// check can fail cleanup with GenerationCancelled joined to a provider error;
+	// that failure must revoke prior proof while the caller is still live.
+	if ctx.Err() != nil {
 		return cause
 	}
 	status := "unavailable"
