@@ -77,8 +77,12 @@ local credentials and reaps the Bridge, while retaining snapshots/history/usage.
 The output reports `remote_revocation_confirmed`; if false, disconnect the app in
 ChatGPT Settings to confirm remote revocation. A SecretStore deletion failure is
 an error, retried on startup or another logout. Other Host processes reject final
-results after observing auth loss; HTTP provider-side history/cache deletion is
-not promised. Account requests disable provider cache retention.
+results by rechecking their captured epoch and account status inside the usage
+write transaction, serialized with auth mutations. Completion reaches the sink
+only after that transaction succeeds. Logout or reauthorization between the
+observer Guard and persistence records `AUTH_REQUIRED` with no accepted result
+or token counts. Same-identity refresh preserves the epoch. HTTP history/cache
+deletion is not promised. Account requests disable provider cache retention.
 
 `scripts/verify_account.py` drives this path with an owned local OAuth/Responses
 server and an explicit `-test-secret-store SOCKET` in-memory fixture. This flag
@@ -86,6 +90,12 @@ is never inferred from configuration, saved metadata or missing Keychain. It
 creates no credential file. `make verify` repeats the full account harness five
 times and repeats Node/Go security cases. `evidence/account*.json` contains safe
 observations, not tokens or authorization URLs.
+
+`go test ./internal/agent/sqlite -run TestAccountFinalAcceptance -v` drives the
+real Go → Node → Pi completion path, pauses before usage persistence, then mutates
+auth through a second Host/DB handle. It covers logout, reauthorization, auth loss,
+same-identity refresh and storage failure. Node contracts also capture the actual
+Tool continuation wire and require the fixed `erii` namespace on replay.
 
 [ADR 001](adr/001-current-openai-account-auth.md) records approved Device
 Authorization deferral. It remains a future requirement, not a passing check.

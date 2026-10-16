@@ -58,6 +58,13 @@ export async function startFixture() {
       if(req.url!=='/v1/responses')return json({},404);
       stats.generations++;const b=JSON.parse(body);
       stats.request_valid &&= b.stream===true && b.store===false && !('max_output_tokens' in b) && !('temperature' in b) && !('previous_response_id' in b) && (!b.tools?.length || b.tools.every(t=>t.type==='namespace'));
+      // Validate the actual replay wire, not just the declared Tool schema.
+      if(b.input.some(i=>i.type==='function_call_output')) {
+        const call=b.input.find(i=>i.type==='function_call');
+        const valid=call?.namespace==='erii' && call.name==='probe_echo' && b.input.some(i=>i.type==='function_call_output' && i.call_id===call.call_id);
+        stats.request_valid &&= valid;
+        if(!valid)return json({error:{code:'invalid_tool_namespace'}},400);
+      }
       res.writeHead(200,{'content-type':'text/event-stream'});
       const emit=(type,rest)=>res.write('event: '+type+'\ndata: '+JSON.stringify({type,...rest})+'\n\n');
       emit('response.created',{response:{id:'owned-response',status:'in_progress'}});

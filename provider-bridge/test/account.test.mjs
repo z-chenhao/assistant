@@ -67,3 +67,48 @@ test('malformed catalog is a protocol error rather than authorization loss',asyn
     await assert.rejects(accountCatalog(connection,async()=>new Response(body)),e=>e.message==='INVALID_PROVIDER_RESPONSE');
   }
 });
+
+test('account Pi continuation replays the fixed erii namespace on the wire',{timeout:10000},async t=>{
+  const f=await fixture(t);const credential=await f.complete(await f.start());
+  const network=globalThis.fetch;
+  let captured;
+  globalThis.fetch=async(input,init)=>{
+    const url=new URL(typeof input==='string'?input:input.url??input.toString());
+    if(url.pathname==='/v1/responses'){
+      const body=JSON.parse(init.body);
+      if(body.input.some(i=>i.type==='function_call_output'))captured=body;
+    }
+    return f.peer.fetch(input,init);
+  };
+  try {
+    const {handle}=await import('../bridge.mjs');
+    await handle({jsonrpc:'2.0',id:1,method:'bridge.initialize',params:{protocol_version:1}},()=>{});
+    let id=1;
+    const run=async(method,r)=>{
+      const events=[];let terminal;
+      const done=new Promise(resolve=>{terminal=resolve;});
+      await handle({jsonrpc:'2.0',id:++id,method,params:r},frame=>{
+        if(frame.error)throw Error(frame.error.message);
+        if(frame.method==='generation.event'){
+          events.push(frame.params);
+          if(['completed','error'].includes(frame.params.kind))terminal();
+        }
+      });
+      await done;assert.equal(events.at(-1).kind,'completed');return events;
+    };
+    const connection=()=>({endpoint:API,access_token:credential.access_token,connection_id:'account'});
+    const r={generation_id:'first',run_id:'run',session_id:'run',connection:connection(),
+      model_snapshot:{snapshot_id:'s',provider_kind:'openai_account',wire_api:'openai_responses',endpoint_hash:'',model_id:'fixture-account-model',context_window:8192,max_output_tokens:1024,compatibility:{tool_result_format:'openai'}},
+      messages:[{role:'user',text:'Call probe_echo'}],tools:[{name:'probe_echo',input_schema:'{"type":"object","properties":{"value":{"type":"string"}}}'}]};
+    const first=await run('generation.start',r);
+    const call=first.find(e=>e.kind==='tool_call').tool_call;
+    r.generation_id='second';r.connection=connection();r.messages.push({role:'assistant',tool_calls:[call]},{role:'tool',tool_call_id:call.id,text:'PROBE_RESULT_OK'});
+    await run('generation.continue',r);
+    const wireCall=captured.input.find(i=>i.type==='function_call');
+    assert.equal(captured.tools[0].name,'erii');
+    assert.equal(wireCall.namespace,'erii');
+    assert.equal(wireCall.name,call.name);assert.equal(wireCall.arguments,call.arguments);
+    assert.equal(captured.input.find(i=>i.type==='function_call_output').call_id,wireCall.call_id);
+    assert.equal(f.peer.stats.request_valid,true);
+  } finally {globalThis.fetch=network;}
+});

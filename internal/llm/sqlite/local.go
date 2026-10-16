@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/llm"
@@ -50,21 +51,44 @@ func (s *Store) RecordUsage(ctx context.Context, r llm.GenerationRequest, result
 	if err != nil {
 		return err
 	}
-	var input, output, read, write any
-	if result.Usage != nil {
-		input = result.Usage.InputTokens
-		output = result.Usage.OutputTokens
-		read = result.Usage.CacheReadTokens
-		write = result.Usage.CacheWriteTokens
-	}
-	code := ""
-	if cause != nil {
-		code = llm.NormalizeError(cause.Error()).Error()
-	}
-	return s.write(ctx, func(tx *sql.Tx) error {
+	rejected := false
+	err = s.write(ctx, func(tx *sql.Tx) error {
+		// BEGIN IMMEDIATE serializes this check and usage commit with auth
+		// mutation, including other Host processes. Resolution failures have no
+		// captured epoch; retain their error, but never accept an unfenced success.
+		if r.Snapshot.ProviderKind == "openai_account" && (r.AuthEpoch != 0 || cause == nil) {
+			var epoch int64
+			var status string
+			err := tx.QueryRowContext(ctx, `SELECT r.auth_epoch,a.status FROM account_registration r JOIN auth_connection a USING(connection_id) WHERE r.connection_id=?`, r.Snapshot.AuthConnectionID).Scan(&epoch, &status)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if err != nil || r.AuthEpoch < 1 || epoch != r.AuthEpoch || status != "connected" && status != "refreshing" {
+				rejected = true
+				cause, result = llm.AuthRequired, llm.GenerationResult{}
+			}
+		}
+		var input, output, read, write any
+		if result.Usage != nil {
+			input = result.Usage.InputTokens
+			output = result.Usage.OutputTokens
+			read = result.Usage.CacheReadTokens
+			write = result.Usage.CacheWriteTokens
+		}
+		code := ""
+		if cause != nil {
+			code = llm.NormalizeError(cause.Error()).Error()
+		}
 		_, err := tx.ExecContext(ctx, `INSERT INTO provider_usage(generation_id,run_id,snapshot_id,snapshot_json,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,latency_ms,error_code,recorded_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, r.GenerationID, r.RunID, r.Snapshot.SnapshotID, string(encoded), input, output, read, write, latency.Milliseconds(), code, now().UnixMicro())
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	if rejected {
+		return llm.AuthRequired
+	}
+	return nil
 }
 
 func (s *Store) Connection(ctx context.Context, endpoint, authID string, secrets llm.SecretStore) (bridge.Connection, error) {

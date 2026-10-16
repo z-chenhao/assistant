@@ -50,6 +50,9 @@ type ToolSpec struct {
 }
 
 type GenerationRequest struct {
+	// AuthEpoch is captured by the Host resolver and passed only to final
+	// persistence. It is not part of the frozen snapshot or Bridge protocol.
+	AuthEpoch        int64      `json:"-"`
 	GenerationID     string     `json:"generation_id"`
 	OutputLimitBytes int        `json:"output_limit_bytes,omitempty"`
 	RunID            string     `json:"run_id"`

@@ -417,12 +417,18 @@ func (c *Client) Continue(ctx context.Context, r llm.GenerationRequest, sink fun
 func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (result llm.GenerationResult, err error) {
 	started := time.Now()
 	var connection Connection
+	var completed *llm.GenerationEvent
 	defer func() {
 		if c.observer != nil {
 			if recordErr := c.observer(context.WithoutCancel(ctx), r, connection, result, time.Since(started), err); recordErr != nil {
 				result = llm.GenerationResult{}
 				err = recordErr
 			}
+		}
+		// Account completion is provisional until Host persistence accepts it.
+		// In particular, auth loss must not publish a completed event.
+		if err == nil && completed != nil && sink != nil {
+			sink(*completed)
 		}
 	}()
 	var params any = r
@@ -570,7 +576,9 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 			result.ToolCalls = append(result.ToolCalls, *e.ToolCall)
 		case "completed":
 			result.Usage = e.Usage
-			if sink != nil {
+			if r.Snapshot.ProviderKind == "openai_account" {
+				completed = &e
+			} else if sink != nil {
 				sink(e)
 			}
 			return result, nil

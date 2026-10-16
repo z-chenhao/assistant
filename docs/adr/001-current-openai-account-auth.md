@@ -80,8 +80,12 @@ No change to Main/Worker ownership, immutable snapshots or ToolInvocation.
 The MVP is a single local installation, on macOS/Linux filesystems supporting
 advisory locks. Account streams use HTTP with provider cache retention disabled;
 logout aborts matching Bridge work and reaps its process. Another Host's final
-result is rejected after auth loss; remote provider history/cache deletion is
-not promised. Account-provider 401/403 closes readiness without switching model.
+result is rejected after auth loss: the usage write transaction rechecks the
+Host-captured account epoch and status, serializing acceptance with auth mutation.
+Only a committed acceptance can publish completion. Logout/reauthorization between
+the observer Guard and persistence rejects the old text with `AUTH_REQUIRED`;
+successful same-identity refresh preserves acceptance. Remote history/cache
+deletion is not promised. Account-provider 401/403 closes readiness without switching model.
 
 ## Verification and remaining requirements
 

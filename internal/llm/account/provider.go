@@ -66,6 +66,9 @@ func (m *Manager) Resolver(local bridge.Resolver) bridge.Resolver {
 func (m *Manager) Observer(record func(context.Context, llm.GenerationRequest, llm.GenerationResult, time.Duration, error) error) bridge.Observer {
 	return func(ctx context.Context, r llm.GenerationRequest, c bridge.Connection, result llm.GenerationResult, latency time.Duration, cause error) error {
 		if r.Snapshot.ProviderKind == "openai_account" {
+			// RecordUsage revalidates this fence in its write transaction. Guard
+			// alone cannot serialize final acceptance with another Host's logout.
+			r.AuthEpoch = c.AuthEpoch
 			if errors.Is(cause, llm.AuthRequired) && c.AuthVersion > 0 {
 				_ = m.LoseVersion(ctx, r.Snapshot.AuthConnectionID, c.AuthVersion)
 			}

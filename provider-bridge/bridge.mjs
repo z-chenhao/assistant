@@ -84,7 +84,9 @@ function context(r, model) {
   const messages = [];
   for (const m of r.messages) {
     if (m.role === 'user') messages.push({ role:'user', content:m.text, timestamp:0 });
-    else if (m.role === 'assistant') messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments)}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
+    // Account tools are always declared under the fixed erii namespace. Restore
+    // it on replay without adding provider metadata to the Host ToolCall schema.
+    else if (m.role === 'assistant') messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments),...(model.provider==='openai'?{namespace:'erii'}:{})}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
     else if (m.role === 'tool') {
       const call = r.messages.flatMap(m => m.tool_calls ?? []).find(t => t.id === m.tool_call_id);
       if (!call) fail('INVALID_PROVIDER_RESPONSE');
