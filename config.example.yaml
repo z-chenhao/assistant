@@ -12,6 +12,10 @@ nats:
   ack_wait: 30s
   retry_interval: 1s
 
+tasks:
+  recent_days: 30
+  recent_limit: 200
+
 # Optional real local-model Bridge. Install pinned dependencies first; use an absolute path.
 # llm:
 #   provider_bridge_command: node
