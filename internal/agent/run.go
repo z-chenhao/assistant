@@ -38,7 +38,7 @@ func TextMessage(kind, text string) AgentMessage {
 }
 
 // ProviderMessages is the only runtime -> provider message conversion. The
-// text-only M1 provider fails closed for unsupported media and custom types.
+// text provider receives bounded reference hints for media, never binary data.
 func ProviderMessages(messages []AgentMessage) ([]llm.Message, error) {
 	out := make([]llm.Message, 0, len(messages))
 	for _, m := range messages {
@@ -84,6 +84,9 @@ func ProviderMessages(messages []AgentMessage) ([]llm.Message, error) {
 			switch p.Type {
 			case "text":
 				wire.Text += p.Text
+			case "image", "audio", "video", "file":
+				raw, _ := json.Marshal(p)
+				wire.Text += "\nArtifact reference (content not loaded): " + string(raw)
 			case "tool_call":
 				wire.ToolCalls = append(wire.ToolCalls, llm.ToolCall{ID: p.ToolCall.ID, Name: p.ToolCall.Name, Arguments: p.ToolCall.Arguments})
 			default:

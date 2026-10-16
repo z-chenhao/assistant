@@ -271,6 +271,10 @@ func (u *terminal) history(ctx context.Context) error {
 		for _, p := range m.Content {
 			if p.Type == "text" {
 				u.print(m.Role + ": " + p.Text)
+			} else if p.ArtifactRef != "" {
+				u.print(m.Role + " attachment: " + p.ArtifactRef)
+			} else if p.ArtifactRef != "" {
+				u.print(m.Role + " attachment: " + p.ArtifactRef)
 			} else {
 				u.print(m.Role + ": [" + p.Type + "]")
 			}

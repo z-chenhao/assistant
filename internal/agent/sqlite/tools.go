@@ -156,15 +156,21 @@ func (t *tools) Start(ctx context.Context, id string) error {
 	})
 }
 func (t *tools) Finish(ctx context.Context, id string, result tool.Result) error {
-	return t.finish(ctx, id, result, false, false)
+	return t.finish(ctx, ctx, id, result, false, false, nil)
 }
 func (t *tools) Reject(ctx context.Context, id string, result tool.Result) error {
 	if result.Error == nil {
 		return agent.ErrConflict
 	}
-	return t.finish(ctx, id, result, false, true)
+	return t.finish(ctx, ctx, id, result, false, true, nil)
 }
-func (t *tools) finish(ctx context.Context, id string, result tool.Result, reconcile, reject bool) error {
+func (t *tools) FinishResult(ctx context.Context, id string, result tool.Result) (tool.Result, error) {
+	var out tool.Result
+	err := t.finish(context.WithoutCancel(ctx), ctx, id, result, false, false, &out)
+	return out, err
+}
+func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Result, reconcile, reject bool, out *tool.Result) error {
+	committed := false
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, t.claim); err != nil {
 			return err
@@ -175,6 +181,24 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 			}
 		}
 		result = tool.Normalize(result)
+		var err error
+		if reconcile {
+			result, err = t.runs.storeRecoveryOutput(ctx, outputCtx, tx, t.claim.RunID(), id, result)
+		} else {
+			result, err = t.runs.storeOutput(ctx, outputCtx, tx, t.claim.RunID(), id, result)
+		}
+		if err != nil {
+			return err
+		}
+		if err = fence(ctx, tx, t.claim); err != nil {
+			return err
+		}
+		if out != nil {
+			*out = result
+		}
+		if reconcile && result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT" {
+			return nil // Caller persists uncertainty for a still-running invocation.
+		}
 		value, err := encoded(result)
 		if err != nil {
 			return err
@@ -183,6 +207,9 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 		var errorJSON any
 		if result.Error != nil {
 			status = "failed"
+			if result.Error.Code == "UNKNOWN_SIDE_EFFECT" {
+				status = "unknown"
+			}
 			errorJSON, _ = encoded(result.Error)
 		}
 		now := time.Now().UnixMicro()
@@ -190,7 +217,11 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 		if reconcile {
 			proof = value
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status=?,wait_reason=NULL,result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,version=version+1,reconciliation_json=? WHERE invocation_id=? AND run_id=? AND (status='running' OR (? AND status='unknown'))`, status, value, digest(value), errorJSON, now, now, proof, id, t.claim.RunID(), reconcile)
+		resultRef := digest(value)
+		if len(result.ArtifactRefs) > 0 {
+			resultRef = result.ArtifactRefs[0]
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status=?,wait_reason=NULL,result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,version=version+1,reconciliation_json=? WHERE invocation_id=? AND run_id=? AND (status='running' OR (? AND status='unknown'))`, status, value, resultRef, errorJSON, now, now, proof, id, t.claim.RunID(), reconcile)
 		if err != nil {
 			return err
 		}
@@ -198,10 +229,11 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 		if n != 1 {
 			return agent.ErrConflict
 		}
+		committed = true
 		t.runs.host.boundary("before_tool_commit")
 		return runEvent(ctx, tx, t.claim.RunID(), "tool_invocation."+status, 1)
 	})
-	if err == nil {
+	if err == nil && committed {
 		t.runs.host.boundary("after_tool_commit")
 	}
 	return err
@@ -385,7 +417,13 @@ func (t *tools) Unknown(ctx context.Context, id string) error {
 	})
 }
 func (t *tools) Reconcile(ctx context.Context, id string, result tool.Result) error {
-	return t.finish(ctx, id, result, true, false)
+	_, err := t.ReconcileResult(ctx, id, result)
+	return err
+}
+func (t *tools) ReconcileResult(ctx context.Context, id string, result tool.Result) (tool.Result, error) {
+	var out tool.Result
+	err := t.finish(context.WithoutCancel(ctx), ctx, id, result, true, false, &out)
+	return out, err
 }
 
 var _ tool.PolicyStore = (*tools)(nil)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
@@ -75,7 +76,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -101,6 +102,11 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 	parts, err := conversation.Normalize(parts)
 	if err != nil {
 		return agent.Receipt{}, err
+	}
+	for _, p := range parts {
+		if p.Type == "tool_call" {
+			return agent.Receipt{}, conversation.ErrInvalid
+		}
 	}
 	receipt := agent.Receipt{RequestKey: key}
 	content, _ := encoded(parts)
@@ -139,6 +145,17 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 			return err
 		}
 		receipt.MessageID = newID()
+		scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: agentID, Owner: true}
+		for _, p := range parts {
+			if p.ArtifactRef != "" {
+				if err = r.host.Artifacts().PinTx(ctx, tx, scope, p.ArtifactRef, "run", receipt.RunID); err != nil {
+					return conversation.ErrInvalid
+				}
+				if err = r.host.Artifacts().PinTx(ctx, tx, scope, p.ArtifactRef, "conversation", receipt.MessageID); err != nil {
+					return err
+				}
+			}
+		}
 		if err := invalidateApprovals(ctx, tx, receipt.RunID); err != nil {
 			return err
 		}

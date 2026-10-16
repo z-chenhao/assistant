@@ -23,8 +23,26 @@ type Error struct {
 }
 
 type Result struct {
-	Text  string `json:"text"`
-	Error *Error `json:"error,omitempty"`
+	Text         string        `json:"text"`
+	ArtifactRefs []string      `json:"artifact_refs,omitempty"`
+	Output       *BinaryOutput `json:"-"`
+	PublishRefs  []string      `json:"-"`
+	Error        *Error        `json:"error,omitempty"`
+}
+
+// BinaryOutput is an internal provider stream, never serialized into history.
+// The Executor consumes it within the frozen deadline and closes io.Closers.
+type BinaryOutput struct {
+	Name, MediaType string
+	Reader          io.Reader
+}
+
+// OutputStore atomically normalizes large/binary results and commits their
+// metadata with the invocation terminal state before exposing references.
+// ctx bounds result consumption; the store separately commits known failure.
+type OutputStore interface {
+	FinishResult(context.Context, string, Result) (Result, error)
+	ReconcileResult(context.Context, string, Result) (Result, error)
 }
 
 func Failure(code string) Result {
@@ -32,6 +50,10 @@ func Failure(code string) Result {
 }
 func (r Result) ModelText() string {
 	if r.Error == nil {
+		if len(r.ArtifactRefs) > 0 {
+			b, _ := json.Marshal(r)
+			return string(b)
+		}
 		return r.Text
 	}
 	b, _ := json.Marshal(r.Error)
@@ -80,6 +102,12 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 }
 func validDefinition(d Definition) bool {
 	if d.Host {
+		switch d.Spec.Name {
+		case "builtin__artifact__save", "builtin__artifact__publish":
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "artifact_write"
+		case "builtin__artifact__read", "builtin__artifact__describe", "builtin__artifact__list":
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
+		}
 		return d.Execute == nil && ((d.Spec.Name == "builtin__task__search" && d.Spec.Permission == "read_only") || (d.Spec.Name == "builtin__task__manage" && d.Spec.Permission == "task_control"))
 	}
 	return (d.Execute != nil && d.Invoke == nil && d.Spec.Permission == "read_only") || (d.Invoke != nil && d.Spec.Permission == "external_effect")
@@ -244,7 +272,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 			// Persist uncertainty before the Loop can consume the error and
 			// finish its Run. Task reporting and reconciliation rely on it.
 			if inv.Status != "unknown" {
-				if err := policyStore.Unknown(ctx, inv.ID); err != nil {
+				if err := policyStore.Unknown(context.WithoutCancel(ctx), inv.ID); err != nil {
 					return Result{}, err
 				}
 			}
@@ -256,18 +284,23 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		if d.Query == nil {
 			return uncertain()
 		}
-		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
-		evidence := d.Query(queryCtx, request)
-		cancel()
+		evidence, err := RecoverResult(ctx, d, request, func(queryCtx context.Context, result Result) (Result, error) {
+			if store, ok := e.Store.(OutputStore); ok {
+				return store.ReconcileResult(queryCtx, inv.ID, result)
+			}
+			if result.Output != nil || len(result.ArtifactRefs) > 0 || result.PublishRefs != nil {
+				return Failure("UNKNOWN_SIDE_EFFECT"), nil
+			}
+			return result, policyStore.Reconcile(context.WithoutCancel(queryCtx), inv.ID, result)
+		})
+		if err != nil {
+			if _, persistErr := uncertain(); persistErr != nil {
+				return Result{}, persistErr
+			}
+			return Result{}, err
+		}
 		if evidence.State == "succeeded" || evidence.State == "failed" {
-			result := Normalize(evidence.Result)
-			if (evidence.State == "succeeded") != (result.Error == nil) || !result.terminal() || len(result.Text) > p.OutputBytes {
-				return uncertain()
-			}
-			if err := policyStore.Reconcile(ctx, inv.ID, result); err != nil {
-				return Result{}, err
-			}
-			return result, nil
+			return evidence.Result, nil
 		}
 		// unknown is terminal for retry purposes. Only an incomplete running
 		// query-before-retry call may proceed after authoritative absence.
@@ -296,8 +329,11 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 	}
 	result := Failure("NOT_FOUND")
 	outcome := Outcome{}
+	resultCtx := ctx
 	if known {
 		callCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
+		resultCtx = callCtx
+		defer cancel()
 		if d.Host {
 			host, ok := e.Store.(HostStore)
 			if !ok {
@@ -316,6 +352,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		} else {
 			result = d.Execute(callCtx, inv.Call.Arguments)
 		}
+		defer closeOutput(callCtx, result)()
 		if callCtx.Err() != nil && !d.Host {
 			if d.Spec.Permission == "external_effect" {
 				outcome.Ambiguous = true
@@ -325,7 +362,6 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 				result = Failure("TIMEOUT")
 			}
 		}
-		cancel()
 	}
 	result = Normalize(result)
 	if outcome.Ambiguous || (result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT") {
@@ -343,10 +379,15 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		}
 		return Result{}, ErrSuspended
 	}
-	if len(result.Text) > p.OutputBytes {
-		result = Failure("RESOURCE_LIMIT")
+	if store, ok := e.Store.(OutputStore); ok {
+		result, err = store.FinishResult(resultCtx, inv.ID, result)
+	} else {
+		if len(result.Text) > p.OutputBytes || result.Output != nil {
+			result = Failure("RESOURCE_LIMIT")
+		}
+		err = e.Store.Finish(context.WithoutCancel(ctx), inv.ID, result)
 	}
-	if err := e.Store.Finish(context.WithoutCancel(ctx), inv.ID, result); err != nil {
+	if err != nil {
 		return Result{}, err
 	}
 	if e.Sink != nil {

@@ -201,33 +201,51 @@ func (r *Runs) ReconcileUnknown(ctx context.Context) error {
 		if !ok || d.Query == nil {
 			continue
 		}
-		p := d.Spec.Policy()
-		callCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
-		evidence := d.Query(callCtx, tool.Request{Arguments: v.args, IdempotencyKey: v.key})
-		cancel()
-		if evidence.State != "succeeded" && evidence.State != "failed" {
-			continue
-		}
-		result := tool.Normalize(evidence.Result)
-		if (evidence.State == "succeeded") != (result.Error == nil) || (result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT") || len(result.Text) > p.OutputBytes {
-			continue
-		}
-		err = r.write(ctx, func(tx *sql.Tx) error {
-			value, _ := encoded(result)
-			status := "succeeded"
-			var errorJSON any
-			if result.Error != nil {
-				status = "failed"
-				errorJSON, _ = encoded(result.Error)
+		_, err = tool.RecoverResult(ctx, d, tool.Request{Arguments: v.args, IdempotencyKey: v.key}, func(outputCtx context.Context, result tool.Result) (tool.Result, error) {
+			writeCtx := context.WithoutCancel(outputCtx)
+			committed := false
+			err := r.write(writeCtx, func(tx *sql.Tx) error {
+				// The query ran outside the lock. Another reconciler may have won;
+				// never consume or publish another receipt after terminal commit.
+				var status string
+				if err := tx.QueryRowContext(writeCtx, `SELECT status FROM tool_invocation WHERE invocation_id=?`, v.id).Scan(&status); err != nil {
+					return err
+				}
+				if status != "unknown" {
+					result = tool.Failure("UNKNOWN_SIDE_EFFECT")
+					return nil
+				}
+				var err error
+				result, err = r.storeRecoveryOutput(writeCtx, outputCtx, tx, v.run, v.id, result)
+				if err != nil || (result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT") {
+					return err
+				}
+				value, _ := encoded(result)
+				status = "succeeded"
+				var errorJSON any
+				if result.Error != nil {
+					status = "failed"
+					errorJSON, _ = encoded(result.Error)
+				}
+				resultRef := digest(value)
+				if len(result.ArtifactRefs) > 0 {
+					resultRef = result.ArtifactRefs[0]
+				}
+				res, err := tx.ExecContext(writeCtx, `UPDATE tool_invocation SET status=?,result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,reconciliation_json=?,version=version+1 WHERE invocation_id=? AND status='unknown'`, status, value, resultRef, errorJSON, time.Now().UnixMicro(), time.Now().UnixMicro(), value, v.id)
+				if err != nil {
+					return err
+				}
+				if n, _ := res.RowsAffected(); n == 0 {
+					return nil
+				}
+				r.host.boundary("before_tool_commit")
+				committed = true
+				return runEvent(writeCtx, tx, v.run, "tool_invocation.reconciled", 1)
+			})
+			if err == nil && committed {
+				r.host.boundary("after_tool_commit")
 			}
-			res, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status=?,result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,reconciliation_json=?,version=version+1 WHERE invocation_id=? AND status='unknown'`, status, value, digest(value), errorJSON, time.Now().UnixMicro(), time.Now().UnixMicro(), value, v.id)
-			if err != nil {
-				return err
-			}
-			if n, _ := res.RowsAffected(); n == 0 {
-				return nil
-			}
-			return runEvent(ctx, tx, v.run, "tool_invocation.reconciled", 1)
+			return result, err
 		})
 		if err != nil {
 			return err
