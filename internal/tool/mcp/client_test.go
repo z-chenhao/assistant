@@ -164,6 +164,67 @@ func TestCancellationAndUnknownEffect(t *testing.T) {
 	}
 }
 
+func TestCallResultShapeOverStdio(t *testing.T) {
+	for _, tc := range []struct {
+		name, reply, text string
+		valid             bool
+	}{
+		{"null", `null`, "", false},
+		{"scalar", `"secret"`, "", false},
+		{"array", `[]`, "", false},
+		{"missing_content", `{}`, "", false},
+		{"null_content", `{"content":null}`, "", false},
+		{"object_content", `{"content":{}}`, "", false},
+		{"null_part", `{"content":[null]}`, "", false},
+		{"missing_type", `{"content":[{"text":"secret"}]}`, "", false},
+		{"missing_text", `{"content":[{"type":"text"}]}`, "", false},
+		{"null_text", `{"content":[{"type":"text","text":null}]}`, "", false},
+		{"number_text", `{"content":[{"type":"text","text":42}]}`, "", false},
+		{"null_error", `{"content":[],"isError":null}`, "", false},
+		{"string_error", `{"content":[],"isError":"false"}`, "", false},
+		{"unsupported_content", `{"content":[{"type":"image","data":"secret"}]}`, "", false},
+		{"error_with_missing_text", `{"content":[{"type":"text"}],"isError":true}`, "", false},
+		{"empty_content", `{"content":[]}`, "", true},
+		{"empty_text", `{"content":[{"type":"text","text":""}]}`, "", true},
+		{"text_parts", `{"content":[{"type":"text","text":"one"},{"type":"text","text":"two"}],"isError":false}`, "onetwo", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := config(t)
+			if err := os.WriteFile(filepath.Join(c.Directory, "mcp-result.json"), []byte(tc.reply), 0600); err != nil {
+				t.Fatal(err)
+			}
+			defs, err := Definitions(context.Background(), c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r, err := tool.NewRegistry(defs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			read, _ := r.Resolve("mcp__fixture__read")
+			send, _ := r.Resolve("mcp__fixture__send")
+			got := read.Execute(context.Background(), `{"text":"read"}`)
+			outcome := send.Invoke(context.Background(), tool.Request{Arguments: `{"text":"order"}`})
+			if tc.valid {
+				if got.Error != nil || got.Text != tc.text || outcome.Ambiguous || outcome.Result.Error != nil || outcome.Result.Text != tc.text {
+					t.Fatalf("valid reply rejected: %+v %+v", got, outcome)
+				}
+			} else {
+				if got.Error == nil || got.Error.Code != "PROVIDER_UNAVAILABLE" || !outcome.Ambiguous || outcome.Result.Error == nil || outcome.Result.Error.Code != "PROVIDER_UNAVAILABLE" {
+					t.Fatalf("malformed post-dispatch reply accepted: %+v %+v", got, outcome)
+				}
+				if strings.Contains(got.ModelText(), "secret") || strings.Contains(outcome.Result.ModelText(), "secret") {
+					t.Fatal("raw malformed reply leaked")
+				}
+			}
+			b, err := os.ReadFile(filepath.Join(c.Directory, "mcp-effects.jsonl"))
+			if err != nil || strings.Count(string(b), "order") != 1 {
+				t.Fatal("expected exactly one external effect", string(b), err)
+			}
+		})
+	}
+}
+
 func TestMCPProcessHasOnlyItsConfiguredDirectory(t *testing.T) {
 	c := config(t)
 	secret := filepath.Join(t.TempDir(), "credential")

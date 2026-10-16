@@ -87,17 +87,19 @@ def content(invocation):
     return json.loads(invocation['result_json'])
 
 
-def run(binary):
+def run(binary, selected=None):
     report = {'version': 1, 'scope': 'M3 MCP/Skill/coding contracts; GC-19 prerequisites, GC-20 coding boundary only; M4 Child and M5 Durable Replay remain not_applicable',
               'checks': [], 'crashes': [], 'cleanup': False}
     with tempfile.TemporaryDirectory(prefix='erii-capabilities-') as temp:
         root = Path(temp)
-        def scenario(name, fn, mode='edit'):
+        def scenario(name, fn, mode='edit', kind='checks'):
+            if selected and selected != name:
+                return
             folder = root / name
             folder.mkdir()
             h = prepare(binary, folder, mode)
             try:
-                return fn(h)
+                report[kind].append(fn(h))
             finally:
                 h.cleanup()
 
@@ -135,7 +137,35 @@ def run(binary):
             return {'name': 'real_red_edit_green_with_Worker_approval', 'changed': changed,
                     'before': observed, 'after': json.loads(content(tested)['text']),
                     'sentinel_hash': digest(repo / 'docs/notes.md'), 'hook_hash': digest(repo / '.git/hooks/pre-commit'), 'state': h.state()}
-        report['checks'].append(scenario('coding', coding))
+        scenario('coding', coding)
+
+        def dirty_index(h):
+            # Exercise unprotected files through approved Worker calls. Git's
+            # hidden-index flags must never turn user bytes into editable input.
+            repo = h.root / 'repo'
+            rules = json.loads(content(call(h, 'rules', 'builtin__workspace__read', {'path': 'AGENTS.md'}))['text'])
+            observations = []
+            paths = ['cmd/taskctl/main.go', 'internal/retry/executor.go', 'internal/task/search.go']
+            for flag, path in zip([None, '--assume-unchanged', '--skip-worktree'], paths):
+                if flag:
+                    subprocess.run(['git', 'update-index', flag, '--', path], cwd=repo, check=True,
+                                   capture_output=True, env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent',
+                                                            'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'})
+                source = repo / path
+                source.write_text(source.read_text() + '\n// USER_UNCOMMITTED_CHANGE\n')
+                before = tree(repo)
+                observed = json.loads(content(call(h, 'read-' + path, 'builtin__workspace__read', {'path': path}))['text'])
+                invocation = call(h, 'edit-' + path, 'builtin__workspace__edit',
+                                  {'path': path, 'before_hash': observed['hash'], 'rules_hash': rules['hash'],
+                                   'text': '// AGENT_REPLACEMENT\n'}, worker=True)
+                require(invocation['status'] == 'failed' and content(invocation)['error']['code'] == 'PERMISSION_DENIED',
+                        f'{flag or "ordinary dirty"}: approved Worker overwrote user content')
+                require(tree(repo) == before, f'{flag or "ordinary dirty"}: workspace/index/hooks changed')
+                observations.append({'flag': flag, 'path': path, 'content_preserved': digest(source) == before[path],
+                                     'index_unchanged': digest(repo / '.git/index') == before['.git/index'],
+                                     'invocation': invocation})
+            return {'name': 'approved_Worker_dirty_index_flags_refused', 'cases': observations, 'state': h.state()}
+        scenario('dirty-index', dirty_index)
 
         def audit(h):
             repo = h.root / 'repo'
@@ -148,7 +178,7 @@ def run(binary):
             require(forbidden['error']['code'] == 'NOT_FOUND', 'audit edit capability leaked')
             require(tree(repo) == before, 'audit changed workspace bytes or Git state')
             return {'name': 'audit_read_search_no_writes', 'tree_hashes': before, 'state': h.state()}
-        report['checks'].append(scenario('audit', audit, mode='audit'))
+        scenario('audit', audit, mode='audit')
 
         def quotes(h):
             fetched = content(call(h, 'quotes', 'mcp__fixture__read', {'text': 'insurance_quotes'}))
@@ -171,7 +201,7 @@ def run(binary):
             return {'name': 'GC-11_structured_quote_and_Artifact_fragment', 'source': data,
                     'conditional_net_cny': possible, 'without_cashback_cny': b['premium_cny'], 'artifact_ref': ref,
                     'artifact_sha256': hashlib.sha256(opened.stdout.encode()).hexdigest(), 'state': h.state()}
-        report['checks'].append(scenario('quotes', quotes))
+        scenario('quotes', quotes)
 
         def discovery(h):
             listed = content(call(h, 'skills', 'builtin__skill__list', {}, worker=True))
@@ -206,7 +236,34 @@ def run(binary):
             require('Inspect code and preserve user files.' in serialized and 'PRIVATE_BODY_MARKER' not in serialized,
                     'startup Skill disclosure is not progressive')
             return {'name': 'MCP_transport_Skill_scope_role_denial_unknown', 'state': value}
-        report['checks'].append(scenario('discovery', discovery))
+        scenario('discovery', discovery)
+
+        def malformed_mcp(h):
+            provider = h.root / 'provider'
+            observations = []
+            # The real stdio Fake records an effect before emitting each
+            # malformed reply. Every CLI command opens a new Host process.
+            for name, reply in [('null', None), ('missing-text', {'content': [{'type': 'text'}]})]:
+                (provider / 'mcp-result.json').write_text(json.dumps(reply))
+                read = call(h, 'read-' + name, 'mcp__fixture__read', {'text': 'read'})
+                require(read['status'] == 'failed' and content(read)['error']['code'] == 'PROVIDER_UNAVAILABLE',
+                        'malformed read reply accepted')
+                invocation = call(h, 'send-' + name, 'mcp__fixture__send', {'text': name}, worker=True)
+                require(invocation['status'] == 'unknown' and invocation['attempt_count'] == 1 and
+                        invocation['result_json'] is None, 'malformed effect reply claimed completion')
+                require('UNKNOWN_SIDE_EFFECT' in json.dumps(h.command('chat', 'history')[-1]),
+                        'side-effect uncertainty was not delivered')
+                effects = (provider / 'mcp-effects.jsonl').read_bytes()
+                require(len(effects.splitlines()) == len(observations) + 1, 'effect missing or repeated')
+                h.command('approval', 'reconcile')
+                h.command('chat', 'work')
+                current = next(t for t in h.state()['tools'] if t['invocation_id'] == invocation['invocation_id'])
+                require(current['status'] == 'unknown' and current['attempt_count'] == 1 and
+                        (provider / 'mcp-effects.jsonl').read_bytes() == effects,
+                        'malformed effect lost uncertainty or retried after restart/reconcile')
+                observations.append({'reply': reply, 'invocation': current, 'effect_count': len(effects.splitlines())})
+            return {'name': 'malformed_stdio_effect_replies_stay_unknown', 'cases': observations, 'state': h.state()}
+        scenario('mcp-reply', malformed_mcp)
 
         def crash(h):
             repo = h.root / 'repo'
@@ -230,7 +287,7 @@ def run(binary):
             require(inv['status'] == 'unknown' and inv['attempt_count'] == 1 and (repo / path).read_text() == replacement,
                     'crashed edit retried or falsely completed')
             return {'name': 'edit_after_effect_before_result_commit', 'signal': 'SIGKILL', 'state': value}
-        report['crashes'].append(scenario('crash', crash))
+        scenario('crash', crash, kind='crashes')
     report['cleanup'] = not root.exists()
     require(report['cleanup'], 'disposable roots remain')
     return report
@@ -240,8 +297,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash'],
+                        help='Run one maintained scenario; omit for the complete gate')
     args = parser.parse_args()
-    report = run(args.binary.resolve())
+    report = run(args.binary.resolve(), args.scenario)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({'checks': len(report['checks']), 'crashes': len(report['crashes']), 'cleanup': report['cleanup']}))

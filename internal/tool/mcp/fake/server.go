@@ -77,6 +77,13 @@ func Serve(in io.Reader, out io.Writer, root string) error {
 				}
 			}
 			result = map[string]any{"content": []any{map[string]string{"type": "text", "text": p.Arguments.Text}}, "isError": p.Arguments.Behavior == "error"}
+			// Host-owned fault fixture. Override only the post-dispatch reply,
+			// after recording the actual effect; discovery remains unchanged.
+			if reply, err := os.ReadFile(filepath.Join(root, "mcp-result.json")); err == nil {
+				result = json.RawMessage(reply)
+			} else if !os.IsNotExist(err) {
+				return err
+			}
 		default:
 			return io.ErrUnexpectedEOF
 		}

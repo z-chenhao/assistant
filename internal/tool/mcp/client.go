@@ -261,25 +261,35 @@ func Definitions(ctx context.Context, c Config) ([]tool.Definition, error) {
 			if json.Unmarshal([]byte(args), &params) != nil {
 				return tool.Failure("INVALID_ARGUMENT"), false
 			}
-			var reply struct {
-				Content []struct {
-					Type string `json:"type"`
-					Text string `json:"text"`
+			// Pointers distinguish required empty values from missing/null
+			// values. A malformed reply after dispatch cannot prove an effect.
+			var reply *struct {
+				Content *[]struct {
+					Type string  `json:"type"`
+					Text *string `json:"text"`
 				} `json:"content"`
-				IsError bool `json:"isError"`
+				IsError json.RawMessage `json:"isError"`
 			}
-			if peer.call("tools/call", map[string]any{"name": a.Name, "arguments": params}, &reply) != nil {
+			if peer.call("tools/call", map[string]any{"name": a.Name, "arguments": params}, &reply) != nil || reply == nil || reply.Content == nil {
 				return tool.Failure("PROVIDER_UNAVAILABLE"), true
 			}
-			if reply.IsError {
-				return tool.Failure("INVALID_ARGUMENT"), false
-			}
-			text := ""
-			for _, part := range reply.Content {
-				if part.Type != "text" {
+			var isError bool
+			if len(reply.IsError) > 0 {
+				var flag *bool
+				if json.Unmarshal(reply.IsError, &flag) != nil || flag == nil {
 					return tool.Failure("PROVIDER_UNAVAILABLE"), true
 				}
-				text += part.Text
+				isError = *flag
+			}
+			text := ""
+			for _, part := range *reply.Content {
+				if part.Type != "text" || part.Text == nil {
+					return tool.Failure("PROVIDER_UNAVAILABLE"), true
+				}
+				text += *part.Text
+			}
+			if isError {
+				return tool.Failure("INVALID_ARGUMENT"), false
 			}
 			return tool.Result{Text: text}, false
 		}

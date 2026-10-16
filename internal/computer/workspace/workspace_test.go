@@ -1,8 +1,10 @@
 package workspace
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -13,6 +15,59 @@ import (
 
 	"github.com/z-chenhao/erii/internal/tool"
 )
+
+func TestEditRejectsHiddenIndexEntriesWithoutChangingUserState(t *testing.T) {
+	for _, flag := range []string{"", "--assume-unchanged", "--skip-worktree"} {
+		for _, dirty := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/dirty=%t", flag, dirty), func(t *testing.T) {
+				c := fixture(t)
+				path := "clean.go"
+				if flag != "" {
+					cmd := exec.Command("git", "update-index", flag, "--", path)
+					cmd.Dir = c.Root
+					cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=/nonexistent", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
+					if out, err := cmd.CombinedOutput(); err != nil {
+						t.Fatal(string(out), err)
+					}
+				}
+				if dirty {
+					if err := os.WriteFile(filepath.Join(c.Root, path), []byte("package fixture\n// USER_UNCOMMITTED_CHANGE\n"), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				before, err := os.ReadFile(filepath.Join(c.Root, path))
+				if err != nil {
+					t.Fatal(err)
+				}
+				index, err := os.ReadFile(filepath.Join(c.Root, ".git/index"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				rules, err := os.ReadFile(filepath.Join(c.Root, "AGENTS.md"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, _ := json.Marshal(map[string]string{"path": path, "before_hash": hash(before), "rules_hash": hash(rules), "text": "package replacement\n"})
+				outcome := definition(t, c, "edit").Invoke(context.Background(), tool.Request{Arguments: string(raw)})
+				wantDenied := dirty || flag != ""
+				if wantDenied && (outcome.Ambiguous || outcome.Result.Error == nil || outcome.Result.Error.Code != "PERMISSION_DENIED") {
+					t.Fatalf("expected refusal, got %+v", outcome)
+				}
+				if !wantDenied && outcome.Result.Error != nil {
+					t.Fatal(outcome)
+				}
+				after, err := os.ReadFile(filepath.Join(c.Root, path))
+				if err != nil || (wantDenied && !bytes.Equal(after, before)) {
+					t.Fatal("user content changed", err)
+				}
+				afterIndex, err := os.ReadFile(filepath.Join(c.Root, ".git/index"))
+				if err != nil || !bytes.Equal(afterIndex, index) {
+					t.Fatal("original index changed", err)
+				}
+			})
+		}
+	}
+}
 
 func fixture(t *testing.T) Config {
 	t.Helper()

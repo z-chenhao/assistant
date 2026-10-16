@@ -350,7 +350,12 @@ func Definitions(c Config) ([]tool.Definition, error) {
 				return fail("NON_DETERMINISTIC_REPLAY")
 			}
 			// The fixed literal pathspec prevents names from becoming Git options.
-			if _, err = git(ctx, c, "ls-files", "--error-unmatch", "--", ":(literal)"+a.Path); err != nil {
+			// Status trusts assume-unchanged/skip-worktree flags. Accept only
+			// one ordinary cached entry: -v lowers its tag for assume-unchanged
+			// and uses S for skip-worktree. Inspect the private index copy;
+			// never clear flags or refresh the user's original index.
+			entry, err := git(ctx, c, "ls-files", "-v", "-z", "--error-unmatch", "--", ":(literal)"+a.Path)
+			if err != nil || string(entry) != "H "+a.Path+"\x00" {
 				return fail("PERMISSION_DENIED")
 			}
 			dirty, err := git(ctx, c, "status", "--ignore-submodules=all", "--porcelain=v1", "-z", "--untracked-files=all", "--", ":(literal)"+a.Path)

@@ -38,7 +38,10 @@ The operator must classify each exposed tool as `read_only` or `external_effect`
 Provider annotations cannot grant permissions. Reads use `safe`; effects use
 `high` risk and `never` replay because standard MCP has no authoritative receipt
 query/idempotency contract. Every effect requires its own frozen approval.
-Transport loss after dispatch is `unknown`; no retry or claimed success follows.
+Transport loss or a malformed result after dispatch is `unknown`; no retry or
+claimed success follows. A call result must be an object with a non-null content
+array, text entries with explicit string text, and a boolean `isError` when
+present. Empty content arrays and explicit empty text are valid.
 Raw provider errors are discarded. Cancellation terminates and collects the
 session's process group. The executor supplies timeout, audit, conflict, quota,
 result ordering and Artifact spillover semantics. A server-wide conflict key
@@ -91,7 +94,9 @@ overlap with Erii data, Skills and provider directories.
 
 `audit` mode omits edit entirely, including from Worker discovery. `edit` mode
 requires an exact approval and rejects protected paths, AGENTS.md, dirty/staged
-files, invalid links and stale hashes. A temporary sibling is synced and renamed
+files, assume-unchanged/skip-worktree index entries, invalid links and stale
+hashes. Index flags are inspected in the private metadata copy and never cleared
+on the original index. A temporary sibling is synced and renamed
 atomically. This first adapter conservatively rejects a second edit to an already
 dirty file, including its own earlier edit. There are no create/delete/commit,
 reset/checkout, arbitrary shell, environment, mount or command parameters. Human
