@@ -43,7 +43,8 @@ invocation and approval. Already dispatched effects cannot be revoked by steerin
 only authoritative success/failure. It does not revive Runs, fabricate a new
 approval, or send another action. The scheduler also runs this query-only scan. The CLI prints each unknown or
 reconciled action with its observed status and safe result/receipt.
-A previously delivered unknown message is a historical observation; reconciliation
+A Root with any unresolved effect in its current tree reports `unknown` and keeps
+its Task active. A previously delivered unknown message is a historical observation; reconciliation
 does not rewrite Conversation history or claim a new user delivery.
 
 ## Provider contract

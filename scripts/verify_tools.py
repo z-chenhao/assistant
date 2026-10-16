@@ -26,6 +26,8 @@ def state(h):
             'approvals': 'SELECT * FROM approval ORDER BY created_at',
             'invocations': 'SELECT * FROM tool_invocation ORDER BY created_at,delivery_seq',
             'claims': 'SELECT * FROM run_claim',
+            'tasks': 'SELECT * FROM task',
+            'updates': 'SELECT * FROM task_update ORDER BY occurred_at',
             'policy_events': "SELECT type,payload_json FROM event_outbox WHERE type LIKE '%approval%' OR type LIKE '%tool_invocation%' ORDER BY occurred_at",
         }.items():
             value[name] = [dict(r) for r in db.execute(query)]
@@ -142,6 +144,34 @@ def run(binary):
             require(len(value['effects']) == 1 and 'Tuesday' in value['effects'][0]['args'], 'wrong frozen effect')
             return {'name': 'GC-12_steering_invalidates_approved_parameters', 'state': value}
         report['checks'].append(scenario('steering', steering))
+
+        def worker(h):
+            receipt = h.send('delegate', 'Delegate effect: ' + json.dumps({'target': 'R1', 'text': 'reservation', 'behavior': 'unknown'}))
+            h.command('chat', 'work')
+            approval = h.command('approval', 'list')[-1]
+            before = state(h)
+            inv = next(i for i in before['invocations'] if i['tool_name'] == 'mcp__fixture__send')
+            require(inv['run_id'] != receipt['run_id'] and inv['status'] == 'waiting' and not before['updates'], 'Worker approval leaked to Main or ran without independent decision')
+            decide(h, approval)
+            h.command('chat', 'work')
+            after = state(h)
+            require(after['tasks'][0]['status'] == 'active' and len(after['updates']) == 1 and
+                    after['updates'][0]['kind'] == 'unknown' and not after['effects'], 'unknown Worker falsely completed Task')
+            return {'name': 'Worker_approval_and_unknown_report_to_Main', 'before': before, 'after': after}
+        report['checks'].append(scenario('worker', worker))
+
+        def cancel_waiter(h):
+            h.send('delegate', 'Delegate effect: ' + json.dumps({'target': 'Alex', 'text': 'draft'}))
+            h.command('chat', 'work')
+            approval = h.command('approval', 'list')[-1]
+            h.send('cancel', 'Cancel: Effect fixture')
+            h.command('chat', 'work')
+            value = state(h)
+            inv = next(i for i in value['invocations'] if i['tool_name'] == 'mcp__fixture__send')
+            require(inv['status'] == 'cancelled' and inv['attempt_count'] == 0 and not value['effects'], 'cancelled approval waiter dispatched')
+            require(h.command('approval', 'approve', approval['approval_id'], approval['frozen_arguments_hash'], ok=False).returncode != 0, 'cancelled approval accepted')
+            return {'name': 'Worker_cancel_during_approval_no_dispatch', 'state': value}
+        report['checks'].append(scenario('cancel-waiter', cancel_waiter))
 
         def uncertain(h):
             approval = pending(h, {'target': 'R1', 'text': 'Saturday 19:00 party 2 no deposit', 'behavior': 'unknown'})

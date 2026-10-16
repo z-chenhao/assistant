@@ -568,3 +568,55 @@ func TestToolAcceptanceRollbackIncludesPolicyKeyAndOutbox(t *testing.T) {
 		t.Fatal("missing atomic admission fields")
 	}
 }
+
+func TestToolWorkerUnknownReturnsUnknownUpdateAndKeepsTaskActive(t *testing.T) {
+	ctx := context.Background()
+	s, r, a, p := taskFixture(t)
+	definitions := []tool.Definition{}
+	for _, spec := range a.Registry.Describe() {
+		d, _ := a.Registry.Resolve(spec.Name)
+		definitions = append(definitions, d)
+	}
+	d := effectDef(t, "query_before_retry")
+	d.Invoke = func(context.Context, tool.Request) tool.Outcome { return tool.Outcome{Ambiguous: true} }
+	d.Query = func(context.Context, tool.Request) tool.Evidence { return tool.Evidence{State: "unknown"} }
+	definitions = append(definitions, d)
+	registry, err := tool.NewRegistry(definitions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Registry = registry
+	r.registry = registry
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if isFollowup(req) {
+			return llm.GenerationResult{Text: "Main observed the uncertain result"}, nil
+		}
+		if isRoot(req) {
+			if req.Messages[len(req.Messages)-1].Role == "tool" {
+				return llm.GenerationResult{Text: "Worker finished reasoning"}, nil
+			}
+			return calls(toolfake.Name, `{"target":"R1","text":"reservation"}`), nil
+		}
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "Delegated"}, nil
+		}
+		return calls("builtin__task__manage", `{"operation":"create","task":"Reserve R1 after confirmation"}`), nil
+	}
+	mustSubmit(t, a, "delegate", "delegate reservation")
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='waiting' AND wait_reason='approval'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+		t.Fatal("approval was reported as business result")
+	}
+	approvePolicy(t, s, r)
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM task WHERE status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update WHERE kind='unknown' AND content LIKE 'External effect outcome is unconfirmed.%'`) != 1 || scalar(t, s, `SELECT count(*) FROM main_inbox`) != 1 {
+		t.Fatal("unconfirmed effect falsely completed Task")
+	}
+	if err = r.Report(ctx); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 || scalar(t, s, `SELECT count(*) FROM main_inbox`) != 1 {
+		t.Fatal("unknown report duplicated")
+	}
+}
