@@ -18,7 +18,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -105,7 +105,17 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
-			if fixture == "main" && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
+			if fixture == "terminal-input" && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
+				// A short model reply isolates the terminal byte boundary from
+				// the separate Tool argument/output limits. Probe still runs below.
+				e.Text = "Input received."
+				if err = event(e); err != nil {
+					return err
+				}
+				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 2, Kind: "completed"})
+				break
+			}
+			if (fixture == "main" || fixture == "golden") && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
 				// Same call IDs on distinct exchanges deliberately exercise the
 				// (run, exchange, call) association, never global call-ID dedup.
 				sequence := int64(1)
@@ -122,15 +132,8 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 					}
 				} else if last.Role == "tool" {
 					text := "Processed: " + last.Text
-					// Scripted L0 Main fragments. These do not grade a real model
-					// or claim the complete Memory/scheduling/local-search Cases.
-					switch last.Text {
-					case "我醒了，好困。":
-						text = "先喝点水，缓一缓。昨晚大约睡了多久？"
-					case "先帮我排一下优先级。":
-						text = "先准备9点的会议，再集中完成下午要交的报告。"
-					case "今晚想在附近吃点清淡的。":
-						text = "你现在在哪个区域？有位置后，我再帮你筛选清淡的选择。"
+					if fixture == "golden" {
+						text = goldenReply(request.Messages)
 					}
 					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: text}); err != nil {
 						return err
@@ -214,4 +217,37 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 		}
 	}
 	return scanner.Err()
+}
+
+// Scripted protocol evidence, never model-quality evidence. Select the response
+// by the versioned fixture context and turn ordinal, not by exact prompt wording.
+// The production Context Builder and provider request are unchanged.
+func goldenReply(messages []llm.Message) string {
+	var context string
+	users := 0
+	for _, m := range messages {
+		if m.Role == "user" {
+			if context == "" {
+				context = m.Text
+			}
+			users++
+		}
+	}
+	switch {
+	case strings.Contains(context, "轻度脂肪肝"):
+		switch users {
+		case 2:
+			return "先喝水、接触自然光，09:50到公司前缓一缓。昨晚大约睡了多久？"
+		case 3:
+			return "一点半才睡，睡眠不足是最直接的解释。先补水、进食和短暂活动。"
+		default:
+			return "工作没问题，下午适当休息，今晚提前上床。"
+		}
+	case strings.Contains(context, "发布风险说明"):
+		return "1. 先做发布风险说明，在10:00周会前或会后立即完成，12:00前确认。\n2. 14:00面试前留准备时间，E4只核对。\n3. 新闻和已确认的酒店邮件稍后看。"
+	case strings.Contains(context, "rain_probability_evening"):
+		return "开车通勤可穿短袖、薄长裤，带薄卫衣。18:30散步时按体感添衣，21:00下班更凉，薄卫衣用得上。"
+	default:
+		return "Fixture context missing."
+	}
 }

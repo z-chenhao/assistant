@@ -44,6 +44,15 @@ class Secrets(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps({"ok": op != "get" or value is not None, "value": value}) + "\n").encode())
 
 
+def account_config(root, bridge, endpoint):
+    """Owned fetch substitution shared by CLI and terminal acceptance."""
+    wrapper = root / "bridge.mjs"
+    wrapper.write_text("const network=globalThis.fetch;globalThis.fetch=(u,i)=>{const url=new URL(typeof u==='string'?u:u.url??u.toString());if(!['https://auth.openai.com','https://api.openai.com'].includes(url.origin))throw new Error('forbidden fixture network');return network(" + json.dumps(endpoint) + "+url.pathname+url.search,i)};process.argv[1]=" + json.dumps(str(bridge)) + ";await import(" + json.dumps(bridge.as_uri()) + ");\n")
+    cfg = root / "config.yaml"
+    cfg.write_text(f"version: 1\napp:\n  data_root: {root / 'data'}\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: {wrapper}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+    return cfg
+
+
 def verify(binary, bridge):
     require(shutil.which("node"), "Node is missing")
     report = {"protocol": "current-openai-account", "live_shadow": "inconclusive", "device_authorization": "deferred_by_approval", "checks": []}
@@ -61,12 +70,7 @@ def verify(binary, bridge):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                wrapper = root / "bridge.mjs"
-                # Test-only fetch substitution. The production module still validates
-                # the original trusted HTTPS destination before this I/O seam.
-                wrapper.write_text("const network=globalThis.fetch;globalThis.fetch=(u,i)=>{const url=new URL(typeof u==='string'?u:u.url??u.toString());if(!['https://auth.openai.com','https://api.openai.com'].includes(url.origin))throw new Error('forbidden fixture network');return network(" + json.dumps(endpoint) + "+url.pathname+url.search,i)};process.argv[1]=" + json.dumps(str(bridge)) + ";await import(" + json.dumps(bridge.as_uri()) + ");\n")
-                cfg = root / "config.yaml"
-                cfg.write_text(f"version: 1\napp:\n  data_root: {root / 'data'}\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: {wrapper}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+                cfg = account_config(root, bridge, endpoint)
                 env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
                 args = [str(binary), "-config", str(cfg), "-test-secret-store", str(socket)]
                 ordinary_output = []

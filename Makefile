@@ -6,6 +6,7 @@ build:
 test:
 	go test ./...
 	npm test --prefix provider-bridge
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 
 test-race:
 	go test -race ./...
@@ -23,6 +24,10 @@ verify: build
 	python3 scripts/verify_local_provider.py --binary bin/personal-agent --evidence evidence/local-provider.json
 	python3 scripts/verify_account.py --binary bin/personal-agent --evidence evidence/account.json
 	python3 scripts/verify_main.py --binary bin/personal-agent --evidence evidence/main.json
+	python3 scripts/run_cases.py --binary bin/personal-agent --evidence evidence/cases.json
+	python3 scripts/verify_tui.py --binary bin/personal-agent --evidence evidence/tui.json
+	@for attempt in 2 3 4 5; do python3 scripts/verify_tui.py --binary bin/personal-agent --evidence evidence/tui-$$attempt.json || exit 1; done
+	python3 scripts/verify_terminal_input.py --binary bin/personal-agent --evidence evidence/terminal-input.json
 	rm -f evidence/pi-bridge.tap
 	@for attempt in 1 2 3 4 5; do node --test --test-reporter=tap provider-bridge/test/*.test.mjs >> evidence/pi-bridge.tap || { cat evidence/pi-bridge.tap; exit 1; }; done
 	@for attempt in 1 2 3 4 5; do python3 scripts/verify_account.py --binary bin/personal-agent --evidence evidence/account-$$attempt.json || exit 1; done

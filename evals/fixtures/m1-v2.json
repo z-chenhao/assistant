@@ -1,0 +1,297 @@
+{
+  "version": 2,
+  "milestone": "M1",
+  "level": "L0",
+  "scope": "Main fragments with explicit synthetic context. No connector, Memory or full product Case claim.",
+  "common": {
+    "user": {
+      "id": "user_eval_001",
+      "name": "陈屿",
+      "timezone": "Asia/Shanghai",
+      "locale": "zh-CN",
+      "city": "杭州",
+      "occupation": "后端工程师",
+      "household": "与伴侣共同生活"
+    },
+    "agent": {
+      "id": "agent_eval_001",
+      "language": "zh-CN"
+    },
+    "security": {
+      "external_writes_require_approval": true,
+      "secrets_are_never_model_visible": true
+    }
+  },
+  "variants": [
+    {
+      "id": "wording-1",
+      "wording": 0,
+      "noise": 0
+    },
+    {
+      "id": "wording-2",
+      "wording": 1,
+      "noise": 0
+    },
+    {
+      "id": "wording-3",
+      "wording": 2,
+      "noise": 0
+    },
+    {
+      "id": "noise-1",
+      "wording": 0,
+      "noise": 1
+    },
+    {
+      "id": "noise-2",
+      "wording": 0,
+      "noise": 2
+    },
+    {
+      "id": "order-1",
+      "wording": 0,
+      "noise": 0,
+      "reverse_world_keys": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "GC-01",
+      "version": 2,
+      "clock": "2026-10-15T08:26:00+08:00",
+      "world": {
+        "conversation": [
+          {
+            "at": "2026-10-12T23:48:00+08:00",
+            "text": "明明觉得无聊，还是忍不住刷手机。"
+          },
+          {
+            "at": "2026-10-14T08:02:00+08:00",
+            "text": "我醒了。"
+          },
+          {
+            "at": "2026-10-14T23:10:00+08:00",
+            "text": "今晚大概一点睡。"
+          }
+        ],
+        "health": {
+          "age": 28,
+          "sex": "male",
+          "diagnoses": [
+            "轻度脂肪肝",
+            "过敏性鼻炎"
+          ],
+          "current_red_flags": []
+        },
+        "calendar": [
+          {
+            "start": "2026-10-15T09:50:00+08:00",
+            "title": "到公司"
+          },
+          {
+            "start": "2026-10-15T12:00:00+08:00",
+            "title": "午饭"
+          }
+        ],
+        "weather": {
+          "temperature_c": 22,
+          "air_quality": "good"
+        }
+      },
+      "events": [
+        {
+          "at": "2026-10-15T08:26:00+08:00",
+          "wordings": [
+            "我睡醒了，但是好困。",
+            "醒了，还是特别困。",
+            "刚醒，feeling sleepy。"
+          ],
+          "required_text": [
+            "09:50"
+          ],
+          "max_questions": 1
+        },
+        {
+          "at": "2026-10-15T08:35:00+08:00",
+          "wordings": [
+            "我昨晚一点半才睡，今天没有头晕、胸痛或者呼吸困难。",
+            "昨夜01:30才入睡；今天不头晕、不胸痛，呼吸正常。",
+            "昨晚1:30才睡，no dizziness/chest pain/breathing trouble today。"
+          ],
+          "required_text": [
+            "睡眠不足"
+          ],
+          "max_questions": 0
+        },
+        {
+          "at": "2026-10-15T12:30:00+08:00",
+          "wordings": [
+            "上午还是有点困，但工作没问题。",
+            "这一上午仍有些困，工作照常能做。",
+            "上午still sleepy，不过工作没受影响。"
+          ],
+          "required_text": [
+            "今晚"
+          ],
+          "max_questions": 0
+        }
+      ],
+      "forbidden_text": [
+        "诊断为",
+        "慢性睡眠障碍",
+        "血压",
+        "心率",
+        "体温",
+        "已经记录",
+        "已经保存"
+      ],
+      "not_applicable": [
+        "Memory Curator",
+        "Health connector",
+        "red-flag safety variant (M6)",
+        "Task/Automation persistence"
+      ]
+    },
+    {
+      "case_id": "GC-09",
+      "version": 2,
+      "clock": "2026-10-16T08:30:00+08:00",
+      "world": {
+        "calendar": [
+          {
+            "time": "10:00-10:30",
+            "title": "周会",
+            "required": true
+          },
+          {
+            "time": "14:00-15:00",
+            "title": "候选人面试",
+            "required": true
+          },
+          {
+            "time": "16:00-16:30",
+            "title": "可选产品分享",
+            "required": false
+          }
+        ],
+        "emails": [
+          {
+            "id": "E1",
+            "from": "leader@example.test",
+            "subject": "今天12点前确认发布风险",
+            "unread": true
+          },
+          {
+            "id": "E2",
+            "from": "newsletter@example.test",
+            "subject": "本周AI新闻",
+            "unread": true
+          },
+          {
+            "id": "E3",
+            "from": "hotel@example.test",
+            "subject": "预订已确认",
+            "unread": true
+          },
+          {
+            "id": "E4",
+            "from": "candidate@example.test",
+            "subject": "面试时间确认",
+            "unread": true
+          }
+        ],
+        "tasks": [
+          {
+            "id": "T1",
+            "title": "发布风险说明",
+            "due": "2026-10-16T12:00:00+08:00",
+            "status": "active"
+          },
+          {
+            "id": "T2",
+            "title": "旅行路线手册",
+            "due": "2026-10-20T20:00:00+08:00",
+            "status": "active"
+          }
+        ]
+      },
+      "events": [
+        {
+          "at": "2026-10-16T08:30:00+08:00",
+          "wordings": [
+            "我今天先做什么？给我一个尽量短的安排。",
+            "今天优先忙哪件？安排越简短越好。",
+            "今天priorities是什么？给个很短的计划。"
+          ],
+          "required_text": [
+            "发布风险",
+            "12:00",
+            "10:00",
+            "14:00"
+          ],
+          "max_questions": 0
+        }
+      ],
+      "forbidden_text": [
+        "已经发送",
+        "已经取消",
+        "已经创建"
+      ],
+      "max_items": 8,
+      "not_applicable": [
+        "Calendar/email connectors",
+        "Task reads",
+        "Follow-up aggregation",
+        "Automation"
+      ]
+    },
+    {
+      "case_id": "GC-10",
+      "version": 2,
+      "clock": "2026-10-12T08:10:00+08:00",
+      "world": {
+        "location": "杭州",
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        },
+        "schedule": {
+          "commute": "开车",
+          "outdoor_walk": "18:30-19:10",
+          "leave_office": "21:00"
+        }
+      },
+      "events": [
+        {
+          "at": "2026-10-12T08:10:00+08:00",
+          "wordings": [
+            "今天穿什么？我开车上下班，六点半会散步，九点下班。",
+            "开车通勤，18:30散步，21:00离开公司，今天怎么穿？",
+            "今天outfit怎么选？开车上下班，18:30走走，21:00下班。"
+          ],
+          "required_text": [
+            "薄",
+            "18:30",
+            "21:00",
+            "开车"
+          ],
+          "max_questions": 0
+        }
+      ],
+      "forbidden_text": [
+        "厚外套",
+        "已经查询",
+        "已经刷新"
+      ],
+      "not_applicable": [
+        "Weather connector",
+        "stale weather refresh variant (M6)",
+        "location/Computer"
+      ]
+    }
+  ]
+}

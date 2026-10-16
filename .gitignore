@@ -2,3 +2,5 @@
 /evidence/
 
 /provider-bridge/node_modules/
+
+__pycache__/

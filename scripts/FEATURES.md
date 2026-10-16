@@ -9,7 +9,7 @@ real boundary, records evidence, and always reaps its processes/removes state.
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
 | Help/doctor | `bin/personal-agent -help` | `cmd/personal-agent:run` | Usage; no state created |
-| Startup diagnostics | `bin/personal-agent [-config path]` | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
+| Startup diagnostics | `bin/personal-agent [-config path] status`; no-command with redirected stdin | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
 | Configuration | `-config`, `ERII_*` overrides | `config.Load` | Invalid fields/URLs/durations rejected without value echo |
 | SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v7, WAL, one Agent, one atomic fresh-bootstrap event |
@@ -83,8 +83,24 @@ See [Main operations](../docs/main-loop.md) for recovery and limits.
 | Result/trace events | Host EventSink | Loop + Executor, `Runs.Trace` | Persist completion before message/tool end; ordered trace envelope; no streaming EventQueue writes |
 | Graceful shutdown | SIGTERM during a generation | Actor controlled release | Accepted model result retained, unclaimed nonterminal Run, no business cancellation, recovery reuses result |
 | Local/account Main path | Configured local endpoint or account profile | Real CLI -> Go Actor/Loop -> Node/Pi -> Tool -> Conversation | `local-provider.json` and `account.json`, actual System Prompt and Tool continuation; no online account required |
-| Main L0 fragments | `make verify`, `evals/fixtures/main-v1.json` | Shared Main CLI Case Runner | GC-01/09/10 fragment assertions; full Cases not_applicable and semantic score null |
+| Main L0 fragments | `make verify`, `evals/fixtures/m1-v2.json` | `case_runner.py`, `run_cases.py`, actual TUI | 18 GC-01/09/10 wording/noise/order fragments; normative facts; fixed scenario clock; locked fixtures/scoring; full Cases not_applicable and semantic scores null |
 | M1 storage migration | Startup from empty or v6 | `agent/sqlite` v7, `conversation/sqlite` v1 | Prior identity/config/events retained; partial DDL rolls back; future schemas rejected |
 
 Local DeliveryRequests are durable pending intents; an external delivery consumer
-is not implemented. No full M1, M3 Security or M5 Durable Replay claim.
+is not implemented. No scored product-Case, full M3 Security or M5 Durable Replay claim.
+
+## Terminal slice (ERII-10)
+
+`scripts/verify_tui.py` owns launch/doctor/drive/evidence/cleanup through a real
+PTY and the existing local/account HTTP peers. `make verify` runs it five times.
+See [terminal operations and proof limits](../docs/tui-and-evals.md).
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Fresh setup | Default launch on terminal or `tui` | `tui.Session`, existing `llm.Control` | Actual PTY discovery/manual URL or browser account setup → Probe → explicit selection → ready |
+| Terminal conversation | Plain text, `/history` | `agent.Actor.Submit/Drain`, semantic Conversation | Actual Pi Main/Tool/reply for both paths; busy Steering enters one Main; no raw Tool trace |
+| Profile controls | `/models`, `/test ID`, `/select ID`, `/setup`, `/login [ID]`, `/logout ID` | Existing Model control plane and account Manager | Dynamic account IDs; versioned activation; logout/degraded gate; new Run model switch with old Snapshot retained |
+| Cancel and readiness | `/cancel`, Ctrl-C, SIGTERM, unavailable Bridge | `tui.Session`, `agent.EffectiveReadiness` | Fresh setup stays closed, active profile retained; login cancels without credentials; prompt input and executor joined; five consecutive runs |
+| Terminal recovery | Restart TUI after actual SIGKILL | Existing Main recovery and Conversation intents | Identical semantic state for both providers; held generation with Steering reused; no duplicate reply |
+| Terminal input byte boundary | Default launch; `verify_terminal_input.py` in `make verify` | `tui.OpenInput`, bounded `readInput`, same Actor | 12 actual PTY cases: exact 16 KiB ASCII/UTF-8, overflow rejected without partial Main rows, recovery, editing/EOF, echo on/off, signal shutdown, flags/termios restored; macOS review reproducer retained as before/after evidence |
+| Eval result/scoring protocol | `run_cases.py`; `make test` scorer regressions | `case_runner.py`, locked `scoring-v1.json` | Real TUI drives 18 fragments; full evidence and snapshots; missing grades null, hard/mechanical failure cannot be overridden, thresholds enforced |

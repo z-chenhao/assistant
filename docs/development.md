@@ -63,8 +63,10 @@ make build
 ```
 
 `status` opens/migrates SQLite, prints one JSON object, and exits. With no
-command, startup prints the same object and waits for SIGINT/SIGTERM. Neither
-path connects to NATS. `relay` explicitly runs only the internal event publisher;
+command on a terminal, startup opens [setup and conversation](tui-and-evals.md).
+With redirected stdin it prints the same diagnostic object and waits for
+SIGINT/SIGTERM. Explicit `tui` also opens the terminal adapter. These paths do
+not connect to NATS. `relay` explicitly runs only the internal event publisher;
 it prints diagnostics, connects to the configured broker, and drains pending
 Outbox events in bounded batches until stopped. It does not enable a model or
 Agent ingress. There is no production consumer yet; transactional Inbox handling
