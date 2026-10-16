@@ -23,7 +23,7 @@ func fixture(t *testing.T) Config {
 		}
 	}
 	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture"}} {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command("git", append([]string{"-c", "maintenance.auto=false", "-c", "gc.auto=0"}, args...)...)
 		cmd.Dir = root
 		cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=/nonexistent", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -199,5 +199,30 @@ func TestReadOnlyGitNeverExecutesCheckoutConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
 		t.Fatal("Git executed repository config", err)
+	}
+}
+
+func TestWorkspaceMetadataSnapshotIgnoresTransientLocks(t *testing.T) {
+	c := fixture(t)
+	// Git's automatic maintenance owns this non-authoritative lock. Its
+	// lifetime/target must not become an input to read-only status or diff.
+	lock := filepath.Join(c.Root, ".git/objects/maintenance.lock")
+	if err := os.Symlink(filepath.Join(t.TempDir(), "vanished"), lock); err != nil {
+		t.Fatal(err)
+	}
+	defs, err := Definitions(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := tool.NewRegistry(defs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := registry.Resolve("builtin__workspace__git")
+	if got := d.Execute(context.Background(), `{"operation":"status"}`); got.Error != nil {
+		t.Fatal(got)
+	}
+	if _, err := os.Lstat(lock); err != nil {
+		t.Fatal("source lock was changed", err)
 	}
 }

@@ -118,6 +118,15 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 		if count > 4096 {
 			return invalid
 		}
+		// Locks are transient coordination state, not repository contents.
+		// In particular, detached Git maintenance may remove one between
+		// enumeration and ReadFile. Never copy or follow it into the snapshot.
+		if strings.HasSuffix(p, ".lock") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 		if d.IsDir() {
 			if p == "hooks" || p == "logs" {
 				return fs.SkipDir
@@ -130,7 +139,7 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 			}
 			return nil
 		}
-		if p == "config" || p == "config.worktree" || p == "info/attributes" || p == "index.lock" {
+		if p == "config" || p == "config.worktree" || p == "info/attributes" {
 			return nil
 		}
 		if d.Type()&os.ModeSymlink != 0 || p == "commondir" || p == "objects/info/alternates" {
@@ -164,7 +173,7 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 	if err != nil {
 		return nil, invalid
 	}
-	prefix := []string{"--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.pager=cat", "-c", "core.attributesFile=/dev/null", "-c", "diff.ignoreSubmodules=all", "-c", "core.worktree=" + c.Root}
+	prefix := []string{"--no-optional-locks", "-c", "maintenance.auto=false", "-c", "gc.auto=0", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.pager=cat", "-c", "core.attributesFile=/dev/null", "-c", "diff.ignoreSubmodules=all", "-c", "core.worktree=" + c.Root}
 	cmd := exec.CommandContext(ctx, bin, append(prefix, args...)...)
 	cmd.Dir = c.Root
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=/nonexistent", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_ATTR_NOSYSTEM=1", "GIT_NO_REPLACE_OBJECTS=1", "GIT_DIR=" + metadata, "GIT_WORK_TREE=" + c.Root}

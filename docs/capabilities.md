@@ -103,6 +103,8 @@ uncooperative external writer between the final preimage check and rename.
 Git runs against a disposable metadata copy without repository config, hooks,
 external diff/textconv, filters, fsmonitor, replacement objects or submodule
 recursion. The original index, dirty files and hooks remain byte-identical.
+Transient metadata locks are excluded. Automatic maintenance is disabled for
+read commands and fixture bootstrap so no detached Git writer owns test state.
 Tests copy regular source files without `.git`, then run under macOS Seatbelt
 (`sandbox-exec`) or Linux bubblewrap namespaces with host user files, network,
 keychain/Mach services and inherited secrets unavailable. Writable cache/temp
