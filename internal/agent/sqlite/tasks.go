@@ -10,6 +10,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
 )
@@ -28,7 +29,7 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	id, capID := newID(), newID()
 	specs, _ := encoded(r.registry.Describe())
 	now := time.Now().UnixMicro()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), digest("[]"), agentID, specs, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), skill.SetHash(r.registry.Describe()), agentID, specs, now); err != nil {
 		return "", err
 	}
 	cp, _ := encoded(agent.Checkpoint{Phase: "model", Messages: append(agent.MainContext(nil), updates...)})
@@ -65,7 +66,7 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	raw, _ := encoded(specs)
 	id, capID := newID(), newID()
 	now := time.Now().UnixMicro()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,0,?,?,2)`, capID, config, digest(raw), digest("[]"), agentID, raw, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,0,?,?,2)`, capID, config, digest(raw), skill.SetHash(specs), agentID, raw, now); err != nil {
 		return err
 	}
 	// Prior instructions remain part of the durable Task context on continuation;

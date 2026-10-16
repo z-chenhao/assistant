@@ -47,6 +47,7 @@ type Message struct {
 
 type ToolSpec struct {
 	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 	InputSchema string `json:"input_schema"`
 }
 

@@ -1,4 +1,18 @@
 version: 1
+# Optional M3 adapters, disabled when absent. Use private dedicated directories.
+# mcp:
+#   - name: local_catalog
+#     command: /absolute/path/to/self-contained-mcp-server
+#     args: []
+#     directory: /absolute/path/to/provider-state
+#     tools: {lookup: read_only, send: external_effect}
+# skills:
+#   root: /absolute/path/to/curated-skills
+#   scope: agent  # agent or workspace, within this local Agent
+# workspace:
+#   root: /absolute/path/to/disposable-git-checkout
+#   mode: audit  # edit exposes exact approved clean-file replacement
+#   protected: [docs/notes.md]
 app:
   # Must be absolute. ERII_DATA_ROOT can override this for deployment.
   data_root: /tmp/erii-local

@@ -18,7 +18,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "capabilities", "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -105,7 +105,7 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
-			if (fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "builtin__text__echo") {
+			if (fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "builtin__text__echo") {
 				// Hold an actual accepted Worker generation while keeping the RPC
 				// peer responsive to cancellation. A new Root gets the appended
 				// instruction as its last message and can finish normally.
@@ -116,7 +116,9 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 				}
 				var value llm.GenerationResult
 				var cause error
-				if fixture == "artifacts" {
+				if fixture == "capabilities" {
+					value = capabilitiesReply(request)
+				} else if fixture == "artifacts" {
 					value = artifactsReply(request)
 				} else if fixture == "tasks" {
 					value, cause = tasksReply(request)

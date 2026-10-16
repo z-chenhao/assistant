@@ -25,6 +25,7 @@ import (
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
+	mcpfake "github.com/z-chenhao/erii/internal/tool/mcp/fake"
 	"github.com/z-chenhao/erii/internal/tui"
 )
 
@@ -38,6 +39,9 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) (err error) {
+	if len(args) == 2 && args[0] == "-test-mcp-server" {
+		return mcpfake.Serve(in, out, args[1])
+	}
 	if len(args) == 2 && args[0] == "-test-provider-bridge" {
 		return fake.Serve(in, out, args[1])
 	}

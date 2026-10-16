@@ -12,20 +12,23 @@ import (
 // The registry accepts this deliberately bounded JSON Schema vocabulary. An
 // unsupported keyword fails registration, rather than silently skipping a rule.
 type schema struct {
-	Type       string            `json:"type"`
-	Properties map[string]schema `json:"properties"`
-	Required   []string          `json:"required"`
-	Additional *bool             `json:"additionalProperties"`
-	Items      *schema           `json:"items"`
-	OneOf      []schema          `json:"oneOf"`
-	Enum       []any             `json:"enum"`
-	Const      json.RawMessage   `json:"const"`
-	Minimum    *float64          `json:"minimum"`
-	Maximum    *float64          `json:"maximum"`
-	MaxLength  *int              `json:"maxLength"`
-	MinLength  *int              `json:"minLength"`
-	MaxItems   *int              `json:"maxItems"`
-	MinItems   *int              `json:"minItems"`
+	Description string            `json:"description"`
+	Title       string            `json:"title"`
+	Dialect     string            `json:"$schema"`
+	Type        string            `json:"type"`
+	Properties  map[string]schema `json:"properties"`
+	Required    []string          `json:"required"`
+	Additional  *bool             `json:"additionalProperties"`
+	Items       *schema           `json:"items"`
+	OneOf       []schema          `json:"oneOf"`
+	Enum        []any             `json:"enum"`
+	Const       json.RawMessage   `json:"const"`
+	Minimum     *float64          `json:"minimum"`
+	Maximum     *float64          `json:"maximum"`
+	MaxLength   *int              `json:"maxLength"`
+	MinLength   *int              `json:"minLength"`
+	MaxItems    *int              `json:"maxItems"`
+	MinItems    *int              `json:"minItems"`
 }
 
 func parseSchema(raw string) (schema, bool) {

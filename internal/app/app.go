@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
@@ -28,9 +29,11 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
 	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
+	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"github.com/z-chenhao/erii/internal/tui"
 )
 
@@ -100,6 +103,30 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := artifacttools.Definitions()
+	for _, server := range cfg.MCP {
+		more, e := mcp.Definitions(ctx, server)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, more...)
+	}
+	if cfg.Skills != nil {
+		more, e := skill.Definitions(*cfg.Skills)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, more...)
+	}
+	if cfg.Workspace != nil {
+		more, e := workspace.Definitions(*cfg.Workspace)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, more...)
+	}
 	if fixture == "artifacts" {
 		defs = append(defs, toolfake.Artifacts()...)
 	}

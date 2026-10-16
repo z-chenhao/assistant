@@ -2,9 +2,10 @@
 
 Every Direct Tool enters `tool.Executor`: persisted provider response → frozen
 admission → input validation → security/approval → bounded dispatch → normalized
-result commit. Future Runtime facades must use this same entry point. Code Mode,
-Child Runs, real MCP transport and Computer actions are not implemented by this
-slice. No new production provider or implicit Fake is enabled.
+result commit. Future Runtime facades must use this same entry point. MCP stdio,
+progressive Skills and the controlled M3 coding fixture use this path; see
+[capability operations](capabilities.md). Code Mode, Child Runs and the production
+Computer adapter remain later milestones. No implicit Fake is enabled.
 
 `approval list` shows the local user's approval requests, complete final arguments,
 frozen hash, status and expiry. To decide the displayed action:
@@ -90,7 +91,8 @@ External tool adapters never receive model-provider credentials.
 
 The registry validates a bounded JSON Schema vocabulary: type, properties,
 required, additionalProperties, items, oneOf, enum, const, numeric bounds, string
-length and array length. Unsupported keywords reject registration. Arguments
+length and array length. Schema description/title/$schema annotations are carried
+as metadata. Unsupported validation keywords reject registration. Arguments
 reject duplicate keys, excessive depth/size, invalid types and bounds before
 provider execution. Provider-specific semantic validation remains required.
 

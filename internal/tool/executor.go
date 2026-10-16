@@ -62,6 +62,8 @@ func (r Result) ModelText() string {
 
 type Spec struct {
 	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	ResourceHash   string `json:"resource_hash,omitempty"`
 	Version        int    `json:"version"`
 	InputSchema    string `json:"input_schema"`
 	ReplayPolicy   string `json:"replay_policy"`

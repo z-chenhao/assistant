@@ -1195,6 +1195,8 @@ runtime/javascript/
 
 ### 7.1 Skill 结构与加载
 
+M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 与 Root 开放，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。仅摘要进入 Tool description，全文按需读取。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/capabilities.md`。
+
 - 使用成熟的 Agent Skills 目录约定。
 - 每个 Skill 以 `SKILL.md` 为入口，可选包含 `scripts/`、`references/` 和 `assets/`。
 - 启动时只加载 Skill 摘要，需要使用时再读取完整内容，以减少上下文占用。
@@ -2062,6 +2064,8 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 完成条件：Main 可把耗时工作委派给 Root；对话仍可继续；Root 完成后只触发一次 Main 汇总。
 
 ### M3：统一 Tooling、Approval 与 Artifact
+
+M3 的 MCP 与 Coding 验证使用真实 stdio 协议和受控磁盘 fixture：进程由 macOS Seatbelt / Linux bubblewrap 隔离，网络与 Host 用户目录不可达；生产 Lume/Guest ComputerProvider 仍在 M6。它们共享现有 ToolExecutor/Security/Artifact 管线，不另建 Computer Agent Loop。新增 ToolSpec 的可选 description/resource_hash 随 tools_json 冻结，旧快照不自动扩权；不需要新增 schema 或领域状态。该中间验证边界的限制和证据见 `docs/capabilities.md`。
 
 - 完成 Tool Registry/Executor、Capability Snapshot、Security Policy、可恢复 Approval、ArtifactStore 和 Delivery Outbox。
 - 为每个 ToolSpec 强制声明风险、`replay_policy`、超时、输出限制与冲突键生成器。
