@@ -31,3 +31,11 @@ tools:
   provider_concurrency: 16
   tool_concurrency: 8
   approval_ttl_seconds: 3600
+
+# Immutable binary storage under app.data_root/artifacts. Cleanup protects
+# references and active/paused Tasks; artifact cleanup defaults to dry-run.
+artifact:
+  retention_days: 30
+  quota_bytes: 1073741824
+  max_bytes: 67108864
+  cleanup_batch: 100

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
@@ -32,6 +33,11 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	}
 	cp, _ := encoded(agent.Checkpoint{Phase: "model", Messages: append(agent.MainContext(nil), updates...)})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,kind,status,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,'main','queued',?,?,?,(SELECT coalesce(max(sequence),0) FROM conversation_intent),?,?,1)`, id, agentID, agentID, capID, snapshot.SnapshotID, cp, now, now); err != nil {
+		return "", err
+	}
+	// History grants remain within this local user's Conversation. Later Main
+	// Runs can reopen refs already supplied or explicitly delivered there.
+	if _, err = tx.ExecContext(ctx, `INSERT INTO artifact_reference SELECT json_extract(j.value,'$.artifact_ref'),'run',? FROM conversation_intent c,json_each(json_extract(c.message_json,'$.content')) j JOIN artifact a ON a.artifact_ref=json_extract(j.value,'$.artifact_ref') WHERE json_extract(c.message_json,'$.conversation_id')=? AND a.owner_agent_id=? ON CONFLICT DO NOTHING`, id, agentID, agentID); err != nil {
 		return "", err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
@@ -65,17 +71,24 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	// Prior instructions remain part of the durable Task context on continuation;
 	// no Conversation or Main checkpoint is copied into a Root.
 	messages := agent.RootContext(title, brief)
-	rows, err := tx.QueryContext(ctx, `SELECT instruction FROM task_instruction WHERE task_id=? AND task_epoch<? ORDER BY sequence`, taskID, epoch)
+	var refs string
+	if err = tx.QueryRowContext(ctx, `SELECT anchor_artifact_refs FROM task WHERE task_id=?`, taskID).Scan(&refs); err != nil {
+		return err
+	}
+	if refs != "[]" {
+		messages = append(messages, agent.TextMessage("user", "Task artifact references: "+refs))
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT instruction,artifact_refs FROM task_instruction WHERE task_id=? AND task_epoch<? ORDER BY sequence`, taskID, epoch)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
-		var text string
-		if err = rows.Scan(&text); err != nil {
+		var text, refs string
+		if err = rows.Scan(&text, &refs); err != nil {
 			rows.Close()
 			return err
 		}
-		messages = append(messages, agent.TextMessage("user", "Previous Task instruction: "+text))
+		messages = append(messages, agent.TextMessage("user", "Previous Task instruction: "+text+"\nArtifact references: "+refs))
 	}
 	err = rows.Err()
 	rows.Close()
@@ -175,14 +188,20 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 		if err := tx.QueryRowContext(ctx, `SELECT r.kind,i.tool_name,i.arguments_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.run_id=? AND i.status='running'`, inv.ID, t.claim.RunID()).Scan(&kind, &name, &args); err != nil {
 			return err
 		}
-		if kind != "main" {
-			return nil
-		}
+
 		var visible int
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id, json_each(c.tools_json) j WHERE r.run_id=? AND json_extract(j.value,'$.name')=?`, t.claim.RunID(), name).Scan(&visible); err != nil {
 			return err
 		}
 		if visible != 1 {
+			return nil
+		}
+		if artifacttools.Known(name) {
+			var e error
+			result, e = t.executeArtifact(ctx, tx, name, args)
+			return e
+		}
+		if kind != "main" {
 			return nil
 		}
 		if name == task.SearchName {
@@ -202,11 +221,15 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 			result = tool.Failure("INVALID_ARGUMENT")
 			return nil
 		}
-		// Artifact admission arrives with M3. Until then every nonempty reference is
-		// inaccessible; never accept a fabricated/unvalidated reference.
-		if len(request.ArtifactRefs) > 0 {
-			result = tool.Failure("NOT_FOUND")
-			return nil
+		scope, e := runScope(ctx, tx, t.claim.RunID())
+		if e != nil {
+			return e
+		}
+		for _, ref := range request.ArtifactRefs {
+			if _, e = t.runs.host.Artifacts().DescribeTx(ctx, tx, scope, ref, true); e != nil {
+				result = artifactFailure(e)
+				return nil
+			}
 		}
 		canonical, _ := encoded(request)
 		hash := digest(canonical)
@@ -244,6 +267,11 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 				taskID, ref = newID(), "task:"+newID()
 				if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1)`, taskID, ref, agentID, conv, task.Title(request.Task), request.Task, refs, now, now); err != nil {
 					return err
+				}
+				for _, ref := range request.ArtifactRefs {
+					if err = t.runs.host.Artifacts().PinTx(ctx, tx, scope, ref, "task", taskID); err != nil {
+						return err
+					}
 				}
 				if err = t.runs.createRoot(ctx, tx, taskID); err != nil {
 					return err
@@ -302,6 +330,11 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 					n, _ := res.RowsAffected()
 					if n != 1 {
 						return agent.ErrConflict
+					}
+					for _, ref := range request.ArtifactRefs {
+						if err = t.runs.host.Artifacts().PinTx(ctx, tx, scope, ref, "task", taskID); err != nil {
+							return err
+						}
 					}
 					if _, err = tx.ExecContext(ctx, `INSERT INTO task_instruction(instruction_id,task_id,task_epoch,source_message_id,instruction,artifact_refs,created_at) VALUES(?,?,?,?,?,?,?)`, newID(), taskID, epoch, source, request.Instruction, refs, now); err != nil {
 						return err
@@ -365,18 +398,18 @@ func (r *Runs) taskSteering(ctx context.Context, c agent.RunClaim, after int64) 
 		if frozen > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.instruction FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND i.sequence>? ORDER BY i.sequence`, c.RunID(), after)
+		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.instruction,i.artifact_refs FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND i.sequence>? ORDER BY i.sequence`, c.RunID(), after)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var i agent.Input
-			var text string
-			if err = rows.Scan(&i.Sequence, &text); err != nil {
+			var text, refs string
+			if err = rows.Scan(&i.Sequence, &text, &refs); err != nil {
 				return err
 			}
-			i.Message.Content = conversation.Text("Task instruction: " + text)
+			i.Message.Content = conversation.Text("Task instruction: " + text + "\nArtifact references: " + refs)
 			inputs = append(inputs, i)
 		}
 		return rows.Err()

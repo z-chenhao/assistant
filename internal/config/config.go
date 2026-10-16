@@ -10,17 +10,19 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/z-chenhao/erii/internal/artifact"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
-	Version int               `yaml:"version"`
-	App     App               `yaml:"app"`
-	NATS    eventnats.Options `yaml:"nats"`
-	Tools   ToolLimits        `yaml:"tools"`
-	Tasks   Tasks             `yaml:"tasks"`
-	LLM     LLM               `yaml:"llm"`
+	Version  int               `yaml:"version"`
+	Artifact artifact.Policy   `yaml:"artifact"`
+	App      App               `yaml:"app"`
+	NATS     eventnats.Options `yaml:"nats"`
+	Tools    ToolLimits        `yaml:"tools"`
+	Tasks    Tasks             `yaml:"tasks"`
+	LLM      LLM               `yaml:"llm"`
 }
 
 type ToolLimits struct {
@@ -56,11 +58,12 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("resolve home directory")
 	}
 	cfg := Config{
-		Version: 1,
-		Tools:   ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
-		Tasks:   Tasks{RecentDays: 30, RecentLimit: 200},
-		App:     App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
-		NATS:    eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
+		Version:  1,
+		Artifact: artifact.DefaultPolicy(),
+		Tools:    ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
+		Tasks:    Tasks{RecentDays: 30, RecentLimit: 200},
+		App:      App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
+		NATS:     eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
 	if path != "" {
 		f, err := os.Open(path)
@@ -94,6 +97,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	}
+	if cfg.Artifact.Validate() != nil {
+		return Config{}, errors.New("invalid artifact retention/quota/size/batch policy")
 	}
 	if err := cfg.NATS.Validate(); err != nil {
 		return Config{}, err

@@ -156,15 +156,20 @@ func (t *tools) Start(ctx context.Context, id string) error {
 	})
 }
 func (t *tools) Finish(ctx context.Context, id string, result tool.Result) error {
-	return t.finish(ctx, id, result, false, false)
+	return t.finish(ctx, id, result, false, false, nil)
 }
 func (t *tools) Reject(ctx context.Context, id string, result tool.Result) error {
 	if result.Error == nil {
 		return agent.ErrConflict
 	}
-	return t.finish(ctx, id, result, false, true)
+	return t.finish(ctx, id, result, false, true, nil)
 }
-func (t *tools) finish(ctx context.Context, id string, result tool.Result, reconcile, reject bool) error {
+func (t *tools) FinishResult(ctx context.Context, id string, result tool.Result) (tool.Result, error) {
+	var out tool.Result
+	err := t.finish(ctx, id, result, false, false, &out)
+	return out, err
+}
+func (t *tools) finish(ctx context.Context, id string, result tool.Result, reconcile, reject bool, out *tool.Result) error {
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, t.claim); err != nil {
 			return err
@@ -175,6 +180,17 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 			}
 		}
 		result = tool.Normalize(result)
+		var err error
+		result, err = t.storeOutput(ctx, tx, id, result)
+		if err != nil {
+			return err
+		}
+		if err = fence(ctx, tx, t.claim); err != nil {
+			return err
+		}
+		if out != nil {
+			*out = result
+		}
 		value, err := encoded(result)
 		if err != nil {
 			return err
@@ -190,7 +206,11 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 		if reconcile {
 			proof = value
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status=?,wait_reason=NULL,result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,version=version+1,reconciliation_json=? WHERE invocation_id=? AND run_id=? AND (status='running' OR (? AND status='unknown'))`, status, value, digest(value), errorJSON, now, now, proof, id, t.claim.RunID(), reconcile)
+		resultRef := digest(value)
+		if len(result.ArtifactRefs) > 0 {
+			resultRef = result.ArtifactRefs[0]
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status=?,wait_reason=NULL,result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,version=version+1,reconciliation_json=? WHERE invocation_id=? AND run_id=? AND (status='running' OR (? AND status='unknown'))`, status, value, resultRef, errorJSON, now, now, proof, id, t.claim.RunID(), reconcile)
 		if err != nil {
 			return err
 		}
@@ -385,7 +405,7 @@ func (t *tools) Unknown(ctx context.Context, id string) error {
 	})
 }
 func (t *tools) Reconcile(ctx context.Context, id string, result tool.Result) error {
-	return t.finish(ctx, id, result, true, false)
+	return t.finish(ctx, id, result, true, false, nil)
 }
 
 var _ tool.PolicyStore = (*tools)(nil)

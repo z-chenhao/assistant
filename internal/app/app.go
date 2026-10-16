@@ -12,6 +12,7 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
+	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
@@ -32,6 +33,7 @@ import (
 
 type App struct {
 	store        *sqlite.Store
+	artifacts    artifactStore
 	telemetry    *observability.Telemetry
 	provider     *bridge.Client
 	control      llm.Control
@@ -79,14 +81,28 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		startup.End(err)
 		return nil, errors.Join(err, t.Close())
 	}
-	a := &App{store: store, telemetry: t}
+	store.Artifacts().Policy = cfg.Artifact
+	a := &App{store: store, telemetry: t, artifacts: store.Artifacts()}
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()
 		_ = t.Close()
 		return nil, err
 	}
-	a.registry = task.Registry()
+	base := task.Registry()
+	defs := artifacttools.Definitions()
+	if fixture == "artifacts" {
+		defs = append(defs, toolfake.Artifacts()...)
+	}
+	for _, spec := range base.Describe() {
+		d, _ := base.Resolve(spec.Name)
+		defs = append(defs, d)
+	}
+	a.registry, err = tool.NewRegistry(defs)
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
 	if fixture == "approval" || fixture == "approval-never" {
 		defs := []tool.Definition{}
 		for _, spec := range a.registry.Describe() {

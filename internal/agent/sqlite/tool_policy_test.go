@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -119,7 +120,7 @@ func TestToolApprovalWrongPrincipalHashDuplicateAndFrozenAdmission(t *testing.T)
 		t.Fatal(first, err)
 	}
 	again, err := e.Execute(ctx, exchange, calls)
-	if err != nil || again[0] != first[0] {
+	if err != nil || !reflect.DeepEqual(again[0], first[0]) {
 		t.Fatal(again, err)
 	}
 	if scalar(t, s, `SELECT attempt_count FROM tool_invocation`) != 1 {

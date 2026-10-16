@@ -149,7 +149,12 @@ func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string,
 	if err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO task_update VALUES(?,?,?,?,?,?,'[]',?)`, e.ID(), taskID, runID, epoch, kind, content, e.Time().UnixMicro()); err != nil {
+	refs, err := published(ctx, tx, runID)
+	if err != nil {
+		return err
+	}
+	rawRefs, _ := encoded(refs)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO task_update VALUES(?,?,?,?,?,?,?,?)`, e.ID(), taskID, runID, epoch, kind, content, rawRefs, e.Time().UnixMicro()); err != nil {
 		return err
 	}
 	return eventsqlite.Enqueue(ctx, tx, e)
@@ -269,6 +274,9 @@ func (r *Runs) promoteFollowups(ctx context.Context) error {
 		}
 
 		for _, seq := range ids {
+			if _, err = tx.ExecContext(ctx, `INSERT INTO artifact_reference SELECT j.value,'run',? FROM main_inbox b JOIN task_update u USING(event_id),json_each(u.artifact_refs) j WHERE b.sequence=? ON CONFLICT DO NOTHING`, id, seq); err != nil {
+				return err
+			}
 			if _, err = tx.ExecContext(ctx, `UPDATE main_inbox SET run_id=? WHERE sequence=? AND run_id IS NULL`, id, seq); err != nil {
 				return err
 			}

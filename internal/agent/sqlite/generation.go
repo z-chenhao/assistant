@@ -175,6 +175,13 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		}
 		messageID, deliveryID := newID(), newID()
 		message := conversation.Message{MessageID: messageID, ConversationID: run.ConversationID, Role: "assistant", Content: conversation.Text(run.Checkpoint.Result.Text), Source: "main", SourceEventID: run.Checkpoint.ExchangeID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		refs, err := published(ctx, tx, run.ID)
+		if err != nil {
+			return err
+		}
+		for _, ref := range refs {
+			message.Content = append(message.Content, conversation.ContentPart{Type: "file", ArtifactRef: ref})
+		}
 		raw, _ := encoded(message)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO main_reply VALUES(?,?,?,?)`, run.Checkpoint.ExchangeID, run.ID, messageID, deliveryID); err != nil {
 			return err

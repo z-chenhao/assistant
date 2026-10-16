@@ -23,8 +23,23 @@ type Error struct {
 }
 
 type Result struct {
-	Text  string `json:"text"`
-	Error *Error `json:"error,omitempty"`
+	Text         string        `json:"text"`
+	ArtifactRefs []string      `json:"artifact_refs,omitempty"`
+	Output       *BinaryOutput `json:"-"`
+	PublishRefs  []string      `json:"-"`
+	Error        *Error        `json:"error,omitempty"`
+}
+
+// BinaryOutput is an internal provider stream, never serialized into history.
+type BinaryOutput struct {
+	Name, MediaType string
+	Reader          io.Reader
+}
+
+// OutputStore atomically normalizes large/binary results and commits their
+// metadata with the invocation terminal state before exposing references.
+type OutputStore interface {
+	FinishResult(context.Context, string, Result) (Result, error)
 }
 
 func Failure(code string) Result {
@@ -32,6 +47,10 @@ func Failure(code string) Result {
 }
 func (r Result) ModelText() string {
 	if r.Error == nil {
+		if len(r.ArtifactRefs) > 0 {
+			b, _ := json.Marshal(r)
+			return string(b)
+		}
 		return r.Text
 	}
 	b, _ := json.Marshal(r.Error)
@@ -80,6 +99,12 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 }
 func validDefinition(d Definition) bool {
 	if d.Host {
+		switch d.Spec.Name {
+		case "builtin__artifact__save", "builtin__artifact__publish":
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "artifact_write"
+		case "builtin__artifact__read", "builtin__artifact__describe", "builtin__artifact__list":
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
+		}
 		return d.Execute == nil && ((d.Spec.Name == "builtin__task__search" && d.Spec.Permission == "read_only") || (d.Spec.Name == "builtin__task__manage" && d.Spec.Permission == "task_control"))
 	}
 	return (d.Execute != nil && d.Invoke == nil && d.Spec.Permission == "read_only") || (d.Invoke != nil && d.Spec.Permission == "external_effect")
@@ -343,10 +368,15 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		}
 		return Result{}, ErrSuspended
 	}
-	if len(result.Text) > p.OutputBytes {
-		result = Failure("RESOURCE_LIMIT")
+	if store, ok := e.Store.(OutputStore); ok {
+		result, err = store.FinishResult(context.WithoutCancel(ctx), inv.ID, result)
+	} else {
+		if len(result.Text) > p.OutputBytes || result.Output != nil {
+			result = Failure("RESOURCE_LIMIT")
+		}
+		err = e.Store.Finish(context.WithoutCancel(ctx), inv.ID, result)
 	}
-	if err := e.Store.Finish(context.WithoutCancel(ctx), inv.ID, result); err != nil {
+	if err != nil {
 		return Result{}, err
 	}
 	if e.Sink != nil {
