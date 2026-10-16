@@ -68,13 +68,16 @@ class ContractTests(unittest.TestCase):
                 load_contract(root)
 
     def test_task_fragments_use_same_locked_policy_and_variant_contract(self):
-        dataset, policy, lock = load_contract(self.root, "m2-v1")
+        dataset, policy, lock = load_contract(self.root, "m2-v2")
         self.assertEqual(policy, self.policy)
         self.assertEqual({c["case_id"] for c in dataset["cases"]}, {"GC-02", "GC-04", "GC-08", "GC-18"})
         for case in dataset["cases"]:
             generated = list(variants(dataset, case))
             self.assertEqual(len(generated), 6)
             self.assertEqual(len({v["fixture_digest"] for v in generated}), 6)
+            if case["case_id"] in ("GC-04", "GC-08"):
+                self.assertTrue(all(v["events"][0]["wait_for"] == "worker_generation" for v in generated))
+                self.assertEqual(case["expected_epoch"], 3)
         self.assertEqual(lock["files"]["evals/scoring-v1.json"], self.lock["files"]["evals/scoring-v1.json"])
 
     def test_internal_task_permission_does_not_admit_external_tool(self):

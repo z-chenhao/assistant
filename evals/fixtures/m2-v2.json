@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "milestone": "M2",
   "level": "L0",
-  "scope": "Task/create/search/append/Root/Reporter fragments only; scripted policy, no product score claim.",
+  "scope": "Task/Root/Reporter plus controlled pause/cancel and continuation fragments; scripted policy, no product score claim.",
   "common": {
     "user": {
       "id": "user_eval_001",
@@ -58,7 +58,7 @@
   "cases": [
     {
       "case_id": "GC-02",
-      "version": 1,
+      "version": 2,
       "clock": "2026-09-25T09:00:00+08:00",
       "world": {
         "goal": "Read four books this quarter; no automation requested."
@@ -103,7 +103,7 @@
     },
     {
       "case_id": "GC-04",
-      "version": 1,
+      "version": 2,
       "clock": "2026-09-26T10:00:00+08:00",
       "world": {
         "trip": "Kyoto, two travelers, November 10–12; no purchases."
@@ -115,9 +115,18 @@
         {
           "at": "2026-09-26T10:00:00+08:00",
           "wordings": [
-            "Delegate: Prepare a Kyoto travel itinerary for two people, November 10–12. Return a daily plan; do not book anything.",
-            "Delegate: Draft Kyoto travel plans for two travelers on November 10–12. Deliver daily routes without reservations.",
-            "Delegate: Build a Kyoto travel plan for November 10–12, two people. Provide daily routes and make no purchases."
+            "Delegate: Hold worker Prepare a Kyoto travel itinerary for two people, November 10–12. Return a daily plan; do not book anything.",
+            "Delegate: Hold worker Draft Kyoto travel plans for two travelers on November 10–12. Deliver daily routes without reservations.",
+            "Delegate: Hold worker Build a Kyoto travel plan for November 10–12, two people. Provide daily routes and make no purchases."
+          ],
+          "wait_for": "worker_generation"
+        },
+        {
+          "at": "2026-09-26T10:00:01+08:00",
+          "wordings": [
+            "Pause: Kyoto",
+            "Pause: Kyoto",
+            "Pause: Kyoto"
           ]
         },
         {
@@ -133,13 +142,16 @@
         "full semantic Case grading",
         "Artifact and external side effects",
         "Memory and automation",
-        "controlled pause/cancel (ERII-12)",
         "Child collaboration (M4)"
-      ]
+      ],
+      "expected_cancelled_roots": 1,
+      "expected_epoch": 3,
+      "stop_actions": 1,
+      "stop_reason": "task_paused"
     },
     {
       "case_id": "GC-08",
-      "version": 1,
+      "version": 2,
       "clock": "2026-09-27T11:00:00+08:00",
       "world": {
         "event": "Wedding venue checklist; user explicitly asks continuation."
@@ -152,9 +164,18 @@
         {
           "at": "2026-09-27T11:00:00+08:00",
           "wordings": [
-            "Duplicate: Prepare a wedding venue checklist with material dependencies and unresolved questions; contact nobody.",
-            "Duplicate: Draft a wedding venue checklist. Include prerequisite materials and blockers without contacting anyone.",
-            "Duplicate: Deliver a wedding venue checklist showing dependencies and missing information; do not send messages."
+            "Duplicate: Hold worker Prepare a wedding venue checklist with material dependencies and unresolved questions; contact nobody.",
+            "Duplicate: Hold worker Draft a wedding venue checklist. Include prerequisite materials and blockers without contacting anyone.",
+            "Duplicate: Hold worker Deliver a wedding venue checklist showing dependencies and missing information; do not send messages."
+          ],
+          "wait_for": "worker_generation"
+        },
+        {
+          "at": "2026-09-27T11:00:01+08:00",
+          "wordings": [
+            "Cancel: wedding",
+            "Cancel: wedding",
+            "Cancel: wedding"
           ]
         },
         {
@@ -170,13 +191,16 @@
         "full semantic Case grading",
         "Artifact and external side effects",
         "Memory and automation",
-        "controlled pause/cancel (ERII-12)",
         "Child collaboration (M4)"
-      ]
+      ],
+      "expected_cancelled_roots": 1,
+      "expected_epoch": 3,
+      "stop_actions": 1,
+      "stop_reason": "task_cancelled"
     },
     {
       "case_id": "GC-18",
-      "version": 1,
+      "version": 2,
       "clock": "2026-09-28T12:00:00+08:00",
       "world": {
         "deliverables": [

@@ -73,20 +73,30 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 	if kind != "worker" {
 		return nil
 	}
-	var position string
+	var rootID string
 	var epoch int64
-	if err := tx.QueryRowContext(ctx, `SELECT worker_position,task_epoch FROM run WHERE run_id=?`, runID).Scan(&position, &epoch); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT root_run_id,task_epoch FROM run WHERE run_id=?`, runID).Scan(&rootID, &epoch); err != nil {
 		return err
 	}
-	if position != "root" {
-		return agent.ErrConflict
+	// A Root may have finished while descendants still drain. Only the final
+	// tree boundary completes the Task and publishes the Root's result.
+	if err := tx.QueryRowContext(ctx, `SELECT status,coalesce(error_code,'') FROM run WHERE run_id=?`, rootID).Scan(&status, &reason); err != nil {
+		return err
 	}
+	if status != "completed" && status != "failed" {
+		return nil
+	}
+	runID = rootID
 	var pending int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND task_epoch=? AND run_id!=? AND status IN ('queued','running','waiting')`, taskID.String, epoch, runID).Scan(&pending); err != nil {
 		return err
 	}
-	if status == "completed" && pending > 0 {
-		return agent.ErrConflict
+	if pending > 0 {
+		return nil
+	}
+	var reported int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_update WHERE root_run_id=?`, runID).Scan(&reported); err != nil || reported > 0 {
+		return err
 	}
 	now := time.Now().UnixMicro()
 	content := "Worker execution failed: " + reason
@@ -97,7 +107,11 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 	}
 	next := "active"
 	var completed any
-	if status == "completed" {
+	var policy string
+	if err := tx.QueryRowContext(ctx, `SELECT completion_policy FROM task WHERE task_id=?`, taskID.String).Scan(&policy); err != nil {
+		return err
+	}
+	if status == "completed" && policy == "once" && pending == 0 {
 		next = "completed"
 		completed = now
 	}

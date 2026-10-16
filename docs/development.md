@@ -5,7 +5,7 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation](tasks.md) are runnable. Controlled pause/cancel, Child Runs and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
+local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Child Runs and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
 
 ## Commands and evidence
 
@@ -73,7 +73,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":8,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":9,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,

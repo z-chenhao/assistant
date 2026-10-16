@@ -60,7 +60,7 @@ future version fails startup. Memory storage remains a later slice.
 
 The Main foundation reserves the baseline's cancelled state.
 [The Task slice](tasks.md) now supplies create/search/append; controlled user
-pause/cancel remains ERII-12. Waiting reasons use the baseline enum. Resource waits
+pause/cancel uses the controlled [Task stop path](tasks.md). Waiting reasons use the baseline enum. Resource waits
 are recoverable; user-input waits become eligible when new steering arrives.
 Approval/external-event wake mechanics arrive with their respective slices.
 

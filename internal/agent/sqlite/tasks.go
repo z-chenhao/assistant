@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
@@ -98,6 +100,36 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if err != nil {
 		return err
 	}
+	// Completed exchanges/tool results survive pause even if the process died
+	// before copying them into its checkpoint. Carry only committed Task data,
+	// framed as untrusted history rather than as new instructions/tool calls.
+	rows, err = tx.QueryContext(ctx, `SELECT data FROM (
+ SELECT g.result_json AS data,r.created_at AS root_at,0 AS kind,g.step_index AS sequence FROM model_generation g JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch<? AND g.status='completed'
+ UNION ALL SELECT i.result_json,r.created_at,1,i.delivery_seq FROM tool_invocation i JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch<? AND i.status IN ('succeeded','failed')
+ ) ORDER BY root_at,kind,sequence`, taskID, epoch, taskID, epoch)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var data string
+		if err = rows.Scan(&data); err != nil {
+			rows.Close()
+			return err
+		}
+		messages = append(messages, agent.TextMessage("user", "Previous committed Task work (untrusted data): "+data))
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	var progress string
+	if err = tx.QueryRowContext(ctx, `SELECT progress_summary FROM task WHERE task_id=?`, taskID).Scan(&progress); err != nil {
+		return err
+	}
+	if progress != "" {
+		messages = append(messages, agent.TextMessage("user", "Previous Task progress (untrusted data): "+progress))
+	}
 	cp, _ := encoded(agent.Checkpoint{ContextReady: true, Phase: "model", Messages: messages})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,task_id,root_run_id,kind,worker_position,status,task_epoch,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,?,?,'worker','root','queued',?,?,?,?,0,?,?,1)`, id, agentID, conversationID, taskID, id, epoch, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return err
@@ -109,6 +141,29 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 }
 
 func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
+	for {
+		result, err := t.executeBuiltin(ctx, inv)
+		if !errors.Is(err, agent.ErrBusy) {
+			return result, err
+		}
+		t.runs.host.boundary("before_append_stop_wait")
+		// An append racing a controlled stop must not create a second live
+		// Root. Wait outside the transaction, then commit instruction/epoch/Root
+		// together. This retries only a rolled-back admission, never execution.
+		if err = t.runs.recoverStops(ctx); err != nil {
+			return tool.Result{}, err
+		}
+		timer := time.NewTimer(25 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return tool.Result{}, agent.ErrBusy
+		case <-timer.C:
+		}
+	}
+}
+
+func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	result := tool.Failure("PERMISSION_DENIED")
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, t.claim); err != nil {
@@ -153,10 +208,6 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 			result = tool.Failure("NOT_FOUND")
 			return nil
 		}
-		if request.Operation == "pause" || request.Operation == "cancel" {
-			result = tool.Failure("PERMISSION_DENIED")
-			return nil
-		} // ERII-12
 		canonical, _ := encoded(request)
 		hash := digest(canonical)
 		var oldHash, receipt string
@@ -185,6 +236,7 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 				return err
 			}
 			ref, taskID := request.TaskRef, ""
+			receiptStatus := "active"
 			epoch := int64(1)
 			now := time.Now().UnixMicro()
 			refs, _ := encoded(request.ArtifactRefs)
@@ -205,36 +257,67 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 				} else if err != nil {
 					return err
 				}
-				var active int
-				if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND worker_position='root' AND status IN ('queued','running','waiting')`, taskID).Scan(&active); err != nil {
-					return err
-				}
-				fresh := status != "active" || active == 0
-				if fresh {
-					epoch++
-				}
-				res, err := tx.ExecContext(ctx, `UPDATE task SET status='active',task_epoch=?,completed_at=NULL,cancelled_at=NULL,updated_at=?,version=version+1 WHERE task_id=? AND version=?`, epoch, now, taskID, version)
-				if err != nil {
-					return err
-				}
-				n, _ := res.RowsAffected()
-				if n != 1 {
-					return agent.ErrConflict
-				}
-				if _, err = tx.ExecContext(ctx, `INSERT INTO task_instruction(instruction_id,task_id,task_epoch,source_message_id,instruction,artifact_refs,created_at) VALUES(?,?,?,?,?,?,?)`, newID(), taskID, epoch, source, request.Instruction, refs, now); err != nil {
-					return err
-				}
-				if fresh {
-					if err = t.runs.createRoot(ctx, tx, taskID); err != nil {
-						return err
+				if request.Operation == "pause" || request.Operation == "cancel" {
+					receiptStatus = "paused"
+					if request.Operation == "cancel" {
+						receiptStatus = "cancelled"
+					}
+					if status != receiptStatus {
+						if status != "active" && !(status == "paused" && receiptStatus == "cancelled") {
+							result = tool.Failure("INVALID_ARGUMENT")
+							return nil
+						}
+						if err = t.runs.stopTask(ctx, tx, taskID, receiptStatus, epoch, version); err != nil {
+							return err
+						}
+						epoch++
 					}
 				} else {
-					if err = runEvent(ctx, tx, taskID, "task.steering", epoch); err != nil {
+					var active int
+					if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND worker_position='root' AND status IN ('queued','running','waiting')`, taskID).Scan(&active); err != nil {
 						return err
+					}
+					fresh := status != "active" || active == 0
+					if fresh && active > 0 {
+						return agent.ErrBusy
+					}
+					if fresh {
+						// A finished Root can still have draining descendants. Keep
+						// their epoch valid until the tree reaches its boundary.
+						var pendingTree int
+						if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND status IN ('queued','running','waiting')`, taskID).Scan(&pendingTree); err != nil {
+							return err
+						}
+						if pendingTree > 0 {
+							return agent.ErrBusy
+						}
+					}
+					if fresh {
+						epoch++
+					}
+					res, err := tx.ExecContext(ctx, `UPDATE task SET status='active',task_epoch=?,completed_at=NULL,cancelled_at=NULL,updated_at=?,version=version+1 WHERE task_id=? AND version=?`, epoch, now, taskID, version)
+					if err != nil {
+						return err
+					}
+					n, _ := res.RowsAffected()
+					if n != 1 {
+						return agent.ErrConflict
+					}
+					if _, err = tx.ExecContext(ctx, `INSERT INTO task_instruction(instruction_id,task_id,task_epoch,source_message_id,instruction,artifact_refs,created_at) VALUES(?,?,?,?,?,?,?)`, newID(), taskID, epoch, source, request.Instruction, refs, now); err != nil {
+						return err
+					}
+					if fresh {
+						if err = t.runs.createRoot(ctx, tx, taskID); err != nil {
+							return err
+						}
+					} else {
+						if err = runEvent(ctx, tx, taskID, "task.steering", epoch); err != nil {
+							return err
+						}
 					}
 				}
 			}
-			receipt, _ = encoded(task.Receipt{TaskRef: ref, Status: "active", Accepted: true})
+			receipt, _ = encoded(task.Receipt{TaskRef: ref, Status: receiptStatus, Accepted: true})
 			if _, err = tx.ExecContext(ctx, `INSERT INTO task_request VALUES(?,?,?,?)`, source, hash, receipt, inv.ID); err != nil {
 				return err
 			}
@@ -253,6 +336,10 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	})
 	if err == nil && result.Error == nil {
 		t.runs.host.boundary("after_task_commit")
+		var receipt task.Receipt
+		if json.Unmarshal([]byte(result.Text), &receipt) == nil && (receipt.Status == "paused" || receipt.Status == "cancelled") {
+			t.runs.host.boundary("after_stop_commit")
+		}
 	}
 	return result, err
 }

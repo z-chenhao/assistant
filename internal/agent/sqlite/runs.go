@@ -151,6 +151,9 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 }
 
 func (r *Runs) Next(ctx context.Context) (string, error) {
+	if err := r.recoverStops(ctx); err != nil {
+		return "", err
+	}
 	if err := r.Report(ctx); err != nil {
 		return "", err
 	}
@@ -199,7 +202,7 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 		if workers >= 4 {
 			return agent.ErrBusy
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run WHERE run_id=? AND status IN ('queued','running','waiting'))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
+		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
 		if err != nil {
 			return err
 		}
@@ -219,7 +222,7 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 }
 func (r *Runs) Renew(ctx context.Context, c agent.RunClaim) error {
 	return r.write(ctx, func(tx *sql.Tx) error {
-		if err := fence(ctx, tx, c); err != nil {
+		if err := ownership(ctx, tx, c); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `UPDATE run_claim SET expires_at=?,version=version+1 WHERE run_id=?`, time.Now().Add(leaseDuration).UnixMicro(), c.RunID())

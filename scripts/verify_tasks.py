@@ -53,7 +53,7 @@ def assertions(value, tasks, roots, updates):
                 req["model_snapshot"] == other["model_snapshot"] and req.get("tools") == other.get("tools")
                 for other in requests if other["run_id"] == req["run_id"]) for req in requests),
         "one_durable_delivery_per_main_reply": len(value["deliveries"]) == len(replies) == len({d["message_id"] for d in value["deliveries"]}),
-        "atomic_provider_acceptance": len(value["usage"]) == len(value["generations"]),
+        "atomic_provider_acceptance": len(value["usage"]) == len({g["generation_id"] for g in value["generations"] if g["error_code"] != "GENERATION_CANCELLED"}) and {u["generation_id"] for u in value["usage"]} == {g["generation_id"] for g in value["generations"] if g["error_code"] != "GENERATION_CANCELLED"},
         "ordered_semantic_history": [m["sequence"] for m in value["conversation"]] == list(range(1, len(value["conversation"]) + 1)),
         "no_failed_task_state": all(t["status"] in ("active", "paused", "completed", "cancelled") for t in value["tasks"]),
     }
@@ -66,7 +66,7 @@ def check(value, tasks=1, roots=1, updates=1):
 
 
 def run(binary):
-    report = {"version": 1, "scope": "ERII-11 Task/Root/Reporter implementation; pause/cancel, Child, Artifact and external delivery remain due later", "checks": [], "crashes": []}
+    report = {"version": 1, "scope": "Task/Root/Reporter implementation; controlled stop evidence is in task-control reports; Child, Artifact and external delivery remain due later", "checks": [], "crashes": []}
     with tempfile.TemporaryDirectory(prefix="erii-tasks-") as directory:
         root = Path(directory)
 
