@@ -16,7 +16,7 @@ import tempfile
 
 from case_runner import load_contract, score
 from verify_main import require
-from verify_tools import ToolHarness
+from verify_tools import ToolHarness, decide, state as tool_state
 from terminal_driver import Terminal
 
 
@@ -41,6 +41,89 @@ class ArtifactHarness(ToolHarness):
                 value[table] = [dict(r) for r in db.execute('SELECT * FROM ' + table)]
         value['objects'] = sorted(p.name for p in (Path(self.env['ERII_DATA_ROOT']) / 'artifacts').iterdir())
         return value
+
+
+def recover_receipt(h, path):
+    """Drive approved binary Query recovery through CLI, including real crash.
+
+    Reusable action for the full Artifact gate and --recovery-only diagnosis.
+    The separate Fake ledger is authoritative for the effect and receipt bytes.
+    """
+    text = 'binary receipt \u0000 λ'
+    h.send('delegate-receipt', 'Delegate effect: ' + json.dumps(
+        {'target': 'R1', 'text': text, 'behavior': 'binary_receipt'}))
+    h.command('chat', 'work')
+    approval = h.command('approval', 'list')[-1]
+    require(approval['status'] == 'pending' and not tool_state(h)['effects'], 'receipt effect bypassed approval')
+    decide(h, approval)
+    boundary = 'after_provider_effect' if path == 'running' else 'after_result_commit'
+    child = h.hold(boundary)
+    child.send_signal(signal.SIGKILL)
+    child.communicate(timeout=10)
+    before = tool_state(h)
+    inv = next(i for i in before['invocations'] if i['tool_name'] == 'mcp__fixture__send')
+    require(inv['status'] == path and len(before['effects']) == 1 and inv['attempt_count'] == 1,
+            'missing accepted effect at receipt recovery boundary')
+    run_before = before['runs']
+    if path == 'unknown':
+        outcomes = h.command('approval', 'reconcile')
+        require(outcomes[0]['status'] == 'succeeded', 'authoritative binary receipt not reconciled')
+        returned = outcomes[0]['result']
+        require(tool_state(h)['runs'] == run_before, 'reconciliation revived or modified terminal Run')
+    else:
+        h.command('chat', 'work')
+    value = h.state()
+    after = tool_state(h)
+    recovered = next(i for i in after['invocations'] if i['invocation_id'] == inv['invocation_id'])
+    committed = json.loads(recovered['result_json'])
+    if path == 'running':
+        messages = [m for g in value['generations'] for m in json.loads(g['request_json'])['messages']]
+        delivered = [json.loads(m['text']) for m in messages if m['role'] == 'tool' and 'artifact_refs' in m['text']]
+        require(delivered, 'caller did not consume recovered receipt')
+        returned = delivered[-1]
+    require(returned == committed and len(committed.get('artifact_refs', [])) == 1,
+            'caller/committed receipt differ')
+    require(json.loads(recovered['reconciliation_json']) == committed,
+            'reconciliation proof lost normalized receipt')
+    ref = committed['artifact_refs'][0]
+    content = h.output(ref)
+    expected = ('Effect recorded for R1: ' + text).encode()
+    require(content == expected, 'recovered receipt bytes changed')
+    descriptor = h.command('artifact', 'describe', ref)
+    digest = hashlib.sha256(content).hexdigest()
+    require(descriptor['content_hash'] == digest and descriptor['byte_size'] == len(expected),
+            'recovered receipt hash/size mismatch')
+    require(recovered['result_ref'] == ref and len(value['artifact']) == 1,
+            'receipt/result not committed atomically')
+    h.command('chat', 'work')
+    settled = tool_state(h)
+    h.command('approval', 'reconcile')
+    h.command('chat', 'work')
+    replayed = tool_state(h)
+    require(replayed['invocations'] == settled['invocations'] and replayed['effects'] == after['effects'],
+            'committed receipt replay dispatched or mutated the effect')
+    require(h.output(ref) == expected and len(h.state()['artifact']) == 1,
+            'replay lost or duplicated receipt')
+    return {'name': path + '_binary_query_receipt', 'before': before, 'caller_result': returned,
+            'descriptor': descriptor, 'readback_hash': digest, 'after': after,
+            'artifacts': value['artifact'], 'replayed': replayed,
+            'signal': 'SIGKILL', 'boundary': boundary}
+
+
+def run_recovery(binary):
+    report = {'version': 1, 'scope': 'binary Query recovery', 'checks': []}
+    with tempfile.TemporaryDirectory(prefix='erii-artifact-recovery-') as temp:
+        for path in ('unknown', 'running'):
+            folder = Path(temp) / path
+            folder.mkdir()
+            h = ArtifactHarness(binary, folder, fixture='approval')
+            try:
+                h.setup()
+                report['checks'].append(recover_receipt(h, path))
+            finally:
+                h.cleanup()
+    report['cleanup'] = 'all child processes joined; isolated roots removed'
+    return report
 
 
 def run(binary):
@@ -220,6 +303,7 @@ def run(binary):
                 return {'boundary': boundary, 'signal': 'SIGKILL', 'before_refs': before_rows,
                         'before_objects': before_objects, 'after': after}
             report['crashes'].append(scenario(boundary, crash))
+    report['recovery'] = run_recovery(binary)
     report['cleanup'] = 'all child processes joined; isolated roots removed'
     return report
 
@@ -228,8 +312,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--recovery-only', action='store_true', help='drive both binary Query receipt recovery paths')
     args = parser.parse_args(); args.evidence.unlink(missing_ok=True)
-    report = run(args.binary.resolve())
+    report = (run_recovery if args.recovery_only else run)(args.binary.resolve())
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print('Artifact contracts/recovery verified:', args.evidence)

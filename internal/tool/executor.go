@@ -42,6 +42,7 @@ type BinaryOutput struct {
 // ctx bounds result consumption; the store separately commits known failure.
 type OutputStore interface {
 	FinishResult(context.Context, string, Result) (Result, error)
+	ReconcileResult(context.Context, string, Result) (Result, error)
 }
 
 func Failure(code string) Result {
@@ -271,7 +272,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 			// Persist uncertainty before the Loop can consume the error and
 			// finish its Run. Task reporting and reconciliation rely on it.
 			if inv.Status != "unknown" {
-				if err := policyStore.Unknown(ctx, inv.ID); err != nil {
+				if err := policyStore.Unknown(context.WithoutCancel(ctx), inv.ID); err != nil {
 					return Result{}, err
 				}
 			}
@@ -283,18 +284,23 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		if d.Query == nil {
 			return uncertain()
 		}
-		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
-		evidence := d.Query(queryCtx, request)
-		cancel()
+		evidence, err := RecoverResult(ctx, d, request, func(queryCtx context.Context, result Result) (Result, error) {
+			if store, ok := e.Store.(OutputStore); ok {
+				return store.ReconcileResult(queryCtx, inv.ID, result)
+			}
+			if result.Output != nil || len(result.ArtifactRefs) > 0 || result.PublishRefs != nil {
+				return Failure("UNKNOWN_SIDE_EFFECT"), nil
+			}
+			return result, policyStore.Reconcile(context.WithoutCancel(queryCtx), inv.ID, result)
+		})
+		if err != nil {
+			if _, persistErr := uncertain(); persistErr != nil {
+				return Result{}, persistErr
+			}
+			return Result{}, err
+		}
 		if evidence.State == "succeeded" || evidence.State == "failed" {
-			result := Normalize(evidence.Result)
-			if (evidence.State == "succeeded") != (result.Error == nil) || !result.terminal() || len(result.Text) > p.OutputBytes {
-				return uncertain()
-			}
-			if err := policyStore.Reconcile(ctx, inv.ID, result); err != nil {
-				return Result{}, err
-			}
-			return result, nil
+			return evidence.Result, nil
 		}
 		// unknown is terminal for retry purposes. Only an incomplete running
 		// query-before-retry call may proceed after authoritative absence.
@@ -346,19 +352,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		} else {
 			result = d.Execute(callCtx, inv.Call.Arguments)
 		}
-		if result.Output != nil {
-			if closer, ok := result.Output.Reader.(io.Closer); ok {
-				closed := make(chan struct{})
-				stop := context.AfterFunc(callCtx, func() { _ = closer.Close(); close(closed) })
-				defer func() {
-					if !stop() {
-						<-closed
-					} else {
-						_ = closer.Close()
-					}
-				}()
-			}
-		}
+		defer closeOutput(callCtx, result)()
 		if callCtx.Err() != nil && !d.Host {
 			if d.Spec.Permission == "external_effect" {
 				outcome.Ambiguous = true

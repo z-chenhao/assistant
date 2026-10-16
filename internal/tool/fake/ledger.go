@@ -6,14 +6,16 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/z-chenhao/erii/internal/tool"
 	_ "modernc.org/sqlite"
 )
 
 const Name = "mcp__fixture__send"
-const Schema = `{"type":"object","properties":{"target":{"type":"string","minLength":1},"text":{"type":"string","maxLength":4096},"behavior":{"enum":["success","ambiguous","transient","error","unknown","timeout"]}},"required":["target","text"],"additionalProperties":false}`
+const Schema = `{"type":"object","properties":{"target":{"type":"string","minLength":1},"text":{"type":"string","maxLength":4096},"behavior":{"enum":["success","ambiguous","binary_receipt","transient","error","unknown","timeout"]}},"required":["target","text"],"additionalProperties":false}`
 
 type arguments struct{ Target, Text, Behavior string }
 
@@ -69,7 +71,7 @@ func Definition(root, policy string, boundary func(string)) tool.Definition {
 		if boundary != nil {
 			boundary("after_provider_effect")
 		}
-		if a.Behavior == "ambiguous" {
+		if a.Behavior == "ambiguous" || a.Behavior == "binary_receipt" {
 			return tool.Outcome{Ambiguous: true}
 		}
 		return tool.Outcome{Result: tool.Result{Text: result}}
@@ -93,6 +95,9 @@ func Definition(root, policy string, boundary func(string)) tool.Definition {
 		}
 		if err != nil || args != request.Arguments {
 			return tool.Evidence{State: "unknown"}
+		}
+		if a.Behavior == "binary_receipt" {
+			return tool.Evidence{State: "succeeded", Result: tool.Result{Output: &tool.BinaryOutput{Name: "receipt.bin", MediaType: "application/octet-stream", Reader: io.NopCloser(strings.NewReader(result))}}}
 		}
 		return tool.Evidence{State: "succeeded", Result: tool.Result{Text: result}}
 	}

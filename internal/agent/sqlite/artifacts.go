@@ -156,12 +156,12 @@ func (r artifactResultReader) Read(p []byte) (int, error) {
 	}
 	return n, err
 }
-func (t *tools) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, id string, result tool.Result) (tool.Result, error) {
-	a, err := runScope(ctx, tx, t.claim.RunID())
+func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result) (tool.Result, error) {
+	a, err := runScope(ctx, tx, runID)
 	if err != nil {
 		return tool.Result{}, err
 	}
-	store := t.runs.host.Artifacts()
+	store := r.host.Artifacts()
 	var policy, name string
 	if err = tx.QueryRowContext(ctx, `SELECT policy_json,tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, id, a.RunID).Scan(&policy, &name); err != nil {
 		if err == sql.ErrNoRows {
@@ -223,7 +223,7 @@ func (t *tools) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, id strin
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			if d, ok := t.runs.registry.Resolve(name); ok && d.Spec.Permission == "external_effect" {
+			if d, ok := r.registry.Resolve(name); ok && d.Spec.Permission == "external_effect" {
 				return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
 			}
 		}
@@ -239,6 +239,19 @@ func (t *tools) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, id strin
 		}
 	}
 	return result, nil
+}
+
+// Receipt storage failures cannot establish that an external effect failed.
+// storeOutput rolls back normalization before returning an expected failure.
+func (r *Runs) storeRecoveryOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result) (tool.Result, error) {
+	if outputCtx.Err() != nil {
+		return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
+	}
+	out, err := r.storeOutput(ctx, outputCtx, tx, runID, id, result)
+	if err == nil && result.Error == nil && out.Error != nil {
+		return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
+	}
+	return out, err
 }
 func published(ctx context.Context, tx *sql.Tx, runID string) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref FROM artifact_publication WHERE run_id=? ORDER BY artifact_ref`, runID)

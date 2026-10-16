@@ -80,8 +80,13 @@ Tool deadline. The Executor closes returned closable streams, including on
 expiry/cancellation, and joins cancellation cleanup before returning. Failed
 normalization rolls back metadata, pins and publications before committing the
 Tool error. An external-effect stream timeout remains `unknown` and never
-retries the effect. A published reference
-is a resource address; it grants no external upload permission or approval.
+retries the effect. Authoritative Query receipts use that same atomic
+normalization for reclaimed running calls and terminal `unknown` calls. The
+caller, persisted result, reconciliation proof and replay expose the committed
+ref. The frozen Query deadline includes receipt consumption and stream closure.
+Unusable receipts retain `unknown`; storage errors propagate without settling or
+redispatching the effect. Query-only reconciliation never revives the old Run.
+A published reference is a resource address; it grants no external upload permission or approval.
 
 `publish` explicitly adds selected final outputs for that Run; it is idempotent
 and additive. Intermediate saves are excluded. The union of final selections is bounded to
@@ -123,6 +128,11 @@ release them. Future history pruning must release its references in the same
 transaction before storage can be reclaimed. After Task protection ends, effective expiry rejects content reads.
 
 ## Verification
+
+For focused receipt recovery, add `--recovery-only` to the command below. It
+launches approved Worker effects, kills after the effect or terminal unknown
+commit, reconciles through the CLI, verifies bytes/hash and caller readback,
+replays without a second effect, and removes all disposable state.
 
 `python3 scripts/verify_artifacts.py --binary bin/personal-agent --evidence
 evidence/artifacts.json` owns Launch/Doctor/Drive/Evidence/Cleanup, using the
