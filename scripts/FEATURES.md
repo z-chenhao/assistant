@@ -12,7 +12,7 @@ real boundary, records evidence, and always reaps its processes/removes state.
 | Startup diagnostics | `bin/personal-agent [-config path] status`; no-command with redirected stdin | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
 | Configuration | `-config`, `ERII_*` overrides | `config.Load` | Invalid fields/URLs/durations rejected without value echo |
-| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v7, WAL, one Agent, one atomic fresh-bootstrap event |
+| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v12, WAL, one Agent, one atomic fresh-bootstrap event |
 | Migration safety | Empty, real v1/v2/v3/v4/v5/v6, future schema | `agent/sqlite.migrate` | Prior Agent/config/timestamps, model metadata/snapshots and Outbox/Inbox preserved; future rejected; failed v3/v4/v5/v6/v7 DDL rolls back |
 | Model metadata | `bin/personal-agent model add` (stdin JSON), `model list`, `status` | `llm/sqlite.Store.AddProfile/ListProfiles` | New process and SIGKILL/restart preserve profile; unverified/version 1; independent SQLite/canonical JSON readback; ingress stays closed |
 | Metadata validation | `model add` | `llm.ProfileInput.Validate`, CLI decoder | Unknown/credential fields, credential-bearing URLs, invalid enums, dangling/mismatched auth and pre-Probe activation rejected without value echo or writes |
@@ -86,8 +86,29 @@ See [Main operations](../docs/main-loop.md) for recovery and limits.
 | Main L0 fragments | `make verify`, `evals/fixtures/m1-v2.json` | `case_runner.py`, `run_cases.py`, actual TUI | 18 GC-01/09/10 wording/noise/order fragments; normative facts; fixed scenario clock; locked fixtures/scoring; full Cases not_applicable and semantic scores null |
 | M1 storage migration | Startup from empty or v6 | `agent/sqlite` v7, `conversation/sqlite` v1 | Prior identity/config/events retained; partial DDL rolls back; future schemas rejected |
 
-Local DeliveryRequests are durable pending intents; an external delivery consumer
-is not implemented. No scored product-Case, full M3 Security or M5 Durable Replay claim.
+DeliveryRequests use the M3 Delivery Outbox below. No scored product-Case or M5
+Durable Replay claim.
+
+## Delivery slice (ERII-15)
+
+`scripts/verify_delivery.py` extends the maintained MainHarness/Terminal mechanics
+for isolated Launch, fixture/schema/readiness Doctor, real CLI/PTY Drive, direct
+SQLite snapshots and transcripts as Evidence, and child/PTY/data Cleanup.
+`make verify` runs it five consecutive times; `evidence/delivery-N.json` records
+20 SIGKILL/restart cases per run and deterministic transport/approval failures.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Semantic delivery and retained history | TUI, `/history`, `delivery work/list`, `chat work` | `Runs.DeliverReply`, `delivery.Service`, `delivery/terminal.Adapter` | Main and Root final replies accepted once into terminal.db; PTY transcript and destination/content readback; duplicate drains/callbacks preserve receipts |
+| Recoverable cross-database commit | Main/Root reply, kill/restart | `Runs.PrepareReply/Flush/DeliverReply` | Deterministic reply/delivery IDs; Conversation precedes enqueue and checkpoint; ten before/after boundaries per role; no duplicate logical generation or semantic message |
+| Delivery retry and reconciliation | Live TUI polling or `delivery work`, explicit `-test-delivery` | `delivery.Service.Drain`, `delivery/sqlite.Store` | Known transient backoff and exhaustion; accepted-send query; unknown stays query-only; terminal sends never rewrite Conversation; late-ack fencing and concurrent-consumer Go tests |
+| Security approval notification | `/approve ID HASH`, `/deny ID HASH`; CLI `approval` | `toolStore.Prepare`, `Runs.Decide`, `tui.terminal.command` | One Security notice without Main inference; frozen hash callback wakes original Root; duplicate decision produces no notice; existing rejection/expiry/cancel/parameter-drift gates remain required |
+| Notification policy | Root completion/failure; read-only `/status` | `replyIntent`, `notification`, `delivery.Request.Validate` | Only completion/failure/needs_input/approval accepted; progress cannot enqueue; Worker results still return through Main |
+| Delivery persistence and configuration | Startup, delivery YAML policy | State schema v12, terminal schema v1, `config.Load` | Every prior schema migrates; populated v11 receipts/keys/status/attempts survive; failed migration rolls back; legal/illegal states, atomic event enqueue, bounded config |
+
+Physical stdout may redisplay retained history on reconnect. No generic external
+exactly-once guarantee, Web/Feishu/UISpec implementation, or full Golden Case
+score is claimed. Operations and state details: `docs/delivery.md`.
 
 ## Terminal slice (ERII-10)
 

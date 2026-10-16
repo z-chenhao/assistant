@@ -39,3 +39,9 @@ artifact:
   quota_bytes: 1073741824
   max_bytes: 67108864
   cleanup_batch: 100
+
+# Delivery to the local terminal inbox, independent of model readiness.
+delivery:
+  lease_seconds: 5
+  retry_milliseconds: 250
+  max_attempts: 5

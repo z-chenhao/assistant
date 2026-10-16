@@ -519,7 +519,7 @@ func TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit(t *testing.T) {
 	}
 }
 
-func TestLoopConversationCommitBeforeDeliveryFailureIsRecoverable(t *testing.T) {
+func TestLoopDeliveryCommitBeforeCheckpointFailureIsRecoverable(t *testing.T) {
 	s, r, h, a, p := loopFixture(t)
 	mustSubmit(t, a, "one", "hello")
 	if _, err := s.db.Exec(`CREATE TRIGGER fail_reply BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.run.checkpointed.v1' AND EXISTS(SELECT 1 FROM main_reply) BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
@@ -532,8 +532,11 @@ func TestLoopConversationCommitBeforeDeliveryFailureIsRecoverable(t *testing.T) 
 	if err != nil || len(messages) != 2 {
 		t.Fatal("Conversation did not commit first", messages, err)
 	}
-	if scalar(t, s, `SELECT count(*) FROM delivery_request`) != 0 {
-		t.Fatal("partial delivery transaction")
+	if scalar(t, s, `SELECT count(*) FROM delivery_request`) != 1 || scalar(t, s, `SELECT count(*) FROM delivery_outbox`) != 1 {
+		t.Fatal("delivery must commit before the reply checkpoint")
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE json_extract(checkpoint_json,'$.phase')='reply'`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.delivery.pending.v1'`) != 1 {
+		t.Fatal("delivery/event not committed before checkpoint")
 	}
 	if _, err = s.db.Exec(`DROP TRIGGER fail_reply`); err != nil {
 		t.Fatal(err)
@@ -647,7 +650,7 @@ func TestV6MainMigrationPreservesDataAndRollsBack(t *testing.T) {
 			}
 			defer s.Close()
 			d, err := s.Diagnostics(context.Background())
-			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 11 {
+			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 12 {
 				t.Fatal("prior identity changed", d, err)
 			}
 		})

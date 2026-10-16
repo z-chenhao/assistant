@@ -83,16 +83,17 @@ Main replies commit in this order:
 
 1. Save an immutable reply intent with stable message/delivery IDs in `state.db`.
 2. Idempotently append the ordered intents to `conversation.db`.
-3. Write the local DeliveryRequest and advance the reply Checkpoint together.
-4. Complete the Run, or process newly accepted steering.
+3. Enqueue DeliveryRequest and its Delivery Outbox in state.db.
+4. Advance the reply Checkpoint after both durable writes.
+5. Complete the Run, or process newly accepted steering.
 
 There is no cross-database transaction. Restart fills missing writes using the
 saved IDs. The `settle` Checkpoint prevents another generation if the process
 dies between reply commit and Run completion. Any executor may flush immutable
 semantic intents, but only the current claim may create them or advance a Run.
-Local DeliveryRequests stay `pending`: a durable delivery consumer and channel
-send acknowledgements are M3/M7 work. Reading history does not imply a message
-was delivered to an external recipient.
+The M3 [Delivery Outbox](delivery.md) drains requests into the durable terminal
+inbox, independently of model readiness. Reading semantic history alone does not
+imply a message was accepted by the channel.
 
 SIGINT/SIGTERM stops admission to the current executor and waits for its current
 model/Tool step to reach a durable boundary. Model calls have a 45-second Host

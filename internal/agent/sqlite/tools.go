@@ -328,6 +328,14 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 			return err
 		}
 		if n, _ := inserted.RowsAffected(); n > 0 {
+			var approvalID, args, hash, name string
+			if err = tx.QueryRowContext(ctx, `SELECT a.approval_id,i.arguments_json,a.frozen_arguments_hash,i.tool_name FROM approval a JOIN tool_invocation i USING(invocation_id) WHERE i.invocation_id=?`, id).Scan(&approvalID, &args, &hash, &name); err != nil {
+				return err
+			}
+			text := "Approval required for " + name + ": " + args + "\nUse /approve " + approvalID + " " + hash + " or /deny " + approvalID + " " + hash
+			if err = t.runs.notification(ctx, tx, t.claim.RunID(), "approval:"+approvalID, "approval", "security", text); err != nil {
+				return err
+			}
 			if err = runEvent(ctx, tx, t.claim.RunID(), "approval.requested", 1); err != nil {
 				return err
 			}

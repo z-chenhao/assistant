@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
+	Delivery delivery.Policy   `yaml:"delivery"`
 	Version  int               `yaml:"version"`
 	Artifact artifact.Policy   `yaml:"artifact"`
 	App      App               `yaml:"app"`
@@ -59,6 +61,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg := Config{
 		Version:  1,
+		Delivery: delivery.DefaultPolicy(),
 		Artifact: artifact.DefaultPolicy(),
 		Tools:    ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
 		Tasks:    Tasks{RecentDays: 30, RecentLimit: 200},
@@ -97,6 +100,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	}
+	if cfg.Delivery.Validate() != nil {
+		return Config{}, errors.New("invalid delivery lease/retry/attempt policy")
 	}
 	if cfg.Artifact.Validate() != nil {
 		return Config{}, errors.New("invalid artifact retention/quota/size/batch policy")

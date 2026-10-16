@@ -7,12 +7,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
@@ -76,7 +78,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -334,7 +336,7 @@ func (r *Runs) Flush(ctx context.Context) error {
 				return err
 			}
 		}
-		return nil
+		return r.enqueueNotifications(ctx, tx)
 	})
 }
 
@@ -546,6 +548,17 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 		if _, err = tx.ExecContext(ctx, `UPDATE run_claim SET token=NULL,expires_at=0,version=version+1 WHERE run_id=?`, c.RunID()); err != nil {
 			return err
 		}
+		if status == "failed" {
+			var kind string
+			if err = tx.QueryRowContext(ctx, `SELECT kind FROM run WHERE run_id=?`, c.RunID()).Scan(&kind); err != nil {
+				return err
+			}
+			if kind == "main" {
+				if err = r.notification(ctx, tx, c.RunID(), "failure:"+c.RunID(), "failure", "main", "The request could not be completed. Please retry explicitly."); err != nil {
+					return err
+				}
+			}
+		}
 		if err = r.finishTask(ctx, tx, c.RunID(), status, reason); err != nil {
 			return err
 		}
@@ -581,6 +594,17 @@ func (r *Runs) Wait(ctx context.Context, c agent.RunClaim, v int64, reason strin
 	return r.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, c); err != nil {
 			return err
+		}
+		if reason == "user_input" {
+			var main int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE run_id=? AND kind='main'`, c.RunID()).Scan(&main); err != nil {
+				return err
+			}
+			if main == 1 {
+				if err := r.notification(ctx, tx, c.RunID(), "input:"+c.RunID()+":"+fmt.Sprint(v), "needs_input", "main", "More input is needed to continue. Reply in this conversation."); err != nil {
+					return err
+				}
+			}
 		}
 		if reason == "approval" {
 			var ready int
