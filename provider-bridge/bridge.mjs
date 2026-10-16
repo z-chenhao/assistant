@@ -1,6 +1,8 @@
 // Private protocol v1. Only this module imports Pi; no domain, Tool, or Computer access.
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript';
 import { stream } from '@earendil-works/pi-ai/api/openai-completions';
+import { AccountAuth, accountCatalog, API } from './account.mjs';
+import { stream as accountStream } from '@earendil-works/pi-ai/api/openai-responses';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -13,6 +15,7 @@ const fail = code => { throw new Error(code); };
 const hash = endpoint => createHash('sha256').update(JSON.stringify({ endpoint }).replace(/[<>&\u2028\u2029]/g, c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'))).digest('hex');
 const active = new Map();
 let initialized = false;
+const accountAuth = new AccountAuth();
 
 function endpoint(value) {
   const u = new URL(value);
@@ -26,9 +29,10 @@ function transport(connection, signal, state) {
   const base = endpoint(connection.endpoint);
   return async (input, init = {}) => {
     const u = new URL(typeof input === 'string' ? input : input.url ?? input.toString());
-    if (u.origin !== base.origin || ![base.pathname.replace(/\/$/, '') + '/chat/completions', base.pathname.replace(/\/$/, '') + '/models'].includes(u.pathname) || u.search || u.hash || u.username || u.password) fail('MODEL_INCOMPATIBLE');
+    if (u.origin !== base.origin || ![base.pathname.replace(/\/$/, '') + '/chat/completions', base.pathname.replace(/\/$/, '') + '/models', ...(connection.access_token ? [base.pathname.replace(/\/$/, '') + '/responses'] : [])].includes(u.pathname) || u.search || u.hash || u.username || u.password) fail('MODEL_INCOMPATIBLE');
     const headers = new Headers(init.headers);
     headers.delete('authorization');
+    if(connection.access_token) {if(connection.endpoint!==API || connection.api_key) fail('MODEL_INCOMPATIBLE');headers.set('authorization',`Bearer ${connection.access_token}`);}
     if (connection.api_key) headers.set('authorization', `Bearer ${connection.api_key}`);
     for (let attempt = 0; attempt < 3; attempt++) {
       let response;
@@ -80,7 +84,9 @@ function context(r, model) {
   const messages = [];
   for (const m of r.messages) {
     if (m.role === 'user') messages.push({ role:'user', content:m.text, timestamp:0 });
-    else if (m.role === 'assistant') messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments)}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
+    // Account tools are always declared under the fixed erii namespace. Restore
+    // it on replay without adding provider metadata to the Host ToolCall schema.
+    else if (m.role === 'assistant') messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments),...(model.provider==='openai'?{namespace:'erii'}:{})}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
     else if (m.role === 'tool') {
       const call = r.messages.flatMap(m => m.tool_calls ?? []).find(t => t.id === m.tool_call_id);
       if (!call) fail('INVALID_PROVIDER_RESPONSE');
@@ -99,11 +105,30 @@ async function generate(r, job, send) {
   // The SDK timer ends at response headers. This deadline owns the entire generation.
   const deadline = setTimeout(()=>{state.code='PROVIDER_UNAVAILABLE';job.controller.abort();},30000);
   try {
-    if (r.session_id !== r.run_id || !r.run_id || !s.snapshot_id || s.provider_kind !== 'openai_compatible' || s.wire_api !== 'openai_completions' || s.endpoint_hash !== hash(r.connection.endpoint) || s.max_output_tokens < 1 || s.max_output_tokens > 65536 || s.context_window > 1048576) fail('MODEL_INCOMPATIBLE');
+    const isAccount=s.provider_kind==='openai_account';
+    if (isAccount) {
+      if(s.wire_api!=='openai_responses' || s.endpoint_hash || r.connection.endpoint!==API || !r.connection.access_token || r.connection.api_key) fail('MODEL_INCOMPATIBLE');
+      const models=await accountCatalog(r.connection,globalThis.fetch,job.controller.signal);
+      if(!models.some(m=>m.model_id===s.model_id)) fail('MODEL_NOT_FOUND');
+    }
+    if (r.session_id !== r.run_id || !r.run_id || !s.snapshot_id || !isAccount && (s.provider_kind !== 'openai_compatible' || s.wire_api !== 'openai_completions' || s.endpoint_hash !== hash(r.connection.endpoint)) || s.max_output_tokens < 1 || s.max_output_tokens > 65536 || s.context_window > 1048576) fail('MODEL_INCOMPATIBLE');
     if (s.max_output_tokens > s.context_window || s.context_window < 1 || s.reasoning_effort || Object.keys(s.generation_defaults ?? {}).length || ['developer_role','reasoning_effort','parallel_tool_calls','stream_usage'].some(k=>s.compatibility?.[k]) || s.compatibility?.tool_result_format !== 'openai') fail('MODEL_INCOMPATIBLE');
     const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'erii-local',baseUrl:r.connection.endpoint,reasoning:false,input:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
     // Optional compatibility and sampling stay conservative until individually probed.
-    const events = stream(model, normalizeContext(context(r, model)), { apiKey:r.connection.api_key || 'sdk-constructor-only', fetch:transport(r.connection,job.controller.signal,state), signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:30000, onProviderStreamEvent:e=>{if(e.usage) {if(!Number.isSafeInteger(e.usage.prompt_tokens) || !Number.isSafeInteger(e.usage.completion_tokens) || e.usage.prompt_tokens<0 || e.usage.completion_tokens<0) fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}} });
+    if(isAccount) {model.api='openai-responses';model.provider='openai';model.baseUrl=API;model.compat={supportsDeveloperRole:false,supportsStrictMode:false,supportsMaxOutputTokens:false};}
+    const guardedFetch=transport(r.connection,job.controller.signal,state);
+    const fetcher=isAccount ? async(input,init)=>{
+      const body=JSON.parse(init.body);
+      if(body.tools?.length) body.tools=[{type:'namespace',name:'erii',description:'Erii tools',tools:body.tools}];
+      return guardedFetch(input,{...init,body:JSON.stringify(body)});
+    } : guardedFetch;
+    const events = (isAccount ? accountStream : stream)(model, normalizeContext(context(r, model)), { apiKey:r.connection.access_token || r.connection.api_key || 'sdk-constructor-only', cacheRetention:isAccount?'none':undefined, fetch:fetcher, signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:30000, onProviderStreamEvent:e=>{
+      if(isAccount && e.type==='response.completed') {
+        state.completedSeen=true;
+        if(e.response?.usage){const u=e.response.usage;if(!Number.isSafeInteger(u.input_tokens)||!Number.isSafeInteger(u.output_tokens)||u.input_tokens<0||u.output_tokens<0)fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}
+      }
+      if(isAccount && ['response.incomplete','response.failed','error'].includes(e.type)) state.code=e.response?.error?.code==='invalid_api_key'?'AUTH_REQUIRED':'INVALID_PROVIDER_RESPONSE';
+      if(!isAccount && e.usage) {if(!Number.isSafeInteger(e.usage.prompt_tokens) || !Number.isSafeInteger(e.usage.completion_tokens) || e.usage.prompt_tokens<0 || e.usage.completion_tokens<0) fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}} });
     let terminal = false;
     let count = 0, bytes = 0, tools = 0;
     for await (const e of events) {
@@ -121,6 +146,7 @@ async function generate(r, job, send) {
         event('tool_call',{tool_call:{id:e.toolCall.id,name:e.toolCall.name,arguments:argumentsJSON}});
       }
       else if (e.type === 'done') {
+        if(isAccount && !state.completedSeen) fail(state.code ?? 'INVALID_PROVIDER_RESPONSE');
         terminal = true;
         const u = e.message.usage;
         event('completed',{...(state.usageSeen ? {usage:{input_tokens:u.input,output_tokens:u.output,cache_read_tokens:u.cacheRead,cache_write_tokens:u.cacheWrite}} : {}),latency_ms:Math.ceil(performance.now()-started)});
@@ -151,11 +177,24 @@ export async function handle(f, send) {
     }
     if (!initialized) fail('MODEL_INCOMPATIBLE');
     switch (f.method) {
+      case 'auth.start': return reply(await accountAuth.start(p));
+      case 'auth.continue': return reply(await accountAuth.poll());
+      case 'auth.cancel': await accountAuth.cancel();return reply({});
+      case 'auth.status': return reply({status:accountAuth.pending?.status ?? 'logged_out',events:[]});
+      case 'auth.refresh': return reply(await accountAuth.refresh(p.credential));
+      case 'auth.logout': {
+        for(const j of active.values()) if(j.connection===p.connection_id){j.cancelled=true;j.controller.abort();}
+        await Promise.all([...active.values()].filter(j=>j.connection===p.connection_id).map(j=>j.done));
+        await accountAuth.cancel();
+        return reply({revoked:await accountAuth.revoke(p.credential)});
+      }
       case 'bridge.shutdown':
+        await accountAuth.cancel();
         for (const j of active.values()) { j.cancelled=true; j.controller.abort(); }
         await Promise.all([...active.values()].map(j=>j.done));
         return reply({});
       case 'model.probe':
+        if(p.provider_kind==='openai_account' && p.wire_api==='openai_responses' && !p.endpoint) return reply({});
         if (p.provider_kind !== 'openai_compatible' || p.wire_api !== 'openai_completions') fail('MODEL_INCOMPATIBLE');
         endpoint(p.endpoint); return reply({});
       case 'models.list': case 'models.refresh': {
@@ -163,6 +202,7 @@ export async function handle(f, send) {
         const timer = setTimeout(()=>controller.abort(),3000);
         try {
           const c = p.connection;
+          if(c.access_token) return reply(await accountCatalog(c));
           const res = await transport(c,controller.signal,{})(c.endpoint.replace(/\/$/,'')+'/models');
           // Bound catalog memory before parsing untrusted JSON.
           const reader = res.body.getReader(); let size=0; const chunks=[];
@@ -175,7 +215,7 @@ export async function handle(f, send) {
       }
       case 'generation.start': case 'generation.continue': {
         if (!p.generation_id || active.has(p.generation_id)) fail('INVALID_PROVIDER_RESPONSE');
-        const job={controller:new AbortController(),session:p.session_id,cancelled:false};
+        const job={controller:new AbortController(),session:p.session_id,connection:p.connection?.connection_id,cancelled:false};
         active.set(p.generation_id,job);
         reply({});
         job.done=generate(p,job,send);

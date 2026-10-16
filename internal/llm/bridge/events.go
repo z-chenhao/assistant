@@ -19,9 +19,10 @@ type eventDelivery struct {
 	rejected bool // Host validation, rather than a provider terminal error
 }
 
-// The process mutex protects validation and cancellation state. Only normalized
-// deliveries cross to the sink goroutine. The mailbox holds every allowed distinct event
-// plus one rejection, so a slow sink never blocks the shared RPC reader.
+// The process mutex protects validation; settleGate protects final acceptance
+// and the cancellation signal. Only normalized deliveries cross to the sink
+// goroutine. The mailbox holds every allowed distinct event plus one rejection,
+// so a slow sink never blocks the shared RPC reader.
 type eventStream struct {
 	events       chan eventDelivery
 	id           string
@@ -34,6 +35,8 @@ type eventStream struct {
 	cancelled    chan struct{}
 	dispatchDone chan struct{} // closed after start/continuation write, or failed admission
 	interrupt    context.CancelFunc
+	settleGate   chan struct{} // only usage commit/cancellation, never a sink/RPC
+	settled      bool
 }
 
 func newEventStream(id string, maxOutputTokens int64) *eventStream {
@@ -41,7 +44,9 @@ func newEventStream(id string, maxOutputTokens int64) *eventStream {
 	if maxOutputTokens < int64(limit/4) {
 		limit = int(maxOutputTokens * 4)
 	}
-	return &eventStream{events: make(chan eventDelivery, maxGenerationEvents+1), cancelled: make(chan struct{}), dispatchDone: make(chan struct{}), id: id, seen: map[int64][32]byte{}, remaining: limit}
+	s := &eventStream{events: make(chan eventDelivery, maxGenerationEvents+1), cancelled: make(chan struct{}), dispatchDone: make(chan struct{}), settleGate: make(chan struct{}, 1), id: id, seen: map[int64][32]byte{}, remaining: limit}
+	s.settleGate <- struct{}{}
+	return s
 }
 
 func (s *eventStream) reject(err error) {
@@ -58,21 +63,44 @@ func (s *eventStream) wasCancelled() bool {
 	}
 }
 
-// Called under the process mutex only after a matching cancellation or disposal ack. This
-// signal takes priority over queued events, including a queued completion.
-func (s *eventStream) cancel() {
-	if s.wasCancelled() {
-		return
+// Called for the captured registration after a cancellation or disposal ack.
+// A retired registration is permanently settled, so a late ack cannot affect a
+// new registration reusing the ID. No process lock is held while awaiting commit.
+func (s *eventStream) cancel(ctx context.Context) error {
+	select {
+	case <-s.settleGate:
+	case <-ctx.Done():
+		return llm.ProviderUnavailable
 	}
-	s.terminal = true
+	defer func() { s.settleGate <- struct{}{} }()
+	if ctx.Err() != nil {
+		return llm.ProviderUnavailable
+	}
+	if s.settled || s.wasCancelled() {
+		return nil
+	}
 	close(s.cancelled)
 	if s.interrupt != nil {
 		s.interrupt()
 	}
+	return nil
+}
+
+// finalize is called by Host persistence after opening its transaction. The
+// short commit and cancellation share one per-registration acceptance point.
+func (s *eventStream) finalize(commit func(bool) error) error {
+	<-s.settleGate
+	defer func() { s.settleGate <- struct{}{} }()
+	if s.settled {
+		return llm.InvalidProviderResponse
+	}
+	err := commit(s.wasCancelled())
+	s.settled = true
+	return err
 }
 
 func (s *eventStream) accept(e llm.GenerationEvent) {
-	if s.terminal {
+	if s.terminal || s.wasCancelled() {
 		return
 	}
 	// Hash the original payload before clipping; changed duplicates still fail.

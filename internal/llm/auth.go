@@ -55,7 +55,7 @@ type AuthWriter interface {
 
 // RegisterAuth writes a new secret before its metadata reference. A failed
 // database transaction removes only this newly generated, unreferenced secret.
-// No real login, credential refresh, or production secret backend is wired yet.
+// Account OAuth uses its separate validated lifecycle; this helper registers keys.
 func RegisterAuth(ctx context.Context, store AuthWriter, secrets SecretStore, input AuthInput, secret []byte) (AuthConnection, error) {
 	if err := input.Validate(); err != nil {
 		return AuthConnection{}, err

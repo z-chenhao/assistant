@@ -36,9 +36,10 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	flags := flag.NewFlagSet("personal-agent", flag.ContinueOnError)
 	flags.SetOutput(errOut)
 	configPath := flags.String("config", "", "versioned YAML configuration file (optional)")
+	testSecrets := flags.String("test-secret-store", "", "explicit in-memory CI Unix socket; never a production credential backend")
 	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [status|relay|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, print startup diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [status|relay|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, print startup diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -54,12 +55,14 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			modelCommand = flags.NArg() == 2 || flags.NArg() == 4 || flags.NArg() == 5
 		case "discover":
 			modelCommand = flags.NArg() == 3 || flags.NArg() == 4
-		case "list", "cancel":
+		case "list", "cancel", "accounts":
 			modelCommand = flags.NArg() == 2
-		case "catalog", "login":
+		case "catalog", "login", "login-chatgpt":
 			modelCommand = flags.NArg() == 2 || flags.NArg() == 3
-		case "test":
+		case "test", "refresh", "logout", "account-catalog":
 			modelCommand = flags.NArg() == 3
+		case "account-add":
+			modelCommand = flags.NArg() == 4
 		case "select":
 			modelCommand = flags.NArg() == 5
 		}
@@ -102,6 +105,8 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	var application *app.App
 	if *testBridge != "" {
 		application, err = app.OpenWithTestBridge(ctx, cfg, *testBridge)
+	} else if *testSecrets != "" {
+		application, err = app.OpenWithTestSecrets(ctx, cfg, *testSecrets)
 	} else {
 		application, err = app.Open(ctx, cfg)
 	}
@@ -111,6 +116,53 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	defer func() { err = errors.Join(err, application.Close()) }()
 	if modelCommand {
 		switch flags.Arg(1) {
+		case "accounts":
+			accounts, err := application.Models().Accounts(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(accounts)
+		case "login-chatgpt":
+			connection, err := application.Accounts().Login(ctx, flags.Arg(2), func(event llm.AuthEvent) { _ = json.NewEncoder(out).Encode(event) })
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(connection)
+		case "refresh":
+			connection, _, err := application.Accounts().Ensure(ctx, flags.Arg(2))
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(connection)
+		case "logout":
+			revoked, err := application.Accounts().Logout(ctx, flags.Arg(2))
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(map[string]any{"status": "logged_out", "remote_revocation_confirmed": revoked})
+		case "account-catalog", "account-add":
+			auth, _, err := application.Accounts().Ensure(ctx, flags.Arg(2))
+			if err != nil {
+				return err
+			}
+			models, err := application.AccountCatalog(ctx, auth.ConnectionID)
+			if err != nil {
+				return err
+			}
+			if flags.Arg(1) == "account-catalog" {
+				return json.NewEncoder(out).Encode(models)
+			}
+			for _, m := range models {
+				if m.ModelID == flags.Arg(3) {
+					input := llm.ProfileInput{Name: m.ModelID, ProviderKind: "openai_account", WireAPI: "openai_responses", ModelID: m.ModelID, AuthConnectionID: auth.ConnectionID, ContextWindow: m.ContextWindow, MaxOutputTokens: min(m.MaxOutputTokens, m.ContextWindow), Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true}}
+					profile, err := application.Models().AddProfile(ctx, input)
+					if err != nil {
+						return err
+					}
+					return json.NewEncoder(out).Encode(profile)
+				}
+			}
+			return llm.ModelNotFound
 		case "discover":
 			models, err := application.Discover(ctx, flags.Arg(2), flags.Arg(3))
 			if err != nil {
@@ -157,7 +209,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			return json.NewEncoder(out).Encode(r)
 		case "select":
 			if *testBridge == "" {
-				fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to your configured endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Erii never switches providers automatically.")
+				fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to the selected provider (OpenAI account requests use https://api.openai.com/v1) or your configured local endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Erii never switches providers automatically.")
 			}
 			pv, err := strconv.ParseInt(flags.Arg(3), 10, 64)
 			if err != nil || pv < 1 {

@@ -5,7 +5,7 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. ChatGPT OAuth, Main/Worker Runs, Tasks, Agent Loop, UI, and Durable
+local path. Current ChatGPT OAuth is implemented through the CLI. Main/Worker Runs, Tasks, Agent Loop, UI, and Durable
 Replay remain later slices. Product Golden Cases and SC-01–SC-12 are
 `not_applicable` until those capabilities arrive, not passed.
 
@@ -172,11 +172,11 @@ the executable. `llm.RegisterAuth` writes a new secret first, then atomically
 stores the connection reference/event; database failure deletes that newly
 generated credential using a bounded context independent of request cancellation.
 Backend error text never escapes. Cleanup failure is explicit and requires
-reconciliation. Connection metadata serialization omits CredentialRef. Actual
-OAuth and refresh/logout side effects are later slices; native macOS Keychain is implemented.
+reconciliation. Connection metadata serialization omits CredentialRef.
+Current OAuth and refresh/logout are implemented with native macOS Keychain; see docs/provider-bridge.md.
 A crash between SecretStore and SQLite can leave an orphan credential; these
 stores cannot commit atomically, and crash-time orphan reconciliation is not
-implemented here. No startup path claims working OAuth.
+implemented here. Account OAuth uses the current official protocol in the Provider Bridge.
 
 ## SQLite migrations and transaction ownership
 

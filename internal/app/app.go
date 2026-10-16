@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
@@ -13,6 +14,7 @@ import (
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/llm/account"
 	"github.com/z-chenhao/erii/internal/llm/bridge"
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/llm/secret"
@@ -25,10 +27,15 @@ type App struct {
 	telemetry *observability.Telemetry
 	provider  *bridge.Client
 	control   llm.Control
+	accounts  *account.Manager
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
-	return open(ctx, cfg, "")
+	return open(ctx, cfg, "", secret.Store{})
+}
+
+func OpenWithTestSecrets(ctx context.Context, cfg config.Config, path string) (*App, error) {
+	return open(ctx, cfg, "", secret.TestSocket{Path: path})
 }
 
 // OpenWithTestBridge is explicit test injection. No config default, environment
@@ -37,10 +44,10 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 	if !fake.ValidFixture(fixture) {
 		return nil, llm.InvalidProviderResponse
 	}
-	return open(ctx, cfg, fixture)
+	return open(ctx, cfg, fixture, secret.Store{})
 }
 
-func open(ctx context.Context, cfg config.Config, fixture string) (*App, error) {
+func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) (*App, error) {
 	t, err := observability.Open(cfg.App.DataRoot, cfg.LogLevel())
 	if err != nil {
 		return nil, err
@@ -61,7 +68,8 @@ func open(ctx context.Context, cfg config.Config, fixture string) (*App, error) 
 		return nil, errors.Join(err, t.Close())
 	}
 	a := &App{store: store, telemetry: t}
-	a.control = llm.Control{Store: store.Models(), Secrets: secret.Store{}}
+	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
+	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {
@@ -75,12 +83,22 @@ func open(ctx context.Context, cfg config.Config, fixture string) (*App, error) 
 		}
 	}
 	if fixture == "" && cfg.LLM.ProviderBridgeCommand != "" {
-		a.provider, err = bridge.OpenLocal(ctx, cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, store.Models().Resolver(a.control.Secrets), store.Models().RecordUsage)
+		a.provider, err = bridge.OpenLocal(ctx, cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, a.accounts.Resolver(store.Models().Resolver(secrets)), a.accounts.Observer(store.Models().RecordUsage))
 		if err != nil {
 			a.control.BridgeError = llm.NormalizeError(err.Error())
 		} else {
 			a.control.Probe = a.provider
 			a.control.BridgeIdentity = cfg.LLM.ProviderBridgeVersion
+		}
+	}
+	if fixture == "" {
+		if a.provider != nil {
+			a.accounts.Provider = a.provider
+		}
+		a.control.AccountAuth = a.accounts.Check
+		if err = a.accounts.Recover(ctx); err != nil {
+			_ = a.Close()
+			return nil, err
 		}
 	}
 	startup.Logger.Info("application started")
@@ -96,8 +114,9 @@ func (a *App) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 	return agent.EffectiveReadiness(ctx, d, a.control, a.provider), nil
 }
 
-func (a *App) Models() *llmsqlite.Store  { return a.store.Models() }
-func (a *App) ModelControl() llm.Control { return a.control }
+func (a *App) Models() *llmsqlite.Store   { return a.store.Models() }
+func (a *App) ModelControl() llm.Control  { return a.control }
+func (a *App) Accounts() *account.Manager { return a.accounts }
 func (a *App) Catalog(ctx context.Context) ([]llm.CatalogModel, error) {
 	if a.provider == nil {
 		if a.control.BridgeError != nil {
@@ -136,7 +155,17 @@ func (a *App) CatalogProfile(ctx context.Context, id string) ([]llm.CatalogModel
 	if err != nil {
 		return nil, err
 	}
+	if p.ProviderKind == "openai_account" {
+		return a.AccountCatalog(ctx, p.AuthConnectionID)
+	}
 	return a.provider.CatalogForProfile(ctx, p)
+}
+
+func (a *App) AccountCatalog(ctx context.Context, id string) ([]llm.CatalogModel, error) {
+	if a.provider == nil {
+		return nil, llm.ErrNoBridge
+	}
+	return a.accounts.Catalog(ctx, id, a.provider.CatalogAt)
 }
 
 // LoginKey consumes only stdin bytes; credentials never enter arguments or metadata.

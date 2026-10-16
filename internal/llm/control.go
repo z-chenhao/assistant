@@ -29,11 +29,15 @@ type Control struct {
 	Secrets        SecretStore
 	BridgeIdentity string
 	BridgeError    error
+	AccountAuth    func(context.Context, string) (int64, error)
 }
 
 func (c Control) CheckAuth(ctx context.Context, p Profile) (int64, error) {
 	if p.AuthConnectionID == "" {
 		return 0, nil
+	}
+	if p.ProviderKind == "openai_account" && c.AccountAuth != nil {
+		return c.AccountAuth(ctx, p.AuthConnectionID)
 	}
 	a, err := c.Store.Auth(ctx, p.AuthConnectionID)
 	if err != nil || a.Status != "connected" || a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now()) {

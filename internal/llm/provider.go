@@ -57,6 +57,13 @@ type GenerationRequest struct {
 	Snapshot         Snapshot   `json:"model_snapshot"`
 	Messages         []Message  `json:"messages"`
 	Tools            []ToolSpec `json:"tools,omitempty"`
+
+	// AuthEpoch is captured by the Host resolver and passed only to final
+	// persistence. It is not part of the frozen snapshot or Bridge protocol.
+	AuthEpoch int64 `json:"-"`
+	// Finalize serializes the usage commit with acknowledged cancellation.
+	// The Host installs it per registration; it never crosses the Bridge wire.
+	Finalize func(commit func(cancelled bool) error) error `json:"-"`
 }
 
 type TokenUsage struct {

@@ -9,11 +9,16 @@ import (
 
 // Connection is an ephemeral Host-to-Bridge Secret RPC envelope. Never persist it.
 type Connection struct {
-	Endpoint string `json:"endpoint"`
-	APIKey   string `json:"api_key,omitempty"`
+	Endpoint     string                      `json:"endpoint"`
+	APIKey       string                      `json:"api_key,omitempty"`
+	AccessToken  string                      `json:"access_token,omitempty"`
+	ConnectionID string                      `json:"connection_id,omitempty"`
+	AuthVersion  int64                       `json:"-"`
+	AuthEpoch    int64                       `json:"-"`
+	Guard        func(context.Context) error `json:"-"`
 }
 type Resolver func(context.Context, llm.Snapshot) (Connection, error)
-type Observer func(context.Context, llm.GenerationRequest, llm.GenerationResult, time.Duration, error) error
+type Observer func(context.Context, llm.GenerationRequest, Connection, llm.GenerationResult, time.Duration, error) error
 
 // OpenLocal installs trusted resolution before any request can use the client.
 func OpenLocal(ctx context.Context, path, script string, resolver Resolver, observer Observer) (*Client, error) {

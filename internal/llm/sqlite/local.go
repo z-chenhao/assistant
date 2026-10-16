@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/llm"
@@ -50,21 +51,55 @@ func (s *Store) RecordUsage(ctx context.Context, r llm.GenerationRequest, result
 	if err != nil {
 		return err
 	}
-	var input, output, read, write any
-	if result.Usage != nil {
-		input = result.Usage.InputTokens
-		output = result.Usage.OutputTokens
-		read = result.Usage.CacheReadTokens
-		write = result.Usage.CacheWriteTokens
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return llm.ErrStorage
 	}
-	code := ""
-	if cause != nil {
-		code = llm.NormalizeError(cause.Error()).Error()
+	defer tx.Rollback()
+	// BEGIN IMMEDIATE holds the cross-Host auth fence. Open the transaction
+	// before taking the registration's cancellation gate so writer admission
+	// and observer delays remain cancellable.
+	rejected := false
+	if r.Snapshot.ProviderKind == "openai_account" && (r.AuthEpoch != 0 || cause == nil) {
+		var epoch int64
+		var status string
+		err := tx.QueryRowContext(ctx, `SELECT r.auth_epoch,a.status FROM account_registration r JOIN auth_connection a USING(connection_id) WHERE r.connection_id=?`, r.Snapshot.AuthConnectionID).Scan(&epoch, &status)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return llm.ErrStorage
+		}
+		if err != nil || r.AuthEpoch < 1 || epoch != r.AuthEpoch || status != "connected" && status != "refreshing" {
+			rejected = true
+			cause, result = llm.AuthRequired, llm.GenerationResult{}
+		}
 	}
-	return s.write(ctx, func(tx *sql.Tx) error {
+	commit := func(cancelled bool) error {
+		if cancelled && !rejected {
+			cause, result = llm.GenerationCancelled, llm.GenerationResult{}
+		}
+		var input, output, read, write any
+		if result.Usage != nil {
+			input = result.Usage.InputTokens
+			output = result.Usage.OutputTokens
+			read = result.Usage.CacheReadTokens
+			write = result.Usage.CacheWriteTokens
+		}
+		code := ""
+		if cause != nil {
+			code = llm.NormalizeError(cause.Error()).Error()
+		}
 		_, err := tx.ExecContext(ctx, `INSERT INTO provider_usage(generation_id,run_id,snapshot_id,snapshot_json,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,latency_ms,error_code,recorded_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, r.GenerationID, r.RunID, r.Snapshot.SnapshotID, string(encoded), input, output, read, write, latency.Milliseconds(), code, now().UnixMicro())
-		return err
-	})
+		if err != nil || tx.Commit() != nil {
+			return llm.ErrStorage
+		}
+		if rejected || cancelled {
+			return cause
+		}
+		return nil
+	}
+	if r.Finalize != nil {
+		return r.Finalize(commit)
+	}
+	return commit(false)
 }
 
 func (s *Store) Connection(ctx context.Context, endpoint, authID string, secrets llm.SecretStore) (bridge.Connection, error) {
