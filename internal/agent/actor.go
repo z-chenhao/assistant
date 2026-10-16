@@ -69,13 +69,22 @@ func (a Actor) Drain(ctx context.Context) error {
 		found := false
 		if ctx.Err() == nil && firstErr == nil && len(running) < 5 {
 			id, err := a.Store.Next(ctx)
+			// Shutdown may arrive after the loop's context check but before
+			// a database scan/claim completes. Do not classify that cancelled
+			// scheduling operation as a recoverable storage failure.
+			if ctx.Err() != nil {
+				err = ctx.Err()
+			}
 			if err == nil && !running[id] {
 				claim, err := a.Store.Claim(ctx, id)
+				if err != nil && ctx.Err() != nil {
+					err = ctx.Err()
+				}
 				if err == nil {
 					running[id] = true
 					found = true
 					go func() {
-						run, loadErr := a.Store.Load(ctx, claim)
+						run, loadErr := a.Store.Load(context.WithoutCancel(ctx), claim)
 						err := loadErr
 						if err == nil {
 							err = a.execute(ctx, id, claim)
@@ -161,9 +170,9 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 			a.Sink(event)
 		}
 	}
-	err := a.Store.Initialize(work, claim)
+	err := a.Store.Initialize(context.WithoutCancel(work), claim)
 	if err == nil {
-		run, loadErr := a.Store.Load(work, claim)
+		run, loadErr := a.Store.Load(context.WithoutCancel(work), claim)
 		if loadErr != nil {
 			err = loadErr
 		} else {

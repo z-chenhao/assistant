@@ -95,7 +95,9 @@ provider execution. Provider-specific semantic validation remains required.
 TTL. Defaults are in `config.example.yaml`. Admission freezes dynamic conflict
 keys after schema validation. SQLite dispatch transactions arbitrate limits and
 intersecting keys across processes. Only live fenced Run owners retain capacity.
-A live attempt cannot be redispatched by its own owner. Recovery requires a new
+A live attempt cannot be redispatched by its own owner. Shutdown during a
+scheduler scan or claim returns normal cancellation. Already owned local setup
+reaches a stable release boundary without starting another model call. Recovery requires a new
 Run claim; stale owners cannot commit a result.
 
 Migration 10 upgrades empty and all prior schemas. Old immutable Model/Capability
