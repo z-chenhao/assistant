@@ -324,6 +324,8 @@ func TestLoopOldClaimsFenceEveryMutationAndModelAcceptance(t *testing.T) {
 		t.Fatal(err)
 	}
 	checks := []func() error{
+		func() error { _, err := r.StopRequested(ctx, old); return err },
+		func() error { _, err := r.SettleStop(ctx, old); return err },
 		func() error { return r.Renew(ctx, old) }, func() error { return r.Release(ctx, old) }, func() error { return r.Checkpoint(ctx, old, run.Version, run.Checkpoint) }, func() error { return r.Wait(ctx, old, run.Version, "resource") }, func() error { return r.Fail(ctx, old, run.Version, "PROVIDER_UNAVAILABLE") }, func() error { _, err := r.Complete(ctx, old, run.Version); return err }, func() error {
 			_, err := r.ToolStore(old).Accept(ctx, generation.Request.GenerationID, nil, a.Registry.Describe())
 			return err
@@ -645,7 +647,7 @@ func TestV6MainMigrationPreservesDataAndRollsBack(t *testing.T) {
 			}
 			defer s.Close()
 			d, err := s.Diagnostics(context.Background())
-			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 7 {
+			if err != nil || d.AgentID != "prior-agent" || d.SchemaVersion != 9 {
 				t.Fatal("prior identity changed", d, err)
 			}
 		})

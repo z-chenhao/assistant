@@ -42,7 +42,13 @@ var accountAuthSQL string
 //go:embed migrations/007_main_loop.sql
 var mainLoopSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL}
+//go:embed migrations/008_tasks.sql
+var tasksSQL string
+
+//go:embed migrations/009_task_control.sql
+var taskControlSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL}
 
 type Store struct {
 	db   *sql.DB

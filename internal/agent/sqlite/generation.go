@@ -78,6 +78,9 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		return nil
 	})
 	if err == nil && gen.Result == nil && gen.ErrorCode == "" {
+		if run.Kind == "worker" {
+			r.host.boundary("before_worker_generation")
+		}
 		r.host.boundary("before_generation_dispatch")
 	}
 	return gen, err
@@ -140,6 +143,9 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 }
 
 func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run) (bool, error) {
+	if run.Kind == "worker" {
+		return r.prepareWorkerReply(ctx, c, run)
+	}
 	ready := false
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		ready = false
@@ -183,6 +189,9 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 }
 
 func (r *Runs) DeliverReply(ctx context.Context, c agent.RunClaim, run agent.Run) error {
+	if run.Kind == "worker" {
+		return r.deliverWorkerReply(ctx, c, run)
+	}
 	// Conversation must exist before DeliveryRequest, then Checkpoint. Each
 	// interruption reuses the saved message/delivery IDs and fills missing work.
 	if err := r.Flush(ctx); err != nil {
@@ -226,11 +235,23 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 			if err := fence(ctx, tx, c); err != nil {
 				return err
 			}
+		} else {
+			owner, ok := c.(*claim)
+			if !ok {
+				return agent.ErrClaimLost
+			}
+			var valid int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run r JOIN run_claim c USING(run_id) WHERE r.run_id=? AND c.epoch=? AND r.status IN ('completed','failed') AND r.desired_state='running' AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch))`, owner.id, owner.epoch).Scan(&valid); err != nil {
+				return err
+			}
+			if valid != 1 {
+				return agent.ErrClaimLost
+			}
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT coalesce(max(sequence),0)+1 FROM run_trace WHERE run_id=?`, c.RunID()).Scan(&e.Sequence); err != nil {
 			return err
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT agent_id FROM run WHERE run_id=?`, c.RunID()).Scan(&e.AgentID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT agent_id,kind,coalesce(task_id,'') FROM run WHERE run_id=?`, c.RunID()).Scan(&e.AgentID, &e.RunKind, &e.TaskID); err != nil {
 			return err
 		}
 		e.RunID = c.RunID()
