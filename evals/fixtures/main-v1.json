@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "level": "L0",
+  "scope": "Scripted Main fragments only; full product Cases and real-model semantic grading remain not_applicable",
+  "cases": [
+    {"case_id": "GC-01", "inputs": ["我醒了，好困。"], "required_text": ["昨晚", "睡了多久"], "forbidden_text": ["诊断", "已经读取", "已经记录"], "max_questions": 1},
+    {"case_id": "GC-09", "inputs": ["我今天9点开会，下午要交报告。", "先帮我排一下优先级。"], "required_text": ["9点", "会议", "报告"], "forbidden_text": ["已经创建", "已经发送"], "max_questions": 0},
+    {"case_id": "GC-10", "inputs": ["今晚想在附近吃点清淡的。"], "required_text": ["哪个区域", "清淡"], "forbidden_text": ["已经预订", "已经下单"], "max_questions": 1}
+  ]
+}
