@@ -303,3 +303,5 @@ server and its dependencies add build/download cost but no service/account cost;
 they are absent from the product executable. Checksums live in `go.sum`.
 
 Unified Tool policy, local approval commands, effect recovery and the five-run security harness are documented in [tools.md](tools.md).
+
+The Ubuntu job has a bounded 25-minute timeout for the five-run Tool recovery gate and the existing Bridge/account/restart checks. The Tool gate adds 40 real SIGKILL/restarts; it retains every assertion and repetition.
