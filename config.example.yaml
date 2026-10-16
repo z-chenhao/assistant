@@ -1,0 +1,19 @@
+version: 1
+app:
+  # Must be absolute. ERII_DATA_ROOT can override this for deployment.
+  data_root: /tmp/erii-local
+  log_level: info
+# Only the explicit `relay` command connects. status/startup work without a broker.
+nats:
+  url: nats://127.0.0.1:4222
+  # Use a dedicated prefix per data root on a shared broker. Never embed credentials.
+  stream_prefix: erii
+  timeout: 2s
+  ack_wait: 30s
+  retry_interval: 1s
+
+# Optional real local-model Bridge. Install pinned dependencies first; use an absolute path.
+# llm:
+#   provider_bridge_command: node
+#   provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
+#   provider_bridge_version: pi-ai-1.3.0-v1
