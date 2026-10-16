@@ -1,10 +1,130 @@
-# M0 Provider Bridge and model control
+# Provider Bridge and local model control
 
-This is the deterministic M0 skeleton. It performs no provider network access,
-OAuth, billing or Agent execution. It adds no dependencies. Real Pi integration,
-its pinned dependency/version, production SecretStore, credential RPC and live
-provider/login contracts remain M1 work. Product Golden Cases remain
-`not_applicable` until their milestone. This does not claim M1 or Durable Replay.
+The Go Host runs a separate Node stdio Bridge using exact dependency
+`@earendil-works/pi-ai@1.3.0` (MIT), with a checked-in transitive lockfile.
+Only Pi's Chat Completions adapter is imported. Installation downloads the Pi
+SDK dependency tree; it adds no hosted service or account cost. Its SDK still
+brings other provider packages transitively, although Erii does not enable them.
+OAuth, Main/Worker Runs, Conversation recovery, and general Durable Replay
+remain later slices. This is the local-provider part of M1, not complete M1.
+
+## Connect a local model
+
+Install Node 24.21.0 and run `npm ci --prefix provider-bridge --ignore-scripts`.
+Add this explicit configuration, using the absolute repository path:
+
+```yaml
+version: 1
+llm:
+  provider_bridge_command: node
+  provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
+  provider_bridge_version: pi-ai-1.3.0-v1
+```
+
+Use an isolated `ERII_DATA_ROOT` while evaluating the CLI. The Bridge is optional;
+unconfigured startup still provides setup/diagnostics without a provider.
+
+```sh
+bin/personal-agent -config local.yaml model discover http://127.0.0.1:8000/v1
+bin/personal-agent -config local.yaml model add http://127.0.0.1:8000/v1 MODEL_ID
+bin/personal-agent -config local.yaml model catalog PROFILE_ID
+bin/personal-agent -config local.yaml model test PROFILE_ID
+bin/personal-agent -config local.yaml model select PROFILE_ID 1 1
+bin/personal-agent -config local.yaml status
+```
+
+`add URL MODEL_ID [AUTH_ID]` creates an unverified candidate with conservative
+8,192 context/1,024 output token limits. The existing `model add` JSON form allows
+explicit token limits and other candidate metadata. If discovery is unavailable,
+manually supply the ID to `add`; catalog support is never an activation condition.
+Inspect profile/config versions with `model list` and `status` before selecting.
+Every mandatory Probe behavior must pass. Optional compatibility, reasoning,
+modalities, and sampling claims remain disabled until individually verified.
+Responses API is rejected on the local path. Unsupported frozen settings fail
+closed instead of being silently dropped. Clipping Probe uses an eight-byte Host
+output limit while keeping the frozen model token limit, so it actually tests
+clipping rather than depending on a model exceeding its requested token limit.
+
+API keys are optional. On macOS with cgo, `model login` reads a key from stdin
+and writes it through Security.framework Keychain APIs (no credential process
+arguments). It returns an AuthConnection ID to use with `add`. On any platform,
+`model login ENV_NAME` explicitly registers a SecretStore environment reference;
+`ENV_NAME` must be present in each Host process using that connection. Pass the
+returned AuthConnection ID as the last argument to `add URL MODEL_ID AUTH_ID`
+or in the JSON metadata form. Missing credentials fail closed. Neither method
+prints or stores the key in SQLite. Do not enter credentials in metadata fields.
+The native backend is unavailable without macOS/cgo; it never falls back to a file.
+
+Privacy: model requests, conversation content, and Tool schemas go only to the
+configured endpoint. `localhost` resolves from the Go Host network namespace,
+not the Computer Guest. This notice is also printed before CLI activation.
+The Host retrieves only the referenced API key for each catalog/generation call
+and sends it in a private, transient connection RPC envelope. The Node process
+inherits PATH only, receives no domain DB paths or Tool/Computer handles, and
+keeps no credential file. This is a logical process boundary, not an OS sandbox.
+There is no provider fallback. All redirects are rejected, including same-origin
+redirects, so Authorization cannot be forwarded. The SDK constructor requires a
+nonempty key; a transport wrapper always deletes its placeholder Authorization
+and sends a Bearer header only when the user supplied an actual key.
+
+The transport retries connection failures or HTTP 429/502/503/504 at most twice,
+with 50/100 ms delays, before a response stream is accepted. It does not retry
+partial streams, malformed events, auth errors, or model incompatibility. Requests
+use a 30-second absolute Bridge deadline across fetch, retries, and response-body
+consumption, independently of the SDK header timeout. A deadline aborts HTTP and
+returns PROVIDER_UNAVAILABLE, with no completed result or stream retry. The Host
+Probe retains its ten-second total bound and independent one-second cleanup
+contexts. Direct Cancel/Dispose RPCs have a five-second bound. The error body is discarded,
+except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
+context-length classification. SDK console sinks are disabled because malformed
+SSE parsing can otherwise print provider chunks. Raw response streams are limited
+to 4 MiB before SDK parsing, and normalized Tool Calls retain the Host bounds
+of 32 calls and 64 KiB of arguments. Pi argument parse errors and non-object
+arguments fail with INVALID_PROVIDER_RESPONSE before any Tool Call is forwarded.
+Pi raw parse diagnostics are never exposed. An explicit empty object remains valid.
+Errors contain stable codes only.
+
+Readiness checks the saved proof, current credential availability, and Bridge RPC
+health. It does not require catalog support or certify current endpoint health;
+actual inference and explicit re-tests observe provider availability. Failed
+re-tests revoke proof and close ingress. A crashed Bridge is restarted only for
+the next independent operation. No generation is automatically replayed.
+
+Schema v5 retains immutable endpoint locations separately from mutable profiles.
+Resolution uses the frozen endpoint hash; editing a profile cannot redirect an
+old snapshot. Migration backfills endpoints available in prior-schema profiles.
+An endpoint lost through historical edits before v5 cannot be reconstructed and
+fails closed. Snapshots and credentials retain their existing boundaries.
+`provider_usage` stores the snapshot, generation/Run IDs, observed token counts,
+Host elapsed milliseconds, and normalized failure. Missing token usage is NULL,
+including cancellation/crash; zero is recorded only if supplied by the provider.
+Local monetary cost is zero. This is accounting, not a durable generation-result
+ledger. A Host crash can lose an in-flight usage record; Run recovery is later work.
+
+## Verification and operations
+
+`make test` runs Go tests and Node contracts against an owned HTTP endpoint through
+actual subprocesses. `make verify` drives the CLI, reads SQLite independently,
+and writes `evidence/local-provider.json` and `evidence/pi-bridge.tap`. The harness
+owns launch (ephemeral HTTP port and data root), doctor (binary, Node, installed Pi),
+drive (discover/add/test/select/status, keyed/manual/failure variants), evidence
+(usage, failures, snapshot IDs), and cleanup (reap children, close endpoint, delete
+state). Go's actual Pi crash test kills the exact Node child after a text delta,
+rejects partial output, restarts the same Bridge, and reads the catalog back.
+Security/cancellation contracts repeat five times through `make verify`.
+
+For optional owned native Keychain read/update/delete verification on macOS:
+
+```sh
+ERII_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTrip -v -timeout 30s
+```
+
+CI uses deterministic Fakes/environment references and requires no OS credential
+store or real model account. Real Qwen/vLLM/SGLang/LM Studio compatibility remains
+release-time Live Shadow evidence. Product Golden Cases remain not_applicable
+until their Main/Conversation slices; no product score is claimed here.
+
+## Deterministic fixtures
 
 ## Reproduce the CLI path
 
@@ -72,12 +192,12 @@ Tool, Computer, domain database or network operations.
 | --- | --- |
 | `bridge.initialize`, `bridge.shutdown` | Protocol handshake; orderly shutdown followed by bounded forced cleanup and process reap |
 | `auth.start`, `auth.continue`, `auth.refresh`, `auth.logout`, `auth.status` | Fake auth lifecycle; UI-neutral URL, device-code, progress, workspace and input events; no actual credentials |
-| `models.list`, `models.refresh` | Candidate catalog, never proof of capability |
+| `models.list`, `models.refresh` | Candidate catalog, never proof of capability; real calls carry a transient Host connection envelope |
 | `model.probe` | Provider-side connection check; the Host also runs behavioral generation checks |
-| `generation.start`, `generation.continue` | Accepted request with immutable ModelSnapshot, Host-created generation/run IDs, and `session_id = run_id` |
+| `generation.start`, `generation.continue` | Real calls additionally carry a transient connection envelope; accepted request with immutable ModelSnapshot, Host-created generation/run IDs, and `session_id = run_id` |
 | `generation.event` | Notification with generation ID, monotonic sequence and text/tool/completion/error kind |
 | `generation.cancel` | Cancellation acknowledgement; Host discards partial accumulated result |
-| `session.dispose` | Explicit end of the isolated provider session |
+| `session.dispose` | Terminal session cleanup; Host fences new admission and settles matching Generate/Continue calls with GENERATION_CANCELLED after acknowledgement |
 
 The Host accepts a matching duplicate sequence once, rejects changed content under
 one sequence and rejects gaps/out-of-order new events. A completion is delivered
@@ -85,7 +205,7 @@ once per generation call. Complete frames already received before process EOF
 are drained before reporting a crash; incomplete generation returns an explicit
 error with no partial result. Only the next independent operation restarts and
 re-handshakes the same Bridge. There is no durable generation-result ledger yet;
-M1 will persist model-call/Conversation completion and recovery decisions.
+A later M1 slice will persist model-call/Conversation completion and recovery decisions.
 
 Frames are bounded to 1 MiB; generation output to the smaller of 64 KiB and four
 bytes per requested output token, on a UTF-8 boundary. This is a byte safety bound,
@@ -162,3 +282,13 @@ RPC/cancellation and independent SQLite activation contenders. See
 `scripts/FEATURES.md` for exact entries and `evidence/verification.json` for the
 CLI evidence. No account, installed broker, persistent test process or human
 observation relay is required.
+
+Session disposal waits for admitted writes before sending its RPC, without waiting
+for generation start acknowledgements. Its acknowledgement fences queued/late
+completion and settles only captured matching registrations. A result published
+before disposal remains complete. Failed disposal retires the peer instead of
+leaving suppressed work unobservable. Terminal session admission fences remain
+for the lifetime of the Host client, including Bridge restarts; new Runs use new
+session IDs. `make verify` covers ack-only/pre-ack/late/completion races, matching
+Generate/Continue calls against actual Node/HTTP, dispatch ordering, failed cleanup,
+and the full 30-second trickling-body deadline (not a shortened test-only timer).

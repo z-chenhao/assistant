@@ -26,6 +26,7 @@ func TestLifecyclePeer(t *testing.T) {
 	scan := bufio.NewScanner(os.Stdin)
 	enc := json.NewEncoder(os.Stdout)
 	active := map[string]string{}
+	sessions := map[string]string{}
 	cancels := 0
 	send := func(v any) {
 		if enc.Encode(v) != nil {
@@ -67,6 +68,7 @@ func TestLifecyclePeer(t *testing.T) {
 			}
 			mode := req.Messages[0].Text
 			active[req.GenerationID] = mode
+			sessions[req.GenerationID] = req.SessionID
 			if mode == "pre-ack" {
 				continue
 			}
@@ -91,6 +93,40 @@ func TestLifecyclePeer(t *testing.T) {
 					delete(active, req.GenerationID)
 					event(req.GenerationID, 2, "completed")
 				}
+			}
+		case "session.dispose":
+			var req struct {
+				ID string `json:"session_id"`
+			}
+			if json.Unmarshal(r.Params, &req) != nil {
+				os.Exit(2)
+			}
+			late := []string{}
+			for id, mode := range active {
+				if sessions[id] != req.ID {
+					continue
+				}
+				if mode == "dispose-no-ack" {
+					continue
+				}
+				delete(active, id)
+				if mode == "late" {
+					late = append(late, id)
+				}
+			}
+			blocked := false
+			for id, mode := range active {
+				if sessions[id] == req.ID && mode == "dispose-no-ack" {
+					blocked = true
+				}
+			}
+			if blocked {
+				continue
+			}
+			reply(struct{}{})
+			for _, id := range late {
+				event(id, 2, "text_delta")
+				event(id, 3, "completed")
 			}
 		case "generation.cancel":
 			var req struct {

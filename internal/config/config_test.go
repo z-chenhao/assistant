@@ -42,17 +42,20 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 
 func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	for name, body := range map[string]string{
-		"empty":           "",
-		"missing-version": "app: {}",
-		"future-version":  "version: 2",
-		"unknown-field":   "version: 1\napi_key: SECRET_SENTINEL",
-		"unknown-nested":  "version: 1\napp:\n  password: SECRET_SENTINEL",
-		"syntax":          "version: 1\napp: [SECRET_SENTINEL",
-		"bad-type":        "version: SECRET_SENTINEL",
-		"duplicate-field": "version: 1\nversion: 1",
-		"multi-document":  "version: 1\n---\nversion: 1",
-		"relative-root":   "version: 1\napp:\n  data_root: relative",
-		"bad-log-level":   "version: 1\napp:\n  log_level: SECRET_SENTINEL",
+		"llm-missing-script":  "version: 1\nllm:\n  provider_bridge_command: SECRET_SENTINEL",
+		"llm-relative-script": "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: SECRET_SENTINEL\n  provider_bridge_version: pi-ai-1.3.0-v1",
+		"llm-unknown-version": "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: /script.mjs\n  provider_bridge_version: SECRET_SENTINEL",
+		"empty":               "",
+		"missing-version":     "app: {}",
+		"future-version":      "version: 2",
+		"unknown-field":       "version: 1\napi_key: SECRET_SENTINEL",
+		"unknown-nested":      "version: 1\napp:\n  password: SECRET_SENTINEL",
+		"syntax":              "version: 1\napp: [SECRET_SENTINEL",
+		"bad-type":            "version: SECRET_SENTINEL",
+		"duplicate-field":     "version: 1\nversion: 1",
+		"multi-document":      "version: 1\n---\nversion: 1",
+		"relative-root":       "version: 1\napp:\n  data_root: relative",
+		"bad-log-level":       "version: 1\napp:\n  log_level: SECRET_SENTINEL",
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.yaml")
