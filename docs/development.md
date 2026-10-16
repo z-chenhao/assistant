@@ -5,7 +5,7 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). Worker Runs, Tasks, UI and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main-only scripted L0 fragments are reported separately.
+local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Child Runs and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
 
 ## Commands and evidence
 
@@ -73,7 +73,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":7,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":10,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,
@@ -301,3 +301,7 @@ and `nats-server/v2` (Apache-2.0, test harness only). The SDK avoids a custom wi
 format parser; the official client avoids a second broker protocol. The test
 server and its dependencies add build/download cost but no service/account cost;
 they are absent from the product executable. Checksums live in `go.sum`.
+
+Unified Tool policy, local approval commands, effect recovery and the five-run security harness are documented in [tools.md](tools.md).
+
+The Ubuntu job has a bounded 25-minute timeout for the five-run Tool recovery gate and the existing Bridge/account/restart checks. The Tool gate adds 40 real SIGKILL/restarts; it retains every assertion and repetition.
