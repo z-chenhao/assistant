@@ -16,8 +16,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-isatty"
+	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/app"
+	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/config"
+	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/tui"
@@ -43,7 +46,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|chat send [REQUEST_KEY]|chat work|chat history|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -71,12 +74,14 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			modelCommand = flags.NArg() == 5
 		}
 	}
-	chatCommand := flags.Arg(0) == "chat" && ((flags.Arg(1) == "send" && (flags.NArg() == 2 || flags.NArg() == 3)) || ((flags.Arg(1) == "work" || flags.Arg(1) == "history") && flags.NArg() == 2))
+	chatCommand := flags.Arg(0) == "chat" && (((flags.Arg(1) == "send" || flags.Arg(1) == "send-parts") && (flags.NArg() == 2 || flags.NArg() == 3)) || ((flags.Arg(1) == "work" || flags.Arg(1) == "history") && flags.NArg() == 2))
+	artifactCommand := flags.Arg(0) == "artifact" && ((flags.NArg() == 4 && (flags.Arg(1) == "save" || flags.Arg(1) == "delete")) || (flags.NArg() == 3 && (flags.Arg(1) == "open" || flags.Arg(1) == "describe")) || (flags.Arg(1) == "cleanup" && (flags.NArg() == 2 || (flags.NArg() == 3 && flags.Arg(2) == "apply"))))
+	approvalCommand := flags.Arg(0) == "approval" && ((flags.NArg() == 2 && (flags.Arg(1) == "list" || flags.Arg(1) == "reconcile")) || (flags.NArg() == 4 && (flags.Arg(1) == "approve" || flags.Arg(1) == "deny")))
 	terminalCommand := flags.NArg() == 1 && flags.Arg(0) == "tui"
 	if f, ok := in.(*os.File); ok && flags.NArg() == 0 && isatty.IsTerminal(f.Fd()) {
 		terminalCommand = true
 	}
-	if !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	if !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -136,6 +141,73 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			}
 		})
 	}
+	if artifactCommand {
+		switch flags.Arg(1) {
+		case "save":
+			d, e := application.SaveArtifact(ctx, artifact.Input{Name: flags.Arg(2), MediaType: flags.Arg(3)}, in)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(d)
+		case "open":
+			f, e := application.OpenArtifact(ctx, flags.Arg(2))
+			if e != nil {
+				return e
+			}
+			defer f.Close()
+			_, e = io.Copy(out, f)
+			return e
+		case "describe":
+			d, e := application.DescribeArtifact(ctx, flags.Arg(2))
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(d)
+		case "delete":
+			version, e := strconv.ParseInt(flags.Arg(3), 10, 64)
+			if e != nil {
+				return artifact.ErrInvalid
+			}
+			if e = application.DeleteArtifact(ctx, flags.Arg(2), version); e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(map[string]string{"status": "deleted"})
+		case "cleanup":
+			report, e := application.CleanupArtifacts(ctx, flags.Arg(2) != "apply")
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(report)
+		}
+	}
+	if approvalCommand {
+		switch flags.Arg(1) {
+		case "list":
+			values, err := application.Approvals(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(values)
+		case "reconcile":
+			values, err := application.ReconcileTools(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(values)
+		default:
+			decision := "approved"
+			if flags.Arg(1) == "deny" {
+				decision = "denied"
+			}
+			if err := application.DecideApproval(ctx, flags.Arg(2), flags.Arg(3), decision); err != nil {
+				return err
+			}
+		}
+		return json.NewEncoder(out).Encode(struct {
+			Status string `json:"status"`
+		}{"recorded"})
+	}
+
 	if terminalCommand {
 		input, ok := in.(io.ReadCloser)
 		if !ok {
@@ -151,7 +223,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	if chatCommand {
 		switch flags.Arg(1) {
-		case "send":
+		case "send", "send-parts":
 			value, err := io.ReadAll(io.LimitReader(in, 16385))
 			if err != nil || len(value) > 16384 {
 				return errors.New("expected chat text of at most 16 KiB on stdin")
@@ -160,7 +232,22 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			if key == "" {
 				key = uuid.Must(uuid.NewV7()).String()
 			}
-			receipt, err := application.Actor(nil).Submit(ctx, key, string(value))
+			var receipt agent.Receipt
+			if flags.Arg(1) == "send-parts" {
+				var parts []conversation.ContentPart
+				dec := json.NewDecoder(bytes.NewReader(value))
+				dec.DisallowUnknownFields()
+				if dec.Decode(&parts) != nil {
+					return conversation.ErrInvalid
+				}
+				var extra any
+				if dec.Decode(&extra) != io.EOF {
+					return conversation.ErrInvalid
+				}
+				receipt, err = application.SubmitParts(ctx, key, parts)
+			} else {
+				receipt, err = application.Actor(nil).Submit(ctx, key, string(value))
+			}
 			if err != nil {
 				return err
 			}

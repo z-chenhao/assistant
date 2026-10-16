@@ -15,6 +15,7 @@ import signal
 import sqlite3
 import subprocess
 import tempfile
+import time
 
 
 def require(value, message):
@@ -52,6 +53,15 @@ class MainHarness:
     def send(self, key, text):
         return self.command("chat", "send", key, text=text)
 
+    def wait_state(self, predicate, description, reader=None, timeout=10):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            value = reader(self) if reader else self.state()
+            if predicate(value):
+                return value
+            time.sleep(0.025)
+        raise RuntimeError("state boundary not reached: " + description)
+
     def hold(self, boundary):
         child = subprocess.Popen(self.args("-test-main-hold", boundary, "chat", "work"),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -70,7 +80,7 @@ class MainHarness:
         with sqlite3.connect(Path(self.env["ERII_DATA_ROOT"]) / "state.db") as db:
             db.row_factory = sqlite3.Row
             for name, query in {
-                "runs": "SELECT run_id,kind,task_id,parent_run_id,status,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
+                "runs": "SELECT run_id,kind,task_id,parent_run_id,root_run_id,task_epoch,depth,status,desired_state,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
                 "generations": "SELECT generation_id,run_id,step_index,request_hash,request_json,status,result_json,error_code,attempt_count FROM model_generation ORDER BY created_at",
                 "tools": "SELECT invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,status,result_json,delivery_seq,attempt_count FROM tool_invocation ORDER BY created_at,delivery_seq",
                 "deliveries": "SELECT delivery_id,message_id,status,idempotency_key FROM delivery_request ORDER BY created_at",

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
@@ -21,13 +22,17 @@ import (
 )
 
 type Runs struct {
-	host     *Store
-	history  conversation.Store
-	registry *tool.Registry
+	host        *Store
+	history     conversation.Store
+	registry    *tool.Registry
+	recentAge   time.Duration
+	recentLimit int
+	limits      ToolLimits
+	approvalTTL time.Duration
 }
 
 func (s *Store) Runs(history conversation.Store, registry *tool.Registry) *Runs {
-	return &Runs{host: s, history: history, registry: registry}
+	return &Runs{host: s, history: history, registry: registry, recentAge: 30 * 24 * time.Hour, recentLimit: 200}
 }
 
 type claim struct {
@@ -71,7 +76,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, llm.ModelIncompatible, llm.ContextLengthExceeded} {
+	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -84,7 +89,7 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 		return agent.ErrClaimLost
 	}
 	var valid int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running'`, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active'))`, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
 		return agent.ErrStorage
 	}
 	if valid != 1 {
@@ -97,6 +102,11 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 	parts, err := conversation.Normalize(parts)
 	if err != nil {
 		return agent.Receipt{}, err
+	}
+	for _, p := range parts {
+		if p.Type == "tool_call" {
+			return agent.Receipt{}, conversation.ErrInvalid
+		}
 	}
 	receipt := agent.Receipt{RequestKey: key}
 	content, _ := encoded(parts)
@@ -127,36 +137,28 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 		}
 		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
 		if err == sql.ErrNoRows {
-			var pv int64
-			if err := tx.QueryRowContext(ctx, `SELECT version FROM model_profile WHERE profile_id=? AND status='ready'`, profile).Scan(&pv); err != nil {
-				return agent.ErrSetup
-			}
-			snapshot, err := r.host.Models().FreezeProfile(ctx, tx, profile, pv)
+			receipt.RunID, err = r.createMain(ctx, tx, agentID, profile, configVersion, nil)
 			if err != nil {
-				return err
-			}
-			receipt.RunID = newID()
-			capID := newID()
-			tools, _ := encoded(r.registry.Describe())
-			now := time.Now().UTC().UnixMicro()
-			if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot VALUES(?,?,'main',?,?,?,0,?,?)`, capID, configVersion, digest(tools), digest("[]"), agentID, tools, now); err != nil {
-				return err
-			}
-			cp, _ := encoded(agent.Checkpoint{Phase: "model", Messages: agent.MainContext(nil)})
-			_, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,kind,status,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,'main','queued',?,?,?,(SELECT coalesce(max(sequence),0) FROM conversation_intent),?,?,1)`, receipt.RunID, agentID, agentID, capID, snapshot.SnapshotID, cp, now, now)
-			if err != nil {
-				return err
-			}
-			if _, err = tx.ExecContext(ctx, `INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, receipt.RunID); err != nil {
-				return err
-			}
-			if err = runEvent(ctx, tx, receipt.RunID, "run_ready", 1); err != nil {
 				return err
 			}
 		} else if err != nil {
 			return err
 		}
 		receipt.MessageID = newID()
+		scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: agentID, Owner: true}
+		for _, p := range parts {
+			if p.ArtifactRef != "" {
+				if err = r.host.Artifacts().PinTx(ctx, tx, scope, p.ArtifactRef, "run", receipt.RunID); err != nil {
+					return conversation.ErrInvalid
+				}
+				if err = r.host.Artifacts().PinTx(ctx, tx, scope, p.ArtifactRef, "conversation", receipt.MessageID); err != nil {
+					return err
+				}
+			}
+		}
+		if err := invalidateApprovals(ctx, tx, receipt.RunID); err != nil {
+			return err
+		}
 		message := conversation.Message{MessageID: receipt.MessageID, ConversationID: agentID, Role: "user", Content: parts, Source: "cli", SourceEventID: key, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
 		raw, _ := encoded(message)
 		if _, err = tx.ExecContext(ctx, `INSERT INTO main_input(agent_id,request_key,run_id,message_id,message_json) VALUES(?,?,?,?,?)`, agentID, key, receipt.RunID, receipt.MessageID, raw); err != nil {
@@ -171,9 +173,44 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 }
 
 func (r *Runs) Next(ctx context.Context) (string, error) {
+	if err := r.recoverApprovals(ctx); err != nil {
+		return "", err
+	}
+	if err := r.ReconcileUnknown(ctx); err != nil {
+		return "", err
+	}
+	if err := r.recoverStops(ctx); err != nil {
+		return "", err
+	}
+	if err := r.Report(ctx); err != nil {
+		return "", err
+	}
+	if err := r.promoteFollowups(ctx); err != nil {
+		return "", err
+	}
+	r.host.boundary("before_next_scan")
 	var id string
-	err := r.host.db.QueryRowContext(ctx, `SELECT run_id FROM run WHERE kind='main' AND (status IN ('queued','running') OR (status='waiting' AND (wait_reason='resource' OR (wait_reason='user_input' AND EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=run.run_id AND i.sequence>json_extract(run.checkpoint_json,'$.input_sequence')))))) ORDER BY created_at LIMIT 1`).Scan(&id)
+	// Four worker leases plus a reserved Main slot. The database enforces this
+	// host bound across concurrent CLI processes as well as within one Actor.
+	err := r.host.db.QueryRowContext(ctx, `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) WHERE (r.status IN ('queued','running') OR (r.status='waiting' AND (r.wait_reason='resource' OR (r.wait_reason='user_input' AND (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))))))) AND (c.token IS NULL OR c.expires_at<=?) AND (r.kind='main' OR (SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>?)<4) AND NOT (r.status='waiting' AND r.wait_reason='resource' AND EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') AND NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason='resource' OR (i.wait_reason='retry_backoff' AND i.next_wake_at<=?) OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending'))))) ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,r.created_at,r.run_id LIMIT 1`, time.Now().UnixMicro(), time.Now().UnixMicro(), time.Now().UnixMicro()).Scan(&id)
 	if err == sql.ErrNoRows {
+		var active int
+		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE status IN ('queued','running') OR (status='waiting' AND wait_reason='resource')`).Scan(&active); err != nil {
+			return "", agent.ErrStorage
+		}
+		if active > 0 {
+			return "", agent.ErrBusy
+		}
+		// A terminal commit atomically removes the last runnable Root/Main and
+		// may create an update or unblock an Inbox after our earlier scans.
+		// Once active==0, any such completion must already be visible here.
+		var pending int
+		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch)`).Scan(&pending); err != nil {
+			return "", agent.ErrStorage
+		}
+		if pending > 0 {
+			return "", agent.ErrBusy
+		}
 		return "", agent.ErrNotFound
 	}
 	if err != nil {
@@ -181,11 +218,19 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 	}
 	return id, nil
 }
+
 func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 	c := &claim{id: id, token: newID()}
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		now := time.Now().UnixMicro()
-		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run WHERE run_id=? AND status IN ('queued','running','waiting'))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
+		var workers int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>? AND EXISTS(SELECT 1 FROM run WHERE run_id=? AND kind='worker')`, now, id).Scan(&workers); err != nil {
+			return err
+		}
+		if workers >= 4 {
+			return agent.ErrBusy
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
 		if err != nil {
 			return err
 		}
@@ -205,7 +250,7 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 }
 func (r *Runs) Renew(ctx context.Context, c agent.RunClaim) error {
 	return r.write(ctx, func(tx *sql.Tx) error {
-		if err := fence(ctx, tx, c); err != nil {
+		if err := ownership(ctx, tx, c); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `UPDATE run_claim SET expires_at=?,version=version+1 WHERE run_id=?`, time.Now().Add(leaseDuration).UnixMicro(), c.RunID())
@@ -301,6 +346,9 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 	if err != nil {
 		return err
 	}
+	if run.Kind == "worker" {
+		return nil
+	}
 	if run.Checkpoint.ContextReady {
 		return nil
 	}
@@ -332,19 +380,39 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 			filtered = append(filtered, m)
 		}
 	}
+	runtimeMessages := []agent.AgentMessage{}
+	base := []agent.AgentMessage{}
+	for _, m := range run.Checkpoint.Messages {
+		if m.Type == "custom" {
+			runtimeMessages = append(runtimeMessages, m)
+		} else {
+			base = append(base, m)
+		}
+	}
+	run.Checkpoint.Messages = base
 	for _, m := range filtered {
 		run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.AgentMessage{Type: m.Role, Content: m.Content})
 	}
+	run.Checkpoint.Messages = append(run.Checkpoint.Messages, runtimeMessages...)
 	run.Checkpoint.ContextReady = true
 	return r.Checkpoint(ctx, c, run.Version, run.Checkpoint)
 }
 func (r *Runs) Steering(ctx context.Context, c agent.RunClaim, after int64) ([]agent.Input, error) {
+	run, err := r.Load(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	if run.Kind == "worker" {
+		return r.taskSteering(ctx, c, after)
+	}
 	if err := r.Flush(ctx); err != nil {
 		return nil, err
 	}
 	var inputs []agent.Input
-	err := r.write(ctx, func(tx *sql.Tx) error {
+	deferred := false
+	err = r.write(ctx, func(tx *sql.Tx) error {
 		inputs = nil
+		deferred = false
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
@@ -362,17 +430,50 @@ func (r *Runs) Steering(ctx context.Context, c agent.RunClaim, after int64) ([]a
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+
 		for rows.Next() {
 			var i agent.Input
 			var raw string
 			if rows.Scan(&i.Sequence, &raw) != nil || json.Unmarshal([]byte(raw), &i.Message) != nil {
+				rows.Close()
 				return agent.ErrStorage
 			}
 			inputs = append(inputs, i)
 		}
-		return rows.Err()
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		if len(inputs) > 0 {
+			var generations int
+			if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM model_generation WHERE run_id=?`, c.RunID()).Scan(&generations); err != nil {
+				return err
+			}
+			if generations == 0 {
+				cp := run.Checkpoint
+				base := []agent.AgentMessage{}
+				for _, m := range cp.Messages {
+					if m.Type == "custom" {
+						deferred = true
+					} else {
+						base = append(base, m)
+					}
+				}
+				if deferred {
+					cp.Messages = base
+					if _, err = tx.ExecContext(ctx, `UPDATE main_inbox SET run_id=NULL WHERE run_id=?`, c.RunID()); err != nil {
+						return err
+					}
+					return checkpoint(ctx, tx, c, run.Version, cp)
+				}
+			}
+		}
+		return nil
 	})
+	if err == nil && deferred {
+		return nil, agent.ErrConflict
+	}
 	return inputs, err
 }
 func checkpoint(ctx context.Context, tx *sql.Tx, c agent.RunClaim, version int64, cp agent.Checkpoint) error {
@@ -404,6 +505,7 @@ func (r *Runs) Checkpoint(ctx context.Context, c agent.RunClaim, version int64, 
 
 func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, status, reason string) (bool, error) {
 	done := false
+	worker := false
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		done = false
 		if err := fence(ctx, tx, c); err != nil {
@@ -424,6 +526,13 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 			if pending > 0 {
 				return nil
 			}
+			var pendingTask int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')`, c.RunID()).Scan(&pendingTask); err != nil {
+				return err
+			}
+			if pendingTask > 0 {
+				return nil
+			}
 		}
 		now := time.Now().UnixMicro()
 		res, err := tx.ExecContext(ctx, `UPDATE run SET status=?,error_code=?,ended_at=?,updated_at=?,version=version+1 WHERE run_id=? AND version=?`, status, reason, now, now, c.RunID(), version)
@@ -437,9 +546,23 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 		if _, err = tx.ExecContext(ctx, `UPDATE run_claim SET token=NULL,expires_at=0,version=version+1 WHERE run_id=?`, c.RunID()); err != nil {
 			return err
 		}
+		if err = r.finishTask(ctx, tx, c.RunID(), status, reason); err != nil {
+			return err
+		}
 		done = true
+		var workers int
+		if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE run_id=? AND kind='worker'`, c.RunID()).Scan(&workers); err != nil {
+			return err
+		}
+		worker = workers == 1
+		if worker {
+			r.host.boundary("before_result_commit")
+		}
 		return runEvent(ctx, tx, c.RunID(), "run."+status, version+1)
 	})
+	if err == nil && done && worker {
+		r.host.boundary("after_result_commit")
+	}
 	return done, err
 }
 func (r *Runs) Complete(ctx context.Context, c agent.RunClaim, v int64) (bool, error) {
@@ -458,6 +581,15 @@ func (r *Runs) Wait(ctx context.Context, c agent.RunClaim, v int64, reason strin
 	return r.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, c); err != nil {
 			return err
+		}
+		if reason == "approval" {
+			var ready int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM approval a JOIN tool_invocation i USING(invocation_id) WHERE i.run_id=? AND i.status='waiting' AND i.wait_reason='approval' AND a.status!='pending'`, c.RunID()).Scan(&ready); err != nil {
+				return err
+			}
+			if ready > 0 {
+				reason = "resource"
+			}
 		}
 		res, err := tx.ExecContext(ctx, `UPDATE run SET status='waiting',wait_reason=?,updated_at=?,version=version+1 WHERE run_id=? AND version=?`, reason, time.Now().UnixMicro(), c.RunID(), v)
 		if err != nil {

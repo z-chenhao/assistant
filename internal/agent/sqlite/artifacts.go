@@ -1,0 +1,271 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"io"
+	"mime"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/artifact"
+	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	"github.com/z-chenhao/erii/internal/tool"
+)
+
+func runScope(ctx context.Context, tx *sql.Tx, id string) (artifact.Scope, error) {
+	a := artifact.Scope{UserID: artifact.LocalUser, RunID: id}
+	err := tx.QueryRowContext(ctx, `SELECT agent_id,coalesce(task_id,'') FROM run WHERE run_id=?`, id).Scan(&a.AgentID, &a.TaskID)
+	return a, err
+}
+func artifactFailure(err error) tool.Result {
+	switch {
+	case errors.Is(err, artifact.ErrInvalid):
+		return tool.Failure("INVALID_ARGUMENT")
+	case errors.Is(err, artifact.ErrNotFound), errors.Is(err, artifact.ErrIntegrity):
+		return tool.Failure("NOT_FOUND")
+	case errors.Is(err, artifact.ErrLimit):
+		return tool.Failure("RESOURCE_LIMIT")
+	default:
+		return tool.Failure("PROVIDER_UNAVAILABLE")
+	}
+}
+
+// executeArtifact validates the accepted Host call; writes are deferred to
+// storeOutput so metadata/publication and the Tool result commit atomically.
+func (t *tools) executeArtifact(ctx context.Context, tx *sql.Tx, name, args string) (tool.Result, error) {
+	a, err := runScope(ctx, tx, t.claim.RunID())
+	if err != nil {
+		return tool.Result{}, err
+	}
+	var v struct {
+		Name      string   `json:"name"`
+		MediaType string   `json:"mediaType"`
+		Text      string   `json:"text"`
+		Ref       string   `json:"artifactRef"`
+		Refs      []string `json:"artifactRefs"`
+		Offset    int64    `json:"offset"`
+		Limit     int      `json:"limit"`
+	}
+	if json.Unmarshal([]byte(args), &v) != nil {
+		return tool.Failure("INVALID_ARGUMENT"), nil
+	}
+	store := t.runs.host.Artifacts()
+	switch name {
+	case artifacttools.Save:
+		return tool.Result{Output: &tool.BinaryOutput{Name: v.Name, MediaType: v.MediaType, Reader: strings.NewReader(v.Text)}}, nil
+	case artifacttools.Publish:
+		if v.Refs == nil {
+			return tool.Failure("INVALID_ARGUMENT"), nil
+		}
+		return tool.Result{Text: "Final artifacts selected.", PublishRefs: v.Refs}, nil
+	case artifacttools.Describe:
+		d, e := store.DescribeTx(ctx, tx, a, v.Ref, true)
+		if e != nil {
+			return artifactFailure(e), nil
+		}
+		raw, e := encoded(d)
+		return tool.Result{Text: raw}, e
+	case artifacttools.List:
+		list, e := store.ListTx(ctx, tx, a)
+		if e != nil {
+			return artifactFailure(e), nil
+		}
+		raw, e := encoded(list)
+		return tool.Result{Text: raw}, e
+	case artifacttools.Read:
+		d, e := store.DescribeTx(ctx, tx, a, v.Ref, true)
+		if e != nil {
+			return artifactFailure(e), nil
+		}
+		// Binary media are passed by ref; never base64-encode them into history.
+		media, _, _ := mime.ParseMediaType(d.MediaType)
+		if !strings.HasPrefix(media, "text/") && media != "application/json" && !strings.HasSuffix(media, "+json") {
+			return tool.Result{Text: "Binary content; use the artifact reference.", ArtifactRefs: []string{v.Ref}}, nil
+		}
+		f, e := store.OpenTx(ctx, tx, a, v.Ref)
+		if e != nil {
+			return artifactFailure(e), nil
+		}
+		defer f.Close()
+		if v.Limit == 0 {
+			v.Limit = 4096
+		}
+		if v.Limit < 1 || v.Limit > 4096 || v.Offset < 0 || v.Offset > d.ByteSize {
+			return tool.Failure("INVALID_ARGUMENT"), nil
+		}
+		if _, e = io.CopyN(io.Discard, f, v.Offset); e != nil {
+			return artifactFailure(e), nil
+		}
+		b, e := io.ReadAll(io.LimitReader(f, int64(v.Limit)))
+		if e != nil {
+			return artifactFailure(e), nil
+		}
+		// Byte ranges may cut a Unicode character. Reject that range explicitly.
+		if !utf8.Valid(b) {
+			return tool.Failure("INVALID_ARGUMENT"), nil
+		}
+		raw, e := encoded(struct {
+			Text   string `json:"text"`
+			Offset int64  `json:"offset"`
+			Bytes  int    `json:"bytes"`
+			Total  int64  `json:"total_bytes"`
+		}{string(b), v.Offset, len(b), d.ByteSize})
+		return tool.Result{Text: raw}, e
+	}
+	return tool.Failure("NOT_FOUND"), nil
+}
+
+// artifactChange rolls back normalization before recording an expected Tool
+// failure. The terminal result uses a live write context even when its input
+// stream/deadline has ended; no partial metadata, pins or publications survive.
+func artifactChange(ctx, outputCtx context.Context, tx *sql.Tx, change func() error) error {
+	if _, err := tx.ExecContext(ctx, `SAVEPOINT artifact_output`); err != nil {
+		return err
+	}
+	err := change()
+	if outputCtx.Err() != nil {
+		err = outputCtx.Err()
+	}
+	if err != nil {
+		if _, e := tx.ExecContext(ctx, `ROLLBACK TO artifact_output`); e != nil {
+			return artifact.ErrStorage
+		}
+	}
+	if _, e := tx.ExecContext(ctx, `RELEASE artifact_output`); e != nil {
+		return artifact.ErrStorage
+	}
+	return err
+}
+
+type artifactResultReader struct {
+	ctx context.Context
+	src io.Reader
+}
+
+func (r artifactResultReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, err := r.src.Read(p)
+	if cause := r.ctx.Err(); cause != nil {
+		return 0, cause
+	}
+	return n, err
+}
+func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result) (tool.Result, error) {
+	a, err := runScope(ctx, tx, runID)
+	if err != nil {
+		return tool.Result{}, err
+	}
+	store := r.host.Artifacts()
+	var policy, name string
+	if err = tx.QueryRowContext(ctx, `SELECT policy_json,tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, id, a.RunID).Scan(&policy, &name); err != nil {
+		if err == sql.ErrNoRows {
+			return tool.Result{}, agent.ErrConflict
+		}
+		return tool.Result{}, err
+	}
+	if result.PublishRefs != nil && name != artifacttools.Publish {
+		return tool.Failure("PERMISSION_DENIED"), nil
+	}
+	var p tool.Policy
+	if json.Unmarshal([]byte(policy), &p) != nil {
+		return tool.Result{}, artifact.ErrStorage
+	}
+	if p.OutputBytes == 0 {
+		p.OutputBytes = 16384
+	}
+	if result.Error != nil {
+		return tool.Normalize(result), nil
+	}
+	if result.Output == nil && len(result.Text) <= p.OutputBytes && len(result.ArtifactRefs) == 0 && result.PublishRefs == nil {
+		return result, nil
+	}
+	err = artifactChange(ctx, outputCtx, tx, func() error {
+		for _, ref := range result.ArtifactRefs {
+			if _, err := store.DescribeTx(outputCtx, tx, a, ref, true); err != nil {
+				return err
+			}
+		}
+		if result.Output != nil || len(result.Text) > p.OutputBytes {
+			output := result.Output
+			if output == nil {
+				output = &tool.BinaryOutput{Name: "tool-output.txt", MediaType: "text/plain", Reader: strings.NewReader(result.Text)}
+			}
+			if output.Reader == nil {
+				return artifact.ErrInvalid
+			}
+			ref, e := store.PutTx(ctx, tx, a, artifact.Input{Name: output.Name, MediaType: output.MediaType}, artifactResultReader{outputCtx, output.Reader}, "tool:"+id)
+			if e != nil {
+				return e
+			}
+			result.Text = "Saved artifact."
+			result.ArtifactRefs = append(result.ArtifactRefs, ref)
+			result.Output = nil
+		}
+		for _, ref := range result.ArtifactRefs {
+			if err := store.PinTx(outputCtx, tx, a, ref, "tool", id); err != nil {
+				return err
+			}
+		}
+		if result.PublishRefs != nil {
+			if err := store.PublishTx(outputCtx, tx, a, result.PublishRefs); err != nil {
+				return err
+			}
+			result.ArtifactRefs = append(result.ArtifactRefs, result.PublishRefs...)
+			result.PublishRefs = nil
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			if d, ok := r.registry.Resolve(name); ok && d.Spec.Permission == "external_effect" {
+				return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
+			}
+		}
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return tool.Failure("TIMEOUT"), nil
+		case errors.Is(err, context.Canceled):
+			return tool.Failure("CANCELLED"), nil
+		case errors.Is(err, artifact.ErrInvalid), errors.Is(err, artifact.ErrNotFound), errors.Is(err, artifact.ErrIntegrity), errors.Is(err, artifact.ErrLimit):
+			return artifactFailure(err), nil
+		default:
+			return tool.Result{}, err
+		}
+	}
+	return result, nil
+}
+
+// Receipt storage failures cannot establish that an external effect failed.
+// storeOutput rolls back normalization before returning an expected failure.
+func (r *Runs) storeRecoveryOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result) (tool.Result, error) {
+	if outputCtx.Err() != nil {
+		return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
+	}
+	out, err := r.storeOutput(ctx, outputCtx, tx, runID, id, result)
+	if err == nil && result.Error == nil && out.Error != nil {
+		return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
+	}
+	return out, err
+}
+func published(ctx context.Context, tx *sql.Tx, runID string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref FROM artifact_publication WHERE run_id=? ORDER BY artifact_ref`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	refs := []string{}
+	for rows.Next() {
+		var ref string
+		if err = rows.Scan(&ref); err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+	return refs, rows.Err()
+}
