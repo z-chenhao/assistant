@@ -10,11 +10,13 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/z-chenhao/erii/internal/app"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/llm/fake"
 )
 
 func main() {
@@ -27,11 +29,15 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) (err error) {
+	if len(args) == 2 && args[0] == "-test-provider-bridge" {
+		return fake.Serve(in, out, args[1])
+	}
 	flags := flag.NewFlagSet("personal-agent", flag.ContinueOnError)
 	flags.SetOutput(errOut)
 	configPath := flags.String("config", "", "versioned YAML configuration file (optional)")
+	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [status|relay|model add|model list]\nWithout a command, print startup diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmodel add reads one metadata-only JSON object from stdin; all profiles remain unverified.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [status|relay|model add|model list|model catalog|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, print startup diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -40,9 +46,19 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		}
 		return err
 	}
-	modelCommand := flags.NArg() == 2 && flags.Arg(0) == "model" && (flags.Arg(1) == "add" || flags.Arg(1) == "list")
+	modelCommand := false
+	if flags.Arg(0) == "model" {
+		switch flags.Arg(1) {
+		case "add", "list", "catalog", "cancel":
+			modelCommand = flags.NArg() == 2
+		case "test":
+			modelCommand = flags.NArg() == 3
+		case "select":
+			modelCommand = flags.NArg() == 5
+		}
+	}
 	if !modelCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
-		return errors.New("expected status, relay, model add, model list, or no command (see -help)")
+		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
 	if modelCommand && flags.Arg(1) == "add" {
@@ -67,12 +83,54 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
-	application, err := app.Open(ctx, cfg)
+	var application *app.App
+	if *testBridge != "" {
+		application, err = app.OpenWithTestBridge(ctx, cfg, *testBridge)
+	} else {
+		application, err = app.Open(ctx, cfg)
+	}
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, application.Close()) }()
 	if modelCommand {
+		switch flags.Arg(1) {
+		case "catalog":
+			models, err := application.Catalog(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(models)
+		case "test":
+			r, err := application.ModelControl().Test(ctx, flags.Arg(2))
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(r)
+		case "select":
+			pv, err := strconv.ParseInt(flags.Arg(3), 10, 64)
+			if err != nil || pv < 1 {
+				return llm.ErrConflict
+			}
+			cv, err := strconv.ParseInt(flags.Arg(4), 10, 64)
+			if err != nil || cv < 1 {
+				return llm.ErrConflict
+			}
+			if err := application.ModelControl().Select(ctx, flags.Arg(2), pv, cv); err != nil {
+				return err
+			}
+			d, err := application.Diagnostics(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(d)
+		case "cancel":
+			d, err := application.Diagnostics(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(d)
+		}
 		if flags.Arg(1) == "list" {
 			profiles, err := application.Models().ListProfiles(ctx)
 			if err != nil {

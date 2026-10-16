@@ -1,5 +1,5 @@
-// Package llm owns model and authentication metadata. No provider is enabled by
-// storing metadata; only a future successful Probe may make a profile ready.
+// Package llm owns model metadata and the private provider control contracts.
+// Storing metadata alone never enables a provider.
 package llm
 
 import (
@@ -135,6 +135,19 @@ func (p ProfileInput) Validate() error {
 		if v.value != nil && (math.IsNaN(*v.value) || math.IsInf(*v.value, 0) || *v.value < 0 || *v.value > v.max) {
 			return errors.New("invalid generation defaults")
 		}
+	}
+	return nil
+}
+
+// ValidateActivation applies current execution policy without changing the
+// persisted metadata format. Older candidates remain readable for diagnostics
+// and can be edited before testing/selecting them under today's Host limits.
+func (p ProfileInput) ValidateActivation() error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if p.ContextWindow > 1048576 || p.MaxOutputTokens > 65536 {
+		return errors.New("token limits exceed Host safety bounds (context 1048576, output 65536)")
 	}
 	return nil
 }
