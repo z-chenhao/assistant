@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -28,6 +29,9 @@ type Config struct {
 }
 
 var invalid = errors.New("invalid isolated coding workspace")
+
+// Safe Host doctor categories. Never include a provider response or host path.
+func diagnosis(phase string) error { return fmt.Errorf("%w: %s", invalid, phase) }
 
 func (c Config) Validate() error {
 	if !filepath.IsAbs(c.Root) || (c.Mode != "audit" && c.Mode != "edit") || len(c.Protected) > 128 {
@@ -108,7 +112,7 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 	count, total := 0, int64(0)
 	err = fs.WalkDir(source.FS(), ".", func(p string, d fs.DirEntry, e error) error {
 		if e != nil || ctx.Err() != nil {
-			return invalid
+			return diagnosis("metadata_walk")
 		}
 		count++
 		if count > 4096 {
@@ -121,21 +125,24 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 			if p == "." {
 				return nil
 			}
-			return os.MkdirAll(filepath.Join(metadata, p), 0700)
+			if os.MkdirAll(filepath.Join(metadata, p), 0700) != nil {
+				return diagnosis("metadata_copy")
+			}
+			return nil
 		}
 		if p == "config" || p == "config.worktree" || p == "info/attributes" || p == "index.lock" {
 			return nil
 		}
 		if d.Type()&os.ModeSymlink != 0 || p == "commondir" || p == "objects/info/alternates" {
-			return invalid
+			return diagnosis("metadata_link")
 		}
 		info, e := d.Info()
 		if e != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
-			return invalid
+			return diagnosis("metadata_file")
 		}
 		stat, ok := info.Sys().(*syscall.Stat_t)
 		if !ok || stat.Nlink != 1 {
-			return invalid
+			return diagnosis("metadata_hardlink")
 		}
 		total += info.Size()
 		if total > 8<<20 {
@@ -143,12 +150,15 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 		}
 		b, e := source.ReadFile(p)
 		if e != nil {
-			return invalid
+			return diagnosis("metadata_read")
 		}
-		return os.WriteFile(filepath.Join(metadata, p), b, 0600)
+		if os.WriteFile(filepath.Join(metadata, p), b, 0600) != nil {
+			return diagnosis("metadata_copy")
+		}
+		return nil
 	})
 	if err != nil {
-		return nil, invalid
+		return nil, err
 	}
 	bin, err := exec.LookPath("git")
 	if err != nil {
@@ -163,7 +173,7 @@ func git(ctx context.Context, c Config, args ...string) ([]byte, error) {
 	cmd.Stdout = out
 	cmd.Stderr = io.Discard
 	if cmd.Run() != nil || out.overflow {
-		return nil, invalid
+		return nil, diagnosis("git_command")
 	}
 	return out.data, nil
 }
@@ -199,7 +209,7 @@ func Definitions(c Config) ([]tool.Definition, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if _, err = git(ctx, c, "status", "--ignore-submodules=all", "--porcelain=v1", "-z", "--untracked-files=all"); err != nil {
-		return nil, invalid
+		return nil, err
 	}
 	identity, _ := json.Marshal(c)
 	base := tool.Spec{Version: 1, ResourceHash: hash(identity), ReplayPolicy: "safe", Permission: "read_only", Provider: "workspace:" + hash([]byte(c.Root)), Risk: "low", TimeoutMS: 300000, OutputBytes: 65536, ConflictPolicy: "workspace-v1"}

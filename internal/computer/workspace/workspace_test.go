@@ -39,6 +39,18 @@ func definition(t *testing.T, c Config, name string) tool.Definition {
 	t.Helper()
 	defs, err := Definitions(c)
 	if err != nil {
+		// Only disposable fixture metadata is logged. This remains available
+		// in Linux CI when a platform-specific doctor check rejects a fixture.
+		_ = filepath.WalkDir(filepath.Join(c.Root, ".git"), func(p string, d os.DirEntry, e error) error {
+			if e == nil && !d.IsDir() {
+				info, statErr := d.Info()
+				if statErr == nil {
+					relative, _ := filepath.Rel(c.Root, p)
+					t.Logf("fixture metadata %s mode=%s stat=%+v", relative, info.Mode(), info.Sys())
+				}
+			}
+			return nil
+		})
 		t.Fatal(err)
 	}
 	r, err := tool.NewRegistry(defs)
