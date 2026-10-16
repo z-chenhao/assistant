@@ -622,6 +622,121 @@ func TestToolWorkerUnknownReturnsUnknownUpdateAndKeepsTaskActive(t *testing.T) {
 	}
 }
 
+func TestToolWorkerRecoveryUnusableEvidencePersistsUnknown(t *testing.T) {
+	for _, name := range []string{"oversized", "success_with_error", "failure_without_error", "nonterminal_result", "nonterminal_state"} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			s, r, a, p := taskFixture(t)
+			d := effectDef(t, "query_before_retry")
+			invoke, query := d.Invoke, d.Query
+			var dispatches atomic.Int32
+			d.Invoke = func(ctx context.Context, request tool.Request) tool.Outcome {
+				dispatches.Add(1)
+				return invoke(ctx, request)
+			}
+			var authoritative atomic.Bool
+			d.Query = func(ctx context.Context, request tool.Request) tool.Evidence {
+				if authoritative.Load() {
+					return query(ctx, request)
+				}
+				switch name {
+				case "oversized":
+					return tool.Evidence{State: "succeeded", Result: tool.Result{Text: strings.Repeat("x", d.Spec.OutputBytes+1)}}
+				case "success_with_error":
+					return tool.Evidence{State: "succeeded", Result: tool.Failure("INVALID_ARGUMENT")}
+				case "failure_without_error":
+					return tool.Evidence{State: "failed", Result: tool.Result{Text: "receipt"}}
+				case "nonterminal_result":
+					return tool.Evidence{State: "failed", Result: tool.Failure("UNKNOWN_SIDE_EFFECT")}
+				default:
+					return tool.Evidence{State: "pending"}
+				}
+			}
+			definitions := []tool.Definition{d}
+			for _, spec := range a.Registry.Describe() {
+				definition, _ := a.Registry.Resolve(spec.Name)
+				definitions = append(definitions, definition)
+			}
+			registry, err := tool.NewRegistry(definitions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a.Registry, r.registry = registry, registry
+			sawWorkerError, sawMainUpdate := false, false
+			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				if isFollowup(req) {
+					for _, m := range req.Messages {
+						if m.Origin == "runtime" && strings.Contains(m.Text, `"kind":"unknown"`) {
+							sawMainUpdate = true
+						}
+					}
+					return llm.GenerationResult{Text: "Main observed uncertainty"}, nil
+				}
+				if isRoot(req) {
+					if last := req.Messages[len(req.Messages)-1]; last.Role == "tool" {
+						// The durable transition must precede delivery to the Worker.
+						sawWorkerError = strings.Contains(last.Text, "UNKNOWN_SIDE_EFFECT")
+						if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name=? AND status='unknown'`, toolfake.Name) != 1 {
+							t.Error("Worker received uncertainty before it was persisted")
+						}
+						return llm.GenerationResult{Text: "Worker finished reasoning"}, nil
+					}
+					return calls(toolfake.Name, `{"target":"R1","text":"reservation"}`), nil
+				}
+				if req.Messages[len(req.Messages)-1].Role == "tool" {
+					return llm.GenerationResult{Text: "Delegated"}, nil
+				}
+				return calls("builtin__task__manage", `{"operation":"create","task":"Reserve R1 after confirmation"}`), nil
+			}
+			mustSubmit(t, a, "delegate", "delegate reservation")
+			mustDrain(t, a)
+			approvePolicy(t, s, r)
+			var id, runID, args, key string
+			if err = s.db.QueryRow(`SELECT invocation_id,run_id,arguments_json,idempotency_key FROM tool_invocation WHERE tool_name=?`, toolfake.Name).Scan(&id, &runID, &args, &key); err != nil {
+				t.Fatal(err)
+			}
+			claim, err := r.Claim(ctx, runID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = r.ToolStore(claim).Start(ctx, id); err != nil {
+				t.Fatal(err)
+			}
+			request := tool.Request{Arguments: args, IdempotencyKey: key}
+			if outcome := d.Invoke(ctx, request); outcome.Result.Error != nil {
+				t.Fatal(outcome)
+			}
+			// Replace the owner after the independent effect committed, without
+			// committing its Tool result. The CLI harness proves actual SIGKILL.
+			if err = r.Release(ctx, claim); err != nil {
+				t.Fatal(err)
+			}
+			mustDrain(t, a)
+			if !sawWorkerError || !sawMainUpdate || scalar(t, s, `SELECT count(*) FROM task WHERE status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update WHERE kind='unknown'`) != 1 {
+				t.Fatal("unusable evidence falsely completed the Task or lost the Main update")
+			}
+			outcomes, err := r.ToolOutcomes(ctx)
+			if err != nil || len(outcomes) != 1 || outcomes[0].Status != "unknown" {
+				t.Fatal("uncertainty not available for reconciliation", outcomes, err)
+			}
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 {
+				t.Fatal("unknown report duplicated")
+			}
+			authoritative.Store(true)
+			if err = r.ReconcileUnknown(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if dispatches.Load() != 1 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND status='succeeded' AND idempotency_key=? AND arguments_json=? AND attempt_count=1 AND reconciliation_json IS NOT NULL`, id, key, args) != 1 {
+				t.Fatal("authoritative evidence did not settle the original call without dispatch")
+			}
+			if evidence := query(ctx, request); evidence.State != "succeeded" || !strings.Contains(evidence.Result.Text, "reservation") {
+				t.Fatal("original external receipt lost", evidence)
+			}
+		})
+	}
+}
+
 func TestToolHiddenFromWorkerIsNotResolvedOrValidated(t *testing.T) {
 	s, _, a, p := taskFixture(t)
 	sawHiddenResult := false

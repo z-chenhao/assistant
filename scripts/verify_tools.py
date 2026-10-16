@@ -160,6 +160,63 @@ def run(binary):
             return {'name': 'Worker_approval_and_unknown_report_to_Main', 'before': before, 'after': after}
         report['checks'].append(scenario('worker', worker))
 
+        def unusable_query(h):
+            h.send('delegate', 'Delegate effect: ' + json.dumps({'target': 'R1', 'text': 'reservation'}))
+            h.command('chat', 'work')
+            decide(h, h.command('approval', 'list')[-1])
+            child = h.hold('after_provider_effect')
+            child.send_signal(signal.SIGKILL)
+            child.communicate(timeout=10)
+            before = state(h)
+            inv = next(i for i in before['invocations'] if i['tool_name'] == 'mcp__fixture__send')
+            require(inv['status'] == 'running' and len(before['effects']) == 1, 'missing incomplete committed effect')
+            key = inv['idempotency_key']
+            receipt = before['effects'][0]['result']
+            ledger = Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db'
+            # Inject unusable external evidence without changing the frozen
+            # ToolSpec, arguments, key or domain state. Restore it for reconciliation.
+            with sqlite3.connect(ledger) as db:
+                db.execute('UPDATE effects SET result=? WHERE key=?',
+                           ('x' * (json.loads(inv['policy_json'])['output_bytes'] + 1), key))
+            h.command('chat', 'work')
+            after = state(h)
+            recovered = next(i for i in after['invocations'] if i['invocation_id'] == inv['invocation_id'])
+            require(recovered['status'] == 'unknown' and recovered['attempt_count'] == 1,
+                    'unusable query result lost durable uncertainty or dispatched again')
+            require(after['tasks'][0]['status'] == 'active' and len(after['updates']) == 1 and
+                    after['updates'][0]['kind'] == 'unknown', 'unusable recovery evidence completed Task')
+            messages = [m for g in after['generations'] for m in json.loads(g['request_json'])['messages']]
+            require(any(m['role'] == 'tool' and 'UNKNOWN_SIDE_EFFECT' in m['text'] for m in messages),
+                    'Worker did not receive the unknown error')
+            require(any(m.get('origin') == 'runtime' and '"kind":"unknown"' in m['text'] for m in messages),
+                    'Main did not receive the unknown update')
+            observations = h.command('approval', 'reconcile')
+            require(len(observations) == 1 and observations[0]['status'] == 'unknown',
+                    'unknown excluded from reconciliation')
+            h.command('chat', 'work')
+            restarted = state(h)
+            still_unknown = next(i for i in restarted['invocations'] if i['invocation_id'] == inv['invocation_id'])
+            require(still_unknown['status'] == 'unknown' and still_unknown['attempt_count'] == 1 and
+                    restarted['tasks'][0]['status'] == 'active' and len(restarted['updates']) == 1,
+                    'restart lost or duplicated uncertainty')
+            with sqlite3.connect(ledger) as db:
+                db.execute('UPDATE effects SET result=? WHERE key=?', (receipt, key))
+            settled = h.command('approval', 'reconcile')
+            require(len(settled) == 1 and settled[0]['status'] == 'succeeded' and
+                    settled[0]['result']['text'] == receipt, 'authoritative receipt did not settle call')
+            h.command('chat', 'work')
+            final = state(h)
+            original = next(i for i in final['invocations'] if i['invocation_id'] == inv['invocation_id'])
+            require(original['status'] == 'succeeded' and original['reconciliation_json'] is not None and
+                    original['attempt_count'] == 1 and len(final['effects']) == 1,
+                    'reconciliation dispatched again or lost evidence')
+            require(all(original[k] == inv[k] for k in ('idempotency_key', 'arguments_json', 'policy_json')),
+                    'recovery changed frozen call')
+            return {'name': 'Worker_unusable_query_persists_unknown_then_reconciles', 'signal': 'SIGKILL',
+                    'boundary': 'after_provider_effect', 'before': before, 'after': after,
+                    'reconcile_unknown': observations, 'restarted': restarted, 'settled': settled, 'final': final}
+        report['checks'].append(scenario('unusable-query', unusable_query))
+
         def cancel_waiter(h):
             h.send('delegate', 'Delegate effect: ' + json.dumps({'target': 'Alex', 'text': 'draft'}))
             h.command('chat', 'work')

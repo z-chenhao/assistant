@@ -240,15 +240,21 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 	p := d.Spec.Policy()
 	request := Request{Arguments: inv.Call.Arguments, IdempotencyKey: inv.Key}
 	if inv.Status == "unknown" || (inv.Status == "running" && p.Replay != "safe") {
-
-		if inv.Status != "unknown" && p.Replay == "never" {
-			if err := policyStore.Unknown(ctx, inv.ID); err != nil {
-				return Result{}, err
+		uncertain := func() (Result, error) {
+			// Persist uncertainty before the Loop can consume the error and
+			// finish its Run. Task reporting and reconciliation rely on it.
+			if inv.Status != "unknown" {
+				if err := policyStore.Unknown(ctx, inv.ID); err != nil {
+					return Result{}, err
+				}
 			}
 			return Failure("UNKNOWN_SIDE_EFFECT"), nil
 		}
+		if inv.Status != "unknown" && p.Replay == "never" {
+			return uncertain()
+		}
 		if d.Query == nil {
-			return Failure("UNKNOWN_SIDE_EFFECT"), nil
+			return uncertain()
 		}
 		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
 		evidence := d.Query(queryCtx, request)
@@ -256,7 +262,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		if evidence.State == "succeeded" || evidence.State == "failed" {
 			result := Normalize(evidence.Result)
 			if (evidence.State == "succeeded") != (result.Error == nil) || !result.terminal() || len(result.Text) > p.OutputBytes {
-				return Failure("UNKNOWN_SIDE_EFFECT"), nil
+				return uncertain()
 			}
 			if err := policyStore.Reconcile(ctx, inv.ID, result); err != nil {
 				return Result{}, err
@@ -266,12 +272,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		// unknown is terminal for retry purposes. Only an incomplete running
 		// query-before-retry call may proceed after authoritative absence.
 		if evidence.State != "absent" || inv.Status == "unknown" {
-			if inv.Status != "unknown" {
-				if err := policyStore.Unknown(ctx, inv.ID); err != nil {
-					return Result{}, err
-				}
-			}
-			return Failure("UNKNOWN_SIDE_EFFECT"), nil
+			return uncertain()
 		}
 	}
 	if err := e.Store.Start(ctx, inv.ID); err != nil {

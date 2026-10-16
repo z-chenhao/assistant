@@ -46,6 +46,9 @@ reconciled action with its observed status and safe result/receipt.
 A Root with any unresolved effect in its current tree reports `unknown` and keeps
 its Task active. A previously delivered unknown message is a historical observation; reconciliation
 does not rewrite Conversation history or claim a new user delivery.
+An oversized, inconsistent or nonterminal recovery query result is inconclusive.
+The executor persists `unknown` before delivering `UNKNOWN_SIDE_EFFECT` to the
+Worker, so the call remains available for later authoritative reconciliation.
 
 ## Provider contract
 
@@ -119,8 +122,10 @@ Do not retry such an action manually without resolving the original outcome.
 `make verify` runs `scripts/verify_tools.py` five times. Each run launches isolated
 real CLI processes with explicit `-test-bridge approval`/`approval-never` fixtures,
 proves setup readiness, drives decisions and steering, kills Go at four execution
-boundaries for both unsafe strategies, reads back invocation/approval/Outbox and
-a separate Fake external ledger, then joins children and removes temporary data.
+boundaries for both unsafe strategies, injects an oversized external receipt after
+a Worker effect commit/SIGKILL and later reconciles the original call, reads back
+invocation/approval/Outbox and a separate Fake external ledger, then joins children
+and removes temporary data.
 Reports are `evidence/tools-{1..5}.json`. The fixture tool is unavailable without
 explicit test injection. The Fake ledger is not a domain database and has no
 access to Run/Task state.
