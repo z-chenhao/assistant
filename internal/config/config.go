@@ -10,15 +10,35 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
-	Version int               `yaml:"version"`
-	App     App               `yaml:"app"`
-	NATS    eventnats.Options `yaml:"nats"`
-	LLM     LLM               `yaml:"llm"`
+	Delivery delivery.Policy   `yaml:"delivery"`
+	Version  int               `yaml:"version"`
+	Artifact artifact.Policy   `yaml:"artifact"`
+	App      App               `yaml:"app"`
+	NATS     eventnats.Options `yaml:"nats"`
+	Tools    ToolLimits        `yaml:"tools"`
+	Tasks    Tasks             `yaml:"tasks"`
+	LLM      LLM               `yaml:"llm"`
+}
+
+type ToolLimits struct {
+	ApprovalTTLSeconds int `yaml:"approval_ttl_seconds"`
+	Global             int `yaml:"global_concurrency"`
+	Agent              int `yaml:"agent_concurrency"`
+	Run                int `yaml:"run_concurrency"`
+	Provider           int `yaml:"provider_concurrency"`
+	Tool               int `yaml:"tool_concurrency"`
+}
+
+type Tasks struct {
+	RecentDays  int `yaml:"recent_days"`
+	RecentLimit int `yaml:"recent_limit"`
 }
 
 type LLM struct {
@@ -40,9 +60,13 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("resolve home directory")
 	}
 	cfg := Config{
-		Version: 1,
-		App:     App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
-		NATS:    eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
+		Version:  1,
+		Delivery: delivery.DefaultPolicy(),
+		Artifact: artifact.DefaultPolicy(),
+		Tools:    ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
+		Tasks:    Tasks{RecentDays: 30, RecentLimit: 200},
+		App:      App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
+		NATS:     eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
 	if path != "" {
 		f, err := os.Open(path)
@@ -77,8 +101,25 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
 	}
+	if cfg.Delivery.Validate() != nil {
+		return Config{}, errors.New("invalid delivery lease/retry/attempt policy")
+	}
+	if cfg.Artifact.Validate() != nil {
+		return Config{}, errors.New("invalid artifact retention/quota/size/batch policy")
+	}
 	if err := cfg.NATS.Validate(); err != nil {
 		return Config{}, err
+	}
+	if cfg.Tools.ApprovalTTLSeconds < 1 || cfg.Tools.ApprovalTTLSeconds > 86400 {
+		return Config{}, errors.New("tools approval_ttl_seconds must be 1..86400")
+	}
+	for _, limit := range []int{cfg.Tools.Global, cfg.Tools.Agent, cfg.Tools.Run, cfg.Tools.Provider, cfg.Tools.Tool} {
+		if limit < 1 || limit > 1024 {
+			return Config{}, errors.New("tools concurrency limits must be 1..1024")
+		}
+	}
+	if cfg.Tasks.RecentDays < 1 || cfg.Tasks.RecentDays > 3650 || cfg.Tasks.RecentLimit < 1 || cfg.Tasks.RecentLimit > 10000 {
+		return Config{}, errors.New("tasks requires recent_days 1..3650 and recent_limit 1..10000")
 	}
 	if cfg.Version != 1 {
 		return Config{}, errors.New("unsupported configuration version (expected 1)")

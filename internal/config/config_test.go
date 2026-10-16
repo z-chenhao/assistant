@@ -42,9 +42,16 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 
 func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	for name, body := range map[string]string{
+		"delivery-lease":      "version: 1\ndelivery:\n  lease_seconds: 0",
+		"delivery-retry":      "version: 1\ndelivery:\n  retry_milliseconds: 0",
+		"delivery-attempts":   "version: 1\ndelivery:\n  max_attempts: 21",
 		"llm-missing-script":  "version: 1\nllm:\n  provider_bridge_command: SECRET_SENTINEL",
 		"llm-relative-script": "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: SECRET_SENTINEL\n  provider_bridge_version: pi-ai-1.3.0-v1",
 		"llm-unknown-version": "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: /script.mjs\n  provider_bridge_version: SECRET_SENTINEL",
+		"artifact-zero":       "version: 1\nartifact:\n  max_bytes: 0",
+		"artifact-quota":      "version: 1\nartifact:\n  quota_bytes: 1",
+		"artifact-retention":  "version: 1\nartifact:\n  retention_days: -1",
+		"artifact-batch":      "version: 1\nartifact:\n  cleanup_batch: 0",
 		"empty":               "",
 		"missing-version":     "app: {}",
 		"future-version":      "version: 2",

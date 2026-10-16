@@ -397,6 +397,7 @@ Intelligent UI 采用 Delivery 层的声明式组件协议 `UISpec`：
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。
+- M3 本地实现的 `builtin__artifact__save/read/describe/list/publish` 经过同一个 ToolInvocation/Executor。`artifact_write` 只允许本地不可变新产物和显式最终输出选择，不允许外部发送、上传或删除；读取使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](artifacts.md)。
 
 ## 5. 模型与 Agent 决策
 
