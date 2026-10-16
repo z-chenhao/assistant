@@ -82,18 +82,29 @@ function transport(connection, signal, state) {
 const zeroUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input:0, output:0, cacheRead:0, cacheWrite:0, total:0 } });
 function context(r, model) {
   const messages = [];
+  const systems=[];
+  let calls=new Map();
   for (const m of r.messages) {
-    if (m.role === 'user') messages.push({ role:'user', content:m.text, timestamp:0 });
+    if (m.role === 'system') {
+      if(messages.length) fail('INVALID_PROVIDER_RESPONSE');
+      systems.push(m.text);
+    }
+    else if (m.role === 'user') messages.push({ role:'user', content:m.text, timestamp:0 });
     // Account tools are always declared under the fixed erii namespace. Restore
     // it on replay without adding provider metadata to the Host ToolCall schema.
-    else if (m.role === 'assistant') messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments),...(model.provider==='openai'?{namespace:'erii'}:{})}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
+    else if (m.role === 'assistant') {
+      calls=new Map((m.tool_calls ?? []).map(t=>[t.id,t]));
+      if(calls.size!==(m.tool_calls ?? []).length) fail('INVALID_PROVIDER_RESPONSE');
+      messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments),...(model.provider==='openai'?{namespace:'erii'}:{})}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
+    }
     else if (m.role === 'tool') {
-      const call = r.messages.flatMap(m => m.tool_calls ?? []).find(t => t.id === m.tool_call_id);
+      const call = calls.get(m.tool_call_id);
       if (!call) fail('INVALID_PROVIDER_RESPONSE');
       messages.push({ role:'toolResult', toolCallId:m.tool_call_id, toolName:call.name, content:[{type:'text',text:m.text}], isError:false, timestamp:0 });
+      calls.delete(m.tool_call_id);
     } else fail('INVALID_PROVIDER_RESPONSE');
   }
-  return { messages, tools:(r.tools ?? []).map(t => ({name:t.name,description:'',parameters:JSON.parse(t.input_schema)})) };
+  return { systemPrompt:systems.join('\n\n'), messages, tools:(r.tools ?? []).map(t => ({name:t.name,description:'',parameters:JSON.parse(t.input_schema)})) };
 }
 
 async function generate(r, job, send) {

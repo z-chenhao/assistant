@@ -6,8 +6,9 @@ Pi's Chat Completions and Responses adapters are imported. Installation download
 SDK dependency tree; it adds no hosted service or account cost. Its SDK still
 brings other provider packages transitively, although Erii does not enable them.
 Current OpenAI account OAuth is also implemented; see the account lifecycle below.
-Main/Worker Runs, Conversation recovery, and general Durable Replay remain later
-slices. This is not complete M1.
+The [Main CLI](main-loop.md) uses the same Bridge for frozen Run requests,
+Direct Tool continuation and Conversation recovery. Worker Runs and general
+Durable Replay remain later slices. This is not complete M1.
 
 ## ChatGPT account lifecycle
 

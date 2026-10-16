@@ -61,6 +61,9 @@ type GenerationRequest struct {
 	// AuthEpoch is captured by the Host resolver and passed only to final
 	// persistence. It is not part of the frozen snapshot or Bridge protocol.
 	AuthEpoch int64 `json:"-"`
+	// OwnerToken is installed by the Host RunStore for fenced acceptance. It
+	// never crosses the Provider wire or appears in a frozen request hash.
+	OwnerToken string `json:"-"`
 	// Finalize serializes the usage commit with acknowledged cancellation.
 	// The Host installs it per registration; it never crosses the Bridge wire.
 	Finalize func(commit func(cancelled bool) error) error `json:"-"`

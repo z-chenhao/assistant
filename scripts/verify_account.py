@@ -76,8 +76,8 @@ def verify(binary, bridge):
                     with urllib.request.urlopen(request, timeout=20) as response:
                         return json.load(response)
 
-                def run(*command, ok=True):
-                    p = subprocess.run(args + list(command), env=env, text=True, input="", capture_output=True, timeout=25)
+                def run(*command, ok=True, text=""):
+                    p = subprocess.run(args + list(command), env=env, text=True, input=text, capture_output=True, timeout=25)
                     ordinary_output.append((p.stdout + p.stderr).encode())
                     require((p.returncode == 0) == ok, "CLI unexpected exit: " + " ".join(command[:2]) + " " + p.stderr[:100])
                     if not ok:
@@ -117,6 +117,15 @@ def verify(binary, bridge):
                 require(status["readiness"] == "ready", "account activation failed")
                 require(run("status")["agent_ingress_enabled"], "restart lost readiness")
                 report["checks"].append("browser PKCE, verified identity, dynamic model picker, actual Pi Responses probe, activation and restart")
+                run("chat", "send", "account-main", text="actual account Main conversation")
+                run("chat", "work")
+                history = run("chat", "history")
+                require([m["role"] for m in history] == ["user", "assistant"] and history[-1]["content"][0]["text"] == "PROBE_RESULT_OK", "account Main/Direct Tool continuation failed")
+                with sqlite3.connect(root / "data/state.db") as main_db:
+                    require(main_db.execute("SELECT count(*) FROM run WHERE status='completed'").fetchone()[0] == 1, "account Main not complete")
+                    require(main_db.execute("SELECT count(*) FROM tool_invocation WHERE status='succeeded'").fetchone()[0] == 1, "account Direct Tool not persisted")
+                report["main_history"] = history
+                report["checks"].append("actual account CLI Main Actor/Loop/Direct Tool/Conversation and frozen current Responses snapshot")
 
                 # Force near-expiry solely in the in-memory SecretStore, then race
                 # separate Host/Bridge processes against the rotating session.

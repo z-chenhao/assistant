@@ -20,6 +20,16 @@ type Connection struct {
 type Resolver func(context.Context, llm.Snapshot) (Connection, error)
 type Observer func(context.Context, llm.GenerationRequest, Connection, llm.GenerationResult, time.Duration, error) error
 
+// OpenObserved installs Host acceptance for an explicitly injected fixture.
+func OpenObserved(ctx context.Context, path string, observer Observer, args ...string) (*Client, error) {
+	c, err := Open(ctx, path, args...)
+	if err != nil {
+		return nil, err
+	}
+	c.observer = observer
+	return c, nil
+}
+
 // OpenLocal installs trusted resolution before any request can use the client.
 func OpenLocal(ctx context.Context, path, script string, resolver Resolver, observer Observer) (*Client, error) {
 	c, err := Open(ctx, path, script)

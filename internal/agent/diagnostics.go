@@ -1,4 +1,4 @@
-// Package agent owns application readiness. No Agent Loop executes in M0.
+// Package agent owns readiness, Actor coordination and the reusable Agent Loop.
 package agent
 
 import (

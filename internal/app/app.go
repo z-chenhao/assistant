@@ -4,13 +4,17 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
 	"github.com/z-chenhao/erii/internal/config"
+	"github.com/z-chenhao/erii/internal/conversation"
+	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"github.com/z-chenhao/erii/internal/llm"
@@ -20,6 +24,7 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/erii/internal/tool"
 )
 
 type App struct {
@@ -28,6 +33,9 @@ type App struct {
 	provider  *bridge.Client
 	control   llm.Control
 	accounts  *account.Manager
+	history   *conversationsqlite.Store
+	runs      *sqlite.Runs
+	registry  *tool.Registry
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
@@ -68,12 +76,20 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, errors.Join(err, t.Close())
 	}
 	a := &App{store: store, telemetry: t}
+	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
+	if err != nil {
+		_ = store.Close()
+		_ = t.Close()
+		return nil, err
+	}
+	a.registry = tool.EchoRegistry()
+	a.runs = store.Runs(a.history, a.registry)
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {
-			a.provider, err = bridge.Open(ctx, path, "-test-provider-bridge", fixture)
+			a.provider, err = bridge.OpenObserved(ctx, path, a.accounts.Observer(a.recordGeneration), "-test-provider-bridge", fixture)
 		}
 		if err != nil {
 			a.control.BridgeError = llm.NormalizeError(err.Error())
@@ -83,7 +99,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 	}
 	if fixture == "" && cfg.LLM.ProviderBridgeCommand != "" {
-		a.provider, err = bridge.OpenLocal(ctx, cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, a.accounts.Resolver(store.Models().Resolver(secrets)), a.accounts.Observer(store.Models().RecordUsage))
+		a.provider, err = bridge.OpenLocal(ctx, cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, a.accounts.Resolver(store.Models().Resolver(secrets)), a.accounts.Observer(a.recordGeneration))
 		if err != nil {
 			a.control.BridgeError = llm.NormalizeError(err.Error())
 		} else {
@@ -132,8 +148,41 @@ func (a *App) Close() error {
 		_ = a.provider.Close()
 	}
 	err := a.store.Close()
+	err = errors.Join(err, a.history.Close())
 	a.telemetry.Logger.Info("application stopped")
 	return errors.Join(err, a.telemetry.Close())
+}
+
+func (a *App) recordGeneration(ctx context.Context, r llm.GenerationRequest, result llm.GenerationResult, latency time.Duration, cause error) error {
+	err := a.store.Models().RecordUsageAnd(ctx, r, result, latency, cause, func(ctx context.Context, tx *sql.Tx, r llm.GenerationRequest, result llm.GenerationResult, cause error) error {
+		return a.store.AcceptGeneration(ctx, tx, r, result, cause)
+	})
+	if err == nil && r.OwnerToken != "" && a.store.MainBoundary != nil {
+		a.store.MainBoundary("after_generation_commit")
+	}
+	return err
+}
+
+func (a *App) SetTestMainBoundary(boundary func(string)) { a.store.MainBoundary = boundary }
+func (a *App) Actor(sink agent.EventSink) agent.Actor {
+	var provider llm.LLMProvider
+	if a.provider != nil {
+		provider = a.provider
+	}
+	return agent.Actor{Store: a.runs, Provider: provider, Registry: a.registry, Sink: sink, Ready: func(ctx context.Context) bool {
+		d, err := a.Diagnostics(ctx)
+		return err == nil && d.AgentIngressEnabled
+	}}
+}
+func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
+	if err := a.runs.Flush(ctx); err != nil {
+		return nil, err
+	}
+	d, err := a.store.Diagnostics(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return a.history.List(ctx, d.AgentID)
 }
 
 // Relay runs infrastructure only. It never enables Agent ingress or a model.
