@@ -74,7 +74,9 @@ use a 30-second SDK bound and the Host Probe a ten-second total bound; cancellat
 and cleanup retain the existing one-second bound. The error body is discarded,
 except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
 context-length classification. SDK console sinks are disabled because malformed
-SSE parsing can otherwise print provider chunks. Errors contain stable codes only.
+SSE parsing can otherwise print provider chunks. Raw response streams are limited
+to 4 MiB before SDK parsing, and normalized Tool Calls retain the Host bounds
+of 32 calls and 64 KiB of arguments. Errors contain stable codes only.
 
 Readiness checks the saved proof, current credential availability, and Bridge RPC
 health. It does not require catalog support or certify current endpoint health;

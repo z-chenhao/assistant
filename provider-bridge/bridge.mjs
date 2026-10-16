@@ -56,7 +56,20 @@ function transport(connection, signal, state) {
         if (machineCode === 'context_length_exceeded') state.code='CONTEXT_LENGTH_EXCEEDED';
         fail(state.code);
       }
-      return response;
+      // Bound raw SSE before Pi can accumulate a partial JSON/tool argument buffer.
+      const reader=response.body.getReader(); let received=0;
+      return new Response(new ReadableStream({
+        async pull(controller) {
+          try {
+            const {value,done}=await reader.read();
+            if(done){controller.close();return;}
+            received+=value.byteLength;
+            if(received>4<<20){state.code='INVALID_PROVIDER_RESPONSE';await reader.cancel();controller.error(new Error(state.code));return;}
+            controller.enqueue(value);
+          } catch {state.code='INVALID_PROVIDER_RESPONSE';controller.error(new Error(state.code));}
+        },
+        cancel(reason){return reader.cancel(reason);}
+      }),{status:response.status,headers:response.headers});
     }
   };
 }
@@ -79,7 +92,7 @@ function context(r, model) {
 async function generate(r, job, send) {
   const started = performance.now();
   let sequence = 0;
-  const event = (kind, rest = {}) => { if (!job.cancelled) send({jsonrpc:'2.0',method:'generation.event',params:{generation_id:r.generation_id,sequence:++sequence,kind,...rest}}); };
+  const event = (kind, rest = {}) => { if (!job.cancelled) { send({jsonrpc:'2.0',method:'generation.event',params:{generation_id:r.generation_id,sequence:sequence+1,kind,...rest}}); sequence++; } };
   const s = r.model_snapshot;
   const state = {};
   try {
@@ -89,14 +102,18 @@ async function generate(r, job, send) {
     // Optional compatibility and sampling stay conservative until individually probed.
     const events = stream(model, normalizeContext(context(r, model)), { apiKey:r.connection.api_key || 'sdk-constructor-only', fetch:transport(r.connection,job.controller.signal,state), signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:30000, onProviderStreamEvent:e=>{if(e.usage) {if(!Number.isSafeInteger(e.usage.prompt_tokens) || !Number.isSafeInteger(e.usage.completion_tokens) || e.usage.prompt_tokens<0 || e.usage.completion_tokens<0) fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}} });
     let terminal = false;
-    let count = 0, bytes = 0;
+    let count = 0, bytes = 0, tools = 0;
     for await (const e of events) {
       if (++count > 4096) fail('INVALID_PROVIDER_RESPONSE');
       if (e.type === 'text_delta') {
         bytes += Buffer.byteLength(e.delta);
         if (bytes > 1 << 20) fail('INVALID_PROVIDER_RESPONSE');
         event('text_delta',{text:e.delta});
-      } else if (e.type === 'toolcall_end') event('tool_call',{tool_call:{id:e.toolCall.id,name:e.toolCall.name,arguments:JSON.stringify(e.toolCall.arguments)}});
+      } else if (e.type === 'toolcall_end') {
+        const argumentsJSON=JSON.stringify(e.toolCall.arguments);
+        if(++tools>32 || Buffer.byteLength(argumentsJSON)>65536) fail('INVALID_PROVIDER_RESPONSE');
+        event('tool_call',{tool_call:{id:e.toolCall.id,name:e.toolCall.name,arguments:argumentsJSON}});
+      }
       else if (e.type === 'done') {
         terminal = true;
         const u = e.message.usage;
@@ -176,7 +193,7 @@ export async function handle(f, send) {
 // Bounded framing, concurrent dispatch for cancellation, stdout exclusively RPC.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let buffer=Buffer.alloc(0);
-  const send=f=>process.stdout.write(JSON.stringify(f)+'\n');
+  const send=f=>{const data=JSON.stringify(f);if(Buffer.byteLength(data)>=1<<20)fail('INVALID_PROVIDER_RESPONSE');process.stdout.write(data+'\n');};
   process.stdin.on('data',chunk=> {
     buffer=Buffer.concat([buffer,chunk]);
     for(;;) {

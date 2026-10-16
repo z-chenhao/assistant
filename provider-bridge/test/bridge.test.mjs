@@ -26,6 +26,9 @@ async function fixture(t, mode='success') {
   if(mode==='retry' && requests.length<3){res.writeHead(503);res.end('unsafe-secret');return;}
   res.writeHead(200,{'content-type':'text/event-stream'});
   const chunk=(delta,finish_reason=null,usage)=>res.write('data: '+JSON.stringify({id:'fixture',object:'chat.completion.chunk',model:'fixture-model',choices:[{index:0,delta,finish_reason}],...(usage ? {usage}: {})})+'\n\n');
+  if(mode==='oversized-frame'){chunk({content:'\n'.repeat(600000)});chunk({},'stop');res.end('data: [DONE]\n\n');return;}
+  if(mode==='oversized-stream'){res.end('data: '+JSON.stringify({choices:[{index:0,delta:{content:'x'.repeat(5<<20)},finish_reason:null}]})+'\n\n');return;}
+  if(mode==='oversized-tool'){chunk({tool_calls:[{index:0,id:'call_big',type:'function',function:{name:'probe_echo',arguments:JSON.stringify({value:'x'.repeat(70000)})}}]});chunk({},'tool_calls');res.end('data: [DONE]\n\n');return;}
   if(mode==='malformed'){res.end('data: {oops}\n\n');return;}
   if(mode==='cancel'||mode==='partial') {
    chunk({content:'partial'});
@@ -87,7 +90,7 @@ test('Pi tool call and result continuation',{timeout:10000},async t=>{
  assert.equal(f.requests[1].body.messages.at(-1).tool_call_id,'call_echo');
 });
 
-for(const [mode,code,attempts] of [['auth','AUTH_REQUIRED',1],['missing','MODEL_NOT_FOUND',1],['context','CONTEXT_LENGTH_EXCEEDED',1],['context400','CONTEXT_LENGTH_EXCEEDED',1],['bad','MODEL_INCOMPATIBLE',1],['rate','RATE_LIMITED',3],['unavailable','PROVIDER_UNAVAILABLE',3],['malformed','INVALID_PROVIDER_RESPONSE',1],['invalid-usage','INVALID_PROVIDER_RESPONSE',1],['partial','INVALID_PROVIDER_RESPONSE',1],['redirect','MODEL_INCOMPATIBLE',1]])test(`${mode} normalizes errors and bounds attempts`,{timeout:10000},async t=>{
+for(const [mode,code,attempts] of [['auth','AUTH_REQUIRED',1],['missing','MODEL_NOT_FOUND',1],['context','CONTEXT_LENGTH_EXCEEDED',1],['context400','CONTEXT_LENGTH_EXCEEDED',1],['bad','MODEL_INCOMPATIBLE',1],['rate','RATE_LIMITED',3],['unavailable','PROVIDER_UNAVAILABLE',3],['malformed','INVALID_PROVIDER_RESPONSE',1],['oversized-tool','INVALID_PROVIDER_RESPONSE',1],['oversized-frame','INVALID_PROVIDER_RESPONSE',1],['oversized-stream','INVALID_PROVIDER_RESPONSE',1],['invalid-usage','INVALID_PROVIDER_RESPONSE',1],['partial','INVALID_PROVIDER_RESPONSE',1],['redirect','MODEL_INCOMPATIBLE',1]])test(`${mode} normalizes errors and bounds attempts`,{timeout:10000},async t=>{
  const f=await fixture(t,mode);await f.rpc('generation.start',f.request({connection:{endpoint:f.endpoint,api_key:'unsafe-secret'}}));
  const e=await f.wait(e=>e.kind==='error');assert.equal(e.error_code,code);assert.equal(f.requests.length,attempts);assert.equal(f.stats().trapped,0);assert(!JSON.stringify(f.events).includes('unsafe-secret'));assert(!f.events.some(e=>e.kind==='completed'));
 });
