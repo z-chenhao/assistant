@@ -40,8 +40,29 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	}
 }
 
+func TestMCPRejectsDataRootThroughAliasBeforeItExists(t *testing.T) {
+	base := t.TempDir()
+	real := filepath.Join(base, "provider")
+	alias := filepath.Join(base, "alias")
+	if err := os.Mkdir(real, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(base, "config.yaml")
+	body := "version: 1\napp:\n  data_root: " + filepath.Join(alias, "new-data") + "\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: " + real + "\n    tools: {read: read_only}\n"
+	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path, noEnv); err == nil {
+		t.Fatal("provider can access a future domain data directory through an alias")
+	}
+}
+
 func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	for name, body := range map[string]string{
+		"mcp-overlapping-providers": "version: 1\nmcp:\n  - name: first\n    command: /usr/bin/python3\n    directory: /provider\n    tools: {read: read_only}\n  - name: second\n    command: /usr/bin/python3\n    directory: /provider/child\n    tools: {read: read_only}",
 		"mcp-root-scope":            "version: 1\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /\n    tools: {read: read_only}",
 		"workspace-overlaps-data":   "version: 1\napp:\n  data_root: /scope/data\nworkspace:\n  root: /scope\n  mode: edit",
 		"workspace-overlaps-skills": "version: 1\nskills:\n  root: /scope/skills\n  scope: agent\nworkspace:\n  root: /scope\n  mode: edit",

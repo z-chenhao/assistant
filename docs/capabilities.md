@@ -19,7 +19,7 @@ user HOME or network access is available to the server. Its executable, system
 runtime files and configured provider directory are the only file-read scopes;
 only that directory is writable. Put interpreted server code/dependencies there
 if using a system interpreter. The provider directory must not overlap domain
-data, Skills or the coding checkout. The command must be self-contained or use
+data, Skills, the coding checkout or another provider directory. The command must be self-contained or use
 the exposed system runtime; arbitrary host package paths are unavailable.
 
 The adapter implements MCP `2025-03-26` newline JSON-RPC stdio initialization,

@@ -134,11 +134,19 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if !filepath.IsAbs(cfg.App.DataRoot) {
 		return Config{}, errors.New("app.data_root must be an absolute path")
 	}
+	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
 	seenServers := map[string]bool{}
+	providerDirectories := []string{}
 	for _, server := range cfg.MCP {
 		if server.Validate() != nil || seenServers[server.Name] || overlaps(server.Directory, cfg.App.DataRoot) || (cfg.Skills != nil && overlaps(server.Directory, cfg.Skills.Root)) || (cfg.Workspace != nil && overlaps(server.Directory, cfg.Workspace.Root)) {
 			return Config{}, errors.New("invalid or duplicate MCP configuration")
 		}
+		for _, directory := range providerDirectories {
+			if overlaps(directory, server.Directory) {
+				return Config{}, errors.New("MCP provider directories must not overlap")
+			}
+		}
+		providerDirectories = append(providerDirectories, server.Directory)
 		seenServers[server.Name] = true
 	}
 	if cfg.Skills != nil && cfg.Skills.Validate() != nil {
@@ -167,16 +175,25 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 }
 
 func overlaps(a, b string) bool {
-	// Resolve existing aliases before comparing; nonexistent paths are checked
-	// again by the adapters when opened.
-	if p, e := filepath.EvalSymlinks(a); e == nil {
-		a = p
+	// A new data directory may not exist yet. Resolve its closest existing
+	// ancestor too, otherwise /alias/new-data can evade /real/provider scope.
+	canonical := func(path string) string {
+		original := path
+		tail := []string{}
+		for {
+			if p, e := filepath.EvalSymlinks(path); e == nil {
+				return filepath.Join(append([]string{p}, tail...)...)
+			}
+			parent := filepath.Dir(path)
+			if parent == path {
+				return filepath.Clean(original)
+			}
+			tail = append([]string{filepath.Base(path)}, tail...)
+			path = parent
+		}
 	}
-	if p, e := filepath.EvalSymlinks(b); e == nil {
-		b = p
-	}
-	a = filepath.Clean(a)
-	b = filepath.Clean(b)
+	a = canonical(a)
+	b = canonical(b)
 	within := func(parent, child string) bool {
 		relative, err := filepath.Rel(parent, child)
 		return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))

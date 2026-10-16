@@ -39,7 +39,9 @@ def prepare(binary, root, mode='edit'):
     for args in [('init', '-q'), ('add', '.'),
                  ('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
                   'commit', '-qm', 'fixture')]:
-        subprocess.run(['git', *args], cwd=repo, check=True, capture_output=True)
+        subprocess.run(['git', *args], cwd=repo, check=True, capture_output=True,
+                       env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent',
+                            'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'})
     (repo / 'docs/notes.md').write_text('USER_UNCOMMITTED_SENTINEL\n')
     hook = repo / '.git/hooks/pre-commit'
     hook.write_text('#!/bin/sh\necho must-not-run > hook-ran\nexit 1\n')
