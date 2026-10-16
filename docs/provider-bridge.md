@@ -90,9 +90,16 @@ M1 will persist model-call/Conversation completion and recovery decisions.
 Frames are bounded to 1 MiB; generation output to the smaller of 64 KiB and four
 bytes per requested output token, on a UTF-8 boundary. This is a byte safety bound,
 not tokenization or a context-limit estimate. There are at most 4096 distinct
-sequence events and 32 Tool Calls (64 KiB of arguments per call). Host RPC calls
-have a five-second bound per wire exchange, including writer admission and pipe I/O; behavioral
-Probe has a ten-second bound. Writer admission observes cancellation, and pipe
+sequence events and 32 Tool Calls (64 KiB of arguments per call). The reader
+validates and deduplicates events independently of sink speed,
+clips text before retaining it, and queues only each kind's normalized payload.
+Each generation mailbox holds the full 4096-event budget plus one rejection;
+matching duplicates consume no slots. Slow sinks cannot block the shared reader's
+RPC replies. Queued text shares the output byte bound, Tool Calls retain the
+existing count/frame/argument bounds, and sequence history stores only digests.
+Sink callbacks run synchronously; cancellation is observed between callbacks.
+Host RPC calls have a five-second bound per wire exchange, including writer
+admission and pipe I/O; behavioral Probe has a ten-second bound. Writer admission observes cancellation, and pipe
 deadlines interrupt a blocked write without leaking a writer goroutine. A partial
 frame terminates and reaps that Bridge instead of reusing a corrupted stream.
 Cancellation and cleanup have independent one-second contexts. Close can abandon

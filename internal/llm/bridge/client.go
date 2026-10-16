@@ -5,7 +5,6 @@ package bridge
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode/utf8"
 
 	"github.com/z-chenhao/erii/internal/llm"
 )
@@ -43,7 +41,7 @@ type process struct {
 	stopOnce sync.Once
 	mu       sync.Mutex
 	pending  map[uint64]chan frame
-	events   map[string]chan llm.GenerationEvent
+	events   map[string]*eventStream
 	done     chan struct{}
 	wait     chan struct{}
 	failure  error
@@ -170,7 +168,7 @@ func (c *Client) startProcess(ctx context.Context) (*process, error) {
 		_ = out.Close()
 		return nil, llm.ProviderUnavailable
 	}
-	p := &process{cmd: cmd, in: in, write: make(chan struct{}, 1), pending: map[uint64]chan frame{}, events: map[string]chan llm.GenerationEvent{}, done: make(chan struct{}), wait: make(chan struct{})}
+	p := &process{cmd: cmd, in: in, write: make(chan struct{}, 1), pending: map[uint64]chan frame{}, events: map[string]*eventStream{}, done: make(chan struct{}), wait: make(chan struct{})}
 	go p.read(out)
 	// Wait only after read has consumed stdout. Close always reaps this child.
 	go func() { <-p.done; _ = cmd.Wait(); close(p.wait) }()
@@ -218,14 +216,8 @@ func (p *process) read(out io.Reader) {
 				p.fail(llm.InvalidProviderResponse)
 				return
 			}
-			if ch := p.events[e.GenerationID]; ch != nil {
-				select {
-				case ch <- e:
-				default:
-					p.mu.Unlock()
-					p.fail(llm.InvalidProviderResponse)
-					return
-				}
+			if stream := p.events[e.GenerationID]; stream != nil {
+				stream.accept(e)
 			}
 		} else {
 			p.mu.Unlock()
@@ -423,13 +415,13 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		}
 		return llm.GenerationResult{}, err
 	}
-	ch := make(chan llm.GenerationEvent, 64)
+	stream := newEventStream(r.GenerationID, r.Snapshot.MaxOutputTokens)
 	p.mu.Lock()
 	if p.events[r.GenerationID] != nil {
 		p.mu.Unlock()
 		return llm.GenerationResult{}, llm.InvalidProviderResponse
 	}
-	p.events[r.GenerationID] = ch
+	p.events[r.GenerationID] = stream
 	p.mu.Unlock()
 	defer func() { p.mu.Lock(); delete(p.events, r.GenerationID); p.mu.Unlock() }()
 	dispatched, err := c.exchange(ctx, p, method, r, nil)
@@ -449,66 +441,37 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, err
 	}
 	result := llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
-	seen := map[int64][32]byte{}
-	var last int64
-	limit := MaxOutputBytes
-	if r.Snapshot.MaxOutputTokens < int64(limit/4) {
-		limit = int(r.Snapshot.MaxOutputTokens * 4)
-	}
 	for {
 		if ctx.Err() != nil {
 			return llm.GenerationResult{}, c.cancelGeneration(ctx, p, r.GenerationID)
 		}
-		var e llm.GenerationEvent
+		var d eventDelivery
 		select {
 		case <-ctx.Done():
 			continue
 		case <-p.done:
 			select {
-			case e = <-ch:
+			case d = <-stream.events:
 			default:
 				return llm.GenerationResult{}, p.err()
 			}
-		case e = <-ch:
+		case d = <-stream.events:
 		}
-		encoded, _ := json.Marshal(e)
-		digest := sha256.Sum256(encoded)
-		if prior, ok := seen[e.Sequence]; ok {
-			if prior != digest {
-				return llm.GenerationResult{}, llm.InvalidProviderResponse
-			}
-			continue
+		if d.err != nil {
+			return llm.GenerationResult{}, d.err
 		}
-		if e.Sequence != last+1 || e.Sequence > 4096 {
-			return llm.GenerationResult{}, llm.InvalidProviderResponse
-		}
-		last = e.Sequence
-		seen[last] = digest
+		e := d.event
+		result.Clipped = result.Clipped || d.clipped
 		switch e.Kind {
 		case "text_delta":
-			remaining := limit - len(result.Text)
-			if len(e.Text) > remaining {
-				for remaining > 0 && !utf8.ValidString(e.Text[:remaining]) {
-					remaining--
-				}
-				e.Text = e.Text[:remaining]
-				result.Clipped = true
-			}
 			result.Text += e.Text
 		case "tool_call":
-			if e.ToolCall == nil || e.ToolCall.ID == "" || e.ToolCall.Name == "" || len(result.ToolCalls) >= 32 || len(e.ToolCall.Arguments) > MaxOutputBytes {
-				return llm.GenerationResult{}, llm.InvalidProviderResponse
-			}
 			result.ToolCalls = append(result.ToolCalls, *e.ToolCall)
 		case "completed":
 			if sink != nil {
 				sink(e)
 			}
 			return result, nil
-		case "error":
-			return llm.GenerationResult{}, llm.NormalizeError(e.ErrorCode)
-		default:
-			return llm.GenerationResult{}, llm.InvalidProviderResponse
 		}
 		if sink != nil {
 			sink(e)
