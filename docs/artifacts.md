@@ -75,7 +75,12 @@ Large text exceeding the frozen Tool output limit and internal provider binary
 streams become Artifacts before any result event, checkpoint or next generation.
 Small Tool outputs retain their existing representation. Only an accepted
 `publish` invocation can select final outputs; provider result fields cannot
-select them. A published reference
+select them. Binary consumption and publication validation keep the same frozen
+Tool deadline. The Executor closes returned closable streams, including on
+expiry/cancellation, and joins cancellation cleanup before returning. Failed
+normalization rolls back metadata, pins and publications before committing the
+Tool error. An external-effect stream timeout remains `unknown` and never
+retries the effect. A published reference
 is a resource address; it grants no external upload permission or approval.
 
 `publish` explicitly adds selected final outputs for that Run; it is idempotent

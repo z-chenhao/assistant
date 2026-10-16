@@ -279,7 +279,11 @@ func (r *contextReader) Read(b []byte) (int, error) {
 	if err := r.ctx.Err(); err != nil {
 		return 0, err
 	}
-	return r.src.Read(b)
+	n, err := r.src.Read(b)
+	if cause := r.ctx.Err(); cause != nil {
+		return 0, cause
+	}
+	return n, err
 }
 func (s *Store) sync() error {
 	f, e := s.root.Open(".")
@@ -334,7 +338,7 @@ func (s *Store) OpenTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref st
 		return nil, err
 	}
 	h := sha256.New()
-	n, err := io.Copy(h, io.LimitReader(f, d.ByteSize+1))
+	n, err := io.Copy(h, io.LimitReader(&contextReader{ctx, f}, d.ByteSize+1))
 	if err != nil || n != d.ByteSize || hex.EncodeToString(h.Sum(nil)) != d.ContentHash {
 		f.Close()
 		return nil, artifact.ErrIntegrity

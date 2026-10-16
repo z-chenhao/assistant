@@ -100,12 +100,18 @@ def run(binary):
                 require(any(p.get('artifact_ref') == d['artifact_ref'] for p in messages), 'explicit output missing from final delivery')
                 require(h.command('artifact', 'delete', d['artifact_ref'], '1', ok=False).returncode != 0, 'referenced result deleted')
                 evidence.append({'kind': kind, 'descriptor': d, 'readback_hash': hashlib.sha256(content).hexdigest(), 'state': value})
+            h.send('timeout', json.dumps({'operation': 'slow_binary'}))
+            h.command('chat', 'work')
+            timed_out = h.state()
+            invocation = next(t for t in timed_out['tools'] if t['tool_name'] == 'mcp__fixture__slow_binary')
+            require(invocation['status'] == 'failed' and json.loads(invocation['result_json'])['error']['code'] == 'TIMEOUT', 'binary stream escaped its frozen Tool deadline')
+            require(len(timed_out['artifact']) == 2, 'timed-out bytes committed metadata')
             h.send('draft', json.dumps({'name': 'draft.md', 'mediaType': 'text/markdown', 'text': 'intermediate', 'draft': True}))
             h.command('chat', 'work')
             value = h.state(); draft = value['artifact'][-1]['artifact_ref']
             require(not any(p['artifact_ref'] == draft for p in value['artifact_publication']), 'draft auto-published')
             require(not any(p.get('artifact_ref') == draft for m in value['conversation'] for p in m['content']), 'intermediate delivered')
-            return {'name': 'large_binary_refs_only_and_explicit_final_publication', 'outputs': evidence, 'draft_state': value}
+            return {'name': 'large_binary_refs_only_and_explicit_final_publication', 'outputs': evidence, 'timeout_state': timed_out, 'draft_state': value}
         report['checks'].append(scenario('large', large))
 
         def inputs(h):

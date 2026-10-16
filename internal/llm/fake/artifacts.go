@@ -72,6 +72,8 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		return call(task.ManageName, task.ManageRequest{Operation: "create", Task: "Artifact fixture:\n" + user, ArtifactRefs: request.Refs})
 	}
 	switch request.Operation {
+	case "slow_binary":
+		return call("mcp__fixture__slow_binary", map[string]any{})
 	case "binary":
 		return call("mcp__fixture__binary", map[string]any{})
 	case "large":

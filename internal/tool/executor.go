@@ -31,6 +31,7 @@ type Result struct {
 }
 
 // BinaryOutput is an internal provider stream, never serialized into history.
+// The Executor consumes it within the frozen deadline and closes io.Closers.
 type BinaryOutput struct {
 	Name, MediaType string
 	Reader          io.Reader
@@ -38,6 +39,7 @@ type BinaryOutput struct {
 
 // OutputStore atomically normalizes large/binary results and commits their
 // metadata with the invocation terminal state before exposing references.
+// ctx bounds result consumption; the store separately commits known failure.
 type OutputStore interface {
 	FinishResult(context.Context, string, Result) (Result, error)
 }
@@ -321,8 +323,11 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 	}
 	result := Failure("NOT_FOUND")
 	outcome := Outcome{}
+	resultCtx := ctx
 	if known {
 		callCtx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutMS)*time.Millisecond)
+		resultCtx = callCtx
+		defer cancel()
 		if d.Host {
 			host, ok := e.Store.(HostStore)
 			if !ok {
@@ -341,6 +346,19 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		} else {
 			result = d.Execute(callCtx, inv.Call.Arguments)
 		}
+		if result.Output != nil {
+			if closer, ok := result.Output.Reader.(io.Closer); ok {
+				closed := make(chan struct{})
+				stop := context.AfterFunc(callCtx, func() { _ = closer.Close(); close(closed) })
+				defer func() {
+					if !stop() {
+						<-closed
+					} else {
+						_ = closer.Close()
+					}
+				}()
+			}
+		}
 		if callCtx.Err() != nil && !d.Host {
 			if d.Spec.Permission == "external_effect" {
 				outcome.Ambiguous = true
@@ -350,7 +368,6 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 				result = Failure("TIMEOUT")
 			}
 		}
-		cancel()
 	}
 	result = Normalize(result)
 	if outcome.Ambiguous || (result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT") {
@@ -369,7 +386,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		return Result{}, ErrSuspended
 	}
 	if store, ok := e.Store.(OutputStore); ok {
-		result, err = store.FinishResult(context.WithoutCancel(ctx), inv.ID, result)
+		result, err = store.FinishResult(resultCtx, inv.ID, result)
 	} else {
 		if len(result.Text) > p.OutputBytes || result.Output != nil {
 			result = Failure("RESOURCE_LIMIT")

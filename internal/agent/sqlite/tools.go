@@ -156,20 +156,20 @@ func (t *tools) Start(ctx context.Context, id string) error {
 	})
 }
 func (t *tools) Finish(ctx context.Context, id string, result tool.Result) error {
-	return t.finish(ctx, id, result, false, false, nil)
+	return t.finish(ctx, ctx, id, result, false, false, nil)
 }
 func (t *tools) Reject(ctx context.Context, id string, result tool.Result) error {
 	if result.Error == nil {
 		return agent.ErrConflict
 	}
-	return t.finish(ctx, id, result, false, true, nil)
+	return t.finish(ctx, ctx, id, result, false, true, nil)
 }
 func (t *tools) FinishResult(ctx context.Context, id string, result tool.Result) (tool.Result, error) {
 	var out tool.Result
-	err := t.finish(ctx, id, result, false, false, &out)
+	err := t.finish(context.WithoutCancel(ctx), ctx, id, result, false, false, &out)
 	return out, err
 }
-func (t *tools) finish(ctx context.Context, id string, result tool.Result, reconcile, reject bool, out *tool.Result) error {
+func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Result, reconcile, reject bool, out *tool.Result) error {
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, t.claim); err != nil {
 			return err
@@ -181,7 +181,7 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 		}
 		result = tool.Normalize(result)
 		var err error
-		result, err = t.storeOutput(ctx, tx, id, result)
+		result, err = t.storeOutput(ctx, outputCtx, tx, id, result)
 		if err != nil {
 			return err
 		}
@@ -199,6 +199,9 @@ func (t *tools) finish(ctx context.Context, id string, result tool.Result, recon
 		var errorJSON any
 		if result.Error != nil {
 			status = "failed"
+			if result.Error.Code == "UNKNOWN_SIDE_EFFECT" {
+				status = "unknown"
+			}
 			errorJSON, _ = encoded(result.Error)
 		}
 		now := time.Now().UnixMicro()
@@ -405,7 +408,7 @@ func (t *tools) Unknown(ctx context.Context, id string) error {
 	})
 }
 func (t *tools) Reconcile(ctx context.Context, id string, result tool.Result) error {
-	return t.finish(ctx, id, result, true, false, nil)
+	return t.finish(ctx, ctx, id, result, true, false, nil)
 }
 
 var _ tool.PolicyStore = (*tools)(nil)

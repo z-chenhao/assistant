@@ -510,3 +510,152 @@ func TestArtifactTaskLifetimeAndRetentionAfterTaskEnd(t *testing.T) {
 		t.Fatal("expired unreferenced output not collected", report, err)
 	}
 }
+
+type slowArtifactReader struct{ read bool }
+
+func (r *slowArtifactReader) Read(p []byte) (int, error) {
+	if r.read {
+		return 0, io.EOF
+	}
+	r.read = true
+	time.Sleep(50 * time.Millisecond)
+	p[0] = 'x'
+	return 1, nil
+}
+func TestArtifactBinaryOutputHonorsFrozenToolDeadline(t *testing.T) {
+	def := tool.Definition{Spec: tool.Spec{Name: "mcp__fixture__slow_binary", Version: 1, InputSchema: `{"type":"object","additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", TimeoutMS: 5}, Execute: func(context.Context, string) tool.Result {
+		return tool.Result{Output: &tool.BinaryOutput{Name: "slow.bin", MediaType: "application/octet-stream", Reader: &slowArtifactReader{}}}
+	}}
+	call := []llm.ToolCall{{ID: "slow", Name: def.Spec.Name, Arguments: `{}`}}
+	s, _, _, e, exchange := admitPolicy(t, []tool.Definition{def}, call)
+	results, err := e.Execute(context.Background(), exchange, call)
+	if err != nil || len(results) != 1 || results[0].Error == nil || results[0].Error.Code != "TIMEOUT" {
+		t.Fatal("binary output bypassed frozen timeout", results, err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM artifact`) != 0 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE status='failed'`) != 1 {
+		t.Fatal("timeout published bytes or did not settle Tool")
+	}
+}
+
+type blockedArtifactReader struct {
+	closed, started chan struct{}
+	once, start     sync.Once
+}
+
+func (r *blockedArtifactReader) Read([]byte) (int, error) {
+	r.start.Do(func() { close(r.started) })
+	<-r.closed
+	return 0, errors.New("closed stream")
+}
+func (r *blockedArtifactReader) Close() error { r.once.Do(func() { close(r.closed) }); return nil }
+func TestArtifactDeadlineClosesBlockedStream(t *testing.T) {
+	for _, kind := range []string{"deadline", "cancel"} {
+		t.Run(kind, func(t *testing.T) {
+			reader := &blockedArtifactReader{closed: make(chan struct{}), started: make(chan struct{})}
+			timeout := 20
+			if kind == "cancel" {
+				timeout = 5000
+			}
+			def := tool.Definition{Spec: tool.Spec{Name: "mcp__fixture__blocked_binary", Version: 1, InputSchema: `{"type":"object","additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", TimeoutMS: timeout}, Execute: func(context.Context, string) tool.Result {
+				return tool.Result{Output: &tool.BinaryOutput{Name: "blocked.bin", MediaType: "application/octet-stream", Reader: reader}}
+			}}
+			call := []llm.ToolCall{{ID: "blocked", Name: def.Spec.Name, Arguments: `{}`}}
+			s, _, _, e, exchange := admitPolicy(t, []tool.Definition{def}, call)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			type outcome struct {
+				results []tool.Result
+				err     error
+			}
+			done := make(chan outcome, 1)
+			go func() { result, err := e.Execute(ctx, exchange, call); done <- outcome{result, err} }()
+			// Always unblock and join the test's execution, even if the regression
+			// breaks automatic stream closure. A failed contract cannot orphan work.
+			var got outcome
+			if kind == "cancel" {
+				select {
+				case <-reader.started:
+					cancel()
+				case got = <-done:
+					t.Fatal("stream never started", got)
+				case <-time.After(time.Second):
+					cancel()
+					reader.Close()
+					<-done
+					t.Fatal("stream admission stalled")
+				}
+			}
+			select {
+			case got = <-done:
+			case <-time.After(time.Second):
+				cancel()
+				reader.Close()
+				<-done
+				t.Fatal("stream cancellation did not unblock Read")
+			}
+			expected := "TIMEOUT"
+			if kind == "cancel" {
+				expected = "CANCELLED"
+			}
+			if got.err != nil || len(got.results) != 1 || got.results[0].Error == nil || got.results[0].Error.Code != expected {
+				t.Fatal(got.results, got.err)
+			}
+			select {
+			case <-reader.closed:
+			default:
+				t.Fatal("stream not closed")
+			}
+			if scalar(t, s, `SELECT count(*) FROM artifact`) != 0 {
+				t.Fatal("interrupted stream committed")
+			}
+		})
+	}
+}
+func TestArtifactExecutorClosesConsumedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "source.bin")
+	if err := os.WriteFile(path, []byte("file output"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	def := tool.Definition{Spec: tool.Spec{Name: "mcp__fixture__file_binary", Version: 1, InputSchema: `{"type":"object","additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe"}, Execute: func(context.Context, string) tool.Result {
+		return tool.Result{Output: &tool.BinaryOutput{Name: "source.bin", MediaType: "application/octet-stream", Reader: f}}
+	}}
+	call := []llm.ToolCall{{ID: "file", Name: def.Spec.Name, Arguments: `{}`}}
+	s, _, _, e, exchange := admitPolicy(t, []tool.Definition{def}, call)
+	result, err := e.Execute(context.Background(), exchange, call)
+	if err != nil || len(result) != 1 || len(result[0].ArtifactRefs) != 1 {
+		t.Fatal(result, err)
+	}
+	if _, err = f.Stat(); !errors.Is(err, os.ErrClosed) {
+		t.Fatal("consumed file remained open", err)
+	}
+	if readArtifact(t, s, artifactOwner(t, s), result[0].ArtifactRefs[0]) != "file output" {
+		t.Fatal("file output changed")
+	}
+}
+func TestArtifactExternalStreamTimeoutRetainsUnknownWithoutRetry(t *testing.T) {
+	var invoked int
+	def := tool.Definition{Spec: tool.Spec{Name: "mcp__fixture__external_binary", Version: 1, InputSchema: `{"type":"object","additionalProperties":false}`, Permission: "external_effect", ReplayPolicy: "never", Risk: "high", TimeoutMS: 5, OutputBytes: 1024, Provider: "fixture", ConflictPolicy: "none"}, Invoke: func(context.Context, tool.Request) tool.Outcome {
+		invoked++
+		return tool.Outcome{Result: tool.Result{Output: &tool.BinaryOutput{Name: "receipt.bin", MediaType: "application/octet-stream", Reader: &slowArtifactReader{}}}}
+	}}
+	call := []llm.ToolCall{{ID: "external", Name: def.Spec.Name, Arguments: `{}`}}
+	s, r, _, e, exchange := admitPolicy(t, []tool.Definition{def}, call)
+	if _, err := e.Execute(context.Background(), exchange, call); !errors.Is(err, tool.ErrSuspended) {
+		t.Fatal(err)
+	}
+	approvePolicy(t, s, r)
+	for i := 0; i < 2; i++ {
+		results, err := e.Execute(context.Background(), exchange, call)
+		if err != nil || len(results) != 1 || results[0].Error == nil || results[0].Error.Code != "UNKNOWN_SIDE_EFFECT" {
+			t.Fatal(results, err)
+		}
+	}
+	if invoked != 1 || scalar(t, s, `SELECT count(*) FROM artifact`) != 0 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE status='unknown'`) != 1 {
+		t.Fatal("lost uncertainty or retried external stream", invoked)
+	}
+}

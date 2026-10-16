@@ -118,7 +118,45 @@ func (t *tools) executeArtifact(ctx context.Context, tx *sql.Tx, name, args stri
 	}
 	return tool.Failure("NOT_FOUND"), nil
 }
-func (t *tools) storeOutput(ctx context.Context, tx *sql.Tx, id string, result tool.Result) (tool.Result, error) {
+
+// artifactChange rolls back normalization before recording an expected Tool
+// failure. The terminal result uses a live write context even when its input
+// stream/deadline has ended; no partial metadata, pins or publications survive.
+func artifactChange(ctx, outputCtx context.Context, tx *sql.Tx, change func() error) error {
+	if _, err := tx.ExecContext(ctx, `SAVEPOINT artifact_output`); err != nil {
+		return err
+	}
+	err := change()
+	if outputCtx.Err() != nil {
+		err = outputCtx.Err()
+	}
+	if err != nil {
+		if _, e := tx.ExecContext(ctx, `ROLLBACK TO artifact_output`); e != nil {
+			return artifact.ErrStorage
+		}
+	}
+	if _, e := tx.ExecContext(ctx, `RELEASE artifact_output`); e != nil {
+		return artifact.ErrStorage
+	}
+	return err
+}
+
+type artifactResultReader struct {
+	ctx context.Context
+	src io.Reader
+}
+
+func (r artifactResultReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, err := r.src.Read(p)
+	if cause := r.ctx.Err(); cause != nil {
+		return 0, cause
+	}
+	return n, err
+}
+func (t *tools) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, id string, result tool.Result) (tool.Result, error) {
 	a, err := runScope(ctx, tx, t.claim.RunID())
 	if err != nil {
 		return tool.Result{}, err
@@ -141,39 +179,64 @@ func (t *tools) storeOutput(ctx context.Context, tx *sql.Tx, id string, result t
 	if p.OutputBytes == 0 {
 		p.OutputBytes = 16384
 	}
-	if result.Error == nil && (result.Output != nil || len(result.Text) > p.OutputBytes) {
-		output := result.Output
-		if output == nil {
-			output = &tool.BinaryOutput{Name: "tool-output.txt", MediaType: "text/plain", Reader: strings.NewReader(result.Text)}
-		}
-		ref, e := store.PutTx(ctx, tx, a, artifact.Input{Name: output.Name, MediaType: output.MediaType}, output.Reader, "tool:"+id)
-		if e != nil {
-			if errors.Is(e, artifact.ErrLimit) || errors.Is(e, artifact.ErrInvalid) {
-				return artifactFailure(e), nil
-			}
-			return tool.Result{}, e
-		}
-		result.Text = "Saved artifact."
-		result.ArtifactRefs = append(result.ArtifactRefs, ref)
-		result.Output = nil
-	}
 	if result.Error != nil {
 		return tool.Normalize(result), nil
 	}
-	for _, ref := range result.ArtifactRefs {
-		if err = store.PinTx(ctx, tx, a, ref, "tool", id); err != nil {
-			return artifactFailure(err), nil
-		}
+	if result.Output == nil && len(result.Text) <= p.OutputBytes && len(result.ArtifactRefs) == 0 && result.PublishRefs == nil {
+		return result, nil
 	}
-	if result.PublishRefs != nil {
-		if err = store.PublishTx(ctx, tx, a, result.PublishRefs); err != nil {
-			if errors.Is(err, artifact.ErrNotFound) || errors.Is(err, artifact.ErrInvalid) || errors.Is(err, artifact.ErrIntegrity) {
-				return artifactFailure(err), nil
+	err = artifactChange(ctx, outputCtx, tx, func() error {
+		for _, ref := range result.ArtifactRefs {
+			if _, err := store.DescribeTx(outputCtx, tx, a, ref, true); err != nil {
+				return err
 			}
+		}
+		if result.Output != nil || len(result.Text) > p.OutputBytes {
+			output := result.Output
+			if output == nil {
+				output = &tool.BinaryOutput{Name: "tool-output.txt", MediaType: "text/plain", Reader: strings.NewReader(result.Text)}
+			}
+			if output.Reader == nil {
+				return artifact.ErrInvalid
+			}
+			ref, e := store.PutTx(ctx, tx, a, artifact.Input{Name: output.Name, MediaType: output.MediaType}, artifactResultReader{outputCtx, output.Reader}, "tool:"+id)
+			if e != nil {
+				return e
+			}
+			result.Text = "Saved artifact."
+			result.ArtifactRefs = append(result.ArtifactRefs, ref)
+			result.Output = nil
+		}
+		for _, ref := range result.ArtifactRefs {
+			if err := store.PinTx(outputCtx, tx, a, ref, "tool", id); err != nil {
+				return err
+			}
+		}
+		if result.PublishRefs != nil {
+			if err := store.PublishTx(outputCtx, tx, a, result.PublishRefs); err != nil {
+				return err
+			}
+			result.ArtifactRefs = append(result.ArtifactRefs, result.PublishRefs...)
+			result.PublishRefs = nil
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			if d, ok := t.runs.registry.Resolve(name); ok && d.Spec.Permission == "external_effect" {
+				return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
+			}
+		}
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return tool.Failure("TIMEOUT"), nil
+		case errors.Is(err, context.Canceled):
+			return tool.Failure("CANCELLED"), nil
+		case errors.Is(err, artifact.ErrInvalid), errors.Is(err, artifact.ErrNotFound), errors.Is(err, artifact.ErrIntegrity), errors.Is(err, artifact.ErrLimit):
+			return artifactFailure(err), nil
+		default:
 			return tool.Result{}, err
 		}
-		result.ArtifactRefs = append(result.ArtifactRefs, result.PublishRefs...)
-		result.PublishRefs = nil
 	}
 	return result, nil
 }
