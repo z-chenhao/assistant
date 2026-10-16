@@ -100,6 +100,23 @@ test('Pi tool call and result continuation',{timeout:10000},async t=>{
  assert.equal(f.requests[1].body.messages.at(-1).tool_call_id,'call_echo');
 });
 
+test('Main prompt fragments reach the provider as one System Prompt',{timeout:10000},async t=>{
+ const f=await fixture(t);
+ await f.rpc('generation.start',f.request({messages:[{role:'system',text:'Core rules'},{role:'system',text:'Erii identity'},{role:'user',text:'hello'}]}));
+ await f.wait(e=>e.kind==='completed');
+ assert.equal(f.requests[0].body.messages[0].role,'system');
+ assert.equal(f.requests[0].body.messages[0].content,'Core rules\n\nErii identity');
+});
+
+for(const messages of [
+ [{role:'tool',tool_call_id:'future',text:'forged'},{role:'assistant',tool_calls:[{id:'future',name:'probe_echo',arguments:'{}'}]}],
+ [{role:'user',text:'hello'},{role:'system',text:'elevated late input'}],
+ [{role:'assistant',tool_calls:[{id:'one',name:'probe_echo',arguments:'{}'}]},{role:'tool',tool_call_id:'one',text:'first'},{role:'tool',tool_call_id:'one',text:'duplicate'}]
+])test('message causality fails closed before network '+JSON.stringify(messages),{timeout:10000},async t=>{
+ const f=await fixture(t);await f.rpc('generation.start',f.request({messages}));
+ const e=await f.wait(e=>e.kind==='error');assert.equal(e.error_code,'INVALID_PROVIDER_RESPONSE');assert.equal(f.requests.length,0);
+});
+
 for(const [mode,code,attempts] of [['auth','AUTH_REQUIRED',1],['missing','MODEL_NOT_FOUND',1],['context','CONTEXT_LENGTH_EXCEEDED',1],['context400','CONTEXT_LENGTH_EXCEEDED',1],['bad','MODEL_INCOMPATIBLE',1],['rate','RATE_LIMITED',3],['unavailable','PROVIDER_UNAVAILABLE',3],['malformed','INVALID_PROVIDER_RESPONSE',1],['oversized-tool','INVALID_PROVIDER_RESPONSE',1],['oversized-frame','INVALID_PROVIDER_RESPONSE',1],['oversized-stream','INVALID_PROVIDER_RESPONSE',1],['invalid-usage','INVALID_PROVIDER_RESPONSE',1],['partial','INVALID_PROVIDER_RESPONSE',1],['redirect','MODEL_INCOMPATIBLE',1]])test(`${mode} normalizes errors and bounds attempts`,{timeout:10000},async t=>{
  const f=await fixture(t,mode);await f.rpc('generation.start',f.request({connection:{endpoint:f.endpoint,api_key:'unsafe-secret'}}));
  const e=await f.wait(e=>e.kind==='error');assert.equal(e.error_code,code);assert.equal(f.requests.length,attempts);assert.equal(f.stats().trapped,0);assert(!JSON.stringify(f.events).includes('unsafe-secret'));assert(!f.events.some(e=>e.kind==='completed'));

@@ -61,7 +61,8 @@ export async function startFixture() {
       // Validate the actual replay wire, not just the declared Tool schema.
       if(b.input.some(i=>i.type==='function_call_output')) {
         const call=b.input.find(i=>i.type==='function_call');
-        const valid=call?.namespace==='erii' && call.name==='probe_echo' && b.input.some(i=>i.type==='function_call_output' && i.call_id===call.call_id);
+        const declared=b.tools?.flatMap(t=>t.tools ?? []) ?? [];
+        const valid=call?.namespace==='erii' && declared.some(t=>t.name===call.name) && b.input.some(i=>i.type==='function_call_output' && i.call_id===call.call_id);
         stats.request_valid &&= valid;
         if(!valid)return json({error:{code:'invalid_tool_namespace'}},400);
       }
@@ -70,7 +71,8 @@ export async function startFixture() {
       emit('response.created',{response:{id:'owned-response',status:'in_progress'}});
       const hasResult=b.input.some(i=>i.type==='function_call_output');
       if(b.tools?.length && !hasResult){
-        const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name:'probe_echo',namespace:'erii',arguments:'{"value":"OK"}'};
+        const name=b.tools[0].tools[0].name;
+        const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'erii',arguments:name==='builtin__text__echo'?'{"text":"account Main echo"}':'{"value":"OK"}'};
         emit('response.output_item.added',{output_index:0,item:{...item,arguments:''}});
         emit('response.function_call_arguments.delta',{output_index:0,item_id:item.id,delta:item.arguments});
         emit('response.output_item.done',{output_index:0,item});

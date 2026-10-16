@@ -7,7 +7,7 @@ It connects local OpenAI-compatible models through a pinned Pi AI Node Bridge.
 The CLI supports discovery, manual model IDs, capability probes, and explicit
 activation, with optional Keychain/environment credentials. Deterministic
 fixtures remain available through explicit `-test-bridge` injection.
-ChatGPT account login, refresh, model discovery and logout are available through the CLI (see docs/provider-bridge.md). Agent Runs, conversations, and tasks remain later slices.
+ChatGPT account login, refresh, model discovery and logout are available through the CLI (see docs/provider-bridge.md). The Main Agent Loop, ordered Conversation and a pure Direct Tool are available through `chat send`, `chat work` and `chat history`; see [Main CLI and recovery](docs/main-loop.md). Tasks, Workers and TUI remain later slices.
 
 With Go 1.26.2+, Node 24.21.0, and Python 3.10+:
 

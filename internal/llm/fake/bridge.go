@@ -18,7 +18,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -105,6 +105,45 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
+			if fixture == "main" && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
+				// Same call IDs on distinct exchanges deliberately exercise the
+				// (run, exchange, call) association, never global call-ID dedup.
+				sequence := int64(1)
+				if last.Role == "user" {
+					for _, id := range []string{"echo-a", "echo-b"} {
+						args, _ := json.Marshal(struct {
+							Text string `json:"text"`
+						}{last.Text})
+						call := llm.ToolCall{ID: id, Name: "builtin__text__echo", Arguments: string(args)}
+						if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "tool_call", ToolCall: &call}); err != nil {
+							return err
+						}
+						sequence++
+					}
+				} else if last.Role == "tool" {
+					text := "Processed: " + last.Text
+					// Scripted L0 Main fragments. These do not grade a real model
+					// or claim the complete Memory/scheduling/local-search Cases.
+					switch last.Text {
+					case "我醒了，好困。":
+						text = "先喝点水，缓一缓。昨晚大约睡了多久？"
+					case "先帮我排一下优先级。":
+						text = "先准备9点的会议，再集中完成下午要交的报告。"
+					case "今晚想在附近吃点清淡的。":
+						text = "你现在在哪个区域？有位置后，我再帮你筛选清淡的选择。"
+					}
+					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: text}); err != nil {
+						return err
+					}
+					sequence++
+				} else {
+					return llm.InvalidProviderResponse
+				}
+				if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "completed"}); err != nil {
+					return err
+				}
+				break
+			}
 			if r.Method == "generation.continue" {
 				if last.Role != "tool" || last.ToolCallID != "probe-call" {
 					err = failure(string(llm.InvalidProviderResponse))

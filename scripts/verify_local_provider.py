@@ -78,8 +78,10 @@ class Endpoint(BaseHTTPRequestHandler):
                     chunk({"content": "I cannot call tools"})
                     chunk({}, "stop")
                 else:
+                    name = body["tools"][0]["function"]["name"]
+                    arguments = {"text": text} if name == "builtin__text__echo" else {"value": "OK"}
                     chunk({"tool_calls": [{"index": 0, "id": "call_echo", "type": "function",
-                                          "function": {"name": "probe_echo", "arguments": '{"value":"OK"}'}}]})
+                                          "function": {"name": name, "arguments": json.dumps(arguments)}}]})
                     chunk({}, "tool_calls")
             else:
                 chunk({"content": "PROBE_RESULT_OK" if any(m["role"] == "tool" for m in body["messages"])
@@ -111,9 +113,9 @@ def verify(binary, script):
             config = root / "config.yaml"
             config.write_text("version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: " + json.dumps(str(script)) + "\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
 
-            def command(*args, ok=True):
+            def command(*args, ok=True, text=None):
                 p = subprocess.run([str(binary), "-config", str(config), *args], cwd=root, env=env,
-                                   text=True, capture_output=True, timeout=20)
+                                   input=text, text=True, capture_output=True, timeout=20)
                 require((p.returncode == 0) == ok, f"CLI {args[0:2]} unexpected result: {p.stderr}")
                 require("SYNTHETIC_LOCAL_KEY_NEVER_PERSIST" not in p.stdout + p.stderr, "credential in CLI output")
                 return json.loads(p.stdout) if ok else p.stderr
@@ -128,6 +130,14 @@ def verify(binary, script):
             require(all(proof["result"].values()), "probe did not exercise every behavior")
             require(command("model", "select", id_, "1", "1")["readiness"] == "ready", "select")
             require(command("status")["readiness"] == "ready", "restart readiness")
+            command("chat", "send", "local-main", text="actual local conversation")
+            command("chat", "work")
+            history = command("chat", "history")
+            require([m["role"] for m in history] == ["user", "assistant"], "local Main history")
+            require(history[-1]["content"][0]["text"] == "PROBE_RESULT_OK", "local Main did not continue after Direct Tool")
+            require(any(m["role"] == "system" for r in server.requests if r.get("body") for m in r["body"].get("messages", [])), "Main System Prompt missing from actual wire")
+            report["main_history"] = history
+            report["checks"].append("actual CLI Main Actor/Loop/Direct Tool/Conversation through local Node/Pi with System Prompt")
             require(all(r["auth"] is None for r in server.requests), "fabricated Authorization")
             report["checks"] += ["catalog", "manual CLI add", "unverified rejection", "real five-part probe", "atomic select", "restart ready", "no fabricated key"]
 
@@ -159,7 +169,7 @@ def verify(binary, script):
             report["checks"].append("partial stream is not completion")
 
             with closing(sqlite3.connect(root / "data/state.db")) as db:
-                require(db.execute("pragma user_version").fetchone()[0] == 6, "schema")
+                require(db.execute("pragma user_version").fetchone()[0] == 7, "schema")
                 rows = db.execute("SELECT snapshot_id,run_id,input_tokens,output_tokens,latency_ms,error_code,snapshot_json FROM provider_usage").fetchall()
                 require(rows and any(r[2:4] == (7, 8) for r in rows), "usage not recorded")
                 require(any(r[5] == "GENERATION_CANCELLED" and r[2] is None for r in rows), "unknown cancellation usage fabricated")

@@ -45,6 +45,13 @@ func (s *Store) Resolver(secrets llm.SecretStore) bridge.Resolver {
 }
 
 func (s *Store) RecordUsage(ctx context.Context, r llm.GenerationRequest, result llm.GenerationResult, latency time.Duration, cause error) error {
+	return s.RecordUsageAnd(ctx, r, result, latency, cause, nil)
+}
+
+// RecordUsageAnd commits a consumer-owned acceptance record under the same
+// authentication/cancellation fence as usage, before completion notification.
+// The callback is trusted Host code, never a Provider callback or wire value.
+func (s *Store) RecordUsageAnd(ctx context.Context, r llm.GenerationRequest, result llm.GenerationResult, latency time.Duration, cause error, accept func(context.Context, *sql.Tx, llm.GenerationRequest, llm.GenerationResult, error) error) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	encoded, err := llm.CanonicalJSON(r.Snapshot)
@@ -88,7 +95,15 @@ func (s *Store) RecordUsage(ctx context.Context, r llm.GenerationRequest, result
 			code = llm.NormalizeError(cause.Error()).Error()
 		}
 		_, err := tx.ExecContext(ctx, `INSERT INTO provider_usage(generation_id,run_id,snapshot_id,snapshot_json,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,latency_ms,error_code,recorded_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, r.GenerationID, r.RunID, r.Snapshot.SnapshotID, string(encoded), input, output, read, write, latency.Milliseconds(), code, now().UnixMicro())
-		if err != nil || tx.Commit() != nil {
+		if err != nil {
+			return llm.ErrStorage
+		}
+		if accept != nil {
+			if err := accept(ctx, tx, r, result, cause); err != nil {
+				return err
+			}
+		}
+		if tx.Commit() != nil {
 			return llm.ErrStorage
 		}
 		if rejected || cancelled {

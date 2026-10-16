@@ -12,13 +12,13 @@ real boundary, records evidence, and always reaps its processes/removes state.
 | Startup diagnostics | `bin/personal-agent [-config path]` | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
 | Configuration | `-config`, `ERII_*` overrides | `config.Load` | Invalid fields/URLs/durations rejected without value echo |
-| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v6, WAL, one Agent, one atomic fresh-bootstrap event |
-| Migration safety | Empty, real v1/v2/v3/v4/v5, future schema | `agent/sqlite.migrate` | Prior Agent/config/timestamps, model metadata/snapshots and Outbox/Inbox preserved; future rejected; failed v3/v4/v5/v6 DDL rolls back |
+| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v7, WAL, one Agent, one atomic fresh-bootstrap event |
+| Migration safety | Empty, real v1/v2/v3/v4/v5/v6, future schema | `agent/sqlite.migrate` | Prior Agent/config/timestamps, model metadata/snapshots and Outbox/Inbox preserved; future rejected; failed v3/v4/v5/v6/v7 DDL rolls back |
 | Model metadata | `bin/personal-agent model add` (stdin JSON), `model list`, `status` | `llm/sqlite.Store.AddProfile/ListProfiles` | New process and SIGKILL/restart preserve profile; unverified/version 1; independent SQLite/canonical JSON readback; ingress stays closed |
 | Metadata validation | `model add` | `llm.ProfileInput.Validate`, CLI decoder | Unknown/credential fields, credential-bearing URLs, invalid enums, dangling/mismatched auth and pre-Probe activation rejected without value echo or writes |
 | Metadata CAS | Host storage, no CLI update surface | `llm/sqlite.Store.UpdateProfile/UpdateAuthState` | One winner across DB connections; stale CAS and event failures leave metadata/Outbox unchanged; profile edits reset verification |
 | Secret references | `model login [ENV_NAME]`; trusted Host only | `llm.RegisterAuth`, `llm/secret`, `llm/memory` test Fake | Put before metadata; database failure cleans new reference even after cancellation; cleanup failure explicit; DB/WAL/SHM and output exclude credential material |
-| Immutable model snapshot | Trusted transaction fixture, no Agent Runs yet | `llm/sqlite.Store.FreezeProfile/Snapshot` | Ready-only, frozen profile version and canonical endpoint hash; no CredentialRef; auth/profile changes preserve snapshot; update/delete/REPLACE rejected; outer transaction rollback removes snapshot/event |
+| Immutable model snapshot | Main Run creation and trusted transaction fixture | `llm/sqlite.Store.FreezeProfile/Snapshot` | Ready-only, frozen profile version and canonical endpoint hash; no CredentialRef; auth/profile changes preserve snapshot; update/delete/REPLACE rejected; outer transaction rollback removes snapshot/event |
 | Provider Bridge | Explicit `-test-bridge success` | `llm/bridge.Open`, `llm/fake.Serve` | Version handshake, long-lived stdio JSON-RPC, sanitized errors, process crash/restart, orderly shutdown/reap |
 | Catalog and auth fixtures | `model catalog`; Bridge contracts | `ModelCatalog`, `ProviderAuth` | Candidate catalog and refresh; UI-neutral auth events, continue/refresh/status/logout |
 | Capability Probe | `-test-bridge success model test ID` | `llm.Control.Test`, `bridge.Client.Run`, `llm.Prober.Run` | Actual stream, Tool Call/Result continuation, cancellation and clipping; tool-less model rejected; no implicit provider |
@@ -63,3 +63,28 @@ Reports: `evidence/verification.json`, `evidence/models.jsonl`, `evidence/events
 `evidence/relay.json`. `make test-race` separately checks shared-memory access;
 SQL uniqueness/transaction and protocol tests prove their respective invariants.
 This includes the local-provider M1 slice, with no general Durable Replay or exactly-once claim.
+
+## Main slice (ERII-9)
+
+`scripts/verify_main.py --binary bin/personal-agent --evidence evidence/main.json`
+owns Launch/Doctor/Drive/Evidence/Cleanup. It runs from `make verify`, creates
+disposable state, starts only explicit Fakes, and reaps all owned children.
+See [Main operations](../docs/main-loop.md) for recovery and limits.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Durable ingress | `chat send [REQUEST_KEY]`, stdin text | `agent.Actor.Submit`, `agent/sqlite.Runs.Submit` | 16 concurrent CLI processes, one Main, stable receipt, drift rejection, setup gate |
+| Execute/recover Main | `chat work` | `agent.Actor.Drain`, `agent.RunAgentLoop/ContinueAgentLoop` | Nine SIGKILL boundaries; expired claim automatically reclaimed; terminal Runs not replayed |
+| Stable steering | Submit while `chat work` is active | Loop model/tool/reply boundaries | Separate ordered user messages; stale final answer overtaken; no second Main |
+| Context and model freeze | Create Run, switch profile, restart worker | `MainContext`, `Runs.Initialize/Generation` | Frozen role fragments, history boundary, request/schema hashes; new profile only on a new Run |
+| Conversation | `chat history` | `conversation/sqlite.Append/List`, `Runs.Flush` | Independent DB, monotonic sequence, idempotent immutable IDs, no Tool trace; cross-DB missing writes repaired |
+| Direct Tool | Model requests `builtin__text__echo` | `tool.Registry`, `tool.Executor`, bound invocation Store | Real pure execution, schema rejection, absent Tool error, per-exchange uniqueness, immediate completion; slow/fast order regression |
+| Claims/CAS/wait/failure | Host execution boundary | `Runs.Claim/Checkpoint/Wait/Complete/Fail` | Old-token/epoch rejection, version conflict, invalid transition, terminal irreversibility, auth/usage/result atomic rollback |
+| Result/trace events | Host EventSink | Loop + Executor, `Runs.Trace` | Persist completion before message/tool end; ordered trace envelope; no streaming EventQueue writes |
+| Graceful shutdown | SIGTERM during a generation | Actor controlled release | Accepted model result retained, unclaimed nonterminal Run, no business cancellation, recovery reuses result |
+| Local/account Main path | Configured local endpoint or account profile | Real CLI -> Go Actor/Loop -> Node/Pi -> Tool -> Conversation | `local-provider.json` and `account.json`, actual System Prompt and Tool continuation; no online account required |
+| Main L0 fragments | `make verify`, `evals/fixtures/main-v1.json` | Shared Main CLI Case Runner | GC-01/09/10 fragment assertions; full Cases not_applicable and semantic score null |
+| M1 storage migration | Startup from empty or v6 | `agent/sqlite` v7, `conversation/sqlite` v1 | Prior identity/config/events retained; partial DDL rolls back; future schemas rejected |
+
+Local DeliveryRequests are durable pending intents; an external delivery consumer
+is not implemented. No full M1, M3 Security or M5 Durable Replay claim.

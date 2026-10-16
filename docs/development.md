@@ -5,9 +5,7 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. Current ChatGPT OAuth is implemented through the CLI. Main/Worker Runs, Tasks, Agent Loop, UI, and Durable
-Replay remain later slices. Product Golden Cases and SC-01–SC-12 are
-`not_applicable` until those capabilities arrive, not passed.
+local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). Worker Runs, Tasks, UI and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main-only scripted L0 fragments are reported separately.
 
 ## Commands and evidence
 
@@ -36,6 +34,9 @@ isolated from user configuration and removed on success or failure.
 - `evidence/verification.json`: diagnostics, persisted Agent/profile rows,
   canonical JSON, rejected metadata, logs/spans, bootstrap/model kill/restart,
   future-schema rejection, Provider Probe/activation/degraded states, and cleanup assertions.
+- `evidence/main.json`: concurrent Main ingress, nine SIGKILL boundaries, stable
+  steering, profile switching, semantic/Tool/usage/delivery readback and scripted
+  GC-01/09/10 Main fragments.
 - `evidence/local-provider.json`: real Node/Pi HTTP CLI setup, credential safety, failed re-test and usage readback.
 - `evidence/pi-bridge.tap`: owned endpoint contract results.
 - `evidence/models.jsonl`: Go test events for five runs of Bridge/auth/catalog/
@@ -70,7 +71,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":5,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":7,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,

@@ -39,11 +39,22 @@ var localProviderSQL string
 //go:embed migrations/006_account_auth.sql
 var accountAuthSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL}
+//go:embed migrations/007_main_loop.sql
+var mainLoopSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL}
 
 type Store struct {
 	db   *sql.DB
 	path string
+	// MainBoundary is explicit fault injection; production composition leaves it nil.
+	MainBoundary func(string)
+}
+
+func (s *Store) boundary(name string) {
+	if s.MainBoundary != nil {
+		s.MainBoundary(name)
+	}
 }
 
 func Open(ctx context.Context, dataRoot string) (*Store, error) {

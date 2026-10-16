@@ -22,6 +22,7 @@ verify: build
 	python3 scripts/verify.py --binary bin/personal-agent --evidence evidence/verification.json
 	python3 scripts/verify_local_provider.py --binary bin/personal-agent --evidence evidence/local-provider.json
 	python3 scripts/verify_account.py --binary bin/personal-agent --evidence evidence/account.json
+	python3 scripts/verify_main.py --binary bin/personal-agent --evidence evidence/main.json
 	rm -f evidence/pi-bridge.tap
 	@for attempt in 1 2 3 4 5; do node --test --test-reporter=tap provider-bridge/test/*.test.mjs >> evidence/pi-bridge.tap || { cat evidence/pi-bridge.tap; exit 1; }; done
 	@for attempt in 1 2 3 4 5; do python3 scripts/verify_account.py --binary bin/personal-agent --evidence evidence/account-$$attempt.json || exit 1; done
