@@ -21,8 +21,9 @@ close ingress. No implicit model or Fake is selected.
 other terminals submit steering. It waits for a live ownership lease to expire
 or its owner to finish; it never runs a second Main concurrently. When currently
 accepted work ends it exits. Invoke it again for later inputs. The default
-no-command startup still prints diagnostics and waits; it does not run this
-executor. TUI and long-lived ingress are the next M1 slice.
+no-command startup opens the [TUI](tui-and-evals.md) on a terminal; redirected
+stdin retains diagnostics/wait behavior. The TUI uses the same Actor and
+executor, including recovery and Steering while Main is busy.
 
 `chat history` returns ordered semantic user/assistant messages. It also fills
 missing accepted Conversation intents before reading. This is an intentional

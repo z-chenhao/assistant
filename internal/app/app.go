@@ -25,6 +25,7 @@ import (
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
 	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/erii/internal/tui"
 )
 
 type App struct {
@@ -183,6 +184,12 @@ func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
 		return nil, err
 	}
 	return a.history.List(ctx, d.AgentID)
+}
+
+func (a *App) Terminal() tui.Session {
+	return tui.Session{State: a, Models: a.Models(), Accounts: a.accounts,
+		Control: a.control, Actor: a.Actor(nil), Discover: a.Discover,
+		AccountCatalog: a.AccountCatalog, LoginEnvironment: a.LoginEnvironment}
 }
 
 // Relay runs infrastructure only. It never enables Agent ingress or a model.

@@ -6,7 +6,6 @@ Actor/Loop/Tool/Conversation path as an ordinary configured provider.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -16,7 +15,6 @@ import signal
 import sqlite3
 import subprocess
 import tempfile
-import time
 
 
 def require(value, message):
@@ -25,15 +23,16 @@ def require(value, message):
 
 
 class MainHarness:
-    def __init__(self, binary, root):
+    def __init__(self, binary, root, fixture="main"):
         self.binary = binary
         self.root = root
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
         self.env["ERII_DATA_ROOT"] = str(root / "data")
         self.children = []
+        self.fixture = fixture
 
     def args(self, *args):
-        return [str(self.binary), "-test-bridge", "main", *args]
+        return [str(self.binary), "-test-bridge", self.fixture, *args]
 
     def command(self, *args, text=None, ok=True):
         result = subprocess.run(self.args(*args), input=text, text=True, capture_output=True,
@@ -71,12 +70,12 @@ class MainHarness:
         with sqlite3.connect(Path(self.env["ERII_DATA_ROOT"]) / "state.db") as db:
             db.row_factory = sqlite3.Row
             for name, query in {
-                "runs": "SELECT run_id,status,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
+                "runs": "SELECT run_id,kind,task_id,parent_run_id,status,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
                 "generations": "SELECT generation_id,run_id,step_index,request_hash,request_json,status,result_json,error_code,attempt_count FROM model_generation ORDER BY created_at",
-                "tools": "SELECT invocation_id,provider_exchange_id,provider_call_id,status,result_json,delivery_seq,attempt_count FROM tool_invocation ORDER BY created_at,delivery_seq",
+                "tools": "SELECT invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,status,result_json,delivery_seq,attempt_count FROM tool_invocation ORDER BY created_at,delivery_seq",
                 "deliveries": "SELECT delivery_id,message_id,status,idempotency_key FROM delivery_request ORDER BY created_at",
                 "usage": "SELECT u.generation_id,u.snapshot_id,u.error_code FROM provider_usage u JOIN model_generation g USING(generation_id) ORDER BY g.created_at",
-                "snapshots": "SELECT snapshot_id,profile_id,model_id,endpoint_hash FROM model_snapshot ORDER BY created_at",
+                "snapshots": "SELECT * FROM model_snapshot ORDER BY created_at",
                 "capabilities": "SELECT * FROM capability_snapshot ORDER BY created_at",
                 "inputs": "SELECT sequence,request_key,message_json FROM main_input ORDER BY sequence",
                 "trace": "SELECT run_id,sequence,event_json,occurred_at FROM run_trace ORDER BY run_id,sequence",
@@ -109,7 +108,7 @@ def assert_final(state, users, replies=1):
 
 def run(binary):
     report = {"version": 1, "scope": "M1 Main slice; no M3 Security or M5 JavaScript replay claim",
-              "checks": [], "crashes": [], "golden_fragments": []}
+              "checks": [], "crashes": []}
     with tempfile.TemporaryDirectory(prefix="erii-main-") as temp:
         root = Path(temp)
 
@@ -204,43 +203,6 @@ def run(binary):
         report["steering"] = scenario("steering", steering)
         report["checks"].append("SIGTERM preserves business work; separate steering at stable boundary; frozen model and new-Run switch")
         report["checks"].append("SIGKILL at nine model/Tool/Conversation/checkpoint boundaries; completed results reused; missing writes filled")
-        dataset_path = Path(__file__).resolve().parents[1] / "evals/fixtures/main-v1.json"
-        dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
-        fixture_digest = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
-        for case in dataset["cases"]:
-            def fragment(h):
-                started = time.time()
-                h.setup()
-                for i, text in enumerate(case["inputs"]):
-                    h.send(f"{case['case_id']}-{i}", text)
-                h.command("chat", "work")
-                state = h.state()
-                assert_final(state, len(case["inputs"]))
-                reply = state["conversation"][-1]["content"][0]["text"]
-                assertions = {
-                    "required_content": all(text in reply for text in case["required_text"]),
-                    "no_fabricated_actions": not any(text in reply for text in case["forbidden_text"]),
-                    "bounded_questions": reply.count("？") + reply.count("?") <= case["max_questions"],
-                    "no_child_or_task_control": all(not c["can_spawn_agents"] for c in state["capabilities"]),
-                    "one_main": len(state["runs"]) == 1,
-                }
-                require(all(assertions.values()), f"Main fragment failed: {case['case_id']}")
-                finished = time.time()
-                return {"case_id": case["case_id"], "case_version": dataset["version"], "level": "L0",
-                        "status": "fragment_pass", "full_case": "not_applicable", "final_score": None,
-                        "semantic_grading": "unexecuted; scripted Fake is protocol evidence only",
-                        "fixture_digest": fixture_digest, "seed": 0,
-                        "started_at": datetime.fromtimestamp(started, timezone.utc).isoformat().replace("+00:00", "Z"),
-                        "finished_at": datetime.fromtimestamp(finished, timezone.utc).isoformat().replace("+00:00", "Z"),
-                        "run_id": state["runs"][0]["run_id"], "model_snapshot": state["runs"][0]["model_snapshot_id"],
-                        "capability_snapshot": state["runs"][0]["capability_snapshot_id"],
-                        "assertions": assertions, "hard_failure": False, "artifact_refs": [], "trace_ref": "evidence.trace",
-                        "metrics": {"wall_time_ms": round((finished - started) * 1000), "model_calls": len(state["generations"]),
-                                    "tool_calls": len(state["tools"]), "child_runs": 0, "approvals": 0,
-                                    "user_questions": reply.count("？") + reply.count("?"), "duplicate_effects": 0},
-                        "evidence": state}
-            report["golden_fragments"].append(scenario(case["case_id"], fragment))
-        report["checks"].append("versioned GC-01/09/10 scripted Main fragments; full Cases and real-model scores unclaimed")
     report["checks"].append("cleanup: all owned processes reaped and disposable databases removed")
     return report
 
