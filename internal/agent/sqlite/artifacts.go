@@ -182,8 +182,30 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 	if result.Error != nil {
 		return tool.Normalize(result), nil
 	}
+	// Agent results keep their two-field business envelope while reusing the
+	// ordinary output/Artifact transaction for large text and reference pins.
+	isAgentResult := name == agent.RunToolName
+	if isAgentResult {
+		var value agent.AgentResult
+		if json.Unmarshal([]byte(result.Text), &value) != nil {
+			return tool.Failure("PROVIDER_UNAVAILABLE"), nil
+		}
+		result.Text, result.ArtifactRefs = value.Text, value.ArtifactRefs
+		p.OutputBytes = 16384 // Bounded business preview inside the API envelope.
+	}
+	pack := func(value tool.Result) (tool.Result, error) {
+		if !isAgentResult || value.Error != nil {
+			return value, nil
+		}
+		refs := value.ArtifactRefs
+		if refs == nil {
+			refs = []string{}
+		}
+		raw, err := encoded(agent.AgentResult{Text: value.Text, ArtifactRefs: refs})
+		return tool.Result{Text: raw}, err
+	}
 	if result.Output == nil && len(result.Text) <= p.OutputBytes && len(result.ArtifactRefs) == 0 && result.PublishRefs == nil {
-		return result, nil
+		return pack(result)
 	}
 	err = artifactChange(ctx, outputCtx, tx, func() error {
 		for _, ref := range result.ArtifactRefs {
@@ -238,7 +260,7 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 			return tool.Result{}, err
 		}
 	}
-	return result, nil
+	return pack(result)
 }
 
 // Receipt storage failures cannot establish that an external effect failed.

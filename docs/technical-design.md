@@ -908,6 +908,8 @@ tool_execution_end
 
 #### 6.6.1 统一能力表面
 
+ERII-17 Direct Tool 实现说明：`builtin__agent__run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/children.md`。公平 Child 调度与 M5 JavaScript/CodeCall 仍由后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
+
 Worker Run 的 Code Mode Runtime 注入同一组稳定命名空间：
 
 ```text

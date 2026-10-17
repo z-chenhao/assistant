@@ -31,6 +31,7 @@ type Runs struct {
 	recentLimit int
 	limits      ToolLimits
 	approvalTTL time.Duration
+	childLimits agent.ChildLimits
 }
 
 func (s *Store) Runs(history conversation.Store, registry *tool.Registry) *Runs {
@@ -194,10 +195,10 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 	var id string
 	// Four worker leases plus a reserved Main slot. The database enforces this
 	// host bound across concurrent CLI processes as well as within one Actor.
-	err := r.host.db.QueryRowContext(ctx, `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) WHERE (r.status IN ('queued','running') OR (r.status='waiting' AND (r.wait_reason='resource' OR (r.wait_reason='user_input' AND (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))))))) AND (c.token IS NULL OR c.expires_at<=?) AND (r.kind='main' OR (SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>?)<4) AND NOT (r.status='waiting' AND r.wait_reason='resource' AND EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') AND NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason='resource' OR (i.wait_reason='retry_backoff' AND i.next_wake_at<=?) OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending'))))) ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,r.created_at,r.run_id LIMIT 1`, time.Now().UnixMicro(), time.Now().UnixMicro(), time.Now().UnixMicro()).Scan(&id)
+	err := r.host.db.QueryRowContext(ctx, `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) WHERE (r.status IN ('queued','running') OR (r.status='waiting' AND (r.wait_reason='resource' OR (r.wait_reason='user_input' AND (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND r.worker_position='root' AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))))))) AND (c.token IS NULL OR c.expires_at<=?) AND (r.kind='main' OR (SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>?)<4) AND NOT (r.status='waiting' AND r.wait_reason='resource' AND EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') AND NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason='resource' OR (i.wait_reason='child_run' AND EXISTS(SELECT 1 FROM agent_invocation a JOIN run child ON child.run_id=a.child_run_id WHERE a.invocation_id=i.invocation_id AND child.status IN ('completed','failed','cancelled'))) OR (i.wait_reason='retry_backoff' AND i.next_wake_at<=?) OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending'))))) ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,r.created_at,r.run_id LIMIT 1`, time.Now().UnixMicro(), time.Now().UnixMicro(), time.Now().UnixMicro()).Scan(&id)
 	if err == sql.ErrNoRows {
 		var active int
-		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE status IN ('queued','running') OR (status='waiting' AND wait_reason='resource')`).Scan(&active); err != nil {
+		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE status IN ('queued','running') OR (status='waiting' AND wait_reason='resource' AND (NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') OR EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason IN ('resource','retry_backoff') OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending')) OR EXISTS(SELECT 1 FROM agent_invocation a JOIN run c ON c.run_id=a.child_run_id WHERE a.invocation_id=i.invocation_id AND c.status IN ('completed','failed','cancelled'))))))`).Scan(&active); err != nil {
 			return "", agent.ErrStorage
 		}
 		if active > 0 {
@@ -529,7 +530,7 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 				return nil
 			}
 			var pendingTask int
-			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')`, c.RunID()).Scan(&pendingTask); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND r.worker_position='root' AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')`, c.RunID()).Scan(&pendingTask); err != nil {
 				return err
 			}
 			if pendingTask > 0 {
@@ -558,6 +559,9 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 					return err
 				}
 			}
+		}
+		if err = r.childFinished(ctx, tx, c.RunID()); err != nil {
+			return err
 		}
 		if err = r.finishTask(ctx, tx, c.RunID(), status, reason); err != nil {
 			return err

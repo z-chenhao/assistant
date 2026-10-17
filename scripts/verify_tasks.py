@@ -44,7 +44,7 @@ def assertions(value, tasks, roots, updates):
         "one_completion_per_root": len(value["updates"]) == updates and len({u["root_run_id"] for u in value["updates"]}) == updates,
         "durable_report_dedup": len(value["inbox"]) == updates == len(value["reporter_dedup"]),
         "no_worker_task_controls": all(not any(s["name"].startswith("builtin__task__") for s in json.loads(caps[r["capability_snapshot_id"]]["tools_json"])) for r in workers),
-        "main_cannot_spawn": all(not c["can_spawn_agents"] for c in caps.values()),
+        "main_cannot_spawn": all(not c["can_spawn_agents"] and not any(s["name"] == "builtin__agent__run" for s in json.loads(c["tools_json"])) for c in caps.values() if c["role"] == "main"),
         "runtime_origin_and_named_details": all(json.loads(b["message_json"])["origin"] == "runtime" and set(json.loads(b["message_json"])["details"]) <= {"task_ref", "kind", "artifact_refs"} for b in value["inbox"]),
         "runtime_never_system": all(m["role"] != "system" for req in requests for m in req["messages"] if m.get("origin") == "runtime"),
         "worker_not_in_conversation": all(m["role"] in ("user", "assistant") and m["source"] != "runtime" for m in value["conversation"]),
@@ -66,7 +66,7 @@ def check(value, tasks=1, roots=1, updates=1):
 
 
 def run(binary):
-    report = {"version": 1, "scope": "Task/Root/Reporter implementation; controlled stop evidence is in task-control reports; Child, Artifact and external delivery remain due later", "checks": [], "crashes": []}
+    report = {"version": 1, "scope": "Task/Root/Reporter implementation; controlled stop evidence is in task-control reports; Child, Artifact and delivery evidence is maintained in their dedicated harnesses", "checks": [], "crashes": []}
     with tempfile.TemporaryDirectory(prefix="erii-tasks-") as directory:
         root = Path(directory)
 

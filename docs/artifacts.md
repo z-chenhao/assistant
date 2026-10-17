@@ -95,7 +95,7 @@ exceeding that aggregate limit returns `RESOURCE_LIMIT` without changing the
 selection. Root results carry only the
 Root's explicit publications in Task updates; Main explicitly selects outputs
 for final Conversation parts, preserving image/audio/video semantic types and
-using file parts for other MIME types. Child orchestration itself remains M4 work.
+using file parts for other MIME types. Direct Child admission and result handoff are covered by [Child operations](children.md).
 Changing content creates a new ref; no overwrite operation exists.
 
 ## Recovery, quota and retention

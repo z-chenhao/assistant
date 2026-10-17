@@ -239,6 +239,9 @@ func TestArtifactTaskVisibilityConcurrentChildWritersAndPublication(t *testing.T
 	controlMain(t, r, a, "create", "create")
 	var taskID, rootID string
 	s.db.QueryRow(`SELECT task_id,root_run_id FROM run WHERE kind='worker'`).Scan(&taskID, &rootID)
+	if _, err := r.Claim(ctx, rootID); err != nil {
+		t.Fatal(err)
+	}
 	scopes := []artifact.Scope{}
 	for i := 0; i < 8; i++ {
 		id := newID()
@@ -346,7 +349,7 @@ func TestArtifactMigrationV10Atomicity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if idAgent(t, s) != "prior" || scalar(t, s, `PRAGMA user_version`) != 12 || scalar(t, s, `SELECT config_version FROM agent_config`) != 7 {
+	if idAgent(t, s) != "prior" || scalar(t, s, `PRAGMA user_version`) != 13 || scalar(t, s, `SELECT config_version FROM agent_config`) != 7 {
 		t.Fatal("prior state changed")
 	}
 }

@@ -105,6 +105,8 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 func validDefinition(d Definition) bool {
 	if d.Host {
 		switch d.Spec.Name {
+		case "builtin__agent__run":
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "spawn_agents"
 		case "builtin__artifact__save", "builtin__artifact__publish":
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "artifact_write"
 		case "builtin__artifact__read", "builtin__artifact__describe", "builtin__artifact__list":
