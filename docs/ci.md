@@ -63,7 +63,11 @@ python3 -m unittest discover -s scripts -p 'test_verification.py' -v
 ```
 
 `make verify` builds once, then runs two independent shards at a time by default.
-CI runs one shard per isolated runner. Use `VERIFY_JOBS=1` for a serial baseline
+The repeated Go conformance command runs after all local harnesses finish. Its
+real 100 ms receipt-recovery fixtures need isolation from unrelated temporary
+database I/O; assertions, deadlines and five repetitions remain unchanged.
+CI runs one shard per isolated runner and keeps the Go command inside providers.
+Use `VERIFY_JOBS=1` for a serial baseline
 and the same fixtures/environment for comparisons. Do not run two suite commands
 against the same evidence directory at once. A shard-only run proves only that
 shard; full success requires every shard plus unit/lint and race.
