@@ -111,6 +111,14 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             require(not (Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db').exists(), 'denied effect reached Provider')
             report['checks'].append({'name': 'exact-action-approval-rejection', 'attempt_count': nested[0]['attempt_count']})
 
+            p, nested = execute('parallel-child-batch', 'const rows = await Promise.allSettled(Array.from({length:3},()=>agent.run({task:"Capabilities: []"}))); return rows.map(row=>row.status);', worker=True)
+            require(p['status'] == 'succeeded' and len(nested) == 3 and all(c['status'] == 'succeeded' for c in nested), 'parallel Child calls lost at suspension')
+            require(json.loads(json.loads(p['result_json'])['text']) == [{'type':'return','value':['fulfilled']*3}], 'parallel Child aggregation changed declaration order')
+            with sqlite3.connect(db_path) as db:
+                first = db.execute("SELECT message_json FROM code_event WHERE execution_id=? AND json_extract(message_json,'$.kind')='execution_suspended' ORDER BY rowid LIMIT 1", (p['invocation_id'],)).fetchone()
+            require(first is not None and len(json.loads(first[0])['outcome']['pendingCallIds']) == 3, 'batch was serialized by premature VM suspension')
+            report['checks'].append({'name':'parallel-child-batch-survives-suspension','nested':[c['invocation_id'] for c in nested], 'first_suspended':json.loads(first[0])['outcome']})
+
             p, nested = execute('unawaited-effect', 'store("executions", (load("executions") || 0) + 1); tools.mcp__fixture__send({target:"unawaited",text:"registered"}); return "selected-output";')
             require(p['status'] == 'waiting' and len(nested) == 1, 'unawaited accepted effect was orphaned')
             a = next(a for a in h.command('approval', 'list') if a['status'] == 'pending')

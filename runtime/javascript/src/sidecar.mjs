@@ -68,7 +68,7 @@ async function stop(e, kind, code) {
   Atomics.store(new Int32Array(e.interrupt), 0, 1);
   await e.worker?.terminate();
   // Host-accepted calls belong to Go and continue independently of the VM.
-  if (kind === 'completed') {
+  if (kind === 'completed' || kind === 'suspended') {
     let timer;
     const accepted = await Promise.race([
       e.hosts.then(() => true),
@@ -97,7 +97,7 @@ async function hostCall(e, message) {
       (discovery && !['searchTools', 'describeTool', 'describeNamespace'].includes(message.name)))
     { queueMicrotask(() => {void stop(e, 'failed', 'PERMISSION_DENIED')}); return; }
   await event(e, 'call_started', {callId, toolName: message.name});
-  if (e.finished && e.stopKind !== 'completed') return;
+  if (e.finished && e.stopKind !== 'completed' && e.stopKind !== 'suspended') return;
   e.posted.add(callId);
   const result = await request(discovery ? 'host.discover' : 'host.invoke', {
     ...envelope(e), callId, toolName: message.name, arguments: args,
@@ -109,6 +109,7 @@ async function hostCall(e, message) {
   e.pending.delete(callId);
   await event(e, 'call_finished', {callId});
   if (e.finished) return;
+  e.idle = undefined;
   e.worker.postMessage({type: 'result', id: message.id, ok: !result.error,
     payload: result.error ? result.error.code : JSON.stringify(result.value),
     properties: result.error ? JSON.stringify(result.error) : undefined,
@@ -152,7 +153,10 @@ async function start(id, req) {
     if (m.type === 'call') {
       const call = hostCall(e, m).catch(() => {queueMicrotask(() => {void stop(e, 'failed', 'PROVIDER_UNAVAILABLE')})});
       e.hosts = Promise.all([e.hosts, call]);
-      void call.then(() => { if (e.suspend && !e.finished) void stop(e, 'suspended'); });
+      void call.then(() => { if (e.suspend && !e.finished && e.idle === e.delivered) void stop(e, 'suspended'); });
+    } else if (m.type === 'idle') {
+      e.idle = m.seq;
+      if (e.suspend && e.idle === e.delivered) void stop(e, 'suspended');
     } else if (m.type === 'sync') {
       const call = syncCall(e, m);
       e.hosts = Promise.all([e.hosts, call]);
@@ -190,7 +194,7 @@ async function receive(message) {
   const p = message.params;
   switch (message.method) {
     case 'runtime.initialize':
-      if (!/^24\./.test(process.versions.node) || initialized || p?.protocolVersion !== '1' || p?.runtimeVersion !== VERSION || p?.preludeVersion !== PRELUDE) return error(message.id, 'INVALID_ARGUMENT');
+      if (process.versions.node !== '24.21.0' || initialized || p?.protocolVersion !== '1' || p?.runtimeVersion !== VERSION || p?.preludeVersion !== PRELUDE) return error(message.id, 'INVALID_ARGUMENT');
       initialized = true;
       send({jsonrpc: '2.0', id: message.id, result: {protocolVersion: '1', runtimeVersion: VERSION, preludeVersion: PRELUDE}});
       break;

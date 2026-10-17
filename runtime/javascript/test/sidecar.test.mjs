@@ -124,3 +124,12 @@ test('pending-call limit disposes the VM even when the Host stops replying',asyn
  assert.equal(r.result?.kind,'failed');
  assert.equal(r.result?.error?.code,'RESOURCE_LIMIT');
 });
+
+test('suspension registers every issued parallel call before disposing the VM',async t=>{
+ const calls=[];
+ const f=await fixture(t,async m=>{calls.push(m.params);return {suspended:true};});
+ const r=await f.run('const first=tools.builtin__text__echo({n:0});let x=0;for(let i=0;i<1000000;i++)x+=i;await Promise.all([first,...Array.from({length:19},(_,n)=>tools.builtin__text__echo({n:n+1}))]);',[echo]);
+ assert.equal(r.result?.kind,'suspended');
+ assert.equal(calls.length,20);
+ assert.equal(r.result?.pendingCallIds.length,20);
+});
