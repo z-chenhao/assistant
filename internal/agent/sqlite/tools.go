@@ -20,6 +20,10 @@ type tools struct {
 func (r *Runs) ToolStore(c agent.RunClaim) tool.Store { return &tools{r, c} }
 
 func (t *tools) Accept(ctx context.Context, exchange string, calls []llm.ToolCall, specs []tool.Spec) ([]tool.Invocation, error) {
+	return t.accept(ctx, exchange, calls, specs, "")
+}
+
+func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCall, specs []tool.Spec, parent string) ([]tool.Invocation, error) {
 	out := []tool.Invocation{}
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		out = out[:0]
@@ -34,19 +38,29 @@ func (t *tools) Accept(ctx context.Context, exchange string, calls []llm.ToolCal
 		if frozen != current {
 			return llm.ModelIncompatible
 		}
-		// Only calls in a persisted complete model response can be accepted.
-		var value string
-		if err := tx.QueryRowContext(ctx, `SELECT result_json FROM model_generation WHERE generation_id=? AND run_id=? AND status='completed'`, exchange, t.claim.RunID()).Scan(&value); err != nil {
-			return err
-		}
-		var response llm.GenerationResult
-		if json.Unmarshal([]byte(value), &response) != nil {
-			return agent.ErrStorage
-		}
-		a, _ := encoded(response.ToolCalls)
-		b, _ := encoded(calls)
-		if a != b {
-			return tool.ErrReplay
+		if parent == "" {
+			// Only calls in a persisted complete model response can be accepted.
+			var value string
+			if err := tx.QueryRowContext(ctx, `SELECT result_json FROM model_generation WHERE generation_id=? AND run_id=? AND status='completed'`, exchange, t.claim.RunID()).Scan(&value); err != nil {
+				return err
+			}
+			var response llm.GenerationResult
+			if json.Unmarshal([]byte(value), &response) != nil {
+				return agent.ErrStorage
+			}
+			a, _ := encoded(response.ToolCalls)
+			b, _ := encoded(calls)
+			if a != b {
+				return tool.ErrReplay
+			}
+		} else {
+			var valid bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tool_invocation i JOIN code_execution c ON c.execution_id=i.invocation_id WHERE i.invocation_id=? AND i.run_id=? AND i.provider_exchange_id=? AND i.tool_name='builtin__codemode__execute' AND i.status='running')`, parent, t.claim.RunID(), exchange).Scan(&valid); err != nil {
+				return err
+			}
+			if !valid {
+				return agent.ErrConflict
+			}
 		}
 		for i, call := range calls {
 			request, _ := encoded(call)
@@ -86,9 +100,14 @@ func (t *tools) Accept(ctx context.Context, exchange string, calls []llm.ToolCal
 				}
 				sort.Strings(keys)
 				rawKeys, _ = encoded(keys)
-				_, err = tx.ExecContext(ctx, `INSERT INTO tool_invocation(invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,idempotency_key,status,delivery_seq,created_at,updated_at,version,policy_json,conflict_keys) VALUES(?,?,?,?,?,?,?,?,?,'queued',?,?,?,1,?,?)`, inv.ID, t.claim.RunID(), exchange, call.ID, call.Name, call.Arguments, hash, policy, newID(), i, now, now, rawPolicy, rawKeys)
+				_, err = tx.ExecContext(ctx, `INSERT INTO tool_invocation(parent_invocation_id,invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,idempotency_key,status,delivery_seq,created_at,updated_at,version,policy_json,conflict_keys) VALUES(?,?,?,?,?,?,?,?,?,?,'queued',?,?,?,1,?,?)`, nullable(parent), inv.ID, t.claim.RunID(), exchange, call.ID, call.Name, call.Arguments, hash, policy, newID(), i, now, now, rawPolicy, rawKeys)
 				if err != nil {
 					return err
+				}
+				if parent != "" {
+					if _, err = tx.ExecContext(ctx, `INSERT INTO code_call(execution_id,call_id,invocation_id,request_hash) VALUES(?,?,?,?)`, parent, call.ID, inv.ID, hash); err != nil {
+						return err
+					}
 				}
 				if err = runEvent(ctx, tx, t.claim.RunID(), "tool_invocation.accepted", 1); err != nil {
 					return err
@@ -347,6 +366,10 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 				return nil
 			}
 			inv.Status = "queued" // Persisted retry intent proves no effect took place.
+			return nil
+		}
+		if inv.Status == "waiting" && inv.WaitReason == "external_event" && inv.Call.Name == "builtin__codemode__execute" {
+			inv.Status = "queued"
 			return nil
 		}
 		if inv.Status == "waiting" && inv.WaitReason == "child_run" {

@@ -96,3 +96,10 @@ delivery:
   lease_seconds: 5
   retry_milliseconds: 250
   max_attempts: 5
+
+# Enable the sole Code Mode entry for new Runs. Install dependencies first:
+# npm ci --prefix runtime/javascript --ignore-scripts
+# Pin Node 24.21.0; both paths must be absolute and outside an editable workspace.
+# javascript:
+#   command: /absolute/path/to/node
+#   script: /absolute/path/to/erii/runtime/javascript/src/sidecar.mjs

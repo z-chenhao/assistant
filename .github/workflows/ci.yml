@@ -26,9 +26,13 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: provider-bridge/package-lock.json
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
       - name: Install pinned Bridge dependencies
-        run: npm ci --prefix provider-bridge --ignore-scripts
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         run: |
           sudo apt-get update

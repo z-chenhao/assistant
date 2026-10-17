@@ -6,6 +6,7 @@ build:
 test:
 	go test ./...
 	npm test --prefix provider-bridge
+	npm test --prefix runtime/javascript
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 
 test-race:
@@ -16,6 +17,7 @@ lint:
 	go vet ./...
 	go mod verify
 	npm run lint --prefix provider-bridge
+	npm run lint --prefix runtime/javascript
 
 verify: build
 	@mkdir -p evidence
@@ -23,6 +25,7 @@ verify: build
 	python3 scripts/verify.py --binary bin/personal-agent --evidence evidence/verification.json
 	python3 scripts/verify_local_provider.py --binary bin/personal-agent --evidence evidence/local-provider.json
 	python3 scripts/verify_account.py --binary bin/personal-agent --evidence evidence/account.json
+	@for attempt in 1 2 3 4 5; do python3 scripts/verify_codemode.py --binary bin/personal-agent --evidence evidence/codemode-$$attempt.json || exit 1; done
 	python3 scripts/verify_main.py --binary bin/personal-agent --evidence evidence/main.json
 	python3 scripts/verify_tasks.py --binary bin/personal-agent --evidence evidence/tasks.json
 	@for attempt in 1 2 3 4 5; do python3 scripts/verify_children.py --binary bin/personal-agent --evidence evidence/children-$$attempt.json || exit 1; done

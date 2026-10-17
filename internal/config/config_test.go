@@ -208,3 +208,19 @@ func TestNATSConfigAndOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestJavaScriptRuntimeRequiresTrustedAbsolutePaths(t *testing.T) {
+	for _, yaml := range []string{
+		"version: 1\njavascript: {}\n",
+		"version: 1\njavascript: {command: node, script: /runtime/sidecar.mjs}\n",
+		"version: 1\njavascript: {command: /usr/bin/node, script: sidecar.mjs}\n",
+	} {
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		if err := os.WriteFile(path, []byte(yaml), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path, func(string) (string, bool) { return "", false }); err == nil {
+			t.Fatal("accepted untrusted runtime config", yaml)
+		}
+	}
+}

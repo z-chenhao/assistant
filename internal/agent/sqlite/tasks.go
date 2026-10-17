@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/erii/internal/tool/codemode"
 )
 
 // createMain is shared by user ingress and durable Reporter follow-ups. Both
@@ -172,6 +173,9 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	var name string
 	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, inv.ID, t.claim.RunID()).Scan(&name); err != nil {
 		return tool.Result{}, agent.ErrStorage
+	}
+	if name == codemode.ToolName {
+		return t.executeCode(ctx, inv)
 	}
 	if name == agent.RunToolName {
 		return t.AgentToolExecutor(ctx, inv.ID)
