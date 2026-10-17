@@ -8,6 +8,7 @@ real boundary, records evidence, and always reaps its processes/removes state.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
+| Complete offline CI gate | `make verify`; serial baseline with `VERIFY_JOBS=1`; isolated `VERIFY_SHARD=runtime/codemode/security/delivery/providers` | `scripts/verify_suite.py`, `.github/workflows/ci.yml`, `scripts/ci_gate.py` | Unchanged inventory/repetition regression; per-harness/case timings, tested SHA and binary digest; independent shard failure/cancel/skip rejects stable `Ubuntu checks`; 14-day exact-SHA CI artifacts; owned process cleanup. See [operations](../docs/ci.md). |
 | Help/doctor | `bin/personal-agent -help` | `cmd/personal-agent:run` | Usage; no state created |
 | Startup diagnostics | `bin/personal-agent [-config path] status`; no-command with redirected stdin | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
