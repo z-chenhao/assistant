@@ -28,10 +28,11 @@ def main():
     active = {}
     def trace(frame, event, _):
         if event == "call":
-            if frame.f_code.co_name not in ("scenario", "driver") or Path(frame.f_code.co_filename).parent != script.parent:
+            is_cell = frame.f_code.co_name == "execute" and Path(frame.f_code.co_filename).name == "verify_codemode.py"
+            if (frame.f_code.co_name not in ("scenario", "driver") and not is_cell) or Path(frame.f_code.co_filename).parent != script.parent:
                 return None
             values = frame.f_locals
-            name = values.get("name")
+            name = values.get("key") if is_cell else values.get("name")
             if frame.f_code.co_name == "driver":
                 name = values["case"]["case_id"] + "/" + values["variant"]["variant_id"]
             active[id(frame)] = (str(name), time.monotonic())
