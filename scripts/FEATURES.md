@@ -8,7 +8,7 @@ real boundary, records evidence, and always reaps its processes/removes state.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
-| Complete offline CI gate | `make verify`; serial baseline with `VERIFY_JOBS=1`; isolated `VERIFY_SHARD=runtime/security/delivery/providers` | `scripts/verify_suite.py`, `.github/workflows/ci.yml`, `scripts/ci_gate.py` | Unchanged inventory/repetition regression; per-harness/case timings, tested SHA and binary digest; independent shard failure/cancel/skip rejects stable `Ubuntu checks`; 14-day exact-SHA CI artifacts; owned process cleanup. See [operations](../docs/ci.md). |
+| Complete offline CI gate | `make verify`; serial baseline with `VERIFY_JOBS=1`; isolated `VERIFY_SHARD=runtime/codemode/security/delivery/providers` | `scripts/verify_suite.py`, `.github/workflows/ci.yml`, `scripts/ci_gate.py` | Unchanged inventory/repetition regression; per-harness/case timings, tested SHA and binary digest; independent shard failure/cancel/skip rejects stable `Ubuntu checks`; 14-day exact-SHA CI artifacts; owned process cleanup. See [operations](../docs/ci.md). |
 | Help/doctor | `bin/personal-agent -help` | `cmd/personal-agent:run` | Usage; no state created |
 | Startup diagnostics | `bin/personal-agent [-config path] status`; no-command with redirected stdin | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
@@ -285,3 +285,20 @@ Synthetic fixture `evals/fixtures/m4-spend-v1.json` specifies prices and arithme
 | Cancel and late events | Main cancels pending monetary batch | `stopTask`, `invalidateApprovals`, existing epoch/owner fences | Old approval invalidated, callback and late usage rejected, no effect/follow-up, settled repeated drain; Go old-owner/Task-epoch regression |
 | Sanitized unknown costs | `spend status` | Read-only `Runs.Spend`, immutable provider usage | Explicit unpriced/unconfigured/combined state, no guessed approval, missing usage retains reserve and unknown actual, historical and setup-Probe unpriced counts; no endpoint/credential or model-visible query |
 | Migration | Open empty/prior schema and restart | Migration 015 | Every-prior upgrade, retained model/profile/usage data, legacy snapshots remain unpriced/unconfigured, failed migration rolls back atomically |
+
+## M5 Code Mode runtime — ERII-19
+
+| Feature | User boundary | Authoritative implementation | Inspectable evidence |
+| --- | --- | --- | --- |
+| Fresh JavaScript cells, loops and Promises | Configured `builtin__codemode__execute` through `chat send` / `chat work` | `internal/tool/codemode`, `runtime/javascript/src` | `verify_codemode.py`: selected output plus nested ToolInvocation readback; real Node fixtures |
+| Nested Tool execution with one slot | `tools.run_concurrency: 1`, awaited echo and `Promise.all` through `chat work` | Atomic capacity ownership in `internal/agent/sqlite/tools.go` | `verify_codemode.py`: bounded single-slot completion, wrapper/nested attempt counts and ordered parallel results; deterministic Go tests retain all five actual Tool quotas and conflict exclusion while wrappers run |
+| Progressive discovery and role exposure | `ALL_TOOLS`, `searchTools`, `describeTool`, `describeNamespace`, Worker-only `agent.run` | Frozen capability view in `internal/agent/sqlite/codemode.go` | Main hidden Agent, Worker namespace, actual Child final result and inherited model |
+| Synchronous persistent cell Store | `store` / `load` | `code_store` and fenced Go sink | Write survives throw, another cell cannot read it, Surface handles rejected; unawaited calls drain without rerunning the finished cell |
+| CUA facade | `cua.getState`, `getApp`, bound `observe` | Unified Computer Tool bridge; explicit read-only Fake until M6 | Three nested invocations and chosen latest observation |
+| Approval and isolation | Nested effect, prohibited globals, cancellation | Existing ToolExecutor, QuickJS Worker and RPC admission | Exact rejection without dispatch; forbidden globals, CPU/memory/output limits, forged peer and duplicate event fixtures |
+
+Launch/Doctor/Drive/Evidence/Cleanup:
+`python3 scripts/verify_codemode.py --binary bin/personal-agent --evidence evidence/codemode.json`.
+This command owns disposable configuration, Model Fake, Computer Fake, processes
+and SQLite state. `make verify` repeats it five times. `docs/codemode.md` records
+configuration, limits, provenance and the ERII-20/21 recovery/scoring gaps.

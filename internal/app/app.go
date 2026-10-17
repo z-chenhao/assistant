@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
 	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
@@ -32,6 +33,7 @@ import (
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/erii/internal/tool/codemode"
 	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
 	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"github.com/z-chenhao/erii/internal/tui"
@@ -103,6 +105,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	if cfg.JavaScript != nil {
+		defs = append(defs, codemode.Definition())
+	}
 	for _, server := range cfg.MCP {
 		more, e := mcp.Definitions(ctx, server)
 		if e != nil {
@@ -127,6 +132,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 		defs = append(defs, more...)
 	}
+	if fixture == "codemode" && cfg.JavaScript != nil {
+		defs = append(defs, computerfake.Definitions()...)
+	}
 	if fixture == "artifacts" {
 		defs = append(defs, toolfake.Artifacts()...)
 	}
@@ -139,7 +147,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		a.Close()
 		return nil, err
 	}
-	if fixture == "children" || fixture == "approval" || fixture == "approval-never" {
+	if fixture == "codemode" || fixture == "children" || fixture == "approval" || fixture == "approval-never" {
 		defs := []tool.Definition{}
 		for _, spec := range a.registry.Describe() {
 			d, _ := a.registry.Resolve(spec.Name)
@@ -161,6 +169,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 	}
 	a.runs = store.Runs(a.history, a.registry)
+	if cfg.JavaScript != nil {
+		a.runs.ConfigureJavaScript(&codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script})
+	}
 	a.runs.ConfigureChildLimits(cfg.Children)
 	a.runs.ConfigureScheduler(cfg.Scheduler)
 	a.runs.ConfigureSpend(cfg.Spend)

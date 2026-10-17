@@ -33,9 +33,13 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: provider-bridge/package-lock.json
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
       - name: Install pinned Bridge dependencies
-        run: npm ci --prefix provider-bridge --ignore-scripts
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         run: |
           sudo apt-get update
@@ -71,9 +75,13 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: provider-bridge/package-lock.json
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
       - name: Install pinned Bridge dependencies
-        run: npm ci --prefix provider-bridge --ignore-scripts
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         run: |
           sudo apt-get update
@@ -100,7 +108,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "security", "delivery", "providers"]
+        shard: ["runtime", "codemode", "security", "delivery", "providers"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,9 +121,13 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: provider-bridge/package-lock.json
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
       - name: Install pinned Bridge dependencies
-        run: npm ci --prefix provider-bridge --ignore-scripts
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         if: matrix.shard == 'providers'
         run: |

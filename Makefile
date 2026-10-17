@@ -6,6 +6,7 @@ build:
 test:
 	go test ./...
 	npm test --prefix provider-bridge
+	npm test --prefix runtime/javascript
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 
 test-race:
@@ -16,6 +17,7 @@ lint:
 	go vet ./...
 	go mod verify
 	npm run lint --prefix provider-bridge
+	npm run lint --prefix runtime/javascript
 
 # Shards own isolated fixtures and disjoint evidence; repetitions stay serial.
 VERIFY_JOBS ?= 2

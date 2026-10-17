@@ -19,11 +19,13 @@ import (
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/erii/internal/tool/codemode"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
 type Runs struct {
+	javascript  codemode.JavaScriptRuntime
 	host        *Store
 	history     conversation.Store
 	registry    *tool.Registry

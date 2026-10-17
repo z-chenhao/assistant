@@ -1,7 +1,7 @@
 # Offline CI and verification operations
 
 `Ubuntu checks` remains the only branch-protection check name. It runs with
-`always()` after unit/lint, race, and the four verification shards. It succeeds
+`always()` after unit/lint, race, and the five verification shards. It succeeds
 only when all three job results are `success`. A matrix succeeds only when every
 cell succeeds; matrix fail-fast is disabled so failures retain independent
 evidence. Failure, cancellation, skipped dependencies, missing results and
@@ -14,12 +14,14 @@ flowchart LR
     SHA[PR head SHA] --> Fast[Unit tests and lint]
     SHA --> Race[Race detector]
     SHA --> Runtime[Runtime verification]
+    SHA --> CodeMode[Code Mode verification]
     SHA --> Security[Security verification]
     SHA --> Delivery[Delivery verification]
     SHA --> Providers[Provider verification]
     Fast --> Gate[Ubuntu checks]
     Race --> Gate
     Runtime --> Matrix[All verification cells succeed]
+    CodeMode --> Matrix
     Security --> Matrix
     Delivery --> Matrix
     Providers --> Matrix
@@ -36,6 +38,7 @@ The manifest in `scripts/verify_suite.py` owns verification coverage:
 | Shard | Required evidence |
 | --- | --- |
 | runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
+| codemode | Five consecutive Code Mode runs added by main in PR #18; real QuickJS/Tool/Child isolation fixtures |
 | security | Five consecutive Tool approval/recovery and Artifact runs |
 | delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
 | providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |

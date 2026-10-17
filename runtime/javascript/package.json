@@ -1,0 +1,12 @@
+{
+  "name": "erii-javascript-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {"node": "24.21.0"},
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "lint": "node --check src/sidecar.mjs && node --check src/worker.mjs && node --check src/prelude.mjs && node --check src/vendor/vm.mjs && node --check src/vendor/prelude.mjs"
+  },
+  "dependencies": {"quickjs-wasi": "3.6.2"}
+}

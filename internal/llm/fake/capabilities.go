@@ -31,16 +31,25 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 		raw, _ := json.Marshal(map[string]string{"operation": "create", "task": "Capabilities fixture\nCapabilities: " + strings.TrimPrefix(source, "Delegate capabilities: ")})
 		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "delegate", Name: "builtin__task__manage", Arguments: string(raw)}}}
 	}
-	if i := strings.LastIndex(source, "Capabilities: "); i >= 0 {
-		source = source[i+len("Capabilities: "):]
-	} else {
-		return llm.GenerationResult{Text: "No scripted capability request."}
-	}
 	var plan []struct {
 		Name      string          `json:"name"`
 		Arguments json.RawMessage `json:"arguments"`
 	}
-	if json.Unmarshal([]byte(source), &plan) != nil {
+	found := false
+	// A Task title may repeat a truncated plan, and JavaScript may itself
+	// contain a Child request marker. Select the complete JSON plan only.
+	for offset := 0; offset < len(source); {
+		i := strings.Index(source[offset:], "Capabilities: ")
+		if i < 0 {
+			break
+		}
+		offset += i + len("Capabilities: ")
+		if json.Unmarshal([]byte(source[offset:]), &plan) == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
 		return llm.GenerationResult{Text: "Invalid fixture plan."}
 	}
 	count := 0
