@@ -311,3 +311,11 @@ Artifact storage, CLI commands, scopes and recovery evidence: [artifacts.md](art
 Direct Child delegation: `scripts/verify_children.py` runs from `make verify`
 five times. It reuses the CLI/PTY harness and records tree/admission/approval/
 cancel/SIGKILL evidence. Scope and operations: [children.md](children.md).
+
+The M5 Code Mode slice additionally needs Node 24.21.0 and
+`npm ci --prefix runtime/javascript --ignore-scripts`. Its maintained CLI
+harness, transport fixtures, configuration, Pi provenance and recovery boundary
+are documented in [codemode.md](codemode.md). The new dependency is MIT-licensed
+QuickJS-WASI 3.6.2. The adapted MIT Pi 1.3.0 VM/Prelude is vendored; no model
+provider or paid service is introduced. M5 acceptance remains pending the
+ERII-20 replay and ERII-21 Golden Case slices.

@@ -22,20 +22,26 @@ import (
 )
 
 type Config struct {
-	Spend     agent.SpendPolicy     `yaml:"spend"`
-	Scheduler agent.SchedulerLimits `yaml:"scheduler"`
-	Children  agent.ChildLimits     `yaml:"children"`
-	MCP       []mcp.Config          `yaml:"mcp"`
-	Skills    *skill.Config         `yaml:"skills"`
-	Workspace *workspace.Config     `yaml:"workspace"`
-	Delivery  delivery.Policy       `yaml:"delivery"`
-	Version   int                   `yaml:"version"`
-	Artifact  artifact.Policy       `yaml:"artifact"`
-	App       App                   `yaml:"app"`
-	NATS      eventnats.Options     `yaml:"nats"`
-	Tools     ToolLimits            `yaml:"tools"`
-	Tasks     Tasks                 `yaml:"tasks"`
-	LLM       LLM                   `yaml:"llm"`
+	JavaScript *JavaScript           `yaml:"javascript"`
+	Spend      agent.SpendPolicy     `yaml:"spend"`
+	Scheduler  agent.SchedulerLimits `yaml:"scheduler"`
+	Children   agent.ChildLimits     `yaml:"children"`
+	MCP        []mcp.Config          `yaml:"mcp"`
+	Skills     *skill.Config         `yaml:"skills"`
+	Workspace  *workspace.Config     `yaml:"workspace"`
+	Delivery   delivery.Policy       `yaml:"delivery"`
+	Version    int                   `yaml:"version"`
+	Artifact   artifact.Policy       `yaml:"artifact"`
+	App        App                   `yaml:"app"`
+	NATS       eventnats.Options     `yaml:"nats"`
+	Tools      ToolLimits            `yaml:"tools"`
+	Tasks      Tasks                 `yaml:"tasks"`
+	LLM        LLM                   `yaml:"llm"`
+}
+
+type JavaScript struct {
+	Command string `yaml:"command"`
+	Script  string `yaml:"script"`
 }
 
 type ToolLimits struct {
@@ -114,6 +120,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
 	}
+	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
+		return Config{}, errors.New("javascript requires an absolute command and script")
+	}
 	if err := cfg.Spend.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -170,6 +179,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if cfg.Workspace != nil {
 		if cfg.Workspace.Validate() != nil || overlaps(cfg.Workspace.Root, cfg.App.DataRoot) {
 			return Config{}, errors.New("workspace must be separate from application data")
+		}
+		if cfg.JavaScript != nil && (overlaps(cfg.Workspace.Root, cfg.JavaScript.Script) || overlaps(cfg.Workspace.Root, cfg.JavaScript.Command)) {
+			return Config{}, errors.New("workspace cannot contain trusted JavaScript runtime")
 		}
 		if cfg.Skills != nil && overlaps(cfg.Workspace.Root, cfg.Skills.Root) {
 			return Config{}, errors.New("workspace cannot contain or overlap Skills")
