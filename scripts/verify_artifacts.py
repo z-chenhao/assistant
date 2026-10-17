@@ -50,8 +50,9 @@ def recover_receipt(h, path):
     The separate Fake ledger is authoritative for the effect and receipt bytes.
     """
     text = 'binary receipt \u0000 λ'
+    behavior = 'binary_receipt_after_restart' if path == 'unknown' else 'binary_receipt'
     h.send('delegate-receipt', 'Delegate effect: ' + json.dumps(
-        {'target': 'R1', 'text': text, 'behavior': 'binary_receipt'}))
+        {'target': 'R1', 'text': text, 'behavior': behavior}))
     h.command('chat', 'work')
     approval = h.command('approval', 'list')[-1]
     require(approval['status'] == 'pending' and not tool_state(h)['effects'], 'receipt effect bypassed approval')
