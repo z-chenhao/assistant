@@ -104,7 +104,7 @@ function context(r, model) {
       calls.delete(m.tool_call_id);
     } else fail('INVALID_PROVIDER_RESPONSE');
   }
-  return { systemPrompt:systems.join('\n\n'), messages, tools:(r.tools ?? []).map(t => ({name:t.name,description:'',parameters:JSON.parse(t.input_schema)})) };
+  return { systemPrompt:systems.join('\n\n'), messages, tools:(r.tools ?? []).map(t => ({name:t.name,description:t.description ?? '',parameters:JSON.parse(t.input_schema)})) };
 }
 
 async function generate(r, job, send) {
