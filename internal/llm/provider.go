@@ -39,6 +39,7 @@ type ToolCall struct {
 
 type Message struct {
 	Role       string     `json:"role"`
+	Origin     string     `json:"origin,omitempty"`
 	Text       string     `json:"text"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
@@ -46,6 +47,7 @@ type Message struct {
 
 type ToolSpec struct {
 	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 	InputSchema string `json:"input_schema"`
 }
 

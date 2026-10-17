@@ -54,6 +54,17 @@ class Terminal:
         self.position = end
         return value
 
+    def expect_all(self, markers, timeout=20):
+        """Await independently ordered output from concurrent foreground work."""
+        start, end = self.position, self.position
+        values = []
+        for marker in markers:
+            self.position = start
+            values.append(self.expect(marker, timeout))
+            end = max(end, self.position)
+        self.position = end
+        return values
+
     def send(self, text):
         if "\n" in text or "\r" in text:
             raise ValueError("send exactly one terminal line")

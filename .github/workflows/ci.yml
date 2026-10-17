@@ -12,7 +12,9 @@ jobs:
   checks:
     name: Ubuntu checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Prior exact-SHA gates took 44m43s before the five monetary-policy runs.
+    # Preserve every gate and give the expanded fault/restart suite headroom.
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -24,9 +26,19 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: provider-bridge/package-lock.json
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
       - name: Install pinned Bridge dependencies
-        run: npm ci --prefix provider-bridge --ignore-scripts
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+      - name: Prepare isolated coding fixture runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          # This disposable runner needs unprivileged user namespaces for bwrap.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Unit tests
         run: make test
       - name: Race detector
