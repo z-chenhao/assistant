@@ -323,6 +323,34 @@ func TestSchedulerActivityCountsDoNotNotify(t *testing.T) {
 	}
 }
 
+func TestSchedulerDrainWaitsForStoppedLiveOwner(t *testing.T) {
+	s, r, a, p := childFixture(t)
+	ctx := context.Background()
+	c, _, _, _ := childAdmission(t, s, r, a, p)
+	if err := r.write(ctx, func(tx *sql.Tx) error {
+		var id string
+		var epoch, version int64
+		if err := tx.QueryRowContext(ctx, `SELECT t.task_id,t.task_epoch,t.version FROM task t JOIN run r USING(task_id) WHERE r.run_id=?`, c.RunID()).Scan(&id, &epoch, &version); err != nil {
+			return err
+		}
+		return r.stopTask(ctx, tx, id, "cancelled", epoch, version)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Next(ctx); !errors.Is(err, agent.ErrBusy) {
+		t.Fatal("drain finished before cancelled live owner joined/expired", err)
+	}
+	if _, err := s.db.Exec(`UPDATE run_claim SET expires_at=0,version=version+1 WHERE run_id=?`, c.RunID()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Next(ctx); !errors.Is(err, agent.ErrNotFound) {
+		t.Fatal("expired stop did not settle", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled'`) != 1 || scalar(t, s, `SELECT count(*) FROM run_claim WHERE token IS NOT NULL`) != 0 {
+		t.Fatal("cancelled owner retained work")
+	}
+}
+
 func TestSchedulerMigrationV13PreservesFrozenTreeAndRollsBack(t *testing.T) {
 	s, r, a, p := childFixture(t)
 	p.respond = childPolicy

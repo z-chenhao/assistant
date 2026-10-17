@@ -196,7 +196,9 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 	id, err := r.nextScheduled(ctx)
 	if err == sql.ErrNoRows {
 		var active int
-		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE `+runnable, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
+		// Stopping owners must join or expire before Drain can finish. They are
+		// never candidates for business claims, but still require recovery work.
+		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE (`+runnable+`) OR (r.desired_state!='running' AND r.status IN ('queued','running','waiting'))`, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
 			return "", agent.ErrStorage
 		}
 		if active > 0 {

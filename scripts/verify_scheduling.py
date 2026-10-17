@@ -90,13 +90,23 @@ def run(binary):
             children = [r for r in value['runs'] if r['parent_run_id']]
             require(sum(r['status'] == 'completed' for r in children) == 98 and sum(r['status'] == 'failed' for r in children) == 2, 'business failures aborted or duplicated batch')
             invocations = [i for i in value['tools'] if i['tool_name'] == 'builtin__agent__run']
-            require(len({i['provider_call_id'] for i in invocations}) == 100, 'row adoption duplicated')
+            require({i['provider_call_id'] for i in invocations} == {f'row-{i:03d}' for i in range(1, 101)}, 'row adoption missing or duplicated')
+            for invocation in invocations:
+                row = int(invocation['provider_call_id'].removeprefix('row-'))
+                require(json.loads(invocation['arguments_json']) == {'task': f'Batch item {row}'}, 'row input drift')
+                output = json.loads(invocation['result_json'])
+                if row in (37, 74):
+                    require(invocation['status'] == 'failed' and output['error']['code'] == 'PROVIDER_UNAVAILABLE', 'wrong failed row adopted')
+                else:
+                    expected = 'Needs input: confirm region' if row in (7, 8) else f'row {row:03d}: classified'
+                    require(invocation['status'] == 'succeeded' and json.loads(output['text']) == {'text': expected, 'artifactRefs': []}, 'wrong row result adopted')
             result = value['updates'][0]['content']
             require(result == 'Batch aggregate: 98 results, 2 failed. Needs input: confirm region', 'aggregate counts or blocker deduplication')
             root_id = value['trees'][0]['root_run_id']
             require(sum(g['run_id'] == root_id for g in value['generations']) == 5, 'Child completions caused model storm')
             require(value['tree_usage'][0]['model_calls'] == 105 and value['task_usage'][0]['model_calls'] == 105, 'Root tree/Task usage omitted calls')
             require(value['tree_usage'][0]['missing_token_usage'] == 105 and value['tree_usage'][0]['input_tokens'] is None, 'missing provider usage became zero-cost claim')
+            require(value['account_usage'][0]['model_calls'] == len(value['usage']), 'account ledger omitted Main or Worker calls')
             measured = concurrency(value)
             require(not measured['remaining_worker_leases'], 'terminal batch kept leases')
             h.command('chat', 'work')
