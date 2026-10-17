@@ -12,7 +12,7 @@ jobs:
   checks:
     name: Ubuntu checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,6 +27,12 @@ jobs:
           cache-dependency-path: provider-bridge/package-lock.json
       - name: Install pinned Bridge dependencies
         run: npm ci --prefix provider-bridge --ignore-scripts
+      - name: Prepare isolated coding fixture runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          # This disposable runner needs unprivileged user namespaces for bwrap.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Unit tests
         run: make test
       - name: Race detector

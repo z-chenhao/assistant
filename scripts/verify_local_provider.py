@@ -70,6 +70,20 @@ class Endpoint(BaseHTTPRequestHandler):
                 for _ in range(100):
                     chunk({"content": "streaming "})
                     time.sleep(.01)
+            elif self.server.mode == "tasks":
+                names = [item["function"]["name"] for item in body.get("tools", [])]
+                root = any("general Worker executing" in str(m.get("content", "")) for m in body["messages"])
+                runtime = any("Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in body["messages"])
+                has_result = any(m["role"] == "tool" for m in body["messages"])
+                if runtime and not root:
+                    chunk({"content": "Main Task follow-up through Pi."})
+                elif not has_result and (root or "builtin__task__manage" in names):
+                    name = "builtin__text__echo" if root else "builtin__task__manage"
+                    arguments = {"text": "Independent Root report."} if root else {"operation": "create", "task": "Prepare a safe independent report. Return evidence; perform no external actions."}
+                    chunk({"tool_calls": [{"index": 0, "id": "task_call", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}]})
+                else:
+                    chunk({"content": "Root business result through Pi." if root else "Main Task accepted through Pi."})
+                chunk({}, "stop", {"prompt_tokens": 7, "completion_tokens": 8, "total_tokens": 15})
             elif self.server.mode == "partial":
                 chunk({"content": "partial"})
                 return
@@ -78,7 +92,8 @@ class Endpoint(BaseHTTPRequestHandler):
                     chunk({"content": "I cannot call tools"})
                     chunk({}, "stop")
                 else:
-                    name = body["tools"][0]["function"]["name"]
+                    names = [item["function"]["name"] for item in body["tools"]]
+                    name = "builtin__text__echo" if "builtin__text__echo" in names else names[0]
                     arguments = {"text": text} if name == "builtin__text__echo" else {"value": "OK"}
                     chunk({"tool_calls": [{"index": 0, "id": "call_echo", "type": "function",
                                           "function": {"name": name, "arguments": json.dumps(arguments)}}]})
@@ -141,6 +156,24 @@ def verify(binary, script):
             require(all(r["auth"] is None for r in server.requests), "fabricated Authorization")
             report["checks"] += ["catalog", "manual CLI add", "unverified rejection", "real five-part probe", "atomic select", "restart ready", "no fabricated key"]
 
+            server.mode = "tasks"
+            task_start = len(server.requests)
+            command("chat", "send", "local-task", text="Delegate an independent report in the background.")
+            command("chat", "work")
+            task_history = command("chat", "history")
+            require(task_history[-1]["content"][0]["text"] == "Main Task follow-up through Pi.", "actual Pi Task follow-up missing")
+            task_requests = [r["body"] for r in server.requests[task_start:] if r.get("body")]
+            roots = [r for r in task_requests if any("general Worker executing" in str(m.get("content", "")) for m in r["messages"])]
+            require(roots and all(not any(t["function"]["name"].startswith("builtin__task__") for t in r["tools"]) for r in roots), "Root Task control exposed on actual Pi wire")
+            require(all("actual local conversation" not in json.dumps(r["messages"]) for r in roots), "Root inherited Main Conversation")
+            require(any(any(m["role"] == "user" and "Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in r["messages"]) for r in task_requests), "runtime framing lost at actual Pi boundary")
+            with closing(sqlite3.connect(root / "data/state.db")) as db:
+                require(db.execute("SELECT count(*) FROM task WHERE status='completed'").fetchone()[0] == 1, "actual Pi Task missing")
+                require(db.execute("SELECT count(*) FROM main_inbox").fetchone()[0] == 1, "actual Pi Reporter dedup missing")
+            report["task_requests"] = task_requests
+            report["task_history"] = task_history
+            report["checks"].append("actual Node/Pi Task create -> Root echo/result -> runtime-framed Reporter -> one Main follow-up; role/context isolation")
+
             # A failed retest must revoke proof and close ingress after endpoint failure.
             server.mode = "no-tools"
             require("MODEL_INCOMPATIBLE" in command("model", "test", id_, ok=False), "missing tools accepted")
@@ -169,7 +202,7 @@ def verify(binary, script):
             report["checks"].append("partial stream is not completion")
 
             with closing(sqlite3.connect(root / "data/state.db")) as db:
-                require(db.execute("pragma user_version").fetchone()[0] == 7, "schema")
+                require(db.execute("pragma user_version").fetchone()[0] == 13, "schema")
                 rows = db.execute("SELECT snapshot_id,run_id,input_tokens,output_tokens,latency_ms,error_code,snapshot_json FROM provider_usage").fetchall()
                 require(rows and any(r[2:4] == (7, 8) for r in rows), "usage not recorded")
                 require(any(r[5] == "GENERATION_CANCELLED" and r[2] is None for r in rows), "unknown cancellation usage fabricated")
