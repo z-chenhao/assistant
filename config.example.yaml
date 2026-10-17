@@ -1,4 +1,18 @@
 version: 1
+# Optional M3 adapters, disabled when absent. Use private dedicated directories.
+# mcp:
+#   - name: local_catalog
+#     command: /absolute/path/to/self-contained-mcp-server
+#     args: []
+#     directory: /absolute/path/to/provider-state
+#     tools: {lookup: read_only, send: external_effect}
+# skills:
+#   root: /absolute/path/to/curated-skills
+#   scope: agent  # agent or workspace, within this local Agent
+# workspace:
+#   root: /absolute/path/to/disposable-git-checkout
+#   mode: audit  # edit exposes exact approved clean-file replacement
+#   protected: [docs/notes.md]
 app:
   # Must be absolute. ERII_DATA_ROOT can override this for deployment.
   data_root: /tmp/erii-local
@@ -12,8 +26,36 @@ nats:
   ack_wait: 30s
   retry_interval: 1s
 
+tasks:
+  recent_days: 30
+  recent_limit: 200
+
 # Optional real local-model Bridge. Install pinned dependencies first; use an absolute path.
 # llm:
 #   provider_bridge_command: node
 #   provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
 #   provider_bridge_version: pi-ai-1.3.0-v1
+
+# Host limits apply across CLI processes sharing this data root. Waiting calls
+# release execution capacity. External-effect approvals expire after one hour.
+tools:
+  global_concurrency: 32
+  agent_concurrency: 24
+  run_concurrency: 4
+  provider_concurrency: 16
+  tool_concurrency: 8
+  approval_ttl_seconds: 3600
+
+# Immutable binary storage under app.data_root/artifacts. Cleanup protects
+# references and active/paused Tasks; artifact cleanup defaults to dry-run.
+artifact:
+  retention_days: 30
+  quota_bytes: 1073741824
+  max_bytes: 67108864
+  cleanup_batch: 100
+
+# Delivery to the local terminal inbox, independent of model readiness.
+delivery:
+  lease_seconds: 5
+  retry_milliseconds: 250
+  max_attempts: 5

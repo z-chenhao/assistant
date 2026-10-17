@@ -397,6 +397,7 @@ Intelligent UI 采用 Delivery 层的声明式组件协议 `UISpec`：
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。
+- M3 本地实现的 `builtin__artifact__save/read/describe/list/publish` 经过同一个 ToolInvocation/Executor。`artifact_write` 只允许本地不可变新产物和显式最终输出选择，不允许外部发送、上传或删除；读取使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](artifacts.md)。
 
 ## 5. 模型与 Agent 决策
 
@@ -1193,6 +1194,8 @@ runtime/javascript/
 ## 7. Skill 系统
 
 ### 7.1 Skill 结构与加载
+
+M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 与 Root 开放，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。仅摘要进入 Tool description，全文按需读取。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/capabilities.md`。
 
 - 使用成熟的 Agent Skills 目录约定。
 - 每个 Skill 以 `SKILL.md` 为入口，可选包含 `scripts/`、`references/` 和 `assets/`。
@@ -2061,6 +2064,8 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 完成条件：Main 可把耗时工作委派给 Root；对话仍可继续；Root 完成后只触发一次 Main 汇总。
 
 ### M3：统一 Tooling、Approval 与 Artifact
+
+M3 的 MCP 与 Coding 验证使用真实 stdio 协议和受控磁盘 fixture：进程由 macOS Seatbelt / Linux bubblewrap 隔离，网络与 Host 用户目录不可达；生产 Lume/Guest ComputerProvider 仍在 M6。它们共享现有 ToolExecutor/Security/Artifact 管线，不另建 Computer Agent Loop。新增 ToolSpec 的可选 description/resource_hash 随 tools_json 冻结，旧快照不自动扩权；不需要新增 schema 或领域状态。该中间验证边界的限制和证据见 `docs/capabilities.md`。
 
 - 完成 Tool Registry/Executor、Capability Snapshot、Security Policy、可恢复 Approval、ArtifactStore 和 Delivery Outbox。
 - 为每个 ToolSpec 强制声明风险、`replay_policy`、超时、输出限制与冲突键生成器。

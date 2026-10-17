@@ -18,7 +18,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "capabilities", "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -105,7 +105,48 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
-			if fixture == "terminal-input" && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
+			if (fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "builtin__text__echo") {
+				// Hold an actual accepted Worker generation while keeping the RPC
+				// peer responsive to cancellation. A new Root gets the appended
+				// instruction as its last message and can finish normally.
+				if fixture == "tasks" && strings.Contains(last.Text, "Task anchor:") && strings.Contains(last.Text, "Hold worker") {
+					err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "Worker waiting for cancellation"})
+					waiting[request.GenerationID] = 2
+					break
+				}
+				var value llm.GenerationResult
+				var cause error
+				if fixture == "capabilities" {
+					value = capabilitiesReply(request)
+				} else if fixture == "artifacts" {
+					value = artifactsReply(request)
+				} else if fixture == "tasks" {
+					value, cause = tasksReply(request)
+				} else {
+					value = approvalReply(request)
+				}
+				sequence := int64(1)
+				if cause != nil {
+					err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "error", ErrorCode: cause.Error()})
+					break
+				}
+				for _, call := range value.ToolCalls {
+					c := call
+					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "tool_call", ToolCall: &c}); err != nil {
+						return err
+					}
+					sequence++
+				}
+				if value.Text != "" {
+					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: value.Text}); err != nil {
+						return err
+					}
+					sequence++
+				}
+				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "completed"})
+				break
+			}
+			if fixture == "terminal-input" && hasTool(request.Tools, "builtin__text__echo") {
 				// A short model reply isolates the terminal byte boundary from
 				// the separate Tool argument/output limits. Probe still runs below.
 				e.Text = "Input received."
@@ -115,7 +156,7 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 2, Kind: "completed"})
 				break
 			}
-			if (fixture == "main" || fixture == "golden") && len(request.Tools) > 0 && request.Tools[0].Name == "builtin__text__echo" {
+			if (fixture == "main" || fixture == "golden") && hasTool(request.Tools, "builtin__text__echo") {
 				// Same call IDs on distinct exchanges deliberately exercise the
 				// (run, exchange, call) association, never global call-ID dedup.
 				sequence := int64(1)
@@ -250,4 +291,13 @@ func goldenReply(messages []llm.Message) string {
 	default:
 		return "Fixture context missing."
 	}
+}
+
+func hasTool(specs []llm.ToolSpec, name string) bool {
+	for _, s := range specs {
+		if s.Name == name {
+			return true
+		}
+	}
+	return false
 }
