@@ -298,7 +298,7 @@ func TestChildMigrationV12PreservesFrozenRunsAndAtomicRollback(t *testing.T) {
 				if err == nil || version != 12 {
 					t.Fatal("migration partially committed", err, version)
 				}
-			} else if err != nil || version != 14 {
+			} else if err != nil || version != 15 {
 				t.Fatal(err, version)
 			}
 			var config int

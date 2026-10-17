@@ -45,6 +45,24 @@ scheduler:
   infrastructure_failures: 5 # consecutive unavailability/rate limiting
   cooldown_seconds: 30
 
+# Monetary authorization is opt-in; absent/zero boundary means unconfigured.
+# Account is provider_kind:auth_connection_id, or provider_kind:endpoint_hash
+# for an unauthenticated local endpoint. `spend status` shows sanitized keys.
+# All four rates must be explicit integers (including any intentional zeros).
+# Values below are synthetic, NOT current provider prices. Replace all metadata.
+# spend:
+#   accounts:
+#     - account: openai_compatible:REPLACE_WITH_ENDPOINT_HASH
+#       currency: USD
+#       boundary_micros: 10000000 # 10 currency units, cumulative across Roots
+#       prices:
+#         - model: REPLACE_WITH_EXACT_MODEL_ID
+#           version: operator-price-v1
+#           input_micros_per_million: 1000000
+#           output_micros_per_million: 2000000
+#           cache_read_micros_per_million: 200000
+#           cache_write_micros_per_million: 1200000
+
 tasks:
   recent_days: 30
   recent_limit: 200

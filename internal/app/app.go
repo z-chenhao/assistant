@@ -163,6 +163,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	a.runs = store.Runs(a.history, a.registry)
 	a.runs.ConfigureChildLimits(cfg.Children)
 	a.runs.ConfigureScheduler(cfg.Scheduler)
+	a.runs.ConfigureSpend(cfg.Spend)
 	a.runs.ConfigureApprovalTTL(time.Duration(cfg.Tools.ApprovalTTLSeconds) * time.Second)
 	a.runs.ConfigureToolLimits(sqlite.ToolLimits{Global: cfg.Tools.Global, Agent: cfg.Tools.Agent, Run: cfg.Tools.Run, Provider: cfg.Tools.Provider, Tool: cfg.Tools.Tool})
 	a.runs.ConfigureRecentTasks(time.Duration(cfg.Tasks.RecentDays)*24*time.Hour, cfg.Tasks.RecentLimit)
@@ -328,6 +329,8 @@ func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.Cata
 }
 
 func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.runs.Activity(ctx) }
+
+func (a *App) Spend(ctx context.Context) ([]sqlite.SpendView, error) { return a.runs.Spend(ctx) }
 
 func (a *App) Approvals(ctx context.Context) ([]sqlite.ApprovalView, error) {
 	return a.runs.Approvals(ctx)

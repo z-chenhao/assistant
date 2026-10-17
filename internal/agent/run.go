@@ -15,6 +15,7 @@ import (
 var ErrClaimLost = errors.New("CLAIM_LOST")
 var ErrConflict = errors.New("run version conflict")
 var ErrStorage = errors.New("run storage unavailable")
+var ErrSpendDenied = errors.New("SPEND_AUTHORIZATION_DENIED")
 var ErrResourceLimit = errors.New("RESOURCE_LIMIT")
 var ErrBusy = errors.New("run is owned by another executor")
 var ErrNotFound = errors.New("run not found")
@@ -125,6 +126,8 @@ type Input struct {
 	Message  conversation.Message
 }
 type Generation struct {
+	Waiting   bool
+	Denied    bool
 	Request   llm.GenerationRequest
 	Result    *llm.GenerationResult
 	ErrorCode string

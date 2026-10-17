@@ -246,14 +246,14 @@ This is Direct Tool protocol evidence. Fair scheduling and batch capacity are
 covered below. JavaScript CodeCall replay and complete GC-16/17/18/20 remain
 later slice gates; they are not counted as passing here.
 
-## Fair Child scheduling and batch aggregation (ERII-18, draft)
+## Fair Child scheduling and batch aggregation (ERII-18)
 
 `scripts/verify_scheduling.py --binary bin/personal-agent --evidence evidence/scheduling.json`
 owns Launch (isolated Fake/data root), Doctor (profile probe/activation), Drive
 (PTY, CLI and two simultaneous Tasks), Evidence (state, event lease timeline,
 usage, outputs and transcript), and Cleanup (all processes reaped, state removed).
-`make verify` runs five consecutive passes. Account-spend authorization is still
-pending a policy decision; this entry does not establish M4 completion.
+`make verify` runs five consecutive passes. The monetary harness below covers
+account-spend authorization; this entry does not establish full M4 completion.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -262,5 +262,24 @@ pending a policy decision; this entry does not establish M4 completion.
 | Recursive stop and fencing | Main cancel while saturated; then repeat `chat work` | `stopTask`, `recoverStopsTx`, Task/Run claims | Queued/running/waiting descendants and invocations settle; Drain waits for stopping owners to join or expire; no cancelled-tree follow-up; old Task epoch cannot revive; prior Child harness retains late-result and approval rejection evidence |
 | Work-first aggregation and progress | TUI `/status`; Root result -> Main | `runnable`, `Activity`, `finishTask`, Worker prompt | Child joins coalesce until current batch settles; independent ready Tools execute beside pending effect approval without granting it; aggregate five-state counts; reads cause no Outbox/Main turn; successes survive item failures; Fake deduplicates repeated blocker, semantic scores remain null |
 | Tree safety and provider health | `scheduler` + `children` YAML settings | `createTree`, `Generation`, `AcceptGeneration` | Frozen default 256/hard 512 Worker turns, existing depth/descendant/call ceilings, canonical RESOURCE_LIMIT; only infrastructure streak opens recoverable provider cooldown; injected health-write failure rolls back usage/generation and stays a recoverable storage error; per-operation watchdogs remain active |
-| Accounting and migration | State readback; upgrade from schema 013 | Migration 014, immutable `provider_usage` + aggregate views | Empty/every-prior upgrade, populated frozen tree preservation, failed DDL rollback, explicit missing-token counts; spend approval remains unimplemented |
+| Accounting and migration | State readback; upgrade from schema 013 | Migration 014, immutable `provider_usage` + aggregate views | Empty/every-prior upgrade, populated frozen tree preservation, failed DDL rollback, explicit missing-token counts; monetary policy is covered below |
 | Restart | SIGKILL after batch admission, then `chat work` | Existing model/ToolInvocation recovery and Run claims | First 25 Child identities survive; total stays 100; completed model responses reused; exact final aggregate; no JavaScript/CodeCall replay claim |
+
+
+## Account monetary authorization (ERII-18, SC-13)
+
+`scripts/verify_spend.py --binary bin/personal-agent --evidence evidence/spend.json`
+owns Launch (isolated children Fake), Doctor (profile probe/activation), Drive
+(real CLI approval/deny/status, 100-item batch, Main cancellation, SIGKILL),
+Evidence (frozen actions, usage, reservations, Root/Child state, effect ledger)
+and Cleanup (joined processes and removed roots). `make verify` runs five passes.
+Synthetic fixture `evals/fixtures/m4-spend-v1.json` specifies prices and arithmetic.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Account monetary admission | `spend.accounts` YAML, `chat work` | `freezeSpend`, `gateSpend`, `settleSpend` in the shared model admission/acceptance transactions | Integer conversion, full model-bound projection, accumulated actuals plus reservations across Roots, cross-process atomic admission, immutable price version/currency/snapshot, no double reservation, usage/result rollback on injected storage error |
+| One Root spend consent | `approval list`, `approval approve/deny ID HASH`; same TUI commands | `spend_approval`, `Runs.Decide`, existing security notification boundary | 100 Child batch, one Root approval, CLI process exit/restart, no Child prompts, exact frozen hash, denial before model dispatch; independent Main grant |
+| Separate Child effect consent | Approve monetary batch then Child effect | Existing ToolInvocation policy/approval/execution pipeline | No effect after monetary grant; separate frozen effect ID/hash required; SIGKILL after effect and query-before-retry recovery executes exactly once |
+| Cancel and late events | Main cancels pending monetary batch | `stopTask`, `invalidateApprovals`, existing epoch/owner fences | Old approval invalidated, callback and late usage rejected, no effect/follow-up, settled repeated drain; Go old-owner/Task-epoch regression |
+| Sanitized unknown costs | `spend status` | Read-only `Runs.Spend`, immutable provider usage | Explicit unpriced/unconfigured/combined state, no guessed approval, missing usage retains reserve and unknown actual, historical and setup-Probe unpriced counts; no endpoint/credential or model-visible query |
+| Migration | Open empty/prior schema and restart | Migration 015 | Every-prior upgrade, retained model/profile/usage data, legacy snapshots remain unpriced/unconfigured, failed migration rolls back atomically |

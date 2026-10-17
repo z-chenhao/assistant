@@ -53,6 +53,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 		if err := o.Store.Fail(work, claim, r.Version, code); err != nil {
 			return err
 		}
+		if code == "SPEND_AUTHORIZATION_DENIED" {
+			return &runFailure{cause: ErrSpendDenied}
+		}
 		if code == "RESOURCE_LIMIT" {
 			return &runFailure{cause: ErrResourceLimit}
 		}
@@ -97,6 +100,15 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 					return fail(r, providerError.Error())
 				}
 				return err
+			}
+			if generation.Waiting {
+				if err := o.Store.Wait(work, claim, r.Version, "resource"); err != nil {
+					return err
+				}
+				return nil
+			}
+			if generation.Denied {
+				return fail(r, "SPEND_AUTHORIZATION_DENIED")
 			}
 			if generation.ErrorCode != "" {
 				return fail(r, generation.ErrorCode)

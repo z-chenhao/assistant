@@ -32,6 +32,7 @@ type Runs struct {
 	limits      ToolLimits
 	approvalTTL time.Duration
 	childLimits agent.ChildLimits
+	spend       agent.SpendPolicy
 	scheduler   agent.SchedulerLimits
 }
 
@@ -585,7 +586,7 @@ func (r *Runs) Complete(ctx context.Context, c agent.RunClaim, v int64) (bool, e
 	return r.terminal(ctx, c, v, "completed", "")
 }
 func (r *Runs) Fail(ctx context.Context, c agent.RunClaim, v int64, code string) error {
-	if code != "RESOURCE_LIMIT" {
+	if code != "RESOURCE_LIMIT" && code != "SPEND_AUTHORIZATION_DENIED" {
 		code = llm.NormalizeError(code).Error()
 	}
 	_, err := r.terminal(ctx, c, v, "failed", code)

@@ -150,7 +150,13 @@ func Serve(in io.Reader, out io.Writer, fixture string) error {
 					}
 					sequence++
 				}
-				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "completed"})
+				var usage *llm.TokenUsage
+				if fixture == "children" && request.Snapshot.ModelID == "priced-fixture-model" {
+					// Synthetic, explicit monetary fixture; ordinary children keep
+					// their missing-usage contract. No real market price is implied.
+					usage = &llm.TokenUsage{InputTokens: 100, OutputTokens: 50, CacheReadTokens: 20, CacheWriteTokens: 10}
+				}
+				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "completed", Usage: usage})
 				break
 			}
 			if fixture == "terminal-input" && hasTool(request.Tools, "builtin__text__echo") {

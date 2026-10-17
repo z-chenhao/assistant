@@ -164,12 +164,48 @@ model results. `make verify` runs five consecutive passes. Go tests additionally
 cover atomic cross-process limits, fair service after reopening, expired-owner
 fencing, frozen turns, circuit recovery, prior-schema upgrade and rollback.
 
-Account-spend authorization remains unresolved: baseline §6.6.6 requires a
-single recoverable Root approval, while current provider metadata has no prices,
-currency or configured spend boundary. Token accounting is implemented; it is
-not spend authorization. ERII-18 must remain draft until that policy is decided
-and implemented. No M4 milestone completion or JavaScript/Durable Replay claim
-is made by this partial slice.
+Account-spend authorization uses explicitly configured monetary policy. See
+[the approved decision](adr/002-account-monetary-authorization.md). Prices and
+policy freeze with the ModelSnapshot; Children inherit them. Usage acceptance
+settles each reservation exactly once in the same transaction as the model
+result. Missing usage retains unknown actual cost and its conservative reserve.
+No token allowance substitutes for monetary authorization.
+
+`personal-agent -config config.yaml spend status` displays sanitized account
+keys, snapshot/price versions, cumulative committed microcurrency, unknown usage
+and historical unpriced call counts. It reports `configured`, `unpriced`,
+`unconfigured` or `unpriced_unconfigured`; it never invents prices. The account
+key is `provider_kind:auth_connection_id`, or `provider_kind:endpoint_hash` when
+no authentication connection exists. Tokens remain in the usage views.
+Setup Probe snapshots remain visible as unpriced control-plane observations.
+This ledger is not a provider bill and cannot observe other applications' spend.
+
+Configure `spend.accounts` as in `config.example.yaml`. A positive
+`boundary_micros` is the cumulative account authorization boundary, in millionths
+of the three-letter currency. Zero/absent means unconfigured. All four integer
+rates per million tokens must be explicit, even when zero. Each model price
+requires a version. Currency changes and rate drift under an existing version
+fail closed; restart with corrected metadata. New Runs freeze new configuration;
+existing Runs retain their original policy and rates.
+
+Admission reserves the full context bound at the highest configured input/cache
+rate plus the output bound at the output rate. This is deliberately conservative,
+not a token prediction. Once account actual spend plus outstanding reserves and
+the new projection reaches the boundary, all descendants join one Root approval.
+Use the existing `approval list` and `approval approve/deny ID HASH` CLI or TUI
+`/approve`/`/deny`. The displayed frozen action authorizes remaining model spend
+for this Run batch beyond the account boundary without another monetary ceiling.
+It grants no tool effects. An independent Main Run needs its own spend consent.
+A new Root does not inherit the grant. Denial fails held model work;
+pause/cancel invalidates pending approval and fences old results. Pending consent
+survives process exit without expiry or duplicate prompts.
+
+`scripts/verify_spend.py` uses explicit synthetic prices to prove the 100-item
+batch, one Root approval, exact currency conversion, CLI restart, wrong-hash
+rejection, denial, cancellation, and separately approved Child effect recovery
+across SIGKILL. It also proves all unknown configuration/usage states. It runs
+five times in `make verify`. This Direct Tool slice makes no full M4 milestone,
+semantic Golden Case or M5 JavaScript/Durable Replay claim.
 
 ## Verification and operations
 

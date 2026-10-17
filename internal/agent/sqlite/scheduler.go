@@ -19,7 +19,7 @@ func (r *Runs) schedulerLimits() agent.SchedulerLimits {
 // Queues are authoritative Run rows. A durable service ticket rotates among
 // Root trees across processes/restarts; within a tree runnable descendants go
 // first. Waiting ancestors consume no slots. No model or second queue API.
-const runnable = `r.desired_state='running' AND
+const runnable = `NOT EXISTS(SELECT 1 FROM spend_approval sa WHERE sa.root_run_id=coalesce(r.root_run_id,r.run_id) AND sa.status='pending') AND r.desired_state='running' AND
  (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')) AND
  (r.status IN ('queued','running') OR (r.status='waiting' AND
  ((r.wait_reason='user_input' AND

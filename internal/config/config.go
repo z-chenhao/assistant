@@ -22,6 +22,7 @@ import (
 )
 
 type Config struct {
+	Spend     agent.SpendPolicy     `yaml:"spend"`
 	Scheduler agent.SchedulerLimits `yaml:"scheduler"`
 	Children  agent.ChildLimits     `yaml:"children"`
 	MCP       []mcp.Config          `yaml:"mcp"`
@@ -112,6 +113,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	}
+	if err := cfg.Spend.Validate(); err != nil {
+		return Config{}, err
 	}
 	if !cfg.Scheduler.Valid() {
 		return Config{}, errors.New("invalid Worker scheduler limits")

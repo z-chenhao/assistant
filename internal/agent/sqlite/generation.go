@@ -87,9 +87,13 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		}
 		gen.Request = request
 		gen.Request.OwnerToken = owner.token
+		if gen.Result == nil && gen.ErrorCode == "" {
+			gen.Waiting, gen.Denied, err = r.gateSpend(ctx, tx, request)
+			return err
+		}
 		return nil
 	})
-	if err == nil && gen.Result == nil && gen.ErrorCode == "" {
+	if err == nil && gen.Result == nil && gen.ErrorCode == "" && !gen.Waiting && !gen.Denied {
 		if run.Kind == "worker" {
 			r.host.boundary("before_worker_generation")
 		}
@@ -122,6 +126,7 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	if hash != digest(raw) {
 		return agent.ErrConflict
 	}
+	usage := result.Usage
 	code := ""
 	state := "completed"
 	if cause != nil {
@@ -149,6 +154,9 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 		return agent.ErrStorage
 	}
 	if err := runEvent(ctx, tx, runID, "model_generation."+state, 1); err != nil {
+		return agent.ErrStorage
+	}
+	if err := s.settleSpend(ctx, tx, request, llm.GenerationResult{Usage: usage}); err != nil {
 		return agent.ErrStorage
 	}
 	if err := s.recordProviderHealth(ctx, tx, runID, code); err != nil {
