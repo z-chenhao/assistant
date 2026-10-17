@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 
 from verify_artifacts import ArtifactHarness
+from terminal_driver import Terminal
 from verify_children import state as child_state
 from verify_main import require
 from verify_scheduling import setup
@@ -130,8 +131,13 @@ def run(binary):
             policy(h, boundary=1)
             h.command('chat', 'work')
             spend = monetary(h)[0]
-            decide(h, spend)
-            h.command('chat', 'work')
+            with Terminal(h.args('tui'), h.env, h.root) as terminal:
+                terminal.expect_all(('You> ', 'Account spend approval required:'))
+                terminal.send('/approve ' + spend['approval_id'] + ' ' + spend['frozen_arguments_hash'])
+                terminal.expect('Approval decision saved.')
+                terminal.expect('Approval required for mcp__fixture__send:')
+                require(terminal.stop() == 0, 'monetary TUI cleanup')
+                transcript = terminal.transcript()
             approvals = h.command('approval', 'list')
             effects = [a for a in approvals if a['tool'] != 'account_spend' and a['status'] == 'pending']
             require(len(effects) == 1 and not tool_state(h)['effects'], 'batch spend grant authorized Child effect')
@@ -146,7 +152,7 @@ def run(binary):
             finish_main(h)
             after = state(h)
             require(len(tool_state(h)['effects']) == 1, 'approved Child effect not exactly once')
-            return {'name': 'monetary_grant_excludes_effect_kill_restart', 'before': before, 'after': after}
+            return {'name': 'monetary_grant_excludes_effect_kill_restart', 'transcript': transcript, 'before': before, 'after': after}
         report['checks'].append(scenario('effect', effect))
 
         def denied(h):

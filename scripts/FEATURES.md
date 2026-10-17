@@ -270,7 +270,8 @@ account-spend authorization; this entry does not establish full M4 completion.
 
 `scripts/verify_spend.py --binary bin/personal-agent --evidence evidence/spend.json`
 owns Launch (isolated children Fake), Doctor (profile probe/activation), Drive
-(real CLI approval/deny/status, 100-item batch, Main cancellation, SIGKILL),
+(CLI approval/deny/status, real PTY monetary notice and `/approve`, 100-item batch,
+Main cancellation, SIGKILL),
 Evidence (frozen actions, usage, reservations, Root/Child state, effect ledger)
 and Cleanup (joined processes and removed roots). `make verify` runs five passes.
 Synthetic fixture `evals/fixtures/m4-spend-v1.json` specifies prices and arithmetic.
