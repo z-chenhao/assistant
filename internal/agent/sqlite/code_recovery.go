@@ -28,8 +28,14 @@ func (b *codeBridge) fence(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
+type codeClaimFence struct {
+	token string
+	epoch int64
+}
+
 func (b *codeBridge) claim(ctx context.Context, inv tool.Invocation) error {
-	return b.t.runs.write(ctx, func(tx *sql.Tx) error {
+	drift := false
+	err := b.t.runs.write(ctx, func(tx *sql.Tx) error {
 		if err := fence(ctx, tx, b.t.claim); err != nil {
 			return err
 		}
@@ -63,9 +69,7 @@ func (b *codeBridge) claim(ctx context.Context, inv tool.Invocation) error {
 		} else if err != nil {
 			return err
 		}
-		if frozenSnapshots != snapshots || hash != digest(manifest) || source != req.SourceHash || runtime != req.RuntimeVersion || prelude != req.PreludeVersion {
-			return tool.ErrReplay
-		}
+		drift = frozenSnapshots != snapshots || hash != digest(manifest) || source != req.SourceHash || runtime != req.RuntimeVersion || prelude != req.PreludeVersion
 		req.ClaimToken = newID()
 		res, err := tx.ExecContext(ctx, `UPDATE code_execution_state SET state='running',claim_token=?,owner_run_token=?,execution_epoch=execution_epoch+1,claim_expires_at=?,updated_at=?,version=version+1 WHERE execution_id=? AND desired_state='running' AND state IN ('running','suspended') AND (claim_token IS NULL OR claim_expires_at<=? OR owner_run_token!=?)`, req.ClaimToken, b.t.claim.(*claim).token, now+leaseDuration.Microseconds(), now, inv.ID, now, b.t.claim.(*claim).token)
 		if err != nil {
@@ -79,6 +83,10 @@ func (b *codeBridge) claim(ctx context.Context, inv tool.Invocation) error {
 		}
 		return runEvent(ctx, tx, b.t.claim.RunID(), "code_execution.claimed", req.ExecutionEpoch)
 	})
+	if err == nil && drift {
+		return tool.ErrReplay
+	}
+	return err
 }
 
 func (b *codeBridge) wake(ctx context.Context) (int64, error) {

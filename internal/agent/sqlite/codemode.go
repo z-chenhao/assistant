@@ -55,6 +55,11 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (result to
 	if fingerprintErr != nil {
 		return tool.Result{}, agent.ErrStorage
 	}
+	defer func() {
+		if b.req.ClaimToken != "" && b.req.ExecutionEpoch > 0 {
+			result.HostFence = codeClaimFence{b.req.ClaimToken, b.req.ExecutionEpoch}
+		}
+	}()
 	if err := b.claim(ctx, inv); err != nil {
 		if errors.Is(err, tool.ErrReplay) {
 			return tool.Failure("NON_DETERMINISTIC_REPLAY"), nil

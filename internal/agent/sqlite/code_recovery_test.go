@@ -108,6 +108,10 @@ func TestCodeClaimWakeAndOldCallbackFencing(t *testing.T) {
 	if err = staleStore.Finish(ctx, inv.ID, tool.Result{Text: "late"}); !errors.Is(err, agent.ErrClaimLost) {
 		t.Fatalf("old terminal callback %v", err)
 	}
+	staleResult := tool.Result{Text: "late wrapper", HostFence: codeClaimFence{b.req.ClaimToken, b.req.ExecutionEpoch}}
+	if err = b.t.Finish(ctx, inv.ID, staleResult); !errors.Is(err, agent.ErrClaimLost) {
+		t.Fatalf("old wrapper completion %v", err)
+	}
 	old := codeMessage(b)
 	if _, err = b.Handle(ctx, "host.invoke", old); !errors.Is(err, agent.ErrClaimLost) {
 		t.Fatalf("old callback %v", err)
@@ -189,6 +193,9 @@ func TestCodeManifestCannotChangeDuringRecovery(t *testing.T) {
 		}
 		if err := next.claim(ctx, inv); !errors.Is(err, tool.ErrReplay) {
 			t.Fatalf("%s drift: %v", field, err)
+		}
+		if err := next.abandon(); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

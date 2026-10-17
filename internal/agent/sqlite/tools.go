@@ -256,11 +256,12 @@ func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Re
 		// A wrapper result can commit only under the same execution owner that
 		// produced its frozen terminal receipt. Calls rejected before VM admission
 		// have no CodeExecutionState and follow ordinary Tool rejection semantics.
+		owner, _ := result.HostFence.(codeClaimFence)
 		var wrongOwner bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM code_execution_state WHERE execution_id=? AND (claim_token IS NULL OR owner_run_token!=? OR claim_expires_at<=?))`, id, t.claim.(*claim).token, time.Now().UnixMicro()).Scan(&wrongOwner); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM code_execution_state WHERE execution_id=? AND (claim_token IS NULL OR claim_token!=? OR execution_epoch!=? OR owner_run_token!=? OR claim_expires_at<=?))`, id, owner.token, owner.epoch, t.claim.(*claim).token, time.Now().UnixMicro()).Scan(&wrongOwner); err != nil {
 			return err
 		}
-		if wrongOwner && (result.Error == nil || result.Error.Code != "NON_DETERMINISTIC_REPLAY") {
+		if wrongOwner {
 			return agent.ErrClaimLost
 		}
 		if reject {
