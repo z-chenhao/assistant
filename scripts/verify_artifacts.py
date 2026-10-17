@@ -63,7 +63,9 @@ def recover_receipt(h, path):
     before = tool_state(h)
     inv = next(i for i in before['invocations'] if i['tool_name'] == 'mcp__fixture__send')
     require(inv['status'] == path and len(before['effects']) == 1 and inv['attempt_count'] == 1,
-            'missing accepted effect at receipt recovery boundary')
+            f'missing accepted effect at receipt recovery boundary: expected={path}, '
+            f'status={inv["status"]}, effects={len(before["effects"])}, attempts={inv["attempt_count"]}, '
+            f'error={inv["error_json"]}, runs={[(r["kind"], r["status"], r["error_code"]) for r in before["runs"]]}')
     run_before = before['runs']
     if path == 'unknown':
         outcomes = h.command('approval', 'reconcile')

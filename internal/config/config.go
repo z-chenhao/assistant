@@ -8,23 +8,30 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	"github.com/z-chenhao/erii/internal/skill"
+	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
-	Delivery delivery.Policy   `yaml:"delivery"`
-	Version  int               `yaml:"version"`
-	Artifact artifact.Policy   `yaml:"artifact"`
-	App      App               `yaml:"app"`
-	NATS     eventnats.Options `yaml:"nats"`
-	Tools    ToolLimits        `yaml:"tools"`
-	Tasks    Tasks             `yaml:"tasks"`
-	LLM      LLM               `yaml:"llm"`
+	MCP       []mcp.Config      `yaml:"mcp"`
+	Skills    *skill.Config     `yaml:"skills"`
+	Workspace *workspace.Config `yaml:"workspace"`
+	Delivery  delivery.Policy   `yaml:"delivery"`
+	Version   int               `yaml:"version"`
+	Artifact  artifact.Policy   `yaml:"artifact"`
+	App       App               `yaml:"app"`
+	NATS      eventnats.Options `yaml:"nats"`
+	Tools     ToolLimits        `yaml:"tools"`
+	Tasks     Tasks             `yaml:"tasks"`
+	LLM       LLM               `yaml:"llm"`
 }
 
 type ToolLimits struct {
@@ -127,6 +134,37 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if !filepath.IsAbs(cfg.App.DataRoot) {
 		return Config{}, errors.New("app.data_root must be an absolute path")
 	}
+	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
+	seenServers := map[string]bool{}
+	providerDirectories := []string{}
+	for _, server := range cfg.MCP {
+		if server.Validate() != nil || seenServers[server.Name] || overlaps(server.Directory, cfg.App.DataRoot) || (cfg.Skills != nil && overlaps(server.Directory, cfg.Skills.Root)) || (cfg.Workspace != nil && overlaps(server.Directory, cfg.Workspace.Root)) {
+			return Config{}, errors.New("invalid or duplicate MCP configuration")
+		}
+		for _, directory := range providerDirectories {
+			if overlaps(directory, server.Directory) {
+				return Config{}, errors.New("MCP provider directories must not overlap")
+			}
+		}
+		providerDirectories = append(providerDirectories, server.Directory)
+		seenServers[server.Name] = true
+	}
+	if cfg.Skills != nil && cfg.Skills.Validate() != nil {
+		return Config{}, errors.New("invalid Skills configuration")
+	}
+	if cfg.Workspace != nil {
+		if cfg.Workspace.Validate() != nil || overlaps(cfg.Workspace.Root, cfg.App.DataRoot) {
+			return Config{}, errors.New("workspace must be separate from application data")
+		}
+		if cfg.Skills != nil && overlaps(cfg.Workspace.Root, cfg.Skills.Root) {
+			return Config{}, errors.New("workspace cannot contain or overlap Skills")
+		}
+		for _, server := range cfg.MCP {
+			if overlaps(cfg.Workspace.Root, server.Command) {
+				return Config{}, errors.New("workspace cannot contain trusted MCP executable")
+			}
+		}
+	}
 	switch cfg.App.LogLevel {
 	case "debug", "info", "warn", "error":
 	default:
@@ -134,6 +172,33 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
 	return cfg, nil
+}
+
+func overlaps(a, b string) bool {
+	// A new data directory may not exist yet. Resolve its closest existing
+	// ancestor too, otherwise /alias/new-data can evade /real/provider scope.
+	canonical := func(path string) string {
+		original := path
+		tail := []string{}
+		for {
+			if p, e := filepath.EvalSymlinks(path); e == nil {
+				return filepath.Join(append([]string{p}, tail...)...)
+			}
+			parent := filepath.Dir(path)
+			if parent == path {
+				return filepath.Clean(original)
+			}
+			tail = append([]string{filepath.Base(path)}, tail...)
+			path = parent
+		}
+	}
+	a = canonical(a)
+	b = canonical(b)
+	within := func(parent, child string) bool {
+		relative, err := filepath.Rel(parent, child)
+		return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+	}
+	return within(a, b) || within(b, a)
 }
 
 func (c Config) LogLevel() slog.Level {

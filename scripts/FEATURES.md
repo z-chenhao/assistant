@@ -198,3 +198,27 @@ SC-09/recovery five times. See [Artifact operations](../docs/artifacts.md).
 | Task visibility and parallel outputs | `builtin__artifact__list/read` in scoped Worker; Host child-shaped contract fixtures | `DescribeTx`, Run-derived scope | Same Task read, cross-user/Agent/Task/Run denial, eight child-shaped writers cannot overwrite same display name |
 | Object publication/recovery | Real save Tool during `chat work` | `PutTx`, startup `Recover` | Six SIGKILL boundaries, orphan cleanup, one final object, committed ref reused with no second attempt |
 | Schema v11 migration | Startup on empty/v10 DB | `agent/sqlite.migrate` | Prior identity/config retained, partial DDL rollback, prior v1–v9 regressions retained |
+
+## MCP, Skills and coding fixture (ERII-16)
+
+`scripts/verify_capabilities.py --binary bin/personal-agent --evidence evidence/capabilities.json`
+owns Launch (private data/provider/Skills/checkout roots), Doctor (explicit Fake
+model add/test/select, validated scopes), Drive (ordinary chat/Task/approval CLI),
+Evidence (SQLite, real test output, full tree hashes and SIGKILL/restart), and
+Cleanup (join every process and remove disposable roots). `make verify` repeats
+five times. See [capability operations](../docs/capabilities.md).
+
+For focused reproduction, add `--scenario dirty-index` (approved Worker
+dirty-file refusal) or `--scenario mcp-reply` (malformed post-effect stdio
+reply). Both actions use the same Launch/Doctor/Drive/Evidence/Cleanup lifecycle.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Structured MCP stdio | Configure allowlisted `mcp`, normal Direct Tool call; capability harness `mcp-reply` scenario | `tool/mcp.Definitions`, common Executor | Real initialize/list/call; malformed response-shape contracts; null/missing-text replies after approved Worker effects persist unknown with one attempt and one ledger entry, including restart/reconcile; schema drift, malformed metadata/params, cancellation, provider host-read/write/network/env denial; frozen approval rejection |
+| Configured scope isolation | Optional MCP/Skills/workspace configuration at CLI startup | `config.Load/overlaps` | Root, shared-provider and domain-data overlap rejection; symlink alias resolved even before a new data directory exists |
+| GC-11 structured quote fragment | MCP fixture lookup, then ordinary Artifact save/open | stdio provider data, `builtin__artifact__save`, ArtifactStore | Three actual quote records; oral cashback remains conditional (5038.49 versus 5738.49); saved report bytes/hash reopened through CLI |
+| Progressive Skills | `builtin__skill__list/view` in Main or Root | `skill.Definitions`, `skill.SetHash`, Run capability freeze | Summary excludes body; view returns actual text or binary Artifact; exact asset bytes reopened through CLI; reference/scope/version hashes and drift rejection; traversal/link denial; ordinary Worker management NOT_FOUND |
+| Coding edit/test | `workspace.mode: edit`, normal Main/Task/Root calls; capability harness `dirty-index` scenario | `workspace.Definitions`, common Executor/Security, `computer/sandbox.Command` | Real red missing-status test, exact approved Worker edit, real green race test; only CLI file changes; ordinary/assume-unchanged/skip-worktree dirty files refuse approved Worker replacement; complete workspace/index/hooks unchanged on refusal; protected edit rejection and old preimage denial |
+| Coding audit and Git | `workspace.mode: audit`, read/search/git | `workspace.read/git`, registry selection | Audit returns actual retry file/symbol evidence; full tree hashes unchanged; hidden edit and Task control NOT_FOUND; Git filters/textconv/fsmonitor never execute; transient locks excluded and bootstrap auto-maintenance disabled |
+| Coding crash boundary | SIGKILL before result commit after rename; `chat work` restart | Existing ToolStore finish boundary and never-replay policy | One edit, one attempt, persisted unknown; no repeat write or claimed success |
+| Interim Computer isolation | Fixed test command and dedicated MCP executable, Host-only scopes | Seatbelt on macOS, bubblewrap on Linux | Go tests attempt host-secret read/write and network access; source checkout unchanged by test mutation; missing boundary fails closed; VM/Guest production adapter remains M6 |

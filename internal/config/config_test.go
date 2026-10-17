@@ -40,29 +40,57 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	}
 }
 
+func TestMCPRejectsDataRootThroughAliasBeforeItExists(t *testing.T) {
+	base := t.TempDir()
+	real := filepath.Join(base, "provider")
+	alias := filepath.Join(base, "alias")
+	if err := os.Mkdir(real, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(base, "config.yaml")
+	body := "version: 1\napp:\n  data_root: " + filepath.Join(alias, "new-data") + "\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: " + real + "\n    tools: {read: read_only}\n"
+	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path, noEnv); err == nil {
+		t.Fatal("provider can access a future domain data directory through an alias")
+	}
+}
+
 func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	for name, body := range map[string]string{
-		"delivery-lease":      "version: 1\ndelivery:\n  lease_seconds: 0",
-		"delivery-retry":      "version: 1\ndelivery:\n  retry_milliseconds: 0",
-		"delivery-attempts":   "version: 1\ndelivery:\n  max_attempts: 21",
-		"llm-missing-script":  "version: 1\nllm:\n  provider_bridge_command: SECRET_SENTINEL",
-		"llm-relative-script": "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: SECRET_SENTINEL\n  provider_bridge_version: pi-ai-1.3.0-v1",
-		"llm-unknown-version": "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: /script.mjs\n  provider_bridge_version: SECRET_SENTINEL",
-		"artifact-zero":       "version: 1\nartifact:\n  max_bytes: 0",
-		"artifact-quota":      "version: 1\nartifact:\n  quota_bytes: 1",
-		"artifact-retention":  "version: 1\nartifact:\n  retention_days: -1",
-		"artifact-batch":      "version: 1\nartifact:\n  cleanup_batch: 0",
-		"empty":               "",
-		"missing-version":     "app: {}",
-		"future-version":      "version: 2",
-		"unknown-field":       "version: 1\napi_key: SECRET_SENTINEL",
-		"unknown-nested":      "version: 1\napp:\n  password: SECRET_SENTINEL",
-		"syntax":              "version: 1\napp: [SECRET_SENTINEL",
-		"bad-type":            "version: SECRET_SENTINEL",
-		"duplicate-field":     "version: 1\nversion: 1",
-		"multi-document":      "version: 1\n---\nversion: 1",
-		"relative-root":       "version: 1\napp:\n  data_root: relative",
-		"bad-log-level":       "version: 1\napp:\n  log_level: SECRET_SENTINEL",
+		"mcp-overlapping-providers": "version: 1\nmcp:\n  - name: first\n    command: /usr/bin/python3\n    directory: /provider\n    tools: {read: read_only}\n  - name: second\n    command: /usr/bin/python3\n    directory: /provider/child\n    tools: {read: read_only}",
+		"mcp-root-scope":            "version: 1\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /\n    tools: {read: read_only}",
+		"workspace-overlaps-data":   "version: 1\napp:\n  data_root: /scope/data\nworkspace:\n  root: /scope\n  mode: edit",
+		"workspace-overlaps-skills": "version: 1\nskills:\n  root: /scope/skills\n  scope: agent\nworkspace:\n  root: /scope\n  mode: edit",
+		"workspace-invalid-mode":    "version: 1\nworkspace:\n  root: /coding\n  mode: unrestricted",
+		"skill-invalid-scope":       "version: 1\nskills:\n  root: /skills\n  scope: all",
+		"mcp-overlaps-data":         "version: 1\napp:\n  data_root: /scope/data\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /scope\n    tools: {read: read_only}",
+		"mcp-invalid-permission":    "version: 1\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /scope\n    tools: {send: read_only_unrestricted}",
+		"delivery-lease":            "version: 1\ndelivery:\n  lease_seconds: 0",
+		"delivery-retry":            "version: 1\ndelivery:\n  retry_milliseconds: 0",
+		"delivery-attempts":         "version: 1\ndelivery:\n  max_attempts: 21",
+		"llm-missing-script":        "version: 1\nllm:\n  provider_bridge_command: SECRET_SENTINEL",
+		"llm-relative-script":       "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: SECRET_SENTINEL\n  provider_bridge_version: pi-ai-1.3.0-v1",
+		"llm-unknown-version":       "version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: /script.mjs\n  provider_bridge_version: SECRET_SENTINEL",
+		"artifact-zero":             "version: 1\nartifact:\n  max_bytes: 0",
+		"artifact-quota":            "version: 1\nartifact:\n  quota_bytes: 1",
+		"artifact-retention":        "version: 1\nartifact:\n  retention_days: -1",
+		"artifact-batch":            "version: 1\nartifact:\n  cleanup_batch: 0",
+		"empty":                     "",
+		"missing-version":           "app: {}",
+		"future-version":            "version: 2",
+		"unknown-field":             "version: 1\napi_key: SECRET_SENTINEL",
+		"unknown-nested":            "version: 1\napp:\n  password: SECRET_SENTINEL",
+		"syntax":                    "version: 1\napp: [SECRET_SENTINEL",
+		"bad-type":                  "version: SECRET_SENTINEL",
+		"duplicate-field":           "version: 1\nversion: 1",
+		"multi-document":            "version: 1\n---\nversion: 1",
+		"relative-root":             "version: 1\napp:\n  data_root: relative",
+		"bad-log-level":             "version: 1\napp:\n  log_level: SECRET_SENTINEL",
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.yaml")
