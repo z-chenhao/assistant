@@ -60,14 +60,14 @@ func (a Actor) Drain(ctx context.Context) error {
 		id  string
 		err error
 	}
-	done := make(chan completed, 5)
+	done := make(chan completed, 33)
 	running := map[string]bool{}
 	var firstErr error
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		found := false
-		if ctx.Err() == nil && firstErr == nil && len(running) < 5 {
+		if ctx.Err() == nil && firstErr == nil && len(running) < 33 {
 			id, err := a.Store.Next(ctx)
 			// Shutdown may arrive after the loop's context check but before
 			// a database scan/claim completes. Do not classify that cancelled

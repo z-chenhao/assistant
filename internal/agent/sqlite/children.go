@@ -17,7 +17,7 @@ func (r *Runs) createTree(ctx context.Context, tx *sql.Tx, root string) error {
 	if !l.Valid() {
 		l = agent.DefaultChildLimits()
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO run_tree(root_run_id,max_depth,max_descendants,max_tool_calls,version) VALUES(?,?,?,?,1)`, root, l.Depth, l.Descendants, l.ToolCalls)
+	_, err := tx.ExecContext(ctx, `INSERT INTO run_tree(root_run_id,max_depth,max_descendants,max_tool_calls,max_turns,version) VALUES(?,?,?,?,?,1)`, root, l.Depth, l.Descendants, l.ToolCalls, r.schedulerLimits().Turns)
 	return err
 }
 
@@ -169,6 +169,14 @@ func (t *tools) AgentToolExecutor(ctx context.Context, id string) (tool.Result, 
 			code := "PROVIDER_UNAVAILABLE"
 			if status == "cancelled" {
 				code = "CANCELLED"
+			} else {
+				var cause string
+				if err := tx.QueryRowContext(ctx, `SELECT coalesce(error_code,'') FROM run WHERE run_id=?`, child).Scan(&cause); err != nil {
+					return err
+				}
+				if cause == "RESOURCE_LIMIT" {
+					code = cause
+				}
 			}
 			result = tool.Failure(code)
 			return nil

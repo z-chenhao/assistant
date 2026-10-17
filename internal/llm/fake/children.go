@@ -33,10 +33,30 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "fixture-child-call", Name: name, Arguments: string(raw)}}}
 	}
 	if !worker {
+		for _, m := range req.Messages {
+			if m.Origin == "runtime" {
+				_, payload, ok := strings.Cut(m.Text, "\n")
+				var update struct {
+					Content []struct {
+						Text string `json:"text"`
+					} `json:"content"`
+				}
+				if ok && json.Unmarshal([]byte(payload), &update) == nil {
+					for _, part := range update.Content {
+						if strings.HasPrefix(part.Text, "Batch aggregate:") {
+							return llm.GenerationResult{Text: "Main follow-up: " + part.Text}, nil
+						}
+					}
+				}
+			}
+		}
 		if input == "Forge child" && last.Role != "tool" {
 			return call(agent.RunToolName, map[string]string{"task": "forbidden"}), nil
 		}
 		return tasksReply(req)
+	}
+	if (root && strings.Contains(input, "Batch")) || strings.HasPrefix(input, "Batch item ") {
+		return batchReply(req, input, root)
 	}
 	if last.Role == "tool" {
 		if !root && input == "Unknown child" {
@@ -67,6 +87,8 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 	}
 	if root {
 		switch {
+		case strings.Contains(input, "Spend final"):
+			return llm.GenerationResult{Text: "frozen monetary final"}, nil
 		case strings.Contains(input, "Child large"):
 			return call(agent.RunToolName, agent.AgentRunRequest{Task: "Large child"}), nil
 		case strings.Contains(input, "Child artifact"):
@@ -90,6 +112,8 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 	switch input {
 	case "Large child":
 		return llm.GenerationResult{Text: strings.Repeat("bounded detail ", 1800)}, nil
+	case "Hold branch":
+		return call(agent.RunToolName, agent.AgentRunRequest{Task: "Hold child"}), nil
 	case "Branch explicit input":
 		return call(agent.RunToolName, agent.AgentRunRequest{Task: "Leaf explicit input"}), nil
 	case "Leaf explicit input":

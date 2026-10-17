@@ -5,7 +5,7 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Direct [Child Run delegation](children.md) is runnable; fair Child scheduling and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
+local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Direct [Child Run delegation](children.md) is runnable; fair Child scheduling and 100-item Direct Tool batches have a maintained harness. Account monetary authorization has a separate five-run [CLI verification harness](children.md); general Durable Replay remains a later slice. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
 
 ## Commands and evidence
 

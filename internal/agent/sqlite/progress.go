@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
@@ -38,7 +39,13 @@ func (r *Runs) Progress(ctx context.Context, c agent.RunClaim, summary string) e
 	})
 }
 func (r *Runs) Activity(ctx context.Context) ([]task.Summary, error) {
-	rows, err := r.host.db.QueryContext(ctx, `SELECT task_ref,title,status,progress_summary,updated_at FROM task WHERE agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) ORDER BY updated_at DESC,task_ref LIMIT 20`)
+	rows, err := r.host.db.QueryContext(ctx, `SELECT task_ref,title,t.status,progress_summary,t.updated_at,
+ (SELECT count(*) FROM run c WHERE c.task_id=t.task_id AND c.task_epoch=t.task_epoch AND c.worker_position='child' AND c.status='queued'),
+ (SELECT count(*) FROM run c WHERE c.task_id=t.task_id AND c.task_epoch=t.task_epoch AND c.worker_position='child' AND c.status='running'),
+ (SELECT count(*) FROM run c WHERE c.task_id=t.task_id AND c.task_epoch=t.task_epoch AND c.worker_position='child' AND c.status='completed'),
+ (SELECT count(*) FROM run c WHERE c.task_id=t.task_id AND c.task_epoch=t.task_epoch AND c.worker_position='child' AND c.status IN ('failed','cancelled')),
+ (SELECT count(*) FROM run c WHERE c.task_id=t.task_id AND c.task_epoch=t.task_epoch AND c.worker_position='child' AND c.status='waiting')
+ FROM task t WHERE agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) ORDER BY t.updated_at DESC,task_ref LIMIT 20`)
 	if err != nil {
 		return nil, agent.ErrStorage
 	}
@@ -47,8 +54,12 @@ func (r *Runs) Activity(ctx context.Context) ([]task.Summary, error) {
 	for rows.Next() {
 		var s task.Summary
 		var at int64
-		if err = rows.Scan(&s.TaskRef, &s.Title, &s.Status, &s.ProgressSummary, &at); err != nil {
+		var queued, running, succeeded, failed, waiting int
+		if err = rows.Scan(&s.TaskRef, &s.Title, &s.Status, &s.ProgressSummary, &at, &queued, &running, &succeeded, &failed, &waiting); err != nil {
 			return nil, agent.ErrStorage
+		}
+		if queued+running+succeeded+failed+waiting > 0 {
+			s.ProgressSummary = strings.TrimSpace(s.ProgressSummary + fmt.Sprintf(" Children: queued %d, running %d, succeeded %d, failed %d, waiting %d", queued, running, succeeded, failed, waiting))
 		}
 		s.UpdatedAt = time.UnixMicro(at).UTC().Format(time.RFC3339Nano)
 		out = append(out, s)

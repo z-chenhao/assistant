@@ -26,6 +26,9 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	if err != nil {
 		return "", err
 	}
+	if err := r.freezeSpend(ctx, tx, snapshot); err != nil {
+		return "", err
+	}
 	id, capID := newID(), newID()
 	mainSpecs := []tool.Spec{}
 	for _, spec := range r.registry.Describe() {
@@ -61,6 +64,9 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	}
 	snapshot, err := r.host.Models().FreezeProfile(ctx, tx, profile, pv)
 	if err != nil {
+		return err
+	}
+	if err := r.freezeSpend(ctx, tx, snapshot); err != nil {
 		return err
 	}
 	specs := agent.WorkerTools(r.registry.Describe())

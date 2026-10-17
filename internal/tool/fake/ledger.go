@@ -10,16 +10,20 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/tool"
 	_ "modernc.org/sqlite"
 )
 
 const Name = "mcp__fixture__send"
-const Schema = `{"type":"object","properties":{"target":{"type":"string","minLength":1},"text":{"type":"string","maxLength":4096},"behavior":{"enum":["success","ambiguous","binary_receipt","transient","error","unknown","timeout"]}},"required":["target","text"],"additionalProperties":false}`
+const Schema = `{"type":"object","properties":{"target":{"type":"string","minLength":1},"text":{"type":"string","maxLength":4096},"behavior":{"enum":["success","ambiguous","binary_receipt","binary_receipt_after_restart","transient","error","unknown","timeout"]}},"required":["target","text"],"additionalProperties":false}`
 
 type arguments struct{ Target, Text, Behavior string }
 
 func Definition(root, policy string, boundary func(string)) tool.Definition {
+	// Explicit read-visibility fixture: the producing client cannot observe the
+	// receipt yet; a fresh client after restart can. No timing/PID assumption.
+	session := uuid.NewString()
 	open := func() (*sql.DB, error) {
 		db, err := sql.Open("sqlite", filepath.Join(root, "effect-ledger.db")+"?_pragma=busy_timeout(5000)")
 		if err != nil {
@@ -64,14 +68,32 @@ func Definition(root, policy string, boundary func(string)) tool.Definition {
 		}
 		defer db.Close()
 		result := "Effect recorded for " + a.Target + ": " + a.Text
-		_, err = db.ExecContext(ctx, `INSERT INTO effects VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, request.IdempotencyKey, request.Arguments, result)
+		if a.Behavior == "binary_receipt_after_restart" {
+			var tx *sql.Tx
+			tx, err = db.BeginTx(ctx, nil)
+			if err == nil {
+				defer tx.Rollback()
+				_, err = tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS receipt_sessions(key TEXT PRIMARY KEY,session TEXT NOT NULL)`)
+				if err == nil {
+					_, err = tx.ExecContext(ctx, `INSERT INTO effects VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, request.IdempotencyKey, request.Arguments, result)
+				}
+				if err == nil {
+					_, err = tx.ExecContext(ctx, `INSERT INTO receipt_sessions VALUES(?,?) ON CONFLICT(key) DO NOTHING`, request.IdempotencyKey, session)
+				}
+				if err == nil {
+					err = tx.Commit()
+				}
+			}
+		} else {
+			_, err = db.ExecContext(ctx, `INSERT INTO effects VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, request.IdempotencyKey, request.Arguments, result)
+		}
 		if err != nil {
 			return tool.Outcome{Ambiguous: true}
 		}
 		if boundary != nil {
 			boundary("after_provider_effect")
 		}
-		if a.Behavior == "ambiguous" || a.Behavior == "binary_receipt" {
+		if a.Behavior == "ambiguous" || a.Behavior == "binary_receipt" || a.Behavior == "binary_receipt_after_restart" {
 			return tool.Outcome{Ambiguous: true}
 		}
 		return tool.Outcome{Result: tool.Result{Text: result}}
@@ -96,7 +118,13 @@ func Definition(root, policy string, boundary func(string)) tool.Definition {
 		if err != nil || args != request.Arguments {
 			return tool.Evidence{State: "unknown"}
 		}
-		if a.Behavior == "binary_receipt" {
+		if a.Behavior == "binary_receipt_after_restart" {
+			var producer string
+			if err = db.QueryRowContext(ctx, `SELECT session FROM receipt_sessions WHERE key=?`, request.IdempotencyKey).Scan(&producer); err != nil || producer == session {
+				return tool.Evidence{State: "unknown"}
+			}
+		}
+		if a.Behavior == "binary_receipt" || a.Behavior == "binary_receipt_after_restart" {
 			return tool.Evidence{State: "succeeded", Result: tool.Result{Output: &tool.BinaryOutput{Name: "receipt.bin", MediaType: "application/octet-stream", Reader: io.NopCloser(strings.NewReader(result))}}}
 		}
 		return tool.Evidence{State: "succeeded", Result: tool.Result{Text: result}}

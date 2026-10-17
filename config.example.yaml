@@ -33,6 +33,36 @@ children:
   max_descendants: 4096 # deployment hard ceiling 10000
   max_tool_calls: 10000 # deployment hard ceiling 50000
 
+# Fair Host scheduling across Root trees; Main has a separate reserved slot.
+# Each capacity is 1..32. These limits never enter the model protocol.
+scheduler:
+  child_concurrency: 16
+  global_concurrency: 32
+  user_concurrency: 32
+  agent_concurrency: 32
+  provider_concurrency: 32
+  max_worker_turns: 256 # frozen per Root, hard ceiling 512
+  infrastructure_failures: 5 # consecutive unavailability/rate limiting
+  cooldown_seconds: 30
+
+# Monetary authorization is opt-in; absent/zero boundary means unconfigured.
+# Account is provider_kind:auth_connection_id, or provider_kind:endpoint_hash
+# for an unauthenticated local endpoint. `spend status` shows sanitized keys.
+# All four rates must be explicit integers (including any intentional zeros).
+# Values below are synthetic, NOT current provider prices. Replace all metadata.
+# spend:
+#   accounts:
+#     - account: openai_compatible:REPLACE_WITH_ENDPOINT_HASH
+#       currency: USD
+#       boundary_micros: 10000000 # 10 currency units, cumulative across Roots
+#       prices:
+#         - model: REPLACE_WITH_EXACT_MODEL_ID
+#           version: operator-price-v1
+#           input_micros_per_million: 1000000
+#           output_micros_per_million: 2000000
+#           cache_read_micros_per_million: 200000
+#           cache_write_micros_per_million: 1200000
+
 tasks:
   recent_days: 30
   recent_limit: 200

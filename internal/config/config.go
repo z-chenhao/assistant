@@ -22,18 +22,20 @@ import (
 )
 
 type Config struct {
-	Children  agent.ChildLimits `yaml:"children"`
-	MCP       []mcp.Config      `yaml:"mcp"`
-	Skills    *skill.Config     `yaml:"skills"`
-	Workspace *workspace.Config `yaml:"workspace"`
-	Delivery  delivery.Policy   `yaml:"delivery"`
-	Version   int               `yaml:"version"`
-	Artifact  artifact.Policy   `yaml:"artifact"`
-	App       App               `yaml:"app"`
-	NATS      eventnats.Options `yaml:"nats"`
-	Tools     ToolLimits        `yaml:"tools"`
-	Tasks     Tasks             `yaml:"tasks"`
-	LLM       LLM               `yaml:"llm"`
+	Spend     agent.SpendPolicy     `yaml:"spend"`
+	Scheduler agent.SchedulerLimits `yaml:"scheduler"`
+	Children  agent.ChildLimits     `yaml:"children"`
+	MCP       []mcp.Config          `yaml:"mcp"`
+	Skills    *skill.Config         `yaml:"skills"`
+	Workspace *workspace.Config     `yaml:"workspace"`
+	Delivery  delivery.Policy       `yaml:"delivery"`
+	Version   int                   `yaml:"version"`
+	Artifact  artifact.Policy       `yaml:"artifact"`
+	App       App                   `yaml:"app"`
+	NATS      eventnats.Options     `yaml:"nats"`
+	Tools     ToolLimits            `yaml:"tools"`
+	Tasks     Tasks                 `yaml:"tasks"`
+	LLM       LLM                   `yaml:"llm"`
 }
 
 type ToolLimits struct {
@@ -69,14 +71,15 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("resolve home directory")
 	}
 	cfg := Config{
-		Version:  1,
-		Children: agent.DefaultChildLimits(),
-		Delivery: delivery.DefaultPolicy(),
-		Artifact: artifact.DefaultPolicy(),
-		Tools:    ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
-		Tasks:    Tasks{RecentDays: 30, RecentLimit: 200},
-		App:      App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
-		NATS:     eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
+		Version:   1,
+		Scheduler: agent.DefaultSchedulerLimits(),
+		Children:  agent.DefaultChildLimits(),
+		Delivery:  delivery.DefaultPolicy(),
+		Artifact:  artifact.DefaultPolicy(),
+		Tools:     ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
+		Tasks:     Tasks{RecentDays: 30, RecentLimit: 200},
+		App:       App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
+		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
 	if path != "" {
 		f, err := os.Open(path)
@@ -110,6 +113,12 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	}
+	if err := cfg.Spend.Validate(); err != nil {
+		return Config{}, err
+	}
+	if !cfg.Scheduler.Valid() {
+		return Config{}, errors.New("invalid Worker scheduler limits")
 	}
 	if !cfg.Children.Valid() {
 		return Config{}, errors.New("invalid Child Run safety limits")

@@ -55,7 +55,10 @@ func (r *Runs) Approvals(ctx context.Context) ([]ApprovalView, error) {
 	if err := r.recoverApprovals(ctx); err != nil {
 		return nil, err
 	}
-	rows, err := r.host.db.QueryContext(ctx, `SELECT a.approval_id,i.tool_name,i.arguments_json,a.frozen_arguments_hash,a.status,a.expires_at FROM approval a JOIN tool_invocation i USING(invocation_id) WHERE a.scope=(SELECT agent_id FROM agent_config WHERE singleton=1) ORDER BY a.created_at,a.approval_id`)
+	rows, err := r.host.db.QueryContext(ctx, `SELECT approval_id,tool_name,arguments_json,frozen_arguments_hash,status,expires_at FROM (
+ SELECT a.approval_id,i.tool_name,i.arguments_json,a.frozen_arguments_hash,a.status,a.expires_at,a.created_at FROM approval a JOIN tool_invocation i USING(invocation_id) WHERE a.scope=(SELECT agent_id FROM agent_config WHERE singleton=1)
+ UNION ALL SELECT approval_id,'account_spend',arguments_json,frozen_hash,status,0,created_at FROM spend_approval WHERE scope=(SELECT agent_id FROM agent_config WHERE singleton=1)
+ ) ORDER BY created_at,approval_id`)
 	if err != nil {
 		return nil, agent.ErrStorage
 	}
@@ -81,6 +84,9 @@ func (r *Runs) Decide(ctx context.Context, principal, id, hash, decision string)
 		return err
 	}
 	return r.write(ctx, func(tx *sql.Tx) error {
+		if found, err := r.decideSpend(ctx, tx, principal, id, hash, decision); found || err != nil {
+			return err
+		}
 		var status, runID string
 		if err := tx.QueryRowContext(ctx, `SELECT status FROM approval WHERE approval_id=? AND scope=? AND frozen_arguments_hash=?`, id, principal, hash).Scan(&status); err != nil {
 			return agent.ErrConflict

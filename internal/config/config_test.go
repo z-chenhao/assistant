@@ -9,6 +9,38 @@ import (
 
 func noEnv(string) (string, bool) { return "", false }
 
+func TestSpendRequiresExplicitIntegerPrices(t *testing.T) {
+	body := `version: 1
+spend:
+  accounts:
+    - account: openai_compatible:abc
+      currency: USD
+      boundary_micros: 1000000
+      prices:
+        - model: fixture
+          version: v1
+          input_micros_per_million: 0
+          output_micros_per_million: 2000000
+          cache_read_micros_per_million: 0
+          cache_write_micros_per_million: 0
+`
+	for name, value := range map[string]string{"valid": body, "omitted": strings.Replace(body, "          input_micros_per_million: 0\n", "", 1), "fraction": strings.Replace(body, "input_micros_per_million: 0", "input_micros_per_million: 0.5", 1), "boundary-fraction": strings.Replace(body, "boundary_micros: 1000000", "boundary_micros: 1.5", 1), "unknown": strings.Replace(body, "version: v1", "version: v1\n          secret: PRIVATE", 1), "negative": strings.Replace(body, "input_micros_per_million: 0", "input_micros_per_million: -1", 1)} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			if err := os.WriteFile(path, []byte(value), 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Load(path, noEnv)
+			if (err == nil) != (name == "valid") {
+				t.Fatal(err)
+			}
+			if err != nil && strings.Contains(err.Error(), "PRIVATE") {
+				t.Fatal("configuration leaked")
+			}
+		})
+	}
+}
+
 func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	cfg, err := Load("", noEnv)
 	if err != nil {
@@ -62,6 +94,15 @@ func TestMCPRejectsDataRootThroughAliasBeforeItExists(t *testing.T) {
 
 func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	for name, body := range map[string]string{
+		"scheduler-zero":               "version: 1\nscheduler: {child_concurrency: 0}",
+		"scheduler-hard-limit":         "version: 1\nscheduler: {child_concurrency: 33}",
+		"scheduler-global-hard-limit":  "version: 1\nscheduler: {global_concurrency: 33}",
+		"scheduler-user-zero":          "version: 1\nscheduler: {user_concurrency: 0}",
+		"scheduler-provider-zero":      "version: 1\nscheduler: {provider_concurrency: 0}",
+		"scheduler-agent-zero":         "version: 1\nscheduler: {agent_concurrency: 0}",
+		"scheduler-turns-hard-limit":   "version: 1\nscheduler: {max_worker_turns: 513}",
+		"scheduler-circuit-zero":       "version: 1\nscheduler: {infrastructure_failures: 0}",
+		"scheduler-cooldown-zero":      "version: 1\nscheduler: {cooldown_seconds: 0}",
 		"child-depth-zero":             "version: 1\nchildren: {max_depth: 0}",
 		"child-depth-hard-limit":       "version: 1\nchildren: {max_depth: 17}",
 		"child-descendants-zero":       "version: 1\nchildren: {max_descendants: 0}",

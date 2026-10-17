@@ -109,6 +109,14 @@ func (r *Runs) recoverStopsTx(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		now := time.Now().UnixMicro()
+		// Monetary consent freezes a Run batch, not an individual Tool's
+		// arguments. Steering keeps that scope; stopping the batch invalidates it.
+		if _, err = tx.ExecContext(ctx, `UPDATE spend_approval SET status='invalidated',decided_at=? WHERE root_run_id=? AND status='pending'`, now, id); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE spend_reservation SET status='usage_missing' WHERE status='reserved' AND generation_id IN (SELECT generation_id FROM model_generation WHERE run_id=?)`, id); err != nil {
+			return err
+		}
 		if err = invalidateApprovals(ctx, tx, id); err != nil {
 			return err
 		}

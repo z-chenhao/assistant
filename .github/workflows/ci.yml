@@ -12,7 +12,9 @@ jobs:
   checks:
     name: Ubuntu checks
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Prior exact-SHA gates took 44m43s before the five monetary-policy runs.
+    # Preserve every gate and give the expanded fault/restart suite headroom.
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

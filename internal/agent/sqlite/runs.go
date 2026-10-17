@@ -32,6 +32,8 @@ type Runs struct {
 	limits      ToolLimits
 	approvalTTL time.Duration
 	childLimits agent.ChildLimits
+	spend       agent.SpendPolicy
+	scheduler   agent.SchedulerLimits
 }
 
 func (s *Store) Runs(history conversation.Store, registry *tool.Registry) *Runs {
@@ -79,7 +81,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -192,13 +194,12 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 		return "", err
 	}
 	r.host.boundary("before_next_scan")
-	var id string
-	// Four worker leases plus a reserved Main slot. The database enforces this
-	// host bound across concurrent CLI processes as well as within one Actor.
-	err := r.host.db.QueryRowContext(ctx, `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) WHERE (r.status IN ('queued','running') OR (r.status='waiting' AND (r.wait_reason='resource' OR (r.wait_reason='user_input' AND (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND r.worker_position='root' AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))))))) AND (c.token IS NULL OR c.expires_at<=?) AND (r.kind='main' OR (SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>?)<4) AND NOT (r.status='waiting' AND r.wait_reason='resource' AND EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') AND NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason='resource' OR (i.wait_reason='child_run' AND EXISTS(SELECT 1 FROM agent_invocation a JOIN run child ON child.run_id=a.child_run_id WHERE a.invocation_id=i.invocation_id AND child.status IN ('completed','failed','cancelled'))) OR (i.wait_reason='retry_backoff' AND i.next_wake_at<=?) OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending'))))) ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,r.created_at,r.run_id LIMIT 1`, time.Now().UnixMicro(), time.Now().UnixMicro(), time.Now().UnixMicro()).Scan(&id)
+	id, err := r.nextScheduled(ctx)
 	if err == sql.ErrNoRows {
 		var active int
-		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE status IN ('queued','running') OR (status='waiting' AND wait_reason='resource' AND (NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') OR EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND (i.wait_reason IN ('resource','retry_backoff') OR (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending')) OR EXISTS(SELECT 1 FROM agent_invocation a JOIN run c ON c.run_id=a.child_run_id WHERE a.invocation_id=i.invocation_id AND c.status IN ('completed','failed','cancelled'))))))`).Scan(&active); err != nil {
+		// Stopping owners must join or expire before Drain can finish. They are
+		// never candidates for business claims, but still require recovery work.
+		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE (`+runnable+`) OR (r.desired_state!='running' AND r.status IN ('queued','running','waiting'))`, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
 			return "", agent.ErrStorage
 		}
 		if active > 0 {
@@ -226,12 +227,8 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 	c := &claim{id: id, token: newID()}
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		now := time.Now().UnixMicro()
-		var workers int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run w JOIN run_claim wc USING(run_id) WHERE w.kind='worker' AND w.status='running' AND wc.token IS NOT NULL AND wc.expires_at>? AND EXISTS(SELECT 1 FROM run WHERE run_id=? AND kind='worker')`, now, id).Scan(&workers); err != nil {
+		if err := r.claimCapacity(ctx, tx, id); err != nil {
 			return err
-		}
-		if workers >= 4 {
-			return agent.ErrBusy
 		}
 		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
 		if err != nil {
@@ -245,6 +242,9 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 			return err
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE run SET status='running',wait_reason=NULL,started_at=coalesce(started_at,?),updated_at=?,version=version+1 WHERE run_id=?`, now, now, id); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE scheduler_tree SET last_served=(SELECT coalesce(max(last_served),0)+1 FROM scheduler_tree) WHERE root_run_id=(SELECT root_run_id FROM run WHERE run_id=?)`, id); err != nil {
 			return err
 		}
 		return runEvent(ctx, tx, id, "run.claimed", c.epoch)
@@ -282,7 +282,7 @@ func (r *Runs) Load(ctx context.Context, c agent.RunClaim) (agent.Run, error) {
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx, `SELECT r.run_id,r.agent_id,r.conversation_id,r.kind,r.status,coalesce(r.wait_reason,''),r.version,r.model_snapshot_id,r.checkpoint_json,c.tools_json FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id WHERE r.run_id=?`, c.RunID()).Scan(&run.ID, &run.AgentID, &run.ConversationID, &run.Kind, &run.Status, &run.WaitReason, &run.Version, &snapshotID, &cp, &tools)
+		return tx.QueryRowContext(ctx, `SELECT r.run_id,r.agent_id,r.conversation_id,r.kind,r.status,coalesce(r.wait_reason,''),r.version,coalesce(a.status,''),r.model_snapshot_id,r.checkpoint_json,c.tools_json FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id LEFT JOIN spend_approval a ON a.root_run_id=coalesce(r.root_run_id,r.run_id) WHERE r.run_id=?`, c.RunID()).Scan(&run.ID, &run.AgentID, &run.ConversationID, &run.Kind, &run.Status, &run.WaitReason, &run.Version, &run.SpendStatus, &snapshotID, &cp, &tools)
 	})
 	if err != nil {
 		return run, err
@@ -514,6 +514,23 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
+		if status == "failed" && reason == "SPEND_AUTHORIZATION_DENIED" {
+			// Finalize pending model ledger entries with their denied Run.
+			// Retain any pre-crash reservation as unknown
+			// actual spend rather than declaring an uncertain provider charge free.
+			if _, err := tx.ExecContext(ctx, `UPDATE spend_reservation SET status='usage_missing' WHERE status='reserved' AND generation_id IN (SELECT generation_id FROM model_generation WHERE run_id=? AND status='pending')`, c.RunID()); err != nil {
+				return err
+			}
+			res, err := tx.ExecContext(ctx, `UPDATE model_generation SET status='failed',error_code='SPEND_AUTHORIZATION_DENIED',completed_at=? WHERE run_id=? AND status='pending'`, time.Now().UnixMicro(), c.RunID())
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				if err := runEvent(ctx, tx, c.RunID(), "model_generation.failed", 1); err != nil {
+					return err
+				}
+			}
+		}
 		if status == "completed" {
 			var phase string
 			if err := tx.QueryRowContext(ctx, `SELECT json_extract(checkpoint_json,'$.phase') FROM run WHERE run_id=?`, c.RunID()).Scan(&phase); err != nil {
@@ -586,7 +603,10 @@ func (r *Runs) Complete(ctx context.Context, c agent.RunClaim, v int64) (bool, e
 	return r.terminal(ctx, c, v, "completed", "")
 }
 func (r *Runs) Fail(ctx context.Context, c agent.RunClaim, v int64, code string) error {
-	_, err := r.terminal(ctx, c, v, "failed", llm.NormalizeError(code).Error())
+	if code != "RESOURCE_LIMIT" && code != "SPEND_AUTHORIZATION_DENIED" {
+		code = llm.NormalizeError(code).Error()
+	}
+	_, err := r.terminal(ctx, c, v, "failed", code)
 	return err
 }
 func (r *Runs) Wait(ctx context.Context, c agent.RunClaim, v int64, reason string) error {

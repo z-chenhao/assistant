@@ -61,9 +61,16 @@ var deliverySQL string
 //go:embed migrations/013_children.sql
 var childrenSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL}
+//go:embed migrations/014_scheduler.sql
+var schedulerSQL string
+
+//go:embed migrations/015_spend.sql
+var spendSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL}
 
 type Store struct {
+	scheduler agent.SchedulerLimits
 	db        *sql.DB
 	path      string
 	artifacts *artifactsqlite.Store
