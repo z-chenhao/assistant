@@ -238,6 +238,10 @@ owns Launch/Doctor/Drive/Evidence/Cleanup through the existing CLI and PTY harne
 | Recoverable waiting/results | `chat work`, repeat after restart | `tools.Prepare`, `Runs.Next`, terminal Outbox | Waiting ancestors release leases, completion-before-wait scan, six kill/restart boundaries, zero replay of completed generations, stable repeated drain |
 | Child approval and cancellation | TUI cancel; `approval approve/deny ID HASH` + `chat work` | Existing approval/Task stop pipeline and epoch fences | CLI exit/restart approval, separate Parent/Child approval IDs, real Child cancellation, no late old-epoch commits, `unknown` never retried or packaged as success |
 
+The M2 Case Runner permits this local Host capability only on an authorized Worker;
+Main delegation, forged names/permissions and external effects retain hard failures.
+Its actual no-Child, Task-count and action assertions stay strict.
+
 This is Direct Tool protocol evidence. Fair Child scheduling/100-item capacity,
 JavaScript CodeCall replay and complete GC-16/17/18/20 are later slice gates;
 they are not counted as passing here.

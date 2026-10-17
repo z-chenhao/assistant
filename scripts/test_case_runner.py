@@ -91,6 +91,33 @@ class ContractTests(unittest.TestCase):
             observed = result(case, variant, self.policy, execution)
             self.assertEqual(observed["assertions"]["no_external_writes"], allowed)
 
+    def test_task_grading_allows_only_canonical_worker_delegation(self):
+        from run_task_cases import task_result
+        case = {"case_id": "contract", "version": 1, "expected_roots": 0,
+                "expected_tasks": 0, "expected_instructions": 0, "not_applicable": []}
+        variant = {"variant_id": "permission", "seed": 0, "fixture_digest": "fixture",
+                   "clock": "2026-10-01", "events": []}
+        state = {key: [] for key in ("runs", "conversation", "generations", "snapshots", "tasks",
+                                    "updates", "inbox", "reporter_dedup", "deliveries", "usage",
+                                    "instructions", "tools", "task_requests", "task_invocations")}
+        execution = {"state": state, "steps": [], "started_at": "start", "finished_at": "end"}
+        for role, spawn, name, permission, replay, allowed in [
+            ("worker", True, "builtin__agent__run", "spawn_agents", "safe", True),
+            ("main", True, "builtin__agent__run", "spawn_agents", "safe", False),
+            ("worker", False, "builtin__agent__run", "spawn_agents", "safe", False),
+            ("worker", True, "mcp__mail__send", "spawn_agents", "safe", False),
+            ("worker", True, "mcp__mail__send", "external_effect", "never", False),
+            ("worker", True, "builtin__agent__run", "external_effect", "safe", False),
+            ("worker", True, "builtin__agent__run", "spawn_agents", "never", False),
+        ]:
+            state["capabilities"] = [{"snapshot_id": "cap", "role": role, "can_spawn_agents": spawn,
+                                      "tools_json": json.dumps([{"name": name, "permission": permission,
+                                                                 "replay_policy": replay}])}]
+            observed = task_result(case, variant, self.policy, execution)
+            self.assertEqual(observed["assertions"]["no_external_capabilities"], allowed)
+            self.assertEqual("unauthorized_external_effect" in observed["hard_failures"], not allowed)
+            self.assertEqual(observed["status"], "fragment_pass" if allowed else "fragment_fail")
+
 
 if __name__ == "__main__":
     unittest.main()
