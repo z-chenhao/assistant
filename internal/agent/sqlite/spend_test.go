@@ -147,6 +147,28 @@ func TestSpendDenialDrainsAcceptedChildrenAndInvocations(t *testing.T) {
 	}
 }
 
+func TestSpendDenialFinalizesUndispatchedGeneration(t *testing.T) {
+	s, r, a, _, c, run := spendRoot(t, 1)
+	ctx := context.Background()
+	if err := executeTaskRun(t, a, r, ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	v, err := r.Approvals(ctx)
+	if err != nil || len(v) != 1 {
+		t.Fatal(v, err)
+	}
+	if err = r.Decide(ctx, run.AgentID, v[0].ID, v[0].Hash, "denied"); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM model_generation WHERE run_id='`+run.ID+`' AND status='failed' AND error_code='SPEND_AUTHORIZATION_DENIED'`) != 1 {
+		t.Fatal("denied undispatched model call stayed pending")
+	}
+	if scalar(t, s, `SELECT count(*) FROM provider_usage WHERE run_id='`+run.ID+`'`) != 0 {
+		t.Fatal("denial fabricated usage")
+	}
+}
+
 func TestSpendProjectedBoundaryRecoveryAndDecisionFences(t *testing.T) {
 	for _, decision := range []string{"approved", "denied"} {
 		t.Run(decision, func(t *testing.T) {

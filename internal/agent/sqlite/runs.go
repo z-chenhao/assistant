@@ -514,6 +514,23 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
+		if status == "failed" && reason == "SPEND_AUTHORIZATION_DENIED" {
+			// Finalize pending model ledger entries with their denied Run.
+			// Retain any pre-crash reservation as unknown
+			// actual spend rather than declaring an uncertain provider charge free.
+			if _, err := tx.ExecContext(ctx, `UPDATE spend_reservation SET status='usage_missing' WHERE status='reserved' AND generation_id IN (SELECT generation_id FROM model_generation WHERE run_id=? AND status='pending')`, c.RunID()); err != nil {
+				return err
+			}
+			res, err := tx.ExecContext(ctx, `UPDATE model_generation SET status='failed',error_code='SPEND_AUTHORIZATION_DENIED',completed_at=? WHERE run_id=? AND status='pending'`, time.Now().UnixMicro(), c.RunID())
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				if err := runEvent(ctx, tx, c.RunID(), "model_generation.failed", 1); err != nil {
+					return err
+				}
+			}
+		}
 		if status == "completed" {
 			var phase string
 			if err := tx.QueryRowContext(ctx, `SELECT json_extract(checkpoint_json,'$.phase') FROM run WHERE run_id=?`, c.RunID()).Scan(&phase); err != nil {

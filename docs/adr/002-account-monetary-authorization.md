@@ -26,7 +26,8 @@ Run uses its own approval; a Worker grant never authorizes Main work.
 The grant is scoped to the exact Run identity, account, currency, frozen price
 snapshot and Task epoch. New Roots require their own grant if the account
 boundary is reached. Approval requires local ownership and the displayed frozen
-hash. Denial fails held model calls with `SPEND_AUTHORIZATION_DENIED`. Pause or
+hash. Denial fails held model calls with `SPEND_AUTHORIZATION_DENIED` and finalizes
+their undispatched model ledger entries atomically with the Run. Pause or
 cancel invalidates pending grants; old epochs cannot decide or accept usage.
 Pending monetary approvals do not expire on process exit or release/reacquire.
 

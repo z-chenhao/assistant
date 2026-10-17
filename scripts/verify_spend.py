@@ -191,6 +191,7 @@ def run(binary):
             require(len(workers) == 1 and workers[0]['status'] == 'failed' and workers[0]['error_code'] == 'SPEND_AUTHORIZATION_DENIED', 'denial dispatch or status')
             worker_ids = {r['run_id'] for r in workers}
             worker_gens = {g['generation_id'] for g in after['generations'] if g['run_id'] in worker_ids}
+            require(all(g['status'] == 'failed' and g['error_code'] == 'SPEND_AUTHORIZATION_DENIED' for g in after['generations'] if g['run_id'] in worker_ids), 'denied model ledger stayed pending')
             require(not tool_state(h)['effects'] and not any(v['generation_id'] in worker_gens for v in after['spend_reservation']), 'denied model/tool dispatched')
             return {'name': 'deny_no_model_or_effect_dispatch', 'before': before, 'after': after}
         report['checks'].append(scenario('denied', denied))
