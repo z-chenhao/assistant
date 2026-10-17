@@ -282,7 +282,7 @@ func (r *Runs) Load(ctx context.Context, c agent.RunClaim) (agent.Run, error) {
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx, `SELECT r.run_id,r.agent_id,r.conversation_id,r.kind,r.status,coalesce(r.wait_reason,''),r.version,r.model_snapshot_id,r.checkpoint_json,c.tools_json FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id WHERE r.run_id=?`, c.RunID()).Scan(&run.ID, &run.AgentID, &run.ConversationID, &run.Kind, &run.Status, &run.WaitReason, &run.Version, &snapshotID, &cp, &tools)
+		return tx.QueryRowContext(ctx, `SELECT r.run_id,r.agent_id,r.conversation_id,r.kind,r.status,coalesce(r.wait_reason,''),r.version,coalesce(a.status,''),r.model_snapshot_id,r.checkpoint_json,c.tools_json FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id LEFT JOIN spend_approval a ON a.root_run_id=coalesce(r.root_run_id,r.run_id) WHERE r.run_id=?`, c.RunID()).Scan(&run.ID, &run.AgentID, &run.ConversationID, &run.Kind, &run.Status, &run.WaitReason, &run.Version, &run.SpendStatus, &snapshotID, &cp, &tools)
 	})
 	if err != nil {
 		return run, err

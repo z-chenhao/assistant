@@ -87,6 +87,8 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 	}
 	if root {
 		switch {
+		case strings.Contains(input, "Spend final"):
+			return llm.GenerationResult{Text: "frozen monetary final"}, nil
 		case strings.Contains(input, "Child large"):
 			return call(agent.RunToolName, agent.AgentRunRequest{Task: "Large child"}), nil
 		case strings.Contains(input, "Child artifact"):

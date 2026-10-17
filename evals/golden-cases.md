@@ -1110,7 +1110,7 @@ Judge 输入只包含 Case Goal、允许披露的 Fixture、用户可见对话�
 | SC-12 | Model/Capability Snapshot 在 Run 内冻结；Delivery/Outbox 幂等 | 全套抽样 |
 | SC-13 | 显式账户货币授权；价格/策略冻结；Root 合并可恢复审批，Child 副作用独立；无定价/额度不猜测 | 16、17、18、20 |
 
-SC-13 的确定性价格、用量、换算和 hard assertions 见 `fixtures/m4-spend-v1.json`。`scripts/verify_spend.py` 与 `TestSpend*` 必须连续通过五次；猜测价格、用 Token allowance 替代货币授权、Child 重复审批、货币审批授权工具副作用、旧 epoch 接受或重复记账均为 hard failure。此系统证据不产生语义分数，也不代表完整场景或 M5 重放已通过。
+SC-13 的确定性价格、用量、换算和 hard assertions 见 `fixtures/m4-spend-v1.json`。`scripts/verify_spend.py` 与 `TestSpend*` 必须连续通过五次；猜测价格、用 Token allowance 替代货币授权、Child 重复审批、货币审批授权工具副作用、旧 epoch 接受或重复记账均为 hard failure。模型最后一条或失败响应的实际费用触界也必须保存结果并等待 Root 审批；恢复复用结果，不重复模型调用。此系统证据不产生语义分数，也不代表完整场景或 M5 重放已通过。
 
 ## 12. Harness 数据协议建议
 

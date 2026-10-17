@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -75,6 +76,11 @@ func monetaryCost(p agent.ModelPrice, u llm.TokenUsage) (int64, error) {
 	return total.Int64(), nil
 }
 
+func projectedCost(price agent.ModelPrice, snapshot llm.Snapshot) (int64, error) {
+	maxInput := max(price.Input, price.CacheRead, price.CacheWrite)
+	return monetaryCost(agent.ModelPrice{Input: maxInput, Output: price.Output}, llm.TokenUsage{InputTokens: snapshot.ContextWindow, OutputTokens: snapshot.MaxOutputTokens})
+}
+
 // gateSpend runs in generation admission's immediate transaction. A held
 // generation has no provider dispatch and consumes no reservation. Existing
 // reservations are reattached, never double counted after process death.
@@ -102,16 +108,13 @@ func (r *Runs) gateSpend(ctx context.Context, tx *sql.Tx, req llm.GenerationRequ
 	if existing > 0 {
 		return false, false, nil
 	}
-	maxInput := max(price.Input, price.CacheRead, price.CacheWrite)
-	projectionPrice := agent.ModelPrice{Input: maxInput, Output: price.Output}
-	projected, err := monetaryCost(projectionPrice, llm.TokenUsage{InputTokens: req.Snapshot.ContextWindow, OutputTokens: req.Snapshot.MaxOutputTokens})
+	projected, err := projectedCost(*price, req.Snapshot)
 	if err != nil {
 		return false, false, err
 	}
 	if boundary > 0 {
-		var owner, scope string
-		var epoch sql.NullInt64
-		if err = tx.QueryRowContext(ctx, `SELECT coalesce(root_run_id,run_id),agent_id,task_epoch FROM run WHERE run_id=?`, req.RunID).Scan(&owner, &scope, &epoch); err != nil {
+		var owner string
+		if err = tx.QueryRowContext(ctx, `SELECT coalesce(root_run_id,run_id) FROM run WHERE run_id=?`, req.RunID).Scan(&owner); err != nil {
 			return false, false, err
 		}
 		var status string
@@ -131,38 +134,7 @@ func (r *Runs) gateSpend(ctx context.Context, tx *sql.Tx, req llm.GenerationRequ
 				return false, false, err
 			}
 			if total >= boundary || projected >= boundary-total {
-				var unpriced, missing int64
-				if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM spend_unpriced_usage WHERE account_key=?`, account).Scan(&unpriced); err != nil {
-					return false, false, err
-				}
-				if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM spend_reservation WHERE account_key=? AND status='usage_missing'`, account).Scan(&missing); err != nil {
-					return false, false, err
-				}
-				argsJSON, _ := json.Marshal(struct {
-					Root          string `json:"batch_run_id"`
-					Epoch         int64  `json:"task_epoch"`
-					Snapshot      string `json:"model_snapshot_id"`
-					Account       string `json:"account"`
-					Currency      string `json:"currency"`
-					Boundary      int64  `json:"boundary_micros"`
-					Committed     int64  `json:"account_committed_micros"`
-					Projected     int64  `json:"next_call_max_micros"`
-					Pricing       string `json:"pricing_version"`
-					Unpriced      int64  `json:"unpriced_calls"`
-					Missing       int64  `json:"missing_usage_calls"`
-					Authorization string `json:"authorization"`
-				}{owner, epoch.Int64, req.Snapshot.SnapshotID, account, currency, boundary, total, projected, price.Version, unpriced, missing, "continue this Run batch beyond the account boundary without another monetary ceiling; model spend only; tool effects excluded"})
-				args := string(argsJSON)
-				id := newID()
-				hash := digest(args)
-				if _, err = tx.ExecContext(ctx, `INSERT INTO spend_approval VALUES(?,?,?,?,?,?,'pending',?,NULL)`, id, owner, scope, epoch, args, hash, time.Now().UnixMicro()); err != nil {
-					return false, false, err
-				}
-				text := "Account spend approval required: " + args + "\nUse /approve " + id + " " + hash + " or /deny " + id + " " + hash
-				if err = r.notification(ctx, tx, owner, "spend:"+id, "approval", "security", text); err != nil {
-					return false, false, err
-				}
-				if err = runEvent(ctx, tx, owner, "spend_approval.requested", 1); err != nil {
+				if err := r.requestSpendApproval(ctx, tx, req, *price, boundary, total, projected); err != nil {
 					return false, false, err
 				}
 				return true, false, nil
@@ -171,6 +143,64 @@ func (r *Runs) gateSpend(ctx context.Context, tx *sql.Tx, req llm.GenerationRequ
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO spend_reservation VALUES(?,?,?,?,NULL,'reserved')`, req.GenerationID, account, currency, projected)
 	return false, false, err
+}
+
+// requestSpendApproval is shared by projected admission and actual settlement.
+// Both execute inside the existing fenced model transaction.
+func (r *Runs) requestSpendApproval(ctx context.Context, tx *sql.Tx, req llm.GenerationRequest, price agent.ModelPrice, boundary, total, projected int64) error {
+	var owner, scope, account, currency, title string
+	var epoch sql.NullInt64
+	err := tx.QueryRowContext(ctx, `SELECT coalesce(r.root_run_id,r.run_id),r.agent_id,r.task_epoch,s.account_key,s.currency,coalesce(t.title,'Current conversation') FROM run r JOIN spend_snapshot s ON s.snapshot_id=r.model_snapshot_id LEFT JOIN task t ON t.task_id=r.task_id WHERE r.run_id=?`, req.RunID).Scan(&owner, &scope, &epoch, &account, &currency, &title)
+	if err != nil {
+		return err
+	}
+	var exists int
+	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM spend_approval WHERE root_run_id=?`, owner).Scan(&exists); err != nil {
+		return err
+	}
+	if exists != 0 {
+		return nil
+	}
+	var unpriced, missing int64
+	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM spend_unpriced_usage WHERE account_key=?`, account).Scan(&unpriced); err != nil {
+		return err
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM spend_reservation WHERE account_key=? AND status='usage_missing'`, account).Scan(&missing); err != nil {
+		return err
+	}
+	argsJSON, _ := json.Marshal(struct {
+		Root          string `json:"batch_run_id"`
+		Title         string `json:"batch_title"`
+		Epoch         int64  `json:"task_epoch"`
+		Snapshot      string `json:"model_snapshot_id"`
+		Account       string `json:"account"`
+		Currency      string `json:"currency"`
+		Boundary      int64  `json:"boundary_micros"`
+		Committed     int64  `json:"account_committed_micros"`
+		Projected     int64  `json:"next_call_max_micros"`
+		Pricing       string `json:"pricing_version"`
+		Unpriced      int64  `json:"unpriced_calls"`
+		Missing       int64  `json:"missing_usage_calls"`
+		Authorization string `json:"authorization"`
+	}{owner, title, epoch.Int64, req.Snapshot.SnapshotID, account, currency, boundary, total, projected, price.Version, unpriced, missing, "continue this Run batch beyond the account boundary without another monetary ceiling; model spend only; tool effects excluded"})
+	args := string(argsJSON)
+	id := newID()
+	hash := digest(args)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO spend_approval VALUES(?,?,?,?,?,?,'pending',?,NULL)`, id, owner, scope, epoch, args, hash, time.Now().UnixMicro()); err != nil {
+		return err
+	}
+	quotedTitle, _ := json.Marshal(title)
+	// The frozen action retains internal identity for fencing. The ordinary
+	// notice shows the decision, amounts and unknowns, without Run/trace IDs.
+	money := func(v int64) string { return fmt.Sprintf("%d.%06d", v/1000000, v%1000000) }
+	text := "Account spend approval required: " + string(quotedTitle) + "\nCurrency: " + currency + "; pricing: " + price.Version + "; boundary: " + money(boundary) + ".\nAt request time, known spend plus reservations: " + money(total) + "; per-call maximum: " + money(projected) + fmt.Sprintf(".\nUnpriced calls: %d; calls with unknown actual cost: %d.", unpriced, missing) + "\nApprove remaining model spending for this batch beyond the account boundary, without another monetary ceiling. Tool effects require separate approval.\nUse /approve " + id + " " + hash + " or /deny " + id + " " + hash
+	if err = r.notification(ctx, tx, owner, "spend:"+id, "approval", "security", text); err != nil {
+		return err
+	}
+	if err = runEvent(ctx, tx, owner, "spend_approval.requested", 1); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Usage, monetary settlement, and the accepted generation commit together.
@@ -191,20 +221,34 @@ func (s *Store) settleSpend(ctx context.Context, tx *sql.Tx, req llm.GenerationR
 	if reserved != 1 {
 		return agent.ErrStorage
 	}
-	if result.Usage == nil {
-		_, err = tx.ExecContext(ctx, `UPDATE spend_reservation SET status='usage_missing' WHERE generation_id=?`, req.GenerationID)
-		return err
-	}
 	var price agent.ModelPrice
 	if json.Unmarshal([]byte(raw), &price) != nil {
 		return agent.ErrStorage
 	}
-	amount, err := monetaryCost(price, *result.Usage)
+	if result.Usage == nil {
+		_, err = tx.ExecContext(ctx, `UPDATE spend_reservation SET status='usage_missing' WHERE generation_id=?`, req.GenerationID)
+	} else {
+		var amount int64
+		amount, err = monetaryCost(price, *result.Usage)
+		if err == nil {
+			_, err = tx.ExecContext(ctx, `UPDATE spend_reservation SET status='priced',actual_micros=? WHERE generation_id=?`, amount, req.GenerationID)
+		}
+	}
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE spend_reservation SET status='priced',actual_micros=? WHERE generation_id=?`, amount, req.GenerationID)
-	return err
+	var boundary, total int64
+	if err = tx.QueryRowContext(ctx, `SELECT s.boundary_micros,(SELECT coalesce(sum(CASE WHEN v.status='priced' THEN v.actual_micros ELSE v.reserved_micros END),0) FROM spend_reservation v WHERE v.account_key=s.account_key AND v.currency=s.currency) FROM spend_snapshot s WHERE s.snapshot_id=?`, req.Snapshot.SnapshotID).Scan(&boundary, &total); err != nil {
+		return err
+	}
+	if boundary > 0 && total >= boundary {
+		projected, err := projectedCost(price, req.Snapshot)
+		if err != nil {
+			return err
+		}
+		return (&Runs{host: s}).requestSpendApproval(ctx, tx, req, price, boundary, total, projected)
+	}
+	return nil
 }
 
 func (r *Runs) decideSpend(ctx context.Context, tx *sql.Tx, principal, id, hash, decision string) (bool, error) {

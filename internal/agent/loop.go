@@ -70,6 +70,20 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 		if err != nil {
 			return err
 		}
+		// An actual usage overrun can request consent while accepting the final
+		// model result. Hold its checkpointed reply/tools too, without regenerating.
+		if r.SpendStatus == "pending" {
+			if err := o.Store.Wait(work, claim, r.Version, "resource"); err != nil {
+				return err
+			}
+			return nil
+		}
+		// Drain accepted Tool calls through their existing independent policies
+		// before failing the next model/reply boundary. Parents must still adopt
+		// terminal Child results; monetary denial cannot orphan invocations.
+		if (r.SpendStatus == "denied" || r.SpendStatus == "invalidated") && r.Checkpoint.Phase != "tools" {
+			return fail(r, "SPEND_AUTHORIZATION_DENIED")
+		}
 		cp := r.Checkpoint
 		switch cp.Phase {
 		case "model":
@@ -136,7 +150,23 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 					if callErr == ErrClaimLost || callErr == ErrStorage || callErr == llm.ErrStorage {
 						return callErr
 					}
-					return fail(r, llm.NormalizeError(callErr.Error()).Error())
+					// A failed provider response may still report billable usage.
+					// Settlement can have requested Root consent atomically with
+					// that failure; preserve it before finalizing the Run.
+					latest, loadErr := o.Store.Load(work, claim)
+					if loadErr != nil {
+						return loadErr
+					}
+					if latest.SpendStatus == "pending" {
+						if err := o.Store.Wait(work, claim, latest.Version, "resource"); err != nil {
+							return err
+						}
+						return nil
+					}
+					if latest.SpendStatus == "denied" || latest.SpendStatus == "invalidated" {
+						return fail(latest, "SPEND_AUTHORIZATION_DENIED")
+					}
+					return fail(latest, llm.NormalizeError(callErr.Error()).Error())
 				}
 				result = &value
 			}

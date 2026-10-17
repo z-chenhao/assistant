@@ -48,8 +48,12 @@ bound, rather than predicting tokens from text. This can prompt earlier than
 actual usage requires. It prevents concurrent calls from independently consuming
 the same authorization headroom. Historical unpriced usage remains unknown;
 the local spend view and approval action disclose those call counts. Reported
-usage exceeding a reservation is recorded as observed and affects subsequent
-admission; a provider that ignores its model bounds cannot be given a guaranteed
+usage exceeding a reservation is recorded as observed and creates the same Root
+approval immediately, even on the final or failed model response. The shared
+Loop holds its saved outcome and resumes it without another model call. Monetary
+denial drains already accepted Tool calls through their independent policies
+before failing the next model/reply boundary; it never orphans Child invocations.
+A provider that ignores its model bounds cannot be given a guaranteed
 real-world billing ceiling by this local mechanism.
 
 Migration 015, `TestSpend*`, `TestSpendRequiresExplicitIntegerPrices`, and

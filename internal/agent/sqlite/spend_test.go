@@ -74,6 +74,79 @@ func TestSpendProjectionReachesBoundaryExactly(t *testing.T) {
 	}
 }
 
+func TestSpendActualOverrunHoldsFinalResponseWithoutAnotherModelCall(t *testing.T) {
+	for _, cause := range []error{nil, llm.ModelNotFound} {
+		for _, decision := range []string{"approved", "denied"} {
+			name := decision
+			if cause != nil {
+				name += "_provider_error"
+			}
+			t.Run(name, func(t *testing.T) {
+				s, r, a, p, c, run := spendRoot(t, 12000)
+				ctx := context.Background()
+				p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+					return llm.GenerationResult{Text: "observed final answer", Usage: &llm.TokenUsage{InputTokens: 15000}}, cause
+				}
+				if err := executeTaskRun(t, a, r, ctx, c); err != nil {
+					t.Fatal(err)
+				}
+				if scalar(t, s, `SELECT count(*) FROM spend_approval WHERE root_run_id='`+run.ID+`' AND status='pending'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE run_id='`+run.ID+`' AND status='waiting'`) != 1 {
+					t.Fatal("actual cost crossed boundary but final response escaped consent")
+				}
+				if scalar(t, s, `SELECT actual_micros FROM spend_reservation WHERE generation_id IN (SELECT generation_id FROM model_generation WHERE run_id='`+run.ID+`')`) != 15000 {
+					t.Fatal("actual overrun not recorded")
+				}
+				v, err := r.Approvals(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = r.Decide(ctx, run.AgentID, v[0].ID, v[0].Hash, decision); err != nil {
+					t.Fatal(err)
+				}
+				mustDrain(t, a)
+				expected := "completed"
+				if cause != nil || decision == "denied" {
+					expected = "failed"
+				}
+				if scalar(t, s, `SELECT count(*) FROM model_generation WHERE run_id='`+run.ID+`'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE run_id='`+run.ID+`' AND status='`+expected+`'`) != 1 {
+					t.Fatal("resume regenerated final answer")
+				}
+			})
+		}
+	}
+}
+
+func TestSpendDenialDrainsAcceptedChildrenAndInvocations(t *testing.T) {
+	s, r, a, p, c, run := spendRoot(t, 12000)
+	ctx := context.Background()
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.RunID == run.ID {
+			response := calls(agent.RunToolName, `{"task":"one"}`, `{"task":"two"}`, `{"task":"three"}`)
+			response.Usage = &llm.TokenUsage{InputTokens: 1000}
+			return response, nil
+		}
+		return llm.GenerationResult{Text: "Child final", Usage: &llm.TokenUsage{InputTokens: 15000}}, nil
+	}
+	if err := executeTaskRun(t, a, r, ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	v, err := r.Approvals(ctx)
+	if err != nil || len(v) != 1 {
+		t.Fatal(v, err)
+	}
+	if err = r.Decide(ctx, run.AgentID, v[0].ID, v[0].Hash, "denied"); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status IN ('queued','running','waiting')`) != 0 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__agent__run' AND status='failed'`) != 3 {
+		t.Fatal("denial orphaned accepted Child invocations")
+	}
+	if scalar(t, s, `SELECT count(*) FROM provider_usage u JOIN run r USING(run_id) WHERE r.kind='worker'`) != 2 {
+		t.Fatal("denial dispatched extra models")
+	}
+}
+
 func TestSpendProjectedBoundaryRecoveryAndDecisionFences(t *testing.T) {
 	for _, decision := range []string{"approved", "denied"} {
 		t.Run(decision, func(t *testing.T) {

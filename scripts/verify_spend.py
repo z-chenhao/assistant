@@ -30,21 +30,21 @@ def state(h):
     return value
 
 
-def policy(h, *, boundary=None, priced=True):
+def policy(h, *, boundary=None, priced=True, model=None):
     # Matches llm.EndpointHash: canonical JSON of the endpoint, no secret/URL in
     # account status, approval arguments or trace metadata.
     endpoint_hash = hashlib.sha256(json.dumps({'endpoint': FIXTURE['endpoint']}, separators=(',', ':')).encode()).hexdigest()
     account = {'account': 'openai_compatible:' + endpoint_hash, 'currency': FIXTURE['currency'],
                'boundary_micros': FIXTURE['boundary_micros'] if boundary is None else boundary,
-               'prices': [FIXTURE['price']] if priced else []}
+               'prices': [dict(FIXTURE['price'], model=model or FIXTURE['price']['model'])] if priced else []}
     # JSON is valid YAML, so no extra Python package is needed by CI.
     (h.root / 'tool-config.yaml').write_text(json.dumps({'version': 1, 'spend': {'accounts': [account]}}))
 
 
-def priced_setup(h):
+def priced_setup(h, model=None):
     h.setup(metadata={'name': 'spend fixture', 'provider_kind': 'openai_compatible',
                       'endpoint': FIXTURE['endpoint'], 'wire_api': 'openai_completions',
-                      'model_id': FIXTURE['price']['model'], 'context_window': 131072,
+                      'model_id': model or FIXTURE['price']['model'], 'context_window': 131072,
                       'max_output_tokens': 8192, 'generation_defaults': {},
                       'compatibility': {'tool_result_format': 'openai'},
                       'capabilities': {'text_input': True}})
@@ -126,6 +126,26 @@ def run(binary):
             return {'name': '100_item_root_coalescing_restart_conversion', 'before': before, 'after': after}
         report['checks'].append(scenario('batch', batch))
 
+        def actual_final(h):
+            priced_setup(h, model='overrun-fixture-model')
+            h.send('actual-final', 'Delegate: Spend final')
+            policy(h, model='overrun-fixture-model')
+            h.command('chat', 'work')
+            before = state(h)
+            workers = [r for r in before['runs'] if r['kind'] == 'worker']
+            require(len(workers) == 1 and workers[0]['status'] == 'waiting', 'actual final response escaped consent')
+            worker = workers[0]
+            require(json.loads(worker['checkpoint_json'])['phase'] == 'reply', 'final result was not checkpointed')
+            require(len(before['spend_approval']) == 1 and before['spend_reservation'][0]['actual_micros'] == FIXTURE['expected_overrun_micros'], 'actual crossing not durably aggregated')
+            decide(h, monetary(h)[0])
+            h.command('chat', 'work')
+            finish_main(h)
+            after = state(h)
+            require(sum(g['run_id'] == worker['run_id'] for g in after['generations']) == 1, 'final response was regenerated after approval')
+            require(next(r for r in after['runs'] if r['run_id'] == worker['run_id'])['status'] == 'completed', 'frozen final result did not resume')
+            return {'name': 'actual_spend_holds_final_reply_and_reuses_result', 'before': before, 'after': after}
+        report['checks'].append(scenario('actual-final', actual_final))
+
         def effect(h):
             h.send('effect', 'Delegate: Child approval')
             policy(h, boundary=1)
@@ -143,6 +163,8 @@ def run(binary):
             require(len(effects) == 1 and not tool_state(h)['effects'], 'batch spend grant authorized Child effect')
             require(effects[0]['approval_id'] != spend['approval_id'], 'effect reused spend approval')
             before = state(h)
+            owner = next(r for r in before['runs'] if r['run_id'] == before['spend_approval'][0]['root_run_id'])
+            require(owner['run_id'] not in transcript and owner['model_snapshot_id'] not in transcript, 'ordinary spend notice exposed Run/snapshot identity')
             # Real kill at the existing shared pipeline's pre-effect boundary.
             decide(h, effects[0])
             child = h.hold('after_provider_effect')

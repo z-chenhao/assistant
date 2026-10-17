@@ -110,6 +110,7 @@ type Checkpoint struct {
 	Result        *llm.GenerationResult `json:"result,omitempty"`
 }
 type Run struct {
+	SpendStatus    string       `json:"-"`
 	ID             string       `json:"run_id"`
 	AgentID        string       `json:"agent_id"`
 	ConversationID string       `json:"conversation_id"`

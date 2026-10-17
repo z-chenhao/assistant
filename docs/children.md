@@ -196,7 +196,10 @@ Use the existing `approval list` and `approval approve/deny ID HASH` CLI or TUI
 `/approve`/`/deny`. The displayed frozen action authorizes remaining model spend
 for this Run batch beyond the account boundary without another monetary ceiling.
 It grants no tool effects. An independent Main Run needs its own spend consent.
-A new Root does not inherit the grant. Denial fails held model work;
+A new Root does not inherit the grant. Actual spend crossing on a final or failed
+response atomically holds the saved outcome too; consent resumes it without
+another model call. Denial fails held model work; already accepted Tool calls
+settle through their independent policies before the Parent fails;
 pause/cancel invalidates pending approval and fences old results. Pending consent
 survives process exit without expiry or duplicate prompts.
 
