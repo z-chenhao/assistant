@@ -27,10 +27,16 @@ def summarize(folder):
             event = json.loads(line)
             if event.get('Test') and event.get('Action') in ('pass', 'fail'):
                 cases[event['Package'] + '/' + event['Test']].append(event['Elapsed'])
+            elif event.get('Action') in ('pass', 'fail'):
+                # Go packages run concurrently; package elapsed times overlap.
+                harnesses['go-package/' + event['Package']].append(event['Elapsed'])
     tap = folder / 'pi-bridge.tap'
     if tap.exists():
         name = None
         for line in tap.read_text().splitlines():
+            total = re.match(r'# duration_ms ([\d.]+)', line)
+            if total:
+                harnesses['pi-bridge'].append(float(total[1]) / 1000)
             if line.startswith('# Subtest: '):
                 name = line.removeprefix('# Subtest: ')
             duration = re.match(r'\s+duration_ms: ([\d.]+)', line)

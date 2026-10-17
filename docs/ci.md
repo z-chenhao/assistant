@@ -110,5 +110,6 @@ different properties even where packages overlap.
 
 The issue's historical Ubuntu runs were 40m11s and 47m26s; CLI verification was
 33m35s and 37m42s. Those are context, not a same-fixture performance comparison.
-The ERII-134 report records the controlled local serial/parallel measurements
-and exact-head Ubuntu result separately.
+The [ERII-134 report](https://github.com/z-chenhao/erii/pull/19) records the
+controlled local serial/parallel measurements, repeated-gate ranges, timing
+attachments and exact-head Ubuntu result separately.
