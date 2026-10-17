@@ -23,6 +23,10 @@ accounts, installed broker executable, containers, or fixed ports.
 | `make verify` | Real CLI metadata/probe/select/restart and cancelled setup, Bridge and metadata/security contracts five times, relay outage recovery, JetStream wire contract, seven SIGKILL boundaries, independent state readback |
 
 GitHub Actions runs all four checks on Ubuntu for PRs and pushes to `main`.
+Unit/lint, race and five verification shards run in parallel behind the stable
+required `Ubuntu checks` aggregate. Every existing five-run gate remains required
+on every commit. See [CI operations and profiling](ci.md) for shard ownership,
+failure/cancellation behavior, timing evidence and artifact retention.
 The integration tests own an embedded file-backed JetStream server bound to
 loopback on an assigned port. They shut it down, wait for termination, and remove
 its temporary storage. Crash tests kill only their exact Go-test child PID.
