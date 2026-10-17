@@ -36,6 +36,10 @@ class VerificationTests(unittest.TestCase):
                     self.assertNotIn(path, paths)
                     paths.add(path)
         self.assertEqual(counts, expected)
+        scripts = suite.ROOT / "scripts"
+        discovered = {p.name for p in scripts.glob("verify*.py")} - {"verify_suite.py"}
+        discovered.update(p.name for p in scripts.glob("run*cases.py"))
+        self.assertEqual(set(counts), discovered, "every standalone harness must be registered")
         self.assertEqual([(g.name, g.attempts) for g in gates if not g.script],
                          [("events", 1), ("pi-bridge", 5), ("models", 1)])
         model = next(g for g in gates if g.name == "models")
