@@ -115,9 +115,15 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             require(p['status'] == 'succeeded' and len(nested) == 3 and all(c['status'] == 'succeeded' for c in nested), 'parallel Child calls lost at suspension')
             require(json.loads(json.loads(p['result_json'])['text']) == [{'type':'return','value':['fulfilled']*3}], 'parallel Child aggregation changed declaration order')
             with sqlite3.connect(db_path) as db:
-                first = db.execute("SELECT message_json FROM code_event WHERE execution_id=? AND json_extract(message_json,'$.kind')='execution_suspended' ORDER BY rowid LIMIT 1", (p['invocation_id'],)).fetchone()
-            require(first is not None and len(json.loads(first[0])['outcome']['pendingCallIds']) == 3, 'batch was serialized by premature VM suspension')
-            report['checks'].append({'name':'parallel-child-batch-survives-suspension','nested':[c['invocation_id'] for c in nested], 'first_suspended':json.loads(first[0])['outcome']})
+                first = db.execute("SELECT attempt_id,sequence,message_json FROM code_event WHERE execution_id=? AND json_extract(message_json,'$.kind') IN ('execution_suspended','execution_completed') ORDER BY rowid LIMIT 1", (p['invocation_id'],)).fetchone()
+                require(first is not None, 'batch emitted no authoritative outcome')
+                finished = {json.loads(r[0])['callId'] for r in db.execute("SELECT message_json FROM code_event WHERE execution_id=? AND attempt_id=? AND sequence<=? AND json_extract(message_json,'$.kind')='call_finished'", (p['invocation_id'],first[0],first[1]))}
+            initial = json.loads(first[2])['outcome']
+            # A fast Child can already be terminal. Both finished and pending
+            # Host calls prove admission; pending-only counts assume timing.
+            accepted = finished | set(initial['pendingCallIds'])
+            require(len(accepted) == 3, 'batch was serialized by premature VM suspension')
+            report['checks'].append({'name':'parallel-child-batch-survives-suspension','nested':[c['invocation_id'] for c in nested], 'first_outcome':initial, 'initial_accepted_calls':sorted(accepted)})
 
             p, nested = execute('unawaited-effect', 'store("executions", (load("executions") || 0) + 1); tools.mcp__fixture__send({target:"unawaited",text:"registered"}); return "selected-output";')
             require(p['status'] == 'waiting' and len(nested) == 1, 'unawaited accepted effect was orphaned')
