@@ -111,9 +111,9 @@ def run_command(args, env, output, stopped):
                             return child.wait()
 
 
-def run_shard(name, binary, evidence, stopped):
-    rows = []
-    for gate in SHARDS[name]:
+def run_shard(name, binary, evidence, stopped, gates=None, previous=()):
+    rows = list(previous)
+    for gate in SHARDS[name] if gates is None else gates:
         for attempt in range(1, gate.attempts + 1):
             args, env, output = command(gate, attempt, binary, evidence)
             started = time.monotonic()
@@ -167,8 +167,20 @@ def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopped.set())
     started = time.monotonic()
+    plans = {name: SHARDS[name] for name in names}
+    # Repeated Go conformance contains real 100 ms recovery deadlines. Keep it
+    # isolated from unrelated local harness I/O, as it is on its CI runner.
+    deferred = None
+    if not args.shard and "providers" in plans:
+        deferred = next((g for g in plans["providers"] if g.name == "models"), None)
+        plans["providers"] = tuple(g for g in plans["providers"] if g != deferred)
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        results = list(pool.map(lambda name: run_shard(name, binary, evidence, stopped), names))
+        results = list(pool.map(lambda name: run_shard(name, binary, evidence, stopped, plans[name]), names))
+    if deferred is not None and not stopped.is_set():
+        index = names.index("providers")
+        prefix = results[index]
+        if len(prefix) == sum(g.attempts for g in plans["providers"]) and all(r["returncode"] == 0 for r in prefix):
+            results[index] = run_shard("providers", binary, evidence, stopped, (deferred,), prefix)
     passed = not stopped.is_set() and all(
         len(rows) == sum(g.attempts for g in SHARDS[name]) and all(r["returncode"] == 0 for r in rows)
         for name, rows in zip(names, results))

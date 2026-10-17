@@ -127,6 +127,33 @@ class VerificationTests(unittest.TestCase):
             self.assertGreater(profile['elapsed_seconds'], 0)
             self.assertEqual([c['name'] for c in profile['cases']], ['owned-case'])
 
+    def test_full_suite_isolates_models_after_other_harnesses(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            trace = root / 'order'
+            gates = {'runtime': (suite.Gate('slow', '', 'slow'),),
+                     'providers': (suite.Gate('fast', '', 'fast'), suite.Gate('models', '', 'models'))}
+            def command(gate, *_):
+                source = ('import time\nfrom pathlib import Path\n'
+                          f'p=Path({str(trace)!r})\n')
+                if gate.name == 'models':
+                    source += 'assert set(p.read_text().splitlines()) == {"slow", "fast"}\n'
+                else:
+                    source += f'time.sleep({.3 if gate.name == "slow" else .01})\n'
+                    source += f'with p.open("a") as f: f.write({(gate.name + chr(10))!r})\n'
+                return [sys.executable, '-c', source], os.environ.copy(), root / 'logs' / (gate.name + '.log')
+            handlers = {sig: signal.getsignal(sig) for sig in [signal.SIGINT, signal.SIGTERM]}
+            try:
+                with patch.dict(suite.SHARDS, gates, clear=True), patch.object(suite, 'command', command), \
+                     patch.object(sys, 'argv', ['verify_suite.py', '--binary', sys.executable, '--evidence', str(root)]):
+                    self.assertEqual(suite.main(), 0)
+            finally:
+                for sig, handler in handlers.items():
+                    signal.signal(sig, handler)
+            result = json.loads((root / 'suite-all.json').read_text())
+            self.assertTrue(result['passed'])
+            self.assertEqual([r['gate'] for r in result['shards']['providers']], ['fast', 'models'])
+
 
 if __name__ == '__main__':
     unittest.main()
