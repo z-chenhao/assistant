@@ -152,7 +152,7 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 		return agent.ErrStorage
 	}
 	if err := s.recordProviderHealth(ctx, tx, runID, code); err != nil {
-		return err
+		return agent.ErrStorage
 	}
 	return nil
 }

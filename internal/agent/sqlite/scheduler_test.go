@@ -402,6 +402,47 @@ func TestSchedulerReadyToolProgressesBesidePendingApproval(t *testing.T) {
 	}
 }
 
+func TestSchedulerHealthWriteFailureIsRecoverableAndAtomic(t *testing.T) {
+	s, r, a, p := childFixture(t)
+	ctx := context.Background()
+	c, run, gen, cs := childAdmission(t, s, r, a, p, `{"task":"one"}`)
+	if _, err := r.ToolStore(c).Accept(ctx, gen.Request.GenerationID, cs, run.Tools); err != nil {
+		t.Fatal(err)
+	}
+	child, err := r.Claim(ctx, schedulerChildren(t, r)[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	work, err := r.Load(ctx, child)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generation, err := r.Generation(ctx, child, work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`CREATE TRIGGER fail_health BEFORE INSERT ON scheduler_provider BEGIN SELECT RAISE(ABORT,'private storage detail'); END`); err != nil {
+		t.Fatal(err)
+	}
+	result := llm.GenerationResult{Text: "result", Usage: &llm.TokenUsage{InputTokens: 10, OutputTokens: 2}}
+	err = s.Models().RecordUsageAnd(ctx, generation.Request, result, time.Millisecond, nil, s.AcceptGeneration)
+	if !errors.Is(err, agent.ErrStorage) {
+		t.Fatal("health persistence failure escaped infrastructure classification", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM model_generation WHERE generation_id=? AND status='pending'`, generation.Request.GenerationID) != 1 || scalar(t, s, `SELECT count(*) FROM provider_usage WHERE generation_id=?`, generation.Request.GenerationID) != 0 {
+		t.Fatal("health fault partially committed generation/usage")
+	}
+	if _, err := s.db.Exec(`DROP TRIGGER fail_health`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Models().RecordUsageAnd(ctx, generation.Request, result, time.Millisecond, nil, s.AcceptGeneration); err != nil {
+		t.Fatal("acceptance did not recover", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM provider_usage WHERE generation_id=?`, generation.Request.GenerationID) != 1 {
+		t.Fatal("recovery duplicated usage")
+	}
+}
+
 func TestSchedulerMigrationV13PreservesFrozenTreeAndRollsBack(t *testing.T) {
 	s, r, a, p := childFixture(t)
 	p.respond = childPolicy
