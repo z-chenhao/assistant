@@ -319,7 +319,7 @@ func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
 		}
 		return calls(task.ManageName, args...), nil
 	}
-	mustSubmit(t, a, "batch", "start eight independent reports")
+	firstReceipt := mustSubmit(t, a, "batch", "start eight independent reports")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	done := make(chan error, 1)
@@ -336,7 +336,19 @@ func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
 		t.Fatal("host worker concurrency exceeded")
 	case <-time.After(25 * time.Millisecond):
 	}
-	mustSubmit(t, a, "urgent", "urgent synchronous question")
+	// Root entry can precede the initial Main's terminal commit. Wait for that
+	// commit before testing a distinct urgent Main; otherwise Submit correctly
+	// steers the existing Run and there can only be one completed Main.
+	for scalar(t, s, `SELECT count(*) FROM run WHERE kind='main' AND status='completed'`) == 0 && ctx.Err() == nil {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='main' AND status='completed'`) != 1 {
+		t.Fatal("initial Main acknowledgement did not complete")
+	}
+	urgentReceipt := mustSubmit(t, a, "urgent", "urgent synchronous question")
+	if urgentReceipt.RunID == firstReceipt.RunID {
+		t.Fatal("urgent request did not create a distinct Main after completion")
+	}
 	deadline := time.Now().Add(3 * time.Second)
 	for scalar(t, s, `SELECT count(*) FROM run WHERE kind='main' AND status='completed'`) < 2 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
