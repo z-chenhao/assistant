@@ -343,7 +343,7 @@ INSERT INTO delivery_request VALUES('d1','m1','local_cli','prior','pending','d1'
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if scalar(t, s, `PRAGMA user_version`) != 13 || scalar(t, s, `SELECT count(*) FROM delivery_outbox`) != 1 || scalar(t, s, `SELECT config_version FROM agent_config`) != 7 {
+	if scalar(t, s, `PRAGMA user_version`) != 14 || scalar(t, s, `SELECT count(*) FROM delivery_outbox`) != 1 || scalar(t, s, `SELECT config_version FROM agent_config`) != 7 {
 		t.Fatal("migration state")
 	}
 	rows := deliveryRows(t, s)

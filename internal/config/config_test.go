@@ -62,6 +62,15 @@ func TestMCPRejectsDataRootThroughAliasBeforeItExists(t *testing.T) {
 
 func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	for name, body := range map[string]string{
+		"scheduler-zero":               "version: 1\nscheduler: {child_concurrency: 0}",
+		"scheduler-hard-limit":         "version: 1\nscheduler: {child_concurrency: 33}",
+		"scheduler-global-hard-limit":  "version: 1\nscheduler: {global_concurrency: 33}",
+		"scheduler-user-zero":          "version: 1\nscheduler: {user_concurrency: 0}",
+		"scheduler-provider-zero":      "version: 1\nscheduler: {provider_concurrency: 0}",
+		"scheduler-agent-zero":         "version: 1\nscheduler: {agent_concurrency: 0}",
+		"scheduler-turns-hard-limit":   "version: 1\nscheduler: {max_worker_turns: 513}",
+		"scheduler-circuit-zero":       "version: 1\nscheduler: {infrastructure_failures: 0}",
+		"scheduler-cooldown-zero":      "version: 1\nscheduler: {cooldown_seconds: 0}",
 		"child-depth-zero":             "version: 1\nchildren: {max_depth: 0}",
 		"child-depth-hard-limit":       "version: 1\nchildren: {max_depth: 17}",
 		"child-descendants-zero":       "version: 1\nchildren: {max_descendants: 0}",

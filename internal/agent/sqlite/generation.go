@@ -39,6 +39,15 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
+		if run.Kind == "worker" {
+			var limit int64
+			if err := tx.QueryRowContext(ctx, `SELECT t.max_turns FROM run_tree t JOIN run r ON r.root_run_id=t.root_run_id WHERE r.run_id=?`, run.ID).Scan(&limit); err != nil {
+				return err
+			}
+			if run.Checkpoint.Step >= limit {
+				return agent.ErrResourceLimit
+			}
+		}
 		var raw, hash, status string
 		var result sql.NullString
 		err := tx.QueryRowContext(ctx, `SELECT generation_id,request_json,request_hash,status,result_json,error_code FROM model_generation WHERE run_id=? AND step_index=?`, run.ID, run.Checkpoint.Step).Scan(&request.GenerationID, &raw, &hash, &status, &result, &gen.ErrorCode)
@@ -141,6 +150,9 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	}
 	if err := runEvent(ctx, tx, runID, "model_generation."+state, 1); err != nil {
 		return agent.ErrStorage
+	}
+	if err := s.recordProviderHealth(ctx, tx, runID, code); err != nil {
+		return err
 	}
 	return nil
 }

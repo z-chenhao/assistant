@@ -264,7 +264,7 @@ func TestTaskMigrationFromEveryPriorVersion(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer store.Close()
-			if scalar(t, store, `PRAGMA user_version`) != 13 {
+			if scalar(t, store, `PRAGMA user_version`) != 14 {
 				t.Fatal("migration version")
 			}
 		})
@@ -293,7 +293,10 @@ func TestTaskCustomMessageConversionFailsClosed(t *testing.T) {
 }
 
 func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
-	s, _, a, p := taskFixture(t)
+	s, r, a, p := taskFixture(t)
+	limits := agent.DefaultSchedulerLimits()
+	limits.Global = 4
+	r.ConfigureScheduler(limits)
 	entered := make(chan struct{}, 8)
 	release := make(chan struct{})
 	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {

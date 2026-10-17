@@ -92,12 +92,82 @@ Agent Tool do not gain it on upgrade. Existing Root counters initialize from
 stored Runs/invocations. Downgrades fail closed; back up the data root before
 upgrading. No credentials or external account are needed for deterministic CI.
 
-ERII-17 retains the existing four Worker leases plus reserved Main execution
-slot. Configurable Child concurrency/fairness and the larger M4 batch scenario
-belong to the next scheduling slice. M5 adds CodeCall and JavaScript `agent.run()`
+ERII-18 adds fair queues and the larger Direct Tool batch scenario described
+below. M5 adds CodeCall and JavaScript `agent.run()`
 using this same admission and ToolInvocation path. This slice does not claim
 M4 completion, JavaScript execution, general Durable Replay or full GC-16/17/18/20
 product-case scores.
+
+## Fair scheduling and batch evidence (ERII-18)
+
+`scheduler.child_concurrency` defaults to 16 active Child leases per Root tree.
+Global, local-user, Agent and frozen provider account/endpoint limits default to
+32. Every concurrency setting accepts 1–32. Main has a separate reserved slot.
+The single-user data root makes the user limit an aggregate Worker limit.
+All processes sharing a data root must use the same deployment configuration.
+Tool provider/run/tool limits and workspace conflict keys still apply at the
+shared ToolInvocation boundary. A busy workspace serializes only its conflicting
+Tools. Logical Computer allocation/binding remains an M6 integration.
+
+Run rows form the queue. Each successful Worker claim atomically checks live
+leases and advances its Root's durable service ticket. New trees enter at the
+current queue tail. The least recently served eligible tree goes first; runnable
+descendants go first within that tree. No capacity query reaches the model.
+Saturation leaves accepted Children queued. Expired leases lose capacity and
+ownership together. Waiting ancestors hold no lease and resume after the current
+Child batch settles. Approved effects retain their individual frozen approvals.
+
+`scheduler.max_worker_turns` defaults to 256, with a deployment ceiling of 512.
+It is frozen in `run_tree` at Root creation, including for descendants. Exceeding
+it fails that Worker with `RESOURCE_LIMIT`; the Parent can aggregate other items.
+Depth, descendant and tree Tool-call ceilings retain their existing defaults.
+There is no cumulative business-failure cutoff or tree token/cost/time cutoff.
+Model calls retain a 45-second timeout and Tools retain their frozen timeout.
+These are per-operation watchdogs, not a total Task duration limit.
+
+Provider usage acceptance also updates a durable infrastructure-error streak.
+Five consecutive unavailable/rate-limited responses open a 30-second scheduling
+cooldown by default (`infrastructure_failures` and `cooldown_seconds`). Successful
+responses and known business errors reset the streak. A cooldown pauses new
+leases without retrying model/business failures or failing queued items. Other
+providers and Main remain schedulable. The existing Tool pipeline retries only
+its known transient infrastructure outcomes; `unknown` effects stay uncertain.
+
+Migration 014 upgrades schema 013 forward, preserving frozen Runs, capabilities
+and tree counters. Existing trees receive a 256-turn ceiling. New Roots freeze
+the configured value. `scheduler_tree` stores service order; `scheduler_provider`
+stores infrastructure health. Read-only `run_tree_usage`, `task_usage` and
+`account_usage` views aggregate immutable provider observations across the tree,
+Roots and actual account/endpoint. Omitted token usage remains explicit through
+`missing_token_usage`; it is never represented as zero monetary cost.
+
+The TUI `/status` reads aggregate queued/running/succeeded/failed/waiting counts
+for the current Task epoch. Cancelled Children count as failed in this display.
+Reads create no notifications, Task updates or Main model turns. Root prompt
+guidance asks it to collect available results and deduplicate genuine blockers;
+the Fake fixture tests transport and aggregation, not real-model judgment.
+
+```sh
+python3 scripts/verify_scheduling.py --binary bin/personal-agent --evidence evidence/scheduling.json
+```
+
+This maintained harness owns Launch, Doctor, Drive, Evidence and Cleanup. Its
+100-item scenario uses four ordinary 25-call provider exchanges under the
+existing 32-call Bridge limit. It proves one Task/Root/100 Child, 98 successful
+items plus two failures, one deduplicated blocker and one aggregate follow-up.
+It measures lease events, saturates 16 grandchildren, observes a second Task
+complete, cancels the first tree, and checks repeated-drain stability. A SIGKILL
+after 25 atomic admissions proves restart preserves Child identities and saved
+model results. `make verify` runs five consecutive passes. Go tests additionally
+cover atomic cross-process limits, fair service after reopening, expired-owner
+fencing, frozen turns, circuit recovery, prior-schema upgrade and rollback.
+
+Account-spend authorization remains unresolved: baseline §6.6.6 requires a
+single recoverable Root approval, while current provider metadata has no prices,
+currency or configured spend boundary. Token accounting is implemented; it is
+not spend authorization. ERII-18 must remain draft until that policy is decided
+and implemented. No M4 milestone completion or JavaScript/Durable Replay claim
+is made by this partial slice.
 
 ## Verification and operations
 

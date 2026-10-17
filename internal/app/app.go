@@ -162,6 +162,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	}
 	a.runs = store.Runs(a.history, a.registry)
 	a.runs.ConfigureChildLimits(cfg.Children)
+	a.runs.ConfigureScheduler(cfg.Scheduler)
 	a.runs.ConfigureApprovalTTL(time.Duration(cfg.Tools.ApprovalTTLSeconds) * time.Second)
 	a.runs.ConfigureToolLimits(sqlite.ToolLimits{Global: cfg.Tools.Global, Agent: cfg.Tools.Agent, Run: cfg.Tools.Run, Provider: cfg.Tools.Provider, Tool: cfg.Tools.Tool})
 	a.runs.ConfigureRecentTasks(time.Duration(cfg.Tasks.RecentDays)*24*time.Hour, cfg.Tasks.RecentLimit)

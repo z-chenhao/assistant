@@ -38,6 +38,9 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		}
 		return tasksReply(req)
 	}
+	if (root && strings.Contains(input, "Batch")) || strings.HasPrefix(input, "Batch item ") {
+		return batchReply(req, input, root)
+	}
 	if last.Role == "tool" {
 		if !root && input == "Unknown child" {
 			return llm.GenerationResult{}, llm.ModelNotFound
@@ -90,6 +93,8 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 	switch input {
 	case "Large child":
 		return llm.GenerationResult{Text: strings.Repeat("bounded detail ", 1800)}, nil
+	case "Hold branch":
+		return call(agent.RunToolName, agent.AgentRunRequest{Task: "Hold child"}), nil
 	case "Branch explicit input":
 		return call(agent.RunToolName, agent.AgentRunRequest{Task: "Leaf explicit input"}), nil
 	case "Leaf explicit input":

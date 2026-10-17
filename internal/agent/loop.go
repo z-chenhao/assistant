@@ -53,6 +53,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 		if err := o.Store.Fail(work, claim, r.Version, code); err != nil {
 			return err
 		}
+		if code == "RESOURCE_LIMIT" {
+			return &runFailure{cause: ErrResourceLimit}
+		}
 		return &runFailure{cause: llm.NormalizeError(code)}
 	}
 	for {
@@ -86,6 +89,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 			}
 			generation, err := o.Store.Generation(work, claim, r)
 			if err != nil {
+				if errors.Is(err, ErrResourceLimit) {
+					return fail(r, "RESOURCE_LIMIT")
+				}
 				var providerError llm.ProviderError
 				if errors.As(err, &providerError) {
 					return fail(r, providerError.Error())

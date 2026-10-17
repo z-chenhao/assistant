@@ -242,6 +242,25 @@ The M2 Case Runner permits this local Host capability only on an authorized Work
 Main delegation, forged names/permissions and external effects retain hard failures.
 Its actual no-Child, Task-count and action assertions stay strict.
 
-This is Direct Tool protocol evidence. Fair Child scheduling/100-item capacity,
-JavaScript CodeCall replay and complete GC-16/17/18/20 are later slice gates;
-they are not counted as passing here.
+This is Direct Tool protocol evidence. Fair scheduling and batch capacity are
+covered below. JavaScript CodeCall replay and complete GC-16/17/18/20 remain
+later slice gates; they are not counted as passing here.
+
+## Fair Child scheduling and batch aggregation (ERII-18, draft)
+
+`scripts/verify_scheduling.py --binary bin/personal-agent --evidence evidence/scheduling.json`
+owns Launch (isolated Fake/data root), Doctor (profile probe/activation), Drive
+(PTY, CLI and two simultaneous Tasks), Evidence (state, event lease timeline,
+usage, outputs and transcript), and Cleanup (all processes reaped, state removed).
+`make verify` runs five consecutive passes. Account-spend authorization is still
+pending a policy decision; this entry does not establish M4 completion.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| 100-item Direct Tool batch | TUI -> Main creates Task -> Root emits four batches | `Runs.StartChildRun`, `RunAgentLoop`, `batchReply` Fake | Exactly 1 Task/Root/100 Child; 98 successes + 2 failures; unique row calls, exact aggregate, one blocker/follow-up, five Root model calls; GC-16/17/20 transport fragments |
+| Transparent fair capacity | `chat work` with concurrent independent Tasks | `Runs.nextScheduled`, `claimCapacity`, `scheduler_tree` | 16 live grandchildren with queued siblings while second Task completes; atomic global/user/Agent/provider/tree bounds across database connections; reopened scheduler preserves rotation; GC-18 fragment |
+| Recursive stop and fencing | Main cancel while saturated; then repeat `chat work` | `stopTask`, `recoverStopsTx`, Task/Run claims | Queued/running/waiting descendants and invocations settle; no cancelled-tree follow-up; old Task epoch cannot revive; prior Child harness retains late-result and approval rejection evidence |
+| Work-first aggregation and progress | TUI `/status`; Root result -> Main | `runnable`, `Activity`, `finishTask`, Worker prompt | Parent resumes after current Child batch; aggregate five-state counts; reads cause no Outbox/Main turn; successes survive item failures; Fake deduplicates repeated blocker, semantic scores remain null |
+| Tree safety and provider health | `scheduler` + `children` YAML settings | `createTree`, `Generation`, `AcceptGeneration` | Frozen default 256/hard 512 Worker turns, existing depth/descendant/call ceilings, canonical RESOURCE_LIMIT; only infrastructure streak opens recoverable provider cooldown; per-operation watchdogs remain active |
+| Accounting and migration | State readback; upgrade from schema 013 | Migration 014, immutable `provider_usage` + aggregate views | Empty/every-prior upgrade, populated frozen tree preservation, failed DDL rollback, explicit missing-token counts; spend approval remains unimplemented |
+| Restart | SIGKILL after batch admission, then `chat work` | Existing model/ToolInvocation recovery and Run claims | First 25 Child identities survive; total stays 100; completed model responses reused; exact final aggregate; no JavaScript/CodeCall replay claim |
