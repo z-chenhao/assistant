@@ -41,9 +41,10 @@ class MainHarness:
         require(not ok or result.returncode == 0, f"{args}: {result.stderr}")
         return json.loads(result.stdout) if ok else result
 
-    def setup(self, model="fixture-model"):
+    def setup(self, model="fixture-model", metadata=None):
         status = self.command("status")
-        profile = self.command("model", "add", "http://127.0.0.1:1/v1", model)
+        profile = (self.command("model", "add", text=json.dumps(metadata)) if metadata is not None else
+                   self.command("model", "add", "http://127.0.0.1:1/v1", model))
         self.command("model", "test", profile["profile_id"])
         status = self.command("model", "select", profile["profile_id"], str(profile["version"]),
                               str(status["config_version"]))

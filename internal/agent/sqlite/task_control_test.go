@@ -20,6 +20,16 @@ import (
 func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.GenerationResult, error)) (*Store, *Runs, agent.Actor) {
 	t.Helper()
 	s, r, a, p := taskFixture(t)
+	defs := []tool.Definition{agent.AgentToolDefinition()}
+	for _, spec := range a.Registry.Describe() {
+		d, _ := a.Registry.Resolve(spec.Name)
+		defs = append(defs, d)
+	}
+	registry, err := tool.NewRegistry(defs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.registry, a.Registry = registry, registry
 	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if isRoot(req) {
 			if root != nil {
@@ -255,6 +265,11 @@ func TestTaskControlAppendWaitsOutsideTransactionForPauseBoundary(t *testing.T) 
 
 func addControlChild(t *testing.T, s *Store, parent, id string) {
 	t.Helper()
+	// This storage-only control fixture predates delegation. Give its synthetic
+	// Parent a legal active state; delegation itself has end-to-end tests.
+	if _, err := s.db.Exec(`UPDATE run SET status='running',version=version+1 WHERE run_id=? AND status='queued'`, parent); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.db.Exec(`INSERT INTO run(run_id,agent_id,conversation_id,task_id,parent_run_id,root_run_id,kind,worker_position,status,task_epoch,depth,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) SELECT ?,agent_id,conversation_id,task_id,run_id,root_run_id,'worker','child','queued',task_epoch,depth+1,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at+1,updated_at+1,1 FROM run WHERE run_id=?`, id, parent); err != nil {
 		t.Fatal(err)
 	}

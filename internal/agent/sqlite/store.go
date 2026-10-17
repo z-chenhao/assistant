@@ -58,7 +58,10 @@ var artifactsSQL string
 //go:embed migrations/012_delivery.sql
 var deliverySQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL}
+//go:embed migrations/013_children.sql
+var childrenSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL}
 
 type Store struct {
 	db        *sql.DB

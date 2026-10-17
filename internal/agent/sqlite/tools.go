@@ -93,6 +93,33 @@ func (t *tools) Accept(ctx context.Context, exchange string, calls []llm.ToolCal
 				if err = runEvent(ctx, tx, t.claim.RunID(), "tool_invocation.accepted", 1); err != nil {
 					return err
 				}
+				allowed, err := t.runs.admitTreeCall(ctx, tx, t.claim.RunID())
+				if err != nil {
+					return err
+				}
+				rejection := tool.Result{}
+				if !allowed {
+					rejection = tool.Failure("RESOURCE_LIMIT")
+				} else if call.Name == agent.RunToolName {
+					rejection, err = t.runs.StartChildRun(ctx, tx, t.claim, inv)
+					if err != nil {
+						return err
+					}
+				}
+				if rejection.Error != nil {
+					value, _ := encoded(rejection)
+					if _, err = tx.ExecContext(ctx, `UPDATE tool_invocation SET status='running',updated_at=?,version=version+1 WHERE invocation_id=?`, now, inv.ID); err != nil {
+						return err
+					}
+					if _, err = tx.ExecContext(ctx, `UPDATE tool_invocation SET status='failed',result_json=?,result_ref=?,error_json=?,result_ready_at=?,updated_at=?,version=version+1 WHERE invocation_id=?`, value, digest(value), rejection.ModelText(), now, now, inv.ID); err != nil {
+						return err
+					}
+					if err = runEvent(ctx, tx, t.claim.RunID(), "tool_invocation.failed", 1); err != nil {
+						return err
+					}
+					inv.Status, inv.Result = "failed", rejection
+				}
+
 			} else {
 				return err
 			}
@@ -103,6 +130,12 @@ func (t *tools) Accept(ctx context.Context, exchange string, calls []llm.ToolCal
 	})
 	if err == nil {
 		t.runs.host.boundary("after_tool_accept_commit")
+		for _, inv := range out {
+			if inv.Call.Name == agent.RunToolName && inv.Status != "failed" {
+				t.runs.host.boundary("after_child_accept_commit")
+				break
+			}
+		}
 	}
 	return out, err
 }
@@ -314,6 +347,16 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 				return nil
 			}
 			inv.Status = "queued" // Persisted retry intent proves no effect took place.
+			return nil
+		}
+		if inv.Status == "waiting" && inv.WaitReason == "child_run" {
+			var terminal bool
+			if err = tx.QueryRowContext(ctx, `SELECT c.status IN ('completed','failed','cancelled') FROM agent_invocation a JOIN run c ON c.run_id=a.child_run_id WHERE a.invocation_id=?`, id).Scan(&terminal); err != nil {
+				return err
+			}
+			if terminal {
+				inv.Status = "queued"
+			}
 			return nil
 		}
 		if inv.Status == "waiting" && inv.WaitReason == "resource" {

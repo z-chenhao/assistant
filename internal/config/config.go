@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/delivery"
@@ -21,6 +22,7 @@ import (
 )
 
 type Config struct {
+	Children  agent.ChildLimits `yaml:"children"`
 	MCP       []mcp.Config      `yaml:"mcp"`
 	Skills    *skill.Config     `yaml:"skills"`
 	Workspace *workspace.Config `yaml:"workspace"`
@@ -68,6 +70,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg := Config{
 		Version:  1,
+		Children: agent.DefaultChildLimits(),
 		Delivery: delivery.DefaultPolicy(),
 		Artifact: artifact.DefaultPolicy(),
 		Tools:    ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
@@ -107,6 +110,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	}
+	if !cfg.Children.Valid() {
+		return Config{}, errors.New("invalid Child Run safety limits")
 	}
 	if cfg.Delivery.Validate() != nil {
 		return Config{}, errors.New("invalid delivery lease/retry/attempt policy")

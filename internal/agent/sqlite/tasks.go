@@ -27,9 +27,15 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 		return "", err
 	}
 	id, capID := newID(), newID()
-	specs, _ := encoded(r.registry.Describe())
+	mainSpecs := []tool.Spec{}
+	for _, spec := range r.registry.Describe() {
+		if spec.Name != agent.RunToolName {
+			mainSpecs = append(mainSpecs, spec)
+		}
+	}
+	specs, _ := encoded(mainSpecs)
 	now := time.Now().UnixMicro()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), skill.SetHash(r.registry.Describe()), agentID, specs, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), skill.SetHash(mainSpecs), agentID, specs, now); err != nil {
 		return "", err
 	}
 	cp, _ := encoded(agent.Checkpoint{Phase: "model", Messages: append(agent.MainContext(nil), updates...)})
@@ -57,16 +63,15 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if err != nil {
 		return err
 	}
-	specs := []tool.Spec{}
-	for _, spec := range r.registry.Describe() {
-		if spec.Name != task.SearchName && spec.Name != task.ManageName {
-			specs = append(specs, spec)
-		}
+	specs := agent.WorkerTools(r.registry.Describe())
+	spawn := false
+	for _, spec := range specs {
+		spawn = spawn || spec.Name == agent.RunToolName
 	}
 	raw, _ := encoded(specs)
 	id, capID := newID(), newID()
 	now := time.Now().UnixMicro()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,0,?,?,2)`, capID, config, digest(raw), skill.SetHash(specs), agentID, raw, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,?,?,?,2)`, capID, config, digest(raw), skill.SetHash(specs), agentID, spawn, raw, now); err != nil {
 		return err
 	}
 	// Prior instructions remain part of the durable Task context on continuation;
@@ -151,10 +156,20 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
 		return err
 	}
+	if err = r.createTree(ctx, tx, id); err != nil {
+		return err
+	}
 	return runEvent(ctx, tx, id, "run_ready", 1)
 }
 
 func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
+	var name string
+	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, inv.ID, t.claim.RunID()).Scan(&name); err != nil {
+		return tool.Result{}, agent.ErrStorage
+	}
+	if name == agent.RunToolName {
+		return t.AgentToolExecutor(ctx, inv.ID)
+	}
 	for {
 		result, err := t.executeBuiltin(ctx, inv)
 		if !errors.Is(err, agent.ErrBusy) {
@@ -399,7 +414,7 @@ func (r *Runs) taskSteering(ctx context.Context, c agent.RunClaim, after int64) 
 		if frozen > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.instruction,i.artifact_refs FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND i.sequence>? ORDER BY i.sequence`, c.RunID(), after)
+		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.instruction,i.artifact_refs FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND r.worker_position='root' AND i.sequence>? ORDER BY i.sequence`, c.RunID(), after)
 		if err != nil {
 			return err
 		}
@@ -425,7 +440,7 @@ func (r *Runs) prepareWorkerReply(ctx context.Context, c agent.RunClaim, run age
 			return err
 		}
 		var pending int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND i.sequence>?`, run.ID, run.Checkpoint.InputSequence).Scan(&pending); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND r.worker_position='root' AND i.sequence>?`, run.ID, run.Checkpoint.InputSequence).Scan(&pending); err != nil {
 			return err
 		}
 		if pending > 0 {

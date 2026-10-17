@@ -26,6 +26,13 @@ nats:
   ack_wait: 30s
   retry_interval: 1s
 
+# Frozen per new Root tree; existing Runs retain their limits after restart.
+# Safety ceilings reject with RESOURCE_LIMIT; concurrency still queues normally.
+children:
+  max_depth: 8          # deployment hard ceiling 16
+  max_descendants: 4096 # deployment hard ceiling 10000
+  max_tool_calls: 10000 # deployment hard ceiling 50000
+
 tasks:
   recent_days: 30
   recent_limit: 200

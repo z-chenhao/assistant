@@ -5,7 +5,7 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Child Runs and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
+local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Direct [Child Run delegation](children.md) is runnable; fair Child scheduling and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
 
 ## Commands and evidence
 
@@ -307,3 +307,7 @@ Unified Tool policy, local approval commands, effect recovery and the five-run s
 The Ubuntu job has a bounded 25-minute timeout for the five-run Tool recovery gate and the existing Bridge/account/restart checks. The Tool gate adds 40 real SIGKILL/restarts; it retains every assertion and repetition.
 
 Artifact storage, CLI commands, scopes and recovery evidence: [artifacts.md](artifacts.md).
+
+Direct Child delegation: `scripts/verify_children.py` runs from `make verify`
+five times. It reuses the CLI/PTY harness and records tree/admission/approval/
+cancel/SIGKILL evidence. Scope and operations: [children.md](children.md).

@@ -22,10 +22,9 @@ Artifact references return `NOT_FOUND`. Responses expose no Run/invocation IDs,
 credentials, SQL, budgets or internal traces. Infrastructure write failures stop
 at a recoverable boundary instead of becoming a misleading Tool success.
 
-No nonempty ArtifactRef is admitted before M3 supplies an authoritative
-ArtifactStore. No Child/JS Tool,
-external effect, Approval or external channel delivery is enabled here. This is
-not a claim of full Security or Durable Replay semantics.
+The later M3 slices supply authoritative Artifact validation, external effects,
+approvals and delivery. ERII-17 adds [Direct Child delegation](children.md) to
+new Worker capabilities. JavaScript and general Durable Replay remain later work.
 
 ## Controlled stop and continuation
 
@@ -58,10 +57,10 @@ Only the same terminal Root's result is reported after its last descendant ends.
 Host-owned `completion_policy` defaults to `once`; `ongoing` keeps the Task active
 when one Root ends. The current model-visible create Tool makes one-shot Tasks;
 no new policy argument is exposed. Future Automation uses the Host policy.
-M2 admits only safe pure Tools. Synthetic unsafe-invocation tests prove the
-conservative `unknown` stop fallback and no replay, but do not establish M3
-approval, external reconciliation or exactly-once side effects. Child topology
-tests exercise stored relationships; actual Child admission remains M4 work.
+The original M2 tests retain stored topology and conservative unsafe-stop
+fixtures. The M3 Tool harness verifies approvals and external reconciliation;
+the [Child harness](children.md) exercises actual admission, recursive execution
+and cancellation. No external exactly-once guarantee is made.
 
 ## Ownership and acceptance
 
