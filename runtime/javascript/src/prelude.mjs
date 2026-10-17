@@ -14,7 +14,14 @@ let source = replaceOnce(PI_PRELUDE, '"use strict";', `"use strict";
   delete globalThis.FinalizationRegistry;
 `);
 source = replaceOnce(source, 'allTools.push(Object.freeze({ name: jsName, description }));',
-  'allTools.push(Object.freeze({ name, description }));');
+  'if (!["builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke"].includes(name)) allTools.push(Object.freeze({ name, description }));');
+source = replaceOnce(source, 'const toolsProxy = guard(\n\t\ttools,', `const publicTools = Object.create(null);
+  for (const key of Object.keys(tools)) {
+    if (!["builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke"].includes(key)) publicTools[key] = tools[key];
+  }
+  Object.freeze(publicTools);
+  const toolsProxy = guard(
+    publicTools,`);
 source = replaceOnce(source, '// The first tool wins when two names normalize to the same identifier.',
   '// Go/Node validate the complete alias map before VM admission.');
 const start = source.indexOf('\t// key -> JSON text.');

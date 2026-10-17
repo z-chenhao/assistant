@@ -63,12 +63,21 @@ function valid(req) {
 async function stop(e, kind, code) {
   if (e.finished) return;
   e.finished = true;
+  e.stopKind = kind;
   clearTimeout(e.timer);
   Atomics.store(new Int32Array(e.interrupt), 0, 1);
   await e.worker?.terminate();
   // Host-accepted calls belong to Go and continue independently of the VM.
-  if (kind !== 'cancelled') await e.hosts;
-  const result = {kind, output: e.output, pendingCallIds: [...e.pending], error: code ? {code} : undefined};
+  if (kind === 'completed') {
+    let timer;
+    const accepted = await Promise.race([
+      e.hosts.then(() => true),
+      new Promise(resolve => { timer = setTimeout(() => resolve(false), Math.max(1, e.deadlineAt - Date.now())); }),
+    ]);
+    clearTimeout(timer);
+    if (!accepted) {kind = 'failed';code = 'TIMEOUT';e.stopKind = kind;}
+  }
+  const result = {kind, output: e.output, pendingCallIds: [...e.pending].filter(id => e.posted.has(id)), error: code ? {code} : undefined};
   try {
     await event(e, 'execution_' + kind, {outcome: result});
     send({jsonrpc: '2.0', id: e.id, result});
@@ -88,6 +97,8 @@ async function hostCall(e, message) {
       (discovery && !['searchTools', 'describeTool', 'describeNamespace'].includes(message.name)))
     { queueMicrotask(() => {void stop(e, 'failed', 'PERMISSION_DENIED')}); return; }
   await event(e, 'call_started', {callId, toolName: message.name});
+  if (e.finished && e.stopKind !== 'completed') return;
+  e.posted.add(callId);
   const result = await request(discovery ? 'host.discover' : 'host.invoke', {
     ...envelope(e), callId, toolName: message.name, arguments: args,
   });
@@ -120,7 +131,7 @@ async function start(id, req) {
   if (!initialized || !valid(req) || executions.has(req.executionId)) return error(id, 'INVALID_ARGUMENT');
   if (active >= 4) return error(id, 'RESOURCE_LIMIT');
   const tools = aliases(req.tools);
-  const e = {id, req, output: [], bytes: 0, pending: new Set(), seen: new Set(), sequence: 0, delivered: 0,
+  const e = {id, req, deadlineAt: Date.now() + req.limits.timeoutMs, output: [], bytes: 0, pending: new Set(), posted: new Set(), seen: new Set(), sequence: 0, delivered: 0,
     events: Promise.resolve(), hosts: Promise.resolve(), interrupt: new SharedArrayBuffer(4)};
   executions.set(req.executionId, e);
   await event(e, 'execution_started');

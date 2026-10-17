@@ -32,3 +32,12 @@ CREATE TABLE code_call (
 ) STRICT;
 CREATE TRIGGER code_call_immutable BEFORE UPDATE ON code_call BEGIN SELECT RAISE(ABORT,'immutable code call'); END;
 CREATE TRIGGER code_call_retained BEFORE DELETE ON code_call BEGIN SELECT RAISE(ABORT,'code call retained'); END;
+-- A finished cell may still own accepted unawaited calls. Retain its chosen
+-- output while those ordinary invocations drain, without rerunning JavaScript.
+CREATE TABLE code_outcome (
+ execution_id TEXT PRIMARY KEY REFERENCES code_execution(execution_id),
+ outcome_json TEXT NOT NULL CHECK(json_valid(outcome_json)),
+ created_at INTEGER NOT NULL
+) STRICT;
+CREATE TRIGGER code_outcome_immutable BEFORE UPDATE ON code_outcome BEGIN SELECT RAISE(ABORT,'immutable cell outcome'); END;
+CREATE TRIGGER code_outcome_retained BEFORE DELETE ON code_outcome BEGIN SELECT RAISE(ABORT,'cell outcome retained'); END;

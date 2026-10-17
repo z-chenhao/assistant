@@ -146,7 +146,7 @@ func (s *Sidecar) Start(ctx context.Context, req ExecutionRequest, sink Executio
 				return Outcome{}, ErrProtocol
 			}
 		} else {
-			if event.Sequence <= sequence {
+			if event.Sequence != sequence+1 {
 				return Outcome{}, ErrProtocol
 			}
 			sequence = event.Sequence
@@ -161,7 +161,7 @@ func (s *Sidecar) Start(ctx context.Context, req ExecutionRequest, sink Executio
 			}
 			terminal = event.Outcome
 		}
-		respond := func(msg rpc, event Message) {
+		respond := func(msg rpc, event Message) error {
 			reply, err := sink.Handle(ctx, msg.Method, event)
 			response := map[string]any{"jsonrpc": "2.0", "id": msg.ID, "result": reply}
 			if err != nil {
@@ -169,13 +169,17 @@ func (s *Sidecar) Start(ctx context.Context, req ExecutionRequest, sink Executio
 				response["error"] = map[string]any{"code": -32000, "message": "PROVIDER_UNAVAILABLE"}
 			}
 			_ = p.send(response)
+			return err
 		}
 		switch msg.Method {
 		case "host.invoke":
 			wg.Add(1)
-			go func(m rpc, e Message) { defer wg.Done(); respond(m, e) }(msg, event)
+			go func(m rpc, e Message) { defer wg.Done(); _ = respond(m, e) }(msg, event)
 		case "execution.event", "host.discover", "host.store_get", "host.store_put":
-			respond(msg, event)
+			err := respond(msg, event)
+			if msg.Method == "execution.event" && err != nil {
+				return Outcome{}, ErrProtocol
+			}
 		default:
 			return Outcome{}, ErrProtocol
 		}

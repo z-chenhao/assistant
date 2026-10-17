@@ -90,26 +90,46 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (tool.Resu
 	}
 	req.Tools = inner
 	b.req = req
-	outcome, err := t.runs.javascript.Start(ctx, req, b)
+	var outcome codemode.Outcome
+	var saved string
+	err = t.runs.host.db.QueryRowContext(ctx, `SELECT outcome_json FROM code_outcome WHERE execution_id=?`, inv.ID).Scan(&saved)
+	if err == nil {
+		if json.Unmarshal([]byte(saved), &outcome) != nil {
+			return tool.Result{}, agent.ErrStorage
+		}
+	} else if err == sql.ErrNoRows {
+		outcome, err = t.runs.javascript.Start(ctx, req, b)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return tool.Result{}, ctx.Err()
 		}
 		return tool.Failure("PROVIDER_UNAVAILABLE"), nil
 	}
-	switch outcome.Kind {
-	case "suspended":
-		err = t.runs.write(ctx, func(tx *sql.Tx) error {
+	if (outcome.Kind == "completed" || outcome.Kind == "failed") && len(outcome.PendingCallIDs) > 0 {
+		raw, _ := encoded(outcome)
+		if err = t.runs.write(ctx, func(tx *sql.Tx) error {
 			if err := fence(ctx, tx, t.claim); err != nil {
 				return err
 			}
-			_, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status='waiting',wait_reason='external_event',updated_at=?,version=version+1 WHERE invocation_id=? AND status='running'`, time.Now().UnixMicro(), inv.ID)
+			_, err := tx.ExecContext(ctx, `INSERT INTO code_outcome VALUES(?,?,?) ON CONFLICT DO NOTHING`, inv.ID, raw, time.Now().UnixMicro())
 			return err
-		})
-		if err != nil {
+		}); err != nil {
 			return tool.Result{}, err
 		}
-		return tool.Result{}, tool.ErrSuspended
+		if err = b.drain(ctx, outcome.PendingCallIDs); err != nil {
+			if errors.Is(err, tool.ErrSuspended) {
+				return t.suspendCode(ctx, inv.ID)
+			}
+			if errors.Is(err, tool.ErrReplay) {
+				return tool.Failure("NON_DETERMINISTIC_REPLAY"), nil
+			}
+			return tool.Result{}, err
+		}
+	}
+	switch outcome.Kind {
+	case "suspended":
+		return t.suspendCode(ctx, inv.ID)
 	case "cancelled":
 		return tool.Failure("CANCELLED"), nil
 	case "failed":
@@ -123,6 +143,56 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (tool.Resu
 	}
 	return tool.Failure("PROVIDER_UNAVAILABLE"), nil
 }
+
+// suspendCode releases the VM and Parent lease; the ordinary nested waiters
+// supply approval/Child/resource wakes through the existing Run scheduler.
+func (t *tools) suspendCode(ctx context.Context, id string) (tool.Result, error) {
+	err := t.runs.write(ctx, func(tx *sql.Tx) error {
+		if err := fence(ctx, tx, t.claim); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status='waiting',wait_reason='external_event',updated_at=?,version=version+1 WHERE invocation_id=? AND status='running'`, time.Now().UnixMicro(), id)
+		return err
+	})
+	if err != nil {
+		return tool.Result{}, err
+	}
+	return tool.Result{}, tool.ErrSuspended
+}
+func (b *codeBridge) drain(ctx context.Context, pending []string) error {
+	calls := []llm.ToolCall{}
+	for _, id := range pending {
+		var call llm.ToolCall
+		err := b.t.runs.host.db.QueryRowContext(ctx, `SELECT i.provider_call_id,i.tool_name,i.arguments_json FROM code_call c JOIN tool_invocation i USING(invocation_id) WHERE c.execution_id=? AND c.call_id=?`, b.req.ExecutionID, b.req.ExecutionID+"/"+id).Scan(&call.ID, &call.Name, &call.Arguments)
+		// Start joins outstanding Host callbacks before returning. Absence here
+		// proves this issued call was never accepted and had no external effect.
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		calls = append(calls, call)
+	}
+	suspended := false
+	for start := 0; start < len(calls); start += 64 {
+		end := start + 64
+		if end > len(calls) {
+			end = len(calls)
+		}
+		_, err := (tool.Executor{Registry: b.registry, Store: nestedTools{b.t, b.req.ExecutionID}, Concurrency: 4}).Execute(computer.WithExecution(ctx, b.req.ExecutionID), b.exchange, calls[start:end])
+		if errors.Is(err, tool.ErrSuspended) {
+			suspended = true
+		} else if err != nil {
+			return err
+		}
+	}
+	if suspended {
+		return tool.ErrSuspended
+	}
+	return nil
+}
+
 func (b *codeBridge) Handle(ctx context.Context, method string, m codemode.Message) (codemode.Reply, error) {
 	empty := codemode.Reply{}
 	if m.ExecutionID != b.req.ExecutionID || m.ParentInvocationID != b.req.ParentInvocationID || m.RunID != b.req.RunID {
@@ -266,8 +336,11 @@ func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
 			return denied("INVALID_ARGUMENT")
 		}
 		for _, s := range b.req.Tools {
+			if codemode.ComputerBridge(s.Name) {
+				continue
+			}
 			if s.Name == name {
-				return codemode.Reply{Value: description{s.Name, s.Description, s.InputSchema}}
+				return codemode.Reply{Value: codemode.Describe(s)}
 			}
 		}
 	case "describeNamespace":
@@ -280,6 +353,9 @@ func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
 		}
 		if name == "agent" {
 			for _, s := range b.req.Tools {
+				if codemode.ComputerBridge(s.Name) {
+					continue
+				}
 				if s.Name == agent.RunToolName {
 					return codemode.Reply{Value: map[string]any{"name": "agent", "description": "run({task, artifactRefs?}) returns Promise<{text, artifactRefs}>. Creates one general Child Worker; does not create a Task. Host-accepted calls continue after script end; errors reject normally."}}
 				}
@@ -287,12 +363,15 @@ func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
 		}
 		items := []description{}
 		for _, s := range b.req.Tools {
-			if strings.HasPrefix(s.Name, name+"__") {
+			if codemode.ComputerBridge(s.Name) {
+				continue
+			}
+			if codemode.NamespaceMatches(s.Name, name) {
 				items = append(items, description{s.Name, s.Description, ""})
 			}
 		}
 		if len(items) > 0 {
-			return codemode.Reply{Value: items}
+			return codemode.Reply{Value: map[string]any{"name": name, "tools": items}}
 		}
 	case "searchTools":
 		var args []json.RawMessage
@@ -315,7 +394,10 @@ func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
 		}
 		items := []description{}
 		for _, s := range b.req.Tools {
-			if strings.Contains(strings.ToLower(s.Name+" "+s.Description), strings.ToLower(query)) && (options.Namespace == "" || strings.HasPrefix(s.Name, options.Namespace+"__")) {
+			if codemode.ComputerBridge(s.Name) {
+				continue
+			}
+			if strings.Contains(strings.ToLower(s.Name+" "+s.Description), strings.ToLower(query)) && (options.Namespace == "" || codemode.NamespaceMatches(s.Name, options.Namespace)) {
 				items = append(items, description{s.Name, s.Description, ""})
 				if len(items) >= options.Limit {
 					break

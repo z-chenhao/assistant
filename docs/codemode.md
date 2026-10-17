@@ -58,7 +58,7 @@ text(load("summary"));
 return results.map(result => result.status);
 ```
 
-`ALL_TOOLS` contains canonical names and short descriptions. Complete schemas
+`ALL_TOOLS` contains canonical names and short descriptions. Complete schemas, TypeScript declarations and usage instructions
 remain behind discovery. Canonical bracket calls always work; an escaped alias
 is available only when unambiguous. Discovery searches only the frozen Run
 view. Main has no `agent` global and cannot invoke the hidden Agent Tool.
@@ -69,7 +69,9 @@ usage, output schema, agent selector or control handle enters this API.
 The CUA facade provides inventory, explicit binding, and lightweight Surface
 proxies. Binding alone emits no output. `documentation()` and `capabilities`
 resolve through the same nested Executor. Surface handles stay within one cell;
-Store rejects them, including nested handles. The Fake exposes read-only
+Store rejects them, including nested handles. Private Computer bridge helpers
+are absent from public tools/discovery, so scripts cannot extract raw lease
+tokens for persistence. The Fake exposes read-only
 observations and documentation; it does not pretend to implement GUI actions.
 
 Only explicit `text()`, `image()` and top-level `return` reach the parent Tool
@@ -121,12 +123,15 @@ closed. External effects retain `safe/query_before_retry/never` semantics.
 A waiting nested invocation suspends and disposes the VM; its existing
 ToolInvocation and Child Run remain durable. On an ordinary scheduler wake,
 the current slice can re-run source and reuse the stable ordinal's accepted
-invocation. Host-accepted unawaited calls continue internally; they do not add
-outputs to an already finished script.
+invocation. Host-accepted unawaited calls continue internally. The finished cell output is
+saved while these calls drain through the same Executor; the VM is disposed,
+approval remains actionable, and JavaScript does not execute again. Background
+results do not add outputs to the finished cell. The Parent invocation remains
+recoverable until this drain finishes.
 
 This is the ERII-19 runtime slice, **not complete Durable Replay or M5**.
 ERII-20 owns dedicated execution claims/epochs, source-position call keys,
-ordered result-delivery replay, wake drain, orphan-call completion, comprehensive
+ordered result-delivery replay, wake drain, full orphan-recovery conformance, comprehensive
 37-completed/8-active Sidecar and Go kill/restart proof, and frozen runtime
 compatibility across recovery. Until those gates pass, do not use this slice as
 an unattended long-running recovery guarantee. ERII-21 owns full due Golden

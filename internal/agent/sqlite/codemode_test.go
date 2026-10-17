@@ -92,8 +92,8 @@ func TestCodeModeMigrateEmptyAndV15(t *testing.T) {
 				t.Fatal(err)
 			}
 			var tables int
-			db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('code_execution','code_call','code_store','code_event')`).Scan(&tables)
-			if tables != 4 {
+			db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('code_execution','code_call','code_store','code_event','code_outcome')`).Scan(&tables)
+			if tables != 5 {
 				t.Fatal(tables)
 			}
 		})

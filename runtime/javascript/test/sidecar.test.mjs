@@ -110,3 +110,17 @@ test('dynamic imports cannot access modules',async t=>{
  const r=await f.run('try { await import("node:fs"); return "unsafe"; } catch { return "blocked"; }');
  assert.deepEqual(r.result?.output,[{type:'return',value:'blocked'}]);
 });
+test('Computer bridge tokens are private to bound Surface facades',async t=>{
+ const f=await fixture(t,async m=>({value:m.params.toolName==='builtin__computer__bind'?{handle_token:'PRIVATE_LEASE_TOKEN'}:{text:'observed'}}));
+ const tools=['discover','bind','invoke'].map(op=>({name:'builtin__computer__'+op}));
+ const r=await f.run('const app = await cua.getApp("notes"); let blocked=false;try {store("lease",{app});} catch{blocked=true;} let raw=false;try {await tools.builtin__computer__bind({});} catch{raw=true;} return {blocked, raw, inventory:ALL_TOOLS.length, state:await app.observe()};',tools);
+ assert.deepEqual(r.result?.output,[{type:'return',value:{blocked:true,raw:true,inventory:0,state:{text:'observed'}}}]);
+ assert.ok(!JSON.stringify(r.result).includes('PRIVATE_LEASE_TOKEN'));
+});
+
+test('pending-call limit disposes the VM even when the Host stops replying',async t=>{
+ const f=await fixture(t,async()=>new Promise(()=>{}));
+ const r=await f.run('for(let n=0;n<129;n++) tools.builtin__text__echo({}); await new Promise(()=>{});',[echo]);
+ assert.equal(r.result?.kind,'failed');
+ assert.equal(r.result?.error?.code,'RESOURCE_LIMIT');
+});

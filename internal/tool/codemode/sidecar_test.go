@@ -52,7 +52,7 @@ func TestSidecarRejectsForgedProtocolAndDeduplicatesEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"forged-run", "forged-method", "completion-without-event", "completion-drift", "duplicate-event"} {
+	for _, mode := range []string{"forged-run", "forged-method", "completion-without-event", "completion-drift", "duplicate-event", "uncommitted-terminal", "event-gap"} {
 		t.Run(mode, func(t *testing.T) {
 			// This is a malicious transport peer fixture, never a JS interpreter.
 			source := `import {createInterface} from 'node:readline';
@@ -66,6 +66,7 @@ createInterface({input:process.stdin}).on('line',line=>{
   const event={protocolVersion:'1',runtimeId:'erii-js-v1',executionId:request.executionId,parentInvocationId:request.parentInvocationId,runId:request.runId,sequence:1,occurredAt:'2026-10-17T00:00:00Z',kind:'execution_completed',outcome:{kind:'completed',output:[],pendingCallIds:[]}};
   if(MODE==='completion-without-event'){send({id:'start',result:event.outcome});return;}
   if(MODE==='forged-run') event.runId='forged';
+  if(MODE==='event-gap') event.sequence=2;
   send({id:'event',method:MODE==='forged-method'?'host.rawDriver':'execution.event',params:event});
   if(MODE==='duplicate-event')send({id:'duplicate',method:'execution.event',params:event});
  }
@@ -83,6 +84,9 @@ createInterface({input:process.stdin}).on('line',line=>{
 			seen := map[int64]bool{}
 			commits := 0
 			_, err := runtime.Start(ctx, requestFixture("return 1;"), sinkFunc(func(ctx context.Context, method string, m Message) (Reply, error) {
+				if mode == "uncommitted-terminal" {
+					return Reply{}, ErrProtocol
+				}
 				if !seen[m.Sequence] {
 					seen[m.Sequence] = true
 					commits++

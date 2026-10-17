@@ -71,11 +71,11 @@ const observation = await app.observe();
 text(observation);
 let rejected = false;
 try { store("forbidden", {app}); } catch { rejected = true; }
-return {computer: state.computerId, rejected};
+return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>t.name.startsWith("builtin__computer__"))};
 ''')
             require(p['status'] == 'succeeded' and len(nested) == 3, f'CUA bridge missing {p} {nested}')
             output = json.loads(json.loads(p['result_json'])['text'])
-            require(output[-1]['value'] == {'computer': 'fixture-computer', 'rejected': True}, 'Surface persisted or inventory wrong')
+            require(output[-1]['value'] == {'computer': 'fixture-computer', 'rejected': True, 'privateBridge': True}, 'Surface persisted or inventory wrong')
             report['checks'].append({'name': 'cua-discover-bind-invoke', 'nested': [i['tool_name'] for i in nested], 'output': output})
 
             p, _ = execute('main-exposure', 'return {agent: typeof agent, visible: ALL_TOOLS.some(t=>t.name === "builtin__agent__run"), tools: await searchTools("echo")};')
@@ -110,6 +110,24 @@ return {computer: state.computerId, rejected};
             require(final[1] == 'succeeded' and json.loads(json.loads(final[0])['text']) == [{'type':'return','value':'APPROVAL_DENIED'}], f'approval rejection not caught: {final}')
             require(not (Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db').exists(), 'denied effect reached Provider')
             report['checks'].append({'name': 'exact-action-approval-rejection', 'attempt_count': nested[0]['attempt_count']})
+
+            p, nested = execute('unawaited-effect', 'store("executions", (load("executions") || 0) + 1); tools.mcp__fixture__send({target:"unawaited",text:"registered"}); return "selected-output";')
+            require(p['status'] == 'waiting' and len(nested) == 1, 'unawaited accepted effect was orphaned')
+            a = next(a for a in h.command('approval', 'list') if a['status'] == 'pending')
+            h.command('approval', 'approve', a['approval_id'], a['frozen_arguments_hash'])
+            h.command('chat', 'work')
+            with sqlite3.connect(db_path) as db:
+                final = db.execute('SELECT result_json,status FROM tool_invocation WHERE invocation_id=?', (p['invocation_id'],)).fetchone()
+                writes = db.execute('SELECT value_json FROM code_store WHERE execution_id=? AND key=?', (p['invocation_id'],'executions')).fetchone()[0]
+                status = db.execute('SELECT status FROM tool_invocation WHERE invocation_id=?', (nested[0]['invocation_id'],)).fetchone()[0]
+            require(final[1] == 'succeeded' and status == 'succeeded' and json.loads(writes) == 1, 'finished cell reexecuted or lost accepted call')
+            require(json.loads(json.loads(final[0])['text']) == [{'type':'return','value':'selected-output'}], 'unawaited result leaked into finished output')
+            report['checks'].append({'name':'unawaited-effect-drains-without-reexecuting-cell','store_executions':json.loads(writes),'output':json.loads(json.loads(final[0])['text'])})
+
+            p, nested = execute('unawaited-child', 'agent.run({task:"Capabilities: []"}); return "child-started";', worker=True)
+            require(p['status'] == 'succeeded' and len(nested) == 1 and nested[0]['status'] == 'succeeded', 'unawaited Worker orphaned')
+            require(json.loads(json.loads(p['result_json'])['text']) == [{'type':'return','value':'child-started'}], 'unawaited Child result leaked')
+            report['checks'].append({'name':'unawaited-child-completes-internally','status':nested[0]['status']})
 
             for boundary in ('before_provider_effect', 'after_provider_effect'):
                 source = 'return await tools.mcp__fixture__send({target:' + json.dumps(boundary) + ',text:"exact-effect"});'
