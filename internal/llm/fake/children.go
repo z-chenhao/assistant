@@ -33,6 +33,23 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "fixture-child-call", Name: name, Arguments: string(raw)}}}
 	}
 	if !worker {
+		for _, m := range req.Messages {
+			if m.Origin == "runtime" {
+				_, payload, ok := strings.Cut(m.Text, "\n")
+				var update struct {
+					Content []struct {
+						Text string `json:"text"`
+					} `json:"content"`
+				}
+				if ok && json.Unmarshal([]byte(payload), &update) == nil {
+					for _, part := range update.Content {
+						if strings.HasPrefix(part.Text, "Batch aggregate:") {
+							return llm.GenerationResult{Text: "Main follow-up: " + part.Text}, nil
+						}
+					}
+				}
+			}
+		}
 		if input == "Forge child" && last.Role != "tool" {
 			return call(agent.RunToolName, map[string]string{"task": "forbidden"}), nil
 		}

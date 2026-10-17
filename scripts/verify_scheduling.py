@@ -102,6 +102,8 @@ def run(binary):
                     require(invocation['status'] == 'succeeded' and json.loads(output['text']) == {'text': expected, 'artifactRefs': []}, 'wrong row result adopted')
             result = value['updates'][0]['content']
             require(result == 'Batch aggregate: 98 results, 2 failed. Needs input: confirm region', 'aggregate counts or blocker deduplication')
+            replies = [m for m in value['conversation'] if m['role'] == 'assistant']
+            require(replies[-1]['content'] == [{'type': 'text', 'text': 'Main follow-up: ' + result}], 'aggregate did not reach the user through Main')
             root_id = value['trees'][0]['root_run_id']
             require(sum(g['run_id'] == root_id for g in value['generations']) == 5, 'Child completions caused model storm')
             require(value['tree_usage'][0]['model_calls'] == 105 and value['task_usage'][0]['model_calls'] == 105, 'Root tree/Task usage omitted calls')
