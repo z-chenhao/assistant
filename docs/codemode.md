@@ -118,6 +118,13 @@ approval, conflict, timeout and retry policies. Limits from untrusted sources
 cannot expand them. Parameter drift for an admitted nested identity fails
 closed. External effects retain `safe/query_before_retry/never` semantics.
 
+The Code Mode wrapper coordinates nested calls without owning an actual Tool
+execution slot. Nested Tools acquire the same global, Agent, Run, Provider and
+per-Tool capacity as direct calls, including conflict exclusion. A configured
+`tools.run_concurrency: 1` therefore completes an awaited nested call; parallel
+calls still share that one slot. The Loop/Executor and the fixed JavaScript
+limits continue to bound wrapper execution.
+
 ## Recovery boundary and remaining work
 
 A waiting nested invocation suspends and disposes the VM; its existing

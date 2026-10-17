@@ -30,10 +30,10 @@ def run(binary):
         h.setup()
         db_path = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
 
-        def execute(key, source, worker=False):
+        def execute(key, source, worker=False, timeout=320):
             plan = json.dumps([{'name': 'builtin__codemode__execute', 'arguments': {'source': source}}])
             h.send(key, ('Delegate capabilities: ' if worker else 'Capabilities: ') + plan)
-            h.command('chat', 'work')
+            h.command('chat', 'work', timeout=timeout)
             with sqlite3.connect(db_path) as db:
                 db.row_factory = sqlite3.Row
                 rows = [dict(r) for r in db.execute('SELECT * FROM tool_invocation ORDER BY created_at,delivery_seq')]
@@ -42,6 +42,26 @@ def run(binary):
             return parent, [r for r in rows if r['parent_invocation_id'] == parent['invocation_id']]
 
         try:
+            # A wrapper coordinates Tools without owning their execution slot.
+            # Bound this regression so starvation fails instead of spinning.
+            config = root / 'config.yaml'
+            default_config = config.read_text()
+            config.write_text(default_config + 'tools:\n  run_concurrency: 1\n')
+            p, nested = execute('single-slot', 'return await tools.builtin__text__echo({text:"nested"});', timeout=20)
+            require(p['status'] == 'succeeded' and p['attempt_count'] == 1 and len(nested) == 1, f'single-slot wrapper starved: {p} {nested}')
+            require(nested[0]['status'] == 'succeeded' and nested[0]['attempt_count'] == 1, f'single-slot Tool did not execute once: {nested}')
+            require(json.loads(json.loads(p['result_json'])['text']) == [{'type': 'return', 'value': 'nested'}], 'single-slot output missing')
+            report['checks'].append({'name': 'single-slot-nested-tool', 'run_concurrency': 1,
+                                     'parent': p['invocation_id'], 'parent_attempts': p['attempt_count'],
+                                     'nested': nested, 'output': json.loads(json.loads(p['result_json'])['text'])})
+            p, nested = execute('single-slot-parallel', 'return await Promise.all([1,2,3].map(n=>tools.builtin__text__echo({text:"serial-"+n})));', timeout=20)
+            require(p['status'] == 'succeeded' and len(nested) == 3 and all(i['status'] == 'succeeded' and i['attempt_count'] == 1 for i in nested), 'single-slot parallel calls lost or redispatched')
+            output = json.loads(json.loads(p['result_json'])['text'])
+            require(output == [{'type': 'return', 'value': ['serial-1', 'serial-2', 'serial-3']}], 'single-slot aggregation changed order')
+            report['checks'].append({'name': 'single-slot-parallel-tools', 'run_concurrency': 1,
+                                     'parent': p['invocation_id'], 'nested': nested, 'output': output})
+            config.write_text(default_config)
+
             p, nested = execute('parallel', '''
 const values = await Promise.all([1, 2, 3].map(n => tools.builtin__text__echo({text: "nested-" + n})));
 console.log("HIDDEN_CONSOLE");

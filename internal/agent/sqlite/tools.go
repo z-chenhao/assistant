@@ -10,6 +10,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/erii/internal/tool/codemode"
 )
 
 type tools struct {
@@ -186,16 +187,21 @@ func (t *tools) Start(ctx context.Context, id string) error {
 				return tool.ErrApprovalDenied
 			}
 		}
-		// Quotas and dynamic conflicts are checked atomically across processes.
-		// Expired owners cannot retain execution capacity.
-		var global, byAgent, byRun, byProvider, byTool, conflicts int
-		err = tx.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(r.agent_id=(SELECT agent_id FROM run WHERE run_id=?)),0),coalesce(sum(i.run_id=?),0),coalesce(sum(json_extract(i.policy_json,'$.provider')=?),0),coalesce(sum(i.tool_name=?),0),coalesce(sum(EXISTS(SELECT 1 FROM json_each(i.conflict_keys) a JOIN json_each((SELECT conflict_keys FROM tool_invocation WHERE invocation_id=?)) b ON a.value=b.value)),0) FROM tool_invocation i JOIN run r USING(run_id) JOIN run_claim c USING(run_id) WHERE i.status='running' AND c.token IS NOT NULL AND c.expires_at>? AND i.invocation_id!=?`, t.claim.RunID(), t.claim.RunID(), p.Provider, inv.Call.Name, id, time.Now().UnixMicro(), id).Scan(&global, &byAgent, &byRun, &byProvider, &byTool, &conflicts)
-		if err != nil {
-			return err
-		}
-		limits := t.runs.toolLimits()
-		if global >= limits.Global || byAgent >= limits.Agent || byRun >= limits.Run || byProvider >= limits.Provider || byTool >= limits.Tool || conflicts > 0 {
-			return tool.ErrResource
+		// The Code Mode wrapper coordinates nested ToolInvocations; it never
+		// owns their execution slots. Counting it would deadlock a limit of one.
+		// Its VM remains bounded by the Loop/Executor and JavaScript limits.
+		if inv.Call.Name != codemode.ToolName {
+			// Actual Tools share atomic quotas/conflicts across direct and nested
+			// calls. Expired owners and wrappers retain no execution capacity.
+			var global, byAgent, byRun, byProvider, byTool, conflicts int
+			err = tx.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(r.agent_id=(SELECT agent_id FROM run WHERE run_id=?)),0),coalesce(sum(i.run_id=?),0),coalesce(sum(json_extract(i.policy_json,'$.provider')=?),0),coalesce(sum(i.tool_name=?),0),coalesce(sum(EXISTS(SELECT 1 FROM json_each(i.conflict_keys) a JOIN json_each((SELECT conflict_keys FROM tool_invocation WHERE invocation_id=?)) b ON a.value=b.value)),0) FROM tool_invocation i JOIN run r USING(run_id) JOIN run_claim c USING(run_id) WHERE i.status='running' AND c.token IS NOT NULL AND c.expires_at>? AND i.invocation_id!=? AND i.tool_name!=?`, t.claim.RunID(), t.claim.RunID(), p.Provider, inv.Call.Name, id, time.Now().UnixMicro(), id, codemode.ToolName).Scan(&global, &byAgent, &byRun, &byProvider, &byTool, &conflicts)
+			if err != nil {
+				return err
+			}
+			limits := t.runs.toolLimits()
+			if global >= limits.Global || byAgent >= limits.Agent || byRun >= limits.Run || byProvider >= limits.Provider || byTool >= limits.Tool || conflicts > 0 {
+				return tool.ErrResource
+			}
 		}
 		res, err := tx.ExecContext(ctx, `UPDATE tool_invocation SET status='running',wait_reason=NULL,next_wake_at=NULL,execution_token=?,attempt_count=attempt_count+1,version=version+1,updated_at=? WHERE invocation_id=? AND run_id=? AND desired_state='running' AND status IN ('queued','running','waiting')`, t.claim.(*claim).token, time.Now().UnixMicro(), id, t.claim.RunID())
 		if err != nil {

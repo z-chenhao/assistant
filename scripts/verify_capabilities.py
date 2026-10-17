@@ -18,9 +18,9 @@ class CapabilityHarness(MainHarness):
         return [str(self.binary), '-config', str(self.root / 'config.yaml'),
                 '-test-bridge', 'capabilities', *args]
 
-    def command(self, *args, text=None, ok=True):
+    def command(self, *args, text=None, ok=True, timeout=320):
         result = subprocess.run(self.args(*args), input=text, text=True, capture_output=True,
-                                env=self.env, cwd=self.root, timeout=320)
+                                env=self.env, cwd=self.root, timeout=timeout)
         require(not ok or result.returncode == 0, f'{args}: {result.stderr}')
         return json.loads(result.stdout) if ok else result
 
