@@ -25,10 +25,14 @@ const runnable = `r.desired_state='running' AND
  ((r.wait_reason='user_input' AND
  (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR
  EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND r.worker_position='root' AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')))) OR
- (r.wait_reason='resource' AND NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND
- ((i.wait_reason='child_run' AND EXISTS(SELECT 1 FROM agent_invocation a JOIN run child ON child.run_id=a.child_run_id WHERE a.invocation_id=i.invocation_id AND child.status NOT IN ('completed','failed','cancelled'))) OR
- (i.wait_reason='retry_backoff' AND i.next_wake_at>:now) OR
- (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status='pending'))))))))`
+ (r.wait_reason='resource' AND (
+ NOT EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting') OR
+ EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND
+ (i.wait_reason='resource' OR (i.wait_reason='retry_backoff' AND i.next_wake_at<=:now) OR
+ (i.wait_reason='approval' AND EXISTS(SELECT 1 FROM approval a WHERE a.invocation_id=i.invocation_id AND a.status!='pending')))) OR
+ (EXISTS(SELECT 1 FROM tool_invocation i WHERE i.run_id=r.run_id AND i.status='waiting' AND i.wait_reason='child_run') AND
+ NOT EXISTS(SELECT 1 FROM tool_invocation i JOIN agent_invocation a USING(invocation_id) JOIN run child ON child.run_id=a.child_run_id
+ WHERE i.run_id=r.run_id AND i.status='waiting' AND i.wait_reason='child_run' AND child.status NOT IN ('completed','failed','cancelled'))))))))`
 
 // Provider identity is the frozen account or endpoint, not the mutable profile.
 const providerKey = `s.provider_kind||':'||coalesce(s.auth_connection_id,s.endpoint_hash,'local')`

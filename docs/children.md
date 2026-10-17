@@ -114,8 +114,10 @@ leases and advances its Root's durable service ticket. New trees enter at the
 current queue tail. The least recently served eligible tree goes first; runnable
 descendants go first within that tree. No capacity query reaches the model.
 Saturation leaves accepted Children queued. Expired leases lose capacity and
-ownership together. Waiting ancestors hold no lease and resume after the current
-Child batch settles. Approved effects retain their individual frozen approvals.
+ownership together. Waiting ancestors hold no lease. Child joins coalesce until
+the current batch settles; independent ready Tools and resolved approvals can
+wake the Parent earlier. The model receives the joined Tool batch. Effects
+retain their individual frozen approvals.
 
 `scheduler.max_worker_turns` defaults to 256, with a deployment ceiling of 512.
 It is frozen in `run_tree` at Root creation, including for descendants. Exceeding

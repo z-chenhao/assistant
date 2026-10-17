@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/erii/internal/tool"
 )
 
 func TestSchedulerDefaultChildCapacity(t *testing.T) {
@@ -348,6 +349,56 @@ func TestSchedulerDrainWaitsForStoppedLiveOwner(t *testing.T) {
 	}
 	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled'`) != 1 || scalar(t, s, `SELECT count(*) FROM run_claim WHERE token IS NOT NULL`) != 0 {
 		t.Fatal("cancelled owner retained work")
+	}
+}
+
+func TestSchedulerReadyToolProgressesBesidePendingApproval(t *testing.T) {
+	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	cs := append(effectCall(`{"target":"Alex","text":"Tuesday"}`), llm.ToolCall{ID: "retry", Name: echo.Spec.Name, Arguments: `{"text":"independent"}`})
+	s, r, c, e, exchange := admitPolicy(t, []tool.Definition{effectDef(t, "query_before_retry"), echo}, cs)
+	ctx := context.Background()
+	invocations, err := e.Store.Accept(ctx, exchange, cs, e.Registry.Describe())
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := e.Store.(tool.PolicyStore)
+	for _, inv := range invocations {
+		if _, err := policy.Prepare(ctx, inv.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.Store.Start(ctx, invocations[1].ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := policy.Defer(ctx, invocations[1].ID, "retry_backoff", time.Now().Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	run, err := r.Load(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Wait(ctx, c, run.Version, "resource"); err != nil {
+		t.Fatal(err)
+	}
+	if id, err := r.Next(ctx); err != nil || id != c.RunID() {
+		t.Fatal("pending approval blocked independent ready Tool", id, err)
+	}
+	resumed, err := r.Claim(ctx, c.RunID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Store = r.ToolStore(resumed)
+	if _, err := e.Execute(ctx, exchange, cs); !errors.Is(err, tool.ErrSuspended) {
+		t.Fatal("pending effect did not remain suspended", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE provider_call_id='retry' AND status='succeeded'`) != 1 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE provider_call_id='effect' AND status='waiting' AND attempt_count=0`) != 1 {
+		t.Fatal("ready Tool did not progress independently of frozen effect approval")
+	}
+	if err := r.Release(ctx, resumed); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM approval WHERE status='pending'`) != 1 {
+		t.Fatal("scheduler changed effect approval")
 	}
 }
 
