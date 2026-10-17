@@ -224,39 +224,54 @@ func TestTaskControlAppendWaitsOutsideTransactionForPauseBoundary(t *testing.T) 
 		}
 	}
 	controlMain(t, r, a, "create", "create")
+	ctx, cancel := context.WithCancel(context.Background())
 	finished := make(chan error, 1)
-	go func() { finished <- a.Drain(context.Background()) }()
+	joined := make(chan struct{})
+	var unblock sync.Once
+	go func() {
+		defer close(joined)
+		finished <- a.Drain(ctx)
+	}()
+	t.Cleanup(func() {
+		unblock.Do(func() { close(release) })
+		cancel()
+		<-joined
+	})
 	select {
 	case <-entered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("root never started")
 	}
-	controlMain(t, r, a, "pause", "pause")
-	receipt := mustSubmit(t, a, "append", "append")
-	c, err := r.Claim(context.Background(), receipt.RunID)
-	if err != nil {
-		t.Fatal(err)
+	// Drain owns execution after it starts. Manually claiming these Main Runs
+	// races its scheduler and correctly loses the claim on a slower runner.
+	pause := mustSubmit(t, a, "pause", "pause")
+	deadline := time.Now().Add(5 * time.Second)
+	for scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='completed'`, pause.RunID) != 1 {
+		if time.Now().After(deadline) {
+			t.Fatal("pause Main did not complete")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	appended := make(chan error, 1)
-	go func() { appended <- executeTaskRun(t, a, r, context.Background(), c) }()
+	receipt := mustSubmit(t, a, "append", "append")
 	select {
 	case <-waiting:
 	case <-time.After(5 * time.Second):
 		t.Fatal("append did not wait")
 	}
+	if _, err := r.Claim(context.Background(), receipt.RunID); !errors.Is(err, agent.ErrBusy) {
+		t.Fatal("append Main must remain owned by Drain", err)
+	}
 	if scalar(t, s, `SELECT count(*) FROM task_instruction`) != 0 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker'`) != 1 {
 		t.Fatal("append created another live Root")
 	}
-	close(release)
-	for _, done := range []chan error{appended, finished} {
-		select {
-		case err := <-done:
-			if err != nil {
-				t.Fatal(err)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("stop/append did not converge")
+	unblock.Do(func() { close(release) })
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatal(err)
 		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("stop/append did not converge")
 	}
 	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled' AND error_code='task_paused'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status='completed' AND task_epoch=3`) != 1 {
 		t.Fatal("race did not converge to new completed Root")
