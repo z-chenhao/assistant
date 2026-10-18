@@ -148,5 +148,5 @@ not executed. L2 Live Shadow remains **inconclusive**.
 M1 supplies facts as explicit context. It does not claim Health/Weather/Calendar/
 email connectors, stale-weather refresh, Memory, Automation, Task/Worker/Child,
 general M3 approval/security, external delivery or M5 JavaScript Durable Replay.
-These gaps stay visible per result. Existing local delivery rows remain pending
-intents. No full release or 80/85-point product acceptance is claimed here.
+These gaps stay visible per result. M3 local transport and approval evidence is
+maintained separately in [Delivery operations](delivery.md). No full release or 80/85-point product acceptance is claimed here.

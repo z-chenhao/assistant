@@ -71,7 +71,8 @@ export async function startFixture() {
       emit('response.created',{response:{id:'owned-response',status:'in_progress'}});
       const hasResult=b.input.some(i=>i.type==='function_call_output');
       if(b.tools?.length && !hasResult){
-        const name=b.tools[0].tools[0].name;
+        const names=b.tools[0].tools.map(t=>t.name);
+        const name=names.includes('builtin__text__echo')?'builtin__text__echo':names[0];
         const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'erii',arguments:name==='builtin__text__echo'?'{"text":"account Main echo"}':'{"value":"OK"}'};
         emit('response.output_item.added',{output_index:0,item:{...item,arguments:''}});
         emit('response.function_call_arguments.delta',{output_index:0,item_id:item.id,delta:item.arguments});

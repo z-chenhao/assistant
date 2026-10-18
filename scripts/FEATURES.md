@@ -1,5 +1,22 @@
 # Foundation feature map
 
+## Durable context recall (ERII-22)
+
+`python3 scripts/verify_recall.py --binary bin/personal-agent --evidence evidence/recall.json`
+owns Launch/Doctor/Drive/Evidence/Cleanup with isolated databases and explicit HTTP
+embedding/LLM Fakes. `make verify` runs five repetitions. See [recall operations](../docs/recall.md).
+
+| Feature | User boundary | Authoritative implementation | Evidence |
+| --- | --- | --- | --- |
+| Unified scoped recall | Configured `builtin__memory__search` through Main/Root/Child | Host scope in `agent/sqlite.searchMemory`, common ToolExecutor, MemoryProvider/ConversationProvider | Three real invocations; user/Agent exclusions, source/time/author without scores, vector-only synonym in both sources |
+| Memory/Conversation authority | Existing chat ingress and separate provider databases | `memory/sqlite`, `conversation/sqlite`, state migration 018 | Original messages unchanged, immutable evidence, empty/populated-prior migration, atomic index rollback, tombstone/supersession and conflict contracts; maintained recall CLI multipart/pending-v2 and multipart-prior scenarios: 80,001-byte original, bounded UTF-8 embedding chunks, nine generations/four completed Runs, inert repeated drain; actual HTTP regression covers max 128 × 64 KiB parts and mid-chunk failure/retry without partial vector |
+| Hybrid ranking | Explicit embedding configuration and read-only search | `recall/embedding`, private `sqliteindex`, provider-specific RRF ordering | Actual HTTP adapter, FTS5/BM25 + exact cosine, time/tier/rank boundaries, no partial result on embedding/index fault, concurrent independent retrieval |
+| Frozen context | Shared model-generation admission | `run_recall`, `Runs.recallMessages` | SIGKILL after freeze, corpus changes, exact snapshot reused on restart; new turn sees new data, stable prefix/dynamic suffix, no Parent mutable context copied, old-owner rejection |
+
+No embedding configuration means no recall capability; this is not a full vector
+completion claim for that installation. Curator, explicit management and compaction
+remain the next slice; these checks do not score full SC-08.
+
 Run `make verify` from the repository root. `scripts/verify.py` drives the built
 CLI and independently reads SQLite/JSONL. `internal/event/integration` owns the
 JetStream and process-kill mechanics. No online account or installed broker is
@@ -8,11 +25,13 @@ real boundary, records evidence, and always reaps its processes/removes state.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
+| Complete offline CI gate | `make verify`; serial baseline with `VERIFY_JOBS=1`; isolated `VERIFY_SHARD=runtime/codemode/security/delivery/providers` | `scripts/verify_suite.py`, `.github/workflows/ci.yml`, `scripts/ci_gate.py` | Unchanged inventory/repetition regression; per-harness/case timings, tested SHA and binary digest; independent shard failure/cancel/skip rejects stable `Ubuntu checks`; 14-day exact-SHA CI artifacts; owned process cleanup. See [operations](../docs/ci.md). |
+| M5 exact Core case gate | `make verify VERIFY_SHARD=codemode`; focused `scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core-probe.json --case GC-17` (also `GC-19` or `GC-20`) | `run_core_cases`, `core_conformance`, `core_report`; CLI → Actor/Loop → ToolExecutor/QuickJS | Six locked wording/noise/order variants × five serial runs; exact seed1701 CSV/Artifact readback; real Sidecar+Go SIGKILL at 37 completed/8 waiting; Runtime-key F055 drift rejection; unchanged audit/dirty CLI patch; committed migration reused, independent review/repair, final one-Task readback and an isolated grandchild-cancel probe; SC-01…12 with explicit M6 boundary Fakes; `core-cases-1…5.json`, `core-summary.json`, state/trace/external ledgers; processes reaped and temp roots removed. Semantic scores remain null without a Judge. [Scope, mapping and recovery](../docs/core-evals.md). |
 | Help/doctor | `bin/personal-agent -help` | `cmd/personal-agent:run` | Usage; no state created |
 | Startup diagnostics | `bin/personal-agent [-config path] status`; no-command with redirected stdin | `agent/sqlite.Store.Diagnostics` | setup_required, null profile, closed ingress; stored identity |
 | Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
 | Configuration | `-config`, `ERII_*` overrides | `config.Load` | Invalid fields/URLs/durations rejected without value echo |
-| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v7, WAL, one Agent, one atomic fresh-bootstrap event |
+| SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v17, WAL, one Agent, one atomic fresh-bootstrap event |
 | Migration safety | Empty, real v1/v2/v3/v4/v5/v6, future schema | `agent/sqlite.migrate` | Prior Agent/config/timestamps, model metadata/snapshots and Outbox/Inbox preserved; future rejected; failed v3/v4/v5/v6/v7 DDL rolls back |
 | Model metadata | `bin/personal-agent model add` (stdin JSON), `model list`, `status` | `llm/sqlite.Store.AddProfile/ListProfiles` | New process and SIGKILL/restart preserve profile; unverified/version 1; independent SQLite/canonical JSON readback; ingress stays closed |
 | Metadata validation | `model add` | `llm.ProfileInput.Validate`, CLI decoder | Unknown/credential fields, credential-bearing URLs, invalid enums, dangling/mismatched auth and pre-Probe activation rejected without value echo or writes |
@@ -86,8 +105,29 @@ See [Main operations](../docs/main-loop.md) for recovery and limits.
 | Main L0 fragments | `make verify`, `evals/fixtures/m1-v2.json` | `case_runner.py`, `run_cases.py`, actual TUI | 18 GC-01/09/10 wording/noise/order fragments; normative facts; fixed scenario clock; locked fixtures/scoring; full Cases not_applicable and semantic scores null |
 | M1 storage migration | Startup from empty or v6 | `agent/sqlite` v7, `conversation/sqlite` v1 | Prior identity/config/events retained; partial DDL rolls back; future schemas rejected |
 
-Local DeliveryRequests are durable pending intents; an external delivery consumer
-is not implemented. No scored product-Case, full M3 Security or M5 Durable Replay claim.
+DeliveryRequests use the M3 Delivery Outbox below. No scored product-Case or M5
+Durable Replay claim.
+
+## Delivery slice (ERII-15)
+
+`scripts/verify_delivery.py` extends the maintained MainHarness/Terminal mechanics
+for isolated Launch, fixture/schema/readiness Doctor, real CLI/PTY Drive, direct
+SQLite snapshots and transcripts as Evidence, and child/PTY/data Cleanup.
+`make verify` runs it five consecutive times; `evidence/delivery-N.json` records
+20 SIGKILL/restart cases per run and deterministic transport/approval failures.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Semantic delivery and retained history | TUI, `/history`, `delivery work/list`, `chat work` | `Runs.DeliverReply`, `delivery.Service`, `delivery/terminal.Adapter` | Main and Root final replies accepted once into the terminal projection; PTY transcript and destination/content readback; duplicate drains/callbacks preserve receipts |
+| Recoverable cross-database commit | Main/Root reply, kill/restart | `Runs.PrepareReply/Flush/DeliverReply` | Deterministic reply/delivery IDs; Conversation precedes enqueue and checkpoint; ten before/after boundaries per role; no duplicate logical generation or semantic message |
+| Delivery retry and reconciliation | Live TUI polling or `delivery work`, explicit `-test-delivery` | `delivery.Service.Drain`, `delivery/sqlite.Store` | Known transient backoff and exhaustion; accepted-send query; unknown stays query-only; terminal sends never rewrite Conversation; late-ack fencing and concurrent-consumer Go tests |
+| Security approval notification | `/approve ID HASH`, `/deny ID HASH`; CLI `approval` | `toolStore.Prepare`, `Runs.Decide`, `tui.terminal.command` | One Security notice without Main inference; frozen hash callback wakes original Root; duplicate decision produces no notice; existing rejection/expiry/cancel/parameter-drift gates remain required |
+| Notification policy | Root completion/failure; read-only `/status` | `replyIntent`, `notification`, `delivery.Request.Validate` | Only completion/failure/needs_input/approval accepted; progress cannot enqueue; Worker results still return through Main |
+| Delivery persistence and configuration | Startup, delivery YAML policy | State schema v12, `config.Load` | Every prior schema migrates; populated v11 receipts/keys/status/attempts survive; failed migration rolls back; legal/illegal states, atomic event enqueue, bounded config |
+
+Physical stdout may redisplay retained history on reconnect. No generic external
+exactly-once guarantee, Web/Feishu/UISpec implementation, or full Golden Case
+score is claimed. Operations and state details: `docs/delivery.md`.
 
 ## Terminal slice (ERII-10)
 
@@ -104,3 +144,182 @@ See [terminal operations and proof limits](../docs/tui-and-evals.md).
 | Terminal recovery | Restart TUI after actual SIGKILL | Existing Main recovery and Conversation intents | Identical semantic state for both providers; held generation with Steering reused; no duplicate reply |
 | Terminal input byte boundary | Default launch; `verify_terminal_input.py` in `make verify` | `tui.OpenInput`, bounded `readInput`, same Actor | 12 actual PTY cases: exact 16 KiB ASCII/UTF-8, overflow rejected without partial Main rows, recovery, editing/EOF, echo on/off, signal shutdown, flags/termios restored; macOS review reproducer retained as before/after evidence |
 | Eval result/scoring protocol | `run_cases.py`; `make test` scorer regressions | `case_runner.py`, locked `scoring-v1.json` | Real TUI drives 18 fragments; full evidence and snapshots; missing grades null, hard/mechanical failure cannot be overridden, thresholds enforced |
+
+## Task delegation slice (ERII-11)
+
+`scripts/verify_tasks.py` extends the existing CLI/PTY launch, doctor, drive,
+evidence and cleanup harness. `scripts/run_task_cases.py` uses the shared Case
+result/scoring and Terminal mechanics. Both run in `make verify` without accounts.
+See [Task operations and proof limits](../docs/tasks.md).
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Task discovery and mutation | Natural-language Main delegation; canonical Task tools | `task` schemas/validators; accepted `ToolInvocation` -> `tools.ExecuteBuiltin` | Strict union/null/unknown-field checks, defaults/50 limit, scope and hybrid ranking, ambiguous real CLI search, duplicate source/call receipts |
+| Atomic delegation | Main `task_manage(create)` | `Runs.createRoot` and state transaction | Task/anchor/Root/snapshots/Outbox and receipt readback; before/after SIGKILL |
+| Append and continuation | Main searches then `task_manage(append)` | `TaskInstruction`, Root Steering and `createRoot` | Active frozen-generation injection, 16 concurrent instructions, immutable anchor, new Root/epoch after completion, no terminal revival |
+| Root concurrency / responsive Main | Same TUI or `chat work` | Actor scheduler, shared Loop, database lease admission | Eight Tasks/four Worker leases, reserved Main slot, live PTY receives acceptance and new answer while Root is held |
+| Actual provider Task path | Local endpoint through Node/Pi | Same Task/Root/Reporter path, production Bridge conversion | `local-provider.json`: Task union reaches HTTP, Root has no Task controls/Conversation, runtime-framed follow-up returns through Main |
+| Root result / Reporter | Root completes or fails | `finishTask`, TaskUpdate/Outbox, `Report`, Main Inbox | One update and consumer receipt per Root, failure leaves active Task; four result/report SIGKILL boundaries; repeated drain unchanged |
+| Batched follow-up / user priority | Concurrent completions while Main runs | `promoteFollowups`, `Steering` | Go contracts: terminal-commit/idle-scan races, one batch, no current-Main injection; overtaking input defers queued update before its first generation |
+| Runtime provenance | Main receives a Task update | Typed `AgentMessage`, provider conversion | `origin:runtime`, untrusted JSON boundary, named safe details; unknown type/provenance fail closed; no Worker Conversation/System entry |
+| Read-only activity | `/status`, `task_search` | `Runs.Progress/Activity`, `searchTasks` | Progress read/write contract creates no update, model wake or delivery; PTY status shows completed work |
+| M2 due fragments | `run_task_cases.py` | Locked `m2-v2` fixture and shared scoring protocol | 24 GC-02/04/08/18 fragments; SC-01/04/05/10/12 applicable invariants; pause/cancel followed by new Root; semantic scores remain null; Child/Artifact behavior not_applicable |
+| M2 storage | Startup from empty or v8 | State schema v9 | Every prior version migrates; v8 rollback/retention; old frozen capabilities still selected; Task/Run epoch fencing and audit immutability |
+
+## Task controls (ERII-12)
+
+`scripts/verify_task_control.py` reuses the CLI/PTY harness for Launch, Doctor,
+Drive, Evidence and Cleanup. `make verify` repeats it five times. Reports retain
+actual PTY output and persisted state; all processes and disposable databases
+are cleaned up. See [Task operations](../docs/tasks.md) for transitions and limits.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Controlled pause/cancel | Main searches then `task_manage(pause/cancel)` | `stopTask`, Actor execution context, `SettleStop/recoverStopsTx` | `task-control-{1..5}.json`: accepted provider generation cancelled; status/epoch/desired state persisted; exact Root reason; no stale result/followup; three SIGKILL boundaries |
+| Continue stopped work | Main `task_manage(append)` | `executeBuiltin`, `createRoot`, immutable instruction/receipt | New Root and epoch after paused/cancelled/completed; one nonterminal Root; preserved anchor, committed Tool/model results and progress; duplicate and concurrent controls; pause-boundary regression submits through the running dispatcher, rejects a competing Main claim, proves append waits outside its transaction, then joins the old Root before completing the new one |
+| Epoch/owner fencing | Current Task tools and Host persistence boundary | `fence`, `Claim`, `AcceptGeneration`, `Trace` | Go contracts repeated five times: old checkpoint/progress/generation/Tool/reply/terminal/trace writes rejected; usage rollback; out-of-order response cannot change new Task |
+| Tree stop and completion | Internal stored tree relationships | `recoverStopsTx`, `finishTask` | Go synthetic-tree contracts: leaf-before-parent, waiting descendants, safe cancellation/unsafe unknown, no unknown replay, last descendant releases one-shot completion, ongoing stays active; actual Child admission/recovery evidence is in the ERII-17 entry |
+| Shutdown versus user stop | SIGTERM/context cancellation; later `chat work` | Shared Loop, Actor release | Current generation retained and same Root reclaimed after shutdown; Task/epoch untouched; deterministic scan/claim/after-claim cancellation barriers preserve accepted work and return normal cancellation (`TestLoopShutdown*`); user stop gives terminal Root and explicit reason |
+
+| Unified Tool feature | Reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Frozen approval and decision recovery | `approval list`, `approval approve/deny ID HASH`, `chat work` | `tool.Executor`, `sqlite.tools.Prepare/Start`, `Runs.Decide` | `evidence/tools-{1..5}.json`: persisted waiting with no active claim, CLI restart, exact hash, duplicate callback, denial and no early effect |
+| Steering invalidates granted/unexecuted action | `chat send` or `task_manage(append)` while approval waits | `Runs.Submit`, `tools.ExecuteBuiltin`, `invalidateApprovals` | CLI GC-12 fragment changes Monday to Tuesday; only new frozen Tuesday action executes; Go expiry/wrong principal/hash/immutability regressions |
+| External effect recovery and reconciliation | `chat work`, `approval reconcile` | `Executor.executeOne`, `Runs.ReconcileUnknown` | Nine real SIGKILL/restart scenarios per harness run; separate Fake ledger, stable keys, query-before-retry and never; oversized recovery receipt persists unknown before Worker delivery, keeps Task active, reaches Main and later reconciles without dispatch; persisted Worker regressions also cover inconsistent/nonterminal query evidence; unknown absence does not authorize retry; cancel of an approval waiter never dispatches |
+| Tool capacity and independent results | Parallel model Tool batch | `sqlite.tools.Start/Defer/Finish`, `Executor.Execute` | `TestToolQuotasAndDynamicConflictKeys` (all five scopes and intersecting keys), `TestToolResultsCommitIndependentlyAndDeliverInDeclarationOrder`, race detector |
+| Host errors and schema/policy boundary | Direct Tool results | `tool.NewRegistry/Validate/Normalize` | Hidden Worker Tools return NOT_FOUND before validation; strict schema, forged fields/duplicate keys rejected; bounded transient retry and sanitized raw provider errors; no model credentials available to adapters |
+
+Tool harness lifecycle: **Launch** `MainHarness` with explicit Fake provider/tool;
+**Doctor** model add/test/select and ingress readback; **Drive** ordinary chat and
+approval CLI commands; **Evidence** domain state, approval records, Outbox and
+separate external ledger plus kill checkpoints; **Cleanup** join every child and
+remove isolated roots. `make verify` runs five consecutive repetitions. Full
+GC-11/12/13 product scenarios, Code Mode and Artifact spillover are not claimed by
+these Tool fragments. Operational details: `docs/tools.md`.
+
+## Artifact slice (ERII-14)
+
+`scripts/verify_artifacts.py --binary bin/personal-agent --evidence evidence/artifacts.json`
+owns Launch (isolated data root + explicit Fakes), Doctor (selected profile,
+schema/readiness), Drive (CLI and normal Main/Task/Root Tool path), Evidence
+(independent SQLite, bytes/hash readback, history, trace and SIGKILL residue),
+and Cleanup (join children and remove disposable roots). `make verify` repeats
+SC-09/recovery five times. See [Artifact operations](../docs/artifacts.md).
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Binary save/open and audit | `artifact save NAME MIME` stdin; `artifact open/describe REF` | `artifact/sqlite.Put/Open/Describe` | Exact bytes/SHA-256 across processes, opaque path-free descriptor, malformed/forged/traversal rejection |
+| Immutable lifecycle | `artifact delete REF VERSION`; `artifact cleanup [apply]` | `artifact/sqlite.Delete/Cleanup/Recover` | Tombstone/CAS, expired/tampered/symlink rejection, quota/ref guards, dry-run, active/paused Task reads, retention after Task end |
+| Reference inputs | `chat send-parts KEY` stdin parts; Task create/append `artifactRefs` | `Runs.Submit`, `tools.executeBuiltin` | Same transaction validates/pins refs, bounded text read, original hash unchanged, forged input creates no ingress |
+| Large/binary Tool results | Normal Executor result; `chat work`, `approval reconcile` recovery | `tools.FinishResult/ReconcileResult`, `Runs.ReconcileUnknown/storeOutput`, `tool.RecoverResult` | Result ref + metadata atomic commit, no payload in history; both binary Query recovery paths through `verify_artifacts.py --recovery-only` (also in the full gate); terminal-unknown uses explicit producing-client receipt invisibility until a fresh client after restart, so automatic reconciliation cannot race its crash precondition; exact receipt bytes/hash and caller/committed/replayed equality, real post-effect SIGKILL with no second effect; race regressions for scope, frozen deadline/cancel/stream closure, invalid evidence/refs/metadata, read and commit failure retaining unknown, and terminal Run immutability |
+| Final output selection | `builtin__artifact__publish` | `PublishTx`, `PrepareReply`, `taskUpdate/promoteFollowups` | Draft omitted; explicit Root refs in update; Main preserves selected media/file part types and bounds final refs to the Conversation envelope; GC-15 transport fragment reopens report |
+| Terminal Artifact delivery | TUI conversation and `/history` | `tui.terminal.history` | Owned PTY sees final attachment ref; CLI open verifies delivered bytes; clean terminal shutdown |
+| Task visibility and parallel outputs | `builtin__artifact__list/read` in scoped Worker; Host child-shaped contract fixtures | `DescribeTx`, Run-derived scope | Same Task read, cross-user/Agent/Task/Run denial, eight child-shaped writers cannot overwrite same display name |
+| Object publication/recovery | Real save Tool during `chat work` | `PutTx`, startup `Recover` | Six SIGKILL boundaries, orphan cleanup, one final object, committed ref reused with no second attempt |
+| Schema v11 migration | Startup on empty/v10 DB | `agent/sqlite.migrate` | Prior identity/config retained, partial DDL rollback, prior v1–v9 regressions retained |
+
+## MCP, Skills and coding fixture (ERII-16)
+
+`scripts/verify_capabilities.py --binary bin/personal-agent --evidence evidence/capabilities.json`
+owns Launch (private data/provider/Skills/checkout roots), Doctor (explicit Fake
+model add/test/select, validated scopes), Drive (ordinary chat/Task/approval CLI),
+Evidence (SQLite, real test output, full tree hashes and SIGKILL/restart), and
+Cleanup (join every process and remove disposable roots). `make verify` repeats
+five times. See [capability operations](../docs/capabilities.md).
+
+For focused reproduction, add `--scenario dirty-index` (approved Worker
+dirty-file refusal) or `--scenario mcp-reply` (malformed post-effect stdio
+reply). Both actions use the same Launch/Doctor/Drive/Evidence/Cleanup lifecycle.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Structured MCP stdio | Configure allowlisted `mcp`, normal Direct Tool call; capability harness `mcp-reply` scenario | `tool/mcp.Definitions`, common Executor | Real initialize/list/call; malformed response-shape contracts; null/missing-text replies after approved Worker effects persist unknown with one attempt and one ledger entry, including restart/reconcile; schema drift, malformed metadata/params, cancellation, provider host-read/write/network/env denial; frozen approval rejection |
+| Configured scope isolation | Optional MCP/Skills/workspace configuration at CLI startup | `config.Load/overlaps` | Root, shared-provider and domain-data overlap rejection; symlink alias resolved even before a new data directory exists |
+| GC-11 structured quote fragment | MCP fixture lookup, then ordinary Artifact save/open | stdio provider data, `builtin__artifact__save`, ArtifactStore | Three actual quote records; oral cashback remains conditional (5038.49 versus 5738.49); saved report bytes/hash reopened through CLI |
+| Progressive Skills | `builtin__skill__list/view` in Main or Root | `skill.Definitions`, `skill.SetHash`, Run capability freeze | Summary excludes body; view returns actual text or binary Artifact; exact asset bytes reopened through CLI; reference/scope/version hashes and drift rejection; traversal/link denial; ordinary Worker management NOT_FOUND |
+| Coding edit/test | `workspace.mode: edit`, normal Main/Task/Root calls; capability harness `dirty-index` scenario | `workspace.Definitions`, common Executor/Security, `computer/sandbox.Command` | Real red missing-status test, exact approved Worker edit, real green race test; only the CLI and its regression test change; ordinary/assume-unchanged/skip-worktree dirty files refuse approved Worker replacement; complete workspace/index/hooks unchanged on refusal; protected edit rejection and old preimage denial |
+| Coding audit and Git | `workspace.mode: audit`, read/search/git | `workspace.read/git`, registry selection | Reads AGENTS.md; audit records actual retry file/symbol order, trigger and effect risk; full tree hashes unchanged; hidden edit and Task control NOT_FOUND; Git filters/textconv/fsmonitor never execute; transient locks excluded and bootstrap auto-maintenance disabled |
+| Coding crash boundary | SIGKILL before result commit after rename; `chat work` restart | Existing ToolStore finish boundary and never-replay policy | One edit, one attempt, persisted unknown; no repeat write or claimed success |
+| Interim Computer isolation | Fixed test command and dedicated MCP executable, Host-only scopes | Seatbelt on macOS, bubblewrap on Linux | Go tests attempt host-secret read/write and network access; source checkout unchanged by test mutation; missing boundary fails closed; VM/Guest production adapter remains M6 |
+
+## Direct Child Run slice (ERII-17)
+
+`scripts/verify_children.py --binary bin/personal-agent --evidence evidence/children.json`
+owns Launch/Doctor/Drive/Evidence/Cleanup through the existing CLI and PTY harness.
+`make verify` runs five consecutive passes. See [Child operations](../docs/children.md).
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Direct delegation | TUI/`chat send` -> Main Task -> Root `builtin__agent__run`; Child may delegate again | `agent.AgentToolDefinition`, `Runs.StartChildRun`, `tools.AgentToolExecutor`, shared `RunAgentLoop` | One Task/Root, Child/Grandchild, unique invocation links, exact `{text,artifactRefs}` outputs and one Root follow-up |
+| Atomic admission and limits | First accepted Worker Tool call | `tools.Accept`, `run_tree`, migration 013 | Transaction fault rollback, duplicate and concurrent admission, drift rejection, depth/descendant/call ceilings; before/after admission SIGKILL |
+| Capability/context isolation | New Root and recursive Child | `WorkerTools`, `ChildContext`, `child_initial`, `taskSteering` | Main forged call, forbidden controls, real private Artifact rejection, inherited frozen profile/schema/scope/Skills, no identity/Conversation/Task steering in Child |
+| Artifact handoff | `agent.run` input refs and Child publish | `StartChildRun`, `AgentToolExecutor`, scoped ArtifactStore | Explicit input pin, Child read/publish, Parent result refs, Root publication and final Main delivery; large Child text becomes a readable Artifact without entering Parent model context |
+| Recoverable waiting/results | `chat work`, repeat after restart | `tools.Prepare`, `Runs.Next`, terminal Outbox | Waiting ancestors release leases, completion-before-wait scan, six kill/restart boundaries, zero replay of completed generations, stable repeated drain |
+| Child approval and cancellation | TUI cancel; `approval approve/deny ID HASH` + `chat work` | Existing approval/Task stop pipeline and epoch fences | CLI exit/restart approval, separate Parent/Child approval IDs, real Child cancellation, no late old-epoch commits, `unknown` never retried or packaged as success |
+
+The M2 Case Runner permits this local Host capability only on an authorized Worker;
+Main delegation, forged names/permissions and external effects retain hard failures.
+Its actual no-Child, Task-count and action assertions stay strict.
+
+This is Direct Tool protocol evidence. Fair scheduling and batch capacity are
+covered below. JavaScript CodeCall replay and complete GC-16/17/18/20 remain
+later slice gates; they are not counted as passing here.
+
+## Fair Child scheduling and batch aggregation (ERII-18)
+
+`scripts/verify_scheduling.py --binary bin/personal-agent --evidence evidence/scheduling.json`
+owns Launch (isolated Fake/data root), Doctor (profile probe/activation), Drive
+(PTY, CLI and two simultaneous Tasks), Evidence (state, event lease timeline,
+usage, outputs and transcript), and Cleanup (all processes reaped, state removed).
+`make verify` runs five consecutive passes. The monetary harness below covers
+account-spend authorization; this entry does not establish full M4 completion.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| 100-item Direct Tool batch | TUI -> Main creates Task -> Root emits four batches | `Runs.StartChildRun`, `RunAgentLoop`, `batchReply` Fake | Exactly 1 Task/Root/100 Child; 98 successes + 2 failures; unique row calls, exact aggregate, one blocker/follow-up, five Root model calls; GC-16/17/20 transport fragments |
+| Transparent fair capacity | `chat work` with concurrent independent Tasks | `Runs.nextScheduled`, `claimCapacity`, `scheduler_tree` | 16 live grandchildren with queued siblings while second Task completes; atomic global/user/Agent/provider/tree bounds across database connections; reopened scheduler preserves rotation; distinct urgent Main is admitted after initial Main acknowledgement while Workers stay blocked (20 race runs, original three-second response bound); GC-18 fragment |
+| Recursive stop and fencing | Main cancel while saturated; then repeat `chat work` | `stopTask`, `recoverStopsTx`, Task/Run claims | Queued/running/waiting descendants and invocations settle; Drain waits for stopping owners to join or expire; no cancelled-tree follow-up; old Task epoch cannot revive; prior Child harness retains late-result and approval rejection evidence |
+| Work-first aggregation and progress | TUI `/status`; Root result -> Main | `runnable`, `Activity`, `finishTask`, Worker prompt | Child joins coalesce until current batch settles; independent ready Tools execute beside pending effect approval without granting it; aggregate five-state counts; reads cause no Outbox/Main turn; successes survive item failures; Fake deduplicates repeated blocker, semantic scores remain null |
+| Tree safety and provider health | `scheduler` + `children` YAML settings | `createTree`, `Generation`, `AcceptGeneration` | Frozen default 256/hard 512 Worker turns, existing depth/descendant/call ceilings, canonical RESOURCE_LIMIT; only infrastructure streak opens recoverable provider cooldown; injected health-write failure rolls back usage/generation and stays a recoverable storage error; per-operation watchdogs remain active |
+| Accounting and migration | State readback; upgrade from schema 013 | Migration 014, immutable `provider_usage` + aggregate views | Empty/every-prior upgrade, populated frozen tree preservation, failed DDL rollback, explicit missing-token counts; monetary policy is covered below |
+| Restart | SIGKILL after batch admission, then `chat work` | Existing model/ToolInvocation recovery and Run claims | First 25 Child identities survive; total stays 100; completed model responses reused; exact final aggregate; no JavaScript/CodeCall replay claim |
+
+
+## Account monetary authorization (ERII-18, SC-13)
+
+`scripts/verify_spend.py --binary bin/personal-agent --evidence evidence/spend.json`
+owns Launch (isolated children Fake), Doctor (profile probe/activation), Drive
+(CLI approval/deny/status, real PTY monetary notice and `/approve`, 100-item batch,
+Main cancellation, SIGKILL),
+Evidence (frozen actions, usage, reservations, Root/Child state, effect ledger)
+and Cleanup (joined processes and removed roots). `make verify` runs five passes.
+Synthetic fixture `evals/fixtures/m4-spend-v1.json` specifies prices and arithmetic.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Account monetary admission | `spend.accounts` YAML, `chat work` | `freezeSpend`, `gateSpend`, `settleSpend` in the shared model admission/acceptance transactions | Integer conversion, full model-bound projection, accumulated actuals plus reservations across Roots, cross-process atomic admission, immutable price version/currency/snapshot, no double reservation, usage/result rollback on injected storage error |
+| One Root spend consent | `approval list`, `approval approve/deny ID HASH`; same TUI commands | `spend_approval`, `Runs.Decide`, existing security notification boundary | 100 Child batch, one Root approval, CLI process exit/restart, no Child prompts, exact frozen hash, denial before model dispatch atomically finalizes its model ledger; actual final/failed response crossing holds and resumes saved outcome without regeneration; denied Parents settle accepted Child invocations; independent Main grant |
+| Separate Child effect consent | Approve monetary batch then Child effect | Existing ToolInvocation policy/approval/execution pipeline | No effect after monetary grant; separate frozen effect ID/hash required; SIGKILL after effect and query-before-retry recovery executes exactly once |
+| Cancel and late events | Main cancels pending monetary batch | `stopTask`, `invalidateApprovals`, existing epoch/owner fences | Old approval invalidated, callback and late usage rejected, no effect/follow-up, settled repeated drain; Go old-owner/Task-epoch regression |
+| Sanitized unknown costs | `spend status` | Read-only `Runs.Spend`, immutable provider usage | Explicit unpriced/unconfigured/combined state, no guessed approval, missing usage retains reserve and unknown actual, historical and setup-Probe unpriced counts; no endpoint/credential or model-visible query |
+| Migration | Open empty/prior schema and restart | Migration 015 | Every-prior upgrade, retained model/profile/usage data, legacy snapshots remain unpriced/unconfigured, failed migration rolls back atomically |
+
+## M5 Code Mode runtime and recovery — ERII-19 / ERII-20
+
+| Feature | User boundary | Authoritative implementation | Inspectable evidence |
+| --- | --- | --- | --- |
+| Fresh JavaScript cells, loops and Promises | Configured `builtin__codemode__execute` through `chat send` / `chat work` | `internal/tool/codemode`, `runtime/javascript/src` | `verify_codemode.py`: selected output plus nested ToolInvocation readback; real Node fixtures |
+| Nested Tool execution with one slot | `tools.run_concurrency: 1`, awaited echo and `Promise.all` through `chat work` | Atomic capacity ownership in `internal/agent/sqlite/tools.go` | `verify_codemode.py`: bounded single-slot completion, wrapper/nested attempt counts and ordered parallel results; deterministic Go tests retain all five actual Tool quotas and conflict exclusion while wrappers run |
+| Progressive discovery and role exposure | `ALL_TOOLS`, `searchTools`, `describeTool`, `describeNamespace`, Worker-only `agent.run` | Frozen capability view in `internal/agent/sqlite/codemode.go` | Main hidden Agent, Worker namespace, actual Child final result and inherited model |
+| Synchronous persistent cell Store | `store` / `load` | `code_store` and fenced Go sink | Write survives throw, another cell cannot read it, Surface handles rejected; Store operation receipts preserve reads and avoid repeated writes on replay; `store-quota-rejection-shrink-suspend-replay` fills quota, catches `RESOURCE_LIMIT`, shrinks, suspends, then proves the same rejection, unchanged dependent Tool arguments, one dispatch, and no rejected write; unawaited calls drain without rerunning the finished cell |
+| CUA facade | `cua.getState`, `getApp`, bound `observe` | Unified Computer Tool bridge; explicit read-only Fake until M6 | Three nested invocations and chosen latest observation |
+| Approval and isolation | Nested effect, prohibited globals, cancellation | Existing ToolExecutor, QuickJS Worker and RPC admission | Exact rejection without dispatch; forbidden globals, CPU/memory/output limits, forged peer and duplicate event fixtures |
+| Fixed-source Code Mode recovery | configured `builtin__codemode__execute` via `chat send` / `chat work` | `tools.executeCode`, `codeBridge`, `Runs.recoverCode` | `verify_code_recovery.py`: actual Sidecar/Go SIGKILL at 37 completed + 8 active of 100; independent provider dispatch audit; 45 identities reattached; 100 final Children; zero active suspended VMs, replay/latency/RSS metrics, cleanup; five runs in `make verify`. State/contract tests cover old owner, wake-before-release, args/schema/manifest drift, durable delivery order and six fake hours of approval without a VM. |
+
+Launch/Doctor/Drive/Evidence/Cleanup:
+`python3 scripts/verify_codemode.py --binary bin/personal-agent --evidence evidence/codemode.json`.
+This command owns disposable configuration, Model Fake, Computer Fake, processes
+and SQLite state. `make verify` repeats it five times. `docs/codemode.md` records
+configuration, limits, provenance, runtime upgrade constraints and ERII-21 scoring gaps.
+`verify_code_recovery.py` owns the same five harness phases for fixed-source
+SIGKILL/SIGTERM recovery and recursive cancellation.
