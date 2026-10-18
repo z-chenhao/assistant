@@ -38,6 +38,47 @@ type entry struct {
 
 var invalid = errors.New("invalid skill catalog")
 
+type metadata struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+}
+
+// Frontmatter delimiters occupy their own unindented lines. A quoted scalar,
+// an indented block scalar or the body may contain the same punctuation.
+func parseMetadata(name string, b []byte) (metadata, error) {
+	var front metadata
+	if len(b) > 65536 {
+		return front, invalid
+	}
+	text := strings.TrimLeft(string(b), " \t\r\n")
+	opening, rest, ok := strings.Cut(text, "\n")
+	if !ok || strings.TrimRight(opening, " \t\r") != "---" {
+		return front, invalid
+	}
+	header := ""
+	closed := false
+	for offset := 0; offset < len(rest); {
+		line, _, more := strings.Cut(rest[offset:], "\n")
+		if strings.TrimRight(line, " \t\r") == "---" {
+			header, closed = rest[:offset], true
+			break
+		}
+		if !more {
+			break
+		}
+		offset += len(line) + 1
+	}
+	if !closed || yaml.Unmarshal([]byte(header), &front) != nil || front.Name != name || front.Name == "" || front.Description == "" || len(front.Description) > 1024 {
+		return front, invalid
+	}
+	for _, r := range front.Name {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return front, invalid
+		}
+	}
+	return front, nil
+}
+
 func (c Config) Validate() error {
 	if !filepath.IsAbs(c.Root) || (c.Scope != "agent" && c.Scope != "workspace") {
 		return invalid
@@ -108,21 +149,9 @@ func load(c Config) ([]entry, error) {
 		if err != nil {
 			return nil, invalid
 		}
-		parts := strings.SplitN(string(b), "---", 3)
-		if len(parts) != 3 || strings.TrimSpace(parts[0]) != "" {
+		front, err := parseMetadata(d.Name(), b)
+		if err != nil {
 			return nil, invalid
-		}
-		var front struct {
-			Name        string `yaml:"name"`
-			Description string `yaml:"description"`
-		}
-		if yaml.Unmarshal([]byte(parts[1]), &front) != nil || front.Name != d.Name() || front.Description == "" || len(front.Description) > 1024 {
-			return nil, invalid
-		}
-		for _, r := range front.Name {
-			if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
-				return nil, invalid
-			}
 		}
 		blob, _ := json.Marshal(e.files)
 		e.Summary = Summary{Name: front.Name, Description: front.Description, Scope: c.Scope, Version: sum(blob)}

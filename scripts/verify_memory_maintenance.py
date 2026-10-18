@@ -264,25 +264,47 @@ def run(binary):
                                                           'rules_hash': rules['hash'], 'text': replacement}, worker=True)
             tests = [call(h, 'verified-' + str(i), 'builtin__workspace__test', {}) for i in range(2)]
             require(all(json.loads(content(inv)['text'])['passed'] for inv in tests), 'real workspace verification failed')
-            proposal = dict(operation='propose', name='verified-cli-correction', description='Correct and verify a CLI flag.',
-                            procedure='1. Read AGENTS.md and reproduce the missing CLI flag.\n2. Add the flag using the existing parser.\n3. Run go test -race ./... and inspect compatibility tests.',
-                            reason='success', source_refs=['run:' + inv['run_id'] for inv in tests])
-            candidate = h.command('skill', 'manage', text=json.dumps(proposal))
-            request = dict(candidate_ref=candidate['candidate_ref'], version=candidate['version'])
-            denied = h.command('skill', 'manage', text=json.dumps(dict(request, operation='promote')), ok=False)
-            require(denied.returncode != 0, 'unverified experience promoted')
-            for inv in tests:
-                candidate = h.command('skill', 'manage', text=json.dumps(dict(request, operation='verify',
-                                                                            verification_ref='invocation:' + inv['invocation_id'])))
-                request['version'] = candidate['version']
-            require(candidate['status'] == 'verified', 'independent verifications did not qualify')
-            promoted = h.command('skill', 'manage', text=json.dumps(dict(request, operation='promote')))
-            require(promoted['status'] == 'promoted', 'verified procedure not published')
-            require((root / 'skills/verified-cli-correction/SKILL.md').is_file(), 'published Skill missing')
-            request['version'] = promoted['version']
-            retired = h.command('skill', 'manage', text=json.dumps(dict(request, operation='retire')))
-            require(retired['status'] == 'retired' and not (root / 'skills/verified-cli-correction').exists(), 'retirement failed')
-            report['scenarios'].append(dict(name='verified-skill-lifecycle', tests=tests, promoted=promoted, retired=retired))
+            lifecycles = []
+            for skill_name in ('verified-cli', 'verified---cli-correction'):
+                skill_description = 'Review code --- safely.'
+                proposal = dict(operation='propose', name=skill_name, description=skill_description,
+                                procedure='1. Read AGENTS.md and reproduce the missing CLI flag.\n2. Add the flag using the existing parser.\n3. Run go test -race ./... and inspect compatibility tests.',
+                                reason='success', source_refs=['run:' + inv['run_id'] for inv in tests])
+                candidate = h.command('skill', 'manage', text=json.dumps(proposal))
+                request = dict(candidate_ref=candidate['candidate_ref'], version=candidate['version'])
+                denied = h.command('skill', 'manage', text=json.dumps(dict(request, operation='promote')), ok=False)
+                require(denied.returncode != 0, 'unverified experience promoted')
+                for inv in tests:
+                    candidate = h.command('skill', 'manage', text=json.dumps(dict(request, operation='verify',
+                                                                                verification_ref='invocation:' + inv['invocation_id'])))
+                    request['version'] = candidate['version']
+                require(candidate['status'] == 'verified', 'independent verifications did not qualify')
+                promoted = h.command('skill', 'manage', text=json.dumps(dict(request, operation='promote')))
+                require(promoted['status'] == 'promoted', 'verified procedure not published')
+                require((root / 'skills' / skill_name / 'SKILL.md').is_file(), 'published Skill missing')
+                # Each CLI command starts a new configured process. Prove publication
+                # survives startup, exact catalog metadata readback and retirement.
+                restarted = h.command('status')
+                require(restarted['agent_ingress_enabled'], 'published metadata disabled configured startup')
+                listed = call(h, skill_name + '-list', 'builtin__skill__list', {})
+                summaries = json.loads(content(listed)['text'])
+                summary = next((item for item in summaries if item['name'] == skill_name), None)
+                require(summary and summary['description'] == skill_description,
+                        'published punctuation metadata did not round-trip through catalog')
+                viewed = call(h, skill_name + '-view', 'builtin__skill__view',
+                              {'name': skill_name, 'version': summary['version']})
+                require(content(viewed)['text'].endswith(proposal['procedure'] + '\n'),
+                        'published Skill body changed across restart')
+                request['version'] = promoted['version']
+                retired = h.command('skill', 'manage', text=json.dumps(dict(request, operation='retire')))
+                require(retired['status'] == 'retired' and not (root / 'skills' / skill_name).exists(), 'retirement failed')
+                require(h.command('status')['agent_ingress_enabled'], 'retirement disabled configured startup')
+                remaining = json.loads(content(call(h, skill_name + '-retired-list', 'builtin__skill__list', {}))['text'])
+                require(not any(item['name'] == skill_name for item in remaining), 'retired Skill remains in catalog')
+                lifecycles.append(dict(promoted=promoted, restarted=restarted, summary=summary,
+                                       viewed=content(viewed), retired=retired, remaining=remaining))
+            report['scenarios'].append(dict(name='verified-skill-lifecycle', tests=tests,
+                                            **lifecycles[0], lifecycles=lifecycles))
             work(h)
             manage(h, 'forget-health-category', operation='forget', category='health')
             work(h)

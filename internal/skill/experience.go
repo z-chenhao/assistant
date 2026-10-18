@@ -80,12 +80,16 @@ func Publish(ctx context.Context, c Config, id, name, description, procedure str
 	if c.Validate() != nil || ctx.Err() != nil {
 		return invalid
 	}
+	want := content(name, description, procedure)
+	front, e := parseMetadata(name, want)
+	if e != nil || front.Name != name || front.Description != description {
+		return invalid
+	}
 	root, e := os.OpenRoot(c.Root)
 	if e != nil {
 		return invalid
 	}
 	defer root.Close()
-	want := content(name, description, procedure)
 	if existing, e := readFile(root, name+"/SKILL.md"); e == nil {
 		if string(existing) == string(want) {
 			return nil

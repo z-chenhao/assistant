@@ -32,7 +32,7 @@ func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 	two := mustSubmit(t, a, "experience-2", "Independently repeat the corrected method")
 	mustDrain(t, a)
 	c := skill.Config{Root: t.TempDir(), Scope: "agent"}
-	q := skill.ReviewRequest{Operation: "propose", Name: "verified-tests", Description: "Verify a small repository correction.", Procedure: "1. Read AGENTS.md and reproduce the failure.\n2. Make the smallest correction.\n3. Run go test -race ./... and inspect the result.", Reason: "success", SourceRefs: []string{"run:" + one.RunID}}
+	q := skill.ReviewRequest{Operation: "propose", Name: "verified---tests", Description: "Review code --- safely.", Procedure: "1. Read AGENTS.md and reproduce the failure.\n2. Make the smallest correction.\n3. Run go test -race ./... and inspect the result.", Reason: "success", SourceRefs: []string{"run:" + one.RunID}}
 	value, e := r.ReviewExperience(ctx, c, q)
 	if e != nil {
 		t.Fatal(e)
@@ -75,7 +75,7 @@ func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 		t.Fatal(e)
 	}
 	var summaries []skill.Summary
-	if json.Unmarshal([]byte(defs[0].Execute(ctx, `{}`).Text), &summaries) != nil || len(summaries) != 1 || summaries[0].Name != q.Name {
+	if json.Unmarshal([]byte(defs[0].Execute(ctx, `{}`).Text), &summaries) != nil || len(summaries) != 1 || summaries[0].Name != q.Name || summaries[0].Description != q.Description {
 		t.Fatal(summaries)
 	}
 	for _, d := range defs {
