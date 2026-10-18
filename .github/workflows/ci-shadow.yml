@@ -120,7 +120,9 @@ jobs:
           sudo apt-get install -y bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Race detector
-        run: python3 scripts/ci_step.py --name race --phase test -- make test-race
+        # Keep the one-second Bridge burst/control fixture off the CPU-heavy
+        # SQLite package. This changes package scheduling, not test concurrency.
+        run: python3 scripts/ci_step.py --name race --phase test -- go test -race -p 1 -timeout=15m ./...
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() && github.head_ref == 'agent/erii-builder/erii-141' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

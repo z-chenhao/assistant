@@ -248,3 +248,13 @@ an exact-SHA reviewer PASS. Rollback is to remove `ci-shadow.yml`; current requi
 CI never depends on it and needs no protection change. The CI-only approach may
 not meet the cost target while repeated sandbox compiler work remains mandatory;
 any sandbox-cache proposal needs a separate security design and authorization.
+
+The first shadow experiment also tests `go test -race -p 1 -timeout=15m ./...`.
+Baseline job 117675122720 failed the Bridge duplicate-burst concurrent RPC check
+at its one-second deadline while the full SQLite race package was running.
+The peer emits 8,192 notifications before it reads that RPC, so the deadline
+includes instrumented burst transfer. CPU contention is a hypothesis; a local
+full race pass does not prove the cause. Candidate package isolation preserves
+every test, internal concurrency, repetition and deadline. The baseline Makefile
+and required job remain unchanged. Measure both outcomes and cold-build cost
+before promoting this scheduling policy; one passing rerun is not proof of repair.
