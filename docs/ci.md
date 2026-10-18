@@ -125,3 +125,9 @@ The full race command uses an explicit 15-minute Go package budget inside its
 20-minute job. Real SQLite migrations under race instrumentation exhausted the
 implicit 10-minute package budget on Ubuntu; per-test, Tool and lease deadlines
 remain unchanged. See [Core gate evidence](core-evals.md).
+
+The Code Mode verification job has a 60-minute budget; other verification shards
+retain 30 minutes. Four observed Ubuntu Core runs took 497.06, 508.73, 491.36 and
+517.33 seconds each, and the 45-minute job budget interrupted the fifth run.
+The 60-minute allocation preserves all 90 case executions, all five serial
+repetitions and all per-case/Tool/lease deadlines.

@@ -104,7 +104,7 @@ jobs:
   verify:
     name: Verification (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ matrix.shard == 'codemode' && 60 || 30 }}
     strategy:
       fail-fast: false
       matrix:

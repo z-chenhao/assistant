@@ -25,8 +25,11 @@ python3 scripts/run_core_cases.py --binary bin/personal-agent --evidence evidenc
 Omit `--case` to run all variants and SC contracts. Five repetitions are serial
 inside `make verify`'s codemode shard. Existing security, approval, delivery,
 provider and cancellation gates retain all previous repetitions. CI installs
-bubblewrap in the codemode shard as well as the providers shard. The shard
-job deadline is 45 minutes to accommodate 90 isolated case executions; individual
+bubblewrap in the codemode shard as well as the providers shard. The Code Mode shard
+job deadline is 60 minutes to accommodate 90 isolated case executions; the other
+verification shards retain 30 minutes. Ubuntu measured 491–517 seconds per full
+18-variant Core run; the former 45-minute job ended during the fifth run after
+four passing runs. No repetition or assertion is removed. Individual
 Tool, process and assertion deadlines are unchanged. The full Go race package
 budget is explicitly 15 minutes (within the existing 20-minute CI job): Ubuntu
 hit the former implicit 10-minute package alarm while the current test was only
