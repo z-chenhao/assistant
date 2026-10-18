@@ -70,7 +70,7 @@ is intentionally a small fixture, not an additional product database or a
 replacement for Erii's SQLite migration tests. Up/down, repeated upgrade, empty
 state and malformed-state preservation are exercised by real fixture tests.
 The Root applies the migration implementation; Go is killed after that Tool
-result commits while the scheduler edit awaits approval. Recovery reuses that
+result commits while the scheduler implementation is still incomplete. Recovery reuses that
 completed edit. An independent Child reads current cancellation source and
 reports its nonrecursive defect. Only Root edits the shared service. The final
 sandbox tests cover migration, Root/Child admission, old epoch rejection and
