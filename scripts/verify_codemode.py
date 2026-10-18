@@ -17,7 +17,7 @@ from verify_main import require
 
 
 def run(binary):
-    report = {'version': 1, 'scope': 'ERII-19 QuickJS/ToolInvocation contract; ERII-20 full replay/fencing gates remain due',
+    report = {'version': 1, 'scope': 'QuickJS/ToolInvocation contract; full fixed-source kill/restart gates are verify_code_recovery.py',
               'checks': [], 'cleanup': False}
     with tempfile.TemporaryDirectory(prefix='erii-codemode-') as temp:
         root = Path(temp)
@@ -83,6 +83,29 @@ return values;
             p, _ = execute('store-isolated', 'return load("durable") === undefined;')
             require(json.loads(json.loads(p['result_json'])['text']) == [{'type': 'return', 'value': True}], 'Store escaped invocation scope')
             report['checks'].append({'name': 'synchronous-store-failure-and-isolation', 'value': json.loads(value[0])})
+
+            p, nested = execute('store-quota-replay', '''
+for (let i=0; i<4; i++) store("k"+i, "x".repeat(262140));
+let rejected=false;
+try { store("extra", 1); } catch(e) { rejected=e.code === "RESOURCE_LIMIT"; }
+store("k0", null);
+await tools.builtin__text__echo({text:String(rejected)});
+return rejected;
+''')
+            require(p['status'] == 'succeeded', f'quota rejection changed dependent Tool arguments on replay: {p["status"]}')
+            output = json.loads(json.loads(p['result_json'])['text'])
+            require(output == [{'type': 'return', 'value': True}], f'quota rejection changed after shrink/replay: {output}')
+            require(len(nested) == 1 and nested[0]['status'] == 'succeeded' and nested[0]['attempt_count'] == 1
+                    and json.loads(nested[0]['arguments_json']) == {'text': 'true'}, 'quota replay changed or repeated nested call')
+            with sqlite3.connect(db_path) as db:
+                values = db.execute('SELECT key,version,length(value_json) FROM code_store WHERE execution_id=? ORDER BY key', (p['invocation_id'],)).fetchall()
+                receipts = db.execute("SELECT call_key,request_hash,reply_json FROM code_store_call WHERE execution_id=? AND json_extract(reply_json,'$.error.code')='RESOURCE_LIMIT'", (p['invocation_id'],)).fetchall()
+                starts = db.execute("SELECT count(DISTINCT attempt_id) FROM code_event WHERE execution_id=? AND json_extract(message_json,'$.kind')='execution_started'", (p['invocation_id'],)).fetchone()[0]
+            require(values == [('k0', 2, 4), ('k1', 1, 262142), ('k2', 1, 262142), ('k3', 1, 262142)], 'quota replay committed rejected write or repeated shrink')
+            require(len(receipts) == 1 and starts >= 2, 'quota rejection receipt or suspension/replay missing')
+            report['checks'].append({'name': 'store-quota-rejection-shrink-suspend-replay', 'output': output,
+                                     'store': values, 'rejection_receipts': receipts, 'vm_starts': starts,
+                                     'nested_arguments': json.loads(nested[0]['arguments_json']), 'nested_attempts': nested[0]['attempt_count']})
 
             p, nested = execute('cua', '''
 const state = await cua.getState();
@@ -189,7 +212,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             with sqlite3.connect(db_path) as db:
                 report['events'] = [json.loads(r[0]) for r in db.execute('SELECT message_json FROM code_event ORDER BY execution_id,attempt_id,sequence')]
                 report['schema_version'] = db.execute('PRAGMA user_version').fetchone()[0]
-            require(report['events'] and report['schema_version'] == 16, 'durable events/migration missing')
+            require(report['events'] and report['schema_version'] == 17, 'durable events/migration missing')
         finally:
             h.cleanup()
     report['cleanup'] = not root.exists()
