@@ -243,12 +243,13 @@ def main():
     passed = not stopped.is_set() and all(
         len(rows) == sum(g.attempts for g in SHARDS[name]) and all(r["returncode"] == 0 for r in rows)
         for name, rows in zip(names, results))
-    if passed and "codemode" in names:
-        passed = core_report.write(evidence)
     stable = source == source_state() and binary_digest == hashlib.sha256(binary.read_bytes()).hexdigest()
     passed = passed and stable
+    if passed and "codemode" in names:
+        passed = core_report.write(evidence)
     report = dict(version=1, **source, source_stable=stable,
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
+                  image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   binary_sha256=binary_digest,
                   elapsed_seconds=time.monotonic() - started, passed=passed,
                   shards=dict(zip(names, results)))

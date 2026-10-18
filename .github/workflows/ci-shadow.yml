@@ -62,8 +62,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - name: Compile, unit tests and lint
-        run: python3 scripts/ci_step.py --name unit-lint-build --phase build -- make build test lint
+      - name: Compile once
+        run: python3 scripts/ci_step.py --name build --phase build -- make build
+      - name: Unit tests and lint
+        run: python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
       - name: Risk-related race and deterministic early regressions
         run: python3 scripts/ci_step.py --name feedback --phase test -- python3 scripts/ci_feedback.py --plan evidence/impact.json
       - name: Seal exact build and dependency payload

@@ -39,6 +39,7 @@ def main():
         record = dict(version=1, name=args.name, phase=args.phase, command=command, returncode=code,
                       **source, source_stable=stable,
                       wall_seconds=time.monotonic() - started, runner=platform.platform(),
+                      image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                       go_cache_hit=os.environ.get('CI_GO_CACHE_HIT') or None,
                       npm_cache_hit=os.environ.get('CI_NPM_CACHE_HIT') or None, **metrics)
         (folder / (args.name + '.json')).write_text(json.dumps(record, indent=2) + '\n')

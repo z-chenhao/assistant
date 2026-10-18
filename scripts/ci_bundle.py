@@ -21,8 +21,11 @@ META = 'ci-build.json'
 
 
 def sha(path):
+    digest = hashlib.sha256()
     with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def context(root):
@@ -33,6 +36,7 @@ def context(root):
     return dict(source_sha=command('git', 'rev-parse', 'HEAD').decode(),
                 source_inputs_sha256=hashlib.sha256(command('git', 'ls-files', '-s', '-z')).hexdigest(),
                 os=platform.system(), arch=platform.machine(),
+                image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                 go=command('go', 'version').decode(), node=command('node', '--version').decode())
 
 

@@ -99,7 +99,8 @@ class BundleTests(unittest.TestCase):
         self.dest.mkdir()
         self.archive = self.root / 'bundle.tar.gz'
         self.context = dict(source_sha='a' * 40, source_inputs_sha256='b' * 64,
-                            os='Linux', arch='x86_64', go='go pinned', node='node pinned')
+                            os='Linux', arch='x86_64', go='go pinned', node='node pinned',
+                            image_os='ubuntu24', image_version='pinned image')
         self.mock = patch.object(bundle, 'context', return_value=self.context)
         self.mock.start()
         self.addCleanup(self.mock.stop)

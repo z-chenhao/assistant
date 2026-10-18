@@ -185,7 +185,7 @@ single attempts are additional evidence; full five-run series remain intact.
 `ci_bundle.py` seals the binary and both installed dependency trees once, after
 early feedback succeeds. Consumers download only the artifact from their own
 workflow attempt, require the producer output SHA-256, and compare source SHA,
-tracked input digest, OS/architecture and exact Go/Node versions before restore.
+tracked input digest, OS/architecture, runner image version and exact Go/Node versions before restore.
 The source digest includes every tracked file, including lockfiles, go.sum,
 workflows and build scripts. Dirty tracked source is rejected. Binary digest,
 archive entry types, traversal and escaping symlinks are checked; missing or
