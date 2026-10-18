@@ -63,14 +63,14 @@ class MainHarness:
             time.sleep(0.025)
         raise RuntimeError("state boundary not reached: " + description)
 
-    def hold(self, boundary, extra_flags=()):
+    def hold(self, boundary, extra_flags=(), timeout=15):
         child = subprocess.Popen(self.args("-test-main-hold", boundary, *extra_flags, "chat", "work"),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
         with selectors.DefaultSelector() as selector:
             selector.register(child.stdout, selectors.EVENT_READ)
-            require(selector.select(15), f"boundary never reached: {boundary}")
+            require(selector.select(timeout), f"boundary never reached: {boundary}")
         line = child.stdout.readline()
         require(line and json.loads(line).get("boundary") == boundary,
                 f"exited before boundary {boundary}: {line} {child.stderr.read() if not line else ''}")

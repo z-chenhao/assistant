@@ -36,7 +36,7 @@ def tree(root):
 def prepare(binary, root, mode='edit'):
     repo = root / 'repo'
     shutil.copytree(Path(__file__).resolve().parents[1] / 'evals/fixtures/coding-v1', repo)
-    for args in [('init', '-q'), ('add', '.'),
+    for args in [('init', '-q', '-b', 'feature/eval'), ('add', '.'),
                  ('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
                   'commit', '-qm', 'fixture')]:
         subprocess.run(['git', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', *args], cwd=repo, check=True, capture_output=True,
@@ -87,7 +87,7 @@ def content(invocation):
     return json.loads(invocation['result_json'])
 
 
-def run(binary, selected=None):
+def run(binary, selected=None, fixture_context=None):
     report = {'version': 1, 'scope': 'M3 MCP/Skill/coding contracts; GC-19 prerequisites, GC-20 coding boundary only; M4 Child and M5 Durable Replay remain not_applicable',
               'checks': [], 'crashes': [], 'cleanup': False}
     with tempfile.TemporaryDirectory(prefix='erii-capabilities-') as temp:
@@ -99,6 +99,8 @@ def run(binary, selected=None):
             folder.mkdir()
             h = prepare(binary, folder, mode)
             try:
+                if fixture_context:
+                    h.send('fixture-context', fixture_context)
                 report[kind].append(fn(h))
             finally:
                 h.cleanup()
@@ -121,6 +123,11 @@ def run(binary, selected=None):
                           {'path': path, 'before_hash': source['hash'], 'rules_hash': document['hash'], 'text': replacement}, worker=True)
             require(not content(edited).get('error'), 'approved Worker edit failed')
             require((repo / path).read_text() == replacement, 'edit did not reach actual workspace file')
+            test_path = 'cmd/taskctl/main_test.go'
+            test_source = json.loads(content(call(h, 'test-source', 'builtin__workspace__read', {'path': test_path}))['text'])
+            tests = test_source['text'] + '\nfunc TestSearchActiveCompatibility(t *testing.T) {\n var out bytes.Buffer\n if err := run([]string{"--status", "active"}, &out); err != nil { t.Fatal(err) }\n if out.String() != "[{\\\"Title\\\":\\\"Build\\\",\\\"Status\\\":\\\"active\\\"}]\\n" { t.Fatal(out.String()) }\n}\n'
+            test_edit = call(h, 'test-edit', 'builtin__workspace__edit', {'path': test_path, 'before_hash': test_source['hash'], 'rules_hash': document['hash'], 'text': tests}, worker=True)
+            require(not content(test_edit).get('error'), 'test edit failed')
             tested = call(h, 'green', 'builtin__workspace__test', {})
             require(json.loads(content(tested)['text'])['passed'], 'real sandbox tests did not pass: ' + content(tested)['text'])
             diff = content(call(h, 'diff', 'builtin__workspace__git', {'operation': 'diff'}))['text']
@@ -131,7 +138,7 @@ def run(binary, selected=None):
             require(protected['error']['code'] == 'PERMISSION_DENIED', 'protected dirty file edited')
             final = tree(repo)
             changed = [p for p in original if original[p] != final.get(p)]
-            require(changed == [path], f'unrelated coding changes: {changed}')
+            require(sorted(changed) == sorted([path, test_path]), f'unrelated coding changes: {changed}')
             require(not (repo / 'hook-ran').exists() and original['.git/hooks/pre-commit'] == final['.git/hooks/pre-commit'],
                     'hook changed or executed')
             return {'name': 'real_red_edit_green_with_Worker_approval', 'changed': changed,
@@ -170,14 +177,15 @@ def run(binary, selected=None):
         def audit(h):
             repo = h.root / 'repo'
             before = tree(repo)
+            call(h, 'audit-rules', 'builtin__workspace__read', {'path': 'AGENTS.md'})
             searched = content(call(h, 'search', 'builtin__workspace__search', {'query': 'provider.Execute'}, worker=True))
             require('internal/retry/executor.go' in searched['text'], 'audit search missed actual source')
             read = content(call(h, 'read', 'builtin__workspace__read', {'path': 'internal/retry/executor.go'}))
-            require('provider.Execute()' in read['text'] and 'ledger.Lookup()' in read['text'], 'audit lacks symbol evidence')
+            require('provider.Execute()' in read['text'] and 'ledger.Lookup()' in read['text'] and read['text'].index('provider.Execute()') < read['text'].index('ledger.Lookup()'), 'audit lacks call-order evidence')
             forbidden = content(call(h, 'forged-edit', 'builtin__workspace__edit', {}, worker=True))
             require(forbidden['error']['code'] == 'NOT_FOUND', 'audit edit capability leaked')
             require(tree(repo) == before, 'audit changed workspace bytes or Git state')
-            return {'name': 'audit_read_search_no_writes', 'tree_hashes': before, 'state': h.state()}
+            return {'name': 'audit_read_search_no_writes', 'tree_hashes': before, 'finding': {'file': 'internal/retry/executor.go', 'symbols': ['retry.Execute', 'Provider.Execute', 'Ledger.Lookup'], 'trigger': 'retry after a previously completed call', 'impact': 'Provider runs before the completed Ledger result is checked, so a retry can repeat an effect', 'basis': 'observed source order; no claim of a production failure'}, 'state': h.state()}
         scenario('audit', audit, mode='audit')
 
         def quotes(h):

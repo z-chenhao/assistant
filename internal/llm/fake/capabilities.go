@@ -11,6 +11,14 @@ import (
 // executor, scoped files and stdio transport, never from canned success text.
 func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	lastMessage := request.Messages[len(request.Messages)-1]
+	for _, m := range request.Messages {
+		if m.Role == "user" && m.Text == "Review cancellation" {
+			return cancellationReview(request)
+		}
+		if m.Role == "user" && strings.HasPrefix(m.Text, "Classify feedback: ") {
+			return feedbackReply(m.Text, lastMessage.Role == "tool")
+		}
+	}
 	if lastMessage.Origin == "runtime" {
 		return llm.GenerationResult{Text: "Observed Worker update: " + lastMessage.Text}
 	}
