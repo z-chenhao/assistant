@@ -111,3 +111,15 @@ delivery:
 # javascript:
 #   command: /absolute/path/to/node
 #   script: /absolute/path/to/erii/runtime/javascript/src/sidecar.mjs
+
+# Optional background Memory maintenance. The reference resolves to an existing
+# 32-byte key in SecretStore; never put key bytes in YAML. No per-record prompts.
+# When embedding is enabled with maintenance, its endpoint must be literal loopback.
+# memory:
+#   encryption_key_ref: env:ERII_MEMORY_KEY
+
+# Frozen per Run; Children inherit the Parent policy. Provisional defaults.
+context:
+  threshold_percentage: 0.75
+  recent_messages: 6
+  summary_bytes: 2048

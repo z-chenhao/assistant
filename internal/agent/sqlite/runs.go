@@ -13,11 +13,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/recall"
 	"github.com/z-chenhao/erii/internal/tool"
 	"github.com/z-chenhao/erii/internal/tool/codemode"
@@ -26,6 +28,9 @@ import (
 )
 
 type Runs struct {
+	contextPolicy contextbuilder.Policy
+	memory        MemoryWriter
+	vault         memory.Vault
 	recall        *recall.Service
 	javascript    codemode.JavaScriptRuntime
 	host          *Store
@@ -99,7 +104,7 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 		return agent.ErrClaimLost
 	}
 	var valid int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active'))`, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND coalesce((SELECT epoch FROM run_memory_epoch WHERE run_id=r.run_id),0)=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=r.agent_id),0) AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active'))`, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
 		return agent.ErrStorage
 	}
 	if valid != 1 {
@@ -145,7 +150,7 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 		if profile == "" || status != "ready" {
 			return agent.ErrSetup
 		}
-		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
+		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND desired_state='running' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
 		if err == sql.ErrNoRows {
 			receipt.RunID, err = r.createMain(ctx, tx, agentID, profile, configVersion, nil)
 			if err != nil {
@@ -217,7 +222,7 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 		// may create an update or unblock an Inbox after our earlier scans.
 		// Once active==0, any such completion must already be visible here.
 		var pending int
-		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch)`).Scan(&pending); err != nil {
+		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0))`).Scan(&pending); err != nil {
 			return "", agent.ErrStorage
 		}
 		if pending > 0 {
@@ -238,7 +243,7 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 		if err := r.claimCapacity(ctx, tx, id); err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
+		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND `+mainPredecessorsJoined+` AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
 		if err != nil {
 			return err
 		}
@@ -344,6 +349,9 @@ func (r *Runs) Flush(ctx context.Context) error {
 	}
 	return r.write(ctx, func(tx *sql.Tx) error {
 		for _, m := range messages {
+			if err := r.observeMemory(ctx, tx, m.ConversationID, "conversation", m.MessageID); err != nil {
+				return err
+			}
 			if _, err := tx.ExecContext(ctx, `UPDATE conversation_intent SET flushed=1 WHERE message_id=?`, m.MessageID); err != nil {
 				return err
 			}
@@ -366,7 +374,7 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 	if run.Checkpoint.ContextReady {
 		return nil
 	}
-	rows, err := r.host.db.QueryContext(ctx, `SELECT message_id FROM conversation_intent WHERE sequence<=(SELECT history_boundary FROM run WHERE run_id=?)`, c.RunID())
+	rows, err := r.host.db.QueryContext(ctx, `SELECT message_id FROM conversation_intent WHERE sequence>coalesce((SELECT history_floor FROM memory_privacy WHERE agent_id=(SELECT agent_id FROM run WHERE run_id=?)),0) AND sequence<=(SELECT history_boundary FROM run WHERE run_id=?)`, c.RunID(), c.RunID())
 	if err != nil {
 		return agent.ErrStorage
 	}
@@ -405,7 +413,7 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 	}
 	run.Checkpoint.Messages = base
 	for _, m := range filtered {
-		run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.AgentMessage{Type: m.Role, Content: m.Content})
+		run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.AgentMessage{MessageID: m.MessageID, Type: m.Role, Content: m.Content})
 	}
 	run.Checkpoint.Messages = append(run.Checkpoint.Messages, runtimeMessages...)
 	run.Checkpoint.ContextReady = true
@@ -600,6 +608,15 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 			return err
 		}
 		worker = workers == 1
+		if worker && status == "completed" {
+			var owner string
+			if err = tx.QueryRowContext(ctx, `SELECT agent_id FROM run WHERE run_id=?`, c.RunID()).Scan(&owner); err != nil {
+				return err
+			}
+			if err = r.observeMemory(ctx, tx, owner, "run", c.RunID()); err != nil {
+				return err
+			}
+		}
 		if worker {
 			r.host.boundary("before_result_commit")
 		}

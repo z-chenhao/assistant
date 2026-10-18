@@ -114,6 +114,9 @@ func (r *Runs) StartChildRun(ctx context.Context, tx *sql.Tx, c agent.RunClaim, 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,task_id,parent_run_id,root_run_id,kind,worker_position,status,task_epoch,depth,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,?,?,?,'worker','child','queued',?,?,?,?,?,0,?,?,1)`, id, agentID, conv, taskID, c.RunID(), rootID, epoch, depth+1, capID, modelID, cp, now, now); err != nil {
 		return tool.Result{}, err
 	}
+	if err = r.freezeContext(ctx, tx, id); err != nil {
+		return tool.Result{}, err
+	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
 		return tool.Result{}, err
 	}

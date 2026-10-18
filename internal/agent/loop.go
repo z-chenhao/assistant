@@ -61,6 +61,18 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 		}
 		return &runFailure{cause: llm.NormalizeError(code)}
 	}
+	retryContext := func(run Run) (bool, error) {
+		if run.Checkpoint.ContextRetries >= 1 {
+			return false, nil
+		}
+		cp := run.Checkpoint
+		cp.ContextRetries++
+		cp.Step++
+		cp.Result = nil
+		cp.ExchangeID = ""
+		cp.Phase = "model"
+		return true, o.Store.Checkpoint(work, claim, run.Version, cp)
+	}
 	for {
 		// Shutdown is a boundary stop. It never mutates business cancellation.
 		if ctx.Err() != nil {
@@ -96,7 +108,7 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 			}
 			if len(inputs) > 0 {
 				for _, input := range inputs {
-					cp.Messages = append(cp.Messages, AgentMessage{Type: "user", Content: input.Message.Content})
+					cp.Messages = append(cp.Messages, AgentMessage{MessageID: input.Message.MessageID, Type: "user", Content: input.Message.Content})
 					cp.InputSequence = input.Sequence
 				}
 				if err = o.Store.Checkpoint(work, claim, r.Version, cp); err != nil {
@@ -108,6 +120,14 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 			// lost ownership must cancel those provider reads before model admission.
 			generation, err := o.Store.Generation(execution, claim, r)
 			if err != nil {
+				if errors.Is(err, llm.ContextLengthExceeded) {
+					if retry, e := retryContext(r); retry {
+						if e != nil {
+							return e
+						}
+						continue
+					}
+				}
 				if errors.Is(err, ErrResourceLimit) {
 					return fail(r, "RESOURCE_LIMIT")
 				}
@@ -127,6 +147,14 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 				return fail(r, "SPEND_AUTHORIZATION_DENIED")
 			}
 			if generation.ErrorCode != "" {
+				if generation.ErrorCode == llm.ContextLengthExceeded.Error() {
+					if retry, e := retryContext(r); retry {
+						if e != nil {
+							return e
+						}
+						continue
+					}
+				}
 				return fail(r, generation.ErrorCode)
 			}
 			result := generation.Result
@@ -168,10 +196,19 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 					if latest.SpendStatus == "denied" || latest.SpendStatus == "invalidated" {
 						return fail(latest, "SPEND_AUTHORIZATION_DENIED")
 					}
+					if errors.Is(callErr, llm.ContextLengthExceeded) {
+						if retry, e := retryContext(latest); retry {
+							if e != nil {
+								return e
+							}
+							continue
+						}
+					}
 					return fail(latest, llm.NormalizeError(callErr.Error()).Error())
 				}
 				result = &value
 			}
+			cp.ContextRetries = 0
 			// Bridge acceptance has durably saved the complete result already.
 			parts := conversation.Text(result.Text)
 			for _, call := range result.ToolCalls {

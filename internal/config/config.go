@@ -14,8 +14,10 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/computer/workspace"
+	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/recall/embedding"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/tool/mcp"
@@ -23,6 +25,8 @@ import (
 )
 
 type Config struct {
+	Context    contextbuilder.Policy `yaml:"context"`
+	Memory     *memory.Config        `yaml:"memory"`
 	Embedding  *embedding.Config     `yaml:"embedding"`
 	JavaScript *JavaScript           `yaml:"javascript"`
 	Spend      agent.SpendPolicy     `yaml:"spend"`
@@ -80,6 +84,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg := Config{
 		Version:   1,
+		Context:   contextbuilder.DefaultPolicy(),
 		Scheduler: agent.DefaultSchedulerLimits(),
 		Children:  agent.DefaultChildLimits(),
 		Delivery:  delivery.DefaultPolicy(),
@@ -127,6 +132,15 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if cfg.Embedding != nil && cfg.Embedding.Validate() != nil {
 		return Config{}, errors.New("invalid embedding provider, endpoint, model or dimensions")
+	}
+	if !cfg.Context.Valid() {
+		return Config{}, errors.New("invalid context compaction policy")
+	}
+	if cfg.Memory != nil && !cfg.Memory.Valid() {
+		return Config{}, errors.New("memory requires an encryption key reference")
+	}
+	if cfg.Memory != nil && cfg.Embedding != nil && !cfg.Embedding.Local() {
+		return Config{}, errors.New("encrypted Memory requires a literal loopback embedding endpoint")
 	}
 	if err := cfg.Spend.Validate(); err != nil {
 		return Config{}, err

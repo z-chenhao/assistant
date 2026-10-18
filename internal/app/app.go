@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
@@ -29,6 +30,7 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
+	"github.com/z-chenhao/erii/internal/memory"
 	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
 	"github.com/z-chenhao/erii/internal/recall"
@@ -44,6 +46,11 @@ import (
 )
 
 type App struct {
+	memoryCurator  *memory.Curator
+	memoryOnce     sync.Once
+	memoryCancel   context.CancelFunc
+	memoryDone     chan struct{}
+	skillConfig    *skill.Config
 	store          *sqlite.Store
 	artifacts      artifactStore
 	telemetry      *observability.Telemetry
@@ -79,6 +86,9 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 }
 
 func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) (*App, error) {
+	if cfg.Memory != nil && (!cfg.Memory.Valid() || cfg.Embedding != nil && !cfg.Embedding.Local()) {
+		return nil, errors.New("Memory maintenance requires an encryption key reference and local embedding")
+	}
 	t, err := observability.Open(cfg.App.DataRoot, cfg.LogLevel())
 	if err != nil {
 		return nil, err
@@ -99,7 +109,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, errors.Join(err, t.Close())
 	}
 	store.Artifacts().Policy = cfg.Artifact
-	a := &App{store: store, telemetry: t, artifacts: store.Artifacts()}
+	a := &App{store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()
@@ -115,6 +125,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	if cfg.Memory != nil {
+		defs = append(defs, memory.Definition())
+	}
 	if cfg.Embedding != nil {
 		engine := embedding.Client{Config: *cfg.Embedding, Secrets: secrets}
 		if err = cfg.Embedding.Validate(); err == nil {
@@ -201,6 +214,16 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 	}
 	a.runs = store.Runs(a.history, a.registry)
+	a.runs.ConfigureContext(cfg.Context)
+	if cfg.Memory != nil {
+		v := memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}
+		if err = a.memory.ConfigureVault(v); err != nil {
+			a.Close()
+			return nil, err
+		}
+		a.runs.ConfigureMemory(a.memory, v)
+		a.memoryCurator = &memory.Curator{Process: a.runs.CurateMemory, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
+	}
 	if cfg.Embedding != nil {
 		a.runs.ConfigureRecall(recall.Service{Memory: a.memory, Conversation: a.history})
 	}
@@ -277,6 +300,10 @@ func (a *App) Catalog(ctx context.Context) ([]llm.CatalogModel, error) {
 }
 
 func (a *App) Close() error {
+	if a.memoryCancel != nil {
+		a.memoryCancel()
+		<-a.memoryDone
+	}
 	if a.provider != nil {
 		_ = a.provider.Close()
 	}
@@ -306,7 +333,7 @@ func (a *App) SetTestMainBoundary(boundary func(string)) {
 func (a *App) Actor(sink agent.EventSink) agent.Actor {
 	var provider llm.LLMProvider
 	if a.provider != nil {
-		provider = a.provider
+		provider = a.runs.GuardProvider(a.provider)
 	}
 	return agent.Actor{Store: a.runs, Provider: provider, Registry: a.registry, Sink: sink, Ready: func(ctx context.Context) bool {
 		d, err := a.Diagnostics(ctx)

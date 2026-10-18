@@ -129,7 +129,7 @@ jobs:
           npm ci --prefix provider-bridge --ignore-scripts
           npm ci --prefix runtime/javascript --ignore-scripts
       - name: Prepare isolated coding fixture runtime
-        if: matrix.shard == 'providers' || matrix.shard == 'codemode'
+        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap

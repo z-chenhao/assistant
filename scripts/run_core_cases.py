@@ -34,6 +34,16 @@ class CoreHarness(CodeHarness):
     def args(self, *args):
         return [str(self.binary), '-config', str(self.root / 'config.yaml'), '-test-bridge', 'core', *args]
 
+    def setup(self):
+        # Exact CSV/attachments appear in the current instruction and accepted
+        # Tool arguments. Declare capacity for that complete exchange instead
+        # of bypassing production compaction or truncating the locked dataset.
+        return super().setup(metadata=dict(name='exact Core fixture', provider_kind='openai_compatible',
+                                           endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                           model_id='fixture-model', context_window=32768, max_output_tokens=1024,
+                                           generation_defaults={}, compatibility=dict(tool_result_format='openai'),
+                                           capabilities=dict(text_input=True)))
+
 
 def configure(folder, workspace=None):
     node = shutil.which('node')

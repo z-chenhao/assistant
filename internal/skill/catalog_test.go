@@ -111,3 +111,38 @@ func TestSkillLinksAndMalformedFrontMatterRejected(t *testing.T) {
 		})
 	}
 }
+
+func TestCatalogFrontmatterUsesDelimiterLines(t *testing.T) {
+	for _, tc := range []struct {
+		name, text, description string
+		valid                   bool
+	}{
+		{"quoted", "---\nname: review\ndescription: \"Review --- safely.\"\n---\nBody --- text.", "Review --- safely.", true},
+		{"crlf", "---\r\nname: review\r\ndescription: Review --- safely.\r\n---\r\nBody.", "Review --- safely.", true},
+		{"block", "---\nname: review\ndescription: |\n  Review\n  ---\n  safely.\n---\nBody.", "Review\n---\nsafely.\n", true},
+		{"inline-opening", "---name: review\ndescription: Review.\n---\nBody.", "", false},
+		{"inline-closing", "---\nname: review\ndescription: Review --- safely.\nBody.", "", false},
+		{"missing-closing", "---\nname: review\ndescription: Review.\n---invalid\nBody.", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := catalog(t)
+			if err := os.WriteFile(filepath.Join(c.Root, "review", "SKILL.md"), []byte(tc.text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			defs, err := Definitions(c)
+			if !tc.valid {
+				if err == nil {
+					t.Fatal("malformed frontmatter accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var summaries []Summary
+			if err = json.Unmarshal([]byte(defs[0].Execute(context.Background(), `{}`).Text), &summaries); err != nil || len(summaries) != 1 || summaries[0].Description != tc.description {
+				t.Fatal(summaries, err)
+			}
+		})
+	}
+}
