@@ -24,6 +24,10 @@ class CoreTests(unittest.TestCase):
         for i, (c,s,text) in EDGES.items():
             self.assertEqual(rows[i-1]['text'],text)
             self.assertEqual(gold[i-1],dict(row_id=f'F{i:03d}',category=c,severity=s))
+        groups = {}
+        for row in rows:
+            groups.setdefault(row['text'], []).append(int(row['row_id'][1:]))
+        self.assertEqual(sorted(sorted(ids) for ids in groups.values() if len(ids) > 1), sorted([list(pair) for pair in PAIRS]))
         for a,b in PAIRS:
             self.assertEqual(rows[a-1]['text'],rows[b-1]['text'])
             self.assertNotEqual(rows[a-1]['row_id'],rows[b-1]['row_id'])

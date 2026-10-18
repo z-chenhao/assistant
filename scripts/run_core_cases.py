@@ -20,7 +20,7 @@ import time
 
 from case_runner import digest, load_contract, score, variants
 from core_conformance import run as conformance
-from core_fixtures import feedback, csv_text, CATEGORIES, SEVERITIES
+from core_fixtures import feedback, csv_text, CATEGORIES, SEVERITIES, PAIRS
 from run_cases import timestamp
 from verify_capabilities import tree
 from verify_codemode import CodeHarness
@@ -151,7 +151,11 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
         classified = list(csv.DictReader(io.StringIO(opened.stdout)))
         answers = {r['row_id']: {k: r[k] for k in ('row_id', 'category', 'severity')} for r in classified}
         originals = {r['row_id']: r for r in rows}
+        duplicates = {}
+        for row in rows:
+            duplicates.setdefault(row['text'], []).append(int(row['row_id'][1:]))
         checks = dict(
+            exact_duplicate_pairs=sorted(sorted(ids) for ids in duplicates.values() if len(ids) > 1) == sorted([list(pair) for pair in PAIRS]),
             input_artifacts_immutable=all(any(a['name'] == asset['name'] and a['content_hash'] == hashlib.sha256(asset['text'].encode()).hexdigest() for a in artifacts) for asset in assets),
             exact_100_rows=len(classified) == 100 and set(answers) == set(originals),
             exact_row_classification=answers == {r['row_id']: r for r in gold},

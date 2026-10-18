@@ -40,7 +40,7 @@ def feedback(seed=1701):
     attachments = {1, 20, 40, 60, 80}
     for i in range(1, 101):
         c, s = labels[i]
-        text = f'{phrases[c]}，{qualifiers[s]}'
+        text = f'{phrases[c]}，{qualifiers[s]}（反馈{i:03d}）'
         if i in EDGES:
             text = EDGES[i][2]
         rows.append(dict(row_id=f'F{i:03d}', text=text,
