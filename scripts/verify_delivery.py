@@ -67,8 +67,9 @@ def assert_delivered(value, count):
     require(all(r["status"] == "completed" for r in value["runs"]), "Run not completed")
 
 
-def run(binary):
-    report = {"version": 1, "scope": "M3 durable semantic delivery to the local terminal inbox; stdout redisplay and remote provider exactly-once are not claimed", "checks": [], "crashes": []}
+def run(binary, feedback=False):
+    report = {"version": 1, "scope": "M3 durable semantic delivery to the local terminal inbox; stdout redisplay and remote provider exactly-once are not claimed", "checks": [], "crashes": [],
+              "evidence_scope": "early_feedback" if feedback else "full"}
     with tempfile.TemporaryDirectory(prefix="erii-delivery-") as directory:
         root = Path(directory)
 
@@ -89,7 +90,10 @@ def run(binary):
                       "before_reply_checkpoint", "after_reply_checkpoint",
                       "before_delivery_send", "after_delivery_send",
                       "before_delivery_ack", "after_delivery_ack")
-        for role in ("main", "root"):
+        # Early feedback adds transport/approval regressions before the full
+        # merge tier runs all twenty faults five times. It cannot sign off the
+        # full gate; the default invocation always retains that entire series.
+        for role in (() if feedback else ("main", "root")):
             for boundary in boundaries:
                 def crash(h):
                     if role == "root":
@@ -120,7 +124,9 @@ def run(binary):
                     require(state(h) == after, "duplicate scan changed settled history or sent again")
                     return {"role": role, "boundary": boundary, "signal": "SIGKILL", "before": before, "after": after, "killed_transcript": killed, "recovered_transcript": transcript}
                 report["crashes"].append(scenario(role + "-" + boundary, crash, "tasks" if role == "root" else "main"))
-        report["checks"].append("20 SIGKILL/restart scenarios: Main and Root final replies through real PTY; Conversation, enqueue, checkpoint, send and ack boundaries")
+        if not feedback:
+            require(len(report["crashes"]) == 20, "complete Main/Root crash inventory required")
+            report["checks"].append("20 SIGKILL/restart scenarios: Main and Root final replies through real PTY; Conversation, enqueue, checkpoint, send and ack boundaries")
 
         for mode in ("retry-once", "ambiguous", "unknown", "unavailable"):
             def failure(h):
@@ -192,9 +198,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--feedback", action="store_true", help="additional early transport/approval checks; not full merge evidence")
     args = parser.parse_args()
     args.evidence.unlink(missing_ok=True)
-    report = run(args.binary.resolve())
+    report = run(args.binary.resolve(), args.feedback)
     report["binary_sha256"] = hashlib.sha256(args.binary.read_bytes()).hexdigest()
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -2,6 +2,7 @@ import copy
 import io
 import json
 import os
+import signal
 from pathlib import Path
 import tarfile
 import subprocess
@@ -12,6 +13,7 @@ from unittest.mock import patch
 import ci_bundle as bundle
 import ci_impact as impact
 import ci_feedback
+import ci_race
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -53,6 +55,18 @@ class ImpactTests(unittest.TestCase):
         self.assertEqual(set(ci_feedback.GATES), set(impact.ALL))
         for shard, names in ci_feedback.GATES.items():
             self.assertEqual(names, {g.name for g in ci_feedback.suite.SHARDS[shard] if g.name in names})
+
+    def test_early_delivery_fragment_cannot_replace_full_fault_series(self):
+        suite = ci_feedback.suite
+        full = next(g for g in suite.SHARDS['delivery'] if g.name == 'delivery')
+        early = ci_feedback.feedback_gates('delivery')[0]
+        full_args, _, _ = suite.command(full, 1, Path('/binary'), Path('/evidence'))
+        early_args, _, _ = suite.command(early, 1, Path('/binary'), Path('/evidence'))
+        self.assertEqual(full.attempts, 5)
+        self.assertNotIn('--feedback', full_args)
+        self.assertIn('--feedback', early_args)
+        for gates in suite.SHARDS.values():
+            self.assertTrue(all(not g.arguments for g in gates), 'full inventory must never select partial evidence')
 
     def test_real_git_base_trust_drift_deleted_and_unknown_paths(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -168,6 +182,55 @@ class BundleTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bundle.restore(self.dest, self.archive, digest)
         self.assertEqual(path.read_text(), 'user state')
+
+
+class RaceInventoryTests(unittest.TestCase):
+    def test_all_packages_exactly_once_including_new_packages(self):
+        packages = [ci_race.BRIDGE, 'github.com/z-chenhao/erii/internal/agent/sqlite',
+                    'github.com/z-chenhao/erii/new/package']
+        groups = ci_race.groups(packages)
+        self.assertEqual(groups[0], ('bridge', [ci_race.BRIDGE]))
+        executed = [p for _, group in groups for p in group]
+        self.assertCountEqual(executed, packages)
+        self.assertEqual(len(executed), len(set(executed)))
+
+    def test_missing_duplicate_empty_or_foreign_inventory_fails_closed(self):
+        for packages in [[], ['github.com/z-chenhao/erii/internal/agent/sqlite'],
+                         [ci_race.BRIDGE, ci_race.BRIDGE], [ci_race.BRIDGE, 'foreign/pkg'],
+                         [ci_race.BRIDGE, 'github.com/z-chenhao/erii/bad argument']]:
+            with self.assertRaises(ValueError):
+                ci_race.groups(packages)
+
+    def test_failure_retains_inventory_and_prevents_expensive_remainder(self):
+        packages = [ci_race.BRIDGE, 'github.com/z-chenhao/erii/internal/agent/sqlite']
+        for first_status in (0, 9):
+            with self.subTest(first_status=first_status), tempfile.TemporaryDirectory() as temp:
+                previous = Path.cwd()
+                handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+                calls = []
+                def execute(command, env, output, stopped, metrics):
+                    calls.append(command)
+                    output.write_text('fixture outcome\n')
+                    return first_status if len(calls) == 1 else 0
+                try:
+                    os.chdir(temp)
+                    with patch.object(ci_race, 'source_state', return_value={'source_sha': 'frozen'}), \
+                         patch.object(ci_race.subprocess, 'check_output', return_value='\n'.join(packages)), \
+                         patch.object(ci_race, 'run_command', execute):
+                        self.assertEqual(ci_race.main(), 0 if first_status == 0 else 1)
+                    report = json.loads(Path('evidence/race/inventory.json').read_text())
+                    self.assertEqual(report['packages'], packages)
+                    self.assertEqual(report['passed'], first_status == 0)
+                    self.assertEqual(len(calls), 2 if first_status == 0 else 1)
+                    self.assertEqual(report['stages'][0]['returncode'], first_status)
+                    for command in calls:
+                        self.assertIn('-race', command)
+                        self.assertIn('-count=1', command)
+                        self.assertIn('-timeout=15m', command)
+                finally:
+                    os.chdir(previous)
+                    for sig, handler in handlers.items():
+                        signal.signal(sig, handler)
 
 
 if __name__ == '__main__':

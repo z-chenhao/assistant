@@ -29,6 +29,7 @@ class Gate:
     script: str
     report: str
     attempts: int = 1
+    arguments: tuple = ()
 
 
 # Complete baseline inventory, including the initial account check AND its
@@ -87,7 +88,7 @@ def command(gate, attempt, binary, evidence):
     if gate.script:
         env["ERII_PROFILE_DIR"] = str(evidence / "profiles" / f"{gate.name}-{attempt}")
         args = [sys.executable, "scripts/profile_harness.py", "scripts/" + gate.script,
-                "--binary", str(binary), "--evidence", str(evidence / report_name(gate, attempt))]
+                "--binary", str(binary), "--evidence", str(evidence / report_name(gate, attempt)), *gate.arguments]
         output = evidence / "logs" / f"{gate.name}-{attempt}.log"
     elif gate.name == "pi-bridge":
         args = ["node", "--test", "--test-reporter=tap",

@@ -19,6 +19,12 @@ GATES = {
 }
 
 
+def feedback_gates(name):
+    return tuple(suite.Gate(g.name, g.script, g.report,
+                           arguments=('--feedback',) if g.name == 'delivery' else ())
+                 for g in suite.SHARDS[name] if g.name in GATES[name])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan', type=Path, required=True)
@@ -45,7 +51,7 @@ def main():
     for name in plan['shards']:
         if not passed:
             break
-        gates = tuple(suite.Gate(g.name, g.script, g.report) for g in suite.SHARDS[name] if g.name in GATES[name])
+        gates = feedback_gates(name)
         rows[name] = suite.run_shard(name, args.binary.resolve(), args.evidence.resolve(), stopped, gates)
         passed = len(rows[name]) == len(gates) and all(r['returncode'] == 0 for r in rows[name])
     stable = source == suite.source_state()

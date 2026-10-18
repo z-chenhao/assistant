@@ -39,7 +39,7 @@ The manifest in `scripts/verify_suite.py` owns verification coverage:
 | --- | --- |
 | runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
 | codemode | Five consecutive Code Mode and fixed-source recovery runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) |
-| security | Five consecutive Tool approval/recovery and Artifact runs |
+| security | Five consecutive recall, Tool approval/recovery and Artifact runs |
 | delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
 | providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |
 
@@ -181,6 +181,13 @@ negative lookalike test; example-file deletion is a drift failure. The manifest
 locks and both Node contracts. An extra Tool race subset and deterministic
 regressions fail closed before heavy candidate jobs are admitted. The early
 single attempts are additional evidence; full five-run series remain intact.
+The measured delivery harness took 128 seconds locally in early feedback,
+dominated by its twenty crash/restart cases. Early delivery feedback now uses
+the same harness's explicitly marked `--feedback` transport/retry/unknown/approval
+fragment. It cannot claim full evidence. The unchanged full-tier invocation
+requires all twenty faults in each of five runs; a contract test prevents the
+partial flag from entering the full inventory. Compare absolute early feedback
+latency separately from the complete, unchanged merge inventory.
 
 `ci_bundle.py` seals the binary and both installed dependency trees once, after
 early feedback succeeds. Consumers download only the artifact from their own
@@ -249,12 +256,20 @@ CI never depends on it and needs no protection change. The CI-only approach may
 not meet the cost target while repeated sandbox compiler work remains mandatory;
 any sandbox-cache proposal needs a separate security design and authorization.
 
-The first shadow experiment also tests `go test -race -p 1 -timeout=15m ./...`.
+The shadow experiment also tests `python3 scripts/ci_race.py`.
 Baseline job 117675122720 failed the Bridge duplicate-burst concurrent RPC check
 at its one-second deadline while the full SQLite race package was running.
 The peer emits 8,192 notifications before it reads that RPC, so the deadline
 includes instrumented burst transfer. CPU contention is a hypothesis; a local
-full race pass does not prove the cause. Candidate package isolation preserves
-every test, internal concurrency, repetition and deadline. The baseline Makefile
-and required job remain unchanged. Measure both outcomes and cold-build cost
-before promoting this scheduling policy; one passing rerun is not proof of repair.
+full race pass does not prove the cause. An exploratory local `-p 1` trial took
+405 seconds versus 308 seconds with normal package scheduling; blanket package
+serialization adds overhead. The candidate instead executes Bridge alone first,
+then the complete remainder with normal package parallelism. Every package from
+`go list ./...` must execute exactly once; unknown new packages enter the remainder,
+and missing/duplicate/foreign inventory fails closed. Every stage uses fresh
+`-count=1` race tests with the existing 15-minute package budget. Internal test
+concurrency, assertions and deadlines are unchanged. `evidence/race/inventory.json`
+records the full inventory and both stage outcomes; an early Bridge failure
+prevents expensive remainder work and fails the gate. The baseline Makefile and
+required job remain unchanged. Measure both outcomes and cold-build cost before
+promoting this scheduling policy; one passing rerun is not proof of repair.
