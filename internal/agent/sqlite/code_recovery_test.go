@@ -291,3 +291,91 @@ func TestCodeReplayStoreObservationsAndWritesAreNotRepeated(t *testing.T) {
 		t.Fatalf("Store changed replay: %s", raw)
 	}
 }
+
+func TestCodeStoreQuotaRejectionReceiptIsFrozen(t *testing.T) {
+	s, _, b, _ := codeClaimFixture(t)
+	ctx := context.Background()
+	put := func(callKey, key string, value any) codemode.Reply {
+		t.Helper()
+		raw, _ := json.Marshal(map[string]any{"key": key, "value": value})
+		reply, err := b.store(ctx, "host.store_put", callKey, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+	for _, key := range []string{"k0", "k1", "k2", "k3"} {
+		if reply := put(digest(key), key, strings.Repeat("x", 262140)); reply.Error != nil {
+			t.Fatal(reply.Error)
+		}
+	}
+	callKey := digest("rejected")
+	first := put(callKey, "extra", 1)
+	if first.Error == nil || first.Error.Code != "RESOURCE_LIMIT" {
+		t.Fatalf("expected quota rejection: %+v", first)
+	}
+	var hash, receipt string
+	if err := s.db.QueryRow(`SELECT request_hash,reply_json FROM code_store_call WHERE call_key=?`, callKey).Scan(&hash, &receipt); err != nil {
+		t.Fatal(err)
+	}
+	if reply := put(digest("shrink"), "k0", nil); reply.Error != nil {
+		t.Fatal(reply.Error)
+	}
+	replayed, _ := encoded(put(callKey, "extra", 1))
+	if replayed != receipt || hash != digest(`host.store_put:{"key":"extra","value":1}`) {
+		t.Fatalf("rejection changed: %s -> %s, hash=%s", receipt, replayed, hash)
+	}
+	if reply := put(callKey, "extra", 2); reply.Error == nil || reply.Error.Code != "NON_DETERMINISTIC_REPLAY" {
+		t.Fatalf("accepted parameter drift: %+v", reply)
+	}
+	if scalar(t, s, `SELECT count(*) FROM code_store WHERE key='extra'`) != 0 {
+		t.Fatal("rejected operation wrote Store")
+	}
+}
+
+func TestCodeReplayStoreQuotaRejectionSurvivesShrink(t *testing.T) {
+	for _, tc := range []struct{ name, suspend string }{
+		{"control", ""},
+		{"replay", `await tools.builtin__text__echo({text:"force-replay"});`},
+		{"dependent-arguments", `await tools.builtin__text__echo({text:String(rejected)});`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, r, a, p := childFixture(t, codemode.Definition())
+			r.ConfigureJavaScript(realCodeRuntime(t))
+			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				if req.Messages[len(req.Messages)-1].Role == "tool" {
+					return llm.GenerationResult{Text: "observed"}, nil
+				}
+				raw, _ := json.Marshal(map[string]string{"source": `
+for (let i=0; i<4; i++) store("k"+i, "x".repeat(262140));
+let rejected=false;
+try { store("extra", 1); } catch(e) { rejected=e.code === "RESOURCE_LIMIT"; }
+store("k0", null);
+` + tc.suspend + `return rejected;`})
+				return calls(codemode.ToolName, string(raw)), nil
+			}
+			mustSubmit(t, a, "quota-replay", "execute")
+			mustDrain(t, a)
+			var raw, status string
+			if err := s.db.QueryRow(`SELECT status,result_json FROM tool_invocation WHERE tool_name=?`, codemode.ToolName).Scan(&status, &raw); err != nil {
+				t.Fatal(err)
+			}
+			var result tool.Result
+			if json.Unmarshal([]byte(raw), &result) != nil || status != "succeeded" || result.Text != `[{"type":"return","value":true}]` {
+				t.Fatalf("quota outcome changed on replay: status=%s result=%s", status, raw)
+			}
+			if scalar(t, s, `SELECT count(*) FROM code_store WHERE key='extra'`) != 0 || scalar(t, s, `SELECT count(*) FROM code_store WHERE key='k0' AND value_json='null' AND version=2`) != 1 {
+				t.Fatal("replay committed rejected write or repeated shrink")
+			}
+			if scalar(t, s, `SELECT count(*) FROM code_store_call WHERE json_extract(reply_json,'$.error.code')='RESOURCE_LIMIT'`) != 1 {
+				t.Fatal("quota rejection lacks one immutable receipt")
+			}
+			if tc.suspend != "" && scalar(t, s, `SELECT count(DISTINCT attempt_id) FROM code_event WHERE json_extract(message_json,'$.kind')='execution_started'`) < 2 {
+				t.Fatal("fixture did not suspend and replay")
+			}
+			if tc.name == "dependent-arguments" && scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__text__echo' AND arguments_json='{"text":"true"}' AND status='succeeded' AND attempt_count=1`) != 1 {
+				t.Fatal("replay changed dependent Tool arguments or repeated dispatch")
+			}
+		})
+	}
+}

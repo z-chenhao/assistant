@@ -390,7 +390,7 @@ func (b *codeBridge) store(ctx context.Context, method, callKey string, raw json
 			}
 			if size+len(args.Value)+len(args.Key) > 1<<20 {
 				reply = denied("RESOURCE_LIMIT")
-				return nil
+				return save()
 			}
 			_, err := tx.ExecContext(ctx, `INSERT INTO code_store(execution_id,key,value_json,version,value_hash,updated_at) VALUES(?,?,?,1,?,?) ON CONFLICT(execution_id,key) DO UPDATE SET value_json=excluded.value_json,value_hash=excluded.value_hash,updated_at=excluded.updated_at,version=code_store.version+1`, b.req.ExecutionID, args.Key, string(args.Value), digest(string(args.Value)), time.Now().UnixMicro())
 			if err != nil {

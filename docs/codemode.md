@@ -156,7 +156,9 @@ Persisted delivery sequence numbers restore Promise continuation order even
 when transport replies arrive out of order. Store retains versioned JSON with
 a value hash and update time; it is isolated to one invocation. Each Store operation has a trusted source key and an immutable receipt. Replay
 reuses its original read or write, so an earlier load cannot observe a later
-write and repeated replay cannot increment a saved counter. Distinct writes
+write and repeated replay cannot increment a saved counter. Aggregate quota
+rejections retain their normalized error under the same operation key and request
+hash, even if a later write shrinks the Store before suspension and replay. Distinct writes
 to one key still use last-write-wins semantics. Events retain their audit.
 
 Each execution claim increments an epoch and issues a new token subordinate
