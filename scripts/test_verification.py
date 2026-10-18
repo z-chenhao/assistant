@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import socket
 import sys
 import tempfile
 import threading
@@ -77,6 +78,22 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('if-no-files-found: error', workflow)
         self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 4)
 
+    def test_shadow_cannot_replace_required_gate_or_skip_full_coverage(self):
+        shadow = (suite.ROOT / '.github/workflows/ci-shadow.yml').read_text()
+        self.assertIn('name: CI shadow comparison', shadow)
+        self.assertNotIn('name: Ubuntu checks', shadow)
+        self.assertEqual(shadow.count('    needs: fast'), 2)
+        self.assertEqual(set(json.loads(re.search(r'        shard: (\[.*\])', shadow)[1])), set(suite.SHARDS))
+        self.assertEqual(shadow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 4)
+        self.assertIn('python3 scripts/ci_feedback.py --plan evidence/impact.json', shadow)
+        self.assertIn('BUILD_DIGEST: ${{ needs.fast.outputs.build_digest }}', shadow)
+        self.assertIn('github.event.pull_request.base.sha || github.event.before', shadow)
+        self.assertIn('github.head_ref == \'agent/erii-builder/erii-141\'', shadow)
+        for forbidden in ['continue-on-error', 'paths-ignore:', 'fromJSON', 'make verify', 'npm ci --prefix provider-bridge --ignore-scripts\n          npm ci']:
+            self.assertNotIn(forbidden, shadow)
+        self.assertIn('fail-fast: false', shadow)
+        self.assertIn('--shard ${{ matrix.shard }} --jobs 1', shadow)
+
     def test_failed_repetition_stops_and_records_failure(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -145,6 +162,63 @@ class VerificationTests(unittest.TestCase):
             profile = json.loads((root / 'profile/fixture.json').read_text())
             self.assertGreater(profile['elapsed_seconds'], 0)
             self.assertEqual([c['name'] for c in profile['cases']], ['owned-case'])
+            self.assertGreaterEqual(profile['cpu_seconds'], 0)
+
+    def test_cancelled_leader_cannot_leave_child_listening(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ready = root / 'ready.json'
+            state = root / 'state'
+            listener = ('import json,os,signal,socket,time\nfrom pathlib import Path\n'
+                        'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+                        's=socket.socket();s.bind(("127.0.0.1",0));s.listen()\n'
+                        f'Path({str(ready)!r}).write_text(json.dumps([os.getpid(),s.getsockname()[1]]))\n'
+                        'time.sleep(60)\n')
+            leader = ('import subprocess,sys,time,shutil\nfrom pathlib import Path\n'
+                      f'Path({str(state)!r}).mkdir()\n'
+                      f'subprocess.Popen([sys.executable,"-c",{listener!r}])\n'
+                      'try: time.sleep(60)\n'
+                      f'finally: shutil.rmtree({str(state)!r})\n')
+            fixture = root / 'leader.py'
+            fixture.write_text(leader)
+            stopped = threading.Event()
+            def interrupt():
+                deadline = time.monotonic() + 5
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                stopped.set()
+            thread = threading.Thread(target=interrupt)
+            thread.start()
+            metrics = {}
+            started = time.monotonic()
+            try:
+                code = suite.run_command([sys.executable, 'scripts/profile_harness.py', str(fixture)],
+                                         dict(os.environ, ERII_PROFILE_DIR=str(root / 'profile')),
+                                         root / 'log', stopped, metrics)
+                self.assertNotEqual(code, 0)
+                self.assertFalse(state.exists())
+                self.assertTrue(ready.exists(), (root / 'log').read_text())
+                _, port = json.loads(ready.read_text())
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    with socket.socket() as probe:
+                        if probe.connect_ex(('127.0.0.1', port)) != 0:
+                            break
+                    time.sleep(.01)
+                else:
+                    self.fail('cancelled group left a live listener')
+                self.assertLess(time.monotonic() - started, 15)
+                self.assertGreaterEqual(metrics['cpu_seconds'], 0)
+                self.assertLess(metrics['cancel_cleanup_seconds'], 15)
+            finally:
+                thread.join(timeout=6)
+                # Clean the regression's deliberate orphan even on the old code.
+                if ready.exists():
+                    pid, _ = json.loads(ready.read_text())
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
     def test_full_suite_isolates_models_after_other_harnesses(self):
         with tempfile.TemporaryDirectory() as temp:

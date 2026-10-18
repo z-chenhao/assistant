@@ -96,24 +96,44 @@ def command(gate, attempt, binary, evidence):
     return args, env, output
 
 
-def run_command(args, env, output, stopped):
+def run_command(args, env, output, stopped, metrics=None):
     """Reap owned groups on interruption; Python harnesses unwind cleanup."""
+    metrics = metrics if metrics is not None else {}
+    metrics.update(cpu_seconds=None, cancel_cleanup_seconds=None)
     if stopped.is_set():
         return 130
+    interrupted = None
     with output.open("a") as log:
         with subprocess.Popen(args, cwd=ROOT, env=env, stdout=log,
                               stderr=subprocess.STDOUT, start_new_session=True) as child:
-            while True:
-                try:
-                    return child.wait(timeout=.2)
-                except subprocess.TimeoutExpired:
-                    if stopped.is_set():
-                        os.killpg(child.pid, signal.SIGTERM)
+            try:
+                while True:
+                    pid, status, usage = os.wait4(child.pid, os.WNOHANG)
+                    if pid:
+                        child.returncode = os.waitstatus_to_exitcode(status)
+                        metrics['cpu_seconds'] = usage.ru_utime + usage.ru_stime
+                        return child.returncode if interrupted is None else 130
+                    if stopped.is_set() and interrupted is None:
+                        interrupted = time.monotonic()
                         try:
-                            return child.wait(timeout=10)
-                        except subprocess.TimeoutExpired:
+                            os.killpg(child.pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                    if interrupted is not None and time.monotonic() - interrupted > 10:
+                        try:
                             os.killpg(child.pid, signal.SIGKILL)
-                            return child.wait()
+                        except ProcessLookupError:
+                            pass
+                    time.sleep(.05)
+            finally:
+                # The group leader can exit before an uncooperative child.
+                # Waiting only for the leader used to leave that child alive.
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                if interrupted is not None:
+                    metrics['cancel_cleanup_seconds'] = time.monotonic() - interrupted
 
 
 def run_shard(name, binary, evidence, stopped, gates=None, previous=()):
@@ -122,13 +142,14 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=()):
         for attempt in range(1, gate.attempts + 1):
             args, env, output = command(gate, attempt, binary, evidence)
             started = time.monotonic()
+            metrics = {}
             try:
-                code = run_command(args, env, output, stopped)
+                code = run_command(args, env, output, stopped, metrics)
             except OSError as error:
                 output.write_text(str(error) + "\n")
                 code = 127
             row = dict(gate=gate.name, attempt=attempt, command=args, returncode=code,
-                       elapsed_seconds=time.monotonic() - started, log=str(output))
+                       elapsed_seconds=time.monotonic() - started, log=str(output), **metrics)
             rows.append(row)
             (evidence / f"timings-{name}.json").write_text(json.dumps(rows, indent=2) + "\n")
             print(f"[{name}] {gate.name} {attempt}/{gate.attempts}: {row['elapsed_seconds']:.2f}s (exit {code})", flush=True)

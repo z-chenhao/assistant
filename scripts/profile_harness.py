@@ -10,9 +10,16 @@ import os
 from pathlib import Path
 import pstats
 import runpy
+import resource
 import signal
 import sys
 import time
+
+
+def cpu():
+    own = resource.getrusage(resource.RUSAGE_SELF)
+    children = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return own.ru_utime + own.ru_stime + children.ru_utime + children.ru_stime
 
 
 def main():
@@ -28,21 +35,28 @@ def main():
     active = {}
     def trace(frame, event, _):
         if event == "call":
-            is_cell = frame.f_code.co_name == "execute" and Path(frame.f_code.co_filename).name == "verify_codemode.py"
-            if (frame.f_code.co_name not in ("scenario", "driver") and not is_cell) or Path(frame.f_code.co_filename).parent != script.parent:
+            function = frame.f_code.co_name
+            file = Path(frame.f_code.co_filename)
+            is_cell = function == "execute" and file.name == "verify_codemode.py"
+            is_core = function in ("feedback_case", "coding_case", "engineering_case") and file.name == "run_core_cases.py"
+            if (function not in ("scenario", "driver") and not is_cell and not is_core) or file.parent != script.parent:
                 return None
             values = frame.f_locals
             name = values.get("key") if is_cell else values.get("name")
             if frame.f_code.co_name == "driver":
                 name = values["case"]["case_id"] + "/" + values["variant"]["variant_id"]
-            active[id(frame)] = (str(name), time.monotonic())
+            if is_core:
+                name = function + "/" + values["variant"]["variant_id"]
+            active[id(frame)] = (str(name), time.monotonic(), cpu())
             frame.f_trace_lines = False
             return trace
         if event == "return" and id(frame) in active:
-            name, start = active.pop(id(frame))
-            cases.append(dict(name=name, elapsed_seconds=time.monotonic() - start))
+            name, start, usage = active.pop(id(frame))
+            cases.append(dict(name=name, elapsed_seconds=time.monotonic() - start,
+                              cpu_seconds=cpu() - usage))
         return trace
     started = time.monotonic()
+    usage = cpu()
     try:
         sys.settrace(trace)
         profile.enable()
@@ -63,6 +77,8 @@ def main():
                                   primitive_calls=primitive, own_seconds=own,
                                   cumulative_seconds=cumulative))
         report = dict(harness=script.name, elapsed_seconds=time.monotonic() - started,
+                      cpu_seconds=cpu() - usage,
+                      cpu_scope="self and reaped descendants; scenario times may overlap",
                       cases=cases,
                       functions=sorted(functions, key=lambda f: -f["cumulative_seconds"]))
         # Each invocation owns its directory (including repeated stability runs).
