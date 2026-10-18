@@ -96,6 +96,17 @@ def command(gate, attempt, binary, evidence):
     return args, env, output
 
 
+def group_alive(pgid):
+    """Ignore exited zombies; they own no running work or listening sockets."""
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    rows = subprocess.check_output(['ps', '-axo', 'pgid=,stat='], text=True)
+    return any(int(parts[0]) == pgid and not parts[1].startswith('Z')
+               for row in rows.splitlines() if len(parts := row.split()) == 2)
+
+
 def run_command(args, env, output, stopped, metrics=None):
     """Reap owned groups on interruption; Python harnesses unwind cleanup."""
     metrics = metrics if metrics is not None else {}
@@ -112,7 +123,7 @@ def run_command(args, env, output, stopped, metrics=None):
                     if pid:
                         child.returncode = os.waitstatus_to_exitcode(status)
                         metrics['cpu_seconds'] = usage.ru_utime + usage.ru_stime
-                        return child.returncode if interrupted is None else 130
+                        break
                     if stopped.is_set() and interrupted is None:
                         interrupted = time.monotonic()
                         try:
@@ -132,8 +143,18 @@ def run_command(args, env, output, stopped, metrics=None):
                     os.killpg(child.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+                deadline = time.monotonic() + 2
+                try:
+                    while group_alive(child.pid) and time.monotonic() < deadline:
+                        time.sleep(.02)
+                    metrics['owned_group_drained'] = not group_alive(child.pid)
+                except (OSError, subprocess.CalledProcessError):
+                    metrics['owned_group_drained'] = False
                 if interrupted is not None:
                     metrics['cancel_cleanup_seconds'] = time.monotonic() - interrupted
+            if not metrics['owned_group_drained']:
+                return 125
+            return child.returncode if interrupted is None else 130
 
 
 def run_shard(name, binary, evidence, stopped, gates=None, previous=()):

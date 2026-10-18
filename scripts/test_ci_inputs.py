@@ -1,8 +1,10 @@
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -51,6 +53,40 @@ class ImpactTests(unittest.TestCase):
         self.assertEqual(set(ci_feedback.GATES), set(impact.ALL))
         for shard, names in ci_feedback.GATES.items():
             self.assertEqual(names, {g.name for g in ci_feedback.suite.SHARDS[shard] if g.name in names})
+
+    def test_real_git_base_trust_drift_deleted_and_unknown_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            env = dict(os.environ, GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL='/dev/null')
+            def git(*args):
+                return subprocess.check_output(['git', '-c', 'core.hooksPath=/dev/null',
+                    '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', *args],
+                    cwd=root, env=env, stderr=subprocess.DEVNULL).decode().strip()
+            git('init', '-q', '-b', 'main')
+            (root / 'scripts').mkdir()
+            (root / impact.MANIFEST).write_text(json.dumps(self.manifest))
+            (root / 'README.md').write_text('fixture')
+            git('add', '.')
+            git('commit', '-qm', 'base')
+            base = git('rev-parse', 'HEAD')
+            (root / 'README.md').unlink()
+            git('add', '.')
+            git('commit', '-qm', 'delete known documentation')
+            result = impact.plan(root, base)
+            self.assertEqual(result['paths'], ['README.md'])
+            self.assertEqual(result['shards'], [])
+            self.assertEqual(result['full_shards'], impact.ALL)
+            (root / 'unknown.go').write_text('new input')
+            git('add', '.')
+            git('commit', '-qm', 'unknown path')
+            self.assertEqual(impact.plan(root, base)['shards'], impact.ALL)
+            (root / 'unknown.go').unlink()
+            (root / impact.MANIFEST).write_text('{}')
+            git('add', '.')
+            git('commit', '-qm', 'manifest drift')
+            self.assertIn('manifest', impact.plan(root, base)['reason'])
+            self.assertEqual(impact.plan(root, base)['shards'], impact.ALL)
+            self.assertEqual(impact.plan(root, '0' * 40)['shards'], impact.ALL)
 
 
 class BundleTests(unittest.TestCase):

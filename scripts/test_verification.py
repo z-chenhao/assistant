@@ -115,6 +115,15 @@ class VerificationTests(unittest.TestCase):
             self.assertEqual(len(report['shards']['test']), 1)
             self.assertEqual(json.loads((root / 'timings-test.json').read_text())[0]['returncode'], 9)
 
+    def test_unverifiable_group_cleanup_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            metrics = {}
+            with patch.object(suite, 'group_alive', side_effect=OSError('ps unavailable')):
+                code = suite.run_command([sys.executable, '-c', 'pass'], os.environ.copy(),
+                                         Path(temp) / 'log', threading.Event(), metrics)
+            self.assertNotEqual(code, 0)
+            self.assertFalse(metrics['owned_group_drained'])
+
     def test_failed_core_run_cannot_leave_previous_success_report(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -210,6 +219,7 @@ class VerificationTests(unittest.TestCase):
                 self.assertLess(time.monotonic() - started, 15)
                 self.assertGreaterEqual(metrics['cpu_seconds'], 0)
                 self.assertLess(metrics['cancel_cleanup_seconds'], 15)
+                self.assertTrue(metrics['owned_group_drained'])
             finally:
                 thread.join(timeout=6)
                 # Clean the regression's deliberate orphan even on the old code.
