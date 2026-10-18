@@ -50,6 +50,7 @@ SHARDS = {
                  Gate("code-recovery", "verify_code_recovery.py", "code-recovery", 5),
                  Gate("core-cases", "run_core_cases.py", "core-cases", 5)),
     "security": (
+		Gate("memory-maintenance", "verify_memory_maintenance.py", "memory-maintenance", 5),
         Gate("recall", "verify_recall.py", "recall", 5),
         Gate("tools", "verify_tools.py", "tools", 5),
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),

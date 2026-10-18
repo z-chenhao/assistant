@@ -226,7 +226,7 @@ def run(binary):
                     require(len(chunks) == 2 and ''.join(chunks) == joined_text, 'multipart truncated or reindexed')
                     with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'conversation.db') as db:
                         stored = db.execute("SELECT content_json FROM conversation_message WHERE message_id='multipart'").fetchone()[0]
-                    require(stored == original_json and value['conversation_schema'] == 2, 'migration rewrote original')
+                    require(stored == original_json and value['conversation_schema'] == 3, 'migration rewrote original')
                     require(len(value['generations']) == 9 and len(value['runs']) == 4, 'multipart blocked later model admission')
                     multipart_evidence = dict(original_json_unchanged=True, original_bytes=80001,
                                               chunk_bytes=[len(c.encode('utf-8')) for c in chunks],

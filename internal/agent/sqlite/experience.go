@@ -1,0 +1,171 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/skill"
+	"github.com/z-chenhao/erii/internal/tool"
+)
+
+// ReviewExperience is a trusted local Reviewer operation, never an ordinary
+// model capability. Evidence must be a scoped successful test ToolInvocation.
+func (r *Runs) ReviewExperience(ctx context.Context, c skill.Config, q skill.ReviewRequest) (map[string]any, error) {
+	if !q.Valid() {
+		return nil, agent.ErrConflict
+	}
+	if q.Operation == "list" {
+		rows, e := r.host.db.QueryContext(ctx, `SELECT candidate_id,name,status,version FROM skill_candidate ORDER BY created_at,candidate_id`)
+		if e != nil {
+			return nil, agent.ErrStorage
+		}
+		defer rows.Close()
+		items := []map[string]any{}
+		for rows.Next() {
+			var id, name, status string
+			var version int64
+			if rows.Scan(&id, &name, &status, &version) != nil {
+				return nil, agent.ErrStorage
+			}
+			items = append(items, map[string]any{"candidate_ref": "experience:" + id, "name": name, "status": status, "version": version})
+		}
+		return map[string]any{"candidates": items}, rows.Err()
+	}
+	result := map[string]any{}
+	e := r.write(ctx, func(tx *sql.Tx) error {
+		var owner string
+		if e := tx.QueryRowContext(ctx, `SELECT agent_id FROM agent_config WHERE singleton=1`).Scan(&owner); e != nil {
+			return e
+		}
+		if q.Operation == "propose" {
+			sourceUser, sourceFailure := false, false
+			for _, ref := range q.SourceRefs {
+				var n int
+				if strings.HasPrefix(ref, "conversation:") {
+					if e := tx.QueryRowContext(ctx, `SELECT count(*) FROM conversation_intent WHERE message_id=? AND json_extract(message_json,'$.conversation_id')=?`, strings.TrimPrefix(ref, "conversation:"), owner).Scan(&n); e != nil {
+						return e
+					}
+				} else if strings.HasPrefix(ref, "run:") {
+					if e := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE run_id=? AND agent_id=? AND status IN('completed','failed')`, strings.TrimPrefix(ref, "run:"), owner).Scan(&n); e != nil {
+						return e
+					}
+				}
+				if n != 1 {
+					return agent.ErrConflict
+				}
+				if strings.HasPrefix(ref, "conversation:") {
+					var user bool
+					if e := tx.QueryRowContext(ctx, `SELECT json_extract(message_json,'$.role')='user' FROM conversation_intent WHERE message_id=?`, strings.TrimPrefix(ref, "conversation:")).Scan(&user); e != nil {
+						return e
+					}
+					sourceUser = sourceUser || user
+				}
+				if strings.HasPrefix(ref, "run:") {
+					var failed bool
+					if e := tx.QueryRowContext(ctx, `SELECT status='failed' FROM run WHERE run_id=?`, strings.TrimPrefix(ref, "run:")).Scan(&failed); e != nil {
+						return e
+					}
+					sourceFailure = sourceFailure || failed
+				}
+			}
+			if q.Reason == "correction" && !sourceUser || q.Reason == "recovered_failure" && !sourceFailure {
+				return agent.ErrConflict
+			}
+			id := newID()
+			now := time.Now().UnixMicro()
+			refs, _ := encoded(q.SourceRefs)
+			hash := digest(q.Procedure)
+			if _, e := tx.ExecContext(ctx, `INSERT INTO skill_candidate VALUES(?,?,?,?,?,?,?,?, 'candidate',?,?,1) ON CONFLICT(agent_id,name,method_hash) DO NOTHING`, id, owner, q.Name, q.Description, q.Procedure, q.Reason, refs, hash, now, now); e != nil {
+				return e
+			}
+			if e := tx.QueryRowContext(ctx, `SELECT candidate_id,status,version FROM skill_candidate WHERE agent_id=? AND name=? AND method_hash=?`, owner, q.Name, hash).Scan(&id, &q.Operation, &q.Version); e != nil {
+				return e
+			}
+			var previousDescription, previousReason, previousRefs string
+			if e := tx.QueryRowContext(ctx, `SELECT description,reason,source_refs FROM skill_candidate WHERE candidate_id=?`, id).Scan(&previousDescription, &previousReason, &previousRefs); e != nil {
+				return e
+			}
+			if previousDescription != q.Description || previousReason != q.Reason || previousRefs != refs {
+				return agent.ErrConflict
+			}
+			result = map[string]any{"candidate_ref": "experience:" + id, "status": q.Operation, "version": q.Version}
+			return runEvent(ctx, tx, id, "skill.candidate", q.Version)
+		}
+		id := strings.TrimPrefix(q.CandidateRef, "experience:")
+		var name, description, procedure, reason, status, hash, refs string
+		var version int64
+		if e := tx.QueryRowContext(ctx, `SELECT name,description,procedure,reason,status,method_hash,source_refs,version FROM skill_candidate WHERE candidate_id=? AND agent_id=?`, id, owner).Scan(&name, &description, &procedure, &reason, &status, &hash, &refs, &version); e != nil {
+			return e
+		}
+		if q.Version != version {
+			return agent.ErrConflict
+		}
+		next := status
+		switch q.Operation {
+		case "verify":
+			if status != "candidate" && status != "verified" {
+				return agent.ErrConflict
+			}
+			var runID, raw string
+			if e := tx.QueryRowContext(ctx, `SELECT i.run_id,i.result_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.tool_name='builtin__workspace__test' AND i.status='succeeded' AND r.agent_id=? AND r.status='completed'`, strings.TrimPrefix(q.VerificationRef, "invocation:"), owner).Scan(&runID, &raw); e != nil {
+				return e
+			}
+			var value tool.Result
+			var proof struct {
+				Passed    bool   `json:"passed"`
+				Command   string `json:"command"`
+				Truncated bool   `json:"truncated"`
+			}
+			if json.Unmarshal([]byte(raw), &value) != nil || value.Error != nil || json.Unmarshal([]byte(value.Text), &proof) != nil || !proof.Passed || proof.Truncated || proof.Command != "go test -race ./..." {
+				return agent.ErrConflict
+			}
+			if _, e := tx.ExecContext(ctx, `INSERT OR IGNORE INTO skill_verification VALUES(?,?,?,?,?)`, id, strings.TrimPrefix(q.VerificationRef, "invocation:"), runID, hash, time.Now().UnixMicro()); e != nil {
+				return e
+			}
+			var count int
+			if e := tx.QueryRowContext(ctx, `SELECT count(DISTINCT run_id) FROM skill_verification WHERE candidate_id=? AND method_hash=?`, id, hash).Scan(&count); e != nil {
+				return e
+			}
+			needed := 2
+			if reason != "success" {
+				needed = 1
+			}
+			if count >= needed {
+				next = "verified"
+			}
+		case "promote":
+			if status != "verified" {
+				return agent.ErrConflict
+			}
+			if e := skill.Publish(ctx, c, id, name, description, procedure); e != nil {
+				return e
+			}
+			next = "promoted"
+		case "reject":
+			if status != "candidate" && status != "verified" {
+				return agent.ErrConflict
+			}
+			next = "rejected"
+		case "retire":
+			if status != "promoted" {
+				return agent.ErrConflict
+			}
+			if e := skill.Retire(c, id, name, description, procedure); e != nil {
+				return e
+			}
+			next = "retired"
+		default:
+			return agent.ErrConflict
+		}
+		if _, e := tx.ExecContext(ctx, `UPDATE skill_candidate SET status=?,version=version+1,updated_at=? WHERE candidate_id=? AND version=?`, next, time.Now().UnixMicro(), id, version); e != nil {
+			return e
+		}
+		result = map[string]any{"candidate_ref": q.CandidateRef, "status": next, "version": version + 1}
+		return runEvent(ctx, tx, id, "skill."+next, version+1)
+	})
+	return result, e
+}

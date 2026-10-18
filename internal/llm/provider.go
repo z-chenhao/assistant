@@ -52,13 +52,16 @@ type ToolSpec struct {
 }
 
 type GenerationRequest struct {
-	GenerationID     string     `json:"generation_id"`
-	OutputLimitBytes int        `json:"output_limit_bytes,omitempty"`
-	RunID            string     `json:"run_id"`
-	SessionID        string     `json:"session_id"`
-	Snapshot         Snapshot   `json:"model_snapshot"`
-	Messages         []Message  `json:"messages"`
-	Tools            []ToolSpec `json:"tools,omitempty"`
+	// DispatchGuard is a trusted Host lease held only while writing the request
+	// frame. Revocation and dispatch serialize; it never crosses the wire/hash.
+	DispatchGuard    func(context.Context) (func(), error) `json:"-"`
+	GenerationID     string                                `json:"generation_id"`
+	OutputLimitBytes int                                   `json:"output_limit_bytes,omitempty"`
+	RunID            string                                `json:"run_id"`
+	SessionID        string                                `json:"session_id"`
+	Snapshot         Snapshot                              `json:"model_snapshot"`
+	Messages         []Message                             `json:"messages"`
+	Tools            []ToolSpec                            `json:"tools,omitempty"`
 
 	// AuthEpoch is captured by the Host resolver and passed only to final
 	// persistence. It is not part of the frozen snapshot or Bridge protocol.

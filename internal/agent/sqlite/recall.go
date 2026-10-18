@@ -64,11 +64,14 @@ func (r *Runs) recallMessages(ctx context.Context, c agent.RunClaim, run agent.R
 			query = "durable context"
 		}
 		// Bound serialized evidence to a quarter of the remaining model budget.
-		base, _ := encoded(messages)
-		available := int(run.Snapshot.ContextWindow*3) - len(base) - 1024
-		budget := max(0, min(16<<10, available/4))
+		budget := max(0, min(16<<10, int(run.Snapshot.ContextWindow*3)/8))
 		lookup, cancel := context.WithTimeout(ctx, 30*time.Second)
-		hits, e := r.recall.Search(lookup, recall.Scope{UserID: artifact.LocalUser, AgentID: run.AgentID}, recall.Query{Query: query}, budget)
+		q, e := r.privacyQuery(lookup, run.AgentID, recall.Query{Query: query})
+		if e != nil {
+			cancel()
+			return nil, e
+		}
+		hits, e := r.recall.Search(lookup, recall.Scope{UserID: artifact.LocalUser, AgentID: run.AgentID}, q, budget)
 		cancel()
 		if e != nil {
 			return nil, agent.ErrStorage
@@ -130,6 +133,10 @@ func (t *tools) searchMemory(ctx context.Context, inv tool.Invocation) (tool.Res
 		return tool.Failure("PROVIDER_UNAVAILABLE"), nil
 	}
 	scope.UserID = artifact.LocalUser
+	q, err = t.runs.privacyQuery(ctx, scope.AgentID, q)
+	if err != nil {
+		return tool.Result{}, err
+	}
 	hits, err := t.runs.recall.Search(ctx, scope, q, 60<<10)
 	if err != nil {
 		return tool.Failure("PROVIDER_UNAVAILABLE"), nil

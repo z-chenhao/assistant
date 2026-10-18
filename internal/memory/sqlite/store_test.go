@@ -196,7 +196,7 @@ func TestMemoryMigrationEmptyPriorAndRollback(t *testing.T) {
 	defer s.Close()
 	var version int
 	s.db.QueryRow(`PRAGMA user_version`).Scan(&version)
-	if version != 1 {
+	if version != 2 {
 		t.Fatal(version)
 	}
 	s.db.Exec(`PRAGMA user_version=0`)

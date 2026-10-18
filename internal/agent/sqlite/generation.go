@@ -27,12 +27,13 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 	if err != nil {
 		return agent.Generation{}, err
 	}
-	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
-	for _, spec := range run.Tools {
-		request.Tools = append(request.Tools, llm.ToolSpec{Name: spec.Name, Description: spec.Description, InputSchema: spec.InputSchema})
+	messages, err = r.compactMessages(ctx, c, run, messages)
+	if err != nil {
+		return agent.Generation{}, err
 	}
-	// Bound by the frozen model window. M6 will add semantic compaction; M1
-	// fails explicitly instead of silently truncating the user's instructions.
+	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
+	request.Tools = agent.ProviderTools(run.Tools)
+	// Compaction is threshold-based; this final bound rejects an irreducible turn.
 	wire, _ := encoded(request.Messages)
 	if int64(len(wire)) > run.Snapshot.ContextWindow*3 {
 		return agent.Generation{}, llm.ContextLengthExceeded

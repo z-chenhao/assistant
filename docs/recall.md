@@ -34,9 +34,9 @@ credentials nor endpoint strings. Credential rotation does not change vector spa
 
 | Database | Version | Authority / derived data |
 | --- | --- | --- |
-| `state.db` | 18 | Run/Tool ledgers; immutable per-Run, per-step recall snapshots |
-| `conversation.db` | 2 | Immutable original messages, monotonic sequences, frozen ownership; derived FTS5/vectors |
-| `memory.db` | 1 | Facts, evidence references, supersession links, tombstones; derived FTS5/vectors |
+| `state.db` | 19 | Run/Tool ledgers; immutable per-Run, per-step recall snapshots |
+| `conversation.db` | 3 | Immutable original messages, monotonic sequences, frozen ownership; derived FTS5/vectors |
+| `memory.db` | 2 | Facts, evidence references, supersession links, tombstones; derived FTS5/vectors |
 
 Files use the absolute data root, private permissions and WAL. Forward migrations
 are transactional and reject future schemas. The populated Conversation v1 upgrade
@@ -49,10 +49,12 @@ Memory.Apply is a trusted Curator boundary. It atomically saves an immutable rec
 evidence and index document. Identical duplicate IDs are harmless; changed payloads
 conflict. Supersession replaces only an active record in the same user and exact
 scope. Competing corrections permit one successor. Forget retains a tombstone and
-excludes the whole supersession lineage from retrieval. Neither operation changes
-Conversation evidence. Legitimate originals remain independently retrievable;
-deleting derived Memory does not delete Conversation. Automatic extraction,
-remember/forget tools and compaction belong to the next slice.
+excludes the whole supersession lineage from retrieval. Neither storage operation changes
+Conversation evidence. Explicit local history retains originals. The public Forget
+control additionally applies the privacy barrier before future automatic retrieval;
+see ADR 003. Automatic extraction, remember/forget and compaction are described in
+[maintenance operations](memory-maintenance.md). Explicit Forget also establishes
+a privacy barrier over unfinished context; immutable audit is retained.
 
 The chosen vector adapter stores dense vectors in SQLite
 `recall_document.vector_json`, partitions by authorized scope/visibility/time using
@@ -111,7 +113,7 @@ Evidence is
 untrusted runtime data in a dynamic suffix, preserving the static system/identity
 prefix. It never becomes a user-authored Conversation message. The suffix uses at
 most one quarter of the remaining conservative byte budget, capped at 16 KiB;
-the existing model-window check remains. Semantic compaction is not in this slice.
+hierarchical compaction and the final model-window check also apply; see maintenance operations.
 
 ## Verification
 

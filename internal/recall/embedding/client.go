@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -26,6 +27,18 @@ type Config struct {
 	Dimensions int    `yaml:"dimensions"`
 	APIKeyRef  string `yaml:"api_key_ref"`
 }
+
+// Local permits plaintext working sets only at an explicitly configured literal
+// loopback endpoint; DNS names and remote endpoints are not privacy authority.
+func (c Config) Local() bool {
+	u, e := url.Parse(c.Endpoint)
+	if e != nil {
+		return false
+	}
+	ip := net.ParseIP(u.Hostname())
+	return ip != nil && ip.IsLoopback()
+}
+func (c Client) Local() bool { return c.Config.Local() }
 
 func (c Config) Validate() error {
 	u, e := url.Parse(c.Endpoint)

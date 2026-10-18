@@ -1091,6 +1091,7 @@ interface CodeCallRecord {
 - 已成功的 Agent CodeCall 直接复用 Child Run 的持久化业务结果；仍运行的调用重新附着；不会为同一个逻辑调用再创建 Task 或第二个 Child Run。
 - Sidecar 或进程崩溃后，恢复器使用固定源码、输入和 Runtime 版本自动重放 JavaScript：已完成调用从 Ledger 取结果，未完成 Child Run 重新附着，只继续尚未开始的调用。QuickJS Heap 和调用栈本身不持久化。
 - `unknown` 表示存在无法确认的外部副作用，Runtime 不自动重试。
+- Forget 隐私撤销优先于未完成 Run 的上下文/已完成召回结果复用；fencing 拒绝旧 epoch，不修改既有调用键或请求哈希。审计记录仍保留（ADR 003）。
 - 所有嵌套 Tool 调用继续采用 ToolInvocation 的 `safe/query_before_retry/never` 恢复策略；Code Mode Tool Executor 不承诺任意外部副作用 exactly-once。
 - QuickJS 禁用无输入的时间、随机数、动态 import、文件系统和网络。时间、种子与外部数据通过明确输入或 Host Call 获得。
 - 当 JavaScript 只剩等待中的 Host Promise 时，Sidecar 返回 `execution_suspended(pending_call_ids)` 并销毁 QuickJS。CodeCall 状态变化后重新运行同一源码，已完成调用由 Call Ledger 直接解析。
@@ -1568,6 +1569,7 @@ context_tokens > context_window * threshold_percentage
 - 每一轮同时执行 `Memory 召回` 与 `Conversation 召回`。
 - 两路召回并行、分别排序，再在统一上下文预算下合并。
 - 本轮召回结果冻结，避免 Agent Loop 中途改变上下文。
+- 用户于 2026-10-18 确认：Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/memory-maintenance.md`。
 - System Prompt、人格、规则和 Core Memory 尽量保持静态。
 - 动态召回内容放在 Prompt 后部，以减少对 Prompt Cache 的破坏。
 
@@ -1674,6 +1676,8 @@ author_role?
 相关性分数仅供系统内部排序，不暴露给 Agent。
 
 ### 11.6 Memory 写入与维护
+
+ERII-23 实现与配置：`docs/memory-maintenance.md`。可信本地 Experience Reviewer 使用 `skill manage` 完成候选、验证、晋升与退役；普通 Main/Worker 不获得 Skill 修改能力。
 
 显式管理工具：
 

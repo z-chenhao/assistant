@@ -11,6 +11,16 @@ import (
 // executor, scoped files and stdio transport, never from canned success text.
 func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	lastMessage := request.Messages[len(request.Messages)-1]
+	// Automatic recall is still present in the captured request. Scripted Tool
+	// plans use the latest semantic message, not the untrusted retrieval suffix.
+	for i := len(request.Messages) - 1; i >= 0; i-- {
+		m := request.Messages[i]
+		if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Retrieved durable context") {
+			continue
+		}
+		lastMessage = m
+		break
+	}
 	for _, m := range request.Messages {
 		if m.Role == "user" && m.Text == "Review cancellation" {
 			return cancellationReview(request)
@@ -26,7 +36,7 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	start := 0
 	for i := len(request.Messages) - 1; i >= 0; i-- {
 		m := request.Messages[i]
-		if m.Role == "user" && (strings.Contains(m.Text, "Capabilities: ") || strings.Contains(m.Text, "Delegate capabilities: ")) {
+		if m.Role == "user" && m.Origin != "runtime" && (strings.Contains(m.Text, "Capabilities: ") || strings.Contains(m.Text, "Delegate capabilities: ")) {
 			source = m.Text
 			start = i
 			break

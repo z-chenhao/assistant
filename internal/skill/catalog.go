@@ -71,6 +71,9 @@ func load(c Config) ([]entry, error) {
 	}
 	var entries []entry
 	for _, d := range dirs {
+		if d.IsDir() && (strings.HasPrefix(d.Name(), ".erii-pending-") || strings.HasPrefix(d.Name(), ".erii-retired-")) {
+			continue
+		}
 		if !d.IsDir() || d.Type()&os.ModeSymlink != 0 {
 			return nil, invalid
 		}
