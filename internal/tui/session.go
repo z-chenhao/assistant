@@ -9,12 +9,14 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/task"
 )
 
 // These private-to-the-repository seams are consumed by this adapter; app wires
@@ -33,6 +35,8 @@ type Accounts interface {
 	Logout(context.Context, string) (bool, error)
 }
 type Session struct {
+	DecideApproval   func(context.Context, string, string, string) error
+	Messages         func(context.Context) ([]conversation.Message, error)
 	State            State
 	Models           Models
 	Accounts         Accounts
@@ -91,7 +95,7 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 			<-u.workDone
 		}
 	}()
-	u.print("Erii — /setup /models /test ID /select ID /login [ACCOUNT_ID] /logout ACCOUNT_ID /history /status /quit")
+	u.print("Erii — /setup /models /test ID /select ID /login [ACCOUNT_ID] /logout ACCOUNT_ID /history /status /approve ID HASH /deny ID HASH /quit")
 	d, err := s.State.Diagnostics(ctx)
 	if err != nil {
 		return err
@@ -148,12 +152,13 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 
 type terminal struct {
 	Session
-	lines      <-chan inputEvent
-	out        io.Writer
-	seen       int64
-	work       context.Context
-	workDone   chan error
-	drainAgain bool
+	lines        <-chan inputEvent
+	out          io.Writer
+	seenMessages map[string]bool
+	work         context.Context
+	workDone     chan error
+	drainAgain   bool
+	updates      chan struct{}
 }
 
 // Keep accepting input while Main is busy. Actor.Submit routes Steering to the
@@ -165,7 +170,19 @@ func (u *terminal) startDrain() {
 	}
 	done := make(chan error, 1)
 	u.workDone = done
-	go func() { done <- u.Actor.Drain(u.work) }()
+	if u.updates == nil {
+		u.updates = make(chan struct{}, 1)
+	}
+	actor := u.Actor
+	actor.Sink = func(e agent.Event) {
+		if e.RunKind == "main" && (e.Kind == "turn_end" || e.Kind == "agent_end") {
+			select {
+			case u.updates <- struct{}{}:
+			default:
+			}
+		}
+	}
+	go func() { done <- actor.Drain(u.work) }()
 }
 
 // Provider and model text are untrusted terminal data. Preserve plain text,
@@ -181,10 +198,19 @@ func plain(text string) string {
 func (u *terminal) print(text string) { fmt.Fprintln(u.out, plain(text)) }
 func (u *terminal) read(ctx context.Context, prompt string) (string, error) {
 	fmt.Fprint(u.out, prompt)
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
+		case <-ticker.C:
+			if u.Messages != nil {
+				u.report(u.history(ctx))
+			}
+		case <-u.updates:
+			u.report(u.history(ctx))
+			fmt.Fprint(u.out, prompt)
 		case err := <-u.workDone:
 			u.workDone = nil
 			u.report(err)
@@ -243,22 +269,31 @@ func (u *terminal) report(err error) {
 	u.print("Operation failed. Check the connection and model settings, then retry explicitly.")
 }
 func (u *terminal) history(ctx context.Context) error {
-	messages, err := u.State.History(ctx)
+	read := u.State.History
+	if u.Messages != nil {
+		read = u.Messages
+	}
+	messages, err := read(ctx)
 	if err != nil {
 		return err
 	}
+	if u.seenMessages == nil {
+		u.seenMessages = map[string]bool{}
+	}
 	for _, m := range messages {
-		if m.Sequence <= u.seen {
+		if u.seenMessages[m.MessageID] {
 			continue
 		}
 		for _, p := range m.Content {
 			if p.Type == "text" {
 				u.print(m.Role + ": " + p.Text)
+			} else if p.ArtifactRef != "" {
+				u.print(m.Role + " attachment: " + p.ArtifactRef)
 			} else {
 				u.print(m.Role + ": [" + p.Type + "]")
 			}
 		}
-		u.seen = m.Sequence
+		u.seenMessages[m.MessageID] = true
 	}
 	return nil
 }
@@ -281,15 +316,40 @@ func (u *terminal) authEvent(e llm.AuthEvent) {
 func (u *terminal) command(ctx context.Context, line string) error {
 	args := strings.Fields(line)
 	switch {
+	case len(args) == 3 && (args[0] == "/approve" || args[0] == "/deny"):
+		if u.DecideApproval == nil {
+			return agent.ErrConflict
+		}
+		decision := "approved"
+		if args[0] == "/deny" {
+			decision = "denied"
+		}
+		if err := u.DecideApproval(ctx, args[1], args[2], decision); err != nil {
+			return err
+		}
+		u.print("Approval decision saved.")
+		u.startDrain()
+		return nil
 	case line == "/setup":
 		return u.setup(ctx)
 	case line == "/history":
-		u.seen = 0
+		u.seenMessages = nil
 		return u.history(ctx)
 	case line == "/status":
 		d, err := u.State.Diagnostics(ctx)
 		if err == nil {
 			u.print("State: " + d.Readiness)
+			if activity, ok := u.State.(interface {
+				Activity(context.Context) ([]task.Summary, error)
+			}); ok {
+				items, readErr := activity.Activity(ctx)
+				if readErr != nil {
+					return readErr
+				}
+				for _, item := range items {
+					u.print(item.Title + ": " + item.Status + " " + item.ProgressSummary)
+				}
+			}
 		}
 		return err
 	case line == "/models":
@@ -326,7 +386,7 @@ func (u *terminal) command(ctx context.Context, line string) error {
 		}
 		return err
 	default:
-		u.print("Unknown command. Use /setup /models /test ID /select ID /login [ACCOUNT_ID] /logout ACCOUNT_ID /history /status /quit")
+		u.print("Unknown command. Use /setup /models /test ID /select ID /login [ACCOUNT_ID] /logout ACCOUNT_ID /history /status /approve ID HASH /deny ID HASH /quit")
 		return nil
 	}
 }

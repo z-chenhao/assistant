@@ -1,0 +1,11 @@
+{
+  "insurance_quotes": {
+    "coverage_equal": true,
+    "quotes": [
+      {"id": "A", "premium_cny": 5150, "cashback_cny": 0, "cashback_written": true},
+      {"id": "B", "premium_cny": 5738.49, "cashback_cny": 700, "cashback_written": false},
+      {"id": "C", "premium_cny": 5980, "cashback_cny": 300, "cashback_written": true}
+    ],
+    "weights": {"reliability": 45, "net_price": 35, "services": 20}
+  }
+}
