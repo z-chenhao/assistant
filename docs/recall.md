@@ -74,6 +74,16 @@ stopping execution, backing up the three databases, clearing only derived vector
 columns and `recall_configuration` in an offline transaction, and configuring new
 Runs. Originals remain intact; there is no online mixing or hot migration.
 
+A valid multipart original can exceed the embedding adapter's 64 KiB per-request
+bound. Derived indexing splits it at UTF-8 boundaries into requests of at most
+64 KiB and pools normalized vectors by chunk byte length into one document vector.
+Every byte is embedded; full FTS text and the original source reference remain.
+Exactly cancelling vectors use the first valid chunk vector as a deterministic
+fallback. No vector is saved until all chunks succeed. Pending v2 documents and
+v1 migration use this same path without rewriting originals or changing schemas;
+already indexed short documents retain their vectors. This document-level pooling
+does not provide passage ranking. Large hits still obey the existing output budget.
+
 ## Ranking, budget and recovery
 
 Each Provider runs FTS5 and vector ranking concurrently. Owner, Agent, visibility
@@ -119,7 +129,11 @@ calls), Evidence (both indexes, scope exclusions, provenance and requests), Clea
 after recall commit, changes the corpus, and proves restart reuses the old turn
 while a later turn sees new data. An embedding outage proves no partial recall or
 model admission; restoring the same endpoint permits recovery. `make verify`/Ubuntu
-CI repeat it five times in the security shard.
+CI repeat it five times in the security shard. Fresh/pending-v2 and populated-v1
+multipart CLI scenarios prove an 80,001-byte original remains unchanged, all bytes
+reach bounded HTTP requests, nine generations/four Runs complete, and a repeated
+drain is inert. The actual HTTP adapter regression also covers UTF-8 boundaries,
+the maximum 128 × 64 KiB original, mid-chunk failure/recovery and vector reuse.
 
 Contracts cover lexical/vector-only fusion, ranking/time boundaries, user/Agent
 scope, provenance, independent concurrent retrieval, competing supersession,

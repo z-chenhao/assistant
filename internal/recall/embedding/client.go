@@ -40,12 +40,15 @@ type Client struct {
 	Secrets llm.SecretStore
 }
 
+// MaxInputBytes bounds one request, not the size of an authoritative record.
+const MaxInputBytes = 64 << 10
+
 func (c Client) Identity() string {
 	h := sha256.Sum256([]byte(c.Config.Provider + "\x00" + c.Config.Endpoint + "\x00" + c.Config.Model + "\x00" + strconv.Itoa(c.Config.Dimensions)))
 	return "embedding-v1:" + hex.EncodeToString(h[:])
 }
 func (c Client) Embed(ctx context.Context, text string) ([]float64, error) {
-	if c.Config.Validate() != nil || len(text) > 64<<10 {
+	if c.Config.Validate() != nil || len(text) > MaxInputBytes {
 		return nil, recall.ErrUnavailable
 	}
 	body, _ := json.Marshal(struct {

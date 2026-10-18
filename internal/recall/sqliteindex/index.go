@@ -99,7 +99,7 @@ func catchUp(ctx context.Context, db *sql.DB, s recall.Scope, e recall.Embedding
 		return recall.ErrUnavailable
 	}
 	for _, m := range pending {
-		v, err := e.Embed(ctx, m.text)
+		v, err := documentVector(ctx, e, m.text)
 		if err != nil || !embedding.Valid(v) {
 			return recall.ErrUnavailable
 		}
