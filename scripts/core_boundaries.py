@@ -1,7 +1,8 @@
 """Private deterministic M6 boundary Fakes; no production adapter claim.
 
-These test fixture lifecycle contracts while real Memory/Computer interfaces are
-still due M6. They are never registered as product tools or enabled in config.
+These cover the full SC-08/SC-11 fixture lifecycle while Curator/Computer work is
+still due M6. Real ERII-22 retrieval/storage evidence lives in verify_recall.py;
+these Fakes are never registered as product tools or enabled in configuration.
 """
 from dataclasses import asdict, dataclass
 

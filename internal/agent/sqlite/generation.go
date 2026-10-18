@@ -23,6 +23,10 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 	if err != nil {
 		return agent.Generation{}, err
 	}
+	messages, err = r.recallMessages(ctx, c, run, messages)
+	if err != nil {
+		return agent.Generation{}, err
+	}
 	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
 	for _, spec := range run.Tools {
 		request.Tools = append(request.Tools, llm.ToolSpec{Name: spec.Name, Description: spec.Description, InputSchema: spec.InputSchema})

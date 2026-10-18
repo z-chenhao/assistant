@@ -104,7 +104,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 				}
 				continue
 			}
-			generation, err := o.Store.Generation(work, claim, r)
+			// Context preparation may retrieve durable evidence. Business stop or
+			// lost ownership must cancel those provider reads before model admission.
+			generation, err := o.Store.Generation(execution, claim, r)
 			if err != nil {
 				if errors.Is(err, ErrResourceLimit) {
 					return fail(r, "RESOURCE_LIMIT")
