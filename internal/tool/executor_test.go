@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestEchoSchemaAndNoEffectfulRegistry(t *testing.T) {
+func TestEchoSchemaAndPolicyDefaults(t *testing.T) {
 	registry := EchoRegistry()
 	definition, ok := registry.Resolve("builtin__text__echo")
 	if !ok {
@@ -21,16 +21,69 @@ func TestEchoSchemaAndNoEffectfulRegistry(t *testing.T) {
 	if result.Error != nil || result.Text != "ok" {
 		t.Fatal(result)
 	}
-	for _, policy := range []string{"", "never", "query_before_retry"} {
+	for _, policy := range []string{"", "never", "safe"} {
 		spec := definition.Spec
 		spec.ReplayPolicy = policy
-		if _, err := NewRegistry([]Definition{{Spec: spec, Execute: definition.Execute}}); err == nil {
-			t.Fatal("unsafe policy admitted without M3 approval", policy)
+		registry, err := NewRegistry([]Definition{{Spec: spec, Execute: definition.Execute}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, _ := registry.Resolve(spec.Name)
+		want := policy
+		if want == "" {
+			want = "never"
+		}
+		if d.Spec.Policy().Replay != want {
+			t.Fatal("replay default", d.Spec.Policy())
 		}
 	}
+	specQuery := definition.Spec
+	specQuery.ReplayPolicy = "query_before_retry"
+	if _, err := NewRegistry([]Definition{{Spec: specQuery, Execute: definition.Execute}}); err == nil {
+		t.Fatal("query policy needs authoritative query")
+	}
+
 	spec := definition.Spec
 	spec.Permission = "external_effect"
 	if _, err := NewRegistry([]Definition{{Spec: spec, Execute: definition.Execute}}); err == nil {
 		t.Fatal("effectful tool admitted")
+	}
+}
+
+func TestRegistryClosesMissingExternalMetadataAndUnsupportedSchemas(t *testing.T) {
+	d := Definition{Spec: Spec{Name: "mcp__example__send", Version: 1, InputSchema: `{"type":"object"}`, Permission: "external_effect", Risk: "high", ReplayPolicy: "never", TimeoutMS: 1000, OutputBytes: 1024, Provider: "example", ConflictPolicy: "none"}, Invoke: func(context.Context, Request) Outcome { return Outcome{} }}
+	if _, err := NewRegistry([]Definition{d}); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*Definition){func(d *Definition) { d.Spec.Risk = "low" }, func(d *Definition) { d.Spec.TimeoutMS = 0 }, func(d *Definition) { d.Spec.OutputBytes = 0 }, func(d *Definition) { d.Spec.Provider = "" }, func(d *Definition) { d.Spec.ReplayPolicy = "safe" }, func(d *Definition) { d.Spec.ReplayPolicy = "query_before_retry" }, func(d *Definition) { d.Spec.ConflictPolicy = "dynamic" }, func(d *Definition) { d.Spec.InputSchema = `{"type":"object","patternProperties":{}}` }} {
+		changed := d
+		mutate(&changed)
+		if _, err := NewRegistry([]Definition{changed}); err == nil {
+			t.Fatal("incomplete policy registered", changed.Spec)
+		}
+	}
+}
+func TestSchemaRejectsInvalidBoundsTypesAndDuplicates(t *testing.T) {
+	schema := `{"type":"object","properties":{"n":{"type":"integer","minimum":1,"maximum":3},"tags":{"type":"array","maxItems":2,"items":{"type":"string","maxLength":2}}},"required":["n"],"additionalProperties":false}`
+	if !Validate(schema, `{"n":1,"tags":["中"]}`) {
+		t.Fatal("valid value rejected")
+	}
+	for _, args := range []string{`{"n":0}`, `{"n":4}`, `{"n":1.1}`, `{"n":"1"}`, `{"n":null}`, `{"n":1,"n":2}`, `{"n":1,"tags":["long"]}`, `{"n":1,"tags":["a","b","c"]}`, `{"n":1,"extra":true}`, `{"n":1} {}`, `null`} {
+		if Validate(schema, args) {
+			t.Fatal("invalid value", args)
+		}
+	}
+}
+
+func TestHostErrorCodesStripAllProviderDetails(t *testing.T) {
+	for _, code := range []string{"INVALID_ARGUMENT", "NOT_FOUND", "PERMISSION_DENIED", "APPROVAL_DENIED", "TIMEOUT", "CANCELLED", "PROVIDER_UNAVAILABLE", "RESOURCE_LIMIT", "UNKNOWN_SIDE_EFFECT", "NON_DETERMINISTIC_REPLAY", "private raw SQL credential"} {
+		result := Normalize(Result{Text: "private internal Run ID", Error: &Error{Code: code, Message: "credential internal-id /private/path SQL", Retryable: true}})
+		want := code
+		if code == "private raw SQL credential" {
+			want = "PROVIDER_UNAVAILABLE"
+		}
+		if result.Error.Code != want || result.Error.Message != want || result.Text != "" || result.Error.Retryable != (want == "PROVIDER_UNAVAILABLE") {
+			t.Fatal(result)
+		}
 	}
 }

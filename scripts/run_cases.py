@@ -44,13 +44,13 @@ def drive(binary, folder, case, variant):
         h.cleanup()
 
 
-def run_suite(dataset, policy, driver):
+def run_suite(dataset, policy, driver, result_builder=result):
     """Independent of provider/terminal mechanics; drivers return observed state."""
     results = []
     for case in dataset["cases"]:
         for variant in variants(dataset, case):
             execution = driver(case, variant)
-            results.append(result(case, variant, policy, execution))
+            results.append(result_builder(case, variant, policy, execution))
     due = {case["case_id"] for case in dataset["cases"]}
     return {"version": 1, "milestone": dataset["milestone"], "level": dataset["level"],
             "scope": dataset["scope"], "dataset_digest": digest(dataset), "policy_digest": digest(policy),
