@@ -120,3 +120,8 @@ The issue's historical Ubuntu runs were 40m11s and 47m26s; CLI verification was
 The [ERII-134 report](https://github.com/z-chenhao/erii/pull/19) records the
 controlled local serial/parallel measurements, repeated-gate ranges, timing
 attachments and exact-head Ubuntu result separately.
+
+The full race command uses an explicit 15-minute Go package budget inside its
+20-minute job. Real SQLite migrations under race instrumentation exhausted the
+implicit 10-minute package budget on Ubuntu; per-test, Tool and lease deadlines
+remain unchanged. See [Core gate evidence](core-evals.md).

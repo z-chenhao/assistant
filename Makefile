@@ -9,8 +9,11 @@ test:
 	npm test --prefix runtime/javascript
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 
+# The full SQLite package repeatedly migrates real schemas under instrumentation.
+# Ubuntu exceeded Go's implicit 10m package budget while its current test was 1s old.
+# Keep per-test/Tool/lease deadlines intact; bound the complete package at 15m.
 test-race:
-	go test -race ./...
+	go test -race -timeout=15m ./...
 
 lint:
 	@files="$$(gofmt -l cmd internal)"; if [ -n "$$files" ]; then echo "$$files"; exit 1; fi

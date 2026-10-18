@@ -27,7 +27,11 @@ inside `make verify`'s codemode shard. Existing security, approval, delivery,
 provider and cancellation gates retain all previous repetitions. CI installs
 bubblewrap in the codemode shard as well as the providers shard. The shard
 job deadline is 45 minutes to accommodate 90 isolated case executions; individual
-Tool, process and assertion deadlines are unchanged.
+Tool, process and assertion deadlines are unchanged. The full Go race package
+budget is explicitly 15 minutes (within the existing 20-minute CI job): Ubuntu
+hit the former implicit 10-minute package alarm while the current test was only
+one second old, in fresh SQLite migration parsing. No data race was reported;
+this is a cumulative suite budget, not an extension of a test or lease deadline.
 
 ## Exact fixtures and observed boundaries
 
