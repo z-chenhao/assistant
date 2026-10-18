@@ -70,3 +70,19 @@ func TestCompactionRefusesIrreducibleInput(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestCompactionCountsCurrentToolExchangeAndSchema(t *testing.T) {
+	// A complete current exchange can duplicate a large explicit instruction.
+	// It must not be dropped, split, or admitted by ignoring Tool schema bytes.
+	source := strings.Repeat("source", 1300)
+	in := []llm.Message{{Role: "system", Text: "rules"}, {Role: "user", Text: source},
+		{Role: "assistant", ToolCalls: []llm.ToolCall{{ID: "call", Name: "execute", Arguments: source}}},
+		{Role: "tool", ToolCallID: "call", Text: "accepted"}}
+	if _, e := Compact(in, refs(len(in)), 8192, 4353, DefaultPolicy(), false); e != llm.ContextLengthExceeded {
+		t.Fatal("oversize current exchange was admitted", e)
+	}
+	got, e := Compact(in, refs(len(in)), 32768, 4353, DefaultPolicy(), false)
+	if e != nil || !reflect.DeepEqual(got.Messages, in) {
+		t.Fatal("adequate declared capacity changed the current exchange", e)
+	}
+}

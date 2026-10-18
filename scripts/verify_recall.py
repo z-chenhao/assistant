@@ -135,6 +135,7 @@ class Harness(MainHarness):
                 # reconstruct all documents without rewriting the source JSON.
                 db.executescript('DROP TABLE recall_fts; DROP TABLE recall_document; '
                                  'DROP TABLE recall_configuration; DROP TABLE conversation_scope; '
+                                 'DROP TABLE compaction_summary; '
                                  'PRAGMA user_version=1;')
         return raw, text
 
