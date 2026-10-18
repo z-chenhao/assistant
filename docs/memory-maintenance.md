@@ -138,6 +138,29 @@ hashes are unchanged, so no data migration is needed. The lifecycle harness cove
 punctuation-bearing metadata through promotion, new-process startup, catalog
 list/view, retirement and another startup.
 
+Each configured catalog admits at most 128 active Skills. Pending publication
+and retained retirement directories do not consume active slots or enter model
+summaries. The loader enumerates directory entries in batches of 128, retains at
+most 128 active entries, and keeps the existing per-file/per-Skill size limits.
+Publication validates the full active catalog, then admits a new Skill under an
+exclusive OS lock on the catalog directory. Readers share that lock; retirement
+uses the same writer boundary. There is no persistent lock file, and process
+exit releases ownership. A contended writer fails closed and can be retried.
+
+At capacity, `skill manage promote` returns `RESOURCE_LIMIT`; the candidate stays
+verified at its current version. Retirement preserves its audit copy and frees
+one slot, after which that same candidate/version can be promoted. An identical
+already-published Skill succeeds even at capacity, recovering a crash between
+directory rename and candidate status commit. A partial pending `SKILL.md` can
+be rewritten on retry; unexpected staged resources or links are rejected. No
+audit copies are removed to make room. These changes need no migration and do
+not change valid Skill bytes or frozen resource hashes. The lifecycle harness
+proves last-slot publication, full rejection with unchanged candidate state,
+retirement, retry and fresh-process readback with more than 128 retained entries.
+That cardinality action selects an explicit 131,072-token local Fake profile so
+the 128 summaries and list results fit; earlier small-profile compaction and
+context-budget assertions run unchanged before that selection.
+
 ```sh
 make build
 python3 scripts/verify_memory_maintenance.py --binary bin/personal-agent --evidence evidence/memory-maintenance.json

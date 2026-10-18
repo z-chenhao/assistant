@@ -85,16 +85,23 @@ func Publish(ctx context.Context, c Config, id, name, description, procedure str
 	if e != nil || front.Name != name || front.Description != description {
 		return invalid
 	}
-	root, e := os.OpenRoot(c.Root)
+	root, close, e := openCatalog(c, true)
 	if e != nil {
 		return invalid
 	}
-	defer root.Close()
+	defer close()
+	entries, e := loadRoot(root, c.Scope)
+	if e != nil {
+		return e
+	}
 	if existing, e := readFile(root, name+"/SKILL.md"); e == nil {
 		if string(existing) == string(want) {
 			return nil
 		}
 		return invalid
+	}
+	if len(entries) >= maxEntries {
+		return ErrCapacity
 	}
 	if _, e = root.Lstat(name); !os.IsNotExist(e) {
 		return invalid
@@ -102,6 +109,29 @@ func Publish(ctx context.Context, c Config, id, name, description, procedure str
 	staging := ".erii-pending-" + id
 	if e = root.Mkdir(staging, 0700); e != nil && !os.IsExist(e) {
 		return invalid
+	}
+	// A recoverable stage owns only SKILL.md. Reject unexpected resources or
+	// links instead of publishing a directory the bounded reader cannot load.
+	info, e := root.Lstat(staging)
+	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return invalid
+	}
+	staged, e := root.Open(staging)
+	if e != nil {
+		return invalid
+	}
+	files, readErr := staged.ReadDir(2)
+	staged.Close()
+	if readErr != nil && readErr != io.EOF || len(files) > 1 {
+		return invalid
+	}
+	if len(files) == 1 {
+		if files[0].Name() != "SKILL.md" || !files[0].Type().IsRegular() {
+			return invalid
+		}
+		if e = root.Remove(staging + "/SKILL.md"); e != nil {
+			return invalid
+		}
 	}
 	if e = root.WriteFile(staging+"/SKILL.md", want, 0600); e != nil {
 		return invalid
@@ -112,11 +142,11 @@ func Publish(ctx context.Context, c Config, id, name, description, procedure str
 	return nil
 }
 func Retire(c Config, id, name, description, procedure string) error {
-	root, e := os.OpenRoot(c.Root)
+	root, close, e := openCatalog(c, true)
 	if e != nil {
 		return invalid
 	}
-	defer root.Close()
+	defer close()
 	if old, e := readFile(root, name+"/SKILL.md"); e == nil {
 		if string(old) != string(content(name, description, procedure)) {
 			return invalid

@@ -50,6 +50,16 @@ def latest_memory(h):
     return readback(h)['memory']['records'][-1]['memory_id']
 
 
+def skill_list(h, key):
+    result = content(call(h, key, 'builtin__skill__list', {}))
+    require(not result.get('error'), 'Skill list Tool failed')
+    refs = result.get('artifact_refs', [])
+    if refs:
+        require(len(refs) == 1, 'unexpected catalog Artifact count')
+        return h.command('artifact', 'open', refs[0])
+    return json.loads(result['text'])
+
+
 def run(binary):
     report = {'scope': 'M6 memory/context/Skill contracts and GC-01/02/03/06 fragments; not full product scores',
               'scenarios': [], 'passed': False}
@@ -264,7 +274,46 @@ def run(binary):
                                                           'rules_hash': rules['hash'], 'text': replacement}, worker=True)
             tests = [call(h, 'verified-' + str(i), 'builtin__workspace__test', {}) for i in range(2)]
             require(all(json.loads(content(inv)['text'])['passed'] for inv in tests), 'real workspace verification failed')
+            # Isolate catalog cardinality from the earlier small-profile context
+            # tests: 128 summaries plus list results need an explicit larger model.
+            catalog_profile = h.setup(metadata=dict(name='catalog capacity fixture', provider_kind='openai_compatible',
+                                                   endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                                   model_id='fixture-model', context_window=131072, max_output_tokens=8192,
+                                                   generation_defaults={}, compatibility=dict(tool_result_format='openai'),
+                                                   capabilities=dict(text_input=True)))
+            skills = root / 'skills'
+            # Fixture data: 127 active entries and more than 128 retained entries.
+            # All admission/retirement decisions still use the real Reviewer CLI.
+            for i in range(126):
+                name = f'slot-{i:03d}'
+                folder = skills / name
+                folder.mkdir()
+                (folder / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: Fixture.\n---\nMethod.\n')
+            retained = []
+            for prefix, count in (('.erii-retired-', 140), ('.erii-pending-', 5)):
+                for i in range(count):
+                    folder = skills / f'{prefix}fixture-{i}'
+                    folder.mkdir()
+                    path = folder / 'SKILL.md'
+                    path.write_text('Retained fixture bytes; not active metadata.\n')
+                    retained.append(path)
+            require(h.command('status')['agent_ingress_enabled'], 'retained history consumed active capacity')
+
+            def retire_skill(request, name):
+                retired = h.command('skill', 'manage', text=json.dumps(dict(request, operation='retire')))
+                require(retired['status'] == 'retired' and not (skills / name).exists(), 'retirement failed')
+                require((skills / ('.erii-retired-' + request['candidate_ref'].removeprefix('experience:')) / 'SKILL.md').is_file(),
+                        'retirement lost audit copy')
+                require(h.command('status')['agent_ingress_enabled'], 'retirement disabled configured startup')
+                remaining = skill_list(h, name + '-retired-list')
+                require(len(remaining) == 127 and not any(item['name'] == name for item in remaining),
+                        'retirement did not release one active slot')
+                return dict(retired=retired, remaining=remaining)
+
             lifecycles = []
+            active_request = None
+            active_name = None
+            capacity = {}
             for skill_name in ('verified-cli', 'verified---cli-correction'):
                 skill_description = 'Review code --- safely.'
                 proposal = dict(operation='propose', name=skill_name, description=skill_description,
@@ -279,6 +328,21 @@ def run(binary):
                                                                                 verification_ref='invocation:' + inv['invocation_id'])))
                     request['version'] = candidate['version']
                 require(candidate['status'] == 'verified', 'independent verifications did not qualify')
+                if active_request is not None:
+                    rejected = h.command('skill', 'manage', text=json.dumps(dict(request, operation='promote')), ok=False)
+                    require(rejected.returncode != 0 and 'RESOURCE_LIMIT' in rejected.stderr,
+                            'full catalog accepted publication or returned an unrelated failure')
+                    snapshot = readback(h)
+                    row = next(row for row in snapshot['state']['candidates']
+                               if row['candidate_id'] == request['candidate_ref'].removeprefix('experience:'))
+                    require(row['status'] == 'verified' and row['version'] == request['version'] == 3,
+                            'capacity rejection committed candidate status/version')
+                    require(not (skills / skill_name).exists(), 'rejected publication left an active entry')
+                    require(h.command('status')['agent_ingress_enabled'], 'capacity rejection disabled startup')
+                    still_full = skill_list(h, 'capacity-rejected-list')
+                    require(len(still_full) == 128, 'capacity rejection changed active catalog')
+                    capacity = dict(rejection=rejected.stderr, candidate=row, active_after_rejection=len(still_full))
+                    lifecycles[-1].update(retire_skill(active_request, active_name))
                 promoted = h.command('skill', 'manage', text=json.dumps(dict(request, operation='promote')))
                 require(promoted['status'] == 'promoted', 'verified procedure not published')
                 require((root / 'skills' / skill_name / 'SKILL.md').is_file(), 'published Skill missing')
@@ -286,8 +350,8 @@ def run(binary):
                 # survives startup, exact catalog metadata readback and retirement.
                 restarted = h.command('status')
                 require(restarted['agent_ingress_enabled'], 'published metadata disabled configured startup')
-                listed = call(h, skill_name + '-list', 'builtin__skill__list', {})
-                summaries = json.loads(content(listed)['text'])
+                summaries = skill_list(h, skill_name + '-list')
+                require(len(summaries) == 128, 'last-slot publication did not preserve catalog limit')
                 summary = next((item for item in summaries if item['name'] == skill_name), None)
                 require(summary and summary['description'] == skill_description,
                         'published punctuation metadata did not round-trip through catalog')
@@ -295,16 +359,17 @@ def run(binary):
                               {'name': skill_name, 'version': summary['version']})
                 require(content(viewed)['text'].endswith(proposal['procedure'] + '\n'),
                         'published Skill body changed across restart')
-                request['version'] = promoted['version']
-                retired = h.command('skill', 'manage', text=json.dumps(dict(request, operation='retire')))
-                require(retired['status'] == 'retired' and not (root / 'skills' / skill_name).exists(), 'retirement failed')
-                require(h.command('status')['agent_ingress_enabled'], 'retirement disabled configured startup')
-                remaining = json.loads(content(call(h, skill_name + '-retired-list', 'builtin__skill__list', {}))['text'])
-                require(not any(item['name'] == skill_name for item in remaining), 'retired Skill remains in catalog')
                 lifecycles.append(dict(promoted=promoted, restarted=restarted, summary=summary,
-                                       viewed=content(viewed), retired=retired, remaining=remaining))
+                                       viewed=content(viewed), active_after_promotion=len(summaries)))
+                active_request = dict(request, version=promoted['version'])
+                active_name = skill_name
+            lifecycles[-1].update(retire_skill(active_request, active_name))
+            require(all(path.read_text() == 'Retained fixture bytes; not active metadata.\n' for path in retained),
+                    'catalog maintenance changed retained history')
             report['scenarios'].append(dict(name='verified-skill-lifecycle', tests=tests,
-                                            **lifecycles[0], lifecycles=lifecycles))
+                                            **lifecycles[0], lifecycles=lifecycles, capacity=capacity,
+                                            retained_history_count=len(retained), catalog_profile_id=catalog_profile,
+                                            catalog_context_window=131072))
             work(h)
             manage(h, 'forget-health-category', operation='forget', category='health')
             work(h)

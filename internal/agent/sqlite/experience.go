@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -142,6 +143,9 @@ func (r *Runs) ReviewExperience(ctx context.Context, c skill.Config, q skill.Rev
 				return agent.ErrConflict
 			}
 			if e := skill.Publish(ctx, c, id, name, description, procedure); e != nil {
+				if errors.Is(e, skill.ErrCapacity) {
+					return agent.ErrResourceLimit
+				}
 				return e
 			}
 			next = "promoted"
