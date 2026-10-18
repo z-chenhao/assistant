@@ -38,7 +38,7 @@ The manifest in `scripts/verify_suite.py` owns verification coverage:
 | Shard | Required evidence |
 | --- | --- |
 | runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
-| codemode | Five consecutive Code Mode runs added by main in PR #18; real QuickJS/Tool/Child isolation fixtures |
+| codemode | Five consecutive Code Mode and fixed-source recovery runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) |
 | security | Five consecutive Tool approval/recovery and Artifact runs |
 | delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
 | providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |
