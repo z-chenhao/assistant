@@ -38,7 +38,7 @@ The manifest in `scripts/verify_suite.py` owns verification coverage:
 | Shard | Required evidence |
 | --- | --- |
 | runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
-| codemode | Five consecutive Code Mode runs added by main in PR #18; real QuickJS/Tool/Child isolation fixtures |
+| codemode | Five consecutive Code Mode and fixed-source recovery runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) |
 | security | Five consecutive Tool approval/recovery and Artifact runs |
 | delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
 | providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |
@@ -120,3 +120,14 @@ The issue's historical Ubuntu runs were 40m11s and 47m26s; CLI verification was
 The [ERII-134 report](https://github.com/z-chenhao/erii/pull/19) records the
 controlled local serial/parallel measurements, repeated-gate ranges, timing
 attachments and exact-head Ubuntu result separately.
+
+The full race command uses an explicit 15-minute Go package budget inside its
+20-minute job. Real SQLite migrations under race instrumentation exhausted the
+implicit 10-minute package budget on Ubuntu; per-test, Tool and lease deadlines
+remain unchanged. See [Core gate evidence](core-evals.md).
+
+The Code Mode verification job has a 60-minute budget; other verification shards
+retain 30 minutes. Four observed Ubuntu Core runs took 497.06, 508.73, 491.36 and
+517.33 seconds each, and the 45-minute job budget interrupted the fifth run.
+The 60-minute allocation preserves all 90 case executions, all five serial
+repetitions and all per-case/Tool/lease deadlines.

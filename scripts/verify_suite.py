@@ -18,6 +18,8 @@ import sys
 import threading
 import time
 
+import core_report
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -45,7 +47,8 @@ SHARDS = {
         Gate("events", "", "events"),
     ),
     "codemode": (Gate("codemode", "verify_codemode.py", "codemode", 5),
-                 Gate("code-recovery", "verify_code_recovery.py", "code-recovery", 5)),
+                 Gate("code-recovery", "verify_code_recovery.py", "code-recovery", 5),
+                 Gate("core-cases", "run_core_cases.py", "core-cases", 5)),
     "security": (
         Gate("tools", "verify_tools.py", "tools", 5),
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),
@@ -151,6 +154,9 @@ def main():
     names = [args.shard] if args.shard else list(SHARDS)
     evidence.mkdir(parents=True, exist_ok=True)
     (evidence / "logs").mkdir(exist_ok=True)
+    (evidence / ("suite-" + (args.shard or "all") + ".json")).unlink(missing_ok=True)
+    if "codemode" in names:
+        (evidence / "core-summary.json").unlink(missing_ok=True)
     # Delete only reports owned by the selected shards; never user state.
     for name in names:
         (evidence / f"timings-{name}.json").unlink(missing_ok=True)
@@ -185,6 +191,8 @@ def main():
     passed = not stopped.is_set() and all(
         len(rows) == sum(g.attempts for g in SHARDS[name]) and all(r["returncode"] == 0 for r in rows)
         for name, rows in zip(names, results))
+    if passed and "codemode" in names:
+        passed = core_report.write(evidence)
     report = dict(version=1, source_sha=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
                   binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),

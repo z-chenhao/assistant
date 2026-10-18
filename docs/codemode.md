@@ -208,3 +208,5 @@ rather than switched. Empty/v16 migration, rollback and preservation are tested.
 This slice proves deterministic protocol/recovery behavior. It does not award
 Golden Case semantic scores or complete M5; ERII-21 owns the due scored cases.
 The real Computer Driver and macOS compatibility remain M6 work.
+
+The M5 exact dataset and five-run Core gate is documented in [Core evaluations](core-evals.md). It adds GC-17/19/20 evidence to these protocol/recovery checks without assigning semantic scores to scripted providers.

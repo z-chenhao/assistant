@@ -34,6 +34,7 @@ import (
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
 	"github.com/z-chenhao/erii/internal/tool/codemode"
+	codefixture "github.com/z-chenhao/erii/internal/tool/codemode/fixture"
 	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
 	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"github.com/z-chenhao/erii/internal/tui"
@@ -140,7 +141,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 		defs = append(defs, more...)
 	}
-	if fixture == "codemode" && cfg.JavaScript != nil {
+	if (fixture == "core" || fixture == "codemode") && cfg.JavaScript != nil {
 		defs = append(defs, computerfake.Definitions()...)
 	}
 	if fixture == "artifacts" {
@@ -155,7 +156,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		a.Close()
 		return nil, err
 	}
-	if fixture == "codemode" || fixture == "children" || fixture == "approval" || fixture == "approval-never" {
+	if fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "approval" || fixture == "approval-never" {
 		defs := []tool.Definition{}
 		for _, spec := range a.registry.Describe() {
 			d, _ := a.registry.Resolve(spec.Name)
@@ -178,7 +179,11 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	}
 	a.runs = store.Runs(a.history, a.registry)
 	if cfg.JavaScript != nil {
-		a.runs.ConfigureJavaScript(&codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script})
+		var runtime codemode.JavaScriptRuntime = &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
+		if fixture == "core" {
+			runtime = &codefixture.Drift{JavaScriptRuntime: runtime, AuditPath: filepath.Join(cfg.App.DataRoot, "f055-drift.json")}
+		}
+		a.runs.ConfigureJavaScript(runtime)
 	}
 	a.runs.ConfigureChildLimits(cfg.Children)
 	a.runs.ConfigureScheduler(cfg.Scheduler)

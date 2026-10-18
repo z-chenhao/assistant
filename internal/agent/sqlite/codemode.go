@@ -273,9 +273,16 @@ func (b *codeBridge) Handle(ctx context.Context, method string, m codemode.Messa
 		// Opt-in exact recovery checkpoint; no production query or hidden fixture.
 		if m.Kind == "execution_suspended" && b.t.runs.host.MainBoundary != nil {
 			var completed, active int
-			err := b.t.runs.host.db.QueryRowContext(ctx, `SELECT coalesce(sum(child.status='completed'),0),coalesce(sum(child.status IN ('queued','running','waiting')),0) FROM code_call c JOIN agent_invocation a USING(invocation_id) JOIN run child ON child.run_id=a.child_run_id WHERE c.execution_id=?`, b.req.ExecutionID).Scan(&completed, &active)
+			err := b.t.runs.host.db.QueryRowContext(ctx, `SELECT coalesce(sum(child.status='completed'),0),coalesce(sum(child.status='waiting'),0) FROM code_call c JOIN agent_invocation a USING(invocation_id) JOIN run child ON child.run_id=a.child_run_id WHERE c.execution_id=?`, b.req.ExecutionID).Scan(&completed, &active)
 			if err != nil {
 				return empty, err
+			}
+			var stage string
+			if err := b.t.runs.host.db.QueryRowContext(ctx, `SELECT value_json FROM code_store WHERE execution_id=? AND key='fixture_stage'`, b.req.ExecutionID).Scan(&stage); err != nil && err != sql.ErrNoRows {
+				return empty, err
+			}
+			if stage == `"migration_complete"` {
+				b.t.runs.host.boundary("code_migration_completed_scheduler_pending")
 			}
 			if completed == 37 && active == 8 {
 				b.t.runs.host.boundary("code_37_completed_8_active")

@@ -24,7 +24,7 @@ class VerificationTests(unittest.TestCase):
             "verify_scheduling.py": 5, "verify_spend.py": 5, "verify_task_control.py": 5,
             "verify_tools.py": 5, "verify_artifacts.py": 5, "verify_delivery.py": 5,
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
-            "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
+            "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
@@ -96,6 +96,24 @@ class VerificationTests(unittest.TestCase):
             self.assertFalse(report['passed'])
             self.assertEqual(len(report['shards']['test']), 1)
             self.assertEqual(json.loads((root / 'timings-test.json').read_text())[0]['returncode'], 9)
+
+    def test_failed_core_run_cannot_leave_previous_success_report(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'core-summary.json').write_text('{"passed":true}')
+            gate = suite.Gate('core-failure', 'fixture.py', 'core-failure')
+            def command(*_):
+                return [sys.executable, '-c', 'raise SystemExit(1)'], os.environ.copy(), root / 'logs/fail.log'
+            handlers = {sig: signal.getsignal(sig) for sig in [signal.SIGINT, signal.SIGTERM]}
+            try:
+                with patch.dict(suite.SHARDS, {'codemode': (gate,)}, clear=True), patch.object(suite, 'command', command), \
+                     patch.object(sys, 'argv', ['verify_suite.py', '--binary', sys.executable, '--evidence', str(root)]):
+                    self.assertEqual(suite.main(), 1)
+            finally:
+                for sig, handler in handlers.items():
+                    signal.signal(sig, handler)
+            self.assertFalse((root / 'core-summary.json').exists())
+            self.assertFalse(json.loads((root / 'suite-all.json').read_text())['passed'])
 
     def test_cancellation_reaps_owned_process_and_runs_finally(self):
         with tempfile.TemporaryDirectory() as temp:
