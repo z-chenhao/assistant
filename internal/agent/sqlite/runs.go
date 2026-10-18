@@ -150,7 +150,7 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 		if profile == "" || status != "ready" {
 			return agent.ErrSetup
 		}
-		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
+		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND desired_state='running' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
 		if err == sql.ErrNoRows {
 			receipt.RunID, err = r.createMain(ctx, tx, agentID, profile, configVersion, nil)
 			if err != nil {
@@ -243,7 +243,7 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 		if err := r.claimCapacity(ctx, tx, id); err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
+		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND `+mainPredecessorsJoined+` AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
 		if err != nil {
 			return err
 		}

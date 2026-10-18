@@ -212,7 +212,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             with sqlite3.connect(db_path) as db:
                 report['events'] = [json.loads(r[0]) for r in db.execute('SELECT message_json FROM code_event ORDER BY execution_id,attempt_id,sequence')]
                 report['schema_version'] = db.execute('PRAGMA user_version').fetchone()[0]
-            require(report['events'] and report['schema_version'] == 19, 'durable events/migration missing')
+            require(report['events'] and report['schema_version'] == 20, 'durable events/migration missing')
         finally:
             h.cleanup()
     report['cleanup'] = not root.exists()

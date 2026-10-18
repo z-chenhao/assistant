@@ -32,6 +32,22 @@ Root across the barrier. The user can create a fresh Task with independent curre
 input. This prevents old anchors/instructions from silently reintroducing revoked
 material.
 
+Input accepted after the barrier owns a new queued Main with its own frozen
+snapshots and immutable receipt. It never joins the revoked Main. Both scheduler
+and direct Claim wait for revoked Main owners to join or expire and settle before
+executing the successor. A later Forget revokes that queued successor as usual.
+State schema 20 replaces the single nonterminal Main index with one Main whose
+desired state is running; stopped audit rows may coexist with its queued successor.
+The migration preserves all input, claim and snapshot records. Use the current
+binary for all processes after migration; older binaries do not enforce this
+successor admission fence.
+
+A newer explicit remember with an independent evidence source creates an
+immutable successor even when its content and tier deduplicate. Its timestamp
+and source belong only to the fresh evidence; the old record stays audit-only.
+Receipt replay, repeated sources and out-of-order older evidence do not renew a
+fact. Scope privacy filtering and lineage/source suppression still apply.
+
 Memory deletion retains tombstones, invalidates the whole supersession lineage,
 and suppresses re-extraction of its evidence sources. Category opt-outs persist
 with CAS versions; replay uses frozen deletion targets and immutable policy

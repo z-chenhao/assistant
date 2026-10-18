@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/memory"
 	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
@@ -134,6 +135,121 @@ func TestForgetRevokesFrozenPendingGeneration(t *testing.T) {
 	}
 	if newRun.Snapshot.ModelID != run.Snapshot.ModelID {
 		t.Fatal("model switched")
+	}
+}
+
+func TestForgetPreservesFreshInputBeforeStopSettlement(t *testing.T) {
+	for _, live := range []bool{false, true} {
+		t.Run(map[bool]string{false: "queued", true: "live-owner"}[live], func(t *testing.T) {
+			ctx := context.Background()
+			s, r, _, a, p := loopFixture(t)
+			m, err := memorysqlite.Open(ctx, filepath.Dir(s.path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer m.Close()
+			r.ConfigureMemory(m, memory.Vault{})
+			old := mustSubmit(t, a, "old", "REVOKED_INPUT_MARKER")
+			var owner agent.RunClaim
+			if live {
+				var err error
+				owner, err = r.Claim(ctx, old.RunID)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := r.ManageMemory(ctx, "forget", memory.Mutation{Operation: "forget", Category: "health"}); err != nil {
+				t.Fatal(err)
+			}
+			fresh := mustSubmit(t, a, "fresh", "FRESH_INPUT_MARKER")
+			if fresh.RunID == old.RunID {
+				t.Fatal("fresh input assigned to revoked Main")
+			}
+			if retry := mustSubmit(t, a, "fresh", "FRESH_INPUT_MARKER"); retry != fresh {
+				t.Fatal("receipt changed", retry, fresh)
+			}
+			if _, err := a.Submit(ctx, "fresh", "different content"); !errors.Is(err, conversation.ErrConflict) {
+				t.Fatal("fresh receipt accepted parameter drift", err)
+			}
+			if live {
+				if _, err := r.Next(ctx); !errors.Is(err, agent.ErrBusy) {
+					t.Fatal("successor scheduled before old owner joined", err)
+				}
+				if _, err := r.Claim(ctx, fresh.RunID); !errors.Is(err, agent.ErrBusy) {
+					t.Fatal("successor claimed before old owner joined", err)
+				}
+				if stopped, err := r.SettleStop(ctx, owner); err != nil || !stopped {
+					t.Fatal(stopped, err)
+				}
+			}
+			mustDrain(t, a)
+			if n := scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='cancelled' AND error_code='memory_forgotten'`, old.RunID); n != 1 {
+				t.Fatal("old Main revived")
+			}
+			if n := scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='completed'`, fresh.RunID); n != 1 {
+				t.Fatal("fresh Main stranded")
+			}
+			if len(p.requests) == 0 || scalar(t, s, `SELECT count(*) FROM delivery_request`) != 1 {
+				t.Fatal("fresh input produced no answer")
+			}
+			for _, req := range p.requests {
+				raw, _ := encoded(req)
+				if strings.Contains(raw, "REVOKED_INPUT_MARKER") {
+					t.Fatal("revoked context imported", raw)
+				}
+			}
+			if retry := mustSubmit(t, a, "fresh", "FRESH_INPUT_MARKER"); retry != fresh {
+				t.Fatal("terminal retry changed", retry, fresh)
+			}
+		})
+	}
+}
+
+func TestForgetCanRevokeQueuedSuccessor(t *testing.T) {
+	ctx := context.Background()
+	s, r, _, a, p := loopFixture(t)
+	m, err := memorysqlite.Open(ctx, filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	r.ConfigureMemory(m, memory.Vault{})
+	old := mustSubmit(t, a, "first", "REVOKED_FIRST_MARKER")
+	owner, err := r.Claim(ctx, old.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forget := func(key string) {
+		t.Helper()
+		if _, err := r.ManageMemory(ctx, key, memory.Mutation{Operation: "forget", Category: "health"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	forget("forget-first")
+	middle := mustSubmit(t, a, "middle", "REVOKED_MIDDLE_MARKER")
+	forget("forget-middle")
+	fresh := mustSubmit(t, a, "last", "FRESH_LAST_MARKER")
+	if old.RunID == middle.RunID || middle.RunID == fresh.RunID || old.RunID == fresh.RunID {
+		t.Fatal("input ownership reused")
+	}
+	if next, err := r.Next(ctx); !errors.Is(err, agent.ErrBusy) {
+		t.Fatal("last successor scheduled before first owner joined", next, err)
+	}
+	if stopped, err := r.SettleStop(ctx, owner); err != nil || !stopped {
+		t.Fatal(stopped, err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id IN (?,?) AND status='cancelled' AND error_code='memory_forgotten'`, old.RunID, middle.RunID) != 2 {
+		t.Fatal("revoked predecessor revived")
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='completed'`, fresh.RunID) != 1 {
+		t.Fatal("last input stranded")
+	}
+	for _, req := range p.requests {
+		raw, _ := encoded(req)
+		if strings.Contains(raw, "REVOKED_") {
+			t.Fatal("revoked predecessor imported", raw)
+		}
 	}
 }
 

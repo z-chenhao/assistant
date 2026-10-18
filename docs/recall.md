@@ -34,7 +34,7 @@ credentials nor endpoint strings. Credential rotation does not change vector spa
 
 | Database | Version | Authority / derived data |
 | --- | --- | --- |
-| `state.db` | 19 | Run/Tool ledgers; immutable per-Run, per-step recall snapshots |
+| `state.db` | 20 | Run/Tool ledgers; immutable recall snapshots; queued Main successor admission fence |
 | `conversation.db` | 3 | Immutable original messages, monotonic sequences, frozen ownership; derived FTS5/vectors |
 | `memory.db` | 2 | Facts, evidence references, supersession links, tombstones; derived FTS5/vectors |
 

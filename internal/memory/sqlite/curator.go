@@ -124,9 +124,11 @@ func (s *Store) Curate(ctx context.Context, eventID string, scope recall.Scope, 
 					return e
 				}
 			}
-			if _, e = tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_evidence VALUES(?,?,?,?,?)`, scope.UserID, scope.AgentID, key, ref.Type, ref.Ref); e != nil {
+			evidence, e := tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_evidence VALUES(?,?,?,?,?)`, scope.UserID, scope.AgentID, key, ref.Type, ref.Ref)
+			if e != nil {
 				return recall.ErrUnavailable
 			}
+			fresh, _ := evidence.RowsAffected()
 			var count int
 			if tx.QueryRowContext(ctx, `SELECT count(*) FROM memory_evidence WHERE user_id=? AND agent_id=? AND fact_key=? AND source_type IN('conversation','feedback')`, scope.UserID, scope.AgentID, key).Scan(&count) != nil {
 				return recall.ErrUnavailable
@@ -142,11 +144,19 @@ func (s *Store) Curate(ctx context.Context, eventID string, scope recall.Scope, 
 			}
 			if old != "" && supersedes == "" {
 				var oldTier string
-				if tx.QueryRowContext(ctx, `SELECT tier FROM memory_record WHERE memory_id=?`, old).Scan(&oldTier) != nil {
+				var oldAt int64
+				if tx.QueryRowContext(ctx, `SELECT tier,created_at FROM memory_record WHERE memory_id=?`, old).Scan(&oldTier, &oldAt) != nil {
 					return recall.ErrUnavailable
 				}
-				if oldTier == tier || oldTier == "core" {
+				// Explicit independent evidence owns its new timestamp/source even
+				// when the content deduplicates. Preserve the old immutable record;
+				// the fresh leaf can cross a later privacy floor without reviving it.
+				renew := explicit && fresh > 0 && at.UnixMicro() > oldAt
+				if (oldTier == tier || oldTier == "core") && !renew {
 					continue
+				}
+				if oldTier == "core" {
+					tier = "core"
 				}
 			}
 			if supersedes != "" {

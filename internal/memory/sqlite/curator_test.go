@@ -77,6 +77,49 @@ func TestCuratorEvidenceDedupEncryptionAndForget(t *testing.T) {
 	}
 }
 
+func TestFreshRememberRetainsIndependentProvenance(t *testing.T) {
+	s := openTest(t)
+	const text = "I prefer unsweetened tea"
+	curate := func(id, source string, at int64) {
+		t.Helper()
+		if err := s.Curate(ctx, id, scope, mem.SourceRef{Type: "feedback", Ref: "feedback:" + source}, time.Unix(at, 0), []string{text}, true, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	curate("original", "original", 100)
+	floor := time.Unix(110, 0)
+	query := recall.Query{Query: "tea", TimeRange: &recall.TimeRange{Start: &floor}}
+	if hits, err := s.Search(ctx, scope, query); err != nil || len(hits) != 0 {
+		t.Fatal("old evidence crossed privacy floor", hits, err)
+	}
+	curate("fresh", "fresh", 120)
+	curate("fresh", "fresh", 120)       // receipt replay
+	curate("same-source", "fresh", 130) // no independent evidence
+	curate("late-old", "late-old", 90)  // out of order cannot replace fresh provenance
+	hits, err := s.Search(ctx, scope, query)
+	if err != nil || len(hits) != 1 || hits[0].Content != text || hits[0].SourceRef != "memory:fresh-0" {
+		t.Fatal("fresh remember invisible", hits, err)
+	}
+	var refs, successor string
+	var created, count int64
+	if err = s.db.QueryRow(`SELECT source_refs,supersedes_memory_id,created_at FROM memory_record WHERE memory_id='fresh-0'`).Scan(&refs, &successor, &created); err != nil {
+		t.Fatal(err)
+	}
+	if successor != "original-0" || created != time.Unix(120, 0).UnixMicro() || refs != `[{"source_ref":"feedback:fresh","source_type":"feedback"}]` {
+		t.Fatal("fresh provenance changed", refs, successor, created)
+	}
+	if err = s.db.QueryRow(`SELECT count(*) FROM memory_record`).Scan(&count); err != nil || count != 2 {
+		t.Fatal("replay/duplicate created revisions", count, err)
+	}
+	if err = s.Forget(ctx, scope, "fresh-0", time.Unix(140, 0)); err != nil {
+		t.Fatal(err)
+	}
+	curate("suppressed", "fresh", 150)
+	if hits, err = s.Search(ctx, scope, query); err != nil || len(hits) != 0 {
+		t.Fatal("suppressed evidence resurrected", hits, err)
+	}
+}
+
 type remoteEmbedding struct{ calls int }
 
 func (e *remoteEmbedding) Identity() string { return fake.Embedding{}.Identity() }

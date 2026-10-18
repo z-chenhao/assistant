@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
 )
 
@@ -102,4 +104,72 @@ DROP TABLE skill_verification; DROP TABLE skill_candidate; PRAGMA user_version=1
 	if e = reopened.db.QueryRow(`SELECT request_json FROM model_generation WHERE generation_id=?`, old.GenerationID).Scan(&stored); e != nil || stored != raw {
 		t.Fatal(e)
 	}
+}
+
+func TestV19MainSuccessorMigrationRetainsInputAndStopOwnership(t *testing.T) {
+	ctx := context.Background()
+	s, r, history, a, _ := loopFixture(t)
+	old := mustSubmit(t, a, "prior-input", "prior input")
+	owner, err := r.Claim(ctx, old.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var original string
+	if err = s.db.QueryRow(`SELECT message_json FROM main_input WHERE request_key='prior-input'`).Scan(&original); err != nil {
+		t.Fatal(err)
+	}
+	// Schema 20 changes only this index. Reconstruct the real populated v19
+	// schema while retaining its live owner, snapshots, input and privacy epoch.
+	if _, err = s.db.Exec(`DROP INDEX one_main;
+CREATE UNIQUE INDEX one_main ON run(agent_id) WHERE kind='main' AND status IN ('queued','running','waiting');
+PRAGMA user_version=19;`); err != nil {
+		t.Fatal(err)
+	}
+	path := s.path
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(ctx, filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	recovered := reopened.Runs(history, r.registry)
+	if scalar(t, reopened, `PRAGMA user_version`) != 20 {
+		t.Fatal("migration not applied")
+	}
+	var after string
+	if err = reopened.db.QueryRow(`SELECT message_json FROM main_input WHERE request_key='prior-input'`).Scan(&after); err != nil || after != original {
+		t.Fatal("input audit changed", err)
+	}
+	if scalar(t, reopened, `SELECT count(*) FROM run_claim WHERE run_id=? AND token=? AND epoch=?`, old.RunID, owner.(*claim).token, owner.(*claim).epoch) != 1 {
+		t.Fatal("live owner changed")
+	}
+	agentID := idAgent(t, reopened)
+	if err = recovered.write(ctx, func(tx *sql.Tx) error { return recovered.revokeMemory(ctx, tx, agentID) }); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := recovered.Submit(ctx, "fresh-after-migration", []conversation.ContentPart{{Type: "text", Text: "fresh input"}})
+	if err != nil || fresh.RunID == old.RunID {
+		t.Fatal(fresh, err)
+	}
+	if _, err = recovered.Claim(ctx, fresh.RunID); !errors.Is(err, agent.ErrBusy) {
+		t.Fatal("new owner admitted before join", err)
+	}
+	// Simulate an owner crash without wall-clock sleeps. Recovery observes the
+	// expired persisted lease and must settle the predecessor before claiming.
+	if _, err = reopened.db.Exec(`UPDATE run_claim SET expires_at=0,version=version+1 WHERE run_id=?`, old.RunID); err != nil {
+		t.Fatal(err)
+	}
+	if next, err := recovered.Next(ctx); err != nil || next != fresh.RunID {
+		t.Fatal(next, err)
+	}
+	if scalar(t, reopened, `SELECT count(*) FROM run WHERE run_id=? AND status='cancelled' AND error_code='memory_forgotten'`, old.RunID) != 1 {
+		t.Fatal("expired predecessor not settled")
+	}
+	c, err := recovered.Claim(ctx, fresh.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recovered.Release(ctx, c)
 }

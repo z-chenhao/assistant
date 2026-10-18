@@ -1570,6 +1570,7 @@ context_tokens > context_window * threshold_percentage
 - 两路召回并行、分别排序，再在统一上下文预算下合并。
 - 本轮召回结果冻结，避免 Agent Loop 中途改变上下文。
 - 用户于 2026-10-18 确认：Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/memory-maintenance.md`。
+- 撤销点之后接受的新输入归属新的排队 Main，保留不可变回执；旧 Main owner join 或租约失效并完成 stop settlement 后，才允许调度或 Claim 后继 Run。同内容的新显式 remember 保留独立的新来源与时间戳，不能因去重而继续指向撤销点之前的证据。
 - System Prompt、人格、规则和 Core Memory 尽量保持静态。
 - 动态召回内容放在 Prompt 后部，以减少对 Prompt Cache 的破坏。
 

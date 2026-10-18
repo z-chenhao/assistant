@@ -83,6 +83,13 @@ It deliberately stops every unfinished Run in the Agent scope and prevents old
 automatic context from being imported into new Runs. Older Tasks are hidden from
 model search and append is denied; a fresh self-contained Task can use new
 independent input. Immutable audit remains.
+Fresh chat input accepted while the revoked Main is stopping binds to a separate
+queued Main and keeps that receipt on retries. Its execution waits for the old
+owner to join or expire and settle. A fresh explicit remember of identical content
+creates a successor with its own timestamp and source, so unrelated Forget does
+not hide the newly supplied evidence. Old evidence remains excluded. State schema
+20 migrates the Main admission index without rewriting stored input or snapshots;
+all processes sharing the data root must use the current binary after migration.
 An explicit Forget issued by a Main Tool can stop that Main before another model
 reply; the durable receipt is visible through the control/status boundary.
 

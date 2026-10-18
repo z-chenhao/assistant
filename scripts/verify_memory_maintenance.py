@@ -142,12 +142,21 @@ def run(binary):
 
             # Freeze the finance fact before provider dispatch; revoke it from
             # another CLI process, kill the old owner and recover its stop.
+            before_delivery = len(h.command('delivery', 'list'))
             receipt = h.send('frozen-before-forget', 'employer options')
             held = h.hold('before_generation_dispatch')
             frozen = h.state()
             pending = next(g for g in frozen['generations'] if g['run_id'] == receipt['run_id'])
             require(corrected in pending['request_json'], 'fixture did not freeze target fact')
             manage(h, 'forget-finance', operation='forget', memory_ref='memory:' + current)
+            fresh = h.send('fresh-before-owner-joins', 'FRESH_LIVE_INPUT_MARKER')
+            require(fresh['run_id'] != receipt['run_id'], 'fresh input reused revoked live Main')
+            require(h.send('fresh-before-owner-joins', 'FRESH_LIVE_INPUT_MARKER') == fresh,
+                    'fresh live-input receipt changed on retry')
+            waiting = h.state()
+            require(next(r for r in waiting['runs'] if r['run_id'] == fresh['run_id'])['status'] == 'queued'
+                    and not any(g['run_id'] == fresh['run_id'] for g in waiting['generations']),
+                    'fresh successor executed before the held owner joined')
             held.kill()
             held.communicate(timeout=10)
             h.command('chat', 'work')
@@ -155,6 +164,14 @@ def run(binary):
             state = h.state()
             old_run = next(r for r in state['runs'] if r['run_id'] == receipt['run_id'])
             require(old_run['status'] == 'cancelled' and old_run['error_code'] == 'memory_forgotten', 'revocation not recovered')
+            require(next(r for r in state['runs'] if r['run_id'] == fresh['run_id'])['status'] == 'completed',
+                    'fresh input stranded after owner crash/restart')
+            fresh_requests = [g['request_json'] for g in state['generations'] if g['run_id'] == fresh['run_id']]
+            require(fresh_requests and all(corrected not in value and finance not in value for value in fresh_requests),
+                    'live successor imported revoked context')
+            require(any('FRESH_LIVE_INPUT_MARKER' in value for value in fresh_requests)
+                    and len(h.command('delivery', 'list')) == before_delivery + 1,
+                    'fresh live input did not produce exactly one answer')
             later = h.send('after-forget', 'What context is available now?')
             h.command('chat', 'work')
             state = h.state()
@@ -164,7 +181,62 @@ def run(binary):
             require(any(corrected in g['request_json'] for g in state['generations'] if g['run_id'] == receipt['run_id']),
                     'immutable audit was erased')
             report['scenarios'].append(dict(name='forget-fences-frozen-recovery', old_run=old_run, requests=new_requests,
+                                            successor=fresh, waiting=waiting, fresh_requests=fresh_requests,
                                             privacy=readback(h)['state']['privacy']))
+
+            # Queued revocation: accept fresh ingress before stop recovery, then
+            # prove its immutable receipt leads to one real model answer.
+            before_delivery = len(h.command('delivery', 'list'))
+            queued = h.send('queued-before-forget', 'REVOKED_QUEUED_INPUT_MARKER')
+            manage(h, 'forget-queued', operation='forget', category='health')
+            fresh = h.send('fresh-before-queued-settles', 'FRESH_QUEUED_INPUT_MARKER')
+            require(fresh['run_id'] != queued['run_id'], 'fresh input reused revoked queued Main')
+            h.command('chat', 'work')
+            state = h.state()
+            require(next(r for r in state['runs'] if r['run_id'] == queued['run_id'])['status'] == 'cancelled',
+                    'revoked queued Main was revived')
+            require(next(r for r in state['runs'] if r['run_id'] == fresh['run_id'])['status'] == 'completed',
+                    'fresh queued input stranded')
+            requests = [g['request_json'] for g in state['generations'] if g['run_id'] == fresh['run_id']]
+            require(requests and all('REVOKED_QUEUED_INPUT_MARKER' not in value for value in requests),
+                    'queued successor imported revoked input')
+            require(any('FRESH_QUEUED_INPUT_MARKER' in value for value in requests),
+                    'fresh queued input absent from successor context')
+            require(len(h.command('delivery', 'list')) == before_delivery + 1,
+                    'fresh queued input did not produce exactly one delivery')
+            require(h.send('fresh-before-queued-settles', 'FRESH_QUEUED_INPUT_MARKER') == fresh,
+                    'fresh terminal receipt changed on retry')
+            report['scenarios'].append(dict(name='forget-preserves-queued-ingress', revoked=queued,
+                                            successor=fresh, requests=requests, state=state))
+
+            # Fresh authorized provenance must survive content deduplication.
+            tea = 'I prefer unsweetened tea'
+            def tea_hits(key):
+                found = call(h, key, 'builtin__memory__search', {'query': 'unsweetened tea'})
+                return [hit for hit in json.loads(content(found)['text'])
+                        if hit['source_type'] == 'memory' and hit['content'] == tea]
+            manage(h, 'tea-before-unrelated-forget', operation='remember', content=tea)
+            work(h)
+            prior_hits = tea_hits('tea-baseline-search')
+            require(len(prior_hits) == 1, 'baseline explicit preference missing')
+            manage(h, 'forget-unrelated-health', operation='forget', category='health')
+            work(h)
+            require(not tea_hits('tea-barrier-search'), 'old preference crossed conservative privacy barrier')
+            reapplied = manage(h, 'tea-after-unrelated-forget', operation='remember', content=tea)
+            work(h)
+            hits = tea_hits('tea-fresh-search')
+            require(len(hits) == 1 and hits[0]['source_ref'] != prior_hits[0]['source_ref'],
+                    'fresh remember invisible or old provenance reused')
+            snapshot = readback(h)
+            record = next(r for r in snapshot['memory']['records']
+                          if 'memory:' + r['memory_id'] == hits[0]['source_ref'])
+            require('feedback:control:tea-after-unrelated-forget' in record['source_refs']
+                    and record['created_at'] > snapshot['state']['privacy'][0]['updated_at'],
+                    'fresh record lacks post-barrier provenance')
+            require(any(r['event_id'] == reapplied['receipt'].removeprefix('memory-event:') and r['applied_at']
+                        for r in snapshot['state']['events']), 'fresh remember receipt not applied')
+            report['scenarios'].append(dict(name='remember-after-unrelated-forget', receipt=reapplied,
+                                            before=prior_hits, after=hits, record=record))
 
             # Real CLI originals trigger hierarchical summaries. Compaction does
             # not replace semantic messages or runtime source boundaries.
