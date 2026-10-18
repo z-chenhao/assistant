@@ -204,6 +204,9 @@ upload timings outside the wrapper come from the GitHub API collector. The
 aggregate adds the tested full SHA and every dependency outcome to the workflow
 summary. Exact-SHA evidence is retained for failure and graceful cancellation;
 hard runner termination can prevent upload.
+Source identity is frozen before a phase starts. A changed HEAD, changed tracked
+working diff or changed suite executable invalidates the result. Dirty local
+trees are marked explicitly and cannot be cited as exact-commit evidence.
 
 The cancellation regression first reproduced a live listening child after its
 group leader exited. The runner now kills the remaining owned group after

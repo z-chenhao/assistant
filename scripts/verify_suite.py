@@ -68,6 +68,13 @@ SHARDS = {
 }
 
 
+def source_state():
+    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    diff = subprocess.check_output(['git', 'diff', '--binary', 'HEAD'], cwd=ROOT)
+    return dict(source_sha=sha, source_dirty=bool(diff),
+                source_diff_sha256=hashlib.sha256(diff).hexdigest())
+
+
 def report_name(gate, attempt):
     suffix = f"-{attempt}" if gate.attempts > 1 else ""
     if gate.name == "tui" and attempt == 1:
@@ -194,6 +201,8 @@ def main():
     binary, evidence = args.binary.resolve(), args.evidence.resolve()
     if not binary.is_file():
         parser.error("binary missing; run make build")
+    source = source_state()
+    binary_digest = hashlib.sha256(binary.read_bytes()).hexdigest()
     names = [args.shard] if args.shard else list(SHARDS)
     evidence.mkdir(parents=True, exist_ok=True)
     (evidence / "logs").mkdir(exist_ok=True)
@@ -236,9 +245,11 @@ def main():
         for name, rows in zip(names, results))
     if passed and "codemode" in names:
         passed = core_report.write(evidence)
-    report = dict(version=1, source_sha=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+    stable = source == source_state() and binary_digest == hashlib.sha256(binary.read_bytes()).hexdigest()
+    passed = passed and stable
+    report = dict(version=1, **source, source_stable=stable,
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
-                  binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
+                  binary_sha256=binary_digest,
                   elapsed_seconds=time.monotonic() - started, passed=passed,
                   shards=dict(zip(names, results)))
     (evidence / ("suite-" + (args.shard or "all") + ".json")).write_text(json.dumps(report, indent=2) + "\n")

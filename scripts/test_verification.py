@@ -124,6 +124,27 @@ class VerificationTests(unittest.TestCase):
             self.assertNotEqual(code, 0)
             self.assertFalse(metrics['owned_group_drained'])
 
+    def test_source_change_during_gate_cannot_claim_exact_sha_success(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            gate = suite.Gate('fixture', '', 'fixture')
+            def command(*_):
+                return [sys.executable, '-c', 'pass'], os.environ.copy(), root / 'logs/fixture.log'
+            handlers = {sig: signal.getsignal(sig) for sig in [signal.SIGINT, signal.SIGTERM]}
+            try:
+                with patch.dict(suite.SHARDS, {'test': (gate,)}, clear=True), \
+                     patch.object(suite, 'command', command), \
+                     patch.object(suite, 'source_state', side_effect=[{'source_sha': 'before'}, {'source_sha': 'after'}]), \
+                     patch.object(sys, 'argv', ['verify_suite.py', '--binary', sys.executable, '--evidence', str(root)]):
+                    self.assertEqual(suite.main(), 1)
+            finally:
+                for sig, handler in handlers.items():
+                    signal.signal(sig, handler)
+            report = json.loads((root / 'suite-all.json').read_text())
+            self.assertEqual(report['source_sha'], 'before')
+            self.assertFalse(report['source_stable'])
+            self.assertFalse(report['passed'])
+
     def test_failed_core_run_cannot_leave_previous_success_report(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

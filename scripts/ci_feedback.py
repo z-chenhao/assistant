@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import signal
-import subprocess
 import threading
 
 import verify_suite as suite
@@ -27,8 +26,8 @@ def main():
     parser.add_argument('--evidence', type=Path, default=Path('evidence/feedback'))
     args = parser.parse_args()
     plan = json.loads(args.plan.read_text())
-    source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-    if (plan.get('source_sha') != source or not isinstance(plan.get('shards'), list) or
+    source = suite.source_state()
+    if (plan.get('source_sha') != source['source_sha'] or not isinstance(plan.get('shards'), list) or
             len(set(plan['shards'])) != len(plan['shards']) or
             any(s not in GATES for s in plan['shards']) or plan.get('full_shards') != sorted(GATES)):
         raise ValueError('invalid or stale impact plan')
@@ -49,8 +48,9 @@ def main():
         gates = tuple(suite.Gate(g.name, g.script, g.report) for g in suite.SHARDS[name] if g.name in GATES[name])
         rows[name] = suite.run_shard(name, args.binary.resolve(), args.evidence.resolve(), stopped, gates)
         passed = len(rows[name]) == len(gates) and all(r['returncode'] == 0 for r in rows[name])
-    passed = passed and not stopped.is_set()
-    report = dict(version=1, source_sha=source, passed=passed, race_returncode=code,
+    stable = source == suite.source_state()
+    passed = passed and not stopped.is_set() and stable
+    report = dict(version=1, **source, source_stable=stable, passed=passed, race_returncode=code,
                   impact=plan, shards=rows, scope='early feedback; no full merge evidence')
     (args.evidence / 'feedback.json').write_text(json.dumps(report, indent=2) + '\n')
     return 0 if passed else 1

@@ -6,11 +6,10 @@ import os
 from pathlib import Path
 import platform
 import signal
-import subprocess
 import threading
 import time
 
-from verify_suite import run_command
+from verify_suite import run_command, source_state
 
 
 def main():
@@ -28,13 +27,17 @@ def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopped.set())
     metrics = {}
+    source = source_state()
     started = time.monotonic()
     code = 127
     try:
         code = run_command(command, os.environ.copy(), folder / (args.name + '.log'), stopped, metrics)
     finally:
+        stable = source == source_state()
+        if not stable:
+            code = 125
         record = dict(version=1, name=args.name, phase=args.phase, command=command, returncode=code,
-                      source_sha=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+                      **source, source_stable=stable,
                       wall_seconds=time.monotonic() - started, runner=platform.platform(),
                       go_cache_hit=os.environ.get('CI_GO_CACHE_HIT') or None,
                       npm_cache_hit=os.environ.get('CI_NPM_CACHE_HIT') or None, **metrics)
