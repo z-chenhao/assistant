@@ -1,5 +1,22 @@
 # Foundation feature map
 
+## Durable context recall (ERII-22)
+
+`python3 scripts/verify_recall.py --binary bin/personal-agent --evidence evidence/recall.json`
+owns Launch/Doctor/Drive/Evidence/Cleanup with isolated databases and explicit HTTP
+embedding/LLM Fakes. `make verify` runs five repetitions. See [recall operations](../docs/recall.md).
+
+| Feature | User boundary | Authoritative implementation | Evidence |
+| --- | --- | --- | --- |
+| Unified scoped recall | Configured `builtin__memory__search` through Main/Root/Child | Host scope in `agent/sqlite.searchMemory`, common ToolExecutor, MemoryProvider/ConversationProvider | Three real invocations; user/Agent exclusions, source/time/author without scores, vector-only synonym in both sources |
+| Memory/Conversation authority | Existing chat ingress and separate provider databases | `memory/sqlite`, `conversation/sqlite`, state migration 018 | Original messages unchanged, immutable evidence, empty/populated-prior migration, atomic index rollback, tombstone/supersession and conflict contracts; maintained recall CLI multipart/pending-v2 and multipart-prior scenarios: 80,001-byte original, bounded UTF-8 embedding chunks, nine generations/four completed Runs, inert repeated drain; actual HTTP regression covers max 128 × 64 KiB parts and mid-chunk failure/retry without partial vector |
+| Hybrid ranking | Explicit embedding configuration and read-only search | `recall/embedding`, private `sqliteindex`, provider-specific RRF ordering | Actual HTTP adapter, FTS5/BM25 + exact cosine, time/tier/rank boundaries, no partial result on embedding/index fault, concurrent independent retrieval |
+| Frozen context | Shared model-generation admission | `run_recall`, `Runs.recallMessages` | SIGKILL after freeze, corpus changes, exact snapshot reused on restart; new turn sees new data, stable prefix/dynamic suffix, no Parent mutable context copied, old-owner rejection |
+
+No embedding configuration means no recall capability; this is not a full vector
+completion claim for that installation. Curator, explicit management and compaction
+remain the next slice; these checks do not score full SC-08.
+
 Run `make verify` from the repository root. `scripts/verify.py` drives the built
 CLI and independently reads SQLite/JSONL. `internal/event/integration` owns the
 JetStream and process-kill mechanics. No online account or installed broker is

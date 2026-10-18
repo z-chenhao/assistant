@@ -1,4 +1,12 @@
 version: 1
+# Optional durable recall. Install/serve the selected model explicitly.
+# No implicit embedding provider or FTS-only fallback. See docs/recall.md.
+# embedding:
+#   provider: openai_compatible
+#   endpoint: http://127.0.0.1:11434/v1
+#   model: nomic-embed-text
+#   dimensions: 768
+#   api_key_ref: credential-reference-in-SecretStore
 # Optional M3 adapters, disabled when absent. Use private dedicated directories.
 # mcp:
 #   - name: local_catalog

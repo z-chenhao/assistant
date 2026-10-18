@@ -16,12 +16,14 @@ import (
 	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	"github.com/z-chenhao/erii/internal/recall/embedding"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
+	Embedding  *embedding.Config     `yaml:"embedding"`
 	JavaScript *JavaScript           `yaml:"javascript"`
 	Spend      agent.SpendPolicy     `yaml:"spend"`
 	Scheduler  agent.SchedulerLimits `yaml:"scheduler"`
@@ -122,6 +124,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
 		return Config{}, errors.New("javascript requires an absolute command and script")
+	}
+	if cfg.Embedding != nil && cfg.Embedding.Validate() != nil {
+		return Config{}, errors.New("invalid embedding provider, endpoint, model or dimensions")
 	}
 	if err := cfg.Spend.Validate(); err != nil {
 		return Config{}, err

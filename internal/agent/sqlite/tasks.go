@@ -180,6 +180,9 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	if name == agent.RunToolName {
 		return t.AgentToolExecutor(ctx, inv.ID)
 	}
+	if name == "builtin__memory__search" {
+		return t.searchMemory(ctx, inv)
+	}
 	for {
 		result, err := t.executeBuiltin(ctx, inv)
 		if !errors.Is(err, agent.ErrBusy) {

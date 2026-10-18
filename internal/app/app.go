@@ -29,7 +29,10 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
+	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/erii/internal/recall"
+	"github.com/z-chenhao/erii/internal/recall/embedding"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
@@ -48,6 +51,7 @@ type App struct {
 	control        llm.Control
 	accounts       *account.Manager
 	history        *conversationsqlite.Store
+	memory         *memorysqlite.Store
 	runs           *sqlite.Runs
 	registry       *tool.Registry
 	terminalInbox  *deliveryterminal.Adapter
@@ -103,9 +107,28 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, err
 	}
 	a.terminalInbox = store.TerminalInbox()
+	a.memory, err = memorysqlite.Open(ctx, cfg.App.DataRoot)
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
 	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	if cfg.Embedding != nil {
+		engine := embedding.Client{Config: *cfg.Embedding, Secrets: secrets}
+		if err = cfg.Embedding.Validate(); err == nil {
+			err = a.memory.Configure(ctx, engine)
+		}
+		if err == nil {
+			err = a.history.Configure(ctx, engine)
+		}
+		if err != nil {
+			a.Close()
+			return nil, err
+		}
+		defs = append(defs, recall.Definition(engine.Identity()))
+	}
 	if cfg.JavaScript != nil {
 		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
 		runtimeHash, preludeHash, e := runtime.Fingerprint()
@@ -178,6 +201,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 	}
 	a.runs = store.Runs(a.history, a.registry)
+	if cfg.Embedding != nil {
+		a.runs.ConfigureRecall(recall.Service{Memory: a.memory, Conversation: a.history})
+	}
 	if cfg.JavaScript != nil {
 		var runtime codemode.JavaScriptRuntime = &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
 		if fixture == "core" {
@@ -256,6 +282,9 @@ func (a *App) Close() error {
 	}
 	err := a.store.Close()
 	err = errors.Join(err, a.history.Close())
+	if a.memory != nil {
+		err = errors.Join(err, a.memory.Close())
+	}
 	a.telemetry.Logger.Info("application stopped")
 	return errors.Join(err, a.telemetry.Close())
 }

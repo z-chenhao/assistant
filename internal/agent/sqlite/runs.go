@@ -18,6 +18,7 @@ import (
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/recall"
 	"github.com/z-chenhao/erii/internal/tool"
 	"github.com/z-chenhao/erii/internal/tool/codemode"
 	sqlitedriver "modernc.org/sqlite"
@@ -25,6 +26,7 @@ import (
 )
 
 type Runs struct {
+	recall        *recall.Service
 	javascript    codemode.JavaScriptRuntime
 	host          *Store
 	history       conversation.Store
