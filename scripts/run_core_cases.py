@@ -268,7 +268,26 @@ return {review:review.text,passed:green.passed};
                       only_root_writes=all(next(r for r in value['runs'] if r['run_id'] == e['run_id'])['parent_run_id'] is None for e in edits),
                       one_task=len(value['task']) == 1,
                       no_compatibility_path=changed == ['internal/migration/schema.go','internal/run/scheduler.go','internal/run/service.go'] and 'worker_job' not in (repo / 'internal/run/service.go').read_text())
-        # Actual product cancellation, including a grandchild Code Mode call.
+        # Auxiliary cancellation conformance owns a separate DB/Agent so its
+        # Task cannot contaminate the normative one-Task engineering snapshot.
+        probe = cancellation_probe(binary, folder / 'cancel-probe')
+        checks.update(probe['assertions'])
+        value = snapshot(h)
+        checks['one_task_final'] = len(value['task']) == 1
+        return dict(assertions=checks, state=value, source=source, workspace=dict(before=original,after=tree(repo),changed=changed),
+                    fault=dict(signal='SIGKILL', migrated_invocations=migrated), cancellation_probe=probe,
+                    sidecar_test=dict(returncode=ts.returncode,stdout=ts.stdout,stderr=ts.stderr))
+    finally:
+        h.cleanup()
+
+
+def cancellation_probe(binary, folder):
+    folder.mkdir()
+    configure(folder)
+    h = CoreHarness(binary, folder)
+    try:
+        h.setup()
+        db = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
         child_plan = [{'name':'builtin__codemode__execute','arguments':{'source':'return await agent.run({task:'+json.dumps('Capabilities: '+json.dumps([{'name':'mcp__fixture__send','arguments':{'target':'held','text':'grandchild'}}]))+'});'}}]
         execute(h,'cancel-tree','return await agent.run({task:'+json.dumps('Capabilities: '+json.dumps(child_plan))+'});')
         task = read(db,"SELECT task_id,task_ref FROM task WHERE status='active'")[0]
@@ -276,11 +295,12 @@ return {review:review.text,passed:green.passed};
         h.command('chat','work',timeout=180)
         cancelled = read(db,'SELECT run_id,parent_run_id,depth,status FROM run WHERE task_id=?',(task['task_id'],))
         h.command('chat','work',timeout=180)
-        checks['recursive_product_cancel'] = len(cancelled) == 3 and max(r['depth'] for r in cancelled) == 2 and all(r['status']=='cancelled' for r in cancelled)
-        checks['cancel_restart_no_revival'] = not read(db,"SELECT 1 FROM run WHERE task_id=? AND status!='cancelled'",(task['task_id'],))
-        return dict(assertions=checks, state=value, source=source, workspace=dict(before=original,after=tree(repo),changed=changed),
-                    fault=dict(signal='SIGKILL', migrated_invocations=migrated), cancelled_tree=cancelled,
-                    sidecar_test=dict(returncode=ts.returncode,stdout=ts.stdout,stderr=ts.stderr))
+        value = snapshot(h)
+        checks = dict(recursive_product_cancel=len(cancelled) == 3 and max(r['depth'] for r in cancelled) == 2 and all(r['status']=='cancelled' for r in cancelled),
+                      cancel_restart_no_revival=not read(db,"SELECT 1 FROM run WHERE task_id=? AND status!='cancelled'",(task['task_id'],)),
+                      cancellation_probe_one_task=len(value['task']) == 1)
+        require(all(checks.values()), 'isolated cancellation conformance failed')
+        return dict(scope='separate isolated SC-05 instance; not a GC-20 business Task', assertions=checks, state=value, cancelled_tree=cancelled)
     finally:
         h.cleanup()
 

@@ -80,8 +80,10 @@ reports its nonrecursive defect. Only Root edits the shared service. The final
 sandbox tests cover migration, Root/Child admission, old epoch rejection and
 recursive cancellation. Node executes the TypeScript fixture contract tests;
 the actual Sidecar protocol/resource/cancel/replay tests remain in `make test`.
-A separate real Erii Root/Child/grandchild tree is cancelled through Main's
-Task tool and read back after restart. No Child messages the user.
+A separate real Erii Root/Child/grandchild tree, in its own isolated database
+and Agent, is cancelled through Main's
+Task tool and read back after restart. The final engineering database is read
+again and must still contain exactly one Task. No Child messages the user.
 
 ## Scores and scope
 
