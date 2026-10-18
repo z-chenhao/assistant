@@ -93,11 +93,12 @@ test('manual ID still generates when catalog unavailable',{timeout:10000},async 
 });
 
 test('Pi tool call and result continuation',{timeout:10000},async t=>{
- const f=await fixture(t);const tools=[{name:'probe_echo',input_schema:'{"type":"object","properties":{"value":{"type":"string"}}}'}];
+ const f=await fixture(t);const tools=[{name:'probe_echo',description:'Read fixture data with frozen schema.',input_schema:'{"type":"object","properties":{"value":{"type":"string"}}}'}];
  await f.rpc('generation.start',f.request({tools}));const e=await f.wait(e=>e.kind==='tool_call');await f.wait(e=>e.kind==='completed');
  await f.rpc('generation.continue',f.request({generation_id:'g2',tools,messages:[{role:'user',text:'call'},{role:'assistant',tool_calls:[e.tool_call]},{role:'tool',tool_call_id:e.tool_call.id,text:'PROBE_RESULT_OK'}]}));
  await f.wait(e=>e.generation_id==='g2'&&e.kind==='completed');assert(f.events.some(e=>e.generation_id==='g2'&&e.text==='PROBE_RESULT_OK'));
  assert.equal(f.requests[1].body.messages.at(-1).tool_call_id,'call_echo');
+ assert.equal(f.requests[0].body.tools[0].function.description,tools[0].description);
 });
 
 test('Main prompt fragments reach the provider as one System Prompt',{timeout:10000},async t=>{

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "case_id": "GC-15",
+  "scope": "Artifact transport/publication fragment only; PNGs are synthetic binary transport assets with normative fields in metadata, not an OCR dataset.",
+  "input": "看下签证和订单，我 10 月 3 日入境、10 月 11 日离境有没有问题？把依据标出来。",
+  "visible_fields": {
+    "visa_front.png": {
+      "valid_from": "2026-09-20",
+      "valid_until": "2026-10-20",
+      "entries": "01",
+      "duration_days": 15
+    },
+    "flight_order.png": {
+      "outbound": "2026-10-03",
+      "inbound_day_month": "10-11",
+      "inbound_year_visible": false
+    }
+  },
+  "report_template": "# Visa check\n\nConfirmed: the 2026-09-20 to 2026-10-20 visa window covers October 3–11. Counting both entry and exit gives 9 days, within 15 days. Entries: 01, single entry.\nSource: {visa_ref}, visible_fields.valid_from/valid_until/duration_days/entries regions.\n\nUnconfirmed: the return-order year is obscured. Please provide a clear screenshot or other order information to confirm 2026.\nSource: {order_ref}, visible_fields.inbound_day_month/inbound_year_visible regions.\n"
+}
