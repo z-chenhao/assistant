@@ -4,3 +4,5 @@
 /provider-bridge/node_modules/
 
 __pycache__/
+
+/runtime/javascript/node_modules/

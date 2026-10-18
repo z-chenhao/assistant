@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "scope": "SC-13 monetary authorization, Direct Tool M4; synthetic prices, no semantic or live-provider claim",
+  "endpoint": "http://127.0.0.1:1/v1",
+  "currency": "USD",
+  "boundary_micros": 174000,
+  "price": {
+    "model": "priced-fixture-model",
+    "version": "synthetic-v1",
+    "input_micros_per_million": 1000000,
+    "output_micros_per_million": 2000000,
+    "cache_read_micros_per_million": 200000,
+    "cache_write_micros_per_million": 1200000
+  },
+  "reported_usage": {"input_tokens": 100, "output_tokens": 50, "cache_read_tokens": 20, "cache_write_tokens": 10},
+  "expected_call_micros": 216,
+  "expected_projection_micros": 173671,
+  "expected_overrun_micros": 200116,
+  "assertions": [
+    "concurrent Children produce one Root-owned durable approval",
+    "frozen hash, pricing version, currency and Task epoch survive restart",
+    "model reservations commit before dispatch and settle exactly once with usage",
+    "actual spend crossing holds even the final or failed model response; approval resumes the saved outcome without another model call",
+    "batch spend grant never grants Child tool side effects",
+    "denial dispatches no held model call; cancellation fences late decisions and usage",
+    "unpriced or unconfigured states retain usage and never trigger guessed monetary approval"
+  ]
+}
