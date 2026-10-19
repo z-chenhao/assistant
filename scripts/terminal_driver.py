@@ -13,9 +13,12 @@ import subprocess
 import termios
 import time
 
+from fixture_pool import current
+
 
 class Terminal:
     def __init__(self, args, env, cwd, echo=False):
+        self.processes = current()
         self.master, slave = pty.openpty()
         settings = termios.tcgetattr(slave)
         if not echo:
@@ -26,8 +29,13 @@ class Terminal:
         self.original_settings = termios.tcgetattr(self.input_observer)
         os.set_blocking(self.master, False)
         try:
-            self.process = subprocess.Popen(args, stdin=slave, stdout=slave,
+            start = self.processes.start if self.processes is not None else subprocess.Popen
+            self.process = start(args, stdin=slave, stdout=slave,
                                             stderr=slave, env=env, cwd=cwd)
+        except BaseException:
+            os.close(self.master)
+            os.close(self.input_observer)
+            raise
         finally:
             os.close(slave)
         self.output = b""
@@ -121,6 +129,8 @@ class Terminal:
         self.process.wait(timeout=20)
         os.close(self.master)
         os.close(self.input_observer)
+        if self.processes is not None:
+            self.processes.retire(self.process)
 
     def __enter__(self):
         return self

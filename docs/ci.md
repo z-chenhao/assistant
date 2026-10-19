@@ -205,6 +205,39 @@ requires all twenty faults in each of five runs; a contract test prevents the
 partial flag from entering the full inventory. Compare absolute early feedback
 latency separately from the complete, unchanged merge inventory.
 
+The repair candidate permits up to four independent fixtures at a time for delivery,
+Tool/Artifact/Child crash boundaries, capability scenarios and Core variants.
+Each fixture retains its own configuration, databases, workspace, approvals and
+provider ledger. Results retain the original inventory order. Every five-run
+series stays serial on one worker; the next Core round starts only after all
+eighteen variants and their conformance checks finish. Explicit inventory checks
+reject missing or duplicated crash boundaries. The baseline workflow uses the
+same source with the default concurrency of one.
+
+`fixture_pool.py` owns process sessions, cancellation admission, joined cleanup
+and retirement. Main/Capability/Artifact harnesses and the PTY driver register
+their children with this owner. Nested selected capability scenarios reuse the
+current owner and stay serial. Cancellation rejects queued launches, stops only
+owned groups and joins active fixtures before temporary roots are removed.
+Regression tests cover two stubborn listening sessions, unrelated-process
+preservation and PTY descriptor closure when launch is cancelled.
+
+Every full Core round also runs `ci_cancel.py`. It holds four real Go/Node Core
+fixtures at the checked 37-completed/8-active checkpoint, cancels their enclosing
+profiled harness, and checks captured process identities and temporary roots.
+Five-round aggregation rejects missing cancellation proof. This is harness
+cancellation; GC-20's separate business Task cancellation remains unchanged.
+It does not measure GitHub's push-to-cancellation delivery latency.
+
+Runtime and provider shards can overlap two independent gate series. Their Go
+event/model checks run after the other series have joined. Code Mode and security
+gate series remain serial. Early feedback can overlap two other shards, then
+runs security alone so the unexplained recall failure is not confounded by
+competing fixtures. Both layers fail closed on any failed or incomplete series.
+The shadow workflow sets `ERII_VERIFY_CASE_JOBS=4`, `ERII_VERIFY_GATE_JOBS=2`
+and `ERII_FEEDBACK_JOBS=2` only in their applicable steps; required CI keeps the
+default serial control. No full shard is omitted.
+
 `ci_bundle.py` seals the binary and both installed dependency trees once, after
 early feedback succeeds. Consumers download only the artifact from their own
 workflow attempt, require the producer output SHA-256, and compare source SHA,
@@ -264,17 +297,24 @@ python3 scripts/ci_impact.py --base BASE_FULL_SHA --output evidence/impact.json
 python3 scripts/ci_step.py --name feedback --phase test -- python3 scripts/ci_feedback.py --plan evidence/impact.json
 python3 -m unittest discover -s scripts -p 'test_ci*.py' -v
 python3 -m unittest discover -s scripts -p 'test_verification.py' -v
+python3 -m unittest discover -s scripts -p 'test_fixture_pool.py' -v
+python3 -m unittest discover -s scripts -p 'test_gate_scheduling.py' -v
+python3 scripts/ci_cancel.py --binary bin/personal-agent --evidence evidence/ci-cancel.json
+# Full required inventory with the candidate scheduling, using isolated evidence.
+ERII_VERIFY_CASE_JOBS=4 python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence/candidate --shard delivery --jobs 1 --gate-jobs 2
 # Collect explicit full-workflow attempts, never the five repetitions inside one run.
 python3 scripts/ci_compare.py --pair BEFORE_RUN:1,SHADOW_RUN:1 --output evidence/controlled.json
 python3 scripts/ci_compare.py --offline --output evidence/controlled.json
+# Explicitly requested five-round experiment; stays foreground until collected.
+python3 scripts/ci_experiment.py --pr 24 --sha FULL_SHA --output evidence/experiment.json
 # Separate compiler experiment through the real sandbox, on disposable fixture copies.
 ERII_WORKSPACE_PROFILE_DIR="$PWD/evidence/workspace-cache-probe" go test ./internal/computer/workspace -run '^$' -bench BenchmarkWorkspaceStandardSeed -benchtime=5x -count=1
 ```
 
 Repeat `--pair` for at least five distinct workflow-attempt pairs, collected from
 the measured source checkout. The collector requires clean, stable exact-SHA
-successes, the current complete gate/repetition inventory, matching binary and
-Ubuntu image across every sample, and successful required aggregates. It retains
+successes, the current complete gate/repetition inventory, matching binary,
+Ubuntu image and CPU-capacity class across every sample, and successful required aggregates. It retains
 failed samples and raw API/suite metadata; incomplete proof exits nonzero. It
 downloads only structural suite JSON from evidence archives and removes temporary
 ZIP files. It neither launches jobs nor retries failures. A complete comparison
@@ -282,6 +322,22 @@ does not assert that the performance targets passed. CPU/cache/scenario detail
 remains in the original artifacts. Rerun timing uses `run_started_at`, not the
 original workflow's creation time; initial rerun queue time remains unmeasured.
 Ordinary-change and cancellation cohorts still need separate proof.
+`ci_experiment.py` keeps the PR Draft and checks its head before every round.
+It watches the initial complete pair, then requests each complete workflow rerun
+once after success, waiting for fresh check records rather than old green ones.
+Every round checkpoints its attempts and raw evidence. A failed test, changed
+head, ambiguous run or unknown rerun outcome stops the experiment. Existing output
+is never overwritten or automatically replayed. It does not mark Ready or assert
+performance acceptance. Use it only when CI results/repeated comparisons are
+explicitly requested; ordinary delivery does not wait for external CI.
+The collector also requires the Core summary's five consecutive nested cleanup
+results. Older summaries cannot certify this strengthened verification contract.
+Threaded scenario CPU measurements describe overlapping harness intervals;
+function profiles cover the main thread. Use whole-harness/step CPU and job
+lifetimes for comparisons, rather than summing overlapping case intervals.
+Suite/phase records retain logical CPU count, affinity and processor model so
+runner variation remains visible. Missing job durations or CPU capacity cannot
+be counted as zero measurements or eligible controlled samples.
 
 The compiler benchmark alternates cold and seeded order, preserves a fresh private
 writable cache for every invocation, and retains the original coding missing-flag

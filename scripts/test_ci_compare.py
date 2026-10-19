@@ -18,12 +18,14 @@ class ComparisonTests(unittest.TestCase):
                            head_branch='review', event='pull_request', html_url='run/' + key,
                            created_at='2026-10-18T00:00:00Z', run_started_at='2026-10-19T00:00:00Z')
                 reports = {}
+                reports['core-summary.json'] = dict(passed=True, ci_cancellation=dict(passed=True, consecutive_runs=5))
                 for name, gates in comparison.SHARDS.items():
                     reports['suite-' + name + '.json'] = dict(source_sha='a' * 40, source_dirty=False,
                         source_stable=True, passed=True, binary_sha256='b' * 64,
                         image_os='ubuntu24', image_version='fixed-image', shards={name: [
                             dict(gate=g.name, attempt=n, returncode=0, command=['full-harness'])
                             for g in gates for n in range(1, g.attempts + 1)]})
+                    reports['suite-' + name + '.json']['hardware'] = dict(logical_cpus=4)
                 names = ['Unit tests and lint', 'Race detector', 'Ubuntu checks'] + [
                     'Verification (' + name + ')' for name in comparison.SHARDS]
                 jobs = [dict(id=i, name=name, conclusion='success', labels=['ubuntu-latest'], steps=[],
@@ -96,12 +98,37 @@ class ComparisonTests(unittest.TestCase):
     def test_internally_matched_pairs_on_different_images_are_not_one_controlled_cohort(self):
         raw = self.experiment()
         for key in ['1:2', '2:2']:
-            for report in raw['attempts'][key]['reports'].values():
-                report['image_version'] = 'different-image'
+            for name, report in raw['attempts'][key]['reports'].items():
+                if name.startswith('suite-'):
+                    report['image_version'] = 'different-image'
         report = comparison.compare(raw)
         self.assertEqual(report['eligible_samples'], 5)
         self.assertFalse(report['comparison_complete'])
         self.assertTrue(report['cohort_errors'])
+
+    def test_missing_or_incomplete_nested_cleanup_cannot_count_as_a_sample(self):
+        for mutation in ('missing', 'failed', 'four-rounds'):
+            raw = self.experiment()
+            reports = raw['attempts']['2:1']['reports']
+            if mutation == 'missing':
+                reports.pop('core-summary.json')
+            elif mutation == 'failed':
+                reports['core-summary.json']['ci_cancellation']['passed'] = False
+            else:
+                reports['core-summary.json']['ci_cancellation']['consecutive_runs'] = 4
+            self.assertFalse(comparison.compare(raw)['comparison_complete'])
+
+    def test_missing_duration_or_cpu_capacity_cannot_count_as_zero(self):
+        for mutation in ('duration', 'capacity', 'capacity-drift'):
+            raw = self.experiment()
+            data = raw['attempts']['2:1']
+            if mutation == 'duration':
+                data['jobs'][0]['started_at'] = None
+            elif mutation == 'capacity':
+                data['reports']['suite-security.json'].pop('hardware')
+            else:
+                data['reports']['suite-security.json']['hardware']['logical_cpus'] = 2
+            self.assertFalse(comparison.compare(raw)['comparison_complete'])
 
 
 if __name__ == '__main__':

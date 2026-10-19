@@ -13,6 +13,7 @@ import runpy
 import resource
 import signal
 import sys
+import threading
 import time
 
 
@@ -57,13 +58,16 @@ def main():
         return trace
     started = time.monotonic()
     usage = cpu()
+    previous_thread_trace = threading.gettrace()
     try:
         sys.settrace(trace)
+        threading.settrace(trace)
         profile.enable()
         runpy.run_path(str(script), run_name="__main__")
     finally:
         profile.disable()
         sys.settrace(None)
+        threading.settrace(previous_thread_trace)
         folder = Path(os.environ["ERII_PROFILE_DIR"])
         folder.mkdir(parents=True, exist_ok=True)
         functions = []
@@ -79,6 +83,7 @@ def main():
         report = dict(harness=script.name, elapsed_seconds=time.monotonic() - started,
                       cpu_seconds=cpu() - usage,
                       cpu_scope="self and reaped descendants; scenario times may overlap",
+                      function_profile_scope="main thread; worker scenarios use traced intervals",
                       cases=cases,
                       functions=sorted(functions, key=lambda f: -f["cumulative_seconds"]))
         # Each invocation owns its directory (including repeated stability runs).

@@ -62,7 +62,8 @@ class CoreTests(unittest.TestCase):
                       status='fragment_pass',assertions={'state':True},hard_failure=False)
                  for case in ['GC-17','GC-19','GC-20'] for i in range(6)]
         return [copy.deepcopy(dict(cleanup=True,binary_sha256='bin',dataset_digest='data',contract_lock={},results=results,
-                                   conformance=dict(passed=True,requirements={},boundary_fakes={}))) for _ in range(5)]
+                                   conformance=dict(passed=True,requirements={},boundary_fakes={}),
+                                   ci_cancellation=dict(passed=True))) for _ in range(5)]
 
     def test_five_run_summary_rechecks_hard_assertions_and_never_invents_scores(self):
         reports=self.reports()
@@ -79,7 +80,7 @@ class CoreTests(unittest.TestCase):
         self.assertLess(bad['cases']['GC-17']['hard_assertions']['pass^5'],1)
 
     def test_summary_rejects_missing_duplicate_and_changed_evidence(self):
-        for mutation in ['missing_run','missing_variant','duplicate','binary','fixture','conformance','cleanup','assertions']:
+        for mutation in ['missing_run','missing_variant','duplicate','binary','fixture','conformance','cleanup','assertions','ci_cancel_missing','ci_cancel_failed']:
             reports=self.reports()
             if mutation=='missing_run':reports.pop()
             elif mutation=='missing_variant':reports[0]['results'].pop()
@@ -89,6 +90,8 @@ class CoreTests(unittest.TestCase):
             elif mutation=='conformance':reports[0]['conformance']['passed']=False
             elif mutation=='cleanup':reports[0]['cleanup']=False
             elif mutation=='assertions':reports[0]['results'][0]['assertions']['extra']=True
+            elif mutation=='ci_cancel_missing':reports[0].pop('ci_cancellation')
+            elif mutation=='ci_cancel_failed':reports[0]['ci_cancellation']['passed']=False
             with self.subTest(mutation=mutation),self.assertRaises(ValueError):aggregate(reports)
 
 

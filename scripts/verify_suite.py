@@ -5,6 +5,7 @@ Shards own disjoint reports and disposable fixtures. Five-run gates are never
 split across workers: one failure prevents that series from passing.
 """
 import argparse
+import errno
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import hashlib
@@ -77,6 +78,24 @@ def source_state():
                 source_diff_sha256=hashlib.sha256(diff).hexdigest())
 
 
+def runner_hardware():
+    info = dict(logical_cpus=os.cpu_count(), affinity_cpus=None, cpu_model=platform.processor() or None)
+    try:
+        if hasattr(os, 'sched_getaffinity'):
+            info['affinity_cpus'] = len(os.sched_getaffinity(0))
+        if sys.platform == 'linux':
+            for line in Path('/proc/cpuinfo').read_text().splitlines():
+                key, separator, value = line.partition(':')
+                if separator and key.strip() == 'model name':
+                    info['cpu_model'] = value.strip()
+                    break
+        elif sys.platform == 'darwin':
+            info['cpu_model'] = subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string'], text=True).strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        info['unavailable'] = type(error).__name__
+    return info
+
+
 def report_name(gate, attempt):
     suffix = f"-{attempt}" if gate.attempts > 1 else ""
     if gate.name == "tui" and attempt == 1:
@@ -118,8 +137,20 @@ def group_alive(pgid):
         if sys.platform != 'darwin':
             raise
     rows = subprocess.check_output(['ps', '-axo', 'pgid=,stat='], text=True)
+    if not rows.strip():
+        raise OSError(errno.EIO, 'process table is empty')
     return any(int(parts[0]) == pgid and not parts[1].startswith('Z')
                for row in rows.splitlines() if len(parts := row.split()) == 2)
+
+
+def signal_group(pgid, sig):
+    try:
+        os.killpg(pgid, sig)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        if sys.platform != 'darwin' or group_alive(pgid):
+            raise
 
 
 def run_command(args, env, output, stopped, metrics=None):
@@ -141,23 +172,14 @@ def run_command(args, env, output, stopped, metrics=None):
                         break
                     if stopped.is_set() and interrupted is None:
                         interrupted = time.monotonic()
-                        try:
-                            os.killpg(child.pid, signal.SIGTERM)
-                        except ProcessLookupError:
-                            pass
+                        signal_group(child.pid, signal.SIGTERM)
                     if interrupted is not None and time.monotonic() - interrupted > 10:
-                        try:
-                            os.killpg(child.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
+                        signal_group(child.pid, signal.SIGKILL)
                     time.sleep(.05)
             finally:
                 # The group leader can exit before an uncooperative child.
                 # Waiting only for the leader used to leave that child alive.
-                try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                signal_group(child.pid, signal.SIGKILL)
                 deadline = time.monotonic() + 2
                 try:
                     while group_alive(child.pid) and time.monotonic() < deadline:
@@ -172,9 +194,12 @@ def run_command(args, env, output, stopped, metrics=None):
             return child.returncode if interrupted is None else 130
 
 
-def run_shard(name, binary, evidence, stopped, gates=None, previous=()):
+def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_jobs=1, record=None):
+    gates = SHARDS[name] if gates is None else gates
+    if gate_jobs == 2 and name in ('runtime', 'providers'):
+        return concurrent_gates(name, binary, evidence, stopped, gates, previous)
     rows = list(previous)
-    for gate in SHARDS[name] if gates is None else gates:
+    for gate in gates:
         for attempt in range(1, gate.attempts + 1):
             args, env, output = command(gate, attempt, binary, evidence)
             started = time.monotonic()
@@ -187,7 +212,10 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=()):
             row = dict(gate=gate.name, attempt=attempt, command=args, returncode=code,
                        elapsed_seconds=time.monotonic() - started, log=str(output), **metrics)
             rows.append(row)
-            (evidence / f"timings-{name}.json").write_text(json.dumps(rows, indent=2) + "\n")
+            if record is not None:
+                record(gate.name, rows)
+            else:
+                (evidence / f"timings-{name}.json").write_text(json.dumps(rows, indent=2) + "\n")
             print(f"[{name}] {gate.name} {attempt}/{gate.attempts}: {row['elapsed_seconds']:.2f}s (exit {code})", flush=True)
             if code:
                 if output.exists():
@@ -196,15 +224,55 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=()):
     return rows
 
 
+def concurrent_gates(name, binary, evidence, stopped, gates, previous):
+    """Independent series overlap; every five-run series stays on one worker."""
+    isolated = tuple(g for g in gates if g.name in ('models', 'events'))
+    parallel = tuple(g for g in gates if g not in isolated)
+    lock, failed = threading.Lock(), threading.Event()
+    by_gate = {}
+    class Stop:
+        def is_set(self):
+            return stopped.is_set() or failed.is_set()
+    stop = Stop()
+    def joined():
+        return list(previous) + [row for g in parallel for row in by_gate.get(g.name, ())]
+    def record(gate, rows):
+        with lock:
+            by_gate[gate] = list(rows)
+            path = evidence / f'timings-{name}.json'
+            temporary = path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(joined(), indent=2) + '\n')
+            temporary.replace(path)
+    def drive(gate):
+        if stop.is_set():
+            return
+        try:
+            rows = run_shard(name, binary, evidence, stop, (gate,), record=record)
+        except BaseException:
+            failed.set()
+            raise
+        if len(rows) != gate.attempts or any(r['returncode'] for r in rows):
+            failed.set()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(drive, parallel))
+    rows = joined()
+    if not stop.is_set() and isolated:
+        rows = run_shard(name, binary, evidence, stopped, isolated, rows)
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard", choices=SHARDS)
     parser.add_argument("--jobs", type=int, default=2)
+    parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
     parser.add_argument("--binary", type=Path, default=Path("bin/personal-agent"))
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+    if args.gate_jobs not in (1, 2):
+        parser.error('--gate-jobs must be 1 or 2')
     os.chdir(ROOT)
     binary, evidence = args.binary.resolve(), args.evidence.resolve()
     if not binary.is_file():
@@ -242,7 +310,7 @@ def main():
         deferred = next((g for g in plans["providers"] if g.name == "models"), None)
         plans["providers"] = tuple(g for g in plans["providers"] if g != deferred)
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        results = list(pool.map(lambda name: run_shard(name, binary, evidence, stopped, plans[name]), names))
+        results = list(pool.map(lambda name: run_shard(name, binary, evidence, stopped, plans[name], gate_jobs=args.gate_jobs), names))
     if deferred is not None and not stopped.is_set():
         index = names.index("providers")
         prefix = results[index]
@@ -257,7 +325,9 @@ def main():
         passed = core_report.write(evidence)
     report = dict(version=1, **source, source_stable=stable,
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
+                  gate_jobs=args.gate_jobs,
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
+                  hardware=runner_hardware(),
                   binary_sha256=binary_digest,
                   elapsed_seconds=time.monotonic() - started, passed=passed,
                   shards=dict(zip(names, results)))

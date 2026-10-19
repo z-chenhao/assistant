@@ -41,6 +41,7 @@ def collect(repo, key):
                  if a['name'].startswith('evidence-') and a['name'].endswith('-' + number)]
     reports = {}
     allowed = {'suite-' + name + '.json' for name in SHARDS}
+    allowed.add('core-summary.json')
     for artifact in artifacts:
         if artifact.get('expired'):
             continue
@@ -83,6 +84,8 @@ def validate(data, source, workflow):
     if (len(names) != len(required) or set(names) != required or
             any(j.get('conclusion') != 'success' for j in data['jobs'])):
         errors.append('missing, duplicate or unsuccessful required job')
+    if any(not j.get('started_at') or not j.get('completed_at') for j in data['jobs']):
+        errors.append('missing job duration is not a zero measurement')
     reports = data['reports']
     identities = set()
     for name, gates in SHARDS.items():
@@ -96,12 +99,19 @@ def validate(data, source, workflow):
                 [(r.get('gate'), r.get('attempt')) for r in rows] != expected or
                 any(r.get('returncode') != 0 or '--feedback' in r.get('command', []) for r in rows)):
             errors.append(name + ': incomplete or partial gate inventory')
-        identity = (report.get('binary_sha256'), report.get('image_os'), report.get('image_version'))
+        identity = (report.get('binary_sha256'), report.get('image_os'), report.get('image_version'),
+                    report.get('hardware', {}).get('logical_cpus'))
         if not all(identity) or not re.fullmatch('[0-9a-f]{64}', identity[0] or ''):
             errors.append(name + ': missing binary/image identity')
         identities.add(identity)
+        if type(report.get('hardware', {}).get('logical_cpus')) is not int or report['hardware']['logical_cpus'] < 1:
+            errors.append(name + ': missing runner CPU capacity')
     if len(identities) != 1:
-        errors.append('binary or runner image differs between full shards')
+        errors.append('binary, runner image or CPU capacity differs between full shards')
+    core = reports.get('core-summary.json', {})
+    if (core.get('passed') is not True or core.get('ci_cancellation', {}).get('passed') is not True or
+            core.get('ci_cancellation', {}).get('consecutive_runs') != 5):
+        errors.append('missing five-run Core/nested cancellation proof')
     return errors, identities
 
 
@@ -156,6 +166,7 @@ def compare(raw):
                              'CPU/cache/scenario detail stays in workflow artifacts; API durations do not substitute for missing measurements.',
                              'No push timestamp is inferred. Cancellation and cost/latency acceptance require separate measured proof.',
                              'Rerun wall time starts at run_started_at; initial rerun queue latency is unavailable and is not zero.',
+                             'Runner CPU model/affinity are retained per shard; hardware variation within a capacity class can contribute noise.',
                              'Five stability repetitions inside one workflow are not five independent workflow attempts.'])
 
 

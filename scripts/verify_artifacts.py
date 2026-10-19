@@ -8,11 +8,14 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import os
 from pathlib import Path
 import signal
 import sqlite3
 import subprocess
 import tempfile
+
+from fixture_pool import run_cases
 
 from case_runner import load_contract, score
 from verify_main import require
@@ -22,7 +25,8 @@ from terminal_driver import Terminal
 
 class ArtifactHarness(ToolHarness):
     def raw(self, *args, data=None, ok=True):
-        result = subprocess.run(self.args(*args), input=data, capture_output=True,
+        run = self.processes.run if self.processes is not None else subprocess.run
+        result = run(self.args(*args), input=data, capture_output=True,
                                 env=self.env, cwd=self.root, timeout=20)
         require(not ok or result.returncode == 0, f'{args}: {result.stderr!r}')
         return result
@@ -113,23 +117,24 @@ def recover_receipt(h, path):
             'signal': 'SIGKILL', 'boundary': boundary}
 
 
-def run_recovery(binary):
+def run_recovery(binary, scenario_jobs=1):
     report = {'version': 1, 'scope': 'binary Query recovery', 'checks': []}
     with tempfile.TemporaryDirectory(prefix='erii-artifact-recovery-') as temp:
-        for path in ('unknown', 'running'):
+        def recover(path):
             folder = Path(temp) / path
             folder.mkdir()
             h = ArtifactHarness(binary, folder, fixture='approval')
             try:
                 h.setup()
-                report['checks'].append(recover_receipt(h, path))
+                return recover_receipt(h, path)
             finally:
                 h.cleanup()
+        report['checks'] = run_cases(('unknown', 'running'), recover, scenario_jobs)
     report['cleanup'] = 'all child processes joined; isolated roots removed'
     return report
 
 
-def run(binary):
+def run(binary, scenario_jobs=1):
     repo = Path(__file__).resolve().parent.parent
     fixture = json.loads((repo / 'evals/fixtures/m3-artifact-v1.json').read_text())
     lock = json.loads((repo / 'evals/fixtures/m3-artifact-v1.lock.json').read_text())
@@ -283,8 +288,7 @@ def run(binary):
             return {'name': 'eight_process_concurrent_writers_and_recovery', 'saved': saved, 'state': h.state()}
         report['checks'].append(scenario('concurrent', concurrent))
 
-        for boundary in ('artifact_temp_created', 'artifact_before_publish', 'artifact_after_publish',
-                         'artifact_after_metadata', 'before_tool_commit', 'after_tool_commit'):
+        def crash_case(boundary):
             def crash(h, boundary=boundary):
                 h.send('crash', json.dumps({'name': 'crash.md', 'mediaType': 'text/markdown', 'text': 'durable bytes'}))
                 child = h.hold(boundary)
@@ -305,8 +309,13 @@ def run(binary):
                     require(after['tools'][0]['attempt_count'] == 1, 'committed save executed again')
                 return {'boundary': boundary, 'signal': 'SIGKILL', 'before_refs': before_rows,
                         'before_objects': before_objects, 'after': after}
-            report['crashes'].append(scenario(boundary, crash))
-    report['recovery'] = run_recovery(binary)
+            return scenario(boundary, crash)
+        cases = ('artifact_temp_created', 'artifact_before_publish', 'artifact_after_publish',
+                         'artifact_after_metadata', 'before_tool_commit', 'after_tool_commit')
+        report['crashes'] = run_cases(cases, crash_case, scenario_jobs)
+        require({r['boundary'] for r in report['crashes']} == set(cases) and len(report['crashes']) == 6, 'complete Artifact crash inventory required')
+    report['recovery'] = run_recovery(binary, scenario_jobs)
+    report['scenario_jobs'] = scenario_jobs
     report['cleanup'] = 'all child processes joined; isolated roots removed'
     return report
 
@@ -316,8 +325,9 @@ if __name__ == '__main__':
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--recovery-only', action='store_true', help='drive both binary Query receipt recovery paths')
+    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args(); args.evidence.unlink(missing_ok=True)
-    report = (run_recovery if args.recovery_only else run)(args.binary.resolve())
+    report = run_recovery(args.binary.resolve(), args.scenario_jobs) if args.recovery_only else run(args.binary.resolve(), args.scenario_jobs)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print('Artifact contracts/recovery verified:', args.evidence)

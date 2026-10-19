@@ -18,14 +18,31 @@ import verify_suite as suite
 
 
 class VerificationTests(unittest.TestCase):
+    def test_signal_eperm_can_only_accept_confirmed_absence_on_darwin(self):
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'darwin'), \
+             patch.object(suite, 'group_alive', return_value=False) as inspect:
+            suite.signal_group(42, signal.SIGKILL)
+            inspect.assert_called_once_with(42)
+            inspect.return_value = True
+            with self.assertRaises(PermissionError):
+                suite.signal_group(42, signal.SIGTERM)
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'linux'):
+            with self.assertRaises(PermissionError):
+                suite.signal_group(42, signal.SIGKILL)
+
     def test_darwin_eperm_requires_authoritative_group_inspection(self):
         with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
              patch.object(suite.sys, 'platform', 'darwin'), \
              patch.object(suite.subprocess, 'check_output') as inspect:
-            for table, alive in [('', False), ('42 Z\n', False), ('42 S\n', True),
+            for table, alive in [('42 Z\n', False), ('42 S\n', True),
                                  ('42 Z\n42 R\n', True), ('99 S\n', False)]:
                 inspect.return_value = table
                 self.assertEqual(suite.group_alive(42), alive)
+            inspect.return_value = ''
+            with self.assertRaises(OSError):
+                suite.group_alive(42)
             inspect.side_effect = PermissionError
             with self.assertRaises(PermissionError):
                 suite.group_alive(42)

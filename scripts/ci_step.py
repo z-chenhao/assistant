@@ -9,7 +9,7 @@ import signal
 import threading
 import time
 
-from verify_suite import run_command, source_state
+from verify_suite import run_command, source_state, runner_hardware
 
 
 def main():
@@ -40,6 +40,7 @@ def main():
                       **source, source_stable=stable,
                       wall_seconds=time.monotonic() - started, runner=platform.platform(),
                       image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
+                      hardware=runner_hardware(),
                       go_cache_hit=os.environ.get('CI_GO_CACHE_HIT') or None,
                       npm_cache_hit=os.environ.get('CI_NPM_CACHE_HIT') or None, **metrics)
         (folder / (args.name + '.json')).write_text(json.dumps(record, indent=2) + '\n')

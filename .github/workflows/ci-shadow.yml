@@ -67,6 +67,9 @@ jobs:
       - name: Unit tests and lint
         run: python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
       - name: Risk-related race and deterministic early regressions
+        env:
+          ERII_FEEDBACK_JOBS: "2"
+          ERII_VERIFY_CASE_JOBS: "4"
         run: python3 scripts/ci_step.py --name feedback --phase test -- python3 scripts/ci_feedback.py --plan evidence/impact.json
       - name: Seal exact build and dependency payload
         id: bundle
@@ -136,6 +139,9 @@ jobs:
     name: Shadow verification (${{ matrix.shard }})
     needs: fast
     runs-on: ubuntu-latest
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
     timeout-minutes: ${{ matrix.shard == 'codemode' && 60 || 30 }}
     strategy:
       fail-fast: false

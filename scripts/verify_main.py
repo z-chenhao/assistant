@@ -17,6 +17,8 @@ import subprocess
 import tempfile
 import time
 
+from fixture_pool import current
+
 
 def require(value, message):
     if not value:
@@ -31,12 +33,14 @@ class MainHarness:
         self.env["ERII_DATA_ROOT"] = str(root / "data")
         self.children = []
         self.fixture = fixture
+        self.processes = current()
 
     def args(self, *args):
         return [str(self.binary), "-test-bridge", self.fixture, *args]
 
     def command(self, *args, text=None, ok=True):
-        result = subprocess.run(self.args(*args), input=text, text=True, capture_output=True,
+        run = self.processes.run if self.processes is not None else subprocess.run
+        result = run(self.args(*args), input=text, text=True, capture_output=True,
                                 env=self.env, cwd=self.root, timeout=20)
         require(not ok or result.returncode == 0, f"{args}: {result.stderr}")
         return json.loads(result.stdout) if ok else result
@@ -57,6 +61,8 @@ class MainHarness:
     def wait_state(self, predicate, description, reader=None, timeout=10):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            if self.processes is not None:
+                self.processes.check()
             value = reader(self) if reader else self.state()
             if predicate(value):
                 return value
@@ -64,7 +70,8 @@ class MainHarness:
         raise RuntimeError("state boundary not reached: " + description)
 
     def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work")):
-        child = subprocess.Popen(self.args("-test-main-hold", boundary, *extra_flags, *command),
+        start = self.processes.start if self.processes is not None else subprocess.Popen
+        child = start(self.args("-test-main-hold", boundary, *extra_flags, *command),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
@@ -100,6 +107,8 @@ class MainHarness:
             if child.poll() is None:
                 child.kill()
             child.communicate(timeout=10)
+            if self.processes is not None:
+                self.processes.retire(child)
 
 
 def assert_final(state, users, replies=1):

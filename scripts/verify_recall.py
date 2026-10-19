@@ -178,6 +178,7 @@ def failure_state(h, embeddings, scenario, stage):
     value = dict(scenario=scenario, stage=stage, embedding_requests=len(embeddings.requests),
                  embedding_failure_enabled=embeddings.fail, databases={})
     root = Path(h.env['ERII_DATA_ROOT'])
+    agents = []
     for name in ('state', 'memory', 'conversation'):
         path = root / (name + '.db')
         if not path.exists():
@@ -188,9 +189,14 @@ def failure_state(h, embeddings, scenario, stage):
                     rows = db.execute('SELECT kind,status,error_code,count(*) FROM run GROUP BY kind,status,error_code').fetchall()
                     value['databases'][name] = dict(run_groups=rows,
                         frozen_recalls=db.execute('SELECT count(*) FROM run_recall').fetchone()[0])
+                    agents = [r[0] for r in db.execute('SELECT DISTINCT agent_id FROM run')]
                 else:
                     rows = db.execute('SELECT active,vector_json IS NULL,count(*) FROM recall_document GROUP BY active,vector_json IS NULL').fetchall()
                     value['databases'][name] = dict(index_groups=rows)
+                    if agents:
+                        parameters = ','.join('?' for _ in agents)
+                        pending = db.execute("SELECT count(*) FROM recall_document WHERE active=1 AND vector_json IS NULL AND user_id='local' AND (agent_id='' OR agent_id IN (" + parameters + '))', agents).fetchone()[0]
+                        value['databases'][name]['authorized_pending_vectors'] = pending
         except sqlite3.Error:
             value['databases'][name] = dict(diagnostic_unavailable=True)
     return value
@@ -264,6 +270,7 @@ def run(binary, failure_evidence=None):
                     same = next(r for r in value['recall'] if r['run_id'] == receipt['run_id'] and r['step_index'] == 0)
                     require(same == frozen, 'restart changed frozen recall')
                     require('NEW_AFTER_FREEZE' not in same['hits_json'] and any('NEW_AFTER_FREEZE' in r['hits_json'] for r in value['recall'] if r != same), 'per-turn snapshot did not advance')
+                stage = 'idempotent-drain'
                 h.command('chat', 'work')
                 require(h.snapshot() == value, 'repeated drain changed terminal state')
                 require(all(len(r['input'].encode('utf-8')) <= 64 << 10 for r in embeddings.requests), 'oversized embedding request')

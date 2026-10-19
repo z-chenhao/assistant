@@ -17,17 +17,19 @@ class RecallEvidenceTests(unittest.TestCase):
             root = Path(directory)
             secret = 'SYNTHETIC_PRIVATE_CONTENT'
             with closing(sqlite3.connect(root / 'memory.db')) as db, db:
-                db.execute('CREATE TABLE recall_document(active,vector_json,content)')
-                db.execute('INSERT INTO recall_document VALUES(1,NULL,?)', (secret,))
+                db.execute('CREATE TABLE recall_document(active,vector_json,content,user_id,agent_id)')
+                db.execute("INSERT INTO recall_document VALUES(1,NULL,?,'local','erii')", (secret,))
+                db.execute("INSERT INTO recall_document VALUES(1,NULL,?,'foreign','other')", (secret,))
             with closing(sqlite3.connect(root / 'state.db')) as db, db:
-                db.execute('CREATE TABLE run(kind,status,error_code,prompt)')
-                db.execute('INSERT INTO run VALUES(?,?,NULL,?)', ('worker', 'running', secret))
+                db.execute('CREATE TABLE run(kind,status,error_code,prompt,agent_id)')
+                db.execute('INSERT INTO run VALUES(?,?,NULL,?,?)', ('worker', 'running', secret, 'erii'))
                 db.execute('CREATE TABLE run_recall(hits_json)')
             before = {p: p.read_bytes() for p in root.iterdir()}
             h = SimpleNamespace(env={'ERII_DATA_ROOT': str(root)})
             embeddings = SimpleNamespace(requests=[{'input': secret}], fail=False)
             evidence = recall.failure_state(h, embeddings, 'ordinary', 'drain')
-            self.assertEqual(evidence['databases']['memory']['index_groups'], [(1, 1, 1)])
+            self.assertEqual(evidence['databases']['memory']['index_groups'], [(1, 1, 2)])
+            self.assertEqual(evidence['databases']['memory']['authorized_pending_vectors'], 1)
             self.assertEqual(evidence['databases']['state']['run_groups'], [('worker', 'running', None, 1)])
             self.assertNotIn(secret, json.dumps(evidence))
             self.assertEqual(before, {p: p.read_bytes() for p in root.iterdir()})
