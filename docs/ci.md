@@ -515,6 +515,33 @@ two stubborn sessions, listening ports, queued work and temporary state are
 cleaned; the four-real-Core focused probe proves the Go/Node path. End-to-end
 GitHub cancellation p95 remains unproven.
 
+The `7300e9506ee8b1342e9c3730444b06f0ace415a2` cohort retained one complete
+pair (3107s → 1886s; 112.78 → 64.82 runner-minutes). Its second Required
+runtime attempt failed the existing fair/cancel drain at thirty seconds; this
+is retained as a failed sample, not rerun into five green pairs. A controlled
+CLI regression proved the Fake ignored appended cancellation after an already
+allocated Main follow-up generation. The Fake now honors that fresh input;
+the original scenario remains and the forced overlap is additional coverage.
+
+An isolated two-workflow cancellation replica recorded 74.84–79.69 seconds to
+all old jobs stopping in its first sample. Phase completion JSON was missing;
+runner logs explicitly terminated orphan Python/Make/Go processes. A local
+regression reproduced the Actions script-file entry receiving SIGINT while the
+phase owner never received it. Single-command phase entries now use shell
+`exec`; the compile entry uses `exec env` with the same frozen toolchain. The two
+dependency installs remain sequential in their existing job, as separate owned
+steps. All tests, five-run counts, job names and per-case deadlines remain.
+
+[GitHub's cancellation contract](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation)
+signals the entry process, waits 7.5 seconds before SIGTERM, then another 2.5
+seconds before killing its tree. CI owners now escalate an uncooperative group
+after five seconds, leaving time for the existing two-second drain and evidence
+write. This changes harness shutdown grace, not any product/test deadline.
+The first signal receipt is atomically retained as `steps/NAME-cancel.json`
+before cleanup, separately from the final phase result. Real shell → owner →
+Make → two-stubborn-session and uncooperative-child regressions cover this path.
+Full GitHub cancellation and five-pair acceptance still require measured proof.
+
 `ci_supersede.py` owns the repeated push/collection mechanics. It freezes the
 source refspec, records an unknown outcome before dispatch, requires a Draft
 on the matching branch, and never retries an existing record. Collection binds

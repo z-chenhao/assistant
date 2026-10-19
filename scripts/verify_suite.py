@@ -173,7 +173,9 @@ def run_command(args, env, output, stopped, metrics=None):
                     if stopped.is_set() and interrupted is None:
                         interrupted = time.monotonic()
                         signal_group(child.pid, signal.SIGTERM)
-                    if interrupted is not None and time.monotonic() - interrupted > 10:
+                    # Leave time to drain and retain evidence before Actions'
+                    # 7.5-second SIGINT grace expires at the entry process.
+                    if interrupted is not None and time.monotonic() - interrupted > 5:
                         signal_group(child.pid, signal.SIGKILL)
                     time.sleep(.05)
             finally:

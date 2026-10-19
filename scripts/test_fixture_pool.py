@@ -124,7 +124,10 @@ class FixturePoolTests(unittest.TestCase):
     def test_step_wrapping_make_joins_sessions_and_cleans_state(self):
         self.check_stubborn_session_cleanup(make_step=True)
 
-    def check_stubborn_session_cleanup(self, make_step=False):
+    def test_actions_entry_sigint_reaches_make_owner_and_cleans_two_sessions(self):
+        self.check_stubborn_session_cleanup(make_step=True, actions_shell=True)
+
+    def check_stubborn_session_cleanup(self, make_step=False, actions_shell=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state = root / 'state'
@@ -153,6 +156,18 @@ class FixturePoolTests(unittest.TestCase):
                 makefile.write_text('.PHONY: fixture\nfixture:\n\t' + shlex.join(command) + '\n')
                 command = [sys.executable, 'scripts/ci_step.py', '--name', step_name, '--phase', 'test',
                            '--', 'make', '-f', str(makefile), 'fixture']
+            entry, entry_log = None, None
+            if actions_shell:
+                workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
+                line = next(line.strip() for line in workflow.splitlines()
+                            if '--name verification --phase test --' in line)
+                shell = root / 'step.sh'
+                shell.write_text(('exec ' if line.startswith('run: exec ') else '') + shlex.join(command) + '\n')
+                entry_log = (root / 'log').open('w')
+                env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'scripts'), ERII_PROFILE_DIR=str(root / 'profiles'))
+                entry = subprocess.Popen(['bash','--noprofile','--norc','-e','-o','pipefail',str(shell)],
+                                         cwd=suite.ROOT,env=env,stdout=entry_log,stderr=subprocess.STDOUT,
+                                         start_new_session=True)
             stopped = threading.Event()
             ready = []
             def interrupt():
@@ -163,14 +178,22 @@ class FixturePoolTests(unittest.TestCase):
                         ready.extend(json.loads(p.read_text()) for p in paths)
                         break
                     time.sleep(.01)
-                stopped.set()
+                if actions_shell:
+                    # GitHub signals the entry PID, not its process group.
+                    os.kill(entry.pid, signal.SIGINT)
+                else:
+                    stopped.set()
             waiter = threading.Thread(target=interrupt)
             waiter.start()
             metrics = {}
             started = time.monotonic()
             try:
                 env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'scripts'), ERII_PROFILE_DIR=str(root / 'profiles'))
-                code = suite.run_command(command, env, root / 'log', stopped, metrics)
+                if actions_shell:
+                    code = entry.wait(timeout=7.5)
+                    metrics.update(json.loads((suite.ROOT / 'evidence/steps' / (step_name + '.json')).read_text()))
+                else:
+                    code = suite.run_command(command, env, root / 'log', stopped, metrics)
                 self.assertNotEqual(code, 0)
                 self.assertEqual(len(ready), 2, (root / 'log').read_text())
                 self.assertEqual(len(list(root.glob('ready-*.json'))), 2, 'queued fixtures started after cancellation')
@@ -188,8 +211,16 @@ class FixturePoolTests(unittest.TestCase):
                         self.assertNotEqual(probe.connect_ex(('127.0.0.1', port)), 0)
             finally:
                 waiter.join(timeout=6)
+                if entry is not None and entry.poll() is None:
+                    os.killpg(entry.pid, signal.SIGTERM)
+                    entry.wait(timeout=8)
+                    deadline = time.monotonic() + 5
+                    while not (suite.ROOT / 'evidence/steps' / (step_name + '.json')).exists() and time.monotonic() < deadline:
+                        time.sleep(.02)
+                if entry_log is not None:
+                    entry_log.close()
                 if make_step:
-                    for suffix in ('.json', '.log'):
+                    for suffix in ('.json', '.log', '-cancel.json'):
                         (suite.ROOT / 'evidence/steps' / (step_name + suffix)).unlink(missing_ok=True)
                 for pid, _ in ready:
                     try:

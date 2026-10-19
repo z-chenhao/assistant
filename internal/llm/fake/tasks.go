@@ -9,6 +9,20 @@ import (
 	"github.com/z-chenhao/erii/internal/task"
 )
 
+// A follow-up contains historical user text. Only input after its runtime notice
+// is fresh steering; accepted notices remain in context on later model steps.
+func hasAppendedUser(messages []llm.Message) bool {
+	user, notice := -1, -1
+	for i, m := range messages {
+		if m.Origin == "runtime" {
+			notice = i
+		} else if m.Role == "user" && m.Origin == "" {
+			user = i
+		}
+	}
+	return notice >= 0 && user > notice
+}
+
 // tasksReply is an explicitly selected scripted policy, never a production
 // provider. Protocol assertions and state readback, not prose, are its evidence.
 func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
@@ -35,7 +49,7 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 			Text string `json:"text"`
 		}{last.Text}), nil
 	}
-	if followup {
+	if followup && !hasAppendedUser(r.Messages) {
 		return llm.GenerationResult{Text: "Main follow-up: the delegated work has returned."}, nil
 	}
 	user := ""

@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import tempfile
+import time
 
 from terminal_driver import Terminal
 from verify_artifacts import ArtifactHarness
@@ -60,7 +61,7 @@ def setup(h):
                       'capabilities': {'text_input': True}})
 
 
-def run(binary):
+def run(binary, evidence=None):
     report = {'version': 1, 'scope': 'M4 Direct Tool scheduling fragments GC-16/17/18/20; semantic scores, JavaScript, CodeCall replay and Computer binding are not_applicable', 'checks': []}
     with tempfile.TemporaryDirectory(prefix='erii-scheduling-') as folder:
         root = Path(folder)
@@ -72,6 +73,21 @@ def run(binary):
             try:
                 setup(h)
                 return action(h)
+            except BaseException as error:
+                if evidence is not None:
+                    report['passed'] = False
+                    report['failure'] = dict(scenario=name, error=type(error).__name__, message=str(error))
+                    try:
+                        report['failure']['state'] = state(h)
+                    except Exception as diagnostic:
+                        report['failure']['diagnostic_error'] = type(diagnostic).__name__
+                        if hasattr(h, 'scheduling_diagnostic_state'):
+                            report['failure']['state'] = h.scheduling_diagnostic_state
+                            report['failure']['snapshot'] = 'last observed before owned-process cancellation'
+                    report['binary_sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
+                    evidence.parent.mkdir(parents=True, exist_ok=True)
+                    evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+                raise
             finally:
                 h.cleanup()
 
@@ -137,22 +153,63 @@ def run(binary):
         report['restart'] = scenario('restart', restart)
         report['checks'].append('SIGKILL after 25 atomic Child admissions: restart reuses invocation/Child identities and completed generations; exactly 100 total Children and one aggregate')
 
-        def fair_cancel(h):
+        def fair_cancel(h, pending_followup=False):
             h.send('batch', 'Delegate: Batch hold')
-            work = subprocess.Popen(h.args('chat', 'work'), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            if pending_followup:
+                release = h.root / 'release-followup'
+                generation = h.root / 'release-generation'
+                generation.touch()
+                observed = dict(started=time.monotonic())
+                def progress():
+                    value = state(h)
+                    h.scheduling_diagnostic_state = value
+                    if 'held' not in observed:
+                        if sum(c['token'] is not None and any(r['run_id'] == c['run_id'] and r['depth'] == 2 for r in value['runs']) for c in value['claims']) == 16:
+                            observed.update(held=value, second=time.monotonic())
+                            h.send('second', 'Delegate: Child tree')
+                    elif 'progressed' not in observed:
+                        if len(value['tasks']) == 2 and any(t['status'] == 'completed' for t in value['tasks']):
+                            observed['progressed'] = value
+                    phase = observed.get('cancel', observed.get('second', observed['started']))
+                    require(time.monotonic() - phase < 30, 'controlled fair/cancel phase exceeded original thirty-second bound')
+                def boundary(name):
+                    if name == 'after_followup_commit':
+                        progress()
+                        require('progressed' in observed, 'follow-up preceded independent Task completion')
+                        generation.unlink()
+                        observed['frozen_followup'] = True
+                        release.touch()
+                    elif name == 'before_generation_dispatch' and observed.get('frozen_followup') and 'cancel' not in observed:
+                        value = state(h)
+                        mains = {r['run_id'] for r in value['runs'] if r['kind'] == 'main'}
+                        frozen = [g for g in value['generations'] if g['run_id'] in mains and g['status'] == 'pending'
+                                  and any(m.get('origin') == 'runtime' for m in json.loads(g['request_json'])['messages'])]
+                        require(len(frozen) == 1, 'controlled boundary did not freeze the real Main follow-up generation')
+                        receipt = h.send('cancel', 'Cancel: Batch hold')
+                        require(receipt['run_id'] == frozen[0]['run_id'], 'cancel did not append to the frozen follow-up Main')
+                        observed.update(cancel=time.monotonic(), frozen_generation=frozen[0])
+                        generation.touch()
+                work = h.drive_boundaries({'after_followup_commit': release, 'before_generation_dispatch': generation},
+                                          boundary, progress, timeout=90)
+                require('cancel' in observed, 'controlled cancellation was never submitted')
+                held, progressed = observed['held'], observed['progressed']
+                stdout, stderr = work.stdout, work.stderr
+            else:
+                start = h.processes.start if h.processes is not None else subprocess.Popen
+                work = start(h.args('chat', 'work'), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     text=True, env=h.env, cwd=h.root)
-            h.children.append(work)
-            held = h.wait_state(lambda v: sum(c['token'] is not None and any(r['run_id'] == c['run_id'] and r['depth'] == 2 for r in v['runs']) for c in v['claims']) == 16,
+                h.children.append(work)
+                held = h.wait_state(lambda v: sum(c['token'] is not None and any(r['run_id'] == c['run_id'] and r['depth'] == 2 for r in v['runs']) for c in v['claims']) == 16,
                                 '16 running grandchildren', reader=state, timeout=30)
-            require(any(r['depth'] == 2 for r in held['runs']), 'recursive delegation missing')
-            # New independent Task progresses while the batch occupies its full
-            # Child allowance. Main always has its reserved execution lane.
-            h.send('second', 'Delegate: Child tree')
-            progressed = h.wait_state(lambda v: len(v['tasks']) == 2 and any(t['status'] == 'completed' for t in v['tasks']),
+                # New independent Task progresses while the batch occupies its full
+                # Child allowance. Main always has its reserved execution lane.
+                h.send('second', 'Delegate: Child tree')
+                progressed = h.wait_state(lambda v: len(v['tasks']) == 2 and any(t['status'] == 'completed' for t in v['tasks']),
                                      'fair second Task completion', reader=state, timeout=30)
+                h.send('cancel', 'Cancel: Batch hold')
+                stdout, stderr = work.communicate(timeout=30)
+            require(any(r['depth'] == 2 for r in held['runs']), 'recursive delegation missing')
             require(any(g['status'] == 'pending' for g in progressed['generations']), 'first Task did not remain active during second Task progress')
-            h.send('cancel', 'Cancel: Batch hold')
-            stdout, stderr = work.communicate(timeout=30)
             require(work.returncode == 0, 'fair/cancel drain: ' + stderr)
             after = state(h)
             cancelled = next(t for t in after['tasks'] if t['status'] == 'cancelled')
@@ -165,10 +222,13 @@ def run(binary):
             require(measured['peak_children_per_tree'] == 16 and not measured['remaining_worker_leases'], 'saturation/cleanup evidence missing')
             h.command('chat', 'work')
             require(state(h) == after, 'cancelled tree revived')
-            return {'saturated': held, 'second_task_progress': progressed, 'cancelled': after, 'observed': measured, 'stdout': stdout}
+            return {'saturated': held, 'second_task_progress': progressed, 'cancelled': after, 'observed': measured, 'stdout': stdout,
+                    **({'frozen_followup_generation': observed['frozen_generation']} if pending_followup else {})}
 
         report['fair_cancel'] = scenario('fair-cancel', fair_cancel)
         report['checks'].append('16 live grandchildren + queued work: independent second Task completes; Main cancels first tree; all descendants and invocations settle, no late follow-up, restart cannot revive old epoch')
+        report['fair_cancel_followup'] = scenario('fair-cancel-followup', lambda h: fair_cancel(h, pending_followup=True))
+        report['checks'].append('Controlled follow-up/user-input overlap: Main consumes the appended cancellation with the independent completion notice; same saturation, thirty-second drain and recursive cleanup assertions')
     report['cleanup'] = 'all owned PTYs/processes joined; disposable data roots removed'
     return report
 
@@ -180,7 +240,7 @@ def main():
     args = parser.parse_args()
     args.evidence.unlink(missing_ok=True)
     binary = args.binary.resolve()
-    result = run(binary)
+    result = run(binary, args.evidence)
     result['binary_sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
