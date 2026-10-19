@@ -20,7 +20,10 @@ class ExperimentTests(unittest.TestCase):
     def test_unknown_rerun_outcome_is_checkpointed_without_retry(self):
         self.drive(unknown=True)
 
-    def drive(self, fail_round=None, unknown=False):
+    def test_read_interruption_resumes_same_attempt_without_an_extra_rerun(self):
+        self.drive(interrupted=True)
+
+    def drive(self, fail_round=None, unknown=False, interrupted=False):
         raw = comparison_fixture.ComparisonTests().experiment()
         attempts = {1: 1, 2: 1}
         commands = []
@@ -42,6 +45,8 @@ class ExperimentTests(unittest.TestCase):
                 attempts[run_id] += 1
             else:
                 watches.append(len(watches) + 1)
+                if interrupted and len(watches) == 2:
+                    raise experiment.ReadError('transport unavailable')
             return subprocess.CompletedProcess(args, 1 if watches and watches[-1] == fail_round else 0)
         def collect(_, key):
             value = raw['attempts'][key]
@@ -52,11 +57,20 @@ class ExperimentTests(unittest.TestCase):
             output = Path(directory) / 'experiment.json'
             with patch.object(experiment, 'gh', side_effect=api), \
                  patch.object(experiment, 'wait_active'), \
+                 patch.object(experiment, 'read', side_effect=lambda *args, **kwargs: command(['gh', *args], **kwargs)), \
                  patch.object(experiment.subprocess, 'run', side_effect=command), \
                  patch.object(experiment.ci_compare, 'collect', side_effect=collect):
                 if unknown:
                     with self.assertRaises(subprocess.CalledProcessError):
                         experiment.run(24, 'a' * 40, output)
+                elif interrupted:
+                    with self.assertRaises(experiment.ReadError):
+                        experiment.run(24, 'a' * 40, output)
+                    checkpoint = json.loads(output.read_text())
+                    self.assertEqual(checkpoint['stage'], 'observation_error')
+                    self.assertEqual(checkpoint['active_pair'], {'before': '1:2', 'after': '2:2'})
+                    self.assertEqual(attempts, {1: 2, 2: 2})
+                    self.assertEqual(experiment.run(24, 'a' * 40, output, resume=True), 0)
                 else:
                     self.assertEqual(experiment.run(24, 'a' * 40, output), 1 if fail_round else 0)
                 state = json.loads(output.read_text())
@@ -70,11 +84,26 @@ class ExperimentTests(unittest.TestCase):
                     self.assertEqual(len(state['requests']), 2)
                 else:
                     self.assertEqual(state['stage'], 'complete')
-                    self.assertEqual(len(watches), 5)
+                    self.assertEqual(len(watches), 6 if interrupted else 5)
                     self.assertEqual(len(state['requests']), 8)
                     self.assertEqual(attempts, {1: 5, 2: 5})
                 with self.assertRaisesRegex(ValueError, 'already exists'):
                     experiment.run(24, 'a' * 40, output)
+
+    def test_resume_rejects_unknown_failed_and_drifted_checkpoints(self):
+        base = dict(pr=24, source_sha='a'*40, stage='watching', active_round=1,
+                    rounds=[], requests=[], active_pair={'before':'1:1','after':'2:1'})
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'checkpoint.json'
+            for change in [dict(stage='failed'), dict(stage='requesting-rerun'),
+                           dict(requests=[dict(outcome='unknown')]), dict(source_sha='b'*40),
+                           dict(active_round=2)]:
+                output.write_text(json.dumps(base | change))
+                with self.assertRaises(ValueError): experiment.resume_state(24, 'a'*40, output)
+            output.write_text(json.dumps(base))
+            for change in [dict(head_sha='b'*40), dict(run_attempt=2), dict(path='.github/workflows/other.yml')]:
+                with patch.object(experiment,'gh',return_value=dict(head_sha='a'*40,run_attempt=1,path='.github/workflows/ci.yml') | change):
+                    with self.assertRaises(ValueError): experiment.resume_state(24, 'a'*40, output)
 
     def test_head_must_remain_draft_and_exact(self):
         for state in [dict(headRefOid='b' * 40, isDraft=True), dict(headRefOid='a' * 40, isDraft=False)]:

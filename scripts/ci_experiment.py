@@ -14,6 +14,7 @@ import subprocess
 import time
 
 import ci_compare
+from ci_github import ReadError, read
 from ci_profile import gh
 
 REPO = 'z-chenhao/erii'
@@ -70,12 +71,44 @@ def wait_active(pr, sha, pair):
         time.sleep(2 if active else 30)
 
 
-def run(pr, sha, output):
-    if output.exists():
+def resume_state(pr, sha, output):
+    state = json.loads(output.read_text())
+    if (state.get('pr') != pr or state.get('source_sha') != sha or
+            state.get('stage') not in ('watching', 'collecting', 'observation_error') or
+            state.get('active_round') != len(state.get('rounds', [])) + 1 or
+            not 1 <= state['active_round'] <= 5 or
+            any(r.get('outcome') != 'accepted' for r in state.get('requests', []))):
+        raise ValueError('checkpoint is not an acknowledged observation; refuse mutation or failed-sample recovery')
+    pair = state['active_pair']
+    if set(pair) != {'before', 'after'}:
+        raise ValueError('checkpoint requires the original complete pair')
+    for side, workflow in [('before', 'ci.yml'), ('after', 'ci-shadow.yml')]:
+        run_id, attempt = pair[side].split(':')
+        value = gh('api', f'repos/{REPO}/actions/runs/{run_id}')
+        if (value['head_sha'] != sha or value['run_attempt'] != int(attempt) or
+                value['path'] != '.github/workflows/' + workflow):
+            raise ValueError('checkpoint source, workflow or attempt drift')
+        if state['active_round'] > 1 and not any(
+                str(r['run_id']) == run_id and r['target_attempt'] == int(attempt)
+                for r in state['requests']):
+            raise ValueError('checkpoint attempt has no accepted request')
+    for number, row in enumerate(state['rounds'], 1):
+        raw = json.loads(Path(row['raw']).read_text())
+        report = ci_compare.compare(raw)
+        if (row['number'] != number or raw['pairs'] != [row['pair']] or
+                row['watch_returncode'] or len(report['pairs']) != 1 or
+                not report['pairs'][0]['eligible'] or report['pairs'][0]['source_sha'] != sha):
+            raise ValueError('checkpoint contains a failed prior sample')
+    return state
+
+
+def run(pr, sha, output, resume=False):
+    if output.exists() and not resume:
         raise ValueError('experiment output already exists; inspect its checkpoint before taking further actions')
     head(pr, sha)
     output.parent.mkdir(parents=True, exist_ok=True)
-    state = dict(version=1, pr=pr, source_sha=sha, started_at=now(), rounds=[], requests=[], stage='registration')
+    state = (resume_state(pr, sha, output) if resume else
+             dict(version=1, pr=pr, source_sha=sha, started_at=now(), rounds=[], requests=[], stage='registration'))
     save(output, state)
     deadline = time.monotonic() + 60
     while True:
@@ -92,10 +125,10 @@ def run(pr, sha, output):
         if time.monotonic() >= deadline:
             raise RuntimeError('new-head workflows did not register within the bounded readiness window')
         time.sleep(2)
-    for number in range(1, 6):
+    for number in range(len(state['rounds']) + 1, 6):
         head(pr, sha)
-        pair = {}
-        for side, workflow in [('before', 'ci.yml'), ('after', 'ci-shadow.yml')]:
+        pair = dict(state['active_pair']) if resume else {}
+        for side, workflow in ([] if resume else [('before', 'ci.yml'), ('after', 'ci-shadow.yml')]):
             run_id = selected[workflow]['id']
             value = gh('api', f'repos/{REPO}/actions/runs/{run_id}')
             if value['head_sha'] != sha:
@@ -117,15 +150,21 @@ def run(pr, sha, output):
         state.update(stage='watching', active_round=number, active_pair=pair)
         save(output, state)
         print(json.dumps(dict(round=number, source_sha=sha, pair=pair, stage='watching')), flush=True)
-        wait_active(pr, sha, pair)
-        log = output.with_name(output.stem + f'-round-{number}.log')
-        with log.open('w') as stream:
-            result = subprocess.run(['gh', 'pr', 'checks', str(pr), '--repo', REPO, '--watch', '--interval', '30'],
-                                    stdout=stream, stderr=subprocess.STDOUT)
-        head(pr, sha)
-        # Read exactly these attempts, including failed evidence, not whatever
-        # happens to be the latest successful attempt in API history.
-        attempts = {key: ci_compare.collect(REPO, key) for key in pair.values()}
+        try:
+            wait_active(pr, sha, pair)
+            log = output.with_name(output.stem + f'-round-{number}.log')
+            with log.open('a') as stream:
+                result = read('pr', 'checks', str(pr), '--repo', REPO, '--watch', '--interval', '30', stdout=stream)
+            head(pr, sha)
+            state['stage'] = 'collecting'
+            save(output, state)
+            # Read exactly these attempts, including failed evidence, not a later green attempt.
+            attempts = {key: ci_compare.collect(REPO, key) for key in pair.values()}
+        except ReadError as error:
+            state.update(stage='observation_error', observation_error=str(error))
+            save(output, state)
+            raise
+        resume = False
         raw_path = output.with_name(output.stem + f'-round-{number}-raw.json')
         save(raw_path, dict(pairs=[pair], attempts=attempts))
         state['rounds'].append(dict(number=number, pair=pair, raw=str(raw_path), watch_returncode=result.returncode))
@@ -158,10 +197,11 @@ def main():
     parser.add_argument('--pr', type=int, required=True)
     parser.add_argument('--sha', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--resume-observation', action='store_true', help='read the same accepted attempts; never rerun the interrupted pair')
     args = parser.parse_args()
     if not re.fullmatch('[0-9a-f]{40}', args.sha):
         parser.error('--sha must be a full source SHA')
-    return run(args.pr, args.sha, args.output)
+    return run(args.pr, args.sha, args.output, resume=args.resume_observation)
 
 
 if __name__ == '__main__':

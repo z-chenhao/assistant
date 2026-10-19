@@ -134,6 +134,18 @@ repetitions and all per-case/Tool/lease deadlines.
 
 ## ERII-141 shadow experiment (not a performance acceptance claim)
 
+Additional same-VM scheduling profiles preserve every gate and repetition:
+
+| Diagnostic run | Before | After | Unchanged proof |
+| --- | --- | --- | --- |
+| [Security/early scheduling 39232450257](https://github.com/z-chenhao/erii/actions/runs/39232450257), source `6748d2113ff1181f438d291c92f4d177cf3a1a9f` | Security 369.56s; early 184.96s | Security 209.33s; early 131.82s | Same executable and AMD EPYC four-CPU VM; all twenty full security rows and all selected early regressions |
+| [Provider ordering 39236014110](https://github.com/z-chenhao/erii/actions/runs/39236014110), source `af46bead8fee3a7f99f97e1e3af7cd1c52734071` | 393.90s | 333.15s | Same executable and VM; twenty-four rows including five real thirty-second Pi Bridge deadlines; Go models still isolated |
+
+These fixed-order diagnostic pairs support the scheduling change; they are not
+five independent workflow samples or proof of a ten-minute complete Required gate.
+Both SDK doctor and cleanup passed. The full before/after reports and phase timing
+records remain in their run artifacts.
+
 The [machine-readable baseline](ci-baseline.json) covers 30 historical source
 SHAs, grouped by success, failure and cancellation. Successful runs have an
 observed p50 of 2,616 seconds; this mixes coverage versions and is **not** a
@@ -244,11 +256,14 @@ bounds, descendant start-token checks and queued-admission fence. Its phase
 record must contain a cancellation receipt, failed status and drained group.
 The default full-Core probe remains unchanged.
 
-Runtime and provider shards can overlap two independent gate series. Their Go
-event/model checks run after the other series have joined. Code Mode and security
-gate series remain serial. Early feedback can overlap two other shards, then
-runs security alone so the unexplained recall failure is not confounded by
-competing fixtures. Both layers fail closed on any failed or incomplete series.
+Runtime, provider and security shards can overlap two independent gate series.
+Their Go event/model checks run after the other series have joined. Code Mode
+gate series remain serial. Each security series retains five consecutive runs.
+Early feedback starts security and runtime first in its bounded two-shard pool;
+the recall interleavings now have explicit deterministic barriers. Provider
+scheduling starts the long Pi Bridge series first, preserving its real thirty-second
+deadline on every repetition. Report inventory order stays unchanged. Both layers
+fail closed on any failed or incomplete series.
 The shadow workflow sets `ERII_VERIFY_CASE_JOBS=4`, `ERII_VERIFY_GATE_JOBS=2`
 and `ERII_FEEDBACK_JOBS=2` only in their applicable steps; required CI keeps the
 default serial control. No full shard is omitted.
@@ -383,6 +398,8 @@ python3 scripts/ci_compare.py --pair BEFORE_RUN:1,SHADOW_RUN:1 --output evidence
 python3 scripts/ci_compare.py --offline --output evidence/controlled.json
 # Explicitly requested five-round experiment; stays foreground until collected.
 python3 scripts/ci_experiment.py --pr 24 --sha FULL_SHA --output evidence/experiment.json
+# Recover only a read interruption, observing the same accepted workflow attempts.
+python3 scripts/ci_experiment.py --pr 24 --sha FULL_SHA --output evidence/experiment.json --resume-observation
 # After verification/base synchronization: record one frozen push, without retries.
 python3 scripts/ci_supersede.py push --pr 24 --output evidence/push.json
 # Read both superseded workflows once their exact attempts have stopped.
@@ -410,7 +427,12 @@ registration window starts only when that workflow becomes active; this does not
 change any test or job timeout. Queue latency remains visible in attempt data.
 Every round checkpoints its attempts and raw evidence. A failed test, changed
 head, ambiguous run or unknown rerun outcome stops the experiment. Existing output
-is never overwritten or automatically replayed. It does not mark Ready or assert
+is never overwritten or automatically replayed. Evidence GETs and check observation
+retry a transport EOF at most three times, replacing partial ZIP downloads and
+withholding provider stderr that can contain signed URLs. Authentication errors,
+test failures and workflow mutations are never retried. Explicit observation resume
+requires the same Draft head and exact accepted attempts; unknown mutations,
+failed samples and attempt drift are rejected. It does not mark Ready or assert
 performance acceptance. Use it only when CI results/repeated comparisons are
 explicitly requested; ordinary delivery does not wait for external CI.
 The collector also requires the Core summary's five consecutive nested cleanup

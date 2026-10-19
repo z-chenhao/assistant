@@ -9,11 +9,11 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import re
-import subprocess
 import tempfile
 import zipfile
 
 import ci_profile as profile
+from ci_github import read
 from verify_suite import SHARDS
 
 
@@ -48,8 +48,7 @@ def collect(repo, key):
         # Read selected ZIP members without extracting paths, executables,
         # corpus, prompt traces or the much larger business-case payloads.
         with tempfile.TemporaryFile() as archive:
-            subprocess.run(['gh', 'api', f'repos/{repo}/actions/artifacts/{artifact["id"]}/zip'],
-                           stdout=archive, check=True)
+            read('api', f'repos/{repo}/actions/artifacts/{artifact["id"]}/zip', stdout=archive)
             archive.seek(0)
             with zipfile.ZipFile(archive) as entries:
                 for entry in entries.infolist():

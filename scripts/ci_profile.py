@@ -11,11 +11,7 @@ import json
 import math
 from pathlib import Path
 import statistics
-import subprocess
-
-
-def gh(*args):
-    return json.loads(subprocess.check_output(['gh', *args], text=True))
+from ci_github import gh
 
 
 def seconds(start, end):
