@@ -2,8 +2,8 @@
 
 The baseline §9.4 requires actual Jianying compatibility acceptance before the
 production Lume ComputerProvider is implemented. Fake Computer and coding sandbox
-evidence does not establish this compatibility. ERII-24 remains incomplete until
-the live acceptance and the production lifecycle slice are both verified.
+evidence does not establish this compatibility. Production lifecycle configuration,
+durable units and separate CLI verification are documented in [Computer operations](computer.md).
 
 `scripts/lume_live.py` owns the opt-in local mechanics. It is separate from
 deterministic CI and does not install a LaunchAgent. Obtain authorization for the

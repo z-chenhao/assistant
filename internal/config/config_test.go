@@ -46,7 +46,7 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Version != 1 || !filepath.IsAbs(cfg.App.DataRoot) || cfg.App.LogLevel != "info" {
+	if cfg.Computer != nil || cfg.Version != 1 || !filepath.IsAbs(cfg.App.DataRoot) || cfg.App.LogLevel != "info" {
 		t.Fatalf("defaults: %+v", cfg)
 	}
 	dir := t.TempDir()

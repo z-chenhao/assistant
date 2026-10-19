@@ -13,6 +13,7 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/computer/macosvm"
 	"github.com/z-chenhao/erii/internal/computer/workspace"
 	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/delivery"
@@ -25,6 +26,7 @@ import (
 )
 
 type Config struct {
+	Computer   *macosvm.Config       `yaml:"computer"`
 	Context    contextbuilder.Policy `yaml:"context"`
 	Memory     *memory.Config        `yaml:"memory"`
 	Embedding  *embedding.Config     `yaml:"embedding"`
@@ -130,6 +132,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
 		return Config{}, errors.New("javascript requires an absolute command and script")
 	}
+	if cfg.Computer != nil && (cfg.JavaScript == nil || cfg.Computer.Validate() != nil) {
+		return Config{}, errors.New("computer requires JavaScript and an explicit private Lume configuration")
+	}
 	if cfg.Embedding != nil && cfg.Embedding.Validate() != nil {
 		return Config{}, errors.New("invalid embedding provider, endpoint, model or dimensions")
 	}
@@ -178,10 +183,13 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("app.data_root must be an absolute path")
 	}
 	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
+	if cfg.Computer != nil && (overlaps(cfg.Computer.Root, cfg.App.DataRoot) || cfg.Workspace != nil && overlaps(cfg.Computer.Root, cfg.Workspace.Root) || cfg.Skills != nil && overlaps(cfg.Computer.Root, cfg.Skills.Root)) {
+		return Config{}, errors.New("computer storage must be separate from application data, workspace and Skills")
+	}
 	seenServers := map[string]bool{}
 	providerDirectories := []string{}
 	for _, server := range cfg.MCP {
-		if server.Validate() != nil || seenServers[server.Name] || overlaps(server.Directory, cfg.App.DataRoot) || (cfg.Skills != nil && overlaps(server.Directory, cfg.Skills.Root)) || (cfg.Workspace != nil && overlaps(server.Directory, cfg.Workspace.Root)) {
+		if server.Validate() != nil || seenServers[server.Name] || overlaps(server.Directory, cfg.App.DataRoot) || (cfg.Skills != nil && overlaps(server.Directory, cfg.Skills.Root)) || (cfg.Workspace != nil && overlaps(server.Directory, cfg.Workspace.Root)) || (cfg.Computer != nil && overlaps(server.Directory, cfg.Computer.Root)) {
 			return Config{}, errors.New("invalid or duplicate MCP configuration")
 		}
 		for _, directory := range providerDirectories {

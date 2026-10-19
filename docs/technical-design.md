@@ -1270,6 +1270,19 @@ builtin__skill__manage
 - 用户不感知 Instance 的启动、暂停、迁移或恢复状态。
 - 用户只看到 Agent 空闲/忙碌和持续进行中的工作。
 
+ERII-24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生命周期策略：
+首次 `cua.getState()` 获取逻辑 Computer，已接受嵌套调用全部结束后优雅关机、
+提交 Durable Checkpoint、销毁 Instance。Computer 元数据、冻结操作和 Outbox
+同处 `state.db`，使用 Run/Code claim 与 instance epoch fencing。Guest 的签名、
+权限、登录及 Driver 连接和三文件原子恢复由 `computer/macosvm` 负责。
+Surface Inventory/Handle/Action 的后续切片独立验证；当前身份响应明确报告
+Inventory 不可用。配置、恢复和故障处理见 [Computer 运维](computer.md)。
+
+生产 CUA bridge 的 `ToolSpec.internal` 随 Capability Snapshot 冻结，仅供 Code
+Mode 的宿主绑定使用，不投影到模型 Tool 列表；直接模型调用仍被 Code claim
+校验拒绝。该可选元数据缺省为 false 且省略编码，保留既有非 Computer Run
+及显式旧 Fake 的冻结 Tool 表示；已接受快照不自动改写或扩权。
+
 ### 9.4 镜像与兼容性
 
 - 使用不包含用户凭据和个人文件的基础 macOS 镜像，通过 Lume 克隆形成具体 Computer。

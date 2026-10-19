@@ -73,6 +73,21 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (result to
 			}
 		}
 	}()
+	defer func() {
+		select {
+		case <-tool.ShutdownSignal(ctx):
+			// Shutdown keeps the Run heartbeat alive until this accepted step
+			// joins. Drain its admitted calls before reclaiming the instance.
+			if t.runs.computerProvider != nil && ctx.Err() == nil && b.registry != nil {
+				if err := b.drain(ctx); err != nil {
+					executionErr = errors.Join(executionErr, err)
+				} else if err := b.computer().Idle(ctx); err != nil {
+					executionErr = errors.Join(executionErr, err)
+				}
+			}
+		default:
+		}
+	}()
 	var err error
 	b.registry, err = t.runs.registry.Select(b.req.Tools)
 	if err != nil {
@@ -172,6 +187,14 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (result to
 				continue
 			}
 			return tool.Result{}, tool.ErrSuspended
+		}
+		if t.runs.computerProvider != nil && outcome.Kind != "suspended" {
+			if err := b.computer().Idle(ctx); err != nil {
+				if errors.Is(err, agent.ErrClaimLost) || errors.Is(err, agent.ErrStorage) {
+					return tool.Result{}, err
+				}
+				return computerFailure(err), nil
+			}
 		}
 		switch outcome.Kind {
 		case "suspended":

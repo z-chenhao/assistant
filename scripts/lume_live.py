@@ -71,7 +71,7 @@ def decode_details(text):
 
 
 class Live:
-    def __init__(self, root):
+    def __init__(self, root, profile='acceptance', vm=VM):
         root = Path(root).absolute()
         require(not any(p.is_symlink() for p in [root, *root.parents]),
                 'test root must not contain symlinks')
@@ -89,6 +89,28 @@ class Live:
         self.env = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
                     'XDG_CONFIG_HOME': str(root / 'config'),
                     'LUME_TELEMETRY_ENABLED': 'false'}
+        self.vm = vm
+        require(profile in {'acceptance', 'product'}, 'invalid owned test profile')
+        if profile == 'product':
+            product = root / 'product'
+            require(not product.is_symlink() and json.loads((product / 'erii-computer.json').read_text()) == {'version': 1},
+                    'production lifecycle test store must be sealed first')
+            self.store = product / 'vms'
+            config = root / 'product-config'
+            require(config.is_dir() and not config.is_symlink() and self.store.is_dir() and not self.store.is_symlink(),
+                    'invalid isolated production lifecycle store')
+            self.env['XDG_CONFIG_HOME'] = str(config)
+            if vm != VM:
+                require(re.fullmatch(r'erii-[0-9a-f-]{36}-[1-9][0-9]*', vm), 'invalid Host instance name')
+                directory = self.store / vm
+                require(directory.is_dir() and not directory.is_symlink(), 'Host instance missing')
+                owner = directory / 'erii-instance.json'
+                require(owner.is_file() and not owner.is_symlink(), 'Host instance ownership missing')
+                identity = json.loads(owner.read_text())
+                require(identity['native_name'] == vm and vm == f"erii-{identity['computer_id']}-{identity['instance_epoch']}",
+                        'Host instance ownership mismatch')
+        else:
+            require(vm == VM, 'acceptance profile owns exactly its assigned VM')
         self.profile = root / 'host-isolation.sb'
         require(not self.profile.is_symlink(), 'isolation profile must not be a symlink')
         home = Path.home()
@@ -111,7 +133,7 @@ class Live:
 
     def guest(self, command, timeout=60):
         return self.command('ssh', '--storage', str(self.store), '--timeout', str(timeout),
-                            VM, command, timeout=timeout + 15)
+                            self.vm, command, timeout=timeout + 15)
 
     def details(self):
         return decode_details(self.command('get', VM, '--storage', str(self.store), '--format', 'json'))
@@ -568,10 +590,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', required=True)
     parser.add_argument('--port', type=int, default=17774)
+    parser.add_argument('--profile', choices=['acceptance', 'product'], default='acceptance')
+    parser.add_argument('--vm', default=VM)
     parser.add_argument('operation', choices=['doctor', 'fixtures', 'media', 'download', 'create', 'pull-tested-image', 'serve', 'start', 'wait-ready', 'crash', 'state', 'guest', 'guest-script', 'put', 'get', 'driver', 'driver-click', 'vnc-session', 'vnc-control', 'stop', 'poweroff'])
     parser.add_argument('arguments', nargs='*')
     args = parser.parse_args()
-    live = Live(args.root)
+    live = Live(args.root, args.profile, args.vm)
+    if args.profile == 'product':
+        require(args.operation in {'serve', 'doctor', 'guest'}, 'product lifecycle actions must use the accepted Tool pipeline')
+        require(args.operation != 'guest' or args.vm != VM, 'Guest fixture action requires a Host-owned instance')
     live.port = args.port
     if args.operation == 'doctor':
         live.doctor()

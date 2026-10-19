@@ -38,7 +38,7 @@ The manifest in `scripts/verify_suite.py` owns verification coverage:
 | Shard | Required evidence |
 | --- | --- |
 | runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
-| codemode | Five consecutive Code Mode and fixed-source recovery runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) |
+| codemode | Five consecutive Code Mode, fixed-source recovery and Computer lifecycle runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) and [Computer lifecycle](computer.md) |
 | security | Five consecutive Tool approval/recovery and Artifact runs |
 | delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
 | providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |
@@ -121,8 +121,12 @@ The [ERII-134 report](https://github.com/z-chenhao/erii/pull/19) records the
 controlled local serial/parallel measurements, repeated-gate ranges, timing
 attachments and exact-head Ubuntu result separately.
 
-The full race command uses an explicit 15-minute Go package budget inside its
-20-minute job. Real SQLite migrations under race instrumentation exhausted the
+The full race command serializes test packages and uses an explicit 15-minute Go
+package budget inside its 20-minute job. Two ERII-24 preparation jobs exceeded the
+Bridge duplicate-burst RPC's unchanged one-second deadline (1.04s and 1.07s)
+while packages shared the two-core runner. Package isolation preserves the event
+count, intra-package concurrency, race instrumentation and all assertions.
+Real SQLite migrations under race instrumentation exhausted the
 implicit 10-minute package budget on Ubuntu; per-test, Tool and lease deadlines
 remain unchanged. See [Core gate evidence](core-evals.md).
 
