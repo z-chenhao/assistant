@@ -17,9 +17,9 @@ class GateSchedulingTests(unittest.TestCase):
             root = Path(directory)
             (root / 'logs').mkdir()
             ledger = root / 'ledger.jsonl'
-            isolated = 'models' if shard == 'providers' else 'events'
+            isolated = {'providers': 'models', 'runtime': 'events'}.get(shard)
             gates = (suite.Gate('first', '', 'first', 5), suite.Gate('second', '', 'second', 5),
-                     suite.Gate(isolated, '', isolated))
+                     *(() if isolated is None else (suite.Gate(isolated, '', isolated),)))
             program = ('import json,os,sys,time\n'
                        f'p={str(ledger)!r}\n'
                        'def record(event):\n'
@@ -40,7 +40,7 @@ class GateSchedulingTests(unittest.TestCase):
             if failure:
                 self.assertTrue(any(r['returncode'] == 7 for r in rows))
                 self.assertFalse(any(e[1] == isolated for e in events))
-                self.assertLess(len(rows), 11)
+                self.assertLess(len(rows), sum(g.attempts for g in gates))
             else:
                 self.assertEqual([(r['gate'], r['attempt']) for r in rows],
                                  [(g.name, n) for g in gates for n in range(1, g.attempts + 1)])
@@ -59,6 +59,10 @@ class GateSchedulingTests(unittest.TestCase):
 
     def test_runtime_series_and_events(self):
         self.drive('runtime')
+
+    def test_security_series_remain_five_consecutive_runs_at_capacity_two(self):
+        self.drive('security')
+        self.drive('security', failure=True)
 
     def test_provider_series_and_models(self):
         self.drive('providers')

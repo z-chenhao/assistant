@@ -20,6 +20,16 @@ GATES = {
 }
 
 
+EARLY_ORDER = ('security', 'runtime', 'codemode', 'providers', 'delivery')
+
+
+def feedback_order(names):
+    if (set(EARLY_ORDER) != set(GATES) or len(names) != len(set(names)) or
+            any(name not in GATES for name in names)):
+        raise ValueError('early regression scheduling inventory drift')
+    return [name for name in EARLY_ORDER if name in names]
+
+
 def feedback_gates(name):
     return tuple(suite.Gate(g.name, g.script, g.report,
                            arguments=('--feedback',) if g.name == 'delivery' else ())
@@ -66,12 +76,7 @@ def main():
         return name, result
     if passed:
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            rows = dict(pool.map(drive, [name for name in plan['shards'] if name != 'security']))
-        # Keep the unresolved recall boundary free of competing fixture load.
-        # Security's own five-run full gate remains serial and mandatory.
-        if 'security' in plan['shards'] and not stopped.is_set():
-            name, result = drive('security')
-            rows[name] = result
+            rows = dict(pool.map(drive, feedback_order(plan['shards'])))
         passed = len(rows) == len(plan['shards']) and all(
             len(rows[name]) == len(feedback_gates(name)) and all(r['returncode'] == 0 for r in rows[name])
             for name in plan['shards'])

@@ -225,6 +225,18 @@ class BundleTests(unittest.TestCase):
                 self.assertFalse((self.dest / '.ci-go').exists())
 
 
+class FeedbackSchedulingTests(unittest.TestCase):
+    def test_all_selected_shards_remain_in_early_schedule(self):
+        self.assertEqual(ci_feedback.feedback_order(list(ci_feedback.GATES)),
+                         ['security','runtime','codemode','providers','delivery'])
+        self.assertEqual(ci_feedback.feedback_order(['delivery','runtime']), ['runtime','delivery'])
+        self.assertEqual(ci_feedback.feedback_order([]), [])
+        for names in (['unknown'], ['security','security']):
+            with self.assertRaises(ValueError): ci_feedback.feedback_order(names)
+        with patch.dict(ci_feedback.GATES, {'new-shard': set()}):
+            with self.assertRaises(ValueError): ci_feedback.feedback_order([])
+
+
 class RaceInventoryTests(unittest.TestCase):
     def test_all_packages_exactly_once_including_new_packages(self):
         packages = [ci_race.BRIDGE, 'github.com/z-chenhao/erii/internal/agent/sqlite',

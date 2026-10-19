@@ -1,0 +1,74 @@
+name: ERII-141 security scheduling profile
+
+on:
+  push:
+    branches: [ERII-141-security-profile]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: erii-141-security-profile
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+  ERII_VERIFY_CASE_JOBS: "4"
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Launch and Doctor
+        run: |
+          mkdir -p evidence
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          make build
+          python3 scripts/ci_sdk.py prepare --host-cache --evidence evidence/sdk.json
+      - name: Warm the exact Tool race command before either feedback measurement
+        run: python3 scripts/ci_step.py --name tool-race-warmup --phase test -- go test -race -count=1 ./internal/tool/...
+      - name: Complete twenty-row security gate before and after on this VM
+        run: |
+          python3 scripts/ci_step.py --name security-before --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence/security-before --shard security --jobs 1 --gate-jobs 1
+          python3 scripts/ci_step.py --name security-after --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence/security-after --shard security --jobs 1 --gate-jobs 2
+      - name: Complete risk-related early inventory before and after on this VM
+        env:
+          PYTHONPATH: ${{ github.workspace }}/scripts
+        run: |
+          python3 scripts/ci_impact.py --base origin/main --output evidence/impact.json
+          git show 2e04adb886a1293b7f1b31740e09fc22c143b9a7:scripts/ci_feedback.py > evidence/baseline-feedback.py
+          python3 scripts/ci_step.py --name feedback-before --phase test -- python3 evidence/baseline-feedback.py --plan evidence/impact.json --binary bin/personal-agent --evidence evidence/feedback-before --jobs 2
+          python3 scripts/ci_step.py --name feedback-after --phase test -- python3 scripts/ci_feedback.py --plan evidence/impact.json --binary bin/personal-agent --evidence evidence/feedback-after --jobs 2
+      - name: SDK Doctor and Cleanup
+        if: always()
+        run: |
+          python3 scripts/ci_sdk.py doctor
+          python3 scripts/ci_sdk.py cleanup
+      - name: Retain source, full inventories, failures, timings and cleanup
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: security-profile-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
