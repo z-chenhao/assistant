@@ -1,3 +1,3 @@
-# Cancellation profile checkpoint 6
+# Exec owner cancellation profile checkpoint 1
 
-Documentation-only superseding push for the isolated ERII-141 experiment.
+Documentation-only superseding push; workload owners match 3aa91ef.
