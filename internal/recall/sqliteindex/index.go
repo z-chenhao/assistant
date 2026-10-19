@@ -75,11 +75,11 @@ func Bind(ctx context.Context, db *sql.DB, e recall.Embedding) error {
 // Indexing is recoverable derived work: immutable originals commit first. A
 // failed embedding leaves NULL vectors and fails the complete search closed.
 // Only authorized records are ever sent to the configured embedding endpoint.
-func catchUp(ctx context.Context, db *sql.DB, s recall.Scope, e recall.Embedding) error {
+func catchUp(ctx context.Context, db *sql.DB, s recall.Scope, e recall.Embedding, start, end int64) error {
 	if err := Bind(ctx, db, e); err != nil {
 		return err
 	}
-	rows, err := db.QueryContext(ctx, `SELECT ref,content FROM recall_document WHERE user_id=? AND (agent_id='' OR agent_id=?) AND active=1 AND vector_json IS NULL ORDER BY ref`, s.UserID, s.AgentID)
+	rows, err := db.QueryContext(ctx, `SELECT ref,content FROM recall_document WHERE user_id=? AND (agent_id='' OR agent_id=?) AND active=1 AND vector_json IS NULL AND occurred_at>=? AND occurred_at<=? ORDER BY ref`, s.UserID, s.AgentID, start, end)
 	if err != nil {
 		return recall.ErrUnavailable
 	}
@@ -140,13 +140,6 @@ func Search(ctx context.Context, db *sql.DB, s recall.Scope, q recall.Query, e r
 	if !q.Valid() || s.UserID == "" || s.AgentID == "" {
 		return nil, recall.ErrInvalid
 	}
-	if err := catchUp(ctx, db, s, e); err != nil {
-		return nil, err
-	}
-	vector, err := e.Embed(ctx, q.Query)
-	if err != nil || !embedding.Valid(vector) {
-		return nil, recall.ErrUnavailable
-	}
 	start, end := int64(math.MinInt64), int64(math.MaxInt64)
 	if q.TimeRange != nil {
 		if q.TimeRange.Start != nil {
@@ -156,6 +149,14 @@ func Search(ctx context.Context, db *sql.DB, s recall.Scope, q recall.Query, e r
 			end = q.TimeRange.End.UnixMicro()
 		}
 	}
+	if err := catchUp(ctx, db, s, e, start, end); err != nil {
+		return nil, err
+	}
+	vector, err := e.Embed(ctx, q.Query)
+	if err != nil || !embedding.Valid(vector) {
+		return nil, recall.ErrUnavailable
+	}
+
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, recall.ErrUnavailable

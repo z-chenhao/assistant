@@ -14,7 +14,7 @@ import (
 )
 
 func (r *Runs) searchTasks(ctx context.Context, tx *sql.Tx, runID string, request task.SearchRequest) (tool.Result, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT t.task_ref,t.title,t.anchor_task,t.status,t.progress_summary,t.updated_at,coalesce((SELECT group_concat(i.instruction,char(10)) FROM task_instruction i WHERE i.task_id=t.task_id),'') FROM task t JOIN run r ON t.agent_id=r.agent_id AND t.conversation_id=r.conversation_id WHERE r.run_id=? ORDER BY t.updated_at DESC,t.task_ref`, runID)
+	rows, err := tx.QueryContext(ctx, `SELECT t.task_ref,t.title,t.anchor_task,t.status,t.progress_summary,t.updated_at,coalesce((SELECT group_concat(i.instruction,char(10)) FROM task_instruction i WHERE i.task_id=t.task_id),'') FROM task t JOIN run r ON t.agent_id=r.agent_id AND t.conversation_id=r.conversation_id WHERE r.run_id=? AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) ORDER BY t.updated_at DESC,t.task_ref`, runID)
 	if err != nil {
 		return tool.Result{}, err
 	}
@@ -153,6 +153,15 @@ func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string,
 	if err != nil {
 		return err
 	}
+	if kind == "completed" {
+		var owner string
+		if err = tx.QueryRowContext(ctx, `SELECT agent_id FROM task WHERE task_id=?`, taskID).Scan(&owner); err != nil {
+			return err
+		}
+		if err = r.observeMemory(ctx, tx, owner, "task", runID); err != nil {
+			return err
+		}
+	}
 	rawRefs, _ := encoded(refs)
 	if _, err = tx.ExecContext(ctx, `INSERT INTO task_update VALUES(?,?,?,?,?,?,?,?)`, e.ID(), taskID, runID, epoch, kind, content, rawRefs, e.Time().UnixMicro()); err != nil {
 		return err
@@ -167,7 +176,7 @@ func (r *Runs) Report(ctx context.Context) error {
 	changed := false
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		changed = false
-		rows, err := tx.QueryContext(ctx, `SELECT u.event_id,u.task_id,u.root_run_id,u.task_epoch,u.kind,u.content,u.artifact_refs,u.occurred_at,t.agent_id,t.task_ref,t.task_epoch FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id) ORDER BY u.occurred_at,u.event_id`)
+		rows, err := tx.QueryContext(ctx, `SELECT u.event_id,u.task_id,u.root_run_id,u.task_epoch,u.kind,u.content,u.artifact_refs,u.occurred_at,t.agent_id,t.task_ref,CASE WHEN t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) THEN t.task_epoch ELSE -1 END FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id) ORDER BY u.occurred_at,u.event_id`)
 		if err != nil {
 			return err
 		}
@@ -234,7 +243,7 @@ func (r *Runs) promoteFollowups(ctx context.Context) error {
 		if active > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch ORDER BY b.sequence`)
+		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) ORDER BY b.sequence`)
 		if err != nil {
 			return err
 		}

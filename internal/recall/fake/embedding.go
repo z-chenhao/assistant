@@ -10,6 +10,7 @@ import (
 type Embedding struct{ Fail bool }
 
 func (Embedding) Identity() string { return "test-semantic-embedding-v1" }
+func (Embedding) Local() bool      { return true }
 func (e Embedding) Embed(ctx context.Context, s string) ([]float64, error) {
 	if e.Fail || ctx.Err() != nil {
 		return nil, recall.ErrUnavailable

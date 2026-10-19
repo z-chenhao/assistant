@@ -66,6 +66,8 @@ type initialization struct {
 	err  error // published by closing done
 }
 
+type dispatchGuardKey struct{}
+
 // Open takes a Host-selected executable and arguments, never model input.
 // The child receives no inherited credentials, application configuration or DB
 // paths. This is a process boundary, not an OS filesystem/network sandbox.
@@ -327,7 +329,16 @@ func (c *Client) exchange(ctx context.Context, p *process, method string, params
 	// One writer owns pipe deadlines. Cancellation interrupts the actual Write,
 	// including a peer that has stopped reading. Join the callback before the next
 	// writer can reset the deadline, so it cannot interrupt a subsequent request.
-	err = c.write(ctx, p, wire)
+	var release func()
+	if guard, ok := ctx.Value(dispatchGuardKey{}).(func(context.Context) (func(), error)); ok {
+		release, err = guard(ctx)
+	}
+	if err == nil {
+		err = c.write(ctx, p, wire)
+	}
+	if release != nil {
+		release()
+	}
 	<-p.write
 	if dispatchDone != nil {
 		close(dispatchDone)
@@ -474,6 +485,9 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		stream.remaining = r.OutputLimitBytes
 	}
 	dispatchCtx, stopDispatch := context.WithCancel(ctx)
+	if r.DispatchGuard != nil {
+		dispatchCtx = context.WithValue(dispatchCtx, dispatchGuardKey{}, r.DispatchGuard)
+	}
 	defer stopDispatch()
 	stream.interrupt = stopDispatch
 	stream.sessionID = r.SessionID

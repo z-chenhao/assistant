@@ -39,6 +39,16 @@ func TextMessage(kind, text string) AgentMessage {
 	return AgentMessage{Type: kind, Content: conversation.Text(text)}
 }
 
+// ProviderTools is the one model-visible projection. Context budgeting must
+// count this wire shape, not Host policy/hash/permission metadata.
+func ProviderTools(specs []tool.Spec) []llm.ToolSpec {
+	out := []llm.ToolSpec{}
+	for _, spec := range specs {
+		out = append(out, llm.ToolSpec{Name: spec.Name, Description: spec.Description, InputSchema: spec.InputSchema})
+	}
+	return out
+}
+
 // ProviderMessages is the only runtime -> provider message conversion. The
 // text provider receives bounded reference hints for media, never binary data.
 func ProviderMessages(messages []AgentMessage) ([]llm.Message, error) {
@@ -81,7 +91,7 @@ func ProviderMessages(messages []AgentMessage) ([]llm.Message, error) {
 		default:
 			return nil, llm.ModelIncompatible
 		}
-		wire := llm.Message{Role: role, ToolCallID: m.ToolCallID}
+		wire := llm.Message{Role: role, Origin: m.Origin, ToolCallID: m.ToolCallID}
 		for _, p := range parts {
 			switch p.Type {
 			case "text":
@@ -101,13 +111,14 @@ func ProviderMessages(messages []AgentMessage) ([]llm.Message, error) {
 }
 
 type Checkpoint struct {
-	ContextReady  bool                  `json:"context_ready"`
-	Messages      []AgentMessage        `json:"messages"`
-	InputSequence int64                 `json:"input_sequence"`
-	Step          int64                 `json:"step"`
-	Phase         string                `json:"phase"` // model, tools, reply
-	ExchangeID    string                `json:"exchange_id,omitempty"`
-	Result        *llm.GenerationResult `json:"result,omitempty"`
+	ContextRetries int                   `json:"context_retries,omitempty"`
+	ContextReady   bool                  `json:"context_ready"`
+	Messages       []AgentMessage        `json:"messages"`
+	InputSequence  int64                 `json:"input_sequence"`
+	Step           int64                 `json:"step"`
+	Phase          string                `json:"phase"` // model, tools, reply
+	ExchangeID     string                `json:"exchange_id,omitempty"`
+	Result         *llm.GenerationResult `json:"result,omitempty"`
 }
 type Run struct {
 	SpendStatus    string       `json:"-"`

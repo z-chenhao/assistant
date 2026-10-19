@@ -10,6 +10,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
@@ -51,6 +52,9 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	if _, err = tx.ExecContext(ctx, `INSERT INTO artifact_reference SELECT json_extract(j.value,'$.artifact_ref'),'run',? FROM conversation_intent c,json_each(json_extract(c.message_json,'$.content')) j JOIN artifact a ON a.artifact_ref=json_extract(j.value,'$.artifact_ref') WHERE json_extract(c.message_json,'$.conversation_id')=? AND a.owner_agent_id=? ON CONFLICT DO NOTHING`, id, agentID, agentID); err != nil {
 		return "", err
 	}
+	if err = r.freezeContext(ctx, tx, id); err != nil {
+		return "", err
+	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
 		return "", err
 	}
@@ -58,6 +62,13 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 }
 
 func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error {
+	var revoked bool
+	if e := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task t JOIN memory_privacy p USING(agent_id) WHERE t.task_id=? AND t.created_at<=p.updated_at)`, taskID).Scan(&revoked); e != nil {
+		return e
+	}
+	if revoked {
+		return agent.ErrConflict
+	}
 	var agentID, conversationID, title, brief, profile string
 	var epoch, config, pv int64
 	if err := tx.QueryRowContext(ctx, `SELECT t.agent_id,t.conversation_id,t.title,t.anchor_task,t.task_epoch,a.active_model_profile_id,a.config_version,p.version FROM task t JOIN agent_config a ON a.agent_id=t.agent_id JOIN model_profile p ON p.profile_id=a.active_model_profile_id WHERE t.task_id=? AND t.status='active' AND a.setup_status='ready' AND p.status='ready'`, taskID).Scan(&agentID, &conversationID, &title, &brief, &epoch, &profile, &config, &pv); err != nil {
@@ -160,6 +171,9 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,task_id,root_run_id,kind,worker_position,status,task_epoch,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,?,?,'worker','root','queued',?,?,?,?,0,?,?,1)`, id, agentID, conversationID, taskID, id, epoch, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return err
 	}
+	if err = r.freezeContext(ctx, tx, id); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
 		return err
 	}
@@ -179,6 +193,9 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	}
 	if name == agent.RunToolName {
 		return t.AgentToolExecutor(ctx, inv.ID)
+	}
+	if name == memory.ManageName {
+		return t.manageMemory(ctx, inv)
 	}
 	if name == "builtin__memory__search" {
 		return t.searchMemory(ctx, inv)
@@ -313,6 +330,16 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 					return nil
 				} else if err != nil {
 					return err
+				}
+				if request.Operation == "append" {
+					var revoked bool
+					if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task t JOIN memory_privacy p USING(agent_id) WHERE t.task_id=? AND t.created_at<=p.updated_at)`, taskID).Scan(&revoked); err != nil {
+						return err
+					}
+					if revoked {
+						result = tool.Failure("PERMISSION_DENIED")
+						return nil
+					}
 				}
 				if request.Operation == "pause" || request.Operation == "cancel" {
 					receiptStatus = "paused"

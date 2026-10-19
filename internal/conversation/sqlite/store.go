@@ -66,7 +66,7 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 	var version int
-	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 2 {
+	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 3 {
 		return conversation.ErrStorage
 	}
 	if version == 0 {
@@ -125,6 +125,11 @@ CREATE TRIGGER conversation_scope_no_replace BEFORE INSERT ON conversation_scope
 			}
 		}
 		if _, err = tx.ExecContext(ctx, `PRAGMA user_version=2`); err != nil {
+			return conversation.ErrStorage
+		}
+	}
+	if version < 3 {
+		if _, err = tx.ExecContext(ctx, compactionSchema+`PRAGMA user_version=3;`); err != nil {
 			return conversation.ErrStorage
 		}
 	}

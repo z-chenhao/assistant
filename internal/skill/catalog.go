@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	"github.com/z-chenhao/erii/internal/tool"
@@ -38,6 +39,83 @@ type entry struct {
 
 var invalid = errors.New("invalid skill catalog")
 
+// ErrCapacity rejects a new publication without advancing its candidate.
+var ErrCapacity = errors.New("skill catalog capacity exceeded")
+
+const maxEntries = 128
+
+// Lock the directory itself: no lock file enters the catalog or survives a
+// crash. Writers fail closed on contention; callers can retry their unchanged
+// candidate version. Readers share a consistent catalog with other readers.
+func openCatalog(c Config, write bool) (*os.Root, func(), error) {
+	if c.Validate() != nil {
+		return nil, nil, invalid
+	}
+	root, err := os.OpenRoot(c.Root)
+	if err != nil {
+		return nil, nil, invalid
+	}
+	dir, err := root.Open(".")
+	if err != nil {
+		root.Close()
+		return nil, nil, invalid
+	}
+	mode := syscall.LOCK_SH
+	if write {
+		mode = syscall.LOCK_EX | syscall.LOCK_NB
+	}
+	if err = syscall.Flock(int(dir.Fd()), mode); err != nil {
+		dir.Close()
+		root.Close()
+		return nil, nil, invalid
+	}
+	return root, func() {
+		dir.Close()
+		root.Close()
+	}, nil
+}
+
+type metadata struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+}
+
+// Frontmatter delimiters occupy their own unindented lines. A quoted scalar,
+// an indented block scalar or the body may contain the same punctuation.
+func parseMetadata(name string, b []byte) (metadata, error) {
+	var front metadata
+	if len(b) > 65536 {
+		return front, invalid
+	}
+	text := strings.TrimLeft(string(b), " \t\r\n")
+	opening, rest, ok := strings.Cut(text, "\n")
+	if !ok || strings.TrimRight(opening, " \t\r") != "---" {
+		return front, invalid
+	}
+	header := ""
+	closed := false
+	for offset := 0; offset < len(rest); {
+		line, _, more := strings.Cut(rest[offset:], "\n")
+		if strings.TrimRight(line, " \t\r") == "---" {
+			header, closed = rest[:offset], true
+			break
+		}
+		if !more {
+			break
+		}
+		offset += len(line) + 1
+	}
+	if !closed || yaml.Unmarshal([]byte(header), &front) != nil || front.Name != name || front.Name == "" || front.Description == "" || len(front.Description) > 1024 {
+		return front, invalid
+	}
+	for _, r := range front.Name {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return front, invalid
+		}
+	}
+	return front, nil
+}
+
 func (c Config) Validate() error {
 	if !filepath.IsAbs(c.Root) || (c.Scope != "agent" && c.Scope != "workspace") {
 		return invalid
@@ -60,20 +138,41 @@ func readFile(root *os.Root, path string) ([]byte, error) {
 }
 
 func load(c Config) ([]entry, error) {
-	root, err := os.OpenRoot(c.Root)
+	root, close, err := openCatalog(c, false)
 	if err != nil {
 		return nil, invalid
 	}
-	defer root.Close()
-	dirs, err := fs.ReadDir(root.FS(), ".")
-	if err != nil || len(dirs) > 128 {
+	defer close()
+	return loadRoot(root, c.Scope)
+}
+
+func loadRoot(root *os.Root, scope string) ([]entry, error) {
+	dir, err := root.Open(".")
+	if err != nil {
 		return nil, invalid
+	}
+	defer dir.Close()
+	var dirs []fs.DirEntry
+	for {
+		batch, err := dir.ReadDir(maxEntries)
+		for _, d := range batch {
+			if d.IsDir() && (strings.HasPrefix(d.Name(), ".erii-pending-") || strings.HasPrefix(d.Name(), ".erii-retired-")) {
+				continue
+			}
+			if !d.IsDir() || d.Type()&os.ModeSymlink != 0 || len(dirs) >= maxEntries {
+				return nil, invalid
+			}
+			dirs = append(dirs, d)
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, invalid
+		}
 	}
 	var entries []entry
 	for _, d := range dirs {
-		if !d.IsDir() || d.Type()&os.ModeSymlink != 0 {
-			return nil, invalid
-		}
 		e := entry{files: map[string]string{}}
 		total := 0
 		err = fs.WalkDir(root.FS(), d.Name(), func(path string, v fs.DirEntry, walkErr error) error {
@@ -105,24 +204,12 @@ func load(c Config) ([]entry, error) {
 		if err != nil {
 			return nil, invalid
 		}
-		parts := strings.SplitN(string(b), "---", 3)
-		if len(parts) != 3 || strings.TrimSpace(parts[0]) != "" {
+		front, err := parseMetadata(d.Name(), b)
+		if err != nil {
 			return nil, invalid
-		}
-		var front struct {
-			Name        string `yaml:"name"`
-			Description string `yaml:"description"`
-		}
-		if yaml.Unmarshal([]byte(parts[1]), &front) != nil || front.Name != d.Name() || front.Description == "" || len(front.Description) > 1024 {
-			return nil, invalid
-		}
-		for _, r := range front.Name {
-			if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
-				return nil, invalid
-			}
 		}
 		blob, _ := json.Marshal(e.files)
-		e.Summary = Summary{Name: front.Name, Description: front.Description, Scope: c.Scope, Version: sum(blob)}
+		e.Summary = Summary{Name: front.Name, Description: front.Description, Scope: scope, Version: sum(blob)}
 		entries = append(entries, e)
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })

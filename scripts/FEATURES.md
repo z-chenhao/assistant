@@ -1,5 +1,25 @@
 # Foundation feature map
 
+## Memory maintenance, context and experience (ERII-23)
+
+`python3 scripts/verify_memory_maintenance.py --binary bin/personal-agent --evidence evidence/memory-maintenance.json`
+owns isolated Launch, selected-profile/Fake Doctor, CLI/Tool Drive, persisted
+Evidence and Cleanup. `make verify` repeats it five times in the security shard.
+See [maintenance operations](../docs/memory-maintenance.md) and [ADR 003](../docs/adr/003-memory-forget-revokes-unfinished-context.md).
+
+| Feature | User boundary | Authoritative implementation | Evidence |
+| --- | --- | --- | --- |
+| Automatic evidence-backed Memory | Configured foreground `chat work`; explicit `memory work/status` | `Runs.observeMemory/CurateMemory`, Memory receipt/evidence transaction | Health, goal and learning reports stay Recall; no maintenance delivery; serial batches; kill after Memory commit reuses receipt |
+| Remember/correct/forget | Main `builtin__memory__manage`, authenticated `memory manage REQUEST_KEY` | Unified ToolExecutor; durable mutation + privacy barrier; `memory/sqlite` supersession/tombstones | Finance correction, encrypted read-only recall, same-key receipts, lineage/source/category suppression, policy replay; remember → unrelated Forget → identical fresh remember yields one hit with new provenance; duplicate/out-of-order evidence cannot replace it |
+| Forget overrides unfinished replay | Same Forget control and `chat send` | Privacy epoch, Run/Code fences, guarded Provider pipe dispatch, controlled-stop recovery; immutable ingress owns a queued successor while revoked owners join | Queued input → Forget → fresh input before settlement produces one answer from a new Run; live owner held after request freeze → Forget → fresh input → kill/restart completes the successor; Claim/scheduler wait for old owner settlement; audit retained and new requests exclude old content; v19 migration preserves input/owner; Task state not implicitly cancelled |
+| Sensitive records | Explicit key reference, authorized recall | AES-GCM, keyed dedup, scoped in-memory FTS/vector RRF with selected loopback embedding; prior-data sealing/cleanup marker | Memory DB/WAL scans, private vector-only synonym, remote embedding rejection before any request; key loss/tampering fail closed; immutable originals retained |
+| Hierarchical context | Shared Main/Worker generation boundary | Frozen policy; complete Tool exchange removal, bounded extractive summaries; Conversation schema 3 and state manifests | CLI long history, original IDs and provenance readback; stable input budget and runtime-origin tests; one context-length recovery with unchanged Snapshot and no Tool rerun |
+| Verified Skill experience | Trusted `skill manage` Reviewer control | Candidate CAS, method-bound verification ledger, full catalog/publication admission under a directory lock, bounded active loading, staged recovery and retained retirement | Two real workspace-test Runs; punctuation metadata; 127 → 128 active publication; full rejection leaves verified v3; retire then retry same candidate/version; fresh-process status/list/view/retire with >128 retained/pending entries; contracts cover metadata, capacity, concurrent last-slot ownership, writer kill/restart and unsafe staging rejection |
+
+These are M6 contract and GC-01/02/03/06 fragment checks, not full product scores or
+Live Shadow quality. Scope-wide Forget invalidation and conservative extraction
+limits are explicit in the operations notes.
+
 ## Durable context recall (ERII-22)
 
 `python3 scripts/verify_recall.py --binary bin/personal-agent --evidence evidence/recall.json`
@@ -14,8 +34,8 @@ embedding/LLM Fakes. `make verify` runs five repetitions. See [recall operations
 | Frozen context | Shared model-generation admission | `run_recall`, `Runs.recallMessages` | SIGKILL after freeze, corpus changes, exact snapshot reused on restart; new turn sees new data, stable prefix/dynamic suffix, no Parent mutable context copied, old-owner rejection |
 
 No embedding configuration means no recall capability; this is not a full vector
-completion claim for that installation. Curator, explicit management and compaction
-remain the next slice; these checks do not score full SC-08.
+completion claim for that installation. Curator, explicit management and compaction are covered by the ERII-23 entry above;
+these retrieval-only checks do not score full SC-08.
 
 Run `make verify` from the repository root. `scripts/verify.py` drives the built
 CLI and independently reads SQLite/JSONL. `internal/event/integration` owns the

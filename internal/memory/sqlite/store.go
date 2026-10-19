@@ -21,6 +21,7 @@ import (
 type Store struct {
 	db     *sql.DB
 	engine recall.Embedding
+	vault  memory.Vault
 }
 
 const schema = `CREATE TABLE memory_record(
@@ -75,11 +76,16 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 	var version int
-	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 1 {
+	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 2 {
 		return recall.ErrUnavailable
 	}
 	if version == 0 {
 		if _, err = tx.ExecContext(ctx, schema+sqliteindex.Schema+`PRAGMA user_version=1;`); err != nil {
+			return recall.ErrUnavailable
+		}
+	}
+	if version < 2 {
+		if _, err = tx.ExecContext(ctx, maintenanceSchema+`PRAGMA user_version=2;`); err != nil {
 			return recall.ErrUnavailable
 		}
 	}
@@ -97,9 +103,23 @@ func (s *Store) Configure(ctx context.Context, e recall.Embedding) error {
 }
 func (s *Store) Close() error { return s.db.Close() }
 func (s *Store) Search(ctx context.Context, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
-	return sqliteindex.Search(ctx, s.db, scope, q, s.engine, "memory")
+	return s.search(ctx, scope, q)
 }
 func (s *Store) Apply(ctx context.Context, r memory.Record) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return recall.ErrUnavailable
+	}
+	defer tx.Rollback()
+	if err = s.apply(ctx, tx, r); err != nil {
+		return err
+	}
+	if tx.Commit() != nil {
+		return recall.ErrUnavailable
+	}
+	return nil
+}
+func (s *Store) apply(ctx context.Context, tx *sql.Tx, r memory.Record) error {
 	if r.ID == "" || r.UserID == "" || r.ScopeID == "" || (r.ScopeType != "user" && r.ScopeType != "agent") || (r.ScopeType == "user" && r.ScopeID != r.UserID) || (r.Tier != "core" && r.Tier != "recall") || strings.TrimSpace(r.Content) == "" || len(r.Content) > 64<<10 || r.CreatedAt.IsZero() || len(r.SourceRefs) == 0 {
 		return recall.ErrInvalid
 	}
@@ -109,15 +129,10 @@ func (s *Store) Apply(ctx context.Context, r memory.Record) error {
 		}
 	}
 	refs, _ := llm.CanonicalJSON(r.SourceRefs)
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return recall.ErrUnavailable
-	}
-	defer tx.Rollback()
 	var old memory.Record
 	var raw string
 	var created int64
-	err = tx.QueryRowContext(ctx, `SELECT memory_id,user_id,scope_type,scope_id,tier,content,source_refs,coalesce(supersedes_memory_id,''),created_at FROM memory_record WHERE memory_id=?`, r.ID).Scan(&old.ID, &old.UserID, &old.ScopeType, &old.ScopeID, &old.Tier, &old.Content, &raw, &old.Supersedes, &created)
+	err := tx.QueryRowContext(ctx, `SELECT memory_id,user_id,scope_type,scope_id,tier,content,source_refs,coalesce(supersedes_memory_id,''),created_at FROM memory_record WHERE memory_id=?`, r.ID).Scan(&old.ID, &old.UserID, &old.ScopeType, &old.ScopeID, &old.Tier, &old.Content, &raw, &old.Supersedes, &created)
 	if err == nil {
 		if json.Unmarshal([]byte(raw), &old.SourceRefs) != nil {
 			return recall.ErrUnavailable
@@ -126,6 +141,14 @@ func (s *Store) Apply(ctx context.Context, r memory.Record) error {
 		r.CreatedAt = r.CreatedAt.UTC().Truncate(time.Microsecond)
 		a, _ := llm.CanonicalJSON(old)
 		b, _ := llm.CanonicalJSON(r)
+		if strings.HasPrefix(old.Content, "sealed:v1:") {
+			plain, e := s.vault.Open(ctx, old.Content, binding(old))
+			if e != nil {
+				return e
+			}
+			old.Content = plain
+			a, _ = llm.CanonicalJSON(old)
+		}
 		if string(a) != string(b) {
 			return recall.ErrConflict
 		}
@@ -136,34 +159,47 @@ func (s *Store) Apply(ctx context.Context, r memory.Record) error {
 	}
 	if r.Supersedes != "" {
 		var valid int
-		if tx.QueryRowContext(ctx, `SELECT count(*) FROM memory_record m JOIN recall_document d ON d.ref='memory:'||m.memory_id WHERE m.memory_id=? AND m.user_id=? AND m.scope_type=? AND m.scope_id=? AND m.deleted_at IS NULL AND d.active=1`, r.Supersedes, r.UserID, r.ScopeType, r.ScopeID).Scan(&valid) != nil {
+		if tx.QueryRowContext(ctx, `SELECT count(*) FROM memory_record m JOIN recall_document d ON d.ref='memory:'||m.memory_id WHERE m.memory_id=? AND m.user_id=? AND m.scope_type=? AND m.scope_id=? AND m.deleted_at IS NULL AND (d.active=1 OR (m.content LIKE 'sealed:v1:%' AND NOT EXISTS(SELECT 1 FROM memory_record successor WHERE successor.supersedes_memory_id=m.memory_id)))`, r.Supersedes, r.UserID, r.ScopeType, r.ScopeID).Scan(&valid) != nil {
 			return recall.ErrUnavailable
 		}
 		if valid != 1 {
 			return recall.ErrConflict
 		}
 	}
+	content := r.Content
+	sensitive := s.vault.Ref != "" || memory.Sensitive(content)
+	if memory.HasSecret(content) {
+		return recall.ErrInvalid
+	}
+	if sensitive {
+		content, err = s.vault.Seal(ctx, content, binding(r))
+		if err != nil {
+			return err
+		}
+	}
 	var supersedes any
 	if r.Supersedes != "" {
 		supersedes = r.Supersedes
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO memory_record(memory_id,user_id,scope_type,scope_id,tier,content,source_refs,supersedes_memory_id,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, r.ID, r.UserID, r.ScopeType, r.ScopeID, r.Tier, r.Content, string(refs), supersedes, r.CreatedAt.UnixMicro()); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO memory_record(memory_id,user_id,scope_type,scope_id,tier,content,source_refs,supersedes_memory_id,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, r.ID, r.UserID, r.ScopeType, r.ScopeID, r.Tier, content, string(refs), supersedes, r.CreatedAt.UnixMicro()); err != nil {
 		return recall.ErrUnavailable
 	}
 	agentID := ""
 	if r.ScopeType == "agent" {
 		agentID = r.ScopeID
 	}
-	if err = sqliteindex.Insert(ctx, tx, sqliteindex.Document{Ref: "memory:" + r.ID, UserID: r.UserID, AgentID: agentID, Content: r.Content, OccurredAt: r.CreatedAt.UnixMicro(), Core: r.Tier == "core", Active: true}); err != nil {
+	if err = sqliteindex.Insert(ctx, tx, sqliteindex.Document{Ref: "memory:" + r.ID, UserID: r.UserID, AgentID: agentID, Content: func() string {
+		if sensitive {
+			return ""
+		}
+		return r.Content
+	}(), OccurredAt: r.CreatedAt.UnixMicro(), Core: r.Tier == "core", Active: true}); err != nil {
 		return recall.ErrUnavailable
 	}
 	if r.Supersedes != "" {
 		if _, err = tx.ExecContext(ctx, `UPDATE recall_document SET active=0 WHERE ref=?`, "memory:"+r.Supersedes); err != nil {
 			return recall.ErrUnavailable
 		}
-	}
-	if tx.Commit() != nil {
-		return recall.ErrUnavailable
 	}
 	return nil
 }
@@ -194,6 +230,21 @@ func (s *Store) Forget(ctx context.Context, scope recall.Scope, id string, at ti
 		if err != nil || n != 1 {
 			return recall.ErrConflict
 		}
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_suppression(source_type,source_ref)
+        SELECT json_extract(j.value,'$.source_type'),json_extract(j.value,'$.source_ref')
+        FROM memory_record m,json_each(m.source_refs) j WHERE m.memory_id IN
+        (WITH RECURSIVE lineage(id) AS (SELECT ? UNION SELECT m.memory_id FROM memory_record m JOIN lineage l ON m.supersedes_memory_id=l.id UNION SELECT m.supersedes_memory_id FROM memory_record m JOIN lineage l ON m.memory_id=l.id WHERE m.supersedes_memory_id IS NOT NULL) SELECT id FROM lineage)`, id); err != nil {
+		return recall.ErrUnavailable
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE memory_record SET deleted_at=coalesce(deleted_at,?),version=version+1 WHERE memory_id IN
+        (WITH RECURSIVE lineage(id) AS (SELECT ? UNION SELECT m.memory_id FROM memory_record m JOIN lineage l ON m.supersedes_memory_id=l.id UNION SELECT m.supersedes_memory_id FROM memory_record m JOIN lineage l ON m.memory_id=l.id WHERE m.supersedes_memory_id IS NOT NULL) SELECT id FROM lineage) AND deleted_at IS NULL`, at.UnixMicro(), id); err != nil {
+		return recall.ErrUnavailable
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_suppression(source_type,source_ref)
+SELECT e.source_type,e.source_ref FROM memory_evidence e JOIN memory_fact f USING(user_id,agent_id,fact_key)
+WHERE f.memory_id IN (WITH RECURSIVE lineage(id) AS (SELECT ? UNION SELECT m.memory_id FROM memory_record m JOIN lineage l ON m.supersedes_memory_id=l.id UNION SELECT m.supersedes_memory_id FROM memory_record m JOIN lineage l ON m.memory_id=l.id WHERE m.supersedes_memory_id IS NOT NULL) SELECT id FROM lineage)`, id); err != nil {
+		return recall.ErrUnavailable
 	}
 	// Forget the whole supersession lineage: older derived facts cannot reappear.
 	if _, err = tx.ExecContext(ctx, `UPDATE recall_document SET active=0 WHERE ref IN(WITH RECURSIVE lineage(id) AS (SELECT ? UNION SELECT m.memory_id FROM memory_record m JOIN lineage l ON m.supersedes_memory_id=l.id UNION SELECT m.supersedes_memory_id FROM memory_record m JOIN lineage l ON m.memory_id=l.id WHERE m.supersedes_memory_id IS NOT NULL) SELECT 'memory:'||id FROM lineage)`, id); err != nil {
