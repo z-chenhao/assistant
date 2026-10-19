@@ -164,8 +164,19 @@ func (s *Server) ssh(connection net.Conn, config *ssh.ServerConfig) {
 			}
 			request.Reply(true, nil)
 			exit := uint32(0)
+			shutdown := strings.HasPrefix(payload.Command, "/usr/bin/sudo -S -p '' /bin/sh -c 'nohup ")
+			if shutdown {
+				// Real sudo consumes its password before the command can exit.
+				// Closing this channel first races the SSH client's stdin copy,
+				// which correctly makes an otherwise successful exit uncertain.
+				password := make([]byte, len("fixture-only\n"))
+				if _, err := io.ReadFull(channel, password); err != nil || string(password) != "fixture-only\n" {
+					exit = 1
+				}
+			}
 			s.mu.Lock()
 			switch {
+			case exit != 0:
 			case strings.HasPrefix(payload.Command, "set -eu\n") && strings.Contains(payload.Command, "codesign --verify --strict") && strings.Contains(payload.Command, "permissions grant"):
 				if !strings.Contains(payload.Command, `-R '=anchor apple generic and identifier "com.trycua.driver" and certificate leaf[subject.OU] = "YCK386LBJ7"'`) || !strings.Contains(payload.Command, "'"+s.Config.Compatibility.DriverSHA256+"'") || !strings.Contains(payload.Command, "'"+s.Config.Compatibility.GuestBuild+"'") {
 					exit = 42
@@ -174,7 +185,7 @@ func (s *Server) ssh(connection net.Conn, config *ssh.ServerConfig) {
 				}
 			case strings.HasPrefix(payload.Command, "/usr/bin/open -b "):
 				s.reopens++
-			case strings.HasPrefix(payload.Command, "/usr/bin/sudo -S -p '' /bin/sh -c 'nohup "):
+			case shutdown:
 				s.shuts++
 				for name, lock := range s.locks {
 					lock.Close()

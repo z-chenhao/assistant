@@ -32,6 +32,11 @@ marked owned test root, requires separate foreground API cleanup, and retains
 private domain state and checkpoints as inspectable evidence. Surface binding,
 inventory and desktop actions are the subsequent Computer Use slice.
 
+The offline SSH peer consumes the complete sudo input before acknowledging
+shutdown. `TestShutdownRequiresCompleteSudoInput` rejects truncated input and
+proves that only the accepted command changes its shutdown counter. This keeps
+the Fake from closing the channel while the real client is still sending input.
+
 ## Memory maintenance, context and experience (ERII-23)
 
 `python3 scripts/verify_memory_maintenance.py --binary bin/personal-agent --evidence evidence/memory-maintenance.json`
