@@ -343,6 +343,12 @@ The fixture now gives the independent consumer-compatibility assertion a fresh
 broker. It retains incompatible-stream rejection, acknowledged deletion and
 incompatible-consumer rejection, with no retries or deadline changes.
 
+The profiling callback rejects unrelated function names before constructing
+filesystem paths. All six scenario kinds retain their file checks and timing
+records. Its contract test exercises those records and proves unrelated calls
+do not resolve paths. Same-VM full-Core measurements assess the latency effect
+separately; reducing callback work alone does not establish a CI speed target.
+
 Reproduce the measured paths from the repository root:
 
 ```sh

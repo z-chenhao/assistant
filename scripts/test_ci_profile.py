@@ -1,10 +1,53 @@
 import copy
+import json
+import os
+from pathlib import Path
+import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import ci_profile as profile
+import profile_harness
 
 
 class ProfileTests(unittest.TestCase):
+    def test_trace_fast_path_avoids_filesystem_paths_and_preserves_every_scenario_kind(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            script = root/'fixture.py'
+            def frame(name, file, values=None):
+                return SimpleNamespace(f_code=SimpleNamespace(co_name=name, co_filename=str(file)),
+                                       f_locals=values or {}, f_trace_lines=True)
+            def exercise(*_args, **_kwargs):
+                trace = install.call_args.args[0]
+                with patch.object(profile_harness, 'Path', side_effect=AssertionError('unrelated call resolved a path')):
+                    for name in ('read_bytes', 'open', 'digest', 'run', '__new__'):
+                        self.assertIsNone(trace(frame(name, '/unrelated.py'), 'call', None))
+                for name, file, values in [
+                    ('scenario','fixture.py',{'name':'ordinary'}),
+                    ('driver','fixture.py',{'case':{'case_id':'GC-17'},'variant':{'variant_id':'wording-1'}}),
+                    ('execute','verify_codemode.py',{'key':'cell'}),
+                    ('feedback_case','run_core_cases.py',{'variant':{'variant_id':'one'}}),
+                    ('coding_case','run_core_cases.py',{'variant':{'variant_id':'two'}}),
+                    ('engineering_case','run_core_cases.py',{'variant':{'variant_id':'three'}}),
+                ]:
+                    current = frame(name, root/file, values)
+                    self.assertIs(trace(current, 'call', None), trace)
+                    self.assertFalse(current.f_trace_lines)
+                    trace(current, 'return', None)
+                self.assertIsNone(trace(frame('execute',root/'other.py'), 'call', None))
+                self.assertIsNone(trace(frame('scenario',root/'foreign/fixture.py'), 'call', None))
+            with patch.object(profile_harness.sys, 'argv', ['profile_harness.py', str(script)]), \
+                 patch.dict(os.environ, ERII_PROFILE_DIR=str(root/'profiles')), \
+                 patch.object(profile_harness.sys, 'settrace') as install, \
+                 patch.object(profile_harness.runpy, 'run_path', side_effect=exercise):
+                profile_harness.main()
+            result = json.loads((root/'profiles/fixture.json').read_text())
+            self.assertEqual([r['name'] for r in result['cases']],
+                             ['ordinary','GC-17/wording-1','cell','feedback_case/one','coding_case/two','engineering_case/three'])
+            self.assertTrue(all(r['elapsed_seconds'] >= 0 and r['cpu_seconds'] >= 0 for r in result['cases']))
+
     def fixture(self):
         run = dict(id=1, head_branch='branch', event='pull_request', head_sha='a' * 40,
                    created_at='2026-10-18T00:00:00Z', conclusion='cancelled', html_url='run/1')
