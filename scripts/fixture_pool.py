@@ -63,7 +63,9 @@ class Scope:
                 try:
                     stdout, stderr = child.communicate(input, timeout=timeout)
                 except BaseException:
-                    child.kill()
+                    # Descendants can retain captured pipes after the leader
+                    # exits. Kill the owned session before waiting for EOF.
+                    signal_group(child.pid, signal.SIGKILL)
                     child.communicate()
                     raise
                 result = subprocess.CompletedProcess(child.args, child.returncode, stdout, stderr)

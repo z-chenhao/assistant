@@ -19,6 +19,36 @@ import verify_suite as suite
 
 
 class FixturePoolTests(unittest.TestCase):
+    def test_timeout_kills_descendant_holding_captured_pipes(self):
+        scope = fixtures.Scope()
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / 'descendant.json'
+            descendant = ('import json,os,socket,time\n'
+                          'from pathlib import Path\n'
+                          's=socket.socket();s.bind(("127.0.0.1",0));s.listen()\n'
+                          f'Path({str(ready)!r}).write_text(json.dumps([os.getpid(),s.getsockname()[1]]))\n'
+                          'time.sleep(30)\n')
+            leader = ('import subprocess,sys,time\n'
+                      f'subprocess.Popen([sys.executable,"-c",{descendant!r}])\n'
+                      'time.sleep(30)\n')
+            started = time.monotonic()
+            try:
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    scope.run([sys.executable, '-c', leader], capture_output=True, text=True, timeout=.5)
+                self.assertLess(time.monotonic() - started, 2, 'descendant retained captured pipes after timeout')
+                self.assertFalse(scope.children)
+                pid, port = json.loads(ready.read_text())
+                with socket.socket() as probe:
+                    self.assertNotEqual(probe.connect_ex(('127.0.0.1', port)), 0)
+            finally:
+                # The failed pre-fix path must still clean its captured fixture.
+                if ready.exists():
+                    pid, _ = json.loads(ready.read_text())
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
     def test_cancelled_terminal_launch_closes_all_pty_descriptors(self):
         descriptors = []
         openpty, dup = terminal_driver.pty.openpty, os.dup

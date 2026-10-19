@@ -220,7 +220,10 @@ their children with this owner. Nested selected capability scenarios reuse the
 current owner and stay serial. Cancellation rejects queued launches, stops only
 owned groups and joins active fixtures before temporary roots are removed.
 Regression tests cover two stubborn listening sessions, unrelated-process
-preservation and PTY descriptor closure when launch is cancelled.
+preservation and PTY descriptor closure when launch is cancelled. A command
+timeout kills the owned group before draining captured output, so a descendant
+cannot hold its parent's pipes open indefinitely; the regression checks the
+timeout, listening port and owner retirement together.
 
 Every full Core round also runs `ci_cancel.py`. It holds four real Go/Node Core
 fixtures at the checked 37-completed/8-active checkpoint, cancels their enclosing
