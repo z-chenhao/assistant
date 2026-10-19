@@ -64,7 +64,7 @@ def push(pr, output):
     return record['returncode']
 
 
-def summarize(record, snapshots):
+def summarize(record, snapshots, workflows=WORKFLOWS):
     errors = []
     if record.get('returncode') != 0:
         errors.append('push outcome is unknown')
@@ -80,7 +80,7 @@ def summarize(record, snapshots):
     except ValueError:
         errors.append('missing or invalid push timestamp interval')
     paths = [value['run'].get('path') for value in snapshots.values()]
-    if len(paths) != len(WORKFLOWS) or set(paths) != WORKFLOWS:
+    if len(paths) != len(workflows) or set(paths) != workflows:
         errors.append('missing or duplicate superseded workflow')
     if any(value['run'].get('head_sha') != record.get('before_sha') for value in snapshots.values()):
         errors.append('superseded source mismatch')

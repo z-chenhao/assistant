@@ -1,0 +1,230 @@
+name: ERII-141 shadow cancellation profile
+
+on:
+  push:
+    branches: [ERII-141-ordinary-profile]
+    paths: [docs/ci-cancel-probe.md]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  fast:
+    name: Shadow feedback
+    if: ${{ (github.ref_name == 'ERII-141-ordinary-profile') && !contains(github.event.head_commit.message, '[stop-cancel-profile]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      build_digest: ${{ steps.bundle.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        id: go
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        id: node
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Record exact source and trusted impact plan
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-sha.txt
+          python3 scripts/ci_impact.py --base "$BASE_SHA" --output evidence/impact.json
+      - name: Install pinned dependencies once
+        env:
+          CI_GO_CACHE_HIT: ${{ steps.go.outputs.cache-hit }}
+          CI_NPM_CACHE_HIT: ${{ steps.node.outputs.cache-hit }}
+        run: |
+          python3 scripts/ci_step.py --name bridge-deps --phase setup -- npm ci --prefix provider-bridge --ignore-scripts
+          python3 scripts/ci_step.py --name javascript-deps --phase setup -- npm ci --prefix runtime/javascript --ignore-scripts
+      - name: Prepare isolated coding fixture runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Provision copied public SDK and fresh Host cache
+        run: python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --host-cache --evidence evidence/sdk.json
+      - name: Compile once with the control toolchain
+        # Preserve the exact control binary; only the fixture SDK differs.
+        run: GOROOT="$ERII_CI_BASE_GOROOT" PATH="$ERII_CI_BASE_GOROOT/bin:$PATH" python3 scripts/ci_step.py --name build --phase build -- make build
+      - name: Unit tests and lint
+        run: python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
+      - name: Public SDK isolation and cache-miss conformance
+        env:
+          ERII_CI_PUBLIC_SDK_PROBE: "1"
+        run: python3 scripts/ci_step.py --name sdk-conformance --phase test -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
+      - name: Risk-related race and deterministic early regressions
+        env:
+          ERII_FEEDBACK_JOBS: "2"
+          ERII_VERIFY_CASE_JOBS: "4"
+        run: python3 scripts/ci_step.py --name feedback --phase test -- python3 scripts/ci_feedback.py --plan evidence/impact.json
+      - name: Seal exact build and dependency payload
+        id: bundle
+        run: python3 scripts/ci_bundle.py create
+      - name: Publish build for dependent jobs only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: ci-build.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() && github.ref_name == 'ERII-141-ordinary-profile' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-fast-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  race:
+    if: ${{ !contains(github.event.head_commit.message, '[stop-cancel-profile]') }}
+    name: Shadow race detector
+    needs: fast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        id: go
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        id: node
+        with:
+          node-version: 24.21.0
+      - name: Provision copied public SDK
+        run: python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json
+      - name: Download this workflow's exact build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+      - name: Verify and restore build inputs and dependencies
+        env:
+          BUILD_DIGEST: ${{ needs.fast.outputs.build_digest }}
+        run: python3 scripts/ci_step.py --name restore --phase setup -- python3 scripts/ci_bundle.py restore
+      - name: Prepare isolated coding fixture runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Race detector
+        env:
+          GOCACHE: ${{ github.workspace }}/.ci-go/host-cache
+        # Isolate the one-second Bridge burst/control fixture; preserve normal
+        # package parallelism for the complete remainder, with an audited inventory.
+        run: python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() && github.ref_name == 'ERII-141-ordinary-profile' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-race-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    if: ${{ !contains(github.event.head_commit.message, '[stop-cancel-profile]') }}
+    name: Shadow verification (${{ matrix.shard }})
+    needs: fast
+    runs-on: ubuntu-24.04
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    timeout-minutes: ${{ matrix.shard == 'codemode' && 60 || 30 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["runtime", "codemode", "security", "delivery", "providers"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        id: go
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        id: node
+        with:
+          node-version: 24.21.0
+      - name: Provision copied public SDK
+        run: python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json
+      - name: Download this workflow's exact build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+      - name: Verify and restore build inputs and dependencies
+        env:
+          BUILD_DIGEST: ${{ needs.fast.outputs.build_digest }}
+        run: python3 scripts/ci_step.py --name restore --phase setup -- python3 scripts/ci_bundle.py restore
+      - name: Prepare isolated coding fixture runtime
+        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: CLI verification with timings
+        env:
+          GOCACHE: ${{ github.workspace }}/.ci-go/host-cache
+        run: python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard ${{ matrix.shard }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() && github.ref_name == 'ERII-141-ordinary-profile' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-${{ matrix.shard }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  checks:
+    name: CI shadow comparison
+    needs: ["fast", "race", "verify"]
+    if: ${{ (always() && github.ref_name == 'ERII-141-ordinary-profile') && !contains(github.event.head_commit.message, '[stop-cancel-profile]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require every shard to pass
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/ci_gate.py
