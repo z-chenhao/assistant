@@ -361,6 +361,9 @@ Ordinary-change and cancellation cohorts still need separate proof.
 `ci_experiment.py` keeps the PR Draft and checks its head before every round.
 It watches the initial complete pair, then requests each complete workflow rerun
 once after success, waiting for fresh check records rather than old green ones.
+An acknowledged queued workflow waits without another request. The check-record
+registration window starts only when that workflow becomes active; this does not
+change any test or job timeout. Queue latency remains visible in attempt data.
 Every round checkpoints its attempts and raw evidence. A failed test, changed
 head, ambiguous run or unknown rerun outcome stops the experiment. Existing output
 is never overwritten or automatically replayed. It does not mark Ready or assert

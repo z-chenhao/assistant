@@ -103,6 +103,27 @@ class ExperimentTests(unittest.TestCase):
         self.assertEqual(len(checks), 2)
         self.assertEqual(sleeps, [2])
 
+    def test_acknowledged_queued_workflow_waits_without_retrying_or_timing_out_checks(self):
+        clock, reads, jobs = [0], [], []
+        def api(*args):
+            if args[0] == 'pr': return dict(headRefOid='a'*40,isDraft=True)
+            route=args[-1]
+            if '/commits/' in route: return dict(check_runs=[dict(details_url='/job/1001')])
+            if '/jobs?' in route:
+                jobs.append(route)
+                return dict(jobs=[dict(id=1001)])
+            reads.append(route)
+            return dict(head_sha='a'*40,run_attempt=2,status='pending' if len(reads)==1 else 'in_progress')
+        def sleep(_): clock[0]+=180
+        with patch.object(experiment,'gh',side_effect=api), \
+             patch.object(experiment.time,'monotonic',side_effect=lambda:clock[0]), \
+             patch.object(experiment.time,'sleep',side_effect=sleep), \
+             patch.object(experiment.subprocess,'run') as mutation:
+            experiment.wait_active(24,'a'*40,dict(before='1:2'))
+        self.assertEqual(len(reads),2)
+        self.assertEqual(len(jobs),1)
+        mutation.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

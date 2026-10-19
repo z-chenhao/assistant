@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,27 @@ import (
 
 	processsandbox "github.com/z-chenhao/erii/internal/computer/sandbox"
 )
+
+func sdkWriteRefused(err error, output []byte) bool {
+	if err == nil {
+		return false
+	}
+	message := bytes.ToLower(output)
+	return bytes.Contains(message, []byte("permission denied")) || bytes.Contains(message, []byte("operation not permitted")) || bytes.Contains(message, []byte("read-only file system"))
+}
+
+func TestSDKWriteRefusalClassification(t *testing.T) {
+	for _, message := range []string{"Permission denied", "Operation not permitted", "Read-only file system"} {
+		if !sdkWriteRefused(errors.New("exit status 2"), []byte(message)) || sdkWriteRefused(nil, []byte(message)) {
+			t.Fatalf("incorrect refusal classification: %s", message)
+		}
+	}
+	for _, message := range []string{"No such file or directory", "command not found", "unexpected failure"} {
+		if sdkWriteRefused(errors.New("exit status 2"), []byte(message)) {
+			t.Fatalf("launcher failure accepted as sandbox refusal: %s", message)
+		}
+	}
+}
 
 // This additional CI provisioning gate never targets a developer's installed SDK.
 // The original cold-cache workspace/security tests remain enabled independently.
@@ -50,7 +72,7 @@ func TestCIInstalledSDKConformance(t *testing.T) {
 	}
 	write.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + writeRoot, "TMPDIR=" + writeRoot}
 	output, err := write.CombinedOutput()
-	if err == nil || !(bytes.Contains(bytes.ToLower(output), []byte("permission denied")) || bytes.Contains(bytes.ToLower(output), []byte("operation not permitted"))) {
+	if !sdkWriteRefused(err, output) {
 		t.Fatalf("SDK mutation was not denied by the sandbox: %v\n%s", err, output)
 	}
 	after, err := os.ReadFile(archive)

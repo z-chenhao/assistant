@@ -39,25 +39,35 @@ def wait_active(pr, sha, pair):
     """Wait for accepted attempts to replace old green PR check records."""
     deadline = time.monotonic() + 60
     pending = set(pair.values())
+    active_deadlines = {}
     while pending:
         head(pr, sha)
         checks = gh('api', f'repos/{REPO}/commits/{sha}/check-runs?per_page=100')['check_runs']
         links = [check.get('details_url') or '' for check in checks]
+        active = False
         for key in list(pending):
             run_id, number = key.split(':')
             value = gh('api', f'repos/{REPO}/actions/runs/{run_id}')
             if value['head_sha'] != sha:
                 raise ValueError('workflow head drift during registration')
             if value['run_attempt'] != int(number):
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('accepted attempt was not acknowledged')
                 continue
+            # An acknowledged workflow can be queued behind its predecessor.
+            # Queue time is not a missing-check error and never issues a rerun.
+            if value.get('status') in ('pending', 'queued', 'waiting', 'requested'):
+                continue
+            active = True
+            active_deadlines.setdefault(key, time.monotonic() + 60)
             jobs = gh('api', f'repos/{REPO}/actions/runs/{run_id}/attempts/{number}/jobs?per_page=100')['jobs']
             if any(f'/job/{job["id"]}' in link for job in jobs for link in links):
                 pending.remove(key)
+            elif time.monotonic() >= active_deadlines[key]:
+                raise RuntimeError('active attempt did not register fresh PR checks')
         if not pending:
             return
-        if time.monotonic() >= deadline:
-            raise RuntimeError('accepted attempts did not register fresh PR checks')
-        time.sleep(2)
+        time.sleep(2 if active else 30)
 
 
 def run(pr, sha, output):
