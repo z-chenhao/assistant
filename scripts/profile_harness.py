@@ -37,6 +37,8 @@ def main():
     def trace(frame, event, _):
         if event == "call":
             function = frame.f_code.co_name
+            if function not in ("scenario", "driver", "execute", "feedback_case", "coding_case", "engineering_case"):
+                return None
             file = Path(frame.f_code.co_filename)
             is_cell = function == "execute" and file.name == "verify_codemode.py"
             is_core = function in ("feedback_case", "coding_case", "engineering_case") and file.name == "run_core_cases.py"

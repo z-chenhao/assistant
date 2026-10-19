@@ -13,12 +13,17 @@ concurrency:
 
 jobs:
   profile:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
@@ -40,28 +45,15 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           make build
           python3 scripts/ci_sdk.py prepare --host-cache --evidence evidence/sdk.json
-      - name: One complete Core round with real Agent CPU profiles
+      - name: Same-VM complete Core rounds before and after trace fast path
         env:
-          ERII_AGENT_CPU_PROFILE: ${{ github.workspace }}/evidence/agent-cpu
           ERII_VERIFY_CASE_JOBS: "4"
-        run: python3 scripts/ci_step.py --name core-agent-cpu --phase test -- python3 scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core.json
-      - name: Decode complete profiles and mark killed profiles inconclusive
-        if: always()
         run: |
-          if [[ -d evidence/agent-cpu ]]; then
-            : > evidence/agent-cpu/complete-profiles.txt
-            for profile in evidence/agent-cpu/*.cpu; do
-              if go tool pprof -top -nodecount=35 bin/personal-agent "$profile" > "$profile.top.txt" 2> "$profile.decode-error.txt"; then
-                printf '%s\n' "$profile" >> evidence/agent-cpu/complete-profiles.txt
-              else
-                printf '%s\n' "inconclusive: process killed before CPU profile finalization" >> "$profile.decode-error.txt"
-              fi
-            done
-          fi
-          grep -q 'GC-17-' evidence/agent-cpu/complete-profiles.txt
-          grep -q 'GC-20-' evidence/agent-cpu/complete-profiles.txt
-          grep -q 'capabilities-coding-' evidence/agent-cpu/complete-profiles.txt
-          cp bin/personal-agent evidence/profiled-agent
+          git show 174860b376cc29e71d7b3be0cd554a3b1789d2da:scripts/profile_harness.py > evidence/baseline-profile.py
+          ERII_PROFILE_DIR="$GITHUB_WORKSPACE/evidence/before-profile" python3 scripts/ci_step.py --name core-before --phase test -- python3 evidence/baseline-profile.py scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core-before.json
+          ERII_PROFILE_DIR="$GITHUB_WORKSPACE/evidence/after-profile" python3 scripts/ci_step.py --name core-after --phase test -- python3 scripts/profile_harness.py scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core-after.json
+      - name: Entire Agent SQLite race inventory with original deadline
+        run: python3 scripts/ci_step.py --name sqlite-race --phase test -- go test -race -count=1 -timeout=15m ./internal/agent/sqlite
       - name: SDK Doctor and Cleanup
         if: always()
         run: |
@@ -71,7 +63,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: agent-profile-${{ github.sha }}-${{ github.run_attempt }}
+          name: agent-profile-${{ matrix.runner }}-${{ github.sha }}-${{ github.run_attempt }}
           path: evidence/
           if-no-files-found: error
           retention-days: 14
