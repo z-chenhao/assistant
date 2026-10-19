@@ -24,14 +24,16 @@ import (
 // lumeFixture models the pinned API's native lock and stale SharedVM cache,
 // including an ambiguous run response. It never starts a macOS VM or account.
 type lumeFixture struct {
-	mu                 sync.Mutex
-	root               string
-	locks              map[string]*os.File
-	running            map[string]bool
-	runs, shuts, stops int
-	ambiguous, hang    bool
-	manifest           computer.RestorationManifest
-	server             *httptest.Server
+	mu                      sync.Mutex
+	root                    string
+	locks                   map[string]*os.File
+	running                 map[string]bool
+	runs, shuts, stops      int
+	clones                  int
+	clonePartial, cloneLost bool
+	ambiguous, hang         bool
+	manifest                computer.RestorationManifest
+	server                  *httptest.Server
 }
 
 func mustFile(t *testing.T, name, text string) {
@@ -65,6 +67,7 @@ func lifecycleFixture(t *testing.T) (*Provider, *lumeFixture, computer.Request) 
 	for _, name := range unitFiles {
 		mustFile(t, filepath.Join(source, name), "base-"+name)
 	}
+	mustFile(t, filepath.Join(source, "config.json"), `{"macAddress":"02:00:00:00:00:01","machineIdentifier":"base-machine","cpuCount":4}`)
 	if err := ProvisionBase(context.Background(), root, source, testCompatibility()); err != nil {
 		t.Fatal("base provisioning", err)
 	}
@@ -97,6 +100,53 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/lume/host/status" {
 		json.NewEncoder(w).Encode(map[string]string{"version": "0.6.1"})
+		return
+	}
+	if r.URL.Path == "/lume/vms/clone" && r.Method == "POST" {
+		f.clones++
+		var input struct {
+			Name    string `json:"name"`
+			NewName string `json:"newName"`
+			Source  string `json:"sourceLocation"`
+			Dest    string `json:"destLocation"`
+		}
+		if json.NewDecoder(r.Body).Decode(&input) != nil || input.Name != "base" || !identifier.MatchString(input.NewName) || input.Source != f.root || input.Dest != filepath.Join(f.root, "vms") {
+			http.Error(w, "unsafe clone", 400)
+			return
+		}
+		dir := filepath.Join(input.Dest, input.NewName)
+		if os.Mkdir(dir, 0700) != nil {
+			http.Error(w, "clone exists", 400)
+			return
+		}
+		for _, file := range unitFiles {
+			raw, err := os.ReadFile(filepath.Join(f.root, "base", file))
+			if err != nil || os.WriteFile(filepath.Join(dir, file), raw, 0600) != nil {
+				http.Error(w, "clone copy", 500)
+				return
+			}
+		}
+		if f.clonePartial {
+			http.Error(w, "lost partial clone", 503)
+			return
+		}
+		config, err := nativeConfig(dir)
+		if err != nil {
+			http.Error(w, "config", 500)
+			return
+		}
+		config["macAddress"] = "02:00:00:00:00:02"
+		config["machineIdentifier"] = "cloned-machine"
+		raw, err := json.Marshal(config)
+		if err != nil || os.WriteFile(filepath.Join(dir, "config.json"), raw, 0600) != nil {
+			http.Error(w, "config", 500)
+			return
+		}
+		if f.cloneLost {
+			http.Error(w, "lost complete clone response", 503)
+			return
+		}
+		w.Write([]byte(`{}`))
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/lume/vms/"), "/")
@@ -226,6 +276,17 @@ func TestLifecyclePreservesWholeUnitAndIntent(t *testing.T) {
 	if _, err := p.Ensure(ctx, r); err != nil {
 		t.Fatal(err)
 	}
+	base, err := nativeConfig(filepath.Join(p.config.Root, "base"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloned, err := nativeConfig(filepath.Join(p.config.Root, "vms", r.Instance.NativeName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base["macAddress"] == cloned["macAddress"] || base["machineIdentifier"] == cloned["machineIdentifier"] || f.clones != 1 {
+		t.Fatal("base identity reused", base, cloned)
+	}
 	for _, name := range unitFiles {
 		mustFile(t, filepath.Join(p.config.Root, "vms", r.Instance.NativeName, name), "edited-"+name)
 	}
@@ -264,6 +325,25 @@ func TestLifecyclePreservesWholeUnitAndIntent(t *testing.T) {
 	next.Fence = func(context.Context) error { return computer.ErrStale }
 	if _, err := p.Ensure(ctx, next); !errors.Is(err, computer.ErrStale) || f.runs != oldCalls {
 		t.Fatal("old epoch acted", err)
+	}
+}
+
+func TestCloneUnknownOutcomeNeverRepeatsOrStartsPartialUnit(t *testing.T) {
+	for _, partial := range []bool{true, false} {
+		t.Run(fmt.Sprint(partial), func(t *testing.T) {
+			p, f, r := lifecycleFixture(t)
+			f.clonePartial = partial
+			f.cloneLost = !partial
+			for range 2 {
+				_, err := p.Ensure(context.Background(), r)
+				if partial && !errors.Is(err, computer.ErrUnknown) || !partial && err != nil {
+					t.Fatal(err)
+				}
+			}
+			if f.clones != 1 || partial && f.runs != 0 || !partial && f.runs != 1 {
+				t.Fatal("clone repeated or partial unit started", f.clones, f.runs)
+			}
+		})
 	}
 }
 

@@ -240,6 +240,21 @@ func (p *Provider) Restore(ctx context.Context, r computer.Request, cp computer.
 func (p *Provider) ensure(ctx context.Context, r computer.Request, saved *receipt) (computer.Instance, error) {
 	dir := filepath.Join(p.config.Root, "vms", r.Instance.NativeName)
 	operation := filepath.Join(p.config.Root, "operations", r.OperationID+".json")
+	if saved == nil {
+		if _, err := os.Lstat(filepath.Join(dir, "erii-instance.json")); os.IsNotExist(err) {
+			var base receipt
+			source := filepath.Join(p.config.Root, "base")
+			if readJSON(filepath.Join(source, "receipt.json"), &base) != nil || !reflect.DeepEqual(base.Compatibility, r.Compatibility) {
+				return computer.Instance{}, computer.ErrCompatibility
+			}
+			if err := p.verify(ctx, source, base); err != nil {
+				return computer.Instance{}, err
+			}
+			if err := p.cloneBase(ctx, r); err != nil {
+				return computer.Instance{}, err
+			}
+		}
+	}
 	if _, err := os.Lstat(dir); os.IsNotExist(err) {
 		source := filepath.Join(p.config.Root, "base")
 		var base receipt

@@ -197,6 +197,46 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	root := s.Config.Root
+	if r.URL.Path == "/lume/vms/clone" && r.Method == "POST" {
+		var input struct {
+			Name    string `json:"name"`
+			NewName string `json:"newName"`
+			Source  string `json:"sourceLocation"`
+			Dest    string `json:"destLocation"`
+		}
+		if json.NewDecoder(r.Body).Decode(&input) != nil || input.Name != "base" || !strings.HasPrefix(input.NewName, "erii-") || strings.ContainsAny(input.NewName, "/\\.") || input.Source != root || input.Dest != filepath.Join(root, "vms") {
+			http.Error(w, "unsafe clone", 400)
+			return
+		}
+		dir := filepath.Join(input.Dest, input.NewName)
+		if os.Mkdir(dir, 0700) != nil {
+			http.Error(w, "clone exists", 400)
+			return
+		}
+		for _, file := range []string{"disk.img", "nvram.bin", "config.json"} {
+			raw, err := os.ReadFile(filepath.Join(root, "base", file))
+			if err != nil || os.WriteFile(filepath.Join(dir, file), raw, 0600) != nil {
+				http.Error(w, "clone copy", 500)
+				return
+			}
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "config.json"))
+		var config map[string]any
+		if err != nil || json.Unmarshal(raw, &config) != nil {
+			http.Error(w, "config", 500)
+			return
+		}
+		seed := sha256.Sum256([]byte(input.NewName))
+		config["macAddress"] = net.HardwareAddr(append([]byte{2}, seed[:5]...)).String()
+		config["machineIdentifier"] = "fixture-" + input.NewName
+		raw, err = json.Marshal(config)
+		if err != nil || os.WriteFile(filepath.Join(dir, "config.json"), raw, 0600) != nil {
+			http.Error(w, "config", 500)
+			return
+		}
+		w.Write([]byte(`{}`))
+		return
+	}
 	if r.URL.Path == "/fixture/status" {
 		json.NewEncoder(w).Encode(map[string]int{"running": len(s.locks), "runs": s.runs, "shutdowns": s.shuts, "stops": s.stops, "reopens": s.reopens})
 		return

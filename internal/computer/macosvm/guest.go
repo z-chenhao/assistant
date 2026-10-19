@@ -138,8 +138,7 @@ func (g SSHGuest) Ready(ctx context.Context, ip string, compatibility computer.C
 			return err
 		}
 		if err == nil {
-			var value map[string]json.RawMessage
-			if json.Unmarshal([]byte(strings.TrimSpace(output)), &value) == nil && len(value["capture_id"]) > 2 && len(value["screenshot_png_b64"]) > 2 {
+			if captureReady(output) {
 				return nil
 			}
 			return computer.ErrCompatibility
@@ -148,6 +147,14 @@ func (g SSHGuest) Ready(ctx context.Context, ip string, compatibility computer.C
 			return err
 		}
 	}
+}
+
+func captureReady(raw string) bool {
+	var capture struct {
+		ID  string `json:"capture_id"`
+		PNG string `json:"screenshot_png_b64"`
+	}
+	return json.Unmarshal([]byte(raw), &capture) == nil && capture.ID != "" && capture.PNG != ""
 }
 
 func (g SSHGuest) Reopen(ctx context.Context, ip string, manifest computer.RestorationManifest) error {

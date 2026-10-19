@@ -43,6 +43,13 @@ HTTP proxies and redirects are disabled. Runtime starts use headless mode with
 VNC disabled, no shared Host directories, and Lume's disabled clipboard default.
 No default VM store is discovered or adopted.
 
+Initial allocation calls Lume HTTP `clone`, which gives the new logical Computer
+its own MAC and machine identifier. A frozen clone marker is durable before
+dispatch. The pinned implementation writes the new machine identifier after the
+complete directory copy and MAC update; this final postcondition reconciles a
+lost HTTP response. A partial clone is never retried or started. Subsequent
+checkpoint restores retain this Computer's hardware identity.
+
 Add this advanced configuration to the application's versioned YAML. Keep
 `computer.root` separate from application data, coding workspaces, Skills and MCP
 working directories. Use a new empty directory with mode `0700`.

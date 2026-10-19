@@ -46,6 +46,7 @@ def run(binary):
         source.mkdir(mode=0o700)
         for name in ('disk.img', 'nvram.bin', 'config.json'):
             (source / name).write_text('base-' + name)
+        (source / 'config.json').write_text(json.dumps({'macAddress': '02:00:00:00:00:01', 'machineIdentifier': 'fixture-base', 'cpuCount': 4}))
         h = ComputerHarness(binary, root, fixture='computer')
         h.env['ERII_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
         server = subprocess.Popen([str(binary), '-test-computer-server', str(vm_root)],
@@ -176,6 +177,12 @@ def run_live(binary, live_root, config_path):
         require(result.returncode == 0, 'owned Guest fixture proof failed: ' + result.stderr)
         return result.stdout
 
+    def hardware_identity():
+        with sqlite3.connect(root / 'data/state.db') as db:
+            instance = json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
+        cfg = json.loads((live_root / 'product/vms' / instance['native_name'] / 'config.json').read_text())
+        return {key: cfg[key] for key in ('macAddress', 'machineIdentifier')}
+
     def prove_reopened(digest):
         output = guest('/usr/bin/shasum -a 256 ' + path)
         windows = json.loads(guest("/Applications/CuaDriver.app/Contents/MacOS/cua-driver call list_windows '{}'"))
@@ -207,6 +214,10 @@ def run_live(binary, live_root, config_path):
         h.send(f'live-{attempt}-fresh', 'Capabilities: ' + plan)
         child = h.hold('computer_ready', extra_flags=('-test-main-release', str(release)), timeout=295)
         first = h.command('computer', 'status')
+        identity = hardware_identity()
+        base = json.loads((live_root / 'product/base/config.json').read_text())
+        require(all(identity[key] != base[key] for key in identity), 'initial Computer reused base MAC or machine identity')
+        report['hardware_identity_sha256'] = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         output = guest("printf '%s\\n' 'ERII-24 production Provider durable fixture.' > " + path + '; /usr/bin/shasum -a 256 ' + path + '; /bin/test ! -e /Users/lume/erii24-fixtures; /bin/test ! -e /Users/lume/Movies/erii24-live')
         require(expected in output, 'Guest fixture write hash mismatch')
         release.touch()
@@ -221,6 +232,7 @@ def run_live(binary, live_root, config_path):
         h.send(f'live-{attempt}-restore-and-crash', 'Capabilities: ' + plan)
         child = h.hold('computer_ready', timeout=295)
         second = h.command('computer', 'status')
+        require(hardware_identity() == identity, 'restore changed logical Computer hardware identity')
         reopened = prove_reopened(expected)
         changed = payload + 'Saved after the last checkpoint, before Agent SIGKILL.\n'
         changed_hash = hashlib.sha256(changed.encode()).hexdigest()
@@ -232,6 +244,7 @@ def run_live(binary, live_root, config_path):
         report['checks'].append({'action': 'restore-login-driver-app-document', 'state': second, 'guest': reopened, 'native_exit': child.returncode, 'saved_before_crash_sha256': changed_hash})
         child = h.hold('computer_ready', extra_flags=('-test-main-release', str(release)), timeout=295)
         third = h.command('computer', 'status')
+        require(hardware_identity() == identity, 'crash recovery changed logical Computer hardware identity')
         reopened = prove_reopened(changed_hash)
         release.touch()
         stdout, stderr = child.communicate(timeout=295)
