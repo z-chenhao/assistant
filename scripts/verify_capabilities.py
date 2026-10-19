@@ -18,7 +18,7 @@ from fixture_pool import run as fixture_run, run_cases
 class CapabilityHarness(MainHarness):
     def args(self, *args):
         return [str(self.binary), '-config', str(self.root / 'config.yaml'),
-                '-test-bridge', 'capabilities', *args]
+                '-test-bridge', 'capabilities', *self.profile_args(*args), *args]
 
     def command(self, *args, text=None, ok=True, timeout=320):
         run = self.processes.run if self.processes is not None else subprocess.run

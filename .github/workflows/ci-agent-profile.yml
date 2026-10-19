@@ -49,12 +49,18 @@ jobs:
         if: always()
         run: |
           if [[ -d evidence/agent-cpu ]]; then
+            : > evidence/agent-cpu/complete-profiles.txt
             for profile in evidence/agent-cpu/*.cpu; do
-              if ! go tool pprof -top -nodecount=35 bin/personal-agent "$profile" > "$profile.top.txt" 2> "$profile.decode-error.txt"; then
+              if go tool pprof -top -nodecount=35 bin/personal-agent "$profile" > "$profile.top.txt" 2> "$profile.decode-error.txt"; then
+                printf '%s\n' "$profile" >> evidence/agent-cpu/complete-profiles.txt
+              else
                 printf '%s\n' "inconclusive: process killed before CPU profile finalization" >> "$profile.decode-error.txt"
               fi
             done
           fi
+          grep -q 'GC-17-' evidence/agent-cpu/complete-profiles.txt
+          grep -q 'GC-20-' evidence/agent-cpu/complete-profiles.txt
+          grep -q 'capabilities-coding-' evidence/agent-cpu/complete-profiles.txt
           cp bin/personal-agent evidence/profiled-agent
       - name: SDK Doctor and Cleanup
         if: always()

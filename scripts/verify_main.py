@@ -37,13 +37,16 @@ class MainHarness:
         self.processes = current()
 
     def args(self, *args):
+        return [str(self.binary), "-test-bridge", self.fixture, *self.profile_args(*args), *args]
+
+    def profile_args(self, *args):
         profile = []
         if os.environ.get('ERII_AGENT_CPU_PROFILE') and args[-2:] == ('chat', 'work'):
             folder = Path(os.environ['ERII_AGENT_CPU_PROFILE'])
             folder.mkdir(parents=True, exist_ok=True)
             path = folder / (self.fixture + '-' + self.root.name + '-' + uuid.uuid4().hex + '.cpu')
             profile = ['-test-cpu-profile', str(path)]
-        return [str(self.binary), "-test-bridge", self.fixture, *profile, *args]
+        return profile
 
     def command(self, *args, text=None, ok=True):
         run = self.processes.run if self.processes is not None else subprocess.run

@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CoreHarness(CodeHarness):
     def args(self, *args):
-        return [str(self.binary), '-config', str(self.root / 'config.yaml'), '-test-bridge', 'core', *args]
+        return [str(self.binary), '-config', str(self.root / 'config.yaml'), '-test-bridge', 'core', *self.profile_args(*args), *args]
 
     def setup(self):
         # Exact CSV/attachments appear in the current instruction and accepted

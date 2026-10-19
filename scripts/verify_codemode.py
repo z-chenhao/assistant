@@ -12,7 +12,7 @@ from verify_capabilities import CapabilityHarness
 
 class CodeHarness(CapabilityHarness):
     def args(self, *args):
-        return [str(self.binary), "-config", str(self.root / "config.yaml"), "-test-bridge", "codemode", *args]
+        return [str(self.binary), "-config", str(self.root / "config.yaml"), "-test-bridge", "codemode", *self.profile_args(*args), *args]
 from verify_main import require
 
 
