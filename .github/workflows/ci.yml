@@ -135,6 +135,9 @@ jobs:
           sudo apt-get install -y bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: CLI verification with timings
+        env:
+          ERII_VERIFY_CASE_JOBS: "4"
+          ERII_VERIFY_GATE_JOBS: "2"
         run: exec python3 scripts/ci_step.py --name verification --phase test -- make verify VERIFY_SHARD=${{ matrix.shard }} VERIFY_JOBS=1
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() }}

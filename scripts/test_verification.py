@@ -136,6 +136,37 @@ class VerificationTests(unittest.TestCase):
                          set(re.findall(r"matrix.shard == '([^']+)'", re.search(condition, baseline)[1])),
                          'shadow must provision every sandbox dependency required by the full gate')
 
+    def test_codemode_gate_series_parallelize_without_splitting_repetitions(self):
+        gates = suite.SHARDS['codemode']
+        seen, active, peak = [], 0, 0
+        lock = threading.Lock()
+
+        def run_shard(name, binary, evidence, stopped, selected, previous=(), gate_jobs=1, record=None):
+            nonlocal active, peak
+            gate = selected[0]
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            try:
+                time.sleep(.02)
+                rows = [dict(gate=gate.name, attempt=attempt, returncode=0)
+                        for attempt in range(1, gate.attempts + 1)]
+                if record:
+                    record(gate.name, rows)
+                seen.append((gate.name, [row['attempt'] for row in rows]))
+                return rows
+            finally:
+                with lock:
+                    active -= 1
+
+        with tempfile.TemporaryDirectory() as temp, patch.object(suite, 'run_shard', run_shard):
+            rows = suite.concurrent_gates('codemode', Path('/binary'), Path(temp),
+                                          threading.Event(), gates, ())
+        self.assertEqual(peak, 2)
+        self.assertEqual({name: attempts for name, attempts in seen},
+                         {gate.name: list(range(1, gate.attempts + 1)) for gate in gates})
+        self.assertEqual(len(rows), sum(gate.attempts for gate in gates))
+
     def test_failed_repetition_stops_and_records_failure(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

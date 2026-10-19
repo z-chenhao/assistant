@@ -198,7 +198,7 @@ def run_command(args, env, output, stopped, metrics=None):
 
 def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_jobs=1, record=None):
     gates = SHARDS[name] if gates is None else gates
-    if gate_jobs == 2 and name in ('runtime', 'providers', 'security'):
+    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security'):
         return concurrent_gates(name, binary, evidence, stopped, gates, previous)
     rows = list(previous)
     for gate in gates:
