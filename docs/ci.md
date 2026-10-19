@@ -321,6 +321,19 @@ a later caller recovers both originals. This proves an existing contract, not
 the cause of the earlier Ubuntu failure; the harness still rejects every
 unexpected `chat work` error without retrying or changing its assertions.
 
+Attempt 2 at `1d177631a95fbc3d6a23d0f35399e74f17df4f97` retained a
+failed recovery drain: Main completed, Root remained running, and one authorized
+Conversation vector was pending. The repaired harness deterministically exercises
+both legal orderings of this documented contract. Success fixtures freeze Root's
+first recall before Main publication and defer Worker dispatch until that
+publication completes. A new real CLI/HTTP scenario instead holds Root's query
+embeddings after catch-up while Main appends. It requires a rejected drain, no
+Worker recall/model admission, and recovery by a separate explicit caller.
+Every original success, failure, multipart, restart and inert-drain assertion
+remains. Both orderings execute in all five stability runs. Unexpected failures
+are not retried. The repeatable `-test-main-barrier boundary=release-file` CLI
+hook requires an explicit deterministic Bridge; ordinary execution is unchanged.
+
 Reproduce the measured paths from the repository root:
 
 ```sh
@@ -407,6 +420,13 @@ an exact-SHA reviewer PASS. Rollback is to remove `ci-shadow.yml`; current requi
 CI never depends on it and needs no protection change. The CI-only approach may
 not meet the cost target while repeated sandbox compiler work remains mandatory;
 any sandbox-cache proposal needs a separate security design and authorization.
+
+The current requested iteration goal is complete Required CI below ten minutes.
+The first controlled pair at `1d17763` measured 3,352 → 2,117 wall seconds and
+114.73 → 70.98 runner-minutes. Its second pair failed recall; it cannot certify
+a five-pair cohort or that latency goal. Further optimization must preserve the
+full inventory, five serial rounds and existing deadlines. Faster early feedback
+does not certify a sub-ten-minute complete gate.
 
 The shadow experiment also tests `python3 scripts/ci_race.py`.
 Baseline job 117675122720 failed the Bridge duplicate-burst concurrent RPC check
