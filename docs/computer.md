@@ -5,7 +5,10 @@ Security boundary. `cua.getState()` lazily obtains the configured logical
 Computer. Its ID persists in `state.db`; replacement instances get increasing
 epochs. The accepted Code Mode invocation owns its lifecycle plan and cleanup.
 Once its accepted nested calls have drained, the Host requests Guest shutdown,
-commits a durable checkpoint, and destroys the disposable instance.
+commits a durable checkpoint, and destroys the disposable instance. Claim recovery
+retains the frozen idle request and checkpoint IDs until its final metadata commit.
+The provider verifies the published unit before checking the source instance, so
+a crash after deletion can reconcile disposal without requiring that instance.
 
 Surface inventory, handles, desktop actions and browser capabilities belong to
 the subsequent Computer Use slice. This build reports an explicit inventory
@@ -179,7 +182,8 @@ python3 scripts/verify_computer.py --binary bin/personal-agent --evidence eviden
 The maintained offline harness launches the real CLI and production HTTP/SSH
 adapter against explicit protocol Fakes. It drives Code Mode, records nested
 ToolInvocations, kills the Agent at readiness and before/after checkpoint
-publication, reads back all three files and Artifact bytes, and joins all owned
+publication and after instance disposal but before the final metadata commit,
+then proves a fresh cell succeeds, reads back all three files and Artifact bytes, and joins all owned
 processes. `make verify` runs it five consecutive times. Contracts cover empty
 and populated v20 migration, illegal state changes, CAS/fencing, concurrent
 ownership, corrupt NVRAM, blocked shutdown, ambiguous start, symlinks and actual
@@ -195,7 +199,8 @@ python3 scripts/verify_computer.py --binary bin/personal-agent --live-root TEST_
 
 This mode uses the real Lume/macOS/Driver path and a deterministic model fixture.
 It creates only a synthetic Guest text file and TextEdit document intent, proves
-cold and SIGKILL recovery, independently hashes the final full unit, checks the
+cold and SIGKILL recovery (including deletion before the final metadata commit),
+proves resumed and fresh cells succeed, independently hashes the full unit, checks the
 stable Artifact, and retains the private state/receipts for inspection. The
 foreground API is stopped and joined separately after the instance cleanup.
 Actual Jianying compatibility remains a separately recorded [L2 matrix](computer-l2-result.json).

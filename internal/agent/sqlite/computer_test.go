@@ -179,6 +179,72 @@ func TestComputerCheckpointRejectsWrongProviderIdentity(t *testing.T) {
 	}
 }
 
+func TestComputerIdleRecoveryRetainsFrozenCheckpoint(t *testing.T) {
+	for _, boundary := range []string{"before_checkpoint_commit", "after_checkpoint_commit", "after_destroy"} {
+		t.Run(boundary, func(t *testing.T) {
+			s, r, bridges, invs := computerClaims(t)
+			ctx := context.Background()
+			provider := &lifecycleFake{}
+			r.ConfigureComputer(provider, computer.Compatibility{}, computer.RestorationManifest{Version: 1})
+			first, err := bridges[0].computer().Ensure(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldStore := computerStore{bridges[0]}
+			frozen, err := oldStore.Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := frozen.Request
+			request.Fence = oldStore.Fence
+			cp, err := provider.Checkpoint(ctx, request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if boundary != "before_checkpoint_commit" {
+				if err := oldStore.SaveCheckpoint(ctx, frozen, cp); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if boundary == "after_destroy" {
+				if err := provider.Destroy(ctx, request); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := s.db.Exec(`UPDATE code_execution_state SET claim_expires_at=0,version=version+1 WHERE execution_id=?`, bridges[0].req.ExecutionID); err != nil {
+				t.Fatal(err)
+			}
+			recovered := &codeBridge{t: bridges[0].t, registry: bridges[0].registry, attempt: newID(), req: codemode.ExecutionRequest{ProtocolVersion: codemode.ProtocolVersion, RuntimeVersion: codemode.RuntimeVersion, PreludeVersion: codemode.PreludeVersion, ExecutionID: invs[0].ID, ParentInvocationID: invs[0].ID, RunID: bridges[0].req.RunID, Source: "return 1;", SourceHash: digest("return 1;"), Limits: codemode.DefaultLimits()}}
+			if err := recovered.claim(ctx, invs[0]); err != nil {
+				t.Fatal(err)
+			}
+			resumed, err := (computerStore{recovered}).Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			beforeHash, _ := computer.Fingerprint(frozen.Request)
+			afterHash, _ := computer.Fingerprint(resumed.Request)
+			if beforeHash != afterHash {
+				t.Fatal("recovery replaced frozen idle request/checkpoint", frozen.Request, resumed.Request)
+			}
+			if err := oldStore.Finish(ctx, frozen); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatal("old owner completed after takeover", err)
+			}
+			if err := recovered.computer().Idle(ctx); err != nil {
+				t.Fatal(err)
+			}
+			status, err := s.ComputerStatus(ctx)
+			if err != nil || status.Phase != "checkpointed" || status.Checkpoint == nil || *status.Checkpoint != cp {
+				t.Fatal("committed checkpoint was not recovered", status, err)
+			}
+			next, err := bridges[1].computer().Ensure(ctx)
+			if err != nil || next.ComputerID != first.ComputerID || next.Epoch != first.Epoch+1 {
+				t.Fatal("fresh cell cannot restore recovered Computer", next, err)
+			}
+		})
+	}
+}
+
 func TestComputerCannotBypassAcceptedCodeBoundary(t *testing.T) {
 	_, r, b, _ := computerClaims(t)
 	ctx := context.Background()

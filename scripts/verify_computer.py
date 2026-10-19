@@ -117,18 +117,37 @@ def run(binary):
             report['checks'].append(evidence(after))
             report['crashes'].append({'boundary': 'computer_ready', 'native_exit': child.returncode,
                                       'before': before, 'after': after})
-            for index, boundary in enumerate(('computer_before_checkpoint_publish', 'computer_after_checkpoint_publish'), 2):
+            for index, boundary in enumerate(('computer_before_checkpoint_publish', 'computer_after_checkpoint_publish',
+                                               'computer_after_destroy'), 2):
                 h.send(str(index), 'Capabilities: ' + plan)
                 child = h.hold(boundary)
                 held = h.command('computer', 'status')
+                if boundary == 'computer_after_destroy':
+                    require(held['phase'] == 'checkpointing' and held['checkpoint'] is not None,
+                            'post-disposal boundary lacks committed progress')
+                    require(not list((vm_root / 'vms').glob('erii-*')), 'post-disposal instance still exists')
                 child.kill()
                 child.communicate(timeout=10)
                 h.command('chat', 'work')
                 recovered = h.command('computer', 'status')
                 require(recovered['computer_id'] == before['computer_id'] and recovered['phase'] == 'checkpointed', 'checkpoint crash lost identity/cleanup')
+                if boundary == 'computer_after_destroy':
+                    require(recovered['checkpoint'] == held['checkpoint'], 'disposed checkpoint replaced during recovery')
                 report['checks'].append(evidence(recovered))
                 report['crashes'].append({'boundary': boundary, 'native_exit': child.returncode,
                                           'before': held, 'after': recovered})
+            # Prove a new cell can use the recovered Computer, rather than only
+            # observing a terminal phase left by the interrupted cell.
+            h.send('fresh-after-disposal', 'Capabilities: ' + plan)
+            h.command('chat', 'work')
+            fresh = h.command('computer', 'status')
+            require(fresh['computer_id'] == recovered['computer_id'] and fresh['instance_epoch'] == recovered['instance_epoch'] + 1,
+                    'fresh cell cannot restore after interrupted disposal')
+            with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+                results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode__execute' ORDER BY created_at").fetchall()
+                require(len(results) == 5 and all(row[0] == 'succeeded' for row in results),
+                        'resumed or fresh cell failed after disposal')
+            report['checks'].append(evidence(fresh))
             report['peer'] = request(computer['endpoint'], '/fixture/status')
             require(report['peer']['running'] == 0 and report['peer']['reopens'] >= 3, 'Guest session/app intent not restored')
         except Exception:
@@ -270,6 +289,47 @@ def run_live(binary, live_root, config_path):
         require(opened.returncode == 0 and opened.stdout == payload and receipt['manifest']['artifact_refs'] == [artifact['artifact_ref']], 'Artifact identity/content failed across native restart')
         report['checks'].append({'action': 'Host-SIGKILL-recover-checkpoint-destroy', 'state': final, 'guest': reopened,
                                  'checkpoint_files': hashes, 'artifact_ref': artifact['artifact_ref'], 'artifact_sha256': expected})
+
+        release.unlink()
+        h.send(f'live-{attempt}-post-disposal', 'Capabilities: ' + plan)
+        child = h.hold('computer_after_destroy', timeout=295)
+        disposed = h.command('computer', 'status')
+        require(disposed['phase'] == 'checkpointing' and disposed['checkpoint'] is not None and
+                not list((live_root / 'product/vms').glob('erii-*')), 'native post-disposal boundary not reached')
+        child.kill()
+        child.communicate(timeout=10)
+        require(child.returncode < 0, 'post-disposal fault did not terminate Agent')
+        # The same hook also follows verification of an already absent instance.
+        # Waiting through the maintained boundary allows full native disk hashing.
+        child = h.hold('computer_after_destroy', extra_flags=('-test-main-release', str(release)), timeout=295)
+        resumed = h.command('computer', 'status')
+        require(resumed['checkpoint'] == disposed['checkpoint'], 'native recovery replaced committed checkpoint')
+        release.touch()
+        _, stderr = child.communicate(timeout=295)
+        require(child.returncode == 0, 'native post-disposal recovery failed: ' + stderr)
+        resumed = h.command('computer', 'status')
+        require(resumed['phase'] == 'checkpointed', 'native disposal did not finish after takeover')
+        report['checks'].append({'action': 'SIGKILL-after-disposal-before-final-commit', 'native_exit': -9,
+                                 'before': disposed, 'after': resumed})
+
+        release.unlink()
+        h.send(f'live-{attempt}-fresh-after-disposal', 'Capabilities: ' + plan)
+        child = h.hold('computer_ready', extra_flags=('-test-main-release', str(release)), timeout=295)
+        fresh = h.command('computer', 'status')
+        require(hardware_identity() == identity and fresh['computer_id'] == first['computer_id'] and
+                fresh['instance_epoch'] == disposed['instance_epoch'] + 1, 'fresh native cell lost restored identity')
+        reopened = prove_reopened(changed_hash)
+        release.touch()
+        _, stderr = child.communicate(timeout=295)
+        require(child.returncode == 0, 'fresh native cell failed after disposal recovery: ' + stderr)
+        final = h.command('computer', 'status')
+        require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('erii-*')),
+                'fresh native cell retained resources')
+        with sqlite3.connect(root / 'data/state.db') as db:
+            results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode__execute' ORDER BY created_at DESC LIMIT 2").fetchall()
+            require(len(results) == 2 and all(r[0] == 'succeeded' for r in results), 'native resumed/fresh Tool result failed')
+        report['checks'].append({'action': 'fresh-cell-after-disposal-recovery', 'state': final, 'guest': reopened,
+                                 'artifact_ref': artifact['artifact_ref']})
         report['cleanup'] = True
     finally:
         h.cleanup()

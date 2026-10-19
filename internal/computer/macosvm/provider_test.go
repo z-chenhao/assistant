@@ -347,6 +347,34 @@ func TestCloneUnknownOutcomeNeverRepeatsOrStartsPartialUnit(t *testing.T) {
 	}
 }
 
+func TestDisposedInstanceRecoveryStillVerifiesCheckpoint(t *testing.T) {
+	p, f, r := lifecycleFixture(t)
+	ctx := context.Background()
+	if _, err := p.Ensure(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	cp, err := p.Checkpoint(ctx, r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Destroy(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := p.Checkpoint(ctx, r); err != nil || got != cp {
+		t.Fatal("disposed source was required despite committed unit", got, err)
+	}
+	if err := p.Destroy(ctx, r); err != nil || f.runs != 1 {
+		t.Fatal("completed disposal was not reconciled", err, f.runs)
+	}
+	mustFile(t, filepath.Join(p.config.Root, "checkpoints", cp.ID, "nvram.bin"), "corrupted after disposal")
+	if _, err := p.Checkpoint(ctx, r); !errors.Is(err, computer.ErrIntegrity) {
+		t.Fatal("disposed source allowed corrupt checkpoint", err)
+	}
+	if err := p.Destroy(ctx, r); !errors.Is(err, computer.ErrIntegrity) {
+		t.Fatal("absent instance bypassed committed unit verification", err)
+	}
+}
+
 func TestCorruptCheckpointCannotStart(t *testing.T) {
 	p, f, r := lifecycleFixture(t)
 	ctx := context.Background()

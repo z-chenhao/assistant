@@ -83,6 +83,9 @@ func (m Manager) Idle(ctx context.Context) error {
 	}
 	r := p.Request
 	r.Fence = m.Store.Fence
+	// Reconcile the frozen checkpoint ID even when Plan.Checkpoint exists:
+	// it may describe the preceding instance. The provider verifies an already
+	// published unit before consulting the (possibly disposed) source instance.
 	cp, err := m.Provider.Checkpoint(ctx, r)
 	if err != nil {
 		return err

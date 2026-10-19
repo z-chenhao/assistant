@@ -521,6 +521,7 @@ func (p *Provider) Destroy(ctx context.Context, r computer.Request) error {
 	}
 	dir := filepath.Join(p.config.Root, "vms", r.Instance.NativeName)
 	if _, err := os.Lstat(dir); os.IsNotExist(err) {
+		p.boundary("after_destroy")
 		return r.Fence(ctx)
 	}
 	var owner computer.Instance
@@ -544,6 +545,7 @@ func (p *Provider) Destroy(ctx context.Context, r computer.Request) error {
 	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
 		return computer.ErrUnknown
 	}
+	p.boundary("after_destroy")
 	return r.Fence(ctx)
 }
 

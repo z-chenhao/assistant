@@ -140,6 +140,18 @@ func (s computerStore) Begin(ctx context.Context, kind string, compatibility com
 			if err := decodeComputer(instanceJSON, &instance); err != nil {
 				return err
 			}
+			if kind == "idle" && phase == "checkpointing" {
+				// A new Code claim resumes the same accepted disposal. Its
+				// checkpoint may already be committed and its instance deleted;
+				// replacing these frozen IDs would require a nonexistent source.
+				var priorRequest string
+				if err := tx.QueryRowContext(ctx, `SELECT request_json FROM computer_operation WHERE execution_id=? AND execution_epoch=? AND kind='idle' AND status='accepted'`, owner.String, ownerEpoch).Scan(&priorRequest); err != nil {
+					return err
+				}
+				if err := decodeComputer(priorRequest, &plan.Request); err != nil {
+					return err
+				}
+			}
 			if owner.Valid && owner.String != b.req.ExecutionID {
 				var active bool
 				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.status NOT IN ('succeeded','failed','cancelled','unknown') AND r.status IN ('queued','running','waiting'))`, owner.String).Scan(&active); err != nil {
