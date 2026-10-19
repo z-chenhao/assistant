@@ -383,6 +383,10 @@ python3 scripts/ci_compare.py --pair BEFORE_RUN:1,SHADOW_RUN:1 --output evidence
 python3 scripts/ci_compare.py --offline --output evidence/controlled.json
 # Explicitly requested five-round experiment; stays foreground until collected.
 python3 scripts/ci_experiment.py --pr 24 --sha FULL_SHA --output evidence/experiment.json
+# After verification/base synchronization: record one frozen push, without retries.
+python3 scripts/ci_supersede.py push --pr 24 --output evidence/push.json
+# Read both superseded workflows once their exact attempts have stopped.
+python3 scripts/ci_supersede.py collect --push-record evidence/push.json --run BEFORE_CONTROL_RUN:1 --run BEFORE_SHADOW_RUN:1 --output evidence/superseded.json
 # Separate compiler experiment through the real sandbox, on disposable fixture copies.
 ERII_WORKSPACE_PROFILE_DIR="$PWD/evidence/workspace-cache-probe" go test ./internal/computer/workspace -run '^$' -bench BenchmarkWorkspaceStandardSeed -benchtime=5x -count=1
 ```
@@ -488,6 +492,16 @@ changes. Phase records retain first `cancel_received_at`, `started_at`,
 two stubborn sessions, listening ports, queued work and temporary state are
 cleaned; the four-real-Core focused probe proves the Go/Node path. End-to-end
 GitHub cancellation p95 remains unproven.
+
+`ci_supersede.py` owns the repeated push/collection mechanics. It freezes the
+source refspec, records an unknown outcome before dispatch, requires a Draft
+on the matching branch, and never retries an existing record. Collection binds
+both explicit workflow attempts to the superseded full SHA. Incomplete jobs,
+missing timestamps, unknown pushes and already-stopped/naturally-finished work
+cannot become zero-latency cancellation samples. Missing start times remain
+unknown runner waste. Raw API evidence and the start/ack interval are retained;
+the one-second API precision allowance is explicit, and clock skew is not
+independently measured. This measures job completion, not descendant cleanup.
 
 ```sh
 python3 scripts/ci_cancel.py --binary bin/personal-agent --entry make-step --evidence evidence/make-cancel.json
