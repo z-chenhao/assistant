@@ -224,6 +224,12 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_job
     return rows
 
 
+def gate_execution_order(gates):
+    # This five-run series contains a real thirty-second deadline per run.
+    # Start it before shorter independent series; reports retain inventory order.
+    return sorted(gates, key=lambda gate: gate.name != 'pi-bridge')
+
+
 def concurrent_gates(name, binary, evidence, stopped, gates, previous):
     """Independent series overlap; every five-run series stays on one worker."""
     isolated = tuple(g for g in gates if g.name in ('models', 'events'))
@@ -254,7 +260,7 @@ def concurrent_gates(name, binary, evidence, stopped, gates, previous):
         if len(rows) != gate.attempts or any(r['returncode'] for r in rows):
             failed.set()
     with ThreadPoolExecutor(max_workers=2) as pool:
-        list(pool.map(drive, parallel))
+        list(pool.map(drive, gate_execution_order(parallel)))
     rows = joined()
     if not stop.is_set() and isolated:
         rows = run_shard(name, binary, evidence, stopped, isolated, rows)

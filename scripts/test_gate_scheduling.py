@@ -57,6 +57,14 @@ class GateSchedulingTests(unittest.TestCase):
                 for gate in ('first', 'second'):
                     self.assertEqual([e[2] for e in events if e[0] == 'start' and e[1] == gate], list(range(1, 6)))
 
+    def test_long_provider_series_starts_first_without_changing_any_gate(self):
+        gates = (suite.Gate('short', '', 'short', 5), suite.Gate('pi-bridge', '', 'pi', 5),
+                 suite.Gate('another', '', 'another', 5))
+        ordered = suite.gate_execution_order(gates)
+        self.assertEqual([gate.name for gate in ordered], ['pi-bridge', 'short', 'another'])
+        self.assertCountEqual(ordered, gates)
+        self.assertEqual([gate.name for gate in gates], ['short','pi-bridge','another'])
+
     def test_runtime_series_and_events(self):
         self.drive('runtime')
 

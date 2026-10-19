@@ -24,7 +24,7 @@ EARLY_ORDER = ('security', 'runtime', 'codemode', 'providers', 'delivery')
 
 
 def feedback_order(names):
-    if (set(EARLY_ORDER) != set(GATES) or len(names) != len(set(names)) or
+    if (len(EARLY_ORDER) != len(GATES) or set(EARLY_ORDER) != set(GATES) or len(names) != len(set(names)) or
             any(name not in GATES for name in names)):
         raise ValueError('early regression scheduling inventory drift')
     return [name for name in EARLY_ORDER if name in names]
