@@ -6,36 +6,36 @@
     {
       "action": "allocate-write-graceful-checkpoint-destroy",
       "before": {
-        "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
         "instance_epoch": 1,
         "phase": "ready",
         "checkpoint": null
       },
       "after": {
-        "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
         "instance_epoch": 1,
         "phase": "checkpointed",
         "checkpoint": {
-          "checkpoint_id": "01a155f2-25c1-7d32-b37b-c0fa688f0971",
-          "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+          "checkpoint_id": "01a1564b-cfc3-7f36-9b0d-c325cdafeaea",
+          "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
           "source_epoch": 1,
-          "manifest_sha256": "47677e3ff9286813e42127e6ee7f9ccc87c263ad0edfc99083de8337e013c3a0"
+          "manifest_sha256": "3057e41b89cfce40d293c7b545fd684d1f86f871be804565e5fc8362a3d5d76e"
         }
       },
       "guest": "76af538d425ffb655767787cd62f6d3c2223626a8bb7b51963c78a14be12a893  /Users/lume/erii24-product-fixture.txt\n\n",
-      "elapsed_seconds": 167.828
+      "elapsed_seconds": 166.223
     },
     {
       "action": "restore-login-driver-app-document",
       "state": {
-        "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
         "instance_epoch": 2,
         "phase": "ready",
         "checkpoint": {
-          "checkpoint_id": "01a155f2-25c1-7d32-b37b-c0fa688f0971",
-          "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+          "checkpoint_id": "01a1564b-cfc3-7f36-9b0d-c325cdafeaea",
+          "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
           "source_epoch": 1,
-          "manifest_sha256": "47677e3ff9286813e42127e6ee7f9ccc87c263ad0edfc99083de8337e013c3a0"
+          "manifest_sha256": "3057e41b89cfce40d293c7b545fd684d1f86f871be804565e5fc8362a3d5d76e"
         }
       },
       "guest": {
@@ -50,14 +50,14 @@
     {
       "action": "Host-SIGKILL-recover-checkpoint-destroy",
       "state": {
-        "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
         "instance_epoch": 3,
         "phase": "checkpointed",
         "checkpoint": {
-          "checkpoint_id": "01a155f6-253b-7f1f-93fd-97001c1928e4",
-          "computer_id": "01a155f0-b340-7c06-8bc5-9bbd053f4891",
+          "checkpoint_id": "01a1564f-ec1f-769b-8e04-4b28000557e2",
+          "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
           "source_epoch": 3,
-          "manifest_sha256": "47677e3ff9286813e42127e6ee7f9ccc87c263ad0edfc99083de8337e013c3a0"
+          "manifest_sha256": "3057e41b89cfce40d293c7b545fd684d1f86f871be804565e5fc8362a3d5d76e"
         }
       },
       "guest": {
@@ -67,12 +67,59 @@
         ]
       },
       "checkpoint_files": {
-        "disk.img": "d49e94850dab951ba08fe34c63b984f124db5cb3a26075a30d51dbb2a862c3d8",
-        "nvram.bin": "faf7b5322685c1dd8e0f7ccacb5fe9ad7374a2a4f0ef2d96b541840bf1fbd46c",
-        "config.json": "c5b943ffd5d27c6961467493a61c07aa0e63b1f7c3098be799d9b47426d08c60"
+        "disk.img": "4d2a797dd320b27073742b4288543e5137cb6f6e77eb46f8c6aa39b7039673d4",
+        "nvram.bin": "0f700be2c9a5e588c6b19e69f712141f4eff366ae486837d534d891de6507707",
+        "config.json": "894bb3a52c19b15b9ffd7abf905e849ec5efea8e35a6c8185dc78835874f06c3"
       },
-      "artifact_ref": "artifact:39c032726df78897f543de054f8ad2664e3736373f0d33ab21d0ca9fb5b91a6a",
+      "artifact_ref": "artifact:a824bfac2c40eff8dc43106b343abf432dc8b6a0db06ae4c49d78b806b06cadb",
       "artifact_sha256": "76af538d425ffb655767787cd62f6d3c2223626a8bb7b51963c78a14be12a893"
+    },
+    {
+      "action": "SIGKILL-after-disposal-before-final-commit",
+      "native_exit": -9,
+      "before": {
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
+        "instance_epoch": 4,
+        "phase": "checkpointing",
+        "checkpoint": {
+          "checkpoint_id": "01a15653-7821-7aa2-a2bd-215e4289c4f1",
+          "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
+          "source_epoch": 4,
+          "manifest_sha256": "3057e41b89cfce40d293c7b545fd684d1f86f871be804565e5fc8362a3d5d76e"
+        }
+      },
+      "after": {
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
+        "instance_epoch": 4,
+        "phase": "checkpointed",
+        "checkpoint": {
+          "checkpoint_id": "01a15653-7821-7aa2-a2bd-215e4289c4f1",
+          "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
+          "source_epoch": 4,
+          "manifest_sha256": "3057e41b89cfce40d293c7b545fd684d1f86f871be804565e5fc8362a3d5d76e"
+        }
+      }
+    },
+    {
+      "action": "fresh-cell-after-disposal-recovery",
+      "state": {
+        "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
+        "instance_epoch": 5,
+        "phase": "checkpointed",
+        "checkpoint": {
+          "checkpoint_id": "01a15656-ff45-79b4-9c4a-4b135a5174b7",
+          "computer_id": "01a1564a-6c14-772f-957e-647c932798bc",
+          "source_epoch": 5,
+          "manifest_sha256": "3057e41b89cfce40d293c7b545fd684d1f86f871be804565e5fc8362a3d5d76e"
+        }
+      },
+      "guest": {
+        "file_readback": "0d1b75ed1fdd393334c5e02fcddcfb85f277d2ac01cae218eab042eea62d7d61  /Users/lume/erii24-product-fixture.txt",
+        "TextEdit_window_titles": [
+          "erii24-product-fixture.txt"
+        ]
+      },
+      "artifact_ref": "artifact:a824bfac2c40eff8dc43106b343abf432dc8b6a0db06ae4c49d78b806b06cadb"
     }
   ],
   "cleanup": true,
@@ -82,9 +129,9 @@
     "phase": "unprovisioned",
     "checkpoint": null
   },
-  "hardware_identity_sha256": "797ea7b793204e6238a895e7672ab5d709c6ac0f556bb2f491291d8f56aad811",
-  "binary_sha256": "c184e12e30f2f77dcd07cc62fdbe1f7b6d14843dc811d78b54a3ccf2417ad873",
-  "source_revision": "ff580d61e791e56dfab14c77c44b2d8250a65827",
+  "hardware_identity_sha256": "4980549e00c209567710967271e9d7d93ee9b1d17f96e0162e803a8f28245dc4",
+  "binary_sha256": "127be36d34873213a5850965b88640771780990703203087428b86c8150e8bd4",
+  "source_revision": "82ad3afee3f6691847ca44938069127d2ab18640",
   "source_changes": [],
-  "recorded_at": "2026-10-19T21:01:39.542392+00:00"
+  "recorded_at": "2026-10-19T22:46:19.283230+00:00"
 }

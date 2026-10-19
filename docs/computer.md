@@ -204,3 +204,12 @@ proves resumed and fresh cells succeed, independently hashes the full unit, chec
 stable Artifact, and retains the private state/receipts for inspection. The
 foreground API is stopped and joined separately after the instance cleanup.
 Actual Jianying compatibility remains a separately recorded [L2 matrix](computer-l2-result.json).
+
+The latest [native lifecycle report](computer-provider-l2-result.json) includes
+five scenarios. In the post-disposal SIGKILL case, the instance is absent and
+the committed checkpoint ID remains unchanged when phase advances from
+`checkpointing` to `checkpointed` under the replacement claim. The following
+fresh cell restores the same logical Computer at the next instance epoch and
+reads the saved Guest document. The reviewed fixture was archived intact; the
+repair run used fresh isolated CLI state because its predecessor referenced an
+expired worktree's JavaScript installation.
