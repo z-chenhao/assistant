@@ -13,6 +13,7 @@ import selectors
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -130,6 +131,9 @@ def run(binary):
                                           'before': held, 'after': recovered})
             report['peer'] = request(computer['endpoint'], '/fixture/status')
             require(report['peer']['running'] == 0 and report['peer']['reopens'] >= 3, 'Guest session/app intent not restored')
+        except Exception:
+            print(json.dumps({'computer_failure': h.failure_state()}, ensure_ascii=False), file=sys.stderr)
+            raise
         finally:
             h.cleanup()
             server.terminate()
