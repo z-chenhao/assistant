@@ -1,0 +1,78 @@
+name: ERII-141 resource profile
+
+on:
+  push:
+    branches: [ERII-141-profile]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  profile:
+    name: Same-runner fixture resource diagnostic
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Prepare the same isolated fixture runtime
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-sha.txt
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          python3 scripts/ci_step.py --name build --phase build -- make build
+      - name: Five cold versus private-copy compiler pairs
+        env:
+          ERII_WORKSPACE_PROFILE_DIR: ${{ github.workspace }}/evidence/compiler
+        run: python3 scripts/ci_step.py --name compiler --phase test -- go test ./internal/computer/workspace -run '^$' -bench BenchmarkWorkspaceStandardSeed -benchtime=5x -count=1
+      - name: Compare fixed engineering variants at capacity one, two and four
+        run: |
+          for round in 1 2 3; do
+            case "$round" in
+              1) capacities="1 2 4" ;;
+              2) capacities="4 1 2" ;;
+              3) capacities="2 4 1" ;;
+            esac
+            for capacity in $capacities; do
+              export ERII_PROFILE_DIR="$PWD/evidence/profiles/round-$round-capacity-$capacity"
+              python3 scripts/ci_step.py --name "core-$round-$capacity" --phase test -- \
+                python3 scripts/profile_harness.py scripts/run_core_cases.py \
+                --binary bin/personal-agent --case GC-20 --scenario-jobs "$capacity" \
+                --evidence "evidence/core-$round-$capacity.json"
+            done
+          done
+      - name: Retain diagnostic evidence including failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: evidence-resource-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
