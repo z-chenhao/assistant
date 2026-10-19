@@ -1,14 +1,17 @@
 # Isolated cancellation experiment
 
 These two workflow replicas preserve the Required/control and candidate workload
-commands and job topology from `3aa91ef00f6edc0c3df1dcef16e126912f4eabd0`.
+commands and job topology from `a213f7b4f3a6e245f4c08fd375de5b8d6b11d17e`.
 They run only for `docs/ci-cancel-probe.md` pushes on this diagnostic branch.
 The production PR and its five complete before/after pairs stay unchanged.
 `python3 scripts/ci_profile_workflows.py` refreshes the replicas on this branch
 from the checked-in control/shadow definitions, preserving phase commands and
 the four jobs. Its guard refuses to write replicas on the PR branch. The original
 five pre-exec samples remain in `evidence/cancellation-cohort*.json`; the exec
-cohort uses a fresh output name and six new documentation commits.
+cohort uses a fresh output name and six new documentation commits. The exec
+cohort was stopped after a real delivery PTY orphan; its accepted mutations and
+negative evidence remain retained. The final PTY-owner cohort runs only after
+the main complete-workflow comparisons finish, avoiding extra quota competition.
 
 Freeze five ordinary doc-only workload commits followed by a sixth doc-only
 commit whose message contains `[stop-cancel-profile]`. Push the preparation
