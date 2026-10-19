@@ -327,6 +327,19 @@ def coding_case(binary, folder, variant):
                 input_events=variant['events'], context=variant['context'])
 
 
+def run_case_groups(dataset, selected, action, scenario_jobs):
+    rows = []
+    for case in dataset['cases']:
+        if selected and selected != case['case_id']:
+            continue
+        # Keep bounded checkpoint work clear of compiler-heavy fixtures.
+        # The original fifteen-second hold deadline is never extended.
+        capacity = min(scenario_jobs, 2) if case['case_id'] == 'GC-17' else scenario_jobs
+        items = [(case, variant) for variant in variants(dataset, case)]
+        rows.extend(run_cases(items, action, capacity))
+    return rows
+
+
 def run(binary, selected=None, scenario_jobs=1):
     dataset, policy, lock = load_contract(ROOT, 'core-v1')
     report = dict(version=1, milestone='M5', provider='explicit deterministic core Bridge',
@@ -349,8 +362,7 @@ def run(binary, selected=None, scenario_jobs=1):
             print(f"{case['case_id']} {variant['variant_id']}: {row['status']} ({row['wall_time_ms']}ms)",flush=True)
             require(all(assertions.values()),'core assertions failed: '+json.dumps(assertions))
             return row
-        items = [(case, variant) for case in dataset['cases'] if not selected or selected == case['case_id'] for variant in variants(dataset, case)]
-        report['results'] = run_cases(items, variant_case, scenario_jobs)
+        report['results'] = run_case_groups(dataset, selected, variant_case, scenario_jobs)
         report['cleanup']=True
     require(not Path(temp).exists(), 'disposable root leaked')
     if not selected:

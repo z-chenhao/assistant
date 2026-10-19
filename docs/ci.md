@@ -213,6 +213,11 @@ series stays serial on one worker; the next Core round starts only after all
 eighteen variants and their conformance checks finish. Explicit inventory checks
 reject missing or duplicated crash boundaries. The baseline workflow uses the
 same source with the default concurrency of one.
+Core case kinds join before the next kind starts. GC-17 checkpoint variants use
+at most two fixtures so the unchanged fifteen-second fault boundary does not
+compete with coding/engineering compilers. A real failed mixed-kind run is
+retained; the scheduling regression proves case barriers, all eighteen variants
+and the two/four capacity bounds.
 
 `fixture_pool.py` owns process sessions, cancellation admission, joined cleanup
 and retirement. Main/Capability/Artifact harnesses and the PTY driver register

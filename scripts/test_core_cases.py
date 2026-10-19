@@ -2,6 +2,8 @@ import copy
 from collections import Counter
 import json
 from pathlib import Path
+import threading
+import time
 import unittest
 
 from case_runner import load_contract, score, variants
@@ -9,11 +11,36 @@ from core_fixtures import feedback, csv_text, CATEGORIES, SEVERITIES, EDGES, PAI
 from core_boundaries import exercise
 from core_conformance import TESTS, judge
 from core_report import aggregate
+from run_core_cases import run_case_groups
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class CoreTests(unittest.TestCase):
+    def test_case_groups_join_before_compilers_and_checkpoint_capacity_is_bounded(self):
+        dataset, _, _ = load_contract(ROOT, 'core-v1')
+        lock = threading.Lock()
+        active = {}
+        peaks = {}
+        def action(item):
+            case, variant = item
+            kind = case['case_id']
+            with lock:
+                self.assertTrue(not active or set(active) == {kind}, 'case kinds overlapped')
+                active[kind] = active.get(kind, 0) + 1
+                peaks[kind] = max(peaks.get(kind, 0), active[kind])
+            time.sleep(.02)
+            with lock:
+                active[kind] -= 1
+                if not active[kind]: del active[kind]
+            return kind, variant['variant_id']
+        rows = run_case_groups(dataset, None, action, 4)
+        expected = [(case['case_id'], v['variant_id']) for case in dataset['cases'] for v in variants(dataset, case)]
+        self.assertEqual(rows, expected)
+        self.assertEqual(len(rows), 18)
+        self.assertEqual(peaks, {'GC-17':2,'GC-19':4,'GC-20':4})
+        self.assertFalse(active)
+
     def test_seed1701_exact_gold_and_independent_text_rows(self):
         rows, gold = feedback()
         self.assertEqual(Counter(r['category'] for r in gold), CATEGORIES)
