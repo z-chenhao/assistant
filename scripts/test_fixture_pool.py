@@ -127,7 +127,10 @@ class FixturePoolTests(unittest.TestCase):
     def test_actions_entry_sigint_reaches_make_owner_and_cleans_two_sessions(self):
         self.check_stubborn_session_cleanup(make_step=True, actions_shell=True)
 
-    def check_stubborn_session_cleanup(self, make_step=False, actions_shell=False):
+    def test_cancelled_parallel_pty_waits_join_before_owner_deadline(self):
+        self.check_stubborn_session_cleanup(make_step=True, actions_shell=True, pty_wait=True)
+
+    def check_stubborn_session_cleanup(self, make_step=False, actions_shell=False, pty_wait=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state = root / 'state'
@@ -147,6 +150,15 @@ class FixturePoolTests(unittest.TestCase):
                        ' return index\n'
                        'try: run_cases(list(range(20)),action,2)\n'
                        'finally: shutil.rmtree(state)\n')
+            if pty_wait:
+                program = ('import os,shutil,sys\nfrom pathlib import Path\n'
+                           'from fixture_pool import run_cases\nfrom terminal_driver import Terminal\n'
+                           f'state=Path({str(state)!r});state.mkdir()\n'
+                           'def action(index):\n'
+                           f' with Terminal([sys.executable,"-c",{child!r},str(index)],os.environ.copy(),state) as terminal:\n'
+                           '  terminal.expect("never emitted",timeout=20)\n'
+                           'try: run_cases(list(range(20)),action,2)\n'
+                           'finally: shutil.rmtree(state)\n')
             script = root / 'fixture.py'
             script.write_text(program)
             command = [sys.executable, 'scripts/profile_harness.py', str(script)]
