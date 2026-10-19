@@ -334,6 +334,15 @@ remains. Both orderings execute in all five stability runs. Unexpected failures
 are not retried. The repeatable `-test-main-barrier boundary=release-file` CLI
 hook requires an explicit deterministic Bridge; ordinary execution is unchanged.
 
+At `174860b376cc29e71d7b3be0cd554a3b1789d2da`, both recall/security
+shards passed. The required race job instead failed while creating the valid
+stream for the consumer-rejection fixture immediately after deleting the
+incompatible stream. The shadow race job passed. A local 100-run race probe
+did not reproduce that failure, so its vendor-level cause remains inconclusive.
+The fixture now gives the independent consumer-compatibility assertion a fresh
+broker. It retains incompatible-stream rejection, acknowledged deletion and
+incompatible-consumer rejection, with no retries or deadline changes.
+
 Reproduce the measured paths from the repository root:
 
 ```sh
