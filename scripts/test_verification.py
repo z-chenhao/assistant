@@ -18,6 +18,22 @@ import verify_suite as suite
 
 
 class VerificationTests(unittest.TestCase):
+    def test_darwin_eperm_requires_authoritative_group_inspection(self):
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'darwin'), \
+             patch.object(suite.subprocess, 'check_output') as inspect:
+            for table, alive in [('', False), ('42 Z\n', False), ('42 S\n', True),
+                                 ('42 Z\n42 R\n', True), ('99 S\n', False)]:
+                inspect.return_value = table
+                self.assertEqual(suite.group_alive(42), alive)
+            inspect.side_effect = PermissionError
+            with self.assertRaises(PermissionError):
+                suite.group_alive(42)
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'linux'):
+            with self.assertRaises(PermissionError):
+                suite.group_alive(42)
+
     def test_pre_optimization_inventory_and_disjoint_evidence(self):
         expected = {
             "verify.py": 1, "verify_local_provider.py": 1, "verify_account.py": 6,
@@ -97,6 +113,11 @@ class VerificationTests(unittest.TestCase):
             self.assertNotIn(forbidden, shadow)
         self.assertIn('fail-fast: false', shadow)
         self.assertIn('--shard ${{ matrix.shard }} --jobs 1', shadow)
+        baseline = (suite.ROOT / '.github/workflows/ci.yml').read_text()
+        condition = r'      - name: Prepare isolated coding fixture runtime\n        if: (.*)'
+        self.assertEqual(set(re.findall(r"matrix.shard == '([^']+)'", re.search(condition, shadow)[1])),
+                         set(re.findall(r"matrix.shard == '([^']+)'", re.search(condition, baseline)[1])),
+                         'shadow must provision every sandbox dependency required by the full gate')
 
     def test_failed_repetition_stops_and_records_failure(self):
         with tempfile.TemporaryDirectory() as temp:

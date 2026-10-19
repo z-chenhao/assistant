@@ -163,7 +163,7 @@ jobs:
           BUILD_DIGEST: ${{ needs.fast.outputs.build_digest }}
         run: python3 scripts/ci_step.py --name restore --phase setup -- python3 scripts/ci_bundle.py restore
       - name: Prepare isolated coding fixture runtime
-        if: matrix.shard == 'providers' || matrix.shard == 'codemode'
+        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap

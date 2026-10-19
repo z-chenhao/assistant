@@ -21,6 +21,68 @@ import (
 	"github.com/z-chenhao/erii/internal/recall/fake"
 )
 
+type appendDuringQuery struct {
+	append func() error
+	err    error
+}
+
+func (*appendDuringQuery) Identity() string { return "append-during-query" }
+func (e *appendDuringQuery) Embed(_ context.Context, text string) ([]float64, error) {
+	if text == "query-boundary" && e.append != nil {
+		append := e.append
+		e.append = nil
+		e.err = append()
+	}
+	return []float64{1, 0}, e.err
+}
+
+// A Run may append its reply while another Run is searching. Force the exact
+// catch-up/query boundary without sleeps, scheduler luck or a provider outage.
+func TestRecallConcurrentPendingAppendFailsClosed(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	scope := recall.Scope{UserID: "local", AgentID: "erii"}
+	if err = s.BindConversation(ctx, "erii", scope); err != nil {
+		t.Fatal(err)
+	}
+	appendMessage := func(id string) error {
+		return s.Append(ctx, []conversation.Message{{MessageID: id, ConversationID: "erii",
+			Role: "assistant", Content: conversation.Text("tea " + id), Source: "main",
+			CreatedAt: time.Unix(1, 0)}})
+	}
+	if err = appendMessage("original"); err != nil {
+		t.Fatal(err)
+	}
+	e := &appendDuringQuery{append: func() error { return appendMessage("concurrent") }}
+	if err = s.Configure(ctx, e); err != nil {
+		t.Fatal(err)
+	}
+	query := recall.Query{Query: "query-boundary"}
+	hits, err := s.Search(ctx, scope, query)
+	if e.err != nil {
+		t.Fatal("append failed", e.err)
+	}
+	if err != recall.ErrUnavailable || hits != nil {
+		t.Fatal("pending concurrent evidence admitted a partial search", hits, err)
+	}
+	var pending int
+	if err = s.db.QueryRow(`SELECT count(*) FROM recall_document WHERE vector_json IS NULL`).Scan(&pending); err != nil || pending != 1 {
+		t.Fatal("did not force pending append", pending, err)
+	}
+	hits, err = s.Search(ctx, scope, query)
+	if err != nil || len(hits) != 2 {
+		t.Fatal("later explicit caller could not recover both originals", hits, err)
+	}
+	originals, err := s.List(ctx, "erii")
+	if err != nil || len(originals) != 2 || originals[0].MessageID != "original" || originals[1].MessageID != "concurrent" {
+		t.Fatal("immutable originals changed", originals, err)
+	}
+}
+
 // Use the real HTTP adapter: the semantic unit Fake does not enforce its bound.
 func TestMultipartHistoryWithHTTPEmbedding(t *testing.T) {
 	for _, state := range []string{"fresh", "prior-v1", "pending-v2", "max-parts"} {

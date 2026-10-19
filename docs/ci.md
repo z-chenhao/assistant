@@ -181,6 +181,22 @@ negative lookalike test; example-file deletion is a drift failure. The manifest
 locks and both Node contracts. An extra Tool race subset and deterministic
 regressions fail closed before heavy candidate jobs are admitted. The early
 single attempts are additional evidence; full five-run series remain intact.
+The ERII-23 Memory maintenance regression is included in early security feedback;
+both workflows provision the sandbox for the full security shard. A topology
+contract checks this prerequisite against required CI whenever main advances.
+
+Full-shard selection is deliberately constant during shadow repair:
+
+| Changed paths / trust result | Extra early regressions | Required full shards |
+| --- | --- | --- |
+| Known documentation mapping | None | runtime, codemode, security, delivery, providers |
+| Known implementation mapping | Mapped regressions | All five |
+| Unknown/risky path, unavailable base, invalid or drifted manifest | All mapped regressions | All five |
+
+`impact.json.full_shards` records this complete set; the workflow matrix is also
+fixed independently of that file. It is not a conditional full-gate selector.
+No trusted path can waive a five-run series, Code Mode recovery or a Golden Case.
+Conditional full-shard omission is not implemented or claimed as complete.
 The measured delivery harness took 128 seconds locally in early feedback,
 dominated by its twenty crash/restart cases. Early delivery feedback now uses
 the same harness's explicitly marked `--feedback` transport/retry/unknown/approval
@@ -222,6 +238,19 @@ The durable test checks port closure, removal of fixture state, profile evidence
 and a bound below 15 seconds. This is proof for an owned group, not for arbitrary
 detached daemons or GitHub's webhook-to-runner cancellation latency. No processes
 are terminated by executable name.
+Darwin may report `EPERM` for a disappearing process group. Only on Darwin the
+inspector then uses `ps` to distinguish a live group from zombies or absence.
+Unreadable process state still rejects the result; Linux permission errors remain
+failures. The listening-child regression retains its original assertions and
+deadlines.
+
+Recall failure artifacts now identify the scenario, stage, grouped Run state,
+pending-vector counts and HTTP request count before cleanup. They exclude corpus,
+prompts and provider bodies. `TestRecallConcurrentPendingAppendFailsClosed`
+deterministically reproduces the documented pending-append boundary, then proves
+a later caller recovers both originals. This proves an existing contract, not
+the cause of the earlier Ubuntu failure; the harness still rejects every
+unexpected `chat work` error without retrying or changing its assertions.
 
 Reproduce the measured paths from the repository root:
 
@@ -235,7 +264,30 @@ python3 scripts/ci_impact.py --base BASE_FULL_SHA --output evidence/impact.json
 python3 scripts/ci_step.py --name feedback --phase test -- python3 scripts/ci_feedback.py --plan evidence/impact.json
 python3 -m unittest discover -s scripts -p 'test_ci*.py' -v
 python3 -m unittest discover -s scripts -p 'test_verification.py' -v
+# Collect explicit full-workflow attempts, never the five repetitions inside one run.
+python3 scripts/ci_compare.py --pair BEFORE_RUN:1,SHADOW_RUN:1 --output evidence/controlled.json
+python3 scripts/ci_compare.py --offline --output evidence/controlled.json
+# Separate compiler experiment through the real sandbox, on disposable fixture copies.
+ERII_WORKSPACE_PROFILE_DIR="$PWD/evidence/workspace-cache-probe" go test ./internal/computer/workspace -run '^$' -bench BenchmarkWorkspaceStandardSeed -benchtime=5x -count=1
 ```
+
+Repeat `--pair` for at least five distinct workflow-attempt pairs, collected from
+the measured source checkout. The collector requires clean, stable exact-SHA
+successes, the current complete gate/repetition inventory, matching binary and
+Ubuntu image across every sample, and successful required aggregates. It retains
+failed samples and raw API/suite metadata; incomplete proof exits nonzero. It
+downloads only structural suite JSON from evidence archives and removes temporary
+ZIP files. It neither launches jobs nor retries failures. A complete comparison
+does not assert that the performance targets passed. CPU/cache/scenario detail
+remains in the original artifacts. Rerun timing uses `run_started_at`, not the
+original workflow's creation time; initial rerun queue time remains unmeasured.
+Ordinary-change and cancellation cohorts still need separate proof.
+
+The compiler benchmark alternates cold and seeded order, preserves a fresh private
+writable cache for every invocation, and retains the original coding missing-flag
+failure and engineering grandchild failure. Its seed contains only trusted standard-library
+outputs for `testing` and `encoding/json`, built inside the same sandbox. It does
+not install a product cache policy or count as five whole-CI comparisons.
 
 Harnesses clean up their owned fixtures; collector evidence is retained in the
 ignored `evidence/` directory and the collector launches no daemon. Download

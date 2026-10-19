@@ -13,7 +13,7 @@ import verify_suite as suite
 GATES = {
     'runtime': {'foundation', 'main', 'tasks'},
     'codemode': {'codemode', 'code-recovery'},
-    'security': {'tools', 'artifacts', 'recall'},
+    'security': {'tools', 'artifacts', 'recall', 'memory-maintenance'},
     'delivery': {'delivery'},
     'providers': {'local-provider', 'capabilities', 'terminal-input'},
 }

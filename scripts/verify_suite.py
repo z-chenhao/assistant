@@ -111,6 +111,12 @@ def group_alive(pgid):
         os.killpg(pgid, 0)
     except ProcessLookupError:
         return False
+    except PermissionError:
+        # Darwin can return EPERM as an orphaned group disappears. Confirm
+        # absence/zombie state with ps; an unreadable process table still fails
+        # closed in run_command. Other platforms retain their strict error.
+        if sys.platform != 'darwin':
+            raise
     rows = subprocess.check_output(['ps', '-axo', 'pgid=,stat='], text=True)
     return any(int(parts[0]) == pgid and not parts[1].startswith('Z')
                for row in rows.splitlines() if len(parts := row.split()) == 2)

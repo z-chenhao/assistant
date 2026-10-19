@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Memory/Conversation Launch, Doctor, Drive, Evidence and Cleanup through CLI."""
 import argparse
+from contextlib import closing
 import json
 from pathlib import Path
 import signal
@@ -172,7 +173,30 @@ def verify(value):
     require(all('FOREIGN_' not in r['hits_json'] for r in value['recall']), 'automatic recall scope leak')
 
 
-def run(binary):
+def failure_state(h, embeddings, scenario, stage):
+    """Read only structural evidence; never copy corpus, prompts or HTTP bodies."""
+    value = dict(scenario=scenario, stage=stage, embedding_requests=len(embeddings.requests),
+                 embedding_failure_enabled=embeddings.fail, databases={})
+    root = Path(h.env['ERII_DATA_ROOT'])
+    for name in ('state', 'memory', 'conversation'):
+        path = root / (name + '.db')
+        if not path.exists():
+            continue
+        try:
+            with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
+                if name == 'state':
+                    rows = db.execute('SELECT kind,status,error_code,count(*) FROM run GROUP BY kind,status,error_code').fetchall()
+                    value['databases'][name] = dict(run_groups=rows,
+                        frozen_recalls=db.execute('SELECT count(*) FROM run_recall').fetchone()[0])
+                else:
+                    rows = db.execute('SELECT active,vector_json IS NULL,count(*) FROM recall_document GROUP BY active,vector_json IS NULL').fetchall()
+                    value['databases'][name] = dict(index_groups=rows)
+        except sqlite3.Error:
+            value['databases'][name] = dict(diagnostic_unavailable=True)
+    return value
+
+
+def run(binary, failure_evidence=None):
     report = dict(version=1, scope='ERII-22 read-only hybrid recall and frozen context; Curator/manage/compaction and full SC-08 remain ERII-23', scenarios=[])
     with tempfile.TemporaryDirectory(prefix='erii-recall-') as directory:
         for name in ('ordinary', 'kill-restart', 'embedding-failure', 'multipart', 'multipart-prior'):
@@ -180,6 +204,7 @@ def run(binary):
             root.mkdir()
             embeddings = Embeddings()
             h = Harness(binary, root, embeddings)
+            stage = 'setup'
             try:
                 multipart = name.startswith('multipart')
                 if multipart:
@@ -194,6 +219,7 @@ def run(binary):
                 if multipart:
                     original_json, joined_text = h.seed_multipart(agent, prior=name.endswith('prior'))
                 receipt = h.send('recall-request', 'tea work with independent child recall')
+                stage = 'fault-boundary'
                 if name == 'embedding-failure':
                     embeddings.fail = True
                     failure = h.command('chat', 'work', ok=False)
@@ -215,7 +241,9 @@ def run(binary):
                                     'tea NEW_AFTER_FREEZE', '[{"source_type":"conversation","source_ref":"conversation:original"}]', 2000000))
                         db.execute('INSERT INTO recall_document(ref,user_id,agent_id,content,occurred_at,author_role,core,active) VALUES(?,?,?,?,?,?,?,?)',
                                    ('memory:after-freeze', 'local', agent, 'tea NEW_AFTER_FREEZE', 2000000, '', 0, 1))
+                stage = 'drain'
                 h.command('chat', 'work')
+                stage = 'assertions'
                 value = h.snapshot()
                 verify(value)
                 multipart_evidence = None
@@ -242,9 +270,17 @@ def run(binary):
                 report['scenarios'].append(dict(name=name, state=value, embedding_requests=embeddings.requests,
                                                 multipart=multipart_evidence,
                                                 before=before if name in ('kill-restart', 'embedding-failure') else None))
+            except Exception:
+                if failure_evidence is not None:
+                    failure_evidence.parent.mkdir(parents=True, exist_ok=True)
+                    failure_evidence.write_text(json.dumps(dict(version=1, passed=False,
+                        failure=failure_state(h, embeddings, name, stage)), indent=2) + '\n')
+                raise
             finally:
-                h.cleanup()
-                embeddings.close()
+                try:
+                    h.cleanup()
+                finally:
+                    embeddings.close()
     report['cleanup'] = 'CLI processes reaped, HTTP Fake stopped and joined, temporary roots removed'
     report['passed'] = True
     return report
@@ -255,7 +291,8 @@ def main():
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     args = parser.parse_args()
-    report = run(args.binary.resolve())
+    args.evidence.unlink(missing_ok=True)
+    report = run(args.binary.resolve(), args.evidence)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(dict(passed=True, scenarios=len(report['scenarios']), cleanup=report['cleanup'])))
