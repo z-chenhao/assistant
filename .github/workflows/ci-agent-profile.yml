@@ -1,0 +1,71 @@
+name: ERII-141 Agent CPU profile
+
+on:
+  push:
+    branches: [ERII-141-agent-profile]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: erii-141-agent-profile
+  cancel-in-progress: true
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Launch and Doctor
+        run: |
+          mkdir -p evidence
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          make build
+          python3 scripts/ci_sdk.py prepare --host-cache --evidence evidence/sdk.json
+      - name: One complete Core round with real Agent CPU profiles
+        env:
+          ERII_AGENT_CPU_PROFILE: ${{ github.workspace }}/evidence/agent-cpu
+          ERII_VERIFY_CASE_JOBS: "4"
+        run: python3 scripts/ci_step.py --name core-agent-cpu --phase test -- python3 scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core.json
+      - name: Decode complete profiles and mark killed profiles inconclusive
+        if: always()
+        run: |
+          if [[ -d evidence/agent-cpu ]]; then
+            for profile in evidence/agent-cpu/*.cpu; do
+              if ! go tool pprof -top -nodecount=35 bin/personal-agent "$profile" > "$profile.top.txt" 2> "$profile.decode-error.txt"; then
+                printf '%s\n' "inconclusive: process killed before CPU profile finalization" >> "$profile.decode-error.txt"
+              fi
+            done
+          fi
+          cp bin/personal-agent evidence/profiled-agent
+      - name: SDK Doctor and Cleanup
+        if: always()
+        run: |
+          python3 scripts/ci_sdk.py doctor
+          python3 scripts/ci_sdk.py cleanup
+      - name: Retain exact source, profiles, failures and cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: agent-profile-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14

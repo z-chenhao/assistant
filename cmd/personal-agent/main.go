@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"syscall"
@@ -58,6 +59,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	testDelivery := flags.String("test-delivery", "", "explicit test Bridge only: retry-once, unavailable, ambiguous, unknown")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
 	testMainRelease := flags.String("test-main-release", "", "explicit test Bridge only: release a held boundary when this file exists")
+	testCPUProfile := flags.String("test-cpu-profile", "", "explicit test Bridge only: retain a private CPU profile")
 	testBarriers := map[string]string{}
 	flags.Func("test-main-barrier", "explicit test Bridge only: repeatable boundary=release-file barrier", func(value string) error {
 		name, path, ok := strings.Cut(value, "=")
@@ -82,6 +84,22 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	if testBarriers[*testMainHold] != "" {
 		return errors.New("conflicting test boundary barriers")
+	}
+	if *testCPUProfile != "" {
+		if *testBridge == "" {
+			return errors.New("test-cpu-profile requires explicit test-bridge")
+		}
+		profile, openErr := os.OpenFile(*testCPUProfile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if openErr != nil {
+			return openErr
+		}
+		if profileErr := pprof.StartCPUProfile(profile); profileErr != nil {
+			return errors.Join(profileErr, profile.Close())
+		}
+		defer func() {
+			pprof.StopCPUProfile()
+			err = errors.Join(err, profile.Close())
+		}()
 	}
 	modelCommand := false
 	if flags.Arg(0) == "model" {
