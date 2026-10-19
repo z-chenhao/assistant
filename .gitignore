@@ -6,3 +6,6 @@
 __pycache__/
 
 /runtime/javascript/node_modules/
+
+/.ci-go/
+/ci-build.tar.gz

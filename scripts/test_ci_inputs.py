@@ -114,13 +114,14 @@ class BundleTests(unittest.TestCase):
         self.archive = self.root / 'bundle.tar.gz'
         self.context = dict(source_sha='a' * 40, source_inputs_sha256='b' * 64,
                             os='Linux', arch='x86_64', go='go pinned', node='node pinned',
-                            image_os='ubuntu24', image_version='pinned image')
+                            image_os='ubuntu24', image_version='pinned image', sdk_public_sha256='c'*64,
+                            workflow_run_id='fixed run', workflow_attempt='1')
         self.mock = patch.object(bundle, 'context', return_value=self.context)
         self.mock.start()
         self.addCleanup(self.mock.stop)
         for name in bundle.PAYLOAD:
             path = self.source / name
-            if 'node_modules' in name:
+            if name != bundle.PAYLOAD[0]:
                 path.mkdir(parents=True)
                 (path / 'pinned.json').write_text('{"version":"pinned"}')
             else:
@@ -182,6 +183,46 @@ class BundleTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bundle.restore(self.dest, self.archive, digest)
         self.assertEqual(path.read_text(), 'user state')
+
+    def test_host_cache_round_trips_and_sdk_or_old_format_drift_fails_closed(self):
+        digest = bundle.create(self.source, self.archive)
+        self.assertEqual(bundle.restore(self.dest, self.archive, digest)['version'], 2)
+        self.assertEqual((self.dest / bundle.PAYLOAD[-1] / 'pinned.json').read_text(), '{"version":"pinned"}')
+        old = self.root / 'old.tar.gz'
+        with tarfile.open(self.archive) as current, tarfile.open(old, 'w:gz') as archive:
+            for entry in current:
+                data = current.extractfile(entry).read() if entry.isfile() else None
+                if entry.name == bundle.META:
+                    metadata = json.loads(data)
+                    metadata['version'] = 1
+                    data = json.dumps(metadata).encode()
+                    entry.size = len(data)
+                archive.addfile(entry, io.BytesIO(data) if data is not None else None)
+        with self.assertRaisesRegex(ValueError, 'build context mismatch'):
+            bundle.restore(self.dest, old, bundle.sha(old))
+        # A cache with a link is never a source for the executable build payload.
+        (self.source / bundle.PAYLOAD[-1] / 'escape').symlink_to('/outside')
+        with self.assertRaises(ValueError): bundle.create(self.source, self.archive)
+
+    def test_go_executable_cache_hard_links_serialize_as_regular_bytes(self):
+        cache = self.source / bundle.PAYLOAD[-1] / 'cached-executable'
+        os.link(self.source / bundle.PAYLOAD[0], cache)
+        digest = bundle.create(self.source, self.archive)
+        bundle.restore(self.dest, self.archive, digest)
+        self.assertEqual((self.dest / bundle.PAYLOAD[-1] / 'cached-executable').read_bytes(), b'built executable')
+
+    def test_cache_link_and_payload_root_traversal_are_rejected_before_extract(self):
+        for name, target in [('.ci-go/host-cache/link', '../sdk'),
+                             ('.ci-go/host-cache/../../ci-build.json', None)]:
+            with self.subTest(name=name):
+                with tarfile.open(self.archive, 'w:gz') as archive:
+                    entry = tarfile.TarInfo(name)
+                    if target:
+                        entry.type, entry.linkname = tarfile.SYMTYPE, target
+                    archive.addfile(entry, io.BytesIO())
+                with self.assertRaises(ValueError):
+                    bundle.restore(self.dest, self.archive, bundle.sha(self.archive))
+                self.assertFalse((self.dest / '.ci-go').exists())
 
 
 class RaceInventoryTests(unittest.TestCase):

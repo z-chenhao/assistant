@@ -241,18 +241,46 @@ The shadow workflow sets `ERII_VERIFY_CASE_JOBS=4`, `ERII_VERIFY_GATE_JOBS=2`
 and `ERII_FEEDBACK_JOBS=2` only in their applicable steps; required CI keeps the
 default serial control. No full shard is omitted.
 
-`ci_bundle.py` seals the binary and both installed dependency trees once, after
-early feedback succeeds. Consumers download only the artifact from their own
-workflow attempt, require the producer output SHA-256, and compare source SHA,
-tracked input digest, OS/architecture, runner image version and exact Go/Node versions before restore.
+`ci_bundle.py` v2 seals the binary, both installed dependency trees and a fresh
+Host Go build cache after early feedback succeeds. The producer starts that
+cache empty. Consumers download only their own workflow attempt's artifact,
+require its producer SHA-256, and compare source SHA, tracked input digest,
+OS/architecture, runner image, exact Go/Node versions, copied-SDK digest and
+workflow Run/attempt before restore. Version-one payloads fail closed.
 The source digest includes every tracked file, including lockfiles, go.sum,
 workflows and build scripts. Dirty tracked source is rejected. Binary digest,
 archive entry types, traversal and escaping symlinks are checked; missing or
 corrupt payloads fail closed without rebuilding from an alternate source. This
-is intra-run artifact reuse, not cross-SHA executable caching. Go's existing
-content-addressed compilation cache and locked npm download cache remain.
-Sandbox tests keep their own private caches. Consumer checkout and toolchain
+is intra-run artifact reuse, not cross-SHA executable caching. Host cache links
+and special files are rejected; cached executable hard links serialize as regular
+bytes. Required full Go tests retain their explicit `-count=1`/`-count=5`, so a
+build-cache hit cannot replace a required test execution.
+Sandbox commands still receive a new private writable `GOCACHE` each invocation.
+Consumer checkout and toolchain
 setup remain necessary; no elimination of those costs is claimed.
+
+`ci_sdk.py` creates `.ci-go/sdk` as a disposable copy of the installed Go SDK.
+It never modifies the original SDK and refuses occupied or linked destinations.
+A fresh offline compiler environment installs only the public dependency closure
+of `testing`, `encoding/json`, `testing/internal/testdeps`, `runtime/race` and
+`runtime/cgo`. Go's `installgoroot` mode reads these archives from the SDK already
+mounted read-only by the process sandbox. No workspace outputs or user caches
+enter that SDK. A receipt binds clean source, original SDK bytes, compiler bytes,
+fixed roots and the complete copied tree. Doctor rejects any drift. Local cleanup
+removes only an unchanged owned SDK and preserves the separate Host cache.
+
+The build step uses the original compiler/`GOROOT` to preserve the control's exact
+Erii binary. Fixture processes use the copied SDK through their Host environment.
+The mandatory SDK conformance probe checks denied archive mutation, denied sibling
+reads, private writable cache identity, and execution of a program importing an
+uncached standard package. Missing public archives fall back to compilation in
+that private cache. Doctor checks the SDK again after the full job.
+
+Both control and candidate pin `ubuntu-24.04`. GitHub's
+[announced `ubuntu-latest` migration](https://github.com/actions/runner-images/issues/14748)
+starts on October 19, 2026; the diagnostic job emitted that warning. The fixed
+label preserves the measured OS while image-version and CPU checks remain strict.
+No required test command, repetition, assertion or timeout changes with this pin.
 
 `ci_step.py` records phase wall time, reaped process-tree CPU, cache-hit outputs,
 source SHA, return code and cancellation cleanup latency, including failures.
@@ -303,6 +331,11 @@ python3 -m unittest discover -s scripts -p 'test_verification.py' -v
 python3 -m unittest discover -s scripts -p 'test_fixture_pool.py' -v
 python3 -m unittest discover -s scripts -p 'test_gate_scheduling.py' -v
 python3 scripts/ci_cancel.py --binary bin/personal-agent --evidence evidence/ci-cancel.json
+python3 scripts/ci_sdk.py prepare --host-cache --evidence evidence/sdk.json
+python3 scripts/ci_sdk.py doctor
+ERII_CI_PUBLIC_SDK_PROBE=1 python3 scripts/ci_sdk.py run -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
+python3 scripts/ci_sdk.py run -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence/sdk-full --jobs 1
+python3 scripts/ci_sdk.py cleanup
 # Full required inventory with the candidate scheduling, using isolated evidence.
 ERII_VERIFY_CASE_JOBS=4 python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence/candidate --shard delivery --jobs 1 --gate-jobs 2
 # Collect explicit full-workflow attempts, never the five repetitions inside one run.
