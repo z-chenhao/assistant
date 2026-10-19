@@ -542,6 +542,17 @@ before cleanup, separately from the final phase result. Real shell → owner →
 Make → two-stubborn-session and uncooperative-child regressions cover this path.
 Full GitHub cancellation and five-pair acceptance still require measured proof.
 
+The first exec-owner replica retained every phase receipt and drained its direct
+groups, but delivery's parallel PTY wait left one Python process for runner orphan
+cleanup. The retained termios observer keeps the slave end open even after its
+child dies, so EOF cannot wake a worker blocked in a long select. A real shell/Make
+regression reproduced leftover fixture state despite a successful direct-group
+drain record. Scoped PTY reads and writes now check cancellation while polling;
+their original absolute input/output deadlines and assertions remain unchanged.
+The regression requires both stubborn sessions, listening ports, queued-admission
+fence, profile finalization and state cleanup to settle before the owner deadline.
+Group drain alone is not proof of all nested fixture cleanup.
+
 `ci_supersede.py` owns the repeated push/collection mechanics. It freezes the
 source refspec, records an unknown outcome before dispatch, requires a Draft
 on the matching branch, and never retries an existing record. Collection binds

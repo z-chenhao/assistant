@@ -45,9 +45,16 @@ class Terminal:
         pattern = marker.encode()
         deadline = time.monotonic() + timeout
         while pattern not in self.output[self.position:]:
+            if self.processes is not None:
+                self.processes.check()
             remaining = deadline - time.monotonic()
-            if remaining <= 0 or not select.select([self.master], [], [], remaining)[0]:
+            if remaining <= 0:
                 raise RuntimeError(f"terminal timed out awaiting {marker!r}; {self.transcript()[-1200:]}")
+            # The retained slave observer prevents EOF after a scoped child
+            # stops. Poll cancellation while preserving the absolute deadline.
+            wait = min(remaining, .05) if self.processes is not None else remaining
+            if not select.select([self.master], [], [], wait)[0]:
+                continue
             try:
                 chunk = os.read(self.master, 65536)
             except OSError as error:
@@ -84,10 +91,13 @@ class Terminal:
         remaining = memoryview(data)
         deadline = time.monotonic() + 20
         while remaining:
+            if self.processes is not None:
+                self.processes.check()
             timeout = deadline - time.monotonic()
             if timeout <= 0:
                 raise RuntimeError("terminal input write timed out")
-            readable, writable, _ = select.select([self.master], [self.master], [], timeout)
+            wait = min(timeout, .05) if self.processes is not None else timeout
+            readable, writable, _ = select.select([self.master], [self.master], [], wait)
             if readable:
                 self.output += os.read(self.master, 65536)
             if writable:
