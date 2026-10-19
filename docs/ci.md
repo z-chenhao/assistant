@@ -443,7 +443,7 @@ a five-pair cohort or that latency goal. Further optimization must preserve the
 full inventory, five serial rounds and existing deadlines. Faster early feedback
 does not certify a sub-ten-minute complete gate.
 
-The shadow experiment also tests `python3 scripts/ci_race.py`.
+`make test-race` and the shadow job use `python3 scripts/ci_race.py`.
 Baseline job 117675122720 failed the Bridge duplicate-burst concurrent RPC check
 at its one-second deadline while the full SQLite race package was running.
 The peer emits 8,192 notifications before it reads that RPC, so the deadline
@@ -457,6 +457,15 @@ and missing/duplicate/foreign inventory fails closed. Every stage uses fresh
 `-count=1` race tests with the existing 15-minute package budget. Internal test
 concurrency, assertions and deadlines are unchanged. `evidence/race/inventory.json`
 records the full inventory and both stage outcomes; an early Bridge failure
-prevents expensive remainder work and fails the gate. The baseline Makefile and
-required job remain unchanged. Measure both outcomes and cold-build cost before
-promoting this scheduling policy; one passing rerun is not proof of repair.
+prevents expensive remainder work and fails the gate.
+
+Required job 117946948256 at `fbb15390ec3a40cba47766037a193275837546e9`
+again failed this exact duplicate-burst assertion, at its unchanged one-second
+deadline. The NATS fixture passed. This cohort stopped on the evidenced failure
+without requesting a rerun. The Makefile now uses the same audited scheduling
+path as shadow. All race tests remain in the same Required job and run exactly
+once; no test moves to another gate. The test peer, burst bytes, sink barrier,
+RPC deadline and production Bridge remain unchanged. Experimental typed/buffered
+peer variants gave insufficient local end-to-end improvement and were discarded.
+This removes competing package work from the sensitive Bridge phase; its
+exact-SHA CI result and the full comparison cohort still require verification.
