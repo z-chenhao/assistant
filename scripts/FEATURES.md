@@ -1,19 +1,19 @@
 # Foundation feature map
 
-## Computer Live Shadow preparation (ERII-24; lifecycle incomplete)
+## Computer Live Shadow (ERII-24; lifecycle incomplete)
 
 `scripts/lume_live.py --root TEST_ROOT` provides opt-in local L2 mechanics.
 See [Computer acceptance](../docs/computer-l2.md) for authorization, dedicated
-storage, pinned releases and the full acceptance matrix. This preparation does
-not establish a production ComputerProvider or Jianying compatibility.
+storage, pinned releases and the full acceptance matrix. The pinned 26.5.2 Guest combination has actual Jianying acceptance evidence;
+the production ComputerProvider remains a separate incomplete slice.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
 | Owned Lume environment | `doctor`, foreground `serve` | `lume_live.Live`, pinned official Lume CLI | Actual signature/version/config readback; ownership and symlink refusal; disposable host probe denied by Seatbelt while owned fixture remains readable |
-| Resumable clean image | `download`, then `create` | `Live.download`, Lume `create` with explicit owned storage | Per-range SHA-256 receipts, exact HTTP ranges, full Apple image digest before provisioning; refuses an existing VM |
-| Guest observation and cleanup | `start`, `guest`, `vnc`, `state`, `stop` | Owned loopback Lume HTTP API and Guest SSH/VNC | Run-specific L2 evidence required; no live application or recovery pass is inferred from preparation tests |
+| Resumable clean image | `download`, then `create`; `pull-tested-image` | `Live.download`, Lume `create` with explicit owned storage | Per-range SHA-256 receipts, exact HTTP ranges, full Apple image digest before provisioning; refuses an existing VM |
+| Guest observation and cleanup | `start`, `guest`, `put`, `get`, `driver`, `vnc-session control`, `vnc-control`, `state`, `stop` | Owned loopback Lume HTTP API and Guest SSH/VNC | Actual 11.6.0 import/timeline/subtitle/dissolve/MOV+MP3 export; signed Driver consent and raw capture refusal; cold/SIGKILL restart with six matching file hashes. Explicit Host/Guest/VNC constraints in acceptance report; production identity/epoch/checkpoint semantics remain pending |
 
-The eventual live run owns Launch (temporary API/new VM), Doctor (versions,
+The live harness owns Launch (temporary API/new VM), Doctor (versions,
 storage, Guest session and Driver permissions), Drive (synthetic Jianying
 scenario), Evidence (Guest screenshots, export/project hashes, restart state),
 and Cleanup (stop VM, join the owned server, detach owned installation media).
