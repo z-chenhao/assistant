@@ -1,0 +1,78 @@
+name: ERII-141 runtime profile
+
+on:
+  push:
+    branches: [ERII-141-runtime-profile]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: erii-141-runtime-profile
+  cancel-in-progress: true
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Launch and filesystem Doctor
+        run: |
+          mkdir -p evidence
+          df -hT /tmp "$RUNNER_TEMP" "$GITHUB_WORKSPACE" > evidence/filesystems.txt
+          lscpu > evidence/cpu.txt
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          make build
+          python3 scripts/ci_sdk.py prepare --host-cache --evidence evidence/sdk.json
+      - name: Warm the exact full conformance command once
+        env:
+          GOGC: "100"
+        run: python3 scripts/core_conformance.py --evidence evidence/warmup.json
+      - name: Five rotated full conformance comparisons on this one VM
+        run: |
+          for round in 1 2 3 4 5; do
+            if (( round % 2 )); then order="100 400"; else order="400 100"; fi
+            for gc in $order; do
+              profile="evidence/round-$round-gc-$gc"
+              if [[ "$gc" == 400 ]]; then limit="2GiB"; else limit="off"; fi
+              GOGC="$gc" GOMEMLIMIT="$limit" python3 scripts/core_conformance.py --evidence "$profile.json" --cpu-profile "$profile.cpu"
+              go tool pprof -top -nodecount=35 evidence/conformance.test "$profile.cpu" > "$profile.top.txt"
+            done
+          done
+      - name: One complete eighteen-variant Core round under each configuration
+        env:
+          ERII_VERIFY_CASE_JOBS: "4"
+        run: |
+          GOGC=400 GOMEMLIMIT=2GiB python3 scripts/ci_step.py --name core400 --phase test -- python3 scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core400.json
+          GOGC=100 GOMEMLIMIT=off python3 scripts/ci_step.py --name core100 --phase test -- python3 scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core100.json
+      - name: SDK Doctor and Cleanup
+        if: always()
+        run: |
+          python3 scripts/ci_sdk.py doctor
+          python3 scripts/ci_sdk.py cleanup
+      - name: Retain exact source, profiles, failures and cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-profile-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
