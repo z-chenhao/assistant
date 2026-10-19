@@ -237,6 +237,13 @@ Five-round aggregation rejects missing cancellation proof. This is harness
 cancellation; GC-20's separate business Task cancellation remains unchanged.
 It does not measure GitHub's push-to-cancellation delivery latency.
 
+The focused `ci_cancel.py --entry make-step` probe drives those same four held
+fixtures through the Required phase owner → Make → profiled harness chain.
+It retains the original twenty-second readiness and fifteen-second cleanup
+bounds, descendant start-token checks and queued-admission fence. Its phase
+record must contain a cancellation receipt, failed status and drained group.
+The default full-Core probe remains unchanged.
+
 Runtime and provider shards can overlap two independent gate series. Their Go
 event/model checks run after the other series have joined. Code Mode and security
 gate series remain serial. Early feedback can overlap two other shards, then
@@ -469,3 +476,19 @@ RPC deadline and production Bridge remain unchanged. Experimental typed/buffered
 peer variants gave insufficient local end-to-end improvement and were discarded.
 This removes competing package work from the sensitive Bridge phase; its
 exact-SHA CI result and the full comparison cohort still require verification.
+
+Push `fbb1539` → `9a0cebe` bounded all old jobs stopping at 95.5–100.4s.
+The control Code Mode job ended at 08:23:24 UTC; its failed aggregate ended
+eight seconds later. Earlier control cancellation logs also show runner orphan
+cleanup. These observations do not establish whether signal delivery or local
+cleanup dominates. Required commands now use the same `ci_step.py` owner as
+shadow, inside their existing jobs. No check, assertion, repetition or timeout
+changes. Phase records retain first `cancel_received_at`, `started_at`,
+`finished_at` and separate cleanup duration. A real Make-chain regression proves
+two stubborn sessions, listening ports, queued work and temporary state are
+cleaned; the four-real-Core focused probe proves the Go/Node path. End-to-end
+GitHub cancellation p95 remains unproven.
+
+```sh
+python3 scripts/ci_cancel.py --binary bin/personal-agent --entry make-step --evidence evidence/make-cancel.json
+```

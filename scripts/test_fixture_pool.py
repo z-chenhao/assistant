@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shlex
 import socket
 import sys
 import tempfile
@@ -118,6 +119,12 @@ class FixturePoolTests(unittest.TestCase):
         self.assertFalse(scope.children)
 
     def test_sigterm_joins_two_stubborn_sessions_and_cleans_state(self):
+        self.check_stubborn_session_cleanup()
+
+    def test_step_wrapping_make_joins_sessions_and_cleans_state(self):
+        self.check_stubborn_session_cleanup(make_step=True)
+
+    def check_stubborn_session_cleanup(self, make_step=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state = root / 'state'
@@ -139,6 +146,13 @@ class FixturePoolTests(unittest.TestCase):
                        'finally: shutil.rmtree(state)\n')
             script = root / 'fixture.py'
             script.write_text(program)
+            command = [sys.executable, 'scripts/profile_harness.py', str(script)]
+            step_name = 'fixture-cancel-' + root.name.replace('_', '-')
+            if make_step:
+                makefile = root / 'Makefile'
+                makefile.write_text('.PHONY: fixture\nfixture:\n\t' + shlex.join(command) + '\n')
+                command = [sys.executable, 'scripts/ci_step.py', '--name', step_name, '--phase', 'test',
+                           '--', 'make', '-f', str(makefile), 'fixture']
             stopped = threading.Event()
             ready = []
             def interrupt():
@@ -156,8 +170,7 @@ class FixturePoolTests(unittest.TestCase):
             started = time.monotonic()
             try:
                 env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'scripts'), ERII_PROFILE_DIR=str(root / 'profiles'))
-                code = suite.run_command([sys.executable, 'scripts/profile_harness.py', str(script)],
-                                         env, root / 'log', stopped, metrics)
+                code = suite.run_command(command, env, root / 'log', stopped, metrics)
                 self.assertNotEqual(code, 0)
                 self.assertEqual(len(ready), 2, (root / 'log').read_text())
                 self.assertEqual(len(list(root.glob('ready-*.json'))), 2, 'queued fixtures started after cancellation')
@@ -165,11 +178,19 @@ class FixturePoolTests(unittest.TestCase):
                 self.assertTrue(metrics['owned_group_drained'])
                 self.assertLess(time.monotonic() - started, 15)
                 self.assertTrue((root / 'profiles/fixture.json').is_file())
+                if make_step:
+                    record = json.loads((suite.ROOT / 'evidence/steps' / (step_name + '.json')).read_text())
+                    self.assertEqual(record['returncode'], 130)
+                    self.assertIsNotNone(record['cancel_received_at'])
+                    self.assertTrue(record['owned_group_drained'])
                 for _, port in ready:
                     with socket.socket() as probe:
                         self.assertNotEqual(probe.connect_ex(('127.0.0.1', port)), 0)
             finally:
                 waiter.join(timeout=6)
+                if make_step:
+                    for suffix in ('.json', '.log'):
+                        (suite.ROOT / 'evidence/steps' / (step_name + suffix)).unlink(missing_ok=True)
                 for pid, _ in ready:
                     try:
                         os.kill(pid, signal.SIGKILL)

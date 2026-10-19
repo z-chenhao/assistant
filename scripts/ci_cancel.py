@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -65,7 +66,9 @@ def child(binary, folder):
         fixture_pool.run_cases(list(range(20)), drive, 4)
 
 
-def run(binary):
+def run(binary, entry='direct'):
+    if entry not in ('direct', 'make-step'):
+        raise ValueError('unknown cancellation entry')
     source = suite.source_state()
     binary_digest = hashlib.sha256(binary.read_bytes()).hexdigest()
     with tempfile.TemporaryDirectory(prefix='erii-ci-cancel-') as directory:
@@ -86,10 +89,15 @@ def run(binary):
         waiter.start()
         metrics = {}
         env = dict(os.environ, ERII_PROFILE_DIR=str(root / 'profiles'))
+        command = [sys.executable, 'scripts/profile_harness.py',
+                   'scripts/ci_cancel.py', '--child', '--binary', str(binary), '--evidence', str(root)]
+        if entry == 'make-step':
+            makefile = root / 'Makefile'
+            makefile.write_text('.PHONY: fixture\nfixture:\n\t' + shlex.join(command) + '\n')
+            command = [sys.executable, 'scripts/ci_step.py', '--name', 'cancel-probe', '--phase', 'test',
+                       '--evidence', str(root / 'steps'), '--', 'make', '-f', str(makefile), 'fixture']
         try:
-            code = suite.run_command([sys.executable, 'scripts/profile_harness.py',
-                'scripts/ci_cancel.py', '--child', '--binary', str(binary), '--evidence', str(root)],
-                env, root / 'probe.log', stopped, metrics)
+            code = suite.run_command(command, env, root / 'probe.log', stopped, metrics)
             table = processes()
             leaked = [int(pid) for item in ready for pid, prior in item['descendants'].items()
                       if (current := table.get(int(pid))) and current['start'] == prior['start'] and
@@ -105,6 +113,13 @@ def run(binary):
                     'cancellation did not fail with a drained owning group: ' + json.dumps(evidence))
             require(not leaked and not evidence['remaining_state'] and elapsed < 15,
                     'nested Core cancellation cleanup failed: ' + json.dumps(evidence))
+            evidence['entry'] = entry
+            if entry == 'make-step':
+                phase = json.loads((root / 'steps/cancel-probe.json').read_text())
+                require(phase['returncode'] == 130 and phase['owned_group_drained'] is True and
+                        phase['cancel_received_at'] is not None,
+                        'Make phase did not retain cancellation receipt and cleanup proof')
+                evidence['phase'] = phase
             require(source == suite.source_state() and binary_digest == hashlib.sha256(binary.read_bytes()).hexdigest(),
                     'source or executable changed during cancellation probe')
             evidence.update(**source, source_stable=True, binary_sha256=binary_digest)
@@ -130,13 +145,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--entry', choices=['direct', 'make-step'], default='direct')
     parser.add_argument('--child', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.child:
         child(args.binary.resolve(), args.evidence)
     else:
         args.evidence.unlink(missing_ok=True)
-        report = run(args.binary.resolve())
+        report = run(args.binary.resolve(), args.entry)
         args.evidence.parent.mkdir(parents=True, exist_ok=True)
         args.evidence.write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps({k: v for k, v in report.items() if k not in ('log_tail', 'ready')}))
