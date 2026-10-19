@@ -27,10 +27,16 @@ def main():
     folder.mkdir(parents=True, exist_ok=True)
     stopped = threading.Event()
     cancel_received_at = None
-    def stop(*_):
+    def stop(signum, *_):
         nonlocal cancel_received_at
         if cancel_received_at is None:
             cancel_received_at = datetime.now(timezone.utc).isoformat()
+            stopped.set()
+            receipt = folder / (args.name + '-cancel.json')
+            temporary = receipt.with_suffix('.tmp')
+            temporary.write_text(json.dumps(dict(version=1, name=args.name,
+                cancel_received_at=cancel_received_at, signal=signum, owner_pid=os.getpid())) + '\n')
+            temporary.replace(receipt)
         stopped.set()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, stop)

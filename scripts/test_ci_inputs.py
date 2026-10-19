@@ -3,6 +3,7 @@ import io
 import json
 import os
 import signal
+import shlex
 from pathlib import Path
 import tarfile
 import subprocess
@@ -226,6 +227,21 @@ class BundleTests(unittest.TestCase):
 
 
 class FeedbackSchedulingTests(unittest.TestCase):
+    def test_phase_owner_is_the_actions_entry_process(self):
+        for filename in ('ci.yml','ci-shadow.yml'):
+            names = set()
+            for line in (ROOT/'.github/workflows'/filename).read_text().splitlines():
+                if 'python3 scripts/ci_step.py ' not in line:
+                    continue
+                command = shlex.split(line.strip().removeprefix('run: '))
+                self.assertEqual(command[0], 'exec', 'bash must not intercept the entry PID signal')
+                python = command.index('python3')
+                if python > 1:
+                    self.assertEqual(command[1], 'env')
+                    self.assertTrue(all('=' in arg for arg in command[2:python]))
+                names.add(command[command.index('--name')+1])
+            self.assertTrue({'unit-lint','race','verification'} <= names)
+
     def test_all_selected_shards_remain_in_early_schedule(self):
         self.assertEqual(ci_feedback.feedback_order(list(ci_feedback.GATES)),
                          ['security','runtime','codemode','providers','delivery'])
