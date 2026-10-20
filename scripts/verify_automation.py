@@ -29,20 +29,30 @@ class Harness(MainHarness):
         value = self.state()
         with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
             db.row_factory = sqlite3.Row
-            for table in ('automation', 'automation_fire', 'task', 'task_update', 'task_instruction', 'tool_invocation', 'main_inbox'):
+            for table in ('automation', 'automation_fire', 'task', 'task_update', 'task_instruction', 'tool_invocation', 'main_inbox', 'memory_privacy'):
                 value[table] = [dict(row) for row in db.execute('SELECT * FROM ' + table)]
             value['automation_inbox'] = [dict(row) for row in db.execute("SELECT * FROM event_inbox WHERE consumer='automation_actor'")]
         return value
+
+
+class MemoryHarness(Harness):
+    def args(self, *args):
+        return super().args('-config', str(self.root / 'config.yaml'), *args)
+
+    def setup(self):
+        (self.root / 'config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:ERII_MEMORY_KEY\n')
+        self.env['ERII_MEMORY_KEY'] = 'S' * 32  # Explicit disposable fixture key.
+        return super().setup()
 
 
 def run(binary):
     fixture = json.loads(FIXTURE.read_text())
     report = dict(version=1, fixture=fixture, scenarios={}, scope='Deterministic scheduling and notification fragments of GC-02/08/14, SC-05/12; no full M7 or model-quality score')
     with tempfile.TemporaryDirectory(prefix='erii-automation-') as folder:
-        def scenario(name, action):
+        def scenario(name, action, harness=Harness):
             root = Path(folder) / name
             root.mkdir()
-            h = Harness(binary, root, fixture='automation')
+            h = harness(binary, root, fixture='automation')
             try:
                 h.setup()
                 report['scenarios'][name] = action(h)
@@ -106,6 +116,41 @@ def run(binary):
             require(not value['runs'] and value['automation_fire'][0]['state']=='skipped','delayed fire survived cancellation')
             return value
         scenario('GC-08-delayed-cancel', delayed_cancel)
+
+        def forget_next_fire(h):
+            marker = 'REVOKED_AUTOMATION_CONTEXT_MARKER'
+            h.manage('old', operation='create', instruction=marker, triggerType='cron', triggerSpec='0 8 * * *', timezone='Asia/Shanghai')
+            h.now = '2026-10-16T08:00:00+08:00'
+            h.command('chat', 'work')
+            before = h.evidence()
+            old_task = before['task'][0]['task_id']
+            require(len(before['automation_fire']) == 1 and len([r for r in before['runs'] if r['kind'] == 'worker']) == 1, 'first recurring occurrence not completed')
+            receipt = h.command('memory', 'manage', 'forget', text=json.dumps(dict(operation='forget', category='health')))
+            require(receipt.get('accepted') is True, 'Forget not accepted')
+            fresh = h.send('fresh-after-forget', 'Fresh chat must still work')
+            prior_generations = {g['generation_id'] for g in before['generations']}
+            h.now = '2026-10-17T08:00:00+08:00'
+            h.command('chat', 'work')
+            after = h.evidence()
+            require(next(r for r in after['runs'] if r['run_id'] == fresh['run_id'])['status'] == 'completed' and len(after['deliveries']) == len(before['deliveries']) + 1 and all(d['status'] == 'sent' for d in after['deliveries']), 'revoked fire stranded fresh Main')
+            require(len(after['automation_fire']) == 2 and after['automation_fire'][1]['state'] == 'skipped' and not after['automation_fire'][1]['root_run_id'], 'revoked fire did not retire')
+            require(len(after['automation_inbox']) == 2 and len([r for r in after['runs'] if r['task_id'] == old_task]) == 1, 'revoked Task executed again or skip not acknowledged')
+            require(after['task'][0]['created_at'] <= after['memory_privacy'][0]['updated_at'], 'privacy barrier did not cover linked Task')
+            h.command('chat', 'work')
+            require(after == h.evidence(), 'restart retried revoked fire')
+            # Fresh scheduled intent must also progress alongside future revoked fires.
+            h.manage('new', operation='create', instruction='Fresh scheduled intent', triggerType='at', triggerSpec='2026-10-18T08:00:00+08:00', timezone='Asia/Shanghai')
+            h.now = '2026-10-18T08:00:00+08:00'
+            h.command('chat', 'work')
+            final = h.evidence()
+            require(len([r for r in final['runs'] if r['kind'] == 'worker' and r['status'] == 'completed']) == 2 and len([r for r in final['runs'] if r['task_id'] == old_task]) == 1 and len(final['deliveries']) == len(after['deliveries']) + 1, 'fresh Automation blocked or old context revived')
+            require(len(final['automation_inbox']) == 4 and not [f for f in final['automation_fire'] if f['state'] == 'pending'], 'fire disposition not durable')
+            requests = [g['request_json'] for g in final['generations'] if g['generation_id'] not in prior_generations]
+            require(requests and all(marker not in q for q in requests), 'revoked context entered a fresh model request')
+            h.command('chat', 'work')
+            require(final == h.evidence(), 'fresh Automation repeated after restart')
+            return dict(before_forget=before, forget_receipt=receipt, fresh_main_completed=after, fresh_automation_completed=final)
+        scenario('forget-next-fire-fresh-chat', forget_next_fire, MemoryHarness)
 
         for boundary in ('after_result_commit', 'after_report_commit'):
             def edit_committed_result(h, boundary=boundary):

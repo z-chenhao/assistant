@@ -65,6 +65,14 @@ keep their existing snapshots and approval boundaries. Cancel disables future
 fires and uses the existing Task cancel/epoch mechanism for the current tree.
 Task pause/cancel also disables its Automation. A stopped Task cannot be restarted
 by a delayed fire or schedule edit; create a new Automation to establish new intent.
+Memory Forget revokes prior Task context. If a linked Task predates that privacy
+barrier, admission commits its pending fires as `skipped` with Inbox receipts.
+It never replaces the Task to regain its context. Fresh chat and newly created
+Automations continue through the same Actor without manual cancellation of the
+old schedule. A new Automation establishes fresh intent; editing the old schedule
+does not restore its revoked Task. Storage failures still abort admission and
+remain recoverable.
+
 Completed one-shot `at` intent retains `enabled=true, next_fire_at=NULL` for audit;
 it never fires twice. Cancellation is explicit and disables it.
 

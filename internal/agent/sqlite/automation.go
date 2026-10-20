@@ -259,10 +259,13 @@ func (r *Runs) admitAutomations(ctx context.Context) error {
 			var epoch int64 = 1
 			if taskID.Valid && !skip {
 				var status string
-				if e = tx.QueryRowContext(ctx, `SELECT status,task_epoch FROM task WHERE task_id=?`, taskID.String).Scan(&status, &epoch); e != nil {
+				var revoked bool
+				// createRoot rejects pre-Forget Task context. Consume that known
+				// ineligibility here so a durable pending fire cannot block Next.
+				if e = tx.QueryRowContext(ctx, `SELECT t.status,t.task_epoch,t.created_at<=coalesce(p.updated_at,0) FROM task t LEFT JOIN memory_privacy p USING(agent_id) WHERE t.task_id=?`, taskID.String).Scan(&status, &epoch, &revoked); e != nil {
 					return e
 				}
-				skip = status != "active"
+				skip = status != "active" || revoked
 				var busy bool
 				if e = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM run WHERE task_id=? AND status IN ('queued','running','waiting'))`, taskID.String).Scan(&busy); e != nil {
 					return e

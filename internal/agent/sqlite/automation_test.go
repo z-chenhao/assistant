@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/memory"
+	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
@@ -312,6 +315,98 @@ func TestAutomationScheduleEditFencesCommittedFollowups(t *testing.T) {
 				t.Fatal("edited intent did not complete exactly one Main followup")
 			}
 		})
+	}
+}
+
+func TestAutomationForgetSkipsRevokedTaskWithoutBlockingActor(t *testing.T) {
+	ctx := context.Background()
+	s, r, a, p := automationFixture(t)
+	m, err := memorysqlite.Open(ctx, filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	r.ConfigureMemory(m, memory.Vault{})
+	p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		return llm.GenerationResult{Text: "reminder result"}, nil
+	}
+	now := time.Now().UTC()
+	id := createAutomation(t, r, now, nil)
+	first := now.AddDate(0, 0, 1)
+	r.SetTestAutomationClock(first)
+	mustDrain(t, a)
+	var oldTask string
+	if err = s.db.QueryRow(`SELECT task_id FROM automation WHERE automation_id=?`, id).Scan(&oldTask); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE task_id=?`, oldTask) != 1 {
+		t.Fatal("first recurring occurrence did not finish")
+	}
+	forget, err := r.ManageMemory(ctx, "forget-health", memory.Mutation{Operation: "forget", Category: "health"})
+	if err != nil || forget["accepted"] != true {
+		t.Fatal(forget, err)
+	}
+	p.requests = nil
+	fresh := mustSubmit(t, a, "fresh", "Fresh input after Forget")
+	second := first.AddDate(0, 0, 1)
+	r.SetTestAutomationClock(second)
+	mustDrain(t, a)
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='skipped'`) != 1 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 2 {
+		t.Fatal("revoked fire not durably skipped and consumed")
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='completed'`, fresh.RunID) != 1 {
+		t.Fatal("revoked fire blocked fresh Main")
+	}
+	if scalar(t, s, `SELECT count(*) FROM task WHERE task_id=? AND status='active'`, oldTask) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE task_id=?`, oldTask) != 1 {
+		t.Fatal("Task was cancelled or revoked context revived")
+	}
+	third := second.AddDate(0, 0, 1)
+	result, err := r.ManageAutomation(ctx, "fresh-automation", automation.Request{Operation: "create", Instruction: "Fresh scheduled intent", Type: "at", Spec: third.Format(time.RFC3339), Timezone: "UTC"}, second)
+	if err != nil || result.Error != nil {
+		t.Fatal(result, err)
+	}
+	r.SetTestAutomationClock(third)
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 2 || scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='skipped'`) != 2 || scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='pending'`) != 0 {
+		t.Fatal("fresh Automation blocked or revoked occurrence executed")
+	}
+	for _, req := range p.requests {
+		raw, _ := encoded(req)
+		if strings.Contains(raw, "HKG-CDG 2026-12-01 price") {
+			t.Fatal("revoked Task context imported", raw)
+		}
+	}
+}
+
+func TestAutomationAdmissionStorageFailureRemainsPending(t *testing.T) {
+	ctx := context.Background()
+	s, r, a, p := automationFixture(t)
+	p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		return llm.GenerationResult{Text: "reminder result"}, nil
+	}
+	now := time.Now().UTC()
+	createAutomation(t, r, now, nil)
+	fire := now.AddDate(0, 0, 1)
+	r.SetTestAutomationClock(fire)
+	if err := r.ScheduleAutomations(ctx, fire); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`CREATE TRIGGER reject_automation_root BEFORE INSERT ON run WHEN NEW.kind='worker' BEGIN SELECT RAISE(ABORT,'storage fault'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.admitAutomations(ctx); !errors.Is(err, agent.ErrStorage) {
+		t.Fatalf("storage failure swallowed: %v", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='pending'`) != 1 || scalar(t, s, `SELECT count(*) FROM task`) != 0 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 0 {
+		t.Fatal("storage failure partially committed admission")
+	}
+	if _, err := s.db.Exec(`DROP TRIGGER reject_automation_root`); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 1 {
+		t.Fatal("recoverable storage failure lost occurrence")
 	}
 }
 
