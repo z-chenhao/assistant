@@ -1905,7 +1905,7 @@ tool/mcp
 
 数据库文件、Artifact 二进制和日志位于配置的 data root 下；不得依赖进程当前目录。migration 必须前向执行、可在空库重建，并在不兼容版本时 fail-fast，不能带病启动。
 
-`state.db` 的空库初始化可使用从前二十个历史 migration 生成的 schema，减少重复 ALTER 引起的 schema 解析。它仍是 schema version 20，不是新磁盘格式；既有库照常逐版升级，未来 migration 在快照版本之后继续执行。生成文件绑定历史脚本摘要，漂移时 fail-closed；创建、版本更新和后续 migration 在同一个 immediate transaction 内。测试必须验证表/索引/触发器及初始数据与逐版重放一致、失败全回滚，以及提交前后 kill/restart。
+`state.db` 的空库初始化可使用从前二十个历史 migration 生成的 schema，减少重复 ALTER 引起的 schema 解析。快照对应 schema version 20，不是另一种磁盘格式；既有库照常逐版升级，快照之后的迁移仍逐版执行，包括 Computer 的 migration 21。生成文件绑定历史脚本摘要，漂移时 fail-closed；创建、版本更新和后续 migration 在同一个 immediate transaction 内。测试必须验证表/索引/触发器及初始数据与逐版重放一致、失败全回滚，以及提交前后 kill/restart。
 
 ### 16.2 最小持久化模型
 

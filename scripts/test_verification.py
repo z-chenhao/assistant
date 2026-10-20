@@ -139,6 +139,9 @@ class VerificationTests(unittest.TestCase):
 
     def test_codemode_gate_series_parallelize_without_splitting_repetitions(self):
         gates = suite.SHARDS['codemode']
+        ordered = suite.gate_execution_order(gates)
+        self.assertEqual(ordered[0].name, 'core-cases')
+        self.assertCountEqual([g.name for g in ordered], [g.name for g in gates])
         seen, active, peak = [], 0, 0
         lock = threading.Lock()
 

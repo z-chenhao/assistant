@@ -228,9 +228,10 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_job
 
 
 def gate_execution_order(gates):
-    # This five-run series contains a real thirty-second deadline per run.
-    # Start it before shorter independent series; reports retain inventory order.
-    return sorted(gates, key=lambda gate: gate.name != 'pi-bridge')
+    # Core dominates Code Mode; Pi Bridge retains a real thirty-second deadline
+    # per run. Start these measured long series first; retain inventory order in
+    # reports and keep every series' five repetitions on the same worker.
+    return sorted(gates, key=lambda gate: gate.name not in ('core-cases', 'pi-bridge'))
 
 
 def concurrent_gates(name, binary, evidence, stopped, gates, previous):

@@ -266,6 +266,9 @@ The default full-Core probe remains unchanged.
 Runtime, Code Mode, provider and security shards can overlap two independent gate series.
 Their Go event/model checks run after the other series have joined.
 Each series retains five consecutive runs.
+Code Mode starts its measured longest Core series first, including after adding
+the five Computer lifecycle repetitions; the other worker drives the remaining
+independent series. The complete report retains the manifest's inventory order.
 Early feedback starts security and runtime first in its bounded two-shard pool;
 the recall interleavings now have explicit deterministic barriers. Provider
 scheduling starts the long Pi Bridge series first, preserving its real thirty-second
