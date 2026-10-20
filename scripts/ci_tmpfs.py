@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Own one bounded, executable tmpfs for disposable provider fixtures only.
+"""Own one bounded, executable tmpfs for disposable provider and race fixtures.
 
-Unit/lint and the complete race inventory retain ordinary disk storage. This
+Complete unit/lint, five SC race rounds and focused receipt races retain disk. This
 changes neither SQLite's journal/sync policy nor any test command or count.
 """
 import argparse
@@ -23,6 +23,19 @@ def command(*args):
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
+def disk():
+    root = Path(os.environ.get('TMPDIR') or tempfile.gettempdir()).resolve(strict=True)
+    rows = json.loads(command('findmnt', '--json', '--target', str(root),
+                              '--output', 'TARGET,SOURCE,FSTYPE,OPTIONS'))['filesystems']
+    if (len(rows) != 1 or rows[0]['fstype'] not in ('ext4', 'xfs', 'btrfs') or
+            not rows[0]['source'].startswith('/dev/')):
+        raise ValueError('disk conformance requires an ordinary block filesystem')
+    if RECEIPT.exists():
+        raise ValueError('fixture receipt already exists')
+    write(dict(version=1, storage='disk', managed_mount=False, root=str(root), mount=rows[0],
+               scope='ordinary VM filesystem; no host power-loss claim'))
+
+
 def root_path():
     parent = Path(os.environ['RUNNER_TEMP'])
     if not parent.is_absolute() or any(c in str(parent) for c in '\r\n'):
@@ -30,7 +43,7 @@ def root_path():
     parent = parent.resolve(strict=True)
     if parent.stat().st_uid != os.getuid():
         raise ValueError('runner temporary directory has another owner')
-    return parent / 'erii-provider-fixtures'
+    return parent / 'erii-fixtures'
 
 
 def write(receipt):
@@ -127,7 +140,7 @@ def cleanup():
     receipt.update(cleanup=not remaining, remaining_entries=remaining)
     write(receipt)
     if remaining:
-        raise ValueError('provider fixtures left disposable state')
+        raise ValueError('CI fixtures left disposable state')
 
 
 def setup():
@@ -143,9 +156,10 @@ def setup():
     # Exclusive creation prevents mounting over existing or user-owned state.
     root.mkdir(mode=0o700)
     stat = root.stat()
-    receipt = dict(version=1, root=str(root), source='erii-fixtures-' + uuid.uuid4().hex,
+    receipt = dict(version=1, storage='tmpfs', managed_mount=True,
+                   root=str(root), source='erii-fixtures-' + uuid.uuid4().hex,
                    backing=[stat.st_dev, stat.st_ino], previous_tmpdir=previous,
-                   cleanup=False, scope='providers only; unit/lint and race remain on disk')
+                   cleanup=False, scope='providers/race tmpfs; full unit, five SC race rounds and focused receipt races on disk')
     try:
         write(receipt)
     except BaseException:
@@ -165,9 +179,9 @@ def setup():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('setup', 'cleanup'))
+    parser.add_argument('action', choices=('setup', 'cleanup', 'disk'))
     args = parser.parse_args()
-    (setup if args.action == 'setup' else cleanup)()
+    {'setup': setup, 'cleanup': cleanup, 'disk': disk}[args.action]()
     if RECEIPT.exists():
         print(RECEIPT.read_text(), end='')
 

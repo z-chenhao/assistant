@@ -14,7 +14,7 @@ COMMAND = fixtures.command
 INSPECT = fixtures.mount_info
 
 
-class ProviderFixtureStorageTests(unittest.TestCase):
+class FixtureStorageTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -200,3 +200,21 @@ class ProviderFixtureStorageTests(unittest.TestCase):
                     INSPECT(root)
         with patch.object(fixtures.subprocess, 'run', return_value=SimpleNamespace(returncode=1, stdout='')):
             self.assertIsNone(INSPECT(root))
+
+    def test_disk_conformance_records_real_device_and_rejects_ram_or_unknown_storage(self):
+        for filesystem, source in (('ext4', '/dev/root'), ('tmpfs', 'tmpfs'),
+                                   ('overlay', 'overlay'), ('ext4', 'unknown')):
+            with self.subTest(filesystem=filesystem, source=source):
+                response = json.dumps({'filesystems': [dict(target='/', source=source,
+                                                            fstype=filesystem, options='rw')]})
+                with patch.object(fixtures, 'command', return_value=response):
+                    if filesystem == 'ext4' and source == '/dev/root':
+                        fixtures.disk()
+                        receipt = json.loads(self.receipt.read_text())
+                        self.assertEqual(receipt['storage'], 'disk')
+                        self.assertFalse(receipt['managed_mount'])
+                        with self.assertRaisesRegex(ValueError, 'receipt already exists'):
+                            fixtures.disk()
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'ordinary block filesystem'):
+                            fixtures.disk()

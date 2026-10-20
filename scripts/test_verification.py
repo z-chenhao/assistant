@@ -132,16 +132,20 @@ class VerificationTests(unittest.TestCase):
         self.assertNotIn('ci_bundle.py', workflow)
         self.assertIn('python-version: "3.10.22"', workflow)
         self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", workflow)
-        self.assertEqual(workflow.count("provider-fixtures: ${{ matrix.shard == 'providers' }}"), 1)
-        for name in ('fast', 'race', 'codemode'):
+        self.assertEqual(workflow.count("temporary-fixtures: ${{ matrix.shard == 'providers' }}"), 1)
+        for name in ('fast', 'codemode'):
             block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
-            self.assertNotIn('provider-fixtures:', block)
+            self.assertNotIn('temporary-fixtures:', block)
+        race = workflow.split('  race:\n', 1)[1].split('  verify:\n', 1)[0]
+        self.assertIn('temporary-fixtures: "true"', race)
+        self.assertLess(race.index('ci_tmpfs.py cleanup'), race.index('Retain exact-SHA'))
+        self.assertIn("--name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5", workflow)
         verify = workflow.split('  verify:\n', 1)[1].split('  codemode:\n', 1)[0]
         self.assertIn("if: ${{ always() && matrix.shard == 'providers' }}", verify)
         self.assertLess(verify.index('ci_tmpfs.py cleanup'), verify.index('Retain exact-SHA'))
-        self.assertIn('provider-fixtures:', action)
-        self.assertIn("if: inputs.provider-fixtures == 'true'", action)
-        self.assertIn('default: "false"', action.split('  provider-fixtures:\n', 1)[1].split('runs:', 1)[0])
+        self.assertIn('temporary-fixtures:', action)
+        self.assertIn("inputs.temporary-fixtures == 'true' && 'setup' || 'disk'", action)
+        self.assertIn('default: "false"', action.split('  temporary-fixtures:\n', 1)[1].split('runs:', 1)[0])
 
     def test_codemode_gate_series_parallelize_without_splitting_repetitions(self):
         gates = suite.SHARDS['codemode']
