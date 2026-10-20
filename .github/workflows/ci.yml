@@ -161,13 +161,17 @@ jobs:
           for part in control GC-17 GC-19 GC-20 contracts; do
             mv "evidence/parts/evidence-codemode-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/parts/$part"
           done
-          python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence
+          exec python3 scripts/ci_step.py --name codemode-join --phase test -- python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence
       - name: Retain full Code Mode evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: evidence-codemode-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
-          path: evidence/
+          path: |
+            evidence/suite-codemode.json
+            evidence/core-summary.json
+            evidence/core-cases-*.json
+            evidence/steps/
           if-no-files-found: error
           retention-days: 14
 

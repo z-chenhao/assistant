@@ -97,8 +97,9 @@ Computer offline lifecycle evidence does not establish live Lume compatibility.
 Each Required job retains SHA/attempt-named artifacts for fourteen days, even
 on failure. `suite-*.json` binds source, binary, runner and every invocation;
 `timings-*.json` updates after each attempt; `profiles/` records scenario/function
-and CPU/wall timings. Code Mode parts keep original reports, and the join keeps
-both raw parts and canonical `core-cases-1…5.json` / `core-summary.json`.
+and CPU/wall timings. Individual part artifacts keep the original reports.
+The join retains canonical `core-cases-1…5.json` / `core-summary.json` and its
+phase log/metrics without uploading the raw part payloads a second time.
 Semantic Judge scores remain ungraded; deterministic fragments do not establish
 full Golden Case or L2 scores.
 
