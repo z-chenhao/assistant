@@ -42,7 +42,7 @@ func TestFreshAndRepeatedStartupPreserveConfiguration(t *testing.T) {
 	}
 	// Force replacement connections so PRAGMA settings cannot rely on one initial connection.
 	s.db.SetConnMaxLifetime(time.Nanosecond)
-	for pragma, want := range map[string]string{"journal_mode": "wal", "foreign_keys": "1", "busy_timeout": "5000", "user_version": "20"} {
+	for pragma, want := range map[string]string{"journal_mode": "wal", "foreign_keys": "1", "busy_timeout": "5000", "user_version": "21"} {
 		var got string
 		if err := s.db.QueryRow("PRAGMA " + pragma).Scan(&got); err != nil {
 			t.Fatal(err)

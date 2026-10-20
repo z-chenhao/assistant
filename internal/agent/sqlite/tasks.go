@@ -191,6 +191,9 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	if name == codemode.ToolName {
 		return t.executeCode(ctx, inv)
 	}
+	if name == "builtin__computer__discover" || name == "builtin__computer__bind" || name == "builtin__computer__invoke" {
+		return t.executeComputer(ctx, inv)
+	}
 	if name == agent.RunToolName {
 		return t.AgentToolExecutor(ctx, inv.ID)
 	}

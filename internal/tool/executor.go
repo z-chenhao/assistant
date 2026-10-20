@@ -64,6 +64,7 @@ func (r Result) ModelText() string {
 }
 
 type Spec struct {
+	Internal       bool   `json:"internal,omitempty"` // Host bridge binding; excluded from the model Tool projection.
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
 	ResourceHash   string `json:"resource_hash,omitempty"`
@@ -106,8 +107,13 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 	return r, nil
 }
 func validDefinition(d Definition) bool {
+	if d.Spec.Internal && (!d.Host || (d.Spec.Name != "builtin__computer__discover" && d.Spec.Name != "builtin__computer__bind" && d.Spec.Name != "builtin__computer__invoke")) {
+		return false
+	}
 	if d.Host {
 		switch d.Spec.Name {
+		case "builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke":
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
 		case "builtin__codemode__execute":
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
 		case "builtin__memory__manage":

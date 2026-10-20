@@ -197,7 +197,7 @@ CREATE TRIGGER run_recall_immutable BEFORE UPDATE ON agent_config BEGIN SELECT 1
 	}
 	defer s.Close()
 	d, e := s.Diagnostics(ctx)
-	if e != nil || d.AgentID != "prior-recall-agent" || d.ConfigVersion != 7 || d.SchemaVersion != 20 {
+	if e != nil || d.AgentID != "prior-recall-agent" || d.ConfigVersion != 7 || d.SchemaVersion != 21 {
 		t.Fatal(d, e)
 	}
 }

@@ -25,6 +25,7 @@ class VerificationTests(unittest.TestCase):
             "verify_tools.py": 5, "verify_artifacts.py": 5, "verify_delivery.py": 5,
             "verify_recall.py": 5,
             "verify_memory_maintenance.py": 5,
+            "verify_computer.py": 5,
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
         }
