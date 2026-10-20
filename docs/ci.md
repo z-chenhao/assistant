@@ -36,6 +36,17 @@ Unit/lint retains its ordinary Python execution and additionally runs all Python
 regressions on Python 3.10.22, the minimum supported interpreter series. This
 Required step guards portable SDK hashing and the maintained profiling tools.
 
+Only the providers job uses a private 2 GiB tmpfs for disposable test directories,
+through `ci_tmpfs.py setup/cleanup`. The full unit/lint and race inventories keep
+ordinary disk storage, including every SQLite migration, crash/restart and
+receipt test. Provider commands, all five repetitions, SQLite WAL/sync policy
+and assertions are identical. This targets runner disk-wait variance without
+claiming a host power-loss test. The mount Doctor proves executable files,
+fsync, WAL commit/reopen, capacity, owner and mount identity. Cleanup runs even
+after failure, restores TMPDIR, refuses unknown mounts and force/lazy unmount,
+and fails on leaked state, a missing verified mount or an unsuccessful unmount.
+The exact-SHA `fixture-storage.json` receipt accompanies provider evidence.
+
 ## Complete inventory
 
 `scripts/verify_suite.py` is the authoritative logical inventory (100 gate

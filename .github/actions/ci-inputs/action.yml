@@ -4,6 +4,9 @@ inputs:
   sandbox:
     description: Install the offline coding sandbox
     default: "true"
+  provider-fixtures:
+    description: Use bounded tmpfs for disposable provider fixtures
+    default: "false"
 runs:
   using: composite
   steps:
@@ -37,3 +40,7 @@ runs:
         sudo apt-get update
         sudo apt-get install -y bubblewrap
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+    - name: Prepare disposable provider fixture storage
+      if: inputs.provider-fixtures == 'true'
+      shell: bash
+      run: python3 scripts/ci_tmpfs.py setup
