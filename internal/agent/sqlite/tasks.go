@@ -9,6 +9,7 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/skill"
@@ -34,7 +35,7 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	id, capID := newID(), newID()
 	mainSpecs := []tool.Spec{}
 	for _, spec := range r.registry.Describe() {
-		if spec.Name != agent.RunToolName {
+		if spec.Name != agent.RunToolName && spec.Name != automation.ObserveName {
 			mainSpecs = append(mainSpecs, spec)
 		}
 	}
@@ -187,6 +188,9 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	var name string
 	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, inv.ID, t.claim.RunID()).Scan(&name); err != nil {
 		return tool.Result{}, agent.ErrStorage
+	}
+	if name == automation.ManageName || name == automation.ObserveName {
+		return t.executeAutomation(ctx, inv)
 	}
 	if name == codemode.ToolName {
 		return t.executeCode(ctx, inv)

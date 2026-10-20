@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/computer"
 	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/conversation"
@@ -29,6 +30,7 @@ import (
 )
 
 type Runs struct {
+	automationClock       func() time.Time
 	computerProvider      computer.Provider
 	computerCompatibility computer.Compatibility
 	computerManifest      computer.RestorationManifest
@@ -95,7 +97,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -192,6 +194,16 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 }
 
 func (r *Runs) Next(ctx context.Context) (string, error) {
+	now := time.Now()
+	if r.automationClock != nil {
+		now = r.automationClock()
+	}
+	if err := r.ScheduleAutomations(ctx, now); err != nil {
+		return "", err
+	}
+	if err := r.admitAutomations(ctx); err != nil {
+		return "", err
+	}
 	if err := r.recoverCode(ctx); err != nil {
 		return "", err
 	}

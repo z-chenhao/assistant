@@ -131,3 +131,7 @@ context:
 #     port: 9222
 # Install pinned guest-browser/package-lock.json and erii-transfer.py in the
 # clean Guest. See docs/computer-use.md. No Host browser or personal profile.
+
+# Automation intent is persisted through Main/automation manage, not YAML.
+# Run personal-agent automation work in the foreground under your supervisor.
+# Every intent carries its own IANA timezone; see docs/automation.md.

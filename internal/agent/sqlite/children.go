@@ -102,7 +102,7 @@ func (r *Runs) StartChildRun(ctx context.Context, tx *sql.Tx, c agent.RunClaim, 
 	if n != 1 {
 		return tool.Failure("RESOURCE_LIMIT"), nil
 	}
-	specs = agent.WorkerTools(specs)
+	specs = agent.ChildTools(specs)
 	raw, _ = encoded(specs)
 	id := newID()
 	capID = newID()

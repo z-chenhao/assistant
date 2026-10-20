@@ -87,6 +87,13 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 		return nil
 	}
 	runID = rootID
+	var staleAutomation bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM automation_fire f JOIN automation a USING(automation_id) WHERE f.root_run_id=? AND (a.enabled=0 OR a.schedule_version!=f.schedule_version))`, runID).Scan(&staleAutomation); err != nil {
+		return err
+	}
+	if staleAutomation {
+		return nil
+	}
 	var pending int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND task_epoch=? AND run_id!=? AND status IN ('queued','running','waiting')`, taskID.String, epoch, runID).Scan(&pending); err != nil {
 		return err
@@ -136,6 +143,19 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 	n, _ := result.RowsAffected()
 	if n != 1 {
 		return agent.ErrClaimLost
+	}
+	if status == "completed" {
+		var monitored, suppressed, missing bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM automation_fire WHERE root_run_id=? AND below_value IS NOT NULL),EXISTS(SELECT 1 FROM automation_fire WHERE root_run_id=? AND below_value IS NOT NULL AND observed_value IS NOT NULL AND notify=0),EXISTS(SELECT 1 FROM automation_fire WHERE root_run_id=? AND below_value IS NOT NULL AND observed_value IS NULL)`, runID, runID, runID).Scan(&monitored, &suppressed, &missing); err != nil {
+			return err
+		}
+		if monitored && suppressed {
+			return nil
+		}
+		if missing {
+			status = "needs_input"
+			content = "Automation could not establish an observation. " + content
+		}
 	}
 	return r.taskUpdate(ctx, tx, taskID.String, runID, epoch, status, content)
 }

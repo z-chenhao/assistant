@@ -14,6 +14,9 @@ import (
 // after this boundary. Already committed results and checkpoints are retained.
 func (r *Runs) stopTask(ctx context.Context, tx *sql.Tx, taskID, status string, epoch, version int64) error {
 	now := time.Now().UnixMicro()
+	if _, err := tx.ExecContext(ctx, `UPDATE automation SET enabled=0,next_fire_at=NULL,schedule_version=schedule_version+1,updated_at=?,version=version+1 WHERE task_id=? AND enabled=1`, now, taskID); err != nil {
+		return err
+	}
 	var cancelled any
 	if status == "cancelled" {
 		cancelled = now

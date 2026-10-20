@@ -69,7 +69,7 @@ func TestV18AcceptedContextReplaysWithoutRetrospectiveCompaction(t *testing.T) {
 	}
 	// Remove only the new empty schema objects to reconstruct the populated v18
 	// database. All model/Run/request records remain byte-for-byte unchanged.
-	if _, e = db.Exec(`DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer;
+	if _, e = db.Exec(removeAutomationFixtureSchema + `DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer;
 DROP TRIGGER run_memory_epoch;
 DROP TABLE legacy_context_generation; DROP TABLE context_compaction; DROP TABLE run_context_policy;
 DROP TABLE run_memory_epoch; DROP TABLE memory_privacy; DROP TABLE memory_mutation;
@@ -121,7 +121,7 @@ func TestV19MainSuccessorMigrationRetainsInputAndStopOwnership(t *testing.T) {
 	}
 	// Schema 20 changes only this index. Reconstruct the real populated v19
 	// schema while retaining its live owner, snapshots, input and privacy epoch.
-	if _, err = s.db.Exec(`DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer;
+	if _, err = s.db.Exec(removeAutomationFixtureSchema + `DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer;
 DROP INDEX one_main;
 CREATE UNIQUE INDEX one_main ON run(agent_id) WHERE kind='main' AND status IN ('queued','running','waiting');
 PRAGMA user_version=19;`); err != nil {

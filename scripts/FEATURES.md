@@ -414,3 +414,20 @@ and SQLite state. `make verify` repeats it five times. `docs/codemode.md` record
 configuration, limits, provenance, runtime upgrade constraints and ERII-21 scoring gaps.
 `verify_code_recovery.py` owns the same five harness phases for fixed-source
 SIGKILL/SIGTERM recovery and recursive cancellation.
+
+## Automation scheduling and threshold monitoring (ERII-27)
+
+`scripts/verify_automation.py --binary bin/personal-agent --evidence evidence/automation.json`
+owns Launch (private data root and explicit Fake), Doctor (profile probe/select),
+Drive (ordinary chat Tool and Automation CLI), Evidence (fire/Outbox/Inbox,
+Task/Root/snapshot/Tool/Delivery state, four SIGKILL boundaries and restart), and
+Cleanup (all child processes joined and disposable state removed).
+`make verify` runs five consecutive passes. See [Automation operations](../docs/automation.md).
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Zoned at/cron intent | Main `builtin__automation__manage`; `automation manage KEY`/`list` | `automation.Next`, `Runs.manageAutomation`, schema 023 | GC-02 first fire Nov29 20:00 +08, explicit IANA zone, month/leap/DST boundaries, create retry and schedule edit/CAS |
+| Durable trigger and admission | Foreground `automation work`; `automation tick` then `chat work` | `ScheduleAutomations` -> unified Outbox -> Actor `Next`/`admitAutomations` -> existing RunClaim | Four real SIGKILL/restarts; one trigger, Inbox, ongoing Task and Root; duplicate/missed events; new model frozen at admission; completed generations reused |
+| Quiet threshold monitoring | Root price evidence -> `builtin__automation__observe` | Fenced per-fire observation and `finishTask` -> ordinary Main Reporter/Delivery | GC-14 six daily prices and two same-value sources per day; only Oct18/Oct21 notices; quiet days create no Main turn; Task remains active |
+| Stop and version fences | Main manage cancel or Task pause/cancel; edit with current version | Existing `stopTask`/Task epoch, Automation schedule version | Delayed fire becomes skipped; no new Run after cancel; old claim rejected; edits suppress old queued fires/results; no external effect authorization inherited |
+| Upgrade | Startup on empty/prior DB | Migration 023 | Every-prior migration, populated v22 preservation, partial DDL rollback; historical accepted-work migration fixtures remain strict |
