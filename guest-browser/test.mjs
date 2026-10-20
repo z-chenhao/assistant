@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, realpath, readFile, copyFile, rm, symlink} from 'node:fs/promises';
+import {mkdtemp, mkdir, realpath, readFile, copyFile, rm, symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {createServer} from 'node:http';
@@ -12,11 +12,12 @@ import {chromium} from 'playwright-core';
 const exec=promisify(execFile);
 const here=fileURLToPath(new URL('.',import.meta.url));
 const source=await readFile(new URL('../internal/computer/macosvm/browser.mjs',import.meta.url),'utf8');
-const module=resolve(here,'node_modules/playwright-core/index.mjs');
-const transfer=resolve(here,'node_modules/playwright-core/erii-transfer.py');
+const packageRoot=resolve(here,'node_modules/playwright-core');
 
 test('real Chromium: inventory, locator, input, navigation expiry, download and scoped chooser', {timeout:60000}, async()=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'erii-browser-')));
+ const module=join(root,'playwright/index.mjs');
+ const transfer=join(root,'playwright/erii-transfer.py');
  const server=createServer((req,res)=>{
   if(req.url==='/download'){res.writeHead(200,{'Content-Disposition':'attachment; filename=fixture.txt','Content-Type':'text/plain'});res.end('fixture download'+'x'.repeat(300000));return;}
   res.end('<title>Fixture</title><input id="field" aria-label="Fixture text"><button id="button" onclick="document.querySelector(\'#status\').textContent=\'clicked:\'+event.detail" oncontextmenu="document.querySelector(\'#status\').textContent=\'context\';return false">Click</button><div id="status">ready</div><a id="download" href="/download">Download</a><button id="upload" onclick="document.querySelector(\'#file\').click()">Upload</button><input type="file" id="file" onchange="document.querySelector(\'#status\').textContent=this.files[0].name">');
@@ -25,6 +26,10 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
  const endpoint=`http://127.0.0.1:${server.address().port}`;
  let browserContext;
  try{
+  // Each invocation owns its transfer helper; concurrent test commands must
+  // not install/remove a shared file beneath node_modules.
+  await mkdir(join(root,'playwright'));
+  for(const file of ['index.mjs','package.json'])await symlink(join(packageRoot,file),join(root,'playwright',file));
   await copyFile(new URL('../internal/computer/macosvm/transfer.py',import.meta.url),transfer);
   browserContext=await chromium.launchPersistentContext(join(root,'profile'),{headless:true,args:['--remote-debugging-address=127.0.0.1','--remote-debugging-port=0']});
   let port;for(let n=0;n<200;n++){try{port=Number((await readFile(join(root,'profile/DevToolsActivePort'),'utf8')).split('\n')[0]);break;}catch{await delay(25);}}
@@ -113,6 +118,6 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
  }finally{
   if(browserContext)await browserContext.close();
   await new Promise(resolve=>server.close(resolve));
-  await rm(transfer,{force:true});await rm(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});
+  await rm(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});
  }
 });
