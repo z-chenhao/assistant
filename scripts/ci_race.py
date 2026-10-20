@@ -21,6 +21,9 @@ from verify_suite import run_command, source_state
 BRIDGE = 'github.com/z-chenhao/erii/internal/llm/bridge'
 SQLITE = 'github.com/z-chenhao/erii/internal/agent/sqlite'
 RACE = ['go', 'test', '-race', '-count=1', '-timeout=15m']
+# One unchanged five-second context spans three approval/Drain phases. Give
+# this measured timing-sensitive contract the full CPU budget before overlap.
+SERIAL_SQLITE = ['TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases']
 
 
 def groups(packages):
@@ -99,21 +102,23 @@ def run_remainder(selected, folder, stopped):
     if code:
         return dict(row, wall_seconds=time.monotonic() - started)
     names = test_names(listing.read_text())
+    if not set(SERIAL_SQLITE) <= set(names):
+        raise ValueError('timing-sensitive SQLite inventory changed')
     budget = cpu_budget()
-    slices = partitions(names, max(1, min(3, budget - 1)))
-    jobs = [(f'sqlite-{i + 1}', RACE + ['-json', '-run', '^(' + '|'.join(group) + ')$', SQLITE], group)
+    slices = partitions([n for n in names if n not in SERIAL_SQLITE], max(1, min(3, budget - 1)))
+    jobs = [(f'sqlite-{i + 1}', RACE + ['-json', '-run', '^(' + '|'.join(group) + ')$', SQLITE], group, 1)
             for i, group in enumerate(slices)]
     others = [p for p in selected if p != SQLITE]
     if others:
-        jobs.append(('other-packages', RACE + ['-p=1', *others], None))
+        jobs.append(('other-packages', RACE + ['-p=1', *others], None, 1))
     def drive(job):
-        name, command, expected = job
+        name, command, expected, cpus = job
         output, metrics = folder / (name + '.log'), {}
-        env = dict(os.environ, GOMAXPROCS='1')
+        env = dict(os.environ, GOMAXPROCS=str(cpus))
         began = time.monotonic()
         code = run_command(command, env, output, stopped, metrics)
         result = dict(name=name, command=command, returncode=code,
-                      wall_seconds=time.monotonic() - began, gomaxprocs=1, **metrics)
+                      wall_seconds=time.monotonic() - began, gomaxprocs=cpus, **metrics)
         if expected is not None:
             result['expected_tests'] = expected
             if code == 0:
@@ -125,15 +130,18 @@ def run_remainder(selected, folder, stopped):
             stopped.set()
         print(f"[race] {name}: {result['wall_seconds']:.2f}s (exit {result['returncode']})", flush=True)
         return result
-    with ThreadPoolExecutor(max_workers=budget) as pool:
-        workers = list(pool.map(drive, jobs))
+    workers = [drive(('sqlite-serial', RACE + ['-json', '-run', '^(' + '|'.join(SERIAL_SQLITE) + ')$', SQLITE],
+                      SERIAL_SQLITE, budget))]
+    if workers[0]['returncode'] == 0:
+        with ThreadPoolExecutor(max_workers=budget) as pool:
+            workers.extend(pool.map(drive, jobs))
     observed = Counter(name for worker in workers for name in worker.get('tests', {}))
     drained = metrics.get('owned_group_drained') is True and all(
         worker.get('owned_group_drained') is True for worker in workers)
     # wait4 in run_command measures each owned child independently, so summing
     # concurrent workers does not double-count global RUSAGE_CHILDREN deltas.
     costs = [metrics.get('cpu_seconds'), *[w.get('cpu_seconds') for w in workers]]
-    return dict(row, expected_tests=names, cpu_budget=budget, workers=workers,
+    return dict(row, expected_tests=names, isolated_tests=SERIAL_SQLITE, cpu_budget=budget, workers=workers,
                 selection_complete=observed == Counter(names),
                 returncode=0 if drained and observed == Counter(names) and all(w['returncode'] == 0 for w in workers) else 1,
                 owned_group_drained=drained,
@@ -147,7 +155,7 @@ def main():
     plan = groups(packages)
     folder = Path('evidence/race')
     folder.mkdir(parents=True, exist_ok=True)
-    for name in ('bridge', 'remainder', 'sqlite-list', 'sqlite-1', 'sqlite-2', 'sqlite-3', 'other-packages'):
+    for name in ('bridge', 'remainder', 'sqlite-list', 'sqlite-serial', 'sqlite-1', 'sqlite-2', 'sqlite-3', 'other-packages'):
         (folder / (name + '.log')).unlink(missing_ok=True)
     (folder / 'inventory.json').unlink(missing_ok=True)
     stopped = threading.Event()

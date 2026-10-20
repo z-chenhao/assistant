@@ -69,9 +69,10 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
                 race.cpu_budget()
 
     def test_real_dispatch_bounds_workers_and_audits_complete_selection(self):
-        names = ['TestA', 'TestB', 'TestC', 'ExampleD', 'FuzzE', 'TestF']
+        names = [*race.SERIAL_SQLITE, 'TestA', 'TestB', 'TestC', 'ExampleD', 'FuzzE', 'TestF']
         lock, barrier = threading.Lock(), threading.Barrier(4)
         active = peak = 0
+        isolated_done = threading.Event()
         calls = []
         def execute(command, env, output, stopped, metrics):
             nonlocal active, peak
@@ -80,6 +81,14 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
             if '-list' in command:
                 output.write_text('\n'.join(names) + '\nok\t' + race.SQLITE + '\t0.01s\n')
                 return 0
+            selected = command[command.index('-run') + 1][2:-2].split('|') if '-run' in command else None
+            if selected == race.SERIAL_SQLITE:
+                self.assertEqual(active, 0)
+                self.assertEqual(env['GOMAXPROCS'], '4')
+                output.write_text('\n'.join(map(json.dumps, events(selected))))
+                isolated_done.set()
+                return 0
+            self.assertTrue(isolated_done.is_set())
             self.assertEqual(env['GOMAXPROCS'], '1')
             with lock:
                 active += 1
@@ -109,13 +118,14 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
                 self.assertIn(required, command)
 
     def test_locally_valid_partition_cannot_omit_a_global_root(self):
-        names = ['TestA', 'TestB']
+        names = [*race.SERIAL_SQLITE, 'TestA', 'TestB']
         def execute(command, env, output, stopped, metrics):
             metrics.update(owned_group_drained=True, cpu_seconds=.01)
             if '-list' in command:
                 output.write_text('\n'.join(names) + '\nok\t' + race.SQLITE + '\t0.01s\n')
             else:
-                output.write_text('\n'.join(map(json.dumps, events(['TestA']))))
+                selected = command[command.index('-run') + 1][2:-2].split('|')
+                output.write_text('\n'.join(map(json.dumps, events(selected))))
             return 0
         with tempfile.TemporaryDirectory() as directory, \
              patch.object(race, 'run_command', side_effect=execute), \
@@ -131,7 +141,12 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
             def execute(command, env, output, stop, metrics):
                 if '-list' in command:
                     metrics.update(owned_group_drained=True, cpu_seconds=0)
-                    output.write_text('TestA\nTestB\nTestC\nok\t' + race.SQLITE + '\t0.01s\n')
+                    output.write_text('TestA\nTestB\nTestC\n' + race.SERIAL_SQLITE[0] + '\nok\t' + race.SQLITE + '\t0.01s\n')
+                    return 0
+                selected = command[command.index('-run') + 1][2:-2].split('|') if '-run' in command else None
+                if selected == race.SERIAL_SQLITE:
+                    metrics.update(owned_group_drained=True, cpu_seconds=0)
+                    output.write_text('\n'.join(map(json.dumps, events(selected))))
                     return 0
                 ready = folder / (output.stem + '.ready')
                 source = ('import os,signal,time; from pathlib import Path; '
@@ -154,7 +169,7 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
                     result = future.result(timeout=12)
             self.assertNotEqual(result['returncode'], 0)
             self.assertTrue(result['owned_group_drained'])
-            self.assertEqual(len(result['workers']), 4)
+            self.assertEqual(len(result['workers']), 5)
             for worker in result['workers']:
-                self.assertEqual(worker['returncode'], 130)
+                self.assertEqual(worker['returncode'], 0 if worker['name'] == 'sqlite-serial' else 130)
                 self.assertTrue(worker['owned_group_drained'])

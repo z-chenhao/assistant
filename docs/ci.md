@@ -85,7 +85,9 @@ Independent fixture capacity is four; GC-17 checkpoint variants retain capacity
 two. Local unpartitioned Core runs join case kinds in order. Part jobs use
 separate runners. Gate-series concurrency is two, with Go event/model checks
 isolated after other work. The complete race runner isolates Bridge first. It discovers SQLite's complete
-Go Test/Example/Fuzz inventory, then runs every top-level test exactly once in up
+Go Test/Example/Fuzz inventory. The Child approval contract whose original
+five-second context spans three Drain/decision phases runs alone with the full
+CPU budget before overlap. All remaining top-level tests run exactly once in up
 to three separate processes. Each test retains its own Store/temp root, complete
 subtests and internal concurrency; process-local globals and environment remain
 isolated. A fourth worker runs the other packages with package concurrency one.

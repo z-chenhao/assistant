@@ -281,7 +281,7 @@ class RaceInventoryTests(unittest.TestCase):
                     calls.append(command)
                     metrics.update(owned_group_drained=True, cpu_seconds=0.01)
                     if '-list' in command:
-                        output.write_text('TestA\nTestB\nTestC\nok\t' + ci_race.SQLITE + '\t0.01s\n')
+                        output.write_text('TestA\nTestB\nTestC\n' + ci_race.SERIAL_SQLITE[0] + '\nok\t' + ci_race.SQLITE + '\t0.01s\n')
                     elif '-run' in command:
                         names = command[command.index('-run') + 1][2:-2].split('|')
                         events = [dict(Action='pass', Package=ci_race.SQLITE, Test=n) for n in names]
@@ -300,7 +300,7 @@ class RaceInventoryTests(unittest.TestCase):
                     report = json.loads(Path('evidence/race/inventory.json').read_text())
                     self.assertEqual(report['packages'], packages)
                     self.assertEqual(report['passed'], first_status == 0)
-                    self.assertEqual(len(calls), 5 if first_status == 0 else 1)
+                    self.assertEqual(len(calls), 6 if first_status == 0 else 1)
                     self.assertEqual(report['stages'][0]['returncode'], first_status)
                     for command in calls:
                         self.assertIn('-race', command)
