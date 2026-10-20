@@ -47,7 +47,9 @@ Numeric indices always refer to the handle's latest AX state. Screenshots have
 separate revisions and Artifact references. A screenshot-only read disables the AX walk and preserves native tokens; it
 cannot retarget an old index to a changed tree. Browser element tokens also bind
 CDP backend node identity, so replacing a node with identical text does not
-reuse the old reference. Coordinates require a valid screenshot and unchanged geometry.
+reuse the old reference. Core operations retain a fixed ElementHandle while
+waiting for actionability and reject a detached node instead of querying a
+replacement. Explicit Playwright CSS locators remain dynamic. Coordinates require a valid screenshot and unchanged geometry.
 Every action must be followed by observation before using element/pointer refs.
 Observation references become actionable in the same SQLite transaction as the
 Tool result and screenshot Artifact metadata. Failed output normalization leaves

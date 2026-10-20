@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 const request = JSON.parse(process.argv[1]);
 const { method, args: a, root } = request;
 let browser;
+let coreElement;
 let mutating = false;
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const selector = s => {
@@ -108,6 +109,8 @@ async function main() {
   let elementSelector;
   if(a.element_token){
     let token;try{token=JSON.parse(a.element_token);}catch{fail('STALE_ELEMENT_REFERENCE');}
+    coreElement=await page.$(selector(token.selector));
+    if(!coreElement)fail('STALE_ELEMENT_REFERENCE');
     const dom=await page.context().newCDPSession(page);
     try{
       const {root:document}=await dom.send('DOM.getDocument');
@@ -115,10 +118,11 @@ async function main() {
       if(!nodeId)fail('STALE_ELEMENT_REFERENCE');
       const {node}=await dom.send('DOM.describeNode',{nodeId});
       if(node.backendNodeId!==token.backendNodeId)fail('STALE_ELEMENT_REFERENCE');
+      if(!await coreElement.evaluate((node,css)=>node.isConnected && node===document.querySelector(css),token.selector))fail('STALE_ELEMENT_REFERENCE');
       elementSelector=token.selector;
     }finally{await dom.detach();}
   }
-  const locator = () => page.locator(selector(a.selector ?? elementSelector));
+  const locator = () => coreElement ?? page.locator(selector(a.selector ?? elementSelector));
   if (method === 'playwright.count') return { value: await locator().count() };
   if (method === 'playwright.textContent') return { value: (await locator().textContent())?.slice(0, 16384) };
   if (method === 'playwright.waitForSelector') { await locator().waitFor({ state: 'visible' }); return {}; }
@@ -148,7 +152,7 @@ async function main() {
       if (!value || start < 0 || text.indexOf(value, start + value.length) !== -1 || typeof el.setSelectionRange !== 'function') throw new Error('INVALID_ARGUMENT');
       el.focus(); el.setSelectionRange(start, start + value.length);
     }, a.value); break;
-    case 'typeText': case 'paste': if (a.element_token) await locator().pressSequentially(a.text); else await page.keyboard.insertText(a.text); break;
+    case 'typeText': case 'paste': if (a.element_token) await coreElement.type(a.text); else await page.keyboard.insertText(a.text); break;
     case 'pressKey': if (a.element_token) await locator().press(a.text); else await page.keyboard.press(a.text); break;
     case 'playwright.download': {
       const download = page.waitForEvent('download', { timeout: 10000 });
@@ -174,5 +178,8 @@ async function main() {
   return { effect: 'dispatched' };
 }
 try { process.stdout.write(JSON.stringify(await main())); }
-catch (e) { process.stdout.write(JSON.stringify({ error: ['INVALID_ARGUMENT','PERMISSION_DENIED','STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE'].includes(e.code) ? e.code : mutating ? 'UNKNOWN_SIDE_EFFECT' : 'PROVIDER_UNAVAILABLE' })); }
+catch (e) {
+  const detached=coreElement && /^elementHandle\.(click|hover|fill|press|type): Element is not attached to the DOM/.test(String(e.message));
+  process.stdout.write(JSON.stringify({ error: detached ? 'STALE_ELEMENT_REFERENCE' : ['INVALID_ARGUMENT','PERMISSION_DENIED','STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE'].includes(e.code) ? e.code : mutating ? 'UNKNOWN_SIDE_EFFECT' : 'PROVIDER_UNAVAILABLE' }));
+}
 finally { if (browser) await browser.close(); }

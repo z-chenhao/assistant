@@ -59,6 +59,15 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   await peer.close();
   assert.equal((await call('setValue',{tabId,element_token:token,value:'stale'})).error,'STALE_ELEMENT_REFERENCE');
   const changed=await call('observe',{tabId,screenshot:true});assert.ok(changed.tree_markdown);
+  const waitingToken=changed.elements.find(e=>e.label==='Click').element_token;
+  const dynamicPeer=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+  await dynamicPeer.contexts()[0].pages()[0].evaluate(()=>{
+    const button=document.querySelector('#button');button.disabled=true;
+    setTimeout(()=>{const replacement=button.cloneNode(true);replacement.disabled=false;button.replaceWith(replacement);},1000);
+  });
+  await dynamicPeer.close();
+  assert.equal((await call('click',{tabId,element_token:waitingToken})).error,'STALE_ELEMENT_REFERENCE','core ElementRef must not retarget a replacement while waiting for actionability');
+
   await call('reload',{tabId});
   assert.equal((await call('playwright.count',{tabId,selector:'#field',expectedNavigation:navigation})).error,'STALE_SURFACE_HANDLE');
   assert.equal((await call('playwright.count',{tabId,selector:'#field >> internal:control=enter-frame'})).error,'INVALID_ARGUMENT');

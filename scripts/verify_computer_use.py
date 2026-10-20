@@ -258,6 +258,10 @@ return {committed:true,selected:"0:9",elementCount:1,pointerCount:2};
 const tabs=await cua.listTabs();const tab=await cua.getTab(tabs[0].id);
 await tab.goto("http://127.0.0.1:18025/");
 let observed=await tab.getAXStateAndScreenshot();
+const input=Number(observed.ax.state.match(/\[(\d+)\] INPUT "Fixture input"/)[1]);
+await tab.setValue({observationRevision:observed.ax.revision,index:input},"Guest core input");
+observed=await tab.getAXStateAndScreenshot();
+if(!observed.ax.state.includes("Guest core input"))throw new Error("core input readback");
 await tab.capabilities.list();const pw=await tab.capabilities.get("playwright");
 await pw.locator("#field").fill("Guest verified input");
 observed=await tab.getAXStateAndScreenshot();
@@ -275,7 +279,7 @@ if(!observed.ax.state.includes("guest-upload"))throw new Error("chooser readback
 await tab.reload();observed=await tab.getAXStateAndScreenshot();
 let stale;try{await pw.locator("#field").count();}catch(e){stale=e.code;}
 if(stale!=="STALE_CAPABILITY_HANDLE")throw new Error("navigation expiry");
-image(observed.screenshot.image);return {exported,stale,fill:true,click:true,chooser:true};
+image(observed.screenshot.image);return {exported,stale,coreInput:true,fill:true,click:true,chooser:true};
 '''.replace('SOURCE_REF',json.dumps(artifact['artifact_ref'])).replace('UPLOAD_PATH',json.dumps('imports/guest-upload-'+drive_nonce)),refs=[artifact['artifact_ref']])
                 exported=output[-1]['value']['exported']['artifactId']
                 readback=subprocess.run(h.args('artifact','open',exported),env=h.env,capture_output=True,timeout=20)
