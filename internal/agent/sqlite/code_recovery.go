@@ -111,6 +111,11 @@ func (b *codeBridge) release(ctx context.Context, observed int64) (bool, error) 
 			return nil
 		}
 		now := time.Now().UnixMicro()
+		// Controlled approval/resource suspension can retain the same physical
+		// desktop lease. An abandoned active claim never writes this receipt.
+		if _, err := tx.ExecContext(ctx, `INSERT INTO computer_lease_resume SELECT execution_id,execution_epoch FROM computer WHERE execution_id=? AND execution_epoch=? AND phase='ready' AND NOT EXISTS(SELECT 1 FROM tool_invocation WHERE parent_invocation_id=? AND status='running') ON CONFLICT(execution_id) DO UPDATE SET execution_epoch=excluded.execution_epoch`, b.req.ExecutionID, b.req.ExecutionEpoch, b.req.ExecutionID); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `UPDATE code_execution_state SET state='suspended',processed_wake_seq=?,claim_token=NULL,owner_run_token=NULL,claim_expires_at=0,updated_at=?,version=version+1 WHERE execution_id=?`, seq, now, b.req.ExecutionID); err != nil {
 			return err
 		}

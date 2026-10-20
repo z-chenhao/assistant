@@ -22,12 +22,14 @@ import (
 	"sync"
 
 	"github.com/z-chenhao/erii/internal/computer"
+	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sys/unix"
 )
 
 type Server struct {
+	use                         *computerfake.Driver
 	Config                      macosvm.Config
 	mu                          sync.Mutex
 	locks                       map[string]*os.File
@@ -52,7 +54,7 @@ func New(root string) (*Server, error) {
 	if err != nil || resolved != root {
 		return nil, computer.ErrInvalid
 	}
-	s := &Server{locks: map[string]*os.File{}, running: map[string]bool{}, connections: map[net.Conn]bool{}}
+	s := &Server{use: newUseFake(), locks: map[string]*os.File{}, running: map[string]bool{}, connections: map[net.Conn]bool{}}
 	s.HTTP = httptest.NewServer(http.HandlerFunc(s.serve))
 	s.listener, err = net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -67,6 +69,7 @@ func New(root string) (*Server, error) {
 	}
 	port, _ := strconv.Atoi(strings.Split(s.listener.Addr().String(), ":")[1])
 	s.Config = macosvm.Config{Root: root, Endpoint: s.HTTP.URL, Compatibility: computer.Compatibility{ProviderVersion: "0.6.1", GuestBuild: "25F84", DriverVersion: "0.36.0", DriverSHA256: strings.Repeat("a", 64), DriverTeam: "YCK386LBJ7", DriverBundle: "com.trycua.driver", Architecture: "arm64"}, Manifest: computer.RestorationManifest{Version: 1}, Guest: macosvm.SSHConfig{User: "lume", Port: port, PasswordRef: "env:ERII_COMPUTER_FIXTURE_PASSWORD", HostKeySHA256: ssh.FingerprintSHA256(signer.PublicKey())}}
+	s.Config.Browser = &macosvm.BrowserConfig{Node: "/opt/erii/node", Module: "/opt/erii/playwright/index.mjs", Port: 9222}
 	config := &ssh.ServerConfig{PasswordCallback: func(meta ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		if meta.User() != "lume" || string(password) != "fixture-only" {
 			return nil, errors.New("fixture authentication rejected")
@@ -174,6 +177,10 @@ func (s *Server) ssh(connection net.Conn, config *ssh.ServerConfig) {
 					exit = 1
 				}
 			}
+			var input []byte
+			if strings.HasPrefix(payload.Command, "/usr/bin/python3 -c ") {
+				input, _ = io.ReadAll(io.LimitReader(channel, 12<<20))
+			}
 			s.mu.Lock()
 			switch {
 			case exit != 0:
@@ -193,7 +200,11 @@ func (s *Server) ssh(connection net.Conn, config *ssh.ServerConfig) {
 					os.Remove(filepath.Join(s.Config.Root, "vms", name, "sessions.json"))
 				}
 			default:
-				exit = 1
+				if value, ok := s.useCommand(payload.Command, string(input)); ok {
+					json.NewEncoder(channel).Encode(value)
+				} else {
+					exit = 1
+				}
 			}
 			s.mu.Unlock()
 			channel.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{exit}))

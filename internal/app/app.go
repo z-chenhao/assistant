@@ -155,7 +155,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		definition := codemode.Definition()
 		if cfg.Computer != nil {
 			definition.Spec.TimeoutMS = 300000
-			definition.Spec.Description += " This installation supports await cua.getState() for persistent Computer identity. Surface inventory and binding are unavailable in this lifecycle slice."
+			definition.Spec.Description += " This installation supports cua.getState/listApps/listWindows/listBrowsers/listTabs, getApp/getBrowser/getTab and explicit createBrowserTab. Read bound documentation(); cua.computer.launchApp({app}) launches, cua.files.importArtifact/exportArtifact transfers scoped references. Every action follows Security and Approval."
 		}
 		definition.Spec.ResourceHash += ":" + runtimeHash + ":" + preludeHash
 		defs = append(defs, definition)
@@ -192,7 +192,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		defs = append(defs, computerfake.Definitions()...)
 	}
 	if cfg.Computer != nil {
-		hash, e := computer.Fingerprint(cfg.Computer)
+		hash, e := computer.Fingerprint(map[string]any{"configuration": cfg.Computer, "use_runtime": macosvm.UseResourceHash()})
 		if e != nil {
 			a.Close()
 			return nil, e

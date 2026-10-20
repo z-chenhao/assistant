@@ -208,7 +208,19 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (result to
 			return tool.Failure("INVALID_ARGUMENT"), nil
 		case "completed":
 			value, _ := json.Marshal(outcome.Output)
-			return tool.Result{Text: string(value)}, nil
+			result := tool.Result{Text: string(value)}
+			for _, raw := range outcome.Output {
+				var item struct {
+					Type     string
+					Data     string
+					MimeType string
+				}
+				if json.Unmarshal(raw, &item) == nil && item.Type == "image" && item.MimeType == "application/x-erii-artifact" {
+					result.ImageRefs = append(result.ImageRefs, item.Data)
+					result.ArtifactRefs = append(result.ArtifactRefs, item.Data)
+				}
+			}
+			return result, nil
 		}
 		return tool.Failure("PROVIDER_UNAVAILABLE"), nil
 	}
@@ -366,7 +378,7 @@ func (b *codeBridge) Handle(ctx context.Context, method string, m codemode.Messa
 		if json.Unmarshal([]byte(r.Text), &value) != nil {
 			value = r.Text
 		}
-		if len(r.ArtifactRefs) > 0 {
+		if len(r.ArtifactRefs) > 0 && !codemode.ComputerBridge(m.ToolName) {
 			value = map[string]any{"text": r.Text, "artifactRefs": r.ArtifactRefs}
 		}
 		return b.deliver(ctx, call.ID, codemode.Reply{Value: value})

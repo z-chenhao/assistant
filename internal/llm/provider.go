@@ -38,6 +38,7 @@ type ToolCall struct {
 }
 
 type Message struct {
+	ImageRefs  []string   `json:"image_refs,omitempty"`
 	Role       string     `json:"role"`
 	Origin     string     `json:"origin,omitempty"`
 	Text       string     `json:"text"`
@@ -52,6 +53,7 @@ type ToolSpec struct {
 }
 
 type GenerationRequest struct {
+	ResolveImage func(context.Context, string) (string, []byte, error) `json:"-"`
 	// DispatchGuard is a trusted Host lease held only while writing the request
 	// frame. Revocation and dispatch serialize; it never crosses the wire/hash.
 	DispatchGuard    func(context.Context) (func(), error) `json:"-"`

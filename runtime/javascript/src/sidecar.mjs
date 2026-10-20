@@ -208,7 +208,7 @@ async function start(id, req) {
         if ((e.bytes += Buffer.byteLength(JSON.stringify(item))) > req.limits.outputBytes) return void stop(e, 'failed', 'RESOURCE_LIMIT');
         e.output.push(item);
       }
-      const codes = new Set(['INVALID_ARGUMENT','NOT_FOUND','PERMISSION_DENIED','APPROVAL_DENIED','TIMEOUT','CANCELLED','PROVIDER_UNAVAILABLE','RESOURCE_LIMIT','UNKNOWN_SIDE_EFFECT','NON_DETERMINISTIC_REPLAY']);
+      const codes = new Set(['STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE','STALE_CAPABILITY_HANDLE','SCREENSHOT_REQUIRED','WAIT_TIMEOUT','INVALID_ARGUMENT','NOT_FOUND','PERMISSION_DENIED','APPROVAL_DENIED','TIMEOUT','CANCELLED','PROVIDER_UNAVAILABLE','RESOURCE_LIMIT','UNKNOWN_SIDE_EFFECT','NON_DETERMINISTIC_REPLAY']);
       let code;
       if (!m.ok) {
         let detail;

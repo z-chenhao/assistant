@@ -38,7 +38,7 @@ The manifest in `scripts/verify_suite.py` owns verification coverage:
 | Shard | Required evidence |
 | --- | --- |
 | runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
-| codemode | Five consecutive Code Mode, fixed-source recovery and Computer lifecycle runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) and [Computer lifecycle](computer.md) |
+| codemode | Five consecutive Code Mode, fixed-source recovery and Computer lifecycle and Computer Use runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) and [Computer lifecycle](computer.md) |
 | security | Five consecutive Tool approval/recovery and Artifact runs |
 | delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
 | providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |
@@ -53,7 +53,9 @@ In particular, the real streaming deadline and recovery lease waits remain.
 
 Install the versions and pinned dependencies from [development.md](development.md).
 Linux coding tests need bubblewrap and enabled unprivileged user namespaces;
-CI configures these on its disposable runner. The providers shard, unit and race
+CI configures these on its disposable runner. The unit/lint job installs the
+pinned Chromium binary/system dependencies, then runs the actual Browser fixture
+with no external website. The providers shard, unit and race
 jobs exercise the real coding sandbox. No live account, network provider,
 desktop, installed NATS service or fixed port is needed after dependency setup.
 

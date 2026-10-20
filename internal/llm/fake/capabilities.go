@@ -62,7 +62,7 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 			break
 		}
 		offset += i + len("Capabilities: ")
-		if json.Unmarshal([]byte(source[offset:]), &plan) == nil {
+		if json.NewDecoder(strings.NewReader(source[offset:])).Decode(&plan) == nil {
 			found = true
 			break
 		}

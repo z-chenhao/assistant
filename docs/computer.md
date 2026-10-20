@@ -17,11 +17,12 @@ even after supersession. The cancelled Task, Run and Code execution stay termina
 only Computer lifecycle progress is reconciled. No schema or frozen-request
 format changes; unknown effects still fail closed.
 
-Surface inventory, handles, desktop actions and browser capabilities belong to
-the subsequent Computer Use slice. This build reports an explicit inventory
-error alongside the logical identity; empty arrays do not assert an empty
-desktop. Existing explicit Core/Code Mode Computer Fakes keep their fixture
-surfaces. Computer configuration defaults to absent.
+ERII-25 adds live inventory, leased App/Window/Tab bindings, AX and screenshot
+revisions, input, bounded waits, scoped Artifact transfers and the delayed
+Playwright Capability. See [Computer Use](computer-use.md) for the facade,
+conservative action approvals, Guest browser provisioning and verification.
+Existing explicit Core/Code Mode Computer Fakes remain separate fixtures.
+Computer configuration defaults to absent.
 
 ## Provisioning
 

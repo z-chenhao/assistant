@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
@@ -99,6 +100,38 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		return nil
 	})
 	if err == nil && gen.Result == nil && gen.ErrorCode == "" && !gen.Waiting && !gen.Denied {
+		hasImages := false
+		for _, message := range gen.Request.Messages {
+			hasImages = hasImages || len(message.ImageRefs) > 0
+		}
+		if hasImages && gen.Request.Snapshot.Capabilities.ImageInput {
+			gen.Request.ResolveImage = func(imageCtx context.Context, ref string) (string, []byte, error) {
+				var media string
+				var data []byte
+				err := r.write(imageCtx, func(tx *sql.Tx) error {
+					if err := fence(imageCtx, tx, c); err != nil {
+						return err
+					}
+					scope, err := runScope(imageCtx, tx, run.ID)
+					if err != nil {
+						return err
+					}
+					d, err := r.host.Artifacts().DescribeTx(imageCtx, tx, scope, ref, true)
+					if err != nil {
+						return err
+					}
+					media = d.MediaType
+					f, err := r.host.Artifacts().OpenTx(imageCtx, tx, scope, ref)
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					data, err = io.ReadAll(io.LimitReader(f, (8<<20)+1))
+					return err
+				})
+				return media, data, err
+			}
+		}
 		if run.Kind == "worker" {
 			r.host.boundary("before_worker_generation")
 		}

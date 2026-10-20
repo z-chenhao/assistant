@@ -36,15 +36,19 @@ jobs:
           cache-dependency-path: |
             provider-bridge/package-lock.json
             runtime/javascript/package-lock.json
+            guest-browser/package-lock.json
       - name: Install pinned Bridge dependencies
         run: |
           npm ci --prefix provider-bridge --ignore-scripts
           npm ci --prefix runtime/javascript --ignore-scripts
+          npm ci --prefix guest-browser --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Install pinned offline Browser test runtime
+        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: Unit tests and lint
         run: |
           mkdir -p evidence
@@ -78,10 +82,12 @@ jobs:
           cache-dependency-path: |
             provider-bridge/package-lock.json
             runtime/javascript/package-lock.json
+            guest-browser/package-lock.json
       - name: Install pinned Bridge dependencies
         run: |
           npm ci --prefix provider-bridge --ignore-scripts
           npm ci --prefix runtime/javascript --ignore-scripts
+          npm ci --prefix guest-browser --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         run: |
           sudo apt-get update
@@ -124,10 +130,12 @@ jobs:
           cache-dependency-path: |
             provider-bridge/package-lock.json
             runtime/javascript/package-lock.json
+            guest-browser/package-lock.json
       - name: Install pinned Bridge dependencies
         run: |
           npm ci --prefix provider-bridge --ignore-scripts
           npm ci --prefix runtime/javascript --ignore-scripts
+          npm ci --prefix guest-browser --ignore-scripts
       - name: Prepare isolated coding fixture runtime
         if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
         run: |

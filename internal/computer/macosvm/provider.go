@@ -22,6 +22,7 @@ import (
 // Config refers only to an explicitly provisioned, private Lume store. Endpoint
 // and SSH material remain Host configuration; none enters a restoration manifest.
 type Config struct {
+	Browser       *BrowserConfig               `yaml:"browser" json:"browser,omitempty"`
 	Root          string                       `yaml:"root" json:"root"`
 	Endpoint      string                       `yaml:"endpoint" json:"endpoint"`
 	Compatibility computer.Compatibility       `yaml:"compatibility" json:"compatibility"`
@@ -32,6 +33,9 @@ type Config struct {
 func (c Config) Validate() error {
 	u, err := url.Parse(c.Endpoint)
 	if err != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" || net.ParseIP(u.Hostname()) == nil || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || !filepath.IsAbs(c.Root) || filepath.Clean(c.Root) != c.Root {
+		return computer.ErrInvalid
+	}
+	if c.Browser != nil && c.Browser.Validate() != nil {
 		return computer.ErrInvalid
 	}
 	s := c.Compatibility

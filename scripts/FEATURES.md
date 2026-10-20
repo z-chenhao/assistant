@@ -1,5 +1,23 @@
 # Foundation feature map
 
+## Computer Use (ERII-25)
+
+| Feature | User boundary | Authoritative implementation | Inspectable evidence |
+| --- | --- | --- | --- |
+| Live inventory and explicit binding | `cua.getState/list*`, `getApp/getBrowser/getTab`; explicit `launchApp/createBrowserTab` | `computer.UseRuntime`, `macosvm` SSH/Cua and Guest Playwright adapters | `verify_computer_use.py`: CLI/QuickJS/ToolExecutor/real adapter protocol peers; partial inventory failures in Go; existing-resource binding never launches |
+| DesktopLease and versioned observations | Bound `getAXState/getScreenshot/getAXStateAndScreenshot`, input, secondary actions, `waitForChange` | Frozen Tool policy/conflict keys, persisted `computer_use`, common Run/Code fences | Real AppKit live fixture, screenshot Artifact and AX readback; deterministic old epoch/handle/element/capability refusal, independent image revisions, atomic Artifact/result/reference readiness, read barrier, bounded WAIT_TIMEOUT summary; controlled approval resumes same physical lease; unknown input executes once |
+| Scoped Guest files and independent consent | `cua.files.importArtifact/exportArtifact`; Playwright chooser/download | Scoped ArtifactStore, `computer_file`, fixed Guest Transfer Root and `transfer.py` | Byte-for-byte roundtrip; separately frozen import/overwrite/export/upload approvals, denial before dispatch; Python traversal/root/component symlink/hardlink/FIFO refusal before truncation |
+| Delayed Playwright | Tab `capabilities.list/get("playwright")`, locator and navigation waits | Every method uses ordinary nested ToolInvocation; pinned Guest Playwright Core 1.64.1 | `npm test --prefix guest-browser`: actual Chromium/local fixture website, CSS locator/input/navigation expiry, element double-click and coordinate right-click readback, download and chooser bytes; CLI protocol fixture proves executor/approval integration; `verify_computer_use.py --live-browser` drives Guest Chromium through the production SSH adapter with AX/screenshot/transfer readback; no online accounts |
+| Explicit screenshot output | `image(screenshot.image)` | Scoped image refs, Host dispatch-time read/downsample, frozen ImageInput capability, actual Pi Bridge | Actual provider HTTP fixture receives chosen JPEG; observer/request ledger retain refs only; CLI verifies unselected observations stay internal and image Artifacts remain readable |
+| Schema and replay | Open populated v21; existing `chat work` recovery | Migration 022, CAS, existing CodeCall/ToolInvocation replay | Empty/prior schema upgrades, retained accepted request, illegal version/CAS rejection; no replay of unknown input; parent scopes/old owner fences remain enforced |
+
+Launch/Doctor/Drive/Evidence/Cleanup:
+`python3 scripts/verify_computer_use.py --binary bin/personal-agent --evidence evidence/computer-use.json`.
+`make verify` repeats it five times; `make test` runs actual Chromium and transfer
+security contracts. [Computer Use operations](../docs/computer-use.md) documents
+Guest setup, API limits, native selection restrictions and the opt-in real Lume
+AppKit drive. No semantic Golden Case score is inferred from these contracts.
+
 ## Durable Computer and Live Shadow (ERII-24)
 
 `scripts/lume_live.py --root TEST_ROOT` provides opt-in local L2 mechanics.
@@ -30,7 +48,7 @@ and Cleanup (native resource/instance checks plus process joins). Its offline
 five-run gate is in the Code Mode shard. The live mode uses only an explicitly
 marked owned test root, requires separate foreground API cleanup, and retains
 private domain state and checkpoints as inspectable evidence. Surface binding,
-inventory and desktop actions are the subsequent Computer Use slice.
+inventory and desktop actions are covered by the ERII-25 Computer Use entry above.
 
 The offline SSH peer consumes the complete sudo input before acknowledging
 shutdown. `TestShutdownRequiresCompleteSudoInput` rejects truncated input and
@@ -369,7 +387,7 @@ Synthetic fixture `evals/fixtures/m4-spend-v1.json` specifies prices and arithme
 | Nested Tool execution with one slot | `tools.run_concurrency: 1`, awaited echo and `Promise.all` through `chat work` | Atomic capacity ownership in `internal/agent/sqlite/tools.go` | `verify_codemode.py`: bounded single-slot completion, wrapper/nested attempt counts and ordered parallel results; deterministic Go tests retain all five actual Tool quotas and conflict exclusion while wrappers run |
 | Progressive discovery and role exposure | `ALL_TOOLS`, `searchTools`, `describeTool`, `describeNamespace`, Worker-only `agent.run` | Frozen capability view in `internal/agent/sqlite/codemode.go` | Main hidden Agent, Worker namespace, actual Child final result and inherited model |
 | Synchronous persistent cell Store | `store` / `load` | `code_store` and fenced Go sink | Write survives throw, another cell cannot read it, Surface handles rejected; Store operation receipts preserve reads and avoid repeated writes on replay; `store-quota-rejection-shrink-suspend-replay` fills quota, catches `RESOURCE_LIMIT`, shrinks, suspends, then proves the same rejection, unchanged dependent Tool arguments, one dispatch, and no rejected write; unawaited calls drain without rerunning the finished cell |
-| CUA facade | `cua.getState`, `getApp`, bound `observe` | Unified Computer Tool bridge; explicit read-only Fake until M6 | Three nested invocations and chosen latest observation |
+| CUA facade | `cua.getState`, `getApp`, bound `observe` | Unified Computer Tool bridge; explicit read-only Code Mode fixture (production surfaces are in ERII-25) | Three nested invocations and chosen latest observation |
 | Approval and isolation | Nested effect, prohibited globals, cancellation | Existing ToolExecutor, QuickJS Worker and RPC admission | Exact rejection without dispatch; forbidden globals, CPU/memory/output limits, forged peer and duplicate event fixtures |
 | Fixed-source Code Mode recovery | configured `builtin__codemode__execute` via `chat send` / `chat work` | `tools.executeCode`, `codeBridge`, `Runs.recoverCode` | `verify_code_recovery.py`: actual Sidecar/Go SIGKILL at 37 completed + 8 active of 100; independent provider dispatch audit; 45 identities reattached; 100 final Children; zero active suspended VMs, replay/latency/RSS metrics, cleanup; five runs in `make verify`. State/contract tests cover old owner, wake-before-release, args/schema/manifest drift, durable delivery order and six fake hours of approval without a VM. |
 

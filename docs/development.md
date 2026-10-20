@@ -12,12 +12,22 @@ local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the
 Use Go 1.26.2+, Node 24.21.0, Python 3.10+ with standard-library SQLite, and a C compiler for
 the Go race detector. The application uses pure Go SQLite. Initial module
 fetching and `npm ci --prefix provider-bridge --ignore-scripts` need network access; checks subsequently need no online services,
-accounts, installed broker executable, containers, or fixed ports.
+accounts, installed broker executable, containers, or fixed ports. Computer Use
+contracts also require the pinned Browser dependencies and Chromium before tests:
+
+```sh
+npm ci --prefix runtime/javascript --ignore-scripts
+npm ci --prefix guest-browser --ignore-scripts
+node guest-browser/node_modules/playwright-core/cli.js install chromium
+```
+
+On Ubuntu use `install --with-deps chromium` for Browser system libraries.
+The actual Chromium test uses a disposable profile and a loopback synthetic site.
 
 | Command | Evidence |
 | --- | --- |
 | `make build` | `bin/personal-agent`, the only product process entry point |
-| `make test` | Real temporary SQLite, migrations, transaction rollback, duplicate/late/out-of-order events, Fake and real EventBus contracts, broker restart, process kills |
+| `make test` | Real Chromium locators/download/chooser, Guest transfer path checks, real temporary SQLite, migrations, transaction rollback, duplicate/late/out-of-order events, Fake and real EventBus contracts, broker restart, process kills |
 | `make test-race` | Those tests with Go's race detector |
 | `make lint` | `gofmt`, `go vet`, module checksums |
 | `make verify` | Real CLI metadata/probe/select/restart and cancelled setup, Bridge and metadata/security contracts five times, relay outage recovery, JetStream wire contract, seven SIGKILL boundaries, independent state readback |
@@ -38,6 +48,9 @@ isolated from user configuration and removed on success or failure.
 - `evidence/verification.json`: diagnostics, persisted Agent/profile rows,
   canonical JSON, rejected metadata, logs/spans, bootstrap/model kill/restart,
   future-schema rejection, Provider Probe/activation/degraded states, and cleanup assertions.
+- `evidence/computer-use.json` and `computer-use-2.json` through `-5.json`: scoped
+  CLI/QuickJS/SSH/Cua/Playwright protocol drive, exact approvals, image selection,
+  file scope and cleanup. Real Guest evidence is opt-in; see [Computer Use](computer-use.md).
 - `evidence/main.json`: concurrent Main ingress, nine SIGKILL boundaries, stable
   steering, profile switching, semantic/Tool/usage/delivery readback and scripted
   GC-01/09/10 Main fragments.

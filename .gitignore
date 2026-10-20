@@ -6,3 +6,5 @@
 __pycache__/
 
 /runtime/javascript/node_modules/
+
+/guest-browser/node_modules/

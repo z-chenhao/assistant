@@ -83,13 +83,14 @@ const zeroUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, tot
 function context(r, model) {
   const messages = [];
   const systems=[];
+ const images=m=>(m.image_refs??[]).flatMap(ref=>{const v=r.images?.[ref];if(!v)return [];if(v.media_type!=='image/jpeg'||typeof v.data!=='string'||v.data.length>65536)fail('INVALID_PROVIDER_RESPONSE');return [{type:'text',text:`Image original coordinate size: ${v.original_width} x ${v.original_height}; preview: ${v.preview_width} x ${v.preview_height}. Use original coordinates for screenshot actions.`},{type:'image',data:v.data,mimeType:v.media_type}];});
   let calls=new Map();
   for (const m of r.messages) {
     if (m.role === 'system') {
       if(messages.length) fail('INVALID_PROVIDER_RESPONSE');
       systems.push(m.text);
     }
-    else if (m.role === 'user') messages.push({ role:'user', content:m.text, timestamp:0 });
+    else if (m.role === 'user') messages.push({ role:'user', content:images(m).length ? [{type:'text',text:m.text},...images(m)] : m.text, timestamp:0 });
     // Account tools are always declared under the fixed erii namespace. Restore
     // it on replay without adding provider metadata to the Host ToolCall schema.
     else if (m.role === 'assistant') {
@@ -100,7 +101,7 @@ function context(r, model) {
     else if (m.role === 'tool') {
       const call = calls.get(m.tool_call_id);
       if (!call) fail('INVALID_PROVIDER_RESPONSE');
-      messages.push({ role:'toolResult', toolCallId:m.tool_call_id, toolName:call.name, content:[{type:'text',text:m.text}], isError:false, timestamp:0 });
+      messages.push({ role:'toolResult', toolCallId:m.tool_call_id, toolName:call.name, content:[{type:'text',text:m.text},...images(m)], isError:false, timestamp:0 });
       calls.delete(m.tool_call_id);
     } else fail('INVALID_PROVIDER_RESPONSE');
   }
@@ -124,7 +125,7 @@ async function generate(r, job, send) {
     }
     if (r.session_id !== r.run_id || !r.run_id || !s.snapshot_id || !isAccount && (s.provider_kind !== 'openai_compatible' || s.wire_api !== 'openai_completions' || s.endpoint_hash !== hash(r.connection.endpoint)) || s.max_output_tokens < 1 || s.max_output_tokens > 65536 || s.context_window > 1048576) fail('MODEL_INCOMPATIBLE');
     if (s.max_output_tokens > s.context_window || s.context_window < 1 || s.reasoning_effort || Object.keys(s.generation_defaults ?? {}).length || ['developer_role','reasoning_effort','parallel_tool_calls','stream_usage'].some(k=>s.compatibility?.[k]) || s.compatibility?.tool_result_format !== 'openai') fail('MODEL_INCOMPATIBLE');
-    const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'erii-local',baseUrl:r.connection.endpoint,reasoning:false,input:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
+    const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'erii-local',baseUrl:r.connection.endpoint,reasoning:false,input:s.capabilities?.image_input?['text','image']:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
     // Optional compatibility and sampling stay conservative until individually probed.
     if(isAccount) {model.api='openai-responses';model.provider='openai';model.baseUrl=API;model.compat={supportsDeveloperRole:false,supportsStrictMode:false,supportsMaxOutputTokens:false};}
     const guardedFetch=transport(r.connection,job.controller.signal,state);

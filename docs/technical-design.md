@@ -1275,8 +1275,10 @@ ERII-24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生�
 提交 Durable Checkpoint、销毁 Instance。Computer 元数据、冻结操作和 Outbox
 同处 `state.db`，使用 Run/Code claim 与 instance epoch fencing。Guest 的签名、
 权限、登录及 Driver 连接和三文件原子恢复由 `computer/macosvm` 负责。
-Surface Inventory/Handle/Action 的后续切片独立验证；当前身份响应明确报告
-Inventory 不可用。配置、恢复和故障处理见 [Computer 运维](computer.md)。
+ERII-25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
+DesktopLease、Observation 和受控文件传输；来源局部失败进入 Inventory errors。
+受控审批/资源暂停保留物理 Lease，活动 claim 崩溃仍重建 Instance 并拒绝旧 Handle。
+配置、恢复和故障处理见 [Computer 运维](computer.md) 与 [Computer Use](computer-use.md)。
 
 生产 CUA bridge 的 `ToolSpec.internal` 随 Capability Snapshot 冻结，仅供 Code
 Mode 的宿主绑定使用，不投影到模型 Tool 列表；直接模型调用仍被 Code claim
@@ -1469,6 +1471,7 @@ waitForChange(options?: {
 
 - Runtime 负责等待 Driver 事件或执行有界轮询，模型不指定 `poll_interval`，也不能用 Sleep 制造大量空转。
 - 成功时返回变化后的最新 AX Observation；超时返回结构化 `WAIT_TIMEOUT`，并携带最后一次 Observation 摘要。
+  ERII-25 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
 - 模型在拿到新 Observation 后自行判断文本、元素或窗口条件；Browser 的 DOM Locator、URL 和导航同步由 `playwright` Capability 提供。
 - 只有实际场景证明 `waitForChange()` 往返成本不可接受时，才增加声明式语义条件，避免一期维护复杂且 Provider 难以一致实现的等待 DSL。
 
