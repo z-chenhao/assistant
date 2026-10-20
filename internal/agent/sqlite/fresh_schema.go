@@ -6,11 +6,11 @@ import (
 	"fmt"
 )
 
-// This is a compiled form of the first twenty migrations, not another schema
+// This is a compiled form of the first twenty-one migrations, not another schema
 // version. Later migrations still apply normally, including on new databases.
-const freshSchemaVersion = 20
+const freshSchemaVersion = 21
 
-//go:embed schema-020.sql
+//go:embed schema.sql
 var freshSchemaSQL string
 
 func freshSchemaHeader(scripts []string) string {

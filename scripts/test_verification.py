@@ -84,7 +84,7 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(args, ['go', 'test', '-count=5', '-json', './internal/llm/...', './internal/agent/sqlite'])
 
     def test_aggregate_rejects_every_non_success_combination(self):
-        for states in itertools.product(['success', 'failure', 'cancelled', 'skipped'], repeat=3):
+        for states in itertools.product(['success', 'failure', 'cancelled', 'skipped'], repeat=len(ci_gate.REQUIRED)):
             needs = {name: {'result': value} for name, value in zip(sorted(ci_gate.REQUIRED), states)}
             self.assertEqual(ci_gate.passed(needs), all(s == 'success' for s in states))
         good = {name: {'result': 'success'} for name in ci_gate.REQUIRED}
@@ -97,45 +97,38 @@ class VerificationTests(unittest.TestCase):
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS))
-        self.assertEqual(len(shards), len(suite.SHARDS))
-        needs = json.loads(re.search(r'    needs: (\[.*\])', workflow)[1])
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode'})
+        self.assertEqual(len(shards), 4)
+        parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
+        self.assertEqual(parts, list(suite.CODEMODE_PARTS))
+        checks = workflow[workflow.index('  checks:'):]
+        needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
-        self.assertIn('name: Ubuntu checks', workflow)
-        self.assertIn('if: ${{ always() }}', workflow)
-        self.assertIn('NEEDS_JSON: ${{ toJSON(needs) }}', workflow)
-        self.assertIn('run: python3 scripts/ci_gate.py', workflow)
-        self.assertNotIn('continue-on-error', workflow)
-        self.assertNotIn('paths-ignore:', workflow)
-        self.assertIn('cancel-in-progress: true', workflow)
-        self.assertIn('fail-fast: false', workflow)
-        self.assertIn('retention-days: 14', workflow)
-        self.assertIn('if-no-files-found: error', workflow)
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 4)
-        sandbox_condition = re.search(r'      - name: Prepare isolated coding fixture runtime\n        if: (.*)', workflow)[1]
-        self.assertEqual(set(re.findall(r"matrix.shard == '([^']+)'", sandbox_condition)),
-                         {'providers', 'codemode', 'security'})
-
-    def test_shadow_cannot_replace_required_gate_or_skip_full_coverage(self):
-        shadow = (suite.ROOT / '.github/workflows/ci-shadow.yml').read_text()
-        self.assertIn('name: CI shadow comparison', shadow)
-        self.assertNotIn('name: Ubuntu checks', shadow)
-        self.assertEqual(shadow.count('    needs: fast'), 2)
-        self.assertEqual(set(json.loads(re.search(r'        shard: (\[.*\])', shadow)[1])), set(suite.SHARDS))
-        self.assertEqual(shadow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 4)
-        self.assertIn('python3 scripts/ci_feedback.py --plan evidence/impact.json', shadow)
-        self.assertIn('BUILD_DIGEST: ${{ needs.fast.outputs.build_digest }}', shadow)
-        self.assertIn('github.event.pull_request.base.sha || github.event.before', shadow)
-        self.assertIn('github.head_ref == \'agent/erii-builder/erii-141\'', shadow)
-        for forbidden in ['continue-on-error', 'paths-ignore:', 'fromJSON', 'make verify', 'npm ci --prefix provider-bridge --ignore-scripts\n          npm ci']:
-            self.assertNotIn(forbidden, shadow)
-        self.assertIn('fail-fast: false', shadow)
-        self.assertIn('--shard ${{ matrix.shard }} --jobs 1', shadow)
-        baseline = (suite.ROOT / '.github/workflows/ci.yml').read_text()
-        condition = r'      - name: Prepare isolated coding fixture runtime\n        if: (.*)'
-        self.assertEqual(set(re.findall(r"matrix.shard == '([^']+)'", re.search(condition, shadow)[1])),
-                         set(re.findall(r"matrix.shard == '([^']+)'", re.search(condition, baseline)[1])),
-                         'shadow must provision every sandbox dependency required by the full gate')
+        for required in ('name: Ubuntu checks', 'if: ${{ always() }}',
+                         'NEEDS_JSON: ${{ toJSON(needs) }}', 'run: python3 scripts/ci_gate.py',
+                         'cancel-in-progress: true', 'fail-fast: false',
+                         'retention-days: 14', 'if-no-files-found: error'):
+            self.assertIn(required, workflow)
+        for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
+            self.assertNotIn(forbidden, workflow)
+        self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 6)
+        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}", workflow)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 4)
+        action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
+        self.assertIn("if: inputs.sandbox == 'true'", action)
+        self.assertIn('make build', action)
+        self.assertNotIn('ci_bundle.py', action)
+        # Full gates start independently; no slow test or build producer gates
+        # their admission, and there is no cross-image executable reuse.
+        for name in ('fast', 'race', 'verify', 'codemode'):
+            block = workflow.split('  ' + name + ':\n', 1)[1].split('    steps:', 1)[0]
+            self.assertNotIn('needs:', block)
+        join = workflow.split('  codemode_join:\n', 1)[1].split('  checks:', 1)[0]
+        self.assertIn('needs: codemode', join)
+        self.assertIn('test "$PART_RESULT" = success', join)
+        self.assertIn('python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence', join)
+        self.assertNotIn('ci_bundle.py', workflow)
 
     def test_codemode_gate_series_parallelize_without_splitting_repetitions(self):
         gates = suite.SHARDS['codemode']

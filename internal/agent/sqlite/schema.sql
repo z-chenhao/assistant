@@ -1,4 +1,4 @@
--- Generated empty schema v20; migrations SHA-256: fbe9bc52e7727236d16aac258b6914d84912020b958adf42853d294cfe820b24
+-- Generated empty schema v21; migrations SHA-256: e47728f1bcf5bd39cd9a6ab1bc1cf9a742b3c6facd39aa02d5d515c4ac0eb566
 -- Update: go test ./internal/agent/sqlite -run '^TestFreshSchemaSnapshotMatchesHistory$' -args -update-state-schema
 CREATE TABLE event_outbox (
     outbox_id TEXT PRIMARY KEY,
@@ -732,3 +732,32 @@ CREATE TRIGGER skill_verification_immutable BEFORE UPDATE ON skill_verification 
 CREATE TRIGGER skill_verification_audit BEFORE DELETE ON skill_verification BEGIN SELECT RAISE(ABORT,'retain skill verification'); END;
 CREATE UNIQUE INDEX one_main ON run(agent_id)
  WHERE kind='main' AND desired_state='running' AND status IN ('queued','running','waiting');
+CREATE TABLE computer (
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+ computer_id TEXT NOT NULL UNIQUE,
+ instance_epoch INTEGER NOT NULL CHECK(instance_epoch>=1),
+ instance_json TEXT NOT NULL CHECK(json_valid(instance_json)),
+ compatibility_json TEXT NOT NULL CHECK(json_valid(compatibility_json)),
+ manifest_json TEXT NOT NULL CHECK(json_valid(manifest_json)),
+ checkpoint_json TEXT CHECK(checkpoint_json IS NULL OR json_valid(checkpoint_json)),
+ phase TEXT NOT NULL CHECK(phase IN ('restoring','ready','checkpointing','checkpointed')),
+ execution_id TEXT REFERENCES code_execution(execution_id),
+ execution_epoch INTEGER NOT NULL CHECK(execution_epoch>=1),
+ version INTEGER NOT NULL CHECK(version>=1),
+ CHECK(json_extract(instance_json,'$.computer_id')=computer_id AND json_extract(instance_json,'$.instance_epoch')=instance_epoch),
+ CHECK((phase='checkpointed' AND execution_id IS NULL AND checkpoint_json IS NOT NULL) OR (phase!='checkpointed' AND execution_id IS NOT NULL))
+) STRICT;
+CREATE TRIGGER computer_version BEFORE UPDATE ON computer WHEN NEW.version!=OLD.version+1 OR NEW.computer_id!=OLD.computer_id OR NEW.instance_epoch<OLD.instance_epoch OR NEW.compatibility_json!=OLD.compatibility_json OR NEW.manifest_json!=OLD.manifest_json OR NOT(NEW.phase=OLD.phase OR (OLD.phase='restoring' AND NEW.phase IN ('ready','checkpointing')) OR (OLD.phase='ready' AND NEW.phase IN ('restoring','checkpointing')) OR (OLD.phase='checkpointing' AND NEW.phase IN ('checkpointed','restoring')) OR (OLD.phase='checkpointed' AND NEW.phase='restoring')) BEGIN SELECT RAISE(ABORT,'invalid Computer transition'); END;
+CREATE TABLE computer_operation (
+ operation_id TEXT PRIMARY KEY,
+ execution_id TEXT NOT NULL REFERENCES code_execution(execution_id),
+ execution_epoch INTEGER NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('ensure','idle')),
+ request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+ previous_json TEXT CHECK(previous_json IS NULL OR json_valid(previous_json)),
+ checkpoint_json TEXT CHECK(checkpoint_json IS NULL OR json_valid(checkpoint_json)),
+ status TEXT NOT NULL CHECK(status IN ('accepted','completed','superseded')),
+ UNIQUE(execution_id,execution_epoch,kind)
+) STRICT;
+CREATE TRIGGER computer_operation_frozen BEFORE UPDATE ON computer_operation WHEN NEW.operation_id!=OLD.operation_id OR NEW.execution_id!=OLD.execution_id OR NEW.execution_epoch!=OLD.execution_epoch OR NEW.kind!=OLD.kind OR NEW.request_json!=OLD.request_json OR NEW.previous_json IS NOT OLD.previous_json OR OLD.status!='accepted' BEGIN SELECT RAISE(ABORT,'frozen Computer operation'); END;
+CREATE TRIGGER computer_operation_retained BEFORE DELETE ON computer_operation BEGIN SELECT RAISE(ABORT,'Computer operation retained'); END;

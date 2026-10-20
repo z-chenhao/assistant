@@ -16,6 +16,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  PYTHONUNBUFFERED: "1"
+
 jobs:
   fast:
     name: Unit tests and lint
@@ -26,30 +29,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.21.0
-          cache: npm
-          cache-dependency-path: |
-            provider-bridge/package-lock.json
-            runtime/javascript/package-lock.json
-      - name: Install pinned Bridge dependencies
-        run: |
-          npm ci --prefix provider-bridge --ignore-scripts
-          npm ci --prefix runtime/javascript --ignore-scripts
-      - name: Prepare isolated coding fixture runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: ./.github/actions/ci-inputs
       - name: Unit tests and lint
-        run: |
-          mkdir -p evidence
-          git rev-parse HEAD > evidence/source-sha.txt
-          exec python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
+        run: exec python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
+      - name: Public SDK isolation and cache-miss conformance
+        env:
+          ERII_CI_PUBLIC_SDK_PROBE: "1"
+        run: exec python3 scripts/ci_step.py --name sdk-conformance --phase test -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -68,30 +57,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.21.0
-          cache: npm
-          cache-dependency-path: |
-            provider-bridge/package-lock.json
-            runtime/javascript/package-lock.json
-      - name: Install pinned Bridge dependencies
-        run: |
-          npm ci --prefix provider-bridge --ignore-scripts
-          npm ci --prefix runtime/javascript --ignore-scripts
-      - name: Prepare isolated coding fixture runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: ./.github/actions/ci-inputs
       - name: Race detector
-        run: |
-          mkdir -p evidence
-          git rev-parse HEAD > evidence/source-sha.txt
-          exec python3 scripts/ci_step.py --name race --phase test -- make test-race
+        # Isolate the one-second Bridge burst/control fixture; preserve normal
+        # package parallelism for the complete remainder, with an audited inventory.
+        run: exec python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -104,41 +77,27 @@ jobs:
   verify:
     name: Verification (${{ matrix.shard }})
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ matrix.shard == 'codemode' && 60 || 30 }}
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "codemode", "security", "delivery", "providers"]
+        shard: ["runtime", "security", "delivery", "providers"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: ./.github/actions/ci-inputs
         with:
-          go-version-file: go.mod
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24.21.0
-          cache: npm
-          cache-dependency-path: |
-            provider-bridge/package-lock.json
-            runtime/javascript/package-lock.json
-      - name: Install pinned Bridge dependencies
-        run: |
-          npm ci --prefix provider-bridge --ignore-scripts
-          npm ci --prefix runtime/javascript --ignore-scripts
-      - name: Prepare isolated coding fixture runtime
-        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}
       - name: CLI verification with timings
-        env:
-          ERII_VERIFY_CASE_JOBS: "4"
-          ERII_VERIFY_GATE_JOBS: "2"
-        run: exec python3 scripts/ci_step.py --name verification --phase test -- make verify VERIFY_SHARD=${{ matrix.shard }} VERIFY_JOBS=1
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard ${{ matrix.shard }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -148,9 +107,73 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  codemode:
+    name: Code Mode (${{ matrix.part }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ["control", "GC-17", "GC-19", "GC-20", "contracts"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+      - name: Code Mode part with five consecutive repetitions
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard codemode --codemode-part ${{ matrix.part }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-codemode-${{ matrix.part }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  codemode_join:
+    name: Complete Code Mode evidence
+    needs: codemode
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-codemode-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/parts
+      - name: Require successful parts and reconstruct full logical inventory
+        env:
+          PART_RESULT: ${{ needs.codemode.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in control GC-17 GC-19 GC-20 contracts; do
+            mv "evidence/parts/evidence-codemode-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/parts/$part"
+          done
+          python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence
+      - name: Retain full Code Mode evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-codemode-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
   checks:
     name: Ubuntu checks
-    needs: ["fast", "race", "verify"]
+    needs: ["fast", "race", "verify", "codemode", "codemode_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2

@@ -75,7 +75,7 @@ func TestFreshSchemaSnapshotMatchesHistory(t *testing.T) {
 		fmt.Fprintln(&generated, object.SQL+";")
 	}
 	if *updateStateSchema {
-		if err := os.WriteFile("schema-020.sql", []byte(generated.String()), 0644); err != nil {
+		if err := os.WriteFile("schema.sql", []byte(generated.String()), 0644); err != nil {
 			t.Fatal(err)
 		}
 		return // The embedded bytes belong to the preceding build; re-run to verify.

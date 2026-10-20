@@ -72,6 +72,20 @@ SHARDS = {
 }
 
 
+# Each part retains its complete five-run series. The join reconstructs the
+# original logical Code Mode inventory; no partial job is a merge verdict.
+CODEMODE_PARTS = ('control', 'GC-17', 'GC-19', 'GC-20', 'contracts')
+
+
+def codemode_gates(part):
+    if part == 'control':
+        return tuple(g for g in SHARDS['codemode'] if g.name != 'core-cases')
+    if part not in CODEMODE_PARTS:
+        raise ValueError('unknown Code Mode part')
+    arguments = ('--contracts-only',) if part == 'contracts' else ('--case', part)
+    return (Gate('core-' + part, 'run_core_cases.py', 'core-' + part, 5, arguments),)
+
+
 def source_state():
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     diff = subprocess.check_output(['git', 'diff', '--binary', 'HEAD'], cwd=ROOT)
@@ -274,11 +288,14 @@ def concurrent_gates(name, binary, evidence, stopped, gates, previous):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard", choices=SHARDS)
+    parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
     parser.add_argument("--binary", type=Path, default=Path("bin/personal-agent"))
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
+    if args.codemode_part and args.shard != 'codemode':
+        parser.error('--codemode-part requires --shard codemode')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -290,15 +307,17 @@ def main():
     source = source_state()
     binary_digest = hashlib.sha256(binary.read_bytes()).hexdigest()
     names = [args.shard] if args.shard else list(SHARDS)
+    plans = {name: codemode_gates(args.codemode_part) if args.codemode_part else SHARDS[name] for name in names}
+    report_suffix = (args.shard or 'all') + ('-' + args.codemode_part if args.codemode_part else '')
     evidence.mkdir(parents=True, exist_ok=True)
     (evidence / "logs").mkdir(exist_ok=True)
-    (evidence / ("suite-" + (args.shard or "all") + ".json")).unlink(missing_ok=True)
+    (evidence / ('suite-' + report_suffix + '.json')).unlink(missing_ok=True)
     if "codemode" in names:
         (evidence / "core-summary.json").unlink(missing_ok=True)
     # Delete only reports owned by the selected shards; never user state.
     for name in names:
         (evidence / f"timings-{name}.json").unlink(missing_ok=True)
-        for gate in SHARDS[name]:
+        for gate in plans[name]:
             for attempt in range(1, gate.attempts + 1):
                 _, _, output = command(gate, attempt, binary, evidence)
                 output.unlink(missing_ok=True)
@@ -312,7 +331,6 @@ def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopped.set())
     started = time.monotonic()
-    plans = {name: SHARDS[name] for name in names}
     # Repeated Go conformance contains real 100 ms recovery deadlines. Keep it
     # isolated from unrelated local harness I/O, as it is on its CI runner.
     deferred = None
@@ -327,21 +345,22 @@ def main():
         if len(prefix) == sum(g.attempts for g in plans["providers"]) and all(r["returncode"] == 0 for r in prefix):
             results[index] = run_shard("providers", binary, evidence, stopped, (deferred,), prefix)
     passed = not stopped.is_set() and all(
-        len(rows) == sum(g.attempts for g in SHARDS[name]) and all(r["returncode"] == 0 for r in rows)
+        len(rows) == sum(g.attempts for g in plans[name]) + (deferred.attempts if deferred and name == 'providers' else 0) and all(r["returncode"] == 0 for r in rows)
         for name, rows in zip(names, results))
     stable = source == source_state() and binary_digest == hashlib.sha256(binary.read_bytes()).hexdigest()
     passed = passed and stable
-    if passed and "codemode" in names:
+    if passed and "codemode" in names and not args.codemode_part:
         passed = core_report.write(evidence)
     report = dict(version=1, **source, source_stable=stable,
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
                   gate_jobs=args.gate_jobs,
+                  codemode_part=args.codemode_part,
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),
                   binary_sha256=binary_digest,
                   elapsed_seconds=time.monotonic() - started, passed=passed,
                   shards=dict(zip(names, results)))
-    (evidence / ("suite-" + (args.shard or "all") + ".json")).write_text(json.dumps(report, indent=2) + "\n")
+    (evidence / ('suite-' + report_suffix + '.json')).write_text(json.dumps(report, indent=2) + "\n")
     return 0 if passed else 1
 
 

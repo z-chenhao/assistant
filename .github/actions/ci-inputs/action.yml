@@ -1,0 +1,37 @@
+name: Offline CI runtime
+description: Prepare pinned dependencies, isolated public SDK and exact-source binary
+inputs:
+  sandbox:
+    description: Install the offline coding sandbox
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: 24.21.0
+        cache: npm
+        cache-dependency-path: |
+          provider-bridge/package-lock.json
+          runtime/javascript/package-lock.json
+    - name: Install pinned dependencies
+      shell: bash
+      run: |
+        npm ci --prefix provider-bridge --ignore-scripts
+        npm ci --prefix runtime/javascript --ignore-scripts
+    - name: Provision copied public SDK
+      shell: bash
+      run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json
+    - name: Build this job's exact-source CLI
+      shell: bash
+      run: exec env GOROOT="$ERII_CI_BASE_GOROOT" PATH="$ERII_CI_BASE_GOROOT/bin:$PATH" python3 scripts/ci_step.py --name build --phase build -- make build
+    - name: Prepare isolated coding fixture runtime
+      if: inputs.sandbox == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bubblewrap
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0

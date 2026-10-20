@@ -228,7 +228,7 @@ class BundleTests(unittest.TestCase):
 
 class FeedbackSchedulingTests(unittest.TestCase):
     def test_phase_owner_is_the_actions_entry_process(self):
-        for filename in ('ci.yml','ci-shadow.yml'):
+        for filename in ('ci.yml',):
             names = set()
             for line in (ROOT/'.github/workflows'/filename).read_text().splitlines():
                 if 'python3 scripts/ci_step.py ' not in line:

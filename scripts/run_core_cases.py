@@ -340,7 +340,8 @@ def run_case_groups(dataset, selected, action, scenario_jobs):
     return rows
 
 
-def run(binary, selected=None, scenario_jobs=1):
+def run(binary, selected=None, scenario_jobs=1, contracts_only=False):
+    require(not (selected and contracts_only), 'case and contracts-only are mutually exclusive')
     dataset, policy, lock = load_contract(ROOT, 'core-v1')
     report = dict(version=1, milestone='M5', provider='explicit deterministic core Bridge',
                   contract_lock=lock, dataset_digest=digest(dataset), binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
@@ -362,7 +363,8 @@ def run(binary, selected=None, scenario_jobs=1):
             print(f"{case['case_id']} {variant['variant_id']}: {row['status']} ({row['wall_time_ms']}ms)",flush=True)
             require(all(assertions.values()),'core assertions failed: '+json.dumps(assertions))
             return row
-        report['results'] = run_case_groups(dataset, selected, variant_case, scenario_jobs)
+        if not contracts_only:
+            report['results'] = run_case_groups(dataset, selected, variant_case, scenario_jobs)
         report['cleanup']=True
     require(not Path(temp).exists(), 'disposable root leaked')
     if not selected:
@@ -380,10 +382,12 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--evidence',type=Path,required=True)
-    parser.add_argument('--case',choices=['GC-17','GC-19','GC-20'])
+    selection=parser.add_mutually_exclusive_group()
+    selection.add_argument('--case',choices=['GC-17','GC-19','GC-20'])
+    selection.add_argument('--contracts-only',action='store_true')
     parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
     args=parser.parse_args();args.evidence.unlink(missing_ok=True)
-    result=run(args.binary.resolve(),args.case,args.scenario_jobs)
+    result=run(args.binary.resolve(),args.case,args.scenario_jobs,args.contracts_only)
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     args.evidence.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(result['summary']))
