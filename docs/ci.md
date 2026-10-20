@@ -223,8 +223,9 @@ Each fixture retains its own configuration, databases, workspace, approvals and
 provider ledger. Results retain the original inventory order. Every five-run
 series stays serial on one worker; the next Core round starts only after all
 eighteen variants and their conformance checks finish. Explicit inventory checks
-reject missing or duplicated crash boundaries. The baseline workflow uses the
-same source with the default concurrency of one.
+reject missing or duplicated crash boundaries. Earlier serial-control workflows
+used the same source with the default concurrency of one; their reports retain
+the tested SHA and settings.
 Core case kinds join before the next kind starts. GC-17 checkpoint variants use
 at most two fixtures so the unchanged fifteen-second fault boundary does not
 compete with coding/engineering compilers. A real failed mixed-kind run is
@@ -256,17 +257,30 @@ bounds, descendant start-token checks and queued-admission fence. Its phase
 record must contain a cancellation receipt, failed status and drained group.
 The default full-Core probe remains unchanged.
 
-Runtime, provider and security shards can overlap two independent gate series.
-Their Go event/model checks run after the other series have joined. Code Mode
-gate series remain serial. Each security series retains five consecutive runs.
+Runtime, Code Mode, provider and security shards can overlap two independent gate series.
+Their Go event/model checks run after the other series have joined.
+Each series retains five consecutive runs.
 Early feedback starts security and runtime first in its bounded two-shard pool;
 the recall interleavings now have explicit deterministic barriers. Provider
 scheduling starts the long Pi Bridge series first, preserving its real thirty-second
 deadline on every repetition. Report inventory order stays unchanged. Both layers
 fail closed on any failed or incomplete series.
-The shadow workflow sets `ERII_VERIFY_CASE_JOBS=4`, `ERII_VERIFY_GATE_JOBS=2`
-and `ERII_FEEDBACK_JOBS=2` only in their applicable steps; required CI keeps the
-default serial control. No full shard is omitted.
+Required verification and shadow set `ERII_VERIFY_CASE_JOBS=4` and
+`ERII_VERIFY_GATE_JOBS=2` in their verification steps. Shadow early feedback
+also uses `ERII_FEEDBACK_JOBS=2`. CLI defaults remain serial within each gate;
+no full shard is omitted. Older serial-control measurements describe their
+recorded SHA, not the current Required configuration.
+
+The state store's derived empty schema removes repeated historical ALTER/schema
+parsing from fresh fixtures without bypassing real initialization. Existing
+databases still execute their remaining forward migrations. The source of truth
+is the historical SQL; `go test ./internal/agent/sqlite -run
+'^TestFreshSchemaSnapshotMatchesHistory$' -args -update-state-schema` regenerates
+the checked-in SQL. The equivalence check, history digest, transaction rollback,
+existing migration tests and actual before/after-commit process-kill test run in
+the normal Go suite and race detector. Performance evidence must keep assertions,
+instrumentation, environment and sample counts explicit; no unit-test fixture
+receives a pre-migrated database in place of the public store boundary.
 
 `ci_bundle.py` v2 seals the binary, both installed dependency trees and a fresh
 Host Go build cache after early feedback succeeds. The producer starts that

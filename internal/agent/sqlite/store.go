@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -190,6 +191,21 @@ func migrate(ctx context.Context, db *sql.DB, scripts []string) error {
 	}
 	if version < 0 || version > len(scripts) {
 		return fmt.Errorf("unsupported database schema version %d (maximum %d)", version, len(scripts))
+	}
+	if version == 0 && len(scripts) >= freshSchemaVersion {
+		if !strings.HasPrefix(freshSchemaSQL, freshSchemaHeader(scripts[:freshSchemaVersion])) {
+			return errors.New("empty database schema does not match migration history")
+		}
+		// The derived schema has exactly the same objects as replaying the
+		// historical DDL, without repeatedly parsing them after every ALTER.
+		// Keep creation, version and any later migration in this transaction.
+		if _, err := tx.ExecContext(ctx, freshSchemaSQL); err != nil {
+			return fmt.Errorf("create empty schema: %w", err)
+		}
+		version = freshSchemaVersion
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", version)); err != nil {
+			return err
+		}
 	}
 	for i := version; i < len(scripts); i++ {
 		if _, err := tx.ExecContext(ctx, scripts[i]); err != nil {
