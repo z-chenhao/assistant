@@ -1,7 +1,7 @@
 # Offline CI and verification operations
 
 `Ubuntu checks` remains the only branch-protection check name. It runs with
-`always()` after unit/lint, race, and the five verification shards. It succeeds
+`always()` after unit/lint, race, and the six verification shards. It succeeds
 only when all three job results are `success`. A matrix succeeds only when every
 cell succeeds; matrix fail-fast is disabled so failures retain independent
 evidence. Failure, cancellation, skipped dependencies, missing results and
@@ -18,6 +18,7 @@ flowchart LR
     SHA --> Security[Security verification]
     SHA --> Delivery[Delivery verification]
     SHA --> Providers[Provider verification]
+    SHA --> Personal[M6 personal verification]
     Fast --> Gate[Ubuntu checks]
     Race --> Gate
     Runtime --> Matrix[All verification cells succeed]
@@ -25,6 +26,7 @@ flowchart LR
     Security --> Matrix
     Delivery --> Matrix
     Providers --> Matrix
+    Personal --> Matrix
     Matrix --> Gate
 ```
 

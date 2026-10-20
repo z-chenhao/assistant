@@ -1,0 +1,92 @@
+{
+  "visa_front.png": {
+    "sha256": "e10abb0f9d1d4cd2c0338c22087fa8a1e6b05229d7899e18e97504d7ad550674",
+    "image_size": [
+      900,
+      360
+    ],
+    "coordinates": "pixels, top-left",
+    "fields": {
+      "valid_from": {
+        "value": "2026-09-20",
+        "visible": true,
+        "region": [
+          30,
+          83,
+          840,
+          48
+        ]
+      },
+      "valid_until": {
+        "value": "2026-10-20",
+        "visible": true,
+        "region": [
+          30,
+          141,
+          840,
+          48
+        ]
+      },
+      "entries": {
+        "value": "01",
+        "visible": true,
+        "region": [
+          30,
+          199,
+          840,
+          48
+        ]
+      },
+      "duration_days": {
+        "value": 15,
+        "visible": true,
+        "region": [
+          30,
+          257,
+          840,
+          48
+        ]
+      }
+    }
+  },
+  "flight_order.png": {
+    "sha256": "d517fe75055b46418093d6c6bef71e5b7ba6335a6fc81e00fb7ea50db3230b88",
+    "image_size": [
+      900,
+      360
+    ],
+    "coordinates": "pixels, top-left",
+    "fields": {
+      "outbound": {
+        "value": "2026-10-03",
+        "visible": true,
+        "region": [
+          30,
+          83,
+          840,
+          48
+        ]
+      },
+      "inbound_day_month": {
+        "value": "10-11",
+        "visible": true,
+        "region": [
+          30,
+          141,
+          840,
+          48
+        ]
+      },
+      "inbound_year": {
+        "value": null,
+        "visible": false,
+        "region": [
+          160,
+          142,
+          90,
+          40
+        ]
+      }
+    }
+  }
+}

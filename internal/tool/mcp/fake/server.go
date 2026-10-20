@@ -57,7 +57,20 @@ func Serve(in io.Reader, out io.Writer, root string) error {
 				}
 			}
 			if p.Arguments.Behavior == "hold" {
-				time.Sleep(time.Minute)
+				if _, err := os.Stat(filepath.Join(root, "hold-barrier")); err == nil {
+					if err := os.WriteFile(filepath.Join(root, "hold-accepted"), []byte("accepted"), 0600); err != nil {
+						return err
+					}
+					deadline := time.Now().Add(time.Minute)
+					for time.Now().Before(deadline) {
+						if _, err := os.Stat(filepath.Join(root, "hold-release")); err == nil {
+							break
+						}
+						time.Sleep(5 * time.Millisecond)
+					}
+				} else {
+					time.Sleep(time.Minute)
+				}
 			}
 			if p.Name == "send" {
 				f, err := os.OpenFile(filepath.Join(root, "mcp-effects.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)

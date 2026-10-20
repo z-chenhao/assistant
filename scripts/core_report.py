@@ -43,7 +43,7 @@ def aggregate(reports):
                           scope='L0/L1 mechanical fragment; full case not_applicable')
     return dict(version=1, cases=cases, passed=all(c['hard_assertions']['pass^5'] == 1 for c in cases.values()),
                 suite_mean=None, suite_min=None, product_gate='inconclusive; semantic Judge and L2 unexecuted',
-                real_adapters_due_M6=['Memory Curator/compaction','DesktopLease/Computer'],
+                real_adapters_due_M6=[],
                 conformance=reports[0]['conformance']['requirements'],
                 boundary_fakes=reports[0]['conformance']['boundary_fakes'])
 

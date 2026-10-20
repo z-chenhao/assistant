@@ -114,7 +114,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "codemode", "security", "delivery", "providers"]
+        shard: ["runtime", "codemode", "security", "delivery", "personal", "providers"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -137,11 +137,14 @@ jobs:
           npm ci --prefix runtime/javascript --ignore-scripts
           npm ci --prefix guest-browser --ignore-scripts
       - name: Prepare isolated coding fixture runtime
-        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
+        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security' || matrix.shard == 'personal'
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Install pinned offline M6 Browser runtime
+        if: matrix.shard == 'personal'
+        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: CLI verification with timings
         run: make verify VERIFY_SHARD=${{ matrix.shard }} VERIFY_JOBS=1
       - name: Retain exact-SHA evidence, including failures

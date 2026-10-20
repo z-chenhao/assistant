@@ -19,6 +19,7 @@ import threading
 import time
 
 import core_report
+import m6_report
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,6 +59,7 @@ SHARDS = {
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),),
+    "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("local-provider", "verify_local_provider.py", "local-provider"),
         Gate("account-initial", "verify_account.py", "account"),
@@ -161,6 +163,8 @@ def main():
     (evidence / ("suite-" + (args.shard or "all") + ".json")).unlink(missing_ok=True)
     if "codemode" in names:
         (evidence / "core-summary.json").unlink(missing_ok=True)
+    if "personal" in names:
+        (evidence / "m6-summary.json").unlink(missing_ok=True)
     # Delete only reports owned by the selected shards; never user state.
     for name in names:
         (evidence / f"timings-{name}.json").unlink(missing_ok=True)
@@ -197,6 +201,8 @@ def main():
         for name, rows in zip(names, results))
     if passed and "codemode" in names:
         passed = core_report.write(evidence)
+    if passed and "personal" in names:
+        passed = m6_report.write(evidence)
     report = dict(version=1, source_sha=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
                   binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),

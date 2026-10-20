@@ -6,7 +6,6 @@ import unittest
 
 from case_runner import load_contract, score, variants
 from core_fixtures import feedback, csv_text, CATEGORIES, SEVERITIES, EDGES, PAIRS
-from core_boundaries import exercise
 from core_conformance import TESTS, judge
 from core_report import aggregate
 
@@ -52,10 +51,7 @@ class CoreTests(unittest.TestCase):
         for action in ['skip','fail']:
             bad=copy.deepcopy(events);bad[0]['Action']=action
             self.assertFalse(judge(bad,0))
-        boundaries=exercise()
-        self.assertEqual(set(boundaries),{'SC-08','SC-11'})
-        self.assertTrue(all(all(row['assertions'].values()) for row in boundaries.values()))
-        self.assertTrue(all(row['status']=='boundary_fake' for row in boundaries.values()))
+        self.assertEqual(set(TESTS),{f'SC-{i:02d}' for i in range(1,13)})
 
     def reports(self):
         results=[dict(case_id=case,variant_id=f'v{i}',fixture_digest=f'd-{case}-{i}',
