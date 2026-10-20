@@ -157,3 +157,14 @@ test('replay drift fails the cell even if script catches Tool errors',async t=>{
  const r=await f.run('try{await tools.builtin__text__echo({});}catch{} return "unsafe success";',[echo]);
  assert.equal(r.result?.kind,'failed');assert.equal(r.result?.error.code,'NON_DETERMINISTIC_REPLAY');
 });
+
+test('CUA errors remain structured through catch and uncaught cell failure',async t=>{
+ let code='STALE_ELEMENT_REFERENCE';
+ const f=await fixture(t,async()=>({error:{code,message:code,retryable:false,details:{observation:{surfaceId:'notes',revision:'r',state:'latest'}}}}));
+ for(code of ['STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE','STALE_CAPABILITY_HANDLE','SCREENSHOT_REQUIRED','WAIT_TIMEOUT']){
+  const r=await f.run('await tools.builtin__text__echo({});',[echo]);
+  assert.equal(r.result?.error?.code,code);
+ }
+ const caught=await f.run('try{await tools.builtin__text__echo({});}catch(e){return {code:e.code,state:e.details.observation.state};}',[echo]);
+ assert.deepEqual(caught.result?.output,[{type:'return',value:{code:'WAIT_TIMEOUT',state:'latest'}}]);
+});

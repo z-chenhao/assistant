@@ -28,6 +28,12 @@ class ComputerHarness(CapabilityHarness):
         return [str(self.binary), '-config', str(self.root / 'config.yaml'),
                 '-test-bridge', 'computer', *args]
 
+    def guest_command(self, live_root, command):
+        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
+            instance = json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
+        from lume_live import Live
+        return Live(live_root, 'product', instance['native_name']).guest(command)
+
     def cancel_at(self, boundary, plan):
         """Cancel through Main while a Worker holds a real lifecycle boundary."""
         self.send('delegate-' + boundary, 'Delegate capabilities: ' + plan)

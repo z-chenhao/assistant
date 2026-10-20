@@ -38,20 +38,20 @@ Required step guards portable SDK hashing and the maintained profiling tools.
 
 ## Complete inventory
 
-`scripts/verify_suite.py` is the authoritative logical inventory (95 gate
-invocations, including the five newly added Computer lifecycle runs).
+`scripts/verify_suite.py` is the authoritative logical inventory (100 gate
+invocations, including all five Computer lifecycle and Computer Use runs).
 
 | Logical shard | Required evidence |
 | --- | --- |
 | runtime | Foundation, Main, Tasks; five Child/scheduling/spend/task-control runs; Main/Task fragments; embedded JetStream and real CLI relay |
-| codemode | Five Code Mode, Computer lifecycle and fixed-source recovery runs; six variants × five rounds for each GC-17/19/20; five SC conformance and real nested cancellation probes |
+| codemode | Five Code Mode, Computer lifecycle, Computer Use and fixed-source recovery runs; six variants × five rounds for each GC-17/19/20; five SC conformance and real nested cancellation probes |
 | security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs |
 | delivery | Five complete delivery runs, each containing all twenty kill/restart boundaries |
 | providers | Local provider, initial account; five capability/TUI/Pi Bridge/account runs; terminal input; five selected Go model/storage runs |
 
 Each series retains five serial consecutive repetitions on its own worker. Code
 Mode now has five independent Required parts: `control` (Code Mode, Computer,
-recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus real nested CI
+Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus real nested CI
 cancellation). Each case part runs all six locked variants five times. Contracts
 also run five times; splitting cases cannot omit them.
 
@@ -62,7 +62,7 @@ and fixtures still match.
 It rejects duplicate, reordered, failed or missing rounds and misplaced variants.
 It reconstructs the original eighteen-variant Core reports and uses the unchanged
 `core_report.aggregate` / `write` verdict. The resulting logical Code Mode report
-contains the original twenty gate rows. All ninety case executions and five SC
+contains the complete twenty-five gate rows. All ninety case executions and five SC
 and cancellation proofs remain inspectable. Unit regressions mutate each of
 these acceptance boundaries. No partial job independently proves Code Mode.
 
@@ -75,9 +75,13 @@ No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
 ## Launch, doctor, drive, evidence and cleanup
 
-Install pinned dependencies from [development.md](development.md). Linux coding
-fixtures require bubblewrap and unprivileged user namespaces; CI configures its
-disposable runners. Real accounts and desktop VMs are not required offline.
+Install the versions and pinned dependencies from [development.md](development.md).
+Linux coding tests need bubblewrap and enabled unprivileged user namespaces;
+CI configures these on its disposable runner. The unit/lint job installs the
+pinned Chromium binary/system dependencies, then runs the actual Browser fixture
+with no external website. The providers shard, unit and race
+jobs exercise the real coding sandbox. No live account, network provider,
+desktop, installed NATS service or fixed port is needed after dependency setup.
 
 ```sh
 make test lint
@@ -116,7 +120,7 @@ the final boundary. Local cleanup latency is distinct from GitHub push-to-stop.
 
 ## Schema and build integrity
 
-Fresh state stores execute the complete current `schema.sql` directly, removing
+Fresh state stores execute the generated version-21 `schema.sql` baseline and any later migrations, removing
 repeated historical ALTER parsing. Historical migrations remain authoritative
 for existing databases and upgrades. Schema creation, version and later migrations
 share one immediate transaction. The generated SQL binds the historical scripts'

@@ -189,6 +189,23 @@ func (s computerStore) Begin(ctx context.Context, kind string, compatibility com
 				}
 			}
 			if kind == "ensure" {
+				if owner.Valid && owner.String == b.req.ExecutionID && ownerEpoch != b.req.ExecutionEpoch && phase == "ready" {
+					var resumable bool
+					if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM computer_lease_resume WHERE execution_id=? AND execution_epoch=?)`, owner.String, ownerEpoch).Scan(&resumable); err != nil {
+						return err
+					}
+					if resumable {
+						if _, err := tx.ExecContext(ctx, `UPDATE computer SET execution_epoch=?,version=version+1 WHERE singleton=1 AND version=?`, b.req.ExecutionEpoch, version); err != nil {
+							return err
+						}
+						if _, err := tx.ExecContext(ctx, `DELETE FROM computer_lease_resume WHERE execution_id=?`, owner.String); err != nil {
+							return err
+						}
+						plan.Request.Instance = instance
+						plan.Done = true
+						return nil
+					}
+				}
 				if owner.Valid && owner.String == b.req.ExecutionID && ownerEpoch == b.req.ExecutionEpoch && phase == "ready" {
 					plan.Request.Instance = instance
 					plan.Done = true
@@ -378,23 +395,5 @@ func (t *tools) executeComputer(ctx context.Context, inv tool.Invocation) (tool.
 	if t.codeOwner == nil || t.runs.computerProvider == nil {
 		return tool.Failure("PERMISSION_DENIED"), nil
 	}
-	var args struct {
-		Method string `json:"method"`
-	}
-	if json.Unmarshal([]byte(inv.Call.Arguments), &args) != nil || inv.Call.Name != "builtin__computer__discover" || args.Method != "getState" {
-		return tool.Failure("NOT_FOUND"), nil
-	}
-	instance, err := t.codeOwner.computer().Ensure(ctx)
-	if err != nil {
-		if errors.Is(err, agent.ErrClaimLost) || errors.Is(err, agent.ErrStorage) {
-			return tool.Result{}, err
-		}
-		return computerFailure(err), nil
-	}
-	t.runs.host.boundary("computer_ready")
-	raw, err := encoded(map[string]any{"computerId": instance.ComputerID, "instanceEpoch": strconv.FormatInt(instance.Epoch, 10), "platform": "macos", "apps": []any{}, "windows": []any{}, "browsers": []any{}, "errors": []any{map[string]string{"code": "PROVIDER_UNAVAILABLE", "message": "Surface inventory is unavailable in this lifecycle build."}}})
-	if err != nil {
-		return tool.Result{}, err
-	}
-	return tool.Result{Text: raw}, nil
+	return t.executeComputerUse(ctx, inv)
 }

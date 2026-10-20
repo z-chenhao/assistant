@@ -100,6 +100,9 @@ func ProviderMessages(messages []AgentMessage) ([]llm.Message, error) {
 			case "text":
 				wire.Text += p.Text
 			case "image", "audio", "video", "file":
+				if p.Type == "image" && m.Type == "tool_result" {
+					wire.ImageRefs = append(wire.ImageRefs, p.ArtifactRef)
+				}
 				raw, _ := json.Marshal(p)
 				wire.Text += "\nArtifact reference (content not loaded): " + string(raw)
 			case "tool_call":

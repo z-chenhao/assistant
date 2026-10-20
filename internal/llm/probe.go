@@ -1,8 +1,12 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"strings"
 	"time"
 
@@ -16,7 +20,7 @@ type Prober struct{ Provider LLMProvider }
 func (p Prober) Run(ctx context.Context, profile Profile) (ProbeResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	var ids [7]string
+	var ids [8]string
 	for i := range ids {
 		value, err := uuid.NewV7()
 		if err != nil {
@@ -98,5 +102,33 @@ func (p Prober) Run(ctx context.Context, profile Profile) (ProbeResult, error) {
 		return result, err
 	}
 	result.Clipping = long.Clipped
-	return result, result.Validate()
+	if profile.Capabilities.ImageInput {
+		// Host-owned synthetic pixels use the same scoped resolver and provider
+		// envelope as explicitly selected screenshots. No user Artifact is read.
+		img := image.NewRGBA(image.Rect(0, 0, 32, 32))
+		for y := 0; y < 32; y++ {
+			for x := 0; x < 32; x++ {
+				img.Set(x, y, color.RGBA{B: 255, A: 255})
+			}
+		}
+		var pixels bytes.Buffer
+		if png.Encode(&pixels, img) != nil {
+			return result, ProviderUnavailable
+		}
+		r := request("Reply exactly with the dominant color of this image, as a lowercase English color name.")
+		r.Snapshot.Capabilities.ImageInput = true
+		r.Messages[0].ImageRefs = []string{"probe:image"}
+		r.ResolveImage = func(_ context.Context, ref string) (string, []byte, error) {
+			if ref != "probe:image" {
+				return "", nil, ModelIncompatible
+			}
+			return "image/png", pixels.Bytes(), nil
+		}
+		seen, err := p.Provider.Generate(ctx, r, nil)
+		if err != nil {
+			return result, err
+		}
+		result.ImageInput = strings.TrimSpace(seen.Text) == "blue" && len(seen.ToolCalls) == 0 && !seen.Clipped
+	}
+	return result, result.ValidateCapabilities(profile.Capabilities)
 }

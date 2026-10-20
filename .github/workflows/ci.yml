@@ -30,6 +30,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
+      - name: Install pinned offline Browser test runtime
+        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: Unit tests and lint
         run: exec python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
       - name: Public SDK isolation and cache-miss conformance

@@ -54,6 +54,9 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 }
 
 func (g SSHGuest) command(ctx context.Context, ip, command string, sudo bool) (string, error) {
+	return g.commandInput(ctx, ip, command, sudo, nil)
+}
+func (g SSHGuest) commandInput(ctx context.Context, ip, command string, sudo bool, input io.Reader) (string, error) {
 	address := net.ParseIP(ip)
 	if g.Config.Validate() != nil || g.Secrets == nil || address == nil || !address.IsPrivate() && !address.IsLoopback() {
 		return "", computer.ErrInvalid
@@ -105,6 +108,7 @@ func (g SSHGuest) command(ctx context.Context, ip, command string, sudo bool) (s
 		return "", computer.ErrUnavailable
 	}
 	defer session.Close()
+	session.Stdin = input
 	if sudo {
 		session.Stdin = strings.NewReader(string(password) + "\n")
 	}

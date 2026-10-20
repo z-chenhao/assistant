@@ -7,6 +7,7 @@ test:
 	go test ./...
 	npm test --prefix provider-bridge
 	npm test --prefix runtime/javascript
+	npm test --prefix guest-browser
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 
 # The full SQLite package repeatedly migrates real schemas under instrumentation.
@@ -23,6 +24,7 @@ lint:
 	go mod verify
 	npm run lint --prefix provider-bridge
 	npm run lint --prefix runtime/javascript
+	npm run lint --prefix guest-browser
 
 # Shards own isolated fixtures and disjoint evidence; repetitions stay serial.
 VERIFY_JOBS ?= 2

@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	ErrElement       = errors.New("stale Computer element")
 	ErrInvalid       = errors.New("invalid Computer request")
 	ErrUnavailable   = errors.New("Computer provider unavailable")
 	ErrBusy          = errors.New("Computer is in use")

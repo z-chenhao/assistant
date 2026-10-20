@@ -13,6 +13,9 @@ With Go 1.26.2+, Node 24.21.0, and Python 3.10+:
 
 ```sh
 npm ci --prefix provider-bridge --ignore-scripts
+npm ci --prefix runtime/javascript --ignore-scripts
+npm ci --prefix guest-browser --ignore-scripts
+node guest-browser/node_modules/playwright-core/cli.js install chromium
 make build
 ./bin/personal-agent -config config.example.yaml status
 ./bin/personal-agent -config config.example.yaml
@@ -37,3 +40,5 @@ See [local provider setup](docs/provider-bridge.md#connect-a-local-model) for th
 Task delegation, discovery, append and durable follow-up: [operations and limits](docs/tasks.md).
 
 Tool policy, frozen approvals, recovery and deterministic CLI evidence: [docs/tools.md](docs/tools.md).
+
+Guest CUA, leased surfaces and scoped browser transfer: [Computer Use](docs/computer-use.md).

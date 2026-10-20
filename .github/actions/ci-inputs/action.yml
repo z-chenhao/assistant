@@ -17,11 +17,13 @@ runs:
         cache-dependency-path: |
           provider-bridge/package-lock.json
           runtime/javascript/package-lock.json
+          guest-browser/package-lock.json
     - name: Install pinned dependencies
       shell: bash
       run: |
         npm ci --prefix provider-bridge --ignore-scripts
         npm ci --prefix runtime/javascript --ignore-scripts
+        npm ci --prefix guest-browser --ignore-scripts
     - name: Provision copied public SDK
       shell: bash
       run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json

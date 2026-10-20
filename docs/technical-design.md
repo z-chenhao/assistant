@@ -520,6 +520,7 @@ auth_connection_id: null
 - MVP 必须支持常见 Qwen/vLLM/SGLang/LM Studio 风格 Chat Completions；Responses API 只有在实际端点通过契约测试后才启用。
 - 可选 `temperature/top_p` 只在模型声明支持时发送；未设置时使用 Provider 默认值。Reasoning 模型拒绝的采样参数不得强行注入。
 - Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Erii 主模型。
+- 声明 `image_input:true` 时，Host 通过现有图像 resolver 与 Provider envelope 发送合成蓝色方块并验证颜色响应，成功后才保留并冻结图像输入能力。旧 Probe 中缺失图像证明不授予该能力；文本 Profile 的验证与引用回退不变。失败的图像重测同样撤销 readiness。
 - URL、Header、响应 Body 和模型输出都按不可信外部输入处理；禁止跨 Origin 自动携带 Authorization，禁止把凭据或完整 Provider 响应写入日志。
 
 ### 5.4 OpenAI — Sign in with ChatGPT
@@ -1275,8 +1276,10 @@ ERII-24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生�
 提交 Durable Checkpoint、销毁 Instance。Computer 元数据、冻结操作和 Outbox
 同处 `state.db`，使用 Run/Code claim 与 instance epoch fencing。Guest 的签名、
 权限、登录及 Driver 连接和三文件原子恢复由 `computer/macosvm` 负责。
-Surface Inventory/Handle/Action 的后续切片独立验证；当前身份响应明确报告
-Inventory 不可用。配置、恢复和故障处理见 [Computer 运维](computer.md)。
+ERII-25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
+DesktopLease、Observation 和受控文件传输；来源局部失败进入 Inventory errors。
+受控审批/资源暂停保留物理 Lease，活动 claim 崩溃仍重建 Instance 并拒绝旧 Handle。
+配置、恢复和故障处理见 [Computer 运维](computer.md) 与 [Computer Use](computer-use.md)。
 
 生产 CUA bridge 的 `ToolSpec.internal` 随 Capability Snapshot 冻结，仅供 Code
 Mode 的宿主绑定使用，不投影到模型 Tool 列表；直接模型调用仍被 Code claim
@@ -1469,6 +1472,7 @@ waitForChange(options?: {
 
 - Runtime 负责等待 Driver 事件或执行有界轮询，模型不指定 `poll_interval`，也不能用 Sleep 制造大量空转。
 - 成功时返回变化后的最新 AX Observation；超时返回结构化 `WAIT_TIMEOUT`，并携带最后一次 Observation 摘要。
+  ERII-25 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
 - 模型在拿到新 Observation 后自行判断文本、元素或窗口条件；Browser 的 DOM Locator、URL 和导航同步由 `playwright` Capability 提供。
 - 只有实际场景证明 `waitForChange()` 往返成本不可接受时，才增加声明式语义条件，避免一期维护复杂且 Provider 难以一致实现的等待 DSL。
 
