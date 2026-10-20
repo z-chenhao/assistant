@@ -81,7 +81,7 @@ func (c Control) Test(ctx context.Context, id string) (ProbeRecord, error) {
 	if err != nil {
 		return ProbeRecord{}, c.failedProbe(ctx, p, err)
 	}
-	if err := result.Validate(); err != nil {
+	if err := result.ValidateCapabilities(p.Capabilities); err != nil {
 		return ProbeRecord{}, c.failedProbe(ctx, p, err)
 	}
 	r := ProbeRecord{ProfileVersion: p.Version, AuthVersion: version, BridgeIdentity: c.BridgeIdentity, Result: result}
@@ -130,7 +130,7 @@ func (c Control) Select(ctx context.Context, id string, profileVersion, configVe
 	if err != nil {
 		return ErrUnverified
 	}
-	if r.ProfileVersion != p.Version || r.AuthVersion != version || r.BridgeIdentity != c.BridgeIdentity || r.Result.Validate() != nil {
+	if r.ProfileVersion != p.Version || r.AuthVersion != version || r.BridgeIdentity != c.BridgeIdentity || r.Result.ValidateCapabilities(p.Capabilities) != nil {
 		return ErrUnverified
 	}
 	return c.Store.Select(ctx, id, profileVersion, configVersion, c.BridgeIdentity)
@@ -151,5 +151,5 @@ func (c Control) Available(ctx context.Context, id string) bool {
 		return false
 	}
 	r, err := c.Store.Probe(ctx, id)
-	return err == nil && r.ProfileVersion == p.Version && r.AuthVersion == version && r.BridgeIdentity == c.BridgeIdentity && r.Result.Validate() == nil
+	return err == nil && r.ProfileVersion == p.Version && r.AuthVersion == version && r.BridgeIdentity == c.BridgeIdentity && r.Result.ValidateCapabilities(p.Capabilities) == nil
 }

@@ -8,13 +8,22 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
+	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	"github.com/z-chenhao/erii/internal/computer"
+	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
+	"github.com/z-chenhao/erii/internal/computer/macosvm"
+	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
+	"github.com/z-chenhao/erii/internal/delivery"
+	deliveryfake "github.com/z-chenhao/erii/internal/delivery/fake"
+	deliveryterminal "github.com/z-chenhao/erii/internal/delivery/terminal"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	"github.com/z-chenhao/erii/internal/llm"
@@ -23,20 +32,43 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
+	"github.com/z-chenhao/erii/internal/memory"
+	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/erii/internal/recall"
+	"github.com/z-chenhao/erii/internal/recall/embedding"
+	"github.com/z-chenhao/erii/internal/skill"
+	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/erii/internal/tool/codemode"
+	codefixture "github.com/z-chenhao/erii/internal/tool/codemode/fixture"
+	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
+	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"github.com/z-chenhao/erii/internal/tui"
 )
 
 type App struct {
-	store     *sqlite.Store
-	telemetry *observability.Telemetry
-	provider  *bridge.Client
-	control   llm.Control
-	accounts  *account.Manager
-	history   *conversationsqlite.Store
-	runs      *sqlite.Runs
-	registry  *tool.Registry
+	computer       *macosvm.Provider
+	memoryCurator  *memory.Curator
+	memoryOnce     sync.Once
+	memoryCancel   context.CancelFunc
+	memoryDone     chan struct{}
+	skillConfig    *skill.Config
+	store          *sqlite.Store
+	artifacts      artifactStore
+	telemetry      *observability.Telemetry
+	provider       *bridge.Client
+	control        llm.Control
+	accounts       *account.Manager
+	history        *conversationsqlite.Store
+	memory         *memorysqlite.Store
+	runs           *sqlite.Runs
+	registry       *tool.Registry
+	terminalInbox  *deliveryterminal.Adapter
+	deliveryPolicy delivery.Policy
+	deliveryFake   *deliveryfake.Adapter
+	testDelivery   string
+	testBoundary   func(string)
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
@@ -57,6 +89,9 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 }
 
 func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) (*App, error) {
+	if cfg.Memory != nil && (!cfg.Memory.Valid() || cfg.Embedding != nil && !cfg.Embedding.Local()) {
+		return nil, errors.New("Memory maintenance requires an encryption key reference and local embedding")
+	}
 	t, err := observability.Open(cfg.App.DataRoot, cfg.LogLevel())
 	if err != nil {
 		return nil, err
@@ -76,21 +111,174 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		startup.End(err)
 		return nil, errors.Join(err, t.Close())
 	}
-	a := &App{store: store, telemetry: t}
+	store.Artifacts().Policy = cfg.Artifact
+	a := &App{store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()
 		_ = t.Close()
 		return nil, err
 	}
-	a.registry = tool.EchoRegistry()
+	a.terminalInbox = store.TerminalInbox()
+	a.memory, err = memorysqlite.Open(ctx, cfg.App.DataRoot)
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	a.deliveryPolicy = cfg.Delivery
+	base := task.Registry()
+	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	if cfg.Memory != nil {
+		defs = append(defs, memory.Definition())
+	}
+	if cfg.Embedding != nil {
+		engine := embedding.Client{Config: *cfg.Embedding, Secrets: secrets}
+		if err = cfg.Embedding.Validate(); err == nil {
+			err = a.memory.Configure(ctx, engine)
+		}
+		if err == nil {
+			err = a.history.Configure(ctx, engine)
+		}
+		if err != nil {
+			a.Close()
+			return nil, err
+		}
+		defs = append(defs, recall.Definition(engine.Identity()))
+	}
+	if cfg.JavaScript != nil {
+		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
+		runtimeHash, preludeHash, e := runtime.Fingerprint()
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		definition := codemode.Definition()
+		if cfg.Computer != nil {
+			definition.Spec.TimeoutMS = 300000
+			definition.Spec.Description += " This installation supports cua.getState/listApps/listWindows/listBrowsers/listTabs, getApp/getBrowser/getTab and explicit createBrowserTab. Read bound documentation(); cua.computer.launchApp({app}) launches, cua.files.importArtifact/exportArtifact transfers scoped references. Every action follows Security and Approval."
+		}
+		definition.Spec.ResourceHash += ":" + runtimeHash + ":" + preludeHash
+		defs = append(defs, definition)
+	}
+	for _, server := range cfg.MCP {
+		more, e := mcp.Definitions(ctx, server)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, more...)
+	}
+	if cfg.Skills != nil {
+		more, e := skill.Definitions(*cfg.Skills)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, more...)
+	}
+	if cfg.Workspace != nil {
+		more, e := workspace.Definitions(*cfg.Workspace)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, more...)
+	}
+	if (fixture == "core" || fixture == "codemode") && cfg.JavaScript != nil {
+		if cfg.Computer != nil {
+			a.Close()
+			return nil, computer.ErrInvalid
+		}
+		defs = append(defs, computerfake.Definitions()...)
+	}
+	if cfg.Computer != nil {
+		hash, e := computer.Fingerprint(map[string]any{"configuration": cfg.Computer, "use_runtime": macosvm.UseResourceHash()})
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, computer.Definitions(hash)...)
+	}
+	if fixture == "artifacts" {
+		defs = append(defs, toolfake.Artifacts()...)
+	}
+	for _, spec := range base.Describe() {
+		d, _ := base.Resolve(spec.Name)
+		defs = append(defs, d)
+	}
+	a.registry, err = tool.NewRegistry(defs)
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	if fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "approval" || fixture == "approval-never" {
+		defs := []tool.Definition{}
+		for _, spec := range a.registry.Describe() {
+			d, _ := a.registry.Resolve(spec.Name)
+			defs = append(defs, d)
+		}
+		policy := "query_before_retry"
+		if fixture == "approval-never" {
+			policy = "never"
+		}
+		defs = append(defs, toolfake.Definition(cfg.App.DataRoot, policy, func(name string) {
+			if a.testBoundary != nil {
+				a.testBoundary(name)
+			}
+		}))
+		a.registry, err = tool.NewRegistry(defs)
+		if err != nil {
+			a.Close()
+			return nil, err
+		}
+	}
 	a.runs = store.Runs(a.history, a.registry)
+	if cfg.Computer != nil {
+		provider, e := macosvm.New(*cfg.Computer, macosvm.SSHGuest{Config: cfg.Computer.Guest, Secrets: secrets})
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		a.runs.ConfigureComputer(provider, cfg.Computer.Compatibility, cfg.Computer.Manifest)
+		a.computer = provider
+		provider.Boundary = func(point string) {
+			if a.testBoundary != nil {
+				a.testBoundary("computer_" + point)
+			}
+		}
+	}
+	a.runs.ConfigureContext(cfg.Context)
+	if cfg.Memory != nil {
+		v := memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}
+		if err = a.memory.ConfigureVault(v); err != nil {
+			a.Close()
+			return nil, err
+		}
+		a.runs.ConfigureMemory(a.memory, v)
+		a.memoryCurator = &memory.Curator{Process: a.runs.CurateMemory, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
+	}
+	if cfg.Embedding != nil {
+		a.runs.ConfigureRecall(recall.Service{Memory: a.memory, Conversation: a.history})
+	}
+	if cfg.JavaScript != nil {
+		var runtime codemode.JavaScriptRuntime = &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
+		if fixture == "core" {
+			runtime = &codefixture.Drift{JavaScriptRuntime: runtime, AuditPath: filepath.Join(cfg.App.DataRoot, "f055-drift.json")}
+		}
+		a.runs.ConfigureJavaScript(runtime)
+	}
+	a.runs.ConfigureChildLimits(cfg.Children)
+	a.runs.ConfigureScheduler(cfg.Scheduler)
+	a.runs.ConfigureSpend(cfg.Spend)
+	a.runs.ConfigureApprovalTTL(time.Duration(cfg.Tools.ApprovalTTLSeconds) * time.Second)
+	a.runs.ConfigureToolLimits(sqlite.ToolLimits{Global: cfg.Tools.Global, Agent: cfg.Tools.Agent, Run: cfg.Tools.Run, Provider: cfg.Tools.Provider, Tool: cfg.Tools.Tool})
+	a.runs.ConfigureRecentTasks(time.Duration(cfg.Tasks.RecentDays)*24*time.Hour, cfg.Tasks.RecentLimit)
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {
-			a.provider, err = bridge.OpenObserved(ctx, path, a.accounts.Observer(a.recordGeneration), "-test-provider-bridge", fixture)
+			a.provider, err = bridge.OpenObserved(ctx, path, a.accounts.Observer(a.recordGeneration), "-test-provider-bridge", fixture, filepath.Join(cfg.App.DataRoot, "fake-provider-calls.jsonl"))
 		}
 		if err != nil {
 			a.control.BridgeError = llm.NormalizeError(err.Error())
@@ -145,11 +333,21 @@ func (a *App) Catalog(ctx context.Context) ([]llm.CatalogModel, error) {
 }
 
 func (a *App) Close() error {
+	if a.memoryCancel != nil {
+		a.memoryCancel()
+		<-a.memoryDone
+	}
 	if a.provider != nil {
 		_ = a.provider.Close()
 	}
+	if a.computer != nil {
+		a.computer.Close()
+	}
 	err := a.store.Close()
 	err = errors.Join(err, a.history.Close())
+	if a.memory != nil {
+		err = errors.Join(err, a.memory.Close())
+	}
 	a.telemetry.Logger.Info("application stopped")
 	return errors.Join(err, a.telemetry.Close())
 }
@@ -164,11 +362,14 @@ func (a *App) recordGeneration(ctx context.Context, r llm.GenerationRequest, res
 	return err
 }
 
-func (a *App) SetTestMainBoundary(boundary func(string)) { a.store.MainBoundary = boundary }
+func (a *App) SetTestMainBoundary(boundary func(string)) {
+	a.store.MainBoundary = boundary
+	a.testBoundary = boundary
+}
 func (a *App) Actor(sink agent.EventSink) agent.Actor {
 	var provider llm.LLMProvider
 	if a.provider != nil {
-		provider = a.provider
+		provider = a.runs.GuardProvider(a.provider)
 	}
 	return agent.Actor{Store: a.runs, Provider: provider, Registry: a.registry, Sink: sink, Ready: func(ctx context.Context) bool {
 		d, err := a.Diagnostics(ctx)
@@ -187,8 +388,8 @@ func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
 }
 
 func (a *App) Terminal() tui.Session {
-	return tui.Session{State: a, Models: a.Models(), Accounts: a.accounts,
-		Control: a.control, Actor: a.Actor(nil), Discover: a.Discover,
+	return tui.Session{State: a, Models: a.Models(), Accounts: a.accounts, DecideApproval: a.DecideApproval,
+		Messages: a.TerminalHistory, Control: a.control, Actor: a.Actor(nil), Discover: a.Discover,
 		AccountCatalog: a.AccountCatalog, LoginEnvironment: a.LoginEnvironment}
 }
 
@@ -241,4 +442,25 @@ func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.Cata
 		return nil, err
 	}
 	return a.provider.CatalogAt(ctx, connection)
+}
+
+func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.runs.Activity(ctx) }
+
+func (a *App) Spend(ctx context.Context) ([]sqlite.SpendView, error) { return a.runs.Spend(ctx) }
+
+func (a *App) Approvals(ctx context.Context) ([]sqlite.ApprovalView, error) {
+	return a.runs.Approvals(ctx)
+}
+func (a *App) DecideApproval(ctx context.Context, id, hash, decision string) error {
+	d, err := a.store.Diagnostics(ctx)
+	if err != nil {
+		return err
+	}
+	return a.runs.Decide(ctx, d.AgentID, id, hash, decision)
+}
+func (a *App) ReconcileTools(ctx context.Context) ([]sqlite.ToolOutcome, error) {
+	if err := a.runs.ReconcileUnknown(ctx); err != nil {
+		return nil, err
+	}
+	return a.runs.ToolOutcomes(ctx)
 }

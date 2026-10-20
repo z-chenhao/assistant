@@ -1,0 +1,214 @@
+{
+  "issue": "ERII-24",
+  "level": "L2",
+  "scope": "Jianying compatibility prerequisite; not production ComputerProvider identity/epoch/checkpoint conformance",
+  "observed_on_utc": "2026-10-19",
+  "recorded_at": "2026-10-19T18:52:53.228087+00:00",
+  "host": {
+    "arch": "arm64",
+    "macos": "27.0.1",
+    "build": "26A434",
+    "sip_modified": false,
+    "gpu_preferences_modified": false
+  },
+  "guest": {
+    "source": "ghcr.io/trycua/macos-tahoe-cua:26.5.2",
+    "macos": "26.5.2",
+    "build": "25F84",
+    "cpu": 4,
+    "ram_bytes": 8589934592,
+    "disk_bytes": 161061273600,
+    "display": "1920x1080",
+    "sip": "disabled in the published seed",
+    "personal_account_used": false,
+    "production_base": false
+  },
+  "versions": {
+    "lume": "0.6.1",
+    "cua_driver": "0.36.0",
+    "jianying": "11.6.0"
+  },
+  "signatures": {
+    "lume_and_driver_team": "YCK386LBJ7",
+    "driver_bundle": "com.trycua.driver",
+    "jianying_team": "X2JNK7LY8J",
+    "jianying_bundle": "com.lemon.lvpro",
+    "verification": "codesign --verify --deep --strict succeeded"
+  },
+  "cases": [
+    {
+      "name": "install_launch",
+      "status": "passed",
+      "evidence": [
+        "jianying-signature.txt",
+        "jianying-timeline-subtitle.png"
+      ]
+    },
+    {
+      "name": "synthetic_import",
+      "status": "passed",
+      "detail": "Two 3-second H.264 clips, one 6-second WAV and two-cue SRT; Guest readback hashes matched",
+      "evidence": [
+        "recovery-hashes.json",
+        "jianying-timeline-subtitle.png"
+      ]
+    },
+    {
+      "name": "timeline",
+      "status": "passed",
+      "detail": "Two sequential video clips and one 6-second audio track",
+      "evidence": [
+        "jianying-timeline-subtitle.png"
+      ]
+    },
+    {
+      "name": "subtitles_transition",
+      "status": "passed",
+      "detail": "alpha/beta cues and 0.5-second dissolve; decoded export frames inspected",
+      "evidence": [
+        "export-frame-1.0.png",
+        "export-frame-3.0.png",
+        "export-frame-4.5.png"
+      ]
+    },
+    {
+      "name": "audio_video_export",
+      "status": "passed",
+      "detail": "MOV: 6 seconds, 320x180, 30 fps, one audio track; separate MP3: 6.034 seconds; MOV PCM RMS 0.0913, zero-crossing 439.845 Hz",
+      "evidence": [
+        "jianying-export-success.png",
+        "export-content.json",
+        "export-audio.json",
+        "recovery-hashes.json"
+      ]
+    },
+    {
+      "name": "computer_use",
+      "status": "passed",
+      "detail": "Actual Driver observations, clicks, text, keys, drag and AX window frame readback; stale capture explicitly refused after restart",
+      "evidence": [
+        "jianying-transition-preview.png",
+        "stale-capture-rejection.json"
+      ]
+    },
+    {
+      "name": "graceful_cold_restore",
+      "status": "passed",
+      "detail": "Guest OS shutdown, native run-lock/session/listener release, then strict API cache reconciliation; login and signed Driver consent retained; saved project reopened; all six file digests matched",
+      "evidence": [
+        "stop-cold.json",
+        "jianying-after-cold.png",
+        "recovery-hashes.json"
+      ]
+    },
+    {
+      "name": "abnormal_restore",
+      "status": "passed",
+      "detail": "SIGKILL of exact owned Lume process; wrapper observed -9; fresh API/VM/Driver; saved project reopened and sought to dissolve/beta; all six file digests matched",
+      "evidence": [
+        "crash-native-exit.json",
+        "jianying-after-abnormal-transition.png",
+        "jianying-after-abnormal.png",
+        "recovery-hashes.json"
+      ]
+    }
+  ],
+  "limitations": [
+    "320x180 synthetic exercise; no performance or all-version compatibility claim",
+    "Lume 0.6.1 retains stale SharedVM cache after Guest halt; only reconcile after native resource-release proof",
+    "VNC reconnects on this Host caused SIGTRAP; initial Guest consent used one persistent VNC connection; ongoing control used CuaDriver",
+    "Guest macOS 27 unattended setup was not accepted; this pass is scoped to 26.5.2",
+    "Acceptance VM contains synthetic project data and is not a clean production base"
+  ],
+  "cleanup": {
+    "guest_stopped": true,
+    "owned_api_ports_closed": true,
+    "active_owned_handles": 0,
+    "installed_launchagent": false,
+    "installed_driver_on_host": false
+  },
+  "evidence": {
+    "jianying-timeline-subtitle.png": {
+      "sha256": "9971b7154e0cbcf1839a28d81434600666ab7561c7a680793418d76c71ff27e3",
+      "bytes": 463297
+    },
+    "jianying-transition-preview.png": {
+      "sha256": "1b6d99e1206586dc880a08d5ed2a6ec6a24f25491425aa5dde66f87bdf4a4d2d",
+      "bytes": 592783
+    },
+    "jianying-export-success.png": {
+      "sha256": "b52ec6e51d755ce46b0c0affd3a973211d77dfa7f0a710aab6754aeda3dbd942",
+      "bytes": 468161
+    },
+    "export-frame-1.0.png": {
+      "sha256": "9719a8cb8d868317199b5763ec3ee521f3a6a6850ae616ed412f44784f71631f",
+      "bytes": 5430
+    },
+    "export-frame-3.0.png": {
+      "sha256": "1cc8b37b56b7dd507c102753ff0a00903f752ff4293beb9026bd770854380ee8",
+      "bytes": 3457
+    },
+    "export-frame-4.5.png": {
+      "sha256": "b9498b189178d3d9a93271369b8a4185ce26eb73839c1ef6c7467bae2bfb7172",
+      "bytes": 4965
+    },
+    "jianying-after-cold.png": {
+      "sha256": "1474157458eb8cdeeb283677ecfbefd2ac3858ed19b89105efb70b1eef65f4d8",
+      "bytes": 494086
+    },
+    "jianying-after-abnormal.png": {
+      "sha256": "7e64c38a6b5690d4ebd77bf2766f12d73c572058c536e9c8482663ca5a264948",
+      "bytes": 493376
+    },
+    "jianying-after-abnormal-transition.png": {
+      "sha256": "6192e000128fb0c4e8bee7dd95066f475d2b9dc6ea011955d3ed720733cfbc51",
+      "bytes": 491587
+    },
+    "recovery-hashes.json": {
+      "sha256": "ca809475f540e13a262333e10daf3cfe9f2aa9e991d6aad06686029605ec0931",
+      "bytes": 599
+    },
+    "stop-cold.json": {
+      "sha256": "b4cb2abfc9c264daf595441550c5f1f94022c842a48a6338c1a23035c9c863e1",
+      "bytes": 265
+    },
+    "stop.json": {
+      "sha256": "b4cb2abfc9c264daf595441550c5f1f94022c842a48a6338c1a23035c9c863e1",
+      "bytes": 265
+    },
+    "crash.json": {
+      "sha256": "9cfb2c969b2fa8ca20a82ad176f89afd9dec045c230939c8da54b48ff49678c5",
+      "bytes": 133
+    },
+    "crash-native-exit.json": {
+      "sha256": "81f1b702e55173f45ca4c787b0de4d1e85cdb22a70e15ac36fb873adc915b626",
+      "bytes": 121
+    },
+    "stale-capture-rejection.json": {
+      "sha256": "2d8957ce55e474030ac62ffc1a7d3f495612a8657b86468776760f5023613e5a",
+      "bytes": 258
+    },
+    "export-content.json": {
+      "sha256": "8c4d80589a885de94990953c937c76091f8c910e41c90701ca19b830d666f072",
+      "bytes": 408
+    },
+    "export-audio.json": {
+      "sha256": "126c2aabe068f2a5a289b65c87f4d7b102c91f068089e17e4591d486e3bd41dd",
+      "bytes": 104
+    },
+    "jianying-signature.txt": {
+      "sha256": "63ec45c7208195a2c4b9484eb0a4f5363a218a25ebdd77718394f4f68b7d8587",
+      "bytes": 348
+    }
+  },
+  "harness": {
+    "files": {
+      "scripts/lume_live.py": "89f2132620533654469c3369717365aab493799e0409e2b7a584d6ccf5cdda55",
+      "scripts/lume_media.swift": "4fd230475c631ef77b76ab1fba242e6c36c9cfa4804be71fa1e8d145df1740bf",
+      "scripts/test_lume_live.py": "c22e09b5a22a409c9c1e8ebb41acf9a4f105f2e5428fa52d2cb662b8eb60d909"
+    },
+    "offline_tests": 15,
+    "live_tree": "Incremental preparation edits against b2da337; final helper also reran export decoding and Host Doctor",
+    "fixture_generator_selftest": "passed in separate owned empty directory; same WAV/SRT hashes; MOV container hashes are recorded per run"
+  }
+}

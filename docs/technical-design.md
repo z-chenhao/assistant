@@ -397,6 +397,7 @@ Intelligent UI 采用 Delivery 层的声明式组件协议 `UISpec`：
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。
+- M3 本地实现的 `builtin__artifact__save/read/describe/list/publish` 经过同一个 ToolInvocation/Executor。`artifact_write` 只允许本地不可变新产物和显式最终输出选择，不允许外部发送、上传或删除；读取使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](artifacts.md)。
 
 ## 5. 模型与 Agent 决策
 
@@ -519,6 +520,7 @@ auth_connection_id: null
 - MVP 必须支持常见 Qwen/vLLM/SGLang/LM Studio 风格 Chat Completions；Responses API 只有在实际端点通过契约测试后才启用。
 - 可选 `temperature/top_p` 只在模型声明支持时发送；未设置时使用 Provider 默认值。Reasoning 模型拒绝的采样参数不得强行注入。
 - Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Erii 主模型。
+- 声明 `image_input:true` 时，Host 通过现有图像 resolver 与 Provider envelope 发送合成蓝色方块并验证颜色响应，成功后才保留并冻结图像输入能力。旧 Probe 中缺失图像证明不授予该能力；文本 Profile 的验证与引用回退不变。失败的图像重测同样撤销 readiness。
 - URL、Header、响应 Body 和模型输出都按不可信外部输入处理；禁止跨 Origin 自动携带 Authorization，禁止把凭据或完整 Provider 响应写入日志。
 
 ### 5.4 OpenAI — Sign in with ChatGPT
@@ -562,7 +564,7 @@ MVP 使用独立的 Model Provider Bridge 复用 Pi AI 的 Provider、OAuth、�
 - Active Profile 暂时不可用时，新 Run 进入可恢复等待或返回设置级错误；后台已有 Task 不自动换模型。用户选择新 Profile 后，由 Main 决定对受影响工作创建新 Run。
 - Root 的后代树始终继承 Root ModelSnapshot；同一 Durable Replay 不允许换 model ID、endpoint、Wire API、兼容性或 Tool Schema。需要换模型时创建新业务 Run。
 - 本地模型请求只发送到配置的 endpoint；OpenAI Account 请求只发送到 Provider 固定的受信端点。模型连接的隐私说明在激活前展示一次，并可在设置中查看。
-- Token、延迟、错误和费用按 ModelSnapshot 记账；本地模型成本可记为零货币成本，但仍记录 tokens、时延、失败和主机资源指标。
+- Token、延迟、错误和费用按 ModelSnapshot 记账；本地模型只有显式配置四类零费率后才可记为零货币成本；缺少定价保持 unpriced，仍记录 tokens、时延、失败和主机资源指标。
 - Provider 错误统一归一为 `AUTH_REQUIRED | MODEL_NOT_FOUND | MODEL_INCOMPATIBLE | RATE_LIMITED | CONTEXT_LENGTH_EXCEEDED | PROVIDER_UNAVAILABLE | GENERATION_CANCELLED | INVALID_PROVIDER_RESPONSE`。限流、断连和服务暂时不可用可以在同一 generation 内有限重试；鉴权失效、模型不兼容和无效响应不得通过切换 Provider 掩盖。`CONTEXT_LENGTH_EXCEEDED` 只允许 Context Builder 在同一 ModelSnapshot 下压缩后重试。
 
 实现参考：
@@ -596,6 +598,8 @@ builtin__task__manage
 该命名方式可作为 JavaScript 对象属性或字符串键使用，不要求工具名必须是 JavaScript 标识符。
 
 ### 6.2 Code Mode
+
+ERII-19 实现进度：真实 Node/Pi QuickJS 执行、统一嵌套 ToolInvocation、同步持久 Store、发现/角色隔离和 Fake Computer Facade 的运行与证据入口见 `docs/codemode.md`。当前每次 Start 独占 Sidecar/Worker；固定源码全量 Durable Replay、专用 Claim/Wake 与 37+8 kill/restart 验收仍由 ERII-20/21 完成，不据此宣称 M5 完成。
 
 - 采用类似 Pi 1.2.0 / CUA REPL 的 JavaScript Code Mode。
 - 模型侧只暴露一个**代码执行入口** `builtin__codemode__execute`；这不排斥经过 Tool Exposure Policy 选出的普通 Direct Tool。输入直接使用 JavaScript 源码，不再另设 `builtin__computer__run`、Agent 专用 Code Cell 或第二个 CUA JavaScript 工具。
@@ -907,6 +911,10 @@ tool_execution_end
 
 #### 6.6.1 统一能力表面
 
+ERII-17 Direct Tool 实现说明：`builtin__agent__run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/children.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
+
+ERII-18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/children.md`。
+
 Worker Run 的 Code Mode Runtime 注入同一组稳定命名空间：
 
 ```text
@@ -1084,6 +1092,7 @@ interface CodeCallRecord {
 - 已成功的 Agent CodeCall 直接复用 Child Run 的持久化业务结果；仍运行的调用重新附着；不会为同一个逻辑调用再创建 Task 或第二个 Child Run。
 - Sidecar 或进程崩溃后，恢复器使用固定源码、输入和 Runtime 版本自动重放 JavaScript：已完成调用从 Ledger 取结果，未完成 Child Run 重新附着，只继续尚未开始的调用。QuickJS Heap 和调用栈本身不持久化。
 - `unknown` 表示存在无法确认的外部副作用，Runtime 不自动重试。
+- Forget 隐私撤销优先于未完成 Run 的上下文/已完成召回结果复用；fencing 拒绝旧 epoch，不修改既有调用键或请求哈希。审计记录仍保留（ADR 003）。
 - 所有嵌套 Tool 调用继续采用 ToolInvocation 的 `safe/query_before_retry/never` 恢复策略；Code Mode Tool Executor 不承诺任意外部副作用 exactly-once。
 - QuickJS 禁用无输入的时间、随机数、动态 import、文件系统和网络。时间、种子与外部数据通过明确输入或 Host Call 获得。
 - 当 JavaScript 只剩等待中的 Host Promise 时，Sidecar 返回 `execution_suspended(pending_call_ids)` 并销毁 QuickJS。CodeCall 状态变化后重新运行同一源码，已完成调用由 Call Ledger 直接解析。
@@ -1107,6 +1116,11 @@ interface CodeCallRecord {
 - 超过并发额度只进入公平队列，不返回预算不足。深度、后代数、Loop turns 和调用次数上限只作为递归爆炸、无限循环及异常资源放大的安全熔断，正常的 100 条或 1000 条批处理不应触发。
 - Root/Task 不设置较小的 `max_tokens`、`max_cost`、`max_wall_time` 或简单累计 `max_failures`。Token 与费用持续记账并受账户级消费额度约束；长时 Task 可以跨小时、跨进程恢复；模型调用和 ToolInvocation 使用各自超时与无进展 watchdog；故障保护依据连续基础设施错误或异常失败率触发 circuit breaker，而不是因少量业务失败停止整棵 Run 树。
 - 触达账户支出授权边界时，由 Root 合并为一次可恢复审批；不会让并发 Child 分别询问用户。一次允许 Agent 批处理也不等于批准 Child Agent 内的高风险工具副作用。
+- 账户授权边界必须是用户显式配置的货币额度和币种，不是 Token allowance。费率由显式的 Provider/模型/价格版本元数据提供，和账户策略一起冻结为 ModelSnapshot 的不可变组成部分，Child 继承。每百万 Token 的整数微货币费率覆盖互斥的 input/output/cache-read/cache-write 四类；先求和再向上取整到微货币，禁止浮点估价、隐式免费或自动汇率换算。同一账户币种固定，同一价格版本不能换费率。
+- 每次模型 dispatch 前，在同一 admission 事务中以冻结的 context/output 上限和明确费率预留保守货币投影。账户累计已知实际费用加未决预留及新调用投影达到边界时，停止新 dispatch，并由 Root 持久化一次冻结审批；并发 Child 共用它，不各自询问。usage、实际货币结算和模型结果在同一 fenced 事务提交，已完成调用及预留不重复记账；最后一条或失败模型响应的实际费用触界时，也必须原子创建同一个 Root 审批并保留结果，Loop 在交付/终态之前等待，批准后复用已保存结果而不重调模型；未报告 usage 时实际费用保持 unknown 并保留预留，不记为零。
+- 该审批明确授权此 Root Run 批次在账户边界之外继续模型消费，不再为此批次设一个货币上限；仍受冻结的树级安全熔断约束。它绑定 Root、Task epoch、账户、币种、价格快照和冻结动作 hash；不授权任何 Tool 副作用，也不传递给新 Root 或独立 Main Run。同步 Main Run 经过同一货币 admission，但使用该 Main Run 自己的一次控制面审批。denied 使被阻塞的模型调用以 SPEND_AUTHORIZATION_DENIED 失败；pause/cancel 拒绝旧 epoch 回调并使未决审批失效。进程退出不丢失或重复该审批。
+- 未配置定价或正账户额度时，只保留用量记账并在本地控制面明确显示 unpriced/unconfigured，不发起猜测的货币审批。没有额度但有明确费率时仍可记已知货币费用。历史未定价用量不能回填估价，审批和状态展示未定价/缺失 usage 的数量。配置更改只影响新 Run，旧树和恢复继续使用原快照。模型及 JavaScript 不获得 budget/capability 查询工具。
+
 - 模型和 JavaScript 不通过 `agent.capabilities`、`budget.*` 或其他接口读取剩余额度、申请预算或预留并发槽。Host 对调用进行原子 admission；如果未来评测证明 Agent 在安全上限附近无法合理收尾，可以增加一次性的宿主系统事件提示其优先汇总，但不增加预算查询工具。
 - RunScheduler 使用用户、Agent、Provider、Computer 和全局额度做公平调度，不能让单个 100 项脚本占满所有 Worker。
 - 同一批 Child Run 的通用 Worker 规则、模型、Skill 摘要和工具集合相同时可以复用 Prompt Prefix Cache；这只是成本优化，不进入正确性语义，也不要求 Child 使用结构化输出。
@@ -1194,6 +1208,8 @@ runtime/javascript/
 
 ### 7.1 Skill 结构与加载
 
+M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 与 Root 开放，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。仅摘要进入 Tool description，全文按需读取。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/capabilities.md`。
+
 - 使用成熟的 Agent Skills 目录约定。
 - 每个 Skill 以 `SKILL.md` 为入口，可选包含 `scripts/`、`references/` 和 `assets/`。
 - 启动时只加载 Skill 摘要，需要使用时再读取完整内容，以减少上下文占用。
@@ -1254,6 +1270,21 @@ builtin__skill__manage
 - 生命周期策略由系统自行决定；即使允许配置，也只放在高级设置中。
 - 用户不感知 Instance 的启动、暂停、迁移或恢复状态。
 - 用户只看到 Agent 空闲/忙碌和持续进行中的工作。
+
+ERII-24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生命周期策略：
+首次 `cua.getState()` 获取逻辑 Computer，已接受嵌套调用全部结束后优雅关机、
+提交 Durable Checkpoint、销毁 Instance。Computer 元数据、冻结操作和 Outbox
+同处 `state.db`，使用 Run/Code claim 与 instance epoch fencing。Guest 的签名、
+权限、登录及 Driver 连接和三文件原子恢复由 `computer/macosvm` 负责。
+ERII-25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
+DesktopLease、Observation 和受控文件传输；来源局部失败进入 Inventory errors。
+受控审批/资源暂停保留物理 Lease，活动 claim 崩溃仍重建 Instance 并拒绝旧 Handle。
+配置、恢复和故障处理见 [Computer 运维](computer.md) 与 [Computer Use](computer-use.md)。
+
+生产 CUA bridge 的 `ToolSpec.internal` 随 Capability Snapshot 冻结，仅供 Code
+Mode 的宿主绑定使用，不投影到模型 Tool 列表；直接模型调用仍被 Code claim
+校验拒绝。该可选元数据缺省为 false 且省略编码，保留既有非 Computer Run
+及显式旧 Fake 的冻结 Tool 表示；已接受快照不自动改写或扩权。
 
 ### 9.4 镜像与兼容性
 
@@ -1441,6 +1472,7 @@ waitForChange(options?: {
 
 - Runtime 负责等待 Driver 事件或执行有界轮询，模型不指定 `poll_interval`，也不能用 Sleep 制造大量空转。
 - 成功时返回变化后的最新 AX Observation；超时返回结构化 `WAIT_TIMEOUT`，并携带最后一次 Observation 摘要。
+  ERII-25 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
 - 模型在拿到新 Observation 后自行判断文本、元素或窗口条件；Browser 的 DOM Locator、URL 和导航同步由 `playwright` Capability 提供。
 - 只有实际场景证明 `waitForChange()` 往返成本不可接受时，才增加声明式语义条件，避免一期维护复杂且 Provider 难以一致实现的等待 DSL。
 
@@ -1554,6 +1586,8 @@ context_tokens > context_window * threshold_percentage
 - 每一轮同时执行 `Memory 召回` 与 `Conversation 召回`。
 - 两路召回并行、分别排序，再在统一上下文预算下合并。
 - 本轮召回结果冻结，避免 Agent Loop 中途改变上下文。
+- 用户于 2026-10-18 确认：Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/memory-maintenance.md`。
+- 撤销点之后接受的新输入归属新的排队 Main，保留不可变回执；旧 Main owner join 或租约失效并完成 stop settlement 后，才允许调度或 Claim 后继 Run。同内容的新显式 remember 保留独立的新来源与时间戳，不能因去重而继续指向撤销点之前的证据。
 - System Prompt、人格、规则和 Core Memory 尽量保持静态。
 - 动态召回内容放在 Prompt 后部，以减少对 Prompt Cache 的破坏。
 
@@ -1660,6 +1694,8 @@ author_role?
 相关性分数仅供系统内部排序，不暴露给 Agent。
 
 ### 11.6 Memory 写入与维护
+
+ERII-23 实现与配置：`docs/memory-maintenance.md`。可信本地 Experience Reviewer 使用 `skill manage` 完成候选、验证、晋升与退役；普通 Main/Worker 不获得 Skill 修改能力。
 
 显式管理工具：
 
@@ -2062,6 +2098,8 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 
 ### M3：统一 Tooling、Approval 与 Artifact
 
+M3 的 MCP 与 Coding 验证使用真实 stdio 协议和受控磁盘 fixture：进程由 macOS Seatbelt / Linux bubblewrap 隔离，网络与 Host 用户目录不可达；生产 Lume/Guest ComputerProvider 仍在 M6。它们共享现有 ToolExecutor/Security/Artifact 管线，不另建 Computer Agent Loop。新增 ToolSpec 的可选 description/resource_hash 随 tools_json 冻结，旧快照不自动扩权；不需要新增 schema 或领域状态。该中间验证边界的限制和证据见 `docs/capabilities.md`。
+
 - 完成 Tool Registry/Executor、Capability Snapshot、Security Policy、可恢复 Approval、ArtifactStore 和 Delivery Outbox。
 - 为每个 ToolSpec 强制声明风险、`replay_policy`、超时、输出限制与冲突键生成器。
 
@@ -2156,7 +2194,7 @@ Go 测试必须运行 race detector；Sidecar 必须包含协议 fixture、资�
 
 以下选择不阻塞 Coding Agent 按 M0–M5 开工；实现必须放在接口后，不得把某个临时选择泄漏到领域协议：
 
-1. Embedding 模型与 SQLite 向量扩展。M6 前先以 `MemorySearch` 接口和 FTS5 测试，完整一期补齐向量召回与 RRF。
+1. Embedding 与 SQLite 向量实现已在 ERII-22 选择：显式配置 OpenAI-compatible embedding endpoint/model/dimensions，SecretStore 引用凭据；SQLite 保存 dense vectors，私有 adapter 在用户/Agent/时间分区内执行 exact cosine，并与 FTS5/BM25 并行后 RRF。无新增 native extension，不声称 ANN 或次线性性能。未配置 embedding 时不提供召回能力，不将 FTS-only 视作完整向量交付。实现与离线重建限制见 `docs/recall.md`；模型质量留给 release-time Live Shadow。
 2. Web 框架、TUI 框架、飞书 SDK 与视觉实现；TUI 只需支持首次模型设置、首条纵向链路和审批。
 3. Context Compaction 的最终阈值与 Token 分配；算法和配置点先实现，数值通过用户选择的模型压测冻结。
 4. 各具体 Tool 的风险映射、范围授权文案与审批 UI；未知副作用 Tool 默认要求审批且 `replay_policy=never`。

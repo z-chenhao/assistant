@@ -5,24 +5,38 @@ model metadata, immutable snapshots, and a versioned stdio Provider Bridge.
 The local-provider M1 slice connects pinned Pi AI to Chat Completions endpoints
 through the CLI, with native Keychain or explicit environment credentials.
 See [Provider Bridge setup and operations](provider-bridge.md) for the runnable
-local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). Worker Runs, Tasks, UI and general Durable Replay remain later slices. Full product Golden Cases remain `not_applicable`; Main-only scripted L0 fragments are reported separately.
+local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the reusable Agent Loop, ordered Conversation and the first pure Direct Tool are now runnable through [the Main CLI](main-loop.md). The [TUI](tui-and-evals.md) and [Task/Root delegation with controlled pause/cancel](tasks.md) are runnable. Direct [Child Run delegation](children.md) is runnable; fair Child scheduling and 100-item Direct Tool batches have a maintained harness. Account monetary authorization has a separate five-run [CLI verification harness](children.md); general Durable Replay remains a later slice. Full product Golden Cases remain `not_applicable`; Main and Task scripted L0 fragments are reported separately.
 
 ## Commands and evidence
 
 Use Go 1.26.2+, Node 24.21.0, Python 3.10+ with standard-library SQLite, and a C compiler for
 the Go race detector. The application uses pure Go SQLite. Initial module
 fetching and `npm ci --prefix provider-bridge --ignore-scripts` need network access; checks subsequently need no online services,
-accounts, installed broker executable, containers, or fixed ports.
+accounts, installed broker executable, containers, or fixed ports. Computer Use
+contracts also require the pinned Browser dependencies and Chromium before tests:
+
+```sh
+npm ci --prefix runtime/javascript --ignore-scripts
+npm ci --prefix guest-browser --ignore-scripts
+node guest-browser/node_modules/playwright-core/cli.js install chromium
+```
+
+On Ubuntu use `install --with-deps chromium` for Browser system libraries.
+The actual Chromium test uses a disposable profile and a loopback synthetic site.
 
 | Command | Evidence |
 | --- | --- |
 | `make build` | `bin/personal-agent`, the only product process entry point |
-| `make test` | Real temporary SQLite, migrations, transaction rollback, duplicate/late/out-of-order events, Fake and real EventBus contracts, broker restart, process kills |
+| `make test` | Real Chromium locators/download/chooser, Guest transfer path checks, real temporary SQLite, migrations, transaction rollback, duplicate/late/out-of-order events, Fake and real EventBus contracts, broker restart, process kills |
 | `make test-race` | Those tests with Go's race detector |
 | `make lint` | `gofmt`, `go vet`, module checksums |
 | `make verify` | Real CLI metadata/probe/select/restart and cancelled setup, Bridge and metadata/security contracts five times, relay outage recovery, JetStream wire contract, seven SIGKILL boundaries, independent state readback |
 
 GitHub Actions runs all four checks on Ubuntu for PRs and pushes to `main`.
+Unit/lint, race and five verification shards run in parallel behind the stable
+required `Ubuntu checks` aggregate. Every existing five-run gate remains required
+on every commit. See [CI operations and profiling](ci.md) for shard ownership,
+failure/cancellation behavior, timing evidence and artifact retention.
 The integration tests own an embedded file-backed JetStream server bound to
 loopback on an assigned port. They shut it down, wait for termination, and remove
 its temporary storage. Crash tests kill only their exact Go-test child PID.
@@ -34,6 +48,9 @@ isolated from user configuration and removed on success or failure.
 - `evidence/verification.json`: diagnostics, persisted Agent/profile rows,
   canonical JSON, rejected metadata, logs/spans, bootstrap/model kill/restart,
   future-schema rejection, Provider Probe/activation/degraded states, and cleanup assertions.
+- `evidence/computer-use.json` and `computer-use-2.json` through `-5.json`: scoped
+  CLI/QuickJS/SSH/Cua/Playwright protocol drive, exact approvals, image selection,
+  file scope and cleanup. Real Guest evidence is opt-in; see [Computer Use](computer-use.md).
 - `evidence/main.json`: concurrent Main ingress, nine SIGKILL boundaries, stable
   steering, profile switching, semantic/Tool/usage/delivery readback and scripted
   GC-01/09/10 Main fragments.
@@ -73,7 +90,7 @@ Agent ingress. There is no production consumer yet; transactional Inbox handling
 is exercised through its real Go API by the integration harness.
 
 ```json
-{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":7,"state_database":"/tmp/erii-local/state.db"}
+{"readiness":"setup_required","agent_ingress_enabled":false,"agent_id":"<UUIDv7>","active_model_profile_id":null,"config_version":1,"schema_version":10,"state_database":"/tmp/erii-local/state.db"}
 ```
 
 Flags precede commands. `-help` creates no state. SIGINT/SIGTERM close the relay,
@@ -301,3 +318,21 @@ and `nats-server/v2` (Apache-2.0, test harness only). The SDK avoids a custom wi
 format parser; the official client avoids a second broker protocol. The test
 server and its dependencies add build/download cost but no service/account cost;
 they are absent from the product executable. Checksums live in `go.sum`.
+
+Unified Tool policy, local approval commands, effect recovery and the five-run security harness are documented in [tools.md](tools.md).
+
+The Ubuntu job has a bounded 25-minute timeout for the five-run Tool recovery gate and the existing Bridge/account/restart checks. The Tool gate adds 40 real SIGKILL/restarts; it retains every assertion and repetition.
+
+Artifact storage, CLI commands, scopes and recovery evidence: [artifacts.md](artifacts.md).
+
+Direct Child delegation: `scripts/verify_children.py` runs from `make verify`
+five times. It reuses the CLI/PTY harness and records tree/admission/approval/
+cancel/SIGKILL evidence. Scope and operations: [children.md](children.md).
+
+The M5 Code Mode slice additionally needs Node 24.21.0 and
+`npm ci --prefix runtime/javascript --ignore-scripts`. Its maintained CLI
+harness, transport fixtures, configuration, Pi provenance and recovery boundary
+are documented in [codemode.md](codemode.md). The new dependency is MIT-licensed
+QuickJS-WASI 3.6.2. The adapted MIT Pi 1.3.0 VM/Prelude is vendored; no model
+provider or paid service is introduced. M5 acceptance remains pending the
+ERII-20 replay and ERII-21 Golden Case slices.
