@@ -281,7 +281,7 @@ func TestAutomationCapabilityReductionPreservesChildAdmission(t *testing.T) {
 	if scalar(t, s, `SELECT count(*) FROM run WHERE worker_position='child' AND status='completed'`) != 2 {
 		t.Fatal("Automation broke recursive Child admission")
 	}
-	if scalar(t, s, `SELECT count(*) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id,json_each(c.tools_json) j WHERE (r.kind='main' OR r.worker_position='child') AND json_extract(j.value,'$.name')=?`, automation.ObserveName) != 0 {
+	if scalar(t, s, `SELECT count(*) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id,json_each(c.tools_json) j WHERE (r.kind='main' OR r.worker_position IN ('root','child')) AND json_extract(j.value,'$.name')=?`, automation.ObserveName) != 0 {
 		t.Fatal("Root observation authority escaped")
 	}
 	if scalar(t, s, `SELECT count(*) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id,json_each(c.tools_json) j WHERE r.kind='worker' AND json_extract(j.value,'$.name')=?`, automation.ManageName) != 0 {

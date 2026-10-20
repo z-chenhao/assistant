@@ -43,7 +43,7 @@ def assertions(value, tasks, roots, updates):
         "root_count_and_no_child": len(workers) == roots and all(r["task_id"] and r["parent_run_id"] is None for r in workers),
         "one_completion_per_root": len(value["updates"]) == updates and len({u["root_run_id"] for u in value["updates"]}) == updates,
         "durable_report_dedup": len(value["inbox"]) == updates == len(value["reporter_dedup"]),
-        "no_worker_task_controls": all(not any(s["name"].startswith("builtin__task__") for s in json.loads(caps[r["capability_snapshot_id"]]["tools_json"])) for r in workers),
+        "no_worker_task_controls": all(not any((s["name"].startswith("builtin__task__") or s["name"] == "builtin__automation__manage") for s in json.loads(caps[r["capability_snapshot_id"]]["tools_json"])) for r in workers),
         "main_cannot_spawn": all(not c["can_spawn_agents"] and not any(s["name"] == "builtin__agent__run" for s in json.loads(c["tools_json"])) for c in caps.values() if c["role"] == "main"),
         "runtime_origin_and_named_details": all(json.loads(b["message_json"])["origin"] == "runtime" and set(json.loads(b["message_json"])["details"]) <= {"task_ref", "kind", "artifact_refs"} for b in value["inbox"]),
         "runtime_never_system": all(m["role"] != "system" for req in requests for m in req["messages"] if m.get("origin") == "runtime"),

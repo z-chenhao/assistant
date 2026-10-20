@@ -82,7 +82,16 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if err := r.freezeSpend(ctx, tx, snapshot); err != nil {
 		return err
 	}
-	specs := agent.WorkerTools(r.registry.Describe())
+	var monitor bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM automation WHERE task_id=? AND enabled=1 AND below_value IS NOT NULL)`, taskID).Scan(&monitor); err != nil {
+		return err
+	}
+	specs := []tool.Spec{}
+	for _, spec := range agent.WorkerTools(r.registry.Describe()) {
+		if spec.Name != automation.ObserveName || monitor {
+			specs = append(specs, spec)
+		}
+	}
 	spawn := false
 	for _, spec := range specs {
 		spawn = spawn || spec.Name == agent.RunToolName

@@ -90,7 +90,7 @@ no Main turn or DeliveryRequest. Workers never deliver directly to the user.
 | Tool | Exposure | Permission | Replay | Errors |
 | --- | --- | --- | --- | --- |
 | `builtin__automation__manage` | Main | `task_control` | safe; frozen invocation and source/action receipt | invalid request/CAS: `INVALID_ARGUMENT`; missing ref: `NOT_FOUND`; Worker: hidden/denied |
-| `builtin__automation__observe` | Root Workers; only linked Root may execute | `automation_observe` | safe; immutable per-fire observation | invalid value: `INVALID_ARGUMENT`; wrong role/fire: `PERMISSION_DENIED`; value drift: `NON_DETERMINISTIC_REPLAY` |
+| `builtin__automation__observe` | Only monitoring Automation Root; Main/ordinary Roots/Children hidden | `automation_observe` | safe; immutable per-fire observation | invalid value: `INVALID_ARGUMENT`; wrong role/fire: `PERMISSION_DENIED`; value drift: `NON_DETERMINISTIC_REPLAY` |
 
 The shared ToolExecutor enforces frozen schemas and exact action approval for
 any downstream external effect. Automation grants no credentials or effect

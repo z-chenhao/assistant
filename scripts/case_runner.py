@@ -91,7 +91,7 @@ def result(case, variant, policy, execution):
         "ordered_semantic_history": [m["sequence"] for m in state["conversation"]] == list(range(1, len(state["conversation"]) + 1)),
         "no_task_or_child": bool(runs) and all(r["kind"] == "main" and r["task_id"] is None and r["parent_run_id"] is None for r in runs),
         "main_cannot_spawn": bool(caps) and all(not c["can_spawn_agents"] for c in caps),
-        "no_external_writes": bool(caps) and all((t["permission"] == "read_only" or (t["name"] == "builtin__task__manage" and t["permission"] == "task_control") or (t["name"] in ("builtin__artifact__save", "builtin__artifact__publish") and t["permission"] == "artifact_write")) for c in caps for t in json.loads(c["tools_json"])),
+        "no_external_writes": bool(caps) and all((t["permission"] == "read_only" or (t["name"] == "builtin__task__manage" and t["permission"] == "task_control") or (c.get("role") == "main" and t["name"] == "builtin__automation__manage" and t["permission"] == "task_control") or (t["name"] in ("builtin__artifact__save", "builtin__artifact__publish") and t["permission"] == "artifact_write")) for c in caps for t in json.loads(c["tools_json"])),
         "only_pure_tools": bool(tools) and all(t["tool_name"] == "builtin__text__echo" and t["replay_policy"] == "safe" and t["status"] == "succeeded" for t in tools),
         "no_duplicate_effects": all(t["attempt_count"] == 1 for t in tools),
         "terminal_runs": all(r["status"] == "completed" for r in runs),
