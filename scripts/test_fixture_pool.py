@@ -124,6 +124,47 @@ class FixturePoolTests(unittest.TestCase):
     def test_step_wrapping_make_joins_sessions_and_cleans_state(self):
         self.check_stubborn_session_cleanup(make_step=True)
 
+    def test_repeated_termination_cannot_interrupt_profiled_fixture_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = root / 'fixture.py'
+            script.write_text(
+                'import time\nfrom pathlib import Path\n'
+                f'root=Path({str(root)!r})\n'
+                '(root/"state").mkdir()\n'
+                'try:\n'
+                ' (root/"ready").touch()\n'
+                ' while True: time.sleep(.01)\n'
+                'finally:\n'
+                ' (root/"cleanup").touch()\n'
+                ' while not (root/"release").exists(): time.sleep(.01)\n'
+                ' (root/"state").rmdir()\n')
+            env = dict(os.environ, ERII_PROFILE_DIR=str(root / 'profiles'))
+            with (root / 'log').open('w') as log:
+                child = subprocess.Popen([sys.executable, 'scripts/profile_harness.py', str(script)],
+                                         cwd=suite.ROOT, env=env, stdout=log, stderr=subprocess.STDOUT,
+                                         start_new_session=True)
+                try:
+                    for marker in ('ready', 'cleanup'):
+                        deadline = time.monotonic() + 3
+                        while not (root / marker).exists() and time.monotonic() < deadline:
+                            time.sleep(.01)
+                        self.assertTrue((root / marker).exists())
+                        os.kill(child.pid, signal.SIGTERM)
+                    # Cleanup is deliberately held. A second notification must
+                    # not terminate its finally block before release.
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        child.wait(timeout=.2)
+                    (root / 'release').touch()
+                    self.assertEqual(child.wait(timeout=3), 143)
+                    self.assertFalse((root / 'state').exists())
+                    self.assertTrue((root / 'profiles/fixture.json').is_file())
+                finally:
+                    (root / 'release').touch()
+                    if child.poll() is None:
+                        os.killpg(child.pid, signal.SIGKILL)
+                        child.wait(timeout=3)
+
     def test_actions_entry_sigint_reaches_make_owner_and_cleans_two_sessions(self):
         self.check_stubborn_session_cleanup(make_step=True, actions_shell=True)
 

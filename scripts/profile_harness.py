@@ -28,9 +28,17 @@ def main():
     sys.argv = sys.argv[1:]
     sys.path.insert(0, str(script.parent))
     # Let finally blocks reap owned peers/PTYs on CI cancellation.
-    def terminate(*_):
-        raise SystemExit(143)
+    terminating = False
+    def terminate(signum, *_):
+        nonlocal terminating
+        if terminating:
+            return
+        terminating = True
+        # Make and the group owner can both signal this process. A repeated
+        # notification must not raise out of the cleanup already in progress.
+        raise SystemExit(128 + signum)
     signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGINT, terminate)
     profile = cProfile.Profile()
     cases = []
     active = {}

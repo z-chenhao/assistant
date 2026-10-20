@@ -138,6 +138,10 @@ Superseded pushes cancel the same PR's old workflow. Shell `exec` gives the
 phase owner the Actions entry signal. `ci_step.py` records first receipt;
 `fixture_pool.py` stops admission, signals only owned groups, joins children and
 removes temporary roots. Escalation leaves time before Actions' hard stop.
+The profiler accepts the first termination notification and ignores repeats
+while finally blocks unwind; Make and the group owner may both deliver signals.
+The controlled repeated-signal regression holds cleanup, signals again, then
+requires state removal and the original exit code after release.
 Real held Core/PTY/listening-child probes cover cleanup and unrelated-process
 preservation. SIGKILL itself cannot unwind Python; disposable VM teardown is
 the final boundary. Local cleanup latency is distinct from GitHub push-to-stop.
