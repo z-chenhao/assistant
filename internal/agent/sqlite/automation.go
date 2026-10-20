@@ -60,6 +60,9 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 			v.Instruction = task.Title(v.Instruction)
 			views = append(views, v)
 		}
+		if e := rows.Err(); e != nil {
+			return tool.Result{}, e
+		}
 		raw, e := encoded(views)
 		return tool.Result{Text: raw}, e
 	}
@@ -124,7 +127,7 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 					return tool.Failure("INVALID_ARGUMENT"), nil
 				}
 			}
-			_, err = tx.ExecContext(ctx, `UPDATE automation SET instruction=?,trigger_type=?,trigger_spec=?,timezone=?,below_value=?,is_below=0,enabled=1,next_fire_at=?,schedule_version=schedule_version+1,updated_at=?,version=version+1 WHERE automation_id=?`, q.Instruction, q.Type, q.Spec, q.Timezone, q.Below, t.UnixMicro(), now.UnixMicro(), id)
+			_, err = tx.ExecContext(ctx, `UPDATE automation SET instruction=?,trigger_type=?,trigger_spec=?,timezone=?,is_below=CASE WHEN below_value IS ? THEN is_below ELSE 0 END,below_value=?,enabled=1,next_fire_at=?,schedule_version=schedule_version+1,updated_at=?,version=version+1 WHERE automation_id=?`, q.Instruction, q.Type, q.Spec, q.Timezone, q.Below, q.Below, t.UnixMicro(), now.UnixMicro(), id)
 		}
 	}
 	if err != nil {
@@ -139,7 +142,7 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 	if _, err = tx.ExecContext(ctx, `INSERT INTO automation_request VALUES(?,?,?,?)`, owner, key, hash, saved); err != nil {
 		return result, err
 	}
-	return result, runEvent(ctx, tx, id, "automation.changed", 1)
+	return result, automationEvent(ctx, tx, id, "changed")
 }
 
 // ScheduleAutomations only persists due trigger identity + unified Outbox in
@@ -383,7 +386,7 @@ func (t *tools) executeAutomation(ctx context.Context, inv tool.Invocation) (too
 		}
 		result = tool.Result{Text: `{"accepted":true}`}
 		if !old.Valid {
-			return runEvent(ctx, tx, id, "automation.observed", 1)
+			return automationEvent(ctx, tx, id, "observed")
 		}
 		return nil
 	})
@@ -398,4 +401,14 @@ func (r *Runs) AutomationNow() time.Time {
 }
 func (r *Runs) SetTestAutomationClock(now time.Time) {
 	r.automationClock = func() time.Time { return now }
+}
+
+func automationEvent(ctx context.Context, tx *sql.Tx, id, kind string) error {
+	e, err := event.New("/erii/automations", "ai.erii.automation."+kind+".v1", id, struct {
+		ID string `json:"id"`
+	}{id})
+	if err != nil {
+		return err
+	}
+	return eventsqlite.Enqueue(ctx, tx, e)
 }

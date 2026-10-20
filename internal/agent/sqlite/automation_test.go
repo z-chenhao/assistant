@@ -85,12 +85,25 @@ func TestAutomationThresholdCrossingsAndCancel(t *testing.T) {
 	}
 	var version int64
 	s.db.QueryRow(`SELECT version FROM automation WHERE automation_id=?`, id).Scan(&version)
+	// Editing the schedule preserves an already-inside threshold state. A new
+	// daily check below the same threshold must remain quiet.
+	edit := automation.Request{Operation: "update", Ref: id, Version: version, Instruction: "HKG-CDG 2026-12-01 price", Type: "cron", Spec: "0 9 * * *", Timezone: "Asia/Shanghai", Below: &threshold}
+	if result, e := r.ManageAutomation(ctx, "edit-time", edit, now.AddDate(0, 0, 6)); e != nil || result.Error != nil {
+		t.Fatal(result, e)
+	}
+	price = 1700
+	r.SetTestAutomationClock(now.AddDate(0, 0, 7))
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM task_update`) != 2 {
+		t.Fatal("schedule edit repeated threshold notification")
+	}
+	s.db.QueryRow(`SELECT version FROM automation WHERE automation_id=?`, id).Scan(&version)
 	if result, e := r.ManageAutomation(ctx, "cancel", automation.Request{Operation: "cancel", Ref: id, Version: version}, now.AddDate(0, 0, 7)); e != nil || result.Error != nil {
 		t.Fatal(e, result)
 	}
 	r.SetTestAutomationClock(now.AddDate(0, 0, 20))
 	mustDrain(t, a)
-	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker'`) != 6 {
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker'`) != 7 {
 		t.Fatal("cancel created a Root")
 	}
 }
