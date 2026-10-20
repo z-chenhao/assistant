@@ -404,7 +404,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1):
         else:
             artifact_root.mkdir();marker.write_text(json.dumps(owner))
         destination.with_suffix('.progress.json').unlink(missing_ok=True)
-        destination.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+        destination.write_text(json.dumps(report,ensure_ascii=False)+'\n')
     completed = []
     report_lock = threading.Lock()
     items = [(case, variant) for case in dataset['cases'] if not selected or case['case_id']==selected
@@ -471,7 +471,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1):
         if destination:
             order={(c['case_id'],v['variant_id']):i for i,(c,v) in enumerate(items)}
             report['results']=sorted(completed,key=lambda r:order[r['case_id'],r['variant_id']])
-            destination.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+            destination.write_text(json.dumps(report,ensure_ascii=False)+'\n')
     return report
 
 

@@ -70,7 +70,8 @@ Process sessions belong to the pool and cancellation joins them. All 66 locked
 variants (including six separate red-flag branches) finish before the next of
 five consecutive rounds starts. Lightweight progress records avoid rewriting
 the growing full state report after every variant; full evidence is written
-once on join or failure. This is private harness scheduling, with no runtime
+once on join or failure, using the compact JSON encoder to retain every field
+without Python-level indentation overhead. This is private harness scheduling, with no runtime
 protocol or production concurrency change. Serial execution remains available
 for diagnosis. Increase runner partitioning only when measured contention or
 latency justifies it; keep the bounded pool and the same strict aggregate.

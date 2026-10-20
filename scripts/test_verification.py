@@ -97,7 +97,7 @@ class VerificationTests(unittest.TestCase):
             self.assertFalse(ci_gate.passed(invalid))
 
     def test_all_ci_jobs_keep_the_ten_minute_budget(self):
-        for path in (suite.ROOT / '.github/workflows').glob('*.yml'):
+        for path in sorted((suite.ROOT / '.github/workflows').glob('*.y*ml')):
             text = path.read_text()
             jobs = re.findall(r'^  [a-zA-Z0-9_-]+:\n(    .*?)(?=^  [a-zA-Z0-9_-]+:|\Z)',
                               text.split('jobs:', 1)[1], re.M | re.S)

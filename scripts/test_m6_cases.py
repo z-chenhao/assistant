@@ -21,6 +21,7 @@ class M6Cases(unittest.TestCase):
         active, peak = 0, 0
         lock = threading.Lock()
         roots = set()
+        running_cases = []
         class Peer:
             def close(self):pass
         def action(binary, folder, case, variant, *args):
@@ -29,11 +30,19 @@ class M6Cases(unittest.TestCase):
                 self.assertNotIn(folder, roots)
                 roots.add(folder)
                 active += 1
+                running_cases.append(case['case_id'])
+                if case['case_id']=='GC-04':
+                    self.assertLessEqual(active,2)
+                    self.assertEqual(set(running_cases),{'GC-04'})
+                else:
+                    self.assertNotIn('GC-04',running_cases)
                 peak = max(peak, active)
             (folder/'state').write_text(variant['variant_id'])
             time.sleep(.01)
             self.assertEqual((folder/'state').read_text(), variant['variant_id'])
-            with lock:active -= 1
+            with lock:
+                active -= 1
+                running_cases.remove(case['case_id'])
             return dict(observed=True), dict(root=str(folder))
         with tempfile.TemporaryDirectory() as temporary:
             output=Path(temporary)/'report.json'
