@@ -95,9 +95,9 @@ and source/binary/driver/dataset/lock drift. It reconstructs all five canonical
 unpartitioned path. No partial part can satisfy `Ubuntu checks`; both the matrix
 and its join are mandatory. Part artifacts retain original state and openable
 bytes, while the join retains canonical reports and the aggregate. Browser
-installation is needed only by network/booking/desktop parts. M6 does not invoke
-the coding sandbox; unit/SC/GC-19 retain all existing sandbox checks. All M6
-fixtures remain disk-backed.
+installation is needed only by network/booking/desktop parts. M6 prepares the existing Linux sandbox for configured MCP peers, including
+read-only context/Memory fixtures. Unit/SC/GC-19 retain the coding workspace
+checks. All M6 fixtures remain disk-backed.
 
 ## Complete inventory
 

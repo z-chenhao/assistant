@@ -144,6 +144,8 @@ class VerificationTests(unittest.TestCase):
         import m6_report
         parts = json.loads(re.search(r'        m6part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(m6_report.PARTS))
+        personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
+        self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
         personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]
         self.assertIn('needs: personal',personal_join)
         self.assertIn('test "$PART_RESULT" = success',personal_join)
