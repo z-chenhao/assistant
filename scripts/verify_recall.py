@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Memory/Conversation Launch, Doctor, Drive, Evidence and Cleanup through CLI."""
 import argparse
+from contextlib import closing
 import json
 from pathlib import Path
 import signal
@@ -17,6 +18,8 @@ class Embeddings:
     def __init__(self):
         self.fail = False
         self.requests = []
+        self.before_response = None
+        self.callback_errors = []
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -33,6 +36,14 @@ class Embeddings:
                     return
                 require(self.path == '/v1/embeddings', 'wrong embedding endpoint')
                 require(value['model'] == 'semantic-fixture-v1', 'model drift')
+                if owner.before_response is not None:
+                    try:
+                        owner.before_response(value)
+                    except Exception as error:
+                        owner.callback_errors.append(type(error).__name__)
+                        self.send_response(503)
+                        self.end_headers()
+                        return
                 if len(value['input'].encode('utf-8')) > 64 << 10:
                     self.send_response(400)
                     self.end_headers()
@@ -69,6 +80,47 @@ class Harness(MainHarness):
 
     def args(self, *args):
         return super().args('-config', str(self.config), *args)
+
+    def main_completed(self, run_id):
+        with closing(sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db')) as db:
+            return db.execute("SELECT status='completed' FROM run WHERE run_id=? AND kind='main'", (run_id,)).fetchone() == (1,)
+
+    def worker_requests(self):
+        root = Path(self.env['ERII_DATA_ROOT'])
+        with closing(sqlite3.connect(root / 'state.db')) as db:
+            ids = {r[0] for r in db.execute("SELECT generation_id FROM model_generation JOIN run USING(run_id) WHERE kind='worker'")}
+        audit = root / 'fake-provider-calls.jsonl'
+        return sum(json.loads(line)['generation_id'] in ids for line in audit.read_text().splitlines()) if audit.exists() else 0
+
+    def drain(self, main_run):
+        """Choose the legal no-append-conflict ordering; never retry a failure.
+
+        Main's committed Task waits for Root's first frozen recall. Root's model
+        dispatch waits for Main's publication. A separate forced-conflict
+        scenario proves the opposite ordering still fails closed.
+        """
+        main_release, worker_release = self.root / 'publish.release', self.root / 'worker.release'
+        require(not main_release.exists() and not worker_release.exists(), 'occupied recall barriers')
+        seen = dict(after_task_commit=0, before_worker_generation=0)
+        evidence = dict(worker_requests_before_main_completion=None)
+        def observe(name):
+            require(name in seen, 'unexpected recall barrier')
+            seen[name] += 1
+            if name == 'before_worker_generation' and not main_release.exists():
+                main_release.touch(exist_ok=False)
+        def progress():
+            if main_release.exists() and not worker_release.exists() and self.main_completed(main_run):
+                evidence['worker_requests_before_main_completion'] = self.worker_requests()
+                require(evidence['worker_requests_before_main_completion'] == 0,
+                        'Worker dispatched before the publication barrier')
+                worker_release.touch(exist_ok=False)
+        result = self.drive_boundaries({'after_task_commit': main_release,
+                                        'before_worker_generation': worker_release}, observe, progress)
+        require(result.returncode == 0, "('chat', 'work'): " + result.stderr)
+        require(all(seen.values()) and worker_release.exists(),
+                'recall scheduling barriers were not exercised')
+        return dict(**evidence, boundaries=seen, root_recall_frozen_before_main_publication=True,
+                    main_completed_before_worker_dispatch=True)
 
     def snapshot(self):
         result = self.state()
@@ -172,7 +224,105 @@ def verify(value):
     require(all('FOREIGN_' not in r['hits_json'] for r in value['recall']), 'automatic recall scope leak')
 
 
-def run(binary):
+def failure_state(h, embeddings, scenario, stage):
+    """Read only structural evidence; never copy corpus, prompts or HTTP bodies."""
+    value = dict(scenario=scenario, stage=stage, embedding_requests=len(embeddings.requests),
+                 embedding_failure_enabled=embeddings.fail, databases={})
+    root = Path(h.env['ERII_DATA_ROOT'])
+    agents = []
+    for name in ('state', 'memory', 'conversation'):
+        path = root / (name + '.db')
+        if not path.exists():
+            continue
+        try:
+            with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
+                if name == 'state':
+                    rows = db.execute('SELECT kind,status,error_code,count(*) FROM run GROUP BY kind,status,error_code').fetchall()
+                    value['databases'][name] = dict(run_groups=rows,
+                        frozen_recalls=db.execute('SELECT count(*) FROM run_recall').fetchone()[0])
+                    agents = [r[0] for r in db.execute('SELECT DISTINCT agent_id FROM run')]
+                else:
+                    rows = db.execute('SELECT active,vector_json IS NULL,count(*) FROM recall_document GROUP BY active,vector_json IS NULL').fetchall()
+                    value['databases'][name] = dict(index_groups=rows)
+                    if agents:
+                        parameters = ','.join('?' for _ in agents)
+                        pending = db.execute("SELECT count(*) FROM recall_document WHERE active=1 AND vector_json IS NULL AND user_id='local' AND (agent_id='' OR agent_id IN (" + parameters + '))', agents).fetchone()[0]
+                        value['databases'][name]['authorized_pending_vectors'] = pending
+        except sqlite3.Error:
+            value['databases'][name] = dict(diagnostic_unavailable=True)
+    return value
+
+
+def concurrent_append_case(binary, root, failure_evidence=None):
+    """Force Main's real append into Root's catch-up/query gap without sleeps."""
+    root.mkdir()
+    embeddings = Embeddings()
+    h = Harness(binary, root, embeddings)
+    release = root / 'task.release'
+    stage = 'setup'
+    barrier = None
+    try:
+        h.setup()
+        h.seed()
+        receipt = h.send('recall-request', 'tea work with independent child recall')
+        observed = dict(query_requests=0, pending_assistant_vectors=None)
+        def append_after_catch_up():
+            release.touch(exist_ok=False)
+            h.wait_state(bool, 'Main publication during Root query',
+                         reader=lambda _: h.main_completed(receipt['run_id']))
+            with closing(sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'conversation.db')) as db:
+                observed['pending_assistant_vectors'] = db.execute("SELECT count(*) FROM recall_document WHERE active=1 AND vector_json IS NULL AND author_role='assistant' AND user_id='local'").fetchone()[0]
+            require(observed['pending_assistant_vectors'] == 1, 'concurrent append boundary was not forced')
+        barrier = threading.Barrier(2, action=append_after_catch_up)
+        def hold_query(value):
+            if 'Retrieve tea context independently and delegate a separate recall.' in value['input']:
+                observed['query_requests'] += 1
+                barrier.wait(timeout=10)
+        embeddings.before_response = hold_query
+        stage = 'forced-conflict'
+        child = h.hold('after_task_commit', extra_flags=('-test-main-release', str(release)))
+        _, error = child.communicate(timeout=20)
+        require(child.returncode == 1 and error.strip() == 'personal-agent: run storage unavailable',
+                'concurrent pending append did not fail the CLI closed')
+        require(not embeddings.callback_errors and observed['query_requests'] == 2,
+                'embedding barrier failed instead of exercising recall')
+        before = h.snapshot()
+        workers = {r['run_id'] for r in before['runs'] if r['kind'] == 'worker'}
+        require(len(workers) == 1 and h.worker_requests() == 0 and
+                not any(r['run_id'] in workers for r in before['recall']) and
+                not any(g['run_id'] in workers for g in before['generations']),
+                'failed recall admitted a partial Worker context/model request')
+        embeddings.before_response = None
+        stage = 'explicit-later-caller'
+        h.command('chat', 'work')
+        value = h.snapshot()
+        verify(value)
+        require(len(value['generations']) == 9 and len(value['runs']) == 4,
+                'explicit recovery changed the complete recall fixture')
+        require(all(r in value['recall'] for r in before['recall']) and
+                value['conversation'][:len(before['conversation'])] == before['conversation'],
+                'explicit recovery rewrote frozen recall or original messages')
+        h.command('chat', 'work')
+        require(h.snapshot() == value, 'repeated recovery drain changed terminal state')
+        return dict(name='concurrent-append', first_drive_rejected=True,
+                    worker_model_requests_before_recovery=0, explicit_later_caller_recovered=True,
+                    boundary=observed, state=value, embedding_requests=embeddings.requests)
+    except Exception:
+        if failure_evidence is not None:
+            failure_evidence.parent.mkdir(parents=True, exist_ok=True)
+            failure_evidence.write_text(json.dumps(dict(version=1, passed=False,
+                failure=failure_state(h, embeddings, 'concurrent-append', stage)), indent=2) + '\n')
+        raise
+    finally:
+        if barrier is not None:
+            barrier.abort()
+        try:
+            h.cleanup()
+        finally:
+            embeddings.close()
+
+
+def run(binary, failure_evidence=None):
     report = dict(version=1, scope='ERII-22 read-only hybrid recall and frozen context; Curator/manage/compaction and full SC-08 remain ERII-23', scenarios=[])
     with tempfile.TemporaryDirectory(prefix='erii-recall-') as directory:
         for name in ('ordinary', 'kill-restart', 'embedding-failure', 'multipart', 'multipart-prior'):
@@ -180,6 +330,7 @@ def run(binary):
             root.mkdir()
             embeddings = Embeddings()
             h = Harness(binary, root, embeddings)
+            stage = 'setup'
             try:
                 multipart = name.startswith('multipart')
                 if multipart:
@@ -194,6 +345,7 @@ def run(binary):
                 if multipart:
                     original_json, joined_text = h.seed_multipart(agent, prior=name.endswith('prior'))
                 receipt = h.send('recall-request', 'tea work with independent child recall')
+                stage = 'fault-boundary'
                 if name == 'embedding-failure':
                     embeddings.fail = True
                     failure = h.command('chat', 'work', ok=False)
@@ -215,7 +367,9 @@ def run(binary):
                                     'tea NEW_AFTER_FREEZE', '[{"source_type":"conversation","source_ref":"conversation:original"}]', 2000000))
                         db.execute('INSERT INTO recall_document(ref,user_id,agent_id,content,occurred_at,author_role,core,active) VALUES(?,?,?,?,?,?,?,?)',
                                    ('memory:after-freeze', 'local', agent, 'tea NEW_AFTER_FREEZE', 2000000, '', 0, 1))
-                h.command('chat', 'work')
+                stage = 'drain'
+                scheduling = h.drain(receipt['run_id'])
+                stage = 'assertions'
                 value = h.snapshot()
                 verify(value)
                 multipart_evidence = None
@@ -236,15 +390,26 @@ def run(binary):
                     same = next(r for r in value['recall'] if r['run_id'] == receipt['run_id'] and r['step_index'] == 0)
                     require(same == frozen, 'restart changed frozen recall')
                     require('NEW_AFTER_FREEZE' not in same['hits_json'] and any('NEW_AFTER_FREEZE' in r['hits_json'] for r in value['recall'] if r != same), 'per-turn snapshot did not advance')
+                stage = 'idempotent-drain'
                 h.command('chat', 'work')
                 require(h.snapshot() == value, 'repeated drain changed terminal state')
                 require(all(len(r['input'].encode('utf-8')) <= 64 << 10 for r in embeddings.requests), 'oversized embedding request')
                 report['scenarios'].append(dict(name=name, state=value, embedding_requests=embeddings.requests,
+                                                scheduling=scheduling,
                                                 multipart=multipart_evidence,
                                                 before=before if name in ('kill-restart', 'embedding-failure') else None))
+            except Exception:
+                if failure_evidence is not None:
+                    failure_evidence.parent.mkdir(parents=True, exist_ok=True)
+                    failure_evidence.write_text(json.dumps(dict(version=1, passed=False,
+                        failure=failure_state(h, embeddings, name, stage)), indent=2) + '\n')
+                raise
             finally:
-                h.cleanup()
-                embeddings.close()
+                try:
+                    h.cleanup()
+                finally:
+                    embeddings.close()
+        report['scenarios'].append(concurrent_append_case(binary, Path(directory) / 'concurrent-append', failure_evidence))
     report['cleanup'] = 'CLI processes reaped, HTTP Fake stopped and joined, temporary roots removed'
     report['passed'] = True
     return report
@@ -255,7 +420,8 @@ def main():
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     args = parser.parse_args()
-    report = run(args.binary.resolve())
+    args.evidence.unlink(missing_ok=True)
+    report = run(args.binary.resolve(), args.evidence)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(dict(passed=True, scenarios=len(report['scenarios']), cleanup=report['cleanup'])))

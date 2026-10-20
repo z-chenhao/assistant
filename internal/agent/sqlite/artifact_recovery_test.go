@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
@@ -87,84 +88,147 @@ func recoveryFixture(t *testing.T, path string, query func(context.Context, tool
 func TestArtifactQueryRecoveryCommitsExactReceipt(t *testing.T) {
 	for _, path := range []string{"running", "unknown", "ended_unknown"} {
 		t.Run(path, func(t *testing.T) {
-			ctx := context.Background()
-			payload := strings.Repeat("\x00authoritative receipt\xff", 4096)
-			var reader *receiptReader
-			var queries int
-			s, r, e, x, calls, invoked := recoveryFixture(t, path, func(ctx context.Context, _ tool.Request) tool.Evidence {
-				queries++
-				reader = &receiptReader{Reader: strings.NewReader(payload), ctx: ctx}
-				return tool.Evidence{State: "succeeded", Result: tool.Result{Output: &tool.BinaryOutput{Name: "receipt.bin", MediaType: "application/octet-stream", Reader: reader}}}
-			})
-			runVersion := scalar(t, s, `SELECT version FROM run LIMIT 1`)
-			var returned tool.Result
-			if path != "running" {
+			// Keep the frozen 100ms budget, but do not spend it on host
+			// scheduling/filesystem latency in this successful receipt contract.
+			synctest.Test(t, func(t *testing.T) {
+				ctx := context.Background()
+				payload := strings.Repeat("\x00authoritative receipt\xff", 4096)
+				var reader *receiptReader
+				var queries int
+				s, r, e, x, calls, invoked := recoveryFixture(t, path, func(ctx context.Context, _ tool.Request) tool.Evidence {
+					queries++
+					reader = &receiptReader{Reader: strings.NewReader(payload), ctx: ctx}
+					return tool.Evidence{State: "succeeded", Result: tool.Result{Output: &tool.BinaryOutput{Name: "receipt.bin", MediaType: "application/octet-stream", Reader: reader}}}
+				})
+				runVersion := scalar(t, s, `SELECT version FROM run LIMIT 1`)
+				var returned tool.Result
+				if path != "running" {
+					if err := r.ReconcileUnknown(ctx); err != nil {
+						t.Fatal(err)
+					}
+					observations, err := r.ToolOutcomes(ctx)
+					if err != nil || len(observations) != 1 {
+						t.Fatal(observations, err)
+					}
+					returned = observations[0].Result
+				}
+				if path != "ended_unknown" {
+					results, err := e.Execute(ctx, x, calls)
+					if err != nil || len(results) != 1 {
+						t.Fatal(results, err)
+					}
+					if path == "unknown" && !reflect.DeepEqual(returned, results[0]) {
+						t.Fatal("control-plane/caller differ", returned, results)
+					}
+					returned = results[0]
+				}
+				if returned.Error != nil || returned.Output != nil || len(returned.ArtifactRefs) != 1 {
+					t.Fatal(returned)
+				}
+				var persisted tool.Result
+				var raw, proof, ref string
+				if err := s.db.QueryRow(`SELECT result_json,reconciliation_json,result_ref FROM tool_invocation WHERE status='succeeded'`).Scan(&raw, &proof, &ref); err != nil {
+					t.Fatal(err)
+				}
+				if err := json.Unmarshal([]byte(raw), &persisted); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(returned, persisted) || proof != raw || ref != returned.ArtifactRefs[0] {
+					t.Fatal("caller/committed/proof differ", returned, raw, proof, ref)
+				}
+				if got := readArtifact(t, s, artifactOwner(t, s), ref); got != payload {
+					t.Fatal("receipt bytes lost")
+				}
+				d, err := s.Artifacts().Describe(ctx, artifactOwner(t, s), ref)
+				hash := sha256.Sum256([]byte(payload))
+				if err != nil || d.ContentHash != hex.EncodeToString(hash[:]) || d.ByteSize != int64(len(payload)) {
+					t.Fatal(d, err)
+				}
+				var runID string
+				if err := s.db.QueryRow(`SELECT run_id FROM tool_invocation`).Scan(&runID); err != nil {
+					t.Fatal(err)
+				}
+				scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: runID}
+				for _, bad := range []artifact.Scope{{UserID: "other", AgentID: scope.AgentID, RunID: scope.RunID}, {UserID: scope.UserID, AgentID: "other", RunID: scope.RunID}, {UserID: scope.UserID, AgentID: scope.AgentID, RunID: "other"}} {
+					if _, err := s.Artifacts().Open(ctx, bad, ref); !errors.Is(err, artifact.ErrNotFound) {
+						t.Fatal("scope leak", bad, err)
+					}
+				}
+				if readArtifact(t, s, scope, ref) != payload {
+					t.Fatal("Run cannot read own receipt")
+				}
+				if path != "ended_unknown" {
+					replay, err := e.Execute(ctx, x, calls)
+					if err != nil || !reflect.DeepEqual(replay, []tool.Result{returned}) {
+						t.Fatal("replay changed", replay, err)
+					}
+				}
 				if err := r.ReconcileUnknown(ctx); err != nil {
 					t.Fatal(err)
 				}
-				observations, err := r.ToolOutcomes(ctx)
-				if err != nil || len(observations) != 1 {
-					t.Fatal(observations, err)
+				if reader.closed.Load() != 1 || queries != 1 || invoked.Load() != 1 || scalar(t, s, `SELECT attempt_count FROM tool_invocation`) != 1 || scalar(t, s, `SELECT count(*) FROM artifact`) != 1 || scalar(t, s, `SELECT count(*) FROM artifact_reference WHERE holder_kind='tool'`) != 1 || scalar(t, s, `SELECT version FROM run LIMIT 1`) != runVersion {
+					t.Fatal("recovery leaked, revived or repeated", reader.closed.Load(), queries, invoked.Load())
 				}
-				returned = observations[0].Result
-			}
-			if path != "ended_unknown" {
-				results, err := e.Execute(ctx, x, calls)
-				if err != nil || len(results) != 1 {
-					t.Fatal(results, err)
+			})
+		})
+	}
+}
+
+// The exact-receipt contract above assumes its query/receipt fits the frozen
+// budget. Expiry is a different legal outcome: retain unknown, then permit a
+// fresh evidence query without ever redispatching the external effect.
+func TestArtifactQueryRecoveryFrozenDeadline(t *testing.T) {
+	for _, path := range []string{"running", "unknown", "ended_unknown"} {
+		t.Run(path, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx := context.Background()
+				payload := "authoritative binary receipt"
+				queries := 0
+				var readers []*receiptReader
+				s, r, e, x, calls, invoked := recoveryFixture(t, path, func(ctx context.Context, _ tool.Request) tool.Evidence {
+					queries++
+					deadline, ok := ctx.Deadline()
+					if !ok || time.Until(deadline) != 100*time.Millisecond {
+						t.Fatal("query did not retain its frozen 100ms deadline")
+					}
+					if queries == 1 {
+						time.Sleep(100 * time.Millisecond)
+						<-ctx.Done()
+					}
+					reader := &receiptReader{Reader: strings.NewReader(payload), ctx: ctx}
+					readers = append(readers, reader)
+					return tool.Evidence{State: "succeeded", Result: tool.Result{Output: &tool.BinaryOutput{Name: "receipt.bin", MediaType: "application/octet-stream", Reader: reader}}}
+				})
+				runVersion := scalar(t, s, `SELECT version FROM run LIMIT 1`)
+				recover := func() tool.Result {
+					if path == "running" {
+						results, err := e.Execute(ctx, x, calls)
+						if err != nil || len(results) != 1 {
+							t.Fatal(results, err)
+						}
+						return results[0]
+					}
+					if err := r.ReconcileUnknown(ctx); err != nil {
+						t.Fatal(err)
+					}
+					observations, err := r.ToolOutcomes(ctx)
+					if err != nil || len(observations) != 1 {
+						t.Fatal(observations, err)
+					}
+					return observations[0].Result
 				}
-				if path == "unknown" && !reflect.DeepEqual(returned, results[0]) {
-					t.Fatal("control-plane/caller differ", returned, results)
+				first := recover()
+				if first.Error == nil || first.Error.Code != "UNKNOWN_SIDE_EFFECT" || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE status='unknown'`) != 1 || scalar(t, s, `SELECT count(*) FROM artifact`) != 0 || readers[0].closed.Load() != 1 {
+					t.Fatal("expired query settled a receipt or leaked its stream", first)
 				}
-				returned = results[0]
-			}
-			if returned.Error != nil || returned.Output != nil || len(returned.ArtifactRefs) != 1 {
-				t.Fatal(returned)
-			}
-			var persisted tool.Result
-			var raw, proof, ref string
-			if err := s.db.QueryRow(`SELECT result_json,reconciliation_json,result_ref FROM tool_invocation WHERE status='succeeded'`).Scan(&raw, &proof, &ref); err != nil {
-				t.Fatal(err)
-			}
-			if err := json.Unmarshal([]byte(raw), &persisted); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(returned, persisted) || proof != raw || ref != returned.ArtifactRefs[0] {
-				t.Fatal("caller/committed/proof differ", returned, raw, proof, ref)
-			}
-			if got := readArtifact(t, s, artifactOwner(t, s), ref); got != payload {
-				t.Fatal("receipt bytes lost")
-			}
-			d, err := s.Artifacts().Describe(ctx, artifactOwner(t, s), ref)
-			hash := sha256.Sum256([]byte(payload))
-			if err != nil || d.ContentHash != hex.EncodeToString(hash[:]) || d.ByteSize != int64(len(payload)) {
-				t.Fatal(d, err)
-			}
-			var runID string
-			if err := s.db.QueryRow(`SELECT run_id FROM tool_invocation`).Scan(&runID); err != nil {
-				t.Fatal(err)
-			}
-			scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: runID}
-			for _, bad := range []artifact.Scope{{UserID: "other", AgentID: scope.AgentID, RunID: scope.RunID}, {UserID: scope.UserID, AgentID: "other", RunID: scope.RunID}, {UserID: scope.UserID, AgentID: scope.AgentID, RunID: "other"}} {
-				if _, err := s.Artifacts().Open(ctx, bad, ref); !errors.Is(err, artifact.ErrNotFound) {
-					t.Fatal("scope leak", bad, err)
+				second := recover()
+				if second.Error != nil || len(second.ArtifactRefs) != 1 || readArtifact(t, s, artifactOwner(t, s), second.ArtifactRefs[0]) != payload {
+					t.Fatal("fresh authoritative query did not retain its receipt", second)
 				}
-			}
-			if readArtifact(t, s, scope, ref) != payload {
-				t.Fatal("Run cannot read own receipt")
-			}
-			if path != "ended_unknown" {
-				replay, err := e.Execute(ctx, x, calls)
-				if err != nil || !reflect.DeepEqual(replay, []tool.Result{returned}) {
-					t.Fatal("replay changed", replay, err)
+				if queries != 2 || invoked.Load() != 1 || readers[1].closed.Load() != 1 || scalar(t, s, `SELECT attempt_count FROM tool_invocation`) != 1 || scalar(t, s, `SELECT count(*) FROM artifact`) != 1 || scalar(t, s, `SELECT version FROM run LIMIT 1`) != runVersion {
+					t.Fatal("query retry repeated an effect, revived a Run or leaked a stream")
 				}
-			}
-			if err := r.ReconcileUnknown(ctx); err != nil {
-				t.Fatal(err)
-			}
-			if reader.closed.Load() != 1 || queries != 1 || invoked.Load() != 1 || scalar(t, s, `SELECT attempt_count FROM tool_invocation`) != 1 || scalar(t, s, `SELECT count(*) FROM artifact`) != 1 || scalar(t, s, `SELECT count(*) FROM artifact_reference WHERE holder_kind='tool'`) != 1 || scalar(t, s, `SELECT version FROM run LIMIT 1`) != runVersion {
-				t.Fatal("recovery leaked, revived or repeated", reader.closed.Load(), queries, invoked.Load())
-			}
+			})
 		})
 	}
 }

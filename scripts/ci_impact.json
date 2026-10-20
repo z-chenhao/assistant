@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "rules": [
+    {"prefix": "docs/", "shards": [], "example": "docs/development.md"},
+    {"prefix": "README.md", "shards": [], "example": "README.md"},
+    {"prefix": "internal/tui/", "shards": ["runtime", "providers"], "example": "internal/tui/session.go"},
+    {"prefix": "internal/delivery/", "shards": ["runtime", "delivery"], "example": "internal/delivery/delivery.go"},
+    {"prefix": "internal/memory/", "shards": ["runtime", "security"], "example": "internal/memory/memory.go"},
+    {"prefix": "internal/recall/", "shards": ["runtime", "security"], "example": "internal/recall/recall.go"},
+    {"prefix": "internal/skill/", "shards": ["security", "providers"], "example": "internal/skill/catalog.go"},
+    {"prefix": "internal/conversation/", "shards": ["runtime", "security", "providers"], "example": "internal/conversation/message.go"},
+    {"prefix": "provider-bridge/", "shards": ["providers", "codemode"], "example": "provider-bridge/bridge.mjs"}
+  ]
+}

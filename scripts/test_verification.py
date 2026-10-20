@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import socket
 import sys
 import tempfile
 import threading
@@ -17,6 +18,39 @@ import verify_suite as suite
 
 
 class VerificationTests(unittest.TestCase):
+    def test_signal_eperm_can_only_accept_confirmed_absence_on_darwin(self):
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'darwin'), \
+             patch.object(suite, 'group_alive', return_value=False) as inspect:
+            suite.signal_group(42, signal.SIGKILL)
+            inspect.assert_called_once_with(42)
+            inspect.return_value = True
+            with self.assertRaises(PermissionError):
+                suite.signal_group(42, signal.SIGTERM)
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'linux'):
+            with self.assertRaises(PermissionError):
+                suite.signal_group(42, signal.SIGKILL)
+
+    def test_darwin_eperm_requires_authoritative_group_inspection(self):
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'darwin'), \
+             patch.object(suite.subprocess, 'check_output') as inspect:
+            for table, alive in [('42 Z\n', False), ('42 S\n', True),
+                                 ('42 Z\n42 R\n', True), ('99 S\n', False)]:
+                inspect.return_value = table
+                self.assertEqual(suite.group_alive(42), alive)
+            inspect.return_value = ''
+            with self.assertRaises(OSError):
+                suite.group_alive(42)
+            inspect.side_effect = PermissionError
+            with self.assertRaises(PermissionError):
+                suite.group_alive(42)
+        with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
+             patch.object(suite.sys, 'platform', 'linux'):
+            with self.assertRaises(PermissionError):
+                suite.group_alive(42)
+
     def test_pre_optimization_inventory_and_disjoint_evidence(self):
         expected = {
             "verify.py": 1, "verify_local_provider.py": 1, "verify_account.py": 6,
@@ -51,7 +85,7 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(args, ['go', 'test', '-count=5', '-json', './internal/llm/...', './internal/agent/sqlite'])
 
     def test_aggregate_rejects_every_non_success_combination(self):
-        for states in itertools.product(['success', 'failure', 'cancelled', 'skipped'], repeat=3):
+        for states in itertools.product(['success', 'failure', 'cancelled', 'skipped'], repeat=len(ci_gate.REQUIRED)):
             needs = {name: {'result': value} for name, value in zip(sorted(ci_gate.REQUIRED), states)}
             self.assertEqual(ci_gate.passed(needs), all(s == 'success' for s in states))
         good = {name: {'result': 'success'} for name in ci_gate.REQUIRED}
@@ -64,24 +98,88 @@ class VerificationTests(unittest.TestCase):
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS))
-        self.assertEqual(len(shards), len(suite.SHARDS))
-        needs = json.loads(re.search(r'    needs: (\[.*\])', workflow)[1])
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode'})
+        self.assertEqual(len(shards), 4)
+        parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
+        self.assertEqual(parts, list(suite.CODEMODE_PARTS))
+        checks = workflow[workflow.index('  checks:'):]
+        needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
-        self.assertIn('name: Ubuntu checks', workflow)
-        self.assertIn('if: ${{ always() }}', workflow)
-        self.assertIn('NEEDS_JSON: ${{ toJSON(needs) }}', workflow)
-        self.assertIn('run: python3 scripts/ci_gate.py', workflow)
-        self.assertNotIn('continue-on-error', workflow)
-        self.assertNotIn('paths-ignore:', workflow)
-        self.assertIn('cancel-in-progress: true', workflow)
-        self.assertIn('fail-fast: false', workflow)
-        self.assertIn('retention-days: 14', workflow)
-        self.assertIn('if-no-files-found: error', workflow)
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 4)
-        sandbox_condition = re.search(r'      - name: Prepare isolated coding fixture runtime\n        if: (.*)', workflow)[1]
-        self.assertEqual(set(re.findall(r"matrix.shard == '([^']+)'", sandbox_condition)),
-                         {'providers', 'codemode', 'security'})
+        for required in ('name: Ubuntu checks', 'if: ${{ always() }}',
+                         'NEEDS_JSON: ${{ toJSON(needs) }}', 'run: python3 scripts/ci_gate.py',
+                         'cancel-in-progress: true', 'fail-fast: false',
+                         'retention-days: 14', 'if-no-files-found: error'):
+            self.assertIn(required, workflow)
+        for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
+            self.assertNotIn(forbidden, workflow)
+        self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 6)
+        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}", workflow)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 4)
+        action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
+        self.assertIn("if: inputs.sandbox == 'true'", action)
+        self.assertIn('make build', action)
+        self.assertNotIn('ci_bundle.py', action)
+        # Full gates start independently; no slow test or build producer gates
+        # their admission, and there is no cross-image executable reuse.
+        for name in ('fast', 'race', 'verify', 'codemode'):
+            block = workflow.split('  ' + name + ':\n', 1)[1].split('    steps:', 1)[0]
+            self.assertNotIn('needs:', block)
+        join = workflow.split('  codemode_join:\n', 1)[1].split('  checks:', 1)[0]
+        self.assertIn('needs: codemode', join)
+        self.assertIn('test "$PART_RESULT" = success', join)
+        self.assertIn('python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence', join)
+        self.assertNotIn('ci_bundle.py', workflow)
+        self.assertIn('python-version: "3.10.22"', workflow)
+        self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", workflow)
+        self.assertEqual(workflow.count("temporary-fixtures: ${{ matrix.shard == 'providers' }}"), 1)
+        for name in ('fast', 'codemode'):
+            block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
+            self.assertNotIn('temporary-fixtures:', block)
+        race = workflow.split('  race:\n', 1)[1].split('  verify:\n', 1)[0]
+        self.assertIn('temporary-fixtures: "true"', race)
+        self.assertLess(race.index('ci_tmpfs.py cleanup'), race.index('Retain exact-SHA'))
+        self.assertIn("--name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5", workflow)
+        verify = workflow.split('  verify:\n', 1)[1].split('  codemode:\n', 1)[0]
+        self.assertIn("if: ${{ always() && matrix.shard == 'providers' }}", verify)
+        self.assertLess(verify.index('ci_tmpfs.py cleanup'), verify.index('Retain exact-SHA'))
+        self.assertIn('temporary-fixtures:', action)
+        self.assertIn("inputs.temporary-fixtures == 'true' && 'setup' || 'disk'", action)
+        self.assertIn('default: "false"', action.split('  temporary-fixtures:\n', 1)[1].split('runs:', 1)[0])
+
+    def test_codemode_gate_series_parallelize_without_splitting_repetitions(self):
+        gates = suite.SHARDS['codemode']
+        ordered = suite.gate_execution_order(gates)
+        self.assertEqual(ordered[0].name, 'core-cases')
+        self.assertCountEqual([g.name for g in ordered], [g.name for g in gates])
+        seen, active, peak = [], 0, 0
+        lock = threading.Lock()
+
+        def run_shard(name, binary, evidence, stopped, selected, previous=(), gate_jobs=1, record=None):
+            nonlocal active, peak
+            gate = selected[0]
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            try:
+                time.sleep(.02)
+                rows = [dict(gate=gate.name, attempt=attempt, returncode=0)
+                        for attempt in range(1, gate.attempts + 1)]
+                if record:
+                    record(gate.name, rows)
+                seen.append((gate.name, [row['attempt'] for row in rows]))
+                return rows
+            finally:
+                with lock:
+                    active -= 1
+
+        with tempfile.TemporaryDirectory() as temp, patch.object(suite, 'run_shard', run_shard):
+            rows = suite.concurrent_gates('codemode', Path('/binary'), Path(temp),
+                                          threading.Event(), gates, ())
+        self.assertEqual(peak, 2)
+        self.assertEqual({name: attempts for name, attempts in seen},
+                         {gate.name: list(range(1, gate.attempts + 1)) for gate in gates})
+        self.assertEqual(len(rows), sum(gate.attempts for gate in gates))
 
     def test_failed_repetition_stops_and_records_failure(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -103,6 +201,36 @@ class VerificationTests(unittest.TestCase):
             self.assertFalse(report['passed'])
             self.assertEqual(len(report['shards']['test']), 1)
             self.assertEqual(json.loads((root / 'timings-test.json').read_text())[0]['returncode'], 9)
+
+    def test_unverifiable_group_cleanup_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            metrics = {}
+            with patch.object(suite, 'group_alive', side_effect=OSError('ps unavailable')):
+                code = suite.run_command([sys.executable, '-c', 'pass'], os.environ.copy(),
+                                         Path(temp) / 'log', threading.Event(), metrics)
+            self.assertNotEqual(code, 0)
+            self.assertFalse(metrics['owned_group_drained'])
+
+    def test_source_change_during_gate_cannot_claim_exact_sha_success(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            gate = suite.Gate('fixture', '', 'fixture')
+            def command(*_):
+                return [sys.executable, '-c', 'pass'], os.environ.copy(), root / 'logs/fixture.log'
+            handlers = {sig: signal.getsignal(sig) for sig in [signal.SIGINT, signal.SIGTERM]}
+            try:
+                with patch.dict(suite.SHARDS, {'test': (gate,)}, clear=True), \
+                     patch.object(suite, 'command', command), \
+                     patch.object(suite, 'source_state', side_effect=[{'source_sha': 'before'}, {'source_sha': 'after'}]), \
+                     patch.object(sys, 'argv', ['verify_suite.py', '--binary', sys.executable, '--evidence', str(root)]):
+                    self.assertEqual(suite.main(), 1)
+            finally:
+                for sig, handler in handlers.items():
+                    signal.signal(sig, handler)
+            report = json.loads((root / 'suite-all.json').read_text())
+            self.assertEqual(report['source_sha'], 'before')
+            self.assertFalse(report['source_stable'])
+            self.assertFalse(report['passed'])
 
     def test_failed_core_run_cannot_leave_previous_success_report(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -151,6 +279,64 @@ class VerificationTests(unittest.TestCase):
             profile = json.loads((root / 'profile/fixture.json').read_text())
             self.assertGreater(profile['elapsed_seconds'], 0)
             self.assertEqual([c['name'] for c in profile['cases']], ['owned-case'])
+            self.assertGreaterEqual(profile['cpu_seconds'], 0)
+
+    def test_cancelled_leader_cannot_leave_child_listening(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ready = root / 'ready.json'
+            state = root / 'state'
+            listener = ('import json,os,signal,socket,time\nfrom pathlib import Path\n'
+                        'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+                        's=socket.socket();s.bind(("127.0.0.1",0));s.listen()\n'
+                        f'Path({str(ready)!r}).write_text(json.dumps([os.getpid(),s.getsockname()[1]]))\n'
+                        'time.sleep(60)\n')
+            leader = ('import subprocess,sys,time,shutil\nfrom pathlib import Path\n'
+                      f'Path({str(state)!r}).mkdir()\n'
+                      f'subprocess.Popen([sys.executable,"-c",{listener!r}])\n'
+                      'try: time.sleep(60)\n'
+                      f'finally: shutil.rmtree({str(state)!r})\n')
+            fixture = root / 'leader.py'
+            fixture.write_text(leader)
+            stopped = threading.Event()
+            def interrupt():
+                deadline = time.monotonic() + 5
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                stopped.set()
+            thread = threading.Thread(target=interrupt)
+            thread.start()
+            metrics = {}
+            started = time.monotonic()
+            try:
+                code = suite.run_command([sys.executable, 'scripts/profile_harness.py', str(fixture)],
+                                         dict(os.environ, ERII_PROFILE_DIR=str(root / 'profile')),
+                                         root / 'log', stopped, metrics)
+                self.assertNotEqual(code, 0)
+                self.assertFalse(state.exists())
+                self.assertTrue(ready.exists(), (root / 'log').read_text())
+                _, port = json.loads(ready.read_text())
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    with socket.socket() as probe:
+                        if probe.connect_ex(('127.0.0.1', port)) != 0:
+                            break
+                    time.sleep(.01)
+                else:
+                    self.fail('cancelled group left a live listener')
+                self.assertLess(time.monotonic() - started, 15)
+                self.assertGreaterEqual(metrics['cpu_seconds'], 0)
+                self.assertLess(metrics['cancel_cleanup_seconds'], 15)
+                self.assertTrue(metrics['owned_group_drained'])
+            finally:
+                thread.join(timeout=6)
+                # Clean the regression's deliberate orphan even on the old code.
+                if ready.exists():
+                    pid, _ = json.loads(ready.read_text())
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
     def test_full_suite_isolates_models_after_other_harnesses(self):
         with tempfile.TemporaryDirectory() as temp:

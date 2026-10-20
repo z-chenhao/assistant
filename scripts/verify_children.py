@@ -3,9 +3,12 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
+
+from fixture_pool import run_cases
 
 from terminal_driver import Terminal
 from verify_main import require
@@ -64,8 +67,8 @@ def check(value, children=2, completed=True):
     require(all(c["token"] is None for c in value["claims"]), "leases retained")
 
 
-def run(binary):
-    report = {"version": 1, "scope": "ERII-17 Direct Tool Child admission and result path; M4 scheduling and M5 CodeCall/JavaScript remain due later", "checks": [], "crashes": []}
+def run(binary, scenario_jobs=1):
+    report = {"version": 1, "scope": "ERII-17 Direct Tool Child admission and result path; M4 scheduling and M5 CodeCall/JavaScript remain due later", "checks": [], "crashes": [], "scenario_jobs": scenario_jobs}
     with tempfile.TemporaryDirectory(prefix="erii-children-") as directory:
         root = Path(directory)
 
@@ -210,7 +213,7 @@ def run(binary):
         report["cancel"] = scenario("cancel", cancel_tree)
         report["checks"].append("Live TUI cancellation fences the Task epoch and stops a real Child model call plus waiting Root")
 
-        for boundary in ("before_child_accept_commit", "after_child_accept_commit", "before_result_commit", "after_result_commit", "before_tool_commit", "after_tool_commit"):
+        def crash_case(boundary):
             def crash(h):
                 h.send("one", "Delegate: Child tree")
                 process = h.hold(boundary)
@@ -225,7 +228,10 @@ def run(binary):
                 h.command("chat", "work")
                 require(state(h) == after, "duplicate wake/drain changed terminal state")
                 return {"boundary": boundary, "before_kill": before, "recovered": after}
-            report["crashes"].append(scenario(boundary, crash))
+            return scenario(boundary, crash)
+        cases = ("before_child_accept_commit", "after_child_accept_commit", "before_result_commit", "after_result_commit", "before_tool_commit", "after_tool_commit")
+        report['crashes'] = run_cases(cases, crash_case, scenario_jobs)
+        require({r['boundary'] for r in report['crashes']} == set(cases) and len(report['crashes']) == 6, 'complete Child crash inventory required')
         report["checks"].append("Six SIGKILL/restart boundaries preserve one Child per call and reuse committed generations/results")
     report["cleanup"] = "all owned PTYs/children reaped; isolated databases and effect ledgers removed"
     return report
@@ -235,10 +241,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
     args.evidence.unlink(missing_ok=True)
     binary = args.binary.resolve()
-    report = run(binary)
+    report = run(binary, args.scenario_jobs)
     report["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")

@@ -13,6 +13,8 @@ def aggregate(reports):
     for report in reports:
         if not report.get('cleanup') or not report.get('conformance', {}).get('passed'):
             raise ValueError('cleanup/conformance evidence missing or failed')
+        if report.get('ci_cancellation', {}).get('passed') is not True:
+            raise ValueError('nested CI cancellation evidence missing or failed')
         signatures.add((report['binary_sha256'], report['dataset_digest'], json.dumps(report['contract_lock'], sort_keys=True)))
         seen = set()
         for result in report['results']:
@@ -42,6 +44,8 @@ def aggregate(reports):
                           score_status='ungraded; scripted Fake cannot provide semantic Judge scores',
                           scope='L0/L1 mechanical fragment; full case not_applicable')
     return dict(version=1, cases=cases, passed=all(c['hard_assertions']['pass^5'] == 1 for c in cases.values()),
+                ci_cancellation=dict(passed=True, consecutive_runs=5,
+                                     cleanup_seconds=[r['ci_cancellation'].get('cleanup_seconds') for r in reports]),
                 suite_mean=None, suite_min=None, product_gate='inconclusive; semantic Judge and L2 unexecuted',
                 real_adapters_due_M6=['Memory Curator/compaction','DesktopLease/Computer'],
                 conformance=reports[0]['conformance']['requirements'],

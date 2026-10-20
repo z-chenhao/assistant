@@ -17,6 +17,8 @@ import subprocess
 import tempfile
 import time
 
+from fixture_pool import Scope, current
+
 
 def require(value, message):
     if not value:
@@ -31,12 +33,14 @@ class MainHarness:
         self.env["ERII_DATA_ROOT"] = str(root / "data")
         self.children = []
         self.fixture = fixture
+        self.processes = current()
 
     def args(self, *args):
         return [str(self.binary), "-test-bridge", self.fixture, *args]
 
     def command(self, *args, text=None, ok=True):
-        result = subprocess.run(self.args(*args), input=text, text=True, capture_output=True,
+        run = self.processes.run if self.processes is not None else subprocess.run
+        result = run(self.args(*args), input=text, text=True, capture_output=True,
                                 env=self.env, cwd=self.root, timeout=20)
         require(not ok or result.returncode == 0, f"{args}: {result.stderr}")
         return json.loads(result.stdout) if ok else result
@@ -57,6 +61,8 @@ class MainHarness:
     def wait_state(self, predicate, description, reader=None, timeout=10):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            if self.processes is not None:
+                self.processes.check()
             value = reader(self) if reader else self.state()
             if predicate(value):
                 return value
@@ -64,7 +70,8 @@ class MainHarness:
         raise RuntimeError("state boundary not reached: " + description)
 
     def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work")):
-        child = subprocess.Popen(self.args("-test-main-hold", boundary, *extra_flags, *command),
+        start = self.processes.start if self.processes is not None else subprocess.Popen
+        child = start(self.args("-test-main-hold", boundary, *extra_flags, *command),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
@@ -75,6 +82,59 @@ class MainHarness:
         require(line and json.loads(line).get("boundary") == boundary,
                 f"exited before boundary {boundary}: {line} {child.stderr.read() if not line else ''}")
         return child
+
+    def drive_boundaries(self, barriers, observe, progress, timeout=20):
+        """Drive one CLI call with independent, explicitly released test barriers.
+
+        Both pipes are drained while callbacks observe committed state. The
+        original command deadline and owned-session cleanup remain in force.
+        """
+        flags = [part for name, path in barriers.items()
+                 for part in ('-test-main-barrier', name + '=' + str(path))]
+        owner = self.processes or Scope()
+        child = owner.start(self.args(*flags, 'chat', 'work'), stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, env=self.env, cwd=self.root)
+        self.children.append(child)
+        output, errors, pending = bytearray(), bytearray(), bytearray()
+        deadline = time.monotonic() + timeout
+        try:
+            with selectors.DefaultSelector() as streams:
+                streams.register(child.stdout, selectors.EVENT_READ)
+                streams.register(child.stderr, selectors.EVENT_READ)
+                while streams.get_map():
+                    owner.check()
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(child.args, timeout)
+                    for key, _ in streams.select(min(.025, remaining)):
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        if not chunk:
+                            streams.unregister(key.fileobj)
+                            continue
+                        if key.fileobj is child.stderr:
+                            errors.extend(chunk)
+                            continue
+                        output.extend(chunk)
+                        pending.extend(chunk)
+                        while b'\n' in pending:
+                            line, _, rest = pending.partition(b'\n')
+                            pending = bytearray(rest)
+                            value = json.loads(line)
+                            if 'boundary' in value:
+                                observe(value['boundary'])
+                    progress()
+            child.wait(timeout=max(.001, deadline - time.monotonic()))
+            require(not pending, 'incomplete CLI boundary record')
+            return subprocess.CompletedProcess(child.args, child.returncode,
+                                               output.decode(), errors.decode())
+        except BaseException:
+            owner.cancel()
+            child.communicate(timeout=10)
+            raise
+        finally:
+            owner.retire(child)
+            if self.processes is None:
+                owner.finish()
 
     def state(self):
         result = {}
@@ -100,6 +160,8 @@ class MainHarness:
             if child.poll() is None:
                 child.kill()
             child.communicate(timeout=10)
+            if self.processes is not None:
+                self.processes.retire(child)
 
     def failure_state(self):
         """Bounded read-only evidence from disposable fixtures; no claim tokens."""
