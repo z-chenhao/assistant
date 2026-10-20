@@ -89,6 +89,12 @@ def codemode_gates(part):
     return (Gate('core-' + part, 'run_core_cases.py', 'core-' + part, 5, arguments),)
 
 
+def personal_gates(part):
+    if part not in m6_report.PARTS:
+        raise ValueError('unknown M6 part')
+    return (Gate('m6-'+part,'run_m6_cases.py','m6-'+part,5,('--part',part)),)
+
+
 def source_state():
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     diff = subprocess.check_output(['git', 'diff', '--binary', 'HEAD'], cwd=ROOT)
@@ -292,6 +298,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard", choices=SHARDS)
     parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
+    parser.add_argument('--personal-part', choices=m6_report.PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
     parser.add_argument("--binary", type=Path, default=Path("bin/personal-agent"))
@@ -299,6 +306,8 @@ def main():
     args = parser.parse_args()
     if args.codemode_part and args.shard != 'codemode':
         parser.error('--codemode-part requires --shard codemode')
+    if args.personal_part and args.shard != 'personal':
+        parser.error('--personal-part requires --shard personal')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -310,8 +319,13 @@ def main():
     source = source_state()
     binary_digest = hashlib.sha256(binary.read_bytes()).hexdigest()
     names = [args.shard] if args.shard else list(SHARDS)
-    plans = {name: codemode_gates(args.codemode_part) if args.codemode_part else SHARDS[name] for name in names}
-    report_suffix = (args.shard or 'all') + ('-' + args.codemode_part if args.codemode_part else '')
+    plans = {name: SHARDS[name] for name in names}
+    if args.codemode_part:
+        plans['codemode'] = codemode_gates(args.codemode_part)
+    if args.personal_part:
+        plans['personal'] = personal_gates(args.personal_part)
+    part = args.codemode_part or args.personal_part
+    report_suffix = (args.shard or 'all') + ('-' + part if part else '')
     evidence.mkdir(parents=True, exist_ok=True)
     (evidence / "logs").mkdir(exist_ok=True)
     (evidence / ('suite-' + report_suffix + '.json')).unlink(missing_ok=True)
@@ -356,12 +370,12 @@ def main():
     passed = passed and stable
     if passed and "codemode" in names and not args.codemode_part:
         passed = core_report.write(evidence)
-    if passed and "personal" in names:
+    if passed and "personal" in names and not args.personal_part:
         passed = m6_report.write(evidence)
     report = dict(version=1, **source, source_stable=stable,
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
                   gate_jobs=args.gate_jobs,
-                  codemode_part=args.codemode_part,
+                  codemode_part=args.codemode_part, personal_part=args.personal_part,
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),
                   binary_sha256=binary_digest,

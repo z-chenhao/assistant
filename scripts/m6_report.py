@@ -7,6 +7,13 @@ from pathlib import Path
 CASES = ('GC-01','GC-02','GC-03','GC-04','GC-05','GC-06','GC-07','GC-10','GC-13','GC-15','GC-18')
 VARIANTS = ('wording-1','wording-2','wording-3','noise-1','noise-2','order-1')
 
+# Private CI admission groups; every pair remains in exactly one five-run series.
+PARTS = {name: tuple((case, variant) for case in cases for variant in VARIANTS)
+         for name, cases in {'context':('GC-01','GC-04','GC-05','GC-10','GC-15'),
+                             'memory':('GC-02','GC-03','GC-06'),
+                             'network':('GC-07',), 'booking':('GC-13',)}.items()}
+PARTS.update({f'desktop-{i+1}':tuple(('GC-18',v) for v in VARIANTS[i*2:i*2+2]) for i in range(3)})
+
 
 def aggregate(reports):
     if len(reports) != 5:

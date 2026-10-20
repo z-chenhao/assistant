@@ -113,3 +113,14 @@ new release-time observation; do not silently convert offline peers into a
 macOS VM or Jianying compatibility verdict.
 
 M6 supports `--scenario-jobs 1|2|4` (or `ERII_VERIFY_CASE_JOBS`), using the maintained owned-process fixture pool. CI selects four; travel uses an isolated capacity-two group for its simultaneous Main/Root processes. Five rounds remain serial; `m6-summary.json` requires all 330 variants and unchanged assertion inventories. `m6-cases-N.progress.json` records bounded progress; the full state report is written after join, including failure. See [CI latency budget](ci.md#latency-budget).
+
+
+CI uses seven fixed parts from `m6_report.PARTS`. Context/Memory/network/booking
+are separate; GC-18's six variants form three independent pairs. Every pair runs
+five consecutive times. `verify_suite.py --shard personal --personal-part NAME`
+produces partial evidence only. `ci_personal.py --parts DIRECTORY --evidence OUT`
+requires all seven clean exact-SHA/build/driver/fixture parts and reconstructs the
+canonical five full reports before the unchanged M6 aggregate can pass. The join
+also rejects missing, duplicate, reordered, failed and substituted variants.
+Full state/Artifact bytes stay in each part's artifact; the joined reports retain
+the original export paths and hashes. No current L2 or semantic score is added.

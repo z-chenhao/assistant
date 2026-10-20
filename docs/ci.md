@@ -2,7 +2,7 @@
 
 `Ubuntu checks` is the single branch-protection verdict. One workflow runs on
 PR heads and main pushes. It always requires unit/lint, race,
-every verification matrix cell, every Code Mode part and their evidence join.
+every verification matrix cell, every Code Mode/M6 part and both evidence joins.
 Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
 There is no impact-based omission, early-feedback tier or duplicate shadow
 workflow. Every full gate runs for documentation changes too.
@@ -11,7 +11,10 @@ workflow. Every full gate runs for documentation changes too.
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
-    SHA --> Verify[Runtime / security / delivery / personal / providers]
+    SHA --> Verify[Runtime / security / delivery / providers]
+    SHA --> Personal[M6 independent parts]
+    Personal --> M6Join[Complete M6 evidence]
+    M6Join --> Gate
     SHA --> Parts[Code Mode control / GC-17 / GC-19 / GC-20 / contracts]
     Parts --> Join[Complete Code Mode evidence]
     Unit --> Gate[Ubuntu checks]
@@ -75,6 +78,26 @@ without Python-level indentation overhead. This is private harness scheduling, w
 protocol or production concurrency change. Serial execution remains available
 for diagnosis. Increase runner partitioning only when measured contention or
 latency justifies it; keep the bounded pool and the same strict aggregate.
+
+Ubuntu evidence on `1eff344` measured about 259 seconds per complete M6 round;
+the ten-minute job budget stopped the third round. Local rounds on the macOS
+host took about 72 seconds and did not predict this Linux CPU-bound result.
+CI therefore uses seven independent M6 parts: context, memory, network, booking,
+and three pairs of GC-18 variants. All eighteen primary matrix jobs can start
+independently; no binary producer or preceding test gates their admission.
+Each pair retains its complete five-run series on one runner. The fixed pair
+inventory is private to `m6_report.PARTS`, not a new product protocol.
+
+`ci_personal.py` rejects missing/duplicate/reordered rounds, wrong variant pairs,
+failed assertions, invented scores, cleanup failures, dirty or unstable source,
+and source/binary/driver/dataset/lock drift. It reconstructs all five canonical
+66-variant reports and calls the same `m6_report.aggregate/write` as the local
+unpartitioned path. No partial part can satisfy `Ubuntu checks`; both the matrix
+and its join are mandatory. Part artifacts retain original state and openable
+bytes, while the join retains canonical reports and the aggregate. Browser
+installation is needed only by network/booking/desktop parts. M6 does not invoke
+the coding sandbox; unit/SC/GC-19 retain all existing sandbox checks. All M6
+fixtures remain disk-backed.
 
 ## Complete inventory
 
@@ -144,6 +167,9 @@ make verify VERIFY_SHARD=codemode VERIFY_EVIDENCE=evidence/codemode
 python3 scripts/verify_suite.py --shard codemode --codemode-part GC-17 --binary bin/personal-agent --evidence evidence/parts/GC-17 --jobs 1
 # Run the other four parts into their own folders, then require all five:
 python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence/joined
+python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --binary bin/personal-agent --evidence evidence/m6-parts/desktop-1 --jobs 1
+# Run the other six fixed parts in their own folders, then require all seven:
+python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 

@@ -26,6 +26,7 @@ from verify_main import require
 from verify_memory_maintenance import work, manage, readback
 from verify_recall import Embeddings
 from m6_sources import validate, file_hash
+from m6_report import PARTS
 from fixture_pool import run_cases, run as fixture_run
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -385,10 +386,11 @@ def travel(h,world):
                 gap='semantic itinerary quality ungraded; concurrent Root steering also exercised by the maintained task-case gate')
 
 
-def run(binary,selected=None,destination=None,scenario_jobs=1):
+def run(binary,selected=None,destination=None,scenario_jobs=1,part=None):
+    require(not (selected and part),'case and part are mutually exclusive')
     dataset,policy,lock=load_contract(ROOT,'m6-v1')
     report=dict(version=1,milestone='M6',provider='explicit capabilities scripted Bridge',contract_lock=lock,
-                binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,scenario_jobs=scenario_jobs,
+                binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,scenario_jobs=scenario_jobs,part=part,
                 driver_digest=digest({name:file_hash(ROOT/'scripts'/name) for name in ('run_m6_cases.py','m6_desktop.py','m6_browser.mjs','m6_sources.py')}),
                 product_gate='inconclusive; semantic Judge and current L2 not run',
                 live_shadow=dict(lume='prior evidence: docs/computer-provider-l2-result.json',jianying='prior evidence: docs/computer-l2-result.json',current_run='not_run'),
@@ -408,7 +410,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1):
     completed = []
     report_lock = threading.Lock()
     items = [(case, variant) for case in dataset['cases'] if not selected or case['case_id']==selected
-             for variant in variants(dataset,case)]
+             for variant in variants(dataset,case) if not part or (case['case_id'],variant['variant_id']) in PARTS[part]]
     try:
         with tempfile.TemporaryDirectory(prefix='erii-m6-cases-') as temporary:
             def drive_item(item):
@@ -481,8 +483,11 @@ def main():
     parser.add_argument('--evidence',type=Path,required=True)
     parser.add_argument('--case',choices=['GC-01','GC-02','GC-03','GC-04','GC-05','GC-06','GC-07','GC-10','GC-13','GC-15','GC-18'])
     parser.add_argument('--scenario-jobs',type=int,choices=[1,2,4],default=int(os.environ.get('ERII_VERIFY_CASE_JOBS','1')))
-    args=parser.parse_args();args.evidence.unlink(missing_ok=True)
-    report=run(args.binary.resolve(),args.case,args.evidence,args.scenario_jobs)
+    parser.add_argument('--part',choices=PARTS)
+    args=parser.parse_args()
+    if args.case and args.part:parser.error('--case and --part are mutually exclusive')
+    args.evidence.unlink(missing_ok=True)
+    report=run(args.binary.resolve(),args.case,args.evidence,args.scenario_jobs,args.part)
     print(json.dumps(report['summary']))
 
 
