@@ -39,6 +39,7 @@ type Server struct {
 	listener                    net.Listener
 	wait                        sync.WaitGroup
 	closing                     bool
+	browserEndpoint             string
 	runs, shuts, stops, reopens int
 }
 
@@ -55,6 +56,19 @@ func New(root string) (*Server, error) {
 		return nil, computer.ErrInvalid
 	}
 	s := &Server{use: newUseFake(), locks: map[string]*os.File{}, running: map[string]bool{}, connections: map[net.Conn]bool{}}
+	// Opt-in L1 peer: only the browser protocol crosses loopback. Received
+	// Guest shell commands are still never executed on the Host.
+	if data, e := os.ReadFile(filepath.Join(root, "browser-peer.json")); e == nil {
+		var peer struct {
+			Endpoint string `json:"endpoint"`
+		}
+		if json.Unmarshal(data, &peer) != nil || !browserPeerURL(peer.Endpoint) {
+			return nil, computer.ErrInvalid
+		}
+		s.browserEndpoint = peer.Endpoint
+	} else if !os.IsNotExist(e) {
+		return nil, e
+	}
 	s.HTTP = httptest.NewServer(http.HandlerFunc(s.serve))
 	s.listener, err = net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

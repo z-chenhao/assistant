@@ -47,7 +47,7 @@ def aggregate(reports):
                 ci_cancellation=dict(passed=True, consecutive_runs=5,
                                      cleanup_seconds=[r['ci_cancellation'].get('cleanup_seconds') for r in reports]),
                 suite_mean=None, suite_min=None, product_gate='inconclusive; semantic Judge and L2 unexecuted',
-                real_adapters_due_M6=['Memory Curator/compaction','DesktopLease/Computer'],
+                real_adapters_due_M6=[],
                 conformance=reports[0]['conformance']['requirements'],
                 boundary_fakes=reports[0]['conformance']['boundary_fakes'])
 

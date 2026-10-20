@@ -110,6 +110,14 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 			if json.Unmarshal(r.Params, &request) != nil {
 				return llm.InvalidProviderResponse
 			}
+			color := ""
+			if request.Snapshot.Capabilities.ImageInput {
+				var e error
+				color, e = imageInput(r.Params, request)
+				if e != nil {
+					return e
+				}
+			}
 			if audit != nil {
 				if err = json.NewEncoder(audit).Encode(map[string]string{"generation_id": request.GenerationID, "snapshot_id": request.Snapshot.SnapshotID}); err != nil {
 					return err
@@ -233,6 +241,8 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 				e.ToolCall = &llm.ToolCall{ID: "probe-call", Name: "probe_echo", Arguments: `{"value":"OK"}`}
 			} else if strings.Contains(last.Text, "long output") {
 				e.Text = strings.Repeat("x", 128<<10)
+			} else if color != "" && strings.Contains(last.Text, "dominant color") {
+				e.Text = color
 			}
 			if fixture == "bad-sequence" {
 				e.Sequence = 2

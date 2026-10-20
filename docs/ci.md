@@ -2,7 +2,7 @@
 
 `Ubuntu checks` is the single branch-protection verdict. One workflow runs on
 PR heads and main pushes. It always requires unit/lint, race,
-every verification matrix cell, every Code Mode part and their evidence join.
+every verification matrix cell, every Code Mode/M6 part and both evidence joins.
 Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
 There is no impact-based omission, early-feedback tier or duplicate shadow
 workflow. Every full gate runs for documentation changes too.
@@ -12,6 +12,9 @@ flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
     SHA --> Verify[Runtime / security / delivery / providers]
+    SHA --> Personal[M6 independent parts]
+    Personal --> M6Join[Complete M6 evidence]
+    M6Join --> Gate
     SHA --> Parts[Code Mode control / GC-17 / GC-19 / GC-20 / contracts]
     Parts --> Join[Complete Code Mode evidence]
     Unit --> Gate[Ubuntu checks]
@@ -51,9 +54,54 @@ The exact-SHA `fixture-storage.json` receipt accompanies provider and race evide
 Other jobs record the ordinary block filesystem from `findmnt`; unknown or RAM
 storage rejects their disk-conformance claim before tests start.
 
+## Latency budget
+
+All CI uses a ten-minute baseline from workflow creation through the final
+required verdict, with a five-minute target. Queue and dependency waits count
+in observed workflow wall time. Every job has an explicit timeout of at most
+ten minutes; the topology regression rejects missing or larger timeouts in any
+workflow. A job timeout is a stop boundary, not proof of end-to-end latency.
+Record actual exact-SHA timings with `ci_profile.py`; treat any workflow over
+ten minutes as a regression to diagnose before review. Do not remove coverage,
+reduce repetitions, extend fixture deadlines, or retry failures to meet it.
+
+M6 reuses the existing `fixture_pool.py` with capacity four. Travel fixtures
+keep capacity two in a separate admission group because each drives Main and a
+held Root concurrently; they do not overlap ordinary CLI/browser fixtures. Each variant owns
+its database, peer ports, browser, approvals and Artifact export directory.
+Process sessions belong to the pool and cancellation joins them. All 66 locked
+variants (including six separate red-flag branches) finish before the next of
+five consecutive rounds starts. Lightweight progress records avoid rewriting
+the growing full state report after every variant; full evidence is written
+once on join or failure, using the compact JSON encoder to retain every field
+without Python-level indentation overhead. This is private harness scheduling, with no runtime
+protocol or production concurrency change. Serial execution remains available
+for diagnosis. Increase runner partitioning only when measured contention or
+latency justifies it; keep the bounded pool and the same strict aggregate.
+
+Ubuntu evidence on `1eff344` measured about 259 seconds per complete M6 round;
+the ten-minute job budget stopped the third round. Local rounds on the macOS
+host took about 72 seconds and did not predict this Linux CPU-bound result.
+CI therefore uses seven independent M6 parts: context, memory, network, booking,
+and three pairs of GC-18 variants. All eighteen primary matrix jobs can start
+independently; no binary producer or preceding test gates their admission.
+Each pair retains its complete five-run series on one runner. The fixed pair
+inventory is private to `m6_report.PARTS`, not a new product protocol.
+
+`ci_personal.py` rejects missing/duplicate/reordered rounds, wrong variant pairs,
+failed assertions, invented scores, cleanup failures, dirty or unstable source,
+and source/binary/driver/dataset/lock drift. It reconstructs all five canonical
+66-variant reports and calls the same `m6_report.aggregate/write` as the local
+unpartitioned path. No partial part can satisfy `Ubuntu checks`; both the matrix
+and its join are mandatory. Part artifacts retain original state and openable
+bytes, while the join retains canonical reports and the aggregate. Browser
+installation is needed only by network/booking/desktop parts. M6 prepares the existing Linux sandbox for configured MCP peers, including
+read-only context/Memory fixtures. Unit/SC/GC-19 retain the coding workspace
+checks. All M6 fixtures remain disk-backed.
+
 ## Complete inventory
 
-`scripts/verify_suite.py` is the authoritative logical inventory (100 gate
+`scripts/verify_suite.py` is the authoritative logical inventory (105 gate
 invocations, including all five Computer lifecycle and Computer Use runs).
 
 | Logical shard | Required evidence |
@@ -62,6 +110,7 @@ invocations, including all five Computer lifecycle and Computer Use runs).
 | codemode | Five Code Mode, Computer lifecycle, Computer Use and fixed-source recovery runs; six variants × five rounds for each GC-17/19/20; five SC conformance and real nested cancellation probes |
 | security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs |
 | delivery | Five complete delivery runs, each containing all twenty kill/restart boundaries |
+| personal | Eleven exact M6 worlds × six variants × five rounds, plus isolated red-flag routing; all state, openable Artifacts and cleanup |
 | providers | Local provider, initial account; five capability/TUI/Pi Bridge/account runs; terminal input; five selected Go model/storage runs |
 
 Each series retains five serial consecutive repetitions on its own worker. Code
@@ -118,10 +167,13 @@ make verify VERIFY_SHARD=codemode VERIFY_EVIDENCE=evidence/codemode
 python3 scripts/verify_suite.py --shard codemode --codemode-part GC-17 --binary bin/personal-agent --evidence evidence/parts/GC-17 --jobs 1
 # Run the other four parts into their own folders, then require all five:
 python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence/joined
+python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --binary bin/personal-agent --evidence evidence/m6-parts/desktop-1 --jobs 1
+# Run the other six fixed parts in their own folders, then require all seven:
+python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-`make verify` retains the complete five-shard local path. Partial CLI runs prove
+`make verify` retains the complete six-shard local path. Partial CLI runs prove
 only their selected work. Never share an evidence directory between concurrent
 commands. Harnesses launch isolated fixtures, doctor prerequisites, drive the
 real CLI/API, read back persisted state and clean owned processes and state.

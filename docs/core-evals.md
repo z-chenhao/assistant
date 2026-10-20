@@ -101,9 +101,10 @@ O/F/P/A/T/S/R/C semantic grades and product pass metrics remain `null` when no
 constrained Judge ran, matching `evals/scoring-v1.json`. Programmatic evidence
 is inspectable by dimension via the requirement map below; it is not assigned
 invented 100-point product scores. Suite mean/min are also null. No live model,
-L2 observation, real Memory maintenance or real DesktopLease is claimed.
-SC-08/11 execute private deterministic boundary Fakes and explicitly record the
-real adapters as due M6. Full future case portions remain `not_applicable`.
+L2 observation or model-quality verdict is claimed. ERII-26 replaces the SC-08/11
+Python-only simulations with tests of the implemented Memory and Computer
+stores/executors. Personal M6 journeys run separately; see [M6 evidence](m6-evals.md).
+Full M7 case portions remain `not_applicable`.
 These reports cannot by themselves establish the full product release gate.
 
 ## Core requirement-to-test and PR map
@@ -117,7 +118,7 @@ Each named check must actually execute; missing/skipped Go tests fail the gate.
 | GC-11 quote transport / conditional price / Artifact | `capabilities-*.json` `GC-11_structured_quote_and_Artifact_fragment` | ERII-16 #15 |
 | GC-12 frozen recipient/action, steering invalidation, duplicate callback | `tools-*.json` approve/steering; `TestToolApprovalWrongPrincipalHashDuplicateAndFrozenAdmission` | ERII-13 #12 |
 | GC-13 approved transaction / unknown lookup without second submit | `tools-*.json` ambiguous/unknown/crash; `codemode-*.json` nested-effect SIGKILL | ERII-13 #12, ERII-19 #18 |
-| GC-15 immutable images / scoped Artifact publication | `artifacts-*.json` `GC-15_Artifact_fragment`; OCR remains due M6 | ERII-14 #13 |
+| GC-15 immutable images / scoped Artifact publication | `artifacts-*.json` `GC-15_Artifact_fragment`; M6 source-region/pixel evidence runs in `m6-cases-*.json` | ERII-14 #13, ERII-26 |
 | GC-16 Child isolation/aggregation fragment | `children-*.json`, `scheduling-*.json`; research quality remains ungraded | ERII-17 #16, ERII-18 #17 |
 | GC-17 exact seed1701 data / 37+8 / F055 drift | `core-cases-*.json` GC-17, `code-recovery-*.json` | ERII-20 #20, ERII-21 (this PR) |
 | GC-18 multiple Tasks / append / aggregation fragment | `task-cases.json` GC-18, `tasks.json`, `delivery-*.json` | ERII-11 #10, ERII-15 #14 |
@@ -127,10 +128,10 @@ Each named check must actually execute; missing/skipped Go tests fail the gate.
 | SC-03/05 frozen replay / fencing / cancellation | `TestCodeReplayFrozenRequestAndAtomicAdmission`, `TestCodeManifestCannotChangeDuringRecovery`, `TestCodeClaimWakeAndOldCallbackFencing`, `TestTaskControlCancelTreeAndInvocationOutcomes` | ERII-12 #11, ERII-20 #20 |
 | SC-04 controlled pause / new Root | `TestTaskControlPauseFencesLateWritesAndContinueNewRoot`, `TestTaskControlAppendWaitsOutsideTransactionForPauseBoundary` | ERII-12 #11 |
 | SC-06/07 frozen approval / rejection / retry / unknown | `TestToolApproval*`, `TestToolReplayPoliciesAndEvidence`, `TestToolTimeoutAndBusinessErrorsDoNotRetry`, `TestToolUnknownReconcilesOnlyFromAuthoritativeEvidence` | ERII-13 #12 |
-| SC-08 Memory boundary Fake | `conformance.boundary_fakes.SC-08`: supersede, deletion, owner scope, restraint; production adapter **not_applicable** | ERII-21 (this PR); real implementation M6 |
+| SC-08 Memory correction/deletion | `conformance.requirements.SC-08`: actual Curator/encryption/supersede/forget/dispatch-fence tests; `memory-maintenance-*.json`, `m6-cases-*.json` | ERII-23, ERII-26 |
 | SC-09 Artifact scope/hash/expiry/traversal | `TestArtifactStoreContractScopeIntegrityAndTombstone`, `TestArtifactTamperSymlinkAndTraversal` | ERII-14 #13 |
 | SC-10 fair work / progress / steering | `TestSchedulerFairSecondTaskAndDurableTicket`, `TestSchedulerActivityCountsDoNotNotify`; Main ordering tests remain in full gates | ERII-11 #10, ERII-18 #17 |
-| SC-11 DesktopLease boundary Fake | `conformance.boundary_fakes.SC-11`: local blocking, independent desktop, lease loss rejects old action; production adapter **not_applicable** | ERII-21 (this PR); real implementation M6 |
+| SC-11 DesktopLease | `conformance.requirements.SC-11`: persisted Computer identity/arbitration/fencing, cross-App read barrier, approved physical lease resume and unknown never replayed | ERII-24/25/26 |
 | SC-12 frozen model/capability / idempotent Delivery | `TestChildFrozenModelAndCapabilitiesAfterProfileSwitch`, `TestDeliveryClaimFencesLateAckAndQueriesAcceptedSend`; `delivery-*.json`, `events.json` | ERII-15 #14, ERII-17 #16 |
 | SC-13 monetary authorization (existing additional gate) | unchanged `spend-*.json`, `TestSpend*` five-run gates | ERII-18 #17 |
 | Empty/prior SQLite schema, CAS and rollback | `make test-race`, five-run `models.jsonl`; v1–v17 migration tests | ERII-1…20 |

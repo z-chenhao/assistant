@@ -63,6 +63,7 @@ class VerificationTests(unittest.TestCase):
             "verify_computer_use.py": 5,
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
+            "run_m6_cases.py": 5,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
@@ -95,10 +96,21 @@ class VerificationTests(unittest.TestCase):
                         dict(good, race={}), dict(good, race='success')]:
             self.assertFalse(ci_gate.passed(invalid))
 
+    def test_all_ci_jobs_keep_the_ten_minute_budget(self):
+        for path in sorted((suite.ROOT / '.github/workflows').glob('*.y*ml')):
+            text = path.read_text()
+            jobs = re.findall(r'^  [a-zA-Z0-9_-]+:\n(    .*?)(?=^  [a-zA-Z0-9_-]+:|\Z)',
+                              text.split('jobs:', 1)[1], re.M | re.S)
+            self.assertTrue(jobs, str(path))
+            for job in jobs:
+                deadlines = re.findall(r'^    timeout-minutes: (\d+)$', job, re.M)
+                self.assertEqual(len(deadlines), 1, str(path))
+                self.assertTrue(0 < int(deadlines[0]) <= 10, str(path))
+
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode'})
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal'})
         self.assertEqual(len(shards), 4)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
@@ -113,22 +125,31 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 6)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 8)
         self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}", workflow)
-        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 4)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 5)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
         self.assertIn('make build', action)
         self.assertNotIn('ci_bundle.py', action)
         # Full gates start independently; no slow test or build producer gates
         # their admission, and there is no cross-image executable reuse.
-        for name in ('fast', 'race', 'verify', 'codemode'):
+        for name in ('fast', 'race', 'verify', 'codemode', 'personal'):
             block = workflow.split('  ' + name + ':\n', 1)[1].split('    steps:', 1)[0]
             self.assertNotIn('needs:', block)
         join = workflow.split('  codemode_join:\n', 1)[1].split('  checks:', 1)[0]
         self.assertIn('needs: codemode', join)
         self.assertIn('test "$PART_RESULT" = success', join)
         self.assertIn('python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence', join)
+        import m6_report
+        parts = json.loads(re.search(r'        m6part: (\[.*\])', workflow)[1])
+        self.assertEqual(parts, list(m6_report.PARTS))
+        personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
+        self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
+        personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]
+        self.assertIn('needs: personal',personal_join)
+        self.assertIn('test "$PART_RESULT" = success',personal_join)
+        self.assertIn('python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence',personal_join)
         self.assertNotIn('ci_bundle.py', workflow)
         self.assertIn('python-version: "3.10.22"', workflow)
         self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", workflow)

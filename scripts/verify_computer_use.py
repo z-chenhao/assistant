@@ -24,7 +24,7 @@ from verify_main import require
 
 
 @contextmanager
-def launch(binary, root, live_config=None):
+def launch(binary, root, live_config=None, browser_peer=None):
     source, vm = root / 'source', root / 'vm'
     server = None
     h = ComputerHarness(binary, root, fixture='computer')
@@ -36,16 +36,21 @@ def launch(binary, root, live_config=None):
         else:
             source.mkdir(mode=0o700)
             vm.mkdir(mode=0o700)
+            if browser_peer:
+                (vm / 'browser-peer.json').write_text(json.dumps({'endpoint': browser_peer}))
             for name in ('disk.img', 'nvram.bin', 'config.json'):
                 (source / name).write_text('fixture-' + name)
             (source / 'config.json').write_text(json.dumps({'macAddress': '02:00:00:00:00:01', 'machineIdentifier': 'fixture', 'cpuCount': 4}))
             h.env['ERII_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
-            server = subprocess.Popen([str(binary), '-test-computer-server', str(vm)], stdout=subprocess.PIPE,
+            start = h.processes.start if h.processes else subprocess.Popen
+            server = start([str(binary), '-test-computer-server', str(vm)], stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, text=True, env=h.env, cwd=root)
             with selectors.DefaultSelector() as selector:
                 selector.register(server.stdout, selectors.EVENT_READ)
                 require(selector.select(10), 'doctor: fixture HTTP/SSH peer not ready')
             computer = json.loads(server.stdout.readline())
+            if browser_peer:
+                (vm / 'browser-peer.json').unlink()
         node = shutil.which('node')
         require(node, 'doctor: Node required')
         script = Path(__file__).resolve().parents[1] / 'runtime/javascript/src/sidecar.mjs'
@@ -60,6 +65,7 @@ def launch(binary, root, live_config=None):
         if server:
             server.terminate()
             server.communicate(timeout=15)
+            if h.processes:h.processes.retire(server)
             require(server.returncode == 0, 'fixture server did not join cleanly')
 
 

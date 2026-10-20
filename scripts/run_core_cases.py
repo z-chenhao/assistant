@@ -82,7 +82,8 @@ def snapshot(h):
     state['external_provider_dispatches'] = [json.loads(line) for line in audit.read_text().splitlines()]
     effects = Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db'
     state['external_effects'] = read(effects, 'SELECT * FROM effects') if effects.exists() else []
-    state['Memory'] = 'not_applicable; real adapter due M6'
+    state['Memory'] = dict(scope='Core fixture does not enable Curator; M6 journey gate owns Memory behavior',
+                           records=read(Path(h.env['ERII_DATA_ROOT'])/'memory.db','SELECT * FROM memory_record'))
     return state
 
 

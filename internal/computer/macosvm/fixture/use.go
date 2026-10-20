@@ -81,6 +81,9 @@ func (s *Server) useCommand(command, input string) (any, bool) {
 		if json.Unmarshal([]byte(words[len(words)-1]), &req) != nil {
 			return nil, false
 		}
+		if s.browserEndpoint != "" {
+			return s.browserCall(words[len(words)-1]), true
+		}
 		if req.Method == "inventory" {
 			b, _ := s.use.Inventory(ctx, instance, "browsers")
 			t, _ := s.use.Inventory(ctx, instance, "tabs")

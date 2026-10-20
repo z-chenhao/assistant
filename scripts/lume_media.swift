@@ -153,6 +153,9 @@ struct MediaFixture {
             try await inspect(url.appendingPathComponent("blue.mov"))
         } else if args[1] == "inspect" {
             try await inspect(url)
+        } else if args[1] == "clip" {
+            try await makeClip(url, blue: false)
+            try await inspect(url)
         } else if args[1] == "verify-export" {
             try await verifyExport(url)
         } else if args[1] == "audio" {
