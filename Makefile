@@ -13,10 +13,10 @@ test:
 # The full SQLite package repeatedly migrates real schemas under instrumentation.
 # Ubuntu exceeded Go's implicit 10m package budget while its current test was 1s old.
 # Keep per-test/Tool/lease deadlines intact; bound the complete package at 15m.
-# Isolate the unchanged Bridge RPC deadline from concurrent migration packages
-# on the two-core Ubuntu runner; two prior jobs exceeded it during duplicates.
+# Run Bridge before unrelated compiler/race work, then every remaining package
+# at normal parallelism. The maintained runner audits the complete inventory.
 test-race:
-	go test -race -p 1 -timeout=15m ./...
+	python3 scripts/ci_race.py
 
 lint:
 	@files="$$(gofmt -l cmd internal)"; if [ -n "$$files" ]; then echo "$$files"; exit 1; fi

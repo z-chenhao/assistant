@@ -26,6 +26,7 @@ from verify_capabilities import tree
 from verify_codemode import CodeHarness
 from verify_code_recovery import read
 from verify_main import require
+from fixture_pool import run_cases, run as fixture_run
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -156,7 +157,7 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
         drift = json.loads((Path(h.env['ERII_DATA_ROOT']) / 'f055-drift.json').read_text())
         artifacts = value['artifact']
         output = next(a for a in artifacts if a['name'] == 'feedback_analysis.csv')
-        opened = subprocess.run(h.args('artifact', 'open', output['artifact_ref']), env=h.env, cwd=h.root,
+        opened = fixture_run(h.args('artifact', 'open', output['artifact_ref']), env=h.env, cwd=h.root,
                                 capture_output=True, text=True, timeout=20)
         require(opened.returncode == 0, 'analysis Artifact not openable')
         classified = list(csv.DictReader(io.StringIO(opened.stdout)))
@@ -219,7 +220,7 @@ def engineering_case(binary, folder, variant):
     # Known fixture repository, no hooks or user configuration.
     env = dict(PATH='/usr/bin:/bin', HOME='/nonexistent', GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL='/dev/null')
     for args in [('init','-q','-b','feature/eval'), ('add','.'), ('-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','-qm','fixture')]:
-        subprocess.run(['git', *args], cwd=repo, env=env, check=True, capture_output=True)
+        fixture_run(['git', *args], cwd=repo, env=env, check=True, capture_output=True)
     configure(folder, repo)
     h = CoreHarness(binary, folder)
     try:
@@ -268,7 +269,7 @@ return {review:review.text,passed:green.passed};
         store = {r['key']:json.loads(r['value_json']) for r in value['code_store']}
         edits = [i for i in value['tools'] if i['tool_name'] == 'builtin__workspace__edit']
         changed = sorted(p for p in original if tree(repo).get(p) != original[p])
-        ts = subprocess.run([shutil.which('node'), '--test', str(repo / 'sidecar/contract.test.ts')], cwd=repo,
+        ts = fixture_run([shutil.which('node'), '--test', str(repo / 'sidecar/contract.test.ts')], cwd=repo,
                             capture_output=True, text=True, timeout=30)
         checks = dict(red_reproduced=not store['red']['passed'] and 'late result from grandchild' in store['red']['output'],
                       fixture_tests_green=store['green']['passed'] and store['green']['command'] == 'go test -race ./...',
@@ -327,35 +328,51 @@ def coding_case(binary, folder, variant):
                 input_events=variant['events'], context=variant['context'])
 
 
-def run(binary, selected=None):
+def run_case_groups(dataset, selected, action, scenario_jobs):
+    rows = []
+    for case in dataset['cases']:
+        if selected and selected != case['case_id']:
+            continue
+        # Keep bounded checkpoint work clear of compiler-heavy fixtures.
+        # The original fifteen-second hold deadline is never extended.
+        capacity = min(scenario_jobs, 2) if case['case_id'] == 'GC-17' else scenario_jobs
+        items = [(case, variant) for variant in variants(dataset, case)]
+        rows.extend(run_cases(items, action, capacity))
+    return rows
+
+
+def run(binary, selected=None, scenario_jobs=1, contracts_only=False):
+    require(not (selected and contracts_only), 'case and contracts-only are mutually exclusive')
     dataset, policy, lock = load_contract(ROOT, 'core-v1')
     report = dict(version=1, milestone='M5', provider='explicit deterministic core Bridge',
                   contract_lock=lock, dataset_digest=digest(dataset), binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
-                  results=[], cleanup=False, full_case_status='not_applicable; future adapters and semantic evaluation unexecuted')
+                  results=[], cleanup=False, scenario_jobs=scenario_jobs, full_case_status='not_applicable; future adapters and semantic evaluation unexecuted')
     with tempfile.TemporaryDirectory(prefix='erii-core-cases-') as temp:
-        for case in dataset['cases']:
-            if selected and selected != case['case_id']:
-                continue
-            for variant in variants(dataset, case):
-                folder=Path(temp)/(case['case_id']+'-'+variant['variant_id']); folder.mkdir()
-                started, tick=timestamp(),time.monotonic()
-                evidence={'GC-17':feedback_case,'GC-19':coding_case,'GC-20':engineering_case}[case['case_id']](binary,folder,variant)
-                assertions=evidence['assertions']
-                grading=score(policy,assertions,[])
-                row=dict(case_id=case['case_id'],case_version=1,variant_id=variant['variant_id'],seed=case['seed'],
-                         fixture_digest=digest({'variant':variant, 'locked_files':lock['files']}),input_events=variant['events'],clock=variant['clock'],
-                         started_at=started,finished_at=timestamp(),wall_time_ms=round((time.monotonic()-tick)*1000),
-                         assertions=assertions,status='fragment_pass' if all(assertions.values()) else 'fragment_fail',
-                         hard_failure=not all(assertions.values()),final_score=grading['final_score'],
-                         semantic_grading=grading['semantic_grading'],dimensions={d:None for d in policy['weights']},evidence=evidence)
-                report['results'].append(row)
-                print(f"{case['case_id']} {variant['variant_id']}: {row['status']} ({row['wall_time_ms']}ms)",flush=True)
-                require(all(assertions.values()),'core assertions failed: '+json.dumps(assertions))
+        def variant_case(item):
+            case, variant = item
+            folder=Path(temp)/(case['case_id']+'-'+variant['variant_id']); folder.mkdir()
+            started, tick=timestamp(),time.monotonic()
+            evidence={'GC-17':feedback_case,'GC-19':coding_case,'GC-20':engineering_case}[case['case_id']](binary,folder,variant)
+            assertions=evidence['assertions']
+            grading=score(policy,assertions,[])
+            row=dict(case_id=case['case_id'],case_version=1,variant_id=variant['variant_id'],seed=case['seed'],
+                     fixture_digest=digest({'variant':variant, 'locked_files':lock['files']}),input_events=variant['events'],clock=variant['clock'],
+                     started_at=started,finished_at=timestamp(),wall_time_ms=round((time.monotonic()-tick)*1000),
+                     assertions=assertions,status='fragment_pass' if all(assertions.values()) else 'fragment_fail',
+                     hard_failure=not all(assertions.values()),final_score=grading['final_score'],
+                     semantic_grading=grading['semantic_grading'],dimensions={d:None for d in policy['weights']},evidence=evidence)
+            print(f"{case['case_id']} {variant['variant_id']}: {row['status']} ({row['wall_time_ms']}ms)",flush=True)
+            require(all(assertions.values()),'core assertions failed: '+json.dumps(assertions))
+            return row
+        if not contracts_only:
+            report['results'] = run_case_groups(dataset, selected, variant_case, scenario_jobs)
         report['cleanup']=True
     require(not Path(temp).exists(), 'disposable root leaked')
     if not selected:
         report['conformance'] = conformance(ROOT)
         require(report['conformance']['passed'], 'core conformance failed')
+        from ci_cancel import run as cancel_probe
+        report['ci_cancellation'] = cancel_probe(binary)
     report['summary']=dict(fragment_passes=sum(r['status']=='fragment_pass' for r in report['results']),
                            fragments=len(report['results']),hard_failures=sum(r['hard_failure'] for r in report['results']),
                            semantic_scores='unexecuted; no Judge', **{'pass@1':None,'pass^5':None})
@@ -366,9 +383,12 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--evidence',type=Path,required=True)
-    parser.add_argument('--case',choices=['GC-17','GC-19','GC-20'])
+    selection=parser.add_mutually_exclusive_group()
+    selection.add_argument('--case',choices=['GC-17','GC-19','GC-20'])
+    selection.add_argument('--contracts-only',action='store_true')
+    parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
     args=parser.parse_args();args.evidence.unlink(missing_ok=True)
-    result=run(args.binary.resolve(),args.case)
+    result=run(args.binary.resolve(),args.case,args.scenario_jobs,args.contracts_only)
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     args.evidence.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(result['summary']))

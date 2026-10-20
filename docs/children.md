@@ -164,6 +164,15 @@ model results. `make verify` runs five consecutive passes. Go tests additionally
 cover atomic cross-process limits, fair service after reopening, expired-owner
 fencing, frozen turns, circuit recovery, prior-schema upgrade and rollback.
 
+The scheduling harness also freezes an already allocated Main follow-up
+generation, appends the real user cancellation to that same Run, then releases
+the frozen request. It retains the original saturation, second-Task fairness,
+thirty-second drain and recursive cleanup checks. The test Fake distinguishes
+historical user text from fresh input after a runtime notice; completion notices
+cannot replace appended pause/cancel/continue commands. A failed scenario saves
+structural state and the executable digest before disposable cleanup, then still
+exits nonzero without retry.
+
 Account-spend authorization uses explicitly configured monetary policy. See
 [the approved decision](adr/002-account-monetary-authorization.md). Prices and
 policy freeze with the ModelSnapshot; Children inherit them. Usage acceptance

@@ -2,10 +2,13 @@
 """Unified Tool CLI launch/doctor/drive/evidence/cleanup and crash boundaries."""
 import argparse
 import json
+import os
 from pathlib import Path
 import signal
 import sqlite3
 import tempfile
+
+from fixture_pool import run_cases
 
 from verify_main import MainHarness, require
 
@@ -55,9 +58,9 @@ def decide(h, approval, decision='approve'):
     return h.command('approval', decision, approval['approval_id'], approval['frozen_arguments_hash'])
 
 
-def run(binary):
+def run(binary, scenario_jobs=1):
     report = {'version': 1, 'scope': 'SC-06/07 and GC-11/12/13 Tool approval/recovery fragments; full product cases remain due with their integrations',
-              'checks': [], 'crashes': []}
+              'checks': [], 'crashes': [], 'scenario_jobs': scenario_jobs}
     with tempfile.TemporaryDirectory(prefix='erii-tools-') as temp:
         root = Path(temp)
 
@@ -254,27 +257,30 @@ def run(binary):
             return {'name': 'bounded_transient_retries_and_safe_errors', 'state': value}
         report['checks'].append(scenario('transient', transient))
 
-        for policy in ('query_before_retry', 'never'):
-            for boundary in ('before_provider_effect', 'after_provider_effect', 'before_tool_commit', 'after_tool_commit'):
-                def crash(h, boundary=boundary, policy=policy):
-                    approval = pending(h)
-                    decide(h, approval)
-                    child = h.hold(boundary)
-                    child.send_signal(signal.SIGKILL)
-                    child.communicate(timeout=10)
-                    before = state(h)
-                    h.command('chat', 'work')
-                    after = state(h)
-                    expected = 0 if policy == 'never' and boundary == 'before_provider_effect' else 1
-                    require(len(after['effects']) == expected, 'crash duplicated or lost a permitted effect')
-                    inv = after['invocations'][0]
-                    want = 'unknown' if expected == 0 else 'succeeded'
-                    require(inv['status'] == want, 'crash outcome policy')
-                    require(inv['idempotency_key'] == before['invocations'][0]['idempotency_key'], 'restart key drift')
-                    require(inv['attempt_count'] <= 2, 'unbounded replay')
-                    return {'policy': policy, 'boundary': boundary, 'signal': 'SIGKILL', 'before': before, 'after': after}
-                report['crashes'].append(scenario(policy + '-' + boundary, crash,
-                                                  'approval-never' if policy == 'never' else 'approval'))
+        def crash_case(item):
+            policy, boundary = item
+            def crash(h, boundary=boundary, policy=policy):
+                approval = pending(h)
+                decide(h, approval)
+                child = h.hold(boundary)
+                child.send_signal(signal.SIGKILL)
+                child.communicate(timeout=10)
+                before = state(h)
+                h.command('chat', 'work')
+                after = state(h)
+                expected = 0 if policy == 'never' and boundary == 'before_provider_effect' else 1
+                require(len(after['effects']) == expected, 'crash duplicated or lost a permitted effect')
+                inv = after['invocations'][0]
+                want = 'unknown' if expected == 0 else 'succeeded'
+                require(inv['status'] == want, 'crash outcome policy')
+                require(inv['idempotency_key'] == before['invocations'][0]['idempotency_key'], 'restart key drift')
+                require(inv['attempt_count'] <= 2, 'unbounded replay')
+                return {'policy': policy, 'boundary': boundary, 'signal': 'SIGKILL', 'before': before, 'after': after}
+            return scenario(policy + '-' + boundary, crash,
+                                              'approval-never' if policy == 'never' else 'approval')
+        cases = [(policy, boundary) for policy in ('query_before_retry', 'never') for boundary in ('before_provider_effect', 'after_provider_effect', 'before_tool_commit', 'after_tool_commit')]
+        report['crashes'] = run_cases(cases, crash_case, scenario_jobs)
+        require({(r['policy'], r['boundary']) for r in report['crashes']} == set(cases) and len(report['crashes']) == 8, 'complete Tool crash inventory required')
     report['cleanup'] = 'all child processes joined; isolated temporary roots removed'
     return report
 
@@ -283,8 +289,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
-    report = run(args.binary.resolve())
+    report = run(args.binary.resolve(), args.scenario_jobs)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print('unified Tool approvals/recovery verified:', args.evidence)

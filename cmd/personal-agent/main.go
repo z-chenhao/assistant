@@ -63,6 +63,15 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	testDelivery := flags.String("test-delivery", "", "explicit test Bridge only: retry-once, unavailable, ambiguous, unknown")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
 	testMainRelease := flags.String("test-main-release", "", "explicit test Bridge only: release a held boundary when this file exists")
+	testBarriers := map[string]string{}
+	flags.Func("test-main-barrier", "explicit test Bridge only: repeatable boundary=release-file barrier", func(value string) error {
+		name, path, ok := strings.Cut(value, "=")
+		if !ok || name == "" || path == "" || testBarriers[name] != "" {
+			return errors.New("expected a unique boundary=release-file")
+		}
+		testBarriers[name] = path
+		return nil
+	})
 	flags.Usage = func() {
 		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|computer status|computer prepare-base CLEAN_STOPPED_VM|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
@@ -72,6 +81,12 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			return nil
 		}
 		return err
+	}
+	if len(testBarriers) > 0 && *testBridge == "" {
+		return errors.New("test-main-barrier requires explicit test-bridge")
+	}
+	if testBarriers[*testMainHold] != "" {
+		return errors.New("conflicting test boundary barriers")
 	}
 	modelCommand := false
 	if flags.Arg(0) == "model" {
@@ -175,22 +190,26 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			return err
 		}
 	}
-	if *testMainHold != "" {
+	if *testMainHold != "" || len(testBarriers) > 0 {
 		if *testBridge == "" {
 			return errors.New("test-main-hold requires explicit test-bridge")
 		}
 		application.SetTestMainBoundary(func(name string) {
+			release, held := testBarriers[name]
 			if name == *testMainHold {
+				release, held = *testMainRelease, true
+			}
+			if held {
 				_ = json.NewEncoder(out).Encode(struct {
 					Boundary string `json:"boundary"`
 				}{name})
-				if *testMainRelease == "" {
+				if release == "" {
 					<-ctx.Done()
 				} else {
 					ticker := time.NewTicker(10 * time.Millisecond)
 					defer ticker.Stop()
 					for {
-						if _, err := os.Stat(*testMainRelease); err == nil {
+						if _, err := os.Stat(release); err == nil {
 							break
 						}
 						select {

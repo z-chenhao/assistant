@@ -29,6 +29,8 @@ import urllib.parse
 import urllib.error
 import urllib.request
 
+from file_digest import sha256_file
+
 ISSUE = '01a14029-4eab-7782-afba-3980c6c98a7c'
 VM = 'erii24-base'
 LUME_VERSION = '0.6.1'
@@ -260,8 +262,7 @@ class Live:
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
-        with image.open('rb') as source:
-            actual = hashlib.file_digest(source, 'sha256').hexdigest()
+        actual = sha256_file(image)
         require(actual == IPSW_SHA256, 'Apple restore image SHA-256 mismatch')
         print(json.dumps({'image': IPSW_NAME, 'bytes': IPSW_SIZE, 'sha256': actual}), flush=True)
 
@@ -614,9 +615,8 @@ def main():
         image = Path(args.arguments[0]).absolute()
         require(image.parent == live.root / 'downloads' and image.is_file() and not image.is_symlink(),
                 'IPSW must be in owned downloads')
-        with image.open('rb') as source:
-            require(hashlib.file_digest(source, 'sha256').hexdigest() == IPSW_SHA256,
-                    'IPSW digest must match the pinned Apple image')
+        require(sha256_file(image) == IPSW_SHA256,
+                'IPSW digest must match the pinned Apple image')
         require(not (live.store / VM).exists(), 'refusing to overwrite a VM')
         live.foreground('create', VM, '--storage', str(live.store), '--cpu', '4', '--memory', '8GB',
                         '--disk-size', '64GB', '--display', '1280x800', '--ipsw', str(image), '--unattended', 'tahoe')

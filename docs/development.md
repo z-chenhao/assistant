@@ -9,7 +9,8 @@ local path. Current ChatGPT OAuth is implemented through the CLI. Main Runs, the
 
 ## Commands and evidence
 
-Use Go 1.26.2+, Node 24.21.0, Python 3.10+ with standard-library SQLite, and a C compiler for
+Use Go 1.26.2+, Node 24.21.0, Python 3.10.12+ with standard-library SQLite and
+[safe tar extraction filters](https://docs.python.org/3.10/library/tarfile.html#extraction-filters), and a C compiler for
 the Go race detector. The application uses pure Go SQLite. Initial module
 fetching and `npm ci --prefix provider-bridge --ignore-scripts` need network access; checks subsequently need no online services,
 accounts, installed broker executable, containers, or fixed ports. Computer Use

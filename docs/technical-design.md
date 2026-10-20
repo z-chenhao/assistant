@@ -1909,6 +1909,8 @@ tool/mcp
 
 数据库文件、Artifact 二进制和日志位于配置的 data root 下；不得依赖进程当前目录。migration 必须前向执行、可在空库重建，并在不兼容版本时 fail-fast，不能带病启动。
 
+`state.db` 的空库初始化可使用从前二十一个历史 migration 生成的 schema，减少重复 ALTER 引起的 schema 解析。快照对应 schema version 21，不是另一种磁盘格式；既有库照常逐版升级，快照之后的新增迁移仍逐版执行。生成文件绑定历史脚本摘要，漂移时 fail-closed；创建、版本更新和后续 migration 在同一个 immediate transaction 内。测试必须验证表/索引/触发器及初始数据与逐版重放一致、失败全回滚，以及提交前后 kill/restart。
+
 ### 16.2 最小持久化模型
 
 以下是 Coding Agent 必须落库的最小逻辑字段。实现可以拆表或增加内部字段，但不得删除语义：

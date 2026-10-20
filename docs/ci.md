@@ -1,55 +1,103 @@
 # Offline CI and verification operations
 
-`Ubuntu checks` remains the only branch-protection check name. It runs with
-`always()` after unit/lint, race, and the six verification shards. It succeeds
-only when all three job results are `success`. A matrix succeeds only when every
-cell succeeds; matrix fail-fast is disabled so failures retain independent
-evidence. Failure, cancellation, skipped dependencies, missing results and
-unexpected dependencies fail the aggregate. `scripts/test_verification.py`
-exercises these states, the complete legacy inventory, report ownership and
-owned-process cancellation. No heavy gate moves to a schedule or post-merge job.
+`Ubuntu checks` is the single branch-protection verdict. One workflow runs on
+PR heads and main pushes. It always requires unit/lint, race,
+every verification matrix cell, every Code Mode part and their evidence join.
+Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
+There is no impact-based omission, early-feedback tier or duplicate shadow
+workflow. Every full gate runs for documentation changes too.
 
 ```mermaid
 flowchart LR
-    SHA[PR head SHA] --> Fast[Unit tests and lint]
-    SHA --> Race[Race detector]
-    SHA --> Runtime[Runtime verification]
-    SHA --> CodeMode[Code Mode verification]
-    SHA --> Security[Security verification]
-    SHA --> Delivery[Delivery verification]
-    SHA --> Providers[Provider verification]
-    SHA --> Personal[M6 personal verification]
-    Fast --> Gate[Ubuntu checks]
+    SHA[Exact head SHA] --> Unit[Unit tests and lint]
+    SHA --> Race[Complete race inventory]
+    SHA --> Verify[Runtime / security / delivery / personal / providers]
+    SHA --> Parts[Code Mode control / GC-17 / GC-19 / GC-20 / contracts]
+    Parts --> Join[Complete Code Mode evidence]
+    Unit --> Gate[Ubuntu checks]
     Race --> Gate
-    Runtime --> Matrix[All verification cells succeed]
-    CodeMode --> Matrix
-    Security --> Matrix
-    Delivery --> Matrix
-    Providers --> Matrix
-    Personal --> Matrix
-    Matrix --> Gate
+    Verify --> Gate
+    Parts --> Gate
+    Join --> Gate
 ```
 
-Each job checks out the explicit PR head SHA (or push SHA). The platform must
-still require exact-head reviewer PASS and strict main ancestry before merging.
-The workflow does not alter rulesets or merge protection. Superseded commits
-cancel the prior workflow for the same PR. Pushes to `main` use a separate group.
+Each Required job independently installs pinned dependencies, provisions the
+public fixture SDK and builds from its exact checked-out source. A small
+project-local composite action owns those mechanics. There is no long test or
+producer prerequisite. No executable crosses runner boundaries: GitHub image
+rollouts can assign different Ubuntu image versions within one workflow.
+The retained historical build-bundle utility still rejects image/context drift;
+its guards were not relaxed. The new pipeline avoids that reuse entirely.
+All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
+SHA may identify GitHub's synthetic merge commit.
+Strict main ancestry and independent exact-SHA reviewer PASS remain required.
+The workflow never changes protection or enables an administrative bypass.
+Unit/lint retains its ordinary Python execution and additionally runs all Python
+regressions on Python 3.10.22, the minimum supported interpreter series. This
+Required step guards portable SDK hashing and the maintained profiling tools.
 
-The manifest in `scripts/verify_suite.py` owns verification coverage:
+Providers and the complete race job use private 2 GiB tmpfs mounts for disposable
+test directories, through `ci_tmpfs.py setup/cleanup`. The full unit/lint suite,
+all five SC race rounds and every verification job except providers keep ordinary
+disk storage. Unit/lint also requires five disk-backed receipt recovery race runs.
+Every migration, crash/restart and receipt test retains disk coverage. Provider
+commands, race flags/counts, SQLite WAL/sync policy and assertions are preserved.
+This targets runner disk-wait variance without
+claiming a host power-loss test. The mount Doctor proves executable files,
+fsync, WAL commit/reopen, capacity, owner and mount identity. Cleanup runs even
+after failure, restores TMPDIR, refuses unknown mounts and force/lazy unmount,
+and fails on leaked state, a missing verified mount or an unsuccessful unmount.
+The exact-SHA `fixture-storage.json` receipt accompanies provider and race evidence.
+Other jobs record the ordinary block filesystem from `findmnt`; unknown or RAM
+storage rejects their disk-conformance claim before tests start.
 
-| Shard | Required evidence |
+## Complete inventory
+
+`scripts/verify_suite.py` is the authoritative logical inventory (100 gate
+invocations, including all five Computer lifecycle and Computer Use runs).
+
+| Logical shard | Required evidence |
 | --- | --- |
-| runtime | Foundation, Main, Tasks, five consecutive runs each of Child/scheduling/spend/task-control, Main/Task case fragments, embedded JetStream and real CLI relay |
-| codemode | Five consecutive Code Mode, fixed-source recovery and Computer lifecycle and Computer Use runs, plus six variants × five runs of each exact GC-17/19/20 Core fixture and SC contracts; see [scope and recovery](core-evals.md) and [Computer lifecycle](computer.md) |
-| security | Five consecutive Tool approval/recovery and Artifact runs |
-| delivery | Five consecutive delivery runs, including all twenty SIGKILL/restart cases each time |
-| providers | Local provider, initial account check, five runs each of capabilities/TUI/Pi Bridge/account, five runs of the selected Go model/storage packages |
+| runtime | Foundation, Main, Tasks; five Child/scheduling/spend/task-control runs; Main/Task fragments; embedded JetStream and real CLI relay |
+| codemode | Five Code Mode, Computer lifecycle, Computer Use and fixed-source recovery runs; six variants × five rounds for each GC-17/19/20; five SC conformance and real nested cancellation probes |
+| security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs |
+| delivery | Five complete delivery runs, each containing all twenty kill/restart boundaries |
+| providers | Local provider, initial account; five capability/TUI/Pi Bridge/account runs; terminal input; five selected Go model/storage runs |
 
-Repetitions of a gate always run serially in one shard. Shards use independent
-temporary databases, random local ports, owned processes and disjoint report
-paths. They share only immutable source and the built executable. No runtime,
-fixture, assertion, count, lease or deadline is changed by this optimization.
-In particular, the real streaming deadline and recovery lease waits remain.
+Each series retains five serial consecutive repetitions on its own worker. Code
+Mode now has five independent Required parts: `control` (Code Mode, Computer,
+Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus real nested CI
+cancellation). Each case part runs all six locked variants five times. Contracts
+also run five times; splitting cases cannot omit them.
+
+`ci_codemode.py` requires every part and round, successful owned-process cleanup,
+clean stable source, identical source/build/fixture identities. Every part records its runner image;
+independent builds may join across a host image rollout only if binary hashes
+and fixtures still match.
+It rejects duplicate, reordered, failed or missing rounds and misplaced variants.
+It reconstructs the original eighteen-variant Core reports and uses the unchanged
+`core_report.aggregate` / `write` verdict. The resulting logical Code Mode report
+contains the complete twenty-five gate rows. All ninety case executions and five SC
+and cancellation proofs remain inspectable. Unit regressions mutate each of
+these acceptance boundaries. No partial job independently proves Code Mode.
+
+Independent fixture capacity is four; GC-17 checkpoint variants retain capacity
+two. Local unpartitioned Core runs join case kinds in order. Part jobs use
+separate runners. Gate-series concurrency is two, with Go event/model checks
+isolated after other work. The complete race runner isolates Bridge first. It discovers SQLite's complete
+Go Test/Example/Fuzz inventory. The Child approval contract whose original
+five-second context spans three Drain/decision phases runs alone with the full
+CPU budget before overlap. All remaining top-level tests run exactly once in up
+to three separate processes. Each test retains its own Store/temp root, complete
+subtests and internal concurrency; process-local globals and environment remain
+isolated. A fourth worker runs the other packages with package concurrency one.
+All workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
+four-CPU ceiling. Race instrumentation, count=1 and the 15-minute Go timeout
+remain required. Go JSON verdicts reject missing, duplicate, unexpected, failed
+or unfinished test roots. All fifty logical packages remain in the same Required
+race job; discovery automatically includes new tests. Per-worker commands,
+CPU/wall, test outcomes and cleanup remain in `race/inventory.json` and logs.
+No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
 ## Launch, doctor, drive, evidence and cleanup
 
@@ -62,80 +110,120 @@ jobs exercise the real coding sandbox. No live account, network provider,
 desktop, installed NATS service or fixed port is needed after dependency setup.
 
 ```sh
+make test lint
+make test-race
 make verify
 make verify VERIFY_JOBS=1 VERIFY_EVIDENCE=evidence/serial
-make verify VERIFY_JOBS=4 VERIFY_EVIDENCE=evidence/parallel
-make verify VERIFY_SHARD=delivery VERIFY_JOBS=1 VERIFY_EVIDENCE=evidence/delivery-only
-python3 -m unittest discover -s scripts -p 'test_verification.py' -v
+make verify VERIFY_SHARD=codemode VERIFY_EVIDENCE=evidence/codemode
+python3 scripts/verify_suite.py --shard codemode --codemode-part GC-17 --binary bin/personal-agent --evidence evidence/parts/GC-17 --jobs 1
+# Run the other four parts into their own folders, then require all five:
+python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence/joined
+python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-`make verify` builds once, then runs two independent shards at a time by default.
-The repeated Go conformance command runs after all local harnesses finish. Its
-real 100 ms receipt-recovery fixtures need isolation from unrelated temporary
-database I/O; assertions, deadlines and five repetitions remain unchanged.
-CI runs one shard per isolated runner and keeps the Go command inside providers.
-Use `VERIFY_JOBS=1` for a serial baseline
-and the same fixtures/environment for comparisons. Do not run two suite commands
-against the same evidence directory at once. A shard-only run proves only that
-shard; full success requires every shard plus unit/lint and race.
+`make verify` retains the complete five-shard local path. Partial CLI runs prove
+only their selected work. Never share an evidence directory between concurrent
+commands. Harnesses launch isolated fixtures, doctor prerequisites, drive the
+real CLI/API, read back persisted state and clean owned processes and state.
+Computer offline lifecycle evidence does not establish live Lume compatibility.
 
-Each harness owns Launch/Doctor/Drive/Evidence/Cleanup for its product surface.
-The runner returns nonzero for a failed repetition and records that attempt.
-SIGINT/SIGTERM stop admission and terminate/reap owned groups; Python harnesses
-unwind their existing cleanup blocks. SIGKILL cannot run cleanup; disposable CI
-VM teardown is the final boundary in that case. Evidence contains temporary
-paths for databases already removed, never persistent user data.
+Each Required job retains SHA/attempt-named artifacts for fourteen days, even
+on failure. `suite-*.json` binds source, binary, runner and every invocation;
+`timings-*.json` updates after each attempt; `profiles/` records scenario/function
+and CPU/wall timings. Individual part artifacts keep the original reports.
+The join retains canonical `core-cases-1…5.json` / `core-summary.json` and its
+phase log/metrics without uploading the raw part payloads a second time.
+Semantic Judge scores remain ungraded; deterministic fragments do not establish
+full Golden Case or L2 scores.
 
-Evidence is ignored locally and uploaded even on CI failures, retained for
-14 days under a name containing shard, tested head SHA and workflow attempt:
+Superseded pushes cancel the same PR's old workflow. Shell `exec` gives the
+phase owner the Actions entry signal. `ci_step.py` records first receipt;
+`fixture_pool.py` stops admission, signals only owned groups, joins children and
+removes temporary roots. Escalation leaves time before Actions' hard stop.
+The profiler accepts the first termination notification and ignores repeats
+while finally blocks unwind; Make and the group owner may both deliver signals.
+The controlled repeated-signal regression holds cleanup, signals again, then
+requires state removal and the original exit code after release.
+Real held Core/PTY/listening-child probes cover cleanup and unrelated-process
+preservation. SIGKILL itself cannot unwind Python; disposable VM teardown is
+the final boundary. Local cleanup latency is distinct from GitHub push-to-stop.
 
-- `suite-*.json`: tested source SHA, workflow SHA, platform, executable SHA-256,
-  concurrency, total elapsed time, pass/fail and every executed command.
-- `timings-*.json`: per-harness/repetition monotonic durations and exit codes,
-  updated after each attempt so earlier measurements survive a later failure.
-- `profiles/*/*.json`: Python function cumulative/self durations and named
-  scenario/case-variant timings. Timings include child and PTY waits. Function
-  totals overlap and must not be summed. Arguments/locals are never recorded.
-- `logs/*.log`: individual harness output; `models.jsonl` has per-Go-test events
-  and durations; `pi-bridge.tap` retains all five Node runs and case durations.
-- All pre-existing feature-map JSON evidence, with unchanged report names.
+## Schema and build integrity
 
-The source SHA and executable digest identify what ran. Workflow SHA can be
-GitHub's synthetic merge SHA while checkout is the explicit head SHA. Download
-artifacts using `gh run download RUN_ID --dir DESTINATION`; do not compare old
-artifact contents against a new PR head. Record full-suite sample counts and
-per-gate median/range; concurrent runners and cold caches add noise.
+Fresh state stores execute the generated version-21 `schema.sql` baseline and any later migrations, removing
+repeated historical ALTER parsing. Historical migrations remain authoritative
+for existing databases and upgrades. Schema creation, version and later migrations
+share one immediate transaction. The generated SQL binds the historical scripts'
+digest; drift fails closed. Regenerate after a deliberate snapshot update:
 
-## Build and cache integrity
+```sh
+go test ./internal/agent/sqlite -run '^TestFreshSchemaSnapshotMatchesHistory$' -args -update-state-schema
+go test -race ./internal/agent/sqlite -run '^TestFreshSchema' -count=1
+```
 
-Each runner builds from its checked-out source using Go's content-addressed
-build cache. `setup-go` keys its caches by platform/toolchain/module inputs.
-`setup-node` caches npm download inputs; every job still uses locked `npm ci
---ignore-scripts`. No executable or `node_modules` is accepted from another
-workflow artifact. Coding sandboxes retain their own private disposable caches;
-CI never mounts a host build cache into the product sandbox. The existing unit,
-race and repeated conformance executions are intentionally retained: they prove
-different properties even where packages overlap.
+Equivalence covers every table/index/trigger and empty initial data. Existing
+upgrade tests remain. Failure rolls back; real child kills before/after commit
+prove restart/version/bootstrap behavior. Fixture tests still enter the public
+store boundary and initialize real databases.
 
-## Measurements
+Setup-go/npm caches retain their pinned content-addressed input keys. Every job
+still installs lockfiles and builds its own CLI. Full Go test counts remain
+explicit. Historical `ci_bundle.py` v2 and its corruption/context regressions
+remain available for old evidence; the current workflow does not consume build
+artifacts or Host cache artifacts from another runner.
 
-The issue's historical Ubuntu runs were 40m11s and 47m26s; CLI verification was
-33m35s and 37m42s. Those are context, not a same-fixture performance comparison.
-The [ERII-134 report](https://github.com/z-chenhao/erii/pull/19) records the
-controlled local serial/parallel measurements, repeated-gate ranges, timing
-attachments and exact-head Ubuntu result separately.
+`ci_sdk.py` copies the installed SDK without modifying it. Only the fixed public
+standard-library closure is precompiled offline into that copy. Its receipt and
+Doctor bind original/compiler/tree bytes and frozen source. All jobs check
+immutability afterward. The mandatory SDK conformance test proves denied SDK
+mutation and sibling reads plus execution of an uncached standard package.
+Each product workspace still receives its own private writable cache; the Host
+cache is never mounted into the sandbox.
 
-The full race command serializes test packages and uses an explicit 15-minute Go
-package budget inside its 20-minute job. Two ERII-24 preparation jobs exceeded the
-Bridge duplicate-burst RPC's unchanged one-second deadline (1.04s and 1.07s)
-while packages shared the two-core runner. Package isolation preserves the event
-count, intra-package concurrency, race instrumentation and all assertions.
-Real SQLite migrations under race instrumentation exhausted the
-implicit 10-minute package budget on Ubuntu; per-test, Tool and lease deadlines
-remain unchanged. See [Core gate evidence](core-evals.md).
+## Measurement and remaining proof
 
-The Code Mode verification job has a 60-minute budget; other verification shards
-retain 30 minutes. Four observed Ubuntu Core runs took 497.06, 508.73, 491.36 and
-517.33 seconds each, and the 45-minute job budget interrupted the fifth run.
-The 60-minute allocation preserves all 90 case executions, all five serial
-repetitions and all per-case/Tool/lease deadlines.
+Use `ci_profile.py --limit 30 --output evidence/ci-history.json` for exact-attempt
+wall time, runner-minutes and per-job/step evidence. Its raw API snapshots permit
+offline reproduction. Job duration is not billed CPU time. Queues, cache state
+and heterogeneous runner CPUs add noise; one successful run cannot establish
+p95 or a controlled causal speedup. Historical read-only comparison tools retain
+their strict five-pair acceptance rules, but no repeated measurement cohort is
+part of the delivery path. Supersession records never treat unknown outcomes or
+missing timestamps as zero.
+
+For the current topology, `ci_supersede.py collect` requires exactly one
+`ci.yml` attempt for the superseded head. It rejects duplicate/unknown workflows,
+missing source or completion proof and unknown push outcomes. It no longer
+requires the retired shadow workflow. Use an already recorded authorized push;
+collection does not trigger or repeat any workflow:
+
+```sh
+python3 scripts/ci_supersede.py collect --push-record evidence/push.json --run RUN_ID:ATTEMPT --output evidence/supersession.json
+```
+
+The controlled local schema sample (same M4 Max, GOMAXPROCS=4, same eighteen
+variants and SC/cancellation probes) reduced one Core round from 142.4293 to
+119.7031 seconds and one replay race test from 12.529 to 6.582 seconds. This
+single sample preceded the Computer migration merge and is not a whole-CI or
+p95 claim. Actual final-head workflow results are recorded in the PR/issue.
+The ten-minute objective concerns full `Ubuntu checks`, including setup and
+join, rather than an early subset. A miss remains a miss and keeps the PR Draft.
+
+## Failure and rollback
+
+Keep the PR Draft when a part, join or complete gate fails. Inspect its retained
+attempt; do not rerun a failed sample to obtain a green measurement. The local
+fallback is the unchanged `make verify VERIFY_SHARD=codemode` full path.
+If partitioning must be rolled back, restore that complete Code Mode job to the
+Required matrix and change the aggregate dependencies in the same reviewed
+commit. Never make the join optional before full coverage replaces it.
+The schema fast path can be removed without downgrading stored versions:
+existing historical migrations still define the same version 21 format.
+
+Artifact recovery's exact-receipt success fixture uses Go's test virtual clock,
+retaining the frozen 100ms policy rather than spending it on host scheduling or
+filesystem latency. A separate deterministic expiry test consumes that exact
+budget, proves unknown/no Artifact/no second effect, then verifies a fresh
+authoritative query. The existing real deadline, cancellation, unsafe receipt,
+identity and byte/hash assertions remain required. Preserve failed full-suite
+evidence; passing focused diagnostics alone do not supersede it.

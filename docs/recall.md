@@ -137,6 +137,18 @@ reach bounded HTTP requests, nine generations/four Runs complete, and a repeated
 drain is inert. The actual HTTP adapter regression also covers UTF-8 boundaries,
 the maximum 128 × 64 KiB original, mid-chunk failure/recovery and vector reuse.
 
+The success fixtures control the legal Main/Root ordering with explicit test-only
+CLI barriers: Main waits after Task commit until Root freezes its first recall;
+Root's model dispatch waits until Main publishes and completes. Every original
+assertion and command deadline remains. Unexpected CLI failures still fail once,
+without retry. A sixth scenario forces the opposite ordering through the real
+CLI and HTTP adapter: both Root query embeddings wait after catch-up while Main
+appends its reply. That drain must fail closed with one pending assistant vector,
+no Worker recall snapshot and no Worker model request. A separate explicit caller
+then recovers all original Main/Root/Child assertions without rewriting frozen
+recall or Conversation originals. Failed embedding barriers cannot count as a
+successful conflict reproduction. Both orderings run in every five-run series.
+
 Contracts cover lexical/vector-only fusion, ranking/time boundaries, user/Agent
 scope, provenance, independent concurrent retrieval, competing supersession,
 deletion, mutation/index rollback, old-owner rejection and migration. This is SC-08

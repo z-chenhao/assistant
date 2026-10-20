@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import signal
 import sqlite3
@@ -11,6 +12,7 @@ import tempfile
 from pathlib import Path
 
 from verify_main import MainHarness, require
+from fixture_pool import run as fixture_run, run_cases
 
 
 class CapabilityHarness(MainHarness):
@@ -19,7 +21,8 @@ class CapabilityHarness(MainHarness):
                 '-test-bridge', 'capabilities', *args]
 
     def command(self, *args, text=None, ok=True, timeout=320):
-        result = subprocess.run(self.args(*args), input=text, text=True, capture_output=True,
+        run = self.processes.run if self.processes is not None else subprocess.run
+        result = run(self.args(*args), input=text, text=True, capture_output=True,
                                 env=self.env, cwd=self.root, timeout=timeout)
         require(not ok or result.returncode == 0, f'{args}: {result.stderr}')
         return json.loads(result.stdout) if ok else result
@@ -39,7 +42,7 @@ def prepare(binary, root, mode='edit'):
     for args in [('init', '-q', '-b', 'feature/eval'), ('add', '.'),
                  ('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
                   'commit', '-qm', 'fixture')]:
-        subprocess.run(['git', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', *args], cwd=repo, check=True, capture_output=True,
+        fixture_run(['git', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', *args], cwd=repo, check=True, capture_output=True,
                        env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent',
                             'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'})
     (repo / 'docs/notes.md').write_text('USER_UNCOMMITTED_SENTINEL\n')
@@ -87,12 +90,18 @@ def content(invocation):
     return json.loads(invocation['result_json'])
 
 
-def run(binary, selected=None, fixture_context=None):
+def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
     report = {'version': 1, 'scope': 'M3 MCP/Skill/coding contracts; GC-19 prerequisites, GC-20 coding boundary only; M4 Child and M5 Durable Replay remain not_applicable',
-              'checks': [], 'crashes': [], 'cleanup': False}
+              'checks': [], 'crashes': [], 'cleanup': False, 'scenario_jobs': scenario_jobs}
     with tempfile.TemporaryDirectory(prefix='erii-capabilities-') as temp:
         root = Path(temp)
+        cases = []
         def scenario(name, fn, mode='edit', kind='checks'):
+            if not selected or selected == name:
+                cases.append((name, fn, mode, kind))
+
+        def drive(item):
+            name, fn, mode, kind = item
             if selected and selected != name:
                 return
             folder = root / name
@@ -101,7 +110,7 @@ def run(binary, selected=None, fixture_context=None):
             try:
                 if fixture_context:
                     h.send('fixture-context', fixture_context)
-                report[kind].append(fn(h))
+                return kind, fn(h)
             finally:
                 h.cleanup()
 
@@ -155,7 +164,7 @@ def run(binary, selected=None, fixture_context=None):
             paths = ['cmd/taskctl/main.go', 'internal/retry/executor.go', 'internal/task/search.go']
             for flag, path in zip([None, '--assume-unchanged', '--skip-worktree'], paths):
                 if flag:
-                    subprocess.run(['git', 'update-index', flag, '--', path], cwd=repo, check=True,
+                    fixture_run(['git', 'update-index', flag, '--', path], cwd=repo, check=True,
                                    capture_output=True, env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent',
                                                             'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'})
                 source = repo / path
@@ -203,7 +212,7 @@ def run(binary, selected=None, fixture_context=None):
             saved = content(call(h, 'report', 'builtin__artifact__save',
                                  {'name': 'quote_comparison.md', 'mediaType': 'text/markdown', 'text': report_text}))
             ref = saved['artifact_refs'][0]
-            opened = subprocess.run(h.args('artifact', 'open', ref), capture_output=True, text=True,
+            opened = fixture_run(h.args('artifact', 'open', ref), capture_output=True, text=True,
                                     env=h.env, cwd=h.root, timeout=20)
             require(opened.returncode == 0 and opened.stdout == report_text, 'saved comparison bytes not reopenable')
             return {'name': 'GC-11_structured_quote_and_Artifact_fragment', 'source': data,
@@ -219,7 +228,7 @@ def run(binary, selected=None, fixture_context=None):
             require('PRIVATE_BODY_MARKER' in viewed['text'], 'Skill view missing actual body')
             asset = content(call(h, 'asset', 'builtin__skill__view',
                                  {'name': 'review', 'version': summaries[0]['version'], 'path': 'assets/opaque.bin'}))
-            opened = subprocess.run(h.args('artifact', 'open', asset['artifact_refs'][0]), capture_output=True,
+            opened = fixture_run(h.args('artifact', 'open', asset['artifact_refs'][0]), capture_output=True,
                                     env=h.env, cwd=h.root, timeout=20)
             require(opened.returncode == 0 and opened.stdout == b'\x00\xffSKILL_ASSET',
                     'binary Skill asset was corrupted or bypassed ArtifactStore')
@@ -296,6 +305,10 @@ def run(binary, selected=None, fixture_context=None):
                     'crashed edit retried or falsely completed')
             return {'name': 'edit_after_effect_before_result_commit', 'signal': 'SIGKILL', 'state': value}
         scenario('crash', crash, kind='crashes')
+        for kind, result in run_cases(cases, drive, scenario_jobs):
+            report[kind].append(result)
+        if not selected:
+            require(len(report['checks']) == 6 and len(report['crashes']) == 1, 'complete capability scenario inventory required')
     report['cleanup'] = not root.exists()
     require(report['cleanup'], 'disposable roots remain')
     return report
@@ -307,8 +320,9 @@ if __name__ == '__main__':
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash'],
                         help='Run one maintained scenario; omit for the complete gate')
+    parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
-    report = run(args.binary.resolve(), args.scenario)
+    report = run(args.binary.resolve(), args.scenario, scenario_jobs=args.scenario_jobs)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({'checks': len(report['checks']), 'crashes': len(report['crashes']), 'cleanup': report['cleanup']}))

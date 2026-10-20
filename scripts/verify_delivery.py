@@ -7,6 +7,7 @@ Every crash snapshot reads databases directly, without triggering recovery.
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import signal
 import sqlite3
@@ -15,6 +16,7 @@ import tempfile
 
 from terminal_driver import Terminal
 from verify_main import MainHarness, require
+from fixture_pool import run_cases
 
 
 class Harness(MainHarness):
@@ -67,8 +69,9 @@ def assert_delivered(value, count):
     require(all(r["status"] == "completed" for r in value["runs"]), "Run not completed")
 
 
-def run(binary):
-    report = {"version": 1, "scope": "M3 durable semantic delivery to the local terminal inbox; stdout redisplay and remote provider exactly-once are not claimed", "checks": [], "crashes": []}
+def run(binary, feedback=False, scenario_jobs=1):
+    report = {"version": 1, "scope": "M3 durable semantic delivery to the local terminal inbox; stdout redisplay and remote provider exactly-once are not claimed", "checks": [], "crashes": [],
+              "evidence_scope": "early_feedback" if feedback else "full", "scenario_jobs": scenario_jobs}
     with tempfile.TemporaryDirectory(prefix="erii-delivery-") as directory:
         root = Path(directory)
 
@@ -89,38 +92,45 @@ def run(binary):
                       "before_reply_checkpoint", "after_reply_checkpoint",
                       "before_delivery_send", "after_delivery_send",
                       "before_delivery_ack", "after_delivery_ack")
-        for role in ("main", "root"):
-            for boundary in boundaries:
-                def crash(h):
-                    if role == "root":
-                        # Freeze the Root before work, let Main acceptance settle,
-                        # then deliver that acceptance before faulting the final reply.
-                        h.send("delegate", "Delegate: Recover this research report.")
-                        held = h.hold("before_worker_generation")
-                        h.wait_state(lambda v: any(r["kind"] == "main" and r["status"] == "completed" for r in v["runs"]), "Main acceptance committed", reader=state)
-                        h.command("delivery", "work")
-                        held.kill(); held.communicate(timeout=10)
-                    with Terminal(h.args("-test-main-hold", boundary, "tui"), h.env, h.root) as t:
-                        if role == "main":
-                            t.expect("You> "); t.send("Deliver this final answer.")
-                        t.expect('"boundary":"' + boundary + '"')
-                        before = state(h)
-                        t.stop(signal.SIGKILL)
-                        killed = t.transcript()
-                    with Terminal(h.args("tui"), h.env, h.root) as t:
-                        t.expect("Main follow-up:" if role == "root" else "assistant: Processed:")
-                        h.wait_state(lambda v: len(v["requests"]) == (2 if role == "root" else 1) and all(r["status"] == "sent" for r in v["requests"]) and all(r["status"] == "completed" for r in v["runs"]), "recovered send and checkpoint", reader=state)
-                        require(t.stop() == 0, "recovered terminal cleanup failed")
-                        transcript = t.transcript()
-                    after = state(h); assert_delivered(after, 2 if role == "root" else 1)
-                    completed = {g["generation_id"]: g for g in before["generations"] if g["status"] == "completed"}
-                    require(all(g == completed[g["generation_id"]] for g in after["generations"] if g["generation_id"] in completed), "accepted generation replayed")
-                    # No resubmission or model work is needed to recover transport.
-                    h.command("delivery", "work"); h.command("chat", "work")
-                    require(state(h) == after, "duplicate scan changed settled history or sent again")
-                    return {"role": role, "boundary": boundary, "signal": "SIGKILL", "before": before, "after": after, "killed_transcript": killed, "recovered_transcript": transcript}
-                report["crashes"].append(scenario(role + "-" + boundary, crash, "tasks" if role == "root" else "main"))
-        report["checks"].append("20 SIGKILL/restart scenarios: Main and Root final replies through real PTY; Conversation, enqueue, checkpoint, send and ack boundaries")
+        # Early feedback adds transport/approval regressions before the full
+        # merge tier runs all twenty faults five times. It cannot sign off the
+        # full gate; the default invocation always retains that entire series.
+        def crash_case(item):
+            role, boundary = item
+            def crash(h):
+                if role == "root":
+                    # Freeze the Root before work, let Main acceptance settle,
+                    # then deliver that acceptance before faulting the final reply.
+                    h.send("delegate", "Delegate: Recover this research report.")
+                    held = h.hold("before_worker_generation")
+                    h.wait_state(lambda v: any(r["kind"] == "main" and r["status"] == "completed" for r in v["runs"]), "Main acceptance committed", reader=state)
+                    h.command("delivery", "work")
+                    held.kill(); held.communicate(timeout=10)
+                with Terminal(h.args("-test-main-hold", boundary, "tui"), h.env, h.root) as t:
+                    if role == "main":
+                        t.expect("You> "); t.send("Deliver this final answer.")
+                    t.expect('"boundary":"' + boundary + '"')
+                    before = state(h)
+                    t.stop(signal.SIGKILL)
+                    killed = t.transcript()
+                with Terminal(h.args("tui"), h.env, h.root) as t:
+                    t.expect("Main follow-up:" if role == "root" else "assistant: Processed:")
+                    h.wait_state(lambda v: len(v["requests"]) == (2 if role == "root" else 1) and all(r["status"] == "sent" for r in v["requests"]) and all(r["status"] == "completed" for r in v["runs"]), "recovered send and checkpoint", reader=state)
+                    require(t.stop() == 0, "recovered terminal cleanup failed")
+                    transcript = t.transcript()
+                after = state(h); assert_delivered(after, 2 if role == "root" else 1)
+                completed = {g["generation_id"]: g for g in before["generations"] if g["status"] == "completed"}
+                require(all(g == completed[g["generation_id"]] for g in after["generations"] if g["generation_id"] in completed), "accepted generation replayed")
+                # No resubmission or model work is needed to recover transport.
+                h.command("delivery", "work"); h.command("chat", "work")
+                require(state(h) == after, "duplicate scan changed settled history or sent again")
+                return {"role": role, "boundary": boundary, "signal": "SIGKILL", "before": before, "after": after, "killed_transcript": killed, "recovered_transcript": transcript}
+            return scenario(role + "-" + boundary, crash, "tasks" if role == "root" else "main")
+        cases = [] if feedback else [(role, boundary) for role in ("main", "root") for boundary in boundaries]
+        report["crashes"] = run_cases(cases, crash_case, scenario_jobs)
+        if not feedback:
+            require(len(report["crashes"]) == 20, "complete Main/Root crash inventory required")
+            report["checks"].append("20 SIGKILL/restart scenarios: Main and Root final replies through real PTY; Conversation, enqueue, checkpoint, send and ack boundaries")
 
         for mode in ("retry-once", "ambiguous", "unknown", "unavailable"):
             def failure(h):
@@ -192,9 +202,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--feedback", action="store_true", help="additional early transport/approval checks; not full merge evidence")
+    parser.add_argument("--scenario-jobs", type=int, choices=[1, 2, 4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS", "1")))
     args = parser.parse_args()
     args.evidence.unlink(missing_ok=True)
-    report = run(args.binary.resolve())
+    report = run(args.binary.resolve(), args.feedback, args.scenario_jobs)
     report["binary_sha256"] = hashlib.sha256(args.binary.read_bytes()).hexdigest()
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
