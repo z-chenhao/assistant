@@ -16,7 +16,7 @@ import sys
 from ci_profile import gh
 
 REPO = 'z-chenhao/erii'
-WORKFLOWS = {'.github/workflows/ci.yml', '.github/workflows/ci-shadow.yml'}
+WORKFLOWS = {'.github/workflows/ci.yml'}
 
 
 def now():

@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 
+from file_digest import sha256_file as digest
 from verify_suite import source_state
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,11 +25,6 @@ RECEIPT = Path('.ci-go/sdk.json')
 HOST_CACHE = Path('.ci-go/host-cache')
 PACKAGES = ['testing', 'encoding/json', 'testing/internal/testdeps', 'runtime/race', 'runtime/cgo']
 WRAPPER = b'#!/bin/sh\nGODEBUG=installgoroot=all\nexport GODEBUG\nexec "${0}.real" "$@"\n'
-
-
-def digest(path):
-    with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
 def tree_digest(root):

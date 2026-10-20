@@ -18,6 +18,7 @@ import tempfile
 import time
 import urllib.request
 
+from file_digest import sha256_file
 from verify_capabilities import CapabilityHarness
 from verify_main import require
 
@@ -348,8 +349,7 @@ def run_live(binary, live_root, config_path):
         receipt = json.loads((checkpoint / 'receipt.json').read_text())
         hashes = {}
         for name in ('disk.img', 'nvram.bin', 'config.json'):
-            with (checkpoint / name).open('rb') as stream:
-                hashes[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
+            hashes[name] = sha256_file(checkpoint / name)
             require(hashes[name] == receipt['files'][name], 'independent native unit digest mismatch')
         opened = subprocess.run(h.args('artifact', 'open', artifact['artifact_ref']), capture_output=True,
                                 text=True, env=h.env, timeout=20)
@@ -412,8 +412,7 @@ def main():
     args = parser.parse_args()
     require(bool(args.live_root) == bool(args.live_config), 'both live root and config are required')
     report = (run_live(args.binary.resolve(), args.live_root, args.live_config) if args.live_root else run(args.binary.resolve()))
-    with args.binary.open('rb') as stream:
-        report['binary_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    report['binary_sha256'] = sha256_file(args.binary)
     repository = Path(__file__).resolve().parents[1]
     revision = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repository, capture_output=True, text=True, timeout=10)
     report['source_revision'] = revision.stdout.strip() if revision.returncode == 0 else None

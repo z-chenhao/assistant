@@ -129,6 +129,8 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('test "$PART_RESULT" = success', join)
         self.assertIn('python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence', join)
         self.assertNotIn('ci_bundle.py', workflow)
+        self.assertIn('python-version: "3.10.22"', workflow)
+        self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", workflow)
 
     def test_codemode_gate_series_parallelize_without_splitting_repetitions(self):
         gates = suite.SHARDS['codemode']

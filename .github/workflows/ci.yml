@@ -36,6 +36,11 @@ jobs:
         env:
           ERII_CI_PUBLIC_SDK_PROBE: "1"
         run: exec python3 scripts/ci_step.py --name sdk-conformance --phase test -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.10.22"
+      - name: Minimum supported Python compatibility tests
+        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor

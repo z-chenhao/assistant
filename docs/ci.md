@@ -32,6 +32,9 @@ All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
 SHA may identify GitHub's synthetic merge commit.
 Strict main ancestry and independent exact-SHA reviewer PASS remain required.
 The workflow never changes protection or enables an administrative bypass.
+Unit/lint retains its ordinary Python execution and additionally runs all Python
+regressions on Python 3.10.22, the minimum supported interpreter series. This
+Required step guards portable SDK hashing and the maintained profiling tools.
 
 ## Complete inventory
 
@@ -154,6 +157,16 @@ their strict five-pair acceptance rules, but no repeated measurement cohort is
 part of the delivery path. Supersession records never treat unknown outcomes or
 missing timestamps as zero.
 
+For the current topology, `ci_supersede.py collect` requires exactly one
+`ci.yml` attempt for the superseded head. It rejects duplicate/unknown workflows,
+missing source or completion proof and unknown push outcomes. It no longer
+requires the retired shadow workflow. Use an already recorded authorized push;
+collection does not trigger or repeat any workflow:
+
+```sh
+python3 scripts/ci_supersede.py collect --push-record evidence/push.json --run RUN_ID:ATTEMPT --output evidence/supersession.json
+```
+
 The controlled local schema sample (same M4 Max, GOMAXPROCS=4, same eighteen
 variants and SC/cancellation probes) reduced one Core round from 142.4293 to
 119.7031 seconds and one replay race test from 12.529 to 6.582 seconds. This
@@ -172,3 +185,11 @@ Required matrix and change the aggregate dependencies in the same reviewed
 commit. Never make the join optional before full coverage replaces it.
 The schema fast path can be removed without downgrading stored versions:
 existing historical migrations still define the same version 21 format.
+
+Artifact recovery's exact-receipt success fixture uses Go's test virtual clock,
+retaining the frozen 100ms policy rather than spending it on host scheduling or
+filesystem latency. A separate deterministic expiry test consumes that exact
+budget, proves unknown/no Artifact/no second effect, then verifies a fresh
+authoritative query. The existing real deadline, cancellation, unsafe receipt,
+identity and byte/hash assertions remain required. Preserve failed full-suite
+evidence; passing focused diagnostics alone do not supersede it.

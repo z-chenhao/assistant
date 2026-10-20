@@ -1,6 +1,7 @@
 """The SDK provisioner owns only its copy and fails closed before activation."""
 import copy
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -15,6 +16,13 @@ import ci_sdk as sdk
 
 
 class SDKTests(unittest.TestCase):
+    def test_digest_preserves_empty_binary_and_multi_chunk_contents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'public-sdk.bin'
+            for payload in (b'', b'\x00\xffbinary', bytes(range(256)) * 8193):
+                path.write_bytes(payload)
+                self.assertEqual(sdk.digest(path), hashlib.sha256(payload).hexdigest())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
