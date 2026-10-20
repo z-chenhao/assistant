@@ -1,4 +1,26 @@
 version: 1
+# Optional durable recall. Install/serve the selected model explicitly.
+# No implicit embedding provider or FTS-only fallback. See docs/recall.md.
+# embedding:
+#   provider: openai_compatible
+#   endpoint: http://127.0.0.1:11434/v1
+#   model: nomic-embed-text
+#   dimensions: 768
+#   api_key_ref: credential-reference-in-SecretStore
+# Optional M3 adapters, disabled when absent. Use private dedicated directories.
+# mcp:
+#   - name: local_catalog
+#     command: /absolute/path/to/self-contained-mcp-server
+#     args: []
+#     directory: /absolute/path/to/provider-state
+#     tools: {lookup: read_only, send: external_effect}
+# skills:
+#   root: /absolute/path/to/curated-skills
+#   scope: agent  # agent or workspace, within this local Agent
+# workspace:
+#   root: /absolute/path/to/disposable-git-checkout
+#   mode: audit  # edit exposes exact approved clean-file replacement
+#   protected: [docs/notes.md]
 app:
   # Must be absolute. ERII_DATA_ROOT can override this for deployment.
   data_root: /tmp/erii-local
@@ -12,8 +34,100 @@ nats:
   ack_wait: 30s
   retry_interval: 1s
 
+# Frozen per new Root tree; existing Runs retain their limits after restart.
+# Safety ceilings reject with RESOURCE_LIMIT; concurrency still queues normally.
+children:
+  max_depth: 8          # deployment hard ceiling 16
+  max_descendants: 4096 # deployment hard ceiling 10000
+  max_tool_calls: 10000 # deployment hard ceiling 50000
+
+# Fair Host scheduling across Root trees; Main has a separate reserved slot.
+# Each capacity is 1..32. These limits never enter the model protocol.
+scheduler:
+  child_concurrency: 16
+  global_concurrency: 32
+  user_concurrency: 32
+  agent_concurrency: 32
+  provider_concurrency: 32
+  max_worker_turns: 256 # frozen per Root, hard ceiling 512
+  infrastructure_failures: 5 # consecutive unavailability/rate limiting
+  cooldown_seconds: 30
+
+# Monetary authorization is opt-in; absent/zero boundary means unconfigured.
+# Account is provider_kind:auth_connection_id, or provider_kind:endpoint_hash
+# for an unauthenticated local endpoint. `spend status` shows sanitized keys.
+# All four rates must be explicit integers (including any intentional zeros).
+# Values below are synthetic, NOT current provider prices. Replace all metadata.
+# spend:
+#   accounts:
+#     - account: openai_compatible:REPLACE_WITH_ENDPOINT_HASH
+#       currency: USD
+#       boundary_micros: 10000000 # 10 currency units, cumulative across Roots
+#       prices:
+#         - model: REPLACE_WITH_EXACT_MODEL_ID
+#           version: operator-price-v1
+#           input_micros_per_million: 1000000
+#           output_micros_per_million: 2000000
+#           cache_read_micros_per_million: 200000
+#           cache_write_micros_per_million: 1200000
+
+tasks:
+  recent_days: 30
+  recent_limit: 200
+
 # Optional real local-model Bridge. Install pinned dependencies first; use an absolute path.
 # llm:
 #   provider_bridge_command: node
 #   provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
 #   provider_bridge_version: pi-ai-1.3.0-v1
+
+# Host limits apply across CLI processes sharing this data root. Waiting calls
+# release execution capacity. External-effect approvals expire after one hour.
+tools:
+  global_concurrency: 32
+  agent_concurrency: 24
+  run_concurrency: 4
+  provider_concurrency: 16
+  tool_concurrency: 8
+  approval_ttl_seconds: 3600
+
+# Immutable binary storage under app.data_root/artifacts. Cleanup protects
+# references and active/paused Tasks; artifact cleanup defaults to dry-run.
+artifact:
+  retention_days: 30
+  quota_bytes: 1073741824
+  max_bytes: 67108864
+  cleanup_batch: 100
+
+# Delivery to the local terminal inbox, independent of model readiness.
+delivery:
+  lease_seconds: 5
+  retry_milliseconds: 250
+  max_attempts: 5
+
+# Enable the sole Code Mode entry for new Runs. Install dependencies first:
+# npm ci --prefix runtime/javascript --ignore-scripts
+# Pin Node 24.21.0; both paths must be absolute and outside an editable workspace.
+# javascript:
+#   command: /absolute/path/to/node
+#   script: /absolute/path/to/erii/runtime/javascript/src/sidecar.mjs
+
+# Optional background Memory maintenance. The reference resolves to an existing
+# 32-byte key in SecretStore; never put key bytes in YAML. No per-record prompts.
+# When embedding is enabled with maintenance, its endpoint must be literal loopback.
+# memory:
+#   encryption_key_ref: env:ERII_MEMORY_KEY
+
+# Frozen per Run; Children inherit the Parent policy. Provisional defaults.
+context:
+  threshold_percentage: 0.75
+  recent_messages: 6
+  summary_bytes: 2048
+
+# Optional managed Guest Chromium (inside the existing computer: block):
+#   browser:
+#     node: /opt/erii/node/bin/node
+#     module: /opt/erii/browser/node_modules/playwright-core/index.mjs
+#     port: 9222
+# Install pinned guest-browser/package-lock.json and erii-transfer.py in the
+# clean Guest. See docs/computer-use.md. No Host browser or personal profile.

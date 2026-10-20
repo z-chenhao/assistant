@@ -13,13 +13,23 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-isatty"
+	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/app"
+	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/computer/macosvm"
+	computerfixture "github.com/z-chenhao/erii/internal/computer/macosvm/fixture"
 	"github.com/z-chenhao/erii/internal/config"
+	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
+	"github.com/z-chenhao/erii/internal/memory"
+	"github.com/z-chenhao/erii/internal/skill"
+	mcpfake "github.com/z-chenhao/erii/internal/tool/mcp/fake"
 	"github.com/z-chenhao/erii/internal/tui"
 )
 
@@ -33,6 +43,15 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) (err error) {
+	if len(args) == 2 && args[0] == "-test-computer-server" {
+		return computerfixture.Serve(ctx, args[1], out)
+	}
+	if len(args) == 2 && args[0] == "-test-mcp-server" {
+		return mcpfake.Serve(in, out, args[1])
+	}
+	if len(args) == 3 && args[0] == "-test-provider-bridge" {
+		return fake.ServeRecorded(in, out, args[1], args[2])
+	}
 	if len(args) == 2 && args[0] == "-test-provider-bridge" {
 		return fake.Serve(in, out, args[1])
 	}
@@ -41,9 +60,20 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	configPath := flags.String("config", "", "versioned YAML configuration file (optional)")
 	testSecrets := flags.String("test-secret-store", "", "explicit in-memory CI Unix socket; never a production credential backend")
 	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
+	testDelivery := flags.String("test-delivery", "", "explicit test Bridge only: retry-once, unavailable, ambiguous, unknown")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
+	testMainRelease := flags.String("test-main-release", "", "explicit test Bridge only: release a held boundary when this file exists")
+	testBarriers := map[string]string{}
+	flags.Func("test-main-barrier", "explicit test Bridge only: repeatable boundary=release-file barrier", func(value string) error {
+		name, path, ok := strings.Cut(value, "=")
+		if !ok || name == "" || path == "" || testBarriers[name] != "" {
+			return errors.New("expected a unique boundary=release-file")
+		}
+		testBarriers[name] = path
+		return nil
+	})
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|chat send [REQUEST_KEY]|chat work|chat history|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|computer status|computer prepare-base CLEAN_STOPPED_VM|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -51,6 +81,12 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			return nil
 		}
 		return err
+	}
+	if len(testBarriers) > 0 && *testBridge == "" {
+		return errors.New("test-main-barrier requires explicit test-bridge")
+	}
+	if testBarriers[*testMainHold] != "" {
+		return errors.New("conflicting test boundary barriers")
 	}
 	modelCommand := false
 	if flags.Arg(0) == "model" {
@@ -71,12 +107,19 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			modelCommand = flags.NArg() == 5
 		}
 	}
-	chatCommand := flags.Arg(0) == "chat" && ((flags.Arg(1) == "send" && (flags.NArg() == 2 || flags.NArg() == 3)) || ((flags.Arg(1) == "work" || flags.Arg(1) == "history") && flags.NArg() == 2))
+	chatCommand := flags.Arg(0) == "chat" && (((flags.Arg(1) == "send" || flags.Arg(1) == "send-parts") && (flags.NArg() == 2 || flags.NArg() == 3)) || ((flags.Arg(1) == "work" || flags.Arg(1) == "history") && flags.NArg() == 2))
+	artifactCommand := flags.Arg(0) == "artifact" && ((flags.NArg() == 4 && (flags.Arg(1) == "save" || flags.Arg(1) == "delete")) || (flags.NArg() == 3 && (flags.Arg(1) == "open" || flags.Arg(1) == "describe")) || (flags.Arg(1) == "cleanup" && (flags.NArg() == 2 || (flags.NArg() == 3 && flags.Arg(2) == "apply"))))
+	deliveryCommand := flags.Arg(0) == "delivery" && flags.NArg() == 2 && (flags.Arg(1) == "work" || flags.Arg(1) == "list")
+	approvalCommand := flags.Arg(0) == "approval" && ((flags.NArg() == 2 && (flags.Arg(1) == "list" || flags.Arg(1) == "reconcile")) || (flags.NArg() == 4 && (flags.Arg(1) == "approve" || flags.Arg(1) == "deny")))
 	terminalCommand := flags.NArg() == 1 && flags.Arg(0) == "tui"
 	if f, ok := in.(*os.File); ok && flags.NArg() == 0 && isatty.IsTerminal(f.Fd()) {
 		terminalCommand = true
 	}
-	if !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	skillCommand := flags.Arg(0) == "skill" && flags.Arg(1) == "manage" && flags.NArg() == 2
+	memoryCommand := flags.Arg(0) == "memory" && ((flags.NArg() == 2 && (flags.Arg(1) == "work" || flags.Arg(1) == "status")) || (flags.NArg() == 3 && flags.Arg(1) == "manage"))
+	spendCommand := flags.NArg() == 2 && flags.Arg(0) == "spend" && flags.Arg(1) == "status"
+	computerCommand := flags.Arg(0) == "computer" && ((flags.NArg() == 2 && flags.Arg(1) == "status") || (flags.NArg() == 3 && flags.Arg(1) == "prepare-base"))
+	if !computerCommand && !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -111,6 +154,15 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
+	if computerCommand && flags.Arg(1) == "prepare-base" {
+		if cfg.Computer == nil {
+			return errors.New("computer configuration required")
+		}
+		if err := macosvm.ProvisionBase(ctx, cfg.Computer.Root, flags.Arg(2), cfg.Computer.Compatibility); err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(map[string]string{"base": "sealed"})
+	}
 	var application *app.App
 	if *testBridge != "" {
 		application, err = app.OpenWithTestBridge(ctx, cfg, *testBridge)
@@ -123,19 +175,195 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return err
 	}
 	defer func() { err = errors.Join(err, application.Close()) }()
-	if *testMainHold != "" {
+	if computerCommand {
+		state, err := application.ComputerStatus(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(state)
+	}
+	if *testDelivery != "" {
+		if *testBridge == "" {
+			return errors.New("test-delivery requires explicit test-bridge")
+		}
+		if err := application.SetTestDelivery(*testDelivery); err != nil {
+			return err
+		}
+	}
+	if *testMainHold != "" || len(testBarriers) > 0 {
 		if *testBridge == "" {
 			return errors.New("test-main-hold requires explicit test-bridge")
 		}
 		application.SetTestMainBoundary(func(name string) {
+			release, held := testBarriers[name]
 			if name == *testMainHold {
+				release, held = *testMainRelease, true
+			}
+			if held {
 				_ = json.NewEncoder(out).Encode(struct {
 					Boundary string `json:"boundary"`
 				}{name})
-				<-ctx.Done()
+				if release == "" {
+					<-ctx.Done()
+				} else {
+					ticker := time.NewTicker(10 * time.Millisecond)
+					defer ticker.Stop()
+					for {
+						if _, err := os.Stat(release); err == nil {
+							break
+						}
+						select {
+						case <-ctx.Done():
+							return
+						case <-ticker.C:
+						}
+					}
+				}
 			}
 		})
 	}
+	if terminalCommand || flags.NArg() == 0 || chatCommand && flags.Arg(1) == "work" {
+		application.StartMemory(ctx)
+	}
+	if deliveryCommand {
+		if flags.Arg(1) == "work" {
+			if err := application.Deliver(ctx); err != nil {
+				return err
+			}
+		}
+		requests, err := application.DeliveryRequests(ctx)
+		if err != nil {
+			return err
+		}
+		// The CLI protocol uses RFC 3339 UTC; SQLite keeps UTC microseconds.
+		views := make([]struct {
+			delivery.Request
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
+		}, len(requests))
+		for i, r := range requests {
+			views[i].Request = r
+			views[i].CreatedAt = time.UnixMicro(r.CreatedAt).UTC()
+			views[i].UpdatedAt = time.UnixMicro(r.UpdatedAt).UTC()
+		}
+		return json.NewEncoder(out).Encode(views)
+	}
+	if artifactCommand {
+		switch flags.Arg(1) {
+		case "save":
+			d, e := application.SaveArtifact(ctx, artifact.Input{Name: flags.Arg(2), MediaType: flags.Arg(3)}, in)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(d)
+		case "open":
+			f, e := application.OpenArtifact(ctx, flags.Arg(2))
+			if e != nil {
+				return e
+			}
+			defer f.Close()
+			_, e = io.Copy(out, f)
+			return e
+		case "describe":
+			d, e := application.DescribeArtifact(ctx, flags.Arg(2))
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(d)
+		case "delete":
+			version, e := strconv.ParseInt(flags.Arg(3), 10, 64)
+			if e != nil {
+				return artifact.ErrInvalid
+			}
+			if e = application.DeleteArtifact(ctx, flags.Arg(2), version); e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(map[string]string{"status": "deleted"})
+		case "cleanup":
+			report, e := application.CleanupArtifacts(ctx, flags.Arg(2) != "apply")
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(report)
+		}
+	}
+	if skillCommand {
+		raw, e := io.ReadAll(io.LimitReader(in, 16385))
+		if e != nil || len(raw) > 16384 {
+			return errors.New("invalid experience request")
+		}
+		q, ok := skill.ParseReview(raw)
+		if !ok {
+			return errors.New("invalid experience request")
+		}
+		result, e := application.ReviewExperience(ctx, q)
+		if e != nil {
+			return e
+		}
+		return json.NewEncoder(out).Encode(result)
+	}
+	if memoryCommand {
+		if flags.Arg(1) == "manage" {
+			raw, e := io.ReadAll(io.LimitReader(in, 16385))
+			if e != nil || len(raw) > 16384 {
+				return errors.New("invalid memory request")
+			}
+			m, ok := memory.Parse(string(raw))
+			if !ok {
+				return errors.New("invalid memory request")
+			}
+			result, e := application.ManageMemory(ctx, flags.Arg(2), m)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(result)
+		}
+		if flags.Arg(1) == "work" {
+			if e := application.CurateMemory(ctx); e != nil {
+				return e
+			}
+		}
+		result, e := application.MemoryStatus(ctx)
+		if e != nil {
+			return e
+		}
+		return json.NewEncoder(out).Encode(result)
+	}
+	if spendCommand {
+		values, err := application.Spend(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(values)
+	}
+	if approvalCommand {
+		switch flags.Arg(1) {
+		case "list":
+			values, err := application.Approvals(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(values)
+		case "reconcile":
+			values, err := application.ReconcileTools(ctx)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(values)
+		default:
+			decision := "approved"
+			if flags.Arg(1) == "deny" {
+				decision = "denied"
+			}
+			if err := application.DecideApproval(ctx, flags.Arg(2), flags.Arg(3), decision); err != nil {
+				return err
+			}
+		}
+		return json.NewEncoder(out).Encode(struct {
+			Status string `json:"status"`
+		}{"recorded"})
+	}
+
 	if terminalCommand {
 		input, ok := in.(io.ReadCloser)
 		if !ok {
@@ -151,7 +379,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	if chatCommand {
 		switch flags.Arg(1) {
-		case "send":
+		case "send", "send-parts":
 			value, err := io.ReadAll(io.LimitReader(in, 16385))
 			if err != nil || len(value) > 16384 {
 				return errors.New("expected chat text of at most 16 KiB on stdin")
@@ -160,13 +388,33 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			if key == "" {
 				key = uuid.Must(uuid.NewV7()).String()
 			}
-			receipt, err := application.Actor(nil).Submit(ctx, key, string(value))
+			var receipt agent.Receipt
+			if flags.Arg(1) == "send-parts" {
+				var parts []conversation.ContentPart
+				dec := json.NewDecoder(bytes.NewReader(value))
+				dec.DisallowUnknownFields()
+				if dec.Decode(&parts) != nil {
+					return conversation.ErrInvalid
+				}
+				var extra any
+				if dec.Decode(&extra) != io.EOF {
+					return conversation.ErrInvalid
+				}
+				receipt, err = application.SubmitParts(ctx, key, parts)
+			} else {
+				receipt, err = application.Actor(nil).Submit(ctx, key, string(value))
+			}
 			if err != nil {
 				return err
 			}
 			return json.NewEncoder(out).Encode(receipt)
 		case "work":
-			if err := application.Actor(nil).Drain(ctx); err != nil {
+			workErr := application.Actor(nil).Drain(ctx)
+			if ctx.Err() != nil && workErr == ctx.Err() {
+				return nil
+			}
+			deliveryErr := application.Deliver(ctx)
+			if err := errors.Join(workErr, deliveryErr); err != nil {
 				return err
 			}
 			return json.NewEncoder(out).Encode(struct {

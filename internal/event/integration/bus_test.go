@@ -214,8 +214,17 @@ func TestNATSRejectsIncompatibleStreamAndConsumer(t *testing.T) {
 		t.Fatal("incompatible stream accepted")
 	}
 	checkErr(t, js.DeleteStream(ctx, "test_events_v1"))
-	bus := connect(t, broker)
-	_, err = js.CreateConsumer(ctx, "test_events_v1", jetstream.ConsumerConfig{Durable: "incompatible", AckPolicy: jetstream.AckNonePolicy})
+	// Consumer compatibility is independent of the rejected stream. Give it a
+	// fresh broker rather than coupling this assertion to immediate reuse of a
+	// deleted stream name with a different storage type.
+	consumerBroker := testbroker.New(t)
+	consumerConn, err := nat.Connect(consumerBroker.URL())
+	checkErr(t, err)
+	defer consumerConn.Close()
+	consumerJS, err := jetstream.New(consumerConn)
+	checkErr(t, err)
+	bus := connect(t, consumerBroker)
+	_, err = consumerJS.CreateConsumer(ctx, "test_events_v1", jetstream.ConsumerConfig{Durable: "incompatible", AckPolicy: jetstream.AckNonePolicy})
 	checkErr(t, err)
 	if sub, err := bus.Subscribe(ctx, "incompatible"); err == nil {
 		_ = sub.Close()
