@@ -29,6 +29,60 @@ func control(s *Store) llm.Control {
 	return llm.Control{Store: s.Models(), Probe: probeFixture{result: passedProbe()}, BridgeIdentity: "test:success"}
 }
 
+func TestImageActivationRequiresObservedProofAndDeclaration(t *testing.T) {
+	ctx := context.Background()
+	for _, declared := range []bool{false, true} {
+		t.Run(fmt.Sprint(declared), func(t *testing.T) {
+			s := openModels(t)
+			input := modelInput()
+			input.Capabilities.ImageInput = declared
+			p, err := s.Models().AddProfile(ctx, input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			proof := passedProbe()
+			if declared {
+				// Simulate a pre-image Probe record: it may prove text behavior,
+				// but neither the storage boundary nor selection may admit images.
+				r := llm.ProbeRecord{ProfileVersion: p.Version, BridgeIdentity: "test:success", Result: proof}
+				if err := s.Models().RecordProbe(ctx, p, r); !errors.Is(err, llm.ErrUnverified) {
+					t.Fatal("unobserved image proof stored", err)
+				}
+				if _, err := control(s).Test(ctx, p.ProfileID); !errors.Is(err, llm.ModelIncompatible) {
+					t.Fatal("unobserved image Probe admitted", err)
+				}
+			}
+			proof.ImageInput = true
+			c := control(s)
+			c.Probe = probeFixture{result: proof}
+			if _, err := c.Test(ctx, p.ProfileID); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Select(ctx, p.ProfileID, 1, 1); err != nil {
+				t.Fatal(err)
+			}
+			selected, err := s.Models().Profile(ctx, p.ProfileID)
+			if err != nil || selected.Capabilities.ImageInput != declared || !c.Available(ctx, p.ProfileID) {
+				t.Fatal("activation lost observed capability or gained undeclared capability", selected, err)
+			}
+			if declared {
+				if _, err := s.db.Exec(`UPDATE model_probe SET result_json=json_remove(result_json,'$.image_input') WHERE profile_id=?`, p.ProfileID); err != nil {
+					t.Fatal(err)
+				}
+				if c.Available(ctx, p.ProfileID) {
+					t.Fatal("old text proof admitted an image profile at startup")
+				}
+				if err := c.Select(ctx, p.ProfileID, selected.Version, 2); !errors.Is(err, llm.ErrUnverified) {
+					t.Fatal("old text proof admitted image selection", err)
+				}
+				if err := s.Models().Select(ctx, p.ProfileID, selected.Version, 2, c.BridgeIdentity); !errors.Is(err, llm.ErrConflict) {
+					t.Fatal("storage bypass admitted unobserved image selection", err)
+				}
+			}
+		})
+	}
+}
+
 func TestAtomicActivationRollbackAndFencing(t *testing.T) {
 	ctx := context.Background()
 	s := openModels(t)

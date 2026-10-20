@@ -69,10 +69,13 @@ source = source.slice(0, start) + `
     const target = Object.freeze(Object.create(null));
     const proxy = new Proxy(target, {get(_, key) {
       if (key === "then" || key === "toJSON") return undefined;
+      if (key === "ref") return value.ref;
+      if (key === "tabId") return value.ref?.id;
+      if (key === "browserId") return value.ref?.id;
       if (typeof key !== "string") return undefined;
       if (key === "capabilities") return Object.freeze({
         list: () => cuaInvoke(token, "capabilities.list", []),
-        get: (name) => cuaInvoke(token, "capabilities.get", [name]),
+        get: (name) => cuaInvoke(token, "capabilities.get", [name]).then(value => capability(value)),
         documentation: (name) => cuaInvoke(token, "capabilities.documentation", [name])
       });
       return (...args) => cuaInvoke(token, key, args);
@@ -80,7 +83,29 @@ source = source.slice(0, start) + `
     handles.add(proxy);
     return proxy;
   }
+  function capability(value) {
+    const token = value.handle_token;
+    if (typeof token !== "string") throw new TypeErrorCtor("Invalid capability binding");
+    const call = (method, args) => cuaInvoke(token, "playwright." + method, [args]);
+    const cap = Object.freeze({
+      documentation: () => call("documentation", {}),
+      waitForURL: (url, options) => call("waitForURL", {...options, url}),
+      locator: (selector) => Object.freeze({
+        count: () => call("count", {selector}).then(v => v.value),
+        textContent: () => call("textContent", {selector}).then(v => v.value),
+        click: () => call("click", {selector}),
+        fill: (value) => call("fill", {selector, value}),
+        waitFor: (options) => call("waitForSelector", {...options, selector}),
+        download: () => call("download", {selector}),
+        upload: (file) => call("upload", {selector, file})
+      })
+    });
+    handles.add(cap);
+    return cap;
+  }
   const cua = Object.create(null);
+  cua.computer = Object.freeze({platform: "macos", launchApp: (input) => cuaDiscover("launchApp", [input])});
+  cua.files = Object.freeze({importArtifact: (input) => cuaDiscover("importArtifact", [input]), exportArtifact: (input) => cuaDiscover("exportArtifact", [input])});
   for (const method of ["getState", "listApps", "listWindows", "listBrowsers", "listTabs"])
     cua[method] = (args) => cuaDiscover(method, args);
   for (const method of ["getApp", "getBrowser", "getTab", "createBrowserTab"])
@@ -91,4 +116,12 @@ source = source.slice(0, start) + `
 ` + source.slice(end);
 // Console output remains internal. Only explicit text/image/return is exposed.
 source = replaceOnce(source, 'output("console", args.map(format).join(" "));', 'void args;');
+
+
+source = replaceOnce(source, 'function image(value) {', `function image(value) {
+    if (value && typeof value === "object" && typeof value.artifactRef === "string") {
+      output("image", value.artifactRef, "application/x-erii-artifact");
+      return;
+    }`);
+
 export const PRELUDE_SOURCE = source;

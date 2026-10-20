@@ -162,6 +162,17 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 		return tool.Result{}, err
 	}
 	store := r.host.Artifacts()
+	if len(result.ImageRefs) > 0 {
+		if len(result.ImageRefs) > 8 || imageRefsIncluded(result.ImageRefs, result.ArtifactRefs) == false {
+			return tool.Failure("PERMISSION_DENIED"), nil
+		}
+		for _, ref := range result.ImageRefs {
+			d, err := store.DescribeTx(outputCtx, tx, a, ref, true)
+			if err != nil || !strings.HasPrefix(d.MediaType, "image/") {
+				return tool.Failure("PERMISSION_DENIED"), nil
+			}
+		}
+	}
 	var policy, name string
 	if err = tx.QueryRowContext(ctx, `SELECT policy_json,tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, id, a.RunID).Scan(&policy, &name); err != nil {
 		if err == sql.ErrNoRows {
@@ -226,6 +237,12 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 				return e
 			}
 			result.Text = "Saved artifact."
+			if output.ResultJSON != nil {
+				result.Text = output.ResultJSON(ref)
+				if len(result.Text) > p.OutputBytes || !json.Valid([]byte(result.Text)) {
+					return artifact.ErrLimit
+				}
+			}
 			result.ArtifactRefs = append(result.ArtifactRefs, ref)
 			result.Output = nil
 		}
@@ -290,4 +307,17 @@ func published(ctx context.Context, tx *sql.Tx, runID string) ([]string, error) 
 		refs = append(refs, ref)
 	}
 	return refs, rows.Err()
+}
+
+func imageRefsIncluded(images, refs []string) bool {
+	for _, image := range images {
+		found := false
+		for _, ref := range refs {
+			found = found || ref == image
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

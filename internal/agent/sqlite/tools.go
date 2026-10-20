@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/computer"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/tool"
 	"github.com/z-chenhao/erii/internal/tool/codemode"
@@ -112,6 +113,17 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 						if d, ok := t.runs.registry.Resolve(spec.Name); ok && d.ConflictKeys != nil && tool.Validate(spec.InputSchema, call.Arguments) {
 							keys = d.ConflictKeys(call.Arguments)
 						}
+					}
+				}
+				if parent != "" && t.runs.computerProvider != nil && codemode.ComputerBridge(call.Name) {
+					p = computer.CallPolicy(call.Name, call.Arguments, p)
+					policy = p.Replay
+					keys = []string{"computer:local:desktop"}
+					var id string
+					if e := tx.QueryRowContext(ctx, `SELECT computer_id FROM computer WHERE singleton=1`).Scan(&id); e == nil {
+						keys = append(keys, "computer:"+id+":desktop")
+					} else if e != sql.ErrNoRows {
+						return e
 					}
 				}
 				rawPolicy, _ := encoded(p)
@@ -279,6 +291,11 @@ func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Re
 		if err != nil {
 			return err
 		}
+		if receipt, ok := result.HostFence.(computer.ObservationReceipt); ok && result.Error == nil {
+			if err := t.commitObservation(ctx, tx, receipt); err != nil {
+				return err
+			}
+		}
 		if err = t.fence(ctx, tx); err != nil {
 			return err
 		}
@@ -345,6 +362,7 @@ func (t *tools) load(ctx context.Context, tx *sql.Tx, id string) (tool.Invocatio
 			p = d.Spec.Policy()
 		}
 	}
+	inv.Policy = &p
 	return inv, p, nil
 }
 func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error) {

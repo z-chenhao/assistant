@@ -17,9 +17,10 @@ import (
 )
 
 type Error struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable"`
+	Code      string         `json:"code"`
+	Message   string         `json:"message"`
+	Retryable bool           `json:"retryable"`
+	Details   map[string]any `json:"details,omitempty"`
 }
 
 type Result struct {
@@ -28,6 +29,7 @@ type Result struct {
 	HostFence    any           `json:"-"`
 	Text         string        `json:"text"`
 	ArtifactRefs []string      `json:"artifact_refs,omitempty"`
+	ImageRefs    []string      `json:"image_refs,omitempty"`
 	Output       *BinaryOutput `json:"-"`
 	PublishRefs  []string      `json:"-"`
 	Error        *Error        `json:"error,omitempty"`
@@ -38,6 +40,8 @@ type Result struct {
 type BinaryOutput struct {
 	Name, MediaType string
 	Reader          io.Reader
+	// ResultJSON builds the bounded business envelope after the opaque ref exists.
+	ResultJSON func(string) string
 }
 
 // OutputStore atomically normalizes large/binary results and commits their
@@ -187,6 +191,8 @@ func (r *Registry) Resolve(name string) (Definition, bool) {
 }
 
 type Invocation struct {
+	// Policy is loaded from the accepted invocation, never from provider output.
+	Policy     *Policy `json:"-"`
 	ID         string
 	Call       llm.ToolCall
 	Status     string
@@ -285,6 +291,9 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 		d.Spec = Spec{Permission: "read_only", ReplayPolicy: "safe"}
 	}
 	p := d.Spec.Policy()
+	if inv.Policy != nil {
+		p = *inv.Policy
+	}
 	request := Request{Arguments: inv.Call.Arguments, IdempotencyKey: inv.Key}
 	if inv.Status == "unknown" || (inv.Status == "running" && p.Replay != "safe") {
 		uncertain := func() (Result, error) {

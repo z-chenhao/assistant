@@ -112,8 +112,12 @@ func Normalize(r Result) Result {
 		return r
 	}
 	switch r.Error.Code {
-	case "INVALID_ARGUMENT", "NOT_FOUND", "PERMISSION_DENIED", "APPROVAL_DENIED", "TIMEOUT", "CANCELLED", "PROVIDER_UNAVAILABLE", "RESOURCE_LIMIT", "UNKNOWN_SIDE_EFFECT", "NON_DETERMINISTIC_REPLAY":
+	case "STALE_SURFACE_HANDLE", "STALE_ELEMENT_REFERENCE", "STALE_CAPABILITY_HANDLE", "SCREENSHOT_REQUIRED", "WAIT_TIMEOUT", "INVALID_ARGUMENT", "NOT_FOUND", "PERMISSION_DENIED", "APPROVAL_DENIED", "TIMEOUT", "CANCELLED", "PROVIDER_UNAVAILABLE", "RESOURCE_LIMIT", "UNKNOWN_SIDE_EFFECT", "NON_DETERMINISTIC_REPLAY":
 		out := Failure(r.Error.Code)
+		// Only the Host's bounded observation summary survives normalization.
+		if r.Error.Code == "WAIT_TIMEOUT" {
+			out.Error.Details = waitDetails(r.Error.Details)
+		}
 		out.HostFence = r.HostFence
 		return out
 	default:
@@ -123,3 +127,22 @@ func Normalize(r Result) Result {
 	}
 }
 func (r Result) terminal() bool { return r.Error == nil || r.Error.Code != "UNKNOWN_SIDE_EFFECT" }
+
+func waitDetails(details map[string]any) map[string]any {
+	observation, ok := details["observation"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	clean := map[string]any{}
+	for key, limit := range map[string]int{"surfaceId": 256, "revision": 128, "state": 2048} {
+		value, ok := observation[key].(string)
+		if !ok {
+			return nil
+		}
+		if len(value) > limit {
+			value = value[:limit]
+		}
+		clean[key] = value
+	}
+	return map[string]any{"observation": clean}
+}

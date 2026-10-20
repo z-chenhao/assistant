@@ -123,3 +123,11 @@ context:
   threshold_percentage: 0.75
   recent_messages: 6
   summary_bytes: 2048
+
+# Optional managed Guest Chromium (inside the existing computer: block):
+#   browser:
+#     node: /opt/erii/node/bin/node
+#     module: /opt/erii/browser/node_modules/playwright-core/index.mjs
+#     port: 9222
+# Install pinned guest-browser/package-lock.json and erii-transfer.py in the
+# clean Guest. See docs/computer-use.md. No Host browser or personal profile.

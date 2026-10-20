@@ -242,7 +242,11 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error
 				return err
 			}
 			for i, result := range results {
-				cp.Messages = append(cp.Messages, AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: conversation.Text(result.ModelText())})
+				parts := conversation.Text(result.ModelText())
+				for _, ref := range result.ImageRefs {
+					parts = append(parts, conversation.ContentPart{Type: "image", ArtifactRef: ref})
+				}
+				cp.Messages = append(cp.Messages, AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: parts})
 			}
 			cp.Step++
 			cp.Phase = "model"

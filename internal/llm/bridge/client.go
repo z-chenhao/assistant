@@ -455,7 +455,14 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 			sink(*completed)
 		}
 	}()
-	var params any = r
+	images, imageErr := resolveImages(ctx, r)
+	if imageErr != nil {
+		return llm.GenerationResult{}, imageErr
+	}
+	var params any = struct {
+		llm.GenerationRequest
+		Images map[string]imagePayload `json:"images,omitempty"`
+	}{r, images}
 	if c.resolver != nil {
 		resolved, resolveErr := c.resolver(ctx, r.Snapshot)
 		if resolveErr != nil {
@@ -464,8 +471,9 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		connection = resolved
 		params = struct {
 			llm.GenerationRequest
-			Connection Connection `json:"connection"`
-		}{r, connection}
+			Connection Connection              `json:"connection"`
+			Images     map[string]imagePayload `json:"images,omitempty"`
+		}{r, connection, images}
 	}
 	if ctx.Err() != nil {
 		return llm.GenerationResult{}, llm.GenerationCancelled

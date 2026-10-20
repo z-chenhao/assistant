@@ -383,7 +383,7 @@ func TestComputerMigrationFromPopulatedV20PreservesAcceptedWork(t *testing.T) {
 	if err := s.db.QueryRow(`SELECT request_json FROM model_generation LIMIT 1`).Scan(&request); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE computer_operation; DROP TABLE computer; PRAGMA user_version=20`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer; PRAGMA user_version=20`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -398,7 +398,7 @@ func TestComputerMigrationFromPopulatedV20PreservesAcceptedWork(t *testing.T) {
 	if err := reopened.db.QueryRow(`SELECT request_json FROM model_generation LIMIT 1`).Scan(&after); err != nil || after != request {
 		t.Fatal("accepted request changed", err)
 	}
-	if scalar(t, reopened, `PRAGMA user_version`) != 21 || scalar(t, reopened, `SELECT count(*) FROM code_execution_state WHERE execution_id=? AND claim_token=?`, b[0].req.ExecutionID, b[0].req.ClaimToken) != 1 {
+	if scalar(t, reopened, `PRAGMA user_version`) != len(migrations) || scalar(t, reopened, `SELECT count(*) FROM code_execution_state WHERE execution_id=? AND claim_token=?`, b[0].req.ExecutionID, b[0].req.ClaimToken) != 1 {
 		t.Fatal("migration changed owner")
 	}
 	rows, err := reopened.db.Query(`PRAGMA foreign_key_check`)
