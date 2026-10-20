@@ -9,6 +9,13 @@ commits a durable checkpoint, and destroys the disposable instance. Claim recove
 retains the frozen idle request and checkpoint IDs until its final metadata commit.
 The provider verifies the published unit before checking the source instance, so
 a crash after deletion can reconcile disposal without requiring that instance.
+If that invocation is cancelled, a new authorized invocation derives the old
+idle request from the retained operation ledger for the exact previous Computer
+and instance epoch. It verifies the published unit and reconciles disposal before
+restoring the replacement. Reclaiming the new invocation derives the same link
+even after supersession. The cancelled Task, Run and Code execution stay terminal;
+only Computer lifecycle progress is reconciled. No schema or frozen-request
+format changes; unknown effects still fail closed.
 
 Surface inventory, handles, desktop actions and browser capabilities belong to
 the subsequent Computer Use slice. This build reports an explicit inventory
@@ -183,8 +190,12 @@ The maintained offline harness launches the real CLI and production HTTP/SSH
 adapter against explicit protocol Fakes. It drives Code Mode, records nested
 ToolInvocations, kills the Agent at readiness and before/after checkpoint
 publication and after instance disposal but before the final metadata commit,
-then proves a fresh cell succeeds, reads back all three files and Artifact bytes, and joins all owned
-processes. `make verify` runs it five consecutive times. Contracts cover empty
+then proves a fresh cell succeeds and reads back all three files and Artifact bytes.
+It also cancels a Worker Task through Main at readiness and after disposal. Both
+cases require a successful fresh cell and unchanged cancelled Task/Run/Code
+terminal states. After disposal it verifies the committed file hashes and that
+the new ensure uses the original checkpoint. All owned processes are joined.
+`make verify` runs it five consecutive times. Contracts cover empty
 and populated v20 migration, illegal state changes, CAS/fencing, concurrent
 ownership, corrupt NVRAM, blocked shutdown, ambiguous start, symlinks and actual
 test-process death at publication boundaries.

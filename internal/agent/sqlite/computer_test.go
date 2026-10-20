@@ -245,6 +245,117 @@ func TestComputerIdleRecoveryRetainsFrozenCheckpoint(t *testing.T) {
 	}
 }
 
+type retainedCheckpointFake struct {
+	lifecycleFake
+	units    map[string]computer.Checkpoint
+	disposed map[computer.Instance]bool
+}
+
+func (f *retainedCheckpointFake) Checkpoint(ctx context.Context, r computer.Request) (computer.Checkpoint, error) {
+	if err := r.Fence(ctx); err != nil {
+		return computer.Checkpoint{}, err
+	}
+	if cp, ok := f.units[r.CheckpointID]; ok {
+		return cp, nil
+	}
+	if f.disposed[r.Instance] {
+		return computer.Checkpoint{}, computer.ErrStale
+	}
+	cp, err := f.lifecycleFake.Checkpoint(ctx, r)
+	if err == nil {
+		f.units[r.CheckpointID] = cp
+	}
+	return cp, err
+}
+
+func (f *retainedCheckpointFake) Destroy(ctx context.Context, r computer.Request) error {
+	if err := f.lifecycleFake.Destroy(ctx, r); err != nil {
+		return err
+	}
+	if _, ok := f.units[r.CheckpointID]; !ok {
+		return computer.ErrIntegrity
+	}
+	f.disposed[r.Instance] = true
+	return nil
+}
+
+func TestComputerAbandonedIdleRetainsFrozenCleanup(t *testing.T) {
+	for _, boundary := range []string{"before_checkpoint_commit", "after_checkpoint_commit", "after_destroy"} {
+		t.Run(boundary, func(t *testing.T) {
+			s, r, bridges, invs := computerClaims(t)
+			ctx := context.Background()
+			provider := &retainedCheckpointFake{units: map[string]computer.Checkpoint{}, disposed: map[computer.Instance]bool{}}
+			r.ConfigureComputer(provider, computer.Compatibility{}, computer.RestorationManifest{Version: 1})
+			first, err := bridges[0].computer().Ensure(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldStore := computerStore{bridges[0]}
+			frozen, err := oldStore.Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := frozen.Request
+			request.Fence = oldStore.Fence
+			cp, err := provider.Checkpoint(ctx, request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if boundary != "before_checkpoint_commit" {
+				if err := oldStore.SaveCheckpoint(ctx, frozen, cp); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if boundary == "after_destroy" {
+				if err := provider.Destroy(ctx, request); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Storage fixture for a terminal invocation; the maintained CLI
+			// harness exercises actual Main Task cancellation and Run/Code stop.
+			if _, err := s.db.Exec(`UPDATE tool_invocation SET status='cancelled',version=version+1 WHERE invocation_id=?`, invs[0].ID); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := (computerStore{bridges[1]}).Begin(ctx, "ensure", r.computerCompatibility, r.computerManifest)
+			if err != nil || plan.Cleanup == nil {
+				t.Fatal("new invocation lost accepted idle cleanup", plan, err)
+			}
+			beforeHash, _ := computer.Fingerprint(frozen.Request)
+			afterHash, _ := computer.Fingerprint(*plan.Cleanup)
+			if beforeHash != afterHash {
+				t.Fatal("cleanup parameters changed on takeover")
+			}
+			if err := oldStore.Finish(ctx, frozen); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatal("old owner committed after takeover", err)
+			}
+			// Kill the new owner after Begin as well: reattachment must derive
+			// the same cleanup from the superseded, immutable ledger entry.
+			if _, err := s.db.Exec(`UPDATE code_execution_state SET claim_expires_at=0,version=version+1 WHERE execution_id=?`, invs[1].ID); err != nil {
+				t.Fatal(err)
+			}
+			recovered := &codeBridge{t: bridges[1].t, registry: bridges[1].registry, attempt: newID(), req: bridges[1].req}
+			recovered.req.ClaimToken, recovered.req.ExecutionEpoch = "", 0
+			if err := recovered.claim(ctx, invs[1]); err != nil {
+				t.Fatal(err)
+			}
+			next, err := recovered.computer().Ensure(ctx)
+			if err != nil || next.ComputerID != first.ComputerID || next.Epoch != first.Epoch+1 {
+				t.Fatal("fresh invocation cannot restore disposed checkpoint", next, err)
+			}
+			state, err := s.ComputerStatus(ctx)
+			if err != nil || state.Checkpoint == nil || *state.Checkpoint != cp || !provider.disposed[first] {
+				t.Fatal("original cleanup not reconciled", state, err)
+			}
+			if err := recovered.computer().Idle(ctx); err != nil {
+				t.Fatal("new instance idle cleanup failed", err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND status='cancelled'`, invs[0].ID) != 1 {
+				t.Fatal("terminal invocation revived")
+			}
+		})
+	}
+}
+
 func TestComputerCannotBypassAcceptedCodeBoundary(t *testing.T) {
 	_, r, b, _ := computerClaims(t)
 	ctx := context.Background()

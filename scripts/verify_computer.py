@@ -27,6 +27,45 @@ class ComputerHarness(CapabilityHarness):
         return [str(self.binary), '-config', str(self.root / 'config.yaml'),
                 '-test-bridge', 'computer', *args]
 
+    def cancel_at(self, boundary, plan):
+        """Cancel through Main while a Worker holds a real lifecycle boundary."""
+        self.send('delegate-' + boundary, 'Delegate capabilities: ' + plan)
+        release = self.root / ('release-' + boundary)
+        child = self.hold(boundary, extra_flags=('-test-main-release', str(release)), timeout=30)
+        held = self.command('computer', 'status')
+        state = Path(self.env['ERII_DATA_ROOT']) / 'state.db'
+        with sqlite3.connect(state) as db:
+            task_id, ref = db.execute("SELECT task_id,task_ref FROM task WHERE status='active'").fetchone()
+        self.send('cancel-' + boundary, 'Capabilities: ' + json.dumps([
+            {'name': 'builtin__task__manage', 'arguments': {'operation': 'cancel', 'taskRef': ref}}]))
+        control = subprocess.Popen(self.args('chat', 'work'), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, env=self.env, cwd=self.root)
+        self.children.append(control)
+
+        def stopped(_):
+            with sqlite3.connect(state) as db:
+                return db.execute('SELECT status FROM task WHERE task_id=?', (task_id,)).fetchone()[0]
+
+        self.wait_state(lambda status: status == 'cancelled', 'Main cancelled Computer Task', reader=stopped, timeout=15)
+        release.touch()
+        child.communicate(timeout=30)
+        _, stderr = control.communicate(timeout=30)
+        require(control.returncode == 0, 'Main cancellation failed: ' + stderr)
+        self.command('chat', 'work')
+        return {'boundary': boundary, 'task_id': task_id, 'held': held, 'old_owner_exit': child.returncode,
+                'after_cancel': self.command('computer', 'status')}
+
+    def cancelled_state(self, task_id):
+        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
+            task = db.execute('SELECT status,task_epoch FROM task WHERE task_id=?', (task_id,)).fetchone()
+            runs = db.execute('SELECT run_id,status,desired_state FROM run WHERE task_id=? ORDER BY run_id', (task_id,)).fetchall()
+            codes = db.execute('SELECT s.execution_id,s.state,s.desired_state,s.claim_token IS NULL FROM code_execution_state s JOIN tool_invocation i ON i.invocation_id=s.execution_id JOIN run r USING(run_id) WHERE r.task_id=? ORDER BY s.execution_id', (task_id,)).fetchall()
+            tools = db.execute('SELECT invocation_id,i.status FROM tool_invocation i JOIN run USING(run_id) WHERE task_id=? ORDER BY invocation_id', (task_id,)).fetchall()
+        require(task[0] == 'cancelled' and runs and all(r[1] == 'cancelled' for r in runs), 'cancelled Task/Run revived')
+        require(codes and all(c[1:] == ('cancelled', 'cancelled', 1) for c in codes), 'cancelled Code retained authority')
+        require(all(t[1] in ('succeeded', 'failed', 'cancelled', 'unknown') for t in tools), 'cancelled nested work revived')
+        return {'task': task, 'runs': runs, 'codes': codes, 'tools': tools}
+
 
 def request(endpoint, path, value=None):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -148,6 +187,34 @@ def run(binary):
                 require(len(results) == 5 and all(row[0] == 'succeeded' for row in results),
                         'resumed or fresh cell failed after disposal')
             report['checks'].append(evidence(fresh))
+            # A new authorized invocation must reconcile abandoned idle work;
+            # cancellation leaves the original Task/Run/Code terminal forever.
+            report['cancellations'] = []
+            for boundary in ('computer_ready', 'computer_after_destroy'):
+                cancelled = h.cancel_at(boundary, plan)
+                held = cancelled['held']
+                terminal = h.cancelled_state(cancelled['task_id'])
+                if boundary == 'computer_after_destroy':
+                    require(held['phase'] == 'checkpointing' and held['checkpoint'] is not None,
+                            'cancel boundary lacks committed checkpoint')
+                    require(not list((vm_root / 'vms').glob('erii-*')), 'cancelled source instance retained')
+                    cancelled['committed_unit'] = evidence(held)
+                h.send('fresh-after-cancel-' + boundary, 'Capabilities: ' + plan)
+                h.command('chat', 'work')
+                restored = h.command('computer', 'status')
+                require(restored['computer_id'] == held['computer_id'] and restored['instance_epoch'] == held['instance_epoch'] + 1,
+                        'fresh invocation lost cancelled Computer identity/epoch')
+                require(restored['phase'] == 'checkpointed', 'fresh invocation failed after Task cancellation')
+                require(h.cancelled_state(cancelled['task_id']) == terminal, 'recovery changed cancelled terminal state')
+                with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+                    status = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode__execute' ORDER BY created_at DESC LIMIT 1").fetchone()[0]
+                    require(status == 'succeeded', 'fresh cell failed after cancellation')
+                    if boundary == 'computer_after_destroy':
+                        cp = db.execute("SELECT checkpoint_json FROM computer_operation WHERE kind='ensure' ORDER BY rowid DESC LIMIT 1").fetchone()[0]
+                        require(json.loads(cp) == held['checkpoint'], 'takeover replaced disposed checkpoint')
+                cancelled.update(terminal=terminal, after_fresh=restored)
+                report['cancellations'].append(cancelled)
+                report['checks'].append(evidence(restored))
             report['peer'] = request(computer['endpoint'], '/fixture/status')
             require(report['peer']['running'] == 0 and report['peer']['reopens'] >= 3, 'Guest session/app intent not restored')
         except Exception:

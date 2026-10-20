@@ -5,8 +5,11 @@ import "context"
 // Plan is a Host-owned, frozen lifecycle operation under an accepted Code Mode
 // invocation. Previous is present only for recovery of an abandoned instance.
 type Plan struct {
-	Request    Request
-	Previous   *Instance
+	Request  Request
+	Previous *Instance
+	// Cleanup retains an abandoned idle request from the immutable ledger.
+	// It is reconciled under the current claim before restoring Previous.
+	Cleanup    *Request
 	Checkpoint *Checkpoint
 	Done       bool
 	Empty      bool
@@ -44,6 +47,10 @@ func (m Manager) Ensure(ctx context.Context) (Instance, error) {
 		old.Instance = *p.Previous
 		old.OperationID += "-recover"
 		old.CheckpointID += "-recover"
+		if p.Cleanup != nil {
+			old = *p.Cleanup
+			old.Fence = m.Store.Fence
+		}
 		checkpoint, err := m.Provider.Checkpoint(ctx, old)
 		if err != nil {
 			return Instance{}, err

@@ -63,6 +63,33 @@ func decodeComputer(raw string, to any) error {
 	return nil
 }
 
+// The previous instance may have been disposed by a cancelled invocation.
+// Its immutable idle request remains authoritative even after supersession.
+// Derive this link from the retained ledger on every claim, including recovery
+// of an ensure operation, without changing either frozen record.
+func computerCleanup(ctx context.Context, tx *sql.Tx, plan *computer.Plan) error {
+	if plan.Previous == nil || plan.Done {
+		return nil
+	}
+	var raw string
+	err := tx.QueryRowContext(ctx, `SELECT request_json FROM computer_operation WHERE kind='idle' AND json_extract(request_json,'$.instance.computer_id')=? AND json_extract(request_json,'$.instance.instance_epoch')=? ORDER BY rowid DESC LIMIT 1`, plan.Previous.ComputerID, plan.Previous.Epoch).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var request computer.Request
+	if err := decodeComputer(raw, &request); err != nil {
+		return err
+	}
+	if request.Instance != *plan.Previous || !reflect.DeepEqual(request.Compatibility, plan.Request.Compatibility) || !reflect.DeepEqual(request.Manifest, plan.Request.Manifest) {
+		return computer.ErrCompatibility
+	}
+	plan.Cleanup = &request
+	return nil
+}
+
 func (s computerStore) Begin(ctx context.Context, kind string, compatibility computer.Compatibility, manifest computer.RestorationManifest) (computer.Plan, error) {
 	var plan computer.Plan
 	b := s.b
@@ -104,7 +131,7 @@ func (s computerStore) Begin(ctx context.Context, kind string, compatibility com
 					return computer.ErrStale
 				}
 			}
-			return nil
+			return computerCleanup(ctx, tx, &plan)
 		}
 		if err != sql.ErrNoRows {
 			return err
@@ -245,6 +272,9 @@ func (s computerStore) Begin(ctx context.Context, kind string, compatibility com
 		if err != nil {
 			return err
 		}
+		if err := computerCleanup(ctx, tx, &plan); err != nil {
+			return err
+		}
 		return runEvent(ctx, tx, b.t.claim.RunID(), "computer."+phase, instance.Epoch)
 	})
 	return plan, err
@@ -279,6 +309,9 @@ func (s computerStore) SaveCheckpoint(ctx context.Context, plan computer.Plan, c
 	if plan.Previous != nil {
 		expectedID += "-recover"
 		expectedEpoch = plan.Previous.Epoch
+	}
+	if plan.Cleanup != nil {
+		expectedID = plan.Cleanup.CheckpointID
 	}
 	hash, err := computer.Fingerprint(plan.Request.Manifest)
 	if err != nil || cp.ID != expectedID || cp.ComputerID != plan.Request.Instance.ComputerID || cp.SourceEpoch != expectedEpoch || cp.ManifestSHA256 != hash {
