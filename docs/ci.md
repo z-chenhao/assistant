@@ -62,7 +62,9 @@ Record actual exact-SHA timings with `ci_profile.py`; treat any workflow over
 ten minutes as a regression to diagnose before review. Do not remove coverage,
 reduce repetitions, extend fixture deadlines, or retry failures to meet it.
 
-M6 reuses the existing `fixture_pool.py` with capacity four. Each variant owns
+M6 reuses the existing `fixture_pool.py` with capacity four. Travel fixtures
+keep capacity two in a separate admission group because each drives Main and a
+held Root concurrently; they do not overlap ordinary CLI/browser fixtures. Each variant owns
 its database, peer ports, browser, approvals and Artifact export directory.
 Process sessions belong to the pool and cancellation joins them. All 66 locked
 variants (including six separate red-flag branches) finish before the next of

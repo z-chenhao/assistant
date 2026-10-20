@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import time
 import threading
+import traceback
 
 from case_runner import digest, load_contract, score, variants
 from verify_capabilities import CapabilityHarness, call, content
@@ -106,6 +107,12 @@ def personal(binary, folder, case, embeddings):
         h.setup(metadata=dict(name='M6 explicit fixture', provider_kind='openai_compatible', endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions', model_id='fixture-model', context_window=65536, max_output_tokens=4096, generation_defaults={}, compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True,image_input=True)))
         require(h.command('status')['agent_ingress_enabled'], 'doctor: model not activated')
         yield h
+    except BaseException:
+        try:
+            print('M6 failure state:',json.dumps(h.failure_state(),ensure_ascii=False),flush=True)
+        except Exception as snapshot_error:
+            print('M6 failure state unavailable:',repr(snapshot_error),flush=True)
+        raise
     finally:
         h.cleanup()
 
@@ -444,8 +451,17 @@ def run(binary,selected=None,destination=None,scenario_jobs=1):
                     return drive_item(item)
                 except BaseException as error:
                     print(item[0]['case_id'],item[1]['variant_id'],'failed:',repr(error),flush=True)
+                    traceback.print_exc()
                     raise
-            report['results']=run_cases(items,drive_variant,scenario_jobs)
+            # Each travel fixture drives Main and a held Root concurrently.
+            # Keep those pairs isolated from ordinary CLI/Chromium admission,
+            # using the same bounded scheduling rule as Core checkpoints.
+            travel_items=[item for item in items if item[0]['case_id']=='GC-04']
+            other_items=[item for item in items if item[0]['case_id']!='GC-04']
+            rows=run_cases(travel_items,drive_variant,min(scenario_jobs,2))
+            rows+=run_cases(other_items,drive_variant,scenario_jobs)
+            order={(c['case_id'],v['variant_id']):i for i,(c,v) in enumerate(items)}
+            report['results']=sorted(rows,key=lambda r:order[r['case_id'],r['variant_id']])
         require(not Path(temporary).exists(),'cleanup: case root remains')
         report['cleanup']=True
         report['summary']=dict(fragments=len(report['results']),fragment_passes=sum(r['status']=='fragment_pass' for r in report['results']),

@@ -112,4 +112,4 @@ Use the existing `lume_live.py` and `verify_computer_use.py` live commands for a
 new release-time observation; do not silently convert offline peers into a
 macOS VM or Jianying compatibility verdict.
 
-M6 supports `--scenario-jobs 1|2|4` (or `ERII_VERIFY_CASE_JOBS`), using the maintained owned-process fixture pool. CI selects four. Five rounds remain serial; `m6-summary.json` requires all 330 variants and unchanged assertion inventories. `m6-cases-N.progress.json` records bounded progress; the full state report is written after join, including failure. See [CI latency budget](ci.md#latency-budget).
+M6 supports `--scenario-jobs 1|2|4` (or `ERII_VERIFY_CASE_JOBS`), using the maintained owned-process fixture pool. CI selects four; travel uses an isolated capacity-two group for its simultaneous Main/Root processes. Five rounds remain serial; `m6-summary.json` requires all 330 variants and unchanged assertion inventories. `m6-cases-N.progress.json` records bounded progress; the full state report is written after join, including failure. See [CI latency budget](ci.md#latency-budget).
