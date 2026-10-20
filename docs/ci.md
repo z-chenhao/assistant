@@ -160,3 +160,14 @@ single sample preceded the Computer migration merge and is not a whole-CI or
 p95 claim. Actual final-head workflow results are recorded in the PR/issue.
 The ten-minute objective concerns full `Ubuntu checks`, including setup and
 join, rather than an early subset. A miss remains a miss and keeps the PR Draft.
+
+## Failure and rollback
+
+Keep the PR Draft when a part, join or complete gate fails. Inspect its retained
+attempt; do not rerun a failed sample to obtain a green measurement. The local
+fallback is the unchanged `make verify VERIFY_SHARD=codemode` full path.
+If partitioning must be rolled back, restore that complete Code Mode job to the
+Required matrix and change the aggregate dependencies in the same reviewed
+commit. Never make the join optional before full coverage replaces it.
+The schema fast path can be removed without downgrading stored versions:
+existing historical migrations still define the same version 21 format.
