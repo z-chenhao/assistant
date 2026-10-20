@@ -13,6 +13,17 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class M6Cases(unittest.TestCase):
+    def test_external_write_guard_uses_frozen_capabilities_and_fails_unknown(self):
+        from run_m6_cases import no_external_writes
+        value=dict(capabilities=[dict(snapshot_id='cap',tools_json=json.dumps([dict(name='read',permission='read_only'),dict(name='send',permission='external_effect')]))],
+                   runs=[dict(run_id='run',capability_snapshot_id='cap')],tools=[dict(run_id='run',tool_name='read')])
+        self.assertTrue(no_external_writes(value))
+        for tool in ('send','unadvertised'):
+            bad=copy.deepcopy(value);bad['tools'][0]['tool_name']=tool
+            self.assertFalse(no_external_writes(bad))
+        bad=copy.deepcopy(value);bad['tools'][0]['run_id']='unknown'
+        self.assertFalse(no_external_writes(bad))
+
     def test_locked_exact_inputs_and_wording_noise_variants(self):
         data,_,lock=load_contract(ROOT,'m6-v1')
         self.assertEqual(tuple(c['case_id'] for c in data['cases']),CASES)

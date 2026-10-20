@@ -125,6 +125,12 @@ def recall(h, key, query):
 WORLD = 'const world=await tools.mcp__fixture__read({text:"world"});\n'
 
 
+def no_external_writes(value):
+    permissions={c['snapshot_id']:{t['name']:t['permission'] for t in json.loads(c['tools_json'])} for c in value['capabilities']}
+    runs={r['run_id']:r['capability_snapshot_id'] for r in value['runs']}
+    return bool(runs) and all(permissions.get(runs.get(t['run_id']),{}).get(t['tool_name']) not in (None,'external_effect') for t in value['tools'])
+
+
 def personal_case(binary, folder, case, variant, embeddings, artifact_folder=None):
     cid, world = case['case_id'], case['world']
     with personal(binary, folder, case, embeddings) as h:
@@ -201,6 +207,9 @@ const result={weather,refreshed:stale,clothing:["短袖","薄长裤","薄卫衣"
                 documents.append(validate(document,descriptor,size))
             refs=[d['artifactRef'] for d in documents]
             result=execute(h,'visa','''const documents=DOCS;
+// Explicit selection uses the existing ToolResult image path; input media
+// references alone remain unloaded hints, preserving accepted Run semantics.
+for(const document of documents)image({artifactRef:document.artifactRef});
 const visa=documents[0],order=documents[1];
 const value=(d,key)=>d.fields[key].visible?d.fields[key].value:null;
 // Exact same-month fixture; no non-replayable Date global.
@@ -214,6 +223,9 @@ return {days,return_year:value(order,"inbound_year"),artifactRefs:saved.artifact
             report_bytes=open_bytes(h,result['value']['artifactRefs'][0])
             checks.update(inclusive_nine_days=result['value']['days']==9,masked_year_unknown=result['value']['return_year'] is None,
                           provenance=all(ref.encode() in report_bytes for ref in refs),immutable_sources=all(hashlib.sha256(open_bytes(h,d['artifactRef'])).hexdigest()==d['sha256'] for d in documents))
+            requests=[json.loads(g['request_json']) for g in h.state()['generations']]
+            selected={ref for request in requests for message in request['messages'] for ref in message.get('image_refs',[])}
+            checks['selected_pixels_enter_frozen_image_profile']=selected==set(refs) and all(request['model_snapshot']['capabilities']['image_input'] for request in requests)
             evidence.update(documents=documents,decoder='explicit source-region extraction Fake; pixel transport is real; OCR model quality ungraded',report=report_bytes.decode())
         elif cid == 'GC-04':
             result=travel(h,world)
@@ -222,7 +234,7 @@ return {days,return_year:value(order,"inbound_year"),artifactRefs:saved.artifact
             raise ValueError('unsupported personal case')
         evidence['drive']=result
         final=state(h)
-        checks.update(no_external_write=not read(Path(h.env['ERII_DATA_ROOT'])/'state.db',"SELECT 1 FROM tool_invocation WHERE json_extract(policy_json,'$.permission')='external_effect'"),
+        checks.update(no_external_write=no_external_writes(final),
                       original_events_retained=all(any(event['text'] in json.dumps(m['content'],ensure_ascii=False) for m in final['conversation'] if m['role']=='user') for event in variant['events']),
                       frozen_model=all(json.loads(g['request_json'])['model_snapshot']['snapshot_id']==next(r['model_snapshot_id'] for r in final['runs'] if r['run_id']==g['run_id']) for g in final['generations']))
         if cid in ('GC-01','GC-02','GC-03','GC-05','GC-06','GC-10','GC-15'):
