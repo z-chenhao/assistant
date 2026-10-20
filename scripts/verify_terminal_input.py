@@ -32,9 +32,14 @@ def verify(binary):
             folder = root / name
             folder.mkdir()
             h = MainHarness(binary, folder, fixture="terminal-input")
-            # A concise Fake reply isolates input bytes from Tool argument and
-            # output limits. The normal model Probe/Actor/Loop remain unchanged.
-            h.setup()
+            # Isolate the 16 KiB input boundary from model context capacity.
+            # Current input plus frozen rules/Tool schemas must fit unchanged.
+            # Small-profile rejection is covered by context regression tests.
+            h.setup(metadata=dict(name='terminal byte-boundary fixture', provider_kind='openai_compatible',
+                                  endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                  model_id='fixture-model', context_window=32768, max_output_tokens=1024,
+                                  generation_defaults={}, compatibility=dict(tool_result_format='openai'),
+                                  capabilities=dict(text_input=True)))
             with Terminal(h.args(), h.env, h.root, echo=echo) as t:
                 t.expect("You> ")
                 require(not termios.tcgetattr(t.input_observer)[3] & termios.ICANON, "kernel canonical line limit still enabled")
@@ -50,7 +55,8 @@ def verify(binary):
                     state = h.state()
                     users = [m for m in state["conversation"] if m["role"] == "user"]
                     require(len(users) == 1 and users[0]["content"][0]["text"] == text, "valid input lost or changed")
-                    require(len(state["inputs"]) == 1 and all(r["status"] == "completed" for r in state["runs"]), "input did not complete through Main")
+                    require(len(state["inputs"]) == 1 and all(r["status"] == "completed" for r in state["runs"]),
+                            f"{name}: input did not complete through Main: {[(r['status'], r['error_code']) for r in state['runs']]}")
                 else:
                     t.expect("Input rejected: line exceeds 16 KiB"); t.expect("You> ")
                     before = h.state()

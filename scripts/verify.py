@@ -15,6 +15,7 @@ import sqlite3
 import subprocess
 import tempfile
 
+STATE_SCHEMA_VERSION = 21
 
 def require(condition, message):
     if not condition:
@@ -35,7 +36,7 @@ def diagnostics(value):
     require(value["readiness"] == "setup_required", "incorrect readiness")
     require(value["agent_ingress_enabled"] is False, "ingress enabled without a model")
     require(value["active_model_profile_id"] is None, "implicit model enabled")
-    require(value["schema_version"] == 7, "incorrect schema version")
+    require(value["schema_version"] == STATE_SCHEMA_VERSION, "incorrect schema version")
 
 
 class Harness:
@@ -282,7 +283,7 @@ def verify(binary):
             first = harness.launch()
             stored = snapshot(harness.data_root)
             require(not harness.yaml_root.exists(), "environment did not override YAML data root")
-            require(stored["schema_version"] == 7 and stored["journal_mode"] == "wal", "SQLite setup incorrect")
+            require(stored["schema_version"] == STATE_SCHEMA_VERSION and stored["journal_mode"] == "wal", "SQLite setup incorrect")
             require(len(stored["rows"]) == 1, "bootstrap is not a singleton")
             require(stored["rows"][0][1] == first["agent_id"], "CLI disagrees with stored identity")
             live_status = harness.command("status")

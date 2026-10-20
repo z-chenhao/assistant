@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "milestone": "M5",
+  "level": "L0/L1",
+  "scope": "Core deterministic fragments; semantic quality and M6/M7 full portions ungraded/not_applicable",
+  "common": {
+    "user": {
+      "id": "user_eval_001",
+      "name": "陈屿",
+      "timezone": "Asia/Shanghai",
+      "locale": "zh-CN",
+      "city": "杭州",
+      "occupation": "后端工程师",
+      "household": "与伴侣共同生活"
+    },
+    "agent": {
+      "id": "agent_eval_001",
+      "language": "zh-CN"
+    },
+    "security": {
+      "external_writes_require_approval": true,
+      "secrets_are_never_model_visible": true
+    }
+  },
+  "variants": [
+    {
+      "id": "wording-1",
+      "wording": 0,
+      "noise": 0
+    },
+    {
+      "id": "wording-2",
+      "wording": 1,
+      "noise": 0
+    },
+    {
+      "id": "wording-3",
+      "wording": 2,
+      "noise": 0
+    },
+    {
+      "id": "noise-1",
+      "wording": 0,
+      "noise": 1
+    },
+    {
+      "id": "noise-2",
+      "wording": 0,
+      "noise": 2
+    },
+    {
+      "id": "order-1",
+      "wording": 0,
+      "noise": 0,
+      "reverse_world_keys": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "GC-17",
+      "version": 1,
+      "seed": 1701,
+      "clock": "2026-10-15T10:00:00+08:00",
+      "world": {
+        "fixture": "GC-17",
+        "user_changes": "must preserve"
+      },
+      "events": [
+        {
+          "at": "2026-10-15T10:00:00+08:00",
+          "wordings": [
+            "逐条判断问题类型和严重度，再给总体结论，每条能回查。",
+            "分析这100条反馈，分类、严重程度和汇总都要能追溯。",
+            "把feedback逐行分类和标注严重度，保留row_id和总体结论。"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "GC-19",
+      "version": 1,
+      "seed": 1901,
+      "clock": "2026-10-15T10:00:00+08:00",
+      "world": {
+        "fixture": "GC-19",
+        "user_changes": "must preserve"
+      },
+      "events": [
+        {
+          "at": "2026-10-15T10:00:00+08:00",
+          "wordings": [
+            "审计任务恢复实现，只分析不改代码；再给CLI增加status筛选并补测试。",
+            "先只读审计，再按授权补CLI的状态参数，保留我的改动。",
+            "Audit recovery without edits; implement task search --status paused and tests."
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "GC-20",
+      "version": 1,
+      "seed": 2001,
+      "clock": "2026-10-15T10:00:00+08:00",
+      "world": {
+        "fixture": "GC-20",
+        "user_changes": "must preserve"
+      },
+      "events": [
+        {
+          "at": "2026-10-15T10:00:00+08:00",
+          "wordings": [
+            "按设计把旧worker调度迁移到Run树；最后只留完整实现，不要兼容层。",
+            "迁移worker_job到Run树，恢复后继续调度并做独立审查。",
+            "Implement the Run tree migration, recover work and fix recursive cancellation."
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -8,14 +8,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  checks:
-    name: Ubuntu checks
+  fast:
+    name: Unit tests and lint
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -24,14 +33,130 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
-          cache-dependency-path: provider-bridge/package-lock.json
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
       - name: Install pinned Bridge dependencies
-        run: npm ci --prefix provider-bridge --ignore-scripts
-      - name: Unit tests
-        run: make test
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+      - name: Prepare isolated coding fixture runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Unit tests and lint
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-sha.txt
+          make test lint 2>&1 | tee evidence/fast.log
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-fast-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  race:
+    name: Race detector
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Install pinned Bridge dependencies
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+      - name: Prepare isolated coding fixture runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Race detector
-        run: make test-race
-      - name: Lint
-        run: make lint
-      - name: CLI verification
-        run: make verify
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-sha.txt
+          make test-race 2>&1 | tee evidence/race.log
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-race-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    name: Verification (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.shard == 'codemode' && 60 || 30 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["runtime", "codemode", "security", "delivery", "providers"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            provider-bridge/package-lock.json
+            runtime/javascript/package-lock.json
+      - name: Install pinned Bridge dependencies
+        run: |
+          npm ci --prefix provider-bridge --ignore-scripts
+          npm ci --prefix runtime/javascript --ignore-scripts
+      - name: Prepare isolated coding fixture runtime
+        if: matrix.shard == 'providers' || matrix.shard == 'codemode' || matrix.shard == 'security'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: CLI verification with timings
+        run: make verify VERIFY_SHARD=${{ matrix.shard }} VERIFY_JOBS=1
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-${{ matrix.shard }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  checks:
+    name: Ubuntu checks
+    needs: ["fast", "race", "verify"]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require every shard to pass
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/ci_gate.py
