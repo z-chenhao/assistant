@@ -89,7 +89,7 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 			return tool.Failure("INVALID_ARGUMENT"), nil
 		}
 		id = "automation:" + newID()
-		_, err = tx.ExecContext(ctx, `INSERT INTO automation(automation_id,agent_id,instruction,trigger_type,trigger_spec,timezone,enabled,next_fire_at,created_at,updated_at,version,below_value) VALUES(?,?,?,?,?,?,1,?,?,?,1,?)`, id, owner, q.Instruction, q.Type, q.Spec, q.Timezone, t.UnixMicro(), now.UnixMicro(), now.UnixMicro(), q.Below)
+		_, err = tx.ExecContext(ctx, `INSERT INTO automation(automation_id,agent_id,instruction,trigger_type,trigger_spec,timezone,enabled,next_fire_at,created_at,updated_at,version,below_value,intent_privacy_epoch) VALUES(?,?,?,?,?,?,1,?,?,?,1,?,coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=?),0))`, id, owner, q.Instruction, q.Type, q.Spec, q.Timezone, t.UnixMicro(), now.UnixMicro(), now.UnixMicro(), q.Below, owner)
 	} else {
 		var version int64
 		var taskID sql.NullString
@@ -248,14 +248,16 @@ func (r *Runs) admitAutomations(ctx context.Context) error {
 		}
 		for _, id := range ids {
 			var automationID, brief string
-			var enabled bool
+			var enabled, revokedIntent bool
 			var current, v, fireAt int64
 			var taskID sql.NullString
 			var below sql.NullInt64
-			if e = tx.QueryRowContext(ctx, `SELECT a.automation_id,f.instruction,a.enabled,a.schedule_version,f.schedule_version,a.task_id,f.fire_at,f.below_value FROM automation_fire f JOIN automation a USING(automation_id) WHERE f.event_id=?`, id).Scan(&automationID, &brief, &enabled, &current, &v, &taskID, &fireAt, &below); e != nil {
+			if e = tx.QueryRowContext(ctx, `SELECT a.automation_id,f.instruction,a.enabled,a.schedule_version,f.schedule_version,a.task_id,f.fire_at,f.below_value,a.intent_privacy_epoch!=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=a.agent_id),0) FROM automation_fire f JOIN automation a USING(automation_id) WHERE f.event_id=?`, id).Scan(&automationID, &brief, &enabled, &current, &v, &taskID, &fireAt, &below, &revokedIntent); e != nil {
 				return e
 			}
-			skip := !enabled || current != v
+			// Intent provenance is frozen before the first Task exists. Neither
+			// fire bookkeeping nor a fresh Task timestamp can renew revoked context.
+			skip := !enabled || current != v || revokedIntent
 			var epoch int64 = 1
 			if taskID.Valid && !skip {
 				var status string

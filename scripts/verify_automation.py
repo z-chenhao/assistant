@@ -45,6 +45,51 @@ class MemoryHarness(Harness):
         return super().setup()
 
 
+def first_fire_forget(h, *, persist_before_forget):
+    """Drive Forget before first admission, with either ordering of fire persistence."""
+    marker = 'FORGOTTEN_FIRST_FIRE_HEALTH_CONTEXT'
+    h.command('memory', 'manage', 'remember-health', text=json.dumps(dict(operation='remember', content='My sleep health detail is ' + marker)))
+    h.command('memory', 'work')
+    q = dict(operation='create', instruction='Review my health context: ' + marker, triggerType='at', triggerSpec='2026-10-20T08:00:00+08:00', timezone='Asia/Shanghai')
+    receipt = h.manage('old-intent', **q)
+    h.now = '2026-10-20T08:00:00+08:00'
+    if persist_before_forget:
+        h.command('automation', 'tick')
+    before = h.evidence()
+    require(not before['task'] and not before['runs'] and before['automation'][0]['task_id'] is None, 'first Task already exists')
+    forget = h.command('memory', 'manage', 'forget-health', text=json.dumps(dict(operation='forget', category='health')))
+    require(forget.get('accepted') is True, 'Forget not accepted')
+    h.command('memory', 'work')
+    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'memory.db') as db:
+        db.row_factory = sqlite3.Row
+        tombstones = [dict(row) for row in db.execute('SELECT memory_id,created_at,deleted_at FROM memory_record')]
+    require(tombstones and all(row['deleted_at'] is not None for row in tombstones), 'health Memory not tombstoned')
+    require(receipt == h.manage('old-intent', **q), 'create retry renewed receipt')
+    fresh = h.send('fresh-after-forget', 'Fresh chat must still work')
+    h.command('chat', 'work')
+    after = h.evidence()
+    require(not after['task'] and not [r for r in after['runs'] if r['kind'] == 'worker'], 'revoked first intent created Task or Worker')
+    require(len(after['automation_fire']) == 1 and after['automation_fire'][0]['state'] == 'skipped' and not after['automation_fire'][0]['root_run_id'] and len(after['automation_inbox']) == 1, 'first fire not durably skipped')
+    require(next(r for r in after['runs'] if r['run_id'] == fresh['run_id'])['status'] == 'completed' and len(after['deliveries']) == 1 and after['deliveries'][0]['status'] == 'sent', 'fresh Main blocked')
+    require(after['automation'][0]['intent_privacy_epoch'] < after['memory_privacy'][0]['epoch'], 'old provenance renewed')
+    h.command('chat', 'work')
+    require(after == h.evidence(), 'restart retried revoked first fire')
+    row = h.automations()[0]
+    h.manage('edit-old', operation='update', automationRef=row['automationRef'], version=row['version'], instruction=q['instruction'], triggerType='at', triggerSpec='2026-10-22T08:00:00+08:00', timezone='Asia/Shanghai')
+    h.manage('new-intent', operation='create', instruction='Fresh scheduled intent', triggerType='at', triggerSpec='2026-10-22T08:00:00+08:00', timezone='Asia/Shanghai')
+    h.now = '2026-10-22T08:00:00+08:00'
+    h.command('chat', 'work')
+    final = h.evidence()
+    old = next(a for a in final['automation'] if a['automation_id'] == before['automation'][0]['automation_id'])
+    require(old['task_id'] is None and old['created_at'] == before['automation'][0]['created_at'] and old['intent_privacy_epoch'] == before['automation'][0]['intent_privacy_epoch'], 'audit/provenance changed or old intent renewed')
+    require(len(final['task']) == 1 and len([r for r in final['runs'] if r['kind'] == 'worker' and r['status'] == 'completed']) == 1 and len(final['deliveries']) == 2 and all(d['status'] == 'sent' for d in final['deliveries']), 'new Automation blocked or old context revived')
+    require(len(final['automation_inbox']) == 3 and len([f for f in final['automation_fire'] if f['state'] == 'skipped']) == 2 and not [f for f in final['automation_fire'] if f['state'] == 'pending'], 'fire disposition not durable')
+    require(final['generations'] and all(marker not in g['request_json'] for g in final['generations']), 'forgotten marker reached model')
+    h.command('chat', 'work')
+    require(final == h.evidence(), 'restart repeated new intent')
+    return dict(fire_persisted_before_forget=persist_before_forget, before_forget=before, memory_tombstones=tombstones, forget_receipt=forget, fresh_main_completed=after, fresh_automation_completed=final)
+
+
 def run(binary):
     fixture = json.loads(FIXTURE.read_text())
     report = dict(version=1, fixture=fixture, scenarios={}, scope='Deterministic scheduling and notification fragments of GC-02/08/14, SC-05/12; no full M7 or model-quality score')
@@ -151,6 +196,9 @@ def run(binary):
             require(final == h.evidence(), 'fresh Automation repeated after restart')
             return dict(before_forget=before, forget_receipt=receipt, fresh_main_completed=after, fresh_automation_completed=final)
         scenario('forget-next-fire-fresh-chat', forget_next_fire, MemoryHarness)
+
+        for pending in (False, True):
+            scenario('first-fire-forget-' + ('pending' if pending else 'not-persisted'), lambda h, pending=pending: first_fire_forget(h, persist_before_forget=pending), MemoryHarness)
 
         for boundary in ('after_result_commit', 'after_report_commit'):
             def edit_committed_result(h, boundary=boundary):

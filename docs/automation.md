@@ -65,13 +65,18 @@ keep their existing snapshots and approval boundaries. Cancel disables future
 fires and uses the existing Task cancel/epoch mechanism for the current tree.
 Task pause/cancel also disables its Automation. A stopped Task cannot be restarted
 by a delayed fire or schedule edit; create a new Automation to establish new intent.
-Memory Forget revokes prior Task context. If a linked Task predates that privacy
-barrier, admission commits its pending fires as `skipped` with Inbox receipts.
+Memory Forget revokes prior intent as well as Task context. Creation freezes the
+Agent's current privacy epoch in `intent_privacy_epoch` within the acceptance
+transaction. Admission compares it with the current barrier before creating any
+Task, including when the first fire was persisted before Forget. A mismatched
+epoch or a linked Task predating the barrier commits the fire as `skipped` with
+an Inbox receipt.
 It never replaces the Task to regain its context. Fresh chat and newly created
 Automations continue through the same Actor without manual cancellation of the
 old schedule. A new Automation establishes fresh intent; editing the old schedule
-does not restore its revoked Task. Storage failures still abort admission and
-remain recoverable.
+does not restore revoked intent, even before its first Task. Receipt retries,
+schedule edits and scheduler timestamps never renew the frozen privacy epoch.
+Storage failures still abort admission and remain recoverable.
 
 Completed one-shot `at` intent retains `enabled=true, next_fire_at=NULL` for audit;
 it never fires twice. Cancellation is explicit and disables it.
@@ -112,8 +117,14 @@ freeze the active profile at admission, not when the schedule or fire was create
 Migration 023 adds Automation, fire identities, source/action receipts, due and
 pending indexes, version/transition/audit constraints. Empty and all prior schemas
 upgrade forward. Populated v22 migration and partial-DDL rollback have dedicated
-tests. Back up the whole data root with the process stopped before upgrading;
-older binaries reject schema 23. No credentials enter these records.
+tests. Back up the whole data root with the process stopped before upgrading.
+Migration 024 adds the immutable intent privacy epoch. Legacy Automation rows
+retain their audit and default to epoch zero: they remain eligible without a
+Forget barrier; with a barrier they are conservatively skipped, even if their
+calendar timestamps appear newer. Create a new Automation from fresh independent
+input to establish intent after Forget. Existing fire/request receipts are not
+rewritten. Partial-DDL rollback and populated v23 preservation are tested. Older
+binaries reject schema 24. No credentials enter these records.
 
 ## Verification
 

@@ -341,6 +341,7 @@ interface TaskAnchor {
 - 本地 CLI 的 `automation work` 在前台以同一个 Actor/RunClaim 路径消费触发；`automation tick` 只生成事件。运行命令、Tool Schema、升级和证据见 [Automation operations](automation.md)。
 - cron 使用五个数字字段，支持列表、范围、步长；weekday `0L`～`6L` 表示当月最后一个对应星期。不存在的 DST 分钟跳过，回拨的两个 UTC 分钟分别触发。错过多次时合并为持久化的原到期触发，下一次 cron 严格晚于扫描时间。
 - 持久化 fire 身份、独立 schedule version 和 Inbox 收据。修改使旧排队触发/结果失效；取消复用 Task epoch 停止树，不创建新 Run。每个 Automation 绑定 ongoing Task，每次触发按序新建 Root；Model/Capability 在 admission 时冻结。
+- Automation 接受时冻结隐私 epoch；admission 在创建首个 Task 前校验该意图与当前 Forget 屏障，撤销的 fire 持久化 skipped 与 Inbox。收据重放、调度更新或新 Task 时间戳不能恢复旧意图；升级时缺少 provenance 的旧意图在已有 Forget 后保守跳过（ADR 003）。
 - 可选整数 `below` 阈值由绑定 Root 的普通 ToolInvocation 记录观测；同一 fire 的多来源同值幂等，异值拒绝。仅从阈值外进入阈值内允许完成通知；无有效观测报告 needs_input，不伪造数据。
 
 统一链路为：
@@ -1939,7 +1940,7 @@ tool/mcp
 | `DeliveryRequest` | `delivery_id, message_id, channel, destination_ref, status, idempotency_key, attempt_count, last_error?, created_at, updated_at` |
 | `EventOutbox` | `outbox_id, event_id, subject, type, payload_json, occurred_at, published_at?, attempt_count` |
 | `EventInbox` | `consumer, event_id, processed_at` |
-| `Automation` | `automation_id, agent_id, instruction, trigger_type, trigger_spec, timezone, enabled, next_fire_at?, created_at, updated_at, version` |
+| `Automation` | `automation_id, agent_id, instruction, trigger_type, trigger_spec, timezone, enabled, next_fire_at?, created_at, updated_at, version, intent_privacy_epoch` |
 
 枚举值以本文状态机为准：
 

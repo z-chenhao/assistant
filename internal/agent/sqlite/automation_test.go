@@ -379,6 +379,77 @@ func TestAutomationForgetSkipsRevokedTaskWithoutBlockingActor(t *testing.T) {
 	}
 }
 
+// No Task may launder an Automation accepted before Forget into fresh context.
+func TestAutomationFirstFireForgetSkipsIntentWithoutTask(t *testing.T) {
+	for _, pending := range []bool{false, true} {
+		t.Run(fmt.Sprintf("pending=%t", pending), func(t *testing.T) {
+			ctx := context.Background()
+			s, r, a, p := automationFixture(t)
+			m, err := memorysqlite.Open(ctx, filepath.Dir(s.path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer m.Close()
+			r.ConfigureMemory(m, memory.Vault{})
+			p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
+				return llm.GenerationResult{Text: "fresh result"}, nil
+			}
+			// Scheduling time deliberately differs from the privacy wall clock.
+			now, _ := time.Parse(time.RFC3339, "2026-10-15T12:00:00+08:00")
+			id := createAutomation(t, r, now, nil)
+			due := now.AddDate(0, 0, 1)
+			r.SetTestAutomationClock(due)
+			if pending {
+				if err := r.ScheduleAutomations(ctx, due); err != nil {
+					t.Fatal(err)
+				}
+			}
+			receipt, err := r.ManageMemory(ctx, "forget", memory.Mutation{Operation: "forget", Category: "health"})
+			if err != nil || receipt["accepted"] != true {
+				t.Fatal(receipt, err)
+			}
+			// Replaying the accepted create receipt cannot renew its provenance.
+			if got := createAutomation(t, r, now, nil); got != id {
+				t.Fatal("receipt drift")
+			}
+			fresh := mustSubmit(t, a, "fresh", "Fresh input after Forget")
+			mustDrain(t, a)
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='skipped' AND root_run_id IS NULL`) != 1 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 1 || scalar(t, s, `SELECT count(*) FROM task`) != 0 {
+				t.Fatal("pre-Forget intent created Task/Root or was not durably skipped")
+			}
+			if scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='completed'`, fresh.RunID) != 1 {
+				t.Fatal("fresh Main blocked")
+			}
+			var version int64
+			if err := s.db.QueryRow(`SELECT version FROM automation WHERE automation_id=?`, id).Scan(&version); err != nil {
+				t.Fatal(err)
+			}
+			next := due.AddDate(0, 0, 1)
+			q := automation.Request{Operation: "update", Ref: id, Version: version, Instruction: "HKG-CDG 2026-12-01 price", Type: "at", Spec: next.Format(time.RFC3339), Timezone: "UTC"}
+			if result, err := r.ManageAutomation(ctx, "edit-old", q, due); err != nil || result.Error != nil {
+				t.Fatal(result, err)
+			}
+			result, err := r.ManageAutomation(ctx, "new-intent", automation.Request{Operation: "create", Instruction: "Fresh scheduled intent", Type: "at", Spec: next.Format(time.RFC3339), Timezone: "UTC"}, due)
+			if err != nil || result.Error != nil {
+				t.Fatal(result, err)
+			}
+			r.SetTestAutomationClock(next)
+			mustDrain(t, a)
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='skipped'`) != 2 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task`) != 1 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 3 {
+				t.Fatal("edit renewed revoked intent or fresh Automation failed")
+			}
+			for _, req := range p.requests {
+				raw, _ := encoded(req)
+				if strings.Contains(raw, "HKG-CDG 2026-12-01 price") {
+					t.Fatal("revoked intent in model request", raw)
+				}
+			}
+		})
+	}
+}
+
 func TestAutomationAdmissionStorageFailureRemainsPending(t *testing.T) {
 	ctx := context.Background()
 	s, r, a, p := automationFixture(t)
@@ -436,6 +507,93 @@ func TestAutomationMigrationPreservesPriorAndRollsBack(t *testing.T) {
 	var config int
 	if e := db.QueryRow(`SELECT agent_id,config_version FROM agent_config`).Scan(&id, &config); e != nil || id != "prior-automation" || config != 7 {
 		t.Fatal("prior data lost", e)
+	}
+}
+
+func TestAutomationPrivacyMigrationRetainsAuditAndFailsClosed(t *testing.T) {
+	for _, barrier := range []bool{false, true} {
+		t.Run(fmt.Sprintf("barrier=%t", barrier), func(t *testing.T) {
+			ctx := context.Background()
+			db := schemaDB(t)
+			if err := migrate(ctx, db, migrations[:23]); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO agent_config VALUES(1,'legacy',NULL,'setup_required',7,1,1);
+    INSERT INTO automation(automation_id,agent_id,instruction,trigger_type,trigger_spec,timezone,enabled,next_fire_at,created_at,updated_at,version) VALUES('legacy-auto','legacy','audit intent','at','2026-12-01T00:00:00Z','UTC',1,100,10,20,1);
+    INSERT INTO automation_fire(event_id,automation_id,schedule_version,fire_at,instruction,state) VALUES('legacy-fire','legacy-auto',1,100,'audit intent','pending');
+    INSERT INTO automation_request VALUES('legacy','receipt','hash','{"text":"accepted"}');`); err != nil {
+				t.Fatal(err)
+			}
+			if barrier {
+				if _, err := db.Exec(`INSERT INTO memory_privacy VALUES('legacy',2,0,15)`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			broken := append(append([]string{}, migrations[:23]...), automationPrivacySQL+`; INVALID SQL`)
+			if err := migrate(ctx, db, broken); err == nil {
+				t.Fatal("partial migration accepted")
+			}
+			st := &Store{db: db}
+			if scalar(t, st, `PRAGMA user_version`) != 23 || scalar(t, st, `SELECT count(*) FROM pragma_table_info('automation') WHERE name='intent_privacy_epoch'`) != 0 {
+				t.Fatal("partial migration committed")
+			}
+			if err := migrate(ctx, db, migrations); err != nil {
+				t.Fatal(err)
+			}
+			if scalar(t, st, `SELECT count(*) FROM automation WHERE instruction='audit intent' AND created_at=10 AND updated_at=20 AND version=1 AND intent_privacy_epoch=0`) != 1 || scalar(t, st, `SELECT count(*) FROM automation_fire WHERE event_id='legacy-fire' AND state='pending'`) != 1 || scalar(t, st, `SELECT count(*) FROM automation_request WHERE request_key='receipt' AND request_hash='hash'`) != 1 {
+				t.Fatal("migration rewrote audit")
+			}
+			want := 0
+			if barrier {
+				want = 1
+			}
+			if scalar(t, st, `SELECT a.intent_privacy_epoch!=coalesce(p.epoch,0) FROM automation a LEFT JOIN memory_privacy p USING(agent_id)`) != want {
+				t.Fatal("legacy privacy eligibility incorrect")
+			}
+			if _, err := db.Exec(`UPDATE automation SET intent_privacy_epoch=2,version=version+1`); err == nil {
+				t.Fatal("intent provenance mutable")
+			}
+			if barrier {
+				if err := (&Runs{host: st}).admitAutomations(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if scalar(t, st, `SELECT count(*) FROM automation_fire WHERE state='skipped'`) != 1 || scalar(t, st, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 1 || scalar(t, st, `SELECT count(*) FROM task`) != 0 {
+					t.Fatal("legacy intent not retired without execution")
+				}
+			}
+		})
+	}
+}
+
+func TestAutomationRevokedSkipStorageFailureRollsBack(t *testing.T) {
+	ctx := context.Background()
+	s, r, _, _ := automationFixture(t)
+	now := time.Now().UTC()
+	createAutomation(t, r, now, nil)
+	if err := r.ScheduleAutomations(ctx, now.AddDate(0, 0, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO memory_privacy SELECT agent_id,1,0,1 FROM agent_config;
+  CREATE TRIGGER reject_skip_receipt BEFORE INSERT ON event_inbox WHEN NEW.consumer='automation_actor' BEGIN SELECT RAISE(ABORT,'storage fault'); END;`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.admitAutomations(ctx); !errors.Is(err, agent.ErrStorage) {
+		t.Fatalf("skip storage failure swallowed: %v", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='pending'`) != 1 || scalar(t, s, `SELECT count(*) FROM task`) != 0 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 0 {
+		t.Fatal("partial skip committed")
+	}
+	if _, err := s.db.Exec(`DROP TRIGGER reject_skip_receipt`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.admitAutomations(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.admitAutomations(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM automation_fire WHERE state='skipped'`) != 1 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='automation_actor'`) != 1 || scalar(t, s, `SELECT count(*) FROM task`) != 0 {
+		t.Fatal("skip did not recover once")
 	}
 }
 
