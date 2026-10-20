@@ -24,7 +24,7 @@ from verify_capabilities import CapabilityHarness, call, content
 from verify_code_recovery import read
 from verify_main import require
 from verify_memory_maintenance import work, manage, readback
-from verify_recall import Embeddings
+from verify_recall import Embeddings, drain_with_publication_barrier, main_completed
 from m6_sources import validate, file_hash
 from m6_report import PARTS
 from fixture_pool import run_cases, run as fixture_run
@@ -327,31 +327,57 @@ def export_artifacts(h,folder):
     return exported
 
 
+def travel_control(h, receipt, phase, control_plan, applied):
+    provider=h.root/'provider'
+    control=None
+    control_receipt=None
+    held_state=None
+    def advance():
+        nonlocal control,control_receipt,held_state
+        if control is None and (provider/'hold-accepted').exists():
+            held_state=state(h)
+            control_receipt=h.send(phase+'-control','Capabilities: '+json.dumps(control_plan() if callable(control_plan) else control_plan,ensure_ascii=False))
+            control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,
+                                      stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            h.children.append(control)
+        if control_receipt and main_completed(h,control_receipt['run_id']):
+            require(applied(),'travel control was not committed')
+            (provider/'hold-release').touch(exist_ok=True)
+    try:
+        scheduling=drain_with_publication_barrier(h,receipt['run_id'],prefix=phase+'-',progress=advance)
+    finally:
+        (provider/'hold-release').touch(exist_ok=True)
+    require(control is not None,'travel Root never reached the real MCP hold')
+    _,error=control.communicate(timeout=30)
+    require(control.returncode==0,'travel control failed: '+error)
+    require(main_completed(h,control_receipt['run_id']) and applied(),'travel control Main did not publish')
+    return dict(scheduling=scheduling,held_state=held_state,control_main_completed=True)
+
+
 def travel(h,world):
-    # Seed both existing Tasks through actual Main Task tools. Stop NZ while
-    # queued, before the worker runs; completed France is then appended.
+    # Use the maintained legal recall/publication ordering for Task creation
+    # and continuation, then apply Main control while the Root is held.
     originals=[save_bytes(h,'itinerary_1003.md','text/markdown',b'Confirmed Seine cruise 2026-10-03 19:00'),save_bytes(h,'itinerary_1004.md','text/markdown',b'Confirmed Louvre 2026-10-04 09:30')]
     h.command('chat','send-parts','confirmed-inputs',text=json.dumps([dict(type='text',text='Prior confirmed itinerary sources'),*[dict(type='file',artifact_ref=d['artifact_ref']) for d in originals]]))
     france='法国旅行\nCapabilities: '+json.dumps([{'name':'builtin__text__echo','arguments':{'text':json.dumps(world['tasks'][0],ensure_ascii=False)}}],ensure_ascii=False)
-    inv=call(h,'france-seed','builtin__task__manage',dict(operation='create',task=france,artifactRefs=[d['artifact_ref'] for d in originals]))
+    seed=h.send('france-seed','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='create',task=france,artifactRefs=[d['artifact_ref'] for d in originals]))]))
+    seed_scheduling=drain_with_publication_barrier(h,seed['run_id'],prefix='seed-')
     inv=next(i for i in reversed(h.state()['tools']) if i['tool_name']=='builtin__task__manage')
     ref=json.loads(content(inv)['text'])['taskRef']
     provider=h.root/'provider';(provider/'hold-barrier').touch()
     nz_source='await tools.mcp__fixture__read({text:"world",behavior:"hold"});return "NZ context";'
     nz_task='新西兰旅行\nCapabilities: '+json.dumps([dict(name='builtin__codemode__execute',arguments=dict(source=nz_source))])
     nz_plan=json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='create',task=nz_task))])
-    h.send('nz-seed','Capabilities: '+nz_plan)
-    held=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(held)
-    h.wait_state(lambda _:(provider/'hold-accepted').exists(),'NZ Root held before pause',reader=lambda _:None)
+    nz_receipt=h.send('nz-seed','Capabilities: '+nz_plan)
+    def nz_applied():
+        nz=next(t for t in read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM task') if t['task_ref']!=ref)
+        return any(r['desired_state']=='task_paused' for r in read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT desired_state FROM run WHERE task_id=?',(nz['task_id'],)))
+    # Resolve NZ's Task after its actual committed create, in the progress hook.
+    def nz_plan_after_hold():
+        nz=next(t for t in read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM task') if t['task_ref']!=ref)
+        return [dict(name='builtin__task__manage',arguments=dict(operation='pause',taskRef=nz['task_ref']))]
+    nz_guard=travel_control(h,nz_receipt,'nz',nz_plan_after_hold,nz_applied)
     nz=next(t for t in read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM task') if t['task_ref']!=ref)
-    h.send('nz-pause','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='pause',taskRef=nz['task_ref']))]))
-    control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(control)
-    try:
-        h.wait_state(lambda rows:any(r['desired_state']=='task_paused' for r in rows),'NZ pause persisted before release',reader=lambda _:read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT desired_state FROM run WHERE task_id=?',(nz['task_id'],)))
-    finally:
-        (provider/'hold-release').touch()
-    for process in (held,control):
-        _,error=process.communicate(timeout=30);require(process.returncode==0,'NZ seed failed: '+error)
     h.command('chat','work')
     for name in ('hold-release','hold-accepted'):(provider/name).unlink(missing_ok=True)
     before=state(h)
@@ -361,24 +387,18 @@ def travel(h,world):
     source=save_report(body,'itinerary_1005.json')
     task_plan=json.dumps([{'name':'builtin__codemode__execute','arguments':{'source':source}}],ensure_ascii=False)
     provider=h.root/'provider';(provider/'hold-barrier').touch()
-    h.send('france-append','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='append',taskRef=ref,instruction='继续 10 月 5 日，不去南部乡村。\nCapabilities: '+task_plan))],ensure_ascii=False))
-    child=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(child)
-    h.wait_state(lambda _: (provider/'hold-accepted').exists(),'Root reached held world read',reader=lambda _: None)
-    held_state=state(h)
-    h.send('france-steering','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='append',taskRef=ref,instruction='晚上 8 点前回酒店。'))],ensure_ascii=False))
-    control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(control)
-    try:
-        h.wait_state(lambda rows:any('晚上 8 点前' in row['text'] for row in rows),'Main appended live steering',reader=lambda _:read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT instruction AS text FROM task_instruction WHERE task_id=?',(france_id,)))
-    finally:
-        (provider/'hold-release').touch()
-    for process in (child,control):
-        _,error=process.communicate(timeout=30);require(process.returncode==0,'travel drive failed: '+error)
+    france_receipt=h.send('france-append','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='append',taskRef=ref,instruction='继续 10 月 5 日，不去南部乡村。\nCapabilities: '+task_plan))],ensure_ascii=False))
+    steering=[dict(name='builtin__task__manage',arguments=dict(operation='append',taskRef=ref,instruction='晚上 8 点前回酒店。'))]
+    def steering_applied():
+        return any('晚上 8 点前' in row['text'] for row in read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT instruction AS text FROM task_instruction WHERE task_id=?',(france_id,)))
+    france_guard=travel_control(h,france_receipt,'france',steering,steering_applied)
+    held_state=france_guard['held_state']
     h.command('chat','work')
     final=state(h)
     art=next(a for a in final['artifact'] if a['name']=='itinerary_1005.json')
     output=json.loads(open_bytes(h,art['artifact_ref']))
     new_roots={r['run_id'] for r in final['runs'] if r['task_id']==france_id}
-    return dict(value=output,artifact=art,assertions=dict(two_existing_travel_tasks=len(final['task'])==2 and any(t['task_ref']==ref for t in final['task']),
+    return dict(value=output,artifact=art,scheduling=dict(seed=seed_scheduling,nz=nz_guard,france=france_guard),assertions=dict(root_dispatch_after_main_publication=all(g['worker_requests_before_main_completion']==0 for g in (seed_scheduling,nz_guard['scheduling'],france_guard['scheduling'])),two_existing_travel_tasks=len(final['task'])==2 and any(t['task_ref']==ref for t in final['task']),
                 nz_stays_paused=next(t['status'] for t in final['task'] if t['task_ref']==nz['task_ref'])=='paused',
                 new_root_on_continue=len(new_roots-old_roots)==1,steering_during_root=any(r['task_id']==france_id and r['status']=='running' for r in held_state['runs']),
                 confirmed_unchanged=output['confirmed']==world['bookings'] and all(hashlib.sha256(open_bytes(h,d['artifact_ref'])).hexdigest()==d['content_hash'] for d in originals),
@@ -391,7 +411,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1,part=None):
     dataset,policy,lock=load_contract(ROOT,'m6-v1')
     report=dict(version=1,milestone='M6',provider='explicit capabilities scripted Bridge',contract_lock=lock,
                 binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,scenario_jobs=scenario_jobs,part=part,
-                driver_digest=digest({name:file_hash(ROOT/'scripts'/name) for name in ('run_m6_cases.py','m6_desktop.py','m6_browser.mjs','m6_sources.py')}),
+                driver_digest=digest({name:file_hash(ROOT/'scripts'/name) for name in ('run_m6_cases.py','m6_desktop.py','m6_browser.mjs','m6_sources.py','verify_recall.py')}),
                 product_gate='inconclusive; semantic Judge and current L2 not run',
                 live_shadow=dict(lume='prior evidence: docs/computer-provider-l2-result.json',jianying='prior evidence: docs/computer-l2-result.json',current_run='not_run'),
                 not_applicable=['M7 scheduled/channel portions'])

@@ -70,6 +70,51 @@ class Embeddings:
         require(not self.thread.is_alive(), 'embedding Fake did not stop')
 
 
+def main_completed(h, run_id):
+    with closing(sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db')) as db:
+        return db.execute("SELECT status='completed' FROM run WHERE run_id=? AND kind='main'", (run_id,)).fetchone() == (1,)
+
+
+def worker_requests(h):
+    root = Path(h.env['ERII_DATA_ROOT'])
+    with closing(sqlite3.connect(root / 'state.db')) as db:
+        ids = {r[0] for r in db.execute("SELECT generation_id FROM model_generation JOIN run USING(run_id) WHERE kind='worker'")}
+    audit = root / 'fake-provider-calls.jsonl'
+    return sum(json.loads(line)['generation_id'] in ids for line in audit.read_text().splitlines()) if audit.exists() else 0
+
+
+def drain_with_publication_barrier(h, main_run, *, prefix='', progress=None):
+    """Freeze Root recall, publish Main, then dispatch Root; never retry errors.
+
+    Existing forced-conflict coverage proves a pending concurrent append fails
+    closed. Optional progress drives a control Main while a Root is held later.
+    """
+    main_release=h.root/(prefix+'publish.release')
+    worker_release=h.root/(prefix+'worker.release')
+    require(not main_release.exists() and not worker_release.exists(),'occupied recall barriers')
+    baseline=None
+    seen=dict(after_task_commit=0,before_worker_generation=0)
+    evidence=dict(worker_requests_before_main_completion=None)
+    def observe(name):
+        nonlocal baseline
+        if baseline is None:baseline=worker_requests(h)
+        require(name in seen,'unexpected recall barrier')
+        seen[name]+=1
+        if name=='before_worker_generation' and not main_release.exists():
+            main_release.touch(exist_ok=False)
+    def advance():
+        if main_release.exists() and not worker_release.exists() and main_completed(h,main_run):
+            evidence['worker_requests_before_main_completion']=worker_requests(h)-baseline
+            require(evidence['worker_requests_before_main_completion']==0,'Worker dispatched before the publication barrier')
+            worker_release.touch(exist_ok=False)
+        if progress:progress()
+    result=h.drive_boundaries({'after_task_commit':main_release,'before_worker_generation':worker_release},observe,advance)
+    require(result.returncode==0,"('chat', 'work'): "+result.stderr)
+    require(all(seen.values()) and worker_release.exists(),'recall scheduling barriers were not exercised')
+    return dict(**evidence,boundaries=seen,root_recall_frozen_before_main_publication=True,
+                main_completed_before_worker_dispatch=True)
+
+
 class Harness(MainHarness):
     def __init__(self, binary, root, embeddings):
         super().__init__(binary, root, fixture='recall')
@@ -82,45 +127,13 @@ class Harness(MainHarness):
         return super().args('-config', str(self.config), *args)
 
     def main_completed(self, run_id):
-        with closing(sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db')) as db:
-            return db.execute("SELECT status='completed' FROM run WHERE run_id=? AND kind='main'", (run_id,)).fetchone() == (1,)
+        return main_completed(self,run_id)
 
     def worker_requests(self):
-        root = Path(self.env['ERII_DATA_ROOT'])
-        with closing(sqlite3.connect(root / 'state.db')) as db:
-            ids = {r[0] for r in db.execute("SELECT generation_id FROM model_generation JOIN run USING(run_id) WHERE kind='worker'")}
-        audit = root / 'fake-provider-calls.jsonl'
-        return sum(json.loads(line)['generation_id'] in ids for line in audit.read_text().splitlines()) if audit.exists() else 0
+        return worker_requests(self)
 
     def drain(self, main_run):
-        """Choose the legal no-append-conflict ordering; never retry a failure.
-
-        Main's committed Task waits for Root's first frozen recall. Root's model
-        dispatch waits for Main's publication. A separate forced-conflict
-        scenario proves the opposite ordering still fails closed.
-        """
-        main_release, worker_release = self.root / 'publish.release', self.root / 'worker.release'
-        require(not main_release.exists() and not worker_release.exists(), 'occupied recall barriers')
-        seen = dict(after_task_commit=0, before_worker_generation=0)
-        evidence = dict(worker_requests_before_main_completion=None)
-        def observe(name):
-            require(name in seen, 'unexpected recall barrier')
-            seen[name] += 1
-            if name == 'before_worker_generation' and not main_release.exists():
-                main_release.touch(exist_ok=False)
-        def progress():
-            if main_release.exists() and not worker_release.exists() and self.main_completed(main_run):
-                evidence['worker_requests_before_main_completion'] = self.worker_requests()
-                require(evidence['worker_requests_before_main_completion'] == 0,
-                        'Worker dispatched before the publication barrier')
-                worker_release.touch(exist_ok=False)
-        result = self.drive_boundaries({'after_task_commit': main_release,
-                                        'before_worker_generation': worker_release}, observe, progress)
-        require(result.returncode == 0, "('chat', 'work'): " + result.stderr)
-        require(all(seen.values()) and worker_release.exists(),
-                'recall scheduling barriers were not exercised')
-        return dict(**evidence, boundaries=seen, root_recall_frozen_before_main_publication=True,
-                    main_completed_before_worker_dispatch=True)
+        return drain_with_publication_barrier(self,main_run)
 
     def snapshot(self):
         result = self.state()

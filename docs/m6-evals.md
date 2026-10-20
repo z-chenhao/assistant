@@ -51,7 +51,7 @@ or failed results cannot pass. A failed run clears the previous success report.
 | GC-01 | Exact health fields, source/time metadata, preserved three input events, low-confidence Recall, no Task, invented vitals or external writes; isolated Turn-2 red-flag replacement routes to urgent evaluation with no lifestyle advice | Unscripted red-flag recognition and advice quality need semantic model evaluation |
 | GC-02 | Unanswered interview question, exploratory constraint, real supersede and deletion, future context excludes forgotten content | Monthly Automation is `not_applicable` until M7; interview quality ungraded |
 | GC-03 | Real corrected Memory, old recall excluded; 54,995.60 USD, 370,120.39 CNY, 520,000 liquid; 30/35/40万 scenarios; unknown tax | Financial explanation quality ungraded; no trading adapter enabled |
-| GC-04 | Two existing travel Tasks, NZ paused, completed France append creates one new Root, steering accepted during a held Root, confirmed source bytes unchanged, booking groups | Itinerary selection/explanation ungraded |
+| GC-04 | Two existing travel Tasks, NZ paused, completed France append creates one new Root, steering accepted during a held Root, confirmed source bytes unchanged, booking groups; shared Recall/Main publication barriers choose the maintained legal ordering before Root dispatch and before releasing held work | Itinerary selection/explanation ungraded |
 | GC-05 | Scoped stable career preference, exact offers, five verification topics, no resignation decision | Ranking and interview guidance ungraded |
 | GC-06 | Real progress supersede/deletion, three correction topics, no invented refund or permanent deficit | Spoken interaction, English/Chinese style and tutoring quality ungraded |
 | GC-07 | Real browser network-control sandbox: observe disconnected Ethernet, denied repair has no effect, approved repair verifies four paths and one protocol | Sandbox state is synthetic; no claim to repairing a real home network/native macOS Settings |
@@ -124,3 +124,15 @@ canonical five full reports before the unchanged M6 aggregate can pass. The join
 also rejects missing, duplicate, reordered, failed and substituted variants.
 Full state/Artifact bytes stay in each part's artifact; the joined reports retain
 the original export paths and hashes. No current L2 or semantic score is added.
+
+
+Travel reuses `verify_recall.drain_with_publication_barrier`: Root freezes its
+recall before Main publishes, then Main completes before Root model dispatch.
+While the real MCP read is held, a second Main pauses/steers the Task and
+publishes before held work resumes. Reports assert that no new Worker model
+request crossed the first publication barrier, including when earlier Roots
+already ran. The Recall gate still forces the opposite pending-append order,
+requires the fail-closed error and separately proves explicit later recovery.
+The successful M6 journey is evidence for the recorded legal ordering, not an
+all-interleavings success claim. Runtime errors, deadlines and retry rules are
+unchanged.
