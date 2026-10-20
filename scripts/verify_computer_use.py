@@ -42,7 +42,8 @@ def launch(binary, root, live_config=None, browser_peer=None):
                 (source / name).write_text('fixture-' + name)
             (source / 'config.json').write_text(json.dumps({'macAddress': '02:00:00:00:00:01', 'machineIdentifier': 'fixture', 'cpuCount': 4}))
             h.env['ERII_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
-            server = subprocess.Popen([str(binary), '-test-computer-server', str(vm)], stdout=subprocess.PIPE,
+            start = h.processes.start if h.processes else subprocess.Popen
+            server = start([str(binary), '-test-computer-server', str(vm)], stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, text=True, env=h.env, cwd=root)
             with selectors.DefaultSelector() as selector:
                 selector.register(server.stdout, selectors.EVENT_READ)
@@ -64,6 +65,7 @@ def launch(binary, root, live_config=None, browser_peer=None):
         if server:
             server.terminate()
             server.communicate(timeout=15)
+            if h.processes:h.processes.retire(server)
             require(server.returncode == 0, 'fixture server did not join cleanly')
 
 

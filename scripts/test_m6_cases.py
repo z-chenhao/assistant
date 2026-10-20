@@ -4,6 +4,9 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
+import time
+import threading
 
 from case_runner import load_contract, variants
 from m6_report import aggregate, CASES, VARIANTS
@@ -13,6 +16,39 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class M6Cases(unittest.TestCase):
+    def test_parallel_m6_retains_complete_ordered_evidence_and_isolated_roots(self):
+        from run_m6_cases import run
+        active, peak = 0, 0
+        lock = threading.Lock()
+        roots = set()
+        class Peer:
+            def close(self):pass
+        def action(binary, folder, case, variant, *args):
+            nonlocal active, peak
+            with lock:
+                self.assertNotIn(folder, roots)
+                roots.add(folder)
+                active += 1
+                peak = max(peak, active)
+            (folder/'state').write_text(variant['variant_id'])
+            time.sleep(.01)
+            self.assertEqual((folder/'state').read_text(), variant['variant_id'])
+            with lock:active -= 1
+            return dict(observed=True), dict(root=str(folder))
+        with tempfile.TemporaryDirectory() as temporary:
+            output=Path(temporary)/'report.json'
+            with patch('run_m6_cases.Embeddings', Peer), patch('run_m6_cases.personal_case', action), \
+                 patch('run_m6_cases.health_safety', return_value=({'safety':True},{})), \
+                 patch('m6_desktop.drive', action):
+                report=run(Path(__file__),destination=output,scenario_jobs=4)
+            self.assertEqual(peak,4)
+            self.assertEqual([(r['case_id'],r['variant_id']) for r in report['results']],
+                             [(c,v) for c in CASES for v in VARIANTS])
+            self.assertTrue(report['cleanup'])
+            self.assertEqual(json.loads(output.read_text()),report)
+            self.assertTrue(all(not p.exists() for p in roots))
+            self.assertEqual(len(json.loads(output.with_suffix('.progress.json').read_text())),66)
+
     def test_external_write_guard_uses_frozen_capabilities_and_fails_unknown(self):
         from run_m6_cases import no_external_writes
         value=dict(capabilities=[dict(snapshot_id='cap',tools_json=json.dumps([dict(name='read',permission='read_only'),dict(name='send',permission='external_effect')]))],

@@ -96,6 +96,17 @@ class VerificationTests(unittest.TestCase):
                         dict(good, race={}), dict(good, race='success')]:
             self.assertFalse(ci_gate.passed(invalid))
 
+    def test_all_ci_jobs_keep_the_ten_minute_budget(self):
+        for path in (suite.ROOT / '.github/workflows').glob('*.yml'):
+            text = path.read_text()
+            jobs = re.findall(r'^  [a-zA-Z0-9_-]+:\n(    .*?)(?=^  [a-zA-Z0-9_-]+:|\Z)',
+                              text.split('jobs:', 1)[1], re.M | re.S)
+            self.assertTrue(jobs, str(path))
+            for job in jobs:
+                deadlines = re.findall(r'^    timeout-minutes: (\d+)$', job, re.M)
+                self.assertEqual(len(deadlines), 1, str(path))
+                self.assertTrue(0 < int(deadlines[0]) <= 10, str(path))
+
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])

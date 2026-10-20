@@ -9,6 +9,7 @@ import signal
 import subprocess
 
 from verify_main import require
+from fixture_pool import current
 from verify_computer_use import launch
 
 
@@ -18,7 +19,9 @@ def browser(folder,world):
     (root/'world.json').write_text(json.dumps(world,ensure_ascii=False))
     if 'parallel_requests' in world:
         shutil.copytree(Path(__file__).resolve().parents[1]/'evals/fixtures/m6-v1/media',root/'media')
-    child=subprocess.Popen([shutil.which('node'),str(Path(__file__).with_name('m6_browser.mjs')),str(root)],
+    owner=current()
+    start=owner.start if owner else subprocess.Popen
+    child=start([shutil.which('node'),str(Path(__file__).with_name('m6_browser.mjs')),str(root)],
                            stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         with selectors.DefaultSelector() as selector:
@@ -30,6 +33,7 @@ def browser(folder,world):
     finally:
         if child.poll() is None:child.send_signal(signal.SIGTERM)
         _,err=child.communicate(timeout=20)
+        if owner:owner.retire(child)
         require(child.returncode==0,'browser cleanup failed: '+err)
 
 

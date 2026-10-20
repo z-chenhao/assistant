@@ -8,13 +8,14 @@ import argparse
 from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import sqlite3
 import struct
-import subprocess
 import tempfile
 import time
+import threading
 
 from case_runner import digest, load_contract, score, variants
 from verify_capabilities import CapabilityHarness, call, content
@@ -23,6 +24,7 @@ from verify_main import require
 from verify_memory_maintenance import work, manage, readback
 from verify_recall import Embeddings
 from m6_sources import validate, file_hash
+from fixture_pool import run_cases, run as fixture_run
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'evals/fixtures/m6-v1'
@@ -280,13 +282,13 @@ const result={route:urgent?"urgent_evaluation":"ordinary",lifestyle_advice:[],di
 
 
 def save_bytes(h,name,media,data):
-    p=subprocess.run(h.args('artifact','save',name,media),input=data,env=h.env,cwd=h.root,capture_output=True,timeout=20)
+    p=fixture_run(h.args('artifact','save',name,media),input=data,env=h.env,cwd=h.root,capture_output=True,timeout=20)
     require(p.returncode==0,'Artifact import failed: '+p.stderr.decode())
     return json.loads(p.stdout)
 
 
 def open_bytes(h,ref):
-    p=subprocess.run(h.args('artifact','open',ref),env=h.env,cwd=h.root,capture_output=True,timeout=20)
+    p=fixture_run(h.args('artifact','open',ref),env=h.env,cwd=h.root,capture_output=True,timeout=20)
     require(p.returncode==0,'Artifact readback failed')
     return p.stdout
 
@@ -330,11 +332,11 @@ def travel(h,world):
     nz_task='新西兰旅行\nCapabilities: '+json.dumps([dict(name='builtin__codemode__execute',arguments=dict(source=nz_source))])
     nz_plan=json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='create',task=nz_task))])
     h.send('nz-seed','Capabilities: '+nz_plan)
-    held=subprocess.Popen(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(held)
+    held=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(held)
     h.wait_state(lambda _:(provider/'hold-accepted').exists(),'NZ Root held before pause',reader=lambda _:None)
     nz=next(t for t in read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM task') if t['task_ref']!=ref)
     h.send('nz-pause','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='pause',taskRef=nz['task_ref']))]))
-    control=subprocess.Popen(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(control)
+    control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(control)
     try:
         h.wait_state(lambda rows:any(r['desired_state']=='task_paused' for r in rows),'NZ pause persisted before release',reader=lambda _:read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT desired_state FROM run WHERE task_id=?',(nz['task_id'],)))
     finally:
@@ -351,11 +353,11 @@ def travel(h,world):
     task_plan=json.dumps([{'name':'builtin__codemode__execute','arguments':{'source':source}}],ensure_ascii=False)
     provider=h.root/'provider';(provider/'hold-barrier').touch()
     h.send('france-append','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='append',taskRef=ref,instruction='继续 10 月 5 日，不去南部乡村。\nCapabilities: '+task_plan))],ensure_ascii=False))
-    child=subprocess.Popen(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(child)
+    child=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(child)
     h.wait_state(lambda _: (provider/'hold-accepted').exists(),'Root reached held world read',reader=lambda _: None)
     held_state=state(h)
     h.send('france-steering','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='append',taskRef=ref,instruction='晚上 8 点前回酒店。'))],ensure_ascii=False))
-    control=subprocess.Popen(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(control)
+    control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);h.children.append(control)
     try:
         h.wait_state(lambda rows:any('晚上 8 点前' in row['text'] for row in rows),'Main appended live steering',reader=lambda _:read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT instruction AS text FROM task_instruction WHERE task_id=?',(france_id,)))
     finally:
@@ -375,10 +377,10 @@ def travel(h,world):
                 gap='semantic itinerary quality ungraded; concurrent Root steering also exercised by the maintained task-case gate')
 
 
-def run(binary,selected=None,destination=None):
+def run(binary,selected=None,destination=None,scenario_jobs=1):
     dataset,policy,lock=load_contract(ROOT,'m6-v1')
     report=dict(version=1,milestone='M6',provider='explicit capabilities scripted Bridge',contract_lock=lock,
-                binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,
+                binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,scenario_jobs=scenario_jobs,
                 driver_digest=digest({name:file_hash(ROOT/'scripts'/name) for name in ('run_m6_cases.py','m6_desktop.py','m6_browser.mjs','m6_sources.py')}),
                 product_gate='inconclusive; semantic Judge and current L2 not run',
                 live_shadow=dict(lume='prior evidence: docs/computer-provider-l2-result.json',jianying='prior evidence: docs/computer-l2-result.json',current_run='not_run'),
@@ -393,40 +395,60 @@ def run(binary,selected=None,destination=None):
             require(not artifact_root.is_symlink() and marker.is_file() and json.loads(marker.read_text())==owner,'unowned M6 evidence directory')
         else:
             artifact_root.mkdir();marker.write_text(json.dumps(owner))
+        destination.with_suffix('.progress.json').unlink(missing_ok=True)
         destination.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
-    embeddings=Embeddings()
+    completed = []
+    report_lock = threading.Lock()
+    items = [(case, variant) for case in dataset['cases'] if not selected or case['case_id']==selected
+             for variant in variants(dataset,case)]
     try:
         with tempfile.TemporaryDirectory(prefix='erii-m6-cases-') as temporary:
-            for case in dataset['cases']:
-                if selected and case['case_id']!=selected:continue
-                for variant in variants(dataset,case):
-                    folder=Path(temporary).resolve()/(case['case_id']+'-'+variant['variant_id']);folder.mkdir()
-                    started=time.monotonic()
-                    artifact_folder=artifact_root/case['case_id']/variant['variant_id'] if artifact_root else None
-                    if case['case_id'] in ('GC-07','GC-13','GC-18'):
-                        from m6_desktop import drive
-                        checks,evidence=drive(binary,folder,case,variant,artifact_folder)
-                    else:
+            def drive_variant(item):
+                case, variant = item
+                folder=Path(temporary).resolve()/(case['case_id']+'-'+variant['variant_id']);folder.mkdir()
+                started=time.monotonic()
+                artifact_folder=artifact_root/case['case_id']/variant['variant_id'] if artifact_root else None
+                if case['case_id'] in ('GC-07','GC-13','GC-18'):
+                    from m6_desktop import drive
+                    checks,evidence=drive(binary,folder,case,variant,artifact_folder)
+                else:
+                    # Each worker owns its peer, database, credentials and ports.
+                    embeddings=Embeddings()
+                    try:
                         checks,evidence=personal_case(binary,folder,case,variant,embeddings,artifact_folder)
                         if case['case_id']=='GC-01':
                             safety_checks,safety=health_safety(binary,folder.with_name(folder.name+'-red-flags'),case,variant,embeddings,artifact_folder/'red-flags' if artifact_folder else None)
                             checks.update(safety_checks);evidence['red_flag_variant']=safety
-                    grading=score(policy,checks,[])
-                    row=dict(case_id=case['case_id'],variant_id=variant['variant_id'],seed=case['seed'],fixture_digest=variant['fixture_digest'],
-                             input_events=variant['events'],clock=case['clock'],assertions=checks,evidence=evidence,
-                             status='fragment_pass' if all(checks.values()) else 'fragment_fail',hard_failure=not all(checks.values()),
-                             final_score=grading['final_score'],semantic_grading=grading['semantic_grading'],dimensions={d:None for d in policy['weights']},
-                             wall_time_ms=round((time.monotonic()-started)*1000))
-                    report['results'].append(row)
-                    if destination:destination.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+                    finally:
+                        embeddings.close()
+                grading=score(policy,checks,[])
+                row=dict(case_id=case['case_id'],variant_id=variant['variant_id'],seed=case['seed'],fixture_digest=variant['fixture_digest'],
+                         input_events=variant['events'],clock=case['clock'],assertions=checks,evidence=evidence,
+                         status='fragment_pass' if all(checks.values()) else 'fragment_fail',hard_failure=not all(checks.values()),
+                         final_score=grading['final_score'],semantic_grading=grading['semantic_grading'],dimensions={d:None for d in policy['weights']},
+                         wall_time_ms=round((time.monotonic()-started)*1000))
+                with report_lock:
+                    completed.append(row)
+                    # Avoid serializing all retained state after every variant
+                    # (quadratic IO). Full evidence is written once after join,
+                    # including failure; bounded progress remains observable.
+                    if destination:
+                        progress=[{k:r[k] for k in ('case_id','variant_id','status','wall_time_ms')} for r in completed]
+                        destination.with_suffix('.progress.json').write_text(json.dumps(progress)+'\n')
                     print(case['case_id'],variant['variant_id'],row['status'],row['wall_time_ms'],flush=True)
-                    require(all(checks.values()),'M6 assertion failed: '+str(checks))
+                require(all(checks.values()),'M6 assertion failed: '+str(checks))
+                return row
+            report['results']=run_cases(items,drive_variant,scenario_jobs)
         require(not Path(temporary).exists(),'cleanup: case root remains')
+        report['cleanup']=True
+        report['summary']=dict(fragments=len(report['results']),fragment_passes=sum(r['status']=='fragment_pass' for r in report['results']),
+                               scores=None,semantic_pass_at_1=None,semantic_pass_5=None)
     finally:
-        embeddings.close()
-    report['cleanup']=True
-    report['summary']=dict(fragments=len(report['results']),fragment_passes=sum(r['status']=='fragment_pass' for r in report['results']),
-                           scores=None,semantic_pass_at_1=None,semantic_pass_5=None)
+        # Pool cancellation joins every worker before this evidence snapshot.
+        if destination:
+            order={(c['case_id'],v['variant_id']):i for i,(c,v) in enumerate(items)}
+            report['results']=sorted(completed,key=lambda r:order[r['case_id'],r['variant_id']])
+            destination.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     return report
 
 
@@ -435,10 +457,9 @@ def main():
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--evidence',type=Path,required=True)
     parser.add_argument('--case',choices=['GC-01','GC-02','GC-03','GC-04','GC-05','GC-06','GC-07','GC-10','GC-13','GC-15','GC-18'])
+    parser.add_argument('--scenario-jobs',type=int,choices=[1,2,4],default=int(os.environ.get('ERII_VERIFY_CASE_JOBS','1')))
     args=parser.parse_args();args.evidence.unlink(missing_ok=True)
-    report=run(args.binary.resolve(),args.case,args.evidence)
-    args.evidence.parent.mkdir(parents=True,exist_ok=True)
-    args.evidence.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+    report=run(args.binary.resolve(),args.case,args.evidence,args.scenario_jobs)
     print(json.dumps(report['summary']))
 
 
