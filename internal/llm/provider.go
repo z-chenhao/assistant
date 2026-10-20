@@ -145,10 +145,23 @@ type ProbeResult struct {
 	Continuation bool `json:"continuation"`
 	Cancellation bool `json:"cancellation"`
 	Clipping     bool `json:"clipping"`
+	ImageInput   bool `json:"image_input,omitempty"`
 }
 
 func (p ProbeResult) Validate() error {
 	if !p.Streaming || !p.ToolCalls || !p.Continuation || !p.Cancellation || !p.Clipping {
+		return ModelIncompatible
+	}
+	return nil
+}
+
+// Optional modalities require observed proof as well as a profile declaration.
+// Older text-only records remain valid; an old record cannot admit image input.
+func (p ProbeResult) ValidateCapabilities(c Capabilities) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if c.ImageInput && !p.ImageInput {
 		return ModelIncompatible
 	}
 	return nil

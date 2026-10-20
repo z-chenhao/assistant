@@ -110,6 +110,10 @@ The only delayed Capability is Tab `playwright`. Read `capabilities.list()` befo
 `get("playwright")`. Its documentation describes CSS locators, bounded navigation
 waits, download and chooser upload. Every method creates a normal nested
 ToolInvocation. Navigation/reload expires the Capability even at the same URL.
+CSS resolution and actionability waits stay scoped to the bound document. A
+matching control in a replacement document cannot receive the pending input;
+the call fails with `STALE_SURFACE_HANDLE`. CSS may follow element replacement
+within the same document, while core ElementRefs remain tied to one DOM node.
 There is no evaluate, dynamic import, arbitrary browser endpoint or filesystem
 API in the model facade.
 
@@ -146,6 +150,10 @@ persisted request keeps references. Text-only snapshots receive reference hints.
 keep their text-only reference shape; only explicit Code Mode image outputs gain
 the dispatch-time image field, preserving pre-ERII-25 accepted requests.
 No screenshot Base64 crosses QuickJS or enters SQLite, RunTrace or errors.
+To activate image input normally, declare `capabilities.image_input:true`, run
+`model test`, then `model select`. The Host verifies a synthetic image before
+admitting that capability. Undeclared or unverified image input cannot enter a
+new snapshot. Text-only profiles keep the reference fallback.
 
 Offline Launch/Doctor/Drive/Evidence/Cleanup:
 
@@ -155,6 +163,7 @@ node guest-browser/node_modules/playwright-core/cli.js install chromium
 make test
 python3 scripts/verify_computer_use.py --binary bin/personal-agent --evidence evidence/computer-use.json
 npm test --prefix guest-browser
+python3 scripts/verify_local_provider.py --binary bin/personal-agent --evidence evidence/local-provider.json
 ```
 
 `make verify` runs the Computer Use CLI contract five times. `make test` includes

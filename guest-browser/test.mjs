@@ -29,13 +29,18 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   browserContext=await chromium.launchPersistentContext(join(root,'profile'),{headless:true,args:['--remote-debugging-address=127.0.0.1','--remote-debugging-port=0']});
   let port;for(let n=0;n<200;n++){try{port=Number((await readFile(join(root,'profile/DevToolsActivePort'),'utf8')).split('\n')[0]);break;}catch{await delay(25);}}
   assert.ok(port,'doctor: Chromium CDP not ready');
-  const call=async(method,args={})=>JSON.parse((await exec(process.execPath,['--input-type=module','-e',source,JSON.stringify({module,port,root:join(root,'EriiTransfer'),method,args})],{timeout:15000,maxBuffer:12<<20})).stdout);
+  const call=async(method,args={},onLog)=>{
+    const child=exec(process.execPath,['--input-type=module','-e',source,JSON.stringify({module,port,root:join(root,'EriiTransfer'),method,args})],{timeout:15000,maxBuffer:12<<20,env:{...process.env,...(onLog?{DEBUG:'pw:api'}:{})}});
+    if(onLog)child.child.stderr.on('data',onLog);
+    return JSON.parse((await child).stdout);
+  };
   const inventory=await call('inventory');assert.equal(inventory.browsers[0].id,'chromium');
   const tabId=inventory.tabs[0].id;
   assert.equal((await call('goto',{tabId,url:endpoint})).effect,'dispatched');
   const capture=await call('observe',{tabId,screenshot:true});assert.ok(capture.screenshot_png_b64);assert.ok(capture.tree_markdown.includes('Fixture text'));assert.ok(capture.elements.every(e=>e.element_token));
   const navigation=capture.navigation;
   assert.equal((await call('playwright.count',{tabId,selector:'#field',expectedNavigation:navigation})).value,1);
+  assert.equal((await call('playwright.count',{tabId,selector:'html',expectedNavigation:navigation})).value,1);
   assert.equal((await call('playwright.fill',{tabId,selector:'#field',value:'verified',expectedNavigation:navigation})).effect,'dispatched');
   assert.equal((await call('playwright.click',{tabId,selector:'#button'})).effect,'dispatched');
   assert.equal((await call('playwright.textContent',{tabId,selector:'#status'})).value,'clicked:1');
@@ -67,6 +72,38 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   });
   await dynamicPeer.close();
   assert.equal((await call('click',{tabId,element_token:waitingToken})).error,'STALE_ELEMENT_REFERENCE','core ElementRef must not retarget a replacement while waiting for actionability');
+
+  // Synchronize at actual selector resolution, then navigate while the input
+  // waits for actionability. Matching enabled controls in B must stay inert.
+  const page=browserContext.pages()[0];
+  for (const [method,target,missing] of [['playwright.click','#button',false],['playwright.fill','#field',false],['playwright.click','#button',true]]) {
+    await page.goto(endpoint);
+    const bound=(await call('observe',{tabId})).navigation;
+    await page.evaluate(({target,missing})=>{
+      const element=document.querySelector(target);
+      if(missing) element.remove(); else if(target==='#button') element.disabled=true; else element.readOnly=true;
+    },{target,missing});
+    let waiting;
+    const boundary=new Promise(resolve=>{waiting=resolve;});
+    const pending=call(method,{tabId,selector:target,value:'must not reach B',expectedNavigation:bound,timeoutMs:5000},log=>{
+      if(missing ? log.includes('waiting for locator') && log.includes(target) : /element is not enabled|element is not editable/.test(log))waiting();
+    });
+    await Promise.race([boundary,pending.then(value=>assert.fail('action did not reach wait: '+JSON.stringify(value)))]);
+    await page.goto(endpoint+'/replacement');
+    const outcome=await pending;
+    assert.equal(outcome.error,'STALE_SURFACE_HANDLE',JSON.stringify(outcome));
+    assert.equal(await page.locator('#status').textContent(),'ready','input crossed the bound document during waiting');
+    assert.equal(await page.locator('#field').inputValue(),'','fill crossed the bound document during waiting');
+  }
+
+  // Within one document, CSS retains dynamic replacement semantics.
+  await page.goto(endpoint);
+  await page.evaluate(()=>{
+    const old=document.querySelector('#button');old.disabled=true;
+    setTimeout(()=>{const replacement=old.cloneNode(true);replacement.disabled=false;old.replaceWith(replacement);},500);
+  });
+  assert.equal((await call('playwright.click',{tabId,selector:'#button'})).effect,'dispatched');
+  assert.equal(await page.locator('#status').textContent(),'clicked:1');
 
   await call('reload',{tabId});
   assert.equal((await call('playwright.count',{tabId,selector:'#field',expectedNavigation:navigation})).error,'STALE_SURFACE_HANDLE');

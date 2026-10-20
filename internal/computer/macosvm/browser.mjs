@@ -7,6 +7,7 @@ const request = JSON.parse(process.argv[1]);
 const { method, args: a, root } = request;
 let browser;
 let coreElement;
+let boundDocument;
 let mutating = false;
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const selector = s => {
@@ -122,7 +123,39 @@ async function main() {
       elementSelector=token.selector;
     }finally{await dom.detach();}
   }
-  const locator = () => coreElement ?? page.locator(selector(a.selector ?? elementSelector));
+  // A Page locator can re-resolve in a replacement document while waiting.
+  // Resolve CSS beneath a captured Document handle instead. Both selector
+  // waiting and actionability waiting then own handles from that document;
+  // context destruction cannot move the pending input to a new document.
+  const css = a.selector ?? elementSelector;
+  if (!coreElement && css !== undefined) {
+    selector(css);
+    boundDocument = (await page.evaluateHandle(() => document)).asElement();
+    if (!boundDocument || await navigation(page) !== nav) fail('STALE_SURFACE_HANDLE');
+  }
+  const deadline = Date.now() + timeout(a.timeoutMs);
+  const remaining = () => Math.max(1, deadline - Date.now());
+  const detached = error => /Element is not attached to the DOM/.test(String(error.message));
+  const scoped = async (method, ...args) => {
+    while (true) {
+      const element = await boundDocument.waitForSelector(selector(css), {state:'attached',strict:true,timeout:remaining()});
+      const options = {timeout:remaining()};
+      try { return await element[method](...(method === 'click' ? [{...args[0],...options}] : [...args,options])); }
+      catch (error) {
+        // CSS locators may follow replacements within the same document.
+        // Core ElementRefs remain fixed and never enter this retry path.
+        if (!detached(error) || Date.now() >= deadline) throw error;
+        if (!await boundDocument.evaluate(node => node.isConnected)) fail('STALE_SURFACE_HANDLE');
+      } finally { await element.dispose(); }
+    }
+  };
+  const locator = () => coreElement ?? {
+    count: async () => (await boundDocument.$$eval(selector(css), nodes => nodes.length)),
+    textContent: () => scoped('textContent'),
+    waitFor: () => boundDocument.waitForSelector(selector(css), {state:'visible',strict:true,timeout:remaining()}),
+    click: (options={}) => scoped('click', options),
+    fill: value => scoped('fill', value),
+  };
   if (method === 'playwright.count') return { value: await locator().count() };
   if (method === 'playwright.textContent') return { value: (await locator().textContent())?.slice(0, 16384) };
   if (method === 'playwright.waitForSelector') { await locator().waitFor({ state: 'visible' }); return {}; }
@@ -180,6 +213,7 @@ async function main() {
 try { process.stdout.write(JSON.stringify(await main())); }
 catch (e) {
   const detached=coreElement && /^elementHandle\.(click|hover|fill|press|type): Element is not attached to the DOM/.test(String(e.message));
-  process.stdout.write(JSON.stringify({ error: detached ? 'STALE_ELEMENT_REFERENCE' : ['INVALID_ARGUMENT','PERMISSION_DENIED','STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE'].includes(e.code) ? e.code : mutating ? 'UNKNOWN_SIDE_EFFECT' : 'PROVIDER_UNAVAILABLE' }));
+  const expiredDocument=boundDocument && /Execution context was destroyed|Cannot find context with specified id|Element is not attached to the DOM/.test(String(e.message));
+  process.stdout.write(JSON.stringify({ error: detached ? 'STALE_ELEMENT_REFERENCE' : expiredDocument ? 'STALE_SURFACE_HANDLE' : ['INVALID_ARGUMENT','PERMISSION_DENIED','STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE'].includes(e.code) ? e.code : mutating ? 'UNKNOWN_SIDE_EFFECT' : 'PROVIDER_UNAVAILABLE' }));
 }
 finally { if (browser) await browser.close(); }
