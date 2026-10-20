@@ -149,11 +149,14 @@ func (p *Provider) Inventory(ctx context.Context, i computer.Instance, kind stri
 			}
 			out = append(out, computer.Target{ID: id, Kind: "app", Name: text(m["name"]), Native: map[string]any{"pid": m["pid"]}})
 		} else {
-			hash, _ := computer.Fingerprint([]any{m["app_name"], m["title"]})
-			out = append(out, computer.Target{ID: "window:" + hash[:24], Kind: "window", Name: text(m["title"]), Native: map[string]any{"pid": m["pid"], "window_id": m["window_id"], "bounds": m["bounds"]}})
+			out = append(out, windowTarget(m))
 		}
 	}
 	return out, nil
+}
+func windowTarget(m map[string]any) computer.Target {
+	hash, _ := computer.Fingerprint([]any{m["pid"], m["window_id"]})
+	return computer.Target{ID: "window:" + hash[:24], Kind: "window", Name: text(m["title"]), Native: map[string]any{"pid": m["pid"], "window_id": m["window_id"], "bounds": m["bounds"]}}
 }
 func (p *Provider) nativeTarget(ctx context.Context, i computer.Instance, t computer.Target) (map[string]any, error) {
 	if t.Native["window_id"] != nil {

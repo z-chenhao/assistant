@@ -12,3 +12,19 @@ func TestPinnedNativeElementProjection(t *testing.T) {
 		t.Fatal("advertised/default action projection", capture.Elements)
 	}
 }
+
+func TestNativeWindowIdentityDistinguishesDuplicateTitlesAndSurvivesRename(t *testing.T) {
+	first := windowTarget(map[string]any{"app_name": "Editor", "title": "Untitled", "pid": float64(12), "window_id": float64(101)})
+	second := windowTarget(map[string]any{"app_name": "Editor", "title": "Untitled", "pid": float64(12), "window_id": float64(102)})
+	renamed := windowTarget(map[string]any{"app_name": "Editor", "title": "Saved document", "pid": float64(12), "window_id": float64(101)})
+	restarted := windowTarget(map[string]any{"app_name": "Editor", "title": "Untitled", "pid": float64(13), "window_id": float64(101)})
+	if first.ID == second.ID {
+		t.Fatal("distinct windows with identical titles cannot be bound separately", first.Public(), second.Public())
+	}
+	if first.ID != renamed.ID {
+		t.Fatal("renaming a live window changed its Surface identity")
+	}
+	if first.ID == restarted.ID {
+		t.Fatal("a replacement process reused the old window identity")
+	}
+}

@@ -18,7 +18,9 @@ Inventory failures appear by source in `getState().errors`; surviving sources
 remain available. `getApp`, `getBrowser` and `getTab` bind existing resources.
 `cua.computer.launchApp({app: bundleId})` and `createBrowserTab(browserId, url)`
 are explicit mutations. `getApp({windowId})` binds a discovered window when an
-App has multiple windows. A Tab can be rebound by `{url}` when that URL has one
+App has multiple windows. Window IDs use native process/window identity, so
+identical titles remain independently bindable and renaming does not change
+the Surface identity. A Tab can be rebound by `{url}` when that URL has one
 match. Ambiguous selectors fail rather than choosing an arbitrary target.
 
 ## Leases and observations

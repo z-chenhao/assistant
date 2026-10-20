@@ -223,7 +223,9 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
             if live_config and not browser_live:
                 output,_=execute('native-elements-secondary-selection-and-coordinates', r'''
 await cua.computer.launchApp({app:"com.erii.fixture"});
-const app=await cua.getApp("com.erii.fixture");
+const window=(await cua.listWindows()).find(w=>w.name==="Erii CUA Fixture");
+if(!window)throw new Error("fixture window not discovered");
+const app=await cua.getApp({windowId:window.id});
 const field=ax=>Number(ax.state.match(/\[(\d+)\] AXTextField/)[1]);
 const before=await app.getAXState();
 await app.getScreenshot();
