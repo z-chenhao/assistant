@@ -42,6 +42,9 @@ class CodeModeJoinTests(unittest.TestCase):
                              [(g.name, i) for g in SHARDS['codemode'] for i in range(1, 6)])
             self.assertTrue(summary['passed'])
             self.assertEqual([len(r['results']) for r in reports], [18] * 5)
+            self.assertEqual([r['summary']['fragments'] for r in reports], [18] * 5)
+            self.assertEqual([r['summary']['fragment_passes'] for r in reports], [18] * 5)
+            self.assertEqual([r['summary']['hard_failures'] for r in reports], [0] * 5)
             self.assertTrue(all(r['conformance']['passed'] and r['ci_cancellation']['passed'] for r in reports))
             self.assertEqual(sum(c['runs'] for c in summary['cases'].values()), 90)
 

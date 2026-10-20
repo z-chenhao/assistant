@@ -58,6 +58,10 @@ def join(root):
                     {r['case_id'] for r in fragment['results']} != {case}):
                 raise ValueError('missing or misplaced Core variants')
             report['results'].extend(fragment['results'])
+        report['summary'] = dict(report.get('summary', {}),
+                                 fragment_passes=sum(r['status'] == 'fragment_pass' for r in report['results']),
+                                 fragments=len(report['results']),
+                                 hard_failures=sum(r['hard_failure'] for r in report['results']))
         reports.append(report)
     summary = core_report.aggregate(reports)
     if summary['passed'] is not True:
