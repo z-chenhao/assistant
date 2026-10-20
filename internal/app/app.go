@@ -14,7 +14,9 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	"github.com/z-chenhao/erii/internal/computer"
 	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
+	"github.com/z-chenhao/erii/internal/computer/macosvm"
 	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
@@ -46,6 +48,7 @@ import (
 )
 
 type App struct {
+	computer       *macosvm.Provider
 	memoryCurator  *memory.Curator
 	memoryOnce     sync.Once
 	memoryCancel   context.CancelFunc
@@ -150,6 +153,10 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 			return nil, e
 		}
 		definition := codemode.Definition()
+		if cfg.Computer != nil {
+			definition.Spec.TimeoutMS = 300000
+			definition.Spec.Description += " This installation supports await cua.getState() for persistent Computer identity. Surface inventory and binding are unavailable in this lifecycle slice."
+		}
 		definition.Spec.ResourceHash += ":" + runtimeHash + ":" + preludeHash
 		defs = append(defs, definition)
 	}
@@ -178,7 +185,19 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		defs = append(defs, more...)
 	}
 	if (fixture == "core" || fixture == "codemode") && cfg.JavaScript != nil {
+		if cfg.Computer != nil {
+			a.Close()
+			return nil, computer.ErrInvalid
+		}
 		defs = append(defs, computerfake.Definitions()...)
+	}
+	if cfg.Computer != nil {
+		hash, e := computer.Fingerprint(cfg.Computer)
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		defs = append(defs, computer.Definitions(hash)...)
 	}
 	if fixture == "artifacts" {
 		defs = append(defs, toolfake.Artifacts()...)
@@ -214,6 +233,20 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		}
 	}
 	a.runs = store.Runs(a.history, a.registry)
+	if cfg.Computer != nil {
+		provider, e := macosvm.New(*cfg.Computer, macosvm.SSHGuest{Config: cfg.Computer.Guest, Secrets: secrets})
+		if e != nil {
+			a.Close()
+			return nil, e
+		}
+		a.runs.ConfigureComputer(provider, cfg.Computer.Compatibility, cfg.Computer.Manifest)
+		a.computer = provider
+		provider.Boundary = func(point string) {
+			if a.testBoundary != nil {
+				a.testBoundary("computer_" + point)
+			}
+		}
+	}
 	a.runs.ConfigureContext(cfg.Context)
 	if cfg.Memory != nil {
 		v := memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}
@@ -306,6 +339,9 @@ func (a *App) Close() error {
 	}
 	if a.provider != nil {
 		_ = a.provider.Close()
+	}
+	if a.computer != nil {
+		a.computer.Close()
 	}
 	err := a.store.Close()
 	err = errors.Join(err, a.history.Close())

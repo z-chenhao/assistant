@@ -163,6 +163,26 @@ class MainHarness:
             if self.processes is not None:
                 self.processes.retire(child)
 
+    def failure_state(self):
+        """Bounded read-only evidence from disposable fixtures; no claim tokens."""
+        path = Path(self.env['ERII_DATA_ROOT']) / 'state.db'
+        if not path.exists():
+            return {'database': 'not created'}
+        with sqlite3.connect(path) as db:
+            db.row_factory = sqlite3.Row
+            queries = {
+                'runs': 'SELECT run_id,kind,depth,status,desired_state,wait_reason,error_code FROM run ORDER BY created_at DESC LIMIT 40',
+                'claims': 'SELECT run_id,epoch,token IS NOT NULL AS owned,expires_at FROM run_claim ORDER BY expires_at DESC LIMIT 40',
+                'tools': 'SELECT invocation_id,tool_name,status,error_json,result_json FROM tool_invocation ORDER BY created_at DESC LIMIT 16',
+                'models': 'SELECT generation_id,status,request_json,result_json FROM model_generation ORDER BY created_at DESC LIMIT 3',
+                'code': 'SELECT execution_id,state,desired_state,execution_epoch,claim_expires_at FROM code_execution_state ORDER BY updated_at DESC LIMIT 8',
+            }
+            result = {name: [dict(row) for row in db.execute(query)] for name, query in queries.items()}
+            if db.execute("SELECT 1 FROM sqlite_schema WHERE name='computer'").fetchone():
+                result['computer'] = [dict(row) for row in db.execute('SELECT computer_id,instance_epoch,phase,execution_id,execution_epoch,version FROM computer')]
+                result['computer_operations'] = [dict(row) for row in db.execute('SELECT execution_id,execution_epoch,kind,status FROM computer_operation ORDER BY rowid DESC LIMIT 12')]
+            return result
+
 
 def assert_final(state, users, replies=1):
     messages = state["conversation"]

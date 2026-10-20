@@ -44,6 +44,9 @@ func TextMessage(kind, text string) AgentMessage {
 func ProviderTools(specs []tool.Spec) []llm.ToolSpec {
 	out := []llm.ToolSpec{}
 	for _, spec := range specs {
+		if spec.Internal {
+			continue
+		}
 		out = append(out, llm.ToolSpec{Name: spec.Name, Description: spec.Description, InputSchema: spec.InputSchema})
 	}
 	return out

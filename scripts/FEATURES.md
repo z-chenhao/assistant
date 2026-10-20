@@ -1,5 +1,42 @@
 # Foundation feature map
 
+## Durable Computer and Live Shadow (ERII-24)
+
+`scripts/lume_live.py --root TEST_ROOT` provides opt-in local L2 mechanics.
+See [Computer acceptance](../docs/computer-l2.md) for authorization, dedicated
+storage, pinned releases and the full acceptance matrix. The pinned 26.5.2 Guest
+combination has actual Jianying acceptance evidence. [Lifecycle operations](../docs/computer.md)
+describe the production adapter, configuration and retained limits.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Owned Lume environment | `doctor`, foreground `serve` | `lume_live.Live`, pinned official Lume CLI | Actual signature/version/config readback; ownership and symlink refusal; disposable host probe denied by Seatbelt while owned fixture remains readable |
+| Resumable clean image | `download`, then `create`; `pull-tested-image` | `Live.download`, Lume `create` with explicit owned storage | Per-range SHA-256 receipts, exact HTTP ranges, full Apple image digest before provisioning; refuses an existing VM |
+| Guest observation and cleanup | `start`, `guest`, `put`, `get`, `driver`, `vnc-session control`, `vnc-control`, `state`, `stop` | Owned loopback Lume HTTP API and Guest SSH/VNC | Actual 11.6.0 import/timeline/subtitle/dissolve/MOV+MP3 export; signed Driver consent and raw capture refusal; cold/SIGKILL restart with six matching file hashes. Host/Guest/VNC constraints are explicit in the acceptance report |
+| Production logical Computer | Configured `cua.getState()` through Code Mode; read-only `computer status` | `computer.Manager`, fenced `agent/sqlite` ledger, `computer/macosvm.Provider` | `verify_computer.py` runs the real CLI/HTTP/SSH adapter with offline peers five times; stable ID, increasing epochs, old-owner refusal, exclusive use, unchanged Artifact bytes |
+| Durable unit and recovery | Automatic cleanup of the accepted Code Mode invocation | Atomic disk/NVRAM/config/manifest unit; Guest OS shutdown; native lock proof; guarded cache reconciliation | Publication-boundary and post-disposal/pre-final-commit process death; frozen idle IDs survive claim takeover; Main Task cancellation at readiness and post-disposal via `ComputerHarness.cancel_at`; new invocation reconciles retained idle request before restoration; cancelled Task/Run/Code remain terminal; committed unit is verified with its source absent; fresh cell succeeds; corrupted NVRAM, ambiguous start refusal, blocked shutdown, source/target hashes; no session/heap migration; owned instance deletion and process joins |
+| Real provider lifecycle | `verify_computer.py --live-root TEST_ROOT --live-config TEST_ROOT/product-live.json`; `lume_live.py --profile product serve` | Same production adapter and CLI; deterministic model fixture, actual Lume/macOS/signed Driver | Guest file/TextEdit reopening, Agent SIGKILL at readiness and after disposal, resumed/fresh cell success, epoch/identity and Artifact readback, independent full-unit SHA-256, stopped/deleted instance; foreground API joined after acceptance |
+
+The live harness owns Launch (temporary API/new VM), Doctor (versions,
+storage, Guest session and Driver permissions), Drive (synthetic Jianying
+scenario), Evidence (Guest screenshots, export/project hashes, restart state),
+and Cleanup (stop VM, join the owned server, detach owned installation media).
+Each phase must be observed before a live acceptance claim.
+
+`verify_computer.py` owns Launch (isolated CLI and explicit HTTP/SSH peers), Doctor
+(base/config/selected fixture), Drive (nested `cua.getState()`), Evidence (SQLite,
+complete unit hashes, restoration intent, Artifact readback and fault receipts),
+and Cleanup (native resource/instance checks plus process joins). Its offline
+five-run gate is in the Code Mode shard. The live mode uses only an explicitly
+marked owned test root, requires separate foreground API cleanup, and retains
+private domain state and checkpoints as inspectable evidence. Surface binding,
+inventory and desktop actions are the subsequent Computer Use slice.
+
+The offline SSH peer consumes the complete sudo input before acknowledging
+shutdown. `TestShutdownRequiresCompleteSudoInput` rejects truncated input and
+proves that only the accepted command changes its shutdown counter. This keeps
+the Fake from closing the channel while the real client is still sending input.
+
 ## Memory maintenance, context and experience (ERII-23)
 
 `python3 scripts/verify_memory_maintenance.py --binary bin/personal-agent --evidence evidence/memory-maintenance.json`

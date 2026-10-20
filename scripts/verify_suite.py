@@ -49,6 +49,7 @@ SHARDS = {
         Gate("events", "", "events"),
     ),
     "codemode": (Gate("codemode", "verify_codemode.py", "codemode", 5),
+                 Gate("computer", "verify_computer.py", "computer", 5),
                  Gate("code-recovery", "verify_code_recovery.py", "code-recovery", 5),
                  Gate("core-cases", "run_core_cases.py", "core-cases", 5)),
     "security": (

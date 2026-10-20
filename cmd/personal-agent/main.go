@@ -20,6 +20,8 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/app"
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/computer/macosvm"
+	computerfixture "github.com/z-chenhao/erii/internal/computer/macosvm/fixture"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/delivery"
@@ -41,6 +43,9 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) (err error) {
+	if len(args) == 2 && args[0] == "-test-computer-server" {
+		return computerfixture.Serve(ctx, args[1], out)
+	}
 	if len(args) == 2 && args[0] == "-test-mcp-server" {
 		return mcpfake.Serve(in, out, args[1])
 	}
@@ -68,7 +73,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return nil
 	})
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|computer status|computer prepare-base CLEAN_STOPPED_VM|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -113,7 +118,8 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	skillCommand := flags.Arg(0) == "skill" && flags.Arg(1) == "manage" && flags.NArg() == 2
 	memoryCommand := flags.Arg(0) == "memory" && ((flags.NArg() == 2 && (flags.Arg(1) == "work" || flags.Arg(1) == "status")) || (flags.NArg() == 3 && flags.Arg(1) == "manage"))
 	spendCommand := flags.NArg() == 2 && flags.Arg(0) == "spend" && flags.Arg(1) == "status"
-	if !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	computerCommand := flags.Arg(0) == "computer" && ((flags.NArg() == 2 && flags.Arg(1) == "status") || (flags.NArg() == 3 && flags.Arg(1) == "prepare-base"))
+	if !computerCommand && !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -148,6 +154,15 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
+	if computerCommand && flags.Arg(1) == "prepare-base" {
+		if cfg.Computer == nil {
+			return errors.New("computer configuration required")
+		}
+		if err := macosvm.ProvisionBase(ctx, cfg.Computer.Root, flags.Arg(2), cfg.Computer.Compatibility); err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(map[string]string{"base": "sealed"})
+	}
 	var application *app.App
 	if *testBridge != "" {
 		application, err = app.OpenWithTestBridge(ctx, cfg, *testBridge)
@@ -160,6 +175,13 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return err
 	}
 	defer func() { err = errors.Join(err, application.Close()) }()
+	if computerCommand {
+		state, err := application.ComputerStatus(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(state)
+	}
 	if *testDelivery != "" {
 		if *testBridge == "" {
 			return errors.New("test-delivery requires explicit test-bridge")

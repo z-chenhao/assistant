@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -207,7 +208,11 @@ def run(binary, evidence=None):
                 progressed = h.wait_state(lambda v: len(v['tasks']) == 2 and any(t['status'] == 'completed' for t in v['tasks']),
                                      'fair second Task completion', reader=state, timeout=30)
                 h.send('cancel', 'Cancel: Batch hold')
-                stdout, stderr = work.communicate(timeout=30)
+                try:
+                    stdout, stderr = work.communicate(timeout=30)
+                except subprocess.TimeoutExpired:
+                    print(json.dumps({'scheduling_failure': h.failure_state()}), file=sys.stderr)
+                    raise
             require(any(r['depth'] == 2 for r in held['runs']), 'recursive delegation missing')
             require(any(g['status'] == 'pending' for g in progressed['generations']), 'first Task did not remain active during second Task progress')
             require(work.returncode == 0, 'fair/cancel drain: ' + stderr)

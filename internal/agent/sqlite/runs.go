@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/computer"
 	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/delivery"
@@ -28,22 +29,25 @@ import (
 )
 
 type Runs struct {
-	contextPolicy contextbuilder.Policy
-	memory        MemoryWriter
-	vault         memory.Vault
-	recall        *recall.Service
-	javascript    codemode.JavaScriptRuntime
-	host          *Store
-	history       conversation.Store
-	registry      *tool.Registry
-	recentAge     time.Duration
-	recentLimit   int
-	limits        ToolLimits
-	approvalTTL   time.Duration
-	approvalClock func() time.Time
-	childLimits   agent.ChildLimits
-	spend         agent.SpendPolicy
-	scheduler     agent.SchedulerLimits
+	computerProvider      computer.Provider
+	computerCompatibility computer.Compatibility
+	computerManifest      computer.RestorationManifest
+	contextPolicy         contextbuilder.Policy
+	memory                MemoryWriter
+	vault                 memory.Vault
+	recall                *recall.Service
+	javascript            codemode.JavaScriptRuntime
+	host                  *Store
+	history               conversation.Store
+	registry              *tool.Registry
+	recentAge             time.Duration
+	recentLimit           int
+	limits                ToolLimits
+	approvalTTL           time.Duration
+	approvalClock         func() time.Time
+	childLimits           agent.ChildLimits
+	spend                 agent.SpendPolicy
+	scheduler             agent.SchedulerLimits
 }
 
 func (s *Store) Runs(history conversation.Store, registry *tool.Registry) *Runs {
@@ -91,7 +95,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
