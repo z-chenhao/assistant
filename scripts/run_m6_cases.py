@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import struct
+import subprocess
 import tempfile
 import time
 import threading
@@ -403,7 +404,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1):
              for variant in variants(dataset,case)]
     try:
         with tempfile.TemporaryDirectory(prefix='erii-m6-cases-') as temporary:
-            def drive_variant(item):
+            def drive_item(item):
                 case, variant = item
                 folder=Path(temporary).resolve()/(case['case_id']+'-'+variant['variant_id']);folder.mkdir()
                 started=time.monotonic()
@@ -438,6 +439,12 @@ def run(binary,selected=None,destination=None,scenario_jobs=1):
                     print(case['case_id'],variant['variant_id'],row['status'],row['wall_time_ms'],flush=True)
                 require(all(checks.values()),'M6 assertion failed: '+str(checks))
                 return row
+            def drive_variant(item):
+                try:
+                    return drive_item(item)
+                except BaseException as error:
+                    print(item[0]['case_id'],item[1]['variant_id'],'failed:',repr(error),flush=True)
+                    raise
             report['results']=run_cases(items,drive_variant,scenario_jobs)
         require(not Path(temporary).exists(),'cleanup: case root remains')
         report['cleanup']=True
