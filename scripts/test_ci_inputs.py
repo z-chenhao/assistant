@@ -279,18 +279,28 @@ class RaceInventoryTests(unittest.TestCase):
                 calls = []
                 def execute(command, env, output, stopped, metrics):
                     calls.append(command)
-                    output.write_text('fixture outcome\n')
+                    metrics.update(owned_group_drained=True, cpu_seconds=0.01)
+                    if '-list' in command:
+                        output.write_text('TestA\nTestB\nTestC\nok\t' + ci_race.SQLITE + '\t0.01s\n')
+                    elif '-run' in command:
+                        names = command[command.index('-run') + 1][2:-2].split('|')
+                        events = [dict(Action='pass', Package=ci_race.SQLITE, Test=n) for n in names]
+                        events.append(dict(Action='pass', Package=ci_race.SQLITE))
+                        output.write_text('\n'.join(json.dumps(e) for e in events) + '\n')
+                    else:
+                        output.write_text('fixture outcome\n')
                     return first_status if len(calls) == 1 else 0
                 try:
                     os.chdir(temp)
                     with patch.object(ci_race, 'source_state', return_value={'source_sha': 'frozen'}), \
+                         patch.object(ci_race, 'cpu_budget', return_value=4), \
                          patch.object(ci_race.subprocess, 'check_output', return_value='\n'.join(packages)), \
                          patch.object(ci_race, 'run_command', execute):
                         self.assertEqual(ci_race.main(), 0 if first_status == 0 else 1)
                     report = json.loads(Path('evidence/race/inventory.json').read_text())
                     self.assertEqual(report['packages'], packages)
                     self.assertEqual(report['passed'], first_status == 0)
-                    self.assertEqual(len(calls), 2 if first_status == 0 else 1)
+                    self.assertEqual(len(calls), 5 if first_status == 0 else 1)
                     self.assertEqual(report['stages'][0]['returncode'], first_status)
                     for command in calls:
                         self.assertIn('-race', command)

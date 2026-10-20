@@ -41,7 +41,7 @@ test directories, through `ci_tmpfs.py setup/cleanup`. The full unit/lint suite,
 all five SC race rounds and every verification job except providers keep ordinary
 disk storage. Unit/lint also requires five disk-backed receipt recovery race runs.
 Every migration, crash/restart and receipt test retains disk coverage. Provider
-and race commands, counts, SQLite WAL/sync policy and assertions are identical.
+commands, race flags/counts, SQLite WAL/sync policy and assertions are preserved.
 This targets runner disk-wait variance without
 claiming a host power-loss test. The mount Doctor proves executable files,
 fsync, WAL commit/reopen, capacity, owner and mount identity. Cleanup runs even
@@ -84,8 +84,17 @@ these acceptance boundaries. No partial job independently proves Code Mode.
 Independent fixture capacity is four; GC-17 checkpoint variants retain capacity
 two. Local unpartitioned Core runs join case kinds in order. Part jobs use
 separate runners. Gate-series concurrency is two, with Go event/model checks
-isolated after other work. The complete race runner isolates Bridge first, then
-audits that every remaining package ran exactly once with instrumentation.
+isolated after other work. The complete race runner isolates Bridge first. It discovers SQLite's complete
+Go Test/Example/Fuzz inventory, then runs every top-level test exactly once in up
+to three separate processes. Each test retains its own Store/temp root, complete
+subtests and internal concurrency; process-local globals and environment remain
+isolated. A fourth worker runs the other packages with package concurrency one.
+All workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
+four-CPU ceiling. Race instrumentation, count=1 and the 15-minute Go timeout
+remain required. Go JSON verdicts reject missing, duplicate, unexpected, failed
+or unfinished test roots. All fifty logical packages remain in the same Required
+race job; discovery automatically includes new tests. Per-worker commands,
+CPU/wall, test outcomes and cleanup remain in `race/inventory.json` and logs.
 No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
 ## Launch, doctor, drive, evidence and cleanup
