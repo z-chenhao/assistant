@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -244,6 +245,76 @@ func TestAutomationScheduleEditInvalidatesDelayedFireAndFreezesAtAdmission(t *te
 		t.Fatalf("cancel did not fence old owner %v", e)
 	}
 }
+
+// An edit can commit after the Root result or after Reporter has queued its
+// update. The Task epoch stays fixed; the fire lineage must fence both queues.
+func TestAutomationScheduleEditFencesCommittedFollowups(t *testing.T) {
+	for _, reported := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reported=%t", reported), func(t *testing.T) {
+			ctx := context.Background()
+			s, r, a, p := automationFixture(t)
+			p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
+				return llm.GenerationResult{Text: "reminder result"}, nil
+			}
+			now := time.Now().UTC()
+			id := createAutomation(t, r, now, nil)
+			fire := now.AddDate(0, 0, 1)
+			r.SetTestAutomationClock(fire)
+			if err := r.ScheduleAutomations(ctx, fire); err != nil {
+				t.Fatal(err)
+			}
+			if err := r.admitAutomations(ctx); err != nil {
+				t.Fatal(err)
+			}
+			var root string
+			if err := s.db.QueryRow(`SELECT root_run_id FROM automation_fire`).Scan(&root); err != nil {
+				t.Fatal(err)
+			}
+			claim, err := r.Claim(ctx, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = executeTaskRun(t, a, r, ctx, claim); err != nil {
+				t.Fatal(err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 {
+				t.Fatal("result not committed")
+			}
+			if reported {
+				if err = r.Report(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if scalar(t, s, `SELECT count(*) FROM main_inbox WHERE run_id IS NULL`) != 1 {
+					t.Fatal("report not queued")
+				}
+			}
+			var version int64
+			if err = s.db.QueryRow(`SELECT version FROM automation WHERE automation_id=?`, id).Scan(&version); err != nil {
+				t.Fatal(err)
+			}
+			editedFire := fire.AddDate(0, 0, 2)
+			result, err := r.ManageAutomation(ctx, "edit", automation.Request{Operation: "update", Ref: id, Version: version, Instruction: "Edited reminder", Type: "at", Spec: editedFire.Format(time.RFC3339), Timezone: "UTC"}, fire)
+			if err != nil || result.Error != nil {
+				t.Fatal(result, err)
+			}
+			mustDrain(t, a)
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM run WHERE kind='main'`) != 0 || scalar(t, s, `SELECT count(*) FROM event_inbox WHERE consumer='task_reporter'`) != 1 {
+				t.Fatal("obsolete update was not consumed without Main")
+			}
+			if scalar(t, s, `SELECT count(*) FROM main_inbox WHERE run_id IS NOT NULL`) != 0 {
+				t.Fatal("obsolete inbox promoted")
+			}
+			r.SetTestAutomationClock(editedFire)
+			mustDrain(t, a)
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM run WHERE kind='main' AND status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM main_inbox WHERE run_id IS NOT NULL`) != 1 {
+				t.Fatal("edited intent did not complete exactly one Main followup")
+			}
+		})
+	}
+}
+
 func TestAutomationMigrationPreservesPriorAndRollsBack(t *testing.T) {
 	ctx := context.Background()
 	db := schemaDB(t)

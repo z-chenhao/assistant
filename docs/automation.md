@@ -58,7 +58,9 @@ Cancel supplies only `operation: "cancel"`, `automationRef` and `version`.
 Each schedule mutation is CAS; stale versions return `INVALID_ARGUMENT` without
 writes. Scheduler bookkeeping and observations also advance the visible version;
 read list again after a conflict. Edit increments an independent schedule version,
-invalidating queued fires and suppressing stale results. Current in-flight steps
+invalidating queued fires and suppressing stale results. Reporter and Main inbox
+promotion recheck the persisted fire version, including results committed before
+an edit and inbox entries queued before an edit. Current in-flight steps
 keep their existing snapshots and approval boundaries. Cancel disables future
 fires and uses the existing Task cancel/epoch mechanism for the current tree.
 Task pause/cancel also disables its Automation. A stopped Task cannot be restarted

@@ -238,7 +238,7 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 		// may create an update or unblock an Inbox after our earlier scans.
 		// Once active==0, any such completion must already be visible here.
 		var pending int
-		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0))`).Scan(&pending); err != nil {
+		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0))`).Scan(&pending); err != nil {
 			return "", agent.ErrStorage
 		}
 		if pending > 0 {

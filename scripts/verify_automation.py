@@ -29,7 +29,7 @@ class Harness(MainHarness):
         value = self.state()
         with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
             db.row_factory = sqlite3.Row
-            for table in ('automation', 'automation_fire', 'task', 'task_update', 'task_instruction', 'tool_invocation'):
+            for table in ('automation', 'automation_fire', 'task', 'task_update', 'task_instruction', 'tool_invocation', 'main_inbox'):
                 value[table] = [dict(row) for row in db.execute('SELECT * FROM ' + table)]
             value['automation_inbox'] = [dict(row) for row in db.execute("SELECT * FROM event_inbox WHERE consumer='automation_actor'")]
         return value
@@ -106,6 +106,34 @@ def run(binary):
             require(not value['runs'] and value['automation_fire'][0]['state']=='skipped','delayed fire survived cancellation')
             return value
         scenario('GC-08-delayed-cancel', delayed_cancel)
+
+        for boundary in ('after_result_commit', 'after_report_commit'):
+            def edit_committed_result(h, boundary=boundary):
+                h.manage('old', operation='create', instruction='OLD reminder intent', triggerType='at', triggerSpec='2026-10-20T08:00:00+08:00', timezone='Asia/Shanghai')
+                h.now = '2026-10-20T08:00:00+08:00'
+                child = h.hold(boundary)
+                child.kill()
+                child.communicate(timeout=10)
+                before = h.evidence()
+                require(len(before['task_update']) == 1, 'result was not committed before edit')
+                require(len(before['main_inbox']) == int(boundary == 'after_report_commit'), 'wrong report boundary')
+                row = h.automations()[0]
+                h.manage('edit', operation='update', automationRef=row['automationRef'], version=row['version'], instruction='NEW reminder intent', triggerType='at', triggerSpec='2026-10-22T08:00:00+08:00', timezone='Asia/Shanghai')
+                h.command('chat', 'work')
+                stale = h.evidence()
+                require(stale['automation'][0]['schedule_version'] == 2 and stale['automation_fire'][0]['schedule_version'] == 1, 'edit did not change lineage')
+                require(not [r for r in stale['runs'] if r['kind'] == 'main'] and not stale['deliveries'], 'obsolete result produced Main or delivery')
+                h.command('chat', 'work')
+                require(stale == h.evidence(), 'obsolete inbox did not drain idempotently')
+                h.now = '2026-10-22T08:00:00+08:00'
+                h.command('chat', 'work')
+                current = h.evidence()
+                require(len(current['automation_fire']) == 2 and current['automation_fire'][1]['schedule_version'] == 2 and current['automation_fire'][1]['instruction'] == 'NEW reminder intent', 'edited intent did not fire')
+                require(len([r for r in current['runs'] if r['kind'] == 'main' and r['status'] == 'completed']) == 1 and len(current['deliveries']) == 1 and current['deliveries'][0]['status'] == 'sent', 'edited intent did not deliver once')
+                h.command('chat', 'work')
+                require(current == h.evidence(), 'edited intent repeated delivery')
+                return dict(before_edit=before, obsolete_suppressed=stale, edited_intent_delivered=current)
+            scenario('schedule-edit-' + boundary, edit_committed_result)
 
         for boundary in ('before_automation_fire_commit','after_automation_fire_commit','before_automation_admit_commit','after_automation_admit_commit'):
             def crash(h, boundary=boundary):
