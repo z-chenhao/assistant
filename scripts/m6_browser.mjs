@@ -30,7 +30,7 @@ const server=createServer(async(req,res)=>{
    const result=JSON.parse((await exec(process.execPath,['--input-type=module','-e',driver,JSON.stringify({module,port,root:join(root,'transfer'),method,args})],{timeout:15000,maxBuffer:12<<20})).stdout);
    // Disconnect exactly after the real submit reached the external state.
    // This models an SSH/Driver acknowledgement lost after an accepted action.
-   if(method==='playwright.click'&&args.selector==='#submit'&&!result.error){
+   if(method==='playwright.click'&&args.selector.startsWith('#submit[')&&!result.error){
     if(state.orders.length!==1)throw new Error('submit did not commit');
     res.destroy();return;
    }
@@ -57,7 +57,7 @@ const server=createServer(async(req,res)=>{
   if(['/media/red.mov','/media/blue.mov','/media/third.mov'].includes(req.url)){res.setHeader('Content-Type','video/quicktime');res.end(await readFile(join(root,req.url.slice(1))));return;}
   if(req.url?.startsWith('/clips/save?')){state.clips.push(new URL(req.url,'http://localhost').searchParams.get('label'));await persist();res.writeHead(302,{Location:'/clips'});res.end();return;}
   if(req.url==='/booking'){
-   res.end(html('<h1>Final confirmation</h1><pre id="confirmation">'+JSON.stringify({restaurant:world.restaurants[0],request:world.request,total_cny:560})+'</pre><form method="POST" action="/book"><input type="hidden" name="restaurant" value="R1"><input type="hidden" name="date" value="2026-10-17"><input type="hidden" name="time" value="19:00"><input type="hidden" name="party" value="2"><button id="submit">Submit 湖滨店 2026-10-17 19:00 2人 560元 无押金</button></form><div id="status">Not submitted</div>'));return;
+   res.end(html('<h1>Final confirmation</h1><pre id="confirmation">'+JSON.stringify({restaurant:world.restaurants[0],request:world.request,total_cny:560})+'</pre><form method="POST" action="/book"><input type="hidden" name="restaurant" value="R1"><input type="hidden" name="date" value="2026-10-17"><input type="hidden" name="time" value="19:00"><input type="hidden" name="party" value="2"><button id="submit" data-restaurant="R1" data-name="松间·湖滨店" data-date="2026-10-17" data-time="19:00" data-party="2" data-price-pp="280" data-deposit="0">Submit 湖滨店 2026-10-17 19:00 2人 560元 无押金</button></form><div id="status">Not submitted</div>'));return;
   }
   res.writeHead(404);res.end();
  }catch(error){console.error(error.message);res.writeHead(500);res.end(JSON.stringify({error:'PROVIDER_UNAVAILABLE'}));}

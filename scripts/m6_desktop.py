@@ -63,9 +63,11 @@ def drive(binary,folder,case,variant,artifact_folder=None):
             elif cid=='GC-13':
                 observed=execute(h,'final-confirmation',prefix+'await tab.goto('+url+'+"/booking");const view=await tab.getAXStateAndScreenshot();image(view.screenshot.image);return {computer:(await cua.getState()).computerId,state:view.ax.state};')
                 before=json.loads((browser_root/'external-state.json').read_text())
-                denied=execute(h,'denied-submit',prefix+pw+'try{await pw.locator("#submit").click();}catch(e){return e.code;}',approve=False)
+                selector='#submit[data-restaurant="R1"][data-name="松间·湖滨店"][data-date="2026-10-17"][data-time="19:00"][data-party="2"][data-price-pp="280"][data-deposit="0"]'
+                locator='pw.locator('+json.dumps(selector,ensure_ascii=False)+')'
+                denied=execute(h,'denied-submit',prefix+pw+'try{await '+locator+'.click();}catch(e){return e.code;}',approve=False)
                 rejected=json.loads((browser_root/'external-state.json').read_text())
-                submitted=execute(h,'submit-unknown',prefix+pw+'let outcome;try{await pw.locator("#submit").click();outcome="acknowledged";}catch(e){outcome=e.code;}return outcome;')
+                submitted=execute(h,'submit-unknown',prefix+pw+'let outcome;try{await '+locator+'.click();outcome="acknowledged";}catch(e){outcome=e.code;}return outcome;')
                 unknown=state(h)
                 # A new CLI process and new CUA binding query My Orders. There
                 # is no second submission, no fabricated reconciliation verdict.
@@ -73,6 +75,7 @@ def drive(binary,folder,case,variant,artifact_folder=None):
                 after=json.loads((browser_root/'external-state.json').read_text())
                 checks.update(no_submit_before_approval=before['orders']==rejected['orders']==[] and denied['value']=='APPROVAL_DENIED',
                               confirmation_fields=all(term in observed['value']['state'] for term in ('松间·湖滨店','2026-10-17','19:00','560','无押金')),
+                              business_parameters_frozen=any(all(term in d['approval']['arguments'] for term in ('R1','松间·湖滨店','2026-10-17','19:00','280','data-party','data-deposit')) for d in submitted['decisions']),
                               lost_ack_unknown=submitted['value']=='UNKNOWN_SIDE_EFFECT' and any(i['status']=='unknown' for i in unknown['tools']),
                               one_exact_order=after['submissions']==1 and after['orders']==[dict(order_id='order_781',restaurant='R1',date='2026-10-17',time='19:00',party=2)],
                               query_proves_order='order_781' in reconciled['value']['state'],
