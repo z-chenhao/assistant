@@ -121,7 +121,7 @@ func Next(kind, spec, zone string, after time.Time) (time.Time, error) {
 	// A Gregorian calendar repeats within 400 years; eight years suffice for
 	// supported day/month patterns including leap day. Invalid combinations fail.
 	limit := after.AddDate(8, 0, 0)
-	for t := after.UTC().Truncate(time.Minute).Add(time.Minute); t.Before(limit); t = t.Add(time.Minute) {
+	for t := after.UTC().Truncate(time.Minute).Add(time.Minute); !t.After(limit); t = t.Add(time.Minute) {
 		local := t.In(loc)
 		if !masks[3][int(local.Month())] {
 			continue
@@ -134,7 +134,7 @@ func Next(kind, spec, zone string, after time.Time) (time.Time, error) {
 			dow = masks[4][int(local.Weekday())]
 		}
 		day := dom && dow
-		if fields[2] != "*" && fields[4] != "*" {
+		if !strings.Contains(fields[2], "*") && !strings.Contains(fields[4], "*") {
 			day = dom || dow
 		}
 		if day && masks[1][local.Hour()] && masks[0][local.Minute()] {

@@ -40,7 +40,9 @@ explicit IANA timezone (`UTC` works; process-local `Local` is rejected). Cron ha
 five numeric fields: minute, hour, day of month, month, weekday (0=Sunday through
 6=Saturday). Lists, ranges and positive steps work; `0L` through `6L` in the
 weekday field select that month's last weekday. Restricted day-of-month and
-weekday fields use ordinary cron OR semantics. A new schedule fires strictly
+weekday fields use ordinary cron OR semantics; wildcard steps retain wildcard
+semantics (for example `0 8 */1 * 0` still means Sunday). See the
+[crontab day-field rule](https://man7.org/linux/man-pages/man5/crontab.5.html). A new schedule fires strictly
 after creation/edit time. Nonexistent DST wall minutes are skipped; both distinct
 UTC occurrences of a repeated wall minute fire. Invalid calendars fail closed.
 
