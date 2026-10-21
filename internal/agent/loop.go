@@ -27,271 +27,311 @@ type LoopOptions struct {
 	Execution context.Context
 }
 
-// RunAgentLoop and ContinueAgentLoop use exactly the same stateless kernel.
-// Roles supply context, tools and a result destination outside this algorithm.
+// RunAgentLoop and ContinueAgentLoop share one stateless kernel. Roles supply
+// context, tools and a result destination outside this algorithm.
 func RunAgentLoop(ctx context.Context, claim RunClaim, options LoopOptions) error {
 	return ContinueAgentLoop(ctx, claim, options)
 }
 
-func ContinueAgentLoop(ctx context.Context, claim RunClaim, o LoopOptions) error {
+func ContinueAgentLoop(ctx context.Context, claim RunClaim, options LoopOptions) error {
 	work := context.WithoutCancel(ctx)
-	execution := o.Execution
+	execution := options.Execution
 	if execution == nil {
 		execution = work
 	}
-	emit := func(r Run, kind, text, call string) {
-		if o.Sink != nil {
-			o.Sink(Event{Kind: kind, RunID: r.ID, AgentID: r.AgentID, Step: r.Checkpoint.Step, OccurredAt: time.Now().UTC(), Text: text, ToolCallID: call})
-		}
-	}
-	r, err := o.Store.Load(work, claim)
+	return (agentLoop{claim: claim, options: options, work: work, execution: execution}).run(ctx)
+}
+
+// The runner owns no durable state. Every phase reloads the authoritative Run;
+// each phase handler advances exactly one checkpoint or stops at a stable wait.
+// Shutdown stops between phases. Business stop/claim loss cancels execution
+// while persistence continues through the independent work context.
+type agentLoop struct {
+	claim     RunClaim
+	options   LoopOptions
+	work      context.Context
+	execution context.Context
+}
+
+func (l agentLoop) run(ctx context.Context) error {
+	r, err := l.options.Store.Load(l.work, l.claim)
 	if err != nil {
 		return err
 	}
-	emit(r, "agent_start", "", "")
-	fail := func(r Run, code string) error {
-		if err := o.Store.Fail(work, claim, r.Version, code); err != nil {
-			return err
-		}
-		if code == "SPEND_AUTHORIZATION_DENIED" {
-			return &runFailure{cause: ErrSpendDenied}
-		}
-		if code == "RESOURCE_LIMIT" {
-			return &runFailure{cause: ErrResourceLimit}
-		}
-		return &runFailure{cause: llm.NormalizeError(code)}
-	}
-	retryContext := func(run Run) (bool, error) {
-		if run.Checkpoint.ContextRetries >= 1 {
-			return false, nil
-		}
-		cp := run.Checkpoint
-		cp.ContextRetries++
-		cp.Step++
-		cp.Result = nil
-		cp.ExchangeID = ""
-		cp.Phase = "model"
-		return true, o.Store.Checkpoint(work, claim, run.Version, cp)
-	}
+	l.emit(r, "agent_start", "", "")
 	for {
-		// Shutdown is a boundary stop. It never mutates business cancellation.
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		r, err = o.Store.Load(work, claim)
+		r, err = l.options.Store.Load(l.work, l.claim)
 		if err != nil {
 			return err
 		}
-		// An actual usage overrun can request consent while accepting the final
-		// model result. Hold its checkpointed reply/tools too, without regenerating.
+		// Settlement can request consent after a final model result was saved.
+		// Hold that result without regenerating it.
 		if r.SpendStatus == "pending" {
-			if err := o.Store.Wait(work, claim, r.Version, "resource"); err != nil {
-				return err
-			}
-			return nil
+			return l.options.Store.Wait(l.work, l.claim, r.Version, "resource")
 		}
-		// Drain accepted Tool calls through their existing independent policies
-		// before failing the next model/reply boundary. Parents must still adopt
-		// terminal Child results; monetary denial cannot orphan invocations.
+		// Accepted Tool calls must drain and adopt terminal Child results even
+		// when monetary authorization is denied at the next model boundary.
 		if (r.SpendStatus == "denied" || r.SpendStatus == "invalidated") && r.Checkpoint.Phase != "tools" {
-			return fail(r, "SPEND_AUTHORIZATION_DENIED")
+			return l.fail(r, "SPEND_AUTHORIZATION_DENIED")
 		}
-		cp := r.Checkpoint
-		switch cp.Phase {
+		var stopped bool
+		switch r.Checkpoint.Phase {
 		case "model":
-			inputs, err := o.Store.Steering(work, claim, cp.InputSequence)
-			if errors.Is(err, ErrConflict) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			if len(inputs) > 0 {
-				for _, input := range inputs {
-					cp.Messages = append(cp.Messages, AgentMessage{MessageID: input.Message.MessageID, Type: "user", Content: input.Message.Content})
-					cp.InputSequence = input.Sequence
-				}
-				if err = o.Store.Checkpoint(work, claim, r.Version, cp); err != nil {
-					return err
-				}
-				continue
-			}
-			// Context preparation may retrieve durable evidence. Business stop or
-			// lost ownership must cancel those provider reads before model admission.
-			generation, err := o.Store.Generation(execution, claim, r)
-			if err != nil {
-				if errors.Is(err, llm.ContextLengthExceeded) {
-					if retry, e := retryContext(r); retry {
-						if e != nil {
-							return e
-						}
-						continue
-					}
-				}
-				if errors.Is(err, ErrResourceLimit) {
-					return fail(r, "RESOURCE_LIMIT")
-				}
-				var providerError llm.ProviderError
-				if errors.As(err, &providerError) {
-					return fail(r, providerError.Error())
-				}
-				return err
-			}
-			if generation.Waiting {
-				if err := o.Store.Wait(work, claim, r.Version, "resource"); err != nil {
-					return err
-				}
-				return nil
-			}
-			if generation.Denied {
-				return fail(r, "SPEND_AUTHORIZATION_DENIED")
-			}
-			if generation.ErrorCode != "" {
-				if generation.ErrorCode == llm.ContextLengthExceeded.Error() {
-					if retry, e := retryContext(r); retry {
-						if e != nil {
-							return e
-						}
-						continue
-					}
-				}
-				return fail(r, generation.ErrorCode)
-			}
-			result := generation.Result
-			if result == nil {
-				emit(r, "turn_start", "", "")
-				emit(r, "message_start", "", "")
-				callCtx, cancel := context.WithTimeout(execution, 45*time.Second)
-				generate := o.Provider.Generate
-				if cp.Step > 0 {
-					generate = o.Provider.Continue
-				}
-				value, callErr := generate(callCtx, generation.Request, func(e llm.GenerationEvent) {
-					if e.Kind == "text_delta" {
-						emit(r, "message_update", e.Text, "")
-					}
-				})
-				cancel()
-				if execution.Err() != nil {
-					return execution.Err()
-				}
-				if callErr != nil {
-					// Storage/claim rejection is infrastructure, not a failed model.
-					if callErr == ErrClaimLost || callErr == ErrStorage || callErr == llm.ErrStorage {
-						return callErr
-					}
-					// A failed provider response may still report billable usage.
-					// Settlement can have requested Root consent atomically with
-					// that failure; preserve it before finalizing the Run.
-					latest, loadErr := o.Store.Load(work, claim)
-					if loadErr != nil {
-						return loadErr
-					}
-					if latest.SpendStatus == "pending" {
-						if err := o.Store.Wait(work, claim, latest.Version, "resource"); err != nil {
-							return err
-						}
-						return nil
-					}
-					if latest.SpendStatus == "denied" || latest.SpendStatus == "invalidated" {
-						return fail(latest, "SPEND_AUTHORIZATION_DENIED")
-					}
-					if errors.Is(callErr, llm.ContextLengthExceeded) {
-						if retry, e := retryContext(latest); retry {
-							if e != nil {
-								return e
-							}
-							continue
-						}
-					}
-					return fail(latest, llm.NormalizeError(callErr.Error()).Error())
-				}
-				result = &value
-			}
-			cp.ContextRetries = 0
-			// Bridge acceptance has durably saved the complete result already.
-			parts := conversation.Text(result.Text)
-			for _, call := range result.ToolCalls {
-				c := conversation.ToolCall{ID: call.ID, Name: call.Name, Arguments: call.Arguments}
-				parts = append(parts, conversation.ContentPart{Type: "tool_call", ToolCall: &c})
-			}
-			cp.Messages = append(cp.Messages, AgentMessage{Type: "assistant", Content: parts})
-			cp.Result = result
-			cp.ExchangeID = generation.Request.GenerationID
-			cp.Phase = "reply"
-			if len(result.ToolCalls) > 0 {
-				cp.Phase = "tools"
-			}
-			if err = o.Store.Checkpoint(work, claim, r.Version, cp); err != nil {
-				return err
-			}
-			emit(r, "message_end", "", "")
+			stopped, err = l.modelTurn(r)
 		case "tools":
-			results, err := o.Tools.Execute(execution, cp.ExchangeID, cp.Result.ToolCalls)
-			if errors.Is(err, tool.ErrSuspended) {
-				reason, waitErr := o.Tools.Store.WaitReason(work)
-				if waitErr != nil {
-					return waitErr
-				}
-				if err = o.Store.Wait(work, claim, r.Version, reason); err != nil {
-					return err
-				}
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-			for i, result := range results {
-				parts := conversation.Text(result.ModelText())
-				for _, ref := range result.ImageRefs {
-					parts = append(parts, conversation.ContentPart{Type: "image", ArtifactRef: ref})
-				}
-				cp.Messages = append(cp.Messages, AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: parts})
-			}
-			cp.Step++
-			cp.Phase = "model"
-			cp.ExchangeID = ""
-			cp.Result = nil
-			if err = o.Store.Checkpoint(work, claim, r.Version, cp); err != nil {
-				return err
-			}
-			emit(r, "turn_end", "", "")
+			stopped, err = l.toolsTurn(r)
 		case "reply":
-			ready, err := o.Store.PrepareReply(work, claim, r)
-			if err != nil {
-				return err
-			}
-			if !ready {
-				// A completed generation may have been overtaken by user steering.
-				// Keep it as model context, then inject separate user messages.
-				cp.Step++
-				cp.Phase = "model"
-				cp.Result = nil
-				cp.ExchangeID = ""
-				if err = o.Store.Checkpoint(work, claim, r.Version, cp); err != nil {
-					return err
-				}
-				continue
-			}
-			if err = o.Store.DeliverReply(work, claim, r); err != nil {
-				return err
-			}
-			emit(r, "turn_end", "", "")
+			stopped, err = l.replyTurn(r)
 		case "settle":
-			done, err := o.Store.Complete(work, claim, r.Version)
-			if err != nil {
-				return err
-			}
-			if done {
-				emit(r, "agent_end", "", "")
-				return nil
-			}
-			cp.Phase = "model"
-			if err = o.Store.Checkpoint(work, claim, r.Version, cp); err != nil {
-				return err
-			}
+			stopped, err = l.settleTurn(r)
 		default:
 			return ErrStorage
 		}
+		if stopped || err != nil {
+			return err
+		}
 	}
+}
+
+func (l agentLoop) modelTurn(r Run) (bool, error) {
+	cp := r.Checkpoint
+	inputs, err := l.options.Store.Steering(l.work, l.claim, cp.InputSequence)
+	if errors.Is(err, ErrConflict) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if len(inputs) > 0 {
+		for _, input := range inputs {
+			cp.Messages = append(cp.Messages, AgentMessage{MessageID: input.Message.MessageID, Type: "user", Content: input.Message.Content})
+			cp.InputSequence = input.Sequence
+		}
+		if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	// Context preparation may retrieve durable evidence. Business stop or
+	// lost ownership must cancel those provider reads before model admission.
+	generation, err := l.options.Store.Generation(l.execution, l.claim, r)
+	if err != nil {
+		if errors.Is(err, llm.ContextLengthExceeded) {
+			if retry, e := l.retryContext(r); retry {
+				if e != nil {
+					return false, e
+				}
+				return false, nil
+			}
+		}
+		if errors.Is(err, ErrResourceLimit) {
+			return false, l.fail(r, "RESOURCE_LIMIT")
+		}
+		var providerError llm.ProviderError
+		if errors.As(err, &providerError) {
+			return false, l.fail(r, providerError.Error())
+		}
+		return false, err
+	}
+	if generation.Waiting {
+		if err := l.options.Store.Wait(l.work, l.claim, r.Version, "resource"); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if generation.Denied {
+		return false, l.fail(r, "SPEND_AUTHORIZATION_DENIED")
+	}
+	if generation.ErrorCode != "" {
+		if generation.ErrorCode == llm.ContextLengthExceeded.Error() {
+			if retry, e := l.retryContext(r); retry {
+				if e != nil {
+					return false, e
+				}
+				return false, nil
+			}
+		}
+		return false, l.fail(r, generation.ErrorCode)
+	}
+	result := generation.Result
+	if result == nil {
+		l.emit(r, "turn_start", "", "")
+		l.emit(r, "message_start", "", "")
+		callCtx, cancel := context.WithTimeout(l.execution, 45*time.Second)
+		generate := l.options.Provider.Generate
+		if cp.Step > 0 {
+			generate = l.options.Provider.Continue
+		}
+		value, callErr := generate(callCtx, generation.Request, func(e llm.GenerationEvent) {
+			if e.Kind == "text_delta" {
+				l.emit(r, "message_update", e.Text, "")
+			}
+		})
+		cancel()
+		if l.execution.Err() != nil {
+			return false, l.execution.Err()
+		}
+		if callErr != nil {
+			// Storage/claim rejection is infrastructure, not a failed model.
+			if callErr == ErrClaimLost || callErr == ErrStorage || callErr == llm.ErrStorage {
+				return false, callErr
+			}
+			// A failed provider response may still report billable usage.
+			// Settlement can have requested Root consent atomically with
+			// that failure; preserve it before finalizing the Run.
+			latest, loadErr := l.options.Store.Load(l.work, l.claim)
+			if loadErr != nil {
+				return false, loadErr
+			}
+			if latest.SpendStatus == "pending" {
+				if err := l.options.Store.Wait(l.work, l.claim, latest.Version, "resource"); err != nil {
+					return false, err
+				}
+				return true, nil
+			}
+			if latest.SpendStatus == "denied" || latest.SpendStatus == "invalidated" {
+				return false, l.fail(latest, "SPEND_AUTHORIZATION_DENIED")
+			}
+			if errors.Is(callErr, llm.ContextLengthExceeded) {
+				if retry, e := l.retryContext(latest); retry {
+					if e != nil {
+						return false, e
+					}
+					return false, nil
+				}
+			}
+			return false, l.fail(latest, llm.NormalizeError(callErr.Error()).Error())
+		}
+		result = &value
+	}
+	cp.ContextRetries = 0
+	// Bridge acceptance has durably saved the complete result already.
+	parts := conversation.Text(result.Text)
+	for _, call := range result.ToolCalls {
+		c := conversation.ToolCall{ID: call.ID, Name: call.Name, Arguments: call.Arguments}
+		parts = append(parts, conversation.ContentPart{Type: "tool_call", ToolCall: &c})
+	}
+	cp.Messages = append(cp.Messages, AgentMessage{Type: "assistant", Content: parts})
+	cp.Result = result
+	cp.ExchangeID = generation.Request.GenerationID
+	cp.Phase = "reply"
+	if len(result.ToolCalls) > 0 {
+		cp.Phase = "tools"
+	}
+	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
+		return false, err
+	}
+	l.emit(r, "message_end", "", "")
+	return false, nil
+}
+
+func (l agentLoop) toolsTurn(r Run) (bool, error) {
+	cp := r.Checkpoint
+	results, err := l.options.Tools.Execute(l.execution, cp.ExchangeID, cp.Result.ToolCalls)
+	if errors.Is(err, tool.ErrSuspended) {
+		reason, waitErr := l.options.Tools.Store.WaitReason(l.work)
+		if waitErr != nil {
+			return false, waitErr
+		}
+		if err = l.options.Store.Wait(l.work, l.claim, r.Version, reason); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	for i, result := range results {
+		parts := conversation.Text(result.ModelText())
+		for _, ref := range result.ImageRefs {
+			parts = append(parts, conversation.ContentPart{Type: "image", ArtifactRef: ref})
+		}
+		cp.Messages = append(cp.Messages, AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: parts})
+	}
+	cp.Step++
+	cp.Phase = "model"
+	cp.ExchangeID = ""
+	cp.Result = nil
+	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
+		return false, err
+	}
+	l.emit(r, "turn_end", "", "")
+	return false, nil
+}
+
+func (l agentLoop) replyTurn(r Run) (bool, error) {
+	cp := r.Checkpoint
+	ready, err := l.options.Store.PrepareReply(l.work, l.claim, r)
+	if err != nil {
+		return false, err
+	}
+	if !ready {
+		// A completed generation may have been overtaken by user steering.
+		// Keep it as model context, then inject separate user messages.
+		cp.Step++
+		cp.Phase = "model"
+		cp.Result = nil
+		cp.ExchangeID = ""
+		if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if err = l.options.Store.DeliverReply(l.work, l.claim, r); err != nil {
+		return false, err
+	}
+	l.emit(r, "turn_end", "", "")
+	return false, nil
+}
+
+func (l agentLoop) settleTurn(r Run) (bool, error) {
+	cp := r.Checkpoint
+	done, err := l.options.Store.Complete(l.work, l.claim, r.Version)
+	if err != nil {
+		return false, err
+	}
+	if done {
+		l.emit(r, "agent_end", "", "")
+		return true, nil
+	}
+	cp.Phase = "model"
+	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (l agentLoop) emit(r Run, kind, text, call string) {
+	if l.options.Sink != nil {
+		l.options.Sink(Event{Kind: kind, RunID: r.ID, AgentID: r.AgentID, Step: r.Checkpoint.Step, OccurredAt: time.Now().UTC(), Text: text, ToolCallID: call})
+	}
+}
+
+func (l agentLoop) fail(r Run, code string) error {
+	if err := l.options.Store.Fail(l.work, l.claim, r.Version, code); err != nil {
+		return err
+	}
+	if code == "SPEND_AUTHORIZATION_DENIED" {
+		return &runFailure{cause: ErrSpendDenied}
+	}
+	if code == "RESOURCE_LIMIT" {
+		return &runFailure{cause: ErrResourceLimit}
+	}
+	return &runFailure{cause: llm.NormalizeError(code)}
+}
+
+func (l agentLoop) retryContext(run Run) (bool, error) {
+	if run.Checkpoint.ContextRetries >= 1 {
+		return false, nil
+	}
+	cp := run.Checkpoint
+	cp.ContextRetries++
+	cp.Step++
+	cp.Result = nil
+	cp.ExchangeID = ""
+	cp.Phase = "model"
+	return true, l.options.Store.Checkpoint(l.work, l.claim, run.Version, cp)
 }

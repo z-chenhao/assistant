@@ -295,7 +295,7 @@ def concurrent_append_case(binary, root, failure_evidence=None):
         stage = 'forced-conflict'
         child = h.hold('after_task_commit', extra_flags=('-test-main-release', str(release)))
         _, error = child.communicate(timeout=20)
-        require(child.returncode == 1 and error.strip() == 'personal-agent: run storage unavailable',
+        require(child.returncode == 1 and error.strip() == 'erii: run storage unavailable',
                 'concurrent pending append did not fail the CLI closed')
         require(not embeddings.callback_errors and observed['query_requests'] == 2,
                 'embedding barrier failed instead of exercising recall')

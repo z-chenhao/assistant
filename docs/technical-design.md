@@ -338,7 +338,7 @@ interface TaskAnchor {
 - 调度事件进入 `AgentActor`，由正常路由规则创建或唤醒 Main Run/Worker Run；定时触发与用户消息复用同一套 Run、权限、工具和交付链路。
 - 实际执行仍由 `RunExecutor` 消费 `run_ready`、调用 `RunStore.Claim` 后完成，Scheduler 不绕过 RunClaim。
 - 一期不在 Scheduler 内实现资源编排或复杂工作流；未来云端可将触发器实现替换为分布式调度服务，而保持内部事件协议不变。
-- 本地 CLI 的 `automation work` 在前台以同一个 Actor/RunClaim 路径消费触发；`automation tick` 只生成事件。运行命令、Tool Schema、升级和证据见 [Automation operations](automation.md)。
+- 本地 CLI 的 `automation work` 在前台以同一个 Actor/RunClaim 路径消费触发；`automation tick` 只生成事件。运行命令、Tool Schema、升级和证据见 [Automation operations](guides/automation.md)。
 - cron 使用五个数字字段，支持列表、范围、步长；weekday `0L`～`6L` 表示当月最后一个对应星期。不存在的 DST 分钟跳过，回拨的两个 UTC 分钟分别触发。错过多次时合并为持久化的原到期触发，下一次 cron 严格晚于扫描时间。
 - 持久化 fire 身份、独立 schedule version 和 Inbox 收据。修改使旧排队触发/结果失效；取消复用 Task epoch 停止树，不创建新 Run。每个 Automation 绑定 ongoing Task，每次触发按序新建 Root；Model/Capability 在 admission 时冻结。
 - Automation 接受时冻结隐私 epoch；admission 在创建首个 Task 前校验该意图与当前 Forget 屏障，撤销的 fire 持久化 skipped 与 Inbox。收据重放、调度更新或新 Task 时间戳不能恢复旧意图；升级时缺少 provenance 的旧意图在已有 Forget 后保守跳过（ADR 003）。list 对撤销意图仅返回 Host 生成的引用、当前版本和 enabled 控制状态，清空指令/调度/时区并省略 nextFire/below；本地审计保留，新的意图仍完整可见。
@@ -396,9 +396,9 @@ Intelligent UI 采用 Delivery 层的声明式组件协议 `UISpec`：
 - Main Agent Loop 输出渠道无关的语义结果；Delivery Composer 根据语义内容、结构化数据和渠道能力生成 `UISpec`，Agent 不需要感知具体渠道。
 - 后续如需更自由的生成式界面，可增加 `builtin__ui__compose`，产出经过 Schema 校验和安全检查的 `UIArtifact`。
 
-Web/飞书身份绑定、回调规范化、UISpec v1 渲染、冻结路由与不确定投递恢复的实现及操作说明见 [渠道与交付](channels.md)。
+Web/飞书身份绑定、回调规范化、UISpec v1 渲染、冻结路由与不确定投递恢复的实现及操作说明见 [渠道与交付](guides/channels.md)。
 
-Web 展示层复用 ad-agent 的固定 React 组件、OpenIntelligentUI 的原生 DataTable 和 eri 的角色品牌资产；它们只渲染现有 UISpec 与 Host 表单。组件、资源与许可证随 Go 二进制本地嵌入；不引入第二 Agent/模型路由，也不启用任意模型 HTML/JS。来源与构建验证见 `internal/interaction/web/client/README.md`。
+Web 展示层复用 ad-agent 的固定 React 组件、OpenIntelligentUI 的原生 DataTable 和 eri 的角色品牌资产；它们只渲染现有 UISpec 与 Host 表单。组件、资源与许可证随 Go 二进制本地嵌入；不引入第二 Agent/模型路由，也不启用任意模型 HTML/JS。来源与构建验证见 `web/README.md`。
 
 ### 4.3 Artifact 协议
 
@@ -406,7 +406,7 @@ Web 展示层复用 ad-agent 的固定 React 组件、OpenIntelligentUI 的原�
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。
-- M3 本地实现的 `builtin__artifact__save/read/describe/list/publish` 经过同一个 ToolInvocation/Executor。`artifact_write` 只允许本地不可变新产物和显式最终输出选择，不允许外部发送、上传或删除；读取使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](artifacts.md)。
+- M3 本地实现的 `builtin__artifact__save/read/describe/list/publish` 经过同一个 ToolInvocation/Executor。`artifact_write` 只允许本地不可变新产物和显式最终输出选择，不允许外部发送、上传或删除；读取使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](guides/artifacts.md)。
 
 ## 5. 模型与 Agent 决策
 
@@ -608,7 +608,7 @@ builtin__task__manage
 
 ### 6.2 Code Mode
 
-ERII-19 实现进度：真实 Node/Pi QuickJS 执行、统一嵌套 ToolInvocation、同步持久 Store、发现/角色隔离和 Fake Computer Facade 的运行与证据入口见 `docs/codemode.md`。当前每次 Start 独占 Sidecar/Worker；固定源码全量 Durable Replay、专用 Claim/Wake 与 37+8 kill/restart 验收仍由 ERII-20/21 完成，不据此宣称 M5 完成。
+ERII-19 实现进度：真实 Node/Pi QuickJS 执行、统一嵌套 ToolInvocation、同步持久 Store、发现/角色隔离和 Fake Computer Facade 的运行与证据入口见 `docs/guides/codemode.md`。当前每次 Start 独占 Sidecar/Worker；固定源码全量 Durable Replay、专用 Claim/Wake 与 37+8 kill/restart 验收仍由 ERII-20/21 完成，不据此宣称 M5 完成。
 
 - 采用类似 Pi 1.2.0 / CUA REPL 的 JavaScript Code Mode。
 - 模型侧只暴露一个**代码执行入口** `builtin__codemode__execute`；这不排斥经过 Tool Exposure Policy 选出的普通 Direct Tool。输入直接使用 JavaScript 源码，不再另设 `builtin__computer__run`、Agent 专用 Code Cell 或第二个 CUA JavaScript 工具。
@@ -920,9 +920,9 @@ tool_execution_end
 
 #### 6.6.1 统一能力表面
 
-ERII-17 Direct Tool 实现说明：`builtin__agent__run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/children.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
+ERII-17 Direct Tool 实现说明：`builtin__agent__run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/guides/children.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
 
-ERII-18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/children.md`。
+ERII-18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/guides/children.md`。
 
 Worker Run 的 Code Mode Runtime 注入同一组稳定命名空间：
 
@@ -1217,7 +1217,7 @@ runtime/javascript/
 
 ### 7.1 Skill 结构与加载
 
-M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 与 Root 开放，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。仅摘要进入 Tool description，全文按需读取。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/capabilities.md`。
+M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 与 Root 开放，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。仅摘要进入 Tool description，全文按需读取。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/guides/capabilities.md`。
 
 - 使用成熟的 Agent Skills 目录约定。
 - 每个 Skill 以 `SKILL.md` 为入口，可选包含 `scripts/`、`references/` 和 `assets/`。
@@ -1288,7 +1288,7 @@ ERII-24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生�
 ERII-25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
 DesktopLease、Observation 和受控文件传输；来源局部失败进入 Inventory errors。
 受控审批/资源暂停保留物理 Lease，活动 claim 崩溃仍重建 Instance 并拒绝旧 Handle。
-配置、恢复和故障处理见 [Computer 运维](computer.md) 与 [Computer Use](computer-use.md)。
+配置、恢复和故障处理见 [Computer 运维](guides/computer.md) 与 [Computer Use](guides/computer-use.md)。
 
 生产 CUA bridge 的 `ToolSpec.internal` 随 Capability Snapshot 冻结，仅供 Code
 Mode 的宿主绑定使用，不投影到模型 Tool 列表；直接模型调用仍被 Code claim
@@ -1595,7 +1595,7 @@ context_tokens > context_window * threshold_percentage
 - 每一轮同时执行 `Memory 召回` 与 `Conversation 召回`。
 - 两路召回并行、分别排序，再在统一上下文预算下合并。
 - 本轮召回结果冻结，避免 Agent Loop 中途改变上下文。
-- 用户于 2026-10-18 确认：Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/memory-maintenance.md`。
+- 用户于 2026-10-18 确认：Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/guides/memory-maintenance.md`。
 - 撤销点之后接受的新输入归属新的排队 Main，保留不可变回执；旧 Main owner join 或租约失效并完成 stop settlement 后，才允许调度或 Claim 后继 Run。同内容的新显式 remember 保留独立的新来源与时间戳，不能因去重而继续指向撤销点之前的证据。
 - System Prompt、人格、规则和 Core Memory 尽量保持静态。
 - 动态召回内容放在 Prompt 后部，以减少对 Prompt Cache 的破坏。
@@ -1704,7 +1704,7 @@ author_role?
 
 ### 11.6 Memory 写入与维护
 
-ERII-23 实现与配置：`docs/memory-maintenance.md`。可信本地 Experience Reviewer 使用 `skill manage` 完成候选、验证、晋升与退役；普通 Main/Worker 不获得 Skill 修改能力。
+ERII-23 实现与配置：`docs/guides/memory-maintenance.md`。可信本地 Experience Reviewer 使用 `skill manage` 完成候选、验证、晋升与退役；普通 Main/Worker 不获得 Skill 修改能力。
 
 显式管理工具：
 
@@ -1817,13 +1817,15 @@ forget
 ### 14.1 Go 工程组织
 
 - 一期只使用 `cmd/ + internal/`，暂不创建 `pkg/`；只有未来确实需要对外 SDK 时才增加公共包。
-- `cmd/personal-agent` 是一期唯一的 Go 主进程入口。
+- `cmd/erii` 是一期唯一的 Go 主进程入口。
 - `internal/app` 是不包含业务逻辑的 Composition Root，负责依赖组装、启动和关闭。
 - 接口由使用方所在模块定义；SQLite、NATS、飞书、macOS VM 等实现放在对应模块的具名子包中。
 - 不建立通用的 `ports/`、`adapters/`、`controller/`、`service/`、`repository/` 大目录。
 
 ```text
-cmd/personal-agent/
+cmd/erii/
+web/                     # TypeScript 展示层；构建产物嵌入 Go Web Adapter
+provider-bridge/          # Pi AI Provider/Auth Bridge；无 Tool/Computer 权限
 internal/
   app/
   config/
@@ -1844,7 +1846,6 @@ internal/
   event/
   observability/
 runtime/
-  model-provider/        # Pi AI Provider/Auth Bridge；无 Tool/Computer 权限
   javascript/            # QuickJS Code Mode Sidecar；无模型凭据
 ```
 
@@ -2043,6 +2044,15 @@ security.policy_file / artifact.retention / delivery.default_channel
 
 ### 16.6 进程启动、关闭与恢复顺序
 
+桌面安装通过 `install.sh` 安装 `erii`；裸命令进入终端设置/对话。
+无显式配置或 `ERII_NATS_URL` 时，启动器在独立 data-root 锁内托管一个
+loopback 随机端口、文件持久化的 JetStream，随后仍按下述顺序连接 Broker
+并开放 Ingress。显式配置保留外部 Broker 路径。没有 Active Profile 时仍
+保持 `setup_required`，不自动选择模型。用户数据与版本化安装目录分离；
+App 关闭完成后再停止本地 Broker。入口由原 `cmd/personal-agent` 改名为
+唯一的 `cmd/erii`；数据库、ModelSnapshot 与协议无需迁移。
+安装和组织决定见 [ADR 004](adr/004-erii-installation-and-layout.md)。
+
 启动顺序固定为：
 
 1. 加载并校验配置，初始化日志、Trace 与进程身份。
@@ -2084,7 +2094,7 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 
 ### M0：工程骨架与持久化
 
-- 建立 `cmd/personal-agent`、`internal/*`、配置、日志、Trace、SQLite migration 和 NATS 薄适配层。
+- 建立 `cmd/erii`、`internal/*`、配置、日志、Trace、SQLite migration 和 NATS 薄适配层。
 - 实现 ID/时间/版本约定、Outbox/Inbox、ModelProfile/ModelSnapshot/AuthConnection、SecretStore Fake、Fake LLM 与测试夹具。
 - 建立版本化 Model Provider Bridge RPC 骨架和 Fake Bridge；此阶段不要求真实账号登录。
 - 提供 `make test` 或等价单命令，不依赖真实外部服务运行单元测试。
@@ -2109,7 +2119,7 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 
 ### M3：统一 Tooling、Approval 与 Artifact
 
-M3 的 MCP 与 Coding 验证使用真实 stdio 协议和受控磁盘 fixture：进程由 macOS Seatbelt / Linux bubblewrap 隔离，网络与 Host 用户目录不可达；生产 Lume/Guest ComputerProvider 仍在 M6。它们共享现有 ToolExecutor/Security/Artifact 管线，不另建 Computer Agent Loop。新增 ToolSpec 的可选 description/resource_hash 随 tools_json 冻结，旧快照不自动扩权；不需要新增 schema 或领域状态。该中间验证边界的限制和证据见 `docs/capabilities.md`。
+M3 的 MCP 与 Coding 验证使用真实 stdio 协议和受控磁盘 fixture：进程由 macOS Seatbelt / Linux bubblewrap 隔离，网络与 Host 用户目录不可达；生产 Lume/Guest ComputerProvider 仍在 M6。它们共享现有 ToolExecutor/Security/Artifact 管线，不另建 Computer Agent Loop。新增 ToolSpec 的可选 description/resource_hash 随 tools_json 冻结，旧快照不自动扩权；不需要新增 schema 或领域状态。该中间验证边界的限制和证据见 `docs/guides/capabilities.md`。
 
 - 完成 Tool Registry/Executor、Capability Snapshot、Security Policy、可恢复 Approval、ArtifactStore 和 Delivery Outbox。
 - 为每个 ToolSpec 强制声明风险、`replay_policy`、超时、输出限制与冲突键生成器。
@@ -2205,13 +2215,13 @@ Go 测试必须运行 race detector；Sidecar 必须包含协议 fixture、资�
 
 以下选择不阻塞 Coding Agent 按 M0–M5 开工；实现必须放在接口后，不得把某个临时选择泄漏到领域协议：
 
-1. Embedding 与 SQLite 向量实现已在 ERII-22 选择：显式配置 OpenAI-compatible embedding endpoint/model/dimensions，SecretStore 引用凭据；SQLite 保存 dense vectors，私有 adapter 在用户/Agent/时间分区内执行 exact cosine，并与 FTS5/BM25 并行后 RRF。无新增 native extension，不声称 ANN 或次线性性能。未配置 embedding 时不提供召回能力，不将 FTS-only 视作完整向量交付。实现与离线重建限制见 `docs/recall.md`；模型质量留给 release-time Live Shadow。
+1. Embedding 与 SQLite 向量实现已在 ERII-22 选择：显式配置 OpenAI-compatible embedding endpoint/model/dimensions，SecretStore 引用凭据；SQLite 保存 dense vectors，私有 adapter 在用户/Agent/时间分区内执行 exact cosine，并与 FTS5/BM25 并行后 RRF。无新增 native extension，不声称 ANN 或次线性性能。未配置 embedding 时不提供召回能力，不将 FTS-only 视作完整向量交付。实现与离线重建限制见 `docs/guides/recall.md`；模型质量留给 release-time Live Shadow。
 2. Web 框架、TUI 框架、飞书 SDK 与视觉实现；TUI 只需支持首次模型设置、首条纵向链路和审批。
 3. Context Compaction 的最终阈值与 Token 分配；算法和配置点先实现，数值通过用户选择的模型压测冻结。
 4. 各具体 Tool 的风险映射、范围授权文案与审批 UI；未知副作用 Tool 默认要求审批且 `replay_policy=never`。
 5. Artifact 的最终保留周期、配额与清理批次；MVP 必须先有可配置默认值、引用计数/作用域检查和 dry-run 清理。
 6. 公平调度权重、NATS Stream/Consumer/DLQ、租约时长、退避与 watchdog 的生产参数；先使用保守可配置默认值并记录指标。
-   ERII-29 将首版运维参数落在 `docs/operations.md`：事件 Stream 默认 7 天/1 GiB/100 万条/单条 1 MiB，DLQ 仅保留无正文的诊断 receipt，5 次毒消息阈值，32 个未确认消费窗口。远程 NATS 必须 TLS + SecretStore token 引用，既有无界 Stream 通过显式、无立即丢弃的运维命令升级。三个数据库和 Artifact 使用独占冷备、认证加密清单及新目录原子还原；凭据独立保管，还原先禁用，确认源实例退役及外部结果后显式启用。正常关闭不改变 Task 状态；备份不承诺外部副作用 exactly-once。
+   ERII-29 将首版运维参数落在 `docs/guides/operations.md`：事件 Stream 默认 7 天/1 GiB/100 万条/单条 1 MiB，DLQ 仅保留无正文的诊断 receipt，5 次毒消息阈值，32 个未确认消费窗口。远程 NATS 必须 TLS + SecretStore token 引用，既有无界 Stream 通过显式、无立即丢弃的运维命令升级。三个数据库和 Artifact 使用独占冷备、认证加密清单及新目录原子还原；凭据独立保管，还原先禁用，确认源实例退役及外部结果后显式启用。正常关闭不改变 Task 状态；备份不承诺外部副作用 exactly-once。
 7. 高安全上限的最终容量校准、成本估算与可复用脚本管理界面；模型仍不获得预算查询工具。
 8. 金融交易与其他受监管能力的合规设计；未单独评审前不得启用真实交易 Tool。
 9. 云端服务拆分、租户隔离、多 Agent 创建体验和迁移；一期保持模块化单体与单 Agent 产品面。

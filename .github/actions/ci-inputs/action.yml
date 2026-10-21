@@ -15,20 +15,20 @@ runs:
         go-version-file: go.mod
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: 24.21.0
+        node-version-file: .node-version
         cache: npm
         cache-dependency-path: |
           provider-bridge/package-lock.json
           runtime/javascript/package-lock.json
           guest-browser/package-lock.json
-          internal/interaction/web/client/package-lock.json
+          web/package-lock.json
     - name: Install pinned dependencies
       shell: bash
       run: |
         npm ci --prefix provider-bridge --ignore-scripts
         npm ci --prefix runtime/javascript --ignore-scripts
         npm ci --prefix guest-browser --ignore-scripts
-        npm ci --prefix internal/interaction/web/client --ignore-scripts
+        npm ci --prefix web --ignore-scripts
     - name: Provision copied public SDK
       shell: bash
       run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json

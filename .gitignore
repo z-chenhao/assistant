@@ -10,4 +10,5 @@ __pycache__/
 /.ci-go/
 /ci-build.tar.gz
 /guest-browser/node_modules/
-/internal/interaction/web/client/node_modules/
+/web/node_modules/
+/dist/
