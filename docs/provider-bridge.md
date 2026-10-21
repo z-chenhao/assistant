@@ -380,8 +380,14 @@ of 1,048,576/65,536 tokens. These are execution limits, not the persisted metada
 format: valid v3 candidates above these limits still migrate, list and read back
 unchanged, alongside all other candidates. They cannot be probed or selected
 until replaced or edited within limits. No profile is silently clamped.
-Activation retains only observed text/tool/streaming capabilities and conservative
-compatibility. Unprobed image/audio/reasoning/parallel/usage claims and optional
+When `image_input:true` is declared, Probe additionally sends a Host-owned blue
+square through the same image resolver/Pi envelope used by screenshot output and
+requires the correct color response. Rejection or an incorrect reply prevents
+activation; a failed retest revokes existing readiness. Declare `image_input:false`
+for a text-only profile. Activation retains observed text/tool/streaming capabilities,
+declared and verified image input, and conservative compatibility. Old Probe
+records without image proof remain valid for text profiles and cannot admit images.
+Unprobed audio/reasoning/parallel/usage claims and optional
 sampling defaults are cleared. Explicit reasoning effort is rejected until a
 Probe supports it. Frozen snapshots remain unchanged by all control-plane edits.
 

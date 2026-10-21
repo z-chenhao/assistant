@@ -13,9 +13,12 @@ import subprocess
 import termios
 import time
 
+from fixture_pool import current
+
 
 class Terminal:
     def __init__(self, args, env, cwd, echo=False):
+        self.processes = current()
         self.master, slave = pty.openpty()
         settings = termios.tcgetattr(slave)
         if not echo:
@@ -26,8 +29,13 @@ class Terminal:
         self.original_settings = termios.tcgetattr(self.input_observer)
         os.set_blocking(self.master, False)
         try:
-            self.process = subprocess.Popen(args, stdin=slave, stdout=slave,
+            start = self.processes.start if self.processes is not None else subprocess.Popen
+            self.process = start(args, stdin=slave, stdout=slave,
                                             stderr=slave, env=env, cwd=cwd)
+        except BaseException:
+            os.close(self.master)
+            os.close(self.input_observer)
+            raise
         finally:
             os.close(slave)
         self.output = b""
@@ -37,9 +45,16 @@ class Terminal:
         pattern = marker.encode()
         deadline = time.monotonic() + timeout
         while pattern not in self.output[self.position:]:
+            if self.processes is not None:
+                self.processes.check()
             remaining = deadline - time.monotonic()
-            if remaining <= 0 or not select.select([self.master], [], [], remaining)[0]:
+            if remaining <= 0:
                 raise RuntimeError(f"terminal timed out awaiting {marker!r}; {self.transcript()[-1200:]}")
+            # The retained slave observer prevents EOF after a scoped child
+            # stops. Poll cancellation while preserving the absolute deadline.
+            wait = min(remaining, .05) if self.processes is not None else remaining
+            if not select.select([self.master], [], [], wait)[0]:
+                continue
             try:
                 chunk = os.read(self.master, 65536)
             except OSError as error:
@@ -54,6 +69,17 @@ class Terminal:
         self.position = end
         return value
 
+    def expect_all(self, markers, timeout=20):
+        """Await independently ordered output from concurrent foreground work."""
+        start, end = self.position, self.position
+        values = []
+        for marker in markers:
+            self.position = start
+            values.append(self.expect(marker, timeout))
+            end = max(end, self.position)
+        self.position = end
+        return values
+
     def send(self, text):
         if "\n" in text or "\r" in text:
             raise ValueError("send exactly one terminal line")
@@ -65,10 +91,13 @@ class Terminal:
         remaining = memoryview(data)
         deadline = time.monotonic() + 20
         while remaining:
+            if self.processes is not None:
+                self.processes.check()
             timeout = deadline - time.monotonic()
             if timeout <= 0:
                 raise RuntimeError("terminal input write timed out")
-            readable, writable, _ = select.select([self.master], [self.master], [], timeout)
+            wait = min(timeout, .05) if self.processes is not None else timeout
+            readable, writable, _ = select.select([self.master], [self.master], [], wait)
             if readable:
                 self.output += os.read(self.master, 65536)
             if writable:
@@ -110,6 +139,8 @@ class Terminal:
         self.process.wait(timeout=20)
         os.close(self.master)
         os.close(self.input_observer)
+        if self.processes is not None:
+            self.processes.retire(self.process)
 
     def __enter__(self):
         return self

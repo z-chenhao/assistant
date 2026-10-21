@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from verify import STATE_SCHEMA_VERSION
 
 
 def require(ok, message):
@@ -66,10 +67,40 @@ class Endpoint(BaseHTTPRequestHandler):
 
         try:
             text = str(body["messages"][-1].get("content", ""))
+            images = sum(p.get("type") == "image_url" for m in body["messages"]
+                         if isinstance(m.get("content"), list) for p in m["content"])
             if "until cancelled" in text:
                 for _ in range(100):
                     chunk({"content": "streaming "})
                     time.sleep(.01)
+            elif "dominant color of this image" in text:
+                chunk({"content": "blue" if images == 1 and self.server.mode != "reject-images" else "unseen"})
+                chunk({}, "stop")
+            elif self.server.mode == "screenshots" and any(t["function"]["name"] == "builtin__codemode__execute" for t in body.get("tools", [])):
+                self.server.images.append(images)
+                count = sum(m["role"] == "tool" for m in body["messages"])
+                if count < 2:
+                    source = 'const app=await cua.getApp("com.apple.TextEdit");const shot=await app.getScreenshot();'
+                    source += 'image(shot.image);' if count == 1 else 'text("Observed without selecting pixels.");'
+                    chunk({"tool_calls": [{"index": 0, "id": f"screenshot-{count}", "type": "function", "function": {"name": "builtin__codemode__execute", "arguments": json.dumps({"source": source})}}]})
+                    chunk({}, "tool_calls")
+                else:
+                    chunk({"content": "Screenshot selection verified."})
+                    chunk({}, "stop")
+            elif self.server.mode == "tasks":
+                names = [item["function"]["name"] for item in body.get("tools", [])]
+                root = any("general Worker executing" in str(m.get("content", "")) for m in body["messages"])
+                runtime = any("Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in body["messages"])
+                has_result = any(m["role"] == "tool" for m in body["messages"])
+                if runtime and not root:
+                    chunk({"content": "Main Task follow-up through Pi."})
+                elif not has_result and (root or "builtin__task__manage" in names):
+                    name = "builtin__text__echo" if root else "builtin__task__manage"
+                    arguments = {"text": "Independent Root report."} if root else {"operation": "create", "task": "Prepare a safe independent report. Return evidence; perform no external actions."}
+                    chunk({"tool_calls": [{"index": 0, "id": "task_call", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}]})
+                else:
+                    chunk({"content": "Root business result through Pi." if root else "Main Task accepted through Pi."})
+                chunk({}, "stop", {"prompt_tokens": 7, "completion_tokens": 8, "total_tokens": 15})
             elif self.server.mode == "partial":
                 chunk({"content": "partial"})
                 return
@@ -78,7 +109,8 @@ class Endpoint(BaseHTTPRequestHandler):
                     chunk({"content": "I cannot call tools"})
                     chunk({}, "stop")
                 else:
-                    name = body["tools"][0]["function"]["name"]
+                    names = [item["function"]["name"] for item in body["tools"]]
+                    name = "builtin__text__echo" if "builtin__text__echo" in names else names[0]
                     arguments = {"text": text} if name == "builtin__text__echo" else {"value": "OK"}
                     chunk({"tool_calls": [{"index": 0, "id": "call_echo", "type": "function",
                                           "function": {"name": name, "arguments": json.dumps(arguments)}}]})
@@ -141,6 +173,24 @@ def verify(binary, script):
             require(all(r["auth"] is None for r in server.requests), "fabricated Authorization")
             report["checks"] += ["catalog", "manual CLI add", "unverified rejection", "real five-part probe", "atomic select", "restart ready", "no fabricated key"]
 
+            server.mode = "tasks"
+            task_start = len(server.requests)
+            command("chat", "send", "local-task", text="Delegate an independent report in the background.")
+            command("chat", "work")
+            task_history = command("chat", "history")
+            require(task_history[-1]["content"][0]["text"] == "Main Task follow-up through Pi.", "actual Pi Task follow-up missing")
+            task_requests = [r["body"] for r in server.requests[task_start:] if r.get("body")]
+            roots = [r for r in task_requests if any("general Worker executing" in str(m.get("content", "")) for m in r["messages"])]
+            require(roots and all(not any(t["function"]["name"].startswith("builtin__task__") for t in r["tools"]) for r in roots), "Root Task control exposed on actual Pi wire")
+            require(all("actual local conversation" not in json.dumps(r["messages"]) for r in roots), "Root inherited Main Conversation")
+            require(any(any(m["role"] == "user" and "Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in r["messages"]) for r in task_requests), "runtime framing lost at actual Pi boundary")
+            with closing(sqlite3.connect(root / "data/state.db")) as db:
+                require(db.execute("SELECT count(*) FROM task WHERE status='completed'").fetchone()[0] == 1, "actual Pi Task missing")
+                require(db.execute("SELECT count(*) FROM main_inbox").fetchone()[0] == 1, "actual Pi Reporter dedup missing")
+            report["task_requests"] = task_requests
+            report["task_history"] = task_history
+            report["checks"].append("actual Node/Pi Task create -> Root echo/result -> runtime-framed Reporter -> one Main follow-up; role/context isolation")
+
             # A failed retest must revoke proof and close ingress after endpoint failure.
             server.mode = "no-tools"
             require("MODEL_INCOMPATIBLE" in command("model", "test", id_, ok=False), "missing tools accepted")
@@ -169,7 +219,7 @@ def verify(binary, script):
             report["checks"].append("partial stream is not completion")
 
             with closing(sqlite3.connect(root / "data/state.db")) as db:
-                require(db.execute("pragma user_version").fetchone()[0] == 7, "schema")
+                require(db.execute("pragma user_version").fetchone()[0] == STATE_SCHEMA_VERSION, "schema")
                 rows = db.execute("SELECT snapshot_id,run_id,input_tokens,output_tokens,latency_ms,error_code,snapshot_json FROM provider_usage").fetchall()
                 require(rows and any(r[2:4] == (7, 8) for r in rows), "usage not recorded")
                 require(any(r[5] == "GENERATION_CANCELLED" and r[2] is None for r in rows), "unknown cancellation usage fabricated")
@@ -188,12 +238,62 @@ def verify(binary, script):
     return report
 
 
+def verify_screenshot_projection(binary, script):
+    """Normal CLI Test/Select -> Run -> explicit image -> actual Pi HTTP.
+
+    Uses the existing Computer fixture for Guest mechanics; no database edits
+    can inject capabilities into the profile or its frozen snapshot.
+    """
+    from verify_computer_use import launch
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Endpoint)
+    server.requests, server.images, server.mode = [], [], "screenshots"
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    report = {"checks": [], "cleanup": False}
+    try:
+        for enabled in (True, False):
+            server.images.clear()
+            with tempfile.TemporaryDirectory(prefix="erii-image-profile-") as temporary:
+                with launch(binary, Path(temporary).resolve()) as h:
+                    config = json.loads((h.root / "config.yaml").read_text())
+                    config["llm"] = {"provider_bridge_command": "node", "provider_bridge_script": str(script), "provider_bridge_version": "pi-ai-1.3.0-v1"}
+                    (h.root / "config.yaml").write_text(json.dumps(config))
+                    h.args = lambda *a: [str(h.binary), "-config", str(h.root / "config.yaml"), *a]
+                    metadata = {"name": "Screenshot profile", "provider_kind": "openai_compatible", "endpoint": f"http://127.0.0.1:{server.server_port}/v1", "wire_api": "openai_completions", "model_id": "fixture-model", "context_window": 65536, "max_output_tokens": 4096, "compatibility": {"tool_result_format": "openai"}, "capabilities": {"text_input": True, "image_input": enabled}}
+                    profile = h.setup(metadata=metadata)
+                    h.send("screenshot-profile", "Observe two screenshots; explicitly select only the second image.")
+                    h.command("chat", "work")
+                    with closing(sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db")) as db:
+                        requests = [json.loads(r[0]) for r in db.execute("SELECT request_json FROM model_generation ORDER BY created_at")]
+                        require(len(requests) == 3, "screenshot Run exchanges")
+                        require(all(r["model_snapshot"]["capabilities"]["image_input"] == enabled for r in requests), "normally selected image capability lost or gained")
+                        selected = [sum(len(m.get("image_refs", [])) for m in r["messages"]) for r in requests]
+                        require(selected == [0, 0, 1], "explicit screenshot selection not persisted")
+                        require("base64" not in json.dumps(requests), "pixels entered durable generation requests")
+                    require(server.images == ([0, 0, 1] if enabled else [0, 0, 0]), "selected screenshot pixels missing or text-only fallback leaked pixels")
+                    report["checks"].append({"image_input": enabled, "selected_refs": selected, "provider_image_counts": list(server.images)})
+                    if enabled:
+                        server.mode = "reject-images"
+                        failed = h.command("model", "test", profile, ok=False)
+                        require("MODEL_INCOMPATIBLE" in failed.stderr, "failed image probe admitted")
+                        require(h.command("status")["readiness"] == "degraded", "failed image retest left ingress open")
+                        server.mode = "screenshots"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+    report["cleanup"] = True
+    return report
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", default="bin/personal-agent")
     parser.add_argument("--evidence", default="evidence/local-provider.json")
     args = parser.parse_args()
     result = verify(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
+    result["screenshot_projection"] = verify_screenshot_projection(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
     Path(args.evidence).parent.mkdir(parents=True, exist_ok=True)
     Path(args.evidence).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"checks": len(result["checks"]), "usage_rows": len(result["usage"]), "cleanup": result["cleanup"]}))
