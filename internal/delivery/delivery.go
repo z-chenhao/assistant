@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	ErrStorage  = errors.New("delivery storage unavailable")
-	ErrConflict = errors.New("delivery identity or ownership conflict")
-	ErrEmpty    = errors.New("no delivery ready")
+	ErrStorage   = errors.New("delivery storage unavailable")
+	ErrConflict  = errors.New("delivery identity or ownership conflict")
+	ErrEmpty     = errors.New("no delivery ready")
+	ErrClaimLost = errors.New("delivery claim lost")
 )
 
 type Request struct {
@@ -100,6 +101,7 @@ type Claim struct {
 }
 type Store interface {
 	Claim(context.Context, string, string, []string, time.Time, time.Duration) (Claim, error)
+	Renew(context.Context, Claim, time.Duration) error
 	Settle(context.Context, Claim, Observation, time.Time, time.Time) error
 }
 type History interface {
@@ -151,52 +153,102 @@ func (s Service) Drain(ctx context.Context) error {
 			return err
 		}
 		seen = append(seen, c.Request.DeliveryID)
-		messages, err := s.History.List(ctx, c.Request.ConversationID)
-		if err != nil {
+		if err := s.deliverClaim(ctx, c); err != nil && !errors.Is(err, ErrClaimLost) {
 			return err
 		}
-		var message conversation.Message
-		for _, m := range messages {
-			if m.MessageID == c.Request.MessageID {
-				message = m
-				break
-			}
-		}
-		e, err := Compose(c.Request, message)
-		if err != nil {
-			return err
-		}
-		observation := Observation{Outcome: Retry}
-		if c.Recover {
-			observation = s.Adapter.Query(ctx, e)
-		}
-		if c.Recover && observation.Outcome == Retry && !s.Adapter.Idempotent() {
-			observation = Observation{Outcome: Unknown}
-		}
-		// An unknown row is query-only. A recovery scan cannot turn absence or
-		// a query failure into permission to repeat an ambiguous side effect.
-		if c.Request.Status == "unknown" && observation.Outcome == Retry {
-			observation = Observation{Outcome: Unknown}
-		}
-		if observation.Outcome == Retry {
-			if c.Request.AttemptCount > s.Policy.MaxAttempts {
-				observation = Observation{Outcome: Failed, Code: "retry_exhausted"}
-			} else {
-				s.boundary("before_delivery_send")
-				observation = s.Adapter.Send(ctx, e)
-				s.boundary("after_delivery_send")
-			}
-		}
-		if observation.Outcome == Retry && c.Request.AttemptCount >= s.Policy.MaxAttempts {
-			observation = Observation{Outcome: Failed, Code: "retry_exhausted"}
-		}
-		now := time.Now()
-		delay := time.Duration(s.Policy.RetryMilliseconds) * time.Millisecond * time.Duration(1<<min(c.Request.AttemptCount-1, 8))
-		s.boundary("before_delivery_ack")
-		if err := s.Store.Settle(ctx, c, observation, now, now.Add(delay)); err != nil {
-			return err
-		}
-		s.boundary("after_delivery_ack")
 	}
 	return ctx.Err()
+}
+
+// Keep the same fenced owner alive through composition, receipt queries, all
+// multipart sends and settlement. Losing ownership cancels the transport and
+// leaves recovery to the current owner; it must not stop unrelated ingress.
+func (s Service) deliverClaim(ctx context.Context, c Claim) error {
+	work, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan struct{})
+	renewed := make(chan error, 1)
+	lease := time.Duration(s.Policy.LeaseSeconds) * time.Second
+	go func() {
+		ticker := time.NewTicker(lease / 3)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				renewed <- nil
+				return
+			case <-work.Done():
+				renewed <- nil
+				return
+			case <-ticker.C:
+				if err := s.Store.Renew(work, c, lease); err != nil {
+					cancel()
+					renewed <- err
+					return
+				}
+			}
+		}
+	}()
+	err := s.deliver(work, c)
+	close(done)
+	if renewErr := <-renewed; renewErr != nil {
+		return renewErr
+	}
+	return err
+}
+
+func (s Service) deliver(ctx context.Context, c Claim) error {
+	messages, err := s.History.List(ctx, c.Request.ConversationID)
+	if err != nil {
+		return err
+	}
+	var message conversation.Message
+	for _, m := range messages {
+		if m.MessageID == c.Request.MessageID {
+			message = m
+			break
+		}
+	}
+	e, err := Compose(c.Request, message)
+	if err != nil {
+		return err
+	}
+	observation := Observation{Outcome: Retry}
+	if c.Recover {
+		observation = s.Adapter.Query(ctx, e)
+	}
+	if c.Recover && observation.Outcome == Retry && !s.Adapter.Idempotent() {
+		observation = Observation{Outcome: Unknown}
+	}
+	// An unknown row is query-only. A recovery scan cannot turn absence or
+	// a query failure into permission to repeat an ambiguous side effect.
+	if c.Request.Status == "unknown" && observation.Outcome == Retry {
+		observation = Observation{Outcome: Unknown}
+	}
+	if observation.Outcome == Retry {
+		if c.Request.AttemptCount > s.Policy.MaxAttempts {
+			observation = Observation{Outcome: Failed, Code: "retry_exhausted"}
+		} else {
+			s.boundary("before_delivery_send")
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			observation = s.Adapter.Send(ctx, e)
+			s.boundary("after_delivery_send")
+		}
+	}
+	if observation.Outcome == Retry && c.Request.AttemptCount >= s.Policy.MaxAttempts {
+		observation = Observation{Outcome: Failed, Code: "retry_exhausted"}
+	}
+	now := time.Now()
+	delay := time.Duration(s.Policy.RetryMilliseconds) * time.Millisecond * time.Duration(1<<min(c.Request.AttemptCount-1, 8))
+	s.boundary("before_delivery_ack")
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if err := s.Store.Settle(ctx, c, observation, now, now.Add(delay)); err != nil {
+		return err
+	}
+	s.boundary("after_delivery_ack")
+	return nil
 }

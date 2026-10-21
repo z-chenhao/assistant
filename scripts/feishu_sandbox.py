@@ -8,14 +8,21 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import threading
+import time
 
 
 class Sandbox:
-    def __init__(self):
+    def __init__(self, send_delay=0, upload_delay=0):
         self.messages = {}
         self.send_attempts = []
         self.uploads = []
         self.drop_response = False
+        self.send_delay = send_delay
+        self.upload_delay = upload_delay
+        self.operations = []
+        self.send_started = threading.Event()
+        self.upload_started = threading.Event()
+        self.stopping = threading.Event()
         self.lock = threading.Lock()
         outer = self
 
@@ -28,6 +35,7 @@ class Sandbox:
                     self.send_error(401)
                     return
                 raw = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+                drop = False
                 with outer.lock:
                     if self.path == '/open-apis/im/v1/files':
                         envelope = BytesParser(policy=policy.default).parsebytes(
@@ -37,6 +45,7 @@ class Sandbox:
                         key = 'sandbox-file-' + hashlib.sha256(payload).hexdigest()
                         outer.uploads.append(dict(name=fields['file'].get_filename(), sha256=hashlib.sha256(payload).hexdigest(), key=key))
                         result = dict(file_key=key)
+                        kind, delay = 'upload', outer.upload_delay
                     elif self.path == '/open-apis/im/v1/messages?receive_id_type=chat_id':
                         message = json.loads(raw)
                         outer.send_attempts.append(message)
@@ -50,19 +59,32 @@ class Sandbox:
                             return
                         outer.messages[key] = message
                         result = dict(message_id='remote-' + key)
-                        if outer.drop_response:
-                            self.close_connection = True
-                            self.connection.close()
-                            return
+                        kind, delay = 'send', outer.send_delay
+                        drop = outer.drop_response
                     else:
                         self.send_error(404)
                         return
+                    operation = dict(kind=kind, delay_seconds=delay, started_at=time.time(), finished_at=None)
+                    outer.operations.append(operation)
+                    (outer.send_started if kind == 'send' else outer.upload_started).set()
+                # Delay only the platform acknowledgement, after recording the
+                # effect. Never hold the ledger lock while a client is waiting.
+                outer.stopping.wait(delay)
+                with outer.lock:
+                    operation['finished_at'] = time.time()
+                if drop:
+                    self.close_connection = True
+                    self.connection.close()
+                    return
                 body = json.dumps(dict(code=0, data=result)).encode()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # A fenced/cancelled client can leave a real effect.
 
             def do_GET(self):
                 if self.headers.get('Authorization') != 'Bearer sandbox-access-token':
@@ -87,6 +109,7 @@ class Sandbox:
         return self
 
     def __exit__(self, *_):
+        self.stopping.set()
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=10)
@@ -95,4 +118,4 @@ class Sandbox:
 
     def evidence(self):
         with self.lock:
-            return dict(messages=list(self.messages.values()), send_attempts=list(self.send_attempts), uploads=list(self.uploads))
+            return dict(messages=list(self.messages.values()), send_attempts=list(self.send_attempts), uploads=list(self.uploads), operations=[dict(op) for op in self.operations])

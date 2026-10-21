@@ -115,6 +115,31 @@ func (s Store) Claim(ctx context.Context, channel, destination string, excluded 
 	return c, nil
 }
 
+// Renewal never changes semantic state/version. Token, version and live expiry
+// are checked atomically, so an expired owner cannot revive itself or overtake
+// a recovery owner even when its old transport returns late.
+func (s Store) Renew(ctx context.Context, c delivery.Claim, lease time.Duration) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return delivery.ErrStorage
+	}
+	defer tx.Rollback()
+	// Capture time after acquiring the write transaction, not before waiting
+	// on another writer. An expired claim must never be revived by lock delay.
+	now := time.Now()
+	updated, err := tx.ExecContext(ctx, `UPDATE delivery_outbox SET claim_expires_at=max(claim_expires_at,?) WHERE delivery_id=? AND claim_token=? AND claim_expires_at>? AND EXISTS(SELECT 1 FROM delivery_request d WHERE d.delivery_id=delivery_outbox.delivery_id AND d.version=?)`, now.Add(lease).UnixMicro(), c.Request.DeliveryID, c.Token, now.UnixMicro(), c.Request.Version)
+	if err != nil {
+		return delivery.ErrStorage
+	}
+	if n, _ := updated.RowsAffected(); n != 1 {
+		return delivery.ErrClaimLost
+	}
+	if tx.Commit() != nil {
+		return delivery.ErrStorage
+	}
+	return nil
+}
+
 func (s Store) Settle(ctx context.Context, c delivery.Claim, o delivery.Observation, now, next time.Time) error {
 	switch o.Outcome {
 	case delivery.Delivered, delivery.Retry, delivery.Failed, delivery.Unknown:
@@ -139,14 +164,14 @@ func (s Store) Settle(ctx context.Context, c delivery.Claim, o delivery.Observat
 		return delivery.ErrStorage
 	}
 	if valid != 1 {
-		return delivery.ErrConflict
+		return delivery.ErrClaimLost
 	}
 	updated, err := tx.ExecContext(ctx, `UPDATE delivery_request SET status=?,last_error=nullif(?,''),updated_at=?,version=version+1 WHERE delivery_id=? AND version=?`, o.Outcome, code, now.UnixMicro(), c.Request.DeliveryID, c.Request.Version)
 	if err != nil {
 		return delivery.ErrStorage
 	}
 	if n, _ := updated.RowsAffected(); n != 1 {
-		return delivery.ErrConflict
+		return delivery.ErrClaimLost
 	}
 	if o.Outcome == delivery.Delivered || o.Outcome == delivery.Failed {
 		_, err = tx.ExecContext(ctx, `DELETE FROM delivery_outbox WHERE delivery_id=?`, c.Request.DeliveryID)

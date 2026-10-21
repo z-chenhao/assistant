@@ -124,7 +124,7 @@ func TestDeliveryClaimFencesLateAckAndQueriesAcceptedSend(t *testing.T) {
 	}
 	stale := c
 	stale.Request.Version--
-	if err = s.Deliveries().Settle(ctx, stale, delivery.Observation{Outcome: delivery.Failed}, time.Now(), time.Now()); !errors.Is(err, delivery.ErrConflict) {
+	if err = s.Deliveries().Settle(ctx, stale, delivery.Observation{Outcome: delivery.Failed}, time.Now(), time.Now()); !errors.Is(err, delivery.ErrClaimLost) {
 		t.Fatal("stale version accepted", err)
 	}
 	if _, err = s.Deliveries().Claim(ctx, "tui", service.Destination, nil, now, time.Second); !errors.Is(err, delivery.ErrEmpty) {
@@ -144,7 +144,7 @@ func TestDeliveryClaimFencesLateAckAndQueriesAcceptedSend(t *testing.T) {
 	if err = service.Drain(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.Deliveries().Settle(ctx, c, delivery.Observation{Outcome: delivery.Failed}, time.Now(), time.Now()); !errors.Is(err, delivery.ErrConflict) {
+	if err = s.Deliveries().Settle(ctx, c, delivery.Observation{Outcome: delivery.Failed}, time.Now(), time.Now()); !errors.Is(err, delivery.ErrClaimLost) {
 		t.Fatal("late acknowledgement accepted", err)
 	}
 	if deliveryRows(t, s)[0].Status != "sent" {

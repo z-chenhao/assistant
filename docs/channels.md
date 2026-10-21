@@ -122,6 +122,14 @@ resent. Interrupted uploads can leave an unreferenced provider file, but cannot
 justify repeating a user notification. The user can see the semantic message in
 Web history while a remote transport remains unconfirmed.
 
+The shared Delivery service renews its fenced claim through composition, receipt
+queries, every upload/message part and settlement. A slow successful request or
+cumulative multipart operation may exceed the configured lease without becoming
+a second attempt. Renewal checks the current token, version and live expiry;
+an expired or replaced owner cannot renew. Lost ownership cancels that transport
+and joins its heartbeat without stopping Web ingress. The current owner recovers
+from authoritative receipts; an uncertain Feishu send stays query-only.
+
 ## Verification and evidence
 
 ```sh
@@ -130,6 +138,7 @@ make test-race
 make lint
 make verify
 python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/channels.json
+python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/channel-leases.json --delivery-lease-only
 ```
 
 `verify_channels.py` owns Launch (private root, local platform Fake and real Web
@@ -143,7 +152,11 @@ Screenshots and DOM evidence are under `evidence/channels-ui/`.
 The harness covers concurrent callback/source retries, identity/auth/recipient
 rejection, input commit and delivery SIGKILL windows, approval Steering plus
 restart and callback races, inbound/outbound attachment bytes, unknown-send
-non-retry, and GC-08/09/12/14 channel/state fragments. Unit/contract tests cover
+non-retry, and GC-08/09/12/14 channel/state fragments. It also covers
+slow sends/uploads, cumulative multipart duration beyond the default lease,
+competing live/recovery consumers, lost ownership cancellation, late settlement
+and renewed ingress after restart. The existing platform Fake owns deterministic
+response delays and an independent send-attempt ledger. Unit/contract tests cover
 migration rollback, CAS/revocation, route/projection freezing, encryption,
 credential redirect refusal, session expiry, XSS and unknown/invalid-component
 fallback. The channel harness also drives Web account login through the real Manager/Bridge

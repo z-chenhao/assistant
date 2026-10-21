@@ -194,9 +194,84 @@ def run(binary,evidence):
             h.stop()
         finally:h.cleanup()
     extra_scenarios(binary,report)
+    delivery_leases(binary, report)
     account_presentation(binary,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def delivery_leases(binary, report):
+    """Exercise the same foreground delivery path beyond the default 5s lease."""
+    for name, fixture, send_delay, upload_delay in (
+            ('slow-send', 'main', 7, 0),
+            ('slow-upload', 'artifacts', 0, 6),
+            ('cumulative-multipart', 'artifacts', 2, 2)):
+        with tempfile.TemporaryDirectory(prefix='erii-channel-lease-') as temp, Sandbox(send_delay, upload_delay) as platform:
+            h = ChannelHarness(binary, Path(temp), platform, fixture)
+            try:
+                h.setup(); h.start()
+                content = 'Slow delivery must retain its original fenced owner.'
+                text = content if fixture == 'main' else json.dumps(dict(name='slow.txt', mediaType='text/plain', text=content))
+                started = time.monotonic()
+                h.callback(name, text)
+                require(platform.send_started.wait(10), 'slow delivery did not reach platform')
+                competitor = None
+                if name == 'slow-send':
+                    with sqlite3.connect(h.root/'data/state.db') as db:
+                        # Renewal leaves updated_at/version unchanged. Derive
+                        # the original expiry even if a heartbeat already ran.
+                        initial_expiry, token = db.execute('SELECT d.updated_at+5000000,o.claim_token FROM delivery_outbox o JOIN delivery_request d USING(delivery_id)').fetchone()
+                    h.wait(lambda _: time.time() > initial_expiry/1_000_000 + .1, 'past original claim expiry')
+                    require(platform.evidence()['operations'][0]['finished_at'] is None, 'slow send finished before competing scan')
+                    h.command('delivery', 'work')
+                    with sqlite3.connect(h.root/'data/state.db') as db:
+                        expiry, current = db.execute('SELECT claim_expires_at,claim_token FROM delivery_outbox').fetchone()
+                    require(current == token and expiry > initial_expiry, 'competing consumer took a live renewed claim')
+                    competitor = dict(same_owner=True, initial_expiry=initial_expiry, renewed_expiry=expiry)
+                state = h.wait(lambda s: len(s['deliveries']) == 1 and s['deliveries'][0]['status'] == 'sent', name+' settled')
+                elapsed = time.monotonic() - started
+                ledger = platform.evidence()
+                expected = 1 if fixture == 'main' else 2
+                require(elapsed > 5 and len(state['receipts']) == expected and len(ledger['send_attempts']) == expected, 'slow delivery lost or repeated a part')
+                require(state['deliveries'][0]['attempt_count'] == 1, 'slow send became another attempt')
+                require(h.process.poll() is None and h.http('/api/status')['readiness'] == 'ready', 'slow delivery stopped ingress')
+                if fixture == 'artifacts':
+                    require(len(ledger['uploads']) == 1 and ledger['uploads'][0]['name'] == 'slow.txt' and ledger['uploads'][0]['sha256'] == hashlib.sha256(content.encode()).hexdigest(), 'slow multipart changed attachment')
+                report['scenarios'][name] = dict(state=state, platform=ledger, elapsed_seconds=elapsed, competing_scan=competitor)
+                h.stop()
+            finally:
+                h.cleanup()
+
+    # Expire a live sender after the platform recorded the effect, then use the
+    # real CLI as a competing recovery owner. The old HTTP call must cancel and
+    # join without taking down Web ingress; uncertainty is still query-only.
+    with tempfile.TemporaryDirectory(prefix='erii-channel-lost-claim-') as temp, Sandbox(send_delay=6) as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.setup(); h.start()
+            h.callback('lost-claim', 'Keep ingress alive if this transport loses its claim.')
+            require(platform.send_started.wait(10), 'lost-claim send did not reach platform')
+            with sqlite3.connect(h.root/'data/state.db') as db:
+                db.execute('UPDATE delivery_outbox SET claim_expires_at=0')
+            h.command('delivery', 'work')
+            h.wait(lambda s: s['deliveries'][0]['status'] == 'unknown', 'competing recovery query')
+            h.http('/api/message', dict(source_id='after-lost-claim', content=[dict(type='text', text='Web still accepts unrelated conversation input.')]))
+            state = h.wait(lambda s: len(s['deliveries']) == 2 and any(d['channel'] == 'web' and d['status'] == 'sent' for d in s['deliveries']), 'ingress and delivery survive ownership loss')
+            h.wait(lambda _: platform.evidence()['operations'][0]['finished_at'] is not None, 'late platform response finished')
+            h.stop(kill=True)
+            prior = next(d for d in h.rows()['deliveries'] if d['channel'] == 'feishu')['version']
+            h.start()
+            state = h.wait(lambda s: any(d['channel'] == 'feishu' and d['status'] == 'unknown' and d['version'] >= prior+2 for d in s['deliveries']), 'unknown query settled after restart')
+            ledger = platform.evidence()
+            require(len(ledger['send_attempts']) == 1 and len(ledger['messages']) == 1, 'competing recovery resent unknown side effect')
+            feishu_id = next(d for d in state['deliveries'] if d['channel'] == 'feishu')['delivery_id']
+            require(not any(r['delivery_id'] == feishu_id for r in state['receipts']), 'lost sender committed a late channel receipt')
+            require(h.process.poll() is None and h.http('/api/status')['readiness'] == 'ready', 'late sender or recovery stopped ingress')
+            report['scenarios']['lost-claim-competing-recovery'] = dict(state=state, platform=ledger)
+            h.stop()
+        finally:
+            h.cleanup()
+    report['checks'].append('Delivery lease: slow send, slow upload and cumulative multipart settle under one renewed claim; competing live scan excluded; lost owner cancels without stopping ingress, restart keeps unknown query-only with one remote send')
 
 
 def extra_scenarios(binary,report):
@@ -359,9 +434,16 @@ def account_presentation(binary,report):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--evidence',type=Path,required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--evidence',type=Path,required=True);parser.add_argument('--delivery-lease-only',action='store_true');args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
-    report=run_cases([0],lambda _:run(args.binary.resolve(),args.evidence.resolve()),1)[0]
+    def verify(_):
+        if not args.delivery_lease_only:
+            return run(args.binary.resolve(),args.evidence.resolve())
+        report = dict(checks=[], scenarios={})
+        delivery_leases(args.binary.resolve(), report)
+        report['checks'].append('Cleanup: Web/Bridge children joined, sandbox HTTP servers stopped, disposable roots removed')
+        return report
+    report=run_cases([0],verify,1)[0]
     report['binary_sha256']=hashlib.sha256(args.binary.read_bytes()).hexdigest()
     args.evidence.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(dict(evidence=str(args.evidence),checks=report['checks'])))
