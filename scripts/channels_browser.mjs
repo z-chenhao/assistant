@@ -8,7 +8,8 @@ if(process.env.ERII_BROWSER_EXECUTABLE)options.executablePath=process.env.ERII_B
 const browser=await chromium.launch(options);
 let page;
 try{
- page=await browser.newPage({viewport:{width:1400,height:980},deviceScaleFactor:1});
+ const context=await browser.newContext({viewport:{width:1400,height:980},deviceScaleFactor:1});
+ page=await context.newPage();
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const remote=[];page.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});
  await page.goto(url);
@@ -56,15 +57,37 @@ try{
  if(errors.length)throw new Error(errors.join(';'));
  await page.screenshot({path:evidence+'/'+phase+'.png',fullPage:true});
  await writeFile(evidence+'/'+phase+'.json',JSON.stringify({url:page.url(),body,browser:'chromium',errors},null,2));
- await page.setViewportSize({width:390,height:844});
- if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('mobile page overflows viewport');
- await page.getByLabel('Message Erii',{exact:true}).focus();
- await page.screenshot({path:evidence+'/'+phase+'-mobile.png'});
- await page.setViewportSize({width:1400,height:980});
+ const mobile=await page.context().newPage();
+ try{
+  mobile.on('pageerror',e=>errors.push(e.message));
+  mobile.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});
+  await mobile.setViewportSize({width:390,height:844});
+  await mobile.goto(url);
+  await mobile.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
+  await mobile.getByLabel('Message Erii',{exact:true}).fill('');
+  await mobile.evaluate(()=>{document.querySelector('textarea').blur();scrollTo(0,0)});
+  await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const geometry=await mobile.evaluate(()=>({width:innerWidth,height:innerHeight,content:document.documentElement.scrollWidth,footerBottom:document.querySelector('footer').getBoundingClientRect().bottom}));
+  if(geometry.content>geometry.width||geometry.footerBottom>geometry.height)throw new Error('mobile layout exceeds viewport');
+  await mobile.screenshot({path:evidence+'/'+phase+'-mobile.png'});
+  await writeFile(evidence+'/'+phase+'-mobile.json',JSON.stringify(geometry,null,2));
+ }finally{await mobile.close()}
+ if(phase==='components'){
+  const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:1400,height:980}});
+  try{
+   await plain.addCookies(await context.cookies());
+   const fallback=await plain.newPage();await fallback.goto(url);
+   if(await fallback.locator('.message').count()!==await page.locator('.message').count())throw new Error('no-JavaScript fallback lost messages');
+   if(!await fallback.getByLabel('Message Erii',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
+   if(!await fallback.getByText('Processed: Retain this semantic answer.',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost semantics');
+   await fallback.screenshot({path:evidence+'/'+phase+'-no-script.png',fullPage:true});
+  }finally{await plain.close()}
+ }
  await page.getByRole('link',{name:'Ongoing work',exact:false}).click();
  if(await page.locator('main').getByRole('button').count())throw new Error('progress became a management surface');
  await page.screenshot({path:evidence+'/'+phase+'-progress.png',fullPage:true});
  if(remote.length)throw new Error('UI contacted an external service: '+remote.join(', '));
+ if(errors.length)throw new Error(errors.join(';'));
 }catch(error){
  if(page){await page.screenshot({path:evidence+'/'+phase+'-failure.png',fullPage:true});await writeFile(evidence+'/'+phase+'-failure.txt',await page.locator('body').innerText())}
  throw error;
