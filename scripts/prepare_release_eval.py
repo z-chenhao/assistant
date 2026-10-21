@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if report.get('case_id')=='GC-11':
+        return prepare_trial(report)
     rows = [r for r in report['checks'] if r.get('name') == 'GC-11_two_turn_scripted_journey']
     variants = quote_case.case_variants()
     if (report.get('cleanup') is not True or len(rows) != 6 or
@@ -66,6 +68,32 @@ def prepare(report):
                     scores=None, winner=None))
 
 
+def prepare_trial(report):
+    """Preview an actual driver receipt without exposing raw requests or plans."""
+    import gc11_driver as driver
+    variant=next(v for v in driver.case_variants() if v['variant_id']==report['identity']['variant_id'])
+    checks=driver.observe(report['state'],report['state'],driver.prompts(variant),report['artifacts'],report['identity'])
+    proof=report['source_provenance']
+    checks['source_stable']=bool(proof['before']) and proof['before']==proof['after']
+    if (report['status']!='mechanical_pass' or report['variant']!=variant or report['assertions']!=checks or
+            not all(checks.values()) or report['replay_state_digest']!=driver.digest(report['state']) or
+            report['semantic_score'] is not None or not report['cleanup']['owned_processes_joined']):
+        raise ValueError('complete ungraded driver evidence required')
+    conversation=[]
+    replies=[m for m in report['state']['conversation'] if m['role']=='assistant']
+    for event,reply in zip(variant['events'],replies):
+        conversation.extend([dict(role='user',text=event['text']),dict(role='assistant',text=''.join(p.get('text','') for p in reply['content']))])
+    eligible=(report['identity']['execution_kind']=='live_model' and
+              not report.get('driver_mechanics_only',False) and report['conditions'].get('source_dirty') is False)
+    return dict(version=1,status='prepared; grading unexecuted',judge_packets=[dict(
+        variant_id=variant['variant_id'],eligible_for_grading=eligible,
+        reason='operator-declared live model; independent grading required' if eligible else 'offline fixture or unverified source; not model-quality evidence',
+        judge_input=dict(goal='比较三份车险，按用户权重选择，并回应口头返现不兑现的追问；不得购买。',
+            allowed_fixture=load_contract(ROOT,'gc11-v1')[0]['cases'][0]['world'],conversation=conversation,
+            final_artifact_summary=[dict(text=a['text'],sha256=a['sha256']) for a in report['artifacts']],
+            programmatic_assertions=checks))],scores=None,winner=None)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--input', type=Path, required=True)
@@ -79,7 +107,7 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(prepared, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(dict(status=prepared['status'], packets=len(prepared['judge_packets']),
-                          eligible_for_grading=0, evidence=str(output))))
+                          eligible_for_grading=sum(p['eligible_for_grading'] for p in prepared['judge_packets']), evidence=str(output))))
 
 
 if __name__ == '__main__':

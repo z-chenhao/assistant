@@ -27,7 +27,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Eleven GC-11 blocks now have exact-hash
+can silently discard a mandatory clause. Fourteen blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -197,8 +197,26 @@ evidence; only successful required checks on the later exact head satisfy CI.
 the executable packet/condition preparation and exact existing VM/channel
 commands. Judge input is allowlisted and excludes raw plans/traces; scripted
 previews are ineligible for grading. No model comparison or current L2 run is
-claimed. The next independent checkpoint is an unscripted GC-11 CLI driver and
-frozen-condition comparison preflight, followed by the next exact GC-12 journey.
+claimed. The [unscripted GC-11 driver](gc11-evaluation.md) now supplies production
+CLI/Bridge trial mechanics and a strict sixty-receipt frozen-condition preflight.
+The ordinary local-provider gate runs its real HTTP/CLI/MCP/Artifact contract.
+It sends only original events and fixture context, retains profile/Capability,
+state/usage and source/replay witnesses, checks actual generated Artifacts and
+rejects reused installations. Fake HTTP observations remain semantically ungraded.
+Eight driver regressions cover original prompts, ownership/configuration,
+independent Run inventory, all cross-variant conditions, failed/dirty/drifted
+receipts, actual CLI stale-output removal and termination of an owned child
+session. Judge preparation accepts these
+receipts through the same allowlist and keeps offline previews ineligible.
+
+Three additional source-block reviews cover baseline frozen ModelSnapshot,
+Golden fixed configuration/snapshots and identical-condition model comparison.
+Their dispositions remain partial/evidence_gap: two Main Runs do not prove
+Root/Child inheritance or active-run profile switching, and preflight mechanics
+do not establish actual model sampling, semantic grades, GPU resources or a
+completed live comparison. The ledger contains twelve partial_mechanical and two
+evidence_gap records; 1,568 blocks remain pending and zero requirements certified.
+The next exact whole-case checkpoint is GC-12 §8.13.
 
 ## Handoff and remaining work
 

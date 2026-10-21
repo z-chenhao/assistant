@@ -101,6 +101,9 @@ class Endpoint(BaseHTTPRequestHandler):
                 else:
                     chunk({"content": "Root business result through Pi." if root else "Main Task accepted through Pi."})
                 chunk({}, "stop", {"prompt_tokens": 7, "completion_tokens": 8, "total_tokens": 15})
+            elif self.server.mode == "gc11" and any("合成背景" in str(m.get("content", "")) for m in body["messages"]):
+                from gc11_fixture import reply
+                reply(body, chunk)
             elif self.server.mode == "partial":
                 chunk({"content": "partial"})
                 return
@@ -291,9 +294,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", default="bin/personal-agent")
     parser.add_argument("--evidence", default="evidence/local-provider.json")
+    parser.add_argument('--gc11-driver-only',action='store_true')
     args = parser.parse_args()
+    Path(args.evidence).unlink(missing_ok=True)
+    if args.gc11_driver_only:
+        from gc11_fixture import verify as verify_gc11_driver
+        result=verify_gc11_driver(Path(args.binary).resolve(),Path('provider-bridge/bridge.mjs').resolve(),Endpoint,Path(args.evidence))
+        Path(args.evidence).parent.mkdir(parents=True,exist_ok=True)
+        Path(args.evidence).write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
+        print(json.dumps(dict(status=result['status'],cleanup=result['cleanup'])))
+        raise SystemExit(0)
     result = verify(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
     result["screenshot_projection"] = verify_screenshot_projection(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
+    from gc11_fixture import verify as verify_gc11_driver
+    result['gc11_driver'] = verify_gc11_driver(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve(), Endpoint, Path(args.evidence))
     Path(args.evidence).parent.mkdir(parents=True, exist_ok=True)
     Path(args.evidence).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"checks": len(result["checks"]), "usage_rows": len(result["usage"]), "cleanup": result["cleanup"]}))

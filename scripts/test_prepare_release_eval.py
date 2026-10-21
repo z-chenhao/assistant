@@ -8,6 +8,19 @@ import quote_case as q
 
 
 class PreparationTests(unittest.TestCase):
+    def test_production_driver_packet_still_excludes_raw_state_and_fake_grades(self):
+        from test_gc11_driver import DriverTests
+        report=DriverTests().cohort()[0]
+        report['state']['private_trace']='HIDDEN_PROVIDER_REQUEST'
+        report['replay_state_digest']=q.digest(report['state'])
+        prepared=prep.prepare(report)
+        self.assertEqual(len(prepared['judge_packets']),1)
+        self.assertFalse(prepared['judge_packets'][0]['eligible_for_grading'])
+        self.assertNotIn('HIDDEN_PROVIDER_REQUEST',json.dumps(prepared))
+        self.assertIsNone(prepared['scores'])
+        report['identity']['execution_kind']='live_model';report['driver_mechanics_only']=True
+        self.assertFalse(prep.prepare(report)['judge_packets'][0]['eligible_for_grading'])
+
     def report(self):
         data = json.loads((q.ROOT / 'evals/fixtures/m3-capabilities-v1.json').read_text())['insurance_quotes']
         texts = q.answers(data)

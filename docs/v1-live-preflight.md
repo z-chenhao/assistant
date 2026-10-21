@@ -29,9 +29,10 @@ model/profile identity may differ. Each arm needs five actual runs of each
 variant, separate snapshot and latency/resource receipts, mechanical failures
 and eight-dimension dispositions before pass@1/pass^5/variance can be reported.
 O/F/P/A/C semantic review cannot award T/S/R mechanically or override a hard
-failure. This is an executable *preparation* command, not an implemented
-unscripted comparison runner; that runner is the next independent checkpoint.
-It must reuse production CLI/Context Builder and omit all `Capabilities:` plans.
+failure. The [production-CLI GC-11 driver](gc11-evaluation.md) now executes
+individual unscripted trials and validates a sixty-receipt comparison cohort.
+It omits all `Capabilities:` plans and answer templates. Actual approved model
+runs, constrained grades and current L2 remain unexecuted.
 
 ## Exact environment inputs and commands
 

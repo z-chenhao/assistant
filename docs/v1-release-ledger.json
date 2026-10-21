@@ -966,7 +966,7 @@
       "area": "tools",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Six locked variants now exercise both quote turns, MCP/source equality, services/weights, visible scripted replies, two reopened Artifacts and no purchase/replay work. Unscripted source selection/recommendation and semantic evaluation remain inconclusive."
+      "gap": "Two-turn six-variant scripted mechanics and a production-CLI unscripted trial/condition preflight exist with offline HTTP regressions. Actual approved model recommendations/source calibration and constrained grading remain inconclusive."
     },
     "GC-12": {
       "area": "tools",
@@ -1032,12 +1032,12 @@
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "Eleven GC-11 source blocks have hash-bound partial dispositions with observed mechanics and unresolved subclauses; 1571 blocks remain pending and zero requirements are certified. Continue individual normative review."
+      "detail": "Fourteen source blocks have partial/evidence-gap dispositions linked to exact source/code/tests/draft PR/evidence; 1568 remain pending and zero requirements certified. Continue individual normative review."
     },
     {
       "id": "G3",
       "kind": "model_evaluation",
-      "detail": "Run unscripted local/account models under identical fixtures/Context/Capability/tools/limits; constrained Judge for O/F/P/A/T/S/R/C, all 20 >=80, mean >=85, protected cases five passes."
+      "detail": "Production-CLI unscripted GC-11 trial and strict frozen-condition cohort preflight implemented; actual approved local/account runs and constrained Judge for O/F/P/A/T/S/R/C remain unexecuted. All 20 >=80, mean >=85 and protected five passes remain due; offline HTTP evidence earns no model scores."
     },
     {
       "id": "G4",
@@ -1065,14 +1065,16 @@
       "remaining": "尚未观察非脚本模型选择官方网页/PDF与完整合同、最终报价的优先级。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "7.GC-11",
@@ -1086,14 +1088,16 @@
       "remaining": "没有真实条款研究；个性化选择和未知项覆盖须由受约束Judge及人工复核。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "7.GC-11",
@@ -1107,14 +1111,16 @@
       "remaining": "当前措辞来自显式脚本，不证明模型能独立校准未知收益。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "7.GC-11",
@@ -1128,14 +1134,16 @@
       "remaining": "该条还覆盖设备/预算/目标和避免榜单替代判断；本车险fixture没有设备预算，不足以完成一般购买个性化验证。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "7.GC-11",
@@ -1149,14 +1157,16 @@
       "remaining": "无购买阶段；转GC-13的审批语义仍需单独证据，不能由比较阶段无写入推断。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "7.GC-11",
@@ -1170,14 +1180,16 @@
       "remaining": "显式计划与原始输入同时传入，未执行无脚本模型。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "8.12",
@@ -1191,14 +1203,16 @@
       "remaining": "模型对追问的独立连续性及语义质量未评分。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "8.12",
@@ -1212,14 +1226,16 @@
       "remaining": "脚本文案非独立推荐；免责相同不能从共同主险推断。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "8.12",
@@ -1233,14 +1249,16 @@
       "remaining": "无脚本模型算术与证据校准尚缺；不能以回归模板代替。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "8.12",
@@ -1254,14 +1272,16 @@
       "remaining": "未测非脚本模型是否无条件信任销售承诺。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "8.12",
@@ -1275,18 +1295,92 @@
       "remaining": "未向真实保险方索取资料，也没有提交投诉；Judge与L2还未执行。",
       "code": [
         "scripts/quote_case.py#drive",
-        "scripts/quote_case.py#observations"
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
       ],
       "tests": [
         "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
       ],
       "evidence": [
         "scripts/verify_capabilities.py#quote_case.drive",
-        "docs/v1-release-audit.md#GC-11 checkpoint"
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
       "section": "8.12",
       "line": 823
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5",
+      "line": 416,
+      "sha256": "5cefcd8baa09471ad1d1b97665bb4759009f4e257950a38fde753be9b9b3d3c5",
+      "disposition": "partial_mechanical",
+      "observed": "真实生产CLI两轮Main请求引用各自创建时冻结的ModelSnapshot；driver校验所有代次和批准profile/version/limits，无test-bridge。",
+      "remaining": "尚未在本checkpoint热切换活动模型，也没有Root/Child继承或Durable Replay的单独逐项验收；保留原有SC证据义务。",
+      "code": [
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/runs.go#model_snapshot_id",
+        "scripts/gc11_driver.py#observe",
+        "scripts/gc11_driver.py#preflight"
+      ],
+      "tests": [
+        "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify_gc11_driver",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "3",
+      "line": 68,
+      "sha256": "da25e4dbb513ec0014afc87314b38d16ca59865d97b0abf72e5bad5eb822d71e",
+      "disposition": "partial_mechanical",
+      "observed": "Driver保存Model/Capability、源码/binary/Bridge/fixture/config hash及前后稳定见证；比较器拒绝任一变体的条件漂移和重复Run。",
+      "remaining": "真实两模型所有变体/五轮尚未执行；外部模型采样seed支持、Tool/Skill环境和完整真实资源证据仍需审查。fixture seed不等于强行设置Provider seed。",
+      "code": [
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/runs.go#model_snapshot_id",
+        "scripts/gc11_driver.py#observe",
+        "scripts/gc11_driver.py#preflight"
+      ],
+      "tests": [
+        "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify_gc11_driver",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "13",
+      "line": 1180,
+      "sha256": "a027549c2623a43a8229ce797431f748cb8347b95f56d853eca68a9cbcbfa37e",
+      "disposition": "evidence_gap",
+      "observed": "已实现60份收据的冻结条件前置检查，直接重建原始输入/初始Context/工具schema/limits；离线CLI负例拒绝缺失、重复、暗加提示、过期/脏源码和不完整清理，保留各模型快照。",
+      "remaining": "尚无批准的local/account真实模型收据、受约束评分、延迟/GPU资源实测或人审，不能把HTTP Fake或匹配条件当作比较已通过。",
+      "code": [
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/runs.go#model_snapshot_id",
+        "scripts/gc11_driver.py#observe",
+        "scripts/gc11_driver.py#preflight"
+      ],
+      "tests": [
+        "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify_gc11_driver",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)"
     }
   ]
 }
