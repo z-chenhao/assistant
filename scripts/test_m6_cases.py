@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 import time
@@ -16,6 +18,25 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class M6Cases(unittest.TestCase):
+    def test_browser_cleanup_preserves_primary_failure_and_still_rejects_bad_exit(self):
+        from m6_desktop import browser
+        popen=subprocess.Popen
+        children=[]
+        def start(*args,**kwargs):
+            child=popen([sys.executable,'-c','print(\'{"endpoint":"fixture"}\',flush=True);raise SystemExit(7)'],**kwargs)
+            children.append(child)
+            return child
+        for primary in (False,True):
+            with self.subTest(primary=primary), tempfile.TemporaryDirectory() as temporary:
+                with patch('m6_desktop.subprocess.Popen',side_effect=start):
+                    with self.assertRaisesRegex(RuntimeError,'original drive failure' if primary else 'browser cleanup failed') as caught:
+                        with browser(Path(temporary),{}):
+                            if primary:raise RuntimeError('original drive failure')
+                if primary:self.assertIn('browser cleanup failed',str(caught.exception.__cause__))
+                self.assertIsNotNone(children[-1].poll())
+                self.assertTrue(children[-1].stdout.closed)
+                self.assertTrue(children[-1].stderr.closed)
+
     def test_parallel_m6_retains_complete_ordered_evidence_and_isolated_roots(self):
         from run_m6_cases import run
         active, peak = 0, 0

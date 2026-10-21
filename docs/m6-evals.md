@@ -37,6 +37,14 @@ The runner owns all five verification stages:
 | Evidence | Independent SQLite snapshots, exact Tool/Approval parameters, Conversation/events, CLI-opened bytes and hashes, screenshots, external sandbox state |
 | Cleanup | Every owned process joined, browser closed and temporary state removed; exported evidence retained |
 
+Chromium's Playwright pipe can become ready before `DevToolsActivePort` exists.
+The shared Browser readiness helper waits up to five seconds for a valid port,
+within the existing 15-second Doctor deadline. Missing or partially written port
+files are retried; other filesystem errors fail immediately. Readiness regressions
+run in `npm test --prefix guest-browser`. Cleanup preserves a primary journey
+failure and attaches any additional cleanup error; a bad cleanup exit still fails
+an otherwise successful journey.
+
 `m6-cases-1…5.json` hold each journey's state and assertions.
 `m6-cases-N-assets/` retain the actual opened source/output bytes and screenshots,
 indexed by `evidence.exported_artifacts`. The `.m6-evidence.json` marker identifies
