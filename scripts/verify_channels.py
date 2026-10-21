@@ -91,7 +91,7 @@ class ChannelHarness(MainHarness):
             return {name:[dict(r) for r in db.execute(query)] for name,query in dict(
                 inputs='SELECT request_key,message_id,run_id FROM main_input ORDER BY sequence',
                 callbacks='SELECT * FROM channel_callback ORDER BY event_id',
-                deliveries='SELECT delivery_id,message_id,channel,destination_ref,status,attempt_count FROM delivery_request ORDER BY created_at,delivery_id',
+                deliveries='SELECT delivery_id,message_id,channel,destination_ref,status,attempt_count,version FROM delivery_request ORDER BY created_at,delivery_id',
                 receipts='SELECT * FROM channel_receipt ORDER BY delivery_id,part',
                 approvals='SELECT approval_id,frozen_arguments_hash,status FROM approval ORDER BY created_at',
                 tools='SELECT tool_name,arguments_json,status,attempt_count FROM tool_invocation ORDER BY created_at',
@@ -136,7 +136,7 @@ def run(binary,evidence):
             history=h.http('/api/conversation')
             require(len(history)==4 and [m['source'] for m in history if m['role']=='user']==['web','feishu'],'shared Conversation order')
             require([m['sequence'] for m in history]==list(range(1,5)),'nonmonotonic Conversation')
-            require(len(platform.evidence()['messages'])==1,'duplicate remote notification')
+            require(len(platform.evidence()['messages'])==1 and len(platform.evidence()['send_attempts'])==1,'duplicate remote send attempt or notification')
             h.stop();h.start()
             h.callback('feishu-source','Continue the same plan in Feishu.',event='after-restart')
             require(len(h.rows()['inputs'])==2 and len(platform.evidence()['messages'])==1,'restart duplicated accepted callback/delivery')
@@ -215,8 +215,11 @@ def extra_scenarios(binary,report):
                     uploads=platform.evidence()['uploads']
                     require(len(uploads)==1 and uploads[0]['name']=='checklist.txt' and uploads[0]['sha256']==hashlib.sha256(content.encode()).hexdigest(),'wrong outbound attachment')
                     require(len(platform.evidence()['messages'])==2 and len(state['receipts'])==2,'attachment parts lost or duplicated')
+                prior_version=state['deliveries'][0]['version']
                 before=platform.evidence();h.stop(kill=True);h.start()
                 h.callback('output',json.dumps(dict(name='checklist.txt',mediaType='text/plain',text=content)),event='output-retry')
+                if lost_ack:
+                    h.wait(lambda s:s['deliveries'][0]['status']=='unknown' and s['deliveries'][0]['version']>prior_version,'unknown delivery was queried after restart')
                 require(h.rows()['deliveries'][0]['status']==status and platform.evidence()==before,'uncertain effect or sent attachment retried')
                 report['scenarios']['lost-remote-ack' if lost_ack else 'outbound-attachment']=dict(state=h.rows(),platform=platform.evidence())
                 h.stop()
@@ -242,7 +245,7 @@ def extra_scenarios(binary,report):
                     h.stop(kill=True);future.result(timeout=20)
                 h.start();h.callback('crash-input','Recover the same channel message.',event='retry-after-kill')
                 state=h.wait(lambda s:len(s['inputs'])==1 and len(s['deliveries'])==1 and s['deliveries'][0]['status']=='sent','channel crash recovery')
-                require(len(platform.evidence()['messages'])==1,'channel crash duplicated notification')
+                require(len(platform.evidence()['messages'])==1 and len(platform.evidence()['send_attempts'])==1,'channel crash duplicated send attempt or notification')
                 report['scenarios'][boundary]=dict(state=state,platform=platform.evidence())
                 h.stop()
             finally:h.cleanup()

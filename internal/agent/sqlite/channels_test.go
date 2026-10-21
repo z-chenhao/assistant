@@ -140,7 +140,21 @@ func TestChannelRouteFreezeCASRevocationAndDefault(t *testing.T) {
 		t.Fatal("frozen destination drift allowed")
 	}
 	wrongApp := feishu.Adapter{Client: feishu.Client{Config: feishu.Config{AppID: "other-app", TenantKey: "tenant"}}, Store: s}
-	if observed := wrongApp.Send(ctx, delivery.Envelope{Request: rows[0]}); observed.Outcome != delivery.Failed {
+	messages, err := r.history.List(ctx, firstConversation(t, s))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var message conversation.Message
+	for _, m := range messages {
+		if m.MessageID == rows[0].MessageID {
+			message = m
+		}
+	}
+	envelope, err := delivery.Compose(rows[0], message)
+	if err != nil {
+		t.Fatal("account-fence fixture must be an otherwise valid frozen delivery", err)
+	}
+	if observed := wrongApp.Send(ctx, envelope); observed.Outcome != delivery.Failed {
 		t.Fatal("changed Feishu app acquired old delivery", observed)
 	}
 	if _, e = s.BindChannel(ctx, b.Channel, b.Subject, b.Destination, false, 0); !errors.Is(e, agent.ErrConflict) {

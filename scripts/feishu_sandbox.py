@@ -13,6 +13,7 @@ import threading
 class Sandbox:
     def __init__(self):
         self.messages = {}
+        self.send_attempts = []
         self.uploads = []
         self.drop_response = False
         self.lock = threading.Lock()
@@ -38,6 +39,7 @@ class Sandbox:
                         result = dict(file_key=key)
                     elif self.path == '/open-apis/im/v1/messages?receive_id_type=chat_id':
                         message = json.loads(raw)
+                        outer.send_attempts.append(message)
                         if message['receive_id'] != 'bound-chat':
                             self.send_error(403)
                             return
@@ -93,4 +95,4 @@ class Sandbox:
 
     def evidence(self):
         with self.lock:
-            return dict(messages=list(self.messages.values()), uploads=list(self.uploads))
+            return dict(messages=list(self.messages.values()), send_attempts=list(self.send_attempts), uploads=list(self.uploads))
