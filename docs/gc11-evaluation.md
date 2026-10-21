@@ -97,7 +97,8 @@ permission/schema remains exact. Model snapshots stay separate per arm,
 including provider/model/wire/reasoning/compatibility metadata.
 
 Within each arm, all thirty trials must have one canonical model identity.
-Compare every generation snapshot, retaining endpoint hashes, model, wire,
+Compare every generation snapshot, requiring a valid local endpoint SHA-256
+identity and retaining endpoint hashes, model, wire,
 reasoning, defaults, limits, compatibility, capabilities and any future model
 fields. Only installation-generated snapshot/profile/auth-reference IDs,
 timestamps and profile version counters are normalized across installations;

@@ -142,6 +142,11 @@ def comparison_model(snapshot):
             any(not isinstance(snapshot[k],dict)
                 for k in ('generation_defaults','compatibility','capabilities'))):
         raise ValueError('incomplete comparison model identity')
+    endpoint=snapshot.get('endpoint_hash')
+    if snapshot['provider_kind']=='openai_compatible' and (
+            not isinstance(endpoint,str) or len(endpoint)!=64 or
+            any(c not in '0123456789abcdef' for c in endpoint)):
+        raise ValueError('incomplete local endpoint identity')
     # Fresh installations generate their own profile/auth references and local
     # version counters. observe() still freezes those exactly within each trial.
     # Retain every other field, including endpoint_hash and future model fields.

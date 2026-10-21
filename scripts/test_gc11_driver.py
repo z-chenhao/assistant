@@ -150,6 +150,13 @@ class DriverTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'model identity drift within arm: local'):
                 d.preflight(reports,binary)
 
+    def test_cohort_cannot_omit_local_endpoint_identity_everywhere(self):
+        for endpoint in (None,'','not-a-sha256'):
+            reports=self.cohort()
+            for r in reports:
+                if r['identity']['arm']=='local':self.rewrite_model(r,endpoint_hash=endpoint)
+            with self.subTest(endpoint=endpoint),self.assertRaises(ValueError):d.preflight(reports)
+
     def test_missing_duplicate_reused_or_drifted_trials_are_rejected(self):
         original=self.cohort()
         for change in ('missing','duplicate','reused_run','input','limit','context','scope','assertion','replay','score','cleanup','model','source','dirty'):
