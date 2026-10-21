@@ -8,6 +8,7 @@ unchanged race/count/deadline flags and bounded CPU admission.
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -66,10 +67,30 @@ def test_names(text):
     return names
 
 
-def partitions(names, workers):
+def timing_hints():
+    return json.loads(Path(__file__).with_name('ci_race_timings.json').read_text())['seconds']
+
+
+def partitions(names, workers, seconds=None):
     if not names or len(names) != len(set(names)) or workers < 1:
         raise ValueError('invalid SQLite partition inventory')
-    return [names[i::workers] for i in range(min(workers, len(names)))]
+    count = min(workers, len(names))
+    if seconds is None:
+        return [names[i::workers] for i in range(count)]
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) or
+           not math.isfinite(value) or value <= 0 for value in seconds.values()):
+        raise ValueError('invalid SQLite timing hint')
+    known = [seconds[name] for name in names if name in seconds]
+    fallback = sum(known) / len(known) if known else 1
+    # Hints affect placement only. Discovery admits every new Test/Example/Fuzz
+    # root; removed names in historical measurements cannot enter execution.
+    costs = {name: seconds.get(name, fallback) for name in names}
+    slices, loads = [[] for _ in range(count)], [0] * count
+    for name in sorted(names, key=lambda name: (-costs[name], name)):
+        target = min(range(count), key=lambda i: (loads[i], len(slices[i]), i))
+        slices[target].append(name)
+        loads[target] += costs[name]
+    return slices
 
 
 def sqlite_verdict(path, expected):
@@ -105,7 +126,10 @@ def run_remainder(selected, folder, stopped):
     if not set(SERIAL_SQLITE) <= set(names):
         raise ValueError('timing-sensitive SQLite inventory changed')
     budget = cpu_budget()
-    slices = partitions([n for n in names if n not in SERIAL_SQLITE], max(1, min(3, budget - 1)))
+    seconds = timing_hints()
+    slices = partitions([n for n in names if n not in SERIAL_SQLITE], max(1, min(3, budget - 1)), seconds)
+    row.update(partition_strategy='longest_measured_first', timing_hints=seconds,
+               unmeasured_tests=[n for n in names if n not in seconds])
     jobs = [(f'sqlite-{i + 1}', RACE + ['-json', '-run', '^(' + '|'.join(group) + ')$', SQLITE], group, 1)
             for i, group in enumerate(slices)]
     others = [p for p in selected if p != SQLITE]

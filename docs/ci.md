@@ -159,6 +159,17 @@ race job; discovery automatically includes new tests. Per-worker commands,
 CPU/wall, test outcomes and cleanup remain in `race/inventory.json` and logs.
 No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
+SQLite placement uses longest measured tests first, with elapsed-time hints in
+`scripts/ci_race_timings.json`. The hints retain their exact-SHA Ubuntu run
+provenance and only affect scheduling. Go discovery still owns the complete
+inventory; new tests use the mean known cost, and removed tests cannot execute
+through a stale hint. The receipt records the hints and unmeasured roots.
+SC conformance retains its existing unweighted partitions. The measured ERII-30
+timeout had static partition costs of about 330/379/449 seconds; the same
+retained costs balance to about 386 seconds each. These are scheduling estimates,
+not a latency PASS. Actual required race/cleanup and end-to-end timings must
+still pass on the delivered SHA within the unchanged ten-minute budget.
+
 ## Launch, doctor, drive, evidence and cleanup
 
 Install the versions and pinned dependencies from [development.md](development.md).

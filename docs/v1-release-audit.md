@@ -69,6 +69,17 @@ upgrade or change dependency locks.
 
 ## Existing system and recovery evidence
 
+The next exact-head run, 39575536939 on `980dc12`, passed all functional shards
+but exceeded the race job's ten-minute cap. Its static SQLite partitions had
+measured costs near 330/379/449 seconds; the last partition was incomplete and
+the disposable-storage cleanup guard failed. Neither race nor the aggregate
+was green. `ci_race.py` now balances placement using retained Ubuntu root
+durations, while discovery/verdicts still require every root exactly once.
+The hints cannot omit new tests or resurrect removed tests. Bridge and the
+timing-sensitive Child approval test stay isolated; CPU admission, race flags,
+all deadlines and cleanup checks are unchanged. See [CI operations](ci.md)
+for reproduction and evidence. A balanced estimate alone is not a CI PASS.
+
 Exact-head CI run 39572139854 exposed an intermittent pause/restart failure:
 `task-control` attempt 5 exited with `MODEL_INCOMPATIBLE` before
 `before_stop_settle_commit`. Deterministic regression tests reproduced a
