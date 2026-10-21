@@ -169,7 +169,7 @@ func TestComputerUseStateCASAndV21Upgrade(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT request_json FROM model_generation LIMIT 1`).Scan(&frozen); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; PRAGMA user_version=21`); err != nil {
+	if _, err = s.db.Exec(removeAutomationFixtureSchema + `DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; PRAGMA user_version=21`); err != nil {
 		t.Fatal(err)
 	}
 	root := filepath.Dir(s.path)
@@ -183,7 +183,7 @@ func TestComputerUseStateCASAndV21Upgrade(t *testing.T) {
 	if err = next.db.QueryRow(`SELECT request_json FROM model_generation LIMIT 1`).Scan(&after); err != nil || after != frozen {
 		t.Fatal("upgrade changed accepted request", err)
 	}
-	if scalar(t, next, `PRAGMA user_version`) != 22 || scalar(t, next, `SELECT count(*) FROM computer_use`) != 0 {
+	if scalar(t, next, `PRAGMA user_version`) != len(migrations) || scalar(t, next, `SELECT count(*) FROM computer_use`) != 0 {
 		t.Fatal("v21 upgrade failed")
 	}
 }

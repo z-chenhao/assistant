@@ -383,7 +383,7 @@ func TestComputerMigrationFromPopulatedV20PreservesAcceptedWork(t *testing.T) {
 	if err := s.db.QueryRow(`SELECT request_json FROM model_generation LIMIT 1`).Scan(&request); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer; PRAGMA user_version=20`); err != nil {
+	if _, err := s.db.Exec(removeAutomationFixtureSchema + `DROP TABLE computer_file; DROP TABLE computer_use; DROP TABLE computer_lease_resume; DROP TABLE computer_operation; DROP TABLE computer; PRAGMA user_version=20`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

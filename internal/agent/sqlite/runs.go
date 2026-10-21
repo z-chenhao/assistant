@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/computer"
 	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/conversation"
@@ -29,6 +30,7 @@ import (
 )
 
 type Runs struct {
+	automationClock       func() time.Time
 	computerProvider      computer.Provider
 	computerCompatibility computer.Compatibility
 	computerManifest      computer.RestorationManifest
@@ -95,7 +97,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -192,6 +194,16 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 }
 
 func (r *Runs) Next(ctx context.Context) (string, error) {
+	now := time.Now()
+	if r.automationClock != nil {
+		now = r.automationClock()
+	}
+	if err := r.ScheduleAutomations(ctx, now); err != nil {
+		return "", err
+	}
+	if err := r.admitAutomations(ctx); err != nil {
+		return "", err
+	}
 	if err := r.recoverCode(ctx); err != nil {
 		return "", err
 	}
@@ -226,7 +238,7 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 		// may create an update or unblock an Inbox after our earlier scans.
 		// Once active==0, any such completion must already be visible here.
 		var pending int
-		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0))`).Scan(&pending); err != nil {
+		if err = r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id)) OR EXISTS(SELECT 1 FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0))`).Scan(&pending); err != nil {
 			return "", agent.ErrStorage
 		}
 		if pending > 0 {

@@ -14,6 +14,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
+	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/computer"
 	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
@@ -128,6 +129,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	a.deliveryPolicy = cfg.Delivery
 	base := task.Registry()
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	defs = append(defs, automation.Definitions()...)
 	if cfg.Memory != nil {
 		defs = append(defs, memory.Definition())
 	}

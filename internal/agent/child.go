@@ -43,7 +43,19 @@ func WorkerTools(specs []tool.Spec) []tool.Spec {
 			continue
 		}
 		switch s.Permission {
-		case "read_only", "external_effect", "artifact_write", "spawn_agents":
+		case "read_only", "external_effect", "artifact_write", "spawn_agents", "automation_observe":
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// ChildTools applies the additional fixed reduction for a Run tree descendant.
+// Threshold state belongs to the Automation Root, never to its delegated work.
+func ChildTools(specs []tool.Spec) []tool.Spec {
+	out := []tool.Spec{}
+	for _, s := range WorkerTools(specs) {
+		if s.Permission != "automation_observe" {
 			out = append(out, s)
 		}
 	}

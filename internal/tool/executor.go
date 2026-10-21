@@ -115,6 +115,12 @@ func validDefinition(d Definition) bool {
 		return false
 	}
 	if d.Host {
+		if d.Spec.Name == "builtin__automation__manage" {
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "task_control"
+		}
+		if d.Spec.Name == "builtin__automation__observe" {
+			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "automation_observe"
+		}
 		switch d.Spec.Name {
 		case "builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke":
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"

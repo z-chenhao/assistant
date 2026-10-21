@@ -87,6 +87,13 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 		return nil
 	}
 	runID = rootID
+	var staleAutomation bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM automation_fire f JOIN automation a USING(automation_id) WHERE f.root_run_id=? AND (a.enabled=0 OR a.schedule_version!=f.schedule_version))`, runID).Scan(&staleAutomation); err != nil {
+		return err
+	}
+	if staleAutomation {
+		return nil
+	}
 	var pending int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND task_epoch=? AND run_id!=? AND status IN ('queued','running','waiting')`, taskID.String, epoch, runID).Scan(&pending); err != nil {
 		return err
@@ -137,6 +144,19 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 	if n != 1 {
 		return agent.ErrClaimLost
 	}
+	if status == "completed" {
+		var monitored, suppressed, missing bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM automation_fire WHERE root_run_id=? AND below_value IS NOT NULL),EXISTS(SELECT 1 FROM automation_fire WHERE root_run_id=? AND below_value IS NOT NULL AND observed_value IS NOT NULL AND notify=0),EXISTS(SELECT 1 FROM automation_fire WHERE root_run_id=? AND below_value IS NOT NULL AND observed_value IS NULL)`, runID, runID, runID).Scan(&monitored, &suppressed, &missing); err != nil {
+			return err
+		}
+		if monitored && suppressed {
+			return nil
+		}
+		if missing {
+			status = "needs_input"
+			content = "Automation could not establish an observation. " + content
+		}
+	}
 	return r.taskUpdate(ctx, tx, taskID.String, runID, epoch, status, content)
 }
 func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string, epoch int64, kind, content string) error {
@@ -169,14 +189,19 @@ func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string,
 	return eventsqlite.Enqueue(ctx, tx, e)
 }
 
+// A Task epoch does not change when its Automation schedule is edited. Keep
+// the immutable update -> Root -> fire lineage through both pending delivery
+// boundaries. Ordinary Task updates have no fire and remain eligible.
+const currentAutomationUpdate = `NOT EXISTS(SELECT 1 FROM automation_fire f JOIN automation a USING(automation_id) WHERE f.root_run_id=u.root_run_id AND (a.enabled=0 OR a.schedule_version!=f.schedule_version))`
+
 // Report reconstructs from authoritative updates, even if a queue wake was
 // lost. Inbox and consumer dedup commit together; repeating it is harmless.
-// Stale epochs are consumed but never injected into a new Main.
+// Stale epochs and schedule versions are consumed but never enter a new Main.
 func (r *Runs) Report(ctx context.Context) error {
 	changed := false
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		changed = false
-		rows, err := tx.QueryContext(ctx, `SELECT u.event_id,u.task_id,u.root_run_id,u.task_epoch,u.kind,u.content,u.artifact_refs,u.occurred_at,t.agent_id,t.task_ref,CASE WHEN t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) THEN t.task_epoch ELSE -1 END FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id) ORDER BY u.occurred_at,u.event_id`)
+		rows, err := tx.QueryContext(ctx, `SELECT u.event_id,u.task_id,u.root_run_id,u.task_epoch,u.kind,u.content,u.artifact_refs,u.occurred_at,t.agent_id,t.task_ref,CASE WHEN t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) AND `+currentAutomationUpdate+` THEN t.task_epoch ELSE -1 END FROM task_update u JOIN task t USING(task_id) WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND NOT EXISTS(SELECT 1 FROM event_inbox i WHERE i.consumer='task_reporter' AND i.event_id=u.event_id) ORDER BY u.occurred_at,u.event_id`)
 		if err != nil {
 			return err
 		}
@@ -243,7 +268,7 @@ func (r *Runs) promoteFollowups(ctx context.Context) error {
 		if active > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) ORDER BY b.sequence`)
+		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) ORDER BY b.sequence`)
 		if err != nil {
 			return err
 		}

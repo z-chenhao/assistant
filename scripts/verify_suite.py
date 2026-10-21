@@ -41,6 +41,7 @@ SHARDS = {
         Gate("foundation", "verify.py", "verification"),
         Gate("main", "verify_main.py", "main"),
         Gate("tasks", "verify_tasks.py", "tasks"),
+        Gate("automation", "verify_automation.py", "automation", 5),
         Gate("children", "verify_children.py", "children", 5),
         Gate("scheduling", "verify_scheduling.py", "scheduling", 5),
         Gate("spend", "verify_spend.py", "spend", 5),
