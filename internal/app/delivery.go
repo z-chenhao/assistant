@@ -19,7 +19,10 @@ func (a *App) SetTestDelivery(mode string) error {
 	return delivery.ErrConflict
 }
 func (a *App) Deliver(ctx context.Context) error {
-	if err := a.runs.Flush(ctx); err != nil {
+	if a.eventsRequired.Load() && !a.eventsReady.Load() {
+		return nil
+	}
+	if err := a.Runs().Flush(ctx); err != nil {
 		return err
 	}
 	d, err := a.store.Diagnostics(ctx)

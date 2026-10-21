@@ -77,8 +77,10 @@ type LLM struct {
 }
 
 type App struct {
-	DataRoot string `yaml:"data_root"`
-	LogLevel string `yaml:"log_level"`
+	DataRoot    string `yaml:"data_root"`
+	LogLevel    string `yaml:"log_level"`
+	LogMaxBytes int64  `yaml:"log_max_bytes"`
+	LogBackups  int    `yaml:"log_backups"`
 }
 
 // Load uses built-in defaults when path is empty. A supplied file must exist,
@@ -97,7 +99,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		Artifact:  artifact.DefaultPolicy(),
 		Tools:     ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
 		Tasks:     Tasks{RecentDays: 30, RecentLimit: 200},
-		App:       App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info"},
+		App:       App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info", LogMaxBytes: 16 << 20, LogBackups: 2},
 		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
 	if path != "" {
@@ -195,6 +197,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if !filepath.IsAbs(cfg.App.DataRoot) {
 		return Config{}, errors.New("app.data_root must be an absolute path")
+	}
+	if cfg.App.LogMaxBytes < 1<<20 || cfg.App.LogMaxBytes > 1<<30 || cfg.App.LogBackups < 1 || cfg.App.LogBackups > 10 {
+		return Config{}, errors.New("invalid bounded diagnostic log policy")
 	}
 	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
 	if cfg.Computer != nil && (overlaps(cfg.Computer.Root, cfg.App.DataRoot) || cfg.Workspace != nil && overlaps(cfg.Computer.Root, cfg.Workspace.Root) || cfg.Skills != nil && overlaps(cfg.Computer.Root, cfg.Skills.Root)) {

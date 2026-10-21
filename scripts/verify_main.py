@@ -38,10 +38,10 @@ class MainHarness:
     def args(self, *args):
         return [str(self.binary), "-test-bridge", self.fixture, *args]
 
-    def command(self, *args, text=None, ok=True):
+    def command(self, *args, text=None, ok=True, timeout=20):
         run = self.processes.run if self.processes is not None else subprocess.run
         result = run(self.args(*args), input=text, text=True, capture_output=True,
-                                env=self.env, cwd=self.root, timeout=20)
+                                env=self.env, cwd=self.root, timeout=timeout)
         require(not ok or result.returncode == 0, f"{args}: {result.stderr}")
         return json.loads(result.stdout) if ok else result
 

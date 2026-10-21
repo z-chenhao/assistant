@@ -442,6 +442,7 @@ def account_presentation(binary,report):
     # The production Bridge/Manager is real; no login token or auth URL is evidence.
     from verify_account import account_config, Secrets
     from fixture_pool import current
+    from event_broker import Broker
     scope=current()
     fixture=scope.start(['node',str(ROOT/'provider-bridge/test/account-fixture.mjs')],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
@@ -449,13 +450,14 @@ def account_presentation(binary,report):
             selector.register(fixture.stdout,selectors.EVENT_READ)
             require(selector.select(10),'OAuth fixture not ready')
         endpoint=fixture.stdout.readline().strip()
-        with tempfile.TemporaryDirectory(prefix='ec-auth-',dir='/tmp') as temp:
+        with tempfile.TemporaryDirectory(prefix='ec-auth-',dir='/tmp') as temp, Broker(Path(temp)) as broker:
             root=Path(temp);socket=root/'secrets.sock'
             server=socketserver.ThreadingUnixStreamServer(str(socket),Secrets)
             server.values={'credential:web-owner':base64.b64encode(TOKEN.encode()).decode()}
             server.lock=threading.Lock();server.sensitive=set();os.chmod(socket,0o600)
             thread=threading.Thread(target=server.serve_forever);thread.start()
             h=object.__new__(ChannelHarness);MainHarness.__init__(h,binary,root,fixture='')
+            h.env.update(ERII_NATS_URL=broker.url,ERII_NATS_STREAM_PREFIX='web_account')
             try:
                 h.config=account_config(root,ROOT/'provider-bridge/bridge.mjs',endpoint)
                 with h.config.open('a') as out:out.write('web:\n  listen: 127.0.0.1:0\n  token_ref: credential:web-owner\n')

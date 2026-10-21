@@ -2211,6 +2211,7 @@ Go 测试必须运行 race detector；Sidecar 必须包含协议 fixture、资�
 4. 各具体 Tool 的风险映射、范围授权文案与审批 UI；未知副作用 Tool 默认要求审批且 `replay_policy=never`。
 5. Artifact 的最终保留周期、配额与清理批次；MVP 必须先有可配置默认值、引用计数/作用域检查和 dry-run 清理。
 6. 公平调度权重、NATS Stream/Consumer/DLQ、租约时长、退避与 watchdog 的生产参数；先使用保守可配置默认值并记录指标。
+   ERII-29 将首版运维参数落在 `docs/operations.md`：事件 Stream 默认 7 天/1 GiB/100 万条/单条 1 MiB，DLQ 仅保留无正文的诊断 receipt，5 次毒消息阈值，32 个未确认消费窗口。远程 NATS 必须 TLS + SecretStore token 引用，既有无界 Stream 通过显式、无立即丢弃的运维命令升级。三个数据库和 Artifact 使用独占冷备、认证加密清单及新目录原子还原；凭据独立保管，还原先禁用，确认源实例退役及外部结果后显式启用。正常关闭不改变 Task 状态；备份不承诺外部副作用 exactly-once。
 7. 高安全上限的最终容量校准、成本估算与可复用脚本管理界面；模型仍不获得预算查询工具。
 8. 金融交易与其他受监管能力的合规设计；未单独评审前不得启用真实交易 Tool。
 9. 云端服务拆分、租户隔离、多 Agent 创建体验和迁移；一期保持模块化单体与单 Agent 产品面。

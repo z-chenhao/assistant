@@ -8,7 +8,16 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 )
 
-func (r *Runs) ConfigureScheduler(l agent.SchedulerLimits) { r.scheduler = l; r.host.scheduler = l }
+func (r *Runs) ConfigureScheduler(l agent.SchedulerLimits) {
+	r.scheduler = l
+	r.host.scheduler.Store(&l)
+}
+func (s *Store) schedulerLimits() agent.SchedulerLimits {
+	if l := s.scheduler.Load(); l != nil && l.Valid() {
+		return *l
+	}
+	return agent.DefaultSchedulerLimits()
+}
 func (r *Runs) schedulerLimits() agent.SchedulerLimits {
 	if r.scheduler.Valid() {
 		return r.scheduler
@@ -80,10 +89,7 @@ func (r *Runs) claimCapacity(ctx context.Context, tx *sql.Tx, id string) error {
 // Usage/result acceptance and the breaker commit together; lost claims cannot
 // change health. Cooldown gates future leases without failing queued work.
 func (s *Store) recordProviderHealth(ctx context.Context, tx *sql.Tx, id, code string) error {
-	l := s.scheduler
-	if !l.Valid() {
-		l = agent.DefaultSchedulerLimits()
-	}
+	l := s.schedulerLimits()
 	var key string
 	err := tx.QueryRowContext(ctx, `SELECT `+providerKey+` FROM run r JOIN model_snapshot s ON s.snapshot_id=r.model_snapshot_id WHERE r.run_id=? AND r.kind='worker'`, id).Scan(&key)
 	if err == sql.ErrNoRows {

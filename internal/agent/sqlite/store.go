@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,16 +99,21 @@ var automationPrivacySQL string
 //go:embed migrations/025_channels.sql
 var channelsSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL}
+//go:embed migrations/026_operations.sql
+var operationsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL}
 
 type Store struct {
-	scheduler agent.SchedulerLimits
+	scheduler atomic.Pointer[agent.SchedulerLimits]
 	db        *sql.DB
 	path      string
 	artifacts *artifactsqlite.Store
 	// MainBoundary is explicit fault injection; production composition leaves it nil.
 	MainBoundary func(string)
 }
+
+func SchemaVersion() int { return len(migrations) }
 
 func (s *Store) boundary(name string) {
 	if s.MainBoundary != nil {
