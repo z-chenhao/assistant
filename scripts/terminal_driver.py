@@ -1,4 +1,4 @@
-"""Reusable Unix PTY drive for the real personal-agent entry point.
+"""Reusable Unix PTY drive for the real erii entry point.
 
 Owns only its child and PTY. Never writes an unredacted authentication URL to
 evidence. Used by terminal acceptance and the Case Runner.

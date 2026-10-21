@@ -2,7 +2,7 @@
 """CLI -> Code Mode -> Security -> real HTTP/SSH adapter, with offline peers.
 
 The explicit Lume/Guest Fake does not establish macOS or Jianying compatibility.
-Those opt-in L2 results are recorded separately in docs/computer-l2-result.json.
+Those opt-in L2 results are recorded separately in docs/reports/computer-l2-result.json.
 """
 import argparse
 from datetime import datetime, timezone

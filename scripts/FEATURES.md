@@ -2,11 +2,11 @@
 
 ## Production operations (ERII-29)
 
-`python3 scripts/verify_operations.py --binary bin/personal-agent --evidence evidence/operations.json`
+`python3 scripts/verify_operations.py --binary bin/erii --evidence evidence/operations.json`
 owns isolated Launch, explicit provider/SecretStore Doctor, actual CLI Drive,
 hash/state/trace Evidence, and joined-process/disposable-root Cleanup.
 `make verify` runs five passes plus `verify_capacity.py` (three 1000-Child cycles in one state root); its event
-gate drives a real CLI/NATS/Sidecar lifecycle. See [operations](../docs/operations.md).
+gate drives a real CLI/NATS/Sidecar lifecycle. See [operations](../docs/guides/operations.md).
 
 | Feature | Boundary | Authoritative implementation | Evidence |
 | --- | --- | --- | --- |
@@ -19,9 +19,19 @@ gate drives a real CLI/NATS/Sidecar lifecycle. See [operations](../docs/operatio
 
 Release model quality, semantic scores and live accounts remain separate claims.
 
+## Installation and project layout (ERII-183)
+
+| Feature | Reach it | Authoritative entry point | Evidence and cleanup |
+| --- | --- | --- | --- |
+| Install and launch Erii | `./install.sh`, then `erii`; `erii doctor`; explicit `erii start` | `cmd/erii`, `install.sh`, `scripts/package.sh`, `internal/startup`; installed runtime discovery uses executable location | Required providers gate `verify_startup.py`: source build → native archive → install into a path with spaces → read-only Doctor → real PTY setup, explicit Pi Probe/select, Main/Direct Tool/reply → SIGKILL/restart without duplicated state → reinstall without changing data; unmanaged executable rejection; all temporary processes/state/packages removed. No live model/account claim. |
+| Managed desktop broker | Bare terminal `erii`, or `bin/erii start`; external broker via `-config` or `ERII_NATS_URL` | `startup.OpenLocalBroker`, existing `app.OpenRuntime/WithEvents` | `TestLocalBroker*` provisions the production stream and DLQ, proves exclusive desktop ownership, shared maintenance lock, disk-backed notification reopen and full shutdown; cancelled startup releases ownership. Existing lifecycle order and replay gates remain required. |
+| Frontend source and documentation | `web/`; [documentation index](../docs/README.md); `make lint` | `web/build.mjs`, embedded assets in `internal/interaction/web/assets`, `check_docs.py` | `npm run check --prefix web` rejects stale assets; maintained channels browser drive proves composition/approval/fallback; local Markdown destinations checked offline. Historical measurements live in `docs/reports/`. |
+| Native release packaging | `sh scripts/package.sh "$PWD/dist"`; manual/tag package workflow | `.github/workflows/release.yml`, same installer | Native Ubuntu/macOS matrix produces archives/checksums; version tags create unpublished drafts. Local startup gate proves the host-native package; other OS/architecture results require their actual workflow evidence. PR safety gates are unchanged. |
+| Conservative branch cleanup | `python3 scripts/clean_branches.py` (plan), then `--apply` | `clean_branches.select/plan/apply` | Exact merge proof, protected main/worktrees/open PRs, local Git merged guard, remote exact-tip lease, stale tracking-ref pruning; audit in `evidence/branches.json`. Unique work stays intact. |
+
 ## M6 personal journeys (ERII-26)
 
-`ERII_VERIFY_CASE_JOBS=4 make verify VERIFY_SHARD=personal VERIFY_JOBS=1` owns Launch/Doctor/Drive/Evidence/Cleanup for eleven exact M6 worlds × six wording/noise/order variants × five serial runs. See [M6 scope and proof limits](../docs/m6-evals.md). A focused case uses `scripts/run_m6_cases.py --binary bin/personal-agent --case GC-13 --evidence evidence/m6-booking.json`.
+`ERII_VERIFY_CASE_JOBS=4 make verify VERIFY_SHARD=personal VERIFY_JOBS=1` owns Launch/Doctor/Drive/Evidence/Cleanup for eleven exact M6 worlds × six wording/noise/order variants × five serial runs. See [M6 scope and proof limits](../docs/guides/m6-evals.md). A focused case uses `scripts/run_m6_cases.py --binary bin/erii --case GC-13 --evidence evidence/m6-booking.json`.
 
 | Feature | User boundary | Authoritative implementation | Inspectable evidence |
 | --- | --- | --- | --- |
@@ -52,18 +62,18 @@ The M6 fifteen-second launch deadline and every product assertion remain intact.
 | Schema and replay | Open populated v21; existing `chat work` recovery | Migration 022, CAS, existing CodeCall/ToolInvocation replay | Empty/prior schema upgrades, retained accepted request, illegal version/CAS rejection; no replay of unknown input; parent scopes/old owner fences remain enforced |
 
 Launch/Doctor/Drive/Evidence/Cleanup:
-`python3 scripts/verify_computer_use.py --binary bin/personal-agent --evidence evidence/computer-use.json`.
+`python3 scripts/verify_computer_use.py --binary bin/erii --evidence evidence/computer-use.json`.
 `make verify` repeats it five times; `make test` runs actual Chromium and transfer
-security contracts. [Computer Use operations](../docs/computer-use.md) documents
+security contracts. [Computer Use operations](../docs/guides/computer-use.md) documents
 Guest setup, API limits, native selection restrictions and the opt-in real Lume
 AppKit drive. No semantic Golden Case score is inferred from these contracts.
 
 ## Durable Computer and Live Shadow (ERII-24)
 
 `scripts/lume_live.py --root TEST_ROOT` provides opt-in local L2 mechanics.
-See [Computer acceptance](../docs/computer-l2.md) for authorization, dedicated
+See [Computer acceptance](../docs/reports/computer-l2.md) for authorization, dedicated
 storage, pinned releases and the full acceptance matrix. The pinned 26.5.2 Guest
-combination has actual Jianying acceptance evidence. [Lifecycle operations](../docs/computer.md)
+combination has actual Jianying acceptance evidence. [Lifecycle operations](../docs/guides/computer.md)
 describe the production adapter, configuration and retained limits.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
@@ -97,10 +107,10 @@ the Fake from closing the channel while the real client is still sending input.
 
 ## Memory maintenance, context and experience (ERII-23)
 
-`python3 scripts/verify_memory_maintenance.py --binary bin/personal-agent --evidence evidence/memory-maintenance.json`
+`python3 scripts/verify_memory_maintenance.py --binary bin/erii --evidence evidence/memory-maintenance.json`
 owns isolated Launch, selected-profile/Fake Doctor, CLI/Tool Drive, persisted
 Evidence and Cleanup. `make verify` repeats it five times in the security shard.
-See [maintenance operations](../docs/memory-maintenance.md) and [ADR 003](../docs/adr/003-memory-forget-revokes-unfinished-context.md).
+See [maintenance operations](../docs/guides/memory-maintenance.md) and [ADR 003](../docs/adr/003-memory-forget-revokes-unfinished-context.md).
 
 | Feature | User boundary | Authoritative implementation | Evidence |
 | --- | --- | --- | --- |
@@ -117,9 +127,9 @@ limits are explicit in the operations notes.
 
 ## Durable context recall (ERII-22)
 
-`python3 scripts/verify_recall.py --binary bin/personal-agent --evidence evidence/recall.json`
+`python3 scripts/verify_recall.py --binary bin/erii --evidence evidence/recall.json`
 owns Launch/Doctor/Drive/Evidence/Cleanup with isolated databases and explicit HTTP
-embedding/LLM Fakes. `make verify` runs five repetitions. See [recall operations](../docs/recall.md).
+embedding/LLM Fakes. `make verify` runs five repetitions. See [recall operations](../docs/guides/recall.md).
 
 | Feature | User boundary | Authoritative implementation | Evidence |
 | --- | --- | --- | --- |
@@ -143,14 +153,14 @@ real boundary, records evidence, and always reaps its processes/removes state.
 | Complete offline CI gate | `make verify`; serial baseline with `VERIFY_JOBS=1`; isolated `VERIFY_SHARD=runtime/codemode/security/delivery/personal/providers`; focused `ci_cancel.py --entry make-step` | `verify_suite.py`, `ci_personal.py`, `fixture_pool.py`, `ci_cancel.py`, `ci_step.py`, `.github/workflows/ci.yml`, `ci_gate.py`, `ci_codemode.py`, `ci_race.py`, `ci_tmpfs.py`, `.github/actions/ci-inputs` | Ten-minute workflow baseline / five-minute target; all job timeouts ≤10 minutes with topology regression; measured workflow wall/queue via `ci_profile.py`; complete original inventory and serial five-run series; M6 uses seven independent Required parts, four isolated fixture workers (two for travel), compact full evidence after join, and a strict M6 join reconstructing all 330 variants; five parallel Required Code Mode parts reconstruct all 90 variants, five SC/cancel proofs and 25 logical rows; join rejects missing/duplicate/failed/drifted input; bounded independent fixture/gate scheduling; Go model/event checks isolated; SQLite race tests are auto-discovered; the unchanged five-second Child approval contract runs alone before other tests run once across up to three processes within a four-CPU budget; missing/duplicate/failed test roots reject the verdict; providers/race bounded tmpfs with executable/WAL Doctor and identity-checked cleanup; full unit, five SC race rounds and five focused receipt race runs retain disk coverage; frozen source/binary and hardware records; failure/cancel/skip rejects stable `Ubuntu checks`; 14-day exact-SHA artifacts. Shell `exec` makes each phase owner receive the Actions entry-PID signal. Atomic first-signal receipt is separate from final cleanup; repeated profiler termination notifications cannot interrupt finally cleanup; five-second escalation leaves room before the Actions hard stop. Real script-file entry, two-stubborn-session, uncooperative-child and four-real-Core Make-chain probes prove descendant/state cleanup. See [operations](../docs/ci.md). |
 | Copied public CI SDK | `ci_sdk.py prepare` → `doctor` → `run -- …` → `cleanup`; Required pipeline | `ci_sdk.py`, `TestCIInstalledSDKConformance`, `.github/actions/ci-inputs` | Python 3.10-compatible streaming digests; complete Python regressions additionally required on 3.10.22. Original SDK unchanged; fixed offline public roots; immutable copied tree; denied SDK write and sibling read; uncached std program executes with private writable cache. Every job builds from its own exact source; no cross-runner build reuse. Historical bundle v2 corruption/context tests remain intact. [Operations](../docs/ci.md). |
 | CI profiling | `python3 scripts/ci_profile.py --limit 30 --output evidence/ci-history.json`; historical `ci_compare.py`; `ci_supersede.py push/collect` | `ci_profile.py`, `ci_compare.py`, `ci_github.py`, `ci_step.py`, `ci_supersede.py` | Current single-ci.yml supersession collector and CLI regression reject missing/duplicate/unknown workflow, source or completion proof; no shadow attempt required. Exact-attempt wall/runner-minute evidence; raw API snapshots; unknown timestamps remain null; historical controlled-pair acceptance retains five samples; no repeated experiment or duplicate shadow workflow in the Required path. See [operations](../docs/ci.md). |
-| M5 exact Core case gate | `make verify VERIFY_SHARD=codemode`; focused `scripts/run_core_cases.py --binary bin/personal-agent --evidence evidence/core-probe.json --case GC-17` (also `GC-19` or `GC-20`) | `run_core_cases`, `core_conformance`, `core_report`, `ci_cancel`; CLI → Actor/Loop → ToolExecutor/QuickJS | Six locked variants × five serial stability rounds; independent variants can overlap at capacity four. Exact seed1701 CSV/Artifact readback; real Sidecar+Go SIGKILL at 37 completed/8 waiting; F055 drift rejection; unchanged audit/dirty CLI patch; committed migration reused, independent review/repair, final one-Task readback and isolated grandchild cancellation. Each full round also cancels four held real Core fixtures and proves descendant/state cleanup; aggregation requires all five proofs. SC-01…12 exercise implemented stores/executors with explicit external-provider Fakes and ungraded semantic scores. Within each serial round, audited root partitions use at most four single-CPU workers; missing/duplicate/skipped/failed roots reject, and all owned groups join before the cancellation probe. `core-cases-1…5.json`, `core-summary.json`, state/trace/ledgers. [Scope and recovery](../docs/core-evals.md). |
-| Help/doctor | `bin/personal-agent -help` | `cmd/personal-agent:run` | Usage; no state created |
-| Startup diagnostics | `bin/personal-agent [-config path] status`; no-command with redirected stdin | `agent/sqlite.Open`, `Store.Diagnostics`; derived `schema.sql` | setup_required, null profile, closed ingress; stored identity. Fresh schema matches every historical table/index/trigger and empty initial data; digest drift rejects startup; prior versions upgrade normally; initialization and later migrations roll back together. Actual commit-boundary kill/restart preserves schema/version and one bootstrap event. |
-| Diagnostic command | `bin/personal-agent [-config path] status` | `cmd/personal-agent:run` | JSON object, zero exit |
+| M5 exact Core case gate | `make verify VERIFY_SHARD=codemode`; focused `scripts/run_core_cases.py --binary bin/erii --evidence evidence/core-probe.json --case GC-17` (also `GC-19` or `GC-20`) | `run_core_cases`, `core_conformance`, `core_report`, `ci_cancel`; CLI → Actor/Loop → ToolExecutor/QuickJS | Six locked variants × five serial stability rounds; independent variants can overlap at capacity four. Exact seed1701 CSV/Artifact readback; real Sidecar+Go SIGKILL at 37 completed/8 waiting; F055 drift rejection; unchanged audit/dirty CLI patch; committed migration reused, independent review/repair, final one-Task readback and isolated grandchild cancellation. Each full round also cancels four held real Core fixtures and proves descendant/state cleanup; aggregation requires all five proofs. SC-01…12 exercise implemented stores/executors with explicit external-provider Fakes and ungraded semantic scores. Within each serial round, audited root partitions use at most four single-CPU workers; missing/duplicate/skipped/failed roots reject, and all owned groups join before the cancellation probe. `core-cases-1…5.json`, `core-summary.json`, state/trace/ledgers. [Scope and recovery](../docs/guides/core-evals.md). |
+| Help/doctor | `bin/erii -help` | `cmd/erii:run` | Usage; no state created |
+| Startup diagnostics | `bin/erii [-config path] status`; no-command with redirected stdin | `agent/sqlite.Open`, `Store.Diagnostics`; derived `schema.sql` | setup_required, null profile, closed ingress; stored identity. Fresh schema matches every historical table/index/trigger and empty initial data; digest drift rejects startup; prior versions upgrade normally; initialization and later migrations roll back together. Actual commit-boundary kill/restart preserves schema/version and one bootstrap event. |
+| Diagnostic command | `bin/erii [-config path] status` | `cmd/erii:run` | JSON object, zero exit |
 | Configuration | `-config`, `ERII_*` overrides | `config.Load` | Invalid fields/URLs/durations rejected without value echo |
 | SQLite bootstrap | Either startup path | `agent/sqlite.Open` | Schema v17, WAL, one Agent, one atomic fresh-bootstrap event |
 | Migration safety | Empty, real v1/v2/v3/v4/v5/v6, future schema | `agent/sqlite.migrate` | Prior Agent/config/timestamps, model metadata/snapshots and Outbox/Inbox preserved; future rejected; failed v3/v4/v5/v6/v7 DDL rolls back |
-| Model metadata | `bin/personal-agent model add` (stdin JSON), `model list`, `status` | `llm/sqlite.Store.AddProfile/ListProfiles` | New process and SIGKILL/restart preserve profile; unverified/version 1; independent SQLite/canonical JSON readback; ingress stays closed |
+| Model metadata | `bin/erii model add` (stdin JSON), `model list`, `status` | `llm/sqlite.Store.AddProfile/ListProfiles` | New process and SIGKILL/restart preserve profile; unverified/version 1; independent SQLite/canonical JSON readback; ingress stays closed |
 | Metadata validation | `model add` | `llm.ProfileInput.Validate`, CLI decoder | Unknown/credential fields, credential-bearing URLs, invalid enums, dangling/mismatched auth and pre-Probe activation rejected without value echo or writes |
 | Metadata CAS | Host storage, no CLI update surface | `llm/sqlite.Store.UpdateProfile/UpdateAuthState` | One winner across DB connections; stale CAS and event failures leave metadata/Outbox unchanged; profile edits reset verification |
 | Secret references | `model login [ENV_NAME]`; trusted Host only | `llm.RegisterAuth`, `llm/secret`, `llm/memory` test Fake | Put before metadata; database failure cleans new reference even after cancellation; cleanup failure explicit; DB/WAL/SHM and output exclude credential material |
@@ -178,9 +188,9 @@ real boundary, records evidence, and always reaps its processes/removes state.
 | Actual Pi process crash | `make test`, repeated in `make verify` | `bridge.TestActualPiBridgeClippingCrashAndRestart` | Kill Node after delta, no partial result, same Bridge restart/catalog, clipping and token readback |
 | Native credentials | `ERII_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTrip -v -timeout 30s` | Security.framework backend | Owned synthetic credential add/read/update/delete; optional macOS check, CI uses Fakes/env references |
 | Local observability | Configured `logs/` | `observability.Telemetry.Start` | JSONL logs and correlated startup/database spans |
-| Shutdown/restart | SIGTERM/SIGKILL then `status` | `cmd/personal-agent:main` | Stable identity, timestamps, SQLite dump |
+| Shutdown/restart | SIGTERM/SIGKILL then `status` | `cmd/erii:main` | Stable identity, timestamps, SQLite dump |
 | Transactional Outbox | `Store.Transaction` + `event/sqlite.Enqueue` | `event/sqlite.Enqueue` | Domain/event rollback together; unique ID rejects duplicate/drift |
-| Event relay | `bin/personal-agent [-config path] relay` | `event.Relay`, `event.Publisher.Flush` | Actual CLI offline launch, broker recovery, same event ID, SQLite publication marker, clean shutdown |
+| Event relay | `bin/erii [-config path] relay` | `event.Relay`, `event.Publisher.Flush` | Actual CLI offline launch, broker recovery, same event ID, SQLite publication marker, clean shutdown |
 | CloudEvents transport | `EventBus.Publish/Subscribe` | `event/nats.Open`, `event/fake.New` | Shared contract; structured wire JSON/extensions; arbitrary JSON rejected; durable redelivery |
 | Transactional Inbox | `Store.Events().Handle` | `event/sqlite.Store.Handle` | Domain+Inbox commit before ack; rollback, ack loss, consumer scope, concurrent duplicates |
 | Late/out-of-order snapshots | Domain handler on received CloudEvent | `event/sqlite:TestDuplicateLateAndOutOfOrderSnapshots` | New version wins; old epoch/version ignored; duplicates skip effects |
@@ -203,10 +213,10 @@ This includes the local-provider M1 slice, with no general Durable Replay or exa
 
 ## Main slice (ERII-9)
 
-`scripts/verify_main.py --binary bin/personal-agent --evidence evidence/main.json`
+`scripts/verify_main.py --binary bin/erii --evidence evidence/main.json`
 owns Launch/Doctor/Drive/Evidence/Cleanup. It runs from `make verify`, creates
 disposable state, starts only explicit Fakes, and reaps all owned children.
-See [Main operations](../docs/main-loop.md) for recovery and limits.
+See [Main operations](../docs/guides/main-loop.md) for recovery and limits.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -245,13 +255,13 @@ SQLite snapshots and transcripts as Evidence, and child/PTY/data Cleanup.
 
 Physical stdout may redisplay retained history on reconnect. No generic external
 exactly-once guarantee, Web/Feishu/UISpec implementation, or full Golden Case
-score is claimed. Operations and state details: `docs/delivery.md`.
+score is claimed. Operations and state details: `docs/guides/delivery.md`.
 
 ## Terminal slice (ERII-10)
 
 `scripts/verify_tui.py` owns launch/doctor/drive/evidence/cleanup through a real
 PTY and the existing local/account HTTP peers. `make verify` runs it five times.
-See [terminal operations and proof limits](../docs/tui-and-evals.md).
+See [terminal operations and proof limits](../docs/guides/tui-and-evals.md).
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -268,7 +278,7 @@ See [terminal operations and proof limits](../docs/tui-and-evals.md).
 `scripts/verify_tasks.py` extends the existing CLI/PTY launch, doctor, drive,
 evidence and cleanup harness. `scripts/run_task_cases.py` uses the shared Case
 result/scoring and Terminal mechanics. Both run in `make verify` without accounts.
-See [Task operations and proof limits](../docs/tasks.md).
+See [Task operations and proof limits](../docs/guides/tasks.md).
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -289,7 +299,7 @@ See [Task operations and proof limits](../docs/tasks.md).
 `scripts/verify_task_control.py` reuses the CLI/PTY harness for Launch, Doctor,
 Drive, Evidence and Cleanup. `make verify` repeats it five times. Reports retain
 actual PTY output and persisted state; all processes and disposable databases
-are cleaned up. See [Task operations](../docs/tasks.md) for transitions and limits.
+are cleaned up. See [Task operations](../docs/guides/tasks.md) for transitions and limits.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -313,16 +323,16 @@ approval CLI commands; **Evidence** domain state, approval records, Outbox and
 separate external ledger plus kill checkpoints; **Cleanup** join every child and
 remove isolated roots. `make verify` runs five consecutive repetitions. Full
 GC-11/12/13 product scenarios, Code Mode and Artifact spillover are not claimed by
-these Tool fragments. Operational details: `docs/tools.md`.
+these Tool fragments. Operational details: `docs/guides/tools.md`.
 
 ## Artifact slice (ERII-14)
 
-`scripts/verify_artifacts.py --binary bin/personal-agent --evidence evidence/artifacts.json`
+`scripts/verify_artifacts.py --binary bin/erii --evidence evidence/artifacts.json`
 owns Launch (isolated data root + explicit Fakes), Doctor (selected profile,
 schema/readiness), Drive (CLI and normal Main/Task/Root Tool path), Evidence
 (independent SQLite, bytes/hash readback, history, trace and SIGKILL residue),
 and Cleanup (join children and remove disposable roots). `make verify` repeats
-SC-09/recovery five times. See [Artifact operations](../docs/artifacts.md).
+SC-09/recovery five times. See [Artifact operations](../docs/guides/artifacts.md).
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -338,12 +348,12 @@ SC-09/recovery five times. See [Artifact operations](../docs/artifacts.md).
 
 ## MCP, Skills and coding fixture (ERII-16)
 
-`scripts/verify_capabilities.py --binary bin/personal-agent --evidence evidence/capabilities.json`
+`scripts/verify_capabilities.py --binary bin/erii --evidence evidence/capabilities.json`
 owns Launch (private data/provider/Skills/checkout roots), Doctor (explicit Fake
 model add/test/select, validated scopes), Drive (ordinary chat/Task/approval CLI),
 Evidence (SQLite, real test output, full tree hashes and SIGKILL/restart), and
 Cleanup (join every process and remove disposable roots). `make verify` repeats
-five times. See [capability operations](../docs/capabilities.md).
+five times. See [capability operations](../docs/guides/capabilities.md).
 
 For focused reproduction, add `--scenario dirty-index` (approved Worker
 dirty-file refusal) or `--scenario mcp-reply` (malformed post-effect stdio
@@ -362,9 +372,9 @@ reply). Both actions use the same Launch/Doctor/Drive/Evidence/Cleanup lifecycle
 
 ## Direct Child Run slice (ERII-17)
 
-`scripts/verify_children.py --binary bin/personal-agent --evidence evidence/children.json`
+`scripts/verify_children.py --binary bin/erii --evidence evidence/children.json`
 owns Launch/Doctor/Drive/Evidence/Cleanup through the existing CLI and PTY harness.
-`make verify` runs five consecutive passes. See [Child operations](../docs/children.md).
+`make verify` runs five consecutive passes. See [Child operations](../docs/guides/children.md).
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -385,7 +395,7 @@ later slice gates; they are not counted as passing here.
 
 ## Fair Child scheduling and batch aggregation (ERII-18)
 
-`scripts/verify_scheduling.py --binary bin/personal-agent --evidence evidence/scheduling.json`
+`scripts/verify_scheduling.py --binary bin/erii --evidence evidence/scheduling.json`
 owns Launch (isolated Fake/data root), Doctor (profile probe/activation), Drive
 (PTY, CLI and two simultaneous Tasks), Evidence (state, event lease timeline,
 usage, outputs and transcript), and Cleanup (all processes reaped, state removed).
@@ -405,7 +415,7 @@ account-spend authorization; this entry does not establish full M4 completion.
 
 ## Account monetary authorization (ERII-18, SC-13)
 
-`scripts/verify_spend.py --binary bin/personal-agent --evidence evidence/spend.json`
+`scripts/verify_spend.py --binary bin/erii --evidence evidence/spend.json`
 owns Launch (isolated children Fake), Doctor (profile probe/activation), Drive
 (CLI approval/deny/status, real PTY monetary notice and `/approve`, 100-item batch,
 Main cancellation, SIGKILL),
@@ -435,21 +445,21 @@ Synthetic fixture `evals/fixtures/m4-spend-v1.json` specifies prices and arithme
 | Fixed-source Code Mode recovery | configured `builtin__codemode__execute` via `chat send` / `chat work` | `tools.executeCode`, `codeBridge`, `Runs.recoverCode` | `verify_code_recovery.py`: actual Sidecar/Go SIGKILL at 37 completed + 8 active of 100; independent provider dispatch audit; 45 identities reattached; 100 final Children; zero active suspended VMs, replay/latency/RSS metrics, cleanup; five runs in `make verify`. State/contract tests cover old owner, wake-before-release, args/schema/manifest drift, durable delivery order and six fake hours of approval without a VM. |
 
 Launch/Doctor/Drive/Evidence/Cleanup:
-`python3 scripts/verify_codemode.py --binary bin/personal-agent --evidence evidence/codemode.json`.
+`python3 scripts/verify_codemode.py --binary bin/erii --evidence evidence/codemode.json`.
 This command owns disposable configuration, Model Fake, Computer Fake, processes
-and SQLite state. `make verify` repeats it five times. `docs/codemode.md` records
+and SQLite state. `make verify` repeats it five times. `docs/guides/codemode.md` records
 configuration, limits, provenance, runtime upgrade constraints and ERII-21 scoring gaps.
 `verify_code_recovery.py` owns the same five harness phases for fixed-source
 SIGKILL/SIGTERM recovery and recursive cancellation.
 
 ## Automation scheduling and threshold monitoring (ERII-27)
 
-`scripts/verify_automation.py --binary bin/personal-agent --evidence evidence/automation.json`
+`scripts/verify_automation.py --binary bin/erii --evidence evidence/automation.json`
 owns Launch (private data root and explicit Fake), Doctor (profile probe/select),
 Drive (ordinary chat Tool and Automation CLI), Evidence (fire/Outbox/Inbox,
 Task/Root/snapshot/Tool/Delivery state, six SIGKILL boundaries and restart), and
 Cleanup (all child processes joined and disposable state removed).
-`make verify` runs five consecutive passes. See [Automation operations](../docs/automation.md).
+`make verify` runs five consecutive passes. See [Automation operations](../docs/guides/automation.md).
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
@@ -462,11 +472,11 @@ Cleanup (all child processes joined and disposable state removed).
 
 ## Unified Web / Feishu interaction (ERII-28)
 
-`python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/channels.json`
+`python3 scripts/verify_channels.py --binary bin/erii --evidence evidence/channels.json`
 owns isolated Launch, auth/provider Doctor, actual HTTP/browser/platform Drive,
 API/SQLite/independent ledgers/screenshots Evidence and joined-process Cleanup.
 `make verify` and the Delivery CI shard run five consecutive passes. See
-[Channel operations](../docs/channels.md) for enrollment, credentials, revocation,
+[Channel operations](../docs/guides/channels.md) for enrollment, credentials, revocation,
 recovery, supported transports and release evidence limits.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |

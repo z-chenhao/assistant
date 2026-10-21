@@ -105,7 +105,7 @@ Protect the workspace:
 
 Use the project structure defined in the baseline:
 
-- `cmd/personal-agent` is the only Go process entry point.
+- `cmd/erii` is the only Go process entry point.
 - `internal/app` is a composition root with no business logic.
 - Define an interface in the module that uses it. Put implementations in named subpackages such as `memory/sqlite` or `event/nats`.
 - Do not create generic `ports`, `adapters`, `controller`, `service`, or `repository` hierarchies.

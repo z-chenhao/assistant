@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan', type=Path, required=True)
     parser.add_argument('--jobs', type=int, choices=[1, 2], default=int(os.environ.get('ERII_FEEDBACK_JOBS', '1')))
-    parser.add_argument('--binary', type=Path, default=Path('bin/personal-agent'))
+    parser.add_argument('--binary', type=Path, default=Path('bin/erii'))
     parser.add_argument('--evidence', type=Path, default=Path('evidence/feedback'))
     args = parser.parse_args()
     if args.jobs not in (1, 2):
