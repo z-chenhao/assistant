@@ -183,6 +183,16 @@ remaining-work notes and dispositions. Reviewed blocks are not individually
 verified requirements: the verified count stays zero, release_ready stays false
 and scores stay null. Source or reference drift fails closed.
 
+The first checkpoint CI on `6a837f4` passed all functional rounds, including
+the new providers/GC-11 gate, but the delivery job exceeded ten minutes and
+Ubuntu checks failed. Retained `suite-delivery.json` reports clean stable
+source, passed=true and all ten rounds; its 517.6-second wall time equals the
+two series' sum. The dispatch allowlist excluded delivery even though CI
+requested two workers. The bounded executor now honors that setting for these
+independent series, preserving every round and timeout. A real-subprocess
+mutual-admission regression fails on the old code. The failed receipt remains
+evidence; only successful required checks on the later exact head satisfy CI.
+
 [Evaluation preparation and current live preflight](v1-live-preflight.md) provides
 the executable packet/condition preparation and exact existing VM/channel
 commands. Judge input is allowlisted and excludes raw plans/traces; scripted

@@ -18,6 +18,35 @@ import verify_suite as suite
 
 
 class VerificationTests(unittest.TestCase):
+    def test_delivery_two_series_overlap_without_splitting_five_rounds(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'logs').mkdir()
+            gates = tuple(suite.Gate(name, '', name, 5) for name in ('delivery','channels'))
+            def command(gate, attempt, *_):
+                other = 'channels' if gate.name == 'delivery' else 'delivery'
+                # Each first round must observe its peer in flight. A serial
+                # dispatch fails deterministically instead of relying on a
+                # fragile wall-time speed threshold.
+                script = ('from pathlib import Path\nimport time\n'
+                          f'root=Path({str(root)!r})\n'
+                          f'name={gate.name!r}; attempt={attempt}\n'
+                          'with (root/(name+".rounds")).open("a") as out: out.write(str(attempt)+"\\n")\n'
+                          'if attempt==1:\n'
+                          ' (root/(name+".started")).touch()\n'
+                          ' deadline=time.monotonic()+2\n'
+                          f' while not (root/{(other+".started")!r}).exists():\n'
+                          '  assert time.monotonic()<deadline, "peer series never admitted"\n'
+                          '  time.sleep(.01)\n')
+                return [sys.executable,'-c',script], os.environ.copy(), root/'logs'/f'{gate.name}-{attempt}.log'
+            with patch.object(suite, 'command', command):
+                rows = suite.run_shard('delivery',Path('/binary'),root,threading.Event(),gates,gate_jobs=2)
+            self.assertEqual([(r['gate'],r['attempt']) for r in rows],
+                             [(name,i) for name in ('delivery','channels') for i in range(1,6)])
+            self.assertTrue(all(r['returncode']==0 and r['owned_group_drained'] for r in rows))
+            for name in ('delivery','channels'):
+                self.assertEqual((root/(name+'.rounds')).read_text().splitlines(),list('12345'))
+
     def test_signal_eperm_can_only_accept_confirmed_absence_on_darwin(self):
         with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
              patch.object(suite.sys, 'platform', 'darwin'), \

@@ -101,6 +101,21 @@ checks. All M6 fixtures remain disk-backed.
 
 ## Complete inventory
 
+Delivery now honors the same `ERII_VERIFY_GATE_JOBS=2` setting as the other
+eligible shards. On ERII-30 head `6a837f4`, all ten delivery/channel rounds
+passed, but the shard spent 517.6 seconds serially running the two series;
+setup and evidence retention took the job past its unchanged ten-minute ceiling.
+The old dispatch allowlist silently excluded delivery. The existing bounded
+two-worker executor now overlaps these independent series. Each series retains
+five consecutive rounds, its original timeouts/assertions and separate report
+paths. No production concurrency, fixture storage or job budget changes.
+`test_delivery_two_series_overlap_without_splitting_five_rounds` uses two real
+owned subprocesses with mutual admission barriers; it fails under the old
+serial dispatch and checks all ten canonical rows, per-series order and drained
+groups. Actual Web/Feishu/PTY, approval/restart and slow-send lease checks remain
+mandatory in every CI round. A successful run demonstrates capacity for that
+runner; it is not a controlled long-term performance claim.
+
 `scripts/verify_suite.py` is the authoritative logical inventory (105 gate
 invocations, including all five Computer lifecycle and Computer Use runs).
 
