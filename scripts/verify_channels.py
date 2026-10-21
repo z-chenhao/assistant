@@ -222,7 +222,7 @@ def extra_scenarios(binary,report):
                 h.start()
                 h.callback('output',json.dumps(dict(name='checklist.txt',mediaType='text/plain',text=content)),event='output-retry')
                 if lost_ack:
-                    h.wait(lambda s:s['deliveries'][0]['status']=='unknown' and s['deliveries'][0]['version']>prior_version,'unknown delivery was queried after restart')
+                    h.wait(lambda s:s['deliveries'][0]['status']=='unknown' and s['deliveries'][0]['version']>=prior_version+2,'unknown delivery was queried after restart')
                 require(h.rows()['deliveries'][0]['status']==status and platform.evidence()==before,'uncertain effect or sent attachment retried')
                 report['scenarios']['lost-remote-ack' if lost_ack else 'outbound-attachment']=dict(state=h.rows(),platform=platform.evidence())
                 h.stop()
