@@ -912,7 +912,7 @@
       "area": "automation",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Monthly review scheduling is tested separately; the personal journey still omits Turn 4."
+      "gap": "All six deterministic variants include Turn 4 monthly scheduling, no premature Automation, exact first fire and duplicate-input equality. Actual model behavior, semantic grades and current L2 remain inconclusive."
     },
     "GC-03": {
       "area": "memory",
@@ -972,7 +972,7 @@
       "area": "tools",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Approval/channel fragments; no complete exact Alex/Tuesday email AND calendar journey."
+      "gap": "Exact §8.13 six-variant scripted whole-case mechanics plus denial/lost-response probes now run through real channel/Main/Security/MCP. One mail AND one calendar, Tuesday, invalidated Monday, readback/replay/cleanup are asserted. Actual unscripted model grades, full protected product acceptance, current L2/human review remain inconclusive."
     },
     "GC-13": {
       "area": "cua",
@@ -1027,12 +1027,12 @@
     {
       "id": "G1",
       "kind": "implementation",
-      "detail": "Complete remaining exact whole-case journeys/variants within ERII-30 and sole draft PR #32, as authorized by the 2026-10-21 parent Coordination update; propose a bounded ledger split only if a genuinely separate PR is needed."
+      "detail": "Complete remaining exact whole-case journeys/variants within ERII-30 and sole unmerged PR #32, as authorized by the 2026-10-21 parent Coordination update; propose a bounded ledger split only if a genuinely separate PR is needed."
     },
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "Fourteen source blocks have partial/evidence-gap dispositions linked to exact source/code/tests/draft PR/evidence; 1568 remain pending and zero requirements certified. Continue individual normative review."
+      "detail": "Twenty-one source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1561 remain pending and zero requirements certified. Continue individual normative review."
     },
     {
       "id": "G3",
@@ -1076,7 +1076,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "7.GC-11",
       "line": 303
     },
@@ -1099,7 +1099,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "7.GC-11",
       "line": 304
     },
@@ -1122,7 +1122,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "7.GC-11",
       "line": 305
     },
@@ -1145,7 +1145,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "7.GC-11",
       "line": 306
     },
@@ -1168,7 +1168,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "7.GC-11",
       "line": 307
     },
@@ -1191,7 +1191,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "8.12",
       "line": 815
     },
@@ -1214,7 +1214,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "8.12",
       "line": 816
     },
@@ -1237,7 +1237,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "8.12",
       "line": 820
     },
@@ -1260,7 +1260,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "8.12",
       "line": 821
     },
@@ -1283,7 +1283,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "8.12",
       "line": 822
     },
@@ -1306,7 +1306,7 @@
         "docs/v1-release-audit.md#GC-11 checkpoint",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
       "section": "8.12",
       "line": 823
     },
@@ -1332,7 +1332,7 @@
         "scripts/verify_local_provider.py#verify_gc11_driver",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)"
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     },
     {
       "source": "evals/golden-cases.md",
@@ -1356,7 +1356,7 @@
         "scripts/verify_local_provider.py#verify_gc11_driver",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)"
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     },
     {
       "source": "evals/golden-cases.md",
@@ -1384,7 +1384,175 @@
         "scripts/verify_local_provider.py#verify_gc11_driver",
         "docs/gc11-evaluation.md#Offline contract"
       ],
-      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)"
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 317,
+      "sha256": "07fbbdc426a54868fb6a511d7e52ae3d9fc36f354c65efb6f0da33e66259c049",
+      "disposition": "partial_mechanical",
+      "observed": "确定性模型通过实际 MCP 读取联系人/历史线程，重排与额外 Alex 不改变收件人；歧义回归拒绝猜测。",
+      "remaining": "非脚本真实模型的身份解析和追问质量仍需批准环境及受约束评审。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 318,
+      "sha256": "b92f3379aba55961dc1d7f318918a9827722dfe376e13d95b5a8705e043aebff",
+      "disposition": "partial_mechanical",
+      "observed": "独立 MCP invitation 动作通过同一 Security 管线冻结收件人、标题、正文、时区、起止及发送邮件/建会动作；错误 hash 被拒绝。",
+      "remaining": "这里只覆盖合成联合邀请 endpoint；真实邮件/日历集成、UI 人审和语义评分仍未观察。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 319,
+      "sha256": "09107cf69dfde87b1af115fe72346bca4476ba4cfb0e48676084b04e67401ea9",
+      "disposition": "partial_mechanical",
+      "observed": "旧 Monday 审批在渠道通知发送前被 Steering 失效，SIGKILL/重启后仅新 Tuesday 审批有效；并发/重复回调不重复外部记录。",
+      "remaining": "受保护机械五轮不替代真实模型的完整验收系列和当前 L2。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 320,
+      "sha256": "065edd63f54292a6a01cded5fecb1839d02a01c26c62c0202450a4653335c08a",
+      "disposition": "evidence_gap",
+      "observed": "显式模型 Fixture 生成少于120字的简洁邀请正文；冻结正文与远端发信字节一致。",
+      "remaining": "短文本断言和脚本模板不能证明真实模型写作风格、个性化或无未授权承诺；Judge/人审仍 required。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 321,
+      "sha256": "b5ccad76eec125850bb7337dd1f848e4b74630fb59a364923d7dda7d116b15b2",
+      "disposition": "partial_mechanical",
+      "observed": "实际只读 Tool 回读独立 mail/calendar 两表的 sent/confirmed 状态，再产生一次完成通知；缺失/重复/错误状态的持久回归拒绝。",
+      "remaining": "当前仅离线合成 endpoint，无当前真实渠道/模型语义或 L2 人审。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 829,
+      "sha256": "c8bfec2bef13ced4c65ebf11db0c7ba2cd29aed0fcd52435385d133e12f5a633",
+      "disposition": "partial_mechanical",
+      "observed": "gc12-v1.json 与原规范数据完全对齐并锁定 hash；原始两轮输入经 Web/签名回调，原生产 Context Builder/Tool 边界留证。",
+      "remaining": "Fixture 锁和确定性模型不提供真实模型质量/资源或本地与账号模型比较。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 850,
+      "sha256": "712700ca00f332a5bcc5f59fc370580af1ba21eee52271cd650122b7ee172a51",
+      "disposition": "partial_mechanical",
+      "observed": "每次批准后独立 Fake 分别保存恰好一封邮件和一个会议，不使用 Fake 去重掩盖 Host 重发；拒绝审批零写入，丢响应后 Tool unknown/一尝试且不重发。",
+      "remaining": "五轮机械证据不代表全20 Case阈值、protected产品验收、真实模型和当前 L2 已通过。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }
   ]
 }

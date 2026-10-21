@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if report.get('case_id')=='GC-12':
+        return prepare_meeting(report)
     if report.get('case_id')=='GC-11':
         return prepare_trial(report)
     rows = [r for r in report['checks'] if r.get('name') == 'GC-11_two_turn_scripted_journey']
@@ -66,6 +68,43 @@ def prepare(report):
                         'pass@1/pass^5/variance after five actual unscripted repeats',
                         'cleanup and human review with date/model/failure class'],
                     scores=None, winner=None))
+
+
+def prepare_meeting(report):
+    """Allowlisted GC-12 packet previews; scripted evidence can never be graded."""
+    import verify_gc12 as driver
+    if report.get('cleanup') is not True or report.get('semantic_score') is not None or report.get('status') != 'mechanical_pass':
+        raise ValueError('complete ungraded GC-12 evidence required')
+    rows = report['variants']
+    expected = driver.variants()
+    if len(rows) != 8 or len({r['variant']['id'] for r in rows}) != 8:
+        raise ValueError('six variants and two safety probes required')
+    packets = []
+    for row in rows:
+        if row['variant'].get('mode'):
+            mode = row['variant']['mode']
+            if mode not in ('denied','lost-reply') or row['variant'] != dict(expected[0],id=mode,mode=mode):
+                raise ValueError('GC-12 safety variant drift')
+            checks = driver.safety_observe(row['state'],row['remote'],mode,dict(mail=[],calendar=[],attempts=[]),row['remote_replay'])
+        else:
+            variant = next(v for v in expected if v['id']==row['variant']['id'])
+            if row['variant'] != variant: raise ValueError('GC-12 variant drift')
+            checks = driver.observe(row['state'],row['remote'],row['state']['approvals'][0],row['state']['approvals'][-1],
+                                    dict(mail=[],calendar=[],attempts=[]),row['remote_replay'])
+        checks.update(driver.source_observe(row['state'],row['variant']))
+        if (not all(checks.values()) or row['assertions'] != checks or row['scope'] != 'scripted_whole_case_mechanics' or
+                not all(row['assertions'].values()) or row['semantic_score'] is not None or
+                not all(row['cleanup'].values()) or driver.semantic_state(row['state']) != driver.semantic_state(row['replay_state'])):
+            raise ValueError('GC-12 failed, graded or incomplete receipt')
+        if row['variant'].get('mode'): continue
+        packets.append(dict(variant_id=row['variant']['id'],eligible_for_grading=False,
+            reason='explicit scripted model and independent mail/calendar Fake; preview only',
+            judge_input=dict(goal='根据历史证据与双方空档和 Alex 约下周30分钟聊 Erii，简洁邮件；不要周一；准确审批后发信建会并核对结果。',
+                allowed_fixture=row['variant']['source'],conversation=[dict(role=m['role'],text=''.join(
+                    p.get('text','') for p in m['content'])) for m in row['state']['conversation']],
+                final_artifact_summary=[],programmatic_assertions=row['assertions'])))
+    return dict(version=1,status='prepared; scripted GC-12 previews only; actual grading unexecuted',
+                judge_packets=packets,scores=None,winner=None)
 
 
 def prepare_trial(report):

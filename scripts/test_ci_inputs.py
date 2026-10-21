@@ -244,7 +244,7 @@ class FeedbackSchedulingTests(unittest.TestCase):
 
     def test_all_selected_shards_remain_in_early_schedule(self):
         self.assertEqual(ci_feedback.feedback_order(list(ci_feedback.GATES)),
-                         ['security','runtime','codemode','providers','delivery','personal'])
+                         ['security','runtime','codemode','providers','delivery','personal','communication'])
         self.assertEqual(ci_feedback.feedback_order(['delivery','runtime']), ['runtime','delivery'])
         self.assertEqual(ci_feedback.feedback_order([]), [])
         for names in (['unknown'], ['security','security']):

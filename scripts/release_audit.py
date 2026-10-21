@@ -90,7 +90,7 @@ def apply_reviews(root, units, reviews):
         for field in ('observed', 'remaining', 'code', 'tests', 'evidence', 'pr'):
             if not review.get(field):
                 raise ValueError('missing individual review disposition: ' + field)
-        if review['pr'] != 'https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)':
+        if review['pr'] != 'https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)':
             raise ValueError('unrecognized checkpoint PR disposition')
         for category in ('code', 'tests', 'evidence'):
             for ref in review[category]:

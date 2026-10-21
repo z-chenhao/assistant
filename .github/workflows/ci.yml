@@ -98,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "security", "delivery", "providers"]
+        shard: ["runtime", "security", "delivery", "providers", "communication"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,7 +106,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
         with:
-          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}
+          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' || matrix.shard == 'communication' }}
           temporary-fixtures: ${{ matrix.shard == 'providers' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}

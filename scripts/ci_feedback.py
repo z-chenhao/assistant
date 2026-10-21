@@ -18,10 +18,11 @@ GATES = {
     'delivery': {'delivery'},
     'providers': {'local-provider', 'capabilities', 'terminal-input'},
     'personal': {'m6-cases'},
+    'communication': {'gc12'},
 }
 
 
-EARLY_ORDER = ('security', 'runtime', 'codemode', 'providers', 'delivery', 'personal')
+EARLY_ORDER = ('security', 'runtime', 'codemode', 'providers', 'delivery', 'personal', 'communication')
 
 
 def feedback_order(names):

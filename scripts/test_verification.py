@@ -95,6 +95,7 @@ class VerificationTests(unittest.TestCase):
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
+            "verify_gc12.py": 5,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
@@ -142,7 +143,7 @@ class VerificationTests(unittest.TestCase):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
         self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal'})
-        self.assertEqual(len(shards), 4)
+        self.assertEqual(len(shards), 5)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
         checks = workflow[workflow.index('  checks:'):]
@@ -157,7 +158,7 @@ class VerificationTests(unittest.TestCase):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
         self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 8)
-        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}", workflow)
+        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
         self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 5)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
