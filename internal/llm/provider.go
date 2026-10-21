@@ -38,7 +38,9 @@ type ToolCall struct {
 }
 
 type Message struct {
+	ImageRefs  []string   `json:"image_refs,omitempty"`
 	Role       string     `json:"role"`
+	Origin     string     `json:"origin,omitempty"`
 	Text       string     `json:"text"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
@@ -46,17 +48,22 @@ type Message struct {
 
 type ToolSpec struct {
 	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 	InputSchema string `json:"input_schema"`
 }
 
 type GenerationRequest struct {
-	GenerationID     string     `json:"generation_id"`
-	OutputLimitBytes int        `json:"output_limit_bytes,omitempty"`
-	RunID            string     `json:"run_id"`
-	SessionID        string     `json:"session_id"`
-	Snapshot         Snapshot   `json:"model_snapshot"`
-	Messages         []Message  `json:"messages"`
-	Tools            []ToolSpec `json:"tools,omitempty"`
+	ResolveImage func(context.Context, string) (string, []byte, error) `json:"-"`
+	// DispatchGuard is a trusted Host lease held only while writing the request
+	// frame. Revocation and dispatch serialize; it never crosses the wire/hash.
+	DispatchGuard    func(context.Context) (func(), error) `json:"-"`
+	GenerationID     string                                `json:"generation_id"`
+	OutputLimitBytes int                                   `json:"output_limit_bytes,omitempty"`
+	RunID            string                                `json:"run_id"`
+	SessionID        string                                `json:"session_id"`
+	Snapshot         Snapshot                              `json:"model_snapshot"`
+	Messages         []Message                             `json:"messages"`
+	Tools            []ToolSpec                            `json:"tools,omitempty"`
 
 	// AuthEpoch is captured by the Host resolver and passed only to final
 	// persistence. It is not part of the frozen snapshot or Bridge protocol.
@@ -138,10 +145,23 @@ type ProbeResult struct {
 	Continuation bool `json:"continuation"`
 	Cancellation bool `json:"cancellation"`
 	Clipping     bool `json:"clipping"`
+	ImageInput   bool `json:"image_input,omitempty"`
 }
 
 func (p ProbeResult) Validate() error {
 	if !p.Streaming || !p.ToolCalls || !p.Continuation || !p.Cancellation || !p.Clipping {
+		return ModelIncompatible
+	}
+	return nil
+}
+
+// Optional modalities require observed proof as well as a profile declaration.
+// Older text-only records remain valid; an old record cannot admit image input.
+func (p ProbeResult) ValidateCapabilities(c Capabilities) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if c.ImageInput && !p.ImageInput {
 		return ModelIncompatible
 	}
 	return nil

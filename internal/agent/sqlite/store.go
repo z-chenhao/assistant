@@ -10,10 +10,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
+	artifactsqlite "github.com/z-chenhao/erii/internal/artifact/sqlite"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
@@ -42,11 +44,67 @@ var accountAuthSQL string
 //go:embed migrations/007_main_loop.sql
 var mainLoopSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL}
+//go:embed migrations/008_tasks.sql
+var tasksSQL string
+
+//go:embed migrations/009_task_control.sql
+var taskControlSQL string
+
+//go:embed migrations/010_tool_policy.sql
+var toolPolicySQL string
+
+//go:embed migrations/011_artifacts.sql
+var artifactsSQL string
+
+//go:embed migrations/012_delivery.sql
+var deliverySQL string
+
+//go:embed migrations/013_children.sql
+var childrenSQL string
+
+//go:embed migrations/014_scheduler.sql
+var schedulerSQL string
+
+//go:embed migrations/015_spend.sql
+var spendSQL string
+
+//go:embed migrations/016_codemode.sql
+var codemodeSQL string
+
+//go:embed migrations/017_code_recovery.sql
+var codeRecoverySQL string
+
+//go:embed migrations/018_recall.sql
+var recallSQL string
+
+//go:embed migrations/019_memory_maintenance.sql
+var memoryMaintenanceSQL string
+
+//go:embed migrations/020_main_successor.sql
+var mainSuccessorSQL string
+
+//go:embed migrations/021_computers.sql
+var computersSQL string
+
+//go:embed migrations/022_computer_use.sql
+var computerUseSQL string
+
+//go:embed migrations/023_automation.sql
+var automationSQL string
+
+//go:embed migrations/024_automation_privacy.sql
+var automationPrivacySQL string
+
+//go:embed migrations/025_channels.sql
+var channelsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL}
 
 type Store struct {
-	db   *sql.DB
-	path string
+	scheduler agent.SchedulerLimits
+	db        *sql.DB
+	path      string
+	artifacts *artifactsqlite.Store
 	// MainBoundary is explicit fault injection; production composition leaves it nil.
 	MainBoundary func(string)
 }
@@ -98,6 +156,14 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 	if _, err := s.Diagnostics(ctx); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
+	s.artifacts, err = artifactsqlite.New(db, dataRoot)
+	if err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	s.artifacts.Boundary = s.boundary
+	if _, err = s.artifacts.Recover(ctx); err != nil {
+		return nil, errors.Join(err, s.artifacts.Close(), db.Close())
+	}
 	return s, nil
 }
 
@@ -140,6 +206,21 @@ func migrate(ctx context.Context, db *sql.DB, scripts []string) error {
 	}
 	if version < 0 || version > len(scripts) {
 		return fmt.Errorf("unsupported database schema version %d (maximum %d)", version, len(scripts))
+	}
+	if version == 0 && len(scripts) >= freshSchemaVersion {
+		if !strings.HasPrefix(freshSchemaSQL, freshSchemaHeader(scripts[:freshSchemaVersion])) {
+			return errors.New("empty database schema does not match migration history")
+		}
+		// The derived schema has exactly the same objects as replaying the
+		// historical DDL, without repeatedly parsing them after every ALTER.
+		// Keep creation, version and any later migration in this transaction.
+		if _, err := tx.ExecContext(ctx, freshSchemaSQL); err != nil {
+			return fmt.Errorf("create empty schema: %w", err)
+		}
+		version = freshSchemaVersion
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", version)); err != nil {
+			return err
+		}
 	}
 	for i := version; i < len(scripts); i++ {
 		if _, err := tx.ExecContext(ctx, scripts[i]); err != nil {
@@ -204,7 +285,13 @@ func (s *Store) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 	return d, nil
 }
 
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	if s.artifacts != nil {
+		return errors.Join(s.artifacts.Close(), s.db.Close())
+	}
+	return s.db.Close()
+}
+func (s *Store) Artifacts() *artifactsqlite.Store { return s.artifacts }
 
 // Events shares the domain state.db connection and its lifecycle.
 func (s *Store) Events() *eventsqlite.Store { return eventsqlite.New(s.db) }

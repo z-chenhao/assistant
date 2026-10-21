@@ -12,7 +12,7 @@ func (s *Store) RecordProbe(ctx context.Context, p llm.Profile, r llm.ProbeRecor
 	if err := p.ValidateActivation(); err != nil {
 		return err
 	}
-	if r.Result.Validate() != nil || r.ProfileVersion != p.Version || r.BridgeIdentity == "" {
+	if r.Result.ValidateCapabilities(p.Capabilities) != nil || r.ProfileVersion != p.Version || r.BridgeIdentity == "" {
 		return llm.ErrUnverified
 	}
 	encoded, err := llm.CanonicalJSON(r.Result)
@@ -124,6 +124,9 @@ func (s *Store) Select(ctx context.Context, id string, profileVersion, configVer
 		if err := p.ValidateActivation(); err != nil {
 			return err
 		}
+		if result.ValidateCapabilities(p.Capabilities) != nil {
+			return llm.ErrConflict
+		}
 		if p.AuthConnectionID != "" {
 			var version int64
 			if err := tx.QueryRowContext(ctx, `SELECT version FROM auth_connection WHERE connection_id=? AND status='connected' AND (expires_at IS NULL OR expires_at>?)`, p.AuthConnectionID, now().UnixMicro()).Scan(&version); err != nil {
@@ -133,11 +136,11 @@ func (s *Store) Select(ctx context.Context, id string, profileVersion, configVer
 				return llm.ErrConflict
 			}
 		}
-		// Only observed capabilities survive activation. Optional compatibility,
-		// modalities, reasoning and sampling claims have not been probed in M0.
+		// Only observed capabilities survive activation. Audio, compatibility,
+		// reasoning and sampling claims still have no behavioral proof.
 		normalized := p.ProfileInput
 		normalized.Compatibility = llm.Compatibility{ToolResultFormat: "openai"}
-		normalized.Capabilities = llm.Capabilities{TextInput: true, ToolCalls: true, Streaming: true, ReasoningEfforts: []string{}}
+		normalized.Capabilities = llm.Capabilities{TextInput: true, ToolCalls: true, Streaming: true, ImageInput: p.Capabilities.ImageInput && result.ImageInput, ReasoningEfforts: []string{}}
 		normalized.GenerationDefaults = llm.GenerationDefaults{}
 		g, compat, caps, err := encode(normalized)
 		if err != nil {
