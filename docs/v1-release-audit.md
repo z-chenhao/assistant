@@ -223,8 +223,13 @@ The next exact whole-case checkpoint is GC-12 §8.13.
 The user's 2026-10-21 coordination authorizes sequential bounded checkpoints
 inside this existing child and sole PR #32. No new child or competing PR is
 needed. ERII-30 remains incomplete until
-those results and individual normative reviews are available. Its draft PR
-must stay draft; no reviewer PASS, CI result or human acceptance is fabricated.
+those results and individual normative reviews are available. The user's later
+2026-10-21 review instruction authorizes independent review of the implemented
+changes and evidence while these required release results remain missing.
+Ready/In Review means reviewable, not accepted: the Verifier must assess the
+original contract and report BLOCKED for missing required evidence. A prior
+Verifier PASS is not a prerequisite to requesting review. No reviewer PASS,
+CI result or human acceptance is fabricated.
 
 Retain exact commands, exit codes, source/binary hashes, complete reports and
 cleanup results with the issue. The inventory never labels an unrun command

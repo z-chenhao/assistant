@@ -1,6 +1,8 @@
 # Current release evaluation preflight
 
-ERII-30 continues in draft PR #32. These commands prepare or inspect approved
+ERII-30 continues in PR #32. Independent review of its implementation and
+evidence does not satisfy the original release acceptance contract.
+These commands prepare or inspect approved
 test infrastructure; none grants permission to use a personal account, incur
 model cost, provision a VM or send a real channel message. Historical L2
 receipts remain historical. Current scores, comparison winner and human
