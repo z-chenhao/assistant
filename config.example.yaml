@@ -135,3 +135,16 @@ context:
 # Automation intent is persisted through Main/automation manage, not YAML.
 # Run personal-agent automation work in the foreground under your supervisor.
 # Every intent carries its own IANA timezone; see docs/automation.md.
+
+# Optional authenticated Web surface; listener must be literal loopback.
+# web:
+#   listen: 127.0.0.1:8787
+#   token_ref: env:ERII_WEB_TOKEN
+# Optional Feishu p2p channel. Enroll the exact owner/chat through channel manage.
+# All credentials resolve through SecretStore; never put token values here.
+# feishu:
+#   app_id: your-app-id
+#   tenant_key: your-tenant-key
+#   verification_token_ref: env:ERII_FEISHU_VERIFICATION_TOKEN
+#   encrypt_key_ref: env:ERII_FEISHU_ENCRYPT_KEY
+#   access_token_ref: env:ERII_FEISHU_ACCESS_TOKEN

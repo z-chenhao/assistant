@@ -21,7 +21,7 @@ import (
 )
 
 // Historical upgrade fixtures first remove the later, empty Automation schema.
-const removeAutomationFixtureSchema = `DROP TABLE automation_request; DROP TABLE automation_fire; DROP TABLE automation; `
+const removeAutomationFixtureSchema = removeChannelFixtureSchema + `DROP TABLE automation_request; DROP TABLE automation_fire; DROP TABLE automation; `
 
 func automationFixture(t *testing.T) (*Store, *Runs, agent.Actor, *loopProvider) {
 	s, r, _, a, p := loopFixture(t)

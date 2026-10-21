@@ -61,7 +61,8 @@ SHARDS = {
         Gate("tools", "verify_tools.py", "tools", 5),
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),
     ),
-    "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),),
+    "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
+                 Gate("channels", "verify_channels.py", "channels", 5)),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("local-provider", "verify_local_provider.py", "local-provider"),

@@ -105,7 +105,8 @@ func (a *Adapter) Messages(ctx context.Context, destination string) ([]delivery.
 }
 
 // History includes retained pre-v12 sent messages without projection rows.
-// Unsent semantic intents stay hidden until this destination accepts them.
+// Unsent semantic intents stay hidden. Accepted Web/Feishu replies remain in
+// the same Conversation when the local owner opens the terminal history.
 // Input remains visible immediately.
 func (a *Adapter) History(ctx context.Context, destination string, messages []conversation.Message, requests []delivery.Request) ([]conversation.Message, error) {
 	inbox, err := a.Messages(ctx, destination)
@@ -117,7 +118,7 @@ func (a *Adapter) History(ctx context.Context, destination string, messages []co
 		accepted[e.Message.MessageID] = true
 	}
 	for _, r := range requests {
-		if r.Channel == "tui" && r.DestinationRef == destination && r.Status == "sent" {
+		if r.ConversationID == destination && r.Status == "sent" && ((r.Channel == "tui" && r.DestinationRef == destination) || r.Channel == "web" || r.Channel == "feishu") {
 			accepted[r.MessageID] = true
 		}
 	}

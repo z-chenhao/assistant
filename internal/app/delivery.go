@@ -34,6 +34,9 @@ func (a *App) Deliver(ctx context.Context) error {
 		}
 		adapter = a.deliveryFake
 	}
+	if err := a.deliverChannels(ctx); err != nil {
+		return err
+	}
 	return (delivery.Service{Store: a.store.Deliveries(), History: a.history, Adapter: adapter, Channel: "tui", Destination: d.AgentID, Policy: a.deliveryPolicy, Boundary: func(name string) {
 		if a.testBoundary != nil {
 			a.testBoundary(name)

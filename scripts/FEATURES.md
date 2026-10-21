@@ -13,6 +13,14 @@
 | Mixed deliverables and desktop materials | Three Main-created Tasks → Root work → Main; scoped video Artifacts and browser CUA | Same Agent Loop and Task/Tool/Artifact/Computer path | GC-18 later confirmed notes, standalone technical design, exact 416/128/16 CSV summary, three valid videos decoded/organized in real browser; screenshot and original-byte readback |
 | Five-run result integrity | `make verify`, `m6_report.aggregate` | Locked fixtures, exact binary/variant/assertion inventories | `m6-cases-1…5.json`, `m6-summary.json`; CI `ci_personal.py` requires seven fixed parts and rejects missing/duplicate/failed/drifted input; retained CLI-opened files/screenshots under `m6-cases-N-assets/`; all children joined and disposable state removed; semantic/product scores remain null, current L2 unexecuted |
 
+Browser launch Doctor uses `scripts/browser_readiness.mjs` in both the real
+Browser contract test and M6 Computer journeys. The pipe handshake is not proof
+that Chromium published `DevToolsActivePort`. Delayed, missing, empty/invalid
+port files wait within the shared five-second Browser readiness budget;
+non-transient filesystem errors fail immediately. `guest-browser/test.mjs`
+reproduces delayed/partial publication and asserts timeout/error rejection.
+The M6 fifteen-second launch deadline and every product assertion remain intact.
+
 ## Computer Use (ERII-25)
 
 | Feature | User boundary | Authoritative implementation | Inspectable evidence |
@@ -432,3 +440,23 @@ Cleanup (all child processes joined and disposable state removed).
 | Stop and version fences | Main manage cancel or Task pause/cancel; edit with current version | Existing `stopTask`/Task epoch, Automation schedule version through `Report`/`promoteFollowups` | Delayed fire becomes skipped; no new Run after cancel; old claim rejected; edits after `after_result_commit`/`after_report_commit` suppress stale Main and delivery, then the edited Oct22 intent delivers exactly once; no external effect authorization inherited |
 | Privacy-fenced admission | `memory manage KEY` Forget, next due fire, fresh chat and Automation | Immutable acceptance privacy epoch (migration 024), safe `manageAutomation` list projection, `admitAutomations` intent/Task eligibility -> skipped fire + Inbox; `createRoot` fence | `list-after-forget`: two real Main model requests exclude forgotten context, revoked rows retain cancellation controls only, fresh views stay complete, real Main cancel succeeds; linked Automation Task search stays private; `forget-next-fire-fresh-chat` plus `first-fire-forget-pending` / `first-fire-forget-not-persisted`: real health Memory tombstoned, zero revoked Task/Root/model requests, fresh Main and new Automation complete; retries/edits cannot renew intent; repeated drains stable; admission and skipped-receipt storage faults roll back and recover |
 | Upgrade | Startup on empty/prior DB | Migrations 023–024 | Every-prior migration, populated v22/v23 preservation, legacy intent fails closed after Forget, immutable epoch, partial DDL rollback; historical accepted-work migration fixtures remain strict |
+
+## Unified Web / Feishu interaction (ERII-28)
+
+`python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/channels.json`
+owns isolated Launch, auth/provider Doctor, actual HTTP/browser/platform Drive,
+API/SQLite/independent ledgers/screenshots Evidence and joined-process Cleanup.
+`make verify` and the Delivery CI shard run five consecutive passes. See
+[Channel operations](../docs/channels.md) for enrollment, credentials, revocation,
+recovery, supported transports and release evidence limits.
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Owner-bound channel access | `channel manage` bind/list; Web token login; signed `/feishu/callback` | `interaction/web`, `interaction/feishu.Client.Verify`, schema 025 binding/CAS | Browser setup, CSRF/DNS/auth rejection, signed/encrypted event, token/app/tenant/recipient tests; revoked binding, changed outbound app/tenant, frozen-destination drift and preference CAS |
+| One shared Conversation | Web `/`, `POST /api/message`, TUI chat and Feishu v2 p2p message | `Runs.AcceptInbound` -> existing `submit`/Actor; callback/source aliases and message route in one transaction | Concurrent callback IDs, same source/new event retry, content drift, one Main/input/reply; GC-08 continuation and GC-09 agenda transport fragments; SIGKILL before/after input commit |
+| Safe channel UI | Web conversation/settings, Feishu card, TUI fallback; `verify_channels.py --ui-components-only` | `delivery/ui` Composer and persisted `delivery_projection`; embedded ad-agent components, OpenIntelligentUI native DataTable and original Eri logo/avatar | Real desktop/mobile Chromium screenshots/DOM in `channels-ui/`; actual React composer and frozen approval forms; delayed-bundle handoff retains early text/file bytes, focus, selection and source ID, then submits once; escaped native table cells; unknown/empty/invalid component/version uses authoritative semantic fallback; no external frontend requests or raw Run/Tool traces; generated-asset freshness gate |
+| Read-only progress | Web `/progress`, `GET /api/progress` | Existing `Runs.Activity` aggregate projection | Browser asserts no management buttons; underlying Task/Child aggregation tests; ordinary progress does not notify |
+| Approvals and auth presentation | Web frozen confirmation; Feishu `/approve ID HASH`; Web settings sign-in | Existing `Runs.decideTx`, `account.Manager.Login` and frozen Tool pipeline | GC-12 Steering invalidates Monday approval; new recipient/time frozen; SIGKILL/restart and duplicate callbacks; one independent external Fake ledger row; real Manager/Bridge OAuth Fake, hidden-model rejection, Probe/Select, restart account picker, logout and credential scan; ephemeral auth events |
+| Channel attachments | Browser file input/Artifact download; Feishu image/file callback and outbound file | ArtifactStore owner scope, stable `channel_resource`, fixed platform upload/resource endpoint and per-part receipt | Incoming retry retains reference and downloaded bytes; outgoing filename/SHA-256/recipient asserted at independent HTTP Fake; wrong reference rejected |
+| Future notifications | Web settings or `channel manage` prefer; automatic Feishu preference | Immutable `message_route`, existing `DeliveryRequest`/Outbox/claims | GC-14 six scheduled days, two threshold notices through bound Feishu, quiet-day and duplicate-source stability; unknown remote send never resent; successful multipart receipts reused after restart |
+| Upgrade and crash recovery | Startup from empty/prior DB; normal foreground `web serve`; `verify_channels.py --delivery-lease-only` | Migration 025, existing Actor/Delivery claim/renew/recovery | All-prior schema tests, populated-v24 migration rollback/preservation, CAS, frozen projection and route; real SIGKILL input/delivery windows; delayed send/upload and cumulative multipart exceed the default lease, same owner excludes competing scan; pre-transport revalidation rejects expired claims; expired owner cancels and joins without stopping ingress; competing recovery and late response/restart keep unknown query-only with one independent send attempt; cleanup |

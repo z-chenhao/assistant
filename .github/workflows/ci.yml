@@ -108,6 +108,9 @@ jobs:
         with:
           sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}
           temporary-fixtures: ${{ matrix.shard == 'providers' }}
+      - name: Install pinned offline Web test browser
+        if: ${{ matrix.shard == 'delivery' }}
+        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: CLI verification with timings
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard ${{ matrix.shard }} --jobs 1
       - name: Verify the copied SDK stayed immutable

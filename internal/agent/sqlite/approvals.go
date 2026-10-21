@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/interaction"
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
@@ -48,14 +49,7 @@ func (r *Runs) toolLimits() ToolLimits {
 
 // ApprovalView belongs to the local user control plane, never model context.
 // The local CLI is authenticated by ownership of the private data directory.
-type ApprovalView struct {
-	ID        string `json:"approval_id"`
-	Tool      string `json:"tool"`
-	Arguments string `json:"arguments"`
-	Hash      string `json:"frozen_arguments_hash"`
-	Status    string `json:"status"`
-	ExpiresAt int64  `json:"expires_at"`
-}
+type ApprovalView = interaction.Approval
 
 func (r *Runs) Approvals(ctx context.Context) ([]ApprovalView, error) {
 	if err := r.recoverApprovals(ctx); err != nil {
@@ -89,36 +83,60 @@ func (r *Runs) Decide(ctx context.Context, principal, id, hash, decision string)
 	if err := r.recoverApprovals(ctx); err != nil {
 		return err
 	}
+	return r.write(ctx, func(tx *sql.Tx) error { return r.decideTx(ctx, tx, principal, id, hash, decision) })
+}
+func (r *Runs) DecideInbound(ctx context.Context, e interaction.InboundEvent, id, hash, decision string) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+	if decision != "approved" && decision != "denied" {
+		return agent.ErrConflict
+	}
+	if err := r.recoverApprovals(ctx); err != nil {
+		return err
+	}
 	return r.write(ctx, func(tx *sql.Tx) error {
-		if found, err := r.decideSpend(ctx, tx, principal, id, hash, decision); found || err != nil {
+		content, _ := encoded(e.Content)
+		if _, _, err := acceptChannelSource(ctx, tx, e, content); err != nil {
 			return err
 		}
-		var status, runID string
-		if err := tx.QueryRowContext(ctx, `SELECT status FROM approval WHERE approval_id=? AND scope=? AND frozen_arguments_hash=?`, id, principal, hash).Scan(&status); err != nil {
-			return agent.ErrConflict
-		}
-		if status == decision {
-			return nil
-		}
-		err := tx.QueryRowContext(ctx, `SELECT a.status,i.run_id FROM approval a JOIN tool_invocation i USING(invocation_id) JOIN run r USING(run_id) WHERE a.approval_id=? AND a.scope=? AND r.agent_id=? AND a.frozen_arguments_hash=? AND i.request_hash=? AND i.status='waiting' AND i.wait_reason='approval' AND r.desired_state='running' AND r.status IN ('running','waiting') AND a.expires_at>?`, id, principal, principal, hash, hash, r.approvalTime().UnixMicro()).Scan(&status, &runID)
-		if err != nil {
-			return agent.ErrConflict
-		}
-		if status == decision {
-			return nil
-		}
-		if status != "pending" {
-			return agent.ErrConflict
-		}
-		if _, err = tx.ExecContext(ctx, `UPDATE approval SET status=?,decision_source='local_user',decided_at=?,version=version+1 WHERE approval_id=?`, decision, r.approvalTime().UnixMicro(), id); err != nil {
+		var principal string
+		if err := tx.QueryRowContext(ctx, `SELECT agent_id FROM agent_config WHERE singleton=1`).Scan(&principal); err != nil {
 			return err
 		}
-		if err = wakeApproval(ctx, tx, runID); err != nil {
-			return err
-		}
-		return runEvent(ctx, tx, runID, "approval.decided", 1)
+		return r.decideTx(ctx, tx, principal, id, hash, decision)
 	})
 }
+func (r *Runs) decideTx(ctx context.Context, tx *sql.Tx, principal, id, hash, decision string) error {
+	if found, err := r.decideSpend(ctx, tx, principal, id, hash, decision); found || err != nil {
+		return err
+	}
+	var status, runID string
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM approval WHERE approval_id=? AND scope=? AND frozen_arguments_hash=?`, id, principal, hash).Scan(&status); err != nil {
+		return agent.ErrConflict
+	}
+	if status == decision {
+		return nil
+	}
+	err := tx.QueryRowContext(ctx, `SELECT a.status,i.run_id FROM approval a JOIN tool_invocation i USING(invocation_id) JOIN run r USING(run_id) WHERE a.approval_id=? AND a.scope=? AND r.agent_id=? AND a.frozen_arguments_hash=? AND i.request_hash=? AND i.status='waiting' AND i.wait_reason='approval' AND r.desired_state='running' AND r.status IN ('running','waiting') AND a.expires_at>?`, id, principal, principal, hash, hash, r.approvalTime().UnixMicro()).Scan(&status, &runID)
+	if err != nil {
+		return agent.ErrConflict
+	}
+	if status == decision {
+		return nil
+	}
+	if status != "pending" {
+		return agent.ErrConflict
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE approval SET status=?,decision_source='local_user',decided_at=?,version=version+1 WHERE approval_id=?`, decision, r.approvalTime().UnixMicro(), id); err != nil {
+		return err
+	}
+	if err = wakeApproval(ctx, tx, runID); err != nil {
+		return err
+	}
+	return runEvent(ctx, tx, runID, "approval.decided", 1)
+}
+
 func wakeApproval(ctx context.Context, tx *sql.Tx, runID string) error {
 	// Only released approval waiters need an explicit wake. Running owners see
 	// the decision in Prepare; other wait reasons retain their own wake policy.

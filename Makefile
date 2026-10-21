@@ -4,6 +4,7 @@ build:
 	go build -o bin/personal-agent ./cmd/personal-agent
 
 test:
+	npm run check --prefix internal/interaction/web/client
 	go test ./...
 	npm test --prefix provider-bridge
 	npm test --prefix runtime/javascript
@@ -25,6 +26,7 @@ lint:
 	npm run lint --prefix provider-bridge
 	npm run lint --prefix runtime/javascript
 	npm run lint --prefix guest-browser
+	npm run lint --prefix internal/interaction/web/client
 
 # Shards own isolated fixtures and disjoint evidence; repetitions stay serial.
 VERIFY_JOBS ?= 2

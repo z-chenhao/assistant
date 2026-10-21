@@ -20,6 +20,7 @@ import (
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
+	"github.com/z-chenhao/erii/internal/interaction"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/recall"
@@ -97,7 +98,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -120,6 +121,17 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 }
 
 func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.ContentPart) (agent.Receipt, error) {
+	return r.submit(ctx, key, parts, nil)
+}
+
+func (r *Runs) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
+	if err := e.Validate(); err != nil {
+		return agent.Receipt{}, err
+	}
+	return r.submit(ctx, "", e.Content, &e)
+}
+
+func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent) (agent.Receipt, error) {
 	parts, err := conversation.Normalize(parts)
 	if err != nil {
 		return agent.Receipt{}, err
@@ -136,6 +148,14 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 		var configVersion int64
 		if err := tx.QueryRowContext(ctx, `SELECT agent_id,coalesce(active_model_profile_id,''),setup_status,config_version FROM agent_config WHERE singleton=1`).Scan(&agentID, &profile, &status, &configVersion); err != nil {
 			return err
+		}
+		var bindingID string
+		if inbound != nil {
+			bindingID, key, err = acceptChannelSource(ctx, tx, *inbound, content)
+			if err != nil {
+				return err
+			}
+			receipt.RequestKey = key
 		}
 		var old string
 		err := tx.QueryRowContext(ctx, `SELECT run_id,message_id,message_json FROM main_input WHERE agent_id=? AND request_key=?`, agentID, key).Scan(&receipt.RunID, &receipt.MessageID, &old)
@@ -181,6 +201,10 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 			return err
 		}
 		message := conversation.Message{MessageID: receipt.MessageID, ConversationID: agentID, Role: "user", Content: parts, Source: "cli", SourceEventID: key, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		if inbound != nil {
+			message.Source = inbound.Channel
+			message.SourceEventID = inbound.SourceID
+		}
 		raw, _ := encoded(message)
 		if _, err = tx.ExecContext(ctx, `INSERT INTO main_input(agent_id,request_key,run_id,message_id,message_json) VALUES(?,?,?,?,?)`, agentID, key, receipt.RunID, receipt.MessageID, raw); err != nil {
 			return err
@@ -188,8 +212,19 @@ func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.Cont
 		if _, err = tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, receipt.MessageID, raw); err != nil {
 			return err
 		}
+		if bindingID != "" {
+			if _, err = tx.ExecContext(ctx, `INSERT INTO message_route VALUES(?,?)`, receipt.MessageID, bindingID); err != nil {
+				return err
+			}
+		}
+		if inbound != nil {
+			r.host.boundary("before_channel_input_commit")
+		}
 		return runEvent(ctx, tx, receipt.RunID, "main_input.accepted", 1)
 	})
+	if inbound != nil && err == nil {
+		r.host.boundary("after_channel_input_commit")
+	}
 	return receipt, err
 }
 
