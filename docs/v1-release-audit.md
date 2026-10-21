@@ -27,9 +27,10 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Each block remains
-`pending_individual_review`. Some blocks contain several obligations; a future
-review must check every subclause, distinguish v1 requirements from explicit
+can silently discard a mandatory clause. Eleven GC-11 blocks now have exact-hash
+individual dispositions (`partial_mechanical` or `evidence_gap`); the other
+blocks remain `pending_individual_review`. Some blocks contain several obligations;
+each review must check every subclause, distinguish v1 requirements from explicit
 deferrals, and link the exact executed assertion before closing it. Shared
 section mappings are navigation aids, not per-clause conformance proof.
 
@@ -47,7 +48,7 @@ the nonzero completion boundary through the actual CLI.
 | GC-02 semantic quality | The existing six-variant driver now processes all four turns in order and creates one monthly Automation through the Main Tool; it asserts no early Task/schedule, first fire 2026-11-29 20:00 +08 and duplicate-input idempotency | Unscripted interview/constraint selection and semantic grades remain unverified; scripted scheduling evidence is not a product Case score |
 | GC-08 | `verify_channels.py` uses earlier Task continuation; exact wedding checklist is not driven | C1→C2 dependency, 128 guests, unknown tables, hotel draft/frozen recipient/body/attachment; C3 stays lower priority |
 | GC-09 | Main agenda and Web transport fragments exist | Exact full M7 case record, required variants, notification/Steering and semantic grades |
-| GC-11 | `verify_capabilities.py` exercises the quote/Artifact fragment | Complete two-turn three-quote recommendation; conditional oral cashback, written evidence, no purchase |
+| GC-11 | Six locked variants now drive both original turns, three exact quotes/services/weights, actual MCP reads, user-visible scripted responses and two CLI-opened Artifacts; duplicate input creates no work | Unscripted recommendation, source selection and semantic calibration remain unverified; Fake output is not a product score |
 | GC-12 | `verify_channels.py` explicitly labels an approval fragment; Tool tests exercise frozen hashes | Exact Alex Chen/Tuesday 11:00–11:30 journey; obsolete Monday approval invalidated; one mail AND one calendar event and completion notice |
 | GC-14 | `verify_automation.py` and channel checks drive exact threshold days | Complete case variants, input/stop/currency evidence and semantic evaluation; only Oct 18/21 notify |
 | GC-16 | Child admission/isolation/aggregation fragments exist | D1–D5 research journey; earliest primary source Atlas 2024-03-01, rename vs extension, Aster excluded, independent report |
@@ -148,11 +149,52 @@ effect or revive a terminal Run. Approved deviations are ADR 001 (current
 account auth/deferred device flow), ADR 002 (explicit monetary authorization)
 and ADR 003 (Forget revokes unfinished work); no new deviation is approved here.
 
+## GC-11 checkpoint
+
+```sh
+make build
+python3 scripts/verify_capabilities.py --binary bin/personal-agent --scenario quotes --scenario-jobs 2 --evidence evidence/gc11.json
+python3 scripts/prepare_release_eval.py --input evidence/gc11.json --evidence evidence/gc11-eval-preparation.json
+python3 -m unittest discover -s scripts -p 'test_*.py'
+python3 scripts/release_audit.py --evidence evidence/release-audit.json
+```
+
+The `gc11-v1` lock binds source, policy and exact fixture. The existing five-round
+capabilities CI gate now includes every GC-11 variant, preserving the coding,
+Skill/MCP and SIGKILL scenarios. Each quote variant owns isolated configuration,
+databases and provider state. Doctor activates only the explicit Fake. Drive
+preserves two ordered original events with separate inspectable scripted plans;
+the real Main, Tool executor and stdio MCP run through the CLI. Independent
+readback asserts six exact read/save/echo calls, original three-quote source,
+two visible replies/deliveries, no Task/approval/purchase effect and unchanged
+state after a repeated second input. Both Artifacts are opened through the CLI
+and their bytes/hashes retained before joined cleanup removes the temporary root.
+The records include Run tree, snapshots, ToolInvocation, Approval, Outbox and
+Artifact state. `test_quote_case.py` rejects missing turns, services, uncertainty,
+source transport, response bytes, deliveries, unauthorized effects and replay drift.
+
+The ledger's eleven individual reviews bind exact GC-11 source blocks to code,
+regressions, this evidence command and PR #32's **draft/unmerged** disposition.
+Each lists observed mechanics and all remaining semantic or broader obligations;
+for example, no purchase during comparison cannot prove purchase approval, and
+the car-insurance weights do not prove device/budget personalization in other
+purchases. The audit validates block hashes, references, duplicates, required
+remaining-work notes and dispositions. Reviewed blocks are not individually
+verified requirements: the verified count stays zero, release_ready stays false
+and scores stay null. Source or reference drift fails closed.
+
+[Evaluation preparation and current live preflight](v1-live-preflight.md) provides
+the executable packet/condition preparation and exact existing VM/channel
+commands. Judge input is allowlisted and excludes raw plans/traces; scripted
+previews are ineligible for grading. No model comparison or current L2 run is
+claimed. The next independent checkpoint is an unscripted GC-11 CLI driver and
+frozen-condition comparison preflight, followed by the next exact GC-12 journey.
+
 ## Handoff and remaining work
 
-The parent has been asked to update its ledger before dispatching bounded
-whole-case, semantic-comparison and current-L2 work. This run creates no new
-implementation child and activates none. ERII-30 remains incomplete until
+The user's 2026-10-21 coordination authorizes sequential bounded checkpoints
+inside this existing child and sole PR #32. No new child or competing PR is
+needed. ERII-30 remains incomplete until
 those results and individual normative reviews are available. Its draft PR
 must stay draft; no reviewer PASS, CI result or human acceptance is fabricated.
 

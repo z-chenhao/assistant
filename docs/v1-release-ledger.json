@@ -966,7 +966,7 @@
       "area": "tools",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Three-quote Tool fragment; no complete two-turn decision journey."
+      "gap": "Six locked variants now exercise both quote turns, MCP/source equality, services/weights, visible scripted replies, two reopened Artifacts and no purchase/replay work. Unscripted source selection/recommendation and semantic evaluation remain inconclusive."
     },
     "GC-12": {
       "area": "tools",
@@ -1027,12 +1027,12 @@
     {
       "id": "G1",
       "kind": "implementation",
-      "detail": "Complete missing exact whole-case journeys and all normative variants; request parent ledger split before dispatch."
+      "detail": "Complete remaining exact whole-case journeys/variants within ERII-30 and sole draft PR #32, as authorized by the 2026-10-21 parent Coordination update; propose a bounded ledger split only if a genuinely separate PR is needed."
     },
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "Individually review every source unit against exact assertions, including mandatory subclauses. A section-level candidate map is not conformance proof."
+      "detail": "Eleven GC-11 source blocks have hash-bound partial dispositions with observed mechanics and unresolved subclauses; 1571 blocks remain pending and zero requirements are certified. Continue individual normative review."
     },
     {
       "id": "G3",
@@ -1047,12 +1047,246 @@
     {
       "id": "G5",
       "kind": "dependency_audit",
-      "detail": "2026-10-21 npm audit reports high-severity braces through micromatch/@parcel/watcher/@tailwindcss/cli in the Web build toolchain. Confirm exposure and repair through a scoped dependency change; no automatic force upgrade."
+      "detail": "Scoped @tailwindcss/cli watcher 2.6.0 override removes the braces chain: clean full npm audit zero, identical four embedded outputs, real Web UI checks on 6228468a693fef7581436c499e0aa057e7dc962f. Evidence attachment 01a15e1c-0bb2-7b8e-8101-acd28b75fac8; retain documented upstream/removal condition.",
+      "status": "known_chain_repaired; not a complete application security verdict"
     },
     {
       "id": "G6",
       "kind": "acceptance",
       "detail": "Exact-SHA Erii Verifier PASS, green CI, final program ledger/recovery report, and human acceptance are still required. Keep ERII-4 in_progress."
+    }
+  ],
+  "individual_reviews": [
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "96b9080ed3e55ff5dc04b048288f50f6d10aee96f102cb427652d9cffba8db66",
+      "disposition": "partial_mechanical",
+      "observed": "报价来源保留正式/口头返现区别；当前用合成MCP数据。",
+      "remaining": "尚未观察非脚本模型选择官方网页/PDF与完整合同、最终报价的优先级。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "7.GC-11",
+      "line": 303
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "f14b98b8a7a5a7ccd0aeee4655111ea5ef1acfb8e38d7ca9214cdb0a1e92f0dc",
+      "disposition": "partial_mechanical",
+      "observed": "两轮可打开Artifact展示净价情景、服务和未知免责/适用条件。",
+      "remaining": "没有真实条款研究；个性化选择和未知项覆盖须由受约束Judge及人工复核。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "7.GC-11",
+      "line": 304
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "3ba970501dfa24fbf130888895da66b5a3f5e9c14d7fe7dde0b6150dcd6be123",
+      "disposition": "partial_mechanical",
+      "observed": "B口头700元未书面化，输出分别保留5038.49和5738.49。",
+      "remaining": "当前措辞来自显式脚本，不证明模型能独立校准未知收益。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "7.GC-11",
+      "line": 305
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "fe664af14b90c6ce42709d310407a0007fa001e63aad41a043d835935d612435",
+      "disposition": "evidence_gap",
+      "observed": "fixture权重45/35/20进入对话与报告。",
+      "remaining": "该条还覆盖设备/预算/目标和避免榜单替代判断；本车险fixture没有设备预算，不足以完成一般购买个性化验证。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "7.GC-11",
+      "line": 306
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "d47b31050827947df7757a50b3663e73f8cd79b4c890ac79e12a9783f9449c4e",
+      "disposition": "partial_mechanical",
+      "observed": "实际ToolInvocation仅read/save/echo；无MCP效果文件、审批或Task；重复第二轮输入不新增工作。",
+      "remaining": "无购买阶段；转GC-13的审批语义仍需单独证据，不能由比较阶段无写入推断。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "7.GC-11",
+      "line": 307
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "bb9d8562872b0926562bce5eb240bc77fc8a8ea488f59074e8ce075be6e5adeb",
+      "disposition": "partial_mechanical",
+      "observed": "原始第一轮和两种措辞变体，经CLI发送并得到一个可观察回复。",
+      "remaining": "显式计划与原始输入同时传入，未执行无脚本模型。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "8.12",
+      "line": 815
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "b3dc8e4afa53547666703b23ffdf8f1502655188b5f510cd523730c08f75a7c9",
+      "disposition": "partial_mechanical",
+      "observed": "第二轮沿同一Conversation发送，两种措辞与两个噪声变体保留前轮状态。",
+      "remaining": "模型对追问的独立连续性及语义质量未评分。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "8.12",
+      "line": 816
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "6df77172449d0239d402e9c5ba0fc6745547047cbf7935d8f9495384fda92d31",
+      "disposition": "partial_mechanical",
+      "observed": "两轮报告先陈述共同责任和保额一致，并列净价/执行性/服务。",
+      "remaining": "脚本文案非独立推荐；免责相同不能从共同主险推断。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "8.12",
+      "line": 820
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "9ced93ce2a80e929a5b2d577a2997ff86d987530554c8a783aa26ce539704be4",
+      "disposition": "partial_mechanical",
+      "observed": "十进制计算和CLI重开Artifact保留5038.49兑现、5738.49不兑现两情景。",
+      "remaining": "无脚本模型算术与证据校准尚缺；不能以回归模板代替。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "8.12",
+      "line": 821
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "441a1ea3ed07dc99108b8418067bcdb898385118951def3e6b1c743e3c1ee051",
+      "disposition": "partial_mechanical",
+      "observed": "脚本报告将B设为书面确认条件下可考虑，C为确定性选择。",
+      "remaining": "未测非脚本模型是否无条件信任销售承诺。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "8.12",
+      "line": 822
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "72891dbfe3d52d6e379285075b98a18f93a18176ae03f3287fc6b1bfc3374593",
+      "disposition": "partial_mechanical",
+      "observed": "第二轮Artifact和可见回复列书面规则、付款/资格/到账条件、官方投诉路径与不能保证追回。",
+      "remaining": "未向真实保险方索取资料，也没有提交投诉；Judge与L2还未执行。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)",
+      "section": "8.12",
+      "line": 823
     }
   ]
 }

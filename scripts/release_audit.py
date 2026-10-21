@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Inventory v1 source clauses and evidence candidates; never certify release.
 
-The ledger is a navigation index, not proof that a clause passed. Every source
-block remains pending individual review. Existing Fake fragments cannot supply
+The ledger is a navigation index, not proof that a clause passed. Partial reviews
+record both evidence and unresolved obligations. Existing Fake fragments cannot supply
 full-case semantic scores or current Live Shadow evidence.
 """
 import argparse
@@ -74,6 +74,37 @@ def route(section, mappings):
     return mappings[max(matches, key=len)]
 
 
+def apply_reviews(root, units, reviews):
+    """Bind bounded review notes to exact source blocks, without certifying PASS."""
+    def identity(u):
+        return u['source'], u['section'], u['line'], u['sha256']
+    by_key = {identity(u): u for u in units}
+    seen = set()
+    for review in reviews:
+        key = identity(review)
+        if key not in by_key or key in seen:
+            raise ValueError('stale or duplicate individual review: ' + str(key))
+        seen.add(key)
+        if review['disposition'] not in ('partial_mechanical', 'evidence_gap'):
+            raise ValueError('individual review cannot certify release conformance')
+        for field in ('observed', 'remaining', 'code', 'tests', 'evidence', 'pr'):
+            if not review.get(field):
+                raise ValueError('missing individual review disposition: ' + field)
+        if review['pr'] != 'https://github.com/z-chenhao/erii/pull/32 (draft; unmerged)':
+            raise ValueError('unrecognized checkpoint PR disposition')
+        for category in ('code', 'tests', 'evidence'):
+            for ref in review[category]:
+                path, _, symbol = ref.partition('#')
+                target = root / path
+                if not target.is_file() or not target.resolve().is_relative_to(root.resolve()):
+                    raise ValueError('invalid review reference: ' + ref)
+                if symbol and symbol not in target.read_text():
+                    raise ValueError('missing review symbol: ' + ref)
+        by_key[key]['disposition'] = review['disposition']
+        by_key[key]['review'] = review
+    return len(seen)
+
+
 def audit(root, ledger):
     if ledger.get('version') != 1:
         raise ValueError('unsupported release ledger')
@@ -106,12 +137,14 @@ def audit(root, ledger):
             units.append(dict(source=source, **row, area=area,
                               disposition='pending_individual_review'))
         sources[source] = dict(sha256=sha256(path), units=len(rows))
+    reviewed = apply_reviews(root, units, ledger.get('individual_reviews', []))
     # Indexing source text, passing contracts and merged PRs are distinct facts.
     # This command intentionally has no path from those facts to release PASS.
     return dict(version=1, audited_base=ledger['audited_base'], sources=sources,
                 status='inconclusive', release_ready=False,
                 scope='source inventory and evidence candidates, not completed normative audit',
                 individually_verified_requirements=0,
+                individually_reviewed_blocks=reviewed,
                 merged_prs=ledger['merged_prs'], areas=areas, source_units=units,
                 golden_cases=ledger['golden_cases'], gaps=ledger['gaps'],
                 scores=dict(suite_mean=None, suite_min=None,

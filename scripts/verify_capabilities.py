@@ -13,6 +13,7 @@ from pathlib import Path
 
 from verify_main import MainHarness, require
 from fixture_pool import run as fixture_run, run_cases
+import quote_case
 
 
 class CapabilityHarness(MainHarness):
@@ -97,13 +98,11 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         root = Path(temp)
         cases = []
         def scenario(name, fn, mode='edit', kind='checks'):
-            if not selected or selected == name:
+            if not selected or selected == name or selected == 'quotes' and name.startswith('quotes-'):
                 cases.append((name, fn, mode, kind))
 
         def drive(item):
             name, fn, mode, kind = item
-            if selected and selected != name:
-                return
             folder = root / name
             folder.mkdir()
             h = prepare(binary, folder, mode)
@@ -197,28 +196,9 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             return {'name': 'audit_read_search_no_writes', 'tree_hashes': before, 'finding': {'file': 'internal/retry/executor.go', 'symbols': ['retry.Execute', 'Provider.Execute', 'Ledger.Lookup'], 'trigger': 'retry after a previously completed call', 'impact': 'Provider runs before the completed Ledger result is checked, so a retry can repeat an effect', 'basis': 'observed source order; no claim of a production failure'}, 'state': h.state()}
         scenario('audit', audit, mode='audit')
 
-        def quotes(h):
-            fetched = content(call(h, 'quotes', 'mcp__fixture__read', {'text': 'insurance_quotes'}))
-            data = json.loads(fetched['text'])
-            b = next(q for q in data['quotes'] if q['id'] == 'B')
-            require(data['coverage_equal'] and not b['cashback_written'], 'lost quote source uncertainty')
-            possible = round(b['premium_cny'] - b['cashback_cny'], 2)
-            require(possible == 5038.49 and b['premium_cny'] == 5738.49, 'incorrect cashback scenarios')
-            report_text = (f"Coverage is equal. B costs CNY {possible:.2f} if its oral cashback is paid, "
-                           f"or CNY {b['premium_cny']:.2f} otherwise. Cashback is unconfirmed. "
-                           "Request written terms, eligibility/payment conditions and complaint channels. "
-                           "Recommend B only if cashback becomes written; C is an option for certainty. "
-                           "Source: MCP fixture insurance_quotes. This is the M3 transport/artifact fragment.")
-            saved = content(call(h, 'report', 'builtin__artifact__save',
-                                 {'name': 'quote_comparison.md', 'mediaType': 'text/markdown', 'text': report_text}))
-            ref = saved['artifact_refs'][0]
-            opened = fixture_run(h.args('artifact', 'open', ref), capture_output=True, text=True,
-                                    env=h.env, cwd=h.root, timeout=20)
-            require(opened.returncode == 0 and opened.stdout == report_text, 'saved comparison bytes not reopenable')
-            return {'name': 'GC-11_structured_quote_and_Artifact_fragment', 'source': data,
-                    'conditional_net_cny': possible, 'without_cashback_cny': b['premium_cny'], 'artifact_ref': ref,
-                    'artifact_sha256': hashlib.sha256(opened.stdout.encode()).hexdigest(), 'state': h.state()}
-        scenario('quotes', quotes)
+        for variant in quote_case.case_variants():
+            scenario('quotes-' + variant['variant_id'],
+                     lambda h, v=variant: quote_case.drive(h, v, content))
 
         def discovery(h):
             listed = content(call(h, 'skills', 'builtin__skill__list', {}, worker=True))
@@ -308,7 +288,7 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         for kind, result in run_cases(cases, drive, scenario_jobs):
             report[kind].append(result)
         if not selected:
-            require(len(report['checks']) == 6 and len(report['crashes']) == 1, 'complete capability scenario inventory required')
+            require(len(report['checks']) == 11 and len(report['crashes']) == 1, 'complete capability scenario inventory required')
     report['cleanup'] = not root.exists()
     require(report['cleanup'], 'disposable roots remain')
     return report

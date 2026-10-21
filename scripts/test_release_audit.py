@@ -14,7 +14,7 @@ class ReleaseAuditTests(unittest.TestCase):
     def setUp(self):
         self.ledger = json.loads((audit.ROOT / 'docs/v1-release-ledger.json').read_text())
 
-    def test_every_source_block_remains_pending_and_scores_unknown(self):
+    def test_partial_reviews_cannot_certify_requirements_or_scores(self):
         # Even an added success-looking field cannot certify a release.
         self.ledger['release_ready'] = True
         report = audit.audit(audit.ROOT, self.ledger)
@@ -22,11 +22,26 @@ class ReleaseAuditTests(unittest.TestCase):
         self.assertEqual(report['status'], 'inconclusive')
         self.assertFalse(report['release_ready'])
         self.assertEqual(report['individually_verified_requirements'], 0)
-        self.assertTrue(all(r['disposition'] == 'pending_individual_review'
+        self.assertEqual(report['individually_reviewed_blocks'], len(self.ledger['individual_reviews']))
+        self.assertGreater(report['individually_reviewed_blocks'], 0)
+        self.assertTrue(all(r['disposition'] in ('pending_individual_review', 'partial_mechanical', 'evidence_gap')
                             for r in report['source_units']))
         self.assertEqual(set(report['golden_cases']), {f'GC-{n:02}' for n in range(1, 21)})
         self.assertIsNone(report['scores']['suite_mean'])
         self.assertTrue(all(v is None for v in report['scores']['dimensions'].values()))
+
+    def test_individual_review_rejects_stale_duplicate_missing_or_pass_claim(self):
+        for mutation in ('stale', 'duplicate', 'missing', 'pass', 'reference', 'location'):
+            ledger = copy.deepcopy(self.ledger)
+            review = ledger['individual_reviews'][0]
+            if mutation == 'stale': review['sha256'] = '0' * 64
+            if mutation == 'duplicate': ledger['individual_reviews'].append(copy.deepcopy(review))
+            if mutation == 'missing': del review['remaining']
+            if mutation == 'pass': review['disposition'] = 'pass'
+            if mutation == 'reference': review['tests'] = ['scripts/test_quote_case.py#missing_test']
+            if mutation == 'location': review['line'] += 1
+            with self.assertRaises(ValueError):
+                audit.audit(audit.ROOT, ledger)
 
     def test_source_change_unmapped_section_missing_file_or_symbol_fails(self):
         for mutation in ('digest', 'section', 'file', 'symbol', 'pr'):
