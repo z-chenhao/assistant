@@ -215,8 +215,11 @@ def extra_scenarios(binary,report):
                     uploads=platform.evidence()['uploads']
                     require(len(uploads)==1 and uploads[0]['name']=='checklist.txt' and uploads[0]['sha256']==hashlib.sha256(content.encode()).hexdigest(),'wrong outbound attachment')
                     require(len(platform.evidence()['messages'])==2 and len(state['receipts'])==2,'attachment parts lost or duplicated')
-                prior_version=state['deliveries'][0]['version']
-                before=platform.evidence();h.stop(kill=True);h.start()
+                before=platform.evidence()
+                require(len(before['send_attempts'])==(1 if lost_ack else 2),'unexpected remote send attempts before restart')
+                h.stop(kill=True)
+                prior_version=h.rows()['deliveries'][0]['version']
+                h.start()
                 h.callback('output',json.dumps(dict(name='checklist.txt',mediaType='text/plain',text=content)),event='output-retry')
                 if lost_ack:
                     h.wait(lambda s:s['deliveries'][0]['status']=='unknown' and s['deliveries'][0]['version']>prior_version,'unknown delivery was queried after restart')
