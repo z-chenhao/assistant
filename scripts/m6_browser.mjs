@@ -1,13 +1,13 @@
 // Explicit L1 browser peer. Fake Lume/SSH; real Chromium, DOM and production
 // Browser adapter. No model-supplied executable, script, CDP endpoint or path.
 import {chromium} from '../guest-browser/node_modules/playwright-core/index.mjs';
-import {waitForDevToolsPort} from './browser_readiness.mjs';
 import {createServer} from 'node:http';
 import {readFile,writeFile,mkdir,symlink,copyFile,realpath} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {waitForDevToolsPort} from '../guest-browser/readiness.mjs';
 const exec=promisify(execFile);
 const root=await realpath(process.argv[2]);
 const repository=resolve(fileURLToPath(new URL('..',import.meta.url)));

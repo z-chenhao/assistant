@@ -23,6 +23,7 @@ def browser(folder,world):
     start=owner.start if owner else subprocess.Popen
     child=start([shutil.which('node'),str(Path(__file__).with_name('m6_browser.mjs')),str(root)],
                            stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    failure=None
     try:
         with selectors.DefaultSelector() as selector:
             selector.register(child.stdout,selectors.EVENT_READ)
@@ -30,11 +31,18 @@ def browser(folder,world):
         line=child.stdout.readline()
         require(line,'browser exited: '+(child.stderr.read() if child.poll() is not None else ''))
         yield json.loads(line),root
+    except BaseException as error:
+        failure=error
+        raise
     finally:
-        if child.poll() is None:child.send_signal(signal.SIGTERM)
-        _,err=child.communicate(timeout=20)
-        if owner:owner.retire(child)
-        require(child.returncode==0,'browser cleanup failed: '+err)
+        try:
+            if child.poll() is None:child.send_signal(signal.SIGTERM)
+            _,err=child.communicate(timeout=20)
+            if owner:owner.retire(child)
+            require(child.returncode==0,'browser cleanup failed: '+err)
+        except Exception as error:
+            if failure is None:raise
+            raise failure from error
 
 
 def drive(binary,folder,case,variant,artifact_folder=None):

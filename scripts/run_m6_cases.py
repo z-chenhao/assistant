@@ -411,7 +411,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1,part=None):
     dataset,policy,lock=load_contract(ROOT,'m6-v1')
     report=dict(version=1,milestone='M6',provider='explicit capabilities scripted Bridge',contract_lock=lock,
                 binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,scenario_jobs=scenario_jobs,part=part,
-                driver_digest=digest({name:file_hash(ROOT/'scripts'/name) for name in ('run_m6_cases.py','m6_desktop.py','m6_browser.mjs','m6_sources.py','verify_recall.py')}),
+                driver_digest=digest({name:file_hash(ROOT/name) for name in ('scripts/run_m6_cases.py','scripts/m6_desktop.py','scripts/m6_browser.mjs','scripts/m6_sources.py','scripts/verify_recall.py','guest-browser/readiness.mjs')}),
                 product_gate='inconclusive; semantic Judge and current L2 not run',
                 live_shadow=dict(lume='prior evidence: docs/computer-provider-l2-result.json',jianying='prior evidence: docs/computer-l2-result.json',current_run='not_run'),
                 not_applicable=['M7 scheduled/channel portions'])
