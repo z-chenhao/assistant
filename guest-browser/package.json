@@ -7,7 +7,7 @@
     "playwright-core": "1.64.1"
   },
   "scripts": {
-    "test": "node --test test.mjs",
-    "lint": "node --check test.mjs && node --check ../internal/computer/macosvm/browser.mjs"
+    "test": "node --test test.mjs readiness.test.mjs",
+    "lint": "node --check test.mjs && node --check readiness.mjs && node --check readiness.test.mjs && node --check ../scripts/m6_browser.mjs && node --check ../internal/computer/macosvm/browser.mjs"
   }
 }

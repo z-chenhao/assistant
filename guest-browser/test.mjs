@@ -6,7 +6,7 @@ import {join, resolve} from 'node:path';
 import {createServer} from 'node:http';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {setTimeout as delay} from 'node:timers/promises';
+import {waitForDevToolsPort} from './readiness.mjs';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright-core';
 const exec=promisify(execFile);
@@ -32,8 +32,7 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   for(const file of ['index.mjs','package.json'])await symlink(join(packageRoot,file),join(root,'playwright',file));
   await copyFile(new URL('../internal/computer/macosvm/transfer.py',import.meta.url),transfer);
   browserContext=await chromium.launchPersistentContext(join(root,'profile'),{headless:true,args:['--remote-debugging-address=127.0.0.1','--remote-debugging-port=0']});
-  let port;for(let n=0;n<200;n++){try{port=Number((await readFile(join(root,'profile/DevToolsActivePort'),'utf8')).split('\n')[0]);break;}catch{await delay(25);}}
-  assert.ok(port,'doctor: Chromium CDP not ready');
+  const port=await waitForDevToolsPort(join(root,'profile'));
   const call=async(method,args={},onLog)=>{
     const child=exec(process.execPath,['--input-type=module','-e',source,JSON.stringify({module,port,root:join(root,'EriiTransfer'),method,args})],{timeout:15000,maxBuffer:12<<20,env:{...process.env,...(onLog?{DEBUG:'pw:api'}:{})}});
     if(onLog)child.child.stderr.on('data',onLog);
