@@ -50,3 +50,8 @@ The maintained channel browser action proves actual React composition, native
 table cells and fallback, frozen approval fields, artwork loading, responsive
 layout, CSP-compatible execution and local-only frontend requests. Its complete
 action also drives model setup, file upload and actual message submission.
+It deliberately holds the local JavaScript bundle while entering a draft and
+selecting an attachment through the usable server form, then releases it and
+checks text, file bytes, focus, selection and source identity before submitting.
+The composer snapshots and synchronously mounts in one browser task so early
+input cannot be lost during progressive enhancement.

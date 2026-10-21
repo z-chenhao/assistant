@@ -31,10 +31,32 @@ try{
   await page.getByRole('button',{name:'Test connection',exact:true}).click();
   await page.getByRole('link',{name:'Settings',exact:false}).click();
   await page.getByRole('checkbox',{name:'Use this provider for new work'}).check();
-  await page.getByRole('button',{name:'Select model',exact:true}).click();
+  // Deterministically type into usable server HTML before the local bundle is
+  // released. Progressive enhancement must preserve this draft and its file.
+  let release;
+  const bundle=new Promise(resolve=>{release=resolve});
+  let requested;
+  const loading=new Promise(resolve=>{requested=resolve});
+  await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
+  const selecting=page.getByRole('button',{name:'Select model',exact:true}).click();
+  await loading;
   await page.getByLabel('Message Erii').fill('Plan my day: finish the release risk note before noon.');
   await page.getByLabel('Attach a file').setInputFiles({name:'web-note.txt',mimeType:'text/plain',buffer:Buffer.from('Web owner attachment fixture.\n')});
+  await page.getByLabel('Message Erii').focus();
+  await page.getByLabel('Message Erii').press('ArrowLeft');
+  const earlySource=await page.locator('input[name="source_id"]').inputValue();
+  const selection=await page.getByLabel('Message Erii').evaluate(input=>[input.selectionStart,input.selectionEnd]);
+  release();await selecting;
+  await page.unroute('**/app.js');
+  await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
+  if(await page.getByLabel('Message Erii').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
+  const preserved=await page.getByLabel('Message Erii').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
+  if(preserved!==JSON.stringify(selection)||await page.locator('input[name="source_id"]').inputValue()!==earlySource)throw new Error('frontend enhancement changed draft focus, selection or source identity');
+  const file=await page.getByLabel('Attach a file').evaluate(async input=>input.files[0]?{name:input.files[0].name,text:await input.files[0].text()}:null);
+  if(file?.name!=='web-note.txt'||file?.text!=='Web owner attachment fixture.\n')throw new Error('frontend enhancement lost early attachment');
+  const submitted=page.waitForResponse(r=>r.url()===url+'/message'&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Send message',exact:true}).click();
+  if((await submitted).status()!==303)throw new Error('composer submission was not accepted');
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
  }
  if(phase==='components'){

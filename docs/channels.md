@@ -118,6 +118,9 @@ ad-agent Button/Card/Textarea components, OpenIntelligentUI's native DataTable,
 and the original Eri character logo/default agent avatar. The React layer only
 enhances fixed UISpec v1 components and existing forms; it does not add a second
 Agent or model connection. Server rendering remains the semantic fallback.
+The composer preserves text, selected files, focus/selection and the source ID
+when the local bundle takes over an already usable server form. A delayed-bundle
+browser regression enters real input before that handoff and then submits once.
 No frontend asset requires an external request. Source revisions, local changes,
 MIT/Apache-2.0 notices, build and verification commands are recorded in
 `internal/interaction/web/client/README.md`; bundled notices are at `/licenses.txt`.

@@ -247,6 +247,21 @@ def native_components(binary, evidence, report):
         finally:h.cleanup()
 
 
+def early_composer(binary, evidence, report):
+    with tempfile.TemporaryDirectory(prefix='erii-channel-early-composer-') as temp, Sandbox() as platform:
+        h=ChannelHarness(binary,Path(temp),platform)
+        try:
+            h.start()
+            h.browser(evidence.parent/'channels-ui','setup')
+            state=h.wait(lambda s:len(s['inputs'])==1 and len(s['deliveries'])==1 and s['deliveries'][0]['status']=='sent','early draft accepted once with attachment')
+            history=h.http('/api/conversation')
+            require(any(p.get('artifact_ref') for m in history if m['role']=='user' for p in m['content']),'early attachment did not reach Conversation')
+            report['scenarios']['early-composer']=dict(state=state,conversation=history)
+            report['checks'].append('Composer: delayed local bundle preserves early server-rendered draft and attachment, then submits through the real form once')
+            h.stop()
+        finally:h.cleanup()
+
+
 def delivery_leases(binary, report):
     """Exercise the same foreground delivery path beyond the default 5s lease."""
     for name, fixture, send_delay, upload_delay in (
@@ -492,6 +507,7 @@ if __name__=='__main__':
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
         if args.ui_components_only:
+            early_composer(args.binary.resolve(),args.evidence.resolve(),report)
             native_components(args.binary.resolve(),args.evidence.resolve(),report)
         else:
             delivery_leases(args.binary.resolve(), report)
