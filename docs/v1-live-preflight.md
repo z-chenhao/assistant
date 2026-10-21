@@ -11,7 +11,7 @@ acceptance remain unknown.
 ## Offline Judge and model comparison preparation
 
 ```sh
-python3 scripts/verify_capabilities.py --binary bin/personal-agent --scenario quotes --scenario-jobs 2 --evidence evidence/gc11.json
+python3 scripts/verify_capabilities.py --binary bin/erii --scenario quotes --scenario-jobs 2 --evidence evidence/gc11.json
 python3 scripts/prepare_release_eval.py --input evidence/gc11.json --evidence evidence/gc11-eval-preparation.json
 ```
 
@@ -47,8 +47,8 @@ profiles and credential references must already exist in the test installation.
 : "${ERII_TEST_DATA_ROOT:?approved isolated installation data root}"
 : "${ERII_L2_ROOT:?approved existing owned Lume root}"
 : "${ERII_L2_PRODUCT_CONFIG:?approved Lume product-live.json path}"
-ERII_DATA_ROOT="$ERII_TEST_DATA_ROOT" bin/personal-agent -config "$ERII_TEST_CONFIG" status
-ERII_DATA_ROOT="$ERII_TEST_DATA_ROOT" bin/personal-agent -config "$ERII_TEST_CONFIG" model list
+ERII_DATA_ROOT="$ERII_TEST_DATA_ROOT" bin/erii -config "$ERII_TEST_CONFIG" status
+ERII_DATA_ROOT="$ERII_TEST_DATA_ROOT" bin/erii -config "$ERII_TEST_CONFIG" model list
 python3 scripts/lume_live.py --root "$ERII_L2_ROOT" --profile product doctor
 ```
 
@@ -66,12 +66,12 @@ After approval and a successful doctor, the existing VM workflow is:
 ```sh
 python3 scripts/lume_live.py --root "$ERII_L2_ROOT" --profile product serve
 # Separate owned foreground execution; collect/join it after the following drive.
-python3 scripts/verify_computer.py --binary bin/personal-agent --live-root "$ERII_L2_ROOT" --live-config "$ERII_L2_PRODUCT_CONFIG" --evidence "$ERII_L2_ROOT/evidence/erii30-current-computer.json"
+python3 scripts/verify_computer.py --binary bin/erii --live-root "$ERII_L2_ROOT" --live-config "$ERII_L2_PRODUCT_CONFIG" --evidence "$ERII_L2_ROOT/evidence/erii30-current-computer.json"
 ```
 
 The root must satisfy [ownership, pinned Lume, Guest permissions and shutdown
 rules](computer-l2.md) and the sealed clean-base/product configuration in
-[Computer operations](computer.md). The lifecycle drive uses a deterministic
+[Computer operations](guides/computer.md). The lifecycle drive uses a deterministic
 model with a **real VM**; it does not certify unscripted model quality or current
 Jianying compatibility. Re-run the application matrix separately, recording
 Guest/application/Driver versions, current sampling time, actual screenshots,
@@ -81,7 +81,7 @@ not power off to claim a clean checkpoint or touch an existing personal VM.
 The current real channel uses the production foreground command:
 
 ```sh
-ERII_DATA_ROOT="$ERII_TEST_DATA_ROOT" bin/personal-agent -config "$ERII_TEST_CONFIG" web serve
+ERII_DATA_ROOT="$ERII_TEST_DATA_ROOT" bin/erii -config "$ERII_TEST_CONFIG" web serve
 ```
 
 The owner must specify loopback Web vs enrolled Feishu test p2p tenant/app/open

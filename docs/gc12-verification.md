@@ -8,8 +8,8 @@ Run the complete offline checkpoint:
 
 ```sh
 make build
-python3 scripts/verify_gc12.py --binary bin/personal-agent --evidence evidence/gc12.json
-python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence/gc12-series --shard communication --jobs 1
+python3 scripts/verify_gc12.py --binary bin/erii --evidence evidence/gc12.json
+python3 scripts/verify_suite.py --binary bin/erii --evidence evidence/gc12-series --shard communication --jobs 1
 python3 scripts/prepare_release_eval.py --input evidence/gc12.json --evidence evidence/gc12-judge.json
 ```
 

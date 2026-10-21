@@ -8,7 +8,7 @@ model quality, all semantic metrics and current L2 remain unverified.
 ## Offline contract
 
 ```sh
-python3 scripts/verify_local_provider.py --binary bin/personal-agent --gc11-driver-only --evidence evidence/gc11-driver-offline.json
+python3 scripts/verify_local_provider.py --binary bin/erii --gc11-driver-only --evidence evidence/gc11-driver-offline.json
 python3 scripts/prepare_release_eval.py --input evidence/gc11-driver-offline.json --evidence evidence/gc11-driver-preview.json
 ```
 
@@ -42,7 +42,7 @@ with approved absolute paths substituted:
   "llm": {"provider_bridge_command": "node",
     "provider_bridge_script": "SOURCE_ROOT/provider-bridge/bridge.mjs",
     "provider_bridge_version": "pi-ai-1.3.0-v1"},
-  "mcp": [{"name": "fixture", "command": "SOURCE_ROOT/bin/personal-agent",
+  "mcp": [{"name": "fixture", "command": "SOURCE_ROOT/bin/erii",
     "args": ["-test-mcp-server", "TRIAL_ROOT/provider"],
     "directory": "TRIAL_ROOT/provider", "tools": {"read": "read_only"}}]
 }
@@ -73,9 +73,9 @@ provenance; it is not independent proof of a genuine model. The offline harness
 always declares `offline_loopback_fixture`. No secret belongs in these files.
 
 ```sh
-python3 scripts/gc11_driver.py --binary bin/personal-agent --trial /APPROVED/TRIAL_ROOT/erii-eval.json --evidence evidence/trials/local-wording-1-1.json
+python3 scripts/gc11_driver.py --binary bin/erii --trial /APPROVED/TRIAL_ROOT/erii-eval.json --evidence evidence/trials/local-wording-1-1.json
 python3 scripts/prepare_release_eval.py --input evidence/trials/local-wording-1-1.json --evidence evidence/judge/local-wording-1-1.json
-python3 scripts/gc11_driver.py --binary bin/personal-agent --compare evidence/trials --evidence evidence/comparison-preflight.json
+python3 scripts/gc11_driver.py --binary bin/erii --compare evidence/trials --evidence evidence/comparison-preflight.json
 ```
 
 Each trial joins all foreground CLI processes and deliberately retains the

@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "audited_base": "ae2dda0a420d24ffbf45553ee10dec67d2b05ead",
+  "audited_base": "68150f1ec567c1babae7d03b3c6ef91d301966bc",
   "sources": {
     "docs/technical-design.md": {
-      "sha256": "7792e2b06de6e05799d64a017b26e4252b6f568c7c865e1a16c23c2fbe354d7c",
+      "sha256": "cd47b22cf4ad142e9899e41d9466569390b7f4f0c521bb1d450eda3e3cc12bd9",
       "sections": {
         "0": "evaluation",
         "1": "scope",
@@ -134,12 +134,13 @@
       "prs": [
         "8",
         "10",
-        "16"
+        "16",
+        "33"
       ],
       "evidence": [
-        "docs/main-loop.md",
-        "docs/tasks.md",
-        "docs/children.md"
+        "docs/guides/main-loop.md",
+        "docs/guides/tasks.md",
+        "docs/guides/children.md"
       ]
     },
     "main": {
@@ -192,7 +193,7 @@
         "16"
       ],
       "evidence": [
-        "docs/children.md",
+        "docs/guides/children.md",
         "scripts/verify_children.py"
       ]
     },
@@ -209,7 +210,7 @@
       ],
       "evidence": [
         "scripts/verify_automation.py",
-        "docs/automation.md"
+        "docs/guides/automation.md"
       ]
     },
     "messages": {
@@ -225,7 +226,7 @@
         "14"
       ],
       "evidence": [
-        "docs/main-loop.md",
+        "docs/guides/main-loop.md",
         "scripts/verify_delivery.py"
       ]
     },
@@ -245,7 +246,7 @@
       "evidence": [
         "scripts/verify_delivery.py",
         "scripts/verify_channels.py",
-        "docs/channels.md"
+        "docs/guides/channels.md"
       ]
     },
     "artifact": {
@@ -261,7 +262,7 @@
       ],
       "evidence": [
         "scripts/verify_artifacts.py",
-        "docs/artifacts.md"
+        "docs/guides/artifacts.md"
       ]
     },
     "models": {
@@ -314,7 +315,7 @@
       ],
       "evidence": [
         "scripts/verify_local_provider.py",
-        "docs/provider-bridge.md"
+        "docs/guides/provider-bridge.md"
       ]
     },
     "account": {
@@ -349,7 +350,7 @@
         "7"
       ],
       "evidence": [
-        "docs/provider-bridge.md",
+        "docs/guides/provider-bridge.md",
         "scripts/verify_local_provider.py",
         "scripts/verify_account.py"
       ]
@@ -368,7 +369,7 @@
       ],
       "evidence": [
         "scripts/verify_tools.py",
-        "docs/tools.md"
+        "docs/guides/tools.md"
       ]
     },
     "codemode": {
@@ -387,7 +388,7 @@
       ],
       "evidence": [
         "scripts/verify_codemode.py",
-        "docs/codemode.md"
+        "docs/guides/codemode.md"
       ]
     },
     "loop": {
@@ -401,7 +402,8 @@
       ],
       "prs": [
         "8",
-        "10"
+        "10",
+        "33"
       ],
       "evidence": [
         "scripts/verify_main.py",
@@ -424,7 +426,7 @@
       "evidence": [
         "scripts/verify_children.py",
         "scripts/verify_scheduling.py",
-        "docs/children.md"
+        "docs/guides/children.md"
       ]
     },
     "replay": {
@@ -493,7 +495,7 @@
       ],
       "evidence": [
         "scripts/verify_computer.py",
-        "docs/computer-provider-l2-result.json"
+        "docs/reports/computer-provider-l2-result.json"
       ]
     },
     "cua": {
@@ -510,8 +512,8 @@
       ],
       "evidence": [
         "scripts/verify_computer_use.py",
-        "docs/computer-l2-result.json",
-        "docs/computer-use.md"
+        "docs/reports/computer-l2-result.json",
+        "docs/guides/computer-use.md"
       ]
     },
     "context": {
@@ -530,7 +532,7 @@
       ],
       "evidence": [
         "scripts/verify_recall.py",
-        "docs/recall.md"
+        "docs/guides/recall.md"
       ]
     },
     "memory": {
@@ -566,7 +568,7 @@
       ],
       "evidence": [
         "scripts/verify.py",
-        "docs/operations.md"
+        "docs/guides/operations.md"
       ]
     },
     "observability": {
@@ -585,12 +587,12 @@
       ],
       "evidence": [
         "scripts/verify_operations.py",
-        "docs/operations.md"
+        "docs/guides/operations.md"
       ]
     },
     "composition": {
       "code": [
-        "cmd/personal-agent/main.go",
+        "cmd/erii/main.go",
         "internal/app/app.go"
       ],
       "tests": [
@@ -598,11 +600,12 @@
       ],
       "prs": [
         "1",
-        "31"
+        "31",
+        "33"
       ],
       "evidence": [
         "docs/development.md",
-        "docs/operations.md"
+        "docs/guides/operations.md"
       ]
     },
     "storage": {
@@ -639,7 +642,7 @@
         "18"
       ],
       "evidence": [
-        "docs/tools.md",
+        "docs/guides/tools.md",
         "scripts/verify_tools.py"
       ]
     },
@@ -655,11 +658,12 @@
       "prs": [
         "1",
         "3",
-        "31"
+        "31",
+        "33"
       ],
       "evidence": [
         "config.example.yaml",
-        "docs/operations.md"
+        "docs/guides/operations.md"
       ]
     },
     "operations": {
@@ -677,7 +681,7 @@
       "evidence": [
         "scripts/verify_operations.py",
         "scripts/verify_capacity.py",
-        "docs/operations-capacity.json"
+        "docs/reports/operations-capacity.json"
       ]
     },
     "evaluation": {
@@ -697,8 +701,8 @@
         "27"
       ],
       "evidence": [
-        "docs/core-evals.md",
-        "docs/m6-evals.md",
+        "docs/guides/core-evals.md",
+        "docs/guides/m6-evals.md",
         "scripts/verify_suite.py"
       ]
     }
@@ -899,6 +903,13 @@
       "merged_at": "2026-10-21T08:15:39Z",
       "merged_by": "z-chenhao",
       "merge_commit": "ae2dda0a420d24ffbf45553ee10dec67d2b05ead"
+    },
+    "33": {
+      "title": "ERII-183: standardize Erii installation, layout and shared loop",
+      "url": "https://github.com/z-chenhao/erii/pull/33",
+      "merged_at": "2026-10-21T16:02:54Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "68150f1ec567c1babae7d03b3c6ef91d301966bc"
     }
   },
   "golden_cases": {
@@ -1032,7 +1043,7 @@
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "Twenty-one source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1561 remain pending and zero requirements certified. Continue individual normative review."
+      "detail": "Twenty-one source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1562 remain pending and zero requirements certified. Continue individual normative review."
     },
     {
       "id": "G3",

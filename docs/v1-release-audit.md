@@ -78,9 +78,9 @@ No canary, forced downgrade or new production dependency is introduced.
 Reproduce the dependency checks with:
 
 ```sh
-npm ci --prefix internal/interaction/web/client --ignore-scripts
-npm audit --prefix internal/interaction/web/client --json
-npm run check --prefix internal/interaction/web/client
+npm ci --prefix web --ignore-scripts
+npm audit --prefix web --json
+npm run check --prefix web
 ```
 
 The audit is a dated registry observation; offline CI keeps deterministic
@@ -141,7 +141,7 @@ gates, independent of semantic grading and L2 review.
 | Backup/upgrade/capacity and production close | `verify_operations.py`, `verify_capacity.py`, event integration | Cold authenticated restore with hash readback, wrong-key/tamper rejection, fenced cutover, v25 upgrade and 1000-Child cycles |
 | Real VM recovery | `lume_live.py`, `verify_computer.py`, `verify_computer_use.py` | Offline peers are not real macOS; historical L2 is identified separately |
 
-Use [operations.md](operations.md) for startup/close, poison handling, cold
+Use [operations.md](guides/operations.md) for startup/close, poison handling, cold
 backup, independent credential/VM retention, isolated restore, cutover and
 upgrade. A backup excludes SecretStore and VM storage. Retire the source and
 reconcile external outcomes before activation. Never reissue an `unknown`
@@ -153,7 +153,7 @@ and ADR 003 (Forget revokes unfinished work); no new deviation is approved here.
 
 ```sh
 make build
-python3 scripts/verify_capabilities.py --binary bin/personal-agent --scenario quotes --scenario-jobs 2 --evidence evidence/gc11.json
+python3 scripts/verify_capabilities.py --binary bin/erii --scenario quotes --scenario-jobs 2 --evidence evidence/gc11.json
 python3 scripts/prepare_release_eval.py --input evidence/gc11.json --evidence evidence/gc11-eval-preparation.json
 python3 -m unittest discover -s scripts -p 'test_*.py'
 python3 scripts/release_audit.py --evidence evidence/release-audit.json

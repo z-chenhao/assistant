@@ -249,7 +249,7 @@ class DriverTests(unittest.TestCase):
     def test_owned_config_rejects_effects_drift_symlinks_and_wrong_source_before_work(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp).resolve();(root/'data').mkdir();(root/'provider').mkdir()
-            binary=d.ROOT/'bin/personal-agent'
+            binary=d.ROOT/'bin/erii'
             source=load_contract(d.ROOT,'gc11-v1')[0]['cases'][0]['world']
             (root/'provider/mcp-data.json').write_text(json.dumps({'insurance_quotes':source}))
             cfg=dict(version=1,app=dict(data_root=str(root/'data')),

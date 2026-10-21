@@ -154,7 +154,7 @@ oral-cashback uncertainty, delivers two scripted replies and reopens both
 comparison Artifacts. It also rejects purchase/approval/Task effects and proves
 duplicate-input state equality. The same five-round capability gate includes
 every variant. Its deterministic scripted model does not establish live-model
-reasoning quality; see [release evidence and remaining obligations](v1-release-audit.md#gc-11-checkpoint).
+reasoning quality; see [release evidence and remaining obligations](../v1-release-audit.md#gc-11-checkpoint).
 
 No new tables or domain states are needed: schema v12 already freezes arbitrary
 ToolSpecs, Skill set hashes, policy and invocation outcomes. Empty/prior schema
