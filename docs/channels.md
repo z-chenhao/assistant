@@ -113,6 +113,17 @@ Feishu uses a controlled plain-text card and uploaded file attachments. Each
 outbound file retains its name and exact bytes. Missing/oversized resources fail
 closed rather than exposing a host path or silently sending the wrong attachment.
 
+The Web shell uses the requested ChatGPT-style neutral layout, locally bundled
+ad-agent Button/Card/Textarea components, OpenIntelligentUI's native DataTable,
+and the original Eri character logo/default agent avatar. The React layer only
+enhances fixed UISpec v1 components and existing forms; it does not add a second
+Agent or model connection. Server rendering remains the semantic fallback.
+No frontend asset requires an external request. Source revisions, local changes,
+MIT/Apache-2.0 notices, build and verification commands are recorded in
+`internal/interaction/web/client/README.md`; bundled notices are at `/licenses.txt`.
+OpenIntelligentUI's arbitrary generated HTML/JS path is outside this integration
+and requires an explicit architecture/security decision under the baseline.
+
 Local Web receipt acceptance is durable and idempotent. Feishu UUID deduplication
 has a bounded provider window, so the adapter does **not** promise indefinite
 idempotence. Successful parts retain authoritative response IDs before Outbox
@@ -129,6 +140,8 @@ a second attempt. Renewal checks the current token, version and live expiry;
 an expired or replaced owner cannot renew. Lost ownership cancels that transport
 and joins its heartbeat without stopping Web ingress. The current owner recovers
 from authoritative receipts; an uncertain Feishu send stays query-only.
+The service revalidates the live fence before starting transport, so a scheduling
+pause that consumes the original lease cannot authorize even a fast send.
 
 ## Verification and evidence
 
@@ -139,6 +152,7 @@ make lint
 make verify
 python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/channels.json
 python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/channel-leases.json --delivery-lease-only
+python3 scripts/verify_channels.py --binary bin/personal-agent --evidence evidence/components.json --ui-components-only
 ```
 
 `verify_channels.py` owns Launch (private root, local platform Fake and real Web

@@ -200,14 +200,20 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	}
-	if r.URL.Path == "/style.css" {
-		w.Header().Set("Content-Type", "text/css")
-		_, _ = io.WriteString(w, style)
-		return
-	}
-	if r.URL.Path == "/app.js" {
-		w.Header().Set("Content-Type", "text/javascript")
-		_, _ = io.WriteString(w, script)
+	if file, ok := map[string]struct{ path, contentType string }{
+		"/style.css":              {"assets/style.css", "text/css"},
+		"/app.js":                 {"assets/client.js", "text/javascript"},
+		"/licenses.txt":           {"assets/licenses.txt", "text/plain; charset=utf-8"},
+		"/brand/eri-icon-192.png": {"assets/brand/eri-icon-192.png", "image/png"},
+		"/favicon.ico":            {"assets/brand/eri-favicon-32.png", "image/png"},
+	}[r.URL.Path]; ok {
+		body, err := assets.ReadFile(file.path)
+		if err != nil {
+			fail(w, 500)
+			return
+		}
+		w.Header().Set("Content-Type", file.contentType)
+		_, _ = w.Write(body)
 		return
 	}
 	if r.URL.Path == "/session" && r.Method == "POST" {

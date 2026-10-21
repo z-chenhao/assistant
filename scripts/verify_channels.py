@@ -172,6 +172,7 @@ def run(binary,evidence):
             h.callback('effect-source',json.dumps(dict(target='alex.chen@example.test',text='Erii review: 2026-10-19 15:00–15:30 +08:00')))
             state=h.wait(lambda s:len(s['approvals'])==1 and s['approvals'][0]['status']=='pending','approval notice')
             old=state['approvals'][0]
+            h.browser(evidence.parent/'channels-ui','approval')
             h.http('/api/message',dict(source_id='steering',content=[dict(type='text',text=json.dumps(dict(target='alex.chen@example.test',text='Erii review: 2026-10-20 11:00–11:30 +08:00; do not use Monday.')))]))
             state=h.wait(lambda s:len(s['approvals'])==2 and s['approvals'][-1]['status']=='pending','steering invalidates old approval')
             require(state['approvals'][0]['status']=='invalidated','old Monday approval remained valid')
@@ -194,10 +195,56 @@ def run(binary,evidence):
             h.stop()
         finally:h.cleanup()
     extra_scenarios(binary,report)
+    native_components(binary, evidence, report)
     delivery_leases(binary, report)
     account_presentation(binary,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def native_components(binary, evidence, report):
+    """Seed immutable controlled projections before the first transport call.
+
+    Semantic inputs still enter the real signed callback/Actor boundary. Only
+    Host-owned presentation fixtures are inserted; no model HTML is enabled.
+    """
+    with tempfile.TemporaryDirectory(prefix='erii-channel-components-') as temp, Sandbox() as platform:
+        h=ChannelHarness(binary,Path(temp),platform)
+        try:
+            h.setup();h.start('before_delivery_send')
+            h.callback('native-table','Compare these two choices.')
+            with selectors.DefaultSelector() as selector:
+                selector.register(h.process.stdout,selectors.EVENT_READ)
+                require(selector.select(15),'native component fixture did not reach transport boundary')
+            require(json.loads(h.process.stdout.readline())['boundary']=='before_delivery_send','wrong component fixture boundary')
+            h.callback('unknown-component','Retain this semantic answer.')
+            h.wait(lambda s:len(s['deliveries'])==2,'unknown component semantic reply')
+            h.callback('invalid-table','Retain this answer when table rendering fails.')
+            h.wait(lambda s:len(s['deliveries'])==3,'component fixture semantic replies')
+            h.callback('empty-projection','Keep the original text for an empty projection.')
+            h.wait(lambda s:len(s['deliveries'])==4,'empty projection semantic reply')
+            h.callback('unknown-version','Keep the original text for an unknown version.')
+            h.wait(lambda s:len(s['deliveries'])==5,'unknown version semantic reply')
+            messages=[m for m in h.http('/api/conversation') if m['role']=='assistant']
+            specs=[
+                dict(schema_version=1,fallback='Native table semantic fallback',components=[dict(type='table',columns=['Option','Result'],rows=[['A','<img src=x onerror=alert(1)>'],['B','Exact value: 42']])]),
+                dict(schema_version=1,fallback='Unknown component semantic fallback',components=[dict(type='react',text='<script>alert(1)</script>')]),
+                dict(schema_version=1,fallback='Invalid table semantic fallback',components=[dict(type='table',columns=['One'],rows=[['too','many']])]),
+                dict(schema_version=1,fallback='Untrusted projection fallback',components=[]),
+                dict(schema_version=99,fallback='Untrusted projection fallback',components=[]),
+            ]
+            with sqlite3.connect(h.root/'data/state.db') as db:
+                for message,spec in zip(messages,specs):
+                    canonical=json.dumps(message,sort_keys=True,separators=(',',':'),ensure_ascii=False).replace('&','\\u0026').replace('<','\\u003c').replace('>','\\u003e')
+                    identity=hashlib.sha256(canonical.encode()).hexdigest()
+                    delivery_id=db.execute('SELECT delivery_id FROM delivery_request WHERE message_id=?',(message['message_id'],)).fetchone()[0]
+                    db.execute('INSERT INTO delivery_projection VALUES(?,?,?,?)',(delivery_id,identity,1,json.dumps(spec)))
+            h.browser(evidence.parent/'channels-ui','components')
+            require(h.http('/api/conversation')[-1]==messages[-1],'presentation changed semantic Conversation')
+            report['scenarios']['native-components']=dict(state=h.rows(),specs=specs,conversation_unchanged=True)
+            report['checks'].append('UI: bundled ad-agent components, OpenIntelligentUI native table, original Eri logo/avatar, desktop/mobile layouts; escaped cells, unknown/invalid component fallback; no external frontend requests')
+            h.stop()
+        finally:h.cleanup()
 
 
 def delivery_leases(binary, report):
@@ -434,13 +481,20 @@ def account_presentation(binary,report):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--evidence',type=Path,required=True);parser.add_argument('--delivery-lease-only',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--evidence',type=Path,required=True)
+    action=parser.add_mutually_exclusive_group()
+    action.add_argument('--delivery-lease-only',action='store_true')
+    action.add_argument('--ui-components-only',action='store_true')
+    args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only:
+        if not args.delivery_lease_only and not args.ui_components_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        delivery_leases(args.binary.resolve(), report)
+        if args.ui_components_only:
+            native_components(args.binary.resolve(),args.evidence.resolve(),report)
+        else:
+            delivery_leases(args.binary.resolve(), report)
         report['checks'].append('Cleanup: Web/Bridge children joined, sandbox HTTP servers stopped, disposable roots removed')
         return report
     report=run_cases([0],verify,1)[0]
