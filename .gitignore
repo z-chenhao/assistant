@@ -4,3 +4,9 @@
 /provider-bridge/node_modules/
 
 __pycache__/
+
+/runtime/javascript/node_modules/
+
+/.ci-go/
+/ci-build.tar.gz
+/guest-browser/node_modules/

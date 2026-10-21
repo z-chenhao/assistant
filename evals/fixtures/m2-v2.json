@@ -1,0 +1,234 @@
+{
+  "version": 2,
+  "milestone": "M2",
+  "level": "L0",
+  "scope": "Task/Root/Reporter plus controlled pause/cancel and continuation fragments; scripted policy, no product score claim.",
+  "common": {
+    "user": {
+      "id": "user_eval_001",
+      "name": "陈屿",
+      "timezone": "Asia/Shanghai",
+      "locale": "zh-CN",
+      "city": "杭州",
+      "occupation": "后端工程师",
+      "household": "与伴侣共同生活"
+    },
+    "agent": {
+      "id": "agent_eval_001",
+      "language": "zh-CN"
+    },
+    "security": {
+      "external_writes_require_approval": true,
+      "secrets_are_never_model_visible": true
+    }
+  },
+  "variants": [
+    {
+      "id": "wording-1",
+      "wording": 0,
+      "noise": 0
+    },
+    {
+      "id": "wording-2",
+      "wording": 1,
+      "noise": 0
+    },
+    {
+      "id": "wording-3",
+      "wording": 2,
+      "noise": 0
+    },
+    {
+      "id": "noise-1",
+      "wording": 0,
+      "noise": 1
+    },
+    {
+      "id": "noise-2",
+      "wording": 0,
+      "noise": 2
+    },
+    {
+      "id": "order-1",
+      "wording": 0,
+      "noise": 0,
+      "reverse_world_keys": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "GC-02",
+      "version": 2,
+      "clock": "2026-09-25T09:00:00+08:00",
+      "world": {
+        "goal": "Read four books this quarter; no automation requested."
+      },
+      "expected_tasks": 1,
+      "expected_roots": 2,
+      "expected_instructions": 1,
+      "synchronous_first": true,
+      "events": [
+        {
+          "at": "2026-09-25T09:00:00+08:00",
+          "wordings": [
+            "Discuss my reading goal without tracking it.",
+            "Explore a reading goal; no background work yet.",
+            "Talk through my reading preferences synchronously."
+          ]
+        },
+        {
+          "at": "2026-09-25T09:05:00+08:00",
+          "wordings": [
+            "Delegate: Prepare a reading goal review. Chen aims for four books this quarter. Return next steps; create no reminders.",
+            "Delegate: Draft the reading review for Chen: four books this quarter, concrete next steps, no notifications.",
+            "Delegate: Review Chen’s reading goal of four books this quarter; deliver next actions without reminders."
+          ]
+        },
+        {
+          "at": "2026-09-25T09:10:00+08:00",
+          "wordings": [
+            "Continue: reading | Revise the target to three books; retain the original goal as history.",
+            "Continue: reading | Update the current target to three books while preserving the prior anchor.",
+            "Continue: reading | Use three books as the revised target and keep evidence of the earlier goal."
+          ]
+        }
+      ],
+      "not_applicable": [
+        "full semantic Case grading",
+        "Artifact and external side effects",
+        "Memory and automation",
+        "controlled pause/cancel (ERII-12)",
+        "Child collaboration (M4)"
+      ]
+    },
+    {
+      "case_id": "GC-04",
+      "version": 2,
+      "clock": "2026-09-26T10:00:00+08:00",
+      "world": {
+        "trip": "Kyoto, two travelers, November 10–12; no purchases."
+      },
+      "expected_tasks": 1,
+      "expected_roots": 2,
+      "expected_instructions": 1,
+      "events": [
+        {
+          "at": "2026-09-26T10:00:00+08:00",
+          "wordings": [
+            "Delegate: Hold worker Prepare a Kyoto travel itinerary for two people, November 10–12. Return a daily plan; do not book anything.",
+            "Delegate: Hold worker Draft Kyoto travel plans for two travelers on November 10–12. Deliver daily routes without reservations.",
+            "Delegate: Hold worker Build a Kyoto travel plan for November 10–12, two people. Provide daily routes and make no purchases."
+          ],
+          "wait_for": "worker_generation"
+        },
+        {
+          "at": "2026-09-26T10:00:01+08:00",
+          "wordings": [
+            "Pause: Kyoto",
+            "Pause: Kyoto",
+            "Pause: Kyoto"
+          ]
+        },
+        {
+          "at": "2026-09-26T10:05:00+08:00",
+          "wordings": [
+            "Continue: Kyoto | Change the dates to November 11–13; retain the same two travelers.",
+            "Continue: Kyoto | Use November 11–13 for the trip, still two people.",
+            "Continue: Kyoto | Shift the itinerary to November 11–13 without changing party size."
+          ]
+        }
+      ],
+      "not_applicable": [
+        "full semantic Case grading",
+        "Artifact and external side effects",
+        "Memory and automation",
+        "Child collaboration (M4)"
+      ],
+      "expected_cancelled_roots": 1,
+      "expected_epoch": 3,
+      "stop_actions": 1,
+      "stop_reason": "task_paused"
+    },
+    {
+      "case_id": "GC-08",
+      "version": 2,
+      "clock": "2026-09-27T11:00:00+08:00",
+      "world": {
+        "event": "Wedding venue checklist; user explicitly asks continuation."
+      },
+      "expected_tasks": 1,
+      "expected_roots": 2,
+      "expected_instructions": 1,
+      "duplicate": true,
+      "events": [
+        {
+          "at": "2026-09-27T11:00:00+08:00",
+          "wordings": [
+            "Duplicate: Hold worker Prepare a wedding venue checklist with material dependencies and unresolved questions; contact nobody.",
+            "Duplicate: Hold worker Draft a wedding venue checklist. Include prerequisite materials and blockers without contacting anyone.",
+            "Duplicate: Hold worker Deliver a wedding venue checklist showing dependencies and missing information; do not send messages."
+          ],
+          "wait_for": "worker_generation"
+        },
+        {
+          "at": "2026-09-27T11:00:01+08:00",
+          "wordings": [
+            "Cancel: wedding",
+            "Cancel: wedding",
+            "Cancel: wedding"
+          ]
+        },
+        {
+          "at": "2026-09-27T11:05:00+08:00",
+          "wordings": [
+            "Continue: wedding | 继续，补充场地确认的材料清单。",
+            "Continue: wedding | 接着做，加入场地确认所需材料。",
+            "Continue: wedding | 恢复这个工作，补全场地材料清单。"
+          ]
+        }
+      ],
+      "not_applicable": [
+        "full semantic Case grading",
+        "Artifact and external side effects",
+        "Memory and automation",
+        "Child collaboration (M4)"
+      ],
+      "expected_cancelled_roots": 1,
+      "expected_epoch": 3,
+      "stop_actions": 1,
+      "stop_reason": "task_cancelled"
+    },
+    {
+      "case_id": "GC-18",
+      "version": 2,
+      "clock": "2026-09-28T12:00:00+08:00",
+      "world": {
+        "deliverables": [
+          "meeting design outline",
+          "independent travel itinerary"
+        ],
+        "child_delegation": "not_applicable until M4"
+      },
+      "expected_tasks": 2,
+      "expected_roots": 2,
+      "expected_instructions": 0,
+      "events": [
+        {
+          "at": "2026-09-28T12:00:00+08:00",
+          "wordings": [
+            "Delegate many: Draft a design outline from synthetic meeting decisions; return acceptance criteria and unresolved questions. | Prepare a holiday itinerary for two travelers without bookings.",
+            "Delegate many: Turn synthetic meeting decisions into a design outline with acceptance and open issues. | Draft a holiday itinerary for two people; reserve nothing.",
+            "Delegate many: Produce a design outline using synthetic meeting decisions, acceptance criteria and open questions. | Build a holiday itinerary for two travelers without purchasing."
+          ]
+        }
+      ],
+      "not_applicable": [
+        "full semantic Case grading",
+        "Artifact and external side effects",
+        "Memory and automation",
+        "controlled pause/cancel (ERII-12)",
+        "Child collaboration (M4)"
+      ]
+    }
+  ]
+}
