@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"time"
 
 	nat "github.com/nats-io/nats.go"
@@ -18,16 +20,47 @@ import (
 )
 
 type Options struct {
-	URL           string        `yaml:"url"`
-	StreamPrefix  string        `yaml:"stream_prefix"`
-	Timeout       time.Duration `yaml:"timeout"`
-	AckWait       time.Duration `yaml:"ack_wait"`
-	RetryInterval time.Duration `yaml:"retry_interval"`
+	URL             string        `yaml:"url"`
+	StreamPrefix    string        `yaml:"stream_prefix"`
+	Timeout         time.Duration `yaml:"timeout"`
+	AckWait         time.Duration `yaml:"ack_wait"`
+	RetryInterval   time.Duration `yaml:"retry_interval"`
+	TokenRef        string        `yaml:"token_ref"`
+	MaxAge          time.Duration `yaml:"max_age"`
+	MaxBytes        int64         `yaml:"max_bytes"`
+	MaxMessages     int64         `yaml:"max_messages"`
+	MaxMessageBytes int32         `yaml:"max_message_bytes"`
+	PoisonAttempts  int           `yaml:"poison_attempts"`
+}
+
+// Zero values retain the bounded defaults for callers compiled before M7.
+func (o Options) Defaults() Options {
+	if o.MaxAge == 0 {
+		o.MaxAge = 7 * 24 * time.Hour
+	}
+	if o.MaxBytes == 0 {
+		o.MaxBytes = 1 << 30
+	}
+	if o.MaxMessages == 0 {
+		o.MaxMessages = 1000000
+	}
+	if o.MaxMessageBytes == 0 {
+		o.MaxMessageBytes = 1 << 20
+	}
+	if o.PoisonAttempts == 0 {
+		o.PoisonAttempts = 5
+	}
+	return o
+}
+
+type SecretStore interface {
+	Get(context.Context, string) ([]byte, error)
 }
 
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 func (o Options) Validate() error {
+	o = o.Defaults()
 	u, err := url.Parse(o.URL)
 	if err != nil || u == nil || (u.Scheme != "nats" && u.Scheme != "tls") || u.Hostname() == "" || u.Port() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
 		return errors.New("nats.url must be a nats:// or tls:// host:port without credentials, path, query, or fragment")
@@ -35,8 +68,15 @@ func (o Options) Validate() error {
 	if !namePattern.MatchString(o.StreamPrefix) {
 		return errors.New("nats.stream_prefix must contain 1-64 letters, digits, underscores, or hyphens")
 	}
-	if o.Timeout <= 0 || o.Timeout > time.Minute || o.AckWait <= 0 || o.RetryInterval <= 0 {
-		return errors.New("NATS durations must be positive; timeout must not exceed one minute")
+	ip := net.ParseIP(u.Hostname())
+	if (ip == nil || !ip.IsLoopback()) && (u.Scheme != "tls" || o.TokenRef == "") {
+		return errors.New("remote NATS requires TLS and a SecretStore token reference")
+	}
+	if o.MaxAge < time.Hour || o.MaxAge > 90*24*time.Hour || o.MaxBytes < 1<<20 || o.MaxBytes > 1<<40 || o.MaxMessages < 100 || o.MaxMessages > 10000000 || o.MaxMessageBytes < 1024 || o.MaxMessageBytes > 8<<20 || o.PoisonAttempts < 2 || o.PoisonAttempts > 100 {
+		return errors.New("invalid NATS retention, capacity or poison threshold")
+	}
+	if o.Timeout <= 0 || o.Timeout > time.Minute || o.AckWait < 10*time.Millisecond || o.AckWait > 5*time.Minute || o.RetryInterval < time.Millisecond || o.RetryInterval > time.Minute {
+		return errors.New("invalid bounded NATS timeout, acknowledgement wait or retry interval")
 	}
 	return nil
 }
@@ -51,6 +91,19 @@ type Bus struct {
 var _ event.EventBus = (*Bus)(nil)
 
 func Open(ctx context.Context, options Options) (*Bus, error) {
+	return OpenWithSecrets(ctx, options, nil)
+}
+func OpenWithSecrets(ctx context.Context, options Options, secrets SecretStore) (*Bus, error) {
+	return open(ctx, options, secrets, false)
+}
+
+// Upgrade explicitly adopts bounded retention on the original unbounded v1
+// stream. Refuse any change that would immediately discard retained events.
+func Upgrade(ctx context.Context, options Options, secrets SecretStore) (*Bus, error) {
+	return open(ctx, options, secrets, true)
+}
+func open(ctx context.Context, options Options, secrets SecretStore, upgrade bool) (*Bus, error) {
+	options = options.Defaults()
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
@@ -62,7 +115,21 @@ func Open(ctx context.Context, options Options) (*Bus, error) {
 		timeout = time.Until(deadline)
 	}
 	// Disable reconnect/buffering: the durable SQLite relay owns retry decisions.
-	conn, err := nat.Connect(options.URL, nat.Timeout(timeout), nat.NoReconnect(), nat.NoEcho())
+	opts := []nat.Option{nat.Timeout(timeout), nat.NoReconnect(), nat.NoEcho()}
+	if options.TokenRef != "" {
+		if secrets == nil {
+			return nil, errors.New("NATS credential unavailable")
+		}
+		token, e := secrets.Get(ctx, options.TokenRef)
+		if e != nil || len(token) == 0 {
+			return nil, errors.New("NATS credential unavailable")
+		}
+		opts = append(opts, nat.Token(string(token)))
+		for i := range token {
+			token[i] = 0
+		}
+	}
+	conn, err := nat.Connect(options.URL, opts...)
 	if err != nil {
 		return nil, brokerError(err, "connect event broker")
 	}
@@ -75,13 +142,51 @@ func Open(ctx context.Context, options Options) (*Bus, error) {
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
 	// Create validates existing configuration rather than silently mutating it.
-	_, err = js.CreateStream(ctx, jetstream.StreamConfig{
+	streamConfig := jetstream.StreamConfig{
 		Name: b.stream, Subjects: []string{b.subjects + ".>"}, Storage: jetstream.FileStorage,
 		Retention: jetstream.LimitsPolicy, Discard: jetstream.DiscardNew,
-	})
+		MaxAge: options.MaxAge, MaxBytes: options.MaxBytes, MaxMsgs: options.MaxMessages, MaxMsgSize: options.MaxMessageBytes,
+	}
+	if upgrade {
+		previous, e := js.Stream(ctx, b.stream)
+		if e == nil {
+			info, e := previous.Info(ctx)
+			if e != nil {
+				conn.Close()
+				return nil, brokerError(e, "inspect upgrade stream")
+			}
+			if info.State.Bytes > uint64(options.MaxBytes) || info.State.Msgs > uint64(options.MaxMessages) || info.State.Msgs > 0 && info.State.FirstTime.Before(time.Now().Add(-options.MaxAge)) {
+				conn.Close()
+				return nil, errors.New("broker upgrade would discard retained events; settle or export them first")
+			}
+			old := info.Config
+			if len(old.Subjects) != 1 || old.Subjects[0] != b.subjects+".>" || old.Storage != jetstream.FileStorage || old.Retention != jetstream.LimitsPolicy || old.Discard != jetstream.DiscardNew || old.MaxConsumers > 0 || old.Sealed || old.Mirror != nil || len(old.Sources) > 0 {
+				conn.Close()
+				return nil, errors.New("broker stream is not an owned Erii v1 stream")
+			}
+			old.MaxAge = options.MaxAge
+			old.MaxBytes = options.MaxBytes
+			old.MaxMsgs = options.MaxMessages
+			old.MaxMsgSize = options.MaxMessageBytes
+			_, e = js.UpdateStream(ctx, old)
+			if e != nil {
+				conn.Close()
+				return nil, brokerError(e, "upgrade bounded stream")
+			}
+		} else if !errors.Is(e, jetstream.ErrStreamNotFound) {
+			conn.Close()
+			return nil, brokerError(e, "inspect upgrade stream")
+		}
+	}
+	_, err = js.CreateStream(ctx, streamConfig)
 	if err != nil {
 		conn.Close()
 		return nil, brokerError(err, "create or validate event stream")
+	}
+	_, err = js.CreateStream(ctx, jetstream.StreamConfig{Name: options.StreamPrefix + "_dlq_v1", Subjects: []string{options.StreamPrefix + ".v1.dlq.>"}, Storage: jetstream.FileStorage, Retention: jetstream.LimitsPolicy, Discard: jetstream.DiscardNew, MaxAge: 30 * 24 * time.Hour, MaxBytes: 64 << 20, MaxMsgs: 10000, MaxMsgSize: 4096})
+	if err != nil {
+		conn.Close()
+		return nil, brokerError(err, "create or validate DLQ")
 	}
 	return b, nil
 }
@@ -113,7 +218,9 @@ func (b *Bus) Subscribe(ctx context.Context, consumer string) (event.Subscriptio
 	c, err := b.js.CreateConsumer(ctx, b.stream, jetstream.ConsumerConfig{
 		Durable: consumer, AckPolicy: jetstream.AckExplicitPolicy, AckWait: b.options.AckWait,
 		DeliverPolicy: jetstream.DeliverAllPolicy, FilterSubject: b.subjects + ".>",
-		MaxDeliver: -1, MaxAckPending: 1,
+		// Unlimited broker deliveries let us publish a durable quarantine receipt
+		// BEFORE acknowledging, even across a DLQ outage or process crash.
+		MaxDeliver: -1, MaxAckPending: 32,
 	})
 	if err != nil {
 		return nil, brokerError(err, "create or validate durable consumer")
@@ -122,7 +229,7 @@ func (b *Bus) Subscribe(ctx context.Context, consumer string) (event.Subscriptio
 	if err != nil {
 		return nil, errors.New("open event subscription")
 	}
-	return &subscription{messages: messages, timeout: b.options.Timeout}, nil
+	return &subscription{messages: messages, timeout: b.options.Timeout, bus: b, consumer: consumer}, nil
 }
 
 func (b *Bus) Close() error { b.conn.Close(); return nil }
@@ -130,6 +237,8 @@ func (b *Bus) Close() error { b.conn.Close(); return nil }
 type subscription struct {
 	messages jetstream.MessagesContext
 	timeout  time.Duration
+	bus      *Bus
+	consumer string
 }
 
 func (s *subscription) Close() error { s.messages.Stop(); return nil }
@@ -141,12 +250,40 @@ func (s *subscription) Next(ctx context.Context) (event.Delivery, error) {
 		}
 		return nil, brokerError(err, "receive event")
 	}
+	metadata, err := msg.Metadata()
+	if err != nil {
+		return nil, errors.New("read event delivery metadata")
+	}
+	if metadata.NumDelivered > uint64(s.bus.options.PoisonAttempts) {
+		// Bodies, headers, domain subjects and error text never leave the source
+		// stream. A deterministic receipt key makes an ambiguous DLQ ack harmless.
+		digest := sha256.Sum256(msg.Data())
+		receipt := struct {
+			Consumer string `json:"consumer"`
+			Sequence uint64 `json:"sequence"`
+			Attempts uint64 `json:"attempts"`
+			SHA256   string `json:"sha256"`
+			Code     string `json:"code"`
+		}{s.consumer, metadata.Sequence.Stream, metadata.NumDelivered - 1, hex.EncodeToString(digest[:]), "POISON_THRESHOLD"}
+		body, _ := json.Marshal(receipt)
+		dlq := nat.NewMsg(s.bus.options.StreamPrefix + ".v1.dlq." + s.consumer + "." + strconv.FormatUint(metadata.Sequence.Stream, 10))
+		dlq.Data = body
+		bounded, cancel := context.WithTimeout(ctx, s.timeout)
+		defer cancel()
+		if _, err = s.bus.js.PublishMsg(bounded, dlq); err != nil {
+			return nil, brokerError(err, "quarantine event")
+		}
+		if err = msg.DoubleAck(bounded); err != nil {
+			return nil, brokerError(err, "acknowledge quarantined event")
+		}
+		return nil, event.ErrPoison
+	}
 	if msg.Headers().Get("Content-Type") != event.ContentType {
-		return nil, errors.New("event message must use CloudEvents structured JSON")
+		return nil, event.ErrPoison
 	}
 	e, err := event.Decode(msg.Data())
 	if err != nil {
-		return nil, err
+		return nil, event.ErrPoison
 	}
 	return &delivery{message: msg, event: e, timeout: s.timeout}, nil
 }
@@ -179,6 +316,7 @@ func brokerError(err error, action string) error {
 		errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, nat.ErrNoResponders) ||
 		errors.Is(err, jetstream.ErrNoStreamResponse) ||
+		errors.Is(err, jetstream.ErrConnectionClosed) ||
 		(errors.As(err, &api) && api.Code == 503) {
 		return fmt.Errorf("%s: %w", action, event.ErrUnavailable)
 	}

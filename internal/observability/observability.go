@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -16,19 +17,23 @@ import (
 type Telemetry struct {
 	Logger             *slog.Logger
 	traces             *slog.Logger
-	logFile, traceFile *os.File
+	logFile, traceFile io.Closer
 }
 
 func Open(dataRoot string, level slog.Level) (*Telemetry, error) {
+	return OpenWithLimits(dataRoot, level, 16<<20, 2)
+}
+
+func OpenWithLimits(dataRoot string, level slog.Level, maxBytes int64, backups int) (*Telemetry, error) {
 	dir := filepath.Join(dataRoot, "logs")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	logFile, err := os.OpenFile(filepath.Join(dir, "app.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	logFile, err := newWriter(dir, "app.jsonl", maxBytes, backups)
 	if err != nil {
 		return nil, err
 	}
-	traceFile, err := os.OpenFile(filepath.Join(dir, "traces.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	traceFile, err := newWriter(dir, "traces.jsonl", maxBytes, backups)
 	if err != nil {
 		return nil, errors.Join(err, logFile.Close())
 	}

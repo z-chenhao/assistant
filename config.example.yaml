@@ -25,7 +25,10 @@ app:
   # Must be absolute. ERII_DATA_ROOT can override this for deployment.
   data_root: /tmp/erii-local
   log_level: info
-# Only the explicit `relay` command connects. status/startup work without a broker.
+  log_max_bytes: 16777216
+  log_backups: 2
+# Production TUI/Web/automation work starts NATS before Tool admission.
+# Explicit offline CLI scans/diagnostics and deterministic Fakes remain available.
 nats:
   url: nats://127.0.0.1:4222
   # Use a dedicated prefix per data root on a shared broker. Never embed credentials.
@@ -33,6 +36,13 @@ nats:
   timeout: 2s
   ack_wait: 30s
   retry_interval: 1s
+  # Remote brokers require tls:// and a token reference in SecretStore.
+  # token_ref: env:ERII_NATS_TOKEN
+  max_age: 168h
+  max_bytes: 1073741824
+  max_messages: 1000000
+  max_message_bytes: 1048576
+  poison_attempts: 5
 
 # Frozen per new Root tree; existing Runs retain their limits after restart.
 # Safety ceilings reject with RESOURCE_LIMIT; concurrency still queues normally.

@@ -11,7 +11,7 @@ import (
 )
 
 // batchReply is deterministic Direct Tool evidence. Four 25-call exchanges keep
-// the existing 32-call Bridge frame contract, while one Root processes 100.
+// the existing 32-call Bridge frame contract, while one Root processes 100/1000.
 func batchReply(req llm.GenerationRequest, input string, root bool) (llm.GenerationResult, error) {
 	if !root {
 		i, err := strconv.Atoi(strings.TrimPrefix(input, "Batch item "))
@@ -35,7 +35,11 @@ func batchReply(req llm.GenerationRequest, input string, root bool) (llm.Generat
 			}
 		}
 	}
-	if count < 100 {
+	target := 100
+	if strings.Contains(input, "Batch 1000") {
+		target = 1000
+	}
+	if count < target {
 		result := llm.GenerationResult{}
 		for i := count + 1; i <= count+25; i++ {
 			text := fmt.Sprintf("Batch item %d", i)

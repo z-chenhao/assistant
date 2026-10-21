@@ -29,10 +29,10 @@ func (a *App) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (ag
 	if !a.Actor(nil).Ready(ctx) {
 		return agent.Receipt{}, agent.ErrSetup
 	}
-	return a.runs.AcceptInbound(ctx, e)
+	return a.Runs().AcceptInbound(ctx, e)
 }
 func (a *App) DecideInbound(ctx context.Context, e interaction.InboundEvent, id, hash, decision string) error {
-	return a.runs.DecideInbound(ctx, e, id, hash, decision)
+	return a.Runs().DecideInbound(ctx, e, id, hash, decision)
 }
 func (a *App) WebStatus(ctx context.Context) (web.Status, error) {
 	d, err := a.Diagnostics(ctx)

@@ -6,11 +6,11 @@ import (
 )
 
 func (a *App) ManageMemory(ctx context.Context, key string, m memory.Mutation) (map[string]any, error) {
-	return a.runs.ManageMemory(ctx, key, m)
+	return a.Runs().ManageMemory(ctx, key, m)
 }
-func (a *App) CurateMemory(ctx context.Context) error { return a.runs.CurateMemory(ctx) }
+func (a *App) CurateMemory(ctx context.Context) error { return a.Runs().CurateMemory(ctx) }
 func (a *App) MemoryStatus(ctx context.Context) ([]map[string]any, error) {
-	return a.runs.MemoryStatus(ctx)
+	return a.Runs().MemoryStatus(ctx)
 }
 
 func (a *App) StartMemory(ctx context.Context) {

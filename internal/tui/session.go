@@ -42,9 +42,18 @@ type Session struct {
 	Accounts         Accounts
 	Control          llm.Control
 	Actor            agent.Actor
+	CurrentActor     func() agent.Actor
+	AwaitRuntime     func(context.Context) error
 	Discover         func(context.Context, string, string) ([]llm.CatalogModel, error)
 	AccountCatalog   func(context.Context, string) ([]llm.CatalogModel, error)
 	LoginEnvironment func(context.Context, string) (llm.AuthConnection, error)
+}
+
+func (s Session) actor() agent.Actor {
+	if s.CurrentActor != nil {
+		return s.CurrentActor()
+	}
+	return s.Actor
 }
 
 var cancelled = errors.New("setup cancelled")
@@ -140,7 +149,7 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 			u.print("State: " + d.Readiness + ". Use /setup to repair the connection; history remains available.")
 			continue
 		}
-		_, err = s.Actor.Submit(ctx, uuid.Must(uuid.NewV7()).String(), line)
+		_, err = s.actor().Submit(ctx, uuid.Must(uuid.NewV7()).String(), line)
 		if err == nil {
 			u.print("Erii: busy")
 			u.startDrain()
@@ -173,7 +182,7 @@ func (u *terminal) startDrain() {
 	if u.updates == nil {
 		u.updates = make(chan struct{}, 1)
 	}
-	actor := u.Actor
+	actor := u.actor()
 	actor.Sink = func(e agent.Event) {
 		if e.RunKind == "main" && (e.Kind == "turn_end" || e.Kind == "agent_end") {
 			select {
@@ -409,6 +418,11 @@ func (u *terminal) selectModel(ctx context.Context, id string) error {
 	}
 	if err := u.Control.Select(ctx, id, p.Version, d.ConfigVersion); err != nil {
 		return err
+	}
+	if u.AwaitRuntime != nil {
+		if err := u.AwaitRuntime(ctx); err != nil {
+			return err
+		}
 	}
 	u.print("Model selected. New Runs use this model.")
 	return nil

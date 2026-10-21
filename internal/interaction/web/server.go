@@ -52,6 +52,7 @@ type Status struct {
 	ConfigVersion int64  `json:"config_version"`
 }
 type Core interface {
+	WaitForRuntime(context.Context) error
 	ChannelBindings(context.Context) ([]interaction.Binding, error)
 	ChannelPreference(context.Context) (interaction.Preference, error)
 	PreferChannel(context.Context, string, string, int64) error
@@ -453,6 +454,9 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 			return e
 		}
 		if e = s.Control.Select(r.Context(), r.FormValue("profile"), pv, cv); e != nil {
+			return e
+		}
+		if e = s.Core.WaitForRuntime(r.Context()); e != nil {
 			return e
 		}
 	case "/notification":

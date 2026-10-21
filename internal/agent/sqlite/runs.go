@@ -229,36 +229,49 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 }
 
 func (r *Runs) Next(ctx context.Context) (string, error) {
+	if err := r.Recover(ctx); err != nil {
+		return "", err
+	}
+	r.host.boundary("before_next_scan")
+	id, err := r.nextScheduled(ctx)
+	return r.scheduledResult(ctx, id, err)
+}
+
+// Recover scans authoritative intents without acquiring execution ownership.
+// Production startup uses the same idempotent scan as every Actor drain.
+func (r *Runs) Recover(ctx context.Context) error {
 	now := time.Now()
 	if r.automationClock != nil {
 		now = r.automationClock()
 	}
 	if err := r.ScheduleAutomations(ctx, now); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.admitAutomations(ctx); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.recoverCode(ctx); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.recoverApprovals(ctx); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.ReconcileUnknown(ctx); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.recoverStops(ctx); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.Report(ctx); err != nil {
-		return "", err
+		return err
 	}
 	if err := r.promoteFollowups(ctx); err != nil {
-		return "", err
+		return err
 	}
-	r.host.boundary("before_next_scan")
-	id, err := r.nextScheduled(ctx)
+	return nil
+}
+
+func (r *Runs) scheduledResult(ctx context.Context, id string, err error) (string, error) {
 	if err == sql.ErrNoRows {
 		var active int
 		// Stopping owners must join or expire before Drain can finish. They are

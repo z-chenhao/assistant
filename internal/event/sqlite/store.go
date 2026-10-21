@@ -12,7 +12,11 @@ import (
 	"github.com/z-chenhao/erii/internal/event"
 )
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db          *sql.DB
+	MaxFailures int
+	OnDead      func(string)
+}
 
 func New(db *sql.DB) *Store { return &Store{db: db} }
 
@@ -37,24 +41,81 @@ func (s *Store) Pending(ctx context.Context, limit int) ([]event.CloudEvent, err
 	if limit < 1 || limit > 1000 {
 		return nil, errors.New("outbox batch must be between 1 and 1000")
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT payload_json FROM event_outbox WHERE published_at IS NULL ORDER BY rowid LIMIT ?`, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT event_id,payload_json FROM event_outbox WHERE published_at IS NULL AND dead_at IS NULL ORDER BY attempt_count,rowid LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var events []event.CloudEvent
+	var poison []string
 	for rows.Next() {
 		var payload []byte
-		if err := rows.Scan(&payload); err != nil {
+		var id string
+		if err := rows.Scan(&id, &payload); err != nil {
 			return nil, err
 		}
 		e, err := event.Decode(payload)
-		if err != nil {
-			return nil, err
+		if err != nil || e.ID() != id {
+			poison = append(poison, id)
+			continue
 		}
 		events = append(events, e)
 	}
-	return events, rows.Err()
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range poison {
+		result, e := s.db.ExecContext(ctx, `UPDATE event_outbox SET dead_at=?,failure_code='INVALID_ENVELOPE' WHERE event_id=? AND published_at IS NULL AND dead_at IS NULL`, time.Now().UnixMicro(), id)
+		if e != nil {
+			return nil, e
+		}
+		if n, _ := result.RowsAffected(); n > 0 && s.OnDead != nil {
+			s.OnDead("EVENT_OUTBOX_INVALID")
+		}
+	}
+	return events, nil
+}
+
+// Only non-transient publication errors count toward poison isolation. Broker
+// downtime retains all intents, regardless of the number of reconnect attempts.
+func (s *Store) RecordFailure(ctx context.Context, id string) error {
+	limit := s.MaxFailures
+	if limit == 0 {
+		limit = 5
+	}
+	var dead int64
+	err := s.db.QueryRowContext(ctx, `UPDATE event_outbox SET failure_count=failure_count+1,failure_code='PUBLICATION_REJECTED',dead_at=CASE WHEN failure_count+1>=? THEN ? ELSE dead_at END WHERE event_id=? AND published_at IS NULL AND dead_at IS NULL RETURNING coalesce(dead_at,0)`, limit, time.Now().UnixMicro(), id).Scan(&dead)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err == nil && dead > 0 && s.OnDead != nil {
+		s.OnDead("EVENT_OUTBOX_POISON")
+	}
+	return err
+}
+
+// Retry requeues only a validated internal wakeup. It cannot retry a Tool or
+// Delivery side effect. The attempt count fences concurrent operator decisions.
+func (s *Store) Retry(ctx context.Context, id string, attempts int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var raw []byte
+	if err = tx.QueryRowContext(ctx, `SELECT payload_json FROM event_outbox WHERE event_id=? AND dead_at IS NOT NULL AND attempt_count=?`, id, attempts).Scan(&raw); err != nil {
+		return err
+	}
+	e, err := event.Decode(raw)
+	if err != nil || e.ID() != id {
+		return event.ErrPoison
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE event_outbox SET dead_at=NULL,failure_code=NULL,attempt_count=0,failure_count=0 WHERE event_id=?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) RecordAttempt(ctx context.Context, id string) error {
@@ -63,7 +124,7 @@ func (s *Store) RecordAttempt(ctx context.Context, id string) error {
 }
 
 func (s *Store) MarkPublished(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE event_outbox SET published_at = ? WHERE event_id = ? AND published_at IS NULL`, time.Now().UTC().UnixMicro(), id)
+	_, err := s.db.ExecContext(ctx, `UPDATE event_outbox SET published_at = ?,dead_at=NULL,failure_code=NULL WHERE event_id = ? AND published_at IS NULL`, time.Now().UTC().UnixMicro(), id)
 	return err
 }
 

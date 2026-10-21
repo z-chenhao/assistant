@@ -24,6 +24,8 @@ type Store struct {
 	vault  memory.Vault
 }
 
+const SchemaVersion = 2
+
 const schema = `CREATE TABLE memory_record(
  memory_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,scope_type TEXT NOT NULL CHECK(scope_type IN('user','agent')),
  scope_id TEXT NOT NULL,tier TEXT NOT NULL CHECK(tier IN('core','recall')),content TEXT NOT NULL,
@@ -76,7 +78,7 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 	var version int
-	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 2 {
+	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > SchemaVersion {
 		return recall.ErrUnavailable
 	}
 	if version == 0 {

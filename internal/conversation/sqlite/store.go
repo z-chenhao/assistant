@@ -24,6 +24,8 @@ type Store struct {
 	engine recall.Embedding
 }
 
+const SchemaVersion = 3
+
 func Open(ctx context.Context, root string) (*Store, error) {
 	if !filepath.IsAbs(root) {
 		return nil, conversation.ErrStorage
@@ -66,7 +68,7 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 	var version int
-	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > 3 {
+	if tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version) != nil || version < 0 || version > SchemaVersion {
 		return conversation.ErrStorage
 	}
 	if version == 0 {

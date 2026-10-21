@@ -20,6 +20,13 @@ const ContentType = "application/cloudevents+json"
 // ErrUnavailable marks a known transient broker failure, safe to retry.
 var ErrUnavailable = errors.New("event broker unavailable")
 
+// ErrPoison never contains the message body. Operators inspect the local DLQ.
+var ErrPoison = errors.New("event quarantined or awaiting poison threshold")
+
+type FailureOutbox interface {
+	RecordFailure(context.Context, string) error
+}
+
 // New creates a host-owned, globally unique event. Subject is the aggregate key.
 func New(source, typ, subject string, data any) (CloudEvent, error) {
 	id, err := uuid.NewV7()
@@ -107,18 +114,28 @@ func (p Publisher) Flush(ctx context.Context, limit int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	for i, e := range events {
+	count := 0
+	for _, e := range events {
 		if err := p.Outbox.RecordAttempt(ctx, e.ID()); err != nil {
-			return i, err
+			return count, err
 		}
 		if err := p.Bus.Publish(ctx, e); err != nil {
-			return i, err
+			if !errors.Is(err, ErrUnavailable) && ctx.Err() == nil {
+				if failures, ok := p.Outbox.(FailureOutbox); ok {
+					if e := failures.RecordFailure(ctx, e.ID()); e != nil {
+						return count, e
+					}
+					continue
+				}
+			}
+			return count, err
 		}
 		if err := p.Outbox.MarkPublished(ctx, e.ID()); err != nil {
-			return i, err
+			return count, err
 		}
+		count++
 	}
-	return len(events), nil
+	return count, nil
 }
 
 // Relay retries internal event publication, never external Tool side effects.

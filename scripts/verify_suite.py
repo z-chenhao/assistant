@@ -39,6 +39,8 @@ class Gate:
 SHARDS = {
     "runtime": (
         Gate("foundation", "verify.py", "verification"),
+        Gate("operations", "verify_operations.py", "operations",5),
+        Gate("capacity", "verify_capacity.py", "capacity"),
         Gate("main", "verify_main.py", "main"),
         Gate("tasks", "verify_tasks.py", "tasks"),
         Gate("automation", "verify_automation.py", "automation", 5),

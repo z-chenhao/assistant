@@ -3,14 +3,14 @@ package agent
 // SchedulerLimits are deployment policy, never model-visible capacity hints.
 // The local data root has one user; User therefore also bounds all Workers.
 type SchedulerLimits struct {
-	Children               int `yaml:"child_concurrency"`
-	Global                 int `yaml:"global_concurrency"`
-	User                   int `yaml:"user_concurrency"`
-	Agent                  int `yaml:"agent_concurrency"`
-	Provider               int `yaml:"provider_concurrency"`
-	Turns                  int `yaml:"max_worker_turns"`
-	InfrastructureFailures int `yaml:"infrastructure_failures"`
-	CooldownSeconds        int `yaml:"cooldown_seconds"`
+	Children               int `yaml:"child_concurrency" json:"child_concurrency"`
+	Global                 int `yaml:"global_concurrency" json:"global_concurrency"`
+	User                   int `yaml:"user_concurrency" json:"user_concurrency"`
+	Agent                  int `yaml:"agent_concurrency" json:"agent_concurrency"`
+	Provider               int `yaml:"provider_concurrency" json:"provider_concurrency"`
+	Turns                  int `yaml:"max_worker_turns" json:"max_worker_turns"`
+	InfrastructureFailures int `yaml:"infrastructure_failures" json:"infrastructure_failures"`
+	CooldownSeconds        int `yaml:"cooldown_seconds" json:"cooldown_seconds"`
 }
 
 func DefaultSchedulerLimits() SchedulerLimits {

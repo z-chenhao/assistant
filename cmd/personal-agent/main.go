@@ -30,6 +30,8 @@ import (
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
+	"github.com/z-chenhao/erii/internal/llm/secret"
+	"github.com/z-chenhao/erii/internal/maintenance"
 	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/skill"
 	mcpfake "github.com/z-chenhao/erii/internal/tool/mcp/fake"
@@ -63,6 +65,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	configPath := flags.String("config", "", "versioned YAML configuration file (optional)")
 	testSecrets := flags.String("test-secret-store", "", "explicit in-memory CI Unix socket; never a production credential backend")
 	testBridge := flags.String("test-bridge", "", "explicit deterministic test Bridge fixture; never a real provider")
+	testEvents := flags.Bool("test-events", false, "explicit test Bridge only: exercise production NATS lifecycle")
 	testDelivery := flags.String("test-delivery", "", "explicit test Bridge only: retry-once, unavailable, ambiguous, unknown")
 	testAutomationNow := flags.String("test-automation-now", "", "explicit test Bridge only: fixed Automation clock (RFC3339)")
 	testMainHold := flags.String("test-main-hold", "", "explicit test Bridge only: hold at a Main durability boundary until shutdown")
@@ -77,6 +80,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return nil
 	})
 	flags.Usage = func() {
+		fmt.Fprintln(errOut, "Operations: ops health|report|broker|upgrade-broker; ops trace RUN_ID; ops retry-event EVENT_ID ATTEMPTS; ops backup ARCHIVE KEY_REF; ops restore ARCHIVE KEY_REF; ops activate source-retired-and-outcomes-reconciled. See docs/operations.md.")
 		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [web serve|channel manage|tui|status|relay|automation manage REQUEST_KEY|automation list|automation tick|automation work|computer status|computer prepare-base CLEAN_STOPPED_VM|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
@@ -88,6 +92,9 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	if len(testBarriers) > 0 && *testBridge == "" {
 		return errors.New("test-main-barrier requires explicit test-bridge")
+	}
+	if *testEvents && *testBridge == "" {
+		return errors.New("test-events requires explicit test-bridge")
 	}
 	if testBarriers[*testMainHold] != "" {
 		return errors.New("conflicting test boundary barriers")
@@ -126,7 +133,8 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	webCommand := flags.NArg() == 2 && flags.Arg(0) == "web" && flags.Arg(1) == "serve"
 	channelCommand := flags.NArg() == 2 && flags.Arg(0) == "channel" && flags.Arg(1) == "manage"
 	automationCommand := flags.Arg(0) == "automation" && ((flags.NArg() == 3 && flags.Arg(1) == "manage") || (flags.NArg() == 2 && (flags.Arg(1) == "list" || flags.Arg(1) == "tick" || flags.Arg(1) == "work")))
-	if !webCommand && !channelCommand && !automationCommand && !computerCommand && !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	opsCommand := flags.Arg(0) == "ops" && ((flags.NArg() == 2 && (flags.Arg(1) == "health" || flags.Arg(1) == "report" || flags.Arg(1) == "broker" || flags.Arg(1) == "upgrade-broker")) || (flags.NArg() == 3 && (flags.Arg(1) == "trace" || flags.Arg(1) == "activate")) || (flags.NArg() == 4 && (flags.Arg(1) == "backup" || flags.Arg(1) == "restore" || flags.Arg(1) == "retry-event")))
+	if !opsCommand && !webCommand && !channelCommand && !automationCommand && !computerCommand && !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -161,6 +169,39 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
+	if opsCommand {
+		if flags.Arg(1) == "activate" {
+			if err = maintenance.Activate(cfg.App.DataRoot, flags.Arg(2)); err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(map[string]bool{"activated": true})
+		}
+		if flags.Arg(1) == "backup" || flags.Arg(1) == "restore" {
+			var secrets llm.SecretStore = secret.Store{}
+			if *testSecrets != "" {
+				secrets = secret.TestSocket{Path: *testSecrets}
+			}
+			key, e := secrets.Get(ctx, flags.Arg(3))
+			if e != nil || len(key) != 32 {
+				return errors.New("backup requires a 32-byte SecretStore key")
+			}
+			defer func() {
+				for i := range key {
+					key[i] = 0
+				}
+			}()
+			var manifest maintenance.Manifest
+			if flags.Arg(1) == "backup" {
+				manifest, err = maintenance.Backup(ctx, cfg.App.DataRoot, flags.Arg(2), key, app.SchemaVersions())
+			} else {
+				manifest, err = maintenance.Restore(ctx, flags.Arg(2), cfg.App.DataRoot, key, app.SchemaVersions())
+			}
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(manifest)
+		}
+	}
 	if computerCommand && flags.Arg(1) == "prepare-base" {
 		if cfg.Computer == nil {
 			return errors.New("computer configuration required")
@@ -171,7 +212,11 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return json.NewEncoder(out).Encode(map[string]string{"base": "sealed"})
 	}
 	var application *app.App
-	if *testBridge != "" {
+	if (*testBridge == "" || *testEvents) && (webCommand || terminalCommand || automationCommand && flags.Arg(1) == "work") {
+		application, err = app.OpenRuntime(ctx, cfg, *testBridge, *testSecrets)
+	} else if modelCommand || opsCommand || flags.Arg(0) == "status" {
+		application, err = app.OpenControl(ctx, cfg, *testBridge, *testSecrets)
+	} else if *testBridge != "" {
 		application, err = app.OpenWithTestBridge(ctx, cfg, *testBridge)
 	} else if *testSecrets != "" {
 		application, err = app.OpenWithTestSecrets(ctx, cfg, *testSecrets)
@@ -182,6 +227,43 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return err
 	}
 	defer func() { err = errors.Join(err, application.Close()) }()
+	if opsCommand {
+		switch flags.Arg(1) {
+		case "health", "report":
+			v, e := application.Operations(ctx)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(v)
+		case "trace":
+			v, e := application.OperationalTrace(ctx, flags.Arg(2))
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(v)
+		case "broker":
+			v, e := application.BrokerHealth(ctx, cfg)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(v)
+		case "upgrade-broker":
+			v, e := application.UpgradeBroker(ctx, cfg)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(v)
+		case "retry-event":
+			n, e := strconv.Atoi(flags.Arg(3))
+			if e != nil || n < 0 {
+				return errors.New("expected non-negative event attempt count")
+			}
+			if e = application.RetryEvent(ctx, flags.Arg(2), n); e != nil {
+				return e
+			}
+			return json.NewEncoder(out).Encode(map[string]bool{"requeued": true})
+		}
+	}
 	if *testAutomationNow != "" {
 		if *testBridge == "" {
 			return errors.New("test-automation-now requires explicit test-bridge")
@@ -239,7 +321,14 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			}
 		})
 	}
-	if webCommand || terminalCommand || flags.NArg() == 0 || chatCommand && flags.Arg(1) == "work" {
+	foreground := func(action func(context.Context) error) error {
+		if *testBridge == "" || *testEvents {
+			return application.WithEvents(ctx, cfg, action)
+		}
+		application.StartMemory(ctx)
+		return action(ctx)
+	}
+	if !terminalCommand && flags.NArg() == 0 || chatCommand && flags.Arg(1) == "work" {
 		application.StartMemory(ctx)
 	}
 	if webCommand {
@@ -261,15 +350,17 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 				return err
 			}
 		}
-		listener, err := net.Listen("tcp", cfg.Web.Listen)
-		if err != nil {
-			return errors.New("web listener unavailable")
-		}
-		defer listener.Close()
-		if err = json.NewEncoder(out).Encode(map[string]string{"url": "http://" + listener.Addr().String()}); err != nil {
-			return err
-		}
-		return application.ServeWeb(ctx, listener, *cfg.Web)
+		return foreground(func(ctx context.Context) error {
+			listener, err := net.Listen("tcp", cfg.Web.Listen)
+			if err != nil {
+				return errors.New("web listener unavailable")
+			}
+			defer listener.Close()
+			if err = json.NewEncoder(out).Encode(map[string]string{"url": "http://" + listener.Addr().String()}); err != nil {
+				return err
+			}
+			return application.ServeWeb(ctx, listener, *cfg.Web)
+		})
 	}
 	if channelCommand {
 		var q struct {
@@ -313,7 +404,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	}
 	if automationCommand {
 		if flags.Arg(1) == "work" {
-			return application.WorkAutomations(ctx)
+			return foreground(application.WorkAutomations)
 		}
 		if flags.Arg(1) == "tick" {
 			if e := application.ScheduleAutomations(ctx); e != nil {
@@ -469,7 +560,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 				return err
 			}
 		}
-		return application.Terminal().Run(ctx, input, out)
+		return foreground(func(ctx context.Context) error { return application.Terminal().Run(ctx, input, out) })
 	}
 	if chatCommand {
 		switch flags.Arg(1) {

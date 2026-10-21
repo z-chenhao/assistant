@@ -23,12 +23,15 @@ from terminal_driver import Terminal
 from verify_account import Secrets, account_config
 from verify_local_provider import Endpoint
 from verify_main import MainHarness, assert_final, require
+from event_broker import Broker
 
 
 class TUIHarness(MainHarness):
-    def __init__(self, binary, root, config, secrets=None):
+    def __init__(self, binary, root, config, secrets=None, broker=None):
         super().__init__(binary, root)
         self.config, self.secrets = config, secrets
+        if broker is not None:
+            self.env.update(ERII_NATS_URL=broker.url, ERII_NATS_STREAM_PREFIX='tui_'+root.name)
 
     def args(self, *args):
         flags = [str(self.binary), "-config", str(self.config)]
@@ -59,7 +62,7 @@ def local_setup(t, endpoint, model="fixture-model", manual=False):
 
 def verify(binary, bridge):
     report = {"version": 1, "checks": [], "live_shadow": "inconclusive; unexecuted"}
-    with tempfile.TemporaryDirectory(prefix="et-", dir="/tmp") as tmp:
+    with tempfile.TemporaryDirectory(prefix="et-", dir="/tmp") as tmp, Broker(Path(tmp)) as broker:
         root = Path(tmp)
         server = ThreadingHTTPServer(("127.0.0.1", 0), Endpoint)
         server.daemon_threads = True
@@ -72,7 +75,7 @@ def verify(binary, bridge):
                 folder.mkdir()
                 cfg = folder / "config.yaml"
                 cfg.write_text(f"version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: {bridge}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
-                h = TUIHarness(binary, folder, cfg)
+                h = TUIHarness(binary, folder, cfg, broker=broker)
                 server.mode = "manual" if manual else "success"
                 with h.terminal() as t:
                     t.expect("State: setup_required")
@@ -129,7 +132,7 @@ def verify(binary, bridge):
             folder.mkdir()
             cfg = folder / "config.yaml"
             cfg.write_text("version: 1\n")
-            h = TUIHarness(binary, folder, cfg)
+            h = TUIHarness(binary, folder, cfg, broker=broker)
             with h.terminal() as t:
                 t.expect("Connection [1/2]"); t.send("/cancel")
                 t.expect("Setup cancelled."); t.expect("You> ")
@@ -190,7 +193,7 @@ def verify(binary, bridge):
             worker.start()
             try:
                 cfg = account_config(folder, bridge, endpoint)
-                h = TUIHarness(binary, folder, cfg, sock)
+                h = TUIHarness(binary, folder, cfg, sock, broker=broker)
                 # Signal during login, before any callback/credential acceptance.
                 with h.terminal() as t:
                     t.expect("Connection [1/2]"); t.send("2")

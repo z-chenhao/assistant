@@ -9,16 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/agent/sqlite"
-	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
-	"github.com/z-chenhao/erii/internal/automation"
-	"github.com/z-chenhao/erii/internal/computer"
-	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
-	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
@@ -34,52 +30,84 @@ import (
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
+	"github.com/z-chenhao/erii/internal/maintenance"
 	"github.com/z-chenhao/erii/internal/memory"
 	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
-	"github.com/z-chenhao/erii/internal/recall"
 	"github.com/z-chenhao/erii/internal/recall/embedding"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
-	codefixture "github.com/z-chenhao/erii/internal/tool/codemode/fixture"
-	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
-	"github.com/z-chenhao/erii/internal/tool/mcp"
 	"github.com/z-chenhao/erii/internal/tui"
 )
 
 type App struct {
-	feishu         *feishu.Client
-	computer       *macosvm.Provider
-	memoryCurator  *memory.Curator
-	memoryOnce     sync.Once
-	memoryCancel   context.CancelFunc
-	memoryDone     chan struct{}
-	skillConfig    *skill.Config
-	store          *sqlite.Store
-	artifacts      artifactStore
-	telemetry      *observability.Telemetry
-	provider       *bridge.Client
-	control        llm.Control
-	accounts       *account.Manager
-	history        *conversationsqlite.Store
-	memory         *memorysqlite.Store
-	runs           *sqlite.Runs
-	registry       *tool.Registry
-	terminalInbox  *deliveryterminal.Adapter
-	deliveryPolicy delivery.Policy
-	deliveryFake   *deliveryfake.Adapter
-	testDelivery   string
-	testBoundary   func(string)
+	core                atomic.Pointer[runtimeCore]
+	prepareCore         func(context.Context) error
+	eventsRequired      atomic.Bool
+	eventsReady         atomic.Bool
+	runtimeWake         chan struct{}
+	runtimeDone         <-chan struct{}
+	rootLock            *os.File
+	feishu              *feishu.Client
+	computer            *macosvm.Provider
+	memoryCurator       *memory.Curator
+	memoryOnce          sync.Once
+	memoryCancel        context.CancelFunc
+	memoryDone          chan struct{}
+	skillConfig         *skill.Config
+	store               *sqlite.Store
+	artifacts           artifactStore
+	telemetry           *observability.Telemetry
+	provider            *bridge.Client
+	control             llm.Control
+	accounts            *account.Manager
+	history             *conversationsqlite.Store
+	memory              *memorysqlite.Store
+	terminalInbox       *deliveryterminal.Adapter
+	deliveryPolicy      delivery.Policy
+	deliveryFake        *deliveryfake.Adapter
+	testDelivery        string
+	testBoundary        func(string)
+	testAutomationClock *time.Time
+}
+
+type runtimeCore struct {
+	runs     *sqlite.Runs
+	registry *tool.Registry
+}
+
+func (a *App) Runs() *sqlite.Runs { return a.core.Load().runs }
+
+// OpenRuntime defers Tool/Computer initialization until the production broker
+// phase. Explicit fixtures still use the very same composition and lifecycle.
+func OpenRuntime(ctx context.Context, cfg config.Config, fixture, secretsPath string) (*App, error) {
+	if fixture != "" && !fake.ValidFixture(fixture) {
+		return nil, llm.InvalidProviderResponse
+	}
+	var secrets llm.SecretStore = secret.Store{}
+	if secretsPath != "" {
+		secrets = secret.TestSocket{Path: secretsPath}
+	}
+	return open(ctx, cfg, fixture, secrets, true)
+}
+
+// Control commands remain usable when a Tool, Computer or Sidecar is broken.
+// They never acquire the execution runtime or expose an Actor for dispatch.
+func OpenControl(ctx context.Context, cfg config.Config, fixture, secretsPath string) (*App, error) {
+	a, e := OpenRuntime(ctx, cfg, fixture, secretsPath)
+	if e == nil {
+		a.eventsRequired.Store(false)
+	}
+	return a, e
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
-	return open(ctx, cfg, "", secret.Store{})
+	return open(ctx, cfg, "", secret.Store{}, false)
 }
 
 func OpenWithTestSecrets(ctx context.Context, cfg config.Config, path string) (*App, error) {
-	return open(ctx, cfg, "", secret.TestSocket{Path: path})
+	return open(ctx, cfg, "", secret.TestSocket{Path: path}, false)
 }
 
 // OpenWithTestBridge is explicit test injection. No config default, environment
@@ -88,14 +116,27 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 	if !fake.ValidFixture(fixture) {
 		return nil, llm.InvalidProviderResponse
 	}
-	return open(ctx, cfg, fixture, secret.Store{})
+	return open(ctx, cfg, fixture, secret.Store{}, false)
 }
 
-func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) (*App, error) {
+func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore, deferred bool) (*App, error) {
+	lock, err := maintenance.Lock(cfg.App.DataRoot, false)
+	if err != nil {
+		return nil, err
+	}
+	success := false
+	defer func() {
+		if !success {
+			lock.Close()
+		}
+	}()
+	if maintenance.Pending(cfg.App.DataRoot) {
+		return nil, errors.New("restored data root is fenced; retire source and reconcile external outcomes, then use ops activate")
+	}
 	if cfg.Memory != nil && (!cfg.Memory.Valid() || cfg.Embedding != nil && !cfg.Embedding.Local()) {
 		return nil, errors.New("Memory maintenance requires an encryption key reference and local embedding")
 	}
-	t, err := observability.Open(cfg.App.DataRoot, cfg.LogLevel())
+	t, err := observability.OpenWithLimits(cfg.App.DataRoot, cfg.LogLevel(), cfg.App.LogMaxBytes, cfg.App.LogBackups)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +149,11 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		startup.End(err)
 		return nil, errors.Join(err, t.Close())
 	}
+	if err = maintenance.CheckVersions(ctx, cfg.App.DataRoot, SchemaVersions()); err != nil {
+		database.End(err)
+		startup.End(err)
+		return nil, errors.Join(err, t.Close())
+	}
 	store, err := sqlite.Open(ctx, cfg.App.DataRoot)
 	database.End(err)
 	if err != nil {
@@ -115,7 +161,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, errors.Join(err, t.Close())
 	}
 	store.Artifacts().Policy = cfg.Artifact
-	a := &App{store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
+	a := &App{rootLock: lock, store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()
@@ -128,158 +174,27 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		a.Close()
 		return nil, err
 	}
-	a.deliveryPolicy = cfg.Delivery
-	if cfg.Feishu != nil {
-		a.feishu = &feishu.Client{Config: *cfg.Feishu, Secrets: secrets}
-	}
-	base := task.Registry()
-	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
-	defs = append(defs, automation.Definitions()...)
+	startup.Logger.Info("startup stage", "stage", "storage_ready")
 	if cfg.Memory != nil {
-		defs = append(defs, memory.Definition())
+		if err = a.memory.ConfigureVault(memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}); err != nil {
+			a.Close()
+			return nil, err
+		}
 	}
 	if cfg.Embedding != nil {
 		engine := embedding.Client{Config: *cfg.Embedding, Secrets: secrets}
-		if err = cfg.Embedding.Validate(); err == nil {
-			err = a.memory.Configure(ctx, engine)
-		}
-		if err == nil {
+		if err = a.memory.Configure(ctx, engine); err == nil {
 			err = a.history.Configure(ctx, engine)
 		}
 		if err != nil {
 			a.Close()
 			return nil, err
 		}
-		defs = append(defs, recall.Definition(engine.Identity()))
 	}
-	if cfg.JavaScript != nil {
-		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
-		runtimeHash, preludeHash, e := runtime.Fingerprint()
-		if e != nil {
-			a.Close()
-			return nil, e
-		}
-		definition := codemode.Definition()
-		if cfg.Computer != nil {
-			definition.Spec.TimeoutMS = 300000
-			definition.Spec.Description += " This installation supports cua.getState/listApps/listWindows/listBrowsers/listTabs, getApp/getBrowser/getTab and explicit createBrowserTab. Read bound documentation(); cua.computer.launchApp({app}) launches, cua.files.importArtifact/exportArtifact transfers scoped references. Every action follows Security and Approval."
-		}
-		definition.Spec.ResourceHash += ":" + runtimeHash + ":" + preludeHash
-		defs = append(defs, definition)
+	a.deliveryPolicy = cfg.Delivery
+	if cfg.Feishu != nil {
+		a.feishu = &feishu.Client{Config: *cfg.Feishu, Secrets: secrets}
 	}
-	for _, server := range cfg.MCP {
-		more, e := mcp.Definitions(ctx, server)
-		if e != nil {
-			a.Close()
-			return nil, e
-		}
-		defs = append(defs, more...)
-	}
-	if cfg.Skills != nil {
-		more, e := skill.Definitions(*cfg.Skills)
-		if e != nil {
-			a.Close()
-			return nil, e
-		}
-		defs = append(defs, more...)
-	}
-	if cfg.Workspace != nil {
-		more, e := workspace.Definitions(*cfg.Workspace)
-		if e != nil {
-			a.Close()
-			return nil, e
-		}
-		defs = append(defs, more...)
-	}
-	if (fixture == "core" || fixture == "codemode") && cfg.JavaScript != nil {
-		if cfg.Computer != nil {
-			a.Close()
-			return nil, computer.ErrInvalid
-		}
-		defs = append(defs, computerfake.Definitions()...)
-	}
-	if cfg.Computer != nil {
-		hash, e := computer.Fingerprint(map[string]any{"configuration": cfg.Computer, "use_runtime": macosvm.UseResourceHash()})
-		if e != nil {
-			a.Close()
-			return nil, e
-		}
-		defs = append(defs, computer.Definitions(hash)...)
-	}
-	if fixture == "artifacts" {
-		defs = append(defs, toolfake.Artifacts()...)
-	}
-	for _, spec := range base.Describe() {
-		d, _ := base.Resolve(spec.Name)
-		defs = append(defs, d)
-	}
-	a.registry, err = tool.NewRegistry(defs)
-	if err != nil {
-		a.Close()
-		return nil, err
-	}
-	if fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "approval" || fixture == "approval-never" {
-		defs := []tool.Definition{}
-		for _, spec := range a.registry.Describe() {
-			d, _ := a.registry.Resolve(spec.Name)
-			defs = append(defs, d)
-		}
-		policy := "query_before_retry"
-		if fixture == "approval-never" {
-			policy = "never"
-		}
-		defs = append(defs, toolfake.Definition(cfg.App.DataRoot, policy, func(name string) {
-			if a.testBoundary != nil {
-				a.testBoundary(name)
-			}
-		}))
-		a.registry, err = tool.NewRegistry(defs)
-		if err != nil {
-			a.Close()
-			return nil, err
-		}
-	}
-	a.runs = store.Runs(a.history, a.registry)
-	if cfg.Computer != nil {
-		provider, e := macosvm.New(*cfg.Computer, macosvm.SSHGuest{Config: cfg.Computer.Guest, Secrets: secrets})
-		if e != nil {
-			a.Close()
-			return nil, e
-		}
-		a.runs.ConfigureComputer(provider, cfg.Computer.Compatibility, cfg.Computer.Manifest)
-		a.computer = provider
-		provider.Boundary = func(point string) {
-			if a.testBoundary != nil {
-				a.testBoundary("computer_" + point)
-			}
-		}
-	}
-	a.runs.ConfigureContext(cfg.Context)
-	if cfg.Memory != nil {
-		v := memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}
-		if err = a.memory.ConfigureVault(v); err != nil {
-			a.Close()
-			return nil, err
-		}
-		a.runs.ConfigureMemory(a.memory, v)
-		a.memoryCurator = &memory.Curator{Process: a.runs.CurateMemory, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
-	}
-	if cfg.Embedding != nil {
-		a.runs.ConfigureRecall(recall.Service{Memory: a.memory, Conversation: a.history})
-	}
-	if cfg.JavaScript != nil {
-		var runtime codemode.JavaScriptRuntime = &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
-		if fixture == "core" {
-			runtime = &codefixture.Drift{JavaScriptRuntime: runtime, AuditPath: filepath.Join(cfg.App.DataRoot, "f055-drift.json")}
-		}
-		a.runs.ConfigureJavaScript(runtime)
-	}
-	a.runs.ConfigureChildLimits(cfg.Children)
-	a.runs.ConfigureScheduler(cfg.Scheduler)
-	a.runs.ConfigureSpend(cfg.Spend)
-	a.runs.ConfigureApprovalTTL(time.Duration(cfg.Tools.ApprovalTTLSeconds) * time.Second)
-	a.runs.ConfigureToolLimits(sqlite.ToolLimits{Global: cfg.Tools.Global, Agent: cfg.Tools.Agent, Run: cfg.Tools.Run, Provider: cfg.Tools.Provider, Tool: cfg.Tools.Tool})
-	a.runs.ConfigureRecentTasks(time.Duration(cfg.Tasks.RecentDays)*24*time.Hour, cfg.Tasks.RecentLimit)
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
@@ -313,12 +228,75 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 			return nil, err
 		}
 	}
+	startup.Logger.Info("startup stage", "stage", "provider_ready")
+	projection := store.Runs(a.history, nil)
+	projection.ConfigureScheduler(cfg.Scheduler)
+	a.core.Store(&runtimeCore{runs: projection})
+	if cfg.Memory != nil {
+		a.memoryCurator = &memory.Curator{Process: func(ctx context.Context) error { return a.Runs().CurateMemory(ctx) }, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
+	}
+	var once sync.Once
+	var coreError error
+	a.prepareCore = func(ctx context.Context) error {
+		once.Do(func() {
+			coreError = a.prepareRuntime(ctx, cfg, fixture, secrets)
+		})
+		return coreError
+	}
+	if deferred {
+		a.eventsRequired.Store(true)
+	} else if err = a.prepareCore(ctx); err != nil {
+		a.Close()
+		return nil, err
+	}
 	startup.Logger.Info("application started")
 	startup.End(nil)
+	success = true
 	return a, nil
 }
 
+func SchemaVersions() map[string]int {
+	return map[string]int{"state.db": sqlite.SchemaVersion(), "conversation.db": conversationsqlite.SchemaVersion, "memory.db": memorysqlite.SchemaVersion}
+}
+
+func (a *App) Operations(ctx context.Context) (sqlite.Operations, error) {
+	return a.store.Operations(ctx)
+}
+func (a *App) OperationalTrace(ctx context.Context, id string) (sqlite.RunTrace, error) {
+	return a.store.OperationalTrace(ctx, id)
+}
+func (a *App) RetryEvent(ctx context.Context, id string, attempts int) error {
+	return a.store.Events().Retry(ctx, id, attempts)
+}
+
+func (a *App) BrokerHealth(ctx context.Context, cfg config.Config) (eventnats.Health, error) {
+	bus, e := eventnats.OpenWithSecrets(ctx, cfg.NATS, a.control.Secrets)
+	if e != nil {
+		return eventnats.Health{}, e
+	}
+	defer bus.Close()
+	return bus.Health(ctx)
+}
+
+func (a *App) UpgradeBroker(ctx context.Context, cfg config.Config) (eventnats.Health, error) {
+	bus, e := eventnats.Upgrade(ctx, cfg.NATS, a.control.Secrets)
+	if e != nil {
+		return eventnats.Health{}, e
+	}
+	defer bus.Close()
+	return bus.Health(ctx)
+}
+
 func (a *App) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
+	d, err := a.providerDiagnostics(ctx)
+	if err == nil && a.eventsRequired.Load() && !a.eventsReady.Load() && d.AgentIngressEnabled {
+		d.AgentIngressEnabled = false
+		d.Readiness = agent.Degraded
+	}
+	return d, err
+}
+
+func (a *App) providerDiagnostics(ctx context.Context) (agent.Diagnostics, error) {
 	d, err := a.store.Diagnostics(ctx)
 	if err != nil {
 		return d, err
@@ -356,7 +334,12 @@ func (a *App) Close() error {
 		err = errors.Join(err, a.memory.Close())
 	}
 	a.telemetry.Logger.Info("application stopped")
-	return errors.Join(err, a.telemetry.Close())
+	err = errors.Join(err, a.telemetry.Close())
+	if a.rootLock != nil {
+		err = errors.Join(err, a.rootLock.Close())
+		a.rootLock = nil
+	}
+	return err
 }
 
 func (a *App) recordGeneration(ctx context.Context, r llm.GenerationRequest, result llm.GenerationResult, latency time.Duration, cause error) error {
@@ -374,17 +357,24 @@ func (a *App) SetTestMainBoundary(boundary func(string)) {
 	a.testBoundary = boundary
 }
 func (a *App) Actor(sink agent.EventSink) agent.Actor {
+	core := a.core.Load()
 	var provider llm.LLMProvider
-	if a.provider != nil {
-		provider = a.runs.GuardProvider(a.provider)
+	if a.provider != nil && core.registry != nil && (!a.eventsRequired.Load() || a.eventsReady.Load()) {
+		provider = core.runs.GuardProvider(a.provider)
 	}
-	return agent.Actor{Store: a.runs, Provider: provider, Registry: a.registry, Sink: sink, Ready: func(ctx context.Context) bool {
+	return agent.Actor{Store: core.runs, Provider: provider, Registry: core.registry, Sink: sink, Ready: func(ctx context.Context) bool {
+		if core.registry == nil || a.core.Load() != core {
+			return false
+		}
+		if a.eventsRequired.Load() && !a.eventsReady.Load() {
+			return false
+		}
 		d, err := a.Diagnostics(ctx)
 		return err == nil && d.AgentIngressEnabled
 	}}
 }
 func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
-	if err := a.runs.Flush(ctx); err != nil {
+	if err := a.Runs().Flush(ctx); err != nil {
 		return nil, err
 	}
 	d, err := a.store.Diagnostics(ctx)
@@ -396,14 +386,14 @@ func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
 
 func (a *App) Terminal() tui.Session {
 	return tui.Session{State: a, Models: a.Models(), Accounts: a.accounts, DecideApproval: a.DecideApproval,
-		Messages: a.TerminalHistory, Control: a.control, Actor: a.Actor(nil), Discover: a.Discover,
+		Messages: a.TerminalHistory, Control: a.control, CurrentActor: func() agent.Actor { return a.Actor(nil) }, AwaitRuntime: a.WaitForRuntime, Discover: a.Discover,
 		AccountCatalog: a.AccountCatalog, LoginEnvironment: a.LoginEnvironment}
 }
 
 // Relay runs infrastructure only. It never enables Agent ingress or a model.
 func (a *App) Relay(ctx context.Context, cfg config.Config) error {
-	return event.Relay(ctx, a.store.Events(), func(ctx context.Context) (event.EventBus, error) {
-		bus, err := eventnats.Open(ctx, cfg.NATS)
+	return event.Relay(ctx, a.configuredOutbox(cfg), func(ctx context.Context) (event.EventBus, error) {
+		bus, err := eventnats.OpenWithSecrets(ctx, cfg.NATS, a.control.Secrets)
 		if err != nil {
 			return nil, err
 		}
@@ -451,23 +441,23 @@ func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.Cata
 	return a.provider.CatalogAt(ctx, connection)
 }
 
-func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.runs.Activity(ctx) }
+func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.Runs().Activity(ctx) }
 
-func (a *App) Spend(ctx context.Context) ([]sqlite.SpendView, error) { return a.runs.Spend(ctx) }
+func (a *App) Spend(ctx context.Context) ([]sqlite.SpendView, error) { return a.Runs().Spend(ctx) }
 
 func (a *App) Approvals(ctx context.Context) ([]sqlite.ApprovalView, error) {
-	return a.runs.Approvals(ctx)
+	return a.Runs().Approvals(ctx)
 }
 func (a *App) DecideApproval(ctx context.Context, id, hash, decision string) error {
 	d, err := a.store.Diagnostics(ctx)
 	if err != nil {
 		return err
 	}
-	return a.runs.Decide(ctx, d.AgentID, id, hash, decision)
+	return a.Runs().Decide(ctx, d.AgentID, id, hash, decision)
 }
 func (a *App) ReconcileTools(ctx context.Context) ([]sqlite.ToolOutcome, error) {
-	if err := a.runs.ReconcileUnknown(ctx); err != nil {
+	if err := a.Runs().ReconcileUnknown(ctx); err != nil {
 		return nil, err
 	}
-	return a.runs.ToolOutcomes(ctx)
+	return a.Runs().ToolOutcomes(ctx)
 }

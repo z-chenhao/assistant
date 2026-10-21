@@ -1,5 +1,24 @@
 # Foundation feature map
 
+## Production operations (ERII-29)
+
+`python3 scripts/verify_operations.py --binary bin/personal-agent --evidence evidence/operations.json`
+owns isolated Launch, explicit provider/SecretStore Doctor, actual CLI Drive,
+hash/state/trace Evidence, and joined-process/disposable-root Cleanup.
+`make verify` runs five passes plus `verify_capacity.py` (three 1000-Child cycles in one state root); its event
+gate drives a real CLI/NATS/Sidecar lifecycle. See [operations](../docs/operations.md).
+
+| Feature | Boundary | Authoritative implementation | Evidence |
+| --- | --- | --- | --- |
+| Staged production startup and graceful close | TUI, `web serve`, `automation work` | `app.OpenRuntime`, atomic runtime publication, `WithEvents`, existing Actor/Delivery/Memory paths; interactive selection waits for runtime admission and TUI acquires the current Actor | `TestProductionLifecycleCLI`: real binary, Provider Fake, NATS and Sidecar handshake, ordered stages, broker outage/reconnect, committed Inbox, active work completion, SIGTERM without cancellation/lease leaks; real TUI/Web OAuth harnesses share `event_broker.py` and verify immediate first input after selection, without inserted sleeps |
+| Quiet poison isolation and developer alerts | `ops health/broker`, `ops retry-event ID ATTEMPTS` | Migration 026, existing Outbox publisher and Inbox; thin NATS adapter | Real authenticated NATS test: missing/wrong token refusal, durable content-free DLQ after threshold, good message before/after poison and restart; deterministic Outbox outage/non-transient distinction, no global head-of-line block, malformed envelope rejection, CAS requeue; local warning only |
+| Bounded broker policy and forward adoption | NATS config, `ops upgrade-broker` | SecretStore token resolution, TLS requirement, explicit validated Stream adoption | Remote plaintext/no-token refusal; changed bounds fail closed; old unbounded Stream upgrades with retained message; production lifecycle reuses durable consumer positions |
+| Operator diagnostics and shareable report | `ops health/report/trace RUN_ID` | Typed operator projection over existing RunTrace, scheduler and recovery ledgers; bounded multiprocess log rotation | CLI content/credential sentinel exclusion, correlated Run/Parent/Root and Tool IDs; counts/read-only state; Go concurrent rotation JSON and size bounds; no model Tool or user notification |
+| Encrypted cold backup and isolated restore | `ops backup/restore ARCHIVE KEY_REF`, explicit `ops activate` cutover | `maintenance`, shared/exclusive root lock, authenticated streaming archive, schema/hash/integrity/Artifact checks | Real held process blocks backup; SIGKILL releases lock; every restored file hash matches; Memory ciphertext/receipts and credential refs retained; frozen approval identity/hash preserved, denial recovers without an effect; wrong key, tamper/truncate/append, existing-target, symlink refusal; automatic cleanup |
+| Compatible upgrade and capacity | Startup preflight; existing batch fixture | All-DB version preflight, forward migrations, existing scheduler/breaker/account approval | Populated v25 accepted work/snapshot retention and one completion; partial DDL rollback; future Memory version blocks state migration; every-prior migrations; default 1000 Children completes 998 + two business failures, one aggregate blocker, no safety fuse/orphan; `measure_capacity.py` retains same-machine samples/noise for unchanged 100-item fairness/cancel/restart workload |
+
+Release model quality, semantic scores and live accounts remain separate claims.
+
 ## M6 personal journeys (ERII-26)
 
 `ERII_VERIFY_CASE_JOBS=4 make verify VERIFY_SHARD=personal VERIFY_JOBS=1` owns Launch/Doctor/Drive/Evidence/Cleanup for eleven exact M6 worlds × six wording/noise/order variants × five serial runs. See [M6 scope and proof limits](../docs/m6-evals.md). A focused case uses `scripts/run_m6_cases.py --binary bin/personal-agent --case GC-13 --evidence evidence/m6-booking.json`.
@@ -236,7 +255,7 @@ See [terminal operations and proof limits](../docs/tui-and-evals.md).
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
-| Fresh setup | Default launch on terminal or `tui` | `tui.Session`, existing `llm.Control` | Actual PTY discovery/manual URL or browser account setup → Probe → explicit selection → ready |
+| Fresh setup | Default launch on terminal or `tui` | `tui.Session`, existing `llm.Control`, `App.WaitForRuntime` | Actual PTY discovery/manual URL or browser account setup → Probe → explicit selection → owned NATS/runtime ready → immediate first Main message; shared `event_broker.py` owns handshake and joined cleanup |
 | Terminal conversation | Plain text, `/history` | `agent.Actor.Submit/Drain`, semantic Conversation | Actual Pi Main/Tool/reply for both paths; busy Steering enters one Main; no raw Tool trace |
 | Profile controls | `/models`, `/test ID`, `/select ID`, `/setup`, `/login [ID]`, `/logout ID` | Existing Model control plane and account Manager | Dynamic account IDs; versioned activation; logout/degraded gate; new Run model switch with old Snapshot retained |
 | Cancel and readiness | `/cancel`, Ctrl-C, SIGTERM, unavailable Bridge | `tui.Session`, `agent.EffectiveReadiness` | Fresh setup stays closed, active profile retained; login cancels without credentials; prompt input and executor joined; five consecutive runs |

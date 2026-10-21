@@ -16,8 +16,13 @@ type Broker struct {
 }
 
 func New(t testing.TB) *Broker {
+	return NewAuthenticated(t, "")
+}
+
+func NewAuthenticated(t testing.TB, token string) *Broker {
 	t.Helper()
 	b := &Broker{options: server.Options{Host: "127.0.0.1", Port: -1, JetStream: true, StoreDir: t.TempDir(), NoLog: true, NoSigs: true}}
+	b.options.Authorization = token
 	b.Start(t)
 	t.Cleanup(b.Stop)
 	return b
