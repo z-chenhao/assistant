@@ -257,6 +257,9 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		if _, err := tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, messageID, raw); err != nil {
 			return err
 		}
+		if err := freezeMessageRoute(ctx, tx, messageID, run.ID); err != nil {
+			return err
+		}
 		ready = true
 		return runEvent(ctx, tx, run.ID, "main_reply.prepared", 1)
 	})
@@ -289,6 +292,9 @@ func (r *Runs) DeliverReply(ctx context.Context, c agent.RunClaim, run agent.Run
 			return agent.ErrStorage
 		}
 		request := delivery.Request{DeliveryID: deliveryID, MessageID: messageID, ConversationID: run.ConversationID, Channel: "tui", DestinationRef: run.ConversationID, Intent: replyIntent(run), IdempotencyKey: deliveryID, CreatedAt: message.CreatedAt.UnixMicro()}
+		if err := applyMessageRoute(ctx, tx, &request); err != nil {
+			return err
+		}
 		if err := deliverysqlite.Enqueue(ctx, tx, request); err != nil {
 			return err
 		}

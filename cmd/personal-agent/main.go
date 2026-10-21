@@ -7,7 +7,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/z-chenhao/erii/internal/interaction/web"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -75,7 +77,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return nil
 	})
 	flags.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [tui|status|relay|automation manage REQUEST_KEY|automation list|automation tick|automation work|computer status|computer prepare-base CLEAN_STOPPED_VM|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
+		fmt.Fprintln(errOut, "Usage: personal-agent [-config path] [-test-bridge fixture] [web serve|channel manage|tui|status|relay|automation manage REQUEST_KEY|automation list|automation tick|automation work|computer status|computer prepare-base CLEAN_STOPPED_VM|delivery list|delivery work|memory manage REQUEST_KEY|memory work|memory status|skill manage|chat send [REQUEST_KEY]|chat send-parts [REQUEST_KEY]|artifact save NAME MEDIA_TYPE|artifact open REF|artifact describe REF|artifact delete REF VERSION|artifact cleanup [apply]|chat work|chat history|spend status|approval list|approval approve ID HASH|approval deny ID HASH|approval reconcile|model add [URL MODEL_ID [AUTH_ID]]|model discover URL [AUTH_ID]|model list|model catalog [PROFILE_ID]|model login [ENV_NAME]|model test ID|model select ID PROFILE_VERSION CONFIG_VERSION|model cancel]\nWithout a command, open the TUI on a terminal; with redirected stdin, print diagnostics and wait for SIGINT/SIGTERM.\nrelay runs the internal event publisher until stopped.\nmemory manage and skill manage read one control JSON object on stdin; memory work drains a bounded maintenance batch.\nchat send reads text on stdin and durably accepts it; chat work drains/reclaims Main work in the foreground; chat history reads semantic messages.\nmodel add reads metadata JSON; test proves capabilities; select atomically activates a tested version. model cancel leaves setup unchanged. ChatGPT: model login-chatgpt [ACCOUNT_ID], accounts, account-catalog ACCOUNT_ID, account-add ACCOUNT_ID MODEL_ID, refresh ACCOUNT_ID, logout ACCOUNT_ID. Login emits a private browser URL; open it to continue with ChatGPT.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -121,8 +123,10 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	memoryCommand := flags.Arg(0) == "memory" && ((flags.NArg() == 2 && (flags.Arg(1) == "work" || flags.Arg(1) == "status")) || (flags.NArg() == 3 && flags.Arg(1) == "manage"))
 	spendCommand := flags.NArg() == 2 && flags.Arg(0) == "spend" && flags.Arg(1) == "status"
 	computerCommand := flags.Arg(0) == "computer" && ((flags.NArg() == 2 && flags.Arg(1) == "status") || (flags.NArg() == 3 && flags.Arg(1) == "prepare-base"))
+	webCommand := flags.NArg() == 2 && flags.Arg(0) == "web" && flags.Arg(1) == "serve"
+	channelCommand := flags.NArg() == 2 && flags.Arg(0) == "channel" && flags.Arg(1) == "manage"
 	automationCommand := flags.Arg(0) == "automation" && ((flags.NArg() == 3 && flags.Arg(1) == "manage") || (flags.NArg() == 2 && (flags.Arg(1) == "list" || flags.Arg(1) == "tick" || flags.Arg(1) == "work")))
-	if !automationCommand && !computerCommand && !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
+	if !webCommand && !channelCommand && !automationCommand && !computerCommand && !skillCommand && !memoryCommand && !spendCommand && !deliveryCommand && !artifactCommand && !approvalCommand && !modelCommand && !chatCommand && !terminalCommand && (flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "status" && flags.Arg(0) != "relay")) {
 		return errors.New("expected status, relay, model add/list/catalog/test/select/cancel, or no command (see -help)")
 	}
 	var input llm.ProfileInput
@@ -235,8 +239,54 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 			}
 		})
 	}
-	if terminalCommand || flags.NArg() == 0 || chatCommand && flags.Arg(1) == "work" {
+	if webCommand || terminalCommand || flags.NArg() == 0 || chatCommand && flags.Arg(1) == "work" {
 		application.StartMemory(ctx)
+	}
+	if webCommand {
+		if cfg.Web == nil {
+			return errors.New("web configuration is required")
+		}
+		bindings, err := application.ChannelBindings(ctx)
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, b := range bindings {
+			if b.Channel == "web" && b.Subject == web.Subject && b.Destination == web.Destination {
+				found = true
+			}
+		}
+		if !found {
+			if _, err := application.BindChannel(ctx, "web", web.Subject, web.Destination, true, 0); err != nil {
+				return err
+			}
+		}
+		listener, err := net.Listen("tcp", cfg.Web.Listen)
+		if err != nil {
+			return errors.New("web listener unavailable")
+		}
+		defer listener.Close()
+		if err = json.NewEncoder(out).Encode(map[string]string{"url": "http://" + listener.Addr().String()}); err != nil {
+			return err
+		}
+		return application.ServeWeb(ctx, listener, *cfg.Web)
+	}
+	if channelCommand {
+		var q struct {
+			Op          string `json:"op"`
+			Channel     string `json:"channel"`
+			Subject     string `json:"subject"`
+			Destination string `json:"destination"`
+			Enabled     bool   `json:"enabled"`
+			Version     int64  `json:"version"`
+			BindingID   string `json:"binding_id"`
+		}
+		dec := json.NewDecoder(io.LimitReader(in, 64<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&q); err != nil {
+			return errors.New("invalid channel control request")
+		}
+		return application.ManageChannel(ctx, q.Op, q.Channel, q.Subject, q.Destination, q.Enabled, q.Version, q.BindingID, out)
 	}
 	if deliveryCommand {
 		if flags.Arg(1) == "work" {

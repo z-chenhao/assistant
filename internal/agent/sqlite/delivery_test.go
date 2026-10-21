@@ -482,4 +482,19 @@ func TestTerminalProjectionHidesUnsentAndRetainsPriorSentHistory(t *testing.T) {
 	if err != nil || len(projected) != 1 {
 		t.Fatal("cross-destination history", projected, err)
 	}
+	for _, channel := range []string{"web", "feishu"} {
+		requests[0].Channel = channel
+		requests[0].DestinationRef = "bound-remote-chat"
+		projected, err = adapter.History(ctx, service.Destination, messages, requests)
+		if err != nil || len(projected) != 2 {
+			t.Fatal("shared accepted channel history missing", channel, projected, err)
+		}
+		requests[0].ConversationID = "other-conversation"
+		projected, err = adapter.History(ctx, service.Destination, messages, requests)
+		if err != nil || len(projected) != 1 {
+			t.Fatal("other Conversation leaked", projected, err)
+		}
+		requests[0].ConversationID = service.Destination
+	}
+
 }

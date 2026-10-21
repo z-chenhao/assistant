@@ -396,6 +396,8 @@ Intelligent UI 采用 Delivery 层的声明式组件协议 `UISpec`：
 - Main Agent Loop 输出渠道无关的语义结果；Delivery Composer 根据语义内容、结构化数据和渠道能力生成 `UISpec`，Agent 不需要感知具体渠道。
 - 后续如需更自由的生成式界面，可增加 `builtin__ui__compose`，产出经过 Schema 校验和安全检查的 `UIArtifact`。
 
+Web/飞书身份绑定、回调规范化、UISpec v1 渲染、冻结路由与不确定投递恢复的实现及操作说明见 [渠道与交付](channels.md)。
+
 ### 4.3 Artifact 协议
 
 - 核心协议统一使用 `artifact_ref` 引用文件、图片、视频等产物。

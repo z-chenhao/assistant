@@ -27,6 +27,7 @@ import (
 	deliveryterminal "github.com/z-chenhao/erii/internal/delivery/terminal"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	"github.com/z-chenhao/erii/internal/interaction/feishu"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/account"
 	"github.com/z-chenhao/erii/internal/llm/bridge"
@@ -49,6 +50,7 @@ import (
 )
 
 type App struct {
+	feishu         *feishu.Client
 	computer       *macosvm.Provider
 	memoryCurator  *memory.Curator
 	memoryOnce     sync.Once
@@ -127,6 +129,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, err
 	}
 	a.deliveryPolicy = cfg.Delivery
+	if cfg.Feishu != nil {
+		a.feishu = &feishu.Client{Config: *cfg.Feishu, Secrets: secrets}
+	}
 	base := task.Registry()
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
 	defs = append(defs, automation.Definitions()...)

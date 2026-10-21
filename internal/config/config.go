@@ -18,6 +18,8 @@ import (
 	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	"github.com/z-chenhao/erii/internal/interaction/feishu"
+	"github.com/z-chenhao/erii/internal/interaction/web"
 	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/recall/embedding"
 	"github.com/z-chenhao/erii/internal/skill"
@@ -26,6 +28,8 @@ import (
 )
 
 type Config struct {
+	Web        *web.Config           `yaml:"web"`
+	Feishu     *feishu.Config        `yaml:"feishu"`
 	Computer   *macosvm.Config       `yaml:"computer"`
 	Context    contextbuilder.Policy `yaml:"context"`
 	Memory     *memory.Config        `yaml:"memory"`
@@ -155,6 +159,16 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if !cfg.Children.Valid() {
 		return Config{}, errors.New("invalid Child Run safety limits")
+	}
+	if cfg.Web != nil {
+		if err := cfg.Web.Validate(); err != nil {
+			return Config{}, err
+		}
+	}
+	if cfg.Feishu != nil {
+		if err := cfg.Feishu.Validate(); err != nil {
+			return Config{}, err
+		}
 	}
 	if cfg.Delivery.Validate() != nil {
 		return Config{}, errors.New("invalid delivery lease/retry/attempt policy")

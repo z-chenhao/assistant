@@ -39,6 +39,9 @@ func (r *Runs) notification(ctx context.Context, tx *sql.Tx, runID, id, intent, 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, id, raw); err != nil {
 		return err
 	}
+	if err = freezeMessageRoute(ctx, tx, id, runID); err != nil {
+		return err
+	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO notification_intent VALUES(?,?)`, id, intent)
 	return err
 }
@@ -69,7 +72,11 @@ func (r *Runs) enqueueNotifications(ctx context.Context, tx *sql.Tx) error {
 	}
 	for _, n := range items {
 		id := "delivery:" + n.m.MessageID
-		if err = deliverysqlite.Enqueue(ctx, tx, delivery.Request{DeliveryID: id, MessageID: n.m.MessageID, ConversationID: n.m.ConversationID, Channel: "tui", DestinationRef: n.m.ConversationID, Intent: n.intent, IdempotencyKey: id, CreatedAt: n.m.CreatedAt.UnixMicro()}); err != nil {
+		request := delivery.Request{DeliveryID: id, MessageID: n.m.MessageID, ConversationID: n.m.ConversationID, Channel: "tui", DestinationRef: n.m.ConversationID, Intent: n.intent, IdempotencyKey: id, CreatedAt: n.m.CreatedAt.UnixMicro()}
+		if err = applyMessageRoute(ctx, tx, &request); err != nil {
+			return err
+		}
+		if err = deliverysqlite.Enqueue(ctx, tx, request); err != nil {
 			return err
 		}
 	}

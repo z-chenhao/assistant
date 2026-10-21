@@ -56,7 +56,7 @@ class VerificationTests(unittest.TestCase):
             "verify.py": 1, "verify_local_provider.py": 1, "verify_account.py": 6,
             "verify_main.py": 1, "verify_tasks.py": 1, "verify_children.py": 5,
             "verify_scheduling.py": 5, "verify_spend.py": 5, "verify_task_control.py": 5,
-            "verify_tools.py": 5, "verify_artifacts.py": 5, "verify_delivery.py": 5,
+            "verify_tools.py": 5, "verify_artifacts.py": 5, "verify_delivery.py": 5, "verify_channels.py": 5,
             "verify_recall.py": 5,
             "verify_automation.py": 5,
             "verify_memory_maintenance.py": 5,
