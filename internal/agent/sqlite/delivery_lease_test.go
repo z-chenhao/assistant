@@ -57,6 +57,36 @@ func TestDeliveryRenewRejectsExpiredStaleAndTakenOverClaims(t *testing.T) {
 	}
 }
 
+type interruptedDeliveryClaim struct {
+	delivery.Store
+	afterClaim func()
+}
+
+func (s interruptedDeliveryClaim) Claim(ctx context.Context, channel, destination string, excluded []string, now time.Time, lease time.Duration) (delivery.Claim, error) {
+	c, err := s.Store.Claim(ctx, channel, destination, excluded, now, lease)
+	if err == nil {
+		s.afterClaim()
+	}
+	return c, err
+}
+
+func TestDeliveryExpiredBeforeTransportDoesNotSend(t *testing.T) {
+	s, service, adapter := terminalFixture(t)
+	service.Store = interruptedDeliveryClaim{Store: s.Deliveries(), afterClaim: func() {
+		// A scheduling pause can outlast the lease before the heartbeat starts.
+		if _, err := s.db.Exec(`UPDATE delivery_outbox SET claim_expires_at=0`); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	if err := service.Drain(context.Background()); err != nil {
+		t.Fatal("expired claim stopped consumer", err)
+	}
+	items, err := adapter.Messages(context.Background(), service.Destination)
+	if err != nil || len(items) != 0 {
+		t.Fatal("expired owner started transport", items, err)
+	}
+}
+
 type heldDelivery struct {
 	delivery.Adapter
 	query bool

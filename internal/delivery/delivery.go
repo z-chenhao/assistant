@@ -164,11 +164,16 @@ func (s Service) Drain(ctx context.Context) error {
 // multipart sends and settlement. Losing ownership cancels the transport and
 // leaves recovery to the current owner; it must not stop unrelated ingress.
 func (s Service) deliverClaim(ctx context.Context, c Claim) error {
+	lease := time.Duration(s.Policy.LeaseSeconds) * time.Second
+	// A scheduling pause or database wait may have consumed the initial lease.
+	// Validate the live fence before starting even a fast transport operation.
+	if err := s.Store.Renew(ctx, c, lease); err != nil {
+		return err
+	}
 	work, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan struct{})
 	renewed := make(chan error, 1)
-	lease := time.Duration(s.Policy.LeaseSeconds) * time.Second
 	go func() {
 		ticker := time.NewTicker(lease / 3)
 		defer ticker.Stop()
