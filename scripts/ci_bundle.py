@@ -16,7 +16,7 @@ import subprocess
 import tarfile
 import tempfile
 
-PAYLOAD = ('bin/personal-agent', 'provider-bridge/node_modules', 'runtime/javascript/node_modules', '.ci-go/host-cache')
+PAYLOAD = ('bin/erii', 'provider-bridge/node_modules', 'runtime/javascript/node_modules', '.ci-go/host-cache')
 META = 'ci-build.json'
 
 

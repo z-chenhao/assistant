@@ -68,6 +68,7 @@ SHARDS = {
     "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
+        Gate("startup", "verify_startup.py", "startup"),
         Gate("local-provider", "verify_local_provider.py", "local-provider"),
         Gate("account-initial", "verify_account.py", "account"),
         Gate("capabilities", "verify_capabilities.py", "capabilities", 5),
@@ -306,7 +307,7 @@ def main():
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
-    parser.add_argument("--binary", type=Path, default=Path("bin/personal-agent"))
+    parser.add_argument("--binary", type=Path, default=Path("bin/erii"))
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.codemode_part and args.shard != 'codemode':

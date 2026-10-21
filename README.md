@@ -1,44 +1,57 @@
 # Erii
-A durable Personal Agent named Erii with tools, memory, task delegation, and recoverable execution.
 
-The runnable foundation initializes SQLite and reports `setup_required`. It
-includes transactional Outbox/Inbox, CloudEvents, and an optional NATS relay.
-It connects local OpenAI-compatible models through a pinned Pi AI Node Bridge.
-The CLI supports discovery, manual model IDs, capability probes, and explicit
-activation, with optional Keychain/environment credentials. Deterministic
-fixtures remain available through explicit `-test-bridge` injection.
-ChatGPT account login, refresh, model discovery and logout are available through the CLI (see docs/provider-bridge.md). The terminal now supports setup, model controls and conversation through the same Main Agent Loop as `chat send`, `chat work` and `chat history`. See [terminal setup and M1 evals](docs/tui-and-evals.md) and [Main recovery](docs/main-loop.md). Tasks and Workers remain later slices.
+Erii is a personal agent with conversation, tools, memory, delegated tasks, and
+recoverable execution. Use it in the terminal or through the local Web interface.
 
-With Go 1.26.2+, Node 24.21.0, and Python 3.10+:
+## Install and start
+
+From a checkout, with **Go 1.26.2+** and **Node.js 24.21.0** installed:
 
 ```sh
-npm ci --prefix provider-bridge --ignore-scripts
-npm ci --prefix runtime/javascript --ignore-scripts
-npm ci --prefix guest-browser --ignore-scripts
-node guest-browser/node_modules/playwright-core/cli.js install chromium
-make build
-./bin/personal-agent -config config.example.yaml status
-./bin/personal-agent -config config.example.yaml
-# Ctrl-C stops the foreground process.
-# With a local JetStream broker, explicitly run the internal event publisher:
-./bin/personal-agent -config config.example.yaml relay
+./install.sh
+~/.local/bin/erii
 ```
 
+The installer builds Erii, installs its pinned model and JavaScript runtimes, and
+creates the `erii` command under `~/.local/bin`. It never edits your shell profile
+or selects a model. If that directory is on your `PATH`, just run `erii`.
+
+First launch guides you through a **local OpenAI-compatible model** or
+**Sign in with ChatGPT**. Erii starts its local event broker for you. Your data
+stays in `~/.local/share/erii`. Type `/quit` or press Ctrl-C to stop.
+
 ```sh
+erii doctor       # Check the installation without opening user databases
+erii status       # Read model/setup diagnostics
+erii start        # Explicit foreground launch
+```
+
+A native release archive includes the compiled application and both runtimes;
+unpack it and run its `install.sh` with Node installed. Release packaging is
+available to maintainers; no published release is required for source installation.
+See [installation and first conversation](docs/guides/getting-started.md) for
+requirements, upgrades, custom paths, and advanced configurations.
+
+## Develop
+
+```sh
+make setup         # Install all pinned development/test dependencies and Chromium
+make run           # Build and launch Erii
 make test
 make test-race
 make lint
 make verify
 ```
 
-See [local development and storage notes](docs/development.md) and the
-[verification feature map](scripts/FEATURES.md) for configuration, evidence,
-cleanup, and the precise limits of this slice.
+The frontend lives in [`web/`](web/README.md); Go HTTP handlers and embedded assets
+live in `internal/interaction/web/`. The product runs as one Go application with
+local Node sidecars. There is no separate frontend server to deploy.
 
-See [local provider setup](docs/provider-bridge.md#connect-a-local-model) for the actual model path.
+- [Documentation](docs/README.md) — setup, feature guides, architecture, operations
+- [Contributing](CONTRIBUTING.md) — layout, checks, releases, branch maintenance
+- [Verification feature map](scripts/FEATURES.md) — real entry points and evidence
+- [Technical baseline](docs/technical-design.md) — intended semantics and boundaries
 
-Task delegation, discovery, append and durable follow-up: [operations and limits](docs/tasks.md).
-
-Tool policy, frozen approvals, recovery and deterministic CLI evidence: [docs/tools.md](docs/tools.md).
-
-Guest CUA, leased surfaces and scoped browser transfer: [Computer Use](docs/computer-use.md).
+Offline tests prove deterministic behavior. Real model accounts, macOS Computer
+compatibility, and product-quality Golden Case scores require separate Live
+Shadow evidence; a green offline build does not establish those results.

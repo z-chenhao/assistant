@@ -39,7 +39,7 @@ class ImpactTests(unittest.TestCase):
                      'runtime/javascript/src/sidecar.mjs', 'evals/fixtures/new.json',
                      'docs/technical-design.md', 'docs/security.md', 'docs/replay.md',
                      'internal/agent/sqlite/migrations/001.sql', 'docs/schema.md',
-                     'docs/codemode.md', 'provider-bridge/package-lock.json', 'AGENTS.md',
+                     'docs/guides/codemode.md', 'provider-bridge/package-lock.json', 'AGENTS.md',
                      'new-module/removed.go', 'docs/../new', '/docs/file.md']:
             with self.subTest(path=path):
                 self.assertEqual(impact.select([path], self.manifest)['shards'], impact.ALL)
@@ -165,7 +165,7 @@ class BundleTests(unittest.TestCase):
 
     def test_traversal_and_symlink_escape_fail_even_with_matching_digest(self):
         for name, target in [('../escape', None), ('provider-bridge/node_modules/escape', '/tmp/escape'),
-                             ('bin/personal-agent', '/tmp/escape')]:
+                             ('bin/erii', '/tmp/escape')]:
             with self.subTest(name=name):
                 with tarfile.open(self.archive, 'w:gz') as archive:
                     entry = tarfile.TarInfo(name)

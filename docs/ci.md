@@ -7,6 +7,17 @@ Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
 There is no impact-based omission, early-feedback tier or duplicate shadow
 workflow. Every full gate runs for documentation changes too.
 
+The providers shard also requires the native installation/startup gate: source
+installation, archive installation, real PTY setup/chat, managed JetStream,
+SIGKILL/restart, reinstall and cleanup. It uses the already-populated npm cache
+offline and the original Host SDK, preserving the copied public SDK's immutability.
+Node is pinned in `.node-version`; frontend dependencies live under `web/`.
+
+The separate `Native packages` workflow runs only on manual invocation or version
+tags. It builds Linux/macOS native archives with the same installer, retains
+checksums, and creates an unpublished draft for tags. It neither replaces nor
+weakens `Ubuntu checks`. No release is published by an ordinary PR.
+
 ```mermaid
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
@@ -201,10 +212,10 @@ make test-race
 make verify
 make verify VERIFY_JOBS=1 VERIFY_EVIDENCE=evidence/serial
 make verify VERIFY_SHARD=codemode VERIFY_EVIDENCE=evidence/codemode
-python3 scripts/verify_suite.py --shard codemode --codemode-part GC-17 --binary bin/personal-agent --evidence evidence/parts/GC-17 --jobs 1
+python3 scripts/verify_suite.py --shard codemode --codemode-part GC-17 --binary bin/erii --evidence evidence/parts/GC-17 --jobs 1
 # Run the other four parts into their own folders, then require all five:
 python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence/joined
-python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --binary bin/personal-agent --evidence evidence/m6-parts/desktop-1 --jobs 1
+python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --binary bin/erii --evidence evidence/m6-parts/desktop-1 --jobs 1
 # Run the other six fixed parts in their own folders, then require all seven:
 python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'

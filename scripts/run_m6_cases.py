@@ -464,7 +464,7 @@ def run(binary,selected=None,destination=None,scenario_jobs=1,part=None):
                 binary_sha256=file_hash(binary),dataset_digest=digest(dataset),results=[],cleanup=False,scenario_jobs=scenario_jobs,part=part,
                 driver_digest=digest({name:file_hash(ROOT/name) for name in ('scripts/run_m6_cases.py','scripts/m6_desktop.py','scripts/m6_browser.mjs','scripts/m6_sources.py','scripts/verify_recall.py','guest-browser/readiness.mjs')}),
                 product_gate='inconclusive; semantic Judge and current L2 not run',
-                live_shadow=dict(lume='prior evidence: docs/computer-provider-l2-result.json',jianying='prior evidence: docs/computer-l2-result.json',current_run='not_run'),
+                live_shadow=dict(lume='prior evidence: docs/reports/computer-provider-l2-result.json',jianying='prior evidence: docs/reports/computer-l2-result.json',current_run='not_run'),
                 not_applicable=[],unverified=['Remaining M7 scheduled/channel journeys, semantic quality and current L2'],
                 coverage_extensions={'GC-02':'Four-turn journey and monthly Automation; mechanical assertions only'})
     artifact_root=None

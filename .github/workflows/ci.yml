@@ -112,7 +112,7 @@ jobs:
         if: ${{ matrix.shard == 'delivery' }}
         run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: CLI verification with timings
-        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard ${{ matrix.shard }} --jobs 1
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -150,7 +150,7 @@ jobs:
         if: matrix.m6part != 'context' && matrix.m6part != 'memory'
         run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: M6 part with five consecutive repetitions
-        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard personal --personal-part ${{ matrix.m6part }} --jobs 1
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard personal --personal-part ${{ matrix.m6part }} --jobs 1
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -218,7 +218,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
       - name: Code Mode part with five consecutive repetitions
-        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/personal-agent --evidence evidence --shard codemode --codemode-part ${{ matrix.part }} --jobs 1
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard codemode --codemode-part ${{ matrix.part }} --jobs 1
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor

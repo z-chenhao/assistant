@@ -83,6 +83,7 @@ class VerificationTests(unittest.TestCase):
     def test_pre_optimization_inventory_and_disjoint_evidence(self):
         expected = {
             "verify.py": 1, "verify_local_provider.py": 1, "verify_account.py": 6,
+            "verify_startup.py": 1,
             "verify_operations.py":5, "verify_capacity.py":1,
             "verify_main.py": 1, "verify_tasks.py": 1, "verify_children.py": 5,
             "verify_scheduling.py": 5, "verify_spend.py": 5, "verify_task_control.py": 5,

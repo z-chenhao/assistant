@@ -292,7 +292,7 @@ def verify_screenshot_projection(binary, script):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--binary", default="bin/personal-agent")
+    parser.add_argument("--binary", default="bin/erii")
     parser.add_argument("--evidence", default="evidence/local-provider.json")
     parser.add_argument('--gc11-driver-only',action='store_true')
     args = parser.parse_args()
