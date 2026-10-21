@@ -1,6 +1,7 @@
 // Explicit L1 browser peer. Fake Lume/SSH; real Chromium, DOM and production
 // Browser adapter. No model-supplied executable, script, CDP endpoint or path.
 import {chromium} from '../guest-browser/node_modules/playwright-core/index.mjs';
+import {waitForDevToolsPort} from './browser_readiness.mjs';
 import {createServer} from 'node:http';
 import {readFile,writeFile,mkdir,symlink,copyFile,realpath} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
@@ -18,7 +19,8 @@ const module=join(root,'playwright/index.mjs');
 for(const file of ['index.mjs','package.json'])await symlink(join(repository,'guest-browser/node_modules/playwright-core',file),join(root,'playwright',file));
 await copyFile(join(repository,'internal/computer/macosvm/transfer.py'),join(root,'playwright/erii-transfer.py'));
 const browser=await chromium.launchPersistentContext(join(root,'profile'),{headless:true,args:['--remote-debugging-address=127.0.0.1','--remote-debugging-port=0']});
-const port=Number((await readFile(join(root,'profile/DevToolsActivePort'),'utf8')).split('\n')[0]);
+let port;
+try{port=await waitForDevToolsPort(join(root,'profile'))}catch(error){await browser.close();throw error}
 const persist=()=>writeFile(join(root,'external-state.json'),JSON.stringify(state));
 await persist();
 const html=body=>'<!doctype html><meta charset="utf-8"><title>Erii M6 sandbox</title><style>body{font:18px system-ui;margin:40px}button,input{font:inherit;margin:12px;padding:8px}pre{white-space:pre-wrap}</style>'+body;

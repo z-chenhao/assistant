@@ -8,10 +8,18 @@
 | --- | --- | --- | --- |
 | Personal context and correction | `chat send/work`, `memory manage/work`, `builtin__memory__search` | Existing Main/Worker loop, memory mutation/Curator, separate Memory/Conversation stores and unified recall | GC-01/02/03/05/06/10 exact fixture inputs, scoped health/time/location data, real supersede/deletion and future context readback; exact finance computation; no unsolicited Tasks or external writes |
 | Travel continuation and steering | Main `task_manage(create/append/pause)` during a held Root read | Existing Task store and Root instruction boundary | GC-04 shared Recall/Main publication barriers and zero new Worker requests before publication; two existing Tasks, paused NZ, France new Root, concurrent steering before completion, immutable confirmed itineraries, booking groups and ETA Artifact |
-| Network and booking sandbox | Code Mode `cua.*` and delayed Playwright with actual Chromium pages | Existing ToolExecutor, frozen approvals, DesktopLease, production browser adapter; explicit Fake Lume/SSH peer | GC-07 observation/denied repair/four paths/one protocol; GC-13 exact final confirmation, denial, lost acknowledgement, `unknown`, read-only `order_781` reconciliation, one submission, unchanged frozen parameters |
+| Network and booking sandbox | Code Mode `cua.*` and delayed Playwright with actual Chromium pages | Existing ToolExecutor, frozen approvals, DesktopLease, production browser adapter; explicit Fake Lume/SSH peer | Bounded debugger-port publication Doctor (delayed/partial-file regression); GC-07 observation/denied repair/four paths/one protocol; GC-13 exact final confirmation, denial, lost acknowledgement, `unknown`, read-only `order_781` reconciliation, one submission, unchanged frozen parameters |
 | Multimodal source provenance | `chat send-parts` with images, Artifact save/open/describe/publish | Scoped image envelope; Fake validates actual JPEG pixels; immutable ArtifactStore | GC-15 real readable PNGs, pixel rectangles/hash/dimensions, masked return year null, openable `visa_check.md`; negative tamper/region/mask tests; optional actual Vision observations via `m6_sources.py` |
 | Mixed deliverables and desktop materials | Three Main-created Tasks → Root work → Main; scoped video Artifacts and browser CUA | Same Agent Loop and Task/Tool/Artifact/Computer path | GC-18 later confirmed notes, standalone technical design, exact 416/128/16 CSV summary, three valid videos decoded/organized in real browser; screenshot and original-byte readback |
 | Five-run result integrity | `make verify`, `m6_report.aggregate` | Locked fixtures, exact binary/variant/assertion inventories | `m6-cases-1…5.json`, `m6-summary.json`; CI `ci_personal.py` requires seven fixed parts and rejects missing/duplicate/failed/drifted input; retained CLI-opened files/screenshots under `m6-cases-N-assets/`; all children joined and disposable state removed; semantic/product scores remain null, current L2 unexecuted |
+
+Browser launch Doctor uses `scripts/browser_readiness.mjs` in both the real
+Browser contract test and M6 Computer journeys. The pipe handshake is not proof
+that Chromium published `DevToolsActivePort`. Delayed, missing, empty/invalid
+port files wait within the shared five-second Browser readiness budget;
+non-transient filesystem errors fail immediately. `guest-browser/test.mjs`
+reproduces delayed/partial publication and asserts timeout/error rejection.
+The M6 fifteen-second launch deadline and every product assertion remain intact.
 
 ## Computer Use (ERII-25)
 

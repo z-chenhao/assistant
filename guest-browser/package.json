@@ -8,6 +8,6 @@
   },
   "scripts": {
     "test": "node --test test.mjs",
-    "lint": "node --check test.mjs && node --check ../internal/computer/macosvm/browser.mjs"
+    "lint": "node --check test.mjs && node --check ../scripts/browser_readiness.mjs && node --check ../scripts/m6_browser.mjs && node --check ../internal/computer/macosvm/browser.mjs"
   }
 }
