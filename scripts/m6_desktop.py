@@ -42,7 +42,7 @@ def browser(folder,world):
             require(child.returncode==0,'browser cleanup failed: '+err)
         except Exception as error:
             if failure is None:raise
-            failure.add_note(str(error))
+            raise failure from error
 
 
 def drive(binary,folder,case,variant,artifact_folder=None):

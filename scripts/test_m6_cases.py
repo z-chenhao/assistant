@@ -32,7 +32,7 @@ class M6Cases(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError,'original drive failure' if primary else 'browser cleanup failed') as caught:
                         with browser(Path(temporary),{}):
                             if primary:raise RuntimeError('original drive failure')
-                if primary:self.assertIn('browser cleanup failed',str(caught.exception.__notes__))
+                if primary:self.assertIn('browser cleanup failed',str(caught.exception.__cause__))
                 self.assertIsNotNone(children[-1].poll())
                 self.assertTrue(children[-1].stdout.closed)
                 self.assertTrue(children[-1].stderr.closed)
