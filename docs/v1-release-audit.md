@@ -54,18 +54,37 @@ the nonzero completion boundary through the actual CLI.
 | All 20 semantic gates | `case_runner.py`, `core_report.py`, `m6_report.py` correctly leave semantic/product metrics null for scripted Fakes | Constrained Judge O/F/P/A/T/S/R/C, all cases ≥80, suite mean ≥85; pass@1/pass^5, variance and hard-failure priority |
 | Local/account comparison | Provider contracts use deterministic HTTP peers | Unscripted model runs with identical fixture/Context Builder/Capability/tools/limits and separately reported snapshots, quality, latency and resources |
 | Current L2 | `computer-provider-l2-result.json` and `computer-l2-result.json` are dated historical observations | Current real login, VM/CUA/Jianying/channel observations with time, model, failure class, inspectable artifacts and human review |
-| Dependency audit | 2026-10-21 `npm audit --prefix internal/interaction/web/client --json`: four high-severity entries in one build dependency chain | Assess and repair braces → micromatch → @parcel/watcher → @tailwindcss/cli; no force upgrade in this audit |
+| Web build dependency verification | A CLI-scoped watcher 2.6.0 override removes the braces/micromatch chain; clean install and full npm audit report zero findings, and the embedded-asset check produces identical bytes | Keep native build/UI verification; remove the override when a stable Tailwind CLI ships a safe watcher dependency and the same gates pass |
 
 GC-01/03–07/10/13/15/17–20 have stronger mechanical journeys, but that does
 not establish all normative assertions or product scores. At M7, missing
 whole-case portions are release gaps; an older `not_applicable` label cannot
 waive them. No scoring policy, fixture, hard assertion or baseline is relaxed.
 
-The dependency finding concerns the Tailwind CLI build chain, not proof of a
-runtime exploit in the embedded application. The registry report identifies
-`GHSA-vfj7-8cjw-p6xm` in braces. Establish actual exposure and a bounded fix
-before assigning a release disposition. The audit does not run a forced major
-upgrade or change dependency locks.
+The original four npm high entries came from one Tailwind CLI build chain.
+[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+affects braces through 3.0.3 with no patched release. Tailwind CLI 4.3.3 pins
+watcher 2.5.1; a normal transitive update cannot remove that chain. The scoped
+`@tailwindcss/cli` override selects published watcher 2.6.0, which uses picomatch
+instead of micromatch/braces. Upstream has already adopted 2.6.0 in
+[PR 20381](https://github.com/tailwindlabs/tailwindcss/pull/20381).
+Only the build dependency graph/lock changes; the pinned Tailwind compiler and
+runtime dependencies remain unchanged. `npm run check` verifies identical
+embedded JavaScript/CSS/licenses. Watcher and picomatch retain MIT licensing;
+detect-libc 2.x's Apache-2.0 license was already present through Lightning CSS.
+No canary, forced downgrade or new production dependency is introduced.
+
+Reproduce the dependency checks with:
+
+```sh
+npm ci --prefix internal/interaction/web/client --ignore-scripts
+npm audit --prefix internal/interaction/web/client --json
+npm run check --prefix internal/interaction/web/client
+```
+
+The audit is a dated registry observation; offline CI keeps deterministic
+installation, generated-asset freshness and real Web UI gates. A clean audit
+does not establish complete application security or current L2 acceptance.
 
 ## Existing system and recovery evidence
 
