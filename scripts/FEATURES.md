@@ -1,5 +1,16 @@
 # Foundation feature map
 
+## v1 release evidence inventory (ERII-30, incomplete)
+
+`python3 scripts/release_audit.py --evidence evidence/release-audit.json`
+indexes the frozen baseline/Golden source and checks candidate code/test/PR
+references. `make release-audit` deliberately exits 2 while release completion
+is inconclusive. See [scope, gaps and recovery evidence](../docs/v1-release-audit.md).
+
+| Feature | Boundary | Authoritative implementation | Evidence |
+| --- | --- | --- | --- |
+| Inspectable release inventory | Local operator CLI above | `release_audit.py`, `docs/v1-release-ledger.json` | Launch loads the ledger; Doctor validates source hashes and references; Drive inventories each source block; Evidence records original section/line/text/hash and pending disposition; Cleanup owns only the output under `evidence/`, with no product process/data. `test_release_audit.py` drives the same CLI and proves stale-report removal, source/ref rejection and nonzero completion status. No individual requirement, full Case, semantic/model-comparison or current L2 PASS is inferred. |
+
 ## Production operations (ERII-29)
 
 `python3 scripts/verify_operations.py --binary bin/personal-agent --evidence evidence/operations.json`

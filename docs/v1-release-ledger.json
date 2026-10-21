@@ -1,0 +1,1058 @@
+{
+  "version": 1,
+  "audited_base": "ae2dda0a420d24ffbf45553ee10dec67d2b05ead",
+  "sources": {
+    "docs/technical-design.md": {
+      "sha256": "7792e2b06de6e05799d64a017b26e4252b6f568c7c865e1a16c23c2fbe354d7c",
+      "sections": {
+        "0": "evaluation",
+        "1": "scope",
+        "2": "scope",
+        "2.1": "main",
+        "3": "tasks",
+        "3.4": "main",
+        "3.7": "loop",
+        "3.8": "prompts",
+        "3.11": "automation",
+        "4": "messages",
+        "4.2": "delivery",
+        "4.3": "artifact",
+        "5": "models",
+        "5.1": "setup",
+        "5.3": "local",
+        "5.4": "account",
+        "5.5": "bridge",
+        "6": "tools",
+        "6.2": "codemode",
+        "6.4": "loop",
+        "6.5": "loop",
+        "6.6": "children",
+        "6.6.4": "replay",
+        "6.6.5": "replay",
+        "6.6.6": "spend",
+        "6.6.9": "replay",
+        "7": "skill",
+        "8": "tools",
+        "9": "computer",
+        "9.5": "cua",
+        "9.6": "cua",
+        "10": "context",
+        "11": "memory",
+        "12": "events",
+        "13": "observability",
+        "14": "composition",
+        "15": "scope",
+        "16": "storage",
+        "16.4": "errors",
+        "16.5": "config",
+        "16.6": "operations",
+        "16.7": "composition",
+        "17": "evaluation",
+        "17.M0": "storage",
+        "17.M1": "main",
+        "17.M2": "tasks",
+        "17.M3": "tools",
+        "17.M4": "children",
+        "17.M5": "replay",
+        "17.M6": "computer",
+        "17.M7": "operations",
+        "18": "evaluation",
+        "19": "config"
+      }
+    },
+    "evals/golden-cases.md": {
+      "sha256": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f",
+      "sections": {
+        "1": "evaluation",
+        "2": "evaluation",
+        "3": "evaluation",
+        "4": "evaluation",
+        "5": "evaluation",
+        "6": "evaluation",
+        "7": "evaluation",
+        "8": "evaluation",
+        "9": "evaluation",
+        "10": "evaluation",
+        "11": "evaluation",
+        "12": "evaluation",
+        "13": "evaluation",
+        "14": "evaluation",
+        "15": "evaluation",
+        "16": "evaluation",
+        "7.GC-01": "memory",
+        "8.2": "memory",
+        "7.GC-02": "automation",
+        "8.3": "automation",
+        "7.GC-03": "memory",
+        "8.4": "memory",
+        "7.GC-04": "tasks",
+        "8.5": "tasks",
+        "7.GC-05": "memory",
+        "8.6": "memory",
+        "7.GC-06": "memory",
+        "8.7": "memory",
+        "7.GC-07": "cua",
+        "8.8": "cua",
+        "7.GC-08": "tasks",
+        "8.9": "tasks",
+        "7.GC-09": "main",
+        "8.10": "main",
+        "7.GC-10": "local",
+        "8.11": "local",
+        "7.GC-11": "tools",
+        "8.12": "tools",
+        "7.GC-12": "tools",
+        "8.13": "tools",
+        "7.GC-13": "cua",
+        "8.14": "cua",
+        "7.GC-14": "automation",
+        "8.15": "automation",
+        "7.GC-15": "artifact",
+        "8.16": "artifact",
+        "7.GC-16": "children",
+        "8.17": "children",
+        "7.GC-17": "replay",
+        "8.18": "replay",
+        "7.GC-18": "delivery",
+        "8.19": "delivery",
+        "7.GC-19": "evaluation",
+        "8.20": "evaluation",
+        "7.GC-20": "evaluation",
+        "8.21": "evaluation"
+      }
+    }
+  },
+  "areas": {
+    "scope": {
+      "code": [
+        "internal/agent/loop.go",
+        "internal/agent/actor.go"
+      ],
+      "tests": [
+        "internal/agent/loop_test.go"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "16"
+      ],
+      "evidence": [
+        "docs/main-loop.md",
+        "docs/tasks.md",
+        "docs/children.md"
+      ]
+    },
+    "main": {
+      "code": [
+        "internal/agent/actor.go",
+        "internal/agent/sqlite/runs.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation"
+      ],
+      "prs": [
+        "8",
+        "9"
+      ],
+      "evidence": [
+        "scripts/verify_main.py",
+        "scripts/verify_tui.py"
+      ]
+    },
+    "tasks": {
+      "code": [
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/task_control.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/task_control_test.go"
+      ],
+      "prs": [
+        "10",
+        "11"
+      ],
+      "evidence": [
+        "scripts/verify_tasks.py",
+        "scripts/verify_task_control.py",
+        "scripts/run_task_cases.py"
+      ]
+    },
+    "prompts": {
+      "code": [
+        "internal/agent/sqlite/runs.go",
+        "internal/agent/loop.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "16"
+      ],
+      "evidence": [
+        "docs/children.md",
+        "scripts/verify_children.py"
+      ]
+    },
+    "automation": {
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/automation/automation.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/automation_test.go"
+      ],
+      "prs": [
+        "28"
+      ],
+      "evidence": [
+        "scripts/verify_automation.py",
+        "docs/automation.md"
+      ]
+    },
+    "messages": {
+      "code": [
+        "internal/conversation/message.go",
+        "internal/conversation/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/conversation/sqlite/store_test.go#TestConversationOrderedIdempotentConcurrentAndRestart"
+      ],
+      "prs": [
+        "8",
+        "14"
+      ],
+      "evidence": [
+        "docs/main-loop.md",
+        "scripts/verify_delivery.py"
+      ]
+    },
+    "delivery": {
+      "code": [
+        "internal/agent/sqlite/delivery.go",
+        "internal/delivery/ui/spec.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/delivery_test.go",
+        "internal/agent/sqlite/channels_test.go"
+      ],
+      "prs": [
+        "14",
+        "29"
+      ],
+      "evidence": [
+        "scripts/verify_delivery.py",
+        "scripts/verify_channels.py",
+        "docs/channels.md"
+      ]
+    },
+    "artifact": {
+      "code": [
+        "internal/agent/sqlite/artifacts.go",
+        "internal/artifact/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/artifacts_test.go#TestArtifactTamperSymlinkAndTraversal"
+      ],
+      "prs": [
+        "13"
+      ],
+      "evidence": [
+        "scripts/verify_artifacts.py",
+        "docs/artifacts.md"
+      ]
+    },
+    "models": {
+      "code": [
+        "internal/llm/model.go",
+        "internal/llm/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestSnapshotImmutabilityFrozenValuesAndRollback"
+      ],
+      "prs": [
+        "3",
+        "5",
+        "6"
+      ],
+      "evidence": [
+        "scripts/verify.py",
+        "scripts/verify_local_provider.py"
+      ]
+    },
+    "setup": {
+      "code": [
+        "internal/tui/session.go",
+        "internal/llm/control.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/probe_cleanup_test.go"
+      ],
+      "prs": [
+        "6",
+        "7",
+        "9"
+      ],
+      "evidence": [
+        "scripts/verify_tui.py",
+        "scripts/verify_account.py"
+      ]
+    },
+    "local": {
+      "code": [
+        "internal/llm/sqlite/local.go",
+        "provider-bridge/bridge.mjs"
+      ],
+      "tests": [
+        "internal/agent/sqlite/local_provider_test.go",
+        "internal/llm/bridge/local_test.go"
+      ],
+      "prs": [
+        "6"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py",
+        "docs/provider-bridge.md"
+      ]
+    },
+    "account": {
+      "code": [
+        "internal/llm/account/manager.go",
+        "internal/llm/bridge/account.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/account_acceptance_test.go",
+        "internal/agent/sqlite/account_cancel_test.go"
+      ],
+      "prs": [
+        "7"
+      ],
+      "evidence": [
+        "scripts/verify_account.py",
+        "docs/adr/001-current-openai-account-auth.md"
+      ]
+    },
+    "bridge": {
+      "code": [
+        "internal/llm/bridge/client.go",
+        "provider-bridge/bridge.mjs"
+      ],
+      "tests": [
+        "internal/llm/bridge/events_test.go",
+        "internal/llm/bridge/transport_test.go"
+      ],
+      "prs": [
+        "5",
+        "6",
+        "7"
+      ],
+      "evidence": [
+        "docs/provider-bridge.md",
+        "scripts/verify_local_provider.py",
+        "scripts/verify_account.py"
+      ]
+    },
+    "tools": {
+      "code": [
+        "internal/tool/executor.go",
+        "internal/tool/schema.go",
+        "internal/tool/policy.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/tool_policy_test.go"
+      ],
+      "prs": [
+        "12"
+      ],
+      "evidence": [
+        "scripts/verify_tools.py",
+        "docs/tools.md"
+      ]
+    },
+    "codemode": {
+      "code": [
+        "internal/tool/codemode/sidecar.go",
+        "runtime/javascript/src/sidecar.mjs",
+        "runtime/javascript/src/prelude.mjs"
+      ],
+      "tests": [
+        "internal/tool/codemode/sidecar_test.go",
+        "runtime/javascript/test/sidecar.test.mjs"
+      ],
+      "prs": [
+        "18",
+        "20"
+      ],
+      "evidence": [
+        "scripts/verify_codemode.py",
+        "docs/codemode.md"
+      ]
+    },
+    "loop": {
+      "code": [
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/reporter.go"
+      ],
+      "tests": [
+        "internal/agent/loop_test.go",
+        "internal/agent/sqlite/tasks_test.go#TestTaskCustomMessageConversionFailsClosed"
+      ],
+      "prs": [
+        "8",
+        "10"
+      ],
+      "evidence": [
+        "scripts/verify_main.py",
+        "scripts/verify_tasks.py"
+      ]
+    },
+    "children": {
+      "code": [
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/scheduler.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/children_test.go",
+        "internal/agent/sqlite/scheduler_test.go"
+      ],
+      "prs": [
+        "16",
+        "17"
+      ],
+      "evidence": [
+        "scripts/verify_children.py",
+        "scripts/verify_scheduling.py",
+        "docs/children.md"
+      ]
+    },
+    "replay": {
+      "code": [
+        "internal/agent/sqlite/code_recovery.go",
+        "internal/agent/sqlite/codemode.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/code_recovery_test.go#TestCodeClaimWakeAndOldCallbackFencing",
+        "internal/agent/sqlite/code_recovery_test.go#TestCodeReplayFrozenRequestAndAtomicAdmission"
+      ],
+      "prs": [
+        "20",
+        "21"
+      ],
+      "evidence": [
+        "scripts/verify_code_recovery.py",
+        "scripts/run_core_cases.py"
+      ]
+    },
+    "spend": {
+      "code": [
+        "internal/agent/sqlite/spend.go",
+        "internal/agent/sqlite/scheduler.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/spend_test.go"
+      ],
+      "prs": [
+        "17"
+      ],
+      "evidence": [
+        "scripts/verify_spend.py",
+        "docs/adr/002-account-monetary-authorization.md"
+      ]
+    },
+    "skill": {
+      "code": [
+        "internal/skill/catalog.go",
+        "internal/agent/sqlite/experience.go"
+      ],
+      "tests": [
+        "internal/skill/catalog_test.go",
+        "internal/agent/sqlite/experience_test.go"
+      ],
+      "prs": [
+        "15",
+        "23"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py",
+        "scripts/verify_memory_maintenance.py"
+      ]
+    },
+    "computer": {
+      "code": [
+        "internal/computer/lifecycle.go",
+        "internal/computer/macosvm/provider.go",
+        "internal/agent/sqlite/computer.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/computer_test.go"
+      ],
+      "prs": [
+        "25"
+      ],
+      "evidence": [
+        "scripts/verify_computer.py",
+        "docs/computer-provider-l2-result.json"
+      ]
+    },
+    "cua": {
+      "code": [
+        "internal/computer/use.go",
+        "internal/agent/sqlite/computer_use.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/computer_use_test.go",
+        "internal/computer/use_test.go"
+      ],
+      "prs": [
+        "26"
+      ],
+      "evidence": [
+        "scripts/verify_computer_use.py",
+        "docs/computer-l2-result.json",
+        "docs/computer-use.md"
+      ]
+    },
+    "context": {
+      "code": [
+        "internal/context/compact.go",
+        "internal/agent/sqlite/compaction.go",
+        "internal/agent/sqlite/recall.go"
+      ],
+      "tests": [
+        "internal/context/compact_test.go",
+        "internal/agent/sqlite/recall_test.go"
+      ],
+      "prs": [
+        "22",
+        "23"
+      ],
+      "evidence": [
+        "scripts/verify_recall.py",
+        "docs/recall.md"
+      ]
+    },
+    "memory": {
+      "code": [
+        "internal/memory/sqlite/curator.go",
+        "internal/agent/sqlite/memory_control.go"
+      ],
+      "tests": [
+        "internal/memory/sqlite/curator_test.go",
+        "internal/agent/sqlite/memory_test.go"
+      ],
+      "prs": [
+        "22",
+        "23"
+      ],
+      "evidence": [
+        "scripts/verify_memory_maintenance.py",
+        "docs/adr/003-memory-forget-revokes-unfinished-context.md"
+      ]
+    },
+    "events": {
+      "code": [
+        "internal/event/nats/bus.go",
+        "internal/event/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/event/integration/crash_test.go",
+        "internal/event/sqlite/store_test.go"
+      ],
+      "prs": [
+        "2",
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify.py",
+        "docs/operations.md"
+      ]
+    },
+    "observability": {
+      "code": [
+        "internal/observability/rotation.go",
+        "internal/agent/sqlite/progress.go"
+      ],
+      "tests": [
+        "internal/observability/rotation_test.go",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify"
+      ],
+      "prs": [
+        "10",
+        "17",
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify_operations.py",
+        "docs/operations.md"
+      ]
+    },
+    "composition": {
+      "code": [
+        "cmd/personal-agent/main.go",
+        "internal/app/app.go"
+      ],
+      "tests": [
+        "internal/event/integration/production_test.go"
+      ],
+      "prs": [
+        "1",
+        "31"
+      ],
+      "evidence": [
+        "docs/development.md",
+        "docs/operations.md"
+      ]
+    },
+    "storage": {
+      "code": [
+        "internal/agent/sqlite/store.go",
+        "internal/agent/sqlite/fresh_schema.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/fresh_schema_test.go",
+        "internal/agent/sqlite/store_test.go"
+      ],
+      "prs": [
+        "1",
+        "2",
+        "24",
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify.py",
+        "scripts/verify_operations.py"
+      ]
+    },
+    "errors": {
+      "code": [
+        "internal/tool/executor.go",
+        "internal/tool/recovery.go"
+      ],
+      "tests": [
+        "internal/tool/executor_test.go",
+        "internal/agent/sqlite/tool_policy_test.go#TestToolTimeoutAndBusinessErrorsDoNotRetry"
+      ],
+      "prs": [
+        "12",
+        "18"
+      ],
+      "evidence": [
+        "docs/tools.md",
+        "scripts/verify_tools.py"
+      ]
+    },
+    "config": {
+      "code": [
+        "internal/config/config.go",
+        "internal/llm/secret/store.go"
+      ],
+      "tests": [
+        "internal/config/config_test.go",
+        "internal/llm/secret/store_test.go"
+      ],
+      "prs": [
+        "1",
+        "3",
+        "31"
+      ],
+      "evidence": [
+        "config.example.yaml",
+        "docs/operations.md"
+      ]
+    },
+    "operations": {
+      "code": [
+        "internal/maintenance/backup.go",
+        "internal/app/runtime.go"
+      ],
+      "tests": [
+        "internal/maintenance/backup_test.go",
+        "internal/event/integration/production_test.go"
+      ],
+      "prs": [
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify_operations.py",
+        "scripts/verify_capacity.py",
+        "docs/operations-capacity.json"
+      ]
+    },
+    "evaluation": {
+      "code": [
+        "scripts/case_runner.py",
+        "scripts/core_report.py",
+        "scripts/m6_report.py"
+      ],
+      "tests": [
+        "scripts/test_case_runner.py",
+        "scripts/test_core_cases.py",
+        "scripts/test_m6_cases.py"
+      ],
+      "prs": [
+        "9",
+        "21",
+        "27"
+      ],
+      "evidence": [
+        "docs/core-evals.md",
+        "docs/m6-evals.md",
+        "scripts/verify_suite.py"
+      ]
+    }
+  },
+  "merged_prs": {
+    "1": {
+      "title": "ERII-1: bootstrap runnable Go foundation",
+      "url": "https://github.com/z-chenhao/erii/pull/1",
+      "merged_at": "2026-10-15T14:32:21Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "f3ab9d06dc26abc737d5802313f71baf75d18a9e"
+    },
+    "2": {
+      "title": "ERII-2: transactional SQLite Outbox/Inbox and CloudEvents NATS foundation",
+      "url": "https://github.com/z-chenhao/erii/pull/2",
+      "merged_at": "2026-10-15T15:09:53Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "2222b584516dd04dcbddb29b04c1f6b28b75d8a6"
+    },
+    "3": {
+      "title": "ERII-5: persist model profiles, auth references, and immutable snapshots",
+      "url": "https://github.com/z-chenhao/erii/pull/3",
+      "merged_at": "2026-10-15T15:48:41Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "24ac6998fa92087743bfa089b22cda506a2ba2d6"
+    },
+    "5": {
+      "title": "ERII-6: add versioned Provider Bridge and deterministic model fixtures",
+      "url": "https://github.com/z-chenhao/erii/pull/5",
+      "merged_at": "2026-10-16T02:29:30Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "b4509e547c7c00848a8be063da79b580c7a73910"
+    },
+    "6": {
+      "title": "ERII-7: Connect pinned Pi Bridge to local OpenAI-compatible models",
+      "url": "https://github.com/z-chenhao/erii/pull/6",
+      "merged_at": "2026-10-16T04:55:04Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "c590939957efc15af78a448aa73c9ebd46fec5fa"
+    },
+    "7": {
+      "title": "ERII-8: Implement current OpenAI account login and credential lifecycle",
+      "url": "https://github.com/z-chenhao/erii/pull/7",
+      "merged_at": "2026-10-16T07:17:59Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "d39d5386018d1f9367cb3a30a92980887ccfdcb8"
+    },
+    "8": {
+      "title": "ERII-9: Run a durable Main Agent Loop with Conversation and Direct Tools",
+      "url": "https://github.com/z-chenhao/erii/pull/8",
+      "merged_at": "2026-10-16T08:41:11Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "3cc4ad94c99370b783f4ca796f2ef345b51f1a6f"
+    },
+    "9": {
+      "title": "ERII-10: ship terminal setup, conversation and the M1 Case Runner",
+      "url": "https://github.com/z-chenhao/erii/pull/9",
+      "merged_at": "2026-10-16T11:43:58Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "ab223ccc7c16267fd9bb73f25521c3d7b5ff35a9"
+    },
+    "10": {
+      "title": "ERII-11: delegate durable Tasks to Root Workers and deliver Main follow-ups",
+      "url": "https://github.com/z-chenhao/erii/pull/10",
+      "merged_at": "2026-10-16T13:11:12Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "f0bb7de33c7d4cee4dc0abb494fd1aeb8179f2ab"
+    },
+    "11": {
+      "title": "ERII-12: implement controlled Task pause, cancel and continuation",
+      "url": "https://github.com/z-chenhao/erii/pull/11",
+      "merged_at": "2026-10-16T14:32:58Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "7ba0c4b21546201f4a17a8aa02c0b322e4f5653f"
+    },
+    "12": {
+      "title": "ERII-13: enforce unified Tool policy and recover frozen approvals",
+      "url": "https://github.com/z-chenhao/erii/pull/12",
+      "merged_at": "2026-10-16T17:04:06Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "db1302017b44212d58ae7d478a2d194e81746da5"
+    },
+    "13": {
+      "title": "ERII-14: publish immutable scoped Artifacts with secure recovery",
+      "url": "https://github.com/z-chenhao/erii/pull/13",
+      "merged_at": "2026-10-16T20:02:41Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "c03a3311b243ce87fb14c0bda4f6994bb6bb32b6"
+    },
+    "14": {
+      "title": "ERII-15: deliver semantic replies through a recoverable Delivery Outbox",
+      "url": "https://github.com/z-chenhao/erii/pull/14",
+      "merged_at": "2026-10-16T21:50:28Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "be932f4c92637adc7337650fba86a9b5ba35407a"
+    },
+    "15": {
+      "title": "ERII-16: expose MCP, Skills and isolated coding through ToolExecutor",
+      "url": "https://github.com/z-chenhao/erii/pull/15",
+      "merged_at": "2026-10-17T00:53:37Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "d2c6677cee38a46fe22ce9803a6604696171adbe"
+    },
+    "16": {
+      "title": "ERII-17: admit bounded Child Runs through the canonical Agent Tool",
+      "url": "https://github.com/z-chenhao/erii/pull/16",
+      "merged_at": "2026-10-17T02:37:59Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "c2d441700863b54c704a25b4890e73b18485f3ed"
+    },
+    "17": {
+      "title": "ERII-18: authorize account spend once across fair Child batches",
+      "url": "https://github.com/z-chenhao/erii/pull/17",
+      "merged_at": "2026-10-17T07:06:27Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "e654f2ef751df9a706a6a837b01bcb399da9c442"
+    },
+    "18": {
+      "title": "ERII-19: run QuickJS Code Mode through unified ToolExecutor",
+      "url": "https://github.com/z-chenhao/erii/pull/18",
+      "merged_at": "2026-10-17T10:30:48Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "35869b199e37050efa97f5ee0adf8fc2e0c84066"
+    },
+    "20": {
+      "title": "ERII-20: recover fixed-source Code Mode with claims and wake fencing",
+      "url": "https://github.com/z-chenhao/erii/pull/20",
+      "merged_at": "2026-10-18T03:20:25Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "362037adfbb5d2b7284fc0248ce43c6a677511e4"
+    },
+    "21": {
+      "title": "ERII-21: gate exact Core cases with recovery and coding evidence",
+      "url": "https://github.com/z-chenhao/erii/pull/21",
+      "merged_at": "2026-10-18T06:21:15Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "db121dc96db6b64beace89b60cbfa06c92c96bc5"
+    },
+    "22": {
+      "title": "ERII-22: recall scoped Memory and Conversation with FTS5, vectors and RRF",
+      "url": "https://github.com/z-chenhao/erii/pull/22",
+      "merged_at": "2026-10-18T08:59:50Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "620ae2649e3044f8dc3e16d7e5168a791fbfaadf"
+    },
+    "23": {
+      "title": "ERII-23: curate Memory, revoke forgotten context, and verify Skill experience",
+      "url": "https://github.com/z-chenhao/erii/pull/23",
+      "merged_at": "2026-10-18T18:50:53Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "3c275f21f80b7612dff832b252998e171d09dd55"
+    },
+    "24": {
+      "title": "ERII-141: consolidate fresh schema and parallelize complete CI gates",
+      "url": "https://github.com/z-chenhao/erii/pull/24",
+      "merged_at": "2026-10-20T11:17:43Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "cbaed917545a67ac0648bf109ac291a8e9f0c31a"
+    },
+    "25": {
+      "title": "ERII-24: restore logical Computers through durable Lume checkpoints",
+      "url": "https://github.com/z-chenhao/erii/pull/25",
+      "merged_at": "2026-10-20T02:23:35Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "882de0f8c7126783d62d3bbd3fa4fe81c012b058"
+    },
+    "26": {
+      "title": "ERII-25: operate Guest CUA and Playwright with fenced observations and scoped transfer",
+      "url": "https://github.com/z-chenhao/erii/pull/26",
+      "merged_at": "2026-10-20T08:09:59Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "03ef68d4ebb014d13e6a894c235ba72ef42f796a"
+    },
+    "27": {
+      "title": "ERII-26: verify M6 personal and Computer journeys",
+      "url": "https://github.com/z-chenhao/erii/pull/27",
+      "merged_at": "2026-10-20T13:06:13Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "e54ba4074bcd05a5ef839053a8bfaf2e96afddd9"
+    },
+    "28": {
+      "title": "ERII-27: Execute timezone-aware Automation through Actor and Run claims",
+      "url": "https://github.com/z-chenhao/erii/pull/28",
+      "merged_at": "2026-10-21T00:59:51Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "0a5a64eec350705ccb7215d1659aaeec3abde5b8"
+    },
+    "29": {
+      "title": "ERII-28: Unify Web and Feishu interaction with safe UISpec delivery",
+      "url": "https://github.com/z-chenhao/erii/pull/29",
+      "merged_at": "2026-10-21T04:56:02Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "6a4dd3d3c3a4ec4cb883e9a77f51b42e74577850"
+    },
+    "31": {
+      "title": "ERII-29: harden production recovery, DLQ and encrypted backups",
+      "url": "https://github.com/z-chenhao/erii/pull/31",
+      "merged_at": "2026-10-21T08:15:39Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "ae2dda0a420d24ffbf45553ee10dec67d2b05ead"
+    }
+  },
+  "golden_cases": {
+    "GC-01": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-02": {
+      "area": "automation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Monthly review scheduling is tested separately; the personal journey still omits Turn 4."
+    },
+    "GC-03": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-04": {
+      "area": "tasks",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-05": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-06": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-07": {
+      "area": "cua",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-08": {
+      "area": "tasks",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "No exact wedding C1/C2/C3 + 128 guests + hotel draft journey."
+    },
+    "GC-09": {
+      "area": "main",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Main agenda and Web transport fragments; no complete M7 case record."
+    },
+    "GC-10": {
+      "area": "local",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-11": {
+      "area": "tools",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Three-quote Tool fragment; no complete two-turn decision journey."
+    },
+    "GC-12": {
+      "area": "tools",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Approval/channel fragments; no complete exact Alex/Tuesday email AND calendar journey."
+    },
+    "GC-13": {
+      "area": "cua",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-14": {
+      "area": "automation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Exact prices/thresholds run, but no complete case variants and semantic evaluation."
+    },
+    "GC-15": {
+      "area": "artifact",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-16": {
+      "area": "children",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Child isolation/aggregation fragment; no D1-D5 primary-source research journey."
+    },
+    "GC-17": {
+      "area": "replay",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-18": {
+      "area": "delivery",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-19": {
+      "area": "evaluation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-20": {
+      "area": "evaluation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    }
+  },
+  "gaps": [
+    {
+      "id": "G1",
+      "kind": "implementation",
+      "detail": "Complete missing exact whole-case journeys and all normative variants; request parent ledger split before dispatch."
+    },
+    {
+      "id": "G2",
+      "kind": "audit",
+      "detail": "Individually review every source unit against exact assertions, including mandatory subclauses. A section-level candidate map is not conformance proof."
+    },
+    {
+      "id": "G3",
+      "kind": "model_evaluation",
+      "detail": "Run unscripted local/account models under identical fixtures/Context/Capability/tools/limits; constrained Judge for O/F/P/A/T/S/R/C, all 20 >=80, mean >=85, protected cases five passes."
+    },
+    {
+      "id": "G4",
+      "kind": "live_shadow",
+      "detail": "Current real login, macOS/CUA/Jianying and channel observations, model/time/failure class and human review; historical L2 does not substitute."
+    },
+    {
+      "id": "G5",
+      "kind": "dependency_audit",
+      "detail": "2026-10-21 npm audit reports high-severity braces through micromatch/@parcel/watcher/@tailwindcss/cli in the Web build toolchain. Confirm exposure and repair through a scoped dependency change; no automatic force upgrade."
+    },
+    {
+      "id": "G6",
+      "kind": "acceptance",
+      "detail": "Exact-SHA Erii Verifier PASS, green CI, final program ledger/recovery report, and human acceptance are still required. Keep ERII-4 in_progress."
+    }
+  ]
+}
