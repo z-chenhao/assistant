@@ -1,5 +1,6 @@
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 
 from check_docs import ROOT, broken_links
@@ -34,3 +35,17 @@ class ProjectLayoutTests(unittest.TestCase):
         self.assertIn('--verify-tag', workflow)
         self.assertNotIn('pull_request:', workflow)
         self.assertIn('node-version-file: .node-version', workflow)
+
+    def test_startup_owns_node_compile_cache_and_temporary_files(self):
+        from verify_startup import install_environment
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp)
+            root = parent / 'owned'
+            root.mkdir()
+            env = install_environment(root)
+            subprocess.run(['node', '-e', "require('node:module').enableCompileCache(); require('node:fs')"],
+                           env=env, check=True, capture_output=True)
+            subprocess.run(['npm', '--version'], env=env, check=True, capture_output=True)
+            self.assertEqual(list(parent.iterdir()), [root], 'Node/npm left cache outside its fixture')
+            self.assertEqual(Path(env['TMPDIR']).parent, root)
+            self.assertEqual(Path(env['NODE_COMPILE_CACHE']).parent, root)

@@ -30,18 +30,28 @@ class StartupHarness(MainHarness):
         return [str(self.binary), *args]
 
 
+def install_environment(root):
+    env = {k: v for k, v in os.environ.items() if not k.startswith('ERII_')}
+    # npm enables Node's compile cache. Keep that cache and every subprocess
+    # scratch file under this fixture, never beside it in the CI tmpfs root.
+    temporary = root / 'temporary'
+    temporary.mkdir()
+    env.update(TMPDIR=str(temporary), NODE_COMPILE_CACHE=str(root / 'node-compile-cache'),
+               npm_config_offline='true')
+    # CI's copied public SDK is immutable. Product builds use its original
+    # Host SDK, as in ci-inputs; do not populate the fixture SDK's archives.
+    base_sdk = os.environ.get('ERII_CI_BASE_GOROOT')
+    if base_sdk:
+        env['GOROOT'] = base_sdk
+        env['PATH'] = str(Path(base_sdk) / 'bin') + os.pathsep + env['PATH']
+    return env
+
+
 def verify_install():
     report = dict(version=1, checks=[], live_model='not_run')
     with tempfile.TemporaryDirectory(prefix='erii-start-') as tmp:
         root = Path(tmp)
-        env = {k: v for k, v in os.environ.items() if not k.startswith('ERII_')}
-        env['npm_config_offline'] = 'true'
-        # CI's copied public SDK is immutable. Product builds use its original
-        # Host SDK, as in ci-inputs; do not populate the fixture SDK's archives.
-        base_sdk = os.environ.get('ERII_CI_BASE_GOROOT')
-        if base_sdk:
-            env['GOROOT'] = base_sdk
-            env['PATH'] = str(Path(base_sdk) / 'bin') + os.pathsep + env['PATH']
+        env = install_environment(root)
         def run(*args):
             result = owned_run(args, cwd=ROOT, env=env, text=True,
                                     capture_output=True, timeout=120)
@@ -62,6 +72,7 @@ def verify_install():
         folder = root / 'workspace'
         folder.mkdir()
         h = StartupHarness(binary, folder)
+        h.env.update(TMPDIR=env['TMPDIR'], NODE_COMPILE_CACHE=env['NODE_COMPILE_CACHE'])
         diagnosed = h.command('doctor', ok=False)
         report['doctor'] = diagnosed.stdout
         require(diagnosed.returncode == 0 and 'FAIL' not in report['doctor'], 'installed doctor failed')
