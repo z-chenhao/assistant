@@ -268,6 +268,17 @@ func (u *terminal) report(err error) {
 		u.print("Provider Bridge is not configured. Check the connection settings.")
 		return
 	}
+	var probe *llm.ProbeError
+	if errors.As(err, &probe) {
+		// ProbeError contains fixed Host stage names and normalized codes only.
+		u.print("Connection test failed: " + probe.Error())
+		if probe.Timeout > 0 {
+			u.print("The model did not finish this check in time. Check server load and model readiness, then retry explicitly.")
+		} else if errors.Is(err, llm.ModelIncompatible) {
+			u.print("This model must support streaming, Tool calls and Tool results. Check the server's API and chat template.")
+		}
+		return
+	}
 	// Do not render arbitrary error strings, HTTP bodies, endpoints or input.
 	for _, known := range []error{llm.AuthRequired, llm.ModelIncompatible, llm.ProviderUnavailable, llm.RateLimited, llm.GenerationCancelled, llm.ErrConflict, llm.ErrUnverified, llm.ErrSecretStore, llm.ErrSecretCleanup} {
 		if errors.Is(err, known) {
@@ -371,9 +382,10 @@ func (u *terminal) command(ctx context.Context, line string) error {
 		}
 		return nil
 	case len(args) == 2 && args[0] == "/test":
-		_, err := u.Control.Test(ctx, args[1])
+		err := u.testModel(ctx, args[1])
 		if err == nil {
 			u.print("Probe passed.")
+			u.print("Activate with /select " + args[1])
 		}
 		return err
 	case len(args) == 2 && args[0] == "/select":
@@ -429,6 +441,7 @@ func (u *terminal) selectModel(ctx context.Context, id string) error {
 }
 func (u *terminal) setup(ctx context.Context) error {
 	u.print("Choose model connection\n  1. Local / OpenAI-compatible endpoint\n  2. OpenAI — Sign in with ChatGPT")
+	u.print("Local endpoints do not require ChatGPT login. Use /cancel to leave setup.")
 	choice, err := u.ask(ctx, "Connection [1/2]")
 	if err != nil {
 		return err
@@ -478,10 +491,7 @@ func (u *terminal) setup(ctx context.Context) error {
 	default:
 		return cancelled
 	}
-	for _, m := range catalog {
-		u.print("Model: " + m.ModelID)
-	}
-	p.ModelID, err = u.ask(ctx, "Model ID")
+	p.ModelID, err = u.chooseModel(ctx, catalog, p.ProviderKind == "openai_compatible")
 	if err != nil {
 		return err
 	}
@@ -504,17 +514,27 @@ func (u *terminal) setup(ctx context.Context) error {
 		for _, setting := range []struct {
 			name  string
 			value *int64
-		}{{"Context tokens", &p.ContextWindow}, {"Max output tokens", &p.MaxOutputTokens}} {
-			text, err := u.ask(ctx, fmt.Sprintf("%s [%d]", setting.name, *setting.value))
-			if err != nil {
-				return err
+			max   int64
+		}{{"Context tokens", &p.ContextWindow, 1048576}, {"Max output tokens", &p.MaxOutputTokens, 65536}} {
+			max := setting.max
+			if setting.value == &p.MaxOutputTokens {
+				max = min(max, p.ContextWindow)
 			}
-			if text != "" {
-				n, err := strconv.ParseInt(text, 10, 64)
+			for {
+				text, err := u.ask(ctx, fmt.Sprintf("%s [%d]", setting.name, min(*setting.value, max)))
 				if err != nil {
-					return llm.ModelIncompatible
+					return err
+				}
+				if text == "" {
+					text = strconv.FormatInt(min(*setting.value, max), 10)
+				}
+				n, err := strconv.ParseInt(text, 10, 64)
+				if err != nil || n < 1 || n > max {
+					u.print(fmt.Sprintf("Enter a whole number from 1 to %d.", max))
+					continue
 				}
 				*setting.value = n
+				break
 			}
 		}
 	}
@@ -525,10 +545,57 @@ func (u *terminal) setup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	u.print("Testing connection and Agent capabilities…")
-	if _, err = u.Control.Test(ctx, profile.ProfileID); err != nil {
+	u.print("Profile saved: " + profile.ProfileID)
+	if err = u.testModel(ctx, profile.ProfileID); err != nil {
 		return err
 	}
 	u.print("Probe passed: text, streaming, Tool calls, continuation, cancellation and clipping. Additional modalities and reasoning settings are unverified.")
 	return u.selectModel(ctx, profile.ProfileID)
+}
+
+func (u *terminal) testModel(ctx context.Context, id string) error {
+	u.print("Testing connection and Agent capabilities… Each check allows up to 2 minutes; cold local models may need time to load. Ctrl-C exits.")
+	_, err := u.Control.TestWithProgress(ctx, id, func(stage llm.ProbeStage) {
+		u.print("Checking " + stage.String() + "…")
+	})
+	if err != nil && ctx.Err() == nil {
+		u.report(err)
+		u.print("Profile retained. Retry with /test " + id + "; after it passes, use /select " + id + ". Use /setup to change settings.")
+		// The failure was rendered here with the profile's recovery commands.
+		return cancelledTest
+	}
+	return err
+}
+
+var cancelledTest = errors.New("connection test failure reported")
+
+func (u *terminal) chooseModel(ctx context.Context, catalog []llm.CatalogModel, manual bool) (string, error) {
+	for i, model := range catalog {
+		u.print(fmt.Sprintf("  %d. Model: %s", i+1, model.ModelID))
+	}
+	prompt := "Model ID or number"
+	if len(catalog) == 1 {
+		prompt += " [Enter for " + plain(catalog[0].ModelID) + "]"
+	}
+	for {
+		value, err := u.ask(ctx, prompt)
+		if err != nil {
+			return "", err
+		}
+		if value == "" && len(catalog) == 1 {
+			return catalog[0].ModelID, nil
+		}
+		for _, model := range catalog {
+			if value == model.ModelID {
+				return value, nil
+			}
+		}
+		if n, err := strconv.Atoi(value); err == nil && n >= 1 && n <= len(catalog) {
+			return catalog[n-1].ModelID, nil
+		}
+		if manual && value != "" {
+			return value, nil
+		}
+		u.print("Choose a listed model by number or ID.")
+	}
 }
