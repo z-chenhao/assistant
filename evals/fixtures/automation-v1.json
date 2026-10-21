@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "GC-02": {"clock":"2026-10-25T21:00:00+08:00","cron":"0 20 * * 0L","timezone":"Asia/Shanghai","first_fire":"2026-11-29T20:00:00+08:00"},
+  "GC-14": {"clock":"2026-10-15T12:00:00+08:00","route":"HKG-CDG","date":"2026-12-01","cron":"0 8 * * *","timezone":"Asia/Shanghai","below":1800,"prices":{"2026-10-16":2200,"2026-10-17":2190,"2026-10-18":1750,"2026-10-19":1740,"2026-10-20":2050,"2026-10-21":1780},"notify_dates":["2026-10-18","2026-10-21"]},
+  "missed_policy":"One persisted original due occurrence per scan; cron next_fire advances strictly past scan time. Pending occurrences execute in order, one live Root per ongoing Task.",
+  "dst_policy":"Skip nonexistent local minutes; fire both UTC occurrences of repeated local minutes."
+}

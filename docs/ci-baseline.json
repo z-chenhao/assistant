@@ -1,0 +1,476 @@
+{
+  "version": 1,
+  "collected_at": "2026-10-18",
+  "history": {
+    "distinct_shas": 30,
+    "by_conclusion": {
+      "cancelled": {
+        "wall_seconds": {
+          "samples": 11,
+          "p50": 952.0,
+          "p95": 2810.0,
+          "variance": 735845.4181818182
+        },
+        "runner_minutes": {
+          "samples": 11,
+          "p50": 26.416666666666668,
+          "p95": 98.31666666666666,
+          "variance": 1027.8704646464646
+        },
+        "successor_creation_to_stop_seconds": {
+          "samples": 9,
+          "p50": 74.0,
+          "p95": 431.0,
+          "variance": 14474.694444444445
+        }
+      },
+      "failure": {
+        "wall_seconds": {
+          "samples": 4,
+          "p50": 776.5,
+          "p95": 1404.0,
+          "variance": 130637.58333333333
+        },
+        "runner_minutes": {
+          "samples": 4,
+          "p50": 39.78333333333333,
+          "p95": 68.73333333333333,
+          "variance": 759.6424074074074
+        },
+        "successor_creation_to_stop_seconds": {
+          "samples": 0,
+          "p50": null,
+          "p95": null,
+          "variance": null
+        }
+      },
+      "success": {
+        "wall_seconds": {
+          "samples": 15,
+          "p50": 2616.0,
+          "p95": 3014.0,
+          "variance": 1033011.1238095238
+        },
+        "runner_minutes": {
+          "samples": 15,
+          "p50": 53.7,
+          "p95": 106.05,
+          "variance": 550.3906534391534
+        },
+        "successor_creation_to_stop_seconds": {
+          "samples": 0,
+          "p50": null,
+          "p95": null,
+          "variance": null
+        }
+      }
+    },
+    "runs": [
+      {
+        "run_id": 39122438238,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39122438238",
+        "source_sha": "cf68c08dfe63364d4074abf18f0e61bec5c2a8b5",
+        "conclusion": "success",
+        "wall_seconds": 2800.0,
+        "runner_minutes": 90.93333333333334,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39113587233,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39113587233",
+        "source_sha": "620ae2649e3044f8dc3e16d7e5168a791fbfaadf",
+        "conclusion": "failure",
+        "wall_seconds": 850.0,
+        "runner_minutes": 68.73333333333333,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39109951741,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39109951741",
+        "source_sha": "35a76748730a517bd031be08336550899b4027be",
+        "conclusion": "success",
+        "wall_seconds": 2564.0,
+        "runner_minutes": 94.11666666666666,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39105549707,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39105549707",
+        "source_sha": "4f15f0623698ea8d8b14227bb2b1cb7647a8debf",
+        "conclusion": "success",
+        "wall_seconds": 3014.0,
+        "runner_minutes": 106.05,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39103736442,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39103736442",
+        "source_sha": "db121dc96db6b64beace89b60cbfa06c92c96bc5",
+        "conclusion": "success",
+        "wall_seconds": 2742.0,
+        "runner_minutes": 98.23333333333333,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39100756132,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39100756132",
+        "source_sha": "587be72f25f7e04ad1b80c15d9adce5abeea64cd",
+        "conclusion": "success",
+        "wall_seconds": 2616.0,
+        "runner_minutes": 98.81666666666666,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39097943722,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39097943722",
+        "source_sha": "d55e660217ba03433d02452d7cbb6cf7d0fc9ee2",
+        "conclusion": "cancelled",
+        "wall_seconds": 2810.0,
+        "runner_minutes": 98.31666666666666,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39096115806,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39096115806",
+        "source_sha": "97b10176e0c6abd59aee7f86c271139bd825fda3",
+        "conclusion": "cancelled",
+        "wall_seconds": 1977.0,
+        "runner_minutes": 85.38333333333334,
+        "successor_creation_to_stop_seconds": 81.0
+      },
+      {
+        "run_id": 39095272480,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39095272480",
+        "source_sha": "18ebc4d3f7e7d72fdc5c2071767621c43181c6fb",
+        "conclusion": "cancelled",
+        "wall_seconds": 952.0,
+        "runner_minutes": 67.9,
+        "successor_creation_to_stop_seconds": 72.0
+      },
+      {
+        "run_id": 39095130348,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39095130348",
+        "source_sha": "510d19b96496c6549a5197ae3484b643b893aaf4",
+        "conclusion": "cancelled",
+        "wall_seconds": 250.0,
+        "runner_minutes": 26.416666666666668,
+        "successor_creation_to_stop_seconds": 97.0
+      },
+      {
+        "run_id": 39093271298,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39093271298",
+        "source_sha": "362037adfbb5d2b7284fc0248ce43c6a677511e4",
+        "conclusion": "failure",
+        "wall_seconds": 703.0,
+        "runner_minutes": 56.21666666666667,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39092139469,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39092139469",
+        "source_sha": "7f5d95878cb1c04abf9ff6bb0e45a109af5bea61",
+        "conclusion": "success",
+        "wall_seconds": 681.0,
+        "runner_minutes": 53.46666666666667,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39031329562,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39031329562",
+        "source_sha": "6e1460d6e31fa50a5785d557d3771a7b747b1798",
+        "conclusion": "success",
+        "wall_seconds": 699.0,
+        "runner_minutes": 55.06666666666667,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39030920546,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39030920546",
+        "source_sha": "5679ac022df20c26ed00f86a7b7c1eafc493378b",
+        "conclusion": "success",
+        "wall_seconds": 748.0,
+        "runner_minutes": 56.15,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39027845512,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39027845512",
+        "source_sha": "d2d0c8453d3570e5bceab4afc5cee8ddcad12960",
+        "conclusion": "success",
+        "wall_seconds": 744.0,
+        "runner_minutes": 53.7,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39026881721,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39026881721",
+        "source_sha": "596e3bec7a9c96fe6c91a4770967b2a3898246a5",
+        "conclusion": "success",
+        "wall_seconds": 778.0,
+        "runner_minutes": 52.3,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39026452841,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39026452841",
+        "source_sha": "b7abb2e8fc963527ee4f9a1626c56a9c9205ec55",
+        "conclusion": "cancelled",
+        "wall_seconds": 483.0,
+        "runner_minutes": 36.4,
+        "successor_creation_to_stop_seconds": 61.0
+      },
+      {
+        "run_id": 39026433238,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39026433238",
+        "source_sha": "ac26b25db0ba010d0bbabd1fe3bd86c6c75ce868",
+        "conclusion": "cancelled",
+        "wall_seconds": 100.0,
+        "runner_minutes": 10.683333333333334,
+        "successor_creation_to_stop_seconds": 81.0
+      },
+      {
+        "run_id": 39025180805,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39025180805",
+        "source_sha": "35869b199e37050efa97f5ee0adf8fc2e0c84066",
+        "conclusion": "success",
+        "wall_seconds": 2980.0,
+        "runner_minutes": 49.63333333333333,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39024984075,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39024984075",
+        "source_sha": "891d4a3efa3102bc92a528254f40365dd5dd3c6b",
+        "conclusion": "cancelled",
+        "wall_seconds": 467.0,
+        "runner_minutes": 7.75,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39021583185,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39021583185",
+        "source_sha": "4d2f528d998864fc315c85a63512909333588c66",
+        "conclusion": "success",
+        "wall_seconds": 3006.0,
+        "runner_minutes": 50.06666666666667,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39016378343,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39016378343",
+        "source_sha": "575a9b8e6c5c5c58e67cc36ff394093bac205926",
+        "conclusion": "success",
+        "wall_seconds": 2849.0,
+        "runner_minutes": 47.43333333333333,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39014411304,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39014411304",
+        "source_sha": "a4b53249190198767b8172d4192a97c8e47b4ef4",
+        "conclusion": "cancelled",
+        "wall_seconds": 1968.0,
+        "runner_minutes": 32.766666666666666,
+        "successor_creation_to_stop_seconds": 63.0
+      },
+      {
+        "run_id": 39014005019,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39014005019",
+        "source_sha": "6f41f1d5e7e584a692379af61f19af129b3955ca",
+        "conclusion": "cancelled",
+        "wall_seconds": 469.0,
+        "runner_minutes": 7.783333333333333,
+        "successor_creation_to_stop_seconds": 74.0
+      },
+      {
+        "run_id": 39013341669,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39013341669",
+        "source_sha": "d78f68d6419249fa137abea7f70e7dd74111c22b",
+        "conclusion": "cancelled",
+        "wall_seconds": 1068.0,
+        "runner_minutes": 17.766666666666666,
+        "successor_creation_to_stop_seconds": 431.0
+      },
+      {
+        "run_id": 39012398292,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39012398292",
+        "source_sha": "e654f2ef751df9a706a6a837b01bcb399da9c442",
+        "conclusion": "success",
+        "wall_seconds": 2873.0,
+        "runner_minutes": 47.86666666666667,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39009316785,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39009316785",
+        "source_sha": "ce954d724281b7a492c15a9115790cd9a379f0df",
+        "conclusion": "success",
+        "wall_seconds": 2414.0,
+        "runner_minutes": 40.18333333333333,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39008598266,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39008598266",
+        "source_sha": "da89055d76be49804804b4db03b752565798f0fd",
+        "conclusion": "failure",
+        "wall_seconds": 588.0,
+        "runner_minutes": 9.766666666666667,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39006656034,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39006656034",
+        "source_sha": "ad02f4ef1c315b9794e851da14c0238f18e43984",
+        "conclusion": "failure",
+        "wall_seconds": 1404.0,
+        "runner_minutes": 23.35,
+        "successor_creation_to_stop_seconds": null
+      },
+      {
+        "run_id": 39005536113,
+        "url": "https://github.com/z-chenhao/erii/actions/runs/39005536113",
+        "source_sha": "66472d28b3168bc547f3034981a69ded4fa0360c",
+        "conclusion": "cancelled",
+        "wall_seconds": 1146.0,
+        "runner_minutes": 19.05,
+        "successor_creation_to_stop_seconds": 50.0
+      }
+    ]
+  },
+  "codemode": {
+    "run_url": "https://github.com/z-chenhao/erii/actions/runs/39103736442",
+    "source_sha": "db121dc96db6b64beace89b60cbfa06c92c96bc5",
+    "shard_wall_seconds": 2688.968853671,
+    "attempts": [
+      {
+        "gate": "codemode",
+        "attempt": 1,
+        "elapsed_seconds": 20.083821408999995,
+        "returncode": 0
+      },
+      {
+        "gate": "codemode",
+        "attempt": 2,
+        "elapsed_seconds": 18.984958926000004,
+        "returncode": 0
+      },
+      {
+        "gate": "codemode",
+        "attempt": 3,
+        "elapsed_seconds": 18.337110542999994,
+        "returncode": 0
+      },
+      {
+        "gate": "codemode",
+        "attempt": 4,
+        "elapsed_seconds": 18.587426248000014,
+        "returncode": 0
+      },
+      {
+        "gate": "codemode",
+        "attempt": 5,
+        "elapsed_seconds": 18.534986564999997,
+        "returncode": 0
+      },
+      {
+        "gate": "code-recovery",
+        "attempt": 1,
+        "elapsed_seconds": 31.14982900200002,
+        "returncode": 0
+      },
+      {
+        "gate": "code-recovery",
+        "attempt": 2,
+        "elapsed_seconds": 30.591466927,
+        "returncode": 0
+      },
+      {
+        "gate": "code-recovery",
+        "attempt": 3,
+        "elapsed_seconds": 28.591225164999997,
+        "returncode": 0
+      },
+      {
+        "gate": "code-recovery",
+        "attempt": 4,
+        "elapsed_seconds": 24.998131774,
+        "returncode": 0
+      },
+      {
+        "gate": "code-recovery",
+        "attempt": 5,
+        "elapsed_seconds": 24.93912785499998,
+        "returncode": 0
+      },
+      {
+        "gate": "core-cases",
+        "attempt": 1,
+        "elapsed_seconds": 491.30830273900006,
+        "returncode": 0
+      },
+      {
+        "gate": "core-cases",
+        "attempt": 2,
+        "elapsed_seconds": 498.95122013799994,
+        "returncode": 0
+      },
+      {
+        "gate": "core-cases",
+        "attempt": 3,
+        "elapsed_seconds": 513.5684813139999,
+        "returncode": 0
+      },
+      {
+        "gate": "core-cases",
+        "attempt": 4,
+        "elapsed_seconds": 488.75576149999983,
+        "returncode": 0
+      },
+      {
+        "gate": "core-cases",
+        "attempt": 5,
+        "elapsed_seconds": 459.52634645000035,
+        "returncode": 0
+      }
+    ],
+    "core_case_1_functions": [
+      {
+        "file": "scripts/run_core_cases.py",
+        "line": 205,
+        "function": "engineering_case",
+        "calls": 6,
+        "primitive_calls": 6,
+        "own_seconds": 0.005035861,
+        "cumulative_seconds": 184.692933599
+      },
+      {
+        "file": "scripts/run_core_cases.py",
+        "line": 308,
+        "function": "coding_case",
+        "calls": 6,
+        "primitive_calls": 6,
+        "own_seconds": 0.00013061,
+        "cumulative_seconds": 135.29437687700002
+      },
+      {
+        "file": "scripts/run_core_cases.py",
+        "line": 86,
+        "function": "feedback_case",
+        "calls": 6,
+        "primitive_calls": 6,
+        "own_seconds": 0.004513176000000001,
+        "cumulative_seconds": 84.70645916100001
+      }
+    ]
+  },
+  "limitations": [
+    "API history has no CPU/cache-hit or harness timings; null means unmeasured.",
+    "Job initial queue includes dependency waits. Runner-minutes use job lifetime, not billed minutes.",
+    "Successor run creation is a cancellation proxy; exact push-to-stop requires webhook timing.",
+    "Historical samples are observational, not a controlled before/after experiment.",
+    "No controlled five-sample after series yet. No performance acceptance claim.",
+    "The coding sandbox creates a private empty Go cache per call; repeated compiler cost is inferred from code and wall profiles, not yet independently CPU-attributed.",
+    "Current full CI and Ubuntu checks remain unchanged; candidate is shadow only."
+  ]
+}

@@ -15,6 +15,9 @@ import signal
 import sqlite3
 import subprocess
 import tempfile
+import time
+
+from fixture_pool import Scope, current
 
 
 def require(value, message):
@@ -30,19 +33,22 @@ class MainHarness:
         self.env["ERII_DATA_ROOT"] = str(root / "data")
         self.children = []
         self.fixture = fixture
+        self.processes = current()
 
     def args(self, *args):
         return [str(self.binary), "-test-bridge", self.fixture, *args]
 
-    def command(self, *args, text=None, ok=True):
-        result = subprocess.run(self.args(*args), input=text, text=True, capture_output=True,
-                                env=self.env, cwd=self.root, timeout=20)
+    def command(self, *args, text=None, ok=True, timeout=20):
+        run = self.processes.run if self.processes is not None else subprocess.run
+        result = run(self.args(*args), input=text, text=True, capture_output=True,
+                                env=self.env, cwd=self.root, timeout=timeout)
         require(not ok or result.returncode == 0, f"{args}: {result.stderr}")
         return json.loads(result.stdout) if ok else result
 
-    def setup(self, model="fixture-model"):
+    def setup(self, model="fixture-model", metadata=None):
         status = self.command("status")
-        profile = self.command("model", "add", "http://127.0.0.1:1/v1", model)
+        profile = (self.command("model", "add", text=json.dumps(metadata)) if metadata is not None else
+                   self.command("model", "add", "http://127.0.0.1:1/v1", model))
         self.command("model", "test", profile["profile_id"])
         status = self.command("model", "select", profile["profile_id"], str(profile["version"]),
                               str(status["config_version"]))
@@ -52,25 +58,90 @@ class MainHarness:
     def send(self, key, text):
         return self.command("chat", "send", key, text=text)
 
-    def hold(self, boundary):
-        child = subprocess.Popen(self.args("-test-main-hold", boundary, "chat", "work"),
+    def wait_state(self, predicate, description, reader=None, timeout=10):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.processes is not None:
+                self.processes.check()
+            value = reader(self) if reader else self.state()
+            if predicate(value):
+                return value
+            time.sleep(0.025)
+        raise RuntimeError("state boundary not reached: " + description)
+
+    def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work")):
+        start = self.processes.start if self.processes is not None else subprocess.Popen
+        child = start(self.args("-test-main-hold", boundary, *extra_flags, *command),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
         with selectors.DefaultSelector() as selector:
             selector.register(child.stdout, selectors.EVENT_READ)
-            require(selector.select(15), f"boundary never reached: {boundary}")
+            require(selector.select(timeout), f"boundary never reached: {boundary}")
         line = child.stdout.readline()
         require(line and json.loads(line).get("boundary") == boundary,
                 f"exited before boundary {boundary}: {line} {child.stderr.read() if not line else ''}")
         return child
+
+    def drive_boundaries(self, barriers, observe, progress, timeout=20):
+        """Drive one CLI call with independent, explicitly released test barriers.
+
+        Both pipes are drained while callbacks observe committed state. The
+        original command deadline and owned-session cleanup remain in force.
+        """
+        flags = [part for name, path in barriers.items()
+                 for part in ('-test-main-barrier', name + '=' + str(path))]
+        owner = self.processes or Scope()
+        child = owner.start(self.args(*flags, 'chat', 'work'), stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, env=self.env, cwd=self.root)
+        self.children.append(child)
+        output, errors, pending = bytearray(), bytearray(), bytearray()
+        deadline = time.monotonic() + timeout
+        try:
+            with selectors.DefaultSelector() as streams:
+                streams.register(child.stdout, selectors.EVENT_READ)
+                streams.register(child.stderr, selectors.EVENT_READ)
+                while streams.get_map():
+                    owner.check()
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(child.args, timeout)
+                    for key, _ in streams.select(min(.025, remaining)):
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        if not chunk:
+                            streams.unregister(key.fileobj)
+                            continue
+                        if key.fileobj is child.stderr:
+                            errors.extend(chunk)
+                            continue
+                        output.extend(chunk)
+                        pending.extend(chunk)
+                        while b'\n' in pending:
+                            line, _, rest = pending.partition(b'\n')
+                            pending = bytearray(rest)
+                            value = json.loads(line)
+                            if 'boundary' in value:
+                                observe(value['boundary'])
+                    progress()
+            child.wait(timeout=max(.001, deadline - time.monotonic()))
+            require(not pending, 'incomplete CLI boundary record')
+            return subprocess.CompletedProcess(child.args, child.returncode,
+                                               output.decode(), errors.decode())
+        except BaseException:
+            owner.cancel()
+            child.communicate(timeout=10)
+            raise
+        finally:
+            owner.retire(child)
+            if self.processes is None:
+                owner.finish()
 
     def state(self):
         result = {}
         with sqlite3.connect(Path(self.env["ERII_DATA_ROOT"]) / "state.db") as db:
             db.row_factory = sqlite3.Row
             for name, query in {
-                "runs": "SELECT run_id,kind,task_id,parent_run_id,status,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
+                "runs": "SELECT run_id,kind,task_id,parent_run_id,root_run_id,task_epoch,depth,status,desired_state,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
                 "generations": "SELECT generation_id,run_id,step_index,request_hash,request_json,status,result_json,error_code,attempt_count FROM model_generation ORDER BY created_at",
                 "tools": "SELECT invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,status,result_json,delivery_seq,attempt_count FROM tool_invocation ORDER BY created_at,delivery_seq",
                 "deliveries": "SELECT delivery_id,message_id,status,idempotency_key FROM delivery_request ORDER BY created_at",
@@ -89,6 +160,28 @@ class MainHarness:
             if child.poll() is None:
                 child.kill()
             child.communicate(timeout=10)
+            if self.processes is not None:
+                self.processes.retire(child)
+
+    def failure_state(self):
+        """Bounded read-only evidence from disposable fixtures; no claim tokens."""
+        path = Path(self.env['ERII_DATA_ROOT']) / 'state.db'
+        if not path.exists():
+            return {'database': 'not created'}
+        with sqlite3.connect(path) as db:
+            db.row_factory = sqlite3.Row
+            queries = {
+                'runs': 'SELECT run_id,kind,depth,status,desired_state,wait_reason,error_code FROM run ORDER BY created_at DESC LIMIT 40',
+                'claims': 'SELECT run_id,epoch,token IS NOT NULL AS owned,expires_at FROM run_claim ORDER BY expires_at DESC LIMIT 40',
+                'tools': 'SELECT invocation_id,tool_name,status,error_json,result_json FROM tool_invocation ORDER BY created_at DESC LIMIT 16',
+                'models': 'SELECT generation_id,status,request_json,result_json FROM model_generation ORDER BY created_at DESC LIMIT 3',
+                'code': 'SELECT execution_id,state,desired_state,execution_epoch,claim_expires_at FROM code_execution_state ORDER BY updated_at DESC LIMIT 8',
+            }
+            result = {name: [dict(row) for row in db.execute(query)] for name, query in queries.items()}
+            if db.execute("SELECT 1 FROM sqlite_schema WHERE name='computer'").fetchone():
+                result['computer'] = [dict(row) for row in db.execute('SELECT computer_id,instance_epoch,phase,execution_id,execution_epoch,version FROM computer')]
+                result['computer_operations'] = [dict(row) for row in db.execute('SELECT execution_id,execution_epoch,kind,status FROM computer_operation ORDER BY rowid DESC LIMIT 12')]
+            return result
 
 
 def assert_final(state, users, replies=1):

@@ -1,0 +1,13 @@
+{
+  "name": "erii-guest-browser",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "1.64.1"
+  },
+  "scripts": {
+    "test": "node --test test.mjs readiness.test.mjs",
+    "lint": "node --check test.mjs && node --check readiness.mjs && node --check readiness.test.mjs && node --check ../scripts/channels_browser.mjs && node --check ../scripts/m6_browser.mjs && node --check ../internal/computer/macosvm/browser.mjs"
+  }
+}

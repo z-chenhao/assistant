@@ -16,12 +16,12 @@ def digest(value):
                                      separators=(",", ":")).encode()).hexdigest()
 
 
-def load_contract(root):
-    lock = json.loads((root / "evals/fixtures/m1-v2.lock.json").read_text())
+def load_contract(root, fixture="m1-v2"):
+    lock = json.loads((root / f"evals/fixtures/{fixture}.lock.json").read_text())
     for name, expected in lock["files"].items():
         if hashlib.sha256((root / name).read_bytes()).hexdigest() != expected:
             raise ValueError("fixture/policy changed without a versioned lock update: " + name)
-    dataset = json.loads((root / "evals/fixtures/m1-v2.json").read_text())
+    dataset = json.loads((root / f"evals/fixtures/{fixture}.json").read_text())
     policy = json.loads((root / "evals/scoring-v1.json").read_text())
     for case in dataset["cases"]:
         times = [datetime.fromisoformat(e["at"]) for e in case["events"]]
@@ -69,7 +69,7 @@ def variants(dataset, case):
             if not .1 <= len(noise) / length <= .3:
                 raise ValueError("noise ratio outside normative bounds")
             text += " 无关Conversation：" + noise
-        events = [{"at": e["at"], "text": e["wordings"][variant["wording"]]} for e in case["events"]]
+        events = [{**{k: v for k, v in e.items() if k != "wordings"}, "text": e["wordings"][variant["wording"]]} for e in case["events"]]
         yield {"variant_id": variant["id"], "seed": 0, "clock": case["clock"],
                "context": text, "noise_characters": len(noise), "events": events,
                "fixture_digest": digest({"case": case, "common": dataset["common"], "variant": variant, "context": text, "events": events})}
@@ -91,7 +91,7 @@ def result(case, variant, policy, execution):
         "ordered_semantic_history": [m["sequence"] for m in state["conversation"]] == list(range(1, len(state["conversation"]) + 1)),
         "no_task_or_child": bool(runs) and all(r["kind"] == "main" and r["task_id"] is None and r["parent_run_id"] is None for r in runs),
         "main_cannot_spawn": bool(caps) and all(not c["can_spawn_agents"] for c in caps),
-        "no_external_writes": bool(caps) and all(t["permission"] == "read_only" for c in caps for t in json.loads(c["tools_json"])),
+        "no_external_writes": bool(caps) and all((t["permission"] == "read_only" or (t["name"] == "builtin__task__manage" and t["permission"] == "task_control") or (c.get("role") == "main" and t["name"] == "builtin__automation__manage" and t["permission"] == "task_control") or (t["name"] in ("builtin__artifact__save", "builtin__artifact__publish") and t["permission"] == "artifact_write")) for c in caps for t in json.loads(c["tools_json"])),
         "only_pure_tools": bool(tools) and all(t["tool_name"] == "builtin__text__echo" and t["replay_policy"] == "safe" and t["status"] == "succeeded" for t in tools),
         "no_duplicate_effects": all(t["attempt_count"] == 1 for t in tools),
         "terminal_runs": all(r["status"] == "completed" for r in runs),

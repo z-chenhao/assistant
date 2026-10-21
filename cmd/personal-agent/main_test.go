@@ -4,9 +4,50 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestControlDiagnosticsSurviveUnavailableExecutionRuntime(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("ERII_DATA_ROOT", filepath.Join(root, "data"))
+	cfg := filepath.Join(root, "config.yaml")
+	if err := os.WriteFile(cfg, []byte("version: 1\njavascript:\n  command: /missing/node\n  script: /missing/sidecar.mjs\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range [][]string{{"status"}, {"ops", "health"}, {"model", "list"}} {
+		var out, errOut bytes.Buffer
+		if err := run(context.Background(), append([]string{"-config", cfg}, command...), strings.NewReader(""), &out, &errOut); err != nil {
+			t.Fatal("control command depended on execution runtime", command, err)
+		}
+		if !json.Valid(out.Bytes()) {
+			t.Fatal("invalid diagnostics", out.String())
+		}
+	}
+}
+
+func TestBoundaryBarriersRequireExplicitFixtureAndRejectAmbiguity(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "not-created")
+	t.Setenv("ERII_DATA_ROOT", root)
+	for _, args := range [][]string{
+		{"-test-main-barrier", "before_worker_generation=/missing", "status"},
+		{"-test-bridge", "recall", "-test-main-barrier", "missing-equals", "status"},
+		{"-test-bridge", "recall", "-test-main-barrier", "=file", "status"},
+		{"-test-bridge", "recall", "-test-main-barrier", "boundary=", "status"},
+		{"-test-bridge", "recall", "-test-main-barrier", "boundary=one", "-test-main-barrier", "boundary=two", "status"},
+		{"-test-bridge", "recall", "-test-main-hold", "boundary", "-test-main-barrier", "boundary=file", "status"},
+	} {
+		var out, errOut bytes.Buffer
+		if err := run(context.Background(), args, strings.NewReader(""), &out, &errOut); err == nil {
+			t.Fatal("invalid barrier accepted", args)
+		}
+		if _, err := os.Stat(root); !os.IsNotExist(err) {
+			t.Fatal("invalid test barrier created product state", err)
+		}
+	}
+}
 
 const metadataJSON = `{"name":"local","provider_kind":"openai_compatible","endpoint":"http://localhost:8000/v1","wire_api":"openai_completions","model_id":"fixture","context_window":8192,"max_output_tokens":1024,"compatibility":{"tool_result_format":"openai"},"capabilities":{"text_input":true}}`
 

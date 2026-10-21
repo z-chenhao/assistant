@@ -4,10 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
+	deliverysqlite "github.com/z-chenhao/erii/internal/delivery/sqlite"
 	"github.com/z-chenhao/erii/internal/llm"
 )
 
@@ -20,12 +24,17 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 	if err != nil {
 		return agent.Generation{}, err
 	}
-	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
-	for _, spec := range run.Tools {
-		request.Tools = append(request.Tools, llm.ToolSpec{Name: spec.Name, InputSchema: spec.InputSchema})
+	messages, err = r.recallMessages(ctx, c, run, messages)
+	if err != nil {
+		return agent.Generation{}, err
 	}
-	// Bound by the frozen model window. M6 will add semantic compaction; M1
-	// fails explicitly instead of silently truncating the user's instructions.
+	messages, err = r.compactMessages(ctx, c, run, messages)
+	if err != nil {
+		return agent.Generation{}, err
+	}
+	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
+	request.Tools = agent.ProviderTools(run.Tools)
+	// Compaction is threshold-based; this final bound rejects an irreducible turn.
 	wire, _ := encoded(request.Messages)
 	if int64(len(wire)) > run.Snapshot.ContextWindow*3 {
 		return agent.Generation{}, llm.ContextLengthExceeded
@@ -35,6 +44,15 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		gen = agent.Generation{}
 		if err := fence(ctx, tx, c); err != nil {
 			return err
+		}
+		if run.Kind == "worker" {
+			var limit int64
+			if err := tx.QueryRowContext(ctx, `SELECT t.max_turns FROM run_tree t JOIN run r ON r.root_run_id=t.root_run_id WHERE r.run_id=?`, run.ID).Scan(&limit); err != nil {
+				return err
+			}
+			if run.Checkpoint.Step >= limit {
+				return agent.ErrResourceLimit
+			}
 		}
 		var raw, hash, status string
 		var result sql.NullString
@@ -75,9 +93,48 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		}
 		gen.Request = request
 		gen.Request.OwnerToken = owner.token
+		if gen.Result == nil && gen.ErrorCode == "" {
+			gen.Waiting, gen.Denied, err = r.gateSpend(ctx, tx, request)
+			return err
+		}
 		return nil
 	})
-	if err == nil && gen.Result == nil && gen.ErrorCode == "" {
+	if err == nil && gen.Result == nil && gen.ErrorCode == "" && !gen.Waiting && !gen.Denied {
+		hasImages := false
+		for _, message := range gen.Request.Messages {
+			hasImages = hasImages || len(message.ImageRefs) > 0
+		}
+		if hasImages && gen.Request.Snapshot.Capabilities.ImageInput {
+			gen.Request.ResolveImage = func(imageCtx context.Context, ref string) (string, []byte, error) {
+				var media string
+				var data []byte
+				err := r.write(imageCtx, func(tx *sql.Tx) error {
+					if err := fence(imageCtx, tx, c); err != nil {
+						return err
+					}
+					scope, err := runScope(imageCtx, tx, run.ID)
+					if err != nil {
+						return err
+					}
+					d, err := r.host.Artifacts().DescribeTx(imageCtx, tx, scope, ref, true)
+					if err != nil {
+						return err
+					}
+					media = d.MediaType
+					f, err := r.host.Artifacts().OpenTx(imageCtx, tx, scope, ref)
+					if err != nil {
+						return err
+					}
+					defer f.Close()
+					data, err = io.ReadAll(io.LimitReader(f, (8<<20)+1))
+					return err
+				})
+				return media, data, err
+			}
+		}
+		if run.Kind == "worker" {
+			r.host.boundary("before_worker_generation")
+		}
 		r.host.boundary("before_generation_dispatch")
 	}
 	return gen, err
@@ -107,6 +164,7 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	if hash != digest(raw) {
 		return agent.ErrConflict
 	}
+	usage := result.Usage
 	code := ""
 	state := "completed"
 	if cause != nil {
@@ -136,10 +194,19 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	if err := runEvent(ctx, tx, runID, "model_generation."+state, 1); err != nil {
 		return agent.ErrStorage
 	}
+	if err := s.settleSpend(ctx, tx, request, llm.GenerationResult{Usage: usage}); err != nil {
+		return agent.ErrStorage
+	}
+	if err := s.recordProviderHealth(ctx, tx, runID, code); err != nil {
+		return agent.ErrStorage
+	}
 	return nil
 }
 
 func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run) (bool, error) {
+	if run.Kind == "worker" {
+		return r.prepareWorkerReply(ctx, c, run)
+	}
 	ready := false
 	err := r.write(ctx, func(tx *sql.Tx) error {
 		ready = false
@@ -167,13 +234,30 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		if version != run.Version {
 			return agent.ErrConflict
 		}
-		messageID, deliveryID := newID(), newID()
+		messageID := "reply:" + run.Checkpoint.ExchangeID
+		deliveryID := "delivery:" + messageID
 		message := conversation.Message{MessageID: messageID, ConversationID: run.ConversationID, Role: "assistant", Content: conversation.Text(run.Checkpoint.Result.Text), Source: "main", SourceEventID: run.Checkpoint.ExchangeID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		refs, err := published(ctx, tx, run.ID)
+		if err != nil {
+			return err
+		}
+		for _, ref := range refs {
+			// The selected resource was authorized by publish. Read only its immutable
+			// semantic type here; media bytes never enter the Conversation intent.
+			var media string
+			if err = tx.QueryRowContext(ctx, `SELECT media_type FROM artifact WHERE artifact_ref=?`, ref).Scan(&media); err != nil {
+				return err
+			}
+			message.Content = append(message.Content, conversation.ContentPart{Type: artifact.ContentType(media), ArtifactRef: ref})
+		}
 		raw, _ := encoded(message)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO main_reply VALUES(?,?,?,?)`, run.Checkpoint.ExchangeID, run.ID, messageID, deliveryID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, messageID, raw); err != nil {
+			return err
+		}
+		if err := freezeMessageRoute(ctx, tx, messageID, run.ID); err != nil {
 			return err
 		}
 		ready = true
@@ -183,6 +267,9 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 }
 
 func (r *Runs) DeliverReply(ctx context.Context, c agent.RunClaim, run agent.Run) error {
+	if run.Kind == "worker" {
+		return r.deliverWorkerReply(ctx, c, run)
+	}
 	// Conversation must exist before DeliveryRequest, then Checkpoint. Each
 	// interruption reuses the saved message/delivery IDs and fills missing work.
 	if err := r.Flush(ctx); err != nil {
@@ -192,16 +279,34 @@ func (r *Runs) DeliverReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
-		var deliveryID, messageID string
+		var deliveryID, messageID, raw string
 		var flushed int
-		if err := tx.QueryRowContext(ctx, `SELECT p.delivery_id,p.message_id,i.flushed FROM main_reply p JOIN conversation_intent i USING(message_id) WHERE exchange_id=? AND run_id=?`, run.Checkpoint.ExchangeID, run.ID).Scan(&deliveryID, &messageID, &flushed); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT p.delivery_id,p.message_id,i.flushed,i.message_json FROM main_reply p JOIN conversation_intent i USING(message_id) WHERE exchange_id=? AND run_id=?`, run.Checkpoint.ExchangeID, run.ID).Scan(&deliveryID, &messageID, &flushed, &raw); err != nil {
 			return err
 		}
 		if flushed != 1 {
 			return agent.ErrConflict
 		}
-		now := time.Now().UnixMicro()
-		if _, err := tx.ExecContext(ctx, `INSERT INTO delivery_request(delivery_id,message_id,channel,destination_ref,status,idempotency_key,created_at,updated_at) VALUES(?,?,'local_cli',?,'pending',?,?,?) ON CONFLICT(delivery_id) DO NOTHING`, deliveryID, messageID, run.ConversationID, deliveryID, now, now); err != nil {
+		var message conversation.Message
+		if json.Unmarshal([]byte(raw), &message) != nil {
+			return agent.ErrStorage
+		}
+		request := delivery.Request{DeliveryID: deliveryID, MessageID: messageID, ConversationID: run.ConversationID, Channel: "tui", DestinationRef: run.ConversationID, Intent: replyIntent(run), IdempotencyKey: deliveryID, CreatedAt: message.CreatedAt.UnixMicro()}
+		if err := applyMessageRoute(ctx, tx, &request); err != nil {
+			return err
+		}
+		if err := deliverysqlite.Enqueue(ctx, tx, request); err != nil {
+			return err
+		}
+		r.host.boundary("before_delivery_commit")
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	r.host.boundary("after_delivery_commit")
+	err = r.write(ctx, func(tx *sql.Tx) error {
+		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
 		cp := run.Checkpoint
@@ -226,11 +331,23 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 			if err := fence(ctx, tx, c); err != nil {
 				return err
 			}
+		} else {
+			owner, ok := c.(*claim)
+			if !ok {
+				return agent.ErrClaimLost
+			}
+			var valid int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run r JOIN run_claim c USING(run_id) WHERE r.run_id=? AND c.epoch=? AND r.status IN ('completed','failed') AND r.desired_state='running' AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch))`, owner.id, owner.epoch).Scan(&valid); err != nil {
+				return err
+			}
+			if valid != 1 {
+				return agent.ErrClaimLost
+			}
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT coalesce(max(sequence),0)+1 FROM run_trace WHERE run_id=?`, c.RunID()).Scan(&e.Sequence); err != nil {
 			return err
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT agent_id FROM run WHERE run_id=?`, c.RunID()).Scan(&e.AgentID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT agent_id,kind,coalesce(task_id,'') FROM run WHERE run_id=?`, c.RunID()).Scan(&e.AgentID, &e.RunKind, &e.TaskID); err != nil {
 			return err
 		}
 		e.RunID = c.RunID()
@@ -242,4 +359,22 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 		return err
 	})
 	return e, err
+}
+
+// Runtime follow-up semantics determine notification intent. Ordinary progress
+// never enters Main context and cannot reach this composer boundary.
+func replyIntent(run agent.Run) string {
+	intent := "completion"
+	for _, m := range run.Checkpoint.Messages {
+		if m.Type != "custom" || m.Origin != "runtime" || m.Details == nil {
+			continue
+		}
+		switch m.Details.Kind {
+		case "needs_input", "unknown":
+			return "needs_input"
+		case "failed":
+			intent = "failure"
+		}
+	}
+	return intent
 }
