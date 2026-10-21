@@ -2,6 +2,7 @@
 package nats
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -141,7 +142,8 @@ func open(ctx context.Context, options Options, secrets SecretStore, upgrade boo
 	b := &Bus{conn: conn, js: js, options: options, stream: options.StreamPrefix + "_events_v1", subjects: options.StreamPrefix + ".v1.events"}
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
-	// Create validates existing configuration rather than silently mutating it.
+	// Validate existing streams without a create request: JetStream may check
+	// a full additional reservation before recognizing an idempotent create.
 	streamConfig := jetstream.StreamConfig{
 		Name: b.stream, Subjects: []string{b.subjects + ".>"}, Storage: jetstream.FileStorage,
 		Retention: jetstream.LimitsPolicy, Discard: jetstream.DiscardNew,
@@ -178,17 +180,52 @@ func open(ctx context.Context, options Options, secrets SecretStore, upgrade boo
 			return nil, brokerError(e, "inspect upgrade stream")
 		}
 	}
-	_, err = js.CreateStream(ctx, streamConfig)
+	err = ensureStream(ctx, js, streamConfig)
 	if err != nil {
 		conn.Close()
 		return nil, brokerError(err, "create or validate event stream")
 	}
-	_, err = js.CreateStream(ctx, jetstream.StreamConfig{Name: options.StreamPrefix + "_dlq_v1", Subjects: []string{options.StreamPrefix + ".v1.dlq.>"}, Storage: jetstream.FileStorage, Retention: jetstream.LimitsPolicy, Discard: jetstream.DiscardNew, MaxAge: 30 * 24 * time.Hour, MaxBytes: 64 << 20, MaxMsgs: 10000, MaxMsgSize: 4096})
+	err = ensureStream(ctx, js, jetstream.StreamConfig{Name: options.StreamPrefix + "_dlq_v1", Subjects: []string{options.StreamPrefix + ".v1.dlq.>"}, Storage: jetstream.FileStorage, Retention: jetstream.LimitsPolicy, Discard: jetstream.DiscardNew, MaxAge: 30 * 24 * time.Hour, MaxBytes: 64 << 20, MaxMsgs: 10000, MaxMsgSize: 4096})
 	if err != nil {
 		conn.Close()
 		return nil, brokerError(err, "create or validate DLQ")
 	}
 	return b, nil
+}
+
+func ensureStream(ctx context.Context, js jetstream.JetStream, want jetstream.StreamConfig) error {
+	stream, err := js.Stream(ctx, want.Name)
+	if errors.Is(err, jetstream.ErrStreamNotFound) {
+		_, err = js.CreateStream(ctx, want)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return err
+	}
+	// Compare the complete configuration, allowing only JetStream's documented
+	// defaults and server-owned metadata. Never update a drifted stream here.
+	want.MaxConsumers, want.MaxMsgsPerSubject, want.Replicas = -1, -1, 1
+	want.Duplicates = 2 * time.Minute
+	got := info.Config
+	for _, key := range []string{"_nats.level", "_nats.req.level", "_nats.ver"} {
+		delete(got.Metadata, key)
+	}
+	actual, err := json.Marshal(got)
+	if err != nil {
+		return err
+	}
+	expected, err := json.Marshal(want)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(actual, expected) {
+		return errors.New("incompatible existing stream configuration")
+	}
+	return nil
 }
 
 func (b *Bus) Publish(ctx context.Context, e event.CloudEvent) error {

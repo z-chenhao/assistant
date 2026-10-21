@@ -81,6 +81,10 @@ messages and pull one at a time. AckWait defaults to 30 seconds (10 ms–5 min),
 retry interval to one second (1 ms–1 min). Ingress/recovery does not depend on
 broker deduplication or global event ordering.
 
+Provision broker storage for both configured Stream reservations plus operating
+headroom. Reconnect reads and strictly validates existing Stream configuration;
+it does not request another reservation or silently alter retention or access.
+
 After five unsuccessful consumer deliveries, the adapter durably writes a
 content-free quarantine receipt before acknowledging the original message. A
 crash between those writes can duplicate the receipt; its consumer/stream

@@ -21,7 +21,10 @@ func New(t testing.TB) *Broker {
 
 func NewAuthenticated(t testing.TB, token string) *Broker {
 	t.Helper()
-	b := &Broker{options: server.Options{Host: "127.0.0.1", Port: -1, JetStream: true, StoreDir: t.TempDir(), NoLog: true, NoSigs: true}}
+	// Stream MaxBytes reserves capacity without allocating it. Auto-detection
+	// would make admission/restart depend on concurrent Go builds consuming the
+	// shared CI tmpfs. Fixtures write only their small, bounded event samples.
+	b := &Broker{options: server.Options{Host: "127.0.0.1", Port: -1, JetStream: true, StoreDir: t.TempDir(), NoLog: true, NoSigs: true, JetStreamMaxStore: 2 << 30, JetStreamMaxMemory: 64 << 20}}
 	b.options.Authorization = token
 	b.Start(t)
 	t.Cleanup(b.Stop)
