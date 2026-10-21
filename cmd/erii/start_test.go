@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/config"
 )
 
@@ -69,5 +71,14 @@ func TestDoctorRespectsDisabledOptionalRuntimes(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "SKIP model bridge") {
 		t.Fatal("missing configuration was hidden", out.String())
+	}
+}
+
+func TestUnconfiguredDrainDoesNotInferAnInstalledProvider(t *testing.T) {
+	t.Setenv("ERII_DATA_ROOT", t.TempDir())
+	var out bytes.Buffer
+	err := run(context.Background(), []string{"chat", "work"}, strings.NewReader(""), &out, &out)
+	if !errors.Is(err, agent.ErrSetup) || out.Len() != 0 {
+		t.Fatal("unconfigured execution silently gained a provider", out.String(), err)
 	}
 }

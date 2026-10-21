@@ -81,6 +81,10 @@ erii -config /absolute/erii.yaml start
 
 With a config file, only its configured model bridge and optional runtimes are
 enabled. The no-config installation defaults do not override that capability choice.
+Bundled runtime discovery applies to `start`, `doctor` and `status`. Low-level
+execution commands such as `chat work` keep their explicit configuration contract;
+they never infer another provider while recovering existing work. Use the terminal
+for ordinary conversation or supply `-config` for scripted execution.
 
 Copy only the needed sections from [config.example.yaml](../../config.example.yaml).
 The example's `/tmp` data root is for disposable development. Flags precede commands.

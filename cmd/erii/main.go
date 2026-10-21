@@ -182,7 +182,10 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
-	if *configPath == "" && *testBridge == "" {
+	// Bundled defaults belong to the user startup/diagnostic path. Execution
+	// commands still require their explicit configuration; never attach a new
+	// provider bridge while reclaiming an existing Run.
+	if (startCommand || doctorCommand || flags.Arg(0) == "status") && *configPath == "" && *testBridge == "" {
 		home, err := runtimeHome()
 		if err != nil {
 			return err
