@@ -119,6 +119,17 @@ Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus r
 cancellation). Each case part runs all six locked variants five times. Contracts
 also run five times; splitting cases cannot omit them.
 
+SC conformance partitions its unchanged root-test inventory within each round,
+using the existing `ci_race` CPU budget/partition helpers and `fixture_pool`
+process ownership. At most four workers each receive one CPU and one Go package
+slot; each root runs exactly once with `-race -count=1` and the original
+300-second command deadline. The unchanged event judge rejects missing,
+duplicate, skipped or failed roots. Every worker joins before the real nested
+cancellation probe and the next serial round. All five rounds remain disk-backed.
+This addresses the measured M7 Ubuntu run where SC took about 91 seconds per
+warm round and the ten-minute job limit cancelled the fifth cancellation probe.
+The job limit and the probe's readiness/cleanup deadlines remain unchanged.
+
 `ci_codemode.py` requires every part and round, successful owned-process cleanup,
 clean stable source, identical source/build/fixture identities. Every part records its runner image;
 independent builds may join across a host image rollout only if binary hashes

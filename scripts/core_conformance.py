@@ -1,6 +1,9 @@
 """Exact requirement → executed test mapping; absence/skip is a failure."""
 import json
-import subprocess
+import os
+
+from ci_race import cpu_budget, partitions
+from fixture_pool import run_cases, run as fixture_run
 
 TESTS = {
     'SC-01': ['TestChildDirectToolRootChildGrandchild', 'TestChildAtomicAdmissionReplayAndBounds'],
@@ -29,10 +32,19 @@ def judge(events, returncode):
 
 def run(root):
     selected = sorted({test for tests in TESTS.values() for test in tests})
-    command = ['go','test','-race','-count=1','-json','-run','^('+'|'.join(selected)+')$', './internal/agent/sqlite', './internal/memory/sqlite']
-    result = subprocess.run(command,cwd=root,text=True,capture_output=True,timeout=300)
-    events = [json.loads(line) for line in result.stdout.splitlines() if line.startswith('{')]
-    passed = judge(events,result.returncode)
-    return dict(passed=passed, command=command, returncode=result.returncode,events=events,stderr=result.stderr,
+    budget = cpu_budget()
+    workers = 4 if budget >= 4 else 2 if budget >= 2 else 1
+    def drive(names):
+        # Each root owns its stores. Reuse audited partitions and owned process
+        # cleanup, with one CPU/package per worker and the original deadline.
+        command = ['go','test','-race','-count=1','-json','-p=1','-run','^('+'|'.join(names)+')$', './internal/agent/sqlite', './internal/memory/sqlite']
+        return fixture_run(command,cwd=root,env=dict(os.environ,GOMAXPROCS='1'),
+                           text=True,capture_output=True,timeout=300)
+    results = run_cases(partitions(selected, workers), drive, workers)
+    events = [json.loads(line) for result in results for line in result.stdout.splitlines() if line.startswith('{')]
+    returncode = next((result.returncode for result in results if result.returncode), 0)
+    passed = judge(events,returncode)
+    return dict(passed=passed, commands=[result.args for result in results], workers=workers, gomaxprocs=1,
+                returncode=returncode,events=events,stderr=''.join(result.stderr for result in results),
                 requirements={sc:dict(status='implemented_core',tests=tests) for sc,tests in TESTS.items()},
                 boundary_fakes={}, scope='SC-01–12 against implemented stores and executors; external providers remain explicit deterministic Fakes')
