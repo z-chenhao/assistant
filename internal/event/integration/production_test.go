@@ -28,7 +28,9 @@ func TestBrokerFixture(t *testing.T) {
 	if os.Getenv("ERII_BROKER_FIXTURE") != "1" {
 		t.Skip("owned fixture only")
 	}
-	b := testbroker.New(t)
+	// Interactive scenarios share this peer but own separate Stream prefixes.
+	// Six namespaces reserve about 6.4 GiB; actual fixture writes remain tiny.
+	b := testbroker.NewWithStoreLimit(t, 8<<30)
 	if e := json.NewEncoder(os.Stdout).Encode(map[string]any{"version": 1, "url": b.URL()}); e != nil {
 		t.Fatal(e)
 	}
