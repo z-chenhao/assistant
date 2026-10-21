@@ -78,6 +78,18 @@ does not restore revoked intent, even before its first Task. Receipt retries,
 schedule edits and scheduler timestamps never renew the frozen privacy epoch.
 Storage failures still abort admission and remain recoverable.
 
+List uses the same privacy projection for the Main Tool and trusted CLI. A revoked
+row retains only its Host-generated `automationRef`, current `version` and
+`enabled` control state. `instruction`, `triggerType`, `triggerSpec` and `timezone`
+are empty strings; `nextFire` and `below` are absent. This permits safe cancellation
+without returning forgotten intent, schedule or threshold evidence. Fresh rows
+retain their full view. Original fields remain in local audit. Edits and receipt
+retries never restore visibility across the immutable intent epoch. Existing
+Task search, Root admission and Reporter/follow-up privacy fences also protect
+Automation-derived Task context; create/update/cancel receipts expose only the
+Host reference and acceptance, not stored instructions.
+
+
 Completed one-shot `at` intent retains `enabled=true, next_fire_at=NULL` for audit;
 it never fires twice. Cancellation is explicit and disables it.
 

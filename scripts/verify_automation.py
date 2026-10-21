@@ -90,6 +90,59 @@ def first_fire_forget(h, *, persist_before_forget):
     return dict(fire_persisted_before_forget=persist_before_forget, before_forget=before, memory_tombstones=tombstones, forget_receipt=forget, fresh_main_completed=after, fresh_automation_completed=final)
 
 
+def list_after_forget(h):
+    """Drive a fresh Main list Tool call without re-supplying revoked intent."""
+    marker = 'FORGOTTEN_AUTOMATION_LIST_HEALTH_CONTEXT'
+    h.command('memory', 'manage', 'remember-health', text=json.dumps(dict(operation='remember', content='My sleep health detail is ' + marker)))
+    h.command('memory', 'work')
+    q = dict(operation='create', instruction='Review my health context: ' + marker, triggerType='at', triggerSpec='2026-12-01T08:00:00+08:00', timezone='Asia/Shanghai', below=1800)
+    receipt = h.manage('old-intent', **q)
+    before = h.evidence()
+    forget = h.command('memory', 'manage', 'forget-health', text=json.dumps(dict(operation='forget', category='health')))
+    require(forget.get('accepted') is True, 'Forget not accepted')
+    h.command('memory', 'work')
+    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'memory.db') as db:
+        db.row_factory = sqlite3.Row
+        tombstones = [dict(row) for row in db.execute('SELECT memory_id,deleted_at FROM memory_record')]
+    require(tombstones and all(row['deleted_at'] is not None for row in tombstones), 'health Memory not tombstoned')
+
+    def list_main(key):
+        fresh = h.send(key, 'Automation: ' + json.dumps(dict(operation='list')))
+        h.command('chat', 'work')
+        value = h.evidence()
+        calls = [t for t in value['tool_invocation'] if t['run_id'] == fresh['run_id'] and t['tool_name'] == 'builtin__automation__manage']
+        require(len(calls) == 1 and calls[0]['status'] == 'succeeded', 'real Main list Tool call missing')
+        views = json.loads(json.loads(calls[0]['result_json'])['text'])
+        old = next(v for v in views if v['automationRef'] == receipt['automationRef'])
+        require(old['instruction'] == old['triggerType'] == old['triggerSpec'] == old['timezone'] == '' and 'nextFire' not in old and 'below' not in old, 'revoked intent fields exposed')
+        require(old['enabled'] and old['version'] > 0, 'safe cancellation controls lost')
+        require(all(marker not in g['request_json'] for g in value['generations']) and all(marker not in t['result_json'] for t in value['tool_invocation']), 'forgotten marker reached Tool/model')
+        require(not value['task'] and not value['automation_fire'], 'list test reached admission')
+        h.command('chat', 'work')
+        require(value == h.evidence(), 'repeat drain changed state')
+        return value, views
+
+    first, views = list_main('list-after-forget')
+    require(len(first['generations']) == 2 and len(views) == 1 and before['automation'] == first['automation'], 'list changed audit or Main call sequence')
+    require(receipt == h.manage('old-intent', **q), 'receipt retry drift')
+    row = views[0]
+    h.manage('edit-old', operation='update', automationRef=row['automationRef'], version=row['version'], instruction=q['instruction'], triggerType='at', triggerSpec='2026-12-02T08:00:00+08:00', timezone='Asia/Shanghai', below=1700)
+    h.manage('new-intent', operation='create', instruction='Fresh independent scheduled intent', triggerType='at', triggerSpec='2026-12-03T08:00:00+08:00', timezone='Asia/Shanghai', below=1600)
+    second, views = list_main('list-fresh-and-revoked')
+    new = next(v for v in views if v['automationRef'] != receipt['automationRef'])
+    require(new['instruction'] == 'Fresh independent scheduled intent' and new['triggerType'] == 'at' and new['triggerSpec'] == '2026-12-03T08:00:00+08:00' and new['timezone'] == 'Asia/Shanghai' and new['below'] == 1600 and new.get('nextFire'), 'fresh Automation visibility changed')
+    old = next(v for v in views if v['automationRef'] == receipt['automationRef'])
+    h.send('cancel-revoked', 'Automation: ' + json.dumps(dict(operation='cancel', automationRef=old['automationRef'], version=old['version'])))
+    h.command('chat', 'work')
+    final = h.evidence()
+    audit = next(a for a in final['automation'] if a['automation_id'] == receipt['automationRef'])
+    require(not audit['enabled'] and audit['instruction'] == q['instruction'] and audit['intent_privacy_epoch'] == before['automation'][0]['intent_privacy_epoch'] and audit['created_at'] == before['automation'][0]['created_at'], 'safe cancellation failed or audit/provenance changed')
+    require(not final['task'] and not final['automation_fire'] and all(marker not in g['request_json'] for g in final['generations']) and all(marker not in t['result_json'] for t in final['tool_invocation']), 'old context reentered execution')
+    h.command('chat', 'work')
+    require(final == h.evidence(), 'cancel restart changed state')
+    return dict(before_forget=before, forget_receipt=forget, memory_tombstones=tombstones, first_list=first, edited_and_fresh_list=second, cancelled=final)
+
+
 def run(binary):
     fixture = json.loads(FIXTURE.read_text())
     report = dict(version=1, fixture=fixture, scenarios={}, scope='Deterministic scheduling and notification fragments of GC-02/08/14, SC-05/12; no full M7 or model-quality score')
@@ -199,6 +252,8 @@ def run(binary):
 
         for pending in (False, True):
             scenario('first-fire-forget-' + ('pending' if pending else 'not-persisted'), lambda h, pending=pending: first_fire_forget(h, persist_before_forget=pending), MemoryHarness)
+
+        scenario('list-after-forget', list_after_forget, MemoryHarness)
 
         for boundary in ('after_result_commit', 'after_report_commit'):
             def edit_committed_result(h, boundary=boundary):

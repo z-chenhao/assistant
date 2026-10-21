@@ -38,7 +38,7 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 		return tool.Result{}, agent.ErrSetup
 	}
 	if q.Operation == "list" {
-		rows, e := tx.QueryContext(ctx, `SELECT automation_id,instruction,trigger_type,trigger_spec,timezone,enabled,version,next_fire_at,below_value FROM automation WHERE agent_id=? ORDER BY created_at,automation_id LIMIT 50`, owner)
+		rows, e := tx.QueryContext(ctx, `SELECT automation_id,instruction,trigger_type,trigger_spec,timezone,enabled,version,next_fire_at,below_value,intent_privacy_epoch=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=automation.agent_id),0) FROM automation WHERE agent_id=? ORDER BY created_at,automation_id LIMIT 50`, owner)
 		if e != nil {
 			return tool.Result{}, e
 		}
@@ -46,8 +46,9 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 		views := []automation.View{}
 		for rows.Next() {
 			var v automation.View
+			var eligible bool
 			var next, below sql.NullInt64
-			if e = rows.Scan(&v.Ref, &v.Instruction, &v.Type, &v.Spec, &v.Timezone, &v.Enabled, &v.Version, &next, &below); e != nil {
+			if e = rows.Scan(&v.Ref, &v.Instruction, &v.Type, &v.Spec, &v.Timezone, &v.Enabled, &v.Version, &next, &below, &eligible); e != nil {
 				return tool.Result{}, e
 			}
 			if next.Valid {
@@ -58,6 +59,11 @@ func (r *Runs) manageAutomation(ctx context.Context, tx *sql.Tx, key string, q a
 				v.Below = &below.Int64
 			}
 			v.Instruction = task.Title(v.Instruction)
+			if !eligible {
+				// Retain only Host control metadata. Instruction, schedule and
+				// threshold are revoked evidence even before any Task exists.
+				v = automation.View{Ref: v.Ref, Enabled: v.Enabled, Version: v.Version}
+			}
 			views = append(views, v)
 		}
 		if e := rows.Err(); e != nil {

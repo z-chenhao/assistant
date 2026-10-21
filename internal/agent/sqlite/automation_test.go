@@ -16,6 +16,7 @@ import (
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/memory"
 	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
+	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
@@ -375,6 +376,180 @@ func TestAutomationForgetSkipsRevokedTaskWithoutBlockingActor(t *testing.T) {
 		raw, _ := encoded(req)
 		if strings.Contains(raw, "HKG-CDG 2026-12-01 price") {
 			t.Fatal("revoked Task context imported", raw)
+		}
+	}
+}
+
+func TestAutomationListAfterForgetUsesSafeControlProjection(t *testing.T) {
+	ctx := context.Background()
+	s, r, a, p := automationFixture(t)
+	m, err := memorysqlite.Open(ctx, filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	r.ConfigureMemory(m, memory.Vault{})
+	now, _ := time.Parse(time.RFC3339, "2026-10-15T12:00:00+08:00")
+	r.SetTestAutomationClock(now)
+	marker := "OLD_HEALTH_AUTOMATION_CONTEXT"
+	threshold := int64(1800)
+	q := automation.Request{Operation: "create", Instruction: marker, Type: "at", Spec: "2026-12-01T08:00:00+08:00", Timezone: "Asia/Shanghai", Below: &threshold}
+	oldReceipt, err := r.ManageAutomation(ctx, "old-intent", q, now)
+	if err != nil || oldReceipt.Error != nil {
+		t.Fatal(oldReceipt, err)
+	}
+	var receipt struct {
+		Ref string `json:"automationRef"`
+	}
+	if err := json.Unmarshal([]byte(oldReceipt.Text), &receipt); err != nil {
+		t.Fatal(err)
+	}
+	oldID := receipt.Ref
+	before, err := r.ManageAutomation(ctx, "before", automation.Request{Operation: "list"}, now)
+	if err != nil || !strings.Contains(before.Text, marker) {
+		t.Fatal("fresh view missing", before, err)
+	}
+	forgotten, err := r.ManageMemory(ctx, "forget-health", memory.Mutation{Operation: "forget", Category: "health"})
+	if err != nil || forgotten["accepted"] != true {
+		t.Fatal(forgotten, err)
+	}
+	retry, err := r.ManageAutomation(ctx, "old-intent", q, now)
+	if err != nil || retry.Text != oldReceipt.Text {
+		t.Fatal("receipt drift", retry, err)
+	}
+	edit := q
+	edit.Operation = "update"
+	edit.Ref = oldID
+	edit.Version = 1
+	edit.Spec = "2026-12-02T08:00:00+08:00"
+	if result, err := r.ManageAutomation(ctx, "edit-old", edit, now); err != nil || result.Error != nil {
+		t.Fatal(result, err)
+	}
+	freshQ := q
+	freshQ.Instruction = "Fresh independent intent"
+	if result, err := r.ManageAutomation(ctx, "new-intent", freshQ, now); err != nil || result.Error != nil {
+		t.Fatal(result, err)
+	}
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "management complete"}, nil
+		}
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "list", Name: automation.ManageName, Arguments: `{"operation":"list"}`}}}, nil
+	}
+	main := mustSubmit(t, a, "fresh-list", `Automation: {"operation":"list"}`)
+	mustDrain(t, a)
+	mustDrain(t, a)
+	if len(p.requests) != 2 || scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status='completed'`, main.RunID) != 1 {
+		t.Fatal("real Main/Tool cycle incomplete")
+	}
+	var raw string
+	if err := s.db.QueryRow(`SELECT result_json FROM tool_invocation WHERE run_id=? AND tool_name=? AND status='succeeded'`, main.RunID, automation.ManageName).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var result tool.Result
+	var views []automation.View
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(result.Text), &views); err != nil {
+		t.Fatal(err)
+	}
+	if len(views) != 2 {
+		t.Fatal("management handles lost", views)
+	}
+	var old automation.View
+	for _, v := range views {
+		if v.Ref == oldID {
+			old = v
+			if v.Instruction != "" || v.Type != "" || v.Spec != "" || v.Timezone != "" || v.Next != nil || v.Below != nil || v.Version != 2 || !v.Enabled {
+				t.Fatal("revoked intent fields exposed or controls lost", v)
+			}
+		} else if v.Instruction != freshQ.Instruction || v.Type != freshQ.Type || v.Spec != freshQ.Spec || v.Timezone != freshQ.Timezone || v.Next == nil || v.Below == nil || *v.Below != threshold {
+			t.Fatal("fresh view changed", v)
+		}
+	}
+	if old.Ref == "" || strings.Contains(raw, marker) {
+		t.Fatal("old context exposed or cancellation handle missing")
+	}
+	for _, req := range p.requests {
+		data, _ := encoded(req)
+		if strings.Contains(data, marker) {
+			t.Fatal("revoked context in model request")
+		}
+	}
+	if scalar(t, s, `SELECT count(*) FROM automation WHERE automation_id=? AND instruction=? AND intent_privacy_epoch=0 AND version=2`, oldID, marker) != 1 || scalar(t, s, `SELECT count(*) FROM task`) != 0 || scalar(t, s, `SELECT count(*) FROM automation_fire`) != 0 {
+		t.Fatal("list changed audit/provenance or executed work")
+	}
+	cancelArgs, _ := encoded(automation.Request{Operation: "cancel", Ref: old.Ref, Version: old.Version})
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "cancelled"}, nil
+		}
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "cancel", Name: automation.ManageName, Arguments: cancelArgs}}}, nil
+	}
+	mustSubmit(t, a, "cancel-old", "Cancel the revoked schedule using its control handle")
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM automation WHERE automation_id=? AND enabled=0 AND instruction=? AND intent_privacy_epoch=0`, oldID, marker) != 1 {
+		t.Fatal("safe model cancellation failed or audit changed")
+	}
+}
+
+func TestAutomationLinkedTaskProjectionAfterForget(t *testing.T) {
+	ctx := context.Background()
+	s, r, a, p := automationFixture(t)
+	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	defs := append([]tool.Definition{echo}, automation.Definitions()...)
+	defs = append(defs, task.Definitions()...)
+	registry, err := tool.NewRegistry(defs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.registry = registry
+	a.Registry = registry
+	m, err := memorysqlite.Open(ctx, filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	r.ConfigureMemory(m, memory.Vault{})
+	now := time.Now().UTC()
+	createAutomation(t, r, now, nil)
+	r.SetTestAutomationClock(now.AddDate(0, 0, 1))
+	p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		return llm.GenerationResult{Text: "HKG-CDG 2026-12-01 price result"}, nil
+	}
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM task`) != 1 {
+		t.Fatal("linked Task fixture missing")
+	}
+	if _, err := r.ManageMemory(ctx, "forget", memory.Mutation{Operation: "forget", Category: "health"}); err != nil {
+		t.Fatal(err)
+	}
+	p.requests = nil
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "safe management"}, nil
+		}
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "list", Name: automation.ManageName, Arguments: `{"operation":"list"}`}, {ID: "search", Name: task.SearchName, Arguments: `{"scope":"all"}`}}}, nil
+	}
+	fresh := mustSubmit(t, a, "fresh-search", "List Automation controls and search current Tasks")
+	mustDrain(t, a)
+	mustDrain(t, a)
+	var raw string
+	if err := s.db.QueryRow(`SELECT result_json FROM tool_invocation WHERE run_id=? AND tool_name=? AND status='succeeded'`, fresh.RunID, task.SearchName).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var result tool.Result
+	if err := json.Unmarshal([]byte(raw), &result); err != nil || result.Text != "[]" {
+		t.Fatal("revoked Automation Task searchable", raw, err)
+	}
+	if len(p.requests) != 2 {
+		t.Fatal("Main Tool cycle incomplete")
+	}
+	for _, req := range p.requests {
+		data, _ := encoded(req)
+		if strings.Contains(data, "HKG-CDG 2026-12-01 price") {
+			t.Fatal("Automation-derived context reentered Main")
 		}
 	}
 }
