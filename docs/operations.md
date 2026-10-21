@@ -220,3 +220,21 @@ do not trip it. Existing account monetary admission remains independent of Tool
 approval and does not become a Token budget. Default scheduler and safety limits
 remain unchanged until measurements justify a change. Release-time live accounts,
 macOS compatibility and semantic Golden Case scoring remain separately reported.
+
+Recorded local samples are in [operations-capacity.json](operations-capacity.json).
+On one Apple M4 Max (16 logical CPUs, 64 GiB), the unchanged 100-item harness had
+these observations; all six samples passed with the original limits.
+
+| Observation | Before | After |
+| --- | --- | --- |
+| Three samples (seconds) | 9.327, 8.726, 8.893 | 9.041, 8.971, 9.012 |
+| Median (seconds) | 8.893 | 9.012 |
+| Max–min (seconds) | 0.601 | 0.070 |
+
+The median changed by about +1.3%, within the observed before range; three
+samples do not establish a general performance difference. Defaults stay at
+16 Children/tree, 32 global Workers and the original safety ceilings. A separate
+three-cycle test reused one state root for 3000 Children: 2994 completed, six
+injected business failures were aggregated, and every cycle released all Worker
+leases. These are bounded deterministic capacity observations, not a production
+duration or model-quality certification.
