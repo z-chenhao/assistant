@@ -150,7 +150,7 @@ def run(binary,evidence):
             report['checks'].append('Drive/Evidence: Web and signed Feishu callbacks share ordered Conversation; concurrent event/source retries, drift rejection and restart produce one remote reply')
             # Incoming attachment import is stable across independent callback IDs.
             h.callback('media-message','',kind='file')
-            h.wait(lambda s:len(s['inputs'])==3 and all(d['status']=='sent' for d in s['deliveries']),'attachment reply')
+            h.wait(lambda s:len(s['inputs'])==3 and len(s['deliveries'])==3 and all(d['status']=='sent' for d in s['deliveries']),'attachment reply')
             h.callback('media-message','',kind='file',event='media-retry')
             state=h.rows();require(len(state['resources'])==2 and len(state['inputs'])==3,'attachment duplicate changed reference')
             attached=[p['artifact_ref'] for m in h.http('/api/conversation') if m['source']=='feishu' for p in m['content'] if p.get('artifact_ref')]
@@ -181,7 +181,7 @@ def run(binary,evidence):
             h.http('/approval',data=urlencode(dict(approval_id=approval['approval_id'],hash='drift',decision='approved')).encode(),headers={'Content-Type':'application/x-www-form-urlencoded'},expected=409)
             command='/approve '+approval['approval_id']+' '+approval['frozen_arguments_hash']
             with ThreadPoolExecutor(max_workers=6) as pool:list(pool.map(lambda i:h.callback('approve-'+str(i),command),range(6)))
-            state=h.wait(lambda s:any(t['tool_name']=='mcp__fixture__send' and t['status']=='succeeded' for t in s['tools']) and all(d['status']=='sent' for d in s['deliveries']),'approved effect once')
+            state=h.wait(lambda s:any(t['tool_name']=='mcp__fixture__send' and t['status']=='succeeded' for t in s['tools']) and len(s['deliveries'])==3 and all(d['status']=='sent' for d in s['deliveries']),'approved effect once')
             effects=[t for t in state['tools'] if t['tool_name']=='mcp__fixture__send' and t['status']=='succeeded']
             require(len(effects)==1 and effects[0]['attempt_count']==1,'duplicate approved effect')
             frozen=json.loads(effects[0]['arguments_json'])
@@ -268,10 +268,11 @@ def extra_scenarios(binary,report):
                     h.callback(case,'Delegate: Prepare the wedding venue checklist with material dependencies; contact nobody.')
                     h.wait(lambda s:len(s['runs'])>=3 and all(r['status']=='completed' for r in s['runs']),'GC-08 Task completion')
                     h.http('/api/message',dict(source_id='wedding-update',content=[dict(type='text',text='Continue: wedding | Guests confirmed: 128. Preserve the checklist and ask before contacting the hotel.')]))
-                    h.wait(lambda s:len([r for r in s['runs'] if r['kind']=='worker'])==2 and all(r['status']=='completed' for r in s['runs']),'GC-08 continuation')
+                    h.wait(lambda s:len([r for r in s['runs'] if r['kind']=='worker'])==2 and all(r['status']=='completed' for r in s['runs']) and len(s['deliveries'])==4 and all(d['status']=='sent' for d in s['deliveries']),'GC-08 continuation')
                     with sqlite3.connect(h.root/'data/state.db') as db:
                         tasks=list(db.execute('SELECT task_id,anchor_task,task_epoch FROM task'))
                         instructions=list(db.execute('SELECT instruction FROM task_instruction'))
+                    require(len(platform.evidence()['messages'])==3,'wedding notices did not use bound/default Feishu')
                     require(len(tasks)==1 and tasks[0][2]==2 and len(instructions)==1 and '128' in instructions[0][0],'wedding continuity broken')
                     history=h.http('/api/conversation')
                 else:

@@ -11,7 +11,9 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/interaction"
+	"github.com/z-chenhao/erii/internal/interaction/feishu"
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
@@ -129,13 +131,17 @@ func TestChannelRouteFreezeCASRevocationAndDefault(t *testing.T) {
 	if len(rows) != 1 || rows[0].Channel != "feishu" || rows[0].DestinationRef != "chat" {
 		t.Fatal(rows)
 	}
-	if e = s.DeliveryDestinationAllowed(ctx, rows[0]); e != nil {
+	if _, e = s.DeliveryBinding(ctx, rows[0]); e != nil {
 		t.Fatal(e)
 	}
 	drift := rows[0]
 	drift.DestinationRef = "other"
-	if s.DeliveryDestinationAllowed(ctx, drift) == nil {
+	if _, e := s.DeliveryBinding(ctx, drift); e == nil {
 		t.Fatal("frozen destination drift allowed")
+	}
+	wrongApp := feishu.Adapter{Client: feishu.Client{Config: feishu.Config{AppID: "other-app", TenantKey: "tenant"}}, Store: s}
+	if observed := wrongApp.Send(ctx, delivery.Envelope{Request: rows[0]}); observed.Outcome != delivery.Failed {
+		t.Fatal("changed Feishu app acquired old delivery", observed)
 	}
 	if _, e = s.BindChannel(ctx, b.Channel, b.Subject, b.Destination, false, 0); !errors.Is(e, agent.ErrConflict) {
 		t.Fatal("binding CAS bypass", e)
@@ -143,7 +149,7 @@ func TestChannelRouteFreezeCASRevocationAndDefault(t *testing.T) {
 	if _, e = s.BindChannel(ctx, b.Channel, b.Subject, b.Destination, false, b.Version); e != nil {
 		t.Fatal(e)
 	}
-	if s.DeliveryDestinationAllowed(ctx, rows[0]) == nil {
+	if _, e := s.DeliveryBinding(ctx, rows[0]); e == nil {
 		t.Fatal("revoked delivery allowed")
 	}
 	if _, e = r.AcceptInbound(ctx, q); !errors.Is(e, interaction.ErrUnauthorized) {

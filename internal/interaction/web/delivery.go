@@ -6,10 +6,11 @@ import (
 
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/delivery/ui"
+	"github.com/z-chenhao/erii/internal/interaction"
 )
 
 type ProjectionStore interface {
-	DeliveryDestinationAllowed(context.Context, delivery.Request) error
+	DeliveryBinding(context.Context, delivery.Request) (interaction.Binding, error)
 	SaveProjection(context.Context, string, string, int, any) (json.RawMessage, error)
 	ChannelReceipt(context.Context, string, int, string) (string, error)
 	AcceptChannelReceipt(context.Context, string, int, string, string) error
@@ -18,7 +19,8 @@ type Adapter struct{ Store ProjectionStore }
 
 func (Adapter) Idempotent() bool { return true }
 func (a Adapter) Query(ctx context.Context, e delivery.Envelope) delivery.Observation {
-	if a.Store.DeliveryDestinationAllowed(ctx, e.Request) != nil {
+	binding, err := a.Store.DeliveryBinding(ctx, e.Request)
+	if err != nil || binding.Subject != Subject || binding.Destination != Destination {
 		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
 	}
 	hash := ui.Hash(e.Message)

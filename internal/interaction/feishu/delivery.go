@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/delivery/ui"
+	"github.com/z-chenhao/erii/internal/interaction"
 )
 
 type DeliveryStore interface {
-	DeliveryDestinationAllowed(context.Context, delivery.Request) error
+	DeliveryBinding(context.Context, delivery.Request) (interaction.Binding, error)
 	SaveProjection(context.Context, string, string, int, any) (json.RawMessage, error)
 	ChannelReceipt(context.Context, string, int, string) (string, error)
 	AcceptChannelReceipt(context.Context, string, int, string, string) error
@@ -37,7 +39,8 @@ func (a Adapter) Send(ctx context.Context, e delivery.Envelope) delivery.Observa
 }
 func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) delivery.Observation {
 	fail := delivery.Observation{Outcome: delivery.Unknown}
-	if a.Store.DeliveryDestinationAllowed(ctx, e.Request) != nil {
+	binding, bindingErr := a.Store.DeliveryBinding(ctx, e.Request)
+	if bindingErr != nil || !strings.HasPrefix(binding.Subject, a.Client.Subject("")) {
 		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
 	}
 	if _, err := delivery.Compose(e.Request, e.Message); err != nil || e.Request.Channel != "feishu" {

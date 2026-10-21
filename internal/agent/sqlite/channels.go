@@ -240,16 +240,19 @@ func (s *Store) AcceptChannelReceipt(ctx context.Context, id string, part int, h
 		return err
 	})
 }
-func (s *Store) DeliveryDestinationAllowed(ctx context.Context, request delivery.Request) error {
-	var valid int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM delivery_request d JOIN message_route m USING(message_id) JOIN channel_binding b USING(binding_id) WHERE d.delivery_id=? AND d.message_id=? AND d.conversation_id=? AND d.channel=? AND d.destination_ref=? AND d.intent=? AND d.idempotency_key=? AND d.channel=b.channel AND d.destination_ref=b.destination AND b.enabled=1`, request.DeliveryID, request.MessageID, request.ConversationID, request.Channel, request.DestinationRef, request.Intent, request.IdempotencyKey).Scan(&valid)
+
+// DeliveryBinding validates the entire frozen destination and returns the
+// enrolled identity, so adapters also fence changes of platform app/account.
+func (s *Store) DeliveryBinding(ctx context.Context, request delivery.Request) (interaction.Binding, error) {
+	var b interaction.Binding
+	err := s.db.QueryRowContext(ctx, `SELECT b.binding_id,b.channel,b.subject,b.destination,b.enabled,b.version FROM delivery_request d JOIN message_route m USING(message_id) JOIN channel_binding b USING(binding_id) WHERE d.delivery_id=? AND d.message_id=? AND d.conversation_id=? AND d.channel=? AND d.destination_ref=? AND d.intent=? AND d.idempotency_key=? AND d.channel=b.channel AND d.destination_ref=b.destination AND b.enabled=1`, request.DeliveryID, request.MessageID, request.ConversationID, request.Channel, request.DestinationRef, request.Intent, request.IdempotencyKey).Scan(&b.ID, &b.Channel, &b.Subject, &b.Destination, &b.Enabled, &b.Version)
+	if err == sql.ErrNoRows {
+		return b, interaction.ErrUnauthorized
+	}
 	if err != nil {
-		return agent.ErrStorage
+		return b, agent.ErrStorage
 	}
-	if valid != 1 {
-		return interaction.ErrUnauthorized
-	}
-	return nil
+	return b, nil
 }
 
 func (s *Store) AgentStatus(ctx context.Context) (string, error) {

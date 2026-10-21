@@ -46,7 +46,8 @@ work on shutdown. An explicitly revoked Web binding stays revoked on restart.
 `channel manage` also accepts `list`, `preference`, `prefer` and versioned `bind`
 updates. Set `enabled:false` with the current binding version to revoke access.
 There is no destination migration: enroll a new destination and select it for
-future work. Frozen deliveries keep their original destination.
+future work. Frozen deliveries keep their original destination. A changed Feishu app/tenant
+cannot acquire an old binding’s pending delivery.
 
 Web uses a process-local, one-hour HttpOnly/SameSite=Strict session after token
 login, or a Bearer token for API access. It rejects DNS rebinding, cross-site

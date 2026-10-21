@@ -444,7 +444,7 @@ recovery, supported transports and release evidence limits.
 
 | Feature | How to reach it | Authoritative entry point | Evidence |
 | --- | --- | --- | --- |
-| Owner-bound channel access | `channel manage` bind/list; Web token login; signed `/feishu/callback` | `interaction/web`, `interaction/feishu.Client.Verify`, schema 025 binding/CAS | Browser setup, CSRF/DNS/auth rejection, signed/encrypted event, token/app/tenant/recipient tests; revoked binding and preference CAS |
+| Owner-bound channel access | `channel manage` bind/list; Web token login; signed `/feishu/callback` | `interaction/web`, `interaction/feishu.Client.Verify`, schema 025 binding/CAS | Browser setup, CSRF/DNS/auth rejection, signed/encrypted event, token/app/tenant/recipient tests; revoked binding, changed outbound app/tenant, frozen-destination drift and preference CAS |
 | One shared Conversation | Web `/`, `POST /api/message`, TUI chat and Feishu v2 p2p message | `Runs.AcceptInbound` -> existing `submit`/Actor; callback/source aliases and message route in one transaction | Concurrent callback IDs, same source/new event retry, content drift, one Main/input/reply; GC-08 continuation and GC-09 agenda transport fragments; SIGKILL before/after input commit |
 | Safe channel UI | Web conversation/settings, Feishu card, TUI fallback | `delivery/ui` Composer and persisted `delivery_projection` | Real browser screenshots/DOM in `channels-ui/`; escaped tables/markup, unknown-version/component and failed-component text fallback tests; no raw Run/Tool traces |
 | Read-only progress | Web `/progress`, `GET /api/progress` | Existing `Runs.Activity` aggregate projection | Browser asserts no management buttons; underlying Task/Child aggregation tests; ordinary progress does not notify |
