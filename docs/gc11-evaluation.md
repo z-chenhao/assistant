@@ -96,6 +96,18 @@ verified owned Agent namespace and installation paths are normalized; every
 permission/schema remains exact. Model snapshots stay separate per arm,
 including provider/model/wire/reasoning/compatibility metadata.
 
+Within each arm, all thirty trials must have one canonical model identity.
+Compare every generation snapshot, retaining endpoint hashes, model, wire,
+reasoning, defaults, limits, compatibility, capabilities and any future model
+fields. Only installation-generated snapshot/profile/auth-reference IDs,
+timestamps and profile version counters are normalized across installations;
+each trial still checks its exact approved profile ID/version and frozen
+snapshot. Raw snapshots remain separately recorded. Local and account arms
+may use different models; neither arm may switch models between trials.
+Preflight emits the two canonical identities for inspection and rejects drift
+before claiming matching conditions. Synthetic diagnostic cohorts and unit
+tests do not produce real-model execution or semantic grades.
+
 Latency, completed-reply time, usage, calls and CLI-host child CPU/hardware are retained.
 External model/GPU resource measurements remain unknown. Fixture seed zero does
 not pretend that an unsupported provider seed was set; actual generation defaults

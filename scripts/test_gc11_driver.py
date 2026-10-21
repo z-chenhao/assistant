@@ -10,6 +10,7 @@ import signal
 import socket
 import time
 import unittest
+from unittest.mock import patch
 
 from case_runner import digest, load_contract
 import gc11_driver as d
@@ -26,7 +27,12 @@ class DriverTests(unittest.TestCase):
         cap=dict(snapshot_id='cap',created_at=1,data_scope=prefix+'-agent',role='main',can_spawn_agents=0,
                  tools_json=json.dumps([dict(name='mcp__fixture__read',permission='read_only')]))
         model=dict(profile_id=identity['profile_id'],profile_version=2,**identity['limits'],
-                   provider_kind='openai_compatible' if arm=='local' else 'openai_account')
+                   provider_kind='openai_compatible' if arm=='local' else 'openai_account',
+                   model_id='local-model' if arm=='local' else 'account-model',
+                   wire_api='openai_completions' if arm=='local' else 'openai_responses',
+                   generation_defaults={},compatibility={'tool_result_format':'openai'},
+                   capabilities={'text_input':True,'image_input':False})
+        if arm=='local':model['endpoint_hash']='3'*64
         value=dict(agent_id=prefix+'-agent',capabilities=[cap],conversation=[],tools=[],runs=[],generations=[],
                    task=[],approval=[],automation=[],artifact=[],deliveries=[])
         for i,text in enumerate(d.prompts(variant)):
@@ -74,6 +80,76 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(result['eligible_for_model_comparison'])
         self.assertIsNone(result['scores']);self.assertIsNone(result['winner'])
 
+    def rewrite_model(self, report, **changes):
+        for generation in report['state']['generations']:
+            request=json.loads(generation['request_json'])
+            request['model_snapshot'].update(changes)
+            generation['request_json']=json.dumps(request)
+        report['snapshots']=[json.loads(g['request_json'])['model_snapshot'] for g in report['state']['generations']]
+        report['conditions'].update(d.derived_conditions(report['state'],report['identity'],report['variant']))
+        report['conditions_digest']=digest(report['conditions'])
+        report['replay_state_digest']=digest(report['state'])
+        report['assertions']=dict(d.observe(report['state'],report['state'],d.prompts(report['variant']),
+                                          report['artifacts'],report['identity']),source_stable=True)
+
+    def test_model_parameters_are_frozen_within_each_arm(self):
+        changes=dict(model_id='switched-model',endpoint_hash='4'*64,
+                     endpoint='http://another-model/v1',wire_api='another-wire',
+                     reasoning_effort='high',generation_defaults={'temperature':0.75},
+                     compatibility={'tool_result_format':'provider_specific'},
+                     capabilities={'text_input':True,'image_input':True},future_model_parameter='changed')
+        for arm in ('local','account'):
+            for index in (0,29):
+                for field,value in changes.items():
+                    with self.subTest(arm=arm,trial=index,field=field):
+                        reports=self.cohort()
+                        trial=[r for r in reports if r['identity']['arm']==arm][index]
+                        # Both turns, raw state, snapshot copies and all witnesses
+                        # agree: only cross-trial identity validation catches this.
+                        self.rewrite_model(trial,**{field:value})
+                        self.assertTrue(all(trial['assertions'].values()))
+                        with self.assertRaises(ValueError):d.preflight(reports)
+
+    def test_per_arm_identity_normalizes_only_installation_metadata(self):
+        reports=self.cohort()
+        for n,r in enumerate(reports):
+            r['identity']['profile_version']=n+2
+            self.rewrite_model(r,profile_version=n+2,created_at=f'installation-time-{n}',
+                               auth_connection_id=f'installation-connection-{n}')
+        result=d.preflight(reports)
+        models=result['model_identities']
+        self.assertEqual(models['local']['model_id'],'local-model')
+        self.assertEqual(models['account']['model_id'],'account-model')
+        self.assertNotEqual(models['local'],models['account'])
+        for model in models.values():
+            self.assertTrue({'provider_kind','model_id','wire_api','generation_defaults','compatibility','capabilities'}<=model.keys())
+            self.assertFalse({'snapshot_id','profile_id','profile_version','created_at','auth_connection_id'} & model.keys())
+        self.assertEqual(len(result['snapshots']['local']),30)
+        self.assertEqual(result['snapshots']['account'][29]['model_snapshot']['profile_version'],61)
+        self.assertFalse(result['eligible_for_model_comparison'])
+        self.assertIsNone(result['scores']);self.assertIsNone(result['winner'])
+
+    def test_synthetic_live_admission_rejects_coherent_model_switch(self):
+        # Synthetic receipts plus mocked source identity exercise live admission,
+        # not a real model trial or quality evaluation. No model process runs.
+        reports=self.cohort();binary=Path(__file__).resolve()
+        driver_hash=digest({p:d.file_hash(d.ROOT/p) for p in (
+            'scripts/gc11_driver.py','scripts/verify_main.py','scripts/quote_case.py','scripts/case_runner.py')})
+        for r in reports:
+            r['identity']['execution_kind']='live_model'
+            for name,value in dict(driver_sha256=driver_hash,binary_sha256=d.file_hash(binary)).items():
+                r['conditions'][name]=value
+                for phase in ('before','after'):r['source_provenance'][phase][name]=value
+            r['conditions_digest']=digest(r['conditions'])
+        with patch.object(d,'source_state',return_value=dict(source_sha='a'*40,source_dirty=False)):
+            baseline=d.preflight(reports,binary)
+            self.assertTrue(baseline['eligible_for_model_comparison'])
+            self.assertIsNone(baseline['scores']);self.assertIsNone(baseline['winner'])
+            self.rewrite_model(reports[0],model_id='model-B',endpoint_hash='6'*64,
+                               compatibility={'version':'B'})
+            with self.assertRaisesRegex(ValueError,'model identity drift within arm: local'):
+                d.preflight(reports,binary)
+
     def test_missing_duplicate_reused_or_drifted_trials_are_rejected(self):
         original=self.cohort()
         for change in ('missing','duplicate','reused_run','input','limit','context','scope','assertion','replay','score','cleanup','model','source','dirty'):
@@ -111,6 +187,17 @@ class DriverTests(unittest.TestCase):
             result=subprocess.run(command,text=True,capture_output=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertFalse(json.loads(output.read_text())['eligible_for_model_comparison'])
+            original=json.loads((trials/'0.json').read_text())
+            switched=copy.deepcopy(original)
+            self.rewrite_model(switched,model_id='another-model',endpoint_hash='5'*64,
+                               compatibility={'tool_result_format':'provider_specific'})
+            (trials/'0.json').write_text(json.dumps(switched))
+            rejected=subprocess.run(command,text=True,capture_output=True)
+            self.assertNotEqual(rejected.returncode,0)
+            self.assertIn('model identity drift within arm: local',rejected.stderr)
+            self.assertFalse(output.exists())
+            (trials/'0.json').write_text(json.dumps(original))
+            self.assertEqual(subprocess.run(command,capture_output=True).returncode,0)
             (trials/'0.json').unlink()
             self.assertNotEqual(subprocess.run(command,capture_output=True).returncode,0)
             self.assertFalse(output.exists())

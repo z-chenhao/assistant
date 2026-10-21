@@ -1364,17 +1364,21 @@
       "line": 1180,
       "sha256": "a027549c2623a43a8229ce797431f748cb8347b95f56d853eca68a9cbcbfa37e",
       "disposition": "evidence_gap",
-      "observed": "已实现60份收据的冻结条件前置检查，直接重建原始输入/初始Context/工具schema/limits；离线CLI负例拒绝缺失、重复、暗加提示、过期/脏源码和不完整清理，保留各模型快照。",
+      "observed": "已实现60份收据的冻结条件前置检查，直接重建原始输入/初始Context/工具schema/limits；独立评审发现同臂跨试验模型漂移可被放行，现增加每臂30次试验的全部快照身份检查，保留endpoint hash/model/wire/reasoning/defaults/compatibility/capabilities，仅归一化安装生成的标识和版本计数。回归覆盖首末试验、双臂、合成live admission及真实CLI拒绝；保留独立原始快照和null评分。",
       "remaining": "尚无批准的local/account真实模型收据、受约束评分、延迟/GPU资源实测或人审，不能把HTTP Fake或匹配条件当作比较已通过。",
       "code": [
         "internal/agent/loop.go#ContinueAgentLoop",
         "internal/agent/sqlite/runs.go#model_snapshot_id",
         "scripts/gc11_driver.py#observe",
-        "scripts/gc11_driver.py#preflight"
+        "scripts/gc11_driver.py#preflight",
+        "scripts/gc11_driver.py#comparison_model"
       ],
       "tests": [
         "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
-        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output",
+        "scripts/test_gc11_driver.py#test_model_parameters_are_frozen_within_each_arm",
+        "scripts/test_gc11_driver.py#test_per_arm_identity_normalizes_only_installation_metadata",
+        "scripts/test_gc11_driver.py#test_synthetic_live_admission_rejects_coherent_model_switch"
       ],
       "evidence": [
         "scripts/verify_local_provider.py#verify_gc11_driver",

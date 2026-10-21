@@ -133,6 +133,22 @@ def frozen_model(snapshot):
     return {k: v for k, v in snapshot.items() if k not in ('snapshot_id','created_at')}
 
 
+def comparison_model(snapshot):
+    required={'provider_kind','model_id','wire_api','context_window','max_output_tokens',
+              'generation_defaults','compatibility','capabilities'}
+    if (not required <= snapshot.keys() or
+            any(not isinstance(snapshot[k],str) or not snapshot[k].strip()
+                for k in ('provider_kind','model_id','wire_api')) or
+            any(not isinstance(snapshot[k],dict)
+                for k in ('generation_defaults','compatibility','capabilities'))):
+        raise ValueError('incomplete comparison model identity')
+    # Fresh installations generate their own profile/auth references and local
+    # version counters. observe() still freezes those exactly within each trial.
+    # Retain every other field, including endpoint_hash and future model fields.
+    return {k:v for k,v in frozen_model(snapshot).items()
+            if k not in ('profile_id','profile_version','auth_connection_id')}
+
+
 def provenance(binary, manifest, config):
     return dict(**source_state(),binary_sha256=file_hash(binary),
                 driver_sha256=digest({p:file_hash(ROOT/p) for p in (
@@ -314,6 +330,13 @@ def preflight(reports, binary=None):
         indexed[key]=r
     if set(indexed)!=expected:
         raise ValueError('requires exactly two arms, six variants and five repetitions')
+    model_identities={}
+    for arm in ('local','account'):
+        models=[comparison_model(snapshot) for r in reports if r['identity']['arm']==arm
+                for snapshot in r['snapshots']]
+        if any(model!=models[0] for model in models):
+            raise ValueError('frozen model identity drift within arm: '+arm)
+        model_identities[arm]=models[0]
     common=lambda r:{k:v for k,v in r['conditions'].items() if k not in ('inputs','initial_messages')}
     if any(common(r)!=common(reports[0]) for r in reports):
         raise ValueError('source/configuration/limit drift across variants')
@@ -331,6 +354,7 @@ def preflight(reports, binary=None):
             raise ValueError('live cohort must match the current clean source/driver and explicit binary')
     return dict(status='conditions_match; grading unexecuted' if live else 'inconclusive; offline fixture cohort',
                 trials=len(reports),eligible_for_model_comparison=live,scores=None,winner=None,
+                model_identities=model_identities,
                 snapshots={a:[dict(variant_id=r['identity']['variant_id'],repetition=r['identity']['repetition'],
                                   model_snapshot=r['snapshots'][0]) for r in reports if r['identity']['arm']==a] for a in ('local','account')})
 
