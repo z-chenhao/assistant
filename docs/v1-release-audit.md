@@ -44,7 +44,7 @@ the nonzero completion boundary through the actual CLI.
 
 | Gap | Inspectable current state | Required next evidence |
 | --- | --- | --- |
-| GC-02 Turn 4 | `run_m6_cases.py` explicitly returns `automation: not_applicable; M7`; `verify_automation.py` tests the monthly date separately | One complete personal journey through the actual Automation tool, with no duplicate schedule and first fire 2026-11-29 20:00 +08:00 |
+| GC-02 semantic quality | The existing six-variant driver now processes all four turns in order and creates one monthly Automation through the Main Tool; it asserts no early Task/schedule, first fire 2026-11-29 20:00 +08 and duplicate-input idempotency | Unscripted interview/constraint selection and semantic grades remain unverified; scripted scheduling evidence is not a product Case score |
 | GC-08 | `verify_channels.py` uses earlier Task continuation; exact wedding checklist is not driven | C1→C2 dependency, 128 guests, unknown tables, hotel draft/frozen recipient/body/attachment; C3 stays lower priority |
 | GC-09 | Main agenda and Web transport fragments exist | Exact full M7 case record, required variants, notification/Steering and semantic grades |
 | GC-11 | `verify_capabilities.py` exercises the quote/Artifact fragment | Complete two-turn three-quote recommendation; conditional oral cashback, written evidence, no purchase |
@@ -68,6 +68,15 @@ before assigning a release disposition. The audit does not run a forced major
 upgrade or change dependency locks.
 
 ## Existing system and recovery evidence
+
+GC-02 now reaches the same M7 Automation boundary within its existing locked
+wording/noise/order journeys, rather than deferring Turn 4. Its Automation clock
+uses the fixed Case time; Host leases still use wall time. The driver retains
+all four original user events, Memory supersede/deletion, an independent CLI
+schedule readback and before/after/replay state. The five-round M6 aggregate
+requires all six monthly assertions; omitting one in every round fails closed.
+No fixture, scoring policy or production protocol changed. Remaining M7
+journeys are unverified rather than treated as release-time not applicable.
 
 The next exact-head run, 39575536939 on `980dc12`, passed all functional shards
 but exceeded the race job's ten-minute cap. Its static SQLite partitions had
