@@ -12,12 +12,12 @@ import json
 import os
 from pathlib import Path
 import signal
-import subprocess
 import tarfile
 import tempfile
 import threading
 
 from terminal_driver import Terminal
+from fixture_pool import run as owned_run, run_cases
 from verify_local_provider import Endpoint
 from verify_main import MainHarness, assert_final, require
 from verify_tui import local_setup
@@ -30,7 +30,7 @@ class StartupHarness(MainHarness):
         return [str(self.binary), *args]
 
 
-def verify():
+def verify_install():
     report = dict(version=1, checks=[], live_model='not_run')
     with tempfile.TemporaryDirectory(prefix='erii-start-') as tmp:
         root = Path(tmp)
@@ -43,7 +43,7 @@ def verify():
             env['GOROOT'] = base_sdk
             env['PATH'] = str(Path(base_sdk) / 'bin') + os.pathsep + env['PATH']
         def run(*args):
-            result = subprocess.run(args, cwd=ROOT, env=env, text=True,
+            result = owned_run(args, cwd=ROOT, env=env, text=True,
                                     capture_output=True, timeout=120)
             require(result.returncode == 0, result.stdout + result.stderr)
             return result.stdout
@@ -75,7 +75,7 @@ def verify():
         (protected / 'bin').mkdir(parents=True)
         sentinel = protected / 'bin/erii'
         sentinel.write_text('user executable')
-        rejected = subprocess.run(['sh', str(installer), '--prefix', str(protected)],
+        rejected = owned_run(['sh', str(installer), '--prefix', str(protected)],
                                   cwd=folder, env=env, capture_output=True, text=True, timeout=10)
         require(rejected.returncode != 0 and sentinel.read_text() == 'user executable',
                 'installer overwrote an unrelated executable')
@@ -118,11 +118,18 @@ def verify():
             server.shutdown()
             server.server_close()
             thread.join(timeout=5)
+            require(not thread.is_alive(), 'local model peer did not stop')
         report['package_log'] = package_log
         report['install_log'] = install_log
     require(not root.exists(), 'startup fixtures leaked')
     report['cleanup'] = 'all owned processes joined; temporary installation, broker, database and archive removed'
     return report
+
+
+def verify():
+    # Reuse the project process owner for failed installs, timeouts and PTYs too.
+    # Retirement checks the entire owned session, including Node descendants.
+    return run_cases([None], lambda _: verify_install(), jobs=1)[0]
 
 
 if __name__ == '__main__':
