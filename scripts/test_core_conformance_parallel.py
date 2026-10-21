@@ -1,7 +1,6 @@
 import json
 import subprocess
 import threading
-import time
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -14,6 +13,7 @@ class ConformanceSchedulingTests(unittest.TestCase):
     def drive(self, mutation=None, cpus=4):
         calls, active, peak = [], 0, 0
         lock = threading.Lock()
+        barrier = threading.Barrier(4 if cpus >= 4 else 2 if cpus >= 2 else 1)
 
         def execute(command, **kwargs):
             nonlocal active, peak
@@ -23,7 +23,7 @@ class ConformanceSchedulingTests(unittest.TestCase):
                 active += 1
                 peak = max(peak, active)
                 index = len(calls)
-            time.sleep(.03)
+            barrier.wait(timeout=3)
             events = [dict(Test=name, Action='pass') for name in selected]
             if index == 1:
                 if mutation == 'missing': events.pop()
