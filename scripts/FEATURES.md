@@ -10,6 +10,7 @@ is inconclusive. See [scope, gaps and recovery evidence](../docs/v1-release-audi
 | Feature | Boundary | Authoritative implementation | Evidence |
 | --- | --- | --- | --- |
 | Inspectable release inventory | Local operator CLI above | `release_audit.py`, `docs/v1-release-ledger.json` | Launch loads the ledger; Doctor validates source hashes and references; Drive inventories each source block; Evidence records original section/line/text/hash and pending disposition; Cleanup owns only the output under `evidence/`, with no product process/data. `test_release_audit.py` drives the same CLI and proves stale-report removal, source/ref rejection and nonzero completion status. No individual requirement, full Case, semantic/model-comparison or current L2 PASS is inferred. |
+| Steering after a crash during model preparation | `chat send/work`; Main steering and Root Task append | `Runs.Steering`, `Runs.taskSteering`, frozen `context_compaction` | `TestSteeringAfterCompactionBeforeGenerationAdmission` and `TestTaskAppendAfterCompactionBeforeGenerationAdmission` inject admission failure after context commits; the original step recovers unchanged, new input determines the later reply, with one delivery/Root result. Both enter SC-04's five-run conformance gate. `verify_main.py` launches an isolated CLI, checks setup, SIGKILLs at `after_compaction_commit`, appends steering, reads back the unchanged context/hash and final generation/Tool/delivery counts, then reaps processes and removes its root. |
 
 ## Production operations (ERII-29)
 

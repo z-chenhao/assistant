@@ -69,6 +69,22 @@ upgrade or change dependency locks.
 
 ## Existing system and recovery evidence
 
+Exact-head CI run 39572139854 exposed an intermittent pause/restart failure:
+`task-control` attempt 5 exited with `MODEL_INCOMPATIBLE` before
+`before_stop_settle_commit`. Deterministic regression tests reproduced a
+crash/storage-failure window after `context_compaction` commits but before
+`model_generation` admission. The old steering guard checked only generation
+records; it could append new input to an already frozen compaction step.
+
+ERII-30 repairs both Main steering and Root Task append by deferring input when
+either record freezes the current step. Recovery uses the original context;
+pending input is applied at the next step before final delivery. The two named
+regressions in the feature map assert preserved context, ordered input, one
+final reply/Root result and no duplicate adoption. The maintained CLI harness
+adds actual SIGKILL at `after_compaction_commit`; SC-04 includes both tests in
+its five-run conformance inventory. This preserves existing frozen-context,
+snapshot and replay semantics; no migration or protocol deviation is introduced.
+
 `scripts/core_conformance.py:TESTS` maps SC-01–12 to named Go tests and rejects
 missing/skipped results. `verify_spend.py` supplies the additional SC-13 gate.
 `verify_suite.py:SHARDS` is the authoritative offline inventory and preserves

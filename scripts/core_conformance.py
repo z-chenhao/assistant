@@ -9,7 +9,7 @@ TESTS = {
     'SC-01': ['TestChildDirectToolRootChildGrandchild', 'TestChildAtomicAdmissionReplayAndBounds'],
     'SC-02': ['TestChildStorageRejectsAncestryAndCapabilityExpansion', 'TestChildDoesNotReceiveAppendedTaskInstructions'],
     'SC-03': ['TestCodeReplayFrozenRequestAndAtomicAdmission', 'TestCodeManifestCannotChangeDuringRecovery'],
-    'SC-04': ['TestTaskControlPauseFencesLateWritesAndContinueNewRoot', 'TestTaskControlAppendWaitsOutsideTransactionForPauseBoundary'],
+    'SC-04': ['TestTaskControlPauseFencesLateWritesAndContinueNewRoot', 'TestTaskControlAppendWaitsOutsideTransactionForPauseBoundary', 'TestSteeringAfterCompactionBeforeGenerationAdmission', 'TestTaskAppendAfterCompactionBeforeGenerationAdmission'],
     'SC-05': ['TestTaskControlCancelTreeAndInvocationOutcomes', 'TestCodeClaimWakeAndOldCallbackFencing', 'TestChildRejectsRealPrivateArtifactAndLateEpochResult'],
     'SC-06': ['TestToolApprovalWrongPrincipalHashDuplicateAndFrozenAdmission', 'TestToolApprovalExpiryDenialAndArgumentValidationNoEffect'],
     'SC-07': ['TestToolReplayPoliciesAndEvidence', 'TestToolTimeoutAndBusinessErrorsDoNotRetry', 'TestToolUnknownReconcilesOnlyFromAuthoritativeEvidence'],
