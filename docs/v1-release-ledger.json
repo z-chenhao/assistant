@@ -1070,7 +1070,7 @@
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "74 source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1511 remain pending and zero requirements certified. Continue individual normative review."
+      "detail": "Individual partial/evidence-gap dispositions bind exact source/code/tests/unmerged PR/evidence. Read current counts from the audit report individually_reviewed_blocks and source_units fields; zero requirements are certified. Continue individual normative review."
     },
     {
       "id": "G3",
