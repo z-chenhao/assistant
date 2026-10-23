@@ -21,6 +21,7 @@ semantics; feature guides describe the implemented paths and their proof limits.
 
 - [Contributing](../CONTRIBUTING.md), [development commands and layout](development.md)
 - [Verification feature map](../scripts/FEATURES.md)
+- [Local-first evidence collection and handoff](guides/evidence.md)
 - [Main loop and recovery](guides/main-loop.md)
 - [Core conformance](guides/core-evals.md), [personal-assistant evaluation](guides/m6-evals.md)
 - [CI operations](ci.md), [Golden Cases](../evals/golden-cases.md)

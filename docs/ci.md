@@ -301,3 +301,11 @@ budget, proves unknown/no Artifact/no second effect, then verifies a fresh
 authoritative query. The existing real deadline, cancellation, unsafe receipt,
 identity and byte/hash assertions remain required. Preserve failed full-suite
 evidence; passing focused diagnostics alone do not supersede it.
+
+## Low-bandwidth evidence handoff
+
+Use the [local-first evidence commands](guides/evidence.md) to retain raw results
+outside worktree cleanup, share one small receipt and verify same-host files.
+Inspect exact run/attempt metadata before downloading an immutable artifact ID;
+hash-verified warm retrieval transfers zero archive bytes. Mandatory CI part/join
+artifacts and final exports keep their existing completeness and retention rules.

@@ -489,3 +489,15 @@ recovery, supported transports and release evidence limits.
 | Channel attachments | Browser file input/Artifact download; Feishu image/file callback and outbound file | ArtifactStore owner scope, stable `channel_resource`, fixed platform upload/resource endpoint and per-part receipt | Incoming retry retains reference and downloaded bytes; outgoing filename/SHA-256/recipient asserted at independent HTTP Fake; wrong reference rejected |
 | Future notifications | Web settings or `channel manage` prefer; automatic Feishu preference | Immutable `message_route`, existing `DeliveryRequest`/Outbox/claims | GC-14 six scheduled days, two threshold notices through bound Feishu, quiet-day and duplicate-source stability; unknown remote send never resent; successful multipart receipts reused after restart |
 | Upgrade and crash recovery | Startup from empty/prior DB; normal foreground `web serve`; `verify_channels.py --delivery-lease-only` | Migration 025, existing Actor/Delivery claim/renew/recovery | All-prior schema tests, populated-v24 migration rollback/preservation, CAS, frozen projection and route; real SIGKILL input/delivery windows; delayed send/upload and cumulative multipart exceed the default lease, same owner excludes competing scan; pre-transport revalidation rejects expired claims; expired owner cancels and joins without stopping ingress; competing recovery and late response/restart keep unknown query-only with one independent send attempt; cleanup |
+
+## Local-first evidence collection (ERII-206)
+
+| Feature | How to reach it | Authoritative entry point | Evidence |
+| --- | --- | --- | --- |
+| Durable run evidence and same-host reuse | `scripts/evidence.py collect/verify/receipt/export` | `evidence.collect`, `verify`, per-run manifest/raw/export | Command/exit/profile/SHA identity, complete selected raw hashes, exclusions, worktree removal, frozen repeated calls, corruption rejection and interruption recovery |
+| Selective immutable CI archive | `scripts/evidence.py ci-list/ci-fetch`; historical `ci_compare.py` with `ERII_EVIDENCE_ROOT` | Exact-attempt GitHub metadata, `artifact_archive`, existing `ci_github.read` | One ID downloaded cold, verified warm zero payload, expiry/missing/hash/attempt/budget rejection; comparison consumers preserve their assertions |
+| Transport verification harness | `make verify-evidence EVIDENCE_ROOT=/absolute/durable/fresh-root` | `scripts/evidence_harness.py`; `scripts/test_evidence.py` | Real CLI author/reader processes, Fake network object ledger, actual payload sizes versus metadata estimates, explicit staged/uploaded distinction, one complete export, private fixture cleanup |
+
+See [evidence operations](../docs/guides/evidence.md). Supporting local evidence
+never replaces independent clean exact-SHA review or the existing required CI
+and final release evidence contracts.
