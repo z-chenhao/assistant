@@ -240,7 +240,11 @@ upgrade tests remain. Failure rolls back; real child kills before/after commit
 prove restart/version/bootstrap behavior. Fixture tests still enter the public
 store boundary and initialize real databases.
 
-Setup-go/npm caches retain their pinned content-addressed input keys. Every job
+Setup-go retains its existing SDK/module cache. Hosted npm-cache restoration is
+disabled: a clean or cache-disabled runner goes directly through bounded native
+installation, without the previously hanging optional cache transport. Local
+worktrees reuse npm/Playwright download caches through the same
+[setup entry point](development.md#repeated-and-offline-setup). Every job
 still installs lockfiles and builds its own CLI. Full Go test counts remain
 explicit. Historical `ci_bundle.py` v2 and its corruption/context regressions
 remain available for old evidence; the current workflow does not consume build
