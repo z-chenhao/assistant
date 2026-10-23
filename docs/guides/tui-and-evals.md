@@ -29,7 +29,9 @@ Fresh state opens a blocking connection picker:
    variable name**, never a key value. Erii imports that environment credential
    into SecretStore. Choose a discovered model or manually enter an ID when
    discovery is unavailable. Enter conservative context/output bounds; these
-   are candidates until Probe succeeds.
+   are candidates until Probe succeeds. Discovered models are numbered: enter
+   a number or model ID, or press Enter when only one model is listed. Invalid
+   numeric bounds retry the same field instead of discarding setup.
 2. OpenAI — Sign in with ChatGPT: open the private browser URL displayed on this
    terminal. Complete the browser flow, then choose an ID returned by this
    account's catalog. For reauthorization, provide the existing account ID.
@@ -41,6 +43,21 @@ before activating the tested profile through existing version checks. The
 privacy disclosure appears before confirmation. Text is the supported input
 mode; additional modalities and reasoning settings remain unverified and are
 not offered as confirmed settings.
+
+Each Probe check has its own 25-second deadline so a cold local model can load
+and think. This leaves cleanup headroom before the existing 30-second Bridge
+generation bound. The terminal names each check as it starts. A deadline reports the
+failed check and elapsed limit, rather than presenting it as user cancellation.
+The clipping check needs only a short answer longer than eight bytes; it does
+not request thousands of repeated tokens. Configured context/output limits stay
+unchanged. Failed setup prints the saved profile ID and exact `/test ID` and
+`/select ID` recovery commands. A failed retest still revokes prior proof and
+closes ingress. Ctrl-C exits during a check; `/cancel` applies at input prompts.
+
+The numbered picker and explicit connection/model steps follow
+[Pi 1.3.0's model selection flow](https://github.com/earendil-works/pi/blob/v1.3.0/packages/coding-agent/docs/models.md).
+Erii keeps its line-oriented terminal, SecretStore, mandatory Probe and explicit
+version-checked activation.
 
 Use `/cancel` at any setup prompt. A fresh installation stays `setup_required`;
 an existing active profile stays selected. Candidate metadata or an account
@@ -80,6 +97,19 @@ python3 scripts/verify_terminal_input.py --binary bin/erii --evidence evidence/t
 python3 scripts/run_cases.py --binary bin/erii --evidence evidence/cases.json
 ```
 
+For an opt-in, read-only local model Live Shadow, use the maintained provider
+harness. It discovers the exact model, tests it through the real CLI/Pi boundary
+in a disposable data root, records proof and content-free timing/error rows,
+and removes that state. It never selects a model or modifies your installation:
+
+```sh
+python3 scripts/verify_local_provider.py --binary bin/erii \
+  --live-endpoint http://127.0.0.1:8000/v1 \
+  --live-model mlx-community/Qwen3.6-35B-A3B-4bit \
+  --context-tokens 262144 --output-tokens 32768 \
+  --evidence evidence/local-live-probe.json
+```
+
 The terminal harness owns a Unix PTY, isolated data roots, an HTTP local-model
 peer, a browser OAuth/Responses peer and an in-memory SecretStore socket. Both
 provider paths execute the production Go → pinned Node/Pi path. It captures
@@ -90,6 +120,11 @@ ingress, SIGKILL/reopen, busy Steering and model freezing. Every child, PTY,
 server, and disposable database is cleaned up before returning. Authentication
 URLs and credentials never enter the evidence artifact. `make verify` repeats
 the terminal cancellation/security/recovery boundaries five times.
+
+It also retains an 11-second cold-start HTTP fixture, single-model Enter and
+numbered account selection, hidden account-model rejection, numeric field
+repair, fixed stage progress and failed-test recovery commands. These deterministic
+checks require no live local model or online account.
 
 The input harness adds 12 real PTY scenarios: the macOS review reproduction,
 ASCII and multibyte byte boundaries, large overflow and next-line recovery,

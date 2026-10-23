@@ -52,6 +52,9 @@ class Endpoint(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if self.server.mode == "slow" and body["messages"][-1].get("content") == "Reply with OK.":
+            # Actual cold-start regression: longer than the former entire Probe deadline.
+            time.sleep(11)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Connection", "close")
@@ -287,13 +290,63 @@ def verify_screenshot_projection(binary, script):
     return report
 
 
+def verify_live_probe(binary, script, endpoint, model, context_tokens, output_tokens):
+    """Opt-in local Live Shadow. Never selects a profile or opens user state."""
+    from urllib.parse import urlsplit
+    url = urlsplit(endpoint)
+    require(url.scheme in ("http", "https") and url.hostname in ("127.0.0.1", "localhost", "::1")
+            and not (url.username or url.password or url.query or url.fragment), "live probe requires a local endpoint without credentials")
+    with tempfile.TemporaryDirectory(prefix="erii-live-probe-") as directory:
+        root = Path(directory)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
+        env["ERII_DATA_ROOT"] = str(root / "data")
+        config = root / "config.yaml"
+        config.write_text("version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: " + json.dumps(str(script)) + "\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+
+        def command(*args, text=None):
+            return subprocess.run([str(binary), "-config", str(config), *args], cwd=root, env=env,
+                                  input=text, text=True, capture_output=True, timeout=800)
+
+        require(json.loads(command("status").stdout)["readiness"] == "setup_required", "live probe state isolation failed")
+        catalog = command("model", "discover", endpoint)
+        require(catalog.returncode == 0 and any(m["model_id"] == model for m in json.loads(catalog.stdout)), "live model not discovered")
+        profile = command("model", "add", text=json.dumps({"name": model, "provider_kind": "openai_compatible",
+            "endpoint": endpoint, "wire_api": "openai_completions", "model_id": model,
+            "context_window": context_tokens, "max_output_tokens": output_tokens,
+            "compatibility": {"tool_result_format": "openai"}, "capabilities": {"text_input": True}}))
+        require(profile.returncode == 0, "live profile metadata rejected")
+        started = time.monotonic()
+        probe = command("model", "test", json.loads(profile.stdout)["profile_id"])
+        elapsed = time.monotonic() - started
+        # Only normalized Host errors/proof and content-free usage; never model output.
+        with closing(sqlite3.connect(root / "data/state.db")) as db:
+            usage = [dict(zip(("latency_ms", "error_code"), row)) for row in db.execute("SELECT latency_ms,error_code FROM provider_usage ORDER BY rowid")]
+            require(db.execute("SELECT count(*) FROM run").fetchone()[0] == 0, "probe created Agent work")
+        report = {"model": model, "context_tokens": context_tokens, "output_tokens": output_tokens,
+                  "catalog": "discovered", "elapsed_seconds": round(elapsed, 3), "exit_code": probe.returncode,
+                  "proof": json.loads(probe.stdout) if probe.returncode == 0 else None,
+                  "error": probe.stderr.strip() if probe.returncode else None, "usage": usage,
+                  "readiness": json.loads(command("status").stdout)["readiness"]}
+    report["cleanup"] = "CLI children reaped; isolated state removed; no active profile selected"
+    return report
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", default="bin/erii")
     parser.add_argument("--evidence", default="evidence/local-provider.json")
+    parser.add_argument("--live-endpoint", help="opt-in local Live Shadow; isolated Probe only")
+    parser.add_argument("--live-model")
+    parser.add_argument("--context-tokens", type=int, default=262144)
+    parser.add_argument("--output-tokens", type=int, default=32768)
     args = parser.parse_args()
-    result = verify(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
-    result["screenshot_projection"] = verify_screenshot_projection(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
+    if args.live_endpoint:
+        require(args.live_model, "--live-model is required")
+        result = verify_live_probe(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve(),
+                                   args.live_endpoint, args.live_model, args.context_tokens, args.output_tokens)
+    else:
+        result = verify(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
+        result["screenshot_projection"] = verify_screenshot_projection(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
     Path(args.evidence).parent.mkdir(parents=True, exist_ok=True)
     Path(args.evidence).write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps({"checks": len(result["checks"]), "usage_rows": len(result["usage"]), "cleanup": result["cleanup"]}))
+    print(json.dumps({"checks": len(result.get("checks", [])), "usage_rows": len(result["usage"]), "cleanup": result["cleanup"]}))
