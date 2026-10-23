@@ -19,7 +19,8 @@ semantics; feature guides describe the implemented paths and their proof limits.
 
 ## Develop and verify
 
-- [Contributing](../CONTRIBUTING.md), [development commands and layout](development.md)
+- [Contributing, development commands and layout](../CONTRIBUTING.md)
+- [End-to-end verification](guides/verification.md)
 - [Verification feature map](../scripts/FEATURES.md)
 - [Local-first evidence collection and handoff](guides/evidence.md)
 - [Main loop and recovery](guides/main-loop.md)

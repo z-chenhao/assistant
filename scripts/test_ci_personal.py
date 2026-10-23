@@ -24,7 +24,7 @@ class PersonalJoinTests(unittest.TestCase):
                     if (r['case_id'], r['variant_id']) in pairs])
                 (folder / report_name(gate, attempt)).write_text(json.dumps(report))
                 rows.append(dict(gate=gate.name, attempt=attempt, returncode=0, owned_group_drained=True))
-            suite = dict(passed=True, source_stable=True, source_dirty=False, source_sha='a'*40,
+            suite = dict(complete_inventory=False, selected_gates=None, passed=True, source_stable=True, source_dirty=False, source_sha='a'*40,
                          source_diff_sha256='empty', binary_sha256='binary', workflow_sha='merge',
                          personal_part=part, elapsed_seconds=10, shards={'personal': rows})
             (folder/f'suite-personal-{part}.json').write_text(json.dumps(suite))
@@ -35,6 +35,8 @@ class PersonalJoinTests(unittest.TestCase):
             self.fixture(root)
             suite, reports, summary = join(root)
             self.assertTrue(summary['passed'])
+            self.assertTrue(suite['complete_inventory'])
+            self.assertIsNone(suite['selected_gates'])
             self.assertIsNone(summary['suite_mean'])
             self.assertEqual([len(r['results']) for r in reports], [66]*5)
             self.assertEqual([(r['gate'], r['attempt']) for r in suite['shards']['personal']],
@@ -44,7 +46,7 @@ class PersonalJoinTests(unittest.TestCase):
 
     def test_no_missing_failed_drifted_or_substituted_part_can_pass(self):
         mutations = ('missing_part', 'missing_report', 'missing_round', 'duplicate_round', 'reordered',
-                     'failed', 'cancelled', 'undrained', 'dirty', 'unstable', 'wrong_part', 'source',
+                     'focused', 'failed', 'cancelled', 'undrained', 'dirty', 'unstable', 'wrong_part', 'source',
                      'binary', 'fixture', 'driver', 'lock', 'missing_variant', 'duplicate_variant',
                      'wrong_case', 'hard_failure', 'assertion_failure', 'score', 'cleanup')
         for mutation in mutations:
@@ -61,6 +63,7 @@ class PersonalJoinTests(unittest.TestCase):
                 elif mutation == 'missing_round': rows.pop()
                 elif mutation == 'duplicate_round': rows[-1] = rows[0]
                 elif mutation == 'reordered': rows.reverse()
+                elif mutation == 'focused': suite['selected_gates'] = ['main']
                 elif mutation == 'failed': suite['passed'] = False
                 elif mutation == 'cancelled': rows[-1]['returncode'] = 130
                 elif mutation == 'undrained': rows[-1]['owned_group_drained'] = False

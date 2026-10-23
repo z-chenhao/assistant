@@ -18,10 +18,20 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
+func taskFixtureRegistry(t *testing.T) *tool.Registry {
+	t.Helper()
+	echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
+	registry, err := tool.NewRegistry(append(task.Definitions(), echo))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
+}
+
 func taskFixture(t *testing.T) (*Store, *Runs, agent.Actor, *loopProvider) {
 	t.Helper()
 	s, _, history, a, p := loopFixture(t)
-	a.Registry = task.Registry()
+	a.Registry = taskFixtureRegistry(t)
 	r := s.Runs(history, a.Registry)
 	a.Store = r
 	return s, r, a, p
@@ -667,7 +677,7 @@ func TestWorkerCapabilityDriftStopsDrainWithoutRetryLoop(t *testing.T) {
 	if err = executeTaskRun(t, a, r, context.Background(), c); err != nil {
 		t.Fatal(err)
 	}
-	definition, _ := a.Registry.Resolve("builtin__text__echo")
+	definition, _ := a.Registry.Resolve("mcp__fixture__echo")
 	definition.Spec.InputSchema = `{"type":"object"}`
 	a.Registry, err = tool.NewRegistry(append(task.Definitions(), definition))
 	if err != nil {
@@ -685,10 +695,10 @@ func TestOldMainCapabilitySnapshotSurvivesTaskRegistryUpgrade(t *testing.T) {
 	receipt := mustSubmit(t, a, "old-main", "old frozen echo view")
 	// Models and old capability bytes remain unchanged as the Host gains new
 	// registered tools. New Run creation alone gets the larger role view.
-	a.Registry = task.Registry()
+	a.Registry = taskFixtureRegistry(t)
 	r.registry = a.Registry
 	mustDrain(t, a)
-	if len(p.requests) == 0 || len(p.requests[0].Tools) != 1 || p.requests[0].Tools[0].Name != "builtin__text__echo" {
+	if len(p.requests) == 0 || len(p.requests[0].Tools) != 1 || p.requests[0].Tools[0].Name != "mcp__fixture__echo" {
 		t.Fatal("old Run changed tools")
 	}
 	mustSubmit(t, a, "new-main", "new available Task view")
