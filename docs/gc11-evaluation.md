@@ -126,5 +126,23 @@ matching does not assign scores, pass@1/pass^5, variance or a winner.
 Approved profiles/environment and actual Judge/human review remain due; the
 consolidated input request is in [current live preflight](v1-live-preflight.md).
 GC-12 §8.13 now has maintained scripted mail-and-calendar mechanics. GC-08 §8.9
-also has a maintained wedding checkpoint; the next uncovered exact candidate is
-GC-14 §8.15. These observations do not complete release acceptance.
+also has a maintained wedding checkpoint; GC-14 §8.15 now has the exact six-day monitoring driver. These observations
+do not complete release acceptance.
+
+## Scripted capability fixture and compaction
+
+The main #35 Tool schema exposed a deterministic fixture bug: GC-11's explicit
+plan counted retained Tool messages to select the next call. Production context
+compaction correctly removed older completed exchanges, so the Fake repeatedly
+selected its final echo and the providers CI gate reached its unchanged
+320-second command timeout. This is a Fake progress defect, not evidence of a
+production replay retry or a reason to disable compaction.
+
+The scripted provider now includes the plan ordinal in its provider call ID and
+reads that bound ID from completed Tool results. It needs no mutable fixture
+state, can distinguish identical neighboring calls, and retains progress after
+older exchanges disappear. Missing, invalid and out-of-range ordinals fail
+closed. A Go regression uses the real Context Builder to remove old exchanges
+and then requires the plan to terminate; it fails against the old Fake. All
+six quote variants and the existing full capability gate remain required with
+their original assertions, repetitions and deadlines.
