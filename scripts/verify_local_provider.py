@@ -98,12 +98,23 @@ class Endpoint(BaseHTTPRequestHandler):
                 if runtime and not root:
                     chunk({"content": "Main Task follow-up through Pi."})
                 elif not has_result and (root or "builtin__task__manage" in names):
-                    name = "builtin__text__echo" if root else "builtin__task__manage"
-                    arguments = {"text": "Independent Root report."} if root else {"operation": "create", "task": "Prepare a safe independent report. Return evidence; perform no external actions."}
+                    name = "builtin__artifact__search" if root else "builtin__task__manage"
+                    arguments = {} if root else {"operation": "create", "task": "Prepare a safe independent report. Return evidence; perform no external actions."}
                     chunk({"tool_calls": [{"index": 0, "id": "task_call", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}]})
                 else:
                     chunk({"content": "Root business result through Pi." if root else "Main Task accepted through Pi."})
                 chunk({}, "stop", {"prompt_tokens": 7, "completion_tokens": 8, "total_tokens": 15})
+            elif self.server.mode == "memory-disabled":
+                if not any(m["role"] == "tool" for m in body["messages"]):
+                    requests = [("builtin__memory__manage", {"operation": "remember", "content": "I prefer tea"}),
+                                ("builtin__memory__search", {"query": "tea"})]
+                    chunk({"tool_calls": [{"index": i, "id": f"disabled-{i}", "type": "function",
+                                           "function": {"name": name, "arguments": json.dumps(arguments)}}
+                                          for i, (name, arguments) in enumerate(requests)]})
+                    chunk({}, "tool_calls")
+                else:
+                    chunk({"content": "Memory requires configuration."})
+                    chunk({}, "stop")
             elif self.server.mode == "partial":
                 chunk({"content": "partial"})
                 return
@@ -113,8 +124,8 @@ class Endpoint(BaseHTTPRequestHandler):
                     chunk({}, "stop")
                 else:
                     names = [item["function"]["name"] for item in body["tools"]]
-                    name = "builtin__text__echo" if "builtin__text__echo" in names else names[0]
-                    arguments = {"text": text} if name == "builtin__text__echo" else {"value": "OK"}
+                    name = "builtin__artifact__search" if "builtin__artifact__search" in names else names[0]
+                    arguments = {} if name == "builtin__artifact__search" else {"value": "OK"}
                     chunk({"tool_calls": [{"index": 0, "id": "call_echo", "type": "function",
                                           "function": {"name": name, "arguments": json.dumps(arguments)}}]})
                     chunk({}, "tool_calls")
@@ -172,6 +183,22 @@ def verify(binary, script):
             require(history[-1]["content"][0]["text"] == "PROBE_RESULT_OK", "local Main did not continue after Direct Tool")
             require(any(m["role"] == "system" for r in server.requests if r.get("body") for m in r["body"].get("messages", [])), "Main System Prompt missing from actual wire")
             report["main_history"] = history
+            surface = next(r["body"]["tools"] for r in reversed(server.requests) if r.get("body", {}).get("tools") and any(t["function"]["name"] == "builtin__artifact__search" for t in r["body"]["tools"]))
+            names = [t["function"]["name"] for t in surface]
+            require(sorted(n for n in names if n.startswith("builtin__artifact__")) == ["builtin__artifact__manage", "builtin__artifact__search"], "production Artifact surface not consolidated")
+            require("builtin__text__echo" not in names and "mcp__fixture__echo" not in names, "fixture echo leaked to production")
+            require("builtin__memory__search" in names and "builtin__memory__manage" in names, "Memory tools hidden")
+            report["production_surface"] = surface
+            server.mode = "memory-disabled"
+            command("chat", "send", "disabled-memory", text="Remember that I prefer tea and search for tea.")
+            command("chat", "work")
+            with closing(sqlite3.connect(root / "data/state.db")) as db:
+                failures = db.execute("SELECT tool_name,status,error_json FROM tool_invocation WHERE tool_name LIKE 'builtin__memory__%' ORDER BY tool_name").fetchall()
+                require(len(failures) == 2 and all(row[1] == "failed" and json.loads(row[2])["code"] == "PROVIDER_UNAVAILABLE" for row in failures), "unconfigured Memory falsely succeeded")
+                require(db.execute("SELECT count(*) FROM memory_mutation").fetchone()[0] == 0, "disabled memory queued a mutation")
+            report["unconfigured_memory"] = failures
+            report["checks"].append("production manage/search schemas; fixture echo absent; discoverable unconfigured Memory fails without mutation")
+            server.mode = "success"
             report["checks"].append("actual CLI Main Actor/Loop/Direct Tool/Conversation through local Node/Pi with System Prompt")
             require(all(r["auth"] is None for r in server.requests), "fabricated Authorization")
             report["checks"] += ["catalog", "manual CLI add", "unverified rejection", "real five-part probe", "atomic select", "restart ready", "no fabricated key"]
@@ -184,7 +211,8 @@ def verify(binary, script):
             require(task_history[-1]["content"][0]["text"] == "Main Task follow-up through Pi.", "actual Pi Task follow-up missing")
             task_requests = [r["body"] for r in server.requests[task_start:] if r.get("body")]
             roots = [r for r in task_requests if any("general Worker executing" in str(m.get("content", "")) for m in r["messages"])]
-            require(roots and all(not any(t["function"]["name"].startswith("builtin__task__") for t in r["tools"]) for r in roots), "Root Task control exposed on actual Pi wire")
+            require(roots and all(not any(t["function"]["name"].startswith("builtin__task__") or t["function"]["name"] == "builtin__memory__manage" for t in r["tools"]) for r in roots), "Root Task or Memory control exposed on actual Pi wire")
+            require(all(any(t["function"]["name"] == "builtin__memory__search" for t in r["tools"]) for r in roots), "Root read-only Memory search missing")
             require(all("actual local conversation" not in json.dumps(r["messages"]) for r in roots), "Root inherited Main Conversation")
             require(any(any(m["role"] == "user" and "Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in r["messages"]) for r in task_requests), "runtime framing lost at actual Pi boundary")
             with closing(sqlite3.connect(root / "data/state.db")) as db:

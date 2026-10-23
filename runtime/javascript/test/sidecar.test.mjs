@@ -32,10 +32,10 @@ async function fixture(t, host = async () => ({value: 'ok'})) {
  }
  return {run,events,rpc};
 }
-const echo={name:'builtin__text__echo',description:'echo'};
+const echo={name:'mcp__fixture__echo',description:'echo'};
 test('real QuickJS loops, promises, filtering and canonical tools',async t=>{
  const f=await fixture(t,async m=>({value:m.params.arguments}));
- const result=await f.run('const values = await Promise.all([1,2,3].map(n=>tools.builtin__text__echo({n}))); console.log("HIDDEN"); text(values); return 6;',[echo]);
+ const result=await f.run('const values = await Promise.all([1,2,3].map(n=>tools.mcp__fixture__echo({n}))); console.log("HIDDEN"); text(values); return 6;',[echo]);
  assert.equal(result.result?.kind,'completed',JSON.stringify(result));
  assert.deepEqual(result.result.output,[{type:'text',text:'[{"n":1},{"n":2},{"n":3}]'},{type:'return',value:6}]);
 });
@@ -46,7 +46,7 @@ test('forbidden globals and dynamic escape paths',async t=>{
 });
 test('errors are catchable; allSettled retains ordered outcomes',async t=>{
  const f=await fixture(t,async m=>m.params.arguments.fail?{error:{code:'APPROVAL_DENIED'}}:{value:2});
- const r=await f.run('const r = await Promise.allSettled([tools.builtin__text__echo({fail:true}),tools.builtin__text__echo({})]); return r.map(x=> x.status === "fulfilled" ? x.value : x.reason.code);',[echo]);
+ const r=await f.run('const r = await Promise.allSettled([tools.mcp__fixture__echo({fail:true}),tools.mcp__fixture__echo({})]); return r.map(x=> x.status === "fulfilled" ? x.value : x.reason.code);',[echo]);
  assert.deepEqual(r.result?.output,[{type:'return',value:['APPROVAL_DENIED',2]}]);
 });
 test('Store is synchronous and persists even if the script throws',async t=>{
@@ -82,7 +82,7 @@ test('canonical names survive alias collisions', async t => {
 test('cancellation disposes a waiting VM without waiting for a Host result', async t => {
  let reached;const ready=new Promise(resolve=>{reached=resolve});
  const f=await fixture(t,async m=>{reached();return new Promise(()=>{});});
- const running=f.run('await tools.builtin__text__echo({});',[echo]);
+ const running=f.run('await tools.mcp__fixture__echo({});',[echo]);
  await ready;
  const cancel=await f.rpc('execution.cancel',{executionId:'execution-1'});
  assert.ok(cancel.result);
@@ -91,7 +91,7 @@ test('cancellation disposes a waiting VM without waiting for a Host result', asy
 test('unawaited calls are registered and their values remain internal',async t=>{
  const calls=[];
  const f=await fixture(t,async m=>{calls.push(m.params);return {suspended:true};});
- const r=await f.run('tools.builtin__text__echo({text:"accepted"});return "done";',[echo]);
+ const r=await f.run('tools.mcp__fixture__echo({text:"accepted"});return "done";',[echo]);
  assert.equal(calls.length,1);assert.deepEqual(r.result?.output,[{type:'return',value:'done'}]);
 });
 test('fresh cells do not retain globals',async t=>{
@@ -101,7 +101,7 @@ test('fresh cells do not retain globals',async t=>{
 });
 test('unhandled Host errors preserve only their normalized code',async t=>{
  const f=await fixture(t,async()=>({error:{code:'APPROVAL_DENIED',message:'APPROVAL_DENIED',retryable:false}}));
- const r=await f.run('await tools.builtin__text__echo({});',[echo]);
+ const r=await f.run('await tools.mcp__fixture__echo({});',[echo]);
  assert.equal(r.result?.error?.code,'APPROVAL_DENIED');
  assert.ok(!JSON.stringify(r.result).includes('stack'));
 });
@@ -120,7 +120,7 @@ test('Computer bridge tokens are private to bound Surface facades',async t=>{
 
 test('pending-call limit disposes the VM even when the Host stops replying',async t=>{
  const f=await fixture(t,async()=>new Promise(()=>{}));
- const r=await f.run('for(let n=0;n<129;n++) tools.builtin__text__echo({}); await new Promise(()=>{});',[echo]);
+ const r=await f.run('for(let n=0;n<129;n++) tools.mcp__fixture__echo({}); await new Promise(()=>{});',[echo]);
  assert.equal(r.result?.kind,'failed');
  assert.equal(r.result?.error?.code,'RESOURCE_LIMIT');
 });
@@ -128,7 +128,7 @@ test('pending-call limit disposes the VM even when the Host stops replying',asyn
 test('suspension registers every issued parallel call before disposing the VM',async t=>{
  const calls=[];
  const f=await fixture(t,async m=>{calls.push(m.params);return {suspended:true};});
- const r=await f.run('const first=tools.builtin__text__echo({n:0});let x=0;for(let i=0;i<1000000;i++)x+=i;await Promise.all([first,...Array.from({length:19},(_,n)=>tools.builtin__text__echo({n:n+1}))]);',[echo]);
+ const r=await f.run('const first=tools.mcp__fixture__echo({n:0});let x=0;for(let i=0;i<1000000;i++)x+=i;await Promise.all([first,...Array.from({length:19},(_,n)=>tools.mcp__fixture__echo({n:n+1}))]);',[echo]);
  assert.equal(r.result?.kind,'suspended');
  assert.equal(calls.length,20);
  assert.equal(r.result?.pendingCallIds.length,20);
@@ -139,13 +139,13 @@ test('replay restores durable delivery order despite inverted transport replies'
   if(m.params.arguments.n===1){await new Promise(resolve=>setTimeout(resolve,20));return {value:'one',deliverySeq:1};}
   return {value:'two',deliverySeq:2};
  });
- const r=await f.run('return await Promise.race([tools.builtin__text__echo({n:1}),tools.builtin__text__echo({n:2})]);',[echo]);
+ const r=await f.run('return await Promise.race([tools.mcp__fixture__echo({n:1}),tools.mcp__fixture__echo({n:2})]);',[echo]);
  assert.deepEqual(r.result?.output,[{type:'return',value:'one'}]);
 });
 test('trusted source positions and dynamic ordinals produce stable scoped call keys',async t=>{
  const keys=[];
  const f=await fixture(t,async m=>{keys.push(m.params.callKey);return {value:1};});
- const source='for(let i=0;i<2;i++) await tools.builtin__text__echo({});\nawait tools.builtin__text__echo({});';
+ const source='for(let i=0;i<2;i++) await tools.mcp__fixture__echo({});\nawait tools.mcp__fixture__echo({});';
  assert.equal((await f.run(source,[echo])).result?.kind,'completed');
  assert.equal((await f.run(source,[echo])).result?.kind,'completed');
  assert.equal(new Set(keys.slice(0,3)).size,3);
@@ -154,7 +154,7 @@ test('trusted source positions and dynamic ordinals produce stable scoped call k
 });
 test('replay drift fails the cell even if script catches Tool errors',async t=>{
  const f=await fixture(t,async()=>({error:{code:'NON_DETERMINISTIC_REPLAY'}}));
- const r=await f.run('try{await tools.builtin__text__echo({});}catch{} return "unsafe success";',[echo]);
+ const r=await f.run('try{await tools.mcp__fixture__echo({});}catch{} return "unsafe success";',[echo]);
  assert.equal(r.result?.kind,'failed');assert.equal(r.result?.error.code,'NON_DETERMINISTIC_REPLAY');
 });
 
@@ -162,9 +162,9 @@ test('CUA errors remain structured through catch and uncaught cell failure',asyn
  let code='STALE_ELEMENT_REFERENCE';
  const f=await fixture(t,async()=>({error:{code,message:code,retryable:false,details:{observation:{surfaceId:'notes',revision:'r',state:'latest'}}}}));
  for(code of ['STALE_SURFACE_HANDLE','STALE_ELEMENT_REFERENCE','STALE_CAPABILITY_HANDLE','SCREENSHOT_REQUIRED','WAIT_TIMEOUT']){
-  const r=await f.run('await tools.builtin__text__echo({});',[echo]);
+  const r=await f.run('await tools.mcp__fixture__echo({});',[echo]);
   assert.equal(r.result?.error?.code,code);
  }
- const caught=await f.run('try{await tools.builtin__text__echo({});}catch(e){return {code:e.code,state:e.details.observation.state};}',[echo]);
+ const caught=await f.run('try{await tools.mcp__fixture__echo({});}catch(e){return {code:e.code,state:e.details.observation.state};}',[echo]);
  assert.deepEqual(caught.result?.output,[{type:'return',value:{code:'WAIT_TIMEOUT',state:'latest'}}]);
 });

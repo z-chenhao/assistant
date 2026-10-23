@@ -108,7 +108,11 @@ state is authoritative, and Outbox notifications remain available to the relay.
 
 | Tool | Input | Output | Permission | Replay | Limits |
 | --- | --- | --- | --- | --- | --- |
-| `builtin__text__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Main only in this slice | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
+| `mcp__fixture__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Main only in this slice | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
+
+This echo capability exists only under an explicit test bridge. Production does
+not register it. It returns data to the model, never a user message. Main final
+AssistantMessages use the shared Delivery/UISpec path.
 
 The registry describes the frozen schema and resolves only Host-registered
 definitions. The single Executor accepts/persists each invocation before

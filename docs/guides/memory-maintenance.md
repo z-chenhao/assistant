@@ -24,8 +24,13 @@ The shared Event Outbox provides wakeups; the SQLite journal owns acceptance and
 recovery. A crash between the Memory commit and journal acknowledgement reuses
 the same event and its Memory receipt.
 
-Main receives `builtin__memory__manage` with `remember`/`forget`. The Host resolves
-scope and provenance. Workers retain only read-only search; their results become
+Main always discovers `builtin__memory__manage` with `remember`/`forget`. The Host resolves
+scope and provenance. Without `memory.encryption_key_ref`, it returns
+`PROVIDER_UNAVAILABLE` without accepting a mutation or changing privacy state.
+Main and Workers always discover `builtin__memory__search`; it requires an
+explicit embedding configuration. Without that configuration, search returns
+`PROVIDER_UNAVAILABLE`, and automatic recall is disabled. Tool descriptions name
+the missing configuration. No provider or encryption credential is implicit. Workers retain only read-only search; their results become
 Curator source observations. The authenticated local equivalent is:
 
 ```sh
