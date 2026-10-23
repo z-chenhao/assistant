@@ -14,13 +14,28 @@ def prose(path):
     text = path.read_text(encoding='utf-8')
     if path.name == 'AGENTS.md':
         text = text.split('<!-- BEGIN MULTICA-RUNTIME (auto-managed; do not edit) -->')[0]
-    lines, fence = [], None
+    lines, fence, list_indents = [], None, []
     for line in text.splitlines():
+        line = line.expandtabs(4)
+        if not line.strip():
+            lines.append('')
+            continue
+        # Code indentation is relative to the current list item, not the page.
+        # Keep item content columns across blank lines for loose/nested lists.
+        indent = len(line) - len(line.lstrip(' '))
+        while list_indents and indent < list_indents[-1]:
+            list_indents.pop()
+        base = list_indents[-1] if list_indents else 0
+        line = line[base:]
         if fence:
             if re.fullmatch(r' {0,3}' + re.escape(fence[0]) + '{' + str(len(fence)) + r',}\s*', line):
                 fence = None
             lines.append('')
             continue
+        item = re.match(r' {0,3}(?:[-+*]|[0-9]{1,9}[.)])(?: {1,4}(?=\S)| (?= |$))', line)
+        if item:
+            list_indents.append(base + item.end())
+            line = line[item.end():]
         start = re.match(r' {0,3}(`{3,}|~{3,})', line)
         if start:
             fence = start[1]
@@ -32,9 +47,13 @@ def prose(path):
     return re.sub(r'<!--.*?-->', '', '\n'.join(lines), flags=re.S)
 
 
+def without_code_spans(text):
+    """Mask inline examples, including multi-backtick spans."""
+    return re.sub(r'(`+)(?!`)(.*?)(?<!`)\1(?!`)', '', text, flags=re.S)
+
+
 def destinations(path, root):
-    # Mask code spans before recognizing links, including multi-backtick examples.
-    text = re.sub(r'(`+)(?!`)(.*?)(?<!`)\1(?!`)', '', prose(path), flags=re.S)
+    text = without_code_spans(prose(path))
     references = {}
 
     def reference_key(label):
@@ -68,7 +87,7 @@ def anchors(path):
     """GitHub-style heading slugs plus explicit HTML id/name anchors."""
     text = prose(path)
     result = {html.unescape(match[2]) for match in re.finditer(
-        r'<[A-Za-z][^>]*?\s(?:id|name)\s*=\s*(["\'])(.*?)\1', text)}
+        r'<[A-Za-z][^>]*?\s(?:id|name)\s*=\s*(["\'])(.*?)\1', without_code_spans(text))}
     used = set()
     lines = text.splitlines()
     for index, line in enumerate(lines):

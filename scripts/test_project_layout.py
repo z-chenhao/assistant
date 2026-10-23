@@ -1,4 +1,6 @@
 from pathlib import Path
+import shutil
+import sys
 import tempfile
 import subprocess
 import unittest
@@ -7,6 +9,85 @@ from check_docs import ROOT, broken_links, unindexed_docs
 
 
 class ProjectLayoutTests(unittest.TestCase):
+    def test_nested_list_link_is_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            (root / 'docs/guide.md').write_text('# Guide\n')
+            (root / 'README.md').write_text('''- Navigation
+    - [broken](missing.md)
+      [anchor](docs/guide.md#gone)
+    - [guide](docs/guide.md#guide)
+''')
+            self.assertEqual(list(broken_links(root)), [
+                'README.md: missing missing.md',
+                'README.md: missing anchor docs/guide.md#gone'])
+            self.assertEqual(list(unindexed_docs(root)), [])
+
+    def test_tab_indentation_distinguishes_nested_lists_from_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'README.md').write_text(
+                '- Navigation\n\t- [broken](missing.md)\n\n'
+                'Outside list\n\n\t- [code](missing-code.md)\n')
+            self.assertEqual(list(broken_links(root)), ['README.md: missing missing.md'])
+
+    def test_list_indentation_preserves_prose_and_excludes_code(self):
+        for marker in ('-', '1.', '123)'):
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                indent = ' ' * (len(marker) + 1)
+                (root / 'README.md').write_text(
+                    f'{marker} Navigation\n\n'
+                    f'{indent}[continuation](missing-continuation.md)\n\n'
+                    f'{indent}    - [code](missing-code.md)\n\n'
+                    f'{indent}~~~md\n'
+                    f'{indent}[fenced](missing-fenced.md)\n'
+                    f'{indent}~~~\n\n'
+                    f'{indent}- Nested\n\n'
+                    f'{indent}      [code](missing-nested-code.md)\n\n'
+                    f'{indent}- [sibling](missing-sibling.md)\n\n'
+                    'Outside list\n\n'
+                    '    - [code](missing-outside-code.md)\n')
+                self.assertEqual(list(broken_links(root)), [
+                    'README.md: missing missing-continuation.md',
+                    'README.md: missing missing-sibling.md'])
+
+    def test_inline_code_is_not_an_html_anchor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'README.md').write_text('''# Here
+`<a id="gone"></a>` ``<a name='also-gone'>`</a>``
+[broken](#gone) [also broken](#also-gone)
+''')
+            self.assertEqual(list(broken_links(root)), [
+                'README.md: missing anchor #gone',
+                'README.md: missing anchor #also-gone'])
+
+    def test_checker_cli_rejects_list_links_and_example_anchors(self):
+        fixtures = (
+            ('- Navigation\n    - [broken](missing.md)\n', 1, 'missing missing.md'),
+            ('# Here\n`<a id="gone"></a>`\n[broken](#gone)\n',
+             1, 'missing anchor #gone'),
+            ('# A `Code` Title\n<a id="real"></a>\n<a name="legacy"></a>\n'
+             '[heading](#a-code-title) [real](#real) [named](#legacy)\n'
+             '\n    - [example](absent.md)\n'
+             '\n- Examples\n\n      [indented](absent.md)\n'
+             '\n  ```md\n  [fenced](absent.md)\n  ```\n', 0, ''),
+        )
+        for markdown, code, error in fixtures:
+            with self.subTest(markdown=markdown), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / 'scripts').mkdir()
+                shutil.copy2(ROOT / 'scripts/check_docs.py', root / 'scripts/check_docs.py')
+                (root / 'README.md').write_text(markdown, encoding='utf-8')
+                result = subprocess.run([sys.executable, str(root / 'scripts/check_docs.py')],
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                self.assertIn(error, result.stderr)
+                if code == 0:
+                    self.assertIn('Local documentation links and index: OK', result.stdout)
+
     def test_reference_links_check_local_files_and_heading_fragments(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
