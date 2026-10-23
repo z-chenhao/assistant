@@ -5,12 +5,14 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import time
 
 from case_runner import digest, load_contract, result, variants
 from terminal_driver import Terminal
 from verify_main import MainHarness, assert_final, require
+from agenda_case import observations as agenda_observations
 
 
 def timestamp():
@@ -35,13 +37,29 @@ def drive(binary, folder, case, variant):
                 t.expect("assistant: "); t.expect("You> ")
             require(t.stop() == 0, "Case terminal did not exit cleanly")
             transcript = t.transcript()
-        state = h.state()
+        def readback():
+            state = h.state()
+            if case['case_id'] == 'GC-09':
+                with sqlite3.connect(folder/'data/state.db') as db:
+                    db.row_factory = sqlite3.Row
+                    for key, table in (('tasks','task'), ('automations','automation'),
+                                       ('approvals','approval'), ('artifacts','artifact')):
+                        state[key] = [dict(row) for row in db.execute('SELECT * FROM '+table)]
+            return state
+        state = readback()
         assert_final(state, len(case["events"]) + 1, len(case["events"]))
-        return {"started_at": started, "finished_at": timestamp(),
+        execution = {"started_at": started, "finished_at": timestamp(),
                 "wall_time_ms": round((time.monotonic() - tick) * 1000),
                 "transcript": transcript, "state": state}
+        if case['case_id'] == 'GC-09':
+            h.send('event-0', '当前时间：'+event['at']+'。'+event['text'])
+            h.command('chat', 'work')
+            execution['replay_state'] = readback()
+        return execution
     finally:
         h.cleanup()
+        if 'execution' in locals():
+            execution['cleanup'] = dict(owned_processes_joined=all(c.poll() is not None for c in h.children))
 
 
 def run_suite(dataset, policy, driver, result_builder=result):
@@ -50,7 +68,18 @@ def run_suite(dataset, policy, driver, result_builder=result):
     for case in dataset["cases"]:
         for variant in variants(dataset, case):
             execution = driver(case, variant)
-            results.append(result_builder(case, variant, policy, execution))
+            row = result_builder(case, variant, policy, execution)
+            if case['case_id'] == 'GC-09':
+                checks = agenda_observations(variant, execution)
+                row['assertions'].update(checks)
+                row['scope'] = 'scripted_whole_case_mechanics'
+                row['full_case'] = 'inconclusive; unscripted evaluation and semantic grades required'
+                row['not_applicable'] = []
+                row['unimplemented_state'] = {}
+                if not all(checks.values()):
+                    row.update(status='fragment_fail', final_score=0,
+                               semantic_grading='cannot override programmatic failure')
+            results.append(row)
     due = {case["case_id"] for case in dataset["cases"]}
     return {"version": 1, "milestone": dataset["milestone"], "level": dataset["level"],
             "scope": dataset["scope"], "dataset_digest": digest(dataset), "policy_digest": digest(policy),
@@ -82,6 +111,8 @@ def main():
             folder.mkdir()
             return drive(binary, folder, case, variant)
         report = run_suite(dataset, policy, driver)
+    report['cleanup_checks'] = dict(disposable_root_removed=not Path(tmp).exists(),
+        owned_processes_joined=all(r['evidence']['cleanup']['owned_processes_joined'] for r in report['results']))
     report["contract_lock"] = lock
     report["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
     report["bridge_digest"] = hashlib.sha256((root / "provider-bridge/package-lock.json").read_bytes()).hexdigest()

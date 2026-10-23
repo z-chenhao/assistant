@@ -66,6 +66,10 @@ func (t *tools) manageMemory(ctx context.Context, inv tool.Invocation) (tool.Res
 		if kind != "main" || visible != 1 {
 			return nil
 		}
+		if t.runs.memory == nil {
+			result = tool.Failure("PROVIDER_UNAVAILABLE")
+			return nil
+		}
 		m, ok := memory.Parse(args)
 		if !ok {
 			result = tool.Failure("INVALID_ARGUMENT")

@@ -19,11 +19,14 @@ semantics; feature guides describe the implemented paths and their proof limits.
 
 ## Develop and verify
 
-- [Contributing](../CONTRIBUTING.md), [development commands and layout](development.md)
+- [Contributing, development commands and layout](../CONTRIBUTING.md)
+- [End-to-end verification](guides/verification.md)
 - [Verification feature map](../scripts/FEATURES.md)
 - [Main loop and recovery](guides/main-loop.md)
 - [Core conformance](guides/core-evals.md), [personal-assistant evaluation](guides/m6-evals.md)
 - [CI operations](ci.md), [Golden Cases](../evals/golden-cases.md)
+- [v1 release audit](v1-release-audit.md), [live evaluation preflight](v1-live-preflight.md)
+- Exact case mechanics: [GC-08 wedding](gc08-verification.md), [GC-09 agenda](gc09-verification.md), [GC-11 evaluation](gc11-evaluation.md), [GC-12 invitation](gc12-verification.md), [GC-14 monitoring](gc14-verification.md)
 
 ## Architecture and historical evidence
 

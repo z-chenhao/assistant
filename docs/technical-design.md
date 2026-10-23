@@ -406,7 +406,7 @@ Web 展示层复用 ad-agent 的固定 React 组件、OpenIntelligentUI 的原�
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。
-- M3 本地实现的 `builtin__artifact__save/read/describe/list/publish` 经过同一个 ToolInvocation/Executor。`artifact_write` 只允许本地不可变新产物和显式最终输出选择，不允许外部发送、上传或删除；读取使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](guides/artifacts.md)。
+- ERII-192 将模型可见 Artifact 工具收敛为 `builtin__artifact__manage/search`，经过同一个 ToolInvocation/Executor。`manage` 使用严格的 `operation: save | read | describe | publish` 联合 Schema；`search` 无 query 时浏览，有 query 时按名称或 MIME 子串筛选，按可访问结果取最近 1–50 条。`manage` 整体使用 `artifact_write`，只允许本地不可变新产物、读取和显式最终输出选择，不允许外部发送、上传或删除；`search` 使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](guides/artifacts.md)。
 
 ## 5. 模型与 Agent 决策
 
@@ -605,6 +605,8 @@ builtin__task__manage
 ```
 
 该命名方式可作为 JavaScript 对象属性或字符串键使用，不要求工具名必须是 JavaScript 标识符。
+
+生产 Registry 不注册演示 echo 工具；`mcp__fixture__echo` 仅在显式 `-test-bridge` 中存在，返回模型数据，不发送用户消息。用户交付继续由 Main 的最终 AssistantMessage → DeliveryRequest/Outbox → Delivery Composer → UISpec 完成，Web 复用 OpenIntelligentUI 原生表格；Worker 没有用户发送能力。此次不新增第二个发送入口或模型 UI 代码。
 
 ### 6.2 Code Mode
 
@@ -991,14 +993,16 @@ const results = await Promise.allSettled(
   }))
 );
 
-const resultSet = await tools.artifact.save({
-  value: results,
+const resultSet = await tools.builtin__artifact__manage({
+  operation: "save",
+  text: JSON.stringify(results),
+  mediaType: "application/json",
   name: "item-analysis.json"
 });
 
 return agent.run({
   task: "汇总逐条分析结果，指出共性、异常和需要人工复核的项目。",
-  artifactRefs: [resultSet]
+  artifactRefs: resultSet.artifactRefs
 });
 ```
 
@@ -1680,7 +1684,7 @@ Agent 只使用一个统一搜索工具：
 builtin__memory__search
 ```
 
-该工具内部同时搜索 MemoryProvider 与 ConversationProvider，Agent 不选择数据源。
+该工具内部同时搜索 MemoryProvider 与 ConversationProvider，Agent 不选择数据源。工具始终可发现；未配置显式 embedding 时，描述说明配置要求，调用返回 `PROVIDER_UNAVAILABLE`，不触发自动召回或隐式 Provider。已配置的 Run 仍冻结 embedding 身份并对漂移 fail-closed。
 
 输入：
 
@@ -1728,6 +1732,7 @@ forget
 - 用户偏好、身份事实、关系和长期承诺在证据足够时自动写入；不因为信息敏感而弹出确认。敏感 Memory 使用更严格的本地加密、作用域、召回与日志脱敏策略。
 - 凭据、访问令牌、支付密钥等 Secret 不进入语义 Memory；需要保存时进入独立 Secret Store。这是存储边界，不是记忆确认流程。
 - 模糊推断先进入低置信 Recall，只有稳定、重复或被后续行为验证的信息才提升为 Core，避免一次随口表达永久改变 Agent 行为。
+- Main 始终能发现 `builtin__memory__manage`；未配置 `memory.encryption_key_ref` 时描述说明要求，调用返回 `PROVIDER_UNAVAILABLE`，不排队 Mutation、不声称接受、不改变隐私 epoch。Root/Child 不获得该工具。
 - 显式 remember/forget 只同步到事件被可靠写入，后续由 Curator 异步重试直至合并。
 - `remember/forget` 是用户主动覆盖、纠错和删除记忆的控制入口，不是普通 Memory 写入的必经路径。
 - Memory 维护、晋升、淘汰及其暂时性失败默认不告知用户，只进入内部可观测性系统；用户可随时查询、更正、删除或要求“不再记住”某类信息。

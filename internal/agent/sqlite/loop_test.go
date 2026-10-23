@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -78,7 +79,7 @@ func loopFixture(t *testing.T) (*Store, *Runs, *conversationsqlite.Store, agent.
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = h.Close() })
-	registry := tool.EchoRegistry()
+	registry := tool.FixtureRegistry()
 	r := s.Runs(h, registry)
 	p := &loopProvider{store: s, respond: func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 		last := request.Messages[len(request.Messages)-1]
@@ -91,7 +92,7 @@ func loopFixture(t *testing.T) (*Store, *Runs, *conversationsqlite.Store, agent.
 		args, _ := json.Marshal(struct {
 			Text string `json:"text"`
 		}{last.Text})
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "same-id", Name: "builtin__text__echo", Arguments: string(args)}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "same-id", Name: "mcp__fixture__echo", Arguments: string(args)}}}, nil
 	}}
 	a := agent.Actor{Store: r, Provider: p, Registry: registry, Ready: func(context.Context) bool { return true }}
 	return s, r, h, a, p
@@ -375,7 +376,7 @@ func TestLoopToolRejectionPersistsAndDoesNotExposeHostData(t *testing.T) {
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: last.Text}, nil
 		}
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "builtin__text__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent__run", Arguments: `{"task":"forbidden"}`}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "mcp__fixture__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent__run", Arguments: `{"task":"forbidden"}`}}}, nil
 	}
 	mustSubmit(t, a, "one", "try invalid calls")
 	mustDrain(t, a)
@@ -479,6 +480,61 @@ func TestLoopModelFailureIsTerminalObservableAndNotRetried(t *testing.T) {
 	mustDrain(t, a)
 	if len(p.requests) != 1 {
 		t.Fatal("Host retried a failed model")
+	}
+}
+
+func TestSteeringAfterCompactionBeforeGenerationAdmission(t *testing.T) {
+	s, r, h, a, p := loopFixture(t)
+	p.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {
+		text := ""
+		for _, message := range request.Messages {
+			if message.Role == "user" && message.Origin == "" {
+				text = message.Text
+			}
+		}
+		return llm.GenerationResult{Text: "Reply to " + text}, nil
+	}
+	receipt := mustSubmit(t, a, "first", "original instruction")
+	// Compaction commits before generation admission. A crash/storage failure
+	// in this window must not let later steering rewrite that frozen step.
+	if _, err := s.db.Exec(`CREATE TRIGGER fail_admission BEFORE INSERT ON model_generation BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Drain(context.Background()); !errors.Is(err, agent.ErrStorage) {
+		t.Fatal("admission failure was not preserved", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM context_compaction`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation`) != 0 || len(p.requests) != 0 {
+		t.Fatal("did not stop after frozen context and before provider admission")
+	}
+	var originalHash string
+	if err := s.db.QueryRow(`SELECT input_hash FROM context_compaction WHERE run_id=? AND step_index=0`, receipt.RunID).Scan(&originalHash); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`DROP TRIGGER fail_admission`); err != nil {
+		t.Fatal(err)
+	}
+	mustSubmit(t, a, "second", "new instruction")
+	mustDrain(t, a)
+	if len(p.requests) != 2 || strings.Contains(fmt.Sprint(p.requests[0].Messages), "new instruction") || !strings.Contains(fmt.Sprint(p.requests[1].Messages), "new instruction") {
+		t.Fatal("frozen generation was changed or steering was lost", p.requests)
+	}
+	var recoveredHash string
+	if err := s.db.QueryRow(`SELECT input_hash FROM context_compaction WHERE run_id=? AND step_index=0`, receipt.RunID).Scan(&recoveredHash); err != nil || recoveredHash != originalHash {
+		t.Fatal("recovery rewrote frozen context", err)
+	}
+	if err := r.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	conversationID := ""
+	if err := s.db.QueryRow(`SELECT conversation_id FROM run WHERE run_id=?`, receipt.RunID).Scan(&conversationID); err != nil {
+		t.Fatal(err)
+	}
+	messages, err := h.List(context.Background(), conversationID)
+	if err != nil || len(messages) != 3 || messages[2].Content[0].Text != "Reply to new instruction" {
+		t.Fatal("steering did not determine the single final reply", messages, err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM delivery_request`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation WHERE status='completed'`) != 2 {
+		t.Fatal("recovery duplicated delivery or lost accepted results")
 	}
 }
 

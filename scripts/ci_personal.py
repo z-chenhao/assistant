@@ -17,7 +17,8 @@ def join(root):
         folder = root / part
         suite = json.loads((folder / f'suite-personal-{part}.json').read_text())
         if (suite.get('passed') is not True or suite.get('source_stable') is not True or
-                suite.get('source_dirty') is not False or suite.get('personal_part') != part or
+                suite.get('source_dirty') is not False or suite.get('selected_gates') is not None or
+                suite.get('personal_part') != part or
                 set(suite.get('shards', {})) != {'personal'}):
             raise ValueError('failed, dirty or wrong M6 part: ' + part)
         gate, = personal_gates(part)
@@ -63,7 +64,8 @@ def join(root):
     summary = m6_report.aggregate(reports)
     if summary['passed'] is not True:
         raise ValueError('full M6 mechanical assertions failed')
-    full = dict(first, personal_part=None, shards={'personal': rows}, parts=suites,
+    full = dict(first, complete_inventory=True, selected_gates=None,
+                personal_part=None, shards={'personal': rows}, parts=suites,
                 elapsed_seconds=max(s['elapsed_seconds'] for s in suites.values()))
     return full, reports, summary
 

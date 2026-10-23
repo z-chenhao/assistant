@@ -18,7 +18,7 @@ import (
 
 func codeClaimFixture(t *testing.T) (*Store, *Runs, *codeBridge, tool.Invocation) {
 	t.Helper()
-	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 	calls := []llm.ToolCall{{ID: "code", Name: codemode.ToolName, Arguments: `{"source":"return 1;"}`}}
 	s, r, _, e, exchange := admitPolicy(t, []tool.Definition{codemode.Definition(), echo}, calls)
 	invs, err := e.Store.Accept(context.Background(), exchange, calls, e.Registry.Describe())
@@ -35,7 +35,7 @@ func codeClaimFixture(t *testing.T) (*Store, *Runs, *codeBridge, tool.Invocation
 	return s, r, b, invs[0]
 }
 func codeMessage(b *codeBridge) codemode.Message {
-	return codemode.Message{ExecutionID: b.req.ExecutionID, ParentInvocationID: b.req.ParentInvocationID, RunID: b.req.RunID, ClaimToken: b.req.ClaimToken, ExecutionEpoch: b.req.ExecutionEpoch, Sequence: 1, CallID: "1", CallKey: strings.Repeat("a", 64), ToolName: "builtin__text__echo", Arguments: json.RawMessage(`{"text":"first"}`)}
+	return codemode.Message{ExecutionID: b.req.ExecutionID, ParentInvocationID: b.req.ParentInvocationID, RunID: b.req.RunID, ClaimToken: b.req.ClaimToken, ExecutionEpoch: b.req.ExecutionEpoch, Sequence: 1, CallID: "1", CallKey: strings.Repeat("a", 64), ToolName: "mcp__fixture__echo", Arguments: json.RawMessage(`{"text":"first"}`)}
 }
 func TestCodeReplayFrozenRequestAndAtomicAdmission(t *testing.T) {
 	s, _, b, _ := codeClaimFixture(t)
@@ -274,7 +274,7 @@ func TestCodeReplayStoreObservationsAndWritesAreNotRepeated(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "observed"}, nil
 		}
-		raw, _ := json.Marshal(map[string]string{"source": `store("count",(load("count")||0)+1); await tools.builtin__text__echo({text:String(load("count"))}); return load("count");`})
+		raw, _ := json.Marshal(map[string]string{"source": `store("count",(load("count")||0)+1); await tools.mcp__fixture__echo({text:String(load("count"))}); return load("count");`})
 		return calls(codemode.ToolName, string(raw)), nil
 	}
 	mustSubmit(t, a, "store-replay", "execute")
@@ -336,8 +336,8 @@ func TestCodeStoreQuotaRejectionReceiptIsFrozen(t *testing.T) {
 func TestCodeReplayStoreQuotaRejectionSurvivesShrink(t *testing.T) {
 	for _, tc := range []struct{ name, suspend string }{
 		{"control", ""},
-		{"replay", `await tools.builtin__text__echo({text:"force-replay"});`},
-		{"dependent-arguments", `await tools.builtin__text__echo({text:String(rejected)});`},
+		{"replay", `await tools.mcp__fixture__echo({text:"force-replay"});`},
+		{"dependent-arguments", `await tools.mcp__fixture__echo({text:String(rejected)});`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, r, a, p := childFixture(t, codemode.Definition())
@@ -373,7 +373,7 @@ store("k0", null);
 			if tc.suspend != "" && scalar(t, s, `SELECT count(DISTINCT attempt_id) FROM code_event WHERE json_extract(message_json,'$.kind')='execution_started'`) < 2 {
 				t.Fatal("fixture did not suspend and replay")
 			}
-			if tc.name == "dependent-arguments" && scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__text__echo' AND arguments_json='{"text":"true"}' AND status='succeeded' AND attempt_count=1`) != 1 {
+			if tc.name == "dependent-arguments" && scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='mcp__fixture__echo' AND arguments_json='{"text":"true"}' AND status='succeeded' AND attempt_count=1`) != 1 {
 				t.Fatal("replay changed dependent Tool arguments or repeated dispatch")
 			}
 		})

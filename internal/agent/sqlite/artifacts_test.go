@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -222,9 +223,9 @@ func TestArtifactToolAtomicResultReplayPublicationAndFence(t *testing.T) {
 			}
 		})
 	}
-	s, _, _, e, exchange := admitPolicy(t, artifacttools.Definitions(), []llm.ToolCall{{ID: "save", Name: artifacttools.Save, Arguments: `{"name":"report.md","mediaType":"text/markdown","text":"confirmed"}`}})
+	s, _, _, e, exchange := admitPolicy(t, artifacttools.Definitions(), []llm.ToolCall{{ID: "save", Name: artifacttools.Manage, Arguments: `{"operation":"save","name":"report.md","mediaType":"text/markdown","text":"confirmed"}`}})
 	s.db.Exec(`CREATE TRIGGER fail_artifact_tool BEFORE UPDATE ON tool_invocation WHEN NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'fault'); END`)
-	_, err := e.Execute(ctx, exchange, []llm.ToolCall{{ID: "save", Name: artifacttools.Save, Arguments: `{"name":"report.md","mediaType":"text/markdown","text":"confirmed"}`}})
+	_, err := e.Execute(ctx, exchange, []llm.ToolCall{{ID: "save", Name: artifacttools.Manage, Arguments: `{"operation":"save","name":"report.md","mediaType":"text/markdown","text":"confirmed"}`}})
 	if !errors.Is(err, agent.ErrStorage) || scalar(t, s, `SELECT count(*) FROM artifact`) != 0 {
 		t.Fatal("metadata survived failed Tool result", err)
 	}
@@ -371,7 +372,7 @@ func TestArtifactMainRunPrivacyAndInputGrant(t *testing.T) {
 		t.Fatal("unpublished Run output crossed Run", err)
 	}
 	before := scalar(t, s, `SELECT count(*) FROM main_input`)
-	if _, err := r.Submit(ctx, "tool-injection", []conversation.ContentPart{{Type: "tool_call", ToolCall: &conversation.ToolCall{ID: "forged", Name: "builtin__artifact__publish", Arguments: "{}"}}}); !errors.Is(err, conversation.ErrInvalid) {
+	if _, err := r.Submit(ctx, "tool-injection", []conversation.ContentPart{{Type: "tool_call", ToolCall: &conversation.ToolCall{ID: "forged", Name: "builtin__artifact__manage", Arguments: `{"operation":"publish","artifactRefs":[]}`}}}); !errors.Is(err, conversation.ErrInvalid) {
 		t.Fatal("user tool call accepted", err)
 	}
 	if _, err := r.Submit(ctx, "forged", []conversation.ContentPart{{Type: "file", ArtifactRef: "artifact:" + strings.Repeat("0", 64)}}); !errors.Is(err, conversation.ErrInvalid) {
@@ -693,5 +694,111 @@ func TestArtifactFinalSelectionFitsConversationEnvelope(t *testing.T) {
 		if artifact.ContentType(media) != kind {
 			t.Fatal(media, artifact.ContentType(media), kind)
 		}
+	}
+}
+
+func TestArtifactManageSearchExecutionAndReplay(t *testing.T) {
+	ctx := context.Background()
+	save := []llm.ToolCall{{ID: "save", Name: artifacttools.Manage, Arguments: `{"operation":"save","name":"Évidence.md","mediaType":"text/markdown","text":"verified bytes"}`}}
+	s, r, claim, e, exchange := admitPolicy(t, artifacttools.Definitions(), save)
+	// This contract checks sequential operations; capacity suspension is tested separately.
+	e.Concurrency = 1
+	results, err := e.Execute(ctx, exchange, save)
+	if err != nil || len(results) != 1 || results[0].Error != nil || len(results[0].ArtifactRefs) != 1 {
+		t.Fatal(results, err)
+	}
+	ref := results[0].ArtifactRefs[0]
+	again, err := e.Execute(ctx, exchange, save)
+	if err != nil || !reflect.DeepEqual(results, again) || scalar(t, s, `SELECT count(*) FROM artifact`) != 1 {
+		t.Fatal("save repeated", again, err)
+	}
+	runScope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: claim.RunID()}
+	// Matching before the limit must find an older result beyond 50 recent files.
+	for i := 0; i < 52; i++ {
+		putArtifact(t, s, runScope, "newer unrelated file")
+	}
+	// A newer matching file outside this Run must not consume the limit.
+	foreign, err := s.Artifacts().Put(ctx, artifactOwner(t, s), artifact.Input{Name: "Évidence.md", MediaType: "text/markdown"}, strings.NewReader("foreign marker"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, query := range []string{"Évidence.md", "évidence.md", "ÉVIDENCE.MD", "vidence.md", "TEXT/MARKDOWN"} {
+		err = s.Transaction(ctx, func(tx *sql.Tx) error {
+			matches, e := s.Artifacts().SearchTx(ctx, tx, runScope, query, 1)
+			if e != nil {
+				return e
+			}
+			if len(matches) != 1 || matches[0].Ref != ref {
+				t.Errorf("store query %q: got %v, want only %s", query, matches, ref)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	batch := []llm.ToolCall{
+		{ID: "search", Name: artifacttools.Search, Arguments: `{"query":"Évidence.md","limit":1}`},
+		{ID: "read", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"offset":0,"limit":8}`, ref)},
+		{ID: "describe", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"describe","artifactRef":%q}`, ref)},
+		{ID: "foreign", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q}`, foreign)},
+		{ID: "publish", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"publish","artifactRefs":[%q]}`, ref)},
+		{ID: "bad", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"artifactRefs":[%q]}`, ref, ref)},
+		{ID: "lower", Name: artifacttools.Search, Arguments: `{"query":"évidence.md","limit":1}`},
+		{ID: "upper", Name: artifacttools.Search, Arguments: `{"query":"ÉVIDENCE.MD","limit":1}`},
+		{ID: "suffix", Name: artifacttools.Search, Arguments: `{"query":"vidence.md","limit":1}`},
+		{ID: "mime", Name: artifacttools.Search, Arguments: `{"query":"TEXT/MARKDOWN","limit":1}`},
+		{ID: "accent-preserved", Name: artifacttools.Search, Arguments: `{"query":"evidence.md","limit":1}`},
+	}
+	// Persist a second real provider response before admitting its calls.
+	run, err := r.Load(ctx, claim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run.Checkpoint.Step++
+	if err = r.Checkpoint(ctx, claim, run.Version, run.Checkpoint); err != nil {
+		t.Fatal(err)
+	}
+	run, err = r.Load(ctx, claim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generation, err := r.Generation(ctx, claim, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &loopProvider{store: s, respond: func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		return llm.GenerationResult{ToolCalls: batch}, nil
+	}}
+	if _, err = provider.Generate(ctx, generation.Request, nil); err != nil {
+		t.Fatal(err)
+	}
+	exchange = generation.Request.GenerationID
+	out, err := e.Execute(ctx, exchange, batch)
+	if err != nil || len(out) != len(batch) {
+		t.Fatal(out, err)
+	}
+	for _, i := range []int{0, 6, 7, 8, 9} {
+		var descriptors []artifact.Descriptor
+		if out[i].Error != nil || json.Unmarshal([]byte(out[i].Text), &descriptors) != nil || len(descriptors) != 1 || descriptors[0].Ref != ref {
+			t.Fatalf("Tool query %s: %v", batch[i].Arguments, out[i])
+		}
+	}
+	var miss []artifact.Descriptor
+	if out[10].Error != nil || json.Unmarshal([]byte(out[10].Text), &miss) != nil || len(miss) != 0 {
+		t.Fatal("case matching must retain accents", out[10])
+	}
+	if !strings.Contains(out[1].Text, `"text":"verified"`) || !strings.Contains(out[2].Text, `Évidence.md`) {
+		t.Fatal("read/describe", out[1], out[2])
+	}
+	if out[3].Error == nil || out[3].Error.Code != "NOT_FOUND" || out[5].Error == nil || out[5].Error.Code != "INVALID_ARGUMENT" {
+		t.Fatal("access/schema rejection", out)
+	}
+	if out[4].Error != nil || scalar(t, s, `SELECT count(*) FROM artifact_publication`) != 1 {
+		t.Fatal("publish", out[4])
+	}
+	replay, err := e.Execute(ctx, exchange, batch)
+	if err != nil || !reflect.DeepEqual(out, replay) || scalar(t, s, `SELECT count(*) FROM artifact_publication`) != 1 {
+		t.Fatal("replay", err)
 	}
 }

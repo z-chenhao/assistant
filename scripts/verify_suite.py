@@ -65,6 +65,9 @@ SHARDS = {
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
+    "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),
+                      Gate("gc08", "verify_gc08.py", "gc08"),
+                      Gate("gc14", "verify_gc14.py", "gc14")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("startup", "verify_startup.py", "startup"),
@@ -227,7 +230,7 @@ def run_command(args, env, output, stopped, metrics=None):
 
 def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_jobs=1, record=None):
     gates = SHARDS[name] if gates is None else gates
-    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security'):
+    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security', 'delivery'):
         return concurrent_gates(name, binary, evidence, stopped, gates, previous)
     rows = list(previous)
     for gate in gates:
@@ -299,8 +302,31 @@ def concurrent_gates(name, binary, evidence, stopped, gates, previous):
     return rows
 
 
+def catalogue():
+    """Describe the same inventory that execution consumes, without launching it."""
+    return [dict(shard=shard, gate=gate.name, script=gate.script or None,
+                 attempts=gate.attempts,
+                 reports=[report_name(gate, n) for n in range(1, gate.attempts + 1)])
+            for shard, gates in SHARDS.items() for gate in gates]
+
+
+def select_gates(parser, shard, selected):
+    plans = {name: gates for name, gates in SHARDS.items() if not shard or name == shard}
+    if selected:
+        if len(selected) != len(set(selected)):
+            parser.error('--gate must not contain duplicates')
+        available = {g.name for gates in plans.values() for g in gates}
+        if set(selected) - available:
+            parser.error('--gate is outside the selected inventory: ' + ', '.join(sorted(set(selected) - available)))
+        plans = {name: tuple(g for g in gates if g.name in selected) for name, gates in plans.items()}
+        plans = {name: gates for name, gates in plans.items() if gates}
+    return plans
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--list', action='store_true', help='print the gate catalogue as JSON; no binary or fixtures needed')
+    parser.add_argument('--gate', action='append', help='run a named gate with its full repetition count; repeat to select several')
     parser.add_argument("--shard", choices=SHARDS)
     parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
@@ -309,6 +335,14 @@ def main():
     parser.add_argument("--binary", type=Path, default=Path("bin/erii"))
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
+    if args.list:
+        if args.gate or args.codemode_part or args.personal_part:
+            parser.error('--list cannot be combined with gate/part execution')
+        print(json.dumps([row for row in catalogue() if not args.shard or row['shard'] == args.shard], indent=2))
+        return 0
+    if args.gate and (args.codemode_part or args.personal_part):
+        parser.error('--gate cannot be combined with a CI part')
+    plans = select_gates(parser, args.shard, args.gate)
     if args.codemode_part and args.shard != 'codemode':
         parser.error('--codemode-part requires --shard codemode')
     if args.personal_part and args.shard != 'personal':
@@ -323,14 +357,18 @@ def main():
         parser.error("binary missing; run make build")
     source = source_state()
     binary_digest = hashlib.sha256(binary.read_bytes()).hexdigest()
-    names = [args.shard] if args.shard else list(SHARDS)
-    plans = {name: SHARDS[name] for name in names}
+    names = list(plans)
     if args.codemode_part:
         plans['codemode'] = codemode_gates(args.codemode_part)
     if args.personal_part:
         plans['personal'] = personal_gates(args.personal_part)
     part = args.codemode_part or args.personal_part
     report_suffix = (args.shard or 'all') + ('-' + part if part else '')
+    if args.gate:
+        # Focused runs cannot overwrite or masquerade as a complete shard verdict.
+        key = hashlib.sha256(json.dumps(sorted(args.gate)).encode()).hexdigest()[:12]
+        evidence = evidence / 'focused' / key
+        report_suffix = 'focused'
     evidence.mkdir(parents=True, exist_ok=True)
     (evidence / "logs").mkdir(exist_ok=True)
     (evidence / ('suite-' + report_suffix + '.json')).unlink(missing_ok=True)
@@ -373,13 +411,14 @@ def main():
         for name, rows in zip(names, results))
     stable = source == source_state() and binary_digest == hashlib.sha256(binary.read_bytes()).hexdigest()
     passed = passed and stable
-    if passed and "codemode" in names and not args.codemode_part:
+    if passed and "codemode" in names and not args.codemode_part and not args.gate:
         passed = core_report.write(evidence)
-    if passed and "personal" in names and not args.personal_part:
+    if passed and "personal" in names and not args.personal_part and not args.gate:
         passed = m6_report.write(evidence)
     report = dict(version=1, **source, source_stable=stable,
                   workflow_sha=os.environ.get("GITHUB_SHA"), platform=platform.platform(), jobs=args.jobs,
-                  gate_jobs=args.gate_jobs,
+                  gate_jobs=args.gate_jobs, selected_gates=args.gate,
+                  complete_inventory=not bool(args.gate or part),
                   codemode_part=args.codemode_part, personal_part=args.personal_part,
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),

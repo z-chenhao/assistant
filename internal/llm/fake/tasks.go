@@ -45,7 +45,7 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: "Worker result: " + last.Text}, nil
 		}
-		return call("builtin__text__echo", struct {
+		return call("mcp__fixture__echo", struct {
 			Text string `json:"text"`
 		}{last.Text}), nil
 	}

@@ -47,12 +47,12 @@ class ImpactTests(unittest.TestCase):
     def test_manifest_missing_drift_ambiguity_and_empty_fail_closed(self):
         for manifest in [None, {}, [], dict(self.manifest, version=2),
                          dict(self.manifest, rules=[{'prefix': 'docs/'}])]:
-            self.assertEqual(impact.select(['docs/development.md'], manifest)['shards'], impact.ALL)
+            self.assertEqual(impact.select(['docs/README.md'], manifest)['shards'], impact.ALL)
         self.assertEqual(impact.select([], self.manifest)['shards'], impact.ALL)
-        self.assertEqual(impact.select(['docs/development.md'], self.manifest, False)['shards'], impact.ALL)
+        self.assertEqual(impact.select(['docs/README.md'], self.manifest, False)['shards'], impact.ALL)
         manifest = copy.deepcopy(self.manifest)
-        manifest['rules'].append(dict(prefix='docs/development.md', example='docs/development.md', shards=[]))
-        self.assertEqual(impact.select(['docs/development.md'], manifest)['shards'], impact.ALL)
+        manifest['rules'].append(dict(prefix='docs/README.md', example='docs/README.md', shards=[]))
+        self.assertEqual(impact.select(['docs/README.md'], manifest)['shards'], impact.ALL)
         self.assertEqual(set(ci_feedback.GATES), set(impact.ALL))
         for shard, names in ci_feedback.GATES.items():
             self.assertEqual(names, {g.name for g in ci_feedback.suite.SHARDS[shard] if g.name in names})
@@ -244,7 +244,7 @@ class FeedbackSchedulingTests(unittest.TestCase):
 
     def test_all_selected_shards_remain_in_early_schedule(self):
         self.assertEqual(ci_feedback.feedback_order(list(ci_feedback.GATES)),
-                         ['security','runtime','codemode','providers','delivery','personal'])
+                         ['security','runtime','codemode','providers','delivery','personal','communication'])
         self.assertEqual(ci_feedback.feedback_order(['delivery','runtime']), ['runtime','delivery'])
         self.assertEqual(ci_feedback.feedback_order([]), [])
         for names in (['unknown'], ['security','security']):

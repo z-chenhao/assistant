@@ -34,7 +34,7 @@ func TestOperationsPriorSchemaRollbackAndActiveWorkUpgrade(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	registry := tool.EchoRegistry()
+	registry := tool.FixtureRegistry()
 	r := s.Runs(h, registry)
 	a := agent.Actor{Store: r, Registry: registry, Ready: func(context.Context) bool { return true }}
 	receipt := mustSubmit(t, a, "before-upgrade", "PRIVATE_USER_TEXT_29")

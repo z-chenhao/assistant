@@ -18,10 +18,20 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
+func taskFixtureRegistry(t *testing.T) *tool.Registry {
+	t.Helper()
+	echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
+	registry, err := tool.NewRegistry(append(task.Definitions(), echo))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
+}
+
 func taskFixture(t *testing.T) (*Store, *Runs, agent.Actor, *loopProvider) {
 	t.Helper()
 	s, _, history, a, p := loopFixture(t)
-	a.Registry = task.Registry()
+	a.Registry = taskFixtureRegistry(t)
 	r := s.Runs(history, a.Registry)
 	a.Store = r
 	return s, r, a, p
@@ -667,7 +677,7 @@ func TestWorkerCapabilityDriftStopsDrainWithoutRetryLoop(t *testing.T) {
 	if err = executeTaskRun(t, a, r, context.Background(), c); err != nil {
 		t.Fatal(err)
 	}
-	definition, _ := a.Registry.Resolve("builtin__text__echo")
+	definition, _ := a.Registry.Resolve("mcp__fixture__echo")
 	definition.Spec.InputSchema = `{"type":"object"}`
 	a.Registry, err = tool.NewRegistry(append(task.Definitions(), definition))
 	if err != nil {
@@ -680,15 +690,85 @@ func TestWorkerCapabilityDriftStopsDrainWithoutRetryLoop(t *testing.T) {
 	}
 }
 
+func TestTaskAppendAfterCompactionBeforeGenerationAdmission(t *testing.T) {
+	s, r, a, p := taskFixture(t)
+	ctx := context.Background()
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if isRoot(req) {
+			if strings.Contains(fmt.Sprint(req.Messages), "Task instruction: new date") {
+				return llm.GenerationResult{Text: "Worker applied new date"}, nil
+			}
+			return llm.GenerationResult{Text: "Worker original result"}, nil
+		}
+		if isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "Result"}, nil
+		}
+		if req.Messages[len(req.Messages)-1].Text == "append" {
+			var ref string
+			if err := s.db.QueryRow(`SELECT task_ref FROM task`).Scan(&ref); err != nil {
+				return llm.GenerationResult{}, err
+			}
+			raw, _ := json.Marshal(task.ManageRequest{Operation: "append", TaskRef: ref, Instruction: "new date"})
+			return calls(task.ManageName, string(raw)), nil
+		}
+		return calls(task.ManageName, `{"operation":"create","task":"Original task anchor"}`), nil
+	}
+	receipt := mustSubmit(t, a, "create", "create")
+	claim, err := r.Claim(ctx, receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = executeTaskRun(t, a, r, ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(`CREATE TRIGGER fail_worker_admission BEFORE INSERT ON model_generation WHEN NEW.run_id IN (SELECT run_id FROM run WHERE kind='worker') BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.Drain(ctx); !errors.Is(err, agent.ErrStorage) {
+		t.Fatal("worker admission failure was not preserved", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM context_compaction c JOIN run r USING(run_id) WHERE r.kind='worker'`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker'`) != 0 {
+		t.Fatal("worker context was not frozen before the admission failure")
+	}
+	if _, err = s.db.Exec(`DROP TRIGGER fail_worker_admission`); err != nil {
+		t.Fatal(err)
+	}
+	receipt = mustSubmit(t, a, "append", "append")
+	claim, err = r.Claim(ctx, receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = executeTaskRun(t, a, r, ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	workers := []llm.GenerationRequest{}
+	for _, request := range p.requests {
+		if isRoot(request) {
+			workers = append(workers, request)
+		}
+	}
+	if len(workers) != 2 || strings.Contains(fmt.Sprint(workers[0].Messages), "Task instruction: new date") || !strings.Contains(fmt.Sprint(workers[1].Messages), "Task instruction: new date") {
+		t.Fatal("append changed frozen context or was lost", workers)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 1 {
+		t.Fatal("append duplicated a Root, instruction or completion")
+	}
+	var result string
+	if err = s.db.QueryRow(`SELECT content FROM task_update`).Scan(&result); err != nil || result != "Worker applied new date" {
+		t.Fatal("Root returned the superseded result", result, err)
+	}
+}
+
 func TestOldMainCapabilitySnapshotSurvivesTaskRegistryUpgrade(t *testing.T) {
 	s, r, _, a, p := loopFixture(t)
 	receipt := mustSubmit(t, a, "old-main", "old frozen echo view")
 	// Models and old capability bytes remain unchanged as the Host gains new
 	// registered tools. New Run creation alone gets the larger role view.
-	a.Registry = task.Registry()
+	a.Registry = taskFixtureRegistry(t)
 	r.registry = a.Registry
 	mustDrain(t, a)
-	if len(p.requests) == 0 || len(p.requests[0].Tools) != 1 || p.requests[0].Tools[0].Name != "builtin__text__echo" {
+	if len(p.requests) == 0 || len(p.requests[0].Tools) != 1 || p.requests[0].Tools[0].Name != "mcp__fixture__echo" {
 		t.Fatal("old Run changed tools")
 	}
 	mustSubmit(t, a, "new-main", "new available Task view")

@@ -35,13 +35,25 @@ flowchart LR
     Join --> Gate
 ```
 
-Each Required job independently installs pinned dependencies, provisions the
+Each Required job independently installs its pinned runtime dependencies, provisions the
 public fixture SDK and builds from its exact checked-out source. A small
-project-local composite action owns those mechanics. There is no long test or
+project-local composite action owns those mechanics. Its disposable Ubuntu runner
+uses the official HTTPS archive mirror for APT downloads. The Azure mirror
+repeatedly took 8–9 minutes to install browser prerequisites (one retained run
+fetched 25.9 MB in 7m48s), exhausting the ten-minute job limit before checks could
+finish. Package selection, browser installation and job limits are unchanged.
+There is no long test or
 producer prerequisite. No executable crosses runner boundaries: GitHub image
 rollouts can assign different Ubuntu image versions within one workflow.
 The retained historical build-bundle utility still rejects image/context drift;
 its guards were not relaxed. The new pipeline avoids that reuse entirely.
+Frontend build/TypeScript dependencies install only in unit/lint. Playwright
+installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
+QuickJS still install everywhere, including providers' offline packaging gate.
+Across the eighteen execution jobs this removes seventeen frontend and eleven
+Playwright installs. Lockfile cache keys, per-job exact-source builds, every
+assertion and repetition count remain unchanged. Clean-runner complete CI is the
+dependency-closure proof; install counts alone are not wall-time measurements.
 All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
 SHA may identify GitHub's synthetic merge commit.
 Strict main ancestry and independent exact-SHA reviewer PASS remain required.
@@ -112,6 +124,21 @@ checks. All M6 fixtures remain disk-backed.
 
 ## Complete inventory
 
+Delivery now honors the same `ERII_VERIFY_GATE_JOBS=2` setting as the other
+eligible shards. On ERII-30 head `6a837f4`, all ten delivery/channel rounds
+passed, but the shard spent 517.6 seconds serially running the two series;
+setup and evidence retention took the job past its unchanged ten-minute ceiling.
+The old dispatch allowlist silently excluded delivery. The existing bounded
+two-worker executor now overlaps these independent series. Each series retains
+five consecutive rounds, its original timeouts/assertions and separate report
+paths. No production concurrency, fixture storage or job budget changes.
+`test_delivery_two_series_overlap_without_splitting_five_rounds` uses two real
+owned subprocesses with mutual admission barriers; it fails under the old
+serial dispatch and checks all ten canonical rows, per-series order and drained
+groups. Actual Web/Feishu/PTY, approval/restart and slow-send lease checks remain
+mandatory in every CI round. A successful run demonstrates capacity for that
+runner; it is not a controlled long-term performance claim.
+
 `scripts/verify_suite.py` is the authoritative logical inventory (105 gate
 invocations, including all five Computer lifecycle and Computer Use runs).
 
@@ -155,24 +182,54 @@ these acceptance boundaries. No partial job independently proves Code Mode.
 Independent fixture capacity is four; GC-17 checkpoint variants retain capacity
 two. Local unpartitioned Core runs join case kinds in order. Part jobs use
 separate runners. Gate-series concurrency is two, with Go event/model checks
-isolated after other work. The complete race runner isolates Bridge first. It discovers SQLite's complete
+isolated after other work. Local `make test-race` keeps its complete serial-Bridge
+runner. CI places `--part packages` and `--part sqlite` on two independent
+Required runners; both retain their ten-minute limit. The packages part runs
+Bridge alone before the other packages (`-p=1`, GOMAXPROCS=1). The SQLite part
+discovers SQLite's complete
 Go Test/Example/Fuzz inventory. The Child approval contract whose original
 five-second context spans three Drain/decision phases runs alone with the full
 CPU budget before overlap. All remaining top-level tests run exactly once in up
 to three separate processes. Each test retains its own Store/temp root, complete
 subtests and internal concurrency; process-local globals and environment remain
-isolated. A fourth worker runs the other packages with package concurrency one.
-All workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
+isolated. Ordinary SQLite workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
 four-CPU ceiling. Race instrumentation, count=1 and the 15-minute Go timeout
 remain required. Go JSON verdicts reject missing, duplicate, unexpected, failed
-or unfinished test roots. All fifty logical packages remain in the same Required
-race job; discovery automatically includes new tests. Per-worker commands,
+or unfinished test roots. Every discovered package remains required.
+`ci_race_join.py` requires both successful exact-source parts, validates the
+package/command inventory, and re-reads the native SQLite discovery and JSON
+events to reject missing/duplicate/failed/drifted roots or unjoined processes.
+Ubuntu checks requires both the matrix and this join; no part alone proves the
+complete race gate. Discovery automatically includes new tests. Per-worker commands,
 CPU/wall, test outcomes and cleanup remain in `race/inventory.json` and logs.
 No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
+SQLite placement uses longest measured tests first, with elapsed-time hints in
+`scripts/ci_race_timings.json`. The hints retain their exact-SHA Ubuntu run
+provenance and only affect scheduling. Go discovery still owns the complete
+inventory; new tests use the mean known cost, and removed tests cannot execute
+through a stale hint. The receipt records the hints and unmeasured roots.
+SC conformance retains its existing unweighted partitions. The measured ERII-30
+timeout had static partition costs of about 330/379/449 seconds; the same
+retained costs balance to about 386 seconds each. These are scheduling estimates,
+not a latency PASS. Actual required race/cleanup and end-to-end timings must
+still pass on the delivered SHA within the unchanged ten-minute budget.
+
+The `f7808415f20968a58a1c8644bc2b3796f7d54034` run
+[39894692925](https://github.com/z-chenhao/erii/actions/runs/39894692925)
+completed every race test and drained its groups in 509.7 seconds (Bridge 66.3,
+remainder 442.8). About 81 seconds of setup left almost no finalization margin.
+The native inventory, SDK immutability check, fixture cleanup and artifact upload
+all passed; the job itself was cancelled at the ten-minute finalization boundary
+(601 seconds overall). Ubuntu checks
+correctly failed. Both failed job logs and original manifested artifacts remain
+release evidence. Splitting package placement removes Bridge and other-package
+work from the SQLite critical path; all checks, cleanup and deadlines remain.
+This scheduling change needs successful exact-head CI; an estimate is not PASS.
+
 ## Launch, doctor, drive, evidence and cleanup
 
-Install the versions and pinned dependencies from [development.md](development.md).
+Install the versions and pinned dependencies from [CONTRIBUTING](../CONTRIBUTING.md).
 Linux coding tests need bubblewrap and enabled unprivileged user namespaces;
 CI configures these on its disposable runner. The unit/lint job installs the
 pinned Chromium binary/system dependencies, then runs the actual Browser fixture
@@ -301,3 +358,14 @@ budget, proves unknown/no Artifact/no second effect, then verifies a fresh
 authoritative query. The existing real deadline, cancellation, unsafe receipt,
 identity and byte/hash assertions remain required. Preserve failed full-suite
 evidence; passing focused diagnostics alone do not supersede it.
+
+## GC-14 exact monitoring gate
+
+The communication shard also runs `verify_gc14.py` once with all six exact
+wording/noise/order variants. It reuses the existing MCP sandbox provisioning;
+the runtime shard remains independent of that dependency. Receipts retain six
+days per variant, Oct18/21-only notifications, two source observations per day,
+duplicate scheduling/replay, two SIGKILL boundaries, a profile change at later
+admission and cancellation. This adds no timeout changes or reductions to the
+existing GC-12 five-round and GC-08 gates. See
+[GC-14 verification](gc14-verification.md). All semantic scores remain null.

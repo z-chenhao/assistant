@@ -228,7 +228,7 @@ func TestSchedulerFrozenWorkerTurns(t *testing.T) {
 		if !isRoot(req) {
 			return calls(task.ManageName, `{"operation":"create","task":"loop"}`), nil
 		}
-		return calls("builtin__text__echo", `{"text":"loop"}`), nil
+		return calls("mcp__fixture__echo", `{"text":"loop"}`), nil
 	}
 	mustSubmit(t, a, "loop", "delegate")
 	mustDrain(t, a)
@@ -353,7 +353,7 @@ func TestSchedulerDrainWaitsForStoppedLiveOwner(t *testing.T) {
 }
 
 func TestSchedulerReadyToolProgressesBesidePendingApproval(t *testing.T) {
-	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 	cs := append(effectCall(`{"target":"Alex","text":"Tuesday"}`), llm.ToolCall{ID: "retry", Name: echo.Spec.Name, Arguments: `{"text":"independent"}`})
 	s, r, c, e, exchange := admitPolicy(t, []tool.Definition{effectDef(t, "query_before_retry"), echo}, cs)
 	ctx := context.Background()

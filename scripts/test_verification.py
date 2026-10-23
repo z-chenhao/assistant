@@ -18,6 +18,47 @@ import verify_suite as suite
 
 
 class VerificationTests(unittest.TestCase):
+    def test_wedding_gate_requires_the_existing_mcp_sandbox_shard(self):
+        # GC-08 reaches stdio MCP at chat ingress. Runtime intentionally omits
+        # bubblewrap; communication already provisions the same sandbox as GC-12.
+        self.assertEqual([(name,g.attempts) for name,gates in suite.SHARDS.items()
+                          for g in gates if g.script == 'verify_gc08.py'], [('communication',1)])
+        workflow = (suite.ROOT/'.github/workflows/ci.yml').read_text()
+        self.assertIn("matrix.shard == 'communication'", workflow)
+
+    def test_monitor_gate_requires_the_existing_mcp_sandbox_shard(self):
+        self.assertEqual([(name,g.attempts) for name,gates in suite.SHARDS.items()
+                          for g in gates if g.script == 'verify_gc14.py'], [('communication',1)])
+
+    def test_delivery_two_series_overlap_without_splitting_five_rounds(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'logs').mkdir()
+            gates = tuple(suite.Gate(name, '', name, 5) for name in ('delivery','channels'))
+            def command(gate, attempt, *_):
+                other = 'channels' if gate.name == 'delivery' else 'delivery'
+                # Each first round must observe its peer in flight. A serial
+                # dispatch fails deterministically instead of relying on a
+                # fragile wall-time speed threshold.
+                script = ('from pathlib import Path\nimport time\n'
+                          f'root=Path({str(root)!r})\n'
+                          f'name={gate.name!r}; attempt={attempt}\n'
+                          'with (root/(name+".rounds")).open("a") as out: out.write(str(attempt)+"\\n")\n'
+                          'if attempt==1:\n'
+                          ' (root/(name+".started")).touch()\n'
+                          ' deadline=time.monotonic()+2\n'
+                          f' while not (root/{(other+".started")!r}).exists():\n'
+                          '  assert time.monotonic()<deadline, "peer series never admitted"\n'
+                          '  time.sleep(.01)\n')
+                return [sys.executable,'-c',script], os.environ.copy(), root/'logs'/f'{gate.name}-{attempt}.log'
+            with patch.object(suite, 'command', command):
+                rows = suite.run_shard('delivery',Path('/binary'),root,threading.Event(),gates,gate_jobs=2)
+            self.assertEqual([(r['gate'],r['attempt']) for r in rows],
+                             [(name,i) for name in ('delivery','channels') for i in range(1,6)])
+            self.assertTrue(all(r['returncode']==0 and r['owned_group_drained'] for r in rows))
+            for name in ('delivery','channels'):
+                self.assertEqual((root/(name+'.rounds')).read_text().splitlines(),list('12345'))
+
     def test_signal_eperm_can_only_accept_confirmed_absence_on_darwin(self):
         with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
              patch.object(suite.sys, 'platform', 'darwin'), \
@@ -67,6 +108,7 @@ class VerificationTests(unittest.TestCase):
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
+            "verify_gc12.py": 5, "verify_gc08.py": 1, "verify_gc14.py": 1,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
@@ -114,7 +156,7 @@ class VerificationTests(unittest.TestCase):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
         self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal'})
-        self.assertEqual(len(shards), 4)
+        self.assertEqual(len(shards), 5)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
         checks = workflow[workflow.index('  checks:'):]
@@ -128,8 +170,14 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 8)
-        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}", workflow)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 9)
+        self.assertIn('racepart: ["packages", "sqlite"]', workflow)
+        race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
+        self.assertIn('needs: race', race_join)
+        self.assertIn('test "$PART_RESULT" = success', race_join)
+        self.assertIn('scripts/ci_race_join.py', race_join)
+        self.assertIn('evidence-race-part-*', race_join)
+        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
         self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 5)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
