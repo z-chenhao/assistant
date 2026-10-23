@@ -41,7 +41,7 @@ def observations(variant, execution):
         main_only=bool(state['runs']) and all(r['kind'] == 'main' and r['status'] == 'completed'
                                             and r['task_id'] is None for r in state['runs']),
         no_task_schedule_approval_artifact=all(state.get(k) == [] for k in ('tasks','automations','approvals','artifacts')),
-        no_email_calendar_action=bool(state['tools']) and all(t['tool_name'] == 'builtin__text__echo'
+        no_email_calendar_action=bool(state['tools']) and all(t['tool_name'] == 'mcp__fixture__echo'
             and t['status'] == 'succeeded' and t['attempt_count'] == 1 for t in state['tools']),
         one_completion=len(replies) == len(state['deliveries']) == 1 and state['deliveries'][0]['status'] == 'sent',
         replay_equal=state == execution.get('replay_state'),

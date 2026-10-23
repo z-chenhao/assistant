@@ -26,7 +26,7 @@ def reply(body, chunk):
         # Derive an observation from actual Tool bytes, without Gold advice.
         text=json.dumps(dict(quote_ids=[q['id'] for q in source['quotes']],
                              current_user_input=messages[last]['content']),ensure_ascii=False)
-        name,args='builtin__artifact__save',dict(name=f'observation-{turn}.json',mediaType='application/json',text=text)
+        name,args='builtin__artifact__manage',dict(operation='save',name=f'observation-{turn}.json',mediaType='application/json',text=text)
     else:
         chunk({'content':f'Observed quote source and saved turn {turn}.'})
         chunk({},'stop')

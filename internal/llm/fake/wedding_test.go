@@ -32,7 +32,7 @@ func TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent(t *testi
 			r.Messages = append(r.Messages, llm.Message{Role: "user", Text: "Previous Task instruction: 宾客人数已经定了，128 人。"}, llm.Message{Role: "user", Text: "Task instruction: " + tc.instruction + "\nArtifact references: []"})
 		}
 		result := weddingReply(r)
-		if len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != "builtin__artifact__save" {
+		if len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != "builtin__artifact__manage" {
 			t.Fatal(result)
 		}
 		var saved struct{ Text string }
@@ -52,7 +52,7 @@ func TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent(t *testi
 		}
 		r.Messages = append(r.Messages, llm.Message{Role: "assistant", ToolCalls: result.ToolCalls}, llm.Message{Role: "tool", Text: `{"artifact_refs":["artifact:checklist"]}`})
 		publish := weddingReply(r)
-		if len(publish.ToolCalls) != 1 || publish.ToolCalls[0].Name != "builtin__artifact__publish" {
+		if len(publish.ToolCalls) != 1 || publish.ToolCalls[0].Name != "builtin__artifact__manage" {
 			t.Fatal(publish)
 		}
 		r.Messages = append(r.Messages, llm.Message{Role: "assistant", ToolCalls: publish.ToolCalls}, llm.Message{Role: "tool", Text: "Final artifacts selected."})

@@ -66,8 +66,9 @@ def observations(value, events, texts, artifacts, replayed, effects, source=None
             text in ''.join(p.get('text', '') for p in reply['content'])
             for text, reply in zip(texts, replies)),
         exact_read_save_echo=len(tools) == 6 and [t['tool_name'] for t in tools] ==
-            ['mcp__fixture__read', 'builtin__artifact__save', 'builtin__text__echo'] * 2 and
-            all(t['status'] == 'succeeded' and t['attempt_count'] == 1 for t in tools),
+            ['mcp__fixture__read', 'builtin__artifact__manage', 'mcp__fixture__echo'] * 2 and
+            all(t['status'] == 'succeeded' and t['attempt_count'] == 1 for t in tools) and
+            all(json.loads(t['arguments_json']).get('operation') == 'save' for t in tools if t['tool_name']=='builtin__artifact__manage'),
         no_purchase_or_approval=not effects and not value['approval'] and not value['task'] and
             len(value['runs']) == 2 and all(r['kind'] == 'main' and r['status'] == 'completed'
                                            for r in value['runs']),
@@ -92,16 +93,16 @@ def drive(h, variant, unwrap):
     artifacts, inputs = [], []
     for i, (event, text) in enumerate(zip(variant['events'], texts)):
         plan = [dict(name='mcp__fixture__read', arguments=dict(text='insurance_quotes')),
-                dict(name='builtin__artifact__save', arguments=dict(
-                    name=f'quote-comparison-{i+1}.md', mediaType='text/markdown', text=text)),
-                dict(name='builtin__text__echo', arguments=dict(text=text))]
+                dict(name='builtin__artifact__manage', arguments=dict(
+                    operation='save', name=f'quote-comparison-{i+1}.md', mediaType='text/markdown', text=text)),
+                dict(name='mcp__fixture__echo', arguments=dict(text=text))]
         prompt = (variant['context'] + '\n' if i == 0 else '') + event['at'] + ' ' + event['text']
         prompt += '\nExplicit scripted Fake plan (not a user instruction in live evaluation):\nCapabilities: ' + json.dumps(plan, ensure_ascii=False)
         inputs.append(prompt)
         h.send(f'quote-turn-{i}', prompt)
         h.command('chat', 'work')
         value = h.state()
-        saved = unwrap([t for t in value['tools'] if t['tool_name'] == 'builtin__artifact__save'][-1])
+        saved = unwrap([t for t in value['tools'] if t['tool_name'] == 'builtin__artifact__manage'][-1])
         ref = saved['artifact_refs'][0]
         opened = h.command('artifact', 'open', ref, ok=False)
         if opened.returncode != 0:

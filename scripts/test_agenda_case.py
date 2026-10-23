@@ -26,7 +26,7 @@ class AgendaTests(unittest.TestCase):
                      [dict(role='assistant', content=[dict(text=self.text)])],
                      generations=[dict(request_json=json.dumps(dict(messages=messages)))],
                      runs=[dict(kind='main', status='completed', task_id=None)],
-                     tools=[dict(tool_name='builtin__text__echo', status='succeeded', attempt_count=1)],
+                     tools=[dict(tool_name='mcp__fixture__echo', status='succeeded', attempt_count=1)],
                      deliveries=[dict(status='sent')], tasks=[], automations=[], approvals=[], artifacts=[])
         return v, dict(state=state, replay_state=copy.deepcopy(state))
 
@@ -85,11 +85,11 @@ class AgendaTests(unittest.TestCase):
             state['runs'][0].update(run_id='r', parent_run_id=None, model_snapshot_id='m', capability_snapshot_id='c')
             state['snapshots'] = [dict(snapshot_id='m')]
             state['capabilities'] = [dict(snapshot_id='c', can_spawn_agents=False,
-                tools_json=json.dumps([dict(name='builtin__text__echo', permission='read_only')]))]
+                tools_json=json.dumps([dict(name='mcp__fixture__echo', permission='read_only')]))]
             request = dict(run_id='r', model_snapshot=dict(snapshot_id='m'), tools=[],
                            messages=[dict(role='user', text=t) for t in users])
             state['generations'] = [dict(status='completed', request_json=json.dumps(request)) for _ in range(2)]
-            state['tools'] = [dict(tool_name='builtin__text__echo', status='succeeded', replay_policy='safe',
+            state['tools'] = [dict(tool_name='mcp__fixture__echo', status='succeeded', replay_policy='safe',
                                    attempt_count=1) for _ in range(2)]
             state['usage'] = [{}, {}]
             state['deliveries'][0]['message_id'] = 'reply'

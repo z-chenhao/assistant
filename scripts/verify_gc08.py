@@ -118,7 +118,8 @@ def observe(row):
         actual_restart_and_wrong_hash=row['restart']['returncode']==-9 and row['restart']['boundary']=='before_next_scan' and row['wrong_hash']['exit_code']!=0,
         replay_equal=value==row['replay_state'],
         only_expected_tools=all(t['tool_name'] in {'mcp__wedding__read','mcp__wedding__send','builtin__task__search',
-            'builtin__task__manage','builtin__artifact__save','builtin__artifact__publish'} and
+            'builtin__task__manage','builtin__artifact__manage'} and
+            (t['tool_name']!='builtin__artifact__manage' or json.loads(t['arguments_json']).get('operation') in ('save','publish')) and
             (t['status']=='succeeded' and t['attempt_count']==1 or t['tool_name']=='mcp__wedding__send' and t['status']=='waiting' and t['attempt_count']==0) for t in value['tools']))
     checks.update(document_observe(docs,variant['source']))
     return checks

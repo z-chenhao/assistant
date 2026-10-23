@@ -44,7 +44,7 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 	if !root {
 		if update.Details.TaskRef != "" && !hasAppendedUser(r.Messages) {
 			if last.Role != "tool" {
-				return call("builtin__artifact__publish", map[string]any{"artifactRefs": update.Details.ArtifactRefs})
+				return call("builtin__artifact__manage", map[string]any{"operation": "publish", "artifactRefs": update.Details.ArtifactRefs})
 			}
 			text := ""
 			for _, part := range update.Content {
@@ -126,16 +126,20 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 			doc["draft"] = mail
 		}
 		raw, _ := json.Marshal(doc)
-		return call("builtin__artifact__save", map[string]string{"name": "wedding-checklist.json", "mediaType": "application/json", "text": string(raw)})
+		return call("builtin__artifact__manage", map[string]string{"operation": "save", "name": "wedding-checklist.json", "mediaType": "application/json", "text": string(raw)})
 	}
-	if prior.Name == "builtin__artifact__save" {
+	var priorArgs struct {
+		Operation string `json:"operation"`
+	}
+	_ = json.Unmarshal([]byte(prior.Arguments), &priorArgs)
+	if prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "save" {
 		var result struct {
 			Refs []string `json:"artifact_refs"`
 		}
 		_ = json.Unmarshal([]byte(last.Text), &result)
-		return call("builtin__artifact__publish", map[string]any{"artifactRefs": result.Refs})
+		return call("builtin__artifact__manage", map[string]any{"operation": "publish", "artifactRefs": result.Refs})
 	}
-	if prior.Name == "builtin__artifact__publish" && draft {
+	if prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "publish" && draft {
 		return call("mcp__wedding__send", mail)
 	}
 	if prior.Name == "mcp__wedding__send" {

@@ -42,9 +42,9 @@ class QuoteTests(unittest.TestCase):
         value = dict(conversation=[m for e,t in zip(events,texts) for m in
                      (dict(role='user', content=[dict(text=e['text'])]),
                       dict(role='assistant', content=[dict(text=t)]))],
-                     tools=[dict(tool_name=n, status='succeeded', attempt_count=1,
+                     tools=[dict(tool_name=n, status='succeeded', attempt_count=1, arguments_json=json.dumps(dict(operation='save') if n=='builtin__artifact__manage' else {}),
                                  result_json=json.dumps(dict(text=json.dumps(self.data)))) for n in
-                            ['mcp__fixture__read','builtin__artifact__save','builtin__text__echo'] * 2],
+                            ['mcp__fixture__read','builtin__artifact__manage','mcp__fixture__echo'] * 2],
                      task=[], approval=[], runs=[dict(kind='main', status='completed')] * 2,
                      deliveries=[dict(message_id='1',status='sent'),dict(message_id='2',status='sent')])
         artifacts = [dict(text=t, sha256=q.digest_bytes(t)) for t in texts]
