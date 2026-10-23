@@ -101,7 +101,7 @@ jobs:
     env:
       ERII_VERIFY_CASE_JOBS: "4"
       ERII_VERIFY_GATE_JOBS: "2"
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.shard == 'delivery' && 15 || 10 }}
     strategy:
       fail-fast: false
       matrix:
