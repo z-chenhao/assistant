@@ -3,7 +3,7 @@ import tempfile
 import subprocess
 import unittest
 
-from check_docs import ROOT, broken_links
+from check_docs import ROOT, broken_links, unindexed_docs
 
 
 class ProjectLayoutTests(unittest.TestCase):
@@ -17,6 +17,20 @@ class ProjectLayoutTests(unittest.TestCase):
                 '```md\n[example](missing-example.md)\n```\n'
                 '[broken](docs/moved.md)')
             self.assertEqual(list(broken_links(root)), ['README.md: missing docs/moved.md'])
+
+    def test_documentation_must_be_reachable_through_the_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs/guides').mkdir(parents=True)
+            (root / 'README.md').write_text('[docs](docs/README.md)')
+            (root / 'docs/README.md').write_text('[guide](guides/active.md)')
+            (root / 'docs/guides/active.md').write_text('[back](../README.md)')
+            orphan = root / 'docs/guides/orphan.md'
+            orphan.write_text('lost guide')
+            self.assertEqual(list(unindexed_docs(root)), [
+                'docs/guides/orphan.md: unreachable from README.md; update the documentation index'])
+            (root / 'docs/README.md').write_text('[active](guides/active.md) [found](guides/orphan.md)')
+            self.assertEqual(list(unindexed_docs(root)), [])
 
     def test_node_pin_and_frontend_paths_have_one_consistent_value(self):
         import json

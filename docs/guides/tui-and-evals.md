@@ -1,4 +1,4 @@
-# Terminal setup and M1 Case Runner
+# Terminal setup and conversation verification
 
 Build with `make build` after installing the pinned Bridge dependencies. Launch
 `bin/erii -config config.example.yaml` on a terminal, or explicitly use
@@ -8,8 +8,8 @@ and existing model/chat CLI commands retain their contracts.
 
 The terminal is line-oriented and uses the existing Model control plane and
 Actor. It adds no provider, Tool, execution loop, database, or migration.
-Existing state v7 and Conversation v1 open unchanged; the prior migration tests
-continue to cover empty and older databases. No schema bump is required.
+The terminal uses the shared storage migrations. Empty and prior schemas are
+covered by the state owner's upgrade tests.
 
 Terminal input uses a noncanonical, bounded reader on macOS and Linux; it does
 not depend on the kernel's smaller canonical line buffer. A line may contain up
