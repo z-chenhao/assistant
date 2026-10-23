@@ -143,8 +143,10 @@ also execute this path through actual Node/Pi against owned HTTP fixtures.
 GC-01/09/10 Main-only L0 fragments use versioned inputs and scripted Fake
 responses. Reports keep their full Cases `not_applicable`, with no semantic
 score. They prove protocol assertions, not real-model quality, live account
-eligibility or current restaurant information. Full M1, Security/Approval,
-Memory/compaction, Worker/Child and M5 JavaScript Durable Replay remain unclaimed.
-M1 currently stops with a context-length error instead of silently trimming
-history; semantic compaction is M6. Live account inference remains an unexecuted
+eligibility or current restaurant information. These M1 fragments alone do not
+establish Security/Approval, Worker/Child or JavaScript Durable Replay; use the
+[feature map](../../scripts/FEATURES.md) for those implemented paths and gates.
+Without configured context maintenance, overlong context fails rather than
+being silently trimmed. [Memory maintenance](memory-maintenance.md) documents
+configured compaction and privacy. Live account inference remains a separate
 L2 requirement, and Device Authorization remains deferred by ADR 001.

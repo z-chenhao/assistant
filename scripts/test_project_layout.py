@@ -7,6 +7,66 @@ from check_docs import ROOT, broken_links, unindexed_docs
 
 
 class ProjectLayoutTests(unittest.TestCase):
+    def test_reference_links_check_local_files_and_heading_fragments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            (root / 'docs/guide name.md').write_text('# Heading\n')
+            (root / 'README.md').write_text('''# Here
+[source][file] [heading][ ANCHOR   ref ] [self][] [shortcut] ![image][pic]
+[file]: docs/missing.md#gone
+[anchor ref]: <docs/guide name.md#gone> "Guide"
+[self]: #gone
+[shortcut]: missing-shortcut.md
+[pic]: missing.png
+''')
+            self.assertEqual(list(broken_links(root)), [
+                'README.md: missing docs/missing.md#gone',
+                'README.md: missing anchor docs/guide name.md#gone',
+                'README.md: missing anchor #gone',
+                'README.md: missing missing-shortcut.md',
+                'README.md: missing missing.png'])
+
+    def test_unused_external_and_example_references_are_not_local_links(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'README.md').write_text('''# Here
+[web][external] [protocol][] [mail]
+[inline](#here) [local][first]
+`[code][missing]` ``[code ` span][missing]``
+~~~md
+[fenced][missing]
+[hidden]: missing-hidden.md
+~~~
+    [indented][missing]
+<!-- [comment][missing] -->
+[hidden] [unresolved]
+[external]: https://example.test/no#missing
+[protocol]: //example.test/no#missing
+[mail]: mailto:example@example.test
+[inline]: missing-inline.md
+[first]: #here
+[FIRST]: missing-shadowed.md
+[missing]: missing-example.md
+[unused]: missing-unused.md#gone
+''')
+            self.assertEqual(list(broken_links(root)), [])
+
+    def test_reference_links_reach_docs_with_relative_and_encoded_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            (root / 'README.md').write_text('[Guide][guide]\n[guide]: docs/guide%20name.md#heading')
+            (root / 'docs/guide name.md').write_text('''# Heading
+[home][root] [self][] [stable]
+[root]: ../README.md
+[self]: /docs/guide%20name.md#heading
+[stable]: #explicit
+<a id="explicit"></a>
+''')
+            self.assertEqual(list(broken_links(root)), [])
+            self.assertEqual(list(unindexed_docs(root)), [])
+
     def test_markdown_moves_fail_for_missing_local_destinations(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -35,8 +35,25 @@ def prose(path):
 def destinations(path, root):
     # Mask code spans before recognizing links, including multi-backtick examples.
     text = re.sub(r'(`+)(?!`)(.*?)(?<!`)\1(?!`)', '', prose(path), flags=re.S)
-    for match in re.finditer(r'(?<!\\)!?\[[^\]\n]*\]\((<[^>\n]+>|[^\s)]+)(?:\s+["\'][^\n]*?["\'])?\)', text):
-        label = match[1].strip('<>')
+    references = {}
+
+    def reference_key(label):
+        return ' '.join(label.split()).casefold()
+
+    def definition(match):
+        # Markdown uses the first definition; unused definitions are not links.
+        references.setdefault(reference_key(match[1]), match[2])
+        return ''
+
+    text = re.sub(r'^ {0,3}\[([^\]\n]+)\]:[ \t]*(<[^>\n]+>|[^\s]+)'
+                  r'(?:[ \t]+["\'][^\n]*?["\'])?[ \t]*$', definition, text, flags=re.M)
+    for match in re.finditer(r'(?<!\\)!?\[([^\]\n]*)\](?:'
+                             r'\((<[^>\n]+>|[^\s)]+)(?:\s+["\'][^\n]*?["\'])?\)'
+                             r'|\[([^\]\n]*)\])?', text):
+        label = match[2] or references.get(reference_key(match[3] or match[1]))
+        if label is None:
+            continue
+        label = label.strip('<>')
         url = urlsplit(label)
         if url.scheme or url.netloc:
             continue

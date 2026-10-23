@@ -41,13 +41,14 @@ Text uses `{ "type": "text", "text": "..." }`; image/audio/video/file parts use
 `{ "type": "file", "artifact_ref": "..." }` with their semantic type. The Host
 validates and pins each input before accepting it. Large files are uploaded
 through `artifact save`, then passed by reference. The current text Provider
-receives reference hints and can request bounded text reads. Image/OCR,
-audio/video decoding and Computer file transfer remain later integrations;
-reference transport does not claim visual understanding.
+receives reference hints and can request bounded text reads. Reference transport
+does not establish visual understanding. [M6 fixtures](m6-evals.md) exercise
+image/source-region and media handling with explicit Fakes; [Computer Use](computer-use.md)
+provides scoped file transfer. Those paths have separate proof limits.
 
 ## Tool contract
 
-All five builtins use the existing Tool Registry, frozen Capability Snapshot,
+The consolidated Artifact builtins use the existing Tool Registry, frozen Capability Snapshot,
 ToolInvocation, Executor, claim/epoch fence and error normalization. Replay
 policy is `safe`, timeout is 10 seconds, result limit is 64 KiB, risk is low.
 Only the Host executes them. No direct Tool bypass or separate invocation
@@ -147,8 +148,9 @@ is separate (`make test-race`).
 GC-15's versioned fragment preserves source hashes and reopens `visa_check.md`
 through Task → Root → Main final delivery. Synthetic PNGs carry fixture fields
 in metadata; they are binary transport assets, not OCR evidence. Scripted text
-is not semantically graded and the full case remains `not_applicable` until its
-vision/privacy integrations. Original M1/M2 fixtures and locks stay unchanged.
+is not semantically graded; this Artifact fragment keeps the full case
+`not_applicable`. [M6 evidence](m6-evals.md) covers additional image/privacy
+mechanics without establishing model vision quality. Original M1/M2 fixtures and locks stay unchanged.
 No Sidecar exists yet; JavaScript Durable Replay and Computer transfer are not
 claimed by this slice.
 
