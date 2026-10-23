@@ -37,4 +37,6 @@ belong in `adr/`. Dated measurements and compatibility results belong in
 `reports/`; they are historical observations, not current release certification.
 Generated local verification output stays in ignored `evidence/`. Update this
 index and the feature map when changing a user path. `make lint` checks local
-Markdown destinations so moves cannot silently break navigation.
+Markdown destinations and heading anchors, including repository AGENTS links, so moves
+cannot silently break navigation. Code examples and runtime-injected policy are
+not repository navigation.

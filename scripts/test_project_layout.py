@@ -11,12 +11,72 @@ class ProjectLayoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / 'docs').mkdir()
-            (root / 'docs/guide.md').write_text('guide')
+            (root / 'docs/guide.md').write_text('# Heading\n')
             (root / 'README.md').write_text(
                 '[guide](docs/guide.md#heading) [web](https://example.test/missing)\n'
                 '```md\n[example](missing-example.md)\n```\n'
                 '[broken](docs/moved.md)')
             self.assertEqual(list(broken_links(root)), ['README.md: missing docs/moved.md'])
+
+    def test_agents_and_self_fragments_fail_for_missing_targets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'README.md').write_text('# Here\n[bad](#absent) [ok](#here)')
+            (root / 'AGENTS.md').write_text('[bad](missing.md) [bad anchor](README.md#gone)')
+            self.assertEqual(list(broken_links(root)), [
+                'AGENTS.md: missing missing.md', 'AGENTS.md: missing anchor README.md#gone',
+                'README.md: missing anchor #absent'])
+
+    def test_heading_slugs_explicit_anchors_and_relative_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs').mkdir()
+            (root / 'README.md').write_text('[guide](docs/guide%20name.md#repeat-2)')
+            (root / 'docs/guide name.md').write_text('''# Repeat
+## Repeat
+## Repeat-1
+## Repeat
+## A `Code` &amp; **Title**!
+中文 标题
+---
+<a id="stable"></a><a name='legacy'></a>
+[collision](#repeat-1-1) [code](#a-code--title) [unicode](#%E4%B8%AD%E6%96%87-%E6%A0%87%E9%A2%98)
+[explicit](#stable) [named](#legacy) [relative](../README.md)
+[root](/docs/guide%20name.md#repeat) [space](<guide name.md#stable>)
+''')
+            self.assertEqual(list(broken_links(root)), [])
+            (root / 'README.md').write_text('[bad](docs/guide%20name.md#repeat-3)')
+            self.assertEqual(list(broken_links(root)), [
+                'README.md: missing anchor docs/guide%20name.md#repeat-3'])
+
+    def test_code_examples_and_external_fragments_are_not_local_links(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'README.md').write_text('''# Here
+[web](https://example.test/no#missing) [protocol](//example.test/no#missing)
+`[example](inline.md)` ``[backtick ` example](inline2.md)``
+~~~md
+[example](tilde.md)
+~~~
+````md
+```
+[example](long-fence.md)
+````
+    [example](indented.md)
+<!-- [example](comment.md) -->
+\\[escaped](escaped.md)
+''')
+            self.assertEqual(list(broken_links(root)), [])
+
+    def test_injected_runtime_is_outside_repository_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'AGENTS.md').write_text('''[bad](repository-missing.md)
+<!-- BEGIN MULTICA-RUNTIME (auto-managed; do not edit) -->
+[private runtime resource](references/private.md)
+<!-- END MULTICA-RUNTIME -->
+''')
+            self.assertEqual(list(broken_links(root)), ['AGENTS.md: missing repository-missing.md'])
 
     def test_documentation_must_be_reachable_through_the_index(self):
         with tempfile.TemporaryDirectory() as tmp:

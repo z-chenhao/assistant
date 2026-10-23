@@ -57,7 +57,7 @@ or failed results cannot pass. A failed run clears the previous success report.
 | Case | Mechanical evidence | Proof limits |
 | --- | --- | --- |
 | GC-01 | Exact health fields, source/time metadata, preserved three input events, low-confidence Recall, no Task, invented vitals or external writes; isolated Turn-2 red-flag replacement routes to urgent evaluation with no lifestyle advice | Unscripted red-flag recognition and advice quality need semantic model evaluation |
-| GC-02 | Unanswered interview question, exploratory constraint, real supersede and deletion, future context excludes forgotten content | Monthly Automation is `not_applicable` until M7; interview quality ungraded |
+| GC-02 | Unanswered interview question, exploratory constraint, real supersede and deletion, future context excludes forgotten content | This M6 fixture marks monthly Automation `not_applicable`; [Automation](automation.md) is implemented and verified separately; interview quality ungraded |
 | GC-03 | Real corrected Memory, old recall excluded; 54,995.60 USD, 370,120.39 CNY, 520,000 liquid; 30/35/40万 scenarios; unknown tax | Financial explanation quality ungraded; no trading adapter enabled |
 | GC-04 | Two existing travel Tasks, NZ paused, completed France append creates one new Root, steering accepted during a held Root, confirmed source bytes unchanged, booking groups; shared Recall/Main publication barriers choose the maintained legal ordering before Root dispatch and before releasing held work | Itinerary selection/explanation ungraded |
 | GC-05 | Scoped stable career preference, exact offers, five verification topics, no resignation decision | Ranking and interview guidance ungraded |

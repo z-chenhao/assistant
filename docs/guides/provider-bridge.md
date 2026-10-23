@@ -7,8 +7,9 @@ SDK dependency tree; it adds no hosted service or account cost. Its SDK still
 brings other provider packages transitively, although Erii does not enable them.
 Current OpenAI account OAuth is also implemented; see the account lifecycle below.
 The [Main CLI](main-loop.md) uses the same Bridge for frozen Run requests,
-Direct Tool continuation and Conversation recovery. Worker Runs and general
-Durable Replay remain later slices. This is not complete M1.
+Direct Tool continuation and Conversation recovery. [Worker Runs](tasks.md) and
+[Code Mode Durable Replay](codemode.md) reuse frozen model snapshots through
+this Bridge. Bridge conformance alone does not establish M1 or release acceptance.
 
 ## ChatGPT account lifecycle
 

@@ -63,6 +63,120 @@ and limitations, including unexecuted Live Shadow work. See the feature map befo
 inventing a new drive script. [CI operations](docs/ci.md) documents required shards,
 exact-SHA artifacts and fail-closed joins.
 
+## Working on a change
+
+1. Define the observable result, non-goals and evidence that will prove completion.
+2. Inspect the entry point, callers, state owner, failure path and nearby tests.
+   Read only the relevant baseline/Golden Cases. Identify exact conflicts between
+   specification and code; ask when a choice changes product behavior, protocol,
+   compatibility, security or Durable Replay. Continue safe diagnosis meanwhile.
+3. Reproduce a bug before editing, or record why a safe reproduction is infeasible.
+4. Build one complete slice through the real boundary. Include required migration,
+   deterministic Fake, regression and minimal documentation. Do not edit `sources/`.
+5. Drive the CLI/UI/API or restart path and inspect authoritative output/state.
+   Run the risk-based checks below, fix failures caused by the change and rerun
+   affected checks. A build or an agent's self-report alone is not proof.
+6. Inspect the diff and remove temporary artifacts, debug code, dead paths and
+   unrelated changes. Documentation must match observed behavior.
+7. Report outcome, exact checks/results, cleanup, risk/proof gaps and unresolved
+   decisions (`None` when empty). An unavailable required check is `inconclusive`.
+
+Proceed autonomously with scoped reversible edits, local inspection, disposable
+services, Fakes and tests. Preserve user changes; never overwrite, revert,
+reorder or include unrelated edits. Do not use destructive Git commands, bypass
+hooks, swallow failures, weaken tests or relax assertions. Ask only for a real
+product decision, missing credential, permission boundary, destructive operation,
+production/external side effect or material scope expansion. Explain material
+license, cost, security or architecture impact before adding a production dependency;
+add one only for a current requirement.
+
+### Match verification to risk
+
+| Change | Minimum evidence |
+| --- | --- |
+| Docs, comments, local naming | Inspect diff/rendered text; format when relevant |
+| Logic or bug fix | Focused regression and important boundaries |
+| State, schema, persistence | Legal/illegal transitions, empty/prior migration, CAS/conflicts |
+| Tool, approval, side effect | Contract, frozen parameters, rejection/retry, crash before/after effect |
+| Concurrency, cancellation, replay | Duplicate/late/out-of-order events, old epoch, race detector, kill/restart |
+| UI, CLI, API, Artifact | Running user path and inspectable output |
+| Performance | Same environment/input/harness before and after; samples and noise |
+| Milestone/release | All required checks, fault injection and due Golden Cases |
+
+Every external dependency needs a deterministic CI Fake. Real accounts, websites
+and macOS VM compatibility belong to release-time Live Shadow evidence.
+`M0 → M7` are runnable slices: M0–M5 is Core MVP; M6–M7 completes the defined
+first release. An earlier red milestone blocks an alternative architecture.
+Each milestone includes migrations, Fakes, tests, CLI reproduction, operations
+notes, kill/restart evidence and due Golden Cases. Internal M2/M4 builds must not
+claim unimplemented Durable/Security semantics. Golden Cases require 80+ each,
+85+ suite average, no hard failures; security, approval, cancellation, Durable
+Replay and coding workspace protection require five consecutive passes. Record
+an approved architecture deviation in an ADR and update the baseline before merge.
+
+### Maintain the verification path
+
+Use an existing harness before writing new drive mechanics. Each important UI,
+CLI, API and Computer workflow needs isolated Launch, dependency/Fake/state
+Doctor, Drive through the real boundary, inspectable Evidence and joined-process
+Cleanup that preserves user data. Keep the feature map current in the same change.
+Promote repeated mechanical actions into reusable commands. Harness observations
+do not replace code review, measured performance, security or replay tests.
+Prove one real task end to end before widening parallelism or unattended automation.
+
+Parallel slices need independent scope/file ownership, concrete inputs and finish
+conditions, their own checks/output and one named integrator. Do not parallelize
+an unknown root cause, shared state machine, migration or competing implementations
+of one protocol. The integrator inspects diffs and evidence. Improve weak
+verification before adding agents.
+
+### Find history and exact-source evidence
+
+Check the source identity first; a local checkout may predate `origin/main`:
+
+```sh
+git status --short --branch
+git rev-parse HEAD origin/main
+git log -S 'search text' --oneline -- path/to/file
+git log --follow --oneline -- path/to/file
+gh pr view PR_NUMBER --json url,headRefOid,mergeCommit,statusCheckRollup
+gh run list --commit FULL_SHA --workflow ci.yml --limit 5 --json databaseId,headSha,attempt,status,conclusion
+```
+
+PR identity, source SHA and run **attempt** must match the evidence being assessed.
+Read [the verification reports](docs/guides/verification.md#evidence-and-failure-diagnosis)
+and [CI artifact identities](docs/ci.md) before downloading. Keep complete evidence
+under the registered durable local root, outside disposable worktrees. A small
+manifest records issue/repository/full SHA/run/attempt, commands, exit codes,
+versions/profile, relative paths, sizes and SHA-256. Same-host review verifies
+hashes and reuses raw evidence read-only, while independently checking a clean
+exact-SHA checkout. Missing evidence is inconclusive, never a passed check.
+
+[ERII-206 / PR #37](https://github.com/z-chenhao/erii/pull/37) owns the maintained
+collector and exact-artifact cache; reuse its documented entry point once that
+change is present in your revision. [ERII-207 / PR #38](https://github.com/z-chenhao/erii/pull/38)
+owns locked setup/cache diagnostics. Neither is assumed available in older
+checkouts. Reuse package-manager downloads and pinned browser binaries; do not
+share mutable `node_modules`. Default remote delivery is a compact manifest and
+necessary diagnostics, at most 1 MiB per run. Do not recursively bundle dependencies,
+browsers, prior ZIPs or historical logs. Required final exports remain required;
+prepare them once with explicit size/purpose. Retain raw evidence until the issue
+and review/repair resolve; worktree cleanup must not remove it.
+
+### Turn repeated corrections into infrastructure
+
+Prefer, in order: an architecture/API that prevents the bad state; compiler/types/
+lint/CI; regression/fault test/harness; focused Skill or nested instructions; a root
+rule only for repeated cross-repository invariants. Review comments discover the
+missing control. Remove bad examples and stale workarounds. Keep Skill descriptions
+short and route to relevant resources. Audit root instructions for stale/duplicate/
+contradictory rules and remove rules made redundant by stronger controls.
+
+Use short active sentences, stable terms and concrete evidence. Cross-agent briefs
+state goal, inputs, constraints, evidence and stop condition. Use tables for exact
+mappings and diagrams for state/ownership/branches. Review aids are disposable
+unless requested as product artifacts. Do not omit uncertainty to shorten a report.
+
 ## Frontend changes
 
 ```sh
