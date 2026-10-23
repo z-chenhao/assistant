@@ -100,6 +100,53 @@ func rootClaim(t *testing.T, s *Store, r *Runs) agent.RunClaim {
 	return c
 }
 
+// Replay the model's shortest fencing counterexample at the actual persisted
+// generation/Tool admission boundary: claim -> stop commit -> old owner write.
+func TestTaskControlModelCounterexampleRejectsOldOwner(t *testing.T) {
+	for _, stop := range []string{"pause", "cancel"} {
+		t.Run(stop, func(t *testing.T) {
+			s, r, a := controlFixture(t, nil)
+			ctx := context.Background()
+			controlMain(t, r, a, "create", "create")
+			c := rootClaim(t, s, r)
+			run, err := r.Load(ctx, c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gen, err := r.Generation(ctx, c, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := calls(agent.RunToolName, `{"task":"accepted before stop"}`)
+			if err = s.Models().RecordUsageAnd(ctx, gen.Request, response, 0, nil, s.AcceptGeneration); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Progress(ctx, c, "before stop"); err != nil {
+				t.Fatal(err)
+			}
+			controlMain(t, r, a, stop, stop)
+			// A live lease intentionally remains: ownership alone is insufficient.
+			if err = r.Renew(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Progress(ctx, c, "stale model result"); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatalf("model counterexample admitted stale write: %v", err)
+			}
+			if _, err = r.ToolStore(c).Accept(ctx, gen.Request.GenerationID, response.ToolCalls, run.Tools); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatalf("old owner admitted Child: %v", err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM task WHERE progress_summary='before stop' AND task_epoch=2`) != 1 ||
+				scalar(t, s, `SELECT count(*) FROM run WHERE worker_position='child'`) != 0 ||
+				scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE run_id=?`, c.RunID()) != 0 {
+				t.Fatal("rejected write/admission left partial state")
+			}
+			if stopped, err := r.SettleStop(ctx, c); err != nil || !stopped {
+				t.Fatal(stopped, err)
+			}
+		})
+	}
+}
+
 func TestTaskControlPauseFencesLateWritesAndContinueNewRoot(t *testing.T) {
 	s, r, a := controlFixture(t, nil)
 	ctx := context.Background()
