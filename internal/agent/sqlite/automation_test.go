@@ -25,7 +25,7 @@ const removeAutomationFixtureSchema = removeChannelFixtureSchema + `DROP TABLE a
 
 func automationFixture(t *testing.T) (*Store, *Runs, agent.Actor, *loopProvider) {
 	s, r, _, a, p := loopFixture(t)
-	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 	defs := append([]tool.Definition{echo}, automation.Definitions()...)
 	registry, e := tool.NewRegistry(defs)
 	if e != nil {
@@ -497,7 +497,7 @@ func TestAutomationListAfterForgetUsesSafeControlProjection(t *testing.T) {
 func TestAutomationLinkedTaskProjectionAfterForget(t *testing.T) {
 	ctx := context.Background()
 	s, r, a, p := automationFixture(t)
-	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 	defs := append([]tool.Definition{echo}, automation.Definitions()...)
 	defs = append(defs, task.Definitions()...)
 	registry, err := tool.NewRegistry(defs)

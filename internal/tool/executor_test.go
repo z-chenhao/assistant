@@ -6,8 +6,8 @@ import (
 )
 
 func TestEchoSchemaAndPolicyDefaults(t *testing.T) {
-	registry := EchoRegistry()
-	definition, ok := registry.Resolve("builtin__text__echo")
+	registry := FixtureRegistry()
+	definition, ok := registry.Resolve("mcp__fixture__echo")
 	if !ok {
 		t.Fatal("Tool absent")
 	}

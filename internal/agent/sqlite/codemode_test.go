@@ -37,7 +37,7 @@ func TestCodeModeWrapperToolCapacityOwnership(t *testing.T) {
 	for _, scope := range []string{"global", "agent", "run", "provider", "tool", "conflict"} {
 		t.Run(scope, func(t *testing.T) {
 			ctx := context.Background()
-			echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+			echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 			limits := ToolLimits{Global: 32, Agent: 32, Run: 32, Provider: 32, Tool: 32}
 			switch scope {
 			case "global":
@@ -95,7 +95,7 @@ func TestCodeModeRealRuntimeNestedToolAndStore(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "observed"}, nil
 		}
-		source := `store("persisted", {n: 5}); const x = await tools.builtin__text__echo({text:"nested"}); return [x, load("persisted")];`
+		source := `store("persisted", {n: 5}); const x = await tools.mcp__fixture__echo({text:"nested"}); return [x, load("persisted")];`
 		args, _ := json.Marshal(map[string]string{"source": source})
 		return calls(codemode.ToolName, string(args)), nil
 	}
@@ -171,7 +171,7 @@ func TestNestedAdmissionRejectsUnacceptedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = (nestedTools{&tools{runs: r, claim: claim}, "forged-parent"}).Accept(context.Background(), "forged-exchange", []llm.ToolCall{{ID: "1", Name: "builtin__text__echo", Arguments: `{"text":"x"}`}}, a.Registry.Describe())
+	_, err = (nestedTools{&tools{runs: r, claim: claim}, "forged-parent"}).Accept(context.Background(), "forged-exchange", []llm.ToolCall{{ID: "1", Name: "mcp__fixture__echo", Arguments: `{"text":"x"}`}}, a.Registry.Describe())
 	if err == nil {
 		t.Fatal("accepted forged parent")
 	}

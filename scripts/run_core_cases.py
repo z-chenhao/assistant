@@ -110,7 +110,7 @@ def feedback_case(binary, folder, variant):
         source = '''
 const assets = ASSETS;
 const inputs = [];
-for (const asset of assets) { const saved = await tools.builtin__artifact__save(asset); inputs.push(...saved.artifactRefs); }
+for (const asset of assets) { const saved = await tools.builtin__artifact__manage({...asset,operation:"save"}); inputs.push(...saved.artifactRefs); }
 const rows = assets[0].text.trimEnd().split("\\n").slice(1).map(line => {
  const [row_id,text,attachment_ref] = line.split(","); return {row_id,text,attachment_ref};
 });
@@ -125,8 +125,8 @@ const results = [...first,...active,...rest].map(row=>({...row,evidence:row.row_
 const columns = ["row_id","category","severity","evidence","attachment_ref"];
 function quote(x) { return '"' + String(x).replace(/"/g,'""') + '"'; }
 const csv = columns.join(",")+"\\n"+results.map(row=>columns.map(c=>quote(row[c])).join(",")).join("\\n")+"\\n";
-const saved = await tools.builtin__artifact__save({name:"feedback_analysis.csv",mediaType:"text/csv",text:csv});
-await tools.builtin__artifact__publish({artifactRefs:saved.artifactRefs});
+const saved = await tools.builtin__artifact__manage({operation:"save",name:"feedback_analysis.csv",mediaType:"text/csv",text:csv});
+await tools.builtin__artifact__manage({operation:"publish",artifactRefs:saved.artifactRefs});
 return {count:results.length,artifactRefs:saved.artifactRefs};
 '''.replace('ASSETS', json.dumps(assets, ensure_ascii=False)).replace('ROWS', json.dumps(rows, ensure_ascii=False))
         execute(h, 'feedback', source, work=False)

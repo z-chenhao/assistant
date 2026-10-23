@@ -79,7 +79,7 @@ func loopFixture(t *testing.T) (*Store, *Runs, *conversationsqlite.Store, agent.
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = h.Close() })
-	registry := tool.EchoRegistry()
+	registry := tool.FixtureRegistry()
 	r := s.Runs(h, registry)
 	p := &loopProvider{store: s, respond: func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 		last := request.Messages[len(request.Messages)-1]
@@ -92,7 +92,7 @@ func loopFixture(t *testing.T) (*Store, *Runs, *conversationsqlite.Store, agent.
 		args, _ := json.Marshal(struct {
 			Text string `json:"text"`
 		}{last.Text})
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "same-id", Name: "builtin__text__echo", Arguments: string(args)}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "same-id", Name: "mcp__fixture__echo", Arguments: string(args)}}}, nil
 	}}
 	a := agent.Actor{Store: r, Provider: p, Registry: registry, Ready: func(context.Context) bool { return true }}
 	return s, r, h, a, p
@@ -376,7 +376,7 @@ func TestLoopToolRejectionPersistsAndDoesNotExposeHostData(t *testing.T) {
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: last.Text}, nil
 		}
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "builtin__text__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent__run", Arguments: `{"task":"forbidden"}`}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "mcp__fixture__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent__run", Arguments: `{"task":"forbidden"}`}}}, nil
 	}
 	mustSubmit(t, a, "one", "try invalid calls")
 	mustDrain(t, a)

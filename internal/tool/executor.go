@@ -132,9 +132,9 @@ func validDefinition(d Definition) bool {
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
 		case "builtin__agent__run":
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "spawn_agents"
-		case "builtin__artifact__save", "builtin__artifact__publish":
+		case "builtin__artifact__manage":
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "artifact_write"
-		case "builtin__artifact__read", "builtin__artifact__describe", "builtin__artifact__list":
+		case "builtin__artifact__search":
 			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
 		}
 		return d.Execute == nil && ((d.Spec.Name == "builtin__task__search" && d.Spec.Permission == "read_only") || (d.Spec.Name == "builtin__task__manage" && d.Spec.Permission == "task_control"))
@@ -161,8 +161,10 @@ type HostStore interface {
 	ExecuteBuiltin(context.Context, Invocation) (Result, error)
 }
 
-func EchoRegistry() *Registry {
-	r, err := NewRegistry([]Definition{{Spec: Spec{Name: "builtin__text__echo", Version: 1, InputSchema: `{"type":"object","properties":{"text":{"type":"string","maxLength":4096}},"required":["text"],"additionalProperties":false}`, ReplayPolicy: "safe", Permission: "read_only"}, Execute: func(ctx context.Context, args string) Result {
+// FixtureRegistry is a deterministic pure capability for explicitly selected
+// test providers. Production composition must never register this tool.
+func FixtureRegistry() *Registry {
+	r, err := NewRegistry([]Definition{{Spec: Spec{Name: "mcp__fixture__echo", Version: 1, InputSchema: `{"type":"object","properties":{"text":{"type":"string","maxLength":4096}},"required":["text"],"additionalProperties":false}`, ReplayPolicy: "safe", Permission: "read_only"}, Execute: func(ctx context.Context, args string) Result {
 		var value struct {
 			Text *string `json:"text"`
 		}
