@@ -9,7 +9,7 @@ class ReadError(RuntimeError):
     """Safe diagnostic: provider stderr may contain signed download URLs."""
 
 
-def read(*args, stdout=None):
+def read(*args, stdout=None, attempts=3):
     api = (args[:1] == ('api',) and len(args) > 1 and
            all(arg in ('--paginate', '--slurp') or
                (arg.startswith('repos/') and not any(c.isspace() for c in arg))
@@ -23,7 +23,9 @@ def read(*args, stdout=None):
         allowed = {'--repo', '--json', '--watch', '--interval'}
         if any(arg.startswith('-') and arg not in allowed for arg in args[2:]):
             raise ValueError('unsupported PR read option')
-    for attempt in range(3):
+    if attempts not in (1, 3):
+        raise ValueError('evidence reads allow one or three transport attempts')
+    for attempt in range(attempts):
         if stdout is not None and not watch:
             stdout.seek(0)
             stdout.truncate()
@@ -38,8 +40,8 @@ def read(*args, stdout=None):
             if watch and not error.strip():
                 return result  # completed failing checks are evidence, not transport errors
             raise ReadError('GitHub evidence read failed (non-transient; stderr withheld)')
-        if attempt == 2:
-            raise ReadError('GitHub evidence read failed after three transport attempts (stderr withheld)')
+        if attempt == attempts - 1:
+            raise ReadError(f'GitHub evidence read failed after {attempts} transport attempts (stderr withheld)')
         time.sleep(1 + attempt)
 
 
