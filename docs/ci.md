@@ -37,7 +37,12 @@ flowchart LR
 
 Each Required job independently installs pinned dependencies, provisions the
 public fixture SDK and builds from its exact checked-out source. A small
-project-local composite action owns those mechanics. There is no long test or
+project-local composite action owns those mechanics. Its disposable Ubuntu runner
+uses the official HTTPS archive mirror for APT downloads. The Azure mirror
+repeatedly took 8–9 minutes to install browser prerequisites (one retained run
+fetched 25.9 MB in 7m48s), exhausting the ten-minute job limit before checks could
+finish. Package selection, browser installation and job limits are unchanged.
+There is no long test or
 producer prerequisite. No executable crosses runner boundaries: GitHub image
 rollouts can assign different Ubuntu image versions within one workflow.
 The retained historical build-bundle utility still rejects image/context drift;
