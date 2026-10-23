@@ -332,7 +332,7 @@ func goldenReply(messages []llm.Message) string {
 			return "工作没问题，下午适当休息，今晚提前上床。"
 		}
 	case strings.Contains(context, "发布风险说明"):
-		return "1. 先做发布风险说明，在10:00周会前或会后立即完成，12:00前确认。\n2. 14:00面试前留准备时间，E4只核对。\n3. 新闻和已确认的酒店邮件稍后看。"
+		return "1. 先处理E1/T1发布风险说明，在10:00周会前或会后立即完成，12:00前确认。\n2. 13:30–14:00准备14:00面试，E4只核对，无需重复回复。\n3. E2新闻和已确认的E3酒店邮件稍后看；16:00分享可选，T2旅行手册稍后推进。"
 	case strings.Contains(context, "rain_probability_evening"):
 		return "开车通勤可穿短袖、薄长裤，带薄卫衣。18:30散步时按体感添衣，21:00下班更凉，薄卫衣用得上。"
 	default:

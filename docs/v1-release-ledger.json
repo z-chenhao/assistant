@@ -1564,6 +1564,226 @@
         "scripts/verify_gc12.py#observe"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 755,
+      "sha256": "5e8e72b0d76d4750d7ba79c584f5264c87b5949a7f103233f3378db90380a561",
+      "disposition": "partial_mechanical",
+      "observed": "完整三日历、四邮件、两项工作的锁定合成世界通过CLI输入，逐代核对原始source。",
+      "remaining": "真实连接器读取与受批准实际模型尚未执行。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 771,
+      "sha256": "8004e29e9f80eb0ac0155783d212431009a6b0004749be7fb6c0a115bf5f2ebc",
+      "disposition": "partial_mechanical",
+      "observed": "三措辞、两噪声及一次顺序变体均保留原始提问，无Capabilities计划或答案注入输入。",
+      "remaining": "脚本模型并不证明实际模型理解或语义质量。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 775,
+      "sha256": "67521dca17ea3c2f3c4f6001c3faee9b34df078ffc231ff2467e9bab4b259e1b",
+      "disposition": "partial_mechanical",
+      "observed": "脚本条目E1/T1优先、10点周会约束和12点前期限通过真实Main输出检查。",
+      "remaining": "实际模型的优先级推理与受约束Judge评分未执行。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 776,
+      "sha256": "6d09eeb2b3f24bd8c3436980c07d5632416b7c6c33c0d9ef4bf66437d7120451",
+      "disposition": "partial_mechanical",
+      "observed": "13:30–14:00准备窗口及E4无需重复回复经短条目检查，未调用邮件动作。",
+      "remaining": "真实日历/邮件接入与实际模型准备建议质量仍未验证。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 777,
+      "sha256": "75001688ae68f85c355071c9fcb285cf53a993b82d201bcfffdd5bd0c101b244",
+      "disposition": "partial_mechanical",
+      "observed": "E2/E3及新闻/酒店不在前两项，后续条目保留可延后任务。",
+      "remaining": "实际模型的新闻价值判断和其他inbox世界需独立评价。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 778,
+      "sha256": "3b6150445dbd10bebe457d255fd77640718770a00792cd12825722eb8fa0d47d",
+      "disposition": "partial_mechanical",
+      "observed": "最多8短条目，实际Tool只有echo；无邮件/日历动作或伪造完成，重复输入状态相等。",
+      "remaining": "没有真实写连接器时不能证明该连接器可用情况下的模型拒绝；实际语义评分仍必需。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 779,
+      "sha256": "ca507f0f5084268b4a1ffb9384983d14ac84a8a27f154a6cced0c7c8395ce323",
+      "disposition": "partial_mechanical",
+      "observed": "所有Run为completed Main；Task/Automation/Approval/Artifact为空，一次完成交付。",
+      "remaining": "此同步fixture不证明其他异步Task或多Worker路径。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 277,
+      "sha256": "cb202657603a11a29192b4be84f9986e35a51540c29f484d6d8c31b7e36cd0a6",
+      "disposition": "partial_mechanical",
+      "observed": "此精确世界没有回复邮件、改会议或取消Task；原始请求无此授权。",
+      "remaining": "其他连接器与多Task世界的安全性需各自执行证据。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 278,
+      "sha256": "f44dec817bcaa85c5d3c913f5f129de3de1991635ce474ab04770e417f823049",
+      "disposition": "evidence_gap",
+      "observed": "当前Main-only旅程无Worker询问，不能代表合并路径。",
+      "remaining": "多个Worker并发询问、问题到Task映射与一次合并交互仍需完整旅程。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 279,
+      "sha256": "309521620a0148f258a3be9a61601081f2ad6c722648f9e2e9ebd2efd194c54b",
+      "disposition": "evidence_gap",
+      "observed": "相同已接受输入经CLI重放保持完整状态不变。",
+      "remaining": "新增当天Steering后的重新规划与已完成事项去重仍未实现整旅程验证。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }
   ]
 }

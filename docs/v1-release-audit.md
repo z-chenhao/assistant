@@ -5,7 +5,7 @@ ERII-4 must remain `in_progress`; ERII-30 must not be accepted as a completed
 release. This document and its ledger are an initial source/evidence inventory,
 not a claim that every normative requirement has passed.
 
-The inspected base is `ae2dda0a420d24ffbf45553ee10dec67d2b05ead` (ERII-29 #31).
+The current synchronized base is `68150f1ec567c1babae7d03b3c6ef91d301966bc` (human-merged #33); ERII-29 #31 remains the prior release dependency.
 ERII-5–29 each have a merged implementation PR. The ledger records GitHub's
 actual merge commit, actor, time and URL, queried on 2026-10-21. A merge records
 integration, not semantic quality, exact-SHA review or final human acceptance.
@@ -27,7 +27,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Fourteen blocks now have exact-hash
+can silently discard a mandatory clause. Thirty-one blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -47,9 +47,9 @@ the nonzero completion boundary through the actual CLI.
 | --- | --- | --- |
 | GC-02 semantic quality | The existing six-variant driver now processes all four turns in order and creates one monthly Automation through the Main Tool; it asserts no early Task/schedule, first fire 2026-11-29 20:00 +08 and duplicate-input idempotency | Unscripted interview/constraint selection and semantic grades remain unverified; scripted scheduling evidence is not a product Case score |
 | GC-08 | `verify_channels.py` uses earlier Task continuation; exact wedding checklist is not driven | C1→C2 dependency, 128 guests, unknown tables, hotel draft/frozen recipient/body/attachment; C3 stays lower priority |
-| GC-09 | Main agenda and Web transport fragments exist | Exact full M7 case record, required variants, notification/Steering and semantic grades |
+| GC-09 | Six exact §8.10 CLI/TUI agenda variants now retain full source/request/state/replay and enforce every scripted agenda assertion | Broader §7 multi-connector/Worker question aggregation and Steering, actual model quality and constrained grades remain required |
 | GC-11 | Six locked variants now drive both original turns, three exact quotes/services/weights, actual MCP reads, user-visible scripted responses and two CLI-opened Artifacts; duplicate input creates no work | Unscripted recommendation, source selection and semantic calibration remain unverified; Fake output is not a product score |
-| GC-12 | `verify_channels.py` explicitly labels an approval fragment; Tool tests exercise frozen hashes | Exact Alex Chen/Tuesday 11:00–11:30 journey; obsolete Monday approval invalidated; one mail AND one calendar event and completion notice |
+| GC-12 | `verify_gc12.py` drives six complete mechanical journeys plus denial/lost-response, five serial rounds, with independent mail/calendar readback | Actual model evaluation, real approved account actions, complete protected acceptance and constrained grades remain required |
 | GC-14 | `verify_automation.py` and channel checks drive exact threshold days | Complete case variants, input/stop/currency evidence and semantic evaluation; only Oct 18/21 notify |
 | GC-16 | Child admission/isolation/aggregation fragments exist | D1–D5 research journey; earliest primary source Atlas 2024-03-01, rename vs extension, Aster excluded, independent report |
 | All 20 semantic gates | `case_runner.py`, `core_report.py`, `m6_report.py` correctly leave semantic/product metrics null for scripted Fakes | Constrained Judge O/F/P/A/T/S/R/C, all cases ≥80, suite mean ≥85; pass@1/pass^5, variance and hard-failure priority |
@@ -173,8 +173,8 @@ The records include Run tree, snapshots, ToolInvocation, Approval, Outbox and
 Artifact state. `test_quote_case.py` rejects missing turns, services, uncertainty,
 source transport, response bytes, deliveries, unauthorized effects and replay drift.
 
-The ledger's eleven individual reviews bind exact GC-11 source blocks to code,
-regressions, this evidence command and PR #32's **draft/unmerged** disposition.
+The first eleven GC-11 individual reviews bind exact source blocks to code,
+regressions, this evidence command and PR #32's **unmerged; independent review required** disposition.
 Each lists observed mechanics and all remaining semantic or broader obligations;
 for example, no purchase during comparison cannot prove purchase approval, and
 the car-insurance weights do not prove device/budget personalization in other
@@ -214,9 +214,10 @@ Golden fixed configuration/snapshots and identical-condition model comparison.
 Their dispositions remain partial/evidence_gap: two Main Runs do not prove
 Root/Child inheritance or active-run profile switching, and preflight mechanics
 do not establish actual model sampling, semantic grades, GPU resources or a
-completed live comparison. The ledger contains twelve partial_mechanical and two
-evidence_gap records; 1,568 blocks remain pending and zero requirements certified.
-The next exact whole-case checkpoint is GC-12 §8.13.
+completed live comparison. Those fourteen records were the GC-11 checkpoint inventory. After GC-12 and
+GC-09, the ledger has 31 partial/evidence-gap dispositions, 1,552 pending blocks
+and zero certified requirements. The next exact whole-case candidate is GC-08;
+its dependency and draft-approval journey still needs maintained verification.
 
 ## Handoff and remaining work
 

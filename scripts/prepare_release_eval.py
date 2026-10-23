@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if any(r.get('case_id') == 'GC-09' for r in report.get('results', [])):
+        return prepare_agenda(report)
     if report.get('case_id')=='GC-12':
         return prepare_meeting(report)
     if report.get('case_id')=='GC-11':
@@ -68,6 +70,39 @@ def prepare(report):
                         'pass@1/pass^5/variance after five actual unscripted repeats',
                         'cleanup and human review with date/model/failure class'],
                     scores=None, winner=None))
+
+
+def prepare_agenda(report):
+    """Validate complete locked CLI receipts before allowlisting agenda previews."""
+    from agenda_case import observations
+    from case_runner import digest, result, variants
+    dataset, policy, lock = load_contract(ROOT)
+    case = next(c for c in dataset['cases'] if c['case_id'] == 'GC-09')
+    expected = list(variants(dataset, case))
+    rows = [r for r in report['results'] if r['case_id'] == 'GC-09']
+    if (report.get('contract_lock') != lock or report.get('dataset_digest') != digest(dataset) or
+            report.get('policy_digest') != digest(policy) or
+            report.get('cleanup_checks') != dict(disposable_root_removed=True, owned_processes_joined=True) or
+            len(rows) != 6 or {r['variant_id'] for r in rows} != {v['variant_id'] for v in expected}):
+        raise ValueError('complete locked GC-09 receipts and cleanup required')
+    packets = []
+    for row in rows:
+        variant = next(v for v in expected if v['variant_id'] == row['variant_id'])
+        recomputed = result(case, variant, policy, row['evidence'])
+        checks = dict(recomputed['assertions'], **observations(variant, row['evidence']))
+        if (row['assertions'] != checks or not all(checks.values()) or row['final_score'] is not None or
+                row['status'] != 'fragment_pass' or row['scope'] != 'scripted_whole_case_mechanics' or
+                row['fixture_digest'] != variant['fixture_digest'] or
+                row['evidence'].get('cleanup') != dict(owned_processes_joined=True)):
+            raise ValueError('GC-09 failed, graded, drifted or incomplete receipt')
+        packets.append(dict(variant_id=variant['variant_id'], eligible_for_grading=False,
+            reason='explicit scripted golden Bridge; packet preview only', judge_input=dict(
+                goal=variant['events'][0]['text'], allowed_fixture=dict(clock=case['clock'], world=case['world']),
+                conversation=[dict(role=m['role'], text=''.join(p.get('text','') for p in m['content']))
+                              for m in row['evidence']['state']['conversation']],
+                final_artifact_summary=[], programmatic_assertions=checks)))
+    return dict(version=1, status='prepared; scripted GC-09 previews only; actual grading unexecuted',
+                judge_packets=packets, scores=None, winner=None)
 
 
 def prepare_meeting(report):
