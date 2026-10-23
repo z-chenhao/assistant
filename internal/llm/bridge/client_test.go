@@ -149,9 +149,13 @@ func TestProbeAndAuthCatalogContract(t *testing.T) {
 		}
 	}
 	p := llm.Profile{ProfileID: "profile", Version: 1, ProfileInput: llm.ProfileInput{Endpoint: "http://localhost/v1", MaxOutputTokens: 1024}}
-	result, err := (llm.Prober{Provider: c}).Run(ctx, p)
+	var stages []llm.ProbeStage
+	result, err := c.RunWithProgress(ctx, p, func(stage llm.ProbeStage) { stages = append(stages, stage) })
 	if err != nil || result.Validate() != nil {
 		t.Fatalf("behavioral Probe: %+v %v", result, err)
+	}
+	if len(stages) != 5 || stages[0] != llm.ProbeConnection || stages[4] != llm.ProbeClipping {
+		t.Fatalf("Bridge dropped Probe progress: %v", stages)
 	}
 	noTools := open(t, "no-tools")
 	if _, err := (llm.Prober{Provider: noTools}).Run(ctx, p); !errors.Is(err, llm.ModelIncompatible) {
