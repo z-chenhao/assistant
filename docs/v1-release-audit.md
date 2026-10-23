@@ -5,7 +5,7 @@ ERII-4 must remain `in_progress`; ERII-30 must not be accepted as a completed
 release. This document and its ledger are an initial source/evidence inventory,
 not a claim that every normative requirement has passed.
 
-The current synchronized base is `68150f1ec567c1babae7d03b3c6ef91d301966bc` (human-merged #33); ERII-29 #31 remains the prior release dependency.
+The current synchronized base is `5fc788e76ed10acc06e707347a6bbc4148e98fa2` (human-merged #34; #33 remains integrated); ERII-29 #31 remains the prior release dependency.
 ERII-5–29 each have a merged implementation PR. The ledger records GitHub's
 actual merge commit, actor, time and URL, queried on 2026-10-21. A merge records
 integration, not semantic quality, exact-SHA review or final human acceptance.
@@ -27,7 +27,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Thirty-one blocks now have exact-hash
+can silently discard a mandatory clause. Forty-three blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -46,7 +46,7 @@ the nonzero completion boundary through the actual CLI.
 | Gap | Inspectable current state | Required next evidence |
 | --- | --- | --- |
 | GC-02 semantic quality | The existing six-variant driver now processes all four turns in order and creates one monthly Automation through the Main Tool; it asserts no early Task/schedule, first fire 2026-11-29 20:00 +08 and duplicate-input idempotency | Unscripted interview/constraint selection and semantic grades remain unverified; scripted scheduling evidence is not a product Case score |
-| GC-08 | `verify_channels.py` uses earlier Task continuation; exact wedding checklist is not driven | C1→C2 dependency, 128 guests, unknown tables, hotel draft/frozen recipient/body/attachment; C3 stays lower priority |
+| GC-08 | Six exact §8.9 three-turn CLI journeys now prove one Task/three Roots, C1→C2 dependency, 128 guests/unknown tables, Artifact bytes and frozen pending/denied zero-attempt hotel mail | Broader weeks/calendar/reminder/pause variants, actual model quality, constrained scores and current L2/human review remain required |
 | GC-09 | Six exact §8.10 CLI/TUI agenda variants now retain full source/request/state/replay and enforce every scripted agenda assertion | Broader §7 multi-connector/Worker question aggregation and Steering, actual model quality and constrained grades remain required |
 | GC-11 | Six locked variants now drive both original turns, three exact quotes/services/weights, actual MCP reads, user-visible scripted responses and two CLI-opened Artifacts; duplicate input creates no work | Unscripted recommendation, source selection and semantic calibration remain unverified; Fake output is not a product score |
 | GC-12 | `verify_gc12.py` drives six complete mechanical journeys plus denial/lost-response, five serial rounds, with independent mail/calendar readback | Actual model evaluation, real approved account actions, complete protected acceptance and constrained grades remain required |
@@ -214,10 +214,13 @@ Golden fixed configuration/snapshots and identical-condition model comparison.
 Their dispositions remain partial/evidence_gap: two Main Runs do not prove
 Root/Child inheritance or active-run profile switching, and preflight mechanics
 do not establish actual model sampling, semantic grades, GPU resources or a
-completed live comparison. Those fourteen records were the GC-11 checkpoint inventory. After GC-12 and
-GC-09, the ledger has 31 partial/evidence-gap dispositions, 1,552 pending blocks
-and zero certified requirements. The next exact whole-case candidate is GC-08;
-its dependency and draft-approval journey still needs maintained verification.
+completed live comparison. After the GC-08 checkpoint, the ledger has 43 individual dispositions
+(37 partial mechanical and six evidence gaps), 1,540 pending blocks and zero
+certified requirements. GC-08 now has a maintained three-turn wedding runner
+with six variants, frozen draft/denial, SIGKILL/restart and replay evidence.
+Twelve exact source blocks have bounded code/test/PR/evidence dispositions.
+The next uncovered exact candidate is GC-14 §8.15; broader GC-09 question
+aggregation/Steering and GC-16 also remain required.
 
 ## Handoff and remaining work
 

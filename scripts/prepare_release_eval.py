@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if report.get('case_id')=='GC-08':
+        return prepare_wedding(report)
     if any(r.get('case_id') == 'GC-09' for r in report.get('results', [])):
         return prepare_agenda(report)
     if report.get('case_id')=='GC-12':
@@ -70,6 +72,38 @@ def prepare(report):
                         'pass@1/pass^5/variance after five actual unscripted repeats',
                         'cleanup and human review with date/model/failure class'],
                     scores=None, winner=None))
+
+
+def prepare_wedding(report):
+    """Six exact, ungraded GC-08 previews; raw Task/runtime data stays private."""
+    import verify_gc08 as driver
+    lock=json.loads(driver.FIXTURE.with_suffix('.lock.json').read_text())
+    expected=driver.variants()
+    rows=report['variants']
+    provenance=report.get('source_provenance',{})
+    if (report.get('cleanup') is not True or report.get('semantic_score') is not None or
+            report.get('status')!='mechanical_pass' or report.get('fixture_lock')!=lock or
+            not provenance.get('before') or provenance['before']!=provenance.get('after') or
+            len(rows)!=6 or {r['variant']['id'] for r in rows}!={v['id'] for v in expected}):
+        raise ValueError('complete locked ungraded GC-08 receipts required')
+    packets=[]
+    for row in rows:
+        variant=next(v for v in expected if v['id']==row['variant']['id'])
+        checks=driver.observe(row);denial=driver.denial_observe(row)
+        if (row['variant']!=variant or row['assertions']!=checks or not all(checks.values()) or
+                row['denial_assertions']!=denial or not all(denial.values()) or
+                row['scope']!='scripted_whole_case_mechanics' or row['semantic_score'] is not None or
+                row['cleanup']!=dict(owned_processes_joined=True,disposable_root_removed=True)):
+            raise ValueError('GC-08 failed, drifted, graded or incomplete receipt')
+        packets.append(dict(variant_id=variant['id'],eligible_for_grading=False,
+            reason='explicit scripted model; pending/denied mail only; preview, not semantic evidence',
+            judge_input=dict(goal='持续推进同一婚礼 Task；识别人数依赖、保存128人，桌数待确认；邮件发送前审阅。',
+                allowed_fixture=variant['source'],conversation=[dict(role=m['role'],text=''.join(
+                    p.get('text','') for p in m['content'])) for m in row['state']['conversation']],
+                final_artifact_summary=[dict(text=a['text'],sha256=a['sha256']) for a in row['artifacts']],
+                programmatic_assertions=dict(checks,**denial))))
+    return dict(version=1,status='prepared; scripted GC-08 previews only; actual grading unexecuted',
+        judge_packets=packets,scores=None,winner=None)
 
 
 def prepare_agenda(report):

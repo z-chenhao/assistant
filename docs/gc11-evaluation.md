@@ -125,4 +125,6 @@ matching does not assign scores, pass@1/pass^5, variance or a winner.
 
 Approved profiles/environment and actual Judge/human review remain due; the
 consolidated input request is in [current live preflight](v1-live-preflight.md).
-The next exact whole-case checkpoint is GC-12 §8.13.
+GC-12 §8.13 now has maintained scripted mail-and-calendar mechanics. GC-08 §8.9
+also has a maintained wedding checkpoint; the next uncovered exact candidate is
+GC-14 §8.15. These observations do not complete release acceptance.

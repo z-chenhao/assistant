@@ -50,6 +50,7 @@ SHARDS = {
         Gate("task-control", "verify_task_control.py", "task-control", 5),
         Gate("cases", "run_cases.py", "cases"),
         Gate("task-cases", "run_task_cases.py", "task-cases"),
+        Gate("gc08", "verify_gc08.py", "gc08"),
         Gate("events", "", "events"),
     ),
     "codemode": (Gate("codemode", "verify_codemode.py", "codemode", 5),

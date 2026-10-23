@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "audited_base": "68150f1ec567c1babae7d03b3c6ef91d301966bc",
+  "audited_base": "5fc788e76ed10acc06e707347a6bbc4148e98fa2",
   "sources": {
     "docs/technical-design.md": {
       "sha256": "cd47b22cf4ad142e9899e41d9466569390b7f4f0c521bb1d450eda3e3cc12bd9",
@@ -163,11 +163,14 @@
     "tasks": {
       "code": [
         "internal/agent/sqlite/tasks.go",
-        "internal/agent/sqlite/task_control.go"
+        "internal/agent/sqlite/task_control.go",
+        "internal/llm/fake/wedding.go"
       ],
       "tests": [
         "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
-        "internal/agent/sqlite/task_control_test.go"
+        "internal/agent/sqlite/task_control_test.go",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent",
+        "scripts/test_gc08.py"
       ],
       "prs": [
         "10",
@@ -176,7 +179,9 @@
       "evidence": [
         "scripts/verify_tasks.py",
         "scripts/verify_task_control.py",
-        "scripts/run_task_cases.py"
+        "scripts/run_task_cases.py",
+        "scripts/verify_gc08.py",
+        "docs/gc08-verification.md"
       ]
     },
     "prompts": {
@@ -959,7 +964,7 @@
       "area": "tasks",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "No exact wedding C1/C2/C3 + 128 guests + hotel draft journey."
+      "gap": "Exact three-turn six-variant wedding mechanics now run through maintained CLI/Task/Artifact/MCP approval boundaries. Broader weeks/calendar/reminder/pause variants, actual unscripted model quality and constrained grading remain required."
     },
     "GC-09": {
       "area": "main",
@@ -1043,7 +1048,7 @@
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "Twenty-one source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1562 remain pending and zero requirements certified. Continue individual normative review."
+      "detail": "Forty-three source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1540 remain pending and zero requirements certified. Continue individual normative review."
     },
     {
       "id": "G3",
@@ -1782,6 +1787,282 @@
       "evidence": [
         "docs/gc09-verification.md",
         "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 261,
+      "sha256": "d775664049cd921f5f65196c85e5211bc654ff4f744ef1d561e2c1affa7b796b",
+      "disposition": "partial_mechanical",
+      "observed": "Three original messages create one Task and three unique Root epochs; checklist dependency/fact Artifacts are read back.",
+      "remaining": "Other lifestyle events/weeks/variants remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 262,
+      "sha256": "004635c2a3defbbbf3141d0a50432eb49385cf7611c928dd345d0596685c085f",
+      "disposition": "partial_mechanical",
+      "observed": "Native CLI-opened checklists preserve deadlines and auditable before/after dependencies with facts.",
+      "remaining": "Final event completion, materials and appointments remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 263,
+      "sha256": "f04fcfaff9db65c74bdbc5c141e991b0a19220a8c4373495e65b7f9cfedcc86a",
+      "disposition": "evidence_gap",
+      "observed": "This exact fixture creates no Automation or unsolicited contact; C3 stays active.",
+      "remaining": "No days-long reminder timing/noise journey is executed; silence alone does not prove reminder behavior.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 265,
+      "sha256": "149fd02fc186fb1eb2f5789704e281491b340cc9c599ff639199ffa690145337",
+      "disposition": "partial_mechanical",
+      "observed": "Two continuations use Main Task search/append, retaining immutable anchor and new Root IDs/epochs.",
+      "remaining": "Literal continue/pause/resume wording and broader lifecycle variants remain required beyond existing fragments.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 728,
+      "sha256": "665fbce36d3f1e9efdb433a0166a342d946ded7b0895276421337091448db7e7",
+      "disposition": "partial_mechanical",
+      "observed": "MCP source read equals the locked clock/event/checklist/contacts; native IDs remain Host-owned.",
+      "remaining": "Other lifestyle fixtures and live sources remain unproved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 740,
+      "sha256": "1a55eaddab6fd1a446762811c7b335ece7a71c5f43b19d3531726201798d3242",
+      "disposition": "partial_mechanical",
+      "observed": "Original first input reaches Main, one Task and a new Root with CLI-reopened critical-path checklist.",
+      "remaining": "Scripted priority prose is not actual model planning quality.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 741,
+      "sha256": "867fc2a223ed95b47a769ea80b2eb532a4e5ed6df88705966ab789eae3191bca",
+      "disposition": "partial_mechanical",
+      "observed": "Original second input appends same Task; new epoch/Root, persisted instruction and Artifact preserve 128 guests.",
+      "remaining": "Long-duration context and actual model continuity remain unproved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 742,
+      "sha256": "c985a6601bd0aa51fe16d0e3efba44fd392b64af2aec7fc6a8928a9b773099d1",
+      "disposition": "partial_mechanical",
+      "observed": "Original third input appends same Task; draft Artifact and exact frozen pending approval with zero mail attempts.",
+      "remaining": "No real hotel delivery, actual model drafting or human review is proved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 746,
+      "sha256": "7a7bfbb469e028b1b5052dd8cb092b3fb331ab91adedef79a8a6ffa5bfe52a04",
+      "disposition": "partial_mechanical",
+      "observed": "Initial C1 blocks C2; second/third durable checklists mark C1 completed and C2 active.",
+      "remaining": "Other dependency changes and unscripted planning remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 747,
+      "sha256": "a2b35a32808fef12cee607e514f32bfc94c556a6a62e5af15d8fe64cdbfad16f",
+      "disposition": "partial_mechanical",
+      "observed": "Task instruction and two new checklist Artifacts retain 128; table/per-table counts stay null.",
+      "remaining": "Actual model fact extraction across weeks remains required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 748,
+      "sha256": "29557db172fcb5e17fb773cc7677c738c3e0309bb24a74126a3b9f8dfaec7d8d",
+      "disposition": "partial_mechanical",
+      "observed": "Owner CLI reopens exact draft; frozen call binds recipient/body/empty attachments; wrong hash, pending SIGKILL/input replay and denial prove no dispatch.",
+      "remaining": "Real contact/attachment version and semantic/human approval review remain unproved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 749,
+      "sha256": "e19898d2edb224f94b43b4ecb388215cb98fd727b32bca3101ac8662d462746e",
+      "disposition": "partial_mechanical",
+      "observed": "First checklist preserves C3 due/status and prioritizes C1; no reminder or external dispatch occurs.",
+      "remaining": "Risk/date changes and actual model priority evaluation remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }
