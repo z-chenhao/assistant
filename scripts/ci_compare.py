@@ -7,11 +7,13 @@ failed attempts. No test is retried and no workflow or PR state is changed.
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import zipfile
 
 import ci_profile as profile
+from evidence import artifact_archive, inventory
 from verify_suite import SHARDS, CODEMODE_PARTS, codemode_gates, personal_gates
 import m6_report
 from ci_gate import REQUIRED
@@ -33,19 +35,22 @@ def pair(value):
     return dict(zip(('before', 'after'), map(attempt, values)))
 
 
-def collect(repo, key, root, max_bytes=1 << 20):
+def collect(repo, key, root=None, max_bytes=1 << 20):
     # ERII-206 owns metadata, immutable identity, budget and verified local reuse.
     # Do not duplicate its collector or silently fall back to unbounded ZIP reads.
-    import evidence
+    root = root or os.environ.get('ERII_EVIDENCE_ROOT')
+    if not root:
+        raise ValueError('explicit artifact root or ERII_EVIDENCE_ROOT required')
+    root = Path(root)
     run_id, number = map(int, key.split(':'))
     prefix = f'repos/{repo}/actions/runs/{run_id}'
     run = profile.gh('api', prefix + '/attempts/' + str(number))
-    metadata = evidence.inventory(repo, run_id, number, run_info=run)
+    metadata = inventory(repo, run_id, number, run_info=run)
     pages = profile.gh('api', '--paginate', '--slurp', prefix + f'/attempts/{number}/jobs?per_page=100')
     jobs = [job for page in pages for job in page['jobs']]
     reports, receipts = {}, []
     if validate_jobs(dict(run=run, jobs=jobs), run['head_sha']):
-        return dict(run=run, jobs=jobs, reports=reports, artifacts=metadata['artifacts'], artifact_receipts=receipts)
+        return dict(run=run, jobs=jobs, reports=reports, artifacts=metadata['artifacts'], transfers=receipts)
     # Joined suites embed every part receipt. Do not fetch large part archives
     # again, or fast/race artifacts that contain no comparator input.
     for shard in SHARDS:
@@ -53,7 +58,7 @@ def collect(repo, key, root, max_bytes=1 << 20):
         matches = [a for a in metadata['artifacts'] if a['name'] == name]
         if len(matches) != 1:
             raise ValueError('missing or duplicate exact suite artifact: ' + name)
-        archive, receipt = evidence.artifact_archive(root, metadata, matches[0]['id'], max_bytes)
+        archive, receipt = artifact_archive(root, metadata, matches[0]['id'], max_bytes)
         max_bytes -= receipt['downloaded_bytes']
         receipts.append(receipt)
         allowed = {'suite-' + shard + '.json'}
@@ -70,7 +75,7 @@ def collect(repo, key, root, max_bytes=1 << 20):
                     raise ValueError('oversized or duplicate suite report')
                 reports[entry.filename] = json.loads(entries.read(entry))
     return dict(run=run, jobs=jobs, artifacts=metadata['artifacts'], reports=reports,
-                artifact_receipts=receipts)
+                transfers=receipts)
 
 
 def topology(text=None):
@@ -357,7 +362,7 @@ def main():
         values, remaining = [], 1 << 20
         for key in keys:
             value = collect(args.repo, key, args.artifact_root, remaining)
-            remaining -= sum(r['downloaded_bytes'] for r in value['artifact_receipts'])
+            remaining -= sum(r['downloaded_bytes'] for r in value['transfers'])
             if args.profile:
                 value['measurement_profile'] = json.loads(args.profile.read_text())
             values.append(value)

@@ -272,10 +272,10 @@ Use `ci_profile.py --limit 30 --output evidence/ci-history.json` for exact-attem
 wall time, runner-minutes and per-job/step evidence. Its raw API snapshots permit
 offline reproduction. Job duration is not billed CPU time. Queues, cache state
 and heterogeneous runner CPUs add noise; one successful run cannot establish
-p95 or a controlled causal speedup. The comparison command below validates the current complete topology;
-retained nine-job shadow data requires an explicit historical mode. No repeated
-measurement cohort is part of the delivery path. Supersession records never treat unknown outcomes or
-missing timestamps as zero.
+p95 or a controlled causal speedup. The comparison command below validates the
+current complete topology; retained nine-job shadow data requires an explicit historical mode. No repeated
+measurement cohort is part of the delivery path. Supersession records never
+treat unknown outcomes or missing timestamps as zero.
 
 `ci_compare.py` derives required job names and literal matrices from the maintained
 `ci.yml`, cross-checks parts against `verify_suite.py`/`m6_report.py`, and checks
@@ -378,3 +378,11 @@ budget, proves unknown/no Artifact/no second effect, then verifies a fresh
 authoritative query. The existing real deadline, cancellation, unsafe receipt,
 identity and byte/hash assertions remain required. Preserve failed full-suite
 evidence; passing focused diagnostics alone do not supersede it.
+
+## Low-bandwidth evidence handoff
+
+Use the [local-first evidence commands](guides/evidence.md) to retain raw results
+outside worktree cleanup, share one small receipt and verify same-host files.
+Inspect exact run/attempt metadata before downloading an immutable artifact ID;
+hash-verified warm retrieval transfers zero archive bytes. Mandatory CI part/join
+artifacts and final exports keep their existing completeness and retention rules.

@@ -301,7 +301,6 @@ class CollectorBoundaryTests(unittest.TestCase):
         from pathlib import Path
         import sys
         import tempfile
-        import types
         from unittest.mock import patch
         import zipfile
         with tempfile.TemporaryDirectory() as directory:
@@ -312,7 +311,7 @@ class CollectorBoundaryTests(unittest.TestCase):
             metadata = dict(source_sha='a'*40, artifacts=artifacts)
             calls = []
             def archive(cache, meta, artifact_id, budget):
-                self.assertIs(cache, root)
+                self.assertEqual(cache, root)
                 self.assertIs(meta, metadata)
                 self.assertEqual(budget, 100 - len(calls)*10)
                 calls.append(artifact_id)
@@ -324,8 +323,8 @@ class CollectorBoundaryTests(unittest.TestCase):
                     if shard == 'codemode': stream.writestr('core-summary.json', '{}')
                     if shard == 'personal': stream.writestr('m6-summary.json', '{}')
                 return path, dict(downloaded_bytes=10)
-            collector = types.SimpleNamespace(inventory=lambda *a, **k: metadata, artifact_archive=archive)
-            with patch.dict(sys.modules, evidence=collector), patch.object(comparison.profile, 'gh',
+            with patch.object(comparison, 'inventory', return_value=metadata), \
+                 patch.object(comparison, 'artifact_archive', side_effect=archive), patch.object(comparison.profile, 'gh',
                     side_effect=[dict(id=1, run_attempt=1, head_sha='a'*40, path='.github/workflows/ci.yml',
                         status='completed', conclusion='success'), [{'jobs': [dict(name=name, conclusion='success', head_sha='a'*40, run_id=1, run_attempt=1,
                         started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:01Z')
@@ -333,7 +332,7 @@ class CollectorBoundaryTests(unittest.TestCase):
                 value = comparison.collect('z-chenhao/erii', '1:1', root, 100)
             self.assertEqual(calls, list(range(1, 7)))
             self.assertEqual(len(value['reports']), 8)
-            self.assertEqual(sum(r['downloaded_bytes'] for r in value['artifact_receipts']), 60)
+            self.assertEqual(sum(r['downloaded_bytes'] for r in value['transfers']), 60)
 
     def test_retired_experiment_cli_rejects_before_any_github_action(self):
         import subprocess
