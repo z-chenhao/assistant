@@ -240,6 +240,7 @@ def decide(root, pack_path, expected_hash, now=None):
             for ref in rows:
                 value = store.read(ref, 'gate', unique=False)
                 require(set(value['assertions']) == set(suite[category][name]), 'system/safety assertion inventory drift')
+                require(type(value['repetition']) is int, 'integer protected repetition required')
                 rounds.append(value['repetition'])
                 states.append(observed_gate(store, ref, name, now))
             require(rounds == list(range(1, len(rounds) + 1)), 'duplicate/out-of-order protected rounds')
@@ -276,7 +277,10 @@ def decide(root, pack_path, expected_hash, now=None):
             passed &= all(j['conclusion'] == 'success' for j in jobs if j['name'] in required)
             passed &= run['status'] == 'completed' and run['conclusion'] == 'success'
         join = strict_json(store.bytes(ci['ubuntu_needs']))
-        gates['native_ci'] = 'verified' if passed and ci_gate.passed(join) else 'rejected'
+        ubuntu = strict_json(store.bytes(ci['platforms']['ubuntu']))
+        require(join['source_sha'] == sha and join['run_id'] == ubuntu['id'] and
+                join['run_attempt'] == ubuntu['run_attempt'], 'Ubuntu join source/run/attempt mismatch')
+        gates['native_ci'] = 'verified' if passed and ci_gate.passed(join['needs']) else 'rejected'
     gates['final_human_acceptance'] = review(store, pack['human_acceptance'],
         digest({k: v for k, v in pack.items() if k != 'human_acceptance'}), now, pack['author'], human=True) if pack.get('human_acceptance') else 'unmet'
     ready = all(state == 'verified' for state in gates.values())

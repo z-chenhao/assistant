@@ -100,7 +100,8 @@ class PackFixture:
                       for n, name in enumerate(['Ubuntu checks'] if platform == 'ubuntu' else [
                           'Package (ubuntu-24.04)', 'Package (ubuntu-24.04-arm)', 'Package (macos-15)', 'Package (macos-15-intel)'], 1)],
                 status='completed', conclusion='success'))
-        needs = self.file({key: {'result': 'success'} for key in ci_gate.REQUIRED})
+        needs = self.file(dict(source_sha=self.sha, run_id=1, run_attempt=1,
+                               needs={key: {'result': 'success'} for key in ci_gate.REQUIRED}))
         self.pack['native_ci'] = self.record('native_ci', platforms=platforms, ubuntu_needs=needs)
         self.accept(self.pack)
 
@@ -318,15 +319,20 @@ class ReleaseDecisionTests(unittest.TestCase):
                 self.fixture.decide(pack)
 
     def test_ci_wrong_sha_failed_join_missing_native_platform_never_pass(self):
-        for mutation in ('sha', 'join', 'platform'):
+        for mutation in ('sha', 'join', 'platform', 'join-sha', 'join-attempt'):
             pack = copy.deepcopy(self.pack)
             ci = self.fixture.read(pack['native_ci'])
             if mutation == 'sha':
                 run = self.fixture.read(ci['platforms']['macos'])
                 run['head_sha'] = '0' * 40
                 ci['platforms']['macos'] = self.fixture.file(run)
-            elif mutation == 'join': ci['ubuntu_needs'] = self.fixture.file({'fast': {'result': 'success'}})
-            else: ci['platforms'].pop('macos')
+            elif mutation == 'platform': ci['platforms'].pop('macos')
+            else:
+                join = self.fixture.read(ci['ubuntu_needs'])
+                if mutation == 'join': join['needs'] = {'fast': {'result': 'success'}}
+                if mutation == 'join-sha': join['source_sha'] = '0' * 40
+                if mutation == 'join-attempt': join['run_attempt'] = 2
+                ci['ubuntu_needs'] = self.fixture.file(join)
             pack['native_ci'] = self.fixture.file(ci)
             self.fixture.accept(pack)
             if mutation == 'join':

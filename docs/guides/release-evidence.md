@@ -89,7 +89,7 @@ consumer verification.
 | `systems`, `safety` | All SC-01–12. SC-03–07 and security/approval/cancellation/Durable Replay/Coding workspace protection require ordered, distinct rounds 1–5. Receipt reuse, reordered rounds and missing assertions fail closed. |
 | `operations` | Native test/lint/race/Sidecar/e2e/fault reports, actual kill/restart, encrypted backup/restore and upgrade observations; each has raw evidence, command, producer and independent review. |
 | `live` | Current search/login/Mail/Calendar/Feishu/browser/Computer/Jianying L2 records with model, time, failure class, environment, actual state, artifacts and named human review. Current SHA and review/observation dates at or after its commit are required. Historical L2 and prerequisite triage cannot substitute. |
-| `native_ci` | Original GitHub run/job snapshots for current-SHA CI and Native packages workflows, matching repository, run/attempt IDs and job inventories; full Ubuntu needs join; four native package jobs across Linux/macOS architectures. |
+| `native_ci` | Original GitHub run/job snapshots for current-SHA CI and Native packages workflows, matching repository, run/attempt IDs and job inventories; full Ubuntu needs join explicitly bound to the same source/run/attempt; four native package jobs across Linux/macOS architectures. |
 | `human_acceptance` | Named member acceptance binding the complete pack excluding this final reference. It cannot be supplied by the pack author or an agent review. |
 
 Independent review receipts name actor/type, origin, reason, subject hash,
