@@ -12,7 +12,8 @@ import time
 from case_runner import digest, load_contract, result, variants
 from terminal_driver import Terminal
 from verify_main import MainHarness, assert_final, require
-from agenda_case import observations as agenda_observations
+from agenda_case import (observations as agenda_observations, load_steering,
+                         steering_event, steering_observations)
 
 
 def timestamp():
@@ -43,7 +44,8 @@ def drive(binary, folder, case, variant):
                 with sqlite3.connect(folder/'data/state.db') as db:
                     db.row_factory = sqlite3.Row
                     for key, table in (('tasks','task'), ('automations','automation'),
-                                       ('approvals','approval'), ('artifacts','artifact')):
+                                       ('approvals','approval'), ('artifacts','artifact'),
+                                       ('compactions','context_compaction')):
                         state[key] = [dict(row) for row in db.execute('SELECT * FROM '+table)]
             return state
         state = readback()
@@ -55,6 +57,22 @@ def drive(binary, folder, case, variant):
             h.send('event-0', '当前时间：'+event['at']+'。'+event['text'])
             h.command('chat', 'work')
             execution['replay_state'] = readback()
+            # Preserve the original locked journey as its own readback. Drive a
+            # separately locked same-day update through a new real Main Run.
+            steering_started, steering_tick = timestamp(), time.monotonic()
+            text = steering_event(variant)
+            receipt = h.send('steering', text)
+            child = h.hold('after_compaction_commit')
+            child.kill(); child.communicate(timeout=10)
+            frozen = readback()
+            h.command('chat', 'work')
+            updated = readback()
+            require(h.send('steering', text) == receipt, 'Steering duplicate receipt drift')
+            h.command('chat', 'work')
+            execution['steering'] = dict(event=text, fixture_lock=load_steering()[1], receipt=receipt,
+                started_at=steering_started, finished_at=timestamp(), wall_time_ms=round((time.monotonic()-steering_tick)*1000),
+                before_kill=frozen, restart=dict(boundary='after_compaction_commit', returncode=child.returncode),
+                state=updated, replay_state=readback())
         return execution
     finally:
         h.cleanup()
@@ -71,6 +89,7 @@ def run_suite(dataset, policy, driver, result_builder=result):
             row = result_builder(case, variant, policy, execution)
             if case['case_id'] == 'GC-09':
                 checks = agenda_observations(variant, execution)
+                checks.update({'steering_'+key: value for key, value in steering_observations(variant, execution).items()})
                 row['assertions'].update(checks)
                 row['scope'] = 'scripted_whole_case_mechanics'
                 row['full_case'] = 'inconclusive; unscripted evaluation and semantic grades required'

@@ -992,7 +992,7 @@
       "area": "main",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Six exact agenda CLI/TUI variants cover source, priorities, short output and replay; broader question aggregation/Steering and semantic evaluation remain required."
+      "gap": "Six exact agenda CLI/TUI variants plus locked same-day Steering prove original priorities, completed-work omission, updated preparation/personal windows, context-freeze SIGKILL/restart and replay. Multi-connector/Worker question aggregation, actual model quality and semantic evaluation remain required."
     },
     "GC-10": {
       "area": "local",
@@ -1795,20 +1795,23 @@
       "section": "7.GC-09",
       "line": 279,
       "sha256": "309521620a0148f258a3be9a61601081f2ad6c722648f9e2e9ebd2efd194c54b",
-      "disposition": "evidence_gap",
-      "observed": "相同已接受输入经CLI重放保持完整状态不变。",
-      "remaining": "新增当天Steering后的重新规划与已完成事项去重仍未实现整旅程验证。",
+      "disposition": "partial_mechanical",
+      "observed": "六个原始措辞/噪声/顺序变体后续接入独立锁定的11:30 Steering：E1/T1已完成、E4已核对、13:00–14:00私人事务；真实Main更新准备窗口且不重复旧待办。上下文冻结后SIGKILL/重启保留输入及已完成调用，最终模型结果与可见交付相符，重复输入全状态相等。",
+      "remaining": "显式脚本Fake仅证明确定性传输/生命周期；非脚本重新规划质量、真实连接器、多Task回答映射、并发Steering、受约束评分与当前L2/具名人审仍未观察。",
       "code": [
         "scripts/run_cases.py#drive",
-        "scripts/agenda_case.py#observations"
+        "scripts/agenda_case.py#steering_observations",
+        "internal/llm/fake/bridge.go#goldenReply"
       ],
       "tests": [
-        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
-        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+        "internal/llm/fake/agenda_test.go#TestAgendaFixtureSteeringDoesNotRepeatCompletedWork",
+        "scripts/test_agenda_case.py#test_steering_rejects_completed_work_stale_window_and_unproven_restart",
+        "scripts/test_agenda_case.py#test_judge_recomputes_receipts_and_never_grades_or_leaks_private_fields"
       ],
       "evidence": [
         "docs/gc09-verification.md",
-        "scripts/run_cases.py#run_suite"
+        "scripts/run_cases.py#run_suite",
+        "scripts/prepare_release_eval.py#prepare_agenda"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     },

@@ -175,7 +175,7 @@ def prepare_wedding(report):
 
 def prepare_agenda(report):
     """Validate complete locked CLI receipts before allowlisting agenda previews."""
-    from agenda_case import observations
+    from agenda_case import observations, steering_observations, load_steering
     from case_runner import digest, result, variants
     dataset, policy, lock = load_contract(ROOT)
     case = next(c for c in dataset['cases'] if c['case_id'] == 'GC-09')
@@ -191,6 +191,7 @@ def prepare_agenda(report):
         variant = next(v for v in expected if v['variant_id'] == row['variant_id'])
         recomputed = result(case, variant, policy, row['evidence'])
         checks = dict(recomputed['assertions'], **observations(variant, row['evidence']))
+        checks.update({'steering_'+key: value for key, value in steering_observations(variant, row['evidence']).items()})
         if (row['assertions'] != checks or not all(checks.values()) or row['final_score'] is not None or
                 row['status'] != 'fragment_pass' or row['scope'] != 'scripted_whole_case_mechanics' or
                 row['fixture_digest'] != variant['fixture_digest'] or
@@ -199,8 +200,9 @@ def prepare_agenda(report):
         packets.append(dict(variant_id=variant['variant_id'], eligible_for_grading=False,
             reason='explicit scripted golden Bridge; packet preview only', judge_input=dict(
                 goal=variant['events'][0]['text'], allowed_fixture=dict(clock=case['clock'], world=case['world']),
+                allowed_steering=load_steering()[0],
                 conversation=[dict(role=m['role'], text=''.join(p.get('text','') for p in m['content']))
-                              for m in row['evidence']['state']['conversation']],
+                              for m in row['evidence']['steering']['state']['conversation']],
                 final_artifact_summary=[], programmatic_assertions=checks)))
     return dict(version=1, status='prepared; scripted GC-09 previews only; actual grading unexecuted',
                 judge_packets=packets, scores=None, winner=None)
