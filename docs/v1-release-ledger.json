@@ -1034,7 +1034,7 @@
       "area": "children",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Child isolation/aggregation fragment; no D1-D5 primary-source research journey."
+      "gap": "Six exact D1-D5 CLI/MCP parallel-Child/Artifact journeys now check Atlas primary date, rename vs extension, Aster exclusion, scoped citations and unknowns; actual unscripted research, long contexts, semantic grades and current L2 remain due."
     },
     "GC-17": {
       "area": "replay",
@@ -1070,7 +1070,7 @@
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "58 source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1527 remain pending and zero requirements certified. Continue individual normative review."
+      "detail": "74 source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1511 remain pending and zero requirements certified. Continue individual normative review."
     },
     {
       "id": "G3",
@@ -2430,6 +2430,390 @@
       "evidence": [
         "docs/gc14-verification.md",
         "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 369,
+      "sha256": "fceac8837eeca657f7795bc145e6e1097e21e94ab3b4b06966a6ceb5bf25c03e",
+      "disposition": "partial_mechanical",
+      "observed": "Two paths return source evidence and one reopened report; fact/inference/unknown sections are distinct.",
+      "remaining": "Actual unscripted research quality and other research domains remain unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 371,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "disposition": "partial_mechanical",
+      "observed": "Required assertions are individually mapped in the following reviewed blocks.",
+      "remaining": "Heading alone is not a requirement PASS; retain all per-clause obligations.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 373,
+      "sha256": "f59a1b7c80d893f985982f0c0022b243d11dabc7e6dcbb2c6038b4448902587a",
+      "disposition": "partial_mechanical",
+      "observed": "observe.one_tree/parallel_paths proves one Task/Root and two same-exchange Children with overlapping persisted lifetimes; final report unifies Atlas/Aster and all dates.",
+      "remaining": "Actual model decomposition, other parallel schedules and long-context evidence remain due.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 374,
+      "sha256": "532f25b6273b4dafba790bddd44d62bf2c60ba5c16e8848cdbac7fe419019d81",
+      "disposition": "partial_mechanical",
+      "observed": "observe.corpus_exact and lead_is_not_evidence join exact read-only MCP receipts to the independent log; D2 is opened as a lead and D1/D3/D4/D5 support conclusions.",
+      "remaining": "Unscripted source choice and real official-source authenticity remain unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 375,
+      "sha256": "f5c1955f2df836aca84b4cafc9df32460b463d23440938b0adb330ce2889a643",
+      "disposition": "partial_mechanical",
+      "observed": "Child reads D2 then follows D1/D3/D4; independent D5 path rejects Aster equivalence; rename and extension assertions are separate.",
+      "remaining": "Actual model search persistence, fresh pages and longer-context variants remain unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 376,
+      "sha256": "9dc3e0f9de3fc75948a5ff235faf7d775c3a066548b704fe1a6fa0245d45e775",
+      "disposition": "partial_mechanical",
+      "observed": "primary_facts requires direct D1/D3/D4/D5 citations in facts, and independent_report/lead_is_not_evidence require inference/unknown sections and explicit no-earlier-primary-evidence statement.",
+      "remaining": "Semantic Judge must assess whether all citations directly support nearby claims for actual models; no internet-wide priority claim is proved.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 377,
+      "sha256": "371a421c95eda797379e60e61aa08921cc9a96733a07ceb9aa28f1d01b00a08d",
+      "disposition": "partial_mechanical",
+      "observed": "artifact_reopened/artifact_delivered compare CLI-opened Markdown bytes and native content hash; Root and Main publish one reference; report includes scope and next verification step.",
+      "remaining": "Another actual Agent reading and continuing the report, user usability and semantic grades remain unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 379,
+      "sha256": "db0c01ab3c28fc98596e280df2d766c968660108bd8ca334e0f5675f7e0a6f23",
+      "disposition": "partial_mechanical",
+      "observed": "Six three-wording/order/two-20%-noise variants exercise multi-hop retrieval, parallel Child lifetimes and report Artifact.",
+      "remaining": "Long-context and actual stochastic five-repeat model variants remain due; this is not full variant acceptance.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 932,
+      "sha256": "f3bb20c393c60c5ac21abaaff252a6993b63b2c33b17d091325da7db38c678be",
+      "disposition": "partial_mechanical",
+      "observed": "The local corpus is an immutable locked fixture served by the read-only stdio peer.",
+      "remaining": "This label is descriptive; the full corpus assertion is recorded separately.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 934,
+      "sha256": "f189c74ee715c99f5ed9dab35406885a488acb2c9152227dbd99320832db7219",
+      "disposition": "partial_mechanical",
+      "observed": "Locked D1-D5 IDs/types/dates/titles/claims match the original corpus; all exact source bytes are returned by real MCP and checked against independent request logs.",
+      "remaining": "Added synthetic URLs/links only route offline multi-hop discovery; real public-source research remains unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 943,
+      "sha256": "723004e0ff53831dcb2c87b3efcfe10976ad15c72afff87fb8f23b5ae7e8a51b",
+      "disposition": "partial_mechanical",
+      "observed": "observe.original_user checks the exact base question at CLI/Conversation; two further wordings preserve the same source world without Tool plans or Gold.",
+      "remaining": "Unscripted interpretation and generation remain unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 945,
+      "sha256": "22f742d1bf7cc1c9ce71c979f1972fda371e62e4a3d33d5f5950e77ac23252f8",
+      "disposition": "partial_mechanical",
+      "observed": "The four Gold clauses below have independent bounded mechanical dispositions.",
+      "remaining": "Gold heading is not semantic acceptance; all actual-model and release gates remain due.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 947,
+      "sha256": "4639e9795a2e6ac18c069bb8de2e10aa58d72657861c9ca17b182295945a7033",
+      "disposition": "partial_mechanical",
+      "observed": "earliest_primary/lead_is_not_evidence enforce Atlas 2024-03-01 and reject D2 2024-02-10 as proof; mutation oracle rejects earlier substituted date.",
+      "remaining": "Scripted source synthesis cannot establish actual model evidence calibration or global earliestness.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 948,
+      "sha256": "ff612ef7ee5f36a2700cbc054ae32f98d9b33d2713b2e1a22bf918d4a626a74e",
+      "disposition": "partial_mechanical",
+      "observed": "rename_vs_extension and primary_facts enforce both dates, unchanged semantics at rename and later fencing extension; Go script refuses missing or unsupported claims.",
+      "remaining": "Actual model temporal reasoning and additional version history remain unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 949,
+      "sha256": "69e397492a282f7ac68d83f87ca8d654bdab2aba9f01791808ede28d3d12e555",
+      "disposition": "partial_mechanical",
+      "observed": "exclude_similar_entity and exact D5 source require declarative-step caching versus no source replay; independent Child returns only to Root.",
+      "remaining": "Actual entity disambiguation across live similar names remains unverified.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 950,
+      "sha256": "8df2b462bfe5e8cbc2e5adade6d82a562c469cbc8252724ba9bf0609159955f2",
+      "disposition": "partial_mechanical",
+      "observed": "report_observe requires separate facts/inference/unknown sections and nearby D1/D3/D4/D5 links; Judge recomputes native receipts and leaves all previews ineligible/null.",
+      "remaining": "Actual constrained semantic grading, named human review and current L2 remain unexecuted.",
+      "code": [
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/llm/fake/research.go#researchReply",
+        "internal/llm/fake/research.go#researchReport",
+        "scripts/verify_gc16.py#observe"
+      ],
+      "tests": [
+        "internal/llm/fake/research_test.go#TestResearchChildWalksSecondaryLeadThenEveryOfficialLink",
+        "scripts/test_gc16.py#test_report_oracle_refuses_missing_or_false_primary_claims_and_citations"
+      ],
+      "evidence": [
+        "docs/gc16-verification.md",
+        "scripts/verify_gc16.py#drive"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }

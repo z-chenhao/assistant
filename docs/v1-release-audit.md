@@ -28,7 +28,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Fifty-eight blocks now have exact-hash
+can silently discard a mandatory clause. Seventy-four blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -52,7 +52,7 @@ the nonzero completion boundary through the actual CLI.
 | GC-11 | Six locked variants now drive both original turns, three exact quotes/services/weights, actual MCP reads, user-visible scripted responses and two CLI-opened Artifacts; duplicate input creates no work | Unscripted recommendation, source selection and semantic calibration remain unverified; Fake output is not a product score |
 | GC-12 | `verify_gc12.py` drives six complete mechanical journeys plus denial/lost-response, five serial rounds, with independent mail/calendar readback | Actual model evaluation, real approved account actions, complete protected acceptance and constrained grades remain required |
 | GC-14 | `verify_gc14.py` drives six complete six-day CLI variants, exact input/source/currency/schedule, two threshold notices, profile switch, two SIGKILL/restarts, replay and Main cancel | Actual models/providers, other monitor variants, semantic evaluation and current L2 remain required; see [GC-14 verification](gc14-verification.md) |
-| GC-16 | Child admission/isolation/aggregation fragments exist | D1–D5 research journey; earliest primary source Atlas 2024-03-01, rename vs extension, Aster excluded, independent report |
+| GC-16 | Six exact D1–D5 CLI journeys now prove two parallel Child paths, multi-hop source transport, Atlas primary date/rename/extension, Aster exclusion, fact/inference/unknown sections and CLI-reopened report; see [GC-16 verification](gc16-verification.md) | Actual model research quality, long-context/remaining variants, constrained grades, current L2 and named human review remain due |
 | All 20 semantic gates | `case_runner.py`, `core_report.py`, `m6_report.py` correctly leave semantic/product metrics null for scripted Fakes | Constrained Judge O/F/P/A/T/S/R/C, all cases ≥80, suite mean ≥85; pass@1/pass^5, variance and hard-failure priority |
 | Local/account comparison | Provider contracts use deterministic HTTP peers | Unscripted model runs with identical fixture/Context Builder/Capability/tools/limits and separately reported snapshots, quality, latency and resources |
 | Current L2 | `computer-provider-l2-result.json` and `computer-l2-result.json` are dated historical observations | Current real login, VM/CUA/Jianying/channel observations with time, model, failure class, inspectable artifacts and human review |

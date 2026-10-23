@@ -551,3 +551,9 @@ Each named harness owns isolated Launch/Doctor/Drive/Evidence/Cleanup. Commands:
 `python3 scripts/verify_codemode.py --binary bin/erii --evidence evidence/codemode.json`
 and `python3 scripts/verify_local_provider.py --binary bin/erii --evidence evidence/local-provider.json`.
 Compatibility and frozen-Run upgrade procedure: [ADR 005](../docs/adr/005-consolidated-tool-surface.md).
+
+## GC-16 exact research journey (ERII-30)
+
+| Feature | Reach / authoritative entry point | Inspectable evidence |
+| --- | --- | --- |
+| Primary-source research and report | `verify_gc16.py --binary bin/erii --evidence evidence/gc16.json`; CLI → Main Task → Root/Child → MCP → Artifact/Reporter/Delivery | Launch private roots/stdio corpus; Doctor explicit profile and lock; Drive original request with three wordings/order/two noise variants, two same-exchange Children with overlapping lifetimes, D2→D1→D3→D4 and independent D5; Evidence exact source transport/log, Atlas primary date/rename/extension/Aster exclusion, nearby direct citations and fact/inference/unknown separation, CLI-reopened Markdown bytes and one Main artifact delivery, empty Approval/Automation, two SIGKILL/restarts, completed-call/generation reuse, frozen snapshots, complete replay equality; Cleanup joins/removes state. See `docs/gc16-verification.md`; Judge recomputes receipts and leaves all six previews ineligible/null. Actual model research quality, longer contexts and current L2 remain unverified. |

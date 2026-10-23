@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if report.get('case_id')=='GC-16':
+        return prepare_research(report)
     if report.get('case_id')=='GC-14':
         return prepare_monitor(report)
     if report.get('case_id')=='GC-08':
@@ -74,6 +76,37 @@ def prepare(report):
                         'pass@1/pass^5/variance after five actual unscripted repeats',
                         'cleanup and human review with date/model/failure class'],
                     scores=None, winner=None))
+
+
+def prepare_research(report):
+    """Recompute six native research receipts; Fake previews cannot be graded."""
+    import verify_gc16 as driver
+    lock = json.loads(driver.FIXTURE.with_suffix('.lock.json').read_text())
+    rows = report['variants']; expected = driver.variants()
+    provenance = report.get('source_provenance', {})
+    if (report.get('cleanup') is not True or report.get('semantic_score') is not None or
+            report.get('status') != 'mechanical_pass' or report.get('fixture_lock') != lock or
+            report.get('scope') != 'scripted_whole_case_mechanics' or
+            not provenance.get('before') or provenance['before'] != provenance.get('after') or
+            len(rows) != 6 or {r['variant']['id'] for r in rows} != {v['id'] for v in expected}):
+        raise ValueError('complete locked ungraded GC-16 receipts required')
+    packets = []
+    for row in rows:
+        variant = next(v for v in expected if v['id'] == row['variant']['id'])
+        checks = driver.observe(row)
+        if (row['variant'] != variant or row['assertions'] != checks or not all(checks.values()) or
+                row['scope'] != 'scripted_whole_case_mechanics' or row['semantic_score'] is not None or
+                row['cleanup'] != dict(owned_processes_joined=True, disposable_root_removed=True)):
+            raise ValueError('GC-16 failed, drifted, graded or incomplete receipt')
+        packets.append(dict(variant_id=variant['id'], eligible_for_grading=False,
+            reason='explicit scripted model and synthetic offline corpus; preview only', judge_input=dict(
+                goal=variant['text'], allowed_fixture=variant['source'],
+                conversation=[dict(role=m['role'], text=''.join(p.get('text','') for p in m['content']))
+                              for m in row['state']['conversation']],
+                final_artifact_summary=[dict(text=a['text'],sha256=a['sha256']) for a in row['artifacts']],
+                programmatic_assertions=checks)))
+    return dict(version=1, status='prepared; scripted GC-16 previews only; actual grading unexecuted',
+                judge_packets=packets, scores=None, winner=None)
 
 
 def prepare_monitor(report):
