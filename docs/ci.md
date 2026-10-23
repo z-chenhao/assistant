@@ -117,6 +117,21 @@ checks. All M6 fixtures remain disk-backed.
 
 ## Complete inventory
 
+Delivery now honors the same `ERII_VERIFY_GATE_JOBS=2` setting as the other
+eligible shards. On ERII-30 head `6a837f4`, all ten delivery/channel rounds
+passed, but the shard spent 517.6 seconds serially running the two series;
+setup and evidence retention took the job past its unchanged ten-minute ceiling.
+The old dispatch allowlist silently excluded delivery. The existing bounded
+two-worker executor now overlaps these independent series. Each series retains
+five consecutive rounds, its original timeouts/assertions and separate report
+paths. No production concurrency, fixture storage or job budget changes.
+`test_delivery_two_series_overlap_without_splitting_five_rounds` uses two real
+owned subprocesses with mutual admission barriers; it fails under the old
+serial dispatch and checks all ten canonical rows, per-series order and drained
+groups. Actual Web/Feishu/PTY, approval/restart and slow-send lease checks remain
+mandatory in every CI round. A successful run demonstrates capacity for that
+runner; it is not a controlled long-term performance claim.
+
 `scripts/verify_suite.py` is the authoritative logical inventory (105 gate
 invocations, including all five Computer lifecycle and Computer Use runs).
 
@@ -160,20 +175,50 @@ these acceptance boundaries. No partial job independently proves Code Mode.
 Independent fixture capacity is four; GC-17 checkpoint variants retain capacity
 two. Local unpartitioned Core runs join case kinds in order. Part jobs use
 separate runners. Gate-series concurrency is two, with Go event/model checks
-isolated after other work. The complete race runner isolates Bridge first. It discovers SQLite's complete
+isolated after other work. Local `make test-race` keeps its complete serial-Bridge
+runner. CI places `--part packages` and `--part sqlite` on two independent
+Required runners; both retain their ten-minute limit. The packages part runs
+Bridge alone before the other packages (`-p=1`, GOMAXPROCS=1). The SQLite part
+discovers SQLite's complete
 Go Test/Example/Fuzz inventory. The Child approval contract whose original
 five-second context spans three Drain/decision phases runs alone with the full
 CPU budget before overlap. All remaining top-level tests run exactly once in up
 to three separate processes. Each test retains its own Store/temp root, complete
 subtests and internal concurrency; process-local globals and environment remain
-isolated. A fourth worker runs the other packages with package concurrency one.
-All workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
+isolated. Ordinary SQLite workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
 four-CPU ceiling. Race instrumentation, count=1 and the 15-minute Go timeout
 remain required. Go JSON verdicts reject missing, duplicate, unexpected, failed
-or unfinished test roots. All fifty logical packages remain in the same Required
-race job; discovery automatically includes new tests. Per-worker commands,
+or unfinished test roots. Every discovered package remains required.
+`ci_race_join.py` requires both successful exact-source parts, validates the
+package/command inventory, and re-reads the native SQLite discovery and JSON
+events to reject missing/duplicate/failed/drifted roots or unjoined processes.
+Ubuntu checks requires both the matrix and this join; no part alone proves the
+complete race gate. Discovery automatically includes new tests. Per-worker commands,
 CPU/wall, test outcomes and cleanup remain in `race/inventory.json` and logs.
 No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
+
+SQLite placement uses longest measured tests first, with elapsed-time hints in
+`scripts/ci_race_timings.json`. The hints retain their exact-SHA Ubuntu run
+provenance and only affect scheduling. Go discovery still owns the complete
+inventory; new tests use the mean known cost, and removed tests cannot execute
+through a stale hint. The receipt records the hints and unmeasured roots.
+SC conformance retains its existing unweighted partitions. The measured ERII-30
+timeout had static partition costs of about 330/379/449 seconds; the same
+retained costs balance to about 386 seconds each. These are scheduling estimates,
+not a latency PASS. Actual required race/cleanup and end-to-end timings must
+still pass on the delivered SHA within the unchanged ten-minute budget.
+
+The `f7808415f20968a58a1c8644bc2b3796f7d54034` run
+[39894692925](https://github.com/z-chenhao/erii/actions/runs/39894692925)
+completed every race test and drained its groups in 509.7 seconds (Bridge 66.3,
+remainder 442.8). About 81 seconds of setup left almost no finalization margin.
+The native inventory, SDK immutability check, fixture cleanup and artifact upload
+all passed; the job itself was cancelled at the ten-minute finalization boundary
+(601 seconds overall). Ubuntu checks
+correctly failed. Both failed job logs and original manifested artifacts remain
+release evidence. Splitting package placement removes Bridge and other-package
+work from the SQLite critical path; all checks, cleanup and deadlines remain.
+This scheduling change needs successful exact-head CI; an estimate is not PASS.
 
 ## Launch, doctor, drive, evidence and cleanup
 

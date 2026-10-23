@@ -1,0 +1,2070 @@
+{
+  "version": 1,
+  "audited_base": "5fc788e76ed10acc06e707347a6bbc4148e98fa2",
+  "sources": {
+    "docs/technical-design.md": {
+      "sha256": "cd47b22cf4ad142e9899e41d9466569390b7f4f0c521bb1d450eda3e3cc12bd9",
+      "sections": {
+        "0": "evaluation",
+        "1": "scope",
+        "2": "scope",
+        "2.1": "main",
+        "3": "tasks",
+        "3.4": "main",
+        "3.7": "loop",
+        "3.8": "prompts",
+        "3.11": "automation",
+        "4": "messages",
+        "4.2": "delivery",
+        "4.3": "artifact",
+        "5": "models",
+        "5.1": "setup",
+        "5.3": "local",
+        "5.4": "account",
+        "5.5": "bridge",
+        "6": "tools",
+        "6.2": "codemode",
+        "6.4": "loop",
+        "6.5": "loop",
+        "6.6": "children",
+        "6.6.4": "replay",
+        "6.6.5": "replay",
+        "6.6.6": "spend",
+        "6.6.9": "replay",
+        "7": "skill",
+        "8": "tools",
+        "9": "computer",
+        "9.5": "cua",
+        "9.6": "cua",
+        "10": "context",
+        "11": "memory",
+        "12": "events",
+        "13": "observability",
+        "14": "composition",
+        "15": "scope",
+        "16": "storage",
+        "16.4": "errors",
+        "16.5": "config",
+        "16.6": "operations",
+        "16.7": "composition",
+        "17": "evaluation",
+        "17.M0": "storage",
+        "17.M1": "main",
+        "17.M2": "tasks",
+        "17.M3": "tools",
+        "17.M4": "children",
+        "17.M5": "replay",
+        "17.M6": "computer",
+        "17.M7": "operations",
+        "18": "evaluation",
+        "19": "config"
+      }
+    },
+    "evals/golden-cases.md": {
+      "sha256": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f",
+      "sections": {
+        "1": "evaluation",
+        "2": "evaluation",
+        "3": "evaluation",
+        "4": "evaluation",
+        "5": "evaluation",
+        "6": "evaluation",
+        "7": "evaluation",
+        "8": "evaluation",
+        "9": "evaluation",
+        "10": "evaluation",
+        "11": "evaluation",
+        "12": "evaluation",
+        "13": "evaluation",
+        "14": "evaluation",
+        "15": "evaluation",
+        "16": "evaluation",
+        "7.GC-01": "memory",
+        "8.2": "memory",
+        "7.GC-02": "automation",
+        "8.3": "automation",
+        "7.GC-03": "memory",
+        "8.4": "memory",
+        "7.GC-04": "tasks",
+        "8.5": "tasks",
+        "7.GC-05": "memory",
+        "8.6": "memory",
+        "7.GC-06": "memory",
+        "8.7": "memory",
+        "7.GC-07": "cua",
+        "8.8": "cua",
+        "7.GC-08": "tasks",
+        "8.9": "tasks",
+        "7.GC-09": "main",
+        "8.10": "main",
+        "7.GC-10": "local",
+        "8.11": "local",
+        "7.GC-11": "tools",
+        "8.12": "tools",
+        "7.GC-12": "tools",
+        "8.13": "tools",
+        "7.GC-13": "cua",
+        "8.14": "cua",
+        "7.GC-14": "automation",
+        "8.15": "automation",
+        "7.GC-15": "artifact",
+        "8.16": "artifact",
+        "7.GC-16": "children",
+        "8.17": "children",
+        "7.GC-17": "replay",
+        "8.18": "replay",
+        "7.GC-18": "delivery",
+        "8.19": "delivery",
+        "7.GC-19": "evaluation",
+        "8.20": "evaluation",
+        "7.GC-20": "evaluation",
+        "8.21": "evaluation"
+      }
+    }
+  },
+  "areas": {
+    "scope": {
+      "code": [
+        "internal/agent/loop.go",
+        "internal/agent/actor.go"
+      ],
+      "tests": [
+        "internal/agent/loop_test.go"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "16",
+        "33"
+      ],
+      "evidence": [
+        "docs/guides/main-loop.md",
+        "docs/guides/tasks.md",
+        "docs/guides/children.md"
+      ]
+    },
+    "main": {
+      "code": [
+        "internal/agent/actor.go",
+        "internal/agent/sqlite/runs.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation"
+      ],
+      "prs": [
+        "8",
+        "9"
+      ],
+      "evidence": [
+        "scripts/verify_main.py",
+        "scripts/verify_tui.py"
+      ]
+    },
+    "tasks": {
+      "code": [
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/task_control.go",
+        "internal/llm/fake/wedding.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/task_control_test.go",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent",
+        "scripts/test_gc08.py"
+      ],
+      "prs": [
+        "10",
+        "11"
+      ],
+      "evidence": [
+        "scripts/verify_tasks.py",
+        "scripts/verify_task_control.py",
+        "scripts/run_task_cases.py",
+        "scripts/verify_gc08.py",
+        "docs/gc08-verification.md"
+      ]
+    },
+    "prompts": {
+      "code": [
+        "internal/agent/sqlite/runs.go",
+        "internal/agent/loop.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "16"
+      ],
+      "evidence": [
+        "docs/guides/children.md",
+        "scripts/verify_children.py"
+      ]
+    },
+    "automation": {
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/automation/automation.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/automation_test.go"
+      ],
+      "prs": [
+        "28"
+      ],
+      "evidence": [
+        "scripts/verify_automation.py",
+        "docs/guides/automation.md"
+      ]
+    },
+    "messages": {
+      "code": [
+        "internal/conversation/message.go",
+        "internal/conversation/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/conversation/sqlite/store_test.go#TestConversationOrderedIdempotentConcurrentAndRestart"
+      ],
+      "prs": [
+        "8",
+        "14"
+      ],
+      "evidence": [
+        "docs/guides/main-loop.md",
+        "scripts/verify_delivery.py"
+      ]
+    },
+    "delivery": {
+      "code": [
+        "internal/agent/sqlite/delivery.go",
+        "internal/delivery/ui/spec.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/delivery_test.go",
+        "internal/agent/sqlite/channels_test.go"
+      ],
+      "prs": [
+        "14",
+        "29"
+      ],
+      "evidence": [
+        "scripts/verify_delivery.py",
+        "scripts/verify_channels.py",
+        "docs/guides/channels.md"
+      ]
+    },
+    "artifact": {
+      "code": [
+        "internal/agent/sqlite/artifacts.go",
+        "internal/artifact/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/artifacts_test.go#TestArtifactTamperSymlinkAndTraversal"
+      ],
+      "prs": [
+        "13"
+      ],
+      "evidence": [
+        "scripts/verify_artifacts.py",
+        "docs/guides/artifacts.md"
+      ]
+    },
+    "models": {
+      "code": [
+        "internal/llm/model.go",
+        "internal/llm/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestSnapshotImmutabilityFrozenValuesAndRollback"
+      ],
+      "prs": [
+        "3",
+        "5",
+        "6"
+      ],
+      "evidence": [
+        "scripts/verify.py",
+        "scripts/verify_local_provider.py"
+      ]
+    },
+    "setup": {
+      "code": [
+        "internal/tui/session.go",
+        "internal/llm/control.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/probe_cleanup_test.go"
+      ],
+      "prs": [
+        "6",
+        "7",
+        "9"
+      ],
+      "evidence": [
+        "scripts/verify_tui.py",
+        "scripts/verify_account.py"
+      ]
+    },
+    "local": {
+      "code": [
+        "internal/llm/sqlite/local.go",
+        "provider-bridge/bridge.mjs"
+      ],
+      "tests": [
+        "internal/agent/sqlite/local_provider_test.go",
+        "internal/llm/bridge/local_test.go"
+      ],
+      "prs": [
+        "6"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py",
+        "docs/guides/provider-bridge.md"
+      ]
+    },
+    "account": {
+      "code": [
+        "internal/llm/account/manager.go",
+        "internal/llm/bridge/account.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/account_acceptance_test.go",
+        "internal/agent/sqlite/account_cancel_test.go"
+      ],
+      "prs": [
+        "7"
+      ],
+      "evidence": [
+        "scripts/verify_account.py",
+        "docs/adr/001-current-openai-account-auth.md"
+      ]
+    },
+    "bridge": {
+      "code": [
+        "internal/llm/bridge/client.go",
+        "provider-bridge/bridge.mjs"
+      ],
+      "tests": [
+        "internal/llm/bridge/events_test.go",
+        "internal/llm/bridge/transport_test.go"
+      ],
+      "prs": [
+        "5",
+        "6",
+        "7"
+      ],
+      "evidence": [
+        "docs/guides/provider-bridge.md",
+        "scripts/verify_local_provider.py",
+        "scripts/verify_account.py"
+      ]
+    },
+    "tools": {
+      "code": [
+        "internal/tool/executor.go",
+        "internal/tool/schema.go",
+        "internal/tool/policy.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/tool_policy_test.go"
+      ],
+      "prs": [
+        "12"
+      ],
+      "evidence": [
+        "scripts/verify_tools.py",
+        "docs/guides/tools.md"
+      ]
+    },
+    "codemode": {
+      "code": [
+        "internal/tool/codemode/sidecar.go",
+        "runtime/javascript/src/sidecar.mjs",
+        "runtime/javascript/src/prelude.mjs"
+      ],
+      "tests": [
+        "internal/tool/codemode/sidecar_test.go",
+        "runtime/javascript/test/sidecar.test.mjs"
+      ],
+      "prs": [
+        "18",
+        "20"
+      ],
+      "evidence": [
+        "scripts/verify_codemode.py",
+        "docs/guides/codemode.md"
+      ]
+    },
+    "loop": {
+      "code": [
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/reporter.go"
+      ],
+      "tests": [
+        "internal/agent/loop_test.go",
+        "internal/agent/sqlite/tasks_test.go#TestTaskCustomMessageConversionFailsClosed"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "33"
+      ],
+      "evidence": [
+        "scripts/verify_main.py",
+        "scripts/verify_tasks.py"
+      ]
+    },
+    "children": {
+      "code": [
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/scheduler.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/children_test.go",
+        "internal/agent/sqlite/scheduler_test.go"
+      ],
+      "prs": [
+        "16",
+        "17"
+      ],
+      "evidence": [
+        "scripts/verify_children.py",
+        "scripts/verify_scheduling.py",
+        "docs/guides/children.md"
+      ]
+    },
+    "replay": {
+      "code": [
+        "internal/agent/sqlite/code_recovery.go",
+        "internal/agent/sqlite/codemode.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/code_recovery_test.go#TestCodeClaimWakeAndOldCallbackFencing",
+        "internal/agent/sqlite/code_recovery_test.go#TestCodeReplayFrozenRequestAndAtomicAdmission"
+      ],
+      "prs": [
+        "20",
+        "21"
+      ],
+      "evidence": [
+        "scripts/verify_code_recovery.py",
+        "scripts/run_core_cases.py"
+      ]
+    },
+    "spend": {
+      "code": [
+        "internal/agent/sqlite/spend.go",
+        "internal/agent/sqlite/scheduler.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/spend_test.go"
+      ],
+      "prs": [
+        "17"
+      ],
+      "evidence": [
+        "scripts/verify_spend.py",
+        "docs/adr/002-account-monetary-authorization.md"
+      ]
+    },
+    "skill": {
+      "code": [
+        "internal/skill/catalog.go",
+        "internal/agent/sqlite/experience.go"
+      ],
+      "tests": [
+        "internal/skill/catalog_test.go",
+        "internal/agent/sqlite/experience_test.go"
+      ],
+      "prs": [
+        "15",
+        "23"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py",
+        "scripts/verify_memory_maintenance.py"
+      ]
+    },
+    "computer": {
+      "code": [
+        "internal/computer/lifecycle.go",
+        "internal/computer/macosvm/provider.go",
+        "internal/agent/sqlite/computer.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/computer_test.go"
+      ],
+      "prs": [
+        "25"
+      ],
+      "evidence": [
+        "scripts/verify_computer.py",
+        "docs/reports/computer-provider-l2-result.json"
+      ]
+    },
+    "cua": {
+      "code": [
+        "internal/computer/use.go",
+        "internal/agent/sqlite/computer_use.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/computer_use_test.go",
+        "internal/computer/use_test.go"
+      ],
+      "prs": [
+        "26"
+      ],
+      "evidence": [
+        "scripts/verify_computer_use.py",
+        "docs/reports/computer-l2-result.json",
+        "docs/guides/computer-use.md"
+      ]
+    },
+    "context": {
+      "code": [
+        "internal/context/compact.go",
+        "internal/agent/sqlite/compaction.go",
+        "internal/agent/sqlite/recall.go"
+      ],
+      "tests": [
+        "internal/context/compact_test.go",
+        "internal/agent/sqlite/recall_test.go"
+      ],
+      "prs": [
+        "22",
+        "23"
+      ],
+      "evidence": [
+        "scripts/verify_recall.py",
+        "docs/guides/recall.md"
+      ]
+    },
+    "memory": {
+      "code": [
+        "internal/memory/sqlite/curator.go",
+        "internal/agent/sqlite/memory_control.go"
+      ],
+      "tests": [
+        "internal/memory/sqlite/curator_test.go",
+        "internal/agent/sqlite/memory_test.go"
+      ],
+      "prs": [
+        "22",
+        "23"
+      ],
+      "evidence": [
+        "scripts/verify_memory_maintenance.py",
+        "docs/adr/003-memory-forget-revokes-unfinished-context.md"
+      ]
+    },
+    "events": {
+      "code": [
+        "internal/event/nats/bus.go",
+        "internal/event/sqlite/store.go"
+      ],
+      "tests": [
+        "internal/event/integration/crash_test.go",
+        "internal/event/sqlite/store_test.go"
+      ],
+      "prs": [
+        "2",
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify.py",
+        "docs/guides/operations.md"
+      ]
+    },
+    "observability": {
+      "code": [
+        "internal/observability/rotation.go",
+        "internal/agent/sqlite/progress.go"
+      ],
+      "tests": [
+        "internal/observability/rotation_test.go",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify"
+      ],
+      "prs": [
+        "10",
+        "17",
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify_operations.py",
+        "docs/guides/operations.md"
+      ]
+    },
+    "composition": {
+      "code": [
+        "cmd/erii/main.go",
+        "internal/app/app.go"
+      ],
+      "tests": [
+        "internal/event/integration/production_test.go"
+      ],
+      "prs": [
+        "1",
+        "31",
+        "33"
+      ],
+      "evidence": [
+        "docs/development.md",
+        "docs/guides/operations.md"
+      ]
+    },
+    "storage": {
+      "code": [
+        "internal/agent/sqlite/store.go",
+        "internal/agent/sqlite/fresh_schema.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/fresh_schema_test.go",
+        "internal/agent/sqlite/store_test.go"
+      ],
+      "prs": [
+        "1",
+        "2",
+        "24",
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify.py",
+        "scripts/verify_operations.py"
+      ]
+    },
+    "errors": {
+      "code": [
+        "internal/tool/executor.go",
+        "internal/tool/recovery.go"
+      ],
+      "tests": [
+        "internal/tool/executor_test.go",
+        "internal/agent/sqlite/tool_policy_test.go#TestToolTimeoutAndBusinessErrorsDoNotRetry"
+      ],
+      "prs": [
+        "12",
+        "18"
+      ],
+      "evidence": [
+        "docs/guides/tools.md",
+        "scripts/verify_tools.py"
+      ]
+    },
+    "config": {
+      "code": [
+        "internal/config/config.go",
+        "internal/llm/secret/store.go"
+      ],
+      "tests": [
+        "internal/config/config_test.go",
+        "internal/llm/secret/store_test.go"
+      ],
+      "prs": [
+        "1",
+        "3",
+        "31",
+        "33"
+      ],
+      "evidence": [
+        "config.example.yaml",
+        "docs/guides/operations.md"
+      ]
+    },
+    "operations": {
+      "code": [
+        "internal/maintenance/backup.go",
+        "internal/app/runtime.go"
+      ],
+      "tests": [
+        "internal/maintenance/backup_test.go",
+        "internal/event/integration/production_test.go"
+      ],
+      "prs": [
+        "31"
+      ],
+      "evidence": [
+        "scripts/verify_operations.py",
+        "scripts/verify_capacity.py",
+        "docs/reports/operations-capacity.json"
+      ]
+    },
+    "evaluation": {
+      "code": [
+        "scripts/case_runner.py",
+        "scripts/core_report.py",
+        "scripts/m6_report.py"
+      ],
+      "tests": [
+        "scripts/test_case_runner.py",
+        "scripts/test_core_cases.py",
+        "scripts/test_m6_cases.py"
+      ],
+      "prs": [
+        "9",
+        "21",
+        "27"
+      ],
+      "evidence": [
+        "docs/guides/core-evals.md",
+        "docs/guides/m6-evals.md",
+        "scripts/verify_suite.py"
+      ]
+    }
+  },
+  "merged_prs": {
+    "1": {
+      "title": "ERII-1: bootstrap runnable Go foundation",
+      "url": "https://github.com/z-chenhao/erii/pull/1",
+      "merged_at": "2026-10-15T14:32:21Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "f3ab9d06dc26abc737d5802313f71baf75d18a9e"
+    },
+    "2": {
+      "title": "ERII-2: transactional SQLite Outbox/Inbox and CloudEvents NATS foundation",
+      "url": "https://github.com/z-chenhao/erii/pull/2",
+      "merged_at": "2026-10-15T15:09:53Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "2222b584516dd04dcbddb29b04c1f6b28b75d8a6"
+    },
+    "3": {
+      "title": "ERII-5: persist model profiles, auth references, and immutable snapshots",
+      "url": "https://github.com/z-chenhao/erii/pull/3",
+      "merged_at": "2026-10-15T15:48:41Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "24ac6998fa92087743bfa089b22cda506a2ba2d6"
+    },
+    "5": {
+      "title": "ERII-6: add versioned Provider Bridge and deterministic model fixtures",
+      "url": "https://github.com/z-chenhao/erii/pull/5",
+      "merged_at": "2026-10-16T02:29:30Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "b4509e547c7c00848a8be063da79b580c7a73910"
+    },
+    "6": {
+      "title": "ERII-7: Connect pinned Pi Bridge to local OpenAI-compatible models",
+      "url": "https://github.com/z-chenhao/erii/pull/6",
+      "merged_at": "2026-10-16T04:55:04Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "c590939957efc15af78a448aa73c9ebd46fec5fa"
+    },
+    "7": {
+      "title": "ERII-8: Implement current OpenAI account login and credential lifecycle",
+      "url": "https://github.com/z-chenhao/erii/pull/7",
+      "merged_at": "2026-10-16T07:17:59Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "d39d5386018d1f9367cb3a30a92980887ccfdcb8"
+    },
+    "8": {
+      "title": "ERII-9: Run a durable Main Agent Loop with Conversation and Direct Tools",
+      "url": "https://github.com/z-chenhao/erii/pull/8",
+      "merged_at": "2026-10-16T08:41:11Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "3cc4ad94c99370b783f4ca796f2ef345b51f1a6f"
+    },
+    "9": {
+      "title": "ERII-10: ship terminal setup, conversation and the M1 Case Runner",
+      "url": "https://github.com/z-chenhao/erii/pull/9",
+      "merged_at": "2026-10-16T11:43:58Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "ab223ccc7c16267fd9bb73f25521c3d7b5ff35a9"
+    },
+    "10": {
+      "title": "ERII-11: delegate durable Tasks to Root Workers and deliver Main follow-ups",
+      "url": "https://github.com/z-chenhao/erii/pull/10",
+      "merged_at": "2026-10-16T13:11:12Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "f0bb7de33c7d4cee4dc0abb494fd1aeb8179f2ab"
+    },
+    "11": {
+      "title": "ERII-12: implement controlled Task pause, cancel and continuation",
+      "url": "https://github.com/z-chenhao/erii/pull/11",
+      "merged_at": "2026-10-16T14:32:58Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "7ba0c4b21546201f4a17a8aa02c0b322e4f5653f"
+    },
+    "12": {
+      "title": "ERII-13: enforce unified Tool policy and recover frozen approvals",
+      "url": "https://github.com/z-chenhao/erii/pull/12",
+      "merged_at": "2026-10-16T17:04:06Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "db1302017b44212d58ae7d478a2d194e81746da5"
+    },
+    "13": {
+      "title": "ERII-14: publish immutable scoped Artifacts with secure recovery",
+      "url": "https://github.com/z-chenhao/erii/pull/13",
+      "merged_at": "2026-10-16T20:02:41Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "c03a3311b243ce87fb14c0bda4f6994bb6bb32b6"
+    },
+    "14": {
+      "title": "ERII-15: deliver semantic replies through a recoverable Delivery Outbox",
+      "url": "https://github.com/z-chenhao/erii/pull/14",
+      "merged_at": "2026-10-16T21:50:28Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "be932f4c92637adc7337650fba86a9b5ba35407a"
+    },
+    "15": {
+      "title": "ERII-16: expose MCP, Skills and isolated coding through ToolExecutor",
+      "url": "https://github.com/z-chenhao/erii/pull/15",
+      "merged_at": "2026-10-17T00:53:37Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "d2c6677cee38a46fe22ce9803a6604696171adbe"
+    },
+    "16": {
+      "title": "ERII-17: admit bounded Child Runs through the canonical Agent Tool",
+      "url": "https://github.com/z-chenhao/erii/pull/16",
+      "merged_at": "2026-10-17T02:37:59Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "c2d441700863b54c704a25b4890e73b18485f3ed"
+    },
+    "17": {
+      "title": "ERII-18: authorize account spend once across fair Child batches",
+      "url": "https://github.com/z-chenhao/erii/pull/17",
+      "merged_at": "2026-10-17T07:06:27Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "e654f2ef751df9a706a6a837b01bcb399da9c442"
+    },
+    "18": {
+      "title": "ERII-19: run QuickJS Code Mode through unified ToolExecutor",
+      "url": "https://github.com/z-chenhao/erii/pull/18",
+      "merged_at": "2026-10-17T10:30:48Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "35869b199e37050efa97f5ee0adf8fc2e0c84066"
+    },
+    "20": {
+      "title": "ERII-20: recover fixed-source Code Mode with claims and wake fencing",
+      "url": "https://github.com/z-chenhao/erii/pull/20",
+      "merged_at": "2026-10-18T03:20:25Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "362037adfbb5d2b7284fc0248ce43c6a677511e4"
+    },
+    "21": {
+      "title": "ERII-21: gate exact Core cases with recovery and coding evidence",
+      "url": "https://github.com/z-chenhao/erii/pull/21",
+      "merged_at": "2026-10-18T06:21:15Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "db121dc96db6b64beace89b60cbfa06c92c96bc5"
+    },
+    "22": {
+      "title": "ERII-22: recall scoped Memory and Conversation with FTS5, vectors and RRF",
+      "url": "https://github.com/z-chenhao/erii/pull/22",
+      "merged_at": "2026-10-18T08:59:50Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "620ae2649e3044f8dc3e16d7e5168a791fbfaadf"
+    },
+    "23": {
+      "title": "ERII-23: curate Memory, revoke forgotten context, and verify Skill experience",
+      "url": "https://github.com/z-chenhao/erii/pull/23",
+      "merged_at": "2026-10-18T18:50:53Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "3c275f21f80b7612dff832b252998e171d09dd55"
+    },
+    "24": {
+      "title": "ERII-141: consolidate fresh schema and parallelize complete CI gates",
+      "url": "https://github.com/z-chenhao/erii/pull/24",
+      "merged_at": "2026-10-20T11:17:43Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "cbaed917545a67ac0648bf109ac291a8e9f0c31a"
+    },
+    "25": {
+      "title": "ERII-24: restore logical Computers through durable Lume checkpoints",
+      "url": "https://github.com/z-chenhao/erii/pull/25",
+      "merged_at": "2026-10-20T02:23:35Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "882de0f8c7126783d62d3bbd3fa4fe81c012b058"
+    },
+    "26": {
+      "title": "ERII-25: operate Guest CUA and Playwright with fenced observations and scoped transfer",
+      "url": "https://github.com/z-chenhao/erii/pull/26",
+      "merged_at": "2026-10-20T08:09:59Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "03ef68d4ebb014d13e6a894c235ba72ef42f796a"
+    },
+    "27": {
+      "title": "ERII-26: verify M6 personal and Computer journeys",
+      "url": "https://github.com/z-chenhao/erii/pull/27",
+      "merged_at": "2026-10-20T13:06:13Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "e54ba4074bcd05a5ef839053a8bfaf2e96afddd9"
+    },
+    "28": {
+      "title": "ERII-27: Execute timezone-aware Automation through Actor and Run claims",
+      "url": "https://github.com/z-chenhao/erii/pull/28",
+      "merged_at": "2026-10-21T00:59:51Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "0a5a64eec350705ccb7215d1659aaeec3abde5b8"
+    },
+    "29": {
+      "title": "ERII-28: Unify Web and Feishu interaction with safe UISpec delivery",
+      "url": "https://github.com/z-chenhao/erii/pull/29",
+      "merged_at": "2026-10-21T04:56:02Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "6a4dd3d3c3a4ec4cb883e9a77f51b42e74577850"
+    },
+    "31": {
+      "title": "ERII-29: harden production recovery, DLQ and encrypted backups",
+      "url": "https://github.com/z-chenhao/erii/pull/31",
+      "merged_at": "2026-10-21T08:15:39Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "ae2dda0a420d24ffbf45553ee10dec67d2b05ead"
+    },
+    "33": {
+      "title": "ERII-183: standardize Erii installation, layout and shared loop",
+      "url": "https://github.com/z-chenhao/erii/pull/33",
+      "merged_at": "2026-10-21T16:02:54Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "68150f1ec567c1babae7d03b3c6ef91d301966bc"
+    }
+  },
+  "golden_cases": {
+    "GC-01": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-02": {
+      "area": "automation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "All six deterministic variants include Turn 4 monthly scheduling, no premature Automation, exact first fire and duplicate-input equality. Actual model behavior, semantic grades and current L2 remain inconclusive."
+    },
+    "GC-03": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-04": {
+      "area": "tasks",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-05": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-06": {
+      "area": "memory",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-07": {
+      "area": "cua",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-08": {
+      "area": "tasks",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Exact three-turn six-variant wedding mechanics now run through maintained CLI/Task/Artifact/MCP approval boundaries. Broader weeks/calendar/reminder/pause variants, actual unscripted model quality and constrained grading remain required."
+    },
+    "GC-09": {
+      "area": "main",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Main agenda and Web transport fragments; no complete M7 case record."
+    },
+    "GC-10": {
+      "area": "local",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-11": {
+      "area": "tools",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Two-turn six-variant scripted mechanics and a production-CLI unscripted trial/condition preflight exist with offline HTTP regressions. Actual approved model recommendations/source calibration and constrained grading remain inconclusive."
+    },
+    "GC-12": {
+      "area": "tools",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Exact §8.13 six-variant scripted whole-case mechanics plus denial/lost-response probes now run through real channel/Main/Security/MCP. One mail AND one calendar, Tuesday, invalidated Monday, readback/replay/cleanup are asserted. Actual unscripted model grades, full protected product acceptance, current L2/human review remain inconclusive."
+    },
+    "GC-13": {
+      "area": "cua",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-14": {
+      "area": "automation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Exact prices/thresholds run, but no complete case variants and semantic evaluation."
+    },
+    "GC-15": {
+      "area": "artifact",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-16": {
+      "area": "children",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Child isolation/aggregation fragment; no D1-D5 primary-source research journey."
+    },
+    "GC-17": {
+      "area": "replay",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-18": {
+      "area": "delivery",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-19": {
+      "area": "evaluation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    },
+    "GC-20": {
+      "area": "evaluation",
+      "full_case_status": "inconclusive",
+      "semantic_score": null,
+      "gap": "Mechanical fragments exist; full normative assertions and semantic evaluation remain unverified."
+    }
+  },
+  "gaps": [
+    {
+      "id": "G1",
+      "kind": "implementation",
+      "detail": "Complete remaining exact whole-case journeys/variants within ERII-30 and sole unmerged PR #32, as authorized by the 2026-10-21 parent Coordination update; propose a bounded ledger split only if a genuinely separate PR is needed."
+    },
+    {
+      "id": "G2",
+      "kind": "audit",
+      "detail": "Forty-three source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1540 remain pending and zero requirements certified. Continue individual normative review."
+    },
+    {
+      "id": "G3",
+      "kind": "model_evaluation",
+      "detail": "Production-CLI unscripted GC-11 trial and strict frozen-condition cohort preflight implemented; actual approved local/account runs and constrained Judge for O/F/P/A/T/S/R/C remain unexecuted. All 20 >=80, mean >=85 and protected five passes remain due; offline HTTP evidence earns no model scores."
+    },
+    {
+      "id": "G4",
+      "kind": "live_shadow",
+      "detail": "Current real login, macOS/CUA/Jianying and channel observations, model/time/failure class and human review; historical L2 does not substitute."
+    },
+    {
+      "id": "G5",
+      "kind": "dependency_audit",
+      "detail": "Scoped @tailwindcss/cli watcher 2.6.0 override removes the braces chain: clean full npm audit zero, identical four embedded outputs, real Web UI checks on 6228468a693fef7581436c499e0aa057e7dc962f. Evidence attachment 01a15e1c-0bb2-7b8e-8101-acd28b75fac8; retain documented upstream/removal condition.",
+      "status": "known_chain_repaired; not a complete application security verdict"
+    },
+    {
+      "id": "G6",
+      "kind": "acceptance",
+      "detail": "Exact-SHA Erii Verifier PASS, green CI, final program ledger/recovery report, and human acceptance are still required. Keep ERII-4 in_progress."
+    }
+  ],
+  "individual_reviews": [
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "96b9080ed3e55ff5dc04b048288f50f6d10aee96f102cb427652d9cffba8db66",
+      "disposition": "partial_mechanical",
+      "observed": "报价来源保留正式/口头返现区别；当前用合成MCP数据。",
+      "remaining": "尚未观察非脚本模型选择官方网页/PDF与完整合同、最终报价的优先级。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "7.GC-11",
+      "line": 303
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "f14b98b8a7a5a7ccd0aeee4655111ea5ef1acfb8e38d7ca9214cdb0a1e92f0dc",
+      "disposition": "partial_mechanical",
+      "observed": "两轮可打开Artifact展示净价情景、服务和未知免责/适用条件。",
+      "remaining": "没有真实条款研究；个性化选择和未知项覆盖须由受约束Judge及人工复核。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "7.GC-11",
+      "line": 304
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "3ba970501dfa24fbf130888895da66b5a3f5e9c14d7fe7dde0b6150dcd6be123",
+      "disposition": "partial_mechanical",
+      "observed": "B口头700元未书面化，输出分别保留5038.49和5738.49。",
+      "remaining": "当前措辞来自显式脚本，不证明模型能独立校准未知收益。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "7.GC-11",
+      "line": 305
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "fe664af14b90c6ce42709d310407a0007fa001e63aad41a043d835935d612435",
+      "disposition": "evidence_gap",
+      "observed": "fixture权重45/35/20进入对话与报告。",
+      "remaining": "该条还覆盖设备/预算/目标和避免榜单替代判断；本车险fixture没有设备预算，不足以完成一般购买个性化验证。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "7.GC-11",
+      "line": 306
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "d47b31050827947df7757a50b3663e73f8cd79b4c890ac79e12a9783f9449c4e",
+      "disposition": "partial_mechanical",
+      "observed": "实际ToolInvocation仅read/save/echo；无MCP效果文件、审批或Task；重复第二轮输入不新增工作。",
+      "remaining": "无购买阶段；转GC-13的审批语义仍需单独证据，不能由比较阶段无写入推断。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "7.GC-11",
+      "line": 307
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "bb9d8562872b0926562bce5eb240bc77fc8a8ea488f59074e8ce075be6e5adeb",
+      "disposition": "partial_mechanical",
+      "observed": "原始第一轮和两种措辞变体，经CLI发送并得到一个可观察回复。",
+      "remaining": "显式计划与原始输入同时传入，未执行无脚本模型。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "8.12",
+      "line": 815
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "b3dc8e4afa53547666703b23ffdf8f1502655188b5f510cd523730c08f75a7c9",
+      "disposition": "partial_mechanical",
+      "observed": "第二轮沿同一Conversation发送，两种措辞与两个噪声变体保留前轮状态。",
+      "remaining": "模型对追问的独立连续性及语义质量未评分。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "8.12",
+      "line": 816
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "6df77172449d0239d402e9c5ba0fc6745547047cbf7935d8f9495384fda92d31",
+      "disposition": "partial_mechanical",
+      "observed": "两轮报告先陈述共同责任和保额一致，并列净价/执行性/服务。",
+      "remaining": "脚本文案非独立推荐；免责相同不能从共同主险推断。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "8.12",
+      "line": 820
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "9ced93ce2a80e929a5b2d577a2997ff86d987530554c8a783aa26ce539704be4",
+      "disposition": "partial_mechanical",
+      "observed": "十进制计算和CLI重开Artifact保留5038.49兑现、5738.49不兑现两情景。",
+      "remaining": "无脚本模型算术与证据校准尚缺；不能以回归模板代替。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "8.12",
+      "line": 821
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "441a1ea3ed07dc99108b8418067bcdb898385118951def3e6b1c743e3c1ee051",
+      "disposition": "partial_mechanical",
+      "observed": "脚本报告将B设为书面确认条件下可考虑，C为确定性选择。",
+      "remaining": "未测非脚本模型是否无条件信任销售承诺。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "8.12",
+      "line": 822
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "sha256": "72891dbfe3d52d6e379285075b98a18f93a18176ae03f3287fc6b1bfc3374593",
+      "disposition": "partial_mechanical",
+      "observed": "第二轮Artifact和可见回复列书面规则、付款/资格/到账条件、官方投诉路径与不能保证追回。",
+      "remaining": "未向真实保险方索取资料，也没有提交投诉；Judge与L2还未执行。",
+      "code": [
+        "scripts/quote_case.py#drive",
+        "scripts/quote_case.py#observations",
+        "scripts/gc11_driver.py#trial"
+      ],
+      "tests": [
+        "scripts/test_quote_case.py#test_absent_or_extra_turn_tool_artifact_effect_or_replay_rejects"
+      ],
+      "evidence": [
+        "scripts/verify_capabilities.py#quote_case.drive",
+        "docs/v1-release-audit.md#GC-11 checkpoint",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)",
+      "section": "8.12",
+      "line": 823
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5",
+      "line": 416,
+      "sha256": "5cefcd8baa09471ad1d1b97665bb4759009f4e257950a38fde753be9b9b3d3c5",
+      "disposition": "partial_mechanical",
+      "observed": "真实生产CLI两轮Main请求引用各自创建时冻结的ModelSnapshot；driver校验所有代次和批准profile/version/limits，无test-bridge。",
+      "remaining": "尚未在本checkpoint热切换活动模型，也没有Root/Child继承或Durable Replay的单独逐项验收；保留原有SC证据义务。",
+      "code": [
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/runs.go#model_snapshot_id",
+        "scripts/gc11_driver.py#observe",
+        "scripts/gc11_driver.py#preflight"
+      ],
+      "tests": [
+        "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify_gc11_driver",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "3",
+      "line": 68,
+      "sha256": "da25e4dbb513ec0014afc87314b38d16ca59865d97b0abf72e5bad5eb822d71e",
+      "disposition": "partial_mechanical",
+      "observed": "Driver保存Model/Capability、源码/binary/Bridge/fixture/config hash及前后稳定见证；比较器拒绝任一变体的条件漂移和重复Run。",
+      "remaining": "真实两模型所有变体/五轮尚未执行；外部模型采样seed支持、Tool/Skill环境和完整真实资源证据仍需审查。fixture seed不等于强行设置Provider seed。",
+      "code": [
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/runs.go#model_snapshot_id",
+        "scripts/gc11_driver.py#observe",
+        "scripts/gc11_driver.py#preflight"
+      ],
+      "tests": [
+        "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify_gc11_driver",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "13",
+      "line": 1180,
+      "sha256": "a027549c2623a43a8229ce797431f748cb8347b95f56d853eca68a9cbcbfa37e",
+      "disposition": "evidence_gap",
+      "observed": "已实现60份收据的冻结条件前置检查，直接重建原始输入/初始Context/工具schema/limits；独立评审发现同臂跨试验模型漂移可被放行，现增加每臂30次试验的全部快照身份检查，保留endpoint hash/model/wire/reasoning/defaults/compatibility/capabilities，仅归一化安装生成的标识和版本计数。回归覆盖首末试验、双臂、合成live admission及真实CLI拒绝；保留独立原始快照和null评分。",
+      "remaining": "尚无批准的local/account真实模型收据、受约束评分、延迟/GPU资源实测或人审，不能把HTTP Fake或匹配条件当作比较已通过。",
+      "code": [
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/runs.go#model_snapshot_id",
+        "scripts/gc11_driver.py#observe",
+        "scripts/gc11_driver.py#preflight",
+        "scripts/gc11_driver.py#comparison_model"
+      ],
+      "tests": [
+        "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output",
+        "scripts/test_gc11_driver.py#test_model_parameters_are_frozen_within_each_arm",
+        "scripts/test_gc11_driver.py#test_per_arm_identity_normalizes_only_installation_metadata",
+        "scripts/test_gc11_driver.py#test_synthetic_live_admission_rejects_coherent_model_switch"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify_gc11_driver",
+        "docs/gc11-evaluation.md#Offline contract"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 317,
+      "sha256": "07fbbdc426a54868fb6a511d7e52ae3d9fc36f354c65efb6f0da33e66259c049",
+      "disposition": "partial_mechanical",
+      "observed": "确定性模型通过实际 MCP 读取联系人/历史线程，重排与额外 Alex 不改变收件人；歧义回归拒绝猜测。",
+      "remaining": "非脚本真实模型的身份解析和追问质量仍需批准环境及受约束评审。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 318,
+      "sha256": "b92f3379aba55961dc1d7f318918a9827722dfe376e13d95b5a8705e043aebff",
+      "disposition": "partial_mechanical",
+      "observed": "独立 MCP invitation 动作通过同一 Security 管线冻结收件人、标题、正文、时区、起止及发送邮件/建会动作；错误 hash 被拒绝。",
+      "remaining": "这里只覆盖合成联合邀请 endpoint；真实邮件/日历集成、UI 人审和语义评分仍未观察。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 319,
+      "sha256": "09107cf69dfde87b1af115fe72346bca4476ba4cfb0e48676084b04e67401ea9",
+      "disposition": "partial_mechanical",
+      "observed": "旧 Monday 审批在渠道通知发送前被 Steering 失效，SIGKILL/重启后仅新 Tuesday 审批有效；并发/重复回调不重复外部记录。",
+      "remaining": "受保护机械五轮不替代真实模型的完整验收系列和当前 L2。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 320,
+      "sha256": "065edd63f54292a6a01cded5fecb1839d02a01c26c62c0202450a4653335c08a",
+      "disposition": "evidence_gap",
+      "observed": "显式模型 Fixture 生成少于120字的简洁邀请正文；冻结正文与远端发信字节一致。",
+      "remaining": "短文本断言和脚本模板不能证明真实模型写作风格、个性化或无未授权承诺；Judge/人审仍 required。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 321,
+      "sha256": "b5ccad76eec125850bb7337dd1f848e4b74630fb59a364923d7dda7d116b15b2",
+      "disposition": "partial_mechanical",
+      "observed": "实际只读 Tool 回读独立 mail/calendar 两表的 sent/confirmed 状态，再产生一次完成通知；缺失/重复/错误状态的持久回归拒绝。",
+      "remaining": "当前仅离线合成 endpoint，无当前真实渠道/模型语义或 L2 人审。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 829,
+      "sha256": "c8bfec2bef13ced4c65ebf11db0c7ba2cd29aed0fcd52435385d133e12f5a633",
+      "disposition": "partial_mechanical",
+      "observed": "gc12-v1.json 与原规范数据完全对齐并锁定 hash；原始两轮输入经 Web/签名回调，原生产 Context Builder/Tool 边界留证。",
+      "remaining": "Fixture 锁和确定性模型不提供真实模型质量/资源或本地与账号模型比较。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 850,
+      "sha256": "712700ca00f332a5bcc5f59fc370580af1ba21eee52271cd650122b7ee172a51",
+      "disposition": "partial_mechanical",
+      "observed": "每次批准后独立 Fake 分别保存恰好一封邮件和一个会议，不使用 Fake 去重掩盖 Host 重发；拒绝审批零写入，丢响应后 Tool unknown/一尝试且不重发。",
+      "remaining": "五轮机械证据不代表全20 Case阈值、protected产品验收、真实模型和当前 L2 已通过。",
+      "code": [
+        "internal/llm/fake/meeting.go#meetingReply",
+        "scripts/verify_gc12.py#drive",
+        "scripts/meeting_sandbox.py#invite"
+      ],
+      "tests": [
+        "scripts/test_gc12.py#test_full_case_rejects_generic_dispatch_missing_duplicate_or_wrong_effect",
+        "internal/llm/fake/meeting_test.go#TestMeetingFixtureDoesNotGuessContactOrTime"
+      ],
+      "evidence": [
+        "docs/gc12-verification.md",
+        "scripts/verify_suite.py#communication",
+        "scripts/verify_gc12.py#observe"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 755,
+      "sha256": "5e8e72b0d76d4750d7ba79c584f5264c87b5949a7f103233f3378db90380a561",
+      "disposition": "partial_mechanical",
+      "observed": "完整三日历、四邮件、两项工作的锁定合成世界通过CLI输入，逐代核对原始source。",
+      "remaining": "真实连接器读取与受批准实际模型尚未执行。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 771,
+      "sha256": "8004e29e9f80eb0ac0155783d212431009a6b0004749be7fb6c0a115bf5f2ebc",
+      "disposition": "partial_mechanical",
+      "observed": "三措辞、两噪声及一次顺序变体均保留原始提问，无Capabilities计划或答案注入输入。",
+      "remaining": "脚本模型并不证明实际模型理解或语义质量。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 775,
+      "sha256": "67521dca17ea3c2f3c4f6001c3faee9b34df078ffc231ff2467e9bab4b259e1b",
+      "disposition": "partial_mechanical",
+      "observed": "脚本条目E1/T1优先、10点周会约束和12点前期限通过真实Main输出检查。",
+      "remaining": "实际模型的优先级推理与受约束Judge评分未执行。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 776,
+      "sha256": "6d09eeb2b3f24bd8c3436980c07d5632416b7c6c33c0d9ef4bf66437d7120451",
+      "disposition": "partial_mechanical",
+      "observed": "13:30–14:00准备窗口及E4无需重复回复经短条目检查，未调用邮件动作。",
+      "remaining": "真实日历/邮件接入与实际模型准备建议质量仍未验证。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 777,
+      "sha256": "75001688ae68f85c355071c9fcb285cf53a993b82d201bcfffdd5bd0c101b244",
+      "disposition": "partial_mechanical",
+      "observed": "E2/E3及新闻/酒店不在前两项，后续条目保留可延后任务。",
+      "remaining": "实际模型的新闻价值判断和其他inbox世界需独立评价。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 778,
+      "sha256": "3b6150445dbd10bebe457d255fd77640718770a00792cd12825722eb8fa0d47d",
+      "disposition": "partial_mechanical",
+      "observed": "最多8短条目，实际Tool只有echo；无邮件/日历动作或伪造完成，重复输入状态相等。",
+      "remaining": "没有真实写连接器时不能证明该连接器可用情况下的模型拒绝；实际语义评分仍必需。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 779,
+      "sha256": "ca507f0f5084268b4a1ffb9384983d14ac84a8a27f154a6cced0c7c8395ce323",
+      "disposition": "partial_mechanical",
+      "observed": "所有Run为completed Main；Task/Automation/Approval/Artifact为空，一次完成交付。",
+      "remaining": "此同步fixture不证明其他异步Task或多Worker路径。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 277,
+      "sha256": "cb202657603a11a29192b4be84f9986e35a51540c29f484d6d8c31b7e36cd0a6",
+      "disposition": "partial_mechanical",
+      "observed": "此精确世界没有回复邮件、改会议或取消Task；原始请求无此授权。",
+      "remaining": "其他连接器与多Task世界的安全性需各自执行证据。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 278,
+      "sha256": "f44dec817bcaa85c5d3c913f5f129de3de1991635ce474ab04770e417f823049",
+      "disposition": "evidence_gap",
+      "observed": "当前Main-only旅程无Worker询问，不能代表合并路径。",
+      "remaining": "多个Worker并发询问、问题到Task映射与一次合并交互仍需完整旅程。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 279,
+      "sha256": "309521620a0148f258a3be9a61601081f2ad6c722648f9e2e9ebd2efd194c54b",
+      "disposition": "evidence_gap",
+      "observed": "相同已接受输入经CLI重放保持完整状态不变。",
+      "remaining": "新增当天Steering后的重新规划与已完成事项去重仍未实现整旅程验证。",
+      "code": [
+        "scripts/run_cases.py#drive",
+        "scripts/agenda_case.py#observations"
+      ],
+      "tests": [
+        "scripts/test_agenda_case.py#test_rejects_injected_source_side_effect_task_duplicate_and_replay_drift",
+        "scripts/test_agenda_case.py#test_rejects_keyword_only_agenda_and_wrong_priority_deadline_or_window"
+      ],
+      "evidence": [
+        "docs/gc09-verification.md",
+        "scripts/run_cases.py#run_suite"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 261,
+      "sha256": "d775664049cd921f5f65196c85e5211bc654ff4f744ef1d561e2c1affa7b796b",
+      "disposition": "partial_mechanical",
+      "observed": "Three original messages create one Task and three unique Root epochs; checklist dependency/fact Artifacts are read back.",
+      "remaining": "Other lifestyle events/weeks/variants remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 262,
+      "sha256": "004635c2a3defbbbf3141d0a50432eb49385cf7611c928dd345d0596685c085f",
+      "disposition": "partial_mechanical",
+      "observed": "Native CLI-opened checklists preserve deadlines and auditable before/after dependencies with facts.",
+      "remaining": "Final event completion, materials and appointments remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 263,
+      "sha256": "f04fcfaff9db65c74bdbc5c141e991b0a19220a8c4373495e65b7f9cfedcc86a",
+      "disposition": "evidence_gap",
+      "observed": "This exact fixture creates no Automation or unsolicited contact; C3 stays active.",
+      "remaining": "No days-long reminder timing/noise journey is executed; silence alone does not prove reminder behavior.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 265,
+      "sha256": "149fd02fc186fb1eb2f5789704e281491b340cc9c599ff639199ffa690145337",
+      "disposition": "partial_mechanical",
+      "observed": "Two continuations use Main Task search/append, retaining immutable anchor and new Root IDs/epochs.",
+      "remaining": "Literal continue/pause/resume wording and broader lifecycle variants remain required beyond existing fragments.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 728,
+      "sha256": "665fbce36d3f1e9efdb433a0166a342d946ded7b0895276421337091448db7e7",
+      "disposition": "partial_mechanical",
+      "observed": "MCP source read equals the locked clock/event/checklist/contacts; native IDs remain Host-owned.",
+      "remaining": "Other lifestyle fixtures and live sources remain unproved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 740,
+      "sha256": "1a55eaddab6fd1a446762811c7b335ece7a71c5f43b19d3531726201798d3242",
+      "disposition": "partial_mechanical",
+      "observed": "Original first input reaches Main, one Task and a new Root with CLI-reopened critical-path checklist.",
+      "remaining": "Scripted priority prose is not actual model planning quality.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 741,
+      "sha256": "867fc2a223ed95b47a769ea80b2eb532a4e5ed6df88705966ab789eae3191bca",
+      "disposition": "partial_mechanical",
+      "observed": "Original second input appends same Task; new epoch/Root, persisted instruction and Artifact preserve 128 guests.",
+      "remaining": "Long-duration context and actual model continuity remain unproved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 742,
+      "sha256": "c985a6601bd0aa51fe16d0e3efba44fd392b64af2aec7fc6a8928a9b773099d1",
+      "disposition": "partial_mechanical",
+      "observed": "Original third input appends same Task; draft Artifact and exact frozen pending approval with zero mail attempts.",
+      "remaining": "No real hotel delivery, actual model drafting or human review is proved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 746,
+      "sha256": "7a7bfbb469e028b1b5052dd8cb092b3fb331ab91adedef79a8a6ffa5bfe52a04",
+      "disposition": "partial_mechanical",
+      "observed": "Initial C1 blocks C2; second/third durable checklists mark C1 completed and C2 active.",
+      "remaining": "Other dependency changes and unscripted planning remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 747,
+      "sha256": "a2b35a32808fef12cee607e514f32bfc94c556a6a62e5af15d8fe64cdbfad16f",
+      "disposition": "partial_mechanical",
+      "observed": "Task instruction and two new checklist Artifacts retain 128; table/per-table counts stay null.",
+      "remaining": "Actual model fact extraction across weeks remains required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 748,
+      "sha256": "29557db172fcb5e17fb773cc7677c738c3e0309bb24a74126a3b9f8dfaec7d8d",
+      "disposition": "partial_mechanical",
+      "observed": "Owner CLI reopens exact draft; frozen call binds recipient/body/empty attachments; wrong hash, pending SIGKILL/input replay and denial prove no dispatch.",
+      "remaining": "Real contact/attachment version and semantic/human approval review remain unproved.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.9",
+      "line": 749,
+      "sha256": "e19898d2edb224f94b43b4ecb388215cb98fd727b32bca3101ac8662d462746e",
+      "disposition": "partial_mechanical",
+      "observed": "First checklist preserves C3 due/status and prioritizes C1; no reminder or external dispatch occurs.",
+      "remaining": "Risk/date changes and actual model priority evaluation remain required.",
+      "code": [
+        "internal/llm/fake/wedding.go#weddingReply",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "scripts/verify_gc08.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixturePreservesSourceAndDoesNotConfuseAnchorWithIntent"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    }
+  ]
+}

@@ -11,6 +11,19 @@ from verify_suite import personal_gates, report_name
 
 
 class PersonalJoinTests(unittest.TestCase):
+    def test_join_cannot_accept_old_gc02_coverage_in_every_round(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            self.fixture(root)
+            for path in (root/'memory').glob('m6-memory-*.json'):
+                report=json.loads(path.read_text())
+                for row in report['results']:
+                    if row['case_id']=='GC-02':
+                        row['assertions'].pop('first_monthly_fire')
+                path.write_text(json.dumps(report))
+            with self.assertRaisesRegex(ValueError,'mechanical assertions failed'):
+                join(root)
+
     def fixture(self, root):
         reports = test_m6_cases.M6Cases().reports()
         for part, pairs in m6_report.PARTS.items():

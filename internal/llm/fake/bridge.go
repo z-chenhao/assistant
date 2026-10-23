@@ -19,7 +19,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "automation", "computer", "recall", "core", "codemode", "children", "capabilities", "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "monitor", "wedding", "meeting", "automation", "computer", "recall", "core", "codemode", "children", "capabilities", "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -128,7 +128,7 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
-			if (fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
+			if (fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
 				// Hold an actual accepted Worker generation while keeping the RPC
 				// peer responsive to cancellation. A new Root gets the appended
 				// instruction as its last message and can finish normally.
@@ -144,7 +144,13 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 					waiting[request.GenerationID] = 2
 					break
 				}
-				if fixture == "automation" {
+				if fixture == "monitor" {
+					value = monitorReply(request)
+				} else if fixture == "wedding" {
+					value = weddingReply(request)
+				} else if fixture == "meeting" {
+					value = meetingReply(request)
+				} else if fixture == "automation" {
 					value = automationReply(request)
 				} else if fixture == "recall" {
 					value = recallReply(request)
@@ -330,7 +336,7 @@ func goldenReply(messages []llm.Message) string {
 			return "工作没问题，下午适当休息，今晚提前上床。"
 		}
 	case strings.Contains(context, "发布风险说明"):
-		return "1. 先做发布风险说明，在10:00周会前或会后立即完成，12:00前确认。\n2. 14:00面试前留准备时间，E4只核对。\n3. 新闻和已确认的酒店邮件稍后看。"
+		return "1. 先处理E1/T1发布风险说明，在10:00周会前或会后立即完成，12:00前确认。\n2. 13:30–14:00准备14:00面试，E4只核对，无需重复回复。\n3. E2新闻和已确认的E3酒店邮件稍后看；16:00分享可选，T2旅行手册稍后推进。"
 	case strings.Contains(context, "rain_probability_evening"):
 		return "开车通勤可穿短袖、薄长裤，带薄卫衣。18:30散步时按体感添衣，21:00下班更凉，薄卫衣用得上。"
 	default:

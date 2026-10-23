@@ -75,6 +75,8 @@ func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.Generati
 	return s, r, a
 }
 
+// controlMain is only for a fixture without a live Drain. Once Drain starts,
+// submit inputs to it instead of competing for its Main Run claim.
 func controlMain(t *testing.T, r *Runs, a agent.Actor, key, text string) {
 	t.Helper()
 	receipt := mustSubmit(t, a, key, text)
@@ -542,28 +544,46 @@ func TestTaskControlPauseCancelsSafeToolBeforeNextStep(t *testing.T) {
 	a.Registry = registry
 	r.registry = registry
 	controlMain(t, r, a, "create", "create")
-	done := make(chan error, 1)
-	go func() { done <- a.Drain(context.Background()) }()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var drainErr error
+	go func() {
+		drainErr = a.Drain(ctx)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("Actor cleanup did not join")
+		}
+	})
 	select {
 	case <-entered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Tool did not start")
 	}
-	controlMain(t, r, a, "pause", "pause")
+	// The live Actor owns the queued Main. A manual controlMain claim races
+	// the scheduler and legitimately loses with ErrBusy on a loaded runner.
+	pause := mustSubmit(t, a, "pause", "pause")
 	select {
 	case <-cancelled:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Tool cancellation missing")
 	}
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
+	case <-done:
+		if drainErr != nil {
+			t.Fatal(drainErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("Actor did not join Tool")
 	}
 	if scalar(t, s, `SELECT count(*) FROM tool_invocation i JOIN run r USING(run_id) WHERE r.kind='worker' AND i.status='cancelled'`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
 		t.Fatal("safe Tool stop admitted new work or failed settlement")
+	}
+	if scalar(t, s, `SELECT count(*) FROM run r JOIN run_claim c USING(run_id) WHERE r.run_id=? AND r.kind='main' AND r.status='completed' AND c.epoch=1 AND c.token IS NULL`, pause.RunID) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status='paused' AND task_epoch=2`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled' AND error_code='task_paused'`) != 1 || scalar(t, s, `SELECT count(*) FROM run_claim WHERE token IS NOT NULL`) != 0 {
+		t.Fatal("Actor did not own and settle the pause Main/Root exactly once")
 	}
 }
