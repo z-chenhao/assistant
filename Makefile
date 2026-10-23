@@ -52,3 +52,11 @@ verify: build
 verify-evidence:
 	@test -n "$(EVIDENCE_ROOT)" || { echo 'Set EVIDENCE_ROOT to a fresh absolute durable fixture root'; exit 1; }
 	python3 scripts/evidence_harness.py --root "$(EVIDENCE_ROOT)" --sha "$$(git rev-parse HEAD)" --evidence "$(EVIDENCE_ROOT)/report.json"
+
+# Inventory is deliberately inconclusive. It never certifies release.
+.PHONY: release-audit verify-release-decision
+release-audit:
+	python3 scripts/release_audit.py --evidence evidence/release-audit.json --require-complete
+
+verify-release-decision:
+	python3 -m unittest discover -s scripts -p 'test_release_*.py'
