@@ -98,6 +98,24 @@ return {ref,found,read,descriptor,errors,tools:ALL_TOOLS.filter(t=>t.name.starts
             require(all(i['tool_name'] in ('builtin__artifact__manage','builtin__artifact__search','builtin__memory__manage','builtin__memory__search') for i in nested), 'parallel execution pipeline appeared')
             report['checks'].append({'name':'artifact-memory-surface-and-readback','output':output,'nested':nested})
 
+            p, nested = execute('artifact-unicode-search', r'''
+const saved=await tools.builtin__artifact__manage({operation:"save",name:"Évidence.md",mediaType:"text/markdown",text:"Unicode search evidence"});
+const queries=["Évidence.md","évidence.md","ÉVIDENCE.MD","vidence.md","TEXT/MARKDOWN"];
+const matches=[];
+for(const query of queries) matches.push(await tools.builtin__artifact__search({query,limit:1}));
+const absent=await tools.builtin__artifact__search({query:"evidence.md",limit:1});
+const browse=await tools.builtin__artifact__search({});
+return {ref:saved.artifactRefs[0],queries,matches,absent,browse};
+''')
+            require(p['status'] == 'succeeded', 'Unicode filename search cell failed: ' + str(p))
+            output = json.loads(json.loads(p['result_json'])['text'])[-1]['value']
+            for query, matches in zip(output['queries'], output['matches']):
+                require(len(matches) == 1 and matches[0]['artifact_ref'] == output['ref'] and matches[0]['name'] == 'Évidence.md', 'Unicode filename query lost saved Artifact: ' + query)
+            require(output['absent'] == [], 'Unicode case matching discarded accents')
+            require(any(d['artifact_ref'] == output['ref'] for d in output['browse']), 'Unicode file missing from browse')
+            require(len(nested) == 8 and all(i['status'] == 'succeeded' and i['attempt_count'] == 1 for i in nested), 'Unicode search bypassed ordinary nested Tool execution')
+            report['checks'].append({'name':'artifact-unicode-filename-search','output':output,'nested':nested})
+
             p, nested = execute('store-failure', 'store("durable", {count: 7}); text(load("durable")); throw new Error("fixture");')
             require(p['status'] == 'failed', 'throw did not fail')
             with sqlite3.connect(db_path) as db:

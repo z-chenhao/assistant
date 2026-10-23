@@ -429,7 +429,8 @@ func (s *Store) ListTx(ctx context.Context, tx *sql.Tx, a artifact.Scope) ([]art
 	return s.SearchTx(ctx, tx, a, "", 50)
 }
 
-// SearchTx filters metadata before applying the accessible-result bound.
+// SearchTx uses the same Unicode lowercasing for query and metadata.
+// Matching and visibility checks both precede the accessible-result bound.
 func (s *Store) SearchTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, query string, limit int) ([]artifact.Descriptor, error) {
 	if limit == 0 {
 		limit = 50
@@ -441,18 +442,21 @@ func (s *Store) SearchTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, quer
 	if err := s.scope(ctx, tx, a); err != nil {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref FROM artifact WHERE owner_user_id=? AND owner_agent_id=? AND deleted_at IS NULL AND (?='' OR instr(lower(name),?)>0 OR instr(lower(media_type),?)>0) ORDER BY created_at DESC,artifact_ref`, a.UserID, a.AgentID, query, query, query)
+	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref,name,media_type FROM artifact WHERE owner_user_id=? AND owner_agent_id=? AND deleted_at IS NULL ORDER BY created_at DESC,artifact_ref`, a.UserID, a.AgentID)
 	if err != nil {
 		return nil, err
 	}
 	refs := []string{}
 	for rows.Next() {
-		var ref string
-		if err = rows.Scan(&ref); err != nil {
+		var ref, name, mediaType string
+		if err = rows.Scan(&ref, &name, &mediaType); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		refs = append(refs, ref)
+		// SQLite lower() only handles ASCII; use Go for both operands.
+		if query == "" || strings.Contains(strings.ToLower(name), query) || strings.Contains(strings.ToLower(mediaType), query) {
+			refs = append(refs, ref)
+		}
 	}
 	err = rows.Err()
 	rows.Close()

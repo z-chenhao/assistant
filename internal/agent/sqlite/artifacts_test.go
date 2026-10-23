@@ -699,7 +699,7 @@ func TestArtifactFinalSelectionFitsConversationEnvelope(t *testing.T) {
 
 func TestArtifactManageSearchExecutionAndReplay(t *testing.T) {
 	ctx := context.Background()
-	save := []llm.ToolCall{{ID: "save", Name: artifacttools.Manage, Arguments: `{"operation":"save","name":"needle.md","mediaType":"text/markdown","text":"verified bytes"}`}}
+	save := []llm.ToolCall{{ID: "save", Name: artifacttools.Manage, Arguments: `{"operation":"save","name":"Évidence.md","mediaType":"text/markdown","text":"verified bytes"}`}}
 	s, r, claim, e, exchange := admitPolicy(t, artifacttools.Definitions(), save)
 	// This contract checks sequential operations; capacity suspension is tested separately.
 	e.Concurrency = 1
@@ -717,14 +717,38 @@ func TestArtifactManageSearchExecutionAndReplay(t *testing.T) {
 	for i := 0; i < 52; i++ {
 		putArtifact(t, s, runScope, "newer unrelated file")
 	}
-	foreign := putArtifact(t, s, artifactOwner(t, s), "foreign marker")
+	// A newer matching file outside this Run must not consume the limit.
+	foreign, err := s.Artifacts().Put(ctx, artifactOwner(t, s), artifact.Input{Name: "Évidence.md", MediaType: "text/markdown"}, strings.NewReader("foreign marker"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, query := range []string{"Évidence.md", "évidence.md", "ÉVIDENCE.MD", "vidence.md", "TEXT/MARKDOWN"} {
+		err = s.Transaction(ctx, func(tx *sql.Tx) error {
+			matches, e := s.Artifacts().SearchTx(ctx, tx, runScope, query, 1)
+			if e != nil {
+				return e
+			}
+			if len(matches) != 1 || matches[0].Ref != ref {
+				t.Errorf("store query %q: got %v, want only %s", query, matches, ref)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	batch := []llm.ToolCall{
-		{ID: "search", Name: artifacttools.Search, Arguments: `{"query":"NEEDLE","limit":1}`},
+		{ID: "search", Name: artifacttools.Search, Arguments: `{"query":"Évidence.md","limit":1}`},
 		{ID: "read", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"offset":0,"limit":8}`, ref)},
 		{ID: "describe", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"describe","artifactRef":%q}`, ref)},
 		{ID: "foreign", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q}`, foreign)},
 		{ID: "publish", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"publish","artifactRefs":[%q]}`, ref)},
 		{ID: "bad", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"artifactRefs":[%q]}`, ref, ref)},
+		{ID: "lower", Name: artifacttools.Search, Arguments: `{"query":"évidence.md","limit":1}`},
+		{ID: "upper", Name: artifacttools.Search, Arguments: `{"query":"ÉVIDENCE.MD","limit":1}`},
+		{ID: "suffix", Name: artifacttools.Search, Arguments: `{"query":"vidence.md","limit":1}`},
+		{ID: "mime", Name: artifacttools.Search, Arguments: `{"query":"TEXT/MARKDOWN","limit":1}`},
+		{ID: "accent-preserved", Name: artifacttools.Search, Arguments: `{"query":"evidence.md","limit":1}`},
 	}
 	// Persist a second real provider response before admitting its calls.
 	run, err := r.Load(ctx, claim)
@@ -754,11 +778,17 @@ func TestArtifactManageSearchExecutionAndReplay(t *testing.T) {
 	if err != nil || len(out) != len(batch) {
 		t.Fatal(out, err)
 	}
-	var descriptors []artifact.Descriptor
-	if json.Unmarshal([]byte(out[0].Text), &descriptors) != nil || len(descriptors) != 1 || descriptors[0].Ref != ref {
-		t.Fatal("search", out[0])
+	for _, i := range []int{0, 6, 7, 8, 9} {
+		var descriptors []artifact.Descriptor
+		if out[i].Error != nil || json.Unmarshal([]byte(out[i].Text), &descriptors) != nil || len(descriptors) != 1 || descriptors[0].Ref != ref {
+			t.Fatalf("Tool query %s: %v", batch[i].Arguments, out[i])
+		}
 	}
-	if !strings.Contains(out[1].Text, `"text":"verified"`) || !strings.Contains(out[2].Text, `needle.md`) {
+	var miss []artifact.Descriptor
+	if out[10].Error != nil || json.Unmarshal([]byte(out[10].Text), &miss) != nil || len(miss) != 0 {
+		t.Fatal("case matching must retain accents", out[10])
+	}
+	if !strings.Contains(out[1].Text, `"text":"verified"`) || !strings.Contains(out[2].Text, `Évidence.md`) {
 		t.Fatal("read/describe", out[1], out[2])
 	}
 	if out[3].Error == nil || out[3].Error.Code != "NOT_FOUND" || out[5].Error == nil || out[5].Error.Code != "INVALID_ARGUMENT" {

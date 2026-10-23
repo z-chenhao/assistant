@@ -60,7 +60,7 @@ Task controls and user delivery.
 | `builtin__artifact__manage` (`operation: read`) | `artifactRef`, optional byte `offset`, `limit` 1–4096 | bounded text range; binary content returns a ref | `artifact_write` |
 | `builtin__artifact__manage` (`operation: describe`) | `artifactRef` | name, MIME, hash, size, dates, version | `artifact_write` |
 | `builtin__artifact__manage` (`operation: publish`) | `artifactRefs` (0–127) | selected refs | `artifact_write` |
-| `builtin__artifact__search` | optional `query`, `limit` 1–50 (default 50) | accessible descriptors by name/MIME substring, newest first; no query browses | `read_only` |
+| `builtin__artifact__search` | optional `query`, `limit` 1–50 (default 50) | accessible descriptors by Unicode-lowercased name/MIME substring, newest first; no query browses | `read_only` |
 
 Unknown fields, ownership/Run IDs, URLs and path inputs are rejected. Inaccessible,
 forged, expired, deleted or corrupt references return `NOT_FOUND`; invalid
