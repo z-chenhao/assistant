@@ -26,6 +26,10 @@ class VerificationTests(unittest.TestCase):
         workflow = (suite.ROOT/'.github/workflows/ci.yml').read_text()
         self.assertIn("matrix.shard == 'communication'", workflow)
 
+    def test_monitor_gate_requires_the_existing_mcp_sandbox_shard(self):
+        self.assertEqual([(name,g.attempts) for name,gates in suite.SHARDS.items()
+                          for g in gates if g.script == 'verify_gc14.py'], [('communication',1)])
+
     def test_delivery_two_series_overlap_without_splitting_five_rounds(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -104,7 +108,7 @@ class VerificationTests(unittest.TestCase):
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
-            "verify_gc12.py": 5, "verify_gc08.py": 1,
+            "verify_gc12.py": 5, "verify_gc08.py": 1, "verify_gc14.py": 1,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]

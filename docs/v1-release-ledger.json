@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "audited_base": "5fc788e76ed10acc06e707347a6bbc4148e98fa2",
+  "audited_base": "4e337ad2caff82116e4e4658ea526945b4ba4759",
   "sources": {
     "docs/technical-design.md": {
-      "sha256": "cd47b22cf4ad142e9899e41d9466569390b7f4f0c521bb1d450eda3e3cc12bd9",
+      "sha256": "f55d9dd1e5e11e5db1935d31c1b0bebeaa9bacdd8968244a99e9bb886e352fab",
       "sections": {
         "0": "evaluation",
         "1": "scope",
@@ -915,6 +915,20 @@
       "merged_at": "2026-10-21T16:02:54Z",
       "merged_by": "z-chenhao",
       "merge_commit": "68150f1ec567c1babae7d03b3c6ef91d301966bc"
+    },
+    "34": {
+      "title": "ERII-189: fix local model setup timeout and recovery",
+      "url": "https://github.com/z-chenhao/erii/pull/34",
+      "merged_at": "2026-10-23T05:14:13Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "5fc788e76ed10acc06e707347a6bbc4148e98fa2"
+    },
+    "35": {
+      "title": "ERII-192: consolidate Artifact tools and expose Memory capabilities",
+      "url": "https://github.com/z-chenhao/erii/pull/35",
+      "merged_at": "2026-10-23T06:56:39Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "4e337ad2caff82116e4e4658ea526945b4ba4759"
     }
   },
   "golden_cases": {
@@ -970,7 +984,7 @@
       "area": "main",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Main agenda and Web transport fragments; no complete M7 case record."
+      "gap": "Six exact agenda CLI/TUI variants cover source, priorities, short output and replay; broader question aggregation/Steering and semantic evaluation remain required."
     },
     "GC-10": {
       "area": "local",
@@ -1000,7 +1014,7 @@
       "area": "automation",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Exact prices/thresholds run, but no complete case variants and semantic evaluation."
+      "gap": "Six exact six-day CLI variants cover source/currency/schedule, threshold-only delivery, profile-at-admission, kill/restart, deduplication and cancellation; actual-model decisions, other monitor variants and semantic/L2 evaluation remain required."
     },
     "GC-15": {
       "area": "artifact",
@@ -1048,7 +1062,7 @@
     {
       "id": "G2",
       "kind": "audit",
-      "detail": "Forty-three source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1540 remain pending and zero requirements certified. Continue individual normative review."
+      "detail": "58 source blocks have individual partial/evidence-gap dispositions linked to exact source/code/tests/unmerged PR/evidence; 1527 remain pending and zero requirements certified. Continue individual normative review."
     },
     {
       "id": "G3",
@@ -2063,6 +2077,351 @@
       "evidence": [
         "docs/gc08-verification.md",
         "scripts/verify_gc08.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.11",
+      "line": 336,
+      "sha256": "60325af6413e9ceee465a13f6b4ff0257ec04cfb477c06fe828ce915c1ec7578",
+      "disposition": "partial_mechanical",
+      "observed": "Main creates one cron intent with an explicit IANA timezone; no early Task/fire and exact next due minute are read back.",
+      "remaining": "Single-at schedules, all cron/DST boundaries and actual-model intent selection require their separate evidence.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.11",
+      "line": 338,
+      "sha256": "792dfc98ea174b85c407070a75df991b5535a5f6b15eb7689ac36fab7f3c1701",
+      "disposition": "partial_mechanical",
+      "observed": "Six scheduled Roots execute the normal MCP/observe Tools and Reporter/Delivery; quiet days produce no user completion.",
+      "remaining": "Other trigger routes, permissions and every shared-chain invariant require independent conformance evidence.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.11",
+      "line": 343,
+      "sha256": "11061421dcbe1ca188a2bcf63a604affcf4ecf2a42e1444654d8891a17d5ad5f",
+      "disposition": "partial_mechanical",
+      "observed": "Six stable fires/Inbox receipts bind one ongoing Task and distinct Roots; admitted Root recovers after SIGKILL; later profile switch freezes new snapshots and retains all old bytes; cancel adds no Root.",
+      "remaining": "Schedule-version invalidation, concurrent stops, stale epochs and capability reductions require their separate exact fault/contract evidence.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.11",
+      "line": 345,
+      "sha256": "3ad852f15b48cc90ed168c3bc926b6b3fe4b5217f4022453a58eab8c7ced7a2c",
+      "disposition": "partial_mechanical",
+      "observed": "Two independent source reads per day enter ordinary observe Tools with same values; only Oct18/21 notify. Source-mismatch Fake regressions and strict-threshold/reentry oracle mutations pass.",
+      "remaining": "Missing/unequal Host observations and needs_input transitions require the existing independent Host tests; Fake guards do not prove model honesty.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-14",
+      "line": 345,
+      "sha256": "2da34a1474cb13a5fc55bf03a70f7aa0688a5750157bd7a953e0fe7e9a6e4c8f",
+      "disposition": "partial_mechanical",
+      "observed": "Exact HKG-CDG/date/1800 CNY/Asia-Shanghai intent and 08:00 fires; both dated source responses match; user cancel stops further reads.",
+      "remaining": "Other object/timezone/stop variants and actual-model interpretation remain required.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-14",
+      "line": 346,
+      "sha256": "16b4dd8288e063fc40d4a8b4114f6e0380d30d6ce01c3db2794f6803ba3851e9",
+      "disposition": "partial_mechanical",
+      "observed": "Native fire flags, Reporter rows, source values and delivery counts independently identify only Oct18/21; daily duplicates preserve full state.",
+      "remaining": "Unscripted usefulness and real-provider delivery remain ungraded.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-14",
+      "line": 347,
+      "sha256": "614d15f75b08fb2c5f817fb86f11c8c2aa2e4bb53c552baf0b4e4cf1243a2563",
+      "disposition": "partial_mechanical",
+      "observed": "Main cancel uses the same intent; later Nov1 ticks create no Root/read/delivery, while all six historical fire and Root records persist.",
+      "remaining": "Concurrent cancellation and late-event fencing need their separate state-machine/restart evidence.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-14",
+      "line": 348,
+      "sha256": "4b61f44edd070925f7317606d27bc62eb6180fd2ab475023bd778390d9ac27b3",
+      "disposition": "partial_mechanical",
+      "observed": "Profile switches after day3; each later admission uses the new profile; earlier snapshots and Worker schema hashes remain unchanged across replay/restart.",
+      "remaining": "Broader capability mutation/inheritance and actual-provider configuration changes remain independently unproved here.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-14",
+      "line": 349,
+      "sha256": "41500f2db1651f91d099f80281b82ba45964a71fa6d3f593600418c085a34b0e",
+      "disposition": "partial_mechanical",
+      "observed": "Only one requested Automation exists; all read keys match the target/day/source, with no Artifact, approval or unrelated Tool invocation.",
+      "remaining": "This explicit scripted fixture cannot certify unscripted restraint or alternative monitor behavior.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.15",
+      "line": 883,
+      "sha256": "bc1e5e402adca08c1f54f5408db6114b9483603a40f0e00addeb8b8cda1e9388",
+      "disposition": "partial_mechanical",
+      "observed": "Locked exact fixture and six variants execute all original daily prices through an independent read-only peer.",
+      "remaining": "Actual websites/models and semantic dimensions remain unexecuted.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.15",
+      "line": 899,
+      "sha256": "9ed91d44523b7ac30c57b828feacfee14c44a7ec6f8ca6103e666dc8a7bf14e3",
+      "disposition": "partial_mechanical",
+      "observed": "Original natural-language input reaches Main; wording variants and unchanged source/noise variants create one intent without injected plans.",
+      "remaining": "Explicit scripted model is not independent evidence of intent recognition quality.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.15",
+      "line": 903,
+      "sha256": "5fd114603d544c2633faca1b08e4572ac1300a68d108346b2892c79506e05dcc",
+      "disposition": "partial_mechanical",
+      "observed": "CLI list shows one Automation and nextFire 2026-10-16T00:00:00Z; 07:59:59 tick leaves state unchanged.",
+      "remaining": "Actual model/timezone inference and other scheduling cases remain required.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.15",
+      "line": 904,
+      "sha256": "80aad673a0949ec280913fdc2e878d60e2df59aad16b866f78524eb697f6a2f3",
+      "disposition": "partial_mechanical",
+      "observed": "Native observed prices, per-fire notify flags, Task updates and delivered messages show only Oct18/21.",
+      "remaining": "Actual model decisions, usefulness, grades and current L2 remain required.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.15",
+      "line": 905,
+      "sha256": "4ef39d7368635fba37ca69b940b509bc3d51aaafda11d11226e6bfc092a82ffb",
+      "disposition": "partial_mechanical",
+      "observed": "Each day repeats tick/drain and records two same-value observations; independent source log and complete native replay remain equal.",
+      "remaining": "Other duplicate/out-of-order/concurrent paths require their separate conformance evidence.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.15",
+      "line": 906,
+      "sha256": "baacd90771d7df4ef6e14834d62c6516be68d68371fef4e3daceb93907194ff3",
+      "disposition": "partial_mechanical",
+      "observed": "Natural-language cancel lists/cancels the single intent; Nov1 ticks and duplicate input add no Root, read or delivery.",
+      "remaining": "Concurrent cancellation and old-epoch/owner results remain independently required.",
+      "code": [
+        "internal/agent/sqlite/automation.go",
+        "internal/llm/fake/monitor.go#monitorReply",
+        "scripts/verify_gc14.py#observe"
+      ],
+      "tests": [
+        "scripts/test_gc14.py",
+        "internal/llm/fake/monitor_test.go#TestMonitorFixtureRequiresTwoMatchingCurrentFlightSources"
+      ],
+      "evidence": [
+        "docs/gc14-verification.md",
+        "scripts/verify_gc14.py#drive"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }

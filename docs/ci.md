@@ -351,3 +351,14 @@ budget, proves unknown/no Artifact/no second effect, then verifies a fresh
 authoritative query. The existing real deadline, cancellation, unsafe receipt,
 identity and byte/hash assertions remain required. Preserve failed full-suite
 evidence; passing focused diagnostics alone do not supersede it.
+
+## GC-14 exact monitoring gate
+
+The communication shard also runs `verify_gc14.py` once with all six exact
+wording/noise/order variants. It reuses the existing MCP sandbox provisioning;
+the runtime shard remains independent of that dependency. Receipts retain six
+days per variant, Oct18/21-only notifications, two source observations per day,
+duplicate scheduling/replay, two SIGKILL boundaries, a profile change at later
+admission and cancellation. This adds no timeout changes or reductions to the
+existing GC-12 five-round and GC-08 gates. See
+[GC-14 verification](gc14-verification.md). All semantic scores remain null.

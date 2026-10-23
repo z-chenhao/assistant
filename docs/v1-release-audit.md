@@ -5,9 +5,10 @@ ERII-4 must remain `in_progress`; ERII-30 must not be accepted as a completed
 release. This document and its ledger are an initial source/evidence inventory,
 not a claim that every normative requirement has passed.
 
-The current synchronized base is `5fc788e76ed10acc06e707347a6bbc4148e98fa2` (human-merged #34; #33 remains integrated); ERII-29 #31 remains the prior release dependency.
+The current synchronized base is `4e337ad2caff82116e4e4658ea526945b4ba4759`
+(human-merged #35; #33–34 remain integrated); ERII-29 #31 remains the prior release dependency.
 ERII-5–29 each have a merged implementation PR. The ledger records GitHub's
-actual merge commit, actor, time and URL, queried on 2026-10-21. A merge records
+actual merge commit, actor, time and URL; #34–35 were refreshed on 2026-10-23. A merge records
 integration, not semantic quality, exact-SHA review or final human acceptance.
 
 ## Reproduce and inspect
@@ -27,7 +28,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Forty-three blocks now have exact-hash
+can silently discard a mandatory clause. Fifty-eight blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -50,7 +51,7 @@ the nonzero completion boundary through the actual CLI.
 | GC-09 | Six exact §8.10 CLI/TUI agenda variants now retain full source/request/state/replay and enforce every scripted agenda assertion | Broader §7 multi-connector/Worker question aggregation and Steering, actual model quality and constrained grades remain required |
 | GC-11 | Six locked variants now drive both original turns, three exact quotes/services/weights, actual MCP reads, user-visible scripted responses and two CLI-opened Artifacts; duplicate input creates no work | Unscripted recommendation, source selection and semantic calibration remain unverified; Fake output is not a product score |
 | GC-12 | `verify_gc12.py` drives six complete mechanical journeys plus denial/lost-response, five serial rounds, with independent mail/calendar readback | Actual model evaluation, real approved account actions, complete protected acceptance and constrained grades remain required |
-| GC-14 | `verify_automation.py` and channel checks drive exact threshold days | Complete case variants, input/stop/currency evidence and semantic evaluation; only Oct 18/21 notify |
+| GC-14 | `verify_gc14.py` drives six complete six-day CLI variants, exact input/source/currency/schedule, two threshold notices, profile switch, two SIGKILL/restarts, replay and Main cancel | Actual models/providers, other monitor variants, semantic evaluation and current L2 remain required; see [GC-14 verification](gc14-verification.md) |
 | GC-16 | Child admission/isolation/aggregation fragments exist | D1–D5 research journey; earliest primary source Atlas 2024-03-01, rename vs extension, Aster excluded, independent report |
 | All 20 semantic gates | `case_runner.py`, `core_report.py`, `m6_report.py` correctly leave semantic/product metrics null for scripted Fakes | Constrained Judge O/F/P/A/T/S/R/C, all cases ≥80, suite mean ≥85; pass@1/pass^5, variance and hard-failure priority |
 | Local/account comparison | Provider contracts use deterministic HTTP peers | Unscripted model runs with identical fixture/Context Builder/Capability/tools/limits and separately reported snapshots, quality, latency and resources |
@@ -214,13 +215,21 @@ Golden fixed configuration/snapshots and identical-condition model comparison.
 Their dispositions remain partial/evidence_gap: two Main Runs do not prove
 Root/Child inheritance or active-run profile switching, and preflight mechanics
 do not establish actual model sampling, semantic grades, GPU resources or a
-completed live comparison. After the GC-08 checkpoint, the ledger has 43 individual dispositions
-(37 partial mechanical and six evidence gaps), 1,540 pending blocks and zero
+completed live comparison. After the GC-14 checkpoint, the ledger has 58 individual dispositions
+(52 partial mechanical and six evidence gaps), 1,527 pending blocks and zero
 certified requirements. GC-08 now has a maintained three-turn wedding runner
 with six variants, frozen draft/denial, SIGKILL/restart and replay evidence.
 Twelve exact source blocks have bounded code/test/PR/evidence dispositions.
-The next uncovered exact candidate is GC-14 §8.15; broader GC-09 question
-aggregation/Steering and GC-16 also remain required.
+GC-14 adds fifteen bounded source dispositions. Its independent source log,
+native daily states, profile-at-admission and cancellation witnesses are
+recomputed by Judge preparation; all six previews remain ineligible and null.
+The main #35 synchronization changed five normative blocks and added two;
+all forty-three prior review blocks retain identical content hashes and were
+relocated to their current exact lines. Changed/new blocks remain pending.
+The restored inventory covers 1,585 blocks. The stale GC-09 transport-only gap
+summary now describes its exact agenda driver and remaining obligations.
+Broader GC-08 lifecycle/reminders, GC-09 question aggregation/Steering and
+the exact GC-16 research journey remain required.
 
 ## Handoff and remaining work
 

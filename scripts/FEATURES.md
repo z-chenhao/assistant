@@ -472,6 +472,15 @@ SIGKILL/SIGTERM recovery and recursive cancellation.
 
 ## Automation scheduling and threshold monitoring (ERII-27)
 
+The exact GC-14 journey is maintained in `verify_gc14.py` (see
+[scope and commands](../docs/gc14-verification.md)). Its communication CI gate
+uses the configured MCP sandbox; it is distinct from the older scheduling
+fragments and does not establish semantic or L2 acceptance.
+
+| Feature | Reach / authoritative entry point | Inspectable evidence |
+| --- | --- | --- |
+| GC-14 exact monitoring journey | `verify_gc14.py --binary bin/erii --evidence evidence/gc14.json`; production CLI → Main → Automation/Actor/RunClaim → normal MCP/observe/Reporter/Delivery | Launch six isolated roots; Doctor explicit profiles/source lock; Drive original request, one 08:00 Asia/Shanghai intent, six exact prices/two independent sources per day, one ongoing Task/six Roots; Evidence Oct18/21 notices only, 07:59:59 quiet, duplicate ticks/observations/replay, SIGKILL after admission and at final scan, new profile at later admission with old snapshots retained, Main cancel and no later Root/read/delivery, native empty Approval/Artifact inventories; Cleanup joins/removes owned state. Mutation and source-validation regressions; six Judge previews ineligible/null. |
+
 `scripts/verify_automation.py --binary bin/erii --evidence evidence/automation.json`
 owns Launch (private data root and explicit Fake), Doctor (profile probe/select),
 Drive (ordinary chat Tool and Automation CLI), Evidence (fire/Outbox/Inbox,
