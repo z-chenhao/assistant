@@ -11,7 +11,7 @@ python3 scripts/verify_gc08.py --binary bin/erii --evidence evidence/gc08.json
 python3 scripts/prepare_release_eval.py --input evidence/gc08.json --evidence evidence/gc08-judge.json
 ```
 
-`make verify` includes this complete six-variant gate in its runtime shard.
+`make verify` includes this complete six-variant gate in its communication shard (the maintained MCP sandbox is provisioned there).
 `--variant base` is a focused diagnostic, never a complete Judge input.
 
 Launch uses an isolated MainHarness configuration and stdio MCP peer. Doctor

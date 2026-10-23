@@ -18,6 +18,14 @@ import verify_suite as suite
 
 
 class VerificationTests(unittest.TestCase):
+    def test_wedding_gate_requires_the_existing_mcp_sandbox_shard(self):
+        # GC-08 reaches stdio MCP at chat ingress. Runtime intentionally omits
+        # bubblewrap; communication already provisions the same sandbox as GC-12.
+        self.assertEqual([(name,g.attempts) for name,gates in suite.SHARDS.items()
+                          for g in gates if g.script == 'verify_gc08.py'], [('communication',1)])
+        workflow = (suite.ROOT/'.github/workflows/ci.yml').read_text()
+        self.assertIn("matrix.shard == 'communication'", workflow)
+
     def test_delivery_two_series_overlap_without_splitting_five_rounds(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

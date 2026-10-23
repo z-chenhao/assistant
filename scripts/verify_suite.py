@@ -50,7 +50,6 @@ SHARDS = {
         Gate("task-control", "verify_task_control.py", "task-control", 5),
         Gate("cases", "run_cases.py", "cases"),
         Gate("task-cases", "run_task_cases.py", "task-cases"),
-        Gate("gc08", "verify_gc08.py", "gc08"),
         Gate("events", "", "events"),
     ),
     "codemode": (Gate("codemode", "verify_codemode.py", "codemode", 5),
@@ -66,7 +65,8 @@ SHARDS = {
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
-    "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),),
+    "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),
+                      Gate("gc08", "verify_gc08.py", "gc08")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("startup", "verify_startup.py", "startup"),
