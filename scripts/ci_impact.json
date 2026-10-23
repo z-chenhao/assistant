@@ -1,7 +1,7 @@
 {
   "version": 1,
   "rules": [
-    {"prefix": "docs/", "shards": [], "example": "docs/development.md"},
+    {"prefix": "docs/", "shards": [], "example": "docs/README.md"},
     {"prefix": "README.md", "shards": [], "example": "README.md"},
     {"prefix": "internal/tui/", "shards": ["runtime", "providers"], "example": "internal/tui/session.go"},
     {"prefix": "internal/delivery/", "shards": ["runtime", "delivery"], "example": "internal/delivery/delivery.go"},

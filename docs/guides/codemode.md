@@ -210,3 +210,12 @@ Golden Case semantic scores or complete M5; ERII-21 owns the due scored cases.
 The real Computer Driver and macOS compatibility remain M6 work.
 
 The M5 exact dataset and five-run Core gate is documented in [Core evaluations](core-evals.md). It adds GC-17/19/20 evidence to these protocol/recovery checks without assigning semantic scores to scripted providers.
+
+The top-level description names structured `tools[name](args)`, computer use via
+`cua`, and delegation via the singular `agent.run({task, artifactRefs?})`. Discover
+CUA with `describeNamespace("cua")`, observe inventory, bind a surface, read its
+`documentation()`, and re-observe after actions. A delegating Worker discovers
+`describeNamespace("agent")`; Main has no `agent` namespace. There is no plural
+`agents` API. Child completion returns only `{text, artifactRefs}`. Memory and
+Artifact schemas are available through the same discovery functions; unavailable
+Memory configuration is explicit in their descriptions.

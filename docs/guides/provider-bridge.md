@@ -183,8 +183,11 @@ partial streams, malformed events, auth errors, or model incompatibility. Reques
 use a 30-second absolute Bridge deadline across fetch, retries, and response-body
 consumption, independently of the SDK header timeout. A deadline aborts HTTP and
 returns PROVIDER_UNAVAILABLE, with no completed result or stream retry. The Host
-Probe retains its ten-second total bound and independent one-second cleanup
-contexts. Direct Cancel/Dispose RPCs have a five-second bound. The error body is discarded,
+Probe uses a separate 25-second deadline per capability check and independent
+one-second cleanup contexts. Its fixed stage diagnostics distinguish a deadline
+from expected cancellation. This leaves cleanup headroom before the unchanged
+30-second generation bound. Direct Cancel/Dispose RPCs retain their five-second
+bound. The error body is discarded,
 except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
 context-length classification. SDK console sinks are disabled because malformed
 SSE parsing can otherwise print provider chunks. Raw response streams are limited
@@ -192,7 +195,8 @@ to 4 MiB before SDK parsing, and normalized Tool Calls retain the Host bounds
 of 32 calls and 64 KiB of arguments. Pi argument parse errors and non-object
 arguments fail with INVALID_PROVIDER_RESPONSE before any Tool Call is forwarded.
 Pi raw parse diagnostics are never exposed. An explicit empty object remains valid.
-Errors contain stable codes only.
+Provider errors contain stable codes only; Host Probe errors add fixed stage
+labels and timeout durations without provider text.
 
 Readiness checks the saved proof, current credential availability, and Bridge RPC
 health. It does not require catalog support or certify current endpoint health;
@@ -208,8 +212,8 @@ fails closed. Snapshots and credentials retain their existing boundaries.
 `provider_usage` stores the snapshot, generation/Run IDs, observed token counts,
 Host elapsed milliseconds, and normalized failure. Missing token usage is NULL,
 including cancellation/crash; zero is recorded only if supplied by the provider.
-Local monetary cost is zero. This is accounting, not a durable generation-result
-ledger. A Host crash can lose an in-flight usage record; Run recovery is later work.
+Local monetary cost is zero. The shared Run ledger atomically accepts generation results and usage under
+ownership fencing; see [Main recovery](main-loop.md#ownership-and-persistence).
 
 ## Verification and operations
 
@@ -231,15 +235,13 @@ ERII_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTr
 
 CI uses deterministic Fakes/environment references and requires no OS credential
 store or real model account. Real Qwen/vLLM/SGLang/LM Studio compatibility remains
-release-time Live Shadow evidence. Product Golden Cases remain not_applicable
-until their Main/Conversation slices; no product score is claimed here.
-
-## Deterministic fixtures
+release-time Live Shadow evidence. Golden Case conformance runs in the [complete verification suite](verification.md);
+provider contracts alone do not establish semantic product scores.
 
 ## Reproduce the CLI path
 
 Use an isolated absolute `ERII_DATA_ROOT`. Run `make build`, then provide metadata
-through `model add` as documented in `development.md`. Copy its `profile_id`.
+through `model add` as documented in [local model setup](#connect-a-local-model). Copy its `profile_id`.
 Profiles are unverified candidates, and metadata cannot activate one.
 
 ```sh
@@ -273,7 +275,7 @@ automatically. Every process that uses a test profile must explicitly supply
 unavailable/invalid active profiles, or stale Probe evidence also close ingress.
 Diagnostics and metadata remain usable for repair. A compatible, valid active
 profile reports `ready`; this readiness flag is a gate for later Agent admission,
-and does not add a Conversation/Task execution endpoint in M0.
+and governs the existing Main/Worker execution path.
 
 The Fake fixtures are named `success`, `incompatible`, `crash`, `partial-crash`,
 `completed-crash`, `no-tools`, `bad-sequence`, `drift`, `malformed`, `auth-required`,
@@ -284,7 +286,7 @@ a different provider or retries a generation automatically.
 
 ## Private protocol v1
 
-`internal/llm` owns consumer interfaces for the model control plane and future
+`internal/llm` owns consumer interfaces for the model control plane and the shared
 Agent Loop. They are repository-internal and may evolve with conformance tests;
 they are not a public plugin API. `internal/llm/bridge` implements the stdio client.
 `internal/llm/fake` implements deterministic provider fixtures behind it.

@@ -19,7 +19,8 @@ def join(root):
         folder = root / part
         suite = json.loads((folder / f'suite-codemode-{part}.json').read_text())
         if (suite.get('passed') is not True or suite.get('source_stable') is not True or
-                suite.get('source_dirty') is not False or suite.get('codemode_part') != part or
+                suite.get('source_dirty') is not False or suite.get('selected_gates') is not None or
+                suite.get('codemode_part') != part or
                 set(suite.get('shards', {})) != {'codemode'}):
             raise ValueError('failed, dirty or wrong Code Mode part: ' + part)
         rows = suite['shards']['codemode']
@@ -75,7 +76,8 @@ def join(root):
     if Counter((r['gate'], r['attempt']) for r in rows) != Counter(
             (g.name, i) for g in SHARDS['codemode'] for i in range(1, g.attempts + 1)):
         raise ValueError('logical Code Mode inventory drift')
-    full = dict(first, codemode_part=None, shards={'codemode': rows},
+    full = dict(first, complete_inventory=True, selected_gates=None,
+                codemode_part=None, shards={'codemode': rows},
                 parts=suites, elapsed_seconds=max(s['elapsed_seconds'] for s in suites.values()))
     return full, reports, summary
 

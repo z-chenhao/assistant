@@ -31,11 +31,11 @@ func TestCanonicalSchemasAndStrictUnion(t *testing.T) {
 		t.Fatal(got)
 	}
 	r := Registry()
-	if len(r.Describe()) != 3 {
+	if len(r.Describe()) != 2 {
 		t.Fatal(r.Describe())
 	}
 	for _, s := range r.Describe() {
-		if !json.Valid([]byte(s.InputSchema)) {
+		if (s.Name != ManageName && s.Name != SearchName) || !json.Valid([]byte(s.InputSchema)) {
 			t.Fatal(s)
 		}
 	}
