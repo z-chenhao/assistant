@@ -44,7 +44,7 @@ class TUIHarness(MainHarness):
         return Terminal(self.args(*flags), self.env, self.root)
 
 
-def local_setup(t, endpoint, model="fixture-model", manual=False):
+def local_setup(t, endpoint, model="fixture-model", manual=False, invalid_limits=False):
     t.expect("Connection [1/2]"); t.send("1")
     t.expect("Endpoint URL"); t.expect("> "); t.send(endpoint)
     t.expect("API key environment variable"); t.expect("> "); t.send("")
@@ -52,9 +52,19 @@ def local_setup(t, endpoint, model="fixture-model", manual=False):
         t.expect("Catalog unavailable.")
     else:
         t.expect("Model: fixture-model")
-    t.expect("Model ID"); t.expect("> "); t.send(model)
-    t.expect("Context tokens"); t.expect("> "); t.send("")
-    t.expect("Max output tokens"); t.expect("> "); t.send("")
+    t.expect("Model ID"); t.expect("> "); t.send(model if manual else "")
+    t.expect("Context tokens"); t.expect("> ")
+    if invalid_limits:
+        t.send("bad"); t.expect("Enter a whole number from 1 to 1048576.")
+        t.expect("Context tokens"); t.expect("> ")
+    t.send("262144" if invalid_limits else "")
+    t.expect("Max output tokens"); t.expect("> ")
+    if invalid_limits:
+        t.send("65537"); t.expect("Enter a whole number from 1 to 65536.")
+        t.expect("Max output tokens"); t.expect("> ")
+    t.send("32768" if invalid_limits else "")
+    for stage in ("text and streaming", "Tool calls", "Tool result continuation", "cancellation", "output clipping"):
+        t.expect("Checking " + stage + "…")
     t.expect("Probe passed:")
     t.expect("Type yes"); t.expect("> "); t.send("yes")
     t.expect("Model selected."); t.expect("You> ")
@@ -100,7 +110,8 @@ def verify(binary, bridge):
                     t.expect("Setup cancelled."); t.expect("You> ")
                     # Failed Probe must revoke readiness. Repair stays explicit.
                     server.mode = "no-tools"
-                    t.send("/test " + pid); t.expect("Operation failed: MODEL_INCOMPATIBLE"); t.expect("You> ")
+                    t.send("/test " + pid); t.expect("Connection test failed: model probe Tool calls: MODEL_INCOMPATIBLE")
+                    t.expect("Retry with /test " + pid); t.expect("You> ")
                     t.send("must reject after failed probe"); t.expect("State: degraded."); t.expect("You> ")
                     require(h.state() == state, "failed Probe accepted new Main work")
                     server.mode = "manual" if manual else "success"
@@ -127,6 +138,21 @@ def verify(binary, bridge):
                     require(t.stop(signal.SIGTERM) == 0, "prompt shutdown hung or errored")
                     report[folder.name]["degraded_transcript"] = t.transcript()
                 report["checks"].append(folder.name + ": actual PTY setup -> Pi Probe -> select -> Main -> pure Tool -> reply; SIGKILL reopen; failed Probe/degraded ingress; selection cancellation and stale confirmation conflict")
+
+            folder = root / "cold-local"
+            folder.mkdir()
+            cfg = folder / "config.yaml"
+            cfg.write_text(f"version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: {bridge}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+            h = TUIHarness(binary, folder, cfg, broker=broker)
+            server.mode = "slow"
+            with h.terminal() as t:
+                local_setup(t, f"http://127.0.0.1:{server.server_port}/v1", invalid_limits=True)
+                profile = h.command("model", "list")[0]
+                require(profile["context_window"] == 262144 and profile["max_output_tokens"] == 32768, "setup changed accepted limits")
+                require(h.command("status")["readiness"] == "ready", "cold model setup not ready")
+                require(t.stop() == 0, "cold model terminal did not close")
+                report["cold_local"] = {"transcript": t.transcript(), "profile": profile}
+            report["checks"].append("actual PTY single-model Enter picker; invalid numeric fields retry in place; 11-second cold Pi response passes all checks with visible progress; exact 262144/32768 limits retained")
 
             folder = root / "cancel"
             folder.mkdir()
@@ -212,7 +238,8 @@ def verify(binary, bridge):
                     with urllib.request.urlopen(callback, timeout=5) as response:
                         require(response.status == 200, "callback failed")
                     t.expect("Model: fixture-account-model")
-                    t.expect("Model ID"); t.expect("> "); t.send("fixture-account-model")
+                    t.expect("Model ID"); t.expect("> "); t.send("hidden-model")
+                    t.expect("Choose a listed model by number or ID."); t.expect("> "); t.send("1")
                     t.expect("Probe passed:"); t.expect("Type yes"); t.expect("> "); t.send("yes")
                     t.expect("Model selected."); t.expect("You> ")
                     t.send("ChatGPT terminal conversation"); t.expect("assistant: PROBE_RESULT_OK"); t.expect("You> ")

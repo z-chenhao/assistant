@@ -183,8 +183,11 @@ partial streams, malformed events, auth errors, or model incompatibility. Reques
 use a 30-second absolute Bridge deadline across fetch, retries, and response-body
 consumption, independently of the SDK header timeout. A deadline aborts HTTP and
 returns PROVIDER_UNAVAILABLE, with no completed result or stream retry. The Host
-Probe retains its ten-second total bound and independent one-second cleanup
-contexts. Direct Cancel/Dispose RPCs have a five-second bound. The error body is discarded,
+Probe uses a separate 25-second deadline per capability check and independent
+one-second cleanup contexts. Its fixed stage diagnostics distinguish a deadline
+from expected cancellation. This leaves cleanup headroom before the unchanged
+30-second generation bound. Direct Cancel/Dispose RPCs retain their five-second
+bound. The error body is discarded,
 except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
 context-length classification. SDK console sinks are disabled because malformed
 SSE parsing can otherwise print provider chunks. Raw response streams are limited
@@ -192,7 +195,8 @@ to 4 MiB before SDK parsing, and normalized Tool Calls retain the Host bounds
 of 32 calls and 64 KiB of arguments. Pi argument parse errors and non-object
 arguments fail with INVALID_PROVIDER_RESPONSE before any Tool Call is forwarded.
 Pi raw parse diagnostics are never exposed. An explicit empty object remains valid.
-Errors contain stable codes only.
+Provider errors contain stable codes only; Host Probe errors add fixed stage
+labels and timeout durations without provider text.
 
 Readiness checks the saved proof, current credential availability, and Bridge RPC
 health. It does not require catalog support or certify current endpoint health;

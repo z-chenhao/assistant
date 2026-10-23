@@ -18,7 +18,16 @@ func TestDescriptionIncludesSchemaDeclarationsAndInstructions(t *testing.T) {
 	if d.InputSchema != spec.InputSchema || d.Instructions != spec.Description {
 		t.Fatal(d)
 	}
-	if !NamespaceMatches("builtin__text__echo", "text") || !NamespaceMatches("mcp__mail__read", "mcp__mail") || NamespaceMatches("mcp__mail__read", "agent") {
+	if !NamespaceMatches("mcp__fixture__echo", "fixture") || !NamespaceMatches("mcp__mail__read", "mcp__mail") || NamespaceMatches("mcp__mail__read", "agent") {
 		t.Fatal("namespace mapping")
+	}
+}
+
+func TestDefinitionExplainsUnifiedCapabilities(t *testing.T) {
+	description := Definition().Spec.Description
+	for _, required := range []string{"tools[name](args)", `describeNamespace("cua")`, "cua.getState()", "documentation()", "observe after actions", `describeNamespace("agent")`, "agent.run({task,artifactRefs})", "Main has no agent namespace", "{text,artifactRefs}", "unawaited", "Approval"} {
+		if !strings.Contains(description, required) {
+			t.Fatalf("missing %q in %s", required, description)
+		}
 	}
 }
