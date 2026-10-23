@@ -7,6 +7,7 @@ unchanged race/count/deadline flags and bounded CPU admission.
 """
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+import argparse
 import json
 import math
 import os
@@ -27,12 +28,19 @@ RACE = ['go', 'test', '-race', '-count=1', '-timeout=15m']
 SERIAL_SQLITE = ['TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases']
 
 
-def groups(packages):
+def groups(packages, part=None):
     if (not packages or len(set(packages)) != len(packages) or
             not {BRIDGE, SQLITE} <= set(packages) or
             any(not isinstance(p, str) or not p.startswith('github.com/z-chenhao/erii/') or
                 any(c.isspace() for c in p) for p in packages)):
         raise ValueError('invalid or incomplete Go package inventory')
+    if part == 'sqlite':
+        return [('remainder', [SQLITE])]
+    if part == 'packages':
+        others = [p for p in packages if p not in (BRIDGE, SQLITE)]
+        return [('bridge', [BRIDGE])] + ([('other-packages', others)] if others else [])
+    if part is not None:
+        raise ValueError('unknown race part')
     return [('bridge', [BRIDGE]), ('remainder', [p for p in packages if p != BRIDGE])]
 
 
@@ -173,10 +181,11 @@ def run_remainder(selected, folder, stopped):
                 wall_seconds=time.monotonic() - started)
 
 
-def main():
+def main(part=None):
     source = source_state()
     packages = subprocess.check_output(['go', 'list', './...'], text=True).splitlines()
-    plan = groups(packages)
+    plan = groups(packages, part)
+    selected_packages = [p for _, selected in plan for p in selected]
     folder = Path('evidence/race')
     folder.mkdir(parents=True, exist_ok=True)
     for name in ('bridge', 'remainder', 'sqlite-list', 'sqlite-serial', 'sqlite-1', 'sqlite-2', 'sqlite-3', 'other-packages'):
@@ -194,9 +203,10 @@ def main():
             if name == 'remainder':
                 row = run_remainder(selected, folder, stopped)
             else:
-                command, metrics = RACE + selected, {}
+                command, metrics = RACE + (['-p=1'] if name == 'other-packages' else []) + selected, {}
+                env = dict(os.environ, GOMAXPROCS='1') if name == 'other-packages' else os.environ.copy()
                 started = time.monotonic()
-                code = run_command(command, os.environ.copy(), folder / (name + '.log'), stopped, metrics)
+                code = run_command(command, env, folder / (name + '.log'), stopped, metrics)
                 row = dict(name=name, packages=selected, command=command, returncode=code,
                            wall_seconds=time.monotonic() - started, **metrics)
             rows.append(row)
@@ -206,13 +216,15 @@ def main():
     finally:
         stable = source == source_state()
         executed = [p for row in rows if row['returncode'] == 0 for p in row['packages']]
-        passed = (passed and stable and not stopped.is_set() and sorted(executed) == sorted(packages)
+        passed = (passed and stable and not stopped.is_set() and sorted(executed) == sorted(selected_packages)
                   and all(row.get('owned_group_drained') is True for row in rows))
         report = dict(version=1, **source, source_stable=stable, packages=packages,
-                      stages=rows, passed=passed)
+                      part=part, selected_packages=selected_packages, stages=rows, passed=passed)
         (folder / 'inventory.json').write_text(json.dumps(report, indent=2) + '\n')
     return 0 if passed else 1
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--part', choices=['packages', 'sqlite'])
+    raise SystemExit(main(parser.parse_args().part))

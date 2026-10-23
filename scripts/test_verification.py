@@ -158,7 +158,13 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 8)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 9)
+        self.assertIn('racepart: ["packages", "sqlite"]', workflow)
+        race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
+        self.assertIn('needs: race', race_join)
+        self.assertIn('test "$PART_RESULT" = success', race_join)
+        self.assertIn('scripts/ci_race_join.py', race_join)
+        self.assertIn('evidence-race-part-*', race_join)
         self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
         self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 5)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
