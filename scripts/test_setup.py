@@ -181,6 +181,16 @@ class SetupTests(unittest.TestCase):
                 self.assertEqual(len(job.result()['steps']), 4)
         self.assertEqual(self.server.requests, [])
 
+    def test_selected_ci_packages_keep_unconsumed_dependencies_uninstalled(self):
+        report = dict(steps=[])
+        installer.setup(self.root, SimpleNamespace(mode='online', part='packages', timeout=20,
+                                                   with_deps=False, packages=list(installer.PACKAGES[:2])),
+                        report, dict(self.env))
+        self.assertEqual([step['name'] for step in report['steps']], list(installer.PACKAGES[:2]))
+        self.assertEqual(len(self.payload_requests()), 1)
+        for name in installer.PACKAGES[2:]:
+            self.assertFalse((self.root / name / 'node_modules').exists())
+
     def test_same_tree_lock_wait_is_bounded_and_next_owner_recovers(self):
         with installer.worktree_lock(self.root, 1):
             with self.assertRaisesRegex(RuntimeError, 'lock wait timed out'):

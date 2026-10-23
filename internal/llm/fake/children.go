@@ -64,17 +64,17 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if !root && input == "Unknown child" {
 			return llm.GenerationResult{}, llm.ModelNotFound
 		}
-		if root && strings.Contains(input, "Child artifact") && prior.Name == artifacttools.Save {
+		if root && strings.Contains(input, "Child artifact") && prior.Name == artifacttools.Manage && strings.Contains(prior.Arguments, `"operation":"save"`) {
 			var output tool.Result
 			if json.Unmarshal([]byte(last.Text), &output) != nil || len(output.ArtifactRefs) != 1 {
 				return llm.GenerationResult{}, llm.InvalidProviderResponse
 			}
 			return call(agent.RunToolName, agent.AgentRunRequest{Task: "Read child artifact", ArtifactRefs: output.ArtifactRefs}), nil
 		}
-		if !root && input == "Read child artifact" && prior.Name == artifacttools.Read {
+		if !root && input == "Read child artifact" && prior.Name == artifacttools.Manage && strings.Contains(prior.Arguments, `"operation":"read"`) {
 			for _, m := range req.Messages {
 				if strings.HasPrefix(m.Text, "Explicit artifact reference: ") {
-					return call(artifacttools.Publish, map[string]any{"artifactRefs": []string{strings.TrimPrefix(m.Text, "Explicit artifact reference: ")}}), nil
+					return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": []string{strings.TrimPrefix(m.Text, "Explicit artifact reference: ")}}), nil
 				}
 			}
 		}
@@ -83,7 +83,7 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 			if json.Unmarshal([]byte(last.Text), &result) != nil {
 				return llm.GenerationResult{}, llm.InvalidProviderResponse
 			}
-			return call(artifacttools.Publish, map[string]any{"artifactRefs": result.ArtifactRefs}), nil
+			return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": result.ArtifactRefs}), nil
 		}
 		return llm.GenerationResult{Text: "Worker aggregated: " + last.Text}, nil
 	}
@@ -94,7 +94,7 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		case strings.Contains(input, "Child large"):
 			return call(agent.RunToolName, agent.AgentRunRequest{Task: "Large child"}), nil
 		case strings.Contains(input, "Child artifact"):
-			return call(artifacttools.Save, map[string]string{"name": "child-evidence.txt", "mediaType": "text/plain", "text": "explicit artifact input"}), nil
+			return call(artifacttools.Manage, map[string]string{"operation": "save", "name": "child-evidence.txt", "mediaType": "text/plain", "text": "explicit artifact input"}), nil
 		case strings.Contains(input, "Child invalid"):
 			return call(agent.RunToolName, map[string]string{"task": "forbidden", "model": "forged"}), nil
 		case strings.Contains(input, "Child inaccessible"):
@@ -129,7 +129,7 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 	case "Read child artifact":
 		for _, m := range req.Messages {
 			if strings.HasPrefix(m.Text, "Explicit artifact reference: ") {
-				return call(artifacttools.Read, map[string]string{"artifactRef": strings.TrimPrefix(m.Text, "Explicit artifact reference: ")}), nil
+				return call(artifacttools.Manage, map[string]string{"operation": "read", "artifactRef": strings.TrimPrefix(m.Text, "Explicit artifact reference: ")}), nil
 			}
 		}
 	}

@@ -35,13 +35,25 @@ flowchart LR
     Join --> Gate
 ```
 
-Each Required job independently installs pinned dependencies, provisions the
+Each Required job independently installs its pinned runtime dependencies, provisions the
 public fixture SDK and builds from its exact checked-out source. A small
-project-local composite action owns those mechanics. There is no long test or
+project-local composite action owns those mechanics. Its disposable Ubuntu runner
+uses the official HTTPS archive mirror for APT downloads. The Azure mirror
+repeatedly took 8–9 minutes to install browser prerequisites (one retained run
+fetched 25.9 MB in 7m48s), exhausting the ten-minute job limit before checks could
+finish. Package selection, browser installation and job limits are unchanged.
+There is no long test or
 producer prerequisite. No executable crosses runner boundaries: GitHub image
 rollouts can assign different Ubuntu image versions within one workflow.
 The retained historical build-bundle utility still rejects image/context drift;
 its guards were not relaxed. The new pipeline avoids that reuse entirely.
+Frontend build/TypeScript dependencies install only in unit/lint. Playwright
+installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
+QuickJS still install everywhere, including providers' offline packaging gate.
+Across the eighteen execution jobs this removes seventeen frontend and eleven
+Playwright installs. Lockfile cache keys, per-job exact-source builds, every
+assertion and repetition count remain unchanged. Clean-runner complete CI is the
+dependency-closure proof; install counts alone are not wall-time measurements.
 All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
 SHA may identify GitHub's synthetic merge commit.
 Strict main ancestry and independent exact-SHA reviewer PASS remain required.
@@ -172,7 +184,7 @@ No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
 ## Launch, doctor, drive, evidence and cleanup
 
-Install the versions and pinned dependencies from [development.md](development.md).
+Install the versions and pinned dependencies from [CONTRIBUTING](../CONTRIBUTING.md).
 Linux coding tests need bubblewrap and enabled unprivileged user namespaces;
 CI configures these on its disposable runner. The unit/lint job installs the
 pinned Chromium binary/system dependencies, then runs the actual Browser fixture
@@ -244,7 +256,7 @@ Setup-go retains its existing SDK/module cache. Hosted npm-cache restoration is
 disabled: a clean or cache-disabled runner goes directly through bounded native
 installation, without the previously hanging optional cache transport. Local
 worktrees reuse npm/Playwright download caches through the same
-[setup entry point](development.md#repeated-and-offline-setup). Every job
+[setup entry point](../CONTRIBUTING.md#repeated-and-offline-setup). Every job
 still installs lockfiles and builds its own CLI. Full Go test counts remain
 explicit. Historical `ci_bundle.py` v2 and its corruption/context regressions
 remain available for old evidence; the current workflow does not consume build
@@ -305,3 +317,11 @@ budget, proves unknown/no Artifact/no second effect, then verifies a fresh
 authoritative query. The existing real deadline, cancellation, unsafe receipt,
 identity and byte/hash assertions remain required. Preserve failed full-suite
 evidence; passing focused diagnostics alone do not supersede it.
+
+## Low-bandwidth evidence handoff
+
+Use the [local-first evidence commands](guides/evidence.md) to retain raw results
+outside worktree cleanup, share one small receipt and verify same-host files.
+Inspect exact run/attempt metadata before downloading an immutable artifact ID;
+hash-verified warm retrieval transfers zero archive bytes. Mandatory CI part/join
+artifacts and final exports keep their existing completeness and retention rules.

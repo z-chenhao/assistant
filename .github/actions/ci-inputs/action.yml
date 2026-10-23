@@ -1,6 +1,12 @@
 name: Offline CI runtime
 description: Prepare pinned dependencies, isolated public SDK and exact-source binary
 inputs:
+  frontend:
+    description: Install frontend build and TypeScript dependencies (unit/lint only)
+    default: "false"
+  browser:
+    description: Install Playwright for Browser contract and UI journeys
+    default: "false"
   sandbox:
     description: Install the offline coding sandbox
     default: "true"
@@ -10,6 +16,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Use the Ubuntu archive for dependency downloads
+      shell: bash
+      # Azure's mirror repeatedly served browser prerequisites at ~55 kB/s,
+      # consuming 8–9 minutes of the unchanged ten-minute job limit.
+      run: sudo sed -i 's|http://azure\.archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version-file: go.mod
@@ -20,7 +31,11 @@ runs:
         # cache-miss path and local worktrees reuse their existing npm cache.
     - name: Install pinned dependencies
       shell: bash
-      run: python3 scripts/setup.py --part packages
+      run: |
+        packages=(provider-bridge runtime/javascript)
+        if [ "${{ inputs.browser }}" = true ]; then packages+=(guest-browser); fi
+        if [ "${{ inputs.frontend }}" = true ]; then packages+=(web); fi
+        python3 scripts/setup.py --part packages --packages "${packages[@]}"
     - name: Provision copied public SDK
       shell: bash
       run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json

@@ -56,11 +56,11 @@ Task controls and user delivery.
 
 | Tool | Arguments | Result | Permission |
 | --- | --- | --- | --- |
-| `builtin__artifact__save` | `name`, `mediaType`, `text` (8192 characters; 16 KiB total call cap) | opaque ref in `artifact_refs` | `artifact_write` (local immutable write) |
-| `builtin__artifact__read` | `artifactRef`, optional byte `offset`, `limit` 1–4096 | bounded text range; binary content returns a ref | `read_only` |
-| `builtin__artifact__describe` | `artifactRef` | name, MIME, hash, size, dates, version | `read_only` |
-| `builtin__artifact__list` | empty object | newest 50 accessible descriptors | `read_only` |
-| `builtin__artifact__publish` | `artifactRefs` (0–127) | selected refs | `artifact_write` |
+| `builtin__artifact__manage` (`operation: save`) | `name`, `mediaType`, `text` (8192 characters; 16 KiB total call cap) | opaque ref in `artifact_refs` | `artifact_write` (local immutable write) |
+| `builtin__artifact__manage` (`operation: read`) | `artifactRef`, optional byte `offset`, `limit` 1–4096 | bounded text range; binary content returns a ref | `artifact_write` |
+| `builtin__artifact__manage` (`operation: describe`) | `artifactRef` | name, MIME, hash, size, dates, version | `artifact_write` |
+| `builtin__artifact__manage` (`operation: publish`) | `artifactRefs` (0–127) | selected refs | `artifact_write` |
+| `builtin__artifact__search` | optional `query`, `limit` 1–50 (default 50) | accessible descriptors by Unicode-lowercased name/MIME substring, newest first; no query browses | `read_only` |
 
 Unknown fields, ownership/Run IDs, URLs and path inputs are rejected. Inaccessible,
 forged, expired, deleted or corrupt references return `NOT_FOUND`; invalid
@@ -151,3 +151,15 @@ is not semantically graded and the full case remains `not_applicable` until its
 vision/privacy integrations. Original M1/M2 fixtures and locks stay unchanged.
 No Sidecar exists yet; JavaScript Durable Replay and Computer transfer are not
 claimed by this slice.
+
+`manage` accepts only fields for its selected operation. `publish` selects the
+current Run's final outputs; it does not send a message or upload a file. Main's
+final AssistantMessage passes those semantic references to the existing Delivery
+Composer and versioned UISpec (including Web's OpenIntelligentUI table). Workers
+return only to their direct Parent. Neither tool accepts ownership or filesystem
+paths. Search filters before counting accessible matches, so older matches are
+not hidden behind 50 unrelated files.
+
+The five old Direct Tool names are removed. See
+[ERII-192 compatibility](../adr/005-consolidated-tool-surface.md) before upgrading
+an installation with active Runs. The authenticated `artifact` CLI is unchanged.

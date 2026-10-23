@@ -42,6 +42,8 @@ func (t *tools) executeArtifact(ctx context.Context, tx *sql.Tx, name, args stri
 		return tool.Result{}, err
 	}
 	var v struct {
+		Operation string   `json:"operation"`
+		Query     string   `json:"query"`
 		Name      string   `json:"name"`
 		MediaType string   `json:"mediaType"`
 		Text      string   `json:"text"`
@@ -54,29 +56,33 @@ func (t *tools) executeArtifact(ctx context.Context, tx *sql.Tx, name, args stri
 		return tool.Failure("INVALID_ARGUMENT"), nil
 	}
 	store := t.runs.host.Artifacts()
-	switch name {
-	case artifacttools.Save:
+	operation := v.Operation
+	if name == artifacttools.Search {
+		operation = "search"
+	}
+	switch operation {
+	case "save":
 		return tool.Result{Output: &tool.BinaryOutput{Name: v.Name, MediaType: v.MediaType, Reader: strings.NewReader(v.Text)}}, nil
-	case artifacttools.Publish:
+	case "publish":
 		if v.Refs == nil {
 			return tool.Failure("INVALID_ARGUMENT"), nil
 		}
 		return tool.Result{Text: "Final artifacts selected.", PublishRefs: v.Refs}, nil
-	case artifacttools.Describe:
+	case "describe":
 		d, e := store.DescribeTx(ctx, tx, a, v.Ref, true)
 		if e != nil {
 			return artifactFailure(e), nil
 		}
 		raw, e := encoded(d)
 		return tool.Result{Text: raw}, e
-	case artifacttools.List:
-		list, e := store.ListTx(ctx, tx, a)
+	case "search":
+		list, e := store.SearchTx(ctx, tx, a, v.Query, v.Limit)
 		if e != nil {
 			return artifactFailure(e), nil
 		}
 		raw, e := encoded(list)
 		return tool.Result{Text: raw}, e
-	case artifacttools.Read:
+	case "read":
 		d, e := store.DescribeTx(ctx, tx, a, v.Ref, true)
 		if e != nil {
 			return artifactFailure(e), nil
@@ -173,14 +179,18 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 			}
 		}
 	}
-	var policy, name string
-	if err = tx.QueryRowContext(ctx, `SELECT policy_json,tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, id, a.RunID).Scan(&policy, &name); err != nil {
+	var policy, name, args string
+	if err = tx.QueryRowContext(ctx, `SELECT policy_json,tool_name,arguments_json FROM tool_invocation WHERE invocation_id=? AND run_id=?`, id, a.RunID).Scan(&policy, &name, &args); err != nil {
 		if err == sql.ErrNoRows {
 			return tool.Result{}, agent.ErrConflict
 		}
 		return tool.Result{}, err
 	}
-	if result.PublishRefs != nil && name != artifacttools.Publish {
+	var request struct {
+		Operation string `json:"operation"`
+	}
+	_ = json.Unmarshal([]byte(args), &request)
+	if result.PublishRefs != nil && (name != artifacttools.Manage || request.Operation != "publish") {
 		return tool.Failure("PERMISSION_DENIED"), nil
 	}
 	var p tool.Policy

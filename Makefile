@@ -46,3 +46,9 @@ VERIFY_SHARD ?=
 
 verify: build
 	python3 scripts/verify_suite.py --binary bin/erii --evidence "$(VERIFY_EVIDENCE)" --jobs "$(VERIFY_JOBS)" $(if $(VERIFY_SHARD),--shard "$(VERIFY_SHARD)")
+
+# Use a fresh durable fixture root outside the checkout; never contacts GitHub.
+.PHONY: verify-evidence
+verify-evidence:
+	@test -n "$(EVIDENCE_ROOT)" || { echo 'Set EVIDENCE_ROOT to a fresh absolute durable fixture root'; exit 1; }
+	python3 scripts/evidence_harness.py --root "$(EVIDENCE_ROOT)" --sha "$$(git rev-parse HEAD)" --evidence "$(EVIDENCE_ROOT)/report.json"

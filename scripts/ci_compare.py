@@ -7,13 +7,13 @@ failed attempts. No test is retried and no workflow or PR state is changed.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from pathlib import Path
 import re
-import tempfile
 import zipfile
 
 import ci_profile as profile
-from ci_github import read
+from evidence import artifact_archive, inventory
 from verify_suite import SHARDS
 
 
@@ -31,33 +31,36 @@ def pair(value):
 
 
 def collect(repo, key):
+    root = os.environ.get('ERII_EVIDENCE_ROOT')
+    if not root:
+        raise ValueError('ERII_EVIDENCE_ROOT must name durable local evidence storage')
     run_id, number = key.split(':')
     prefix = f'repos/{repo}/actions/runs/{run_id}'
     run = profile.gh('api', prefix + '/attempts/' + number)
     pages = profile.gh('api', '--paginate', '--slurp', prefix + f'/attempts/{number}/jobs?per_page=100')
     jobs = [job for page in pages for job in page['jobs']]
-    pages = profile.gh('api', '--paginate', '--slurp', prefix + '/artifacts?per_page=100')
-    artifacts = [a for page in pages for a in page['artifacts']
-                 if a['name'].startswith('evidence-') and a['name'].endswith('-' + number)]
+    metadata = inventory(repo, int(run_id), int(number), run_info=run)
+    artifacts = metadata['artifacts']
     reports = {}
     allowed = {'suite-' + name + '.json' for name in SHARDS}
     allowed.add('core-summary.json')
+    transfers = []
     for artifact in artifacts:
-        if artifact.get('expired'):
+        # Fast/race/part archives cannot supply a canonical suite report.
+        if artifact['name'] not in {f'evidence-{name}-{run["head_sha"]}-{number}' for name in SHARDS}:
             continue
         # Read selected ZIP members without extracting paths, executables,
         # corpus, prompt traces or the much larger business-case payloads.
-        with tempfile.TemporaryFile() as archive:
-            read('api', f'repos/{repo}/actions/artifacts/{artifact["id"]}/zip', stdout=archive)
-            archive.seek(0)
-            with zipfile.ZipFile(archive) as entries:
-                for entry in entries.infolist():
-                    if entry.filename not in allowed:
-                        continue
-                    if entry.file_size > 16 << 20 or entry.filename in reports:
-                        raise ValueError('oversized or duplicate suite report')
-                    reports[entry.filename] = json.loads(entries.read(entry))
-    return dict(run=run, jobs=jobs, artifacts=artifacts, reports=reports)
+        archive, transfer = artifact_archive(Path(root), metadata, artifact['id'])
+        transfers.append(transfer)
+        with zipfile.ZipFile(archive) as entries:
+            for entry in entries.infolist():
+                if entry.filename not in allowed:
+                    continue
+                if entry.file_size > 16 << 20 or entry.filename in reports:
+                    raise ValueError('oversized or duplicate suite report')
+                reports[entry.filename] = json.loads(entries.read(entry))
+    return dict(run=run, jobs=jobs, artifacts=artifacts, reports=reports, transfers=transfers)
 
 
 def job_name(name):

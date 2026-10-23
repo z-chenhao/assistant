@@ -18,6 +18,9 @@ func (r *Runs) ConfigureRecall(s recall.Service) { r.recall = &s }
 func (r *Runs) recallIdentity(run agent.Run) (string, error) {
 	for _, spec := range run.Tools {
 		if spec.Name == recall.ToolName {
+			if spec.ResourceHash == recall.UnconfiguredIdentity {
+				return "", nil
+			}
 			if r.recall == nil {
 				return "", llm.ModelIncompatible
 			}

@@ -42,7 +42,7 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		if at := strings.Index(last.Text, marker); at >= 0 {
 			_ = json.Unmarshal([]byte(last.Text[at+len(marker):]), &payload)
 		}
-		return call(artifacttools.Publish, map[string]any{"artifactRefs": payload.Details.ArtifactRefs})
+		return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": payload.Details.ArtifactRefs})
 	}
 	if root {
 		user = rootTask
@@ -59,12 +59,12 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 	}
 	_ = json.Unmarshal([]byte(strings.SplitN(user, "\nArtifact reference", 2)[0]), &request)
 	if last.Role == "tool" {
-		if (prior.Name == artifacttools.Save || prior.Name == "mcp__fixture__binary" || prior.Name == "mcp__fixture__large") && !request.Draft {
+		if (prior.Name == artifacttools.Manage && strings.Contains(prior.Arguments, `"operation":"save"`) || prior.Name == "mcp__fixture__binary" || prior.Name == "mcp__fixture__large") && !request.Draft {
 			var result struct {
 				Refs []string `json:"artifact_refs"`
 			}
 			_ = json.Unmarshal([]byte(last.Text), &result)
-			return call(artifacttools.Publish, map[string]any{"artifactRefs": result.Refs})
+			return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": result.Refs})
 		}
 		return llm.GenerationResult{Text: "Artifact operation observed: " + last.Text}
 	}
@@ -79,14 +79,14 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 	case "large":
 		return call("mcp__fixture__large", map[string]any{})
 	case "read":
-		return call(artifacttools.Read, map[string]any{"artifactRef": request.Ref})
+		return call(artifacttools.Manage, map[string]any{"operation": "read", "artifactRef": request.Ref})
 	case "publish":
-		return call(artifacttools.Publish, map[string]any{"artifactRefs": request.Refs})
+		return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": request.Refs})
 	case "list":
-		return call(artifacttools.List, map[string]any{})
+		return call(artifacttools.Search, map[string]any{})
 	case "describe":
-		return call(artifacttools.Describe, map[string]any{"artifactRef": request.Ref})
+		return call(artifacttools.Manage, map[string]any{"operation": "describe", "artifactRef": request.Ref})
 	default:
-		return call(artifacttools.Save, map[string]any{"name": request.Name, "mediaType": request.Media, "text": request.Text})
+		return call(artifacttools.Manage, map[string]any{"operation": "save", "name": request.Name, "mediaType": request.Media, "text": request.Text})
 	}
 }

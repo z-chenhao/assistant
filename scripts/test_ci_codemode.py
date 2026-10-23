@@ -27,7 +27,7 @@ class CodeModeJoinTests(unittest.TestCase):
                         report.pop('conformance')
                         report.pop('ci_cancellation')
                     (folder / report_name(gate, attempt)).write_text(json.dumps(report))
-            suite = dict(passed=True, source_stable=True, source_dirty=False, source_sha='a' * 40,
+            suite = dict(complete_inventory=False, selected_gates=None, passed=True, source_stable=True, source_dirty=False, source_sha='a' * 40,
                          source_diff_sha256='empty', binary_sha256='bin', workflow_sha='merge',
                          image_os='ubuntu24', image_version='image', codemode_part=part,
                          elapsed_seconds=10, shards={'codemode': rows})
@@ -41,6 +41,8 @@ class CodeModeJoinTests(unittest.TestCase):
             self.assertEqual([(r['gate'], r['attempt']) for r in suite['shards']['codemode']],
                              [(g.name, i) for g in SHARDS['codemode'] for i in range(1, 6)])
             self.assertTrue(summary['passed'])
+            self.assertTrue(suite['complete_inventory'])
+            self.assertIsNone(suite['selected_gates'])
             self.assertEqual([len(r['results']) for r in reports], [18] * 5)
             self.assertEqual([r['summary']['fragments'] for r in reports], [18] * 5)
             self.assertEqual([r['summary']['fragment_passes'] for r in reports], [18] * 5)
@@ -64,7 +66,7 @@ class CodeModeJoinTests(unittest.TestCase):
 
     def test_no_part_or_repetition_can_be_omitted_or_substituted(self):
         mutations = ('missing_part', 'missing_report', 'missing_round', 'duplicate_round', 'reordered',
-                     'failed', 'cancelled', 'undrained', 'dirty', 'unstable', 'wrong_part', 'source',
+                     'focused', 'failed', 'cancelled', 'undrained', 'dirty', 'unstable', 'wrong_part', 'source',
                      'binary', 'fixture', 'missing_variant', 'duplicate_variant',
                      'wrong_case', 'hard_failure', 'assertion_failure', 'contracts_cases',
                      'missing_sc', 'failed_sc', 'missing_cancel', 'failed_cancel', 'cleanup')
@@ -82,6 +84,7 @@ class CodeModeJoinTests(unittest.TestCase):
                 elif mutation == 'missing_round': rows.pop()
                 elif mutation == 'duplicate_round': rows[-1] = rows[0]
                 elif mutation == 'reordered': rows.reverse()
+                elif mutation == 'focused': suite['selected_gates'] = ['main']
                 elif mutation == 'failed': suite['passed'] = False
                 elif mutation == 'cancelled': rows[-1]['returncode'] = 130
                 elif mutation == 'undrained': rows[-1]['owned_group_drained'] = False

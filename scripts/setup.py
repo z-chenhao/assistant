@@ -89,7 +89,7 @@ def setup(root, args, report, env):
             item['seconds'] = round(time.monotonic() - started, 3)
 
     if args.part != 'browser':
-        for name in PACKAGES:
+        for name in getattr(args, 'packages', None) or PACKAGES:
             step(name, ['npm', 'ci', '--prefix', name, '--ignore-scripts', '--prefer-offline',
                         '--offline=' + str(args.mode == 'offline').lower(),
                         '--fetch-retries=0', '--fetch-timeout=30000'])
@@ -124,6 +124,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=('online', 'offline'), default='online')
     parser.add_argument('--part', choices=('all', 'packages', 'browser'), default='all')
+    parser.add_argument('--packages', nargs='+', choices=PACKAGES, help='Install only these packages (CI consumers); default: all four')
     parser.add_argument('--with-deps', action='store_true', help='Online only: install Ubuntu browser system libraries')
     parser.add_argument('--timeout', type=float, default=180, help='Maximum seconds per stage, including native lock waits')
     parser.add_argument('--evidence', type=Path, default=ROOT / 'evidence/setup.json')
@@ -131,6 +132,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if not math.isfinite(args.timeout) or args.timeout <= 0 or args.timeout > 600:
         parser.error('--timeout must be > 0 and <= 600')
+    if args.packages and args.part != 'packages':
+        parser.error('--packages requires --part packages')
     if args.with_deps and (args.mode == 'offline' or args.part == 'packages'):
         parser.error('--with-deps requires online browser setup')
     report = dict(version=1, mode=args.mode, part=args.part, outcome='failed', steps=[])
@@ -152,7 +155,7 @@ def main(argv=None):
                 report['outcome'] = 'passed'
             except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
                 report['error'] = str(error)
-                print(f'setup: failed: {error}. See docs/development.md for cache recovery.', flush=True)
+                print(f'setup: failed: {error}. See CONTRIBUTING.md for cache recovery.', flush=True)
             finally:
                 report['seconds'] = round(time.monotonic() - started, 3)
                 if args.measure_network:
