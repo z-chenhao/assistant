@@ -146,7 +146,7 @@ score. They prove protocol assertions, not real-model quality, live account
 eligibility or current restaurant information. These M1 fragments alone do not
 establish Security/Approval, Worker/Child or JavaScript Durable Replay; use the
 [feature map](../../scripts/FEATURES.md) for those implemented paths and gates.
-Without configured context maintenance, overlong context fails rather than
-being silently trimmed. [Memory maintenance](memory-maintenance.md) documents
-configured compaction and privacy. Live account inference remains a separate
+Current Runs use their frozen compaction policy; an irreducible context still
+returns a context-length error. [Memory maintenance](memory-maintenance.md)
+documents compaction, retained originals and privacy. Live account inference remains a separate
 L2 requirement, and Device Authorization remains deferred by ADR 001.

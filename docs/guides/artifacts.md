@@ -48,8 +48,8 @@ provides scoped file transfer. Those paths have separate proof limits.
 
 ## Tool contract
 
-The consolidated Artifact builtins use the existing Tool Registry, frozen Capability Snapshot,
-ToolInvocation, Executor, claim/epoch fence and error normalization. Replay
+The consolidated Artifact builtins use the existing Tool Registry, frozen
+Capability Snapshot, ToolInvocation, Executor, claim/epoch fence and error normalization. Replay
 policy is `safe`, timeout is 10 seconds, result limit is 64 KiB, risk is low.
 Only the Host executes them. No direct Tool bypass or separate invocation
 pipeline exists. Main and Worker share these capabilities; Workers still lack
@@ -150,9 +150,9 @@ through Task → Root → Main final delivery. Synthetic PNGs carry fixture fiel
 in metadata; they are binary transport assets, not OCR evidence. Scripted text
 is not semantically graded; this Artifact fragment keeps the full case
 `not_applicable`. [M6 evidence](m6-evals.md) covers additional image/privacy
-mechanics without establishing model vision quality. Original M1/M2 fixtures and locks stay unchanged.
-No Sidecar exists yet; JavaScript Durable Replay and Computer transfer are not
-claimed by this slice.
+mechanics without establishing model vision quality. Original M1/M2 fixtures
+and locks stay unchanged. [Code Mode replay](codemode.md) and [Computer transfer](computer-use.md)
+are implemented and verified separately from this Artifact fixture.
 
 `manage` accepts only fields for its selected operation. `publish` selects the
 current Run's final outputs; it does not send a message or upload a file. Main's
