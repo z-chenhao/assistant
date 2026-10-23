@@ -52,6 +52,9 @@ class Endpoint(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if self.server.mode == "slow" and body["messages"][-1].get("content") == "Reply with OK.":
+            # Actual cold-start regression: longer than the former entire Probe deadline.
+            time.sleep(11)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Connection", "close")

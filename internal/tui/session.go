@@ -264,6 +264,12 @@ func (u *terminal) report(err error) {
 		u.print("Setup cancelled. Active model unchanged.")
 		return
 	}
+	var test *testFailure
+	if errors.As(err, &test) {
+		u.report(test.cause)
+		u.print("Profile retained. Retry with /test " + test.id + "; after it passes, use /select " + test.id + ". Use /setup to change settings.")
+		return
+	}
 	if errors.Is(err, llm.ErrNoBridge) {
 		u.print("Provider Bridge is not configured. Check the connection settings.")
 		return
@@ -554,20 +560,26 @@ func (u *terminal) setup(ctx context.Context) error {
 }
 
 func (u *terminal) testModel(ctx context.Context, id string) error {
-	u.print("Testing connection and Agent capabilities… Each check allows up to 2 minutes; cold local models may need time to load. Ctrl-C exits.")
+	u.print(fmt.Sprintf("Testing connection and Agent capabilities… Each check allows up to %s; cold local models may need time to load. Ctrl-C exits.", llm.ProbeStepTimeout))
 	_, err := u.Control.TestWithProgress(ctx, id, func(stage llm.ProbeStage) {
 		u.print("Checking " + stage.String() + "…")
 	})
-	if err != nil && ctx.Err() == nil {
-		u.report(err)
-		u.print("Profile retained. Retry with /test " + id + "; after it passes, use /select " + id + ". Use /setup to change settings.")
-		// The failure was rendered here with the profile's recovery commands.
-		return cancelledTest
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if err != nil && !errors.Is(err, llm.ErrNotFound) {
+		return &testFailure{id: id, cause: err}
 	}
 	return err
 }
 
-var cancelledTest = errors.New("connection test failure reported")
+type testFailure struct {
+	id    string
+	cause error
+}
+
+func (e *testFailure) Error() string { return "connection test failed" }
+func (e *testFailure) Unwrap() error { return e.cause }
 
 func (u *terminal) chooseModel(ctx context.Context, catalog []llm.CatalogModel, manual bool) (string, error) {
 	for i, model := range catalog {

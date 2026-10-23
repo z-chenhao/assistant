@@ -134,7 +134,7 @@ async function generate(r, job, send) {
       if(body.tools?.length) body.tools=[{type:'namespace',name:'erii',description:'Erii tools',tools:body.tools}];
       return guardedFetch(input,{...init,body:JSON.stringify(body)});
     } : guardedFetch;
-    const events = (isAccount ? accountStream : stream)(model, normalizeContext(context(r, model)), { apiKey:r.connection.access_token || r.connection.api_key || 'sdk-constructor-only', cacheRetention:isAccount?'none':undefined, fetch:fetcher, signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:180000, onProviderStreamEvent:e=>{
+    const events = (isAccount ? accountStream : stream)(model, normalizeContext(context(r, model)), { apiKey:r.connection.access_token || r.connection.api_key || 'sdk-constructor-only', cacheRetention:isAccount?'none':undefined, fetch:fetcher, signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:30000, onProviderStreamEvent:e=>{
       if(isAccount && e.type==='response.completed') {
         state.completedSeen=true;
         if(e.response?.usage){const u=e.response.usage;if(!Number.isSafeInteger(u.input_tokens)||!Number.isSafeInteger(u.output_tokens)||u.input_tokens<0||u.output_tokens<0)fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}

@@ -17,7 +17,8 @@ import (
 
 // ProbeStepTimeout allows cold local models to load and think. Each check gets
 // its own bound; expected cancellation does not cancel subsequent checks.
-const ProbeStepTimeout = 2 * time.Minute
+// Leave cleanup headroom before the Bridge's existing 30-second generation bound.
+const ProbeStepTimeout = 25 * time.Second
 
 type ProbeStage int
 
@@ -178,8 +179,10 @@ func (p Prober) RunWithProgress(parent context.Context, profile Profile, progres
 	}
 	start(ProbeCancellation)
 	cancelCtx, stop := context.WithCancel(ctx)
+	cancelledOnDelta := false
 	_, err = p.Provider.Generate(cancelCtx, request("Stream until cancelled."), func(e GenerationEvent) {
 		if e.Kind == "text_delta" {
+			cancelledOnDelta = true
 			stop()
 		}
 	})
@@ -187,7 +190,7 @@ func (p Prober) RunWithProgress(parent context.Context, profile Profile, progres
 	// The normalized cancellation outcome means the peer acknowledged it. A
 	// joined cleanup/transport error still cancels the caller, but cannot certify
 	// provider cancellation support for activation.
-	result.Cancellation = err == GenerationCancelled
+	result.Cancellation = cancelledOnDelta && ctx.Err() == nil && err == GenerationCancelled
 	if !result.Cancellation {
 		if err != nil {
 			return result, err
