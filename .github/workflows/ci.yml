@@ -63,7 +63,11 @@ jobs:
   race:
     name: Race detector
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # The full unchanged race inventory measured 9m40s on a 4-vCPU hosted
+    # runner before teardown, so the old 10-minute job limit cancelled valid
+    # work and then made cleanup report leftover state. Keep test deadlines and
+    # repetitions unchanged; bound only the outer hosted job with teardown room.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
