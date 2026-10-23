@@ -179,6 +179,8 @@ class AgendaTests(unittest.TestCase):
         preview = prepare(report)
         self.assertEqual(len(preview['judge_packets']), 6)
         self.assertTrue(all(p['eligible_for_grading'] is False for p in preview['judge_packets']))
+        self.assertTrue(all(set(p['judge_input']['allowed_steering']) == {'at', 'text'}
+                            for p in preview['judge_packets']))
         self.assertIsNone(preview['scores'])
         self.assertIsNone(preview['winner'])
         self.assertNotIn('PRIVATE_', json.dumps(preview))

@@ -200,7 +200,7 @@ def prepare_agenda(report):
         packets.append(dict(variant_id=variant['variant_id'], eligible_for_grading=False,
             reason='explicit scripted golden Bridge; packet preview only', judge_input=dict(
                 goal=variant['events'][0]['text'], allowed_fixture=dict(clock=case['clock'], world=case['world']),
-                allowed_steering=load_steering()[0],
+                allowed_steering=dict(at=load_steering()[0]['at'], text=row['evidence']['steering']['event']),
                 conversation=[dict(role=m['role'], text=''.join(p.get('text','') for p in m['content']))
                               for m in row['evidence']['steering']['state']['conversation']],
                 final_artifact_summary=[], programmatic_assertions=checks)))
