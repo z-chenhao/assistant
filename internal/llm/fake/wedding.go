@@ -95,18 +95,6 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		}
 		return call("mcp__wedding__read", map[string]string{"resource": "source"})
 	}
-	var data struct {
-		Clock     string            `json:"clock"`
-		Event     map[string]any    `json:"event"`
-		Checklist []map[string]any  `json:"checklist"`
-		Contacts  map[string]string `json:"contacts"`
-	}
-	if json.Unmarshal([]byte(source), &data) != nil || data.Contacts["hotel"] == "" {
-		if last.Role == "tool" && prior.Name == "mcp__wedding__read" {
-			return llm.GenerationResult{Text: "婚礼来源不可用，未联系任何人。"}
-		}
-		return call("mcp__wedding__read", map[string]string{"resource": "source"})
-	}
 	all := ""
 	for _, m := range r.Messages {
 		if m.Role == "user" && m.Origin == "" {
@@ -122,6 +110,49 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		user = user[strings.LastIndex(user, "\n")+1:]
 	} else {
 		user = strings.SplitN(strings.TrimPrefix(user, "Task instruction: "), "\n", 2)[0]
+	}
+	var priorArgs struct {
+		Operation string `json:"operation"`
+	}
+	_ = json.Unmarshal([]byte(prior.Arguments), &priorArgs)
+	// A completed save/publish is progress even when its source/read exchanges
+	// have left the bounded context. Handle these receipts before recovering
+	// inputs; never repeat a completed write to reconstruct transient context.
+	if last.Role == "tool" && prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "save" {
+		var result struct {
+			Refs []string `json:"artifact_refs"`
+		}
+		if json.Unmarshal([]byte(last.Text), &result) != nil || len(result.Refs) != 1 || result.Refs[0] == "" {
+			return llm.GenerationResult{Text: "清单保存未核实，未发布或联系任何人。"}
+		}
+		return call("builtin__artifact__manage", map[string]any{"operation": "publish", "artifactRefs": result.Refs})
+	}
+	if last.Role == "tool" && prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "publish" && strings.Contains(user, "婚期改为") {
+		var result struct {
+			Text string   `json:"text"`
+			Refs []string `json:"artifact_refs"`
+		}
+		var args struct {
+			Refs []string `json:"artifactRefs"`
+		}
+		if json.Unmarshal([]byte(last.Text), &result) != nil || result.Text != "Final artifacts selected." ||
+			json.Unmarshal([]byte(prior.Arguments), &args) != nil || len(args.Refs) != 1 || args.Refs[0] == "" ||
+			len(result.Refs) != 1 || result.Refs[0] != args.Refs[0] {
+			return llm.GenerationResult{Text: "修订清单发布未核实，未联系任何人。"}
+		}
+		return llm.GenerationResult{Text: "修订清单已保存并发布；请查看附件中的婚期、截止日期和已确认人数。桌数仍待确认，未联系任何人。"}
+	}
+	var data struct {
+		Clock     string            `json:"clock"`
+		Event     map[string]any    `json:"event"`
+		Checklist []map[string]any  `json:"checklist"`
+		Contacts  map[string]string `json:"contacts"`
+	}
+	if json.Unmarshal([]byte(source), &data) != nil || data.Contacts["hotel"] == "" {
+		if last.Role == "tool" && prior.Name == "mcp__wedding__read" {
+			return llm.GenerationResult{Text: "婚礼来源不可用，未联系任何人。"}
+		}
+		return call("mcp__wedding__read", map[string]string{"resource": "source"})
 	}
 	confirmed := strings.Contains(all, "128")
 	if strings.Contains(user, "婚期改为") {
@@ -181,10 +212,6 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 	if draft {
 		text = "邮件草稿已保存，等待你审阅冻结的收件人、正文和附件；尚未发送。"
 	}
-	var priorArgs struct {
-		Operation string `json:"operation"`
-	}
-	_ = json.Unmarshal([]byte(prior.Arguments), &priorArgs)
 	if last.Role != "tool" || prior.Name == "mcp__wedding__read" || prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "read" {
 		doc := map[string]any{"event": data.Event, "clock": data.Clock, "checklist": data.Checklist,
 			"facts": map[string]any{"guests": guests, "table_count": nil, "per_table": nil}, "summary": text}
@@ -193,13 +220,6 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		}
 		raw, _ := json.Marshal(doc)
 		return call("builtin__artifact__manage", map[string]string{"operation": "save", "name": "wedding-checklist.json", "mediaType": "application/json", "text": string(raw)})
-	}
-	if prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "save" {
-		var result struct {
-			Refs []string `json:"artifact_refs"`
-		}
-		_ = json.Unmarshal([]byte(last.Text), &result)
-		return call("builtin__artifact__manage", map[string]any{"operation": "publish", "artifactRefs": result.Refs})
 	}
 	if prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "publish" && draft {
 		return call("mcp__wedding__send", mail)

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import verify_gc08 as journey
 import wedding_sandbox as peer
@@ -126,6 +127,19 @@ class WeddingTests(unittest.TestCase):
                   arguments_json=json.dumps(dict(operation='read',artifactRef=artifacts[3]['ref'],limit=4096)),
                   result_json=json.dumps(dict(text=json.dumps(dict(text=artifacts[3]['text'])))))
         after['tools']=tools+[send,read]
+        content='修订清单已保存并发布；请查看附件中的婚期、截止日期和已确认人数。桌数仍待确认，未联系任何人。'
+        refs=[artifacts[-1]['ref']]
+        after['worker_results']=[dict(run_id='root4',content=content)]
+        after['updates'][-1].update(event_id='final-event',kind='completed',content=content,artifact_refs=json.dumps(refs))
+        after['inbox'][-1].update(event_id='final-event',message_json=json.dumps(dict(origin='runtime',custom_type='task_update',
+            content=[dict(type='text',text=content)],details=dict(task_ref='task:existing',kind='completed',artifact_refs=refs))))
+        after['conversation'].append(dict(role='assistant',source='main',message_id='final-message',sequence=7,
+            content=[dict(type='text',text=content),dict(type='file',artifact_ref=refs[0])]))
+        after['deliveries']=[dict(message_id='final-message',status='sent')]
+        source_read=dict(read,invocation_id='source-read',tool_name='mcp__wedding__read',arguments_json='{}')
+        save=dict(read,invocation_id='save',arguments_json=json.dumps(dict(operation='save')))
+        publish=dict(read,invocation_id='publish',arguments_json=json.dumps(dict(operation='publish',artifactRefs=refs)))
+        after['tools']=tools+[send,source_read,read,save,publish]
         stop=copy.deepcopy(paused);stop['tools'][-1].update(status='running',attempt_count=1)
         return dict(variant=dict(source=source,turns=journey.TURNS),artifacts=artifacts[:3],denial=dict(state=state),
                     lifecycle=dict(fixture=fixture,interrupted=interrupted,stop_committed=stop,paused=paused,
@@ -140,11 +154,11 @@ class WeddingTests(unittest.TestCase):
             lambda l:l['resumed']['tasks'][0].update(task_epoch=5),lambda l:l['resumed']['tasks'][0].update(anchor_task='replaced'),
             lambda l:l['resumed']['updates'][-1].update(root_run_id='root3'),lambda l:l['resumed']['tools'][0].update(attempt_count=2),
             lambda l:l['resumed']['tools'][4].update(arguments_json=json.dumps(dict(operation='append'))),
-            lambda l:l['resumed']['tools'][-1].update(result_json=json.dumps(dict(text='{}'))),
+            lambda l:l['resumed']['tools'][-3].update(result_json=json.dumps(dict(text='{}'))),
             lambda l:l['resumed']['artifact'][3].update(content_hash='lost'),lambda l:l['crashes'][0].update(returncode=0),
             lambda l:l['stop_committed']['tasks'][0].update(status='active'),lambda l:l['remote'].append(dict(sent=True)),
             lambda l:l['resumed']['approval'][0].update(status='approved'),lambda l:l['resumed']['automation'].append(dict(enabled=True)),
-            lambda l:l['resumed']['tools'][-2].update(attempt_count=1),lambda l:l['paused_replay']['tasks'][0].update(task_epoch=6)]
+            lambda l:l['resumed']['tools'][6].update(attempt_count=1),lambda l:l['paused_replay']['tasks'][0].update(task_epoch=6)]
         for change in changes:
             bad=copy.deepcopy(row);change(bad['lifecycle'])
             self.assertFalse(all(journey.lifecycle_observe(bad).values()),change)
@@ -174,6 +188,61 @@ class WeddingTests(unittest.TestCase):
         lock=json.loads(journey.LIFECYCLE.with_suffix('.lock.json').read_text())
         self.assertEqual(lock['fixture_sha256'],journey.sha(journey.LIFECYCLE.read_bytes()))
         self.assertNotIn('128',row['lifecycle']['fixture']['resume'])
+
+    def test_resumed_delivery_rejects_failure_missing_or_inconsistent_native_receipts(self):
+        row=self.lifecycle_row()
+        state=row['lifecycle']['resumed'];root=state['runs'][-1];artifact=row['lifecycle']['artifacts'][-1]
+        self.assertTrue(all(journey.resumed_delivery_observe(state,root,artifact).values()))
+        changes=[lambda s:s['worker_results'].clear(),lambda s:s['worker_results'][0].update(content='已提交清单不可用'),
+            lambda s:s['updates'][-1].update(content='different'),lambda s:s['updates'][-1].update(artifact_refs='[]'),
+            lambda s:s['inbox'][-1].update(message_json='{}'),lambda s:s['conversation'][-1]['content'][0].update(text='已提交清单不可用'),
+            lambda s:s['conversation'][-1]['content'].pop(),lambda s:s['deliveries'][0].update(status='pending'),
+            lambda s:s['tools'].append(copy.deepcopy(s['tools'][-1]))]
+        for change in changes:
+            bad=copy.deepcopy(state);change(bad)
+            self.assertFalse(all(journey.resumed_delivery_observe(bad,root,artifact).values()),change)
+
+    def test_judge_recomputes_and_rejects_consistent_failed_delivery(self):
+        # Isolate the new native delivery gate while keeping the real lifecycle
+        # observer. Original three-turn and denial gates have separate tests.
+        checks=dict(unrelated=True)
+        with patch.object(journey,'observe',return_value=checks), patch.object(journey,'denial_observe',return_value=checks):
+            rows=[]
+            for variant in journey.variants():
+                row=self.lifecycle_row();row.update(variant=variant,assertions=checks,denial_assertions=checks,
+                    scope='scripted_whole_case_mechanics',semantic_score=None,
+                    cleanup=dict(owned_processes_joined=True,disposable_root_removed=True))
+                for state in [row['denial']['state'],*[row['lifecycle'][key] for key in
+                        ('interrupted','stop_committed','paused','paused_replay','resumed','replay')]]:
+                    for tool in state['tools']:
+                        args=json.loads(tool['arguments_json'])
+                        if tool['tool_name']=='builtin__task__manage' and args.get('instruction') in journey.TURNS[1:]:
+                            args['instruction']=variant['turns'][journey.TURNS.index(args['instruction'])]
+                            tool['arguments_json']=json.dumps(args);tool['request_hash']=journey.call_hash(tool)
+                    for i,message in enumerate(state['conversation'][:3]):
+                        message['content'][0]['text']=variant['turns'][i]
+                    if state['instructions']:
+                        for i,instruction in enumerate(state['instructions'][:2]):
+                            instruction['instruction']=variant['turns'][i+1]
+                row['lifecycle_assertions']=journey.lifecycle_observe(row)
+                self.assertTrue(all(row['lifecycle_assertions'].values()),row['lifecycle_assertions'])
+                rows.append(row)
+            report=dict(case_id='GC-08',variants=rows,cleanup=True,status='mechanical_pass',semantic_score=None,
+                fixture_lock=json.loads(journey.FIXTURE.with_suffix('.lock.json').read_text()),
+                lifecycle_lock=json.loads(journey.LIFECYCLE.with_suffix('.lock.json').read_text()),
+                source_provenance=dict(before=dict(sha='fixture'),after=dict(sha='fixture')))
+            self.assertEqual(len(evaluator.prepare(report)['judge_packets']),6)
+            # Judge must reject B1 even if the author forges every saved check.
+            base=rows[0];state=base['lifecycle']['resumed']
+            failure='已提交清单不可用，未猜测宾客或桌数，未联系任何人。'
+            state['worker_results'][0]['content']=failure;state['updates'][-1]['content']=failure
+            message=json.loads(state['inbox'][-1]['message_json']);message['content'][0]['text']=failure
+            state['inbox'][-1]['message_json']=json.dumps(message)
+            state['conversation'][-1]['content'][0]['text']=failure
+            base['lifecycle']['replay']=copy.deepcopy(state)
+            base['lifecycle_assertions']={k:True for k in base['lifecycle_assertions']}
+            with self.assertRaisesRegex(ValueError,'failed, drifted'):
+                evaluator.prepare(report)
 
 
 if __name__=='__main__':unittest.main()

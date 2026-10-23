@@ -74,12 +74,29 @@ stateDiagram-v2
     Completed --> Completed: duplicate inputs and restart
 ```
 
-The 34 additional assertions inspect this finite trace, including frozen
+The 39 additional assertions inspect this finite trace, including frozen
 completed model/Tool records, no stale result from Root 4, all five CLI-opened
 Artifacts with hashes/ownership, one completion per successful Root, retained
 denial and zero mail attempts. Mutation regressions reject wrong epochs, revived
 Roots, stale dates, missing read results, lost Artifacts and unexpected effects.
 They supplement the Task-control race/late-write tests, not replace them.
+
+The recovery completion gate reads the native Worker result, TaskUpdate,
+Reporter Inbox and final Main Conversation message, including the selected
+Artifact reference and successful delivery row. It requires a successful revised
+checklist receipt and exactly one source read, Artifact read, save and publish
+in the resumed Root. A completed Run with a failure message is rejected even
+when the revised Artifact is correct. Judge preparation recomputes these checks;
+forged saved assertions cannot hide an inconsistent or failed delivery.
+
+The scripted model handles completed save/publish receipts before recovering old
+inputs. After a verified publish it delivers the revised checklist without
+re-reading compacted source or repeating writes. Missing, failed or mismatched
+Artifact receipts remain unverified. The Go regression uses the real Context
+Builder across read → save → publish → completion and proves old reads were
+removed. Python mutation tests cover each delivery boundary and the original
+false-success report. This fixes fixture progress recognition; it neither widens
+the context window nor changes the Host replay or publication protocol.
 
 The incomplete pause Tool is intentionally interrupted after its domain receipt
 commits but before its Tool result commits. Recovery starts one additional

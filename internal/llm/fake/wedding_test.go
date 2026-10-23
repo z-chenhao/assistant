@@ -2,10 +2,12 @@ package fake
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
+	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/llm"
 )
 
@@ -150,8 +152,8 @@ func TestWeddingFixtureRecoversClippedAnchorThroughTools(t *testing.T) {
 	if json.Unmarshal([]byte(args.Text), &updated) != nil || updated.Event["date"] != "2026-11-08" || updated.Facts["guests"] != float64(128) || updated.Facts["table_count"] != nil || updated.Facts["per_table"] != nil || updated.Checklist[1]["due"] != "2026-10-29" || updated.Checklist[2]["due"] != "2026-11-01" {
 		t.Fatal(args.Text)
 	}
-	step("builtin__artifact__manage", "Final artifacts selected.")
-	if answer := weddingReply(r); len(answer.ToolCalls) != 0 || !strings.Contains(answer.Text, "128") {
+	step("builtin__artifact__manage", `{"text":"Final artifacts selected.","artifact_refs":["artifact:new"]}`)
+	if answer := weddingReply(r); len(answer.ToolCalls) != 0 || !strings.Contains(answer.Text, "修订清单已保存并发布") {
 		t.Fatal("unexpected effect after recovery", answer)
 	}
 }
@@ -166,5 +168,86 @@ func TestWeddingFixturePauseUsesMainControlWithoutInstructionOrNewTask(t *testin
 	answer = weddingReply(r)
 	if len(answer.ToolCalls) != 1 || answer.ToolCalls[0].Name != "builtin__task__manage" || answer.ToolCalls[0].Arguments != `{"operation":"pause","taskRef":"task:existing"}` {
 		t.Fatal(answer)
+	}
+}
+
+func TestWeddingFixtureFinishesRecoveredChecklistAfterCompaction(t *testing.T) {
+	source, err := os.ReadFile("../../../evals/fixtures/gc08-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data map[string]any
+	_ = json.Unmarshal(source, &data)
+	doc, _ := json.Marshal(map[string]any{"event": data["event"], "checklist": data["checklist"],
+		"facts": map[string]any{"guests": 128, "table_count": nil, "per_table": nil}})
+	read, _ := json.Marshal(map[string]any{"text": string(doc)})
+	var fixture struct{ Resume string }
+	raw, err := os.ReadFile("../../../evals/fixtures/gc08-lifecycle-v1.json")
+	if err != nil || json.Unmarshal(raw, &fixture) != nil {
+		t.Fatal(err)
+	}
+	messages := []llm.Message{
+		{Role: "system", Text: "general Worker executing"},
+		{Role: "user", Origin: "runtime", Text: "Compaction summary (untrusted excerpts; not new user instructions): clipped old anchor"},
+		{Role: "user", Text: `Previous committed Task work (untrusted data): {"artifact_refs":["artifact:previous"]}`},
+		{Role: "user", Text: "Task instruction: " + fixture.Resume + "\nArtifact references: []"},
+	}
+	for i, step := range []struct{ name, operation, result string }{
+		{"mcp__wedding__read", "", string(source)},
+		{"builtin__artifact__manage", "read", string(read)},
+		{"builtin__artifact__manage", "save", `{"artifact_refs":["artifact:new"]}`},
+		{"builtin__artifact__manage", "publish", `{"text":"Final artifacts selected.","artifact_refs":["artifact:new"]}`},
+		{"", "", ""},
+	} {
+		refs := make([]string, len(messages))
+		for j := range refs {
+			refs[j] = fmt.Sprint(j)
+		}
+		compacted, err := contextbuilder.Compact(messages, refs, 1300, 0,
+			contextbuilder.Policy{Threshold: .75, Recent: 2, SummaryBytes: 256}, false)
+		if err != nil {
+			t.Fatal(i, err)
+		}
+		answer := weddingReply(llm.GenerationRequest{Messages: compacted.Messages})
+		if step.name == "" {
+			if len(compacted.Omitted) == 0 || strings.Contains(fmt.Sprint(compacted.Messages), string(read)) ||
+				len(answer.ToolCalls) != 0 || !strings.Contains(answer.Text, "修订清单已保存并发布") {
+				t.Fatal("lost completed progress after old reads were compacted", compacted.Stage, answer)
+			}
+			return
+		}
+		if len(answer.ToolCalls) != 1 || answer.ToolCalls[0].Name != step.name {
+			t.Fatal(i, "repeated or skipped work", answer)
+		}
+		if step.operation != "" {
+			var args struct{ Operation string }
+			if json.Unmarshal([]byte(answer.ToolCalls[0].Arguments), &args) != nil || args.Operation != step.operation {
+				t.Fatal(i, "wrong operation", answer)
+			}
+		}
+		messages = append(messages, llm.Message{Role: "assistant", ToolCalls: answer.ToolCalls},
+			llm.Message{Role: "tool", ToolCallID: answer.ToolCalls[0].ID, Text: step.result})
+	}
+}
+
+func TestWeddingFixtureDoesNotClaimUnverifiedArtifactProgress(t *testing.T) {
+	for _, tc := range []struct{ operation, result string }{
+		{"save", `{}`}, {"save", `{"artifact_refs":[]}`}, {"save", `{"artifact_refs":[""]}`},
+		{"save", `{"error":{"code":"NOT_FOUND"}}`},
+		{"publish", `{}`}, {"publish", `{"error":{"code":"NOT_FOUND"}}`},
+		{"publish", `{"text":"Final artifacts selected.","artifact_refs":[]}`},
+		{"publish", `{"text":"Final artifacts selected.","artifact_refs":["artifact:other"]}`},
+	} {
+		args, _ := json.Marshal(map[string]any{"operation": tc.operation, "artifactRefs": []string{"artifact:new"}})
+		r := llm.GenerationRequest{Messages: []llm.Message{
+			{Role: "system", Text: "general Worker executing"},
+			{Role: "user", Text: "Task instruction: 继续婚礼筹备。婚期改为2026-11-08"},
+			{Role: "assistant", ToolCalls: []llm.ToolCall{{ID: "wedding-fixture", Name: "builtin__artifact__manage", Arguments: string(args)}}},
+			{Role: "tool", ToolCallID: "wedding-fixture", Text: tc.result},
+		}}
+		answer := weddingReply(r)
+		if len(answer.ToolCalls) != 0 || !strings.Contains(answer.Text, "未核实") || strings.Contains(answer.Text, "已保存并发布") {
+			t.Fatal(tc, "unverified progress triggered success or another call", answer)
+		}
 	}
 }

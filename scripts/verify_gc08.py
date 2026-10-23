@@ -145,6 +145,35 @@ def reopen(h):
     return artifacts
 
 
+def resumed_delivery_observe(value,root,artifact):
+    """Read native completion at every delivery boundary, not only Run status."""
+    results=[r for r in value.get('worker_results',[]) if r['run_id']==root['run_id']]
+    updates=[u for u in value['updates'] if u['root_run_id']==root['run_id']]
+    update=updates[0] if len(updates)==1 else {}
+    inbox=[i for i in value['inbox'] if i.get('event_id')==update.get('event_id')]
+    report=json.loads(inbox[0]['message_json']) if len(inbox)==1 else {}
+    replies=[m for m in value['conversation'] if m['role']=='assistant']
+    reply=replies[-1] if replies else {}
+    text=lambda parts:''.join(p.get('text','') for p in parts)
+    content=results[0].get('content','') if len(results)==1 else ''
+    refs=[artifact['ref']]
+    tools=[t for t in value['tools'] if t['run_id']==root['run_id']]
+    return dict(
+        resumed_worker_reports_success=content.startswith('修订清单已保存并发布') and '桌数仍待确认' in content and
+            '未联系任何人' in content and '不可用' not in content and '未核实' not in content,
+        resumed_task_update_matches_result=len(updates)==1 and update.get('kind')=='completed' and
+            update.get('content')==content and json.loads(update.get('artifact_refs','null'))==refs,
+        resumed_reporter_matches_result=len(inbox)==1 and report.get('origin')=='runtime' and
+            report.get('custom_type')=='task_update' and text(report.get('content',[]))==content and
+            report.get('details')==dict(kind='completed',task_ref=value['tasks'][0]['task_ref'],artifact_refs=refs),
+        resumed_main_delivers_result=bool(content) and text(reply.get('content',[]))==content and
+            [p.get('artifact_ref') for p in reply.get('content',[]) if p.get('type')=='file']==refs and
+            len([d for d in value['deliveries'] if d['message_id']==reply.get('message_id') and d['status']=='sent'])==1,
+        resumed_no_repeated_work=[(t['tool_name'],json.loads(t['arguments_json']).get('operation')) for t in tools]==[
+            ('mcp__wedding__read',None),('builtin__artifact__manage','read'),
+            ('builtin__artifact__manage','save'),('builtin__artifact__manage','publish')])
+
+
 def lifecycle_observe(row):
     """Observe a bounded pause/continue trace; not a general state proof."""
     receipt=row['lifecycle'];fixture=json.loads(LIFECYCLE.read_text())
@@ -164,6 +193,7 @@ def lifecycle_observe(row):
     pause=pause_calls[0] if len(pause_calls)==1 else {}
     recovered_pause=next((t for t in after['tools'] if t['invocation_id']==pause.get('invocation_id')), {})
     checks=task_assertions(after,1,5,4)
+    checks.update(resumed_delivery_observe(after,fresh,artifacts[-1]))
     checks.update(
         lifecycle_fixture=receipt['fixture']==fixture,
         original_turns_preserved=[p['text'] for m in after['conversation'] if m['role']=='user' for p in m['content']]==
