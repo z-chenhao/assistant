@@ -31,19 +31,19 @@ def pair(value):
 
 
 def collect(repo, key):
+    root = os.environ.get('ERII_EVIDENCE_ROOT')
+    if not root:
+        raise ValueError('ERII_EVIDENCE_ROOT must name durable local evidence storage')
     run_id, number = key.split(':')
     prefix = f'repos/{repo}/actions/runs/{run_id}'
     run = profile.gh('api', prefix + '/attempts/' + number)
     pages = profile.gh('api', '--paginate', '--slurp', prefix + f'/attempts/{number}/jobs?per_page=100')
     jobs = [job for page in pages for job in page['jobs']]
-    metadata = inventory(repo, int(run_id), int(number))
+    metadata = inventory(repo, int(run_id), int(number), run_info=run)
     artifacts = metadata['artifacts']
     reports = {}
     allowed = {'suite-' + name + '.json' for name in SHARDS}
     allowed.add('core-summary.json')
-    root = os.environ.get('ERII_EVIDENCE_ROOT')
-    if not root:
-        raise ValueError('ERII_EVIDENCE_ROOT must name durable local evidence storage')
     transfers = []
     for artifact in artifacts:
         # Fast/race/part archives cannot supply a canonical suite report.

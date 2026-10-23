@@ -117,8 +117,8 @@ def collect(root, source, ident, records, profile, includes=()):
     def walk(folder):
         for path in sorted(folder.iterdir()):
             name = path.relative_to(source).as_posix()
-            denied = path.name in EXCLUDED or path.name.endswith(ARCHIVES)
-            if denied and name not in includes:
+            denied = any(part in EXCLUDED for part in path.relative_to(source).parts) or path.name.lower().endswith(ARCHIVES)
+            if denied and not any(inc == name or inc.startswith(name + '/') for inc in includes):
                 excluded.append(name)
                 continue
             if path.is_symlink():
@@ -227,11 +227,11 @@ def export(manifest, purpose):
         return result
 
 
-def inventory(repo, run, attempt):
+def inventory(repo, run, attempt, run_info=None):
     # The artifact list spans attempts. Names are the existing CI SHA/attempt contract.
     identity('metadata', repo, '0' * 40, str(run), attempt)
     prefix = f'repos/{repo}/actions/runs/{run}'
-    info = gh('api', prefix + f'/attempts/{attempt}')
+    info = run_info if run_info is not None else gh('api', prefix + f'/attempts/{attempt}')
     if info['id'] != run or info['run_attempt'] != attempt:
         raise ValueError('run/attempt metadata mismatch')
     sha = info['head_sha']
