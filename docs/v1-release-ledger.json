@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "audited_base": "4e337ad2caff82116e4e4658ea526945b4ba4759",
+  "audited_base": "0c6d964130168da1c93650e77c455d32556b3bf5",
   "sources": {
     "docs/technical-design.md": {
       "sha256": "f55d9dd1e5e11e5db1935d31c1b0bebeaa9bacdd8968244a99e9bb886e352fab",
@@ -606,10 +606,11 @@
       "prs": [
         "1",
         "31",
-        "33"
+        "33",
+        "36"
       ],
       "evidence": [
-        "docs/development.md",
+        "docs/guides/verification.md",
         "docs/guides/operations.md"
       ]
     },
@@ -929,6 +930,13 @@
       "merged_at": "2026-10-23T06:56:39Z",
       "merged_by": "z-chenhao",
       "merge_commit": "4e337ad2caff82116e4e4658ea526945b4ba4759"
+    },
+    "36": {
+      "title": "ERII-201: consolidate CLI, docs and capability verification; trim CI setup",
+      "url": "https://github.com/z-chenhao/erii/pull/36",
+      "merged_at": "2026-10-23T08:17:42Z",
+      "merged_by": "z-chenhao",
+      "merge_commit": "0c6d964130168da1c93650e77c455d32556b3bf5"
     }
   },
   "golden_cases": {

@@ -5,10 +5,10 @@ ERII-4 must remain `in_progress`; ERII-30 must not be accepted as a completed
 release. This document and its ledger are an initial source/evidence inventory,
 not a claim that every normative requirement has passed.
 
-The current synchronized base is `4e337ad2caff82116e4e4658ea526945b4ba4759`
-(human-merged #35; #33–34 remain integrated); ERII-29 #31 remains the prior release dependency.
+The current synchronized base is `0c6d964130168da1c93650e77c455d32556b3bf5`
+(human-merged #36; #33–35 remain integrated); ERII-29 #31 remains the prior release dependency.
 ERII-5–29 each have a merged implementation PR. The ledger records GitHub's
-actual merge commit, actor, time and URL; #34–35 were refreshed on 2026-10-23. A merge records
+actual merge commit, actor, time and URL; #34–36 were refreshed on 2026-10-23. A merge records
 integration, not semantic quality, exact-SHA review or final human acceptance.
 
 ## Reproduce and inspect
@@ -250,3 +250,14 @@ passed. `make test`, `make test-race`, `make lint` and `make verify` are distinc
 checks. CI green is not full v1 acceptance. The final milestone/child/PR and
 recovery report must be refreshed on ERII-4 after all gaps close; parent
 `in_review` is permitted only then and `done` requires human acceptance.
+
+
+Main #36 arrived during review handoff. Its extracted CLI owners and central
+verification guide are integrated. The sole workflow conflict preserves both
+main's delivery-only browser setup and the communication MCP sandbox required
+by GC-08/12/14. The new guide catalogue includes all three communication gates;
+the ledger's deleted development-document reference now points to that maintained
+guide. Normative source hashes and all partial review content remain unchanged.
+Prior 03afb82 full local/CI receipts remain bound to that historical SHA. The
+post-merge head requires its own affected verification and exact-SHA CI/review;
+no earlier verdict transfers.

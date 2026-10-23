@@ -30,6 +30,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
+        with:
+          frontend: "true"
+          browser: "true"
       - name: Install pinned offline Browser test runtime
         run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
       - name: Unit tests and lint
@@ -146,6 +149,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
         with:
+          browser: ${{ matrix.shard == 'delivery' }}
           sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' || matrix.shard == 'communication' }}
           temporary-fixtures: ${{ matrix.shard == 'providers' }}
       - name: Install pinned offline Web test browser
@@ -185,6 +189,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
         with:
+          browser: ${{ matrix.m6part != 'context' && matrix.m6part != 'memory' }}
           sandbox: "true"
       - name: Install pinned offline M6 Browser runtime
         if: matrix.m6part != 'context' && matrix.m6part != 'memory'

@@ -7,9 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/z-chenhao/erii/internal/interaction/web"
 	"io"
-	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -17,26 +15,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mattn/go-isatty"
-	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
 	computerfixture "github.com/z-chenhao/erii/internal/computer/macosvm/fixture"
 	"github.com/z-chenhao/erii/internal/config"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/fake"
 	"github.com/z-chenhao/erii/internal/llm/secret"
 	"github.com/z-chenhao/erii/internal/maintenance"
-	"github.com/z-chenhao/erii/internal/memory"
-	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/startup"
 	mcpfake "github.com/z-chenhao/erii/internal/tool/mcp/fake"
-	"github.com/z-chenhao/erii/internal/tui"
 )
 
 func main() {
@@ -375,187 +365,25 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		application.StartMemory(ctx)
 	}
 	if webCommand {
-		if cfg.Web == nil {
-			return errors.New("web configuration is required")
-		}
-		bindings, err := application.ChannelBindings(ctx)
-		if err != nil {
-			return err
-		}
-		found := false
-		for _, b := range bindings {
-			if b.Channel == "web" && b.Subject == web.Subject && b.Destination == web.Destination {
-				found = true
-			}
-		}
-		if !found {
-			if _, err := application.BindChannel(ctx, "web", web.Subject, web.Destination, true, 0); err != nil {
-				return err
-			}
-		}
-		return foreground(func(ctx context.Context) error {
-			listener, err := net.Listen("tcp", cfg.Web.Listen)
-			if err != nil {
-				return errors.New("web listener unavailable")
-			}
-			defer listener.Close()
-			if err = json.NewEncoder(out).Encode(map[string]string{"url": "http://" + listener.Addr().String()}); err != nil {
-				return err
-			}
-			return application.ServeWeb(ctx, listener, *cfg.Web)
-		})
+		return runWeb(ctx, application, cfg, out, foreground)
 	}
 	if channelCommand {
-		var q struct {
-			Op          string `json:"op"`
-			Channel     string `json:"channel"`
-			Subject     string `json:"subject"`
-			Destination string `json:"destination"`
-			Enabled     bool   `json:"enabled"`
-			Version     int64  `json:"version"`
-			BindingID   string `json:"binding_id"`
-		}
-		dec := json.NewDecoder(io.LimitReader(in, 64<<10))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&q); err != nil {
-			return errors.New("invalid channel control request")
-		}
-		return application.ManageChannel(ctx, q.Op, q.Channel, q.Subject, q.Destination, q.Enabled, q.Version, q.BindingID, out)
+		return runChannel(ctx, application, flags, in, out)
 	}
 	if deliveryCommand {
-		if flags.Arg(1) == "work" {
-			if err := application.Deliver(ctx); err != nil {
-				return err
-			}
-		}
-		requests, err := application.DeliveryRequests(ctx)
-		if err != nil {
-			return err
-		}
-		// The CLI protocol uses RFC 3339 UTC; SQLite keeps UTC microseconds.
-		views := make([]struct {
-			delivery.Request
-			CreatedAt time.Time `json:"created_at"`
-			UpdatedAt time.Time `json:"updated_at"`
-		}, len(requests))
-		for i, r := range requests {
-			views[i].Request = r
-			views[i].CreatedAt = time.UnixMicro(r.CreatedAt).UTC()
-			views[i].UpdatedAt = time.UnixMicro(r.UpdatedAt).UTC()
-		}
-		return json.NewEncoder(out).Encode(views)
+		return runDelivery(ctx, application, flags, in, out)
 	}
 	if automationCommand {
-		if flags.Arg(1) == "work" {
-			return foreground(application.WorkAutomations)
-		}
-		if flags.Arg(1) == "tick" {
-			if e := application.ScheduleAutomations(ctx); e != nil {
-				return e
-			}
-			return json.NewEncoder(out).Encode(map[string]bool{"accepted": true})
-		}
-		q := automation.Request{Operation: "list"}
-		if flags.Arg(1) == "manage" {
-			raw, e := io.ReadAll(io.LimitReader(in, 16385))
-			if e != nil || len(raw) > 16384 {
-				return automation.ErrInvalid
-			}
-			q, e = automation.Parse(string(raw))
-			if e != nil {
-				return e
-			}
-		}
-		key := flags.Arg(2)
-		if key == "" {
-			key = "list"
-		}
-		result, e := application.ManageAutomation(ctx, key, q)
-		if e != nil {
-			return e
-		}
-		return json.NewEncoder(out).Encode(result)
+		return runAutomation(ctx, application, flags, in, out, foreground)
 	}
 	if artifactCommand {
-		switch flags.Arg(1) {
-		case "save":
-			d, e := application.SaveArtifact(ctx, artifact.Input{Name: flags.Arg(2), MediaType: flags.Arg(3)}, in)
-			if e != nil {
-				return e
-			}
-			return json.NewEncoder(out).Encode(d)
-		case "open":
-			f, e := application.OpenArtifact(ctx, flags.Arg(2))
-			if e != nil {
-				return e
-			}
-			defer f.Close()
-			_, e = io.Copy(out, f)
-			return e
-		case "describe":
-			d, e := application.DescribeArtifact(ctx, flags.Arg(2))
-			if e != nil {
-				return e
-			}
-			return json.NewEncoder(out).Encode(d)
-		case "delete":
-			version, e := strconv.ParseInt(flags.Arg(3), 10, 64)
-			if e != nil {
-				return artifact.ErrInvalid
-			}
-			if e = application.DeleteArtifact(ctx, flags.Arg(2), version); e != nil {
-				return e
-			}
-			return json.NewEncoder(out).Encode(map[string]string{"status": "deleted"})
-		case "cleanup":
-			report, e := application.CleanupArtifacts(ctx, flags.Arg(2) != "apply")
-			if e != nil {
-				return e
-			}
-			return json.NewEncoder(out).Encode(report)
-		}
+		return runArtifact(ctx, application, flags, in, out)
 	}
 	if skillCommand {
-		raw, e := io.ReadAll(io.LimitReader(in, 16385))
-		if e != nil || len(raw) > 16384 {
-			return errors.New("invalid experience request")
-		}
-		q, ok := skill.ParseReview(raw)
-		if !ok {
-			return errors.New("invalid experience request")
-		}
-		result, e := application.ReviewExperience(ctx, q)
-		if e != nil {
-			return e
-		}
-		return json.NewEncoder(out).Encode(result)
+		return runSkill(ctx, application, flags, in, out)
 	}
 	if memoryCommand {
-		if flags.Arg(1) == "manage" {
-			raw, e := io.ReadAll(io.LimitReader(in, 16385))
-			if e != nil || len(raw) > 16384 {
-				return errors.New("invalid memory request")
-			}
-			m, ok := memory.Parse(string(raw))
-			if !ok {
-				return errors.New("invalid memory request")
-			}
-			result, e := application.ManageMemory(ctx, flags.Arg(2), m)
-			if e != nil {
-				return e
-			}
-			return json.NewEncoder(out).Encode(result)
-		}
-		if flags.Arg(1) == "work" {
-			if e := application.CurateMemory(ctx); e != nil {
-				return e
-			}
-		}
-		result, e := application.MemoryStatus(ctx)
-		if e != nil {
-			return e
-		}
-		return json.NewEncoder(out).Encode(result)
+		return runMemory(ctx, application, flags, in, out)
 	}
 	if spendCommand {
 		values, err := application.Spend(ctx)
@@ -565,229 +393,17 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return json.NewEncoder(out).Encode(values)
 	}
 	if approvalCommand {
-		switch flags.Arg(1) {
-		case "list":
-			values, err := application.Approvals(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(values)
-		case "reconcile":
-			values, err := application.ReconcileTools(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(values)
-		default:
-			decision := "approved"
-			if flags.Arg(1) == "deny" {
-				decision = "denied"
-			}
-			if err := application.DecideApproval(ctx, flags.Arg(2), flags.Arg(3), decision); err != nil {
-				return err
-			}
-		}
-		return json.NewEncoder(out).Encode(struct {
-			Status string `json:"status"`
-		}{"recorded"})
+		return runApproval(ctx, application, flags, in, out)
 	}
 
 	if terminalCommand {
-		input, ok := in.(io.ReadCloser)
-		if !ok {
-			input = io.NopCloser(in)
-		}
-		if file, ok := in.(*os.File); ok {
-			input, err = tui.OpenInput(file)
-			if err != nil {
-				return err
-			}
-		}
-		return foreground(func(ctx context.Context) error { return application.Terminal().Run(ctx, input, out) })
+		return runTerminal(ctx, application, in, out, foreground)
 	}
 	if chatCommand {
-		switch flags.Arg(1) {
-		case "send", "send-parts":
-			value, err := io.ReadAll(io.LimitReader(in, 16385))
-			if err != nil || len(value) > 16384 {
-				return errors.New("expected chat text of at most 16 KiB on stdin")
-			}
-			key := flags.Arg(2)
-			if key == "" {
-				key = uuid.Must(uuid.NewV7()).String()
-			}
-			var receipt agent.Receipt
-			if flags.Arg(1) == "send-parts" {
-				var parts []conversation.ContentPart
-				dec := json.NewDecoder(bytes.NewReader(value))
-				dec.DisallowUnknownFields()
-				if dec.Decode(&parts) != nil {
-					return conversation.ErrInvalid
-				}
-				var extra any
-				if dec.Decode(&extra) != io.EOF {
-					return conversation.ErrInvalid
-				}
-				receipt, err = application.SubmitParts(ctx, key, parts)
-			} else {
-				receipt, err = application.Actor(nil).Submit(ctx, key, string(value))
-			}
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(receipt)
-		case "work":
-			workErr := application.Actor(nil).Drain(ctx)
-			if ctx.Err() != nil && workErr == ctx.Err() {
-				return nil
-			}
-			deliveryErr := application.Deliver(ctx)
-			if err := errors.Join(workErr, deliveryErr); err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(struct {
-				Status string `json:"status"`
-			}{"drained"})
-		case "history":
-			messages, err := application.History(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(messages)
-		}
+		return runChat(ctx, application, flags, in, out)
 	}
 	if modelCommand {
-		switch flags.Arg(1) {
-		case "accounts":
-			accounts, err := application.Models().Accounts(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(accounts)
-		case "login-chatgpt":
-			connection, err := application.Accounts().Login(ctx, flags.Arg(2), func(event llm.AuthEvent) { _ = json.NewEncoder(out).Encode(event) })
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(connection)
-		case "refresh":
-			connection, _, err := application.Accounts().Ensure(ctx, flags.Arg(2))
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(connection)
-		case "logout":
-			revoked, err := application.Accounts().Logout(ctx, flags.Arg(2))
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(map[string]any{"status": "logged_out", "remote_revocation_confirmed": revoked})
-		case "account-catalog", "account-add":
-			auth, _, err := application.Accounts().Ensure(ctx, flags.Arg(2))
-			if err != nil {
-				return err
-			}
-			models, err := application.AccountCatalog(ctx, auth.ConnectionID)
-			if err != nil {
-				return err
-			}
-			if flags.Arg(1) == "account-catalog" {
-				return json.NewEncoder(out).Encode(models)
-			}
-			for _, m := range models {
-				if m.ModelID == flags.Arg(3) {
-					input := llm.ProfileInput{Name: m.ModelID, ProviderKind: "openai_account", WireAPI: "openai_responses", ModelID: m.ModelID, AuthConnectionID: auth.ConnectionID, ContextWindow: m.ContextWindow, MaxOutputTokens: min(m.MaxOutputTokens, m.ContextWindow), Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true}}
-					profile, err := application.Models().AddProfile(ctx, input)
-					if err != nil {
-						return err
-					}
-					return json.NewEncoder(out).Encode(profile)
-				}
-			}
-			return llm.ModelNotFound
-		case "discover":
-			models, err := application.Discover(ctx, flags.Arg(2), flags.Arg(3))
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(models)
-		case "login":
-			var connection llm.AuthConnection
-			var err error
-			if flags.NArg() == 3 {
-				connection, err = application.LoginEnvironment(ctx, flags.Arg(2))
-			} else {
-				value, readErr := io.ReadAll(io.LimitReader(in, 8193))
-				if readErr != nil || len(value) > 8192 {
-					return llm.ErrSecretStore
-				}
-				value = []byte(strings.TrimSuffix(strings.TrimSuffix(string(value), "\n"), "\r"))
-				connection, err = application.LoginKey(ctx, value)
-				for i := range value {
-					value[i] = 0
-				}
-			}
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(connection)
-		case "catalog":
-			var models []llm.CatalogModel
-			var err error
-			if flags.NArg() == 3 {
-				models, err = application.CatalogProfile(ctx, flags.Arg(2))
-			} else {
-				models, err = application.Catalog(ctx)
-			}
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(models)
-		case "test":
-			r, err := application.ModelControl().Test(ctx, flags.Arg(2))
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(r)
-		case "select":
-			if *testBridge == "" {
-				fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to the selected provider (OpenAI account requests use https://api.openai.com/v1) or your configured local endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Erii never switches providers automatically.")
-			}
-			pv, err := strconv.ParseInt(flags.Arg(3), 10, 64)
-			if err != nil || pv < 1 {
-				return llm.ErrConflict
-			}
-			cv, err := strconv.ParseInt(flags.Arg(4), 10, 64)
-			if err != nil || cv < 1 {
-				return llm.ErrConflict
-			}
-			if err := application.ModelControl().Select(ctx, flags.Arg(2), pv, cv); err != nil {
-				return err
-			}
-			d, err := application.Diagnostics(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(d)
-		case "cancel":
-			d, err := application.Diagnostics(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(d)
-		}
-		if flags.Arg(1) == "list" {
-			profiles, err := application.Models().ListProfiles(ctx)
-			if err != nil {
-				return err
-			}
-			return json.NewEncoder(out).Encode(profiles)
-		}
-		profile, err := application.Models().AddProfile(ctx, input)
-		if err != nil {
-			return err
-		}
-		return json.NewEncoder(out).Encode(profile)
+		return runModel(ctx, application, flags, in, out, input, *testBridge != "", errOut)
 	}
 	diagnostics, err := application.Diagnostics(ctx)
 	if err != nil {
