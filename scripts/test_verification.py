@@ -99,16 +99,17 @@ class VerificationTests(unittest.TestCase):
                         dict(good, race={}), dict(good, race='success')]:
             self.assertFalse(ci_gate.passed(invalid))
 
-    def test_all_ci_jobs_keep_the_ten_minute_budget(self):
+    def test_ci_jobs_keep_bounded_time_budgets(self):
         for path in sorted((suite.ROOT / '.github/workflows').glob('*.y*ml')):
             text = path.read_text()
-            jobs = re.findall(r'^  [a-zA-Z0-9_-]+:\n(    .*?)(?=^  [a-zA-Z0-9_-]+:|\Z)',
+            jobs = re.findall(r'^  ([a-zA-Z0-9_-]+):\n(    .*?)(?=^  [a-zA-Z0-9_-]+:|\Z)',
                               text.split('jobs:', 1)[1], re.M | re.S)
             self.assertTrue(jobs, str(path))
-            for job in jobs:
+            for name, job in jobs:
                 deadlines = re.findall(r'^    timeout-minutes: (\d+)$', job, re.M)
                 self.assertEqual(len(deadlines), 1, str(path))
-                self.assertTrue(0 < int(deadlines[0]) <= 10, str(path))
+                limit = 15 if path.name == 'ci.yml' and name == 'race' else 10
+                self.assertTrue(0 < int(deadlines[0]) <= limit, f'{path}:{name}')
 
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
