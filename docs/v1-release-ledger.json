@@ -1354,8 +1354,8 @@
       "line": 416,
       "sha256": "5cefcd8baa09471ad1d1b97665bb4759009f4e257950a38fde753be9b9b3d3c5",
       "disposition": "partial_mechanical",
-      "observed": "真实生产CLI两轮Main请求引用各自创建时冻结的ModelSnapshot；driver校验所有代次和批准profile/version/limits，无test-bridge。",
-      "remaining": "尚未在本checkpoint热切换活动模型，也没有Root/Child继承或Durable Replay的单独逐项验收；保留原有SC证据义务。",
+      "observed": "真实生产CLI两轮Main请求引用各自创建时冻结的ModelSnapshot；driver校验所有代次和批准profile/version/limits，无test-bridge。 本轮另执行 Main 活跃期切换及 Child admission 沿 Parent 冻结 Model/Capability 的命名回归（含定向 race）；新 Main 使用新 Profile。",
+      "remaining": "确定性回归和 GC-14 profile-at-admission 不能证明全部后代深度、真实跨 Provider 或每个崩溃交错；实际长期树、同条件模型比较和当前 L2/人审仍需证据。",
       "code": [
         "internal/agent/loop.go#ContinueAgentLoop",
         "internal/agent/sqlite/runs.go#model_snapshot_id",
@@ -1364,11 +1364,14 @@
       ],
       "tests": [
         "scripts/test_gc11_driver.py#test_missing_duplicate_reused_or_drifted_trials_are_rejected",
-        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output"
+        "scripts/test_gc11_driver.py#test_comparison_cli_rejects_incomplete_rerun_and_clears_stale_output",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch"
       ],
       "evidence": [
         "scripts/verify_local_provider.py#verify_gc11_driver",
-        "docs/gc11-evaluation.md#Offline contract"
+        "docs/gc11-evaluation.md#Offline contract",
+        "docs/v1-model-audit.md#Maintained reproduction"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     },
@@ -3467,6 +3470,570 @@
         "docs/gc08-verification.md",
         "scripts/verify_gc08.py#drive_lifecycle",
         "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.2",
+      "line": 446,
+      "sha256": "9bfeccd64b2fcfd67808afaece2c12eeb7b5e578c4db9b0a7c3d78bf5dbab7af",
+      "disposition": "evidence_gap",
+      "observed": "Profile/Compatibility/Capabilities/Auth 类型与存储可追踪；执行了元数据重启、CAS、快照和激活测试。",
+      "remaining": "该围栏含多项字段/枚举；未逐字段认证账号生命周期、可选模态、reasoning 或采样能力。",
+      "code": [
+        "internal/llm/model.go#ProfileInput",
+        "internal/llm/sqlite/store.go#FreezeProfile",
+        "internal/llm/sqlite/probe.go#Select"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestModelMetadataRestartCASAndAtomicEvents",
+        "internal/agent/sqlite/models_test.go#TestSnapshotImmutabilityFrozenValuesAndRollback",
+        "internal/agent/sqlite/provider_test.go#TestAtomicActivationRollbackAndFencing"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.2",
+      "line": 507,
+      "sha256": "6dc8f6dd2508b910a5c15edb5c405b37edb7242a3b3351f891042ceb2598353a",
+      "disposition": "partial_mechanical",
+      "observed": "执行合成密钥失败清理/脱敏、真实 CLI keyed/keyless 以及 DB/日志的密钥扫描；Profile 不含凭据字段。",
+      "remaining": "合成密钥扫描不证明所有秘密、真实 OS SecretStore 或实际账号生命周期；当前 L2 仍缺。",
+      "code": [
+        "internal/llm/model.go#ProfileInput",
+        "internal/llm/control.go#TestWithProgress",
+        "internal/llm/sqlite/local.go#Resolver"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestAuthSecretFailureCleanupAndRedaction",
+        "internal/agent/sqlite/local_provider_test.go#TestLocalCredentialResolutionRejectsWrongKindAndMissingSecret"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.2",
+      "line": 508,
+      "sha256": "854795eec9de1a868fc09dbbc8317d7ef5a944bc3e84fa74f4f3f0c7c4370327",
+      "disposition": "partial_mechanical",
+      "observed": "已执行快照不可更新/删除、版本/端点哈希保留、Profile 和 auth 元数据更新后不变及重启读回；快照不含 endpoint/credential ref。",
+      "remaining": "auth 元数据刷新不是实际 OAuth rotation；同账号自动刷新及整个 Root/Child 恢复仍需 §5.4/live 证据。",
+      "code": [
+        "internal/llm/model.go#ProfileInput",
+        "internal/llm/sqlite/store.go#FreezeProfile",
+        "internal/llm/sqlite/local.go#Resolver"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestSnapshotImmutabilityFrozenValuesAndRollback",
+        "internal/agent/sqlite/local_provider_test.go#TestFrozenEndpointAndUsageSurviveProfileEditAndRestart",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.2",
+      "line": 509,
+      "sha256": "1cde768e692c3849e1234576db47aa38a51be2f7e757e157a4e7bdc5edacf111",
+      "disposition": "partial_mechanical",
+      "observed": "Generation 从 run.Snapshot/run.Tools 构建请求；执行了 Main/Child 切换及同快照 context-length 恢复且不重跑 Tool。",
+      "remaining": "命名确定性回归不覆盖全部 Context Builder/Tool Schema 变更与崩溃交错；真实跨 Provider 长期树未认证。",
+      "code": [
+        "internal/agent/sqlite/generation.go#Generation",
+        "internal/llm/sqlite/store.go#FreezeProfile"
+      ],
+      "tests": [
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/memory_test.go#TestContextLengthRetryKeepsSnapshotAndDoesNotReplayTools"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.2",
+      "line": 510,
+      "sha256": "6ab3a4ff5b50877032b9aa5b2d8ee96c29b659fd07640da810764b3ddbd42034",
+      "disposition": "partial_mechanical",
+      "observed": "Profile 更新用 CAS 且撤销验证；选择原子更新规范化 Profile/AgentConfig/Outbox；旧 Snapshot/endpoint/usage 重启仍可读。",
+      "remaining": "本轮未认证全部历史用量查询、账号切换或用户设置与长期运行/崩溃组合。",
+      "code": [
+        "internal/llm/sqlite/probe.go#Select",
+        "internal/llm/sqlite/store.go#FreezeProfile",
+        "internal/llm/sqlite/local.go#Resolver"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestModelMetadataRestartCASAndAtomicEvents",
+        "internal/agent/sqlite/provider_test.go#TestAtomicActivationRollbackAndFencing",
+        "internal/agent/sqlite/provider_test.go#TestActivationConcurrentConfigCAS",
+        "internal/agent/sqlite/local_provider_test.go#TestFrozenEndpointAndUsageSurviveProfileEditAndRestart"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.2",
+      "line": 511,
+      "sha256": "44572f842b2911e1eeb012331bc8aba78e7b41e8da6dde380869dc692a503c6d",
+      "disposition": "partial_mechanical",
+      "observed": "候选与执行界限分开；context 1048576/output 65536 上界测试通过；激活清空未经证明的 sampling/compatibility 声明。",
+      "remaining": "未完成真实目录价格/上下文/reasoning 的规范化矩阵；可选参数需正向 Probe，保守禁用不等于支持。",
+      "code": [
+        "internal/llm/model.go#ValidateActivation",
+        "internal/llm/sqlite/probe.go#Select"
+      ],
+      "tests": [
+        "internal/llm/model_test.go#TestActivationLimitsDoNotRestrictDiagnosticMetadata",
+        "internal/agent/sqlite/provider_test.go#TestAtomicActivationRollbackAndFencing",
+        "provider-bridge/test/bridge.test.mjs#unsupported sampling"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 515,
+      "sha256": "2975930e6425bcb8acbea5ec8816926253954bbefc2aa17baf31c735651b11dd",
+      "disposition": "partial_mechanical",
+      "observed": "真实 CLI model add URL MODEL_ID 建立未验证 Profile，标准驱动通过 Test/Select，无需手写 models.json。",
+      "remaining": "该证据不认证首次设置 UI 或真实本地模型；只观察受控 CLI。",
+      "code": [
+        "cmd/erii/models.go",
+        "internal/llm/model.go#ProfileInput"
+      ],
+      "tests": [
+        "internal/agent/sqlite/models_test.go#TestModelMetadataRestartCASAndAtomicEvents",
+        "provider-bridge/test/bridge.test.mjs#manual ID still generates when catalog unavailable"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 517,
+      "sha256": "f792bfef0a394dbf18dbdda7e5778b60f8d37c58cc2ccd8a34b9fe97b3fd43b3",
+      "disposition": "partial_mechanical",
+      "observed": "示例 openai_compatible/Chat Completions/可空 auth 对应 ProfileInput；loopback peer 的同结构输入经 CLI 完成。",
+      "remaining": "示例模型名与 8000 端口不是可用服务证据；未运行示例 Qwen 权重。",
+      "code": [
+        "internal/llm/model.go#ProfileInput",
+        "cmd/erii/models.go"
+      ],
+      "tests": [
+        "internal/llm/model_test.go#TestProfileValidationBoundaries",
+        "provider-bridge/test/bridge.test.mjs#catalog and Pi streaming with"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 525,
+      "sha256": "f749f0aa94ab4944de066ac5e717728a9599708f691326363de5d6f6b06dab11",
+      "disposition": "partial_mechanical",
+      "observed": "HTTP(S) 校验拒绝凭据/query/fragment/空 host；Go 启动 Node/Pi 请求显式 loopback endpoint，CLI 选择前输出 localhost 隐私提示。",
+      "remaining": "未执行独立 Guest 网络命名空间或真实 HTTPS/TLS；不声称建议 URL 上已有模型。",
+      "code": [
+        "internal/llm/model.go#ProfileInput",
+        "provider-bridge/bridge.mjs#function transport",
+        "cmd/erii/models.go"
+      ],
+      "tests": [
+        "internal/llm/model_test.go#TestProfileValidationBoundaries",
+        "provider-bridge/test/bridge.test.mjs#catalog and Pi streaming with"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 526,
+      "sha256": "a17a06d25daee57a223f7c082c6cf68871033afb5cc3660d80c07f3e8386e47c",
+      "disposition": "partial_mechanical",
+      "observed": "keyless HTTP 无 Authorization；显式合成 Key 经临时 connection 到指定 origin，缺 Key 被拒绝且 DB/日志扫描无该 Key。",
+      "remaining": "未测试所有 OS SecretStore 或要求任意 Bearer 的真实上游；不能认证真实账号访问。",
+      "code": [
+        "internal/llm/control.go#TestWithProgress",
+        "internal/llm/sqlite/local.go#Resolver",
+        "provider-bridge/bridge.mjs#function transport"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#catalog and Pi streaming with",
+        "internal/agent/sqlite/local_provider_test.go#TestLocalCredentialResolutionRejectsWrongKindAndMissingSecret",
+        "internal/agent/sqlite/models_test.go#TestAuthSecretFailureCleanupAndRedaction"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 527,
+      "sha256": "10f7f7be290c2d2d3466e9e01b3680f527be10b17637b6d8dfb9e9608ba0a8d8",
+      "disposition": "partial_mechanical",
+      "observed": "Node/CLI 观察 GET /models；目录 404 时手填 ID 可完成真实推理协议 Probe，未将目录作为激活条件。",
+      "remaining": "回答来自合成 peer；真实目录/模型存在性及服务兼容性尚缺。",
+      "code": [
+        "cmd/erii/models.go",
+        "internal/llm/control.go#TestWithProgress",
+        "provider-bridge/bridge.mjs#function transport"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#manual ID still generates when catalog unavailable",
+        "internal/llm/probe_test.go#TestProbeColdLocalModel"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 528,
+      "sha256": "672a60c164b5afb45758ae387da2a50438041e4b9613762e299533f54ee697bc",
+      "disposition": "partial_mechanical",
+      "observed": "存储五项 Compatibility；激活使用保守 openai Tool Result，其余未经观察字段为 false；不支持请求网络前拒绝。",
+      "remaining": "缺每项可选 compatibility 的正向 Probe，不能把保守值当作该能力可用。",
+      "code": [
+        "internal/llm/model.go#ProfileInput",
+        "internal/llm/sqlite/probe.go#Select",
+        "provider-bridge/bridge.mjs#async function generate"
+      ],
+      "tests": [
+        "internal/agent/sqlite/provider_test.go#TestAtomicActivationRollbackAndFencing",
+        "provider-bridge/test/bridge.test.mjs#unsupported sampling"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 529,
+      "sha256": "81125b51c7a8e04914eea6bea134f4f48729f34bc247157851b67053034ef0ba",
+      "disposition": "evidence_gap",
+      "observed": "真实 Go/Node/Pi 与合成 HTTP peer 完成 Chat Completions/Tool continuation；本地 Responses 网络前拒绝。",
+      "remaining": "未执行实际 Qwen/vLLM/SGLang/LM Studio 各自契约；本地 Responses 不支持且未认证。",
+      "code": [
+        "provider-bridge/bridge.mjs#async function generate",
+        "internal/llm/sqlite/local.go#Resolver"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#catalog and Pi streaming with",
+        "provider-bridge/test/bridge.test.mjs#unsupported sampling"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 530,
+      "sha256": "cf2a6ce3a6f06a7a8b48be64b1a9e15e2438422583129c3e886c40067595dd99",
+      "disposition": "partial_mechanical",
+      "observed": "激活清空 temperature/top_p；捕获请求验证未设置时省略，含不支持 sampling/reasoning 的冻结请求在网络前拒绝。",
+      "remaining": "没有真实模型支持声明后的正向发送证据；保守不发送不能证明所有 reasoning 模型兼容。",
+      "code": [
+        "internal/llm/sqlite/probe.go#Select",
+        "internal/llm/control.go#TestWithProgress",
+        "provider-bridge/bridge.mjs#async function generate"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#catalog and Pi streaming with",
+        "provider-bridge/test/bridge.test.mjs#unsupported sampling"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 531,
+      "sha256": "92ba03dc428a985261cc5a2661d30b6126bb51e0ae5f7bed4a0d7a723f856cb5",
+      "disposition": "partial_mechanical",
+      "observed": "CLI 执行流、Tool Call/Result continuation、delta 后取消及 Host 裁剪；Tool-less 重测关闭 ingress；命名测试覆盖超时/取消。",
+      "remaining": "合成 URL/鉴权错误不证明真实 TLS、模型存在性、真实长输出或当前 L2。",
+      "code": [
+        "internal/llm/control.go#TestWithProgress",
+        "internal/llm/probe.go#RunWithProgress",
+        "internal/llm/sqlite/probe.go#Select"
+      ],
+      "tests": [
+        "internal/llm/probe_test.go#TestProbeColdLocalModel",
+        "internal/llm/probe_test.go#TestProbeDeadlineAndCallerCancellation",
+        "internal/agent/sqlite/provider_test.go#TestFailedRetestRevokesOnlyCurrentProof"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 532,
+      "sha256": "d4e3bbc79597f5017501551e5c23d9c6f2bba48b004898579b194620a688143f",
+      "disposition": "partial_mechanical",
+      "observed": "蓝色方块经现有图像 envelope；CLI 显式选择/文本模式 wire 图片数为 [0,0,1]/[0,0,0]；旧缺图像证明不能激活，失败重测关闭入口。",
+      "remaining": "颜色由脚本回答且 Computer 为 Fake；真实视觉能力、macOS 截图与全部输入尺寸未认证。",
+      "code": [
+        "internal/llm/probe.go#RunWithProgress",
+        "internal/llm/sqlite/probe.go#Select",
+        "internal/agent/sqlite/generation.go#Generation",
+        "provider-bridge/bridge.mjs#async function generate"
+      ],
+      "tests": [
+        "internal/agent/sqlite/provider_test.go#TestImageActivationRequiresObservedProofAndDeclaration",
+        "internal/agent/sqlite/provider_test.go#TestFailedRetestRevokesOnlyCurrentProof"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.3",
+      "line": 533,
+      "sha256": "193f62264d21774068d98f6311e8d97eb7a0f7f81ad2ea07772e0e61352535f9",
+      "disposition": "partial_mechanical",
+      "observed": "独立跨 origin 307 receiver 对 keyed catalog/generation 零请求；配置 origin 收到 Key，每项仅一次、无 completed；follow 变异被拒绝；既有测试验证有界响应/安全错误/空 stderr。",
+      "remaining": "只测 loopback 两 origin 的 307 及现有同源拒绝；其他状态、TLS/proxy、全部敏感内容及真实 Provider 日志未观察。",
+      "code": [
+        "provider-bridge/bridge.mjs#function transport",
+        "provider-bridge/bridge.mjs#async function generate"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#cross-origin redirects reach neither catalog nor generation receiver",
+        "provider-bridge/test/bridge.test.mjs#normalizes errors and bounds attempts",
+        "internal/agent/sqlite/models_test.go#TestAuthSecretFailureCleanupAndRedaction"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 571,
+      "sha256": "f1c31f7f9344fcba90d4a5d033b88cb18e1a7eff576e912ee62b6ea7f289078a",
+      "disposition": "partial_mechanical",
+      "observed": "模型经 Control 显式选择；实际 CLI 未选择保持 setup_required；Main 活跃期切换及新 Main/Child admission 回归通过。",
+      "remaining": "缺实际不同隐私/费用 Provider outage 场景；静态路由与合成回归不能认证所有路径无自动 fallback。",
+      "code": [
+        "internal/llm/control.go#TestWithProgress",
+        "internal/llm/sqlite/local.go#Resolver",
+        "internal/llm/account/provider.go"
+      ],
+      "tests": [
+        "internal/agent/sqlite/provider_test.go#TestAtomicActivationRollbackAndFencing",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 572,
+      "sha256": "561831ee0222f056a7a4e97d91ad7289fd812ecc94f2507e063f328a0c8ba8c9",
+      "disposition": "partial_mechanical",
+      "observed": "本地 CLI 连接显式 endpoint 并持久化 Profile/Probe；失败重测后同 Profile 再 Test/Select 的存储回归通过。",
+      "remaining": "未执行真实 Qwen/vLLM 离线/恢复；启动 Bridge 不是启动模型服务器，全部健康诊断未认证。",
+      "code": [
+        "cmd/erii/models.go",
+        "internal/llm/control.go#TestWithProgress",
+        "internal/llm/probe.go#RunWithProgress"
+      ],
+      "tests": [
+        "internal/agent/sqlite/provider_test.go#TestFailedRetestRevokesOnlyCurrentProof",
+        "internal/llm/probe_test.go#TestProbeColdLocalModel",
+        "internal/llm/probe_test.go#TestProbeDeadlineAndCallerCancellation"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 573,
+      "sha256": "3fa77415a3589cad93f73d3db8d38ae4705162a608b444331b60e05fa1e3525c",
+      "disposition": "partial_mechanical",
+      "observed": "失败重测使 active Profile/config degraded 并关闭 ingress，重测/选择可恢复；旧 Main 保留快照，新 Run 采用新 Profile。",
+      "remaining": "已有真实长运行 Task 服务停机、用户切换后 Main 决策创建新业务 Run 的完整场景未执行。",
+      "code": [
+        "internal/llm/control.go#TestWithProgress",
+        "internal/llm/sqlite/probe.go#Select",
+        "internal/llm/sqlite/local.go#Resolver"
+      ],
+      "tests": [
+        "internal/agent/sqlite/provider_test.go#TestFailedRetestRevokesOnlyCurrentProof",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 574,
+      "sha256": "c7680535c6ba3e687a1124930a050dab14ed418a3b2e841d67a697593d7340db",
+      "disposition": "partial_mechanical",
+      "observed": "执行 Main/Child 切换、不可变 Snapshot/旧端点重启读回及同 Snapshot context-length 重试保留 Tool 结果。",
+      "remaining": "不覆盖全部后代深度和 Durable Replay kill 点；model/wire/Tool Schema 漂移完整跨进程矩阵仍需验收。",
+      "code": [
+        "internal/llm/sqlite/store.go#FreezeProfile",
+        "internal/llm/sqlite/local.go#Resolver",
+        "internal/agent/sqlite/generation.go#Generation"
+      ],
+      "tests": [
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/local_provider_test.go#TestFrozenEndpointAndUsageSurviveProfileEditAndRestart",
+        "internal/agent/sqlite/memory_test.go#TestContextLengthRetryKeepsSnapshotAndDoesNotReplayTools"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 575,
+      "sha256": "4745e45db44e5d2ba7b911f5375cbd633d712153adbfa817a1479e33d8c61f1e",
+      "disposition": "partial_mechanical",
+      "observed": "本地 origin/path/endpoint hash 校验；account 路径单独解析且禁自定义 endpoint；CLI 激活提示隐私，跨 origin receiver 无请求。",
+      "remaining": "真实 OpenAI 可信端点、各 UI 隐私提示首次展示/回看及 TLS/proxy 行为尚未观察。",
+      "code": [
+        "provider-bridge/bridge.mjs#function transport",
+        "provider-bridge/bridge.mjs#async function generate",
+        "internal/llm/account/provider.go",
+        "cmd/erii/models.go"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#cross-origin redirects reach neither catalog nor generation receiver",
+        "internal/agent/sqlite/local_provider_test.go#TestFrozenEndpointAndUsageSurviveProfileEditAndRestart",
+        "internal/llm/model_test.go#TestProfileValidationBoundaries"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 576,
+      "sha256": "eb7e210e32d7f2deb46c2a47bbb06b0751ae64aeba6d331cfb33c7683deb756d",
+      "disposition": "evidence_gap",
+      "observed": "实际 CLI usage 绑定 snapshot_id/token/latency/error；缺 usage 保持 null；执行 unpriced/unconfigured/usage_missing 测试，不把缺数据算免费。",
+      "remaining": "四类显式零费率的所有配置入口与真实 host/GPU 资源未由本轮证明；同条件 local/account 费用/资源比较缺失。",
+      "code": [
+        "internal/llm/sqlite/local.go#Resolver",
+        "internal/agent/sqlite/spend.go#settleSpend"
+      ],
+      "tests": [
+        "internal/agent/sqlite/local_provider_test.go#TestFrozenEndpointAndUsageSurviveProfileEditAndRestart",
+        "internal/agent/sqlite/spend_test.go#TestSpendUnpricedUnconfiguredAndMissingUsage",
+        "provider-bridge/test/bridge.test.mjs#catalog and Pi streaming with"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "5.6",
+      "line": 577,
+      "sha256": "b775241fcc0041c494e09e1bf09cd9af6a463448dfd8a80ad8c0f07181cc2bc9",
+      "disposition": "partial_mechanical",
+      "observed": "Node 测八类错误、有界 transient 重试和部分流不重试；Go 实际 Pi 崩溃拒绝部分结果并恢复 Bridge；context-length 保持 Snapshot 且不重跑 Tool。",
+      "remaining": "真实 Provider 限流/鉴权/无效响应及 active Task outage 仍缺 live；同 generation 边界不代表全部状态与副作用验收。",
+      "code": [
+        "provider-bridge/bridge.mjs#function transport",
+        "provider-bridge/bridge.mjs#async function generate",
+        "internal/agent/sqlite/generation.go#Generation"
+      ],
+      "tests": [
+        "provider-bridge/test/bridge.test.mjs#normalizes errors and bounds attempts",
+        "internal/llm/bridge/local_test.go#TestActualPiBridgeClippingCrashAndRestart",
+        "internal/agent/sqlite/memory_test.go#TestContextLengthRetryKeepsSnapshotAndDoesNotReplayTools"
+      ],
+      "evidence": [
+        "scripts/verify_local_provider.py#verify",
+        "docs/v1-model-audit.md#Maintained reproduction"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }

@@ -28,7 +28,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Ninety-eight blocks now have exact-hash
+can silently discard a mandatory clause. One hundred twenty-two blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -41,6 +41,14 @@ Changing a normative source requires deliberate re-audit and digest update.
 A missing file/symbol/section/PR reference fails the inventory; a failed rerun
 removes its previous report. Unit tests exercise these rejection paths and
 the nonzero completion boundary through the actual CLI.
+
+[The model connection audit](v1-model-audit.md) adds 24 individual dispositions
+for §5.2, §5.3 and the seven normative §5.6 bullets, and strengthens the existing
+§5 frozen-snapshot disposition with named Main/Child switch regressions. A new
+two-origin HTTP contract proves keyed catalog and generation redirects never
+reach the receiver; a disposable follow-redirect mutation is rejected. Real
+provider compatibility, all optional capabilities and live privacy/resource
+claims remain unverified. This does not complete those clauses or the release.
 
 ## Confirmed coverage gaps
 
