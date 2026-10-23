@@ -164,6 +164,30 @@ class EvidenceTests(unittest.TestCase):
         with patch.object(ev, 'gh', return_value=dict(id=42, run_attempt=2)):
             with self.assertRaises(ValueError): ev.inventory('owner/repo', 42, 1)
 
+    def test_concurrent_readers_download_one_immutable_object(self):
+        from concurrent.futures import ThreadPoolExecutor
+        metadata = self.metadata()
+        with patch.object(ev, 'read', side_effect=self.download) as download:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                results = list(pool.map(lambda _: ev.artifact_archive(self.root, metadata, 7), range(4)))
+        self.assertEqual(download.call_count, 1)
+        self.assertEqual(sorted(r['downloaded_bytes'] for _, r in results), [0, 0, 0, len(self.payload)])
+
+    def test_export_receipt_crash_reuses_complete_archive_without_repackaging(self):
+        manifest = self.collect()
+        original_save = ev.save
+        def crash(path, value):
+            if path.name == 'receipt.json':
+                raise InterruptedError()
+            original_save(path, value)
+        with patch.object(ev, 'save', side_effect=crash):
+            with self.assertRaises(InterruptedError): ev.export(manifest, 'required final consumer')
+        archive = manifest.parent / 'export/evidence.zip'
+        before = archive.stat().st_mtime_ns, ev.sha256_file(archive)
+        result = ev.export(manifest, 'required final consumer')
+        self.assertEqual((archive.stat().st_mtime_ns, result['archive']['sha256']), before)
+
+
 class ExistingCollectorTests(unittest.TestCase):
     def test_comparison_collects_only_canonical_reports_and_reuses_immutable_archive(self):
         import ci_compare as compare
