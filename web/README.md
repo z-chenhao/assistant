@@ -9,7 +9,7 @@ the existing forms and semantic fallback remain usable without JavaScript.
 
 | Source | Revision | Reused code or asset | Local changes |
 | --- | --- | --- | --- |
-| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card,textarea}.tsx`, `web/src/lib/utils.ts`, neutral style tokens | Component source preserved; Erii supplies layout, routes and content |
+| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card,textarea}.tsx`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Erii supplies layout, routes and content |
 | [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | `apps/app/src/components/generative-ui/table-catalog.tsx` native `DataTable` and Zod props | Remove the CopilotKit catalog registration/import; retain validation and accessible table; map the existing UISpec table through a private adapter |
 | [eri](https://github.com/z-chenhao/eri) | `f4dcf11f29d17a2be517acb2a50dad08318edc40` | `assets/brand/eri-icon-192.png`, `eri-favicon-32.png` | Original bytes; the same character is the logo and default agent avatar |
 

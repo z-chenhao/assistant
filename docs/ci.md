@@ -374,3 +374,11 @@ duplicate scheduling/replay, two SIGKILL boundaries, a profile change at later
 admission and cancellation. This adds no timeout changes or reductions to the
 existing GC-12 five-round and GC-08 gates. See
 [GC-14 verification](gc14-verification.md). All semantic scores remain null.
+
+## Low-bandwidth evidence handoff
+
+Use the [local-first evidence commands](guides/evidence.md) to retain raw results
+outside worktree cleanup, share one small receipt and verify same-host files.
+Inspect exact run/attempt metadata before downloading an immutable artifact ID;
+hash-verified warm retrieval transfers zero archive bytes. Mandatory CI part/join
+artifacts and final exports keep their existing completeness and retention rules.

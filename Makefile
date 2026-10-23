@@ -55,3 +55,9 @@ verify: build
 # recorded whole-case/audit/model/L2 gaps remain; deterministic CI stays offline.
 release-audit:
 	python3 scripts/release_audit.py --require-complete
+
+# Use a fresh durable fixture root outside the checkout; never contacts GitHub.
+.PHONY: verify-evidence
+verify-evidence:
+	@test -n "$(EVIDENCE_ROOT)" || { echo 'Set EVIDENCE_ROOT to a fresh absolute durable fixture root'; exit 1; }
+	python3 scripts/evidence_harness.py --root "$(EVIDENCE_ROOT)" --sha "$$(git rev-parse HEAD)" --evidence "$(EVIDENCE_ROOT)/report.json"
