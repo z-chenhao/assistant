@@ -1,11 +1,7 @@
 .PHONY: setup install run build test test-race lint verify
 
 setup:
-	npm ci --prefix provider-bridge --ignore-scripts
-	npm ci --prefix runtime/javascript --ignore-scripts
-	npm ci --prefix guest-browser --ignore-scripts
-	npm ci --prefix web --ignore-scripts
-	node guest-browser/node_modules/playwright-core/cli.js install chromium
+	python3 scripts/setup.py $(SETUP_FLAGS)
 
 install:
 	sh install.sh

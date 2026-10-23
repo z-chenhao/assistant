@@ -27,25 +27,15 @@ runs:
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version-file: .node-version
-        cache: npm
-        cache-dependency-path: |
-          provider-bridge/package-lock.json
-          runtime/javascript/package-lock.json
-          guest-browser/package-lock.json
-          web/package-lock.json
+        # Hosted npm restore is intentionally absent; native setup has a bounded
+        # cache-miss path and local worktrees reuse their existing npm cache.
     - name: Install pinned dependencies
       shell: bash
       run: |
-        npm ci --prefix provider-bridge --ignore-scripts
-        npm ci --prefix runtime/javascript --ignore-scripts
-    - name: Install pinned Browser dependencies
-      if: inputs.browser == 'true'
-      shell: bash
-      run: npm ci --prefix guest-browser --ignore-scripts
-    - name: Install pinned frontend build dependencies
-      if: inputs.frontend == 'true'
-      shell: bash
-      run: npm ci --prefix web --ignore-scripts
+        packages=(provider-bridge runtime/javascript)
+        if [ "${{ inputs.browser }}" = true ]; then packages+=(guest-browser); fi
+        if [ "${{ inputs.frontend }}" = true ]; then packages+=(web); fi
+        python3 scripts/setup.py --part packages --packages "${packages[@]}"
     - name: Provision copied public SDK
       shell: bash
       run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json

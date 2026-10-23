@@ -106,10 +106,14 @@ class VerificationTests(unittest.TestCase):
                               text.split('jobs:', 1)[1], re.M | re.S)
             self.assertTrue(jobs, str(path))
             for name, job in jobs:
-                deadlines = re.findall(r'^    timeout-minutes: (\d+)$', job, re.M)
+                deadlines = re.findall(r'^    timeout-minutes: (.+)$', job, re.M)
                 self.assertEqual(len(deadlines), 1, str(path))
-                limit = 15 if path.name == 'ci.yml' and name == 'race' else 10
-                self.assertTrue(0 < int(deadlines[0]) <= limit, f'{path}:{name}')
+                if path.name == 'ci.yml' and name == 'verify':
+                    self.assertEqual(deadlines[0], "${{ matrix.shard == 'delivery' && 15 || 10 }}")
+                else:
+                    self.assertRegex(deadlines[0], r'^\d+$')
+                    limit = 15 if path.name == 'ci.yml' and name == 'race' else 10
+                    self.assertTrue(0 < int(deadlines[0]) <= limit, f'{path}:{name}')
 
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
