@@ -182,53 +182,10 @@ def aggregate_trials(store, rows, plan, policy, models):
                 protected_cases=sorted(PROTECTED), required_repetitions=5)
 
 
-def decide(root, pack_path, expected_hash, now=None):
-    now = now or datetime.now(timezone.utc)
-    data = pack_path.read_bytes()
-    require(hashed(data) == expected_hash, 'pack does not match independently supplied hash')
-    pack = strict_json(data)
-    require(pack.get('version') == 1, 'unsupported private pack')
-    sha = git(root, 'rev-parse', 'HEAD').decode().strip()
-    require(pack['binding']['release_sha'] == sha, 'stale release SHA')
-    ledger = strict_json((root / 'docs/v1-release-ledger.json').read_bytes())
-    inventory = release_audit.audit(root, ledger)
-    sources = {p: v['sha256'] for p, v in inventory['sources'].items()}
-    policy_path = root / 'evals/scoring-v1.json'
-    _, policy, _ = load_contract(root)
-    require(policy_path.read_bytes() == source_blob(str(root), sha, 'evals/scoring-v1.json'),
-            'scoring policy differs from release commit')
-    suite = pack['suite']
-    binding = dict(release_sha=sha, sources=sources, scoring_sha256=hashed(policy_path.read_bytes()),
-                   suite_sha256=digest(suite))
-    require(pack['binding'] == binding, 'source/scoring/suite binding mismatch')
-    store = Receipts(pack_path.parent, binding,
-                     timestamp(git(root, 'show', '-s', '--format=%cI', sha).decode().strip()))
+def _operational_gates(store, pack, models, sha, now):
+    """Check native safety/operations/live evidence after source and trial admission."""
     gates = {}
-    gates['scope_review'] = review(store, pack['scope_review'], digest(suite), now, pack['author'])
-    require(set(suite) == {'cases', 'models', 'systems', 'safety'}, 'release suite inventory mismatch')
-    require(set(suite['cases']) == CASES and set(suite['models']) == ARMS and
-            set(suite['systems']) == SYSTEMS and set(suite['safety']) == SAFETY, 'full v1 suite required')
-    models = {arm: model_identity(suite['models'][arm]) for arm in ARMS}
-    require(models['local']['provider_kind'] == 'openai_compatible' and
-            models['account']['provider_kind'] == 'openai_account', 'local/account comparison arms required')
-    for case, definition in suite['cases'].items():
-        require(bool(definition['assertions']) and len(set(definition['assertions'])) == len(definition['assertions']),
-                'reviewed whole-case assertions required')
-        require(set(definition['conditions']) == VARIANTS, 'all wording/noise/order variants required')
-        require(set(definition['not_applicable']) == DIMENSIONS - set(definition['applicable_dimensions']),
-                'all dimension dispositions required')
-        for conditions in definition['conditions'].values():
-            require(set(conditions) == CONDITIONS and all(v is not None for v in conditions.values()),
-                    'incomplete comparison conditions')
-            require(all(hash_value(v) for k, v in conditions.items() if k.endswith('_sha256')),
-                    'invalid comparison hash')
-    clauses = clause_results(root, store, inventory['source_units'], pack['clauses'], sha, now)
-    gates['source_clauses'] = 'verified' if all(v['status'] == 'verified' for v in clauses.values()) else 'unmet'
-    evaluation = aggregate_trials(store, pack['trials'], suite['cases'], policy, models)
-    gates['golden_cases'] = 'verified' if evaluation['complete'] and all(
-        v['status'] == 'verified' for v in evaluation['arms'].values()) else 'unmet'
-    gates['reporting_metrics'] = 'verified' if evaluation['complete'] and all(
-        v['metrics_complete'] for v in evaluation['arms'].values()) else 'unmet'
+    suite = pack['suite']
     for category, names in [('systems', SYSTEMS), ('safety', SAFETY)]:
         receipts = pack.get(category, {})
         require(set(receipts) <= names, 'unknown system/safety gate')
@@ -283,6 +240,57 @@ def decide(root, pack_path, expected_hash, now=None):
         gates['native_ci'] = 'verified' if passed and ci_gate.passed(join['needs']) else 'rejected'
     gates['final_human_acceptance'] = review(store, pack['human_acceptance'],
         digest({k: v for k, v in pack.items() if k != 'human_acceptance'}), now, pack['author'], human=True) if pack.get('human_acceptance') else 'unmet'
+    return gates
+
+
+def decide(root, pack_path, expected_hash, now=None):
+    now = now or datetime.now(timezone.utc)
+    data = pack_path.read_bytes()
+    require(hashed(data) == expected_hash, 'pack does not match independently supplied hash')
+    pack = strict_json(data)
+    require(pack.get('version') == 1, 'unsupported private pack')
+    sha = git(root, 'rev-parse', 'HEAD').decode().strip()
+    require(pack['binding']['release_sha'] == sha, 'stale release SHA')
+    ledger = strict_json((root / 'docs/v1-release-ledger.json').read_bytes())
+    inventory = release_audit.audit(root, ledger)
+    sources = {p: v['sha256'] for p, v in inventory['sources'].items()}
+    policy_path = root / 'evals/scoring-v1.json'
+    _, policy, _ = load_contract(root)
+    require(policy_path.read_bytes() == source_blob(str(root), sha, 'evals/scoring-v1.json'),
+            'scoring policy differs from release commit')
+    suite = pack['suite']
+    binding = dict(release_sha=sha, sources=sources, scoring_sha256=hashed(policy_path.read_bytes()),
+                   suite_sha256=digest(suite))
+    require(pack['binding'] == binding, 'source/scoring/suite binding mismatch')
+    store = Receipts(pack_path.parent, binding,
+                     timestamp(git(root, 'show', '-s', '--format=%cI', sha).decode().strip()))
+    gates = {}
+    gates['scope_review'] = review(store, pack['scope_review'], digest(suite), now, pack['author'])
+    require(set(suite) == {'cases', 'models', 'systems', 'safety'}, 'release suite inventory mismatch')
+    require(set(suite['cases']) == CASES and set(suite['models']) == ARMS and
+            set(suite['systems']) == SYSTEMS and set(suite['safety']) == SAFETY, 'full v1 suite required')
+    models = {arm: model_identity(suite['models'][arm]) for arm in ARMS}
+    require(models['local']['provider_kind'] == 'openai_compatible' and
+            models['account']['provider_kind'] == 'openai_account', 'local/account comparison arms required')
+    for case, definition in suite['cases'].items():
+        require(bool(definition['assertions']) and len(set(definition['assertions'])) == len(definition['assertions']),
+                'reviewed whole-case assertions required')
+        require(set(definition['conditions']) == VARIANTS, 'all wording/noise/order variants required')
+        require(set(definition['not_applicable']) == DIMENSIONS - set(definition['applicable_dimensions']),
+                'all dimension dispositions required')
+        for conditions in definition['conditions'].values():
+            require(set(conditions) == CONDITIONS and all(v is not None for v in conditions.values()),
+                    'incomplete comparison conditions')
+            require(all(hash_value(v) for k, v in conditions.items() if k.endswith('_sha256')),
+                    'invalid comparison hash')
+    clauses = clause_results(root, store, inventory['source_units'], pack['clauses'], sha, now)
+    gates['source_clauses'] = 'verified' if all(v['status'] == 'verified' for v in clauses.values()) else 'unmet'
+    evaluation = aggregate_trials(store, pack['trials'], suite['cases'], policy, models)
+    gates['golden_cases'] = 'verified' if evaluation['complete'] and all(
+        v['status'] == 'verified' for v in evaluation['arms'].values()) else 'unmet'
+    gates['reporting_metrics'] = 'verified' if evaluation['complete'] and all(
+        v['metrics_complete'] for v in evaluation['arms'].values()) else 'unmet'
+    gates.update(_operational_gates(store, pack, models, sha, now))
     ready = all(state == 'verified' for state in gates.values())
     rejected = (any(state == 'rejected' for state in gates.values()) or
                 any(row['status'] == 'rejected' for row in clauses.values()) or

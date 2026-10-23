@@ -145,6 +145,23 @@ class PackFixture:
         path.write_text(json.dumps(pack))
         return decision.decide(ROOT, path, receipts.hashed(path.read_bytes()), NOW)
 
+    def store(self):
+        return receipts.Receipts(self.folder, self.binding, receipts.timestamp(OBSERVED))
+
+    def operational_gates(self, pack):
+        return decision._operational_gates(self.store(), pack,
+            {arm: receipts.model_identity(model) for arm, model in pack['suite']['models'].items()}, self.sha, NOW)
+
+    def evaluate(self, pack):
+        return decision.aggregate_trials(self.store(), pack['trials'], pack['suite']['cases'],
+            json.loads((ROOT / 'evals/scoring-v1.json').read_text()),
+            {arm: receipts.model_identity(model) for arm, model in pack['suite']['models'].items()})
+
+    def trial(self, row):
+        return receipts.trial(self.store(), row['trial'], row['judge'], self.pack['suite']['cases'],
+            json.loads((ROOT / 'evals/scoring-v1.json').read_text()),
+            {arm: receipts.model_identity(model) for arm, model in self.pack['suite']['models'].items()})
+
     def mutate_trial(self, pack, change):
         row = pack['trials'][0]
         value = self.read(row['trial'])
@@ -169,6 +186,9 @@ class PackFixture:
 
 
 class ReleaseDecisionTests(unittest.TestCase):
+    # The full composition and CLI tests cover the complete evidence join.
+    # Negative contracts call the actual responsible validator, so changing one
+    # receipt does not recheck 1,585 unrelated clauses and 1,200 valid trials.
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(prefix='erii-release-mechanism-')
@@ -208,7 +228,7 @@ class ReleaseDecisionTests(unittest.TestCase):
                 pack = copy.deepcopy(self.pack)
                 pack[category].pop(name)
                 self.fixture.accept(pack)
-                self.assertFalse(self.fixture.decide(pack)['release_ready'])
+                self.assertEqual(self.fixture.operational_gates(pack)[name], 'unmet')
         self.pack['human_acceptance'] = None
         self.assertFalse(self.fixture.decide(self.pack)['release_ready'])
 
@@ -218,10 +238,10 @@ class ReleaseDecisionTests(unittest.TestCase):
             pack = copy.deepcopy(self.pack)
             pack[category][name].pop()
             self.fixture.accept(pack)
-            self.assertFalse(self.fixture.decide(pack)['release_ready'])
+            self.assertEqual(self.fixture.operational_gates(pack)[name], 'unmet')
         self.pack['systems']['SC-03'].reverse()
         with self.assertRaises(ValueError):
-            self.fixture.decide(self.pack)
+            self.fixture.operational_gates(self.pack)
 
     def test_duplicate_trial_source_and_wrong_suite_sha_are_rejected(self):
         for field in ('trials', 'clauses'):
@@ -244,26 +264,26 @@ class ReleaseDecisionTests(unittest.TestCase):
                 pack = copy.deepcopy(self.pack)
                 self.fixture.mutate_trial(pack, change)
                 with self.assertRaises(ValueError):
-                    self.fixture.decide(pack)
+                    self.fixture.trial(pack['trials'][0])
 
     def test_null_grade_is_inconclusive_and_mechanical_failure_overrides_judge(self):
         self.fixture.mutate_trial(self.pack, lambda v: v['mechanical_dimensions']['T'].update(score=None))
         self.fixture.accept(self.pack)
-        report = self.fixture.decide(self.pack)
-        self.assertFalse(report['release_ready'])
-        self.assertIsNone(report['evaluation']['cases']['account']['GC-01']['score'])
+        result = self.fixture.trial(self.pack['trials'][0])
+        self.assertEqual(result['status'], 'ungraded')
+        self.assertIsNone(result['final_score'])
         for category in ('assertions', 'hard_failure_checks'):
             pack = copy.deepcopy(self.fixture.pack)
             self.fixture.mutate_trial(pack, lambda v: v[category].update({next(iter(v[category])): False}))
             # Assertion drift relative to the Judge input rejects even earlier.
             if category == 'assertions':
                 with self.assertRaises(ValueError):
-                    self.fixture.decide(pack)
+                    self.fixture.trial(pack['trials'][0])
             else:
                 self.fixture.accept(pack)
-                result = self.fixture.decide(pack)
-                self.assertFalse(result['release_ready'])
-                self.assertEqual(result['evaluation']['cases']['account']['GC-01']['minimum'], 0)
+                result = self.fixture.trial(pack['trials'][0])
+                self.assertEqual(result['status'], 'fail')
+                self.assertEqual(result['final_score'], 0)
 
     def test_judge_binding_dimension_citation_and_invalid_numeric_reject(self):
         for mutation in ('subject', 'packet', 'dimension', 'citation', 'bool', 'range'):
@@ -282,7 +302,7 @@ class ReleaseDecisionTests(unittest.TestCase):
                     judge['native_response'] = self.fixture.file(response)
                 row['judge'] = self.fixture.file(judge)
                 with self.assertRaises(ValueError):
-                    self.fixture.decide(pack)
+                    self.fixture.trial(pack['trials'][0])
 
     def test_old_l2_expired_rejected_or_checkpoint_review_never_pass(self):
         for mutation in ('sha', 'expiry', 'rejected', 'checkpoint', 'human'):
@@ -299,12 +319,11 @@ class ReleaseDecisionTests(unittest.TestCase):
             pack['live']['computer'] = self.fixture.file(gate)
             self.fixture.accept(pack)
             if mutation in ('expiry', 'rejected'):
-                result = self.fixture.decide(pack)
-                self.assertFalse(result['release_ready'])
-                self.assertEqual(result['gates']['computer'], 'expired' if mutation == 'expiry' else 'rejected')
+                result = self.fixture.operational_gates(pack)
+                self.assertEqual(result['computer'], 'expired' if mutation == 'expiry' else 'rejected')
             else:
                 with self.assertRaises(ValueError):
-                    self.fixture.decide(pack)
+                    self.fixture.operational_gates(pack)
 
     def test_unmerged_pr_and_current_reference_tamper_rejected(self):
         for mutation in ('pr', 'code', 'source'):
@@ -336,10 +355,10 @@ class ReleaseDecisionTests(unittest.TestCase):
             pack['native_ci'] = self.fixture.file(ci)
             self.fixture.accept(pack)
             if mutation == 'join':
-                self.assertFalse(self.fixture.decide(pack)['release_ready'])
+                self.assertEqual(self.fixture.operational_gates(pack)['native_ci'], 'rejected')
             else:
                 with self.assertRaises(ValueError):
-                    self.fixture.decide(pack)
+                    self.fixture.operational_gates(pack)
 
     def test_json_duplicate_keys_nan_tamper_and_path_escape_rejected(self):
         for data in ('{"x":1,"x":2}', '{"x":NaN}', '{"x":1e999}'):
@@ -386,10 +405,11 @@ class ReleaseDecisionTests(unittest.TestCase):
                 pack = copy.deepcopy(self.pack)
                 self.fixture.rescore(pack, grade)
                 self.fixture.accept(pack)
-                report = self.fixture.decide(pack)
-                self.assertEqual(report['release_ready'], ready)
+                report = self.fixture.evaluate(pack)
+                for arm in receipts.ARMS:
+                    self.assertEqual(report['arms'][arm]['status'], 'verified' if ready else 'rejected')
                 if not ready:
-                    self.assertLess(report['evaluation']['arms']['local']['suite_mean'], 85)
+                    self.assertLess(report['arms']['local']['suite_mean'], 85)
 
     def test_each_case_minimum_and_five_protected_trials_cannot_be_averaged_away(self):
         for case in decision.PROTECTED:
@@ -400,9 +420,9 @@ class ReleaseDecisionTests(unittest.TestCase):
             changed = {'trials': [row]}
             self.fixture.mutate_trial(changed, lambda v: v.update(hard_failure_checks=native['hard_failure_checks']))
             self.fixture.accept(pack)
-            report = self.fixture.decide(pack)
-            self.assertFalse(report['release_ready'])
-            self.assertEqual(report['evaluation']['cases']['account'][case]['status'], 'rejected')
+            report = self.fixture.evaluate(pack)
+            self.assertEqual(report['arms']['account']['status'], 'rejected')
+            self.assertEqual(report['cases']['account'][case]['status'], 'rejected')
 
     def test_missing_eligible_semantic_dimensions_and_grade_threshold(self):
         policy = json.loads((ROOT / 'evals/scoring-v1.json').read_text())
@@ -418,10 +438,12 @@ class ReleaseDecisionTests(unittest.TestCase):
             judge['native_response'] = self.fixture.file(response)
             row['judge'] = self.fixture.file(judge)
             if kind == 'absent':
-                with self.assertRaises(ValueError): self.fixture.decide(pack)
+                with self.assertRaises(ValueError): self.fixture.trial(pack['trials'][0])
             else:
                 self.fixture.accept(pack)
-                self.assertFalse(self.fixture.decide(pack)['release_ready'])
+                result = self.fixture.trial(pack['trials'][0])
+                self.assertEqual(result['status'], 'ungraded')
+                self.assertIsNone(result['final_score'])
 
     def test_missing_observed_metrics_remain_inconclusive(self):
         self.fixture.mutate_trial(self.pack, lambda v: v['metrics'].update(latency_ms=None))
@@ -450,7 +472,7 @@ class ReleaseDecisionTests(unittest.TestCase):
         value['execution_id'] = self.fixture.read(first)['execution_id']
         value['review'] = self.fixture.review(digest({k: v for k, v in value.items() if k != 'review'}))
         pack['systems']['SC-03'][1] = self.fixture.file(value)
-        with self.assertRaises(ValueError): self.fixture.decide(pack)
+        with self.assertRaises(ValueError): self.fixture.operational_gates(pack)
 
 
 if __name__ == '__main__':

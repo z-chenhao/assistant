@@ -139,3 +139,11 @@ rounds, unmerged PR, historical L2, missing humans and native CI joins. They
 need no network, account, model invocation or copied credentials. Operator
 reports remain disposable; retain original evidence in the durable evidence
 root until release review is resolved.
+
+Negative receipt contracts call the production trial or operational-gate
+validator directly. Complete composition, missing-evidence decisions and real
+CLI tests still exercise the full join, including all source blocks and both
+arms' 20 Cases, six variants and five repetitions. This keeps ordinary CI and
+minimum-Python verification bounded without repeating unrelated valid cohorts
+for every individual rejection. Assertion inventories, thresholds, repetitions
+and CI time limits remain unchanged.
