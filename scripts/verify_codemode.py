@@ -48,14 +48,14 @@ def run(binary):
             config = root / 'config.yaml'
             default_config = config.read_text()
             config.write_text(default_config + 'tools:\n  run_concurrency: 1\n')
-            p, nested = execute('single-slot', 'return await tools.builtin__text__echo({text:"nested"});', timeout=20)
+            p, nested = execute('single-slot', 'return await tools.mcp__fixture__echo({text:"nested"});', timeout=20)
             require(p['status'] == 'succeeded' and p['attempt_count'] == 1 and len(nested) == 1, f'single-slot wrapper starved: {p} {nested}')
             require(nested[0]['status'] == 'succeeded' and nested[0]['attempt_count'] == 1, f'single-slot Tool did not execute once: {nested}')
             require(json.loads(json.loads(p['result_json'])['text']) == [{'type': 'return', 'value': 'nested'}], 'single-slot output missing')
             report['checks'].append({'name': 'single-slot-nested-tool', 'run_concurrency': 1,
                                      'parent': p['invocation_id'], 'parent_attempts': p['attempt_count'],
                                      'nested': nested, 'output': json.loads(json.loads(p['result_json'])['text'])})
-            p, nested = execute('single-slot-parallel', 'return await Promise.all([1,2,3].map(n=>tools.builtin__text__echo({text:"serial-"+n})));', timeout=20)
+            p, nested = execute('single-slot-parallel', 'return await Promise.all([1,2,3].map(n=>tools.mcp__fixture__echo({text:"serial-"+n})));', timeout=20)
             require(p['status'] == 'succeeded' and len(nested) == 3 and all(i['status'] == 'succeeded' and i['attempt_count'] == 1 for i in nested), 'single-slot parallel calls lost or redispatched')
             output = json.loads(json.loads(p['result_json'])['text'])
             require(output == [{'type': 'return', 'value': ['serial-1', 'serial-2', 'serial-3']}], 'single-slot aggregation changed order')
@@ -64,7 +64,7 @@ def run(binary):
             config.write_text(default_config)
 
             p, nested = execute('parallel', '''
-const values = await Promise.all([1, 2, 3].map(n => tools.builtin__text__echo({text: "nested-" + n})));
+const values = await Promise.all([1, 2, 3].map(n => tools.mcp__fixture__echo({text: "nested-" + n})));
 console.log("HIDDEN_CONSOLE");
 text(values.length);
 return values;
@@ -75,6 +75,28 @@ return values;
             require(len(nested) == 3 and all(i['status'] == 'succeeded' for i in nested), 'nested invocation pipeline missing')
             require(all(i['replay_policy'] == 'safe' and i['attempt_count'] == 1 for i in nested), 'nested execution metadata')
             report['checks'].append({'name': 'parallel-explicit-output', 'parent': p['invocation_id'], 'nested': [i['invocation_id'] for i in nested], 'output': output})
+
+            p, nested = execute('artifact-memory-surface', r'''
+const saved = await tools.builtin__artifact__manage({operation:"save",name:"surface.md",mediaType:"text/markdown",text:"inspectable evidence"});
+const ref = saved.artifactRefs[0];
+const found = await tools.builtin__artifact__search({query:"surface",limit:1});
+const read = await tools.builtin__artifact__manage({operation:"read",artifactRef:ref,limit:11});
+const descriptor = await tools.builtin__artifact__manage({operation:"describe",artifactRef:ref});
+await tools.builtin__artifact__manage({operation:"publish",artifactRefs:[ref]});
+const errors=[];
+for(const [name,args] of [["builtin__memory__search",{query:"tea"}],["builtin__memory__manage",{operation:"remember",content:"I prefer tea"}]]) {
+ try { await tools[name](args); } catch(e) { errors.push(e.code); }
+}
+return {ref,found,read,descriptor,errors,tools:ALL_TOOLS.filter(t=>t.name.startsWith("builtin__artifact__")||t.name.startsWith("builtin__memory__")),declaration:await describeTool("builtin__artifact__manage"),cua:await describeNamespace("cua")};
+''')
+            require(p['status'] == 'succeeded', 'Artifact/Memory cell failed: ' + str(p))
+            output = json.loads(json.loads(p['result_json'])['text'])[-1]['value']
+            require(output['found'][0]['artifact_ref'] == output['ref'] and output['read']['text'] == 'inspectable' and output['descriptor']['name'] == 'surface.md', 'Artifact managed bytes/search differ')
+            require(output['errors'] == ['PROVIDER_UNAVAILABLE'] * 2, 'unconfigured Memory cell falsely succeeded')
+            require(sorted(t['name'] for t in output['tools']) == ['builtin__artifact__manage','builtin__artifact__search','builtin__memory__manage','builtin__memory__search'], 'Code Mode surface drift')
+            require('"publish"' in output['declaration']['declaration'] and output['cua']['name'] == 'cua', 'progressive Tool/CUA documentation missing')
+            require(all(i['tool_name'] in ('builtin__artifact__manage','builtin__artifact__search','builtin__memory__manage','builtin__memory__search') for i in nested), 'parallel execution pipeline appeared')
+            report['checks'].append({'name':'artifact-memory-surface-and-readback','output':output,'nested':nested})
 
             p, nested = execute('store-failure', 'store("durable", {count: 7}); text(load("durable")); throw new Error("fixture");')
             require(p['status'] == 'failed', 'throw did not fail')
@@ -90,7 +112,7 @@ for (let i=0; i<4; i++) store("k"+i, "x".repeat(262140));
 let rejected=false;
 try { store("extra", 1); } catch(e) { rejected=e.code === "RESOURCE_LIMIT"; }
 store("k0", null);
-await tools.builtin__text__echo({text:String(rejected)});
+await tools.mcp__fixture__echo({text:String(rejected)});
 return rejected;
 ''')
             require(p['status'] == 'succeeded', f'quota rejection changed dependent Tool arguments on replay: {p["status"]}')
@@ -124,7 +146,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
 
             p, _ = execute('main-exposure', 'return {agent: typeof agent, visible: ALL_TOOLS.some(t=>t.name === "builtin__agent__run"), tools: await searchTools("echo")};')
             output = json.loads(json.loads(p['result_json'])['text'])[-1]['value']
-            require(output['agent'] == 'undefined' and output['visible'] is False and output['tools'][0]['name'] == 'builtin__text__echo', 'Main gained agent or discovery failed')
+            require(output['agent'] == 'undefined' and output['visible'] is False and output['tools'][0]['name'] == 'mcp__fixture__echo', 'Main gained agent or discovery failed')
             report['checks'].append({'name': 'main-exposure-and-discovery', 'output': output})
 
             p, nested = execute('worker-exposure', 'return {agent: typeof agent.run, ns: await describeNamespace("agent")};', worker=True)

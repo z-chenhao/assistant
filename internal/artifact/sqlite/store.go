@@ -426,10 +426,22 @@ func (s *Store) PublishTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref
 	return nil
 }
 func (s *Store) ListTx(ctx context.Context, tx *sql.Tx, a artifact.Scope) ([]artifact.Descriptor, error) {
+	return s.SearchTx(ctx, tx, a, "", 50)
+}
+
+// SearchTx filters metadata before applying the accessible-result bound.
+func (s *Store) SearchTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, query string, limit int) ([]artifact.Descriptor, error) {
+	if limit == 0 {
+		limit = 50
+	}
+	if limit < 1 || limit > 50 || len(query) > 4096 {
+		return nil, artifact.ErrInvalid
+	}
+	query = strings.ToLower(strings.TrimSpace(query))
 	if err := s.scope(ctx, tx, a); err != nil {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref FROM artifact WHERE owner_user_id=? AND owner_agent_id=? AND deleted_at IS NULL ORDER BY created_at DESC,artifact_ref`, a.UserID, a.AgentID)
+	rows, err := tx.QueryContext(ctx, `SELECT artifact_ref FROM artifact WHERE owner_user_id=? AND owner_agent_id=? AND deleted_at IS NULL AND (?='' OR instr(lower(name),?)>0 OR instr(lower(media_type),?)>0) ORDER BY created_at DESC,artifact_ref`, a.UserID, a.AgentID, query, query, query)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +469,7 @@ func (s *Store) ListTx(ctx context.Context, tx *sql.Tx, a artifact.Scope) ([]art
 			return nil, e
 		}
 		out = append(out, d)
-		if len(out) == 50 {
+		if len(out) == limit {
 			break
 		}
 	}

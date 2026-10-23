@@ -103,19 +103,19 @@ def drive(binary,folder,case,variant,artifact_folder=None):
                     sources[name]=save_bytes(h,name,media,(ASSETS/name).read_bytes())['artifact_ref']
                 meetings={name:ref for name,ref in sources.items() if name.startswith('meeting_')}
                 design=execute(h,'technical-design', '''const sources=SOURCES;const notes={};
-for(const [name,artifactRef] of Object.entries(sources))notes[name]=(await tools.builtin__artifact__read({artifactRef})).text;
+for(const [name,artifactRef] of Object.entries(sources))notes[name]=(await tools.builtin__artifact__manage({operation:"read",artifactRef})).text;
 const confirmed=[...notes["meeting_0915.md"].trim().split("\\n"),...notes["meeting_1001.md"].trim().split("\\n")];
 const design="# Decisions\\n"+confirmed.join("\\n")+"\\n# Non-goals\\nNo second loop or Workflow domain.\\n# Protocol\\nMain owns Tasks; Child returns final business text and ArtifactRef to direct Parent.\\n# Milestones\\nM0-M5 Core, M6 Memory/Computer, M7 automation/channels.\\n# Acceptance\\nFrozen snapshots; approval; cancellation; replay; isolation.\\n# Pending\\nProduction capacity and Live Shadow verification.\\nSources: "+JSON.stringify(sources);
-const saved=await tools.builtin__artifact__save({name:"technical_design.md",mediaType:"text/markdown",text:design});
-await tools.builtin__artifact__publish({artifactRefs:saved.artifactRefs});return {confirmed,artifactRefs:saved.artifactRefs};'''.replace('SOURCES',json.dumps(meetings)),refs=list(meetings.values()),task='技术设计')
+const saved=await tools.builtin__artifact__manage({operation:"save",name:"technical_design.md",mediaType:"text/markdown",text:design});
+await tools.builtin__artifact__manage({operation:"publish",artifactRefs:saved.artifactRefs});return {confirmed,artifactRefs:saved.artifactRefs};'''.replace('SOURCES',json.dumps(meetings)),refs=list(meetings.values()),task='技术设计')
                 summary=execute(h,'customer-summary',save_report('''let text="",offset=0,total=1;
-while(offset<total){const part=await tools.builtin__artifact__read({artifactRef:REF,offset,limit:4096});text+=part.text;offset+=part.bytes;total=part.total_bytes;}
+while(offset<total){const part=await tools.builtin__artifact__manage({operation:"read",artifactRef:REF,offset,limit:4096});text+=part.text;offset+=part.bytes;total=part.total_bytes;}
 const rows=text.trim().split("\\n").slice(1).map(line=>line.split(","));
 const result={rows:rows.length,communicated_clients:new Set(rows.filter(r=>r[1]==="1").map(r=>r[0])).size,adopted_clients:new Set(rows.filter(r=>r[2]==="1").map(r=>r[0])).size};'''.replace('REF',json.dumps(sources['metrics.csv'])),'customer_summary.json'),refs=[sources['metrics.csv']],task='客户数据摘要')
                 media=[]
                 for name in ('red.mov','blue.mov','third.mov'):
                     media.append(save_bytes(h,name,'video/quicktime',(ASSETS/'media'/name).read_bytes()))
-                stages=[execute(h,'desktop-materials',prefix+'await tab.goto('+url+'+"/clips");\nconst files=FILES;const descriptors=[];\nfor(const file of files){\n descriptors.push(await tools.builtin__artifact__describe({artifactRef:file.artifact_ref}));\n await tab.capabilities.list();const pw=await tab.capabilities.get("playwright");\n await pw.locator("#label").fill(file.name);await pw.locator("#save").click();\n const view=await tab.getAXStateAndScreenshot();image(view.screenshot.image);\n}\nreturn {files:descriptors,state:(await tab.getAXState({full:true})).state};'.replace('FILES',json.dumps(media)),refs=[m['artifact_ref'] for m in media],task='桌面素材')]
+                stages=[execute(h,'desktop-materials',prefix+'await tab.goto('+url+'+"/clips");\nconst files=FILES;const descriptors=[];\nfor(const file of files){\n descriptors.push(await tools.builtin__artifact__manage({operation:"describe",artifactRef:file.artifact_ref}));\n await tab.capabilities.list();const pw=await tab.capabilities.get("playwright");\n await pw.locator("#label").fill(file.name);await pw.locator("#save").click();\n const view=await tab.getAXStateAndScreenshot();image(view.screenshot.image);\n}\nreturn {files:descriptors,state:(await tab.getAXState({full:true})).state};'.replace('FILES',json.dumps(media)),refs=[m['artifact_ref'] for m in media],task='桌面素材')]
                 after=json.loads((browser_root/'external-state.json').read_text())
                 design_text=open_bytes(h,design['value']['artifactRefs'][0]).decode()
                 final=state(h)

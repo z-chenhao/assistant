@@ -9,14 +9,14 @@ import (
 )
 
 func TestRuntimeNormalizationAndProviderBoundary(t *testing.T) {
-	call := &conversation.ToolCall{ID: "provider-id", Name: "builtin__text__echo", Arguments: `{"text":"ok"}`}
+	call := &conversation.ToolCall{ID: "provider-id", Name: "mcp__fixture__echo", Arguments: `{"text":"ok"}`}
 	parts := []conversation.ContentPart{{Type: "text", Text: "reason"}, {Type: "tool_call", ToolCall: call}}
 	normalized, err := conversation.Normalize(parts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	call.Name = "mutated"
-	if normalized[1].ToolCall.Name != "builtin__text__echo" {
+	if normalized[1].ToolCall.Name != "mcp__fixture__echo" {
 		t.Fatal("mutable caller content leaked")
 	}
 	messages, err := ProviderMessages([]AgentMessage{TextMessage("system", "rules"), {Type: "assistant", Content: normalized}, {Type: "tool_result", ToolCallID: "provider-id", Content: conversation.Text("ok")}})

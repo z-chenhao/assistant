@@ -209,8 +209,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                            "Request written terms, eligibility/payment conditions and complaint channels. "
                            "Recommend B only if cashback becomes written; C is an option for certainty. "
                            "Source: MCP fixture insurance_quotes. This is the M3 transport/artifact fragment.")
-            saved = content(call(h, 'report', 'builtin__artifact__save',
-                                 {'name': 'quote_comparison.md', 'mediaType': 'text/markdown', 'text': report_text}))
+            saved = content(call(h, 'report', 'builtin__artifact__manage',
+                                 {'operation': 'save', 'name': 'quote_comparison.md', 'mediaType': 'text/markdown', 'text': report_text}))
             ref = saved['artifact_refs'][0]
             opened = fixture_run(h.args('artifact', 'open', ref), capture_output=True, text=True,
                                     env=h.env, cwd=h.root, timeout=20)

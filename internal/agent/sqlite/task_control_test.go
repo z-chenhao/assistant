@@ -306,7 +306,7 @@ func TestTaskControlCancelTreeAndInvocationOutcomes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := calls("builtin__text__echo", `{"text":"saved"}`, `{"text":"in flight"}`, `{"text":"queued"}`)
+	response := calls("mcp__fixture__echo", `{"text":"saved"}`, `{"text":"in flight"}`, `{"text":"queued"}`)
 	response.ToolCalls = append(response.ToolCalls, llm.ToolCall{ID: "unsafe-fixture", Name: "unavailable_external", Arguments: `{}`})
 	if err = s.Models().RecordUsageAnd(ctx, gen.Request, response, 0, nil, s.AcceptGeneration); err != nil {
 		t.Fatal(err)
@@ -520,12 +520,12 @@ func TestTaskControlPauseCancelsSafeToolBeforeNextStep(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "must not reach next model step"}, nil
 		}
-		return calls("builtin__text__echo", `{"text":"safe read"}`), nil
+		return calls("mcp__fixture__echo", `{"text":"safe read"}`), nil
 	})
 	defs := []tool.Definition{}
 	for _, spec := range a.Registry.Describe() {
 		d, _ := a.Registry.Resolve(spec.Name)
-		if spec.Name == "builtin__text__echo" {
+		if spec.Name == "mcp__fixture__echo" {
 			d.Execute = func(ctx context.Context, _ string) tool.Result {
 				close(entered)
 				<-ctx.Done()

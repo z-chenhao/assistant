@@ -30,15 +30,31 @@ import (
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {
 	var err error
 	base := task.Registry()
+	if fixture != "" {
+		fixtureDefs := task.Definitions()
+		echo, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
+		base, err = tool.NewRegistry(append(fixtureDefs, echo))
+		if err != nil {
+			return err
+		}
+	}
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
 	defs = append(defs, automation.Definitions()...)
-	if cfg.Memory != nil {
-		defs = append(defs, memory.Definition())
+	manageMemory := memory.Definition()
+	if cfg.Memory == nil {
+		manageMemory.Spec.Description += " Not configured: requires memory.encryption_key_ref; calls fail with PROVIDER_UNAVAILABLE until configured."
 	}
+	defs = append(defs, manageMemory)
+	recallIdentity := recall.UnconfiguredIdentity
 	if cfg.Embedding != nil {
-		engine := embedding.Client{Config: *cfg.Embedding, Secrets: secrets}
-		defs = append(defs, recall.Definition(engine.Identity()))
+		recallIdentity = (embedding.Client{Config: *cfg.Embedding, Secrets: secrets}).Identity()
 	}
+	searchMemory := recall.Definition(recallIdentity)
+	if cfg.Embedding == nil {
+		searchMemory.Spec.Description += " Not configured: requires an explicit embedding provider; calls fail with PROVIDER_UNAVAILABLE until configured."
+	}
+	defs = append(defs, searchMemory)
+
 	if cfg.JavaScript != nil {
 		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
 		runtimeHash, preludeHash, e := runtime.Fingerprint()
