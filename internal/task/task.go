@@ -24,9 +24,7 @@ func Definitions() []tool.Definition {
 	}
 }
 func Registry() *tool.Registry {
-	echo, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
-	defs := append([]tool.Definition{echo}, Definitions()...)
-	r, err := tool.NewRegistry(defs)
+	r, err := tool.NewRegistry(Definitions())
 	if err != nil {
 		panic(err)
 	}
