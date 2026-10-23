@@ -272,10 +272,75 @@ Use `ci_profile.py --limit 30 --output evidence/ci-history.json` for exact-attem
 wall time, runner-minutes and per-job/step evidence. Its raw API snapshots permit
 offline reproduction. Job duration is not billed CPU time. Queues, cache state
 and heterogeneous runner CPUs add noise; one successful run cannot establish
-p95 or a controlled causal speedup. Historical read-only comparison tools retain
-their strict five-pair acceptance rules, but no repeated measurement cohort is
-part of the delivery path. Supersession records never treat unknown outcomes or
+p95 or a controlled causal speedup. The comparison command below validates the current complete topology;
+retained nine-job shadow data requires an explicit historical mode. No repeated
+measurement cohort is part of the delivery path. Supersession records never treat unknown outcomes or
 missing timestamps as zero.
+
+`ci_compare.py` derives required job names and literal matrices from the maintained
+`ci.yml`, cross-checks parts against `verify_suite.py`/`m6_report.py`, and checks
+all six logical suites against that same gate inventory. Both strict join jobs
+must succeed. Joined suite receipts must retain every original part, its clean
+source/build/image/CPU identity, full ordered repetitions and drained groups.
+The canonical joined rows must agree with those parts. Focused/feedback results,
+missing parts, duplicated jobs, cancelled/skipped runs and mismatched attempts
+cannot become eligible samples. The small Core/M6 summaries remain required;
+these checks consume strict-join evidence, not a new case scorer.
+
+Compare already authorized attempts; this command never launches or reruns CI:
+
+```sh
+python3 scripts/ci_compare.py --pair BEFORE_RUN:ATTEMPT,AFTER_RUN:ATTEMPT --artifact-root /absolute/durable/evidence --profile measurement-profile.json --output evidence/comparison.json
+python3 scripts/ci_compare.py --offline --output evidence/comparison.json
+```
+
+Online artifact retrieval requires ERII-206's `scripts/evidence.py` entry point.
+It reads exact run/attempt metadata first and selects only the six canonical
+suite artifacts by SHA/attempt/name/immutable ID. Each join artifact embeds its
+parts; individual part archives, fast/race archives and unrelated archives are
+not fetched. Hash-verified local archives are reused. The entire invocation has
+a 1 MiB archive payload download budget across all attempts. A larger necessary
+object requires a separate owner decision; the command does not silently raise
+the budget. ZIP member filtering happens after fetching/reusing the whole ZIP;
+it is not a member-only network download. Raw JSON retains artifact metadata and
+transfer receipts; the output binds the raw file's SHA256. Keep both outside
+worktree cleanup for handoff. These private receipts are not a public schema.
+
+Current comparisons require at least three independent complete pairs (three
+attempts per side), one frozen source/binary/image/CPU capacity, and a matching
+non-secret `measurement_profile` on every attempt. `--profile` supplies that
+profile for collection. It contains `input_sha256`, `tool_versions`,
+`lock_sha256`, `cache_state` and `environment`; values describe the actual
+inputs, pinned tools/locks, cache preparation and execution environment. Record
+cold, warm and offline cohorts separately. The profile is an explicit experiment
+record, not an inferred measurement of network traffic. Preserve commands and
+setup receipts alongside it. Do not use this same-source protocol to certify
+changed-code cohorts or compare runs with different gate/assertion inventories.
+
+`comparison_complete=false` and `performance_certified=false` mean the cohort
+is insufficient or incomparable; the CLI exits 1 while retaining observations
+and rejection reasons. Three pairs establish this tool's eligibility threshold,
+not release acceptance, p95 confidence or a causal speedup by themselves. Five
+safety repetitions inside a gate are never independent workflow samples. The
+report separates required-verdict wall time, job lifetime runner-minutes,
+per-job queue/dependency waits and name-classified setup/build/test/upload steps.
+Jobs API data cannot separate queue from dependency wait or prove the actual
+critical path. Missing CPU, cache-hit and outbound payload measurements remain
+null. Do not use delayed workflow `updated_at` as the required verdict time.
+
+Historical evidence is read-only and explicitly labelled:
+
+```sh
+python3 scripts/ci_compare.py --offline --historical-shadow --output evidence/historical-comparison.json
+```
+
+This retains the former nine-job/five-pair interpretation where its original
+gate inventory matches, and never sets `performance_certified=true`. It cannot
+mix with current topology. `ci_experiment.py`'s command-line entry now rejects
+before any GitHub request: its old shadow workflow no longer exists. Historical
+orchestration/checkpoint code and feedback tools remain for their retained
+consumers and regressions. Do not import the old orchestrator to start new runs,
+restore shadow workflows or treat feedback fragments as full verification.
 
 For the current topology, `ci_supersede.py collect` requires exactly one
 `ci.yml` attempt for the superseded head. It rejects duplicate/unknown workflows,
