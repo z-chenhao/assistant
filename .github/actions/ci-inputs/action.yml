@@ -27,12 +27,9 @@ runs:
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version-file: .node-version
-        cache: npm
-        cache-dependency-path: |
-          provider-bridge/package-lock.json
-          runtime/javascript/package-lock.json
-          guest-browser/package-lock.json
-          web/package-lock.json
+        # Optional hosted npm restore exhausted Azure cache egress, then kept
+        # setup-node alive until the ten-minute job limit. Install lockfiles
+        # directly; cache availability must not decide whether gates can run.
     - name: Install pinned dependencies
       shell: bash
       run: |

@@ -87,6 +87,9 @@ class SelectionTests(unittest.TestCase):
         self.assertIn("if: inputs.frontend == 'true'", action)
         self.assertIn('npm ci --prefix runtime/javascript --ignore-scripts', action)
         self.assertIn('npm ci --prefix provider-bridge --ignore-scripts', action)
+        node_setup = action.split('uses: actions/setup-node@', 1)[1].split('    - name:', 1)[0]
+        self.assertNotRegex(node_setup, r'(?m)^\s+cache(?:-dependency-path)?:',
+                            'optional hosted npm restore must not block offline gates on cache egress limits')
         for name in ('fast', 'verify', 'personal', 'race', 'codemode'):
             # Extract the entire job (two-space names, not nested step names).
             block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]

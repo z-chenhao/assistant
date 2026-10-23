@@ -51,7 +51,7 @@ Frontend build/TypeScript dependencies install only in unit/lint. Playwright
 installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
 QuickJS still install everywhere, including providers' offline packaging gate.
 Across the eighteen execution jobs this removes seventeen frontend and eleven
-Playwright installs. Lockfile cache keys, per-job exact-source builds, every
+Playwright installs. Lockfile inputs, per-job exact-source builds, every
 assertion and repetition count remain unchanged. Clean-runner complete CI is the
 dependency-closure proof; install counts alone are not wall-time measurements.
 All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
@@ -297,8 +297,13 @@ upgrade tests remain. Failure rolls back; real child kills before/after commit
 prove restart/version/bootstrap behavior. Fixture tests still enter the public
 store boundary and initialize real databases.
 
-Setup-go/npm caches retain their pinned content-addressed input keys. Every job
-still installs lockfiles and builds its own CLI. Full Go test counts remain
+Setup-go retains its content-addressed cache keys. Optional hosted npm cache
+restore is disabled: [run 39930755535](https://github.com/z-chenhao/erii/actions/runs/39930755535)
+hit Azure's cache egress limit, then `setup-node` hung until the unchanged
+ten-minute job deadline before dependency installation or tests started. Jobs
+install the pinned lockfiles directly and build their own CLI. The npm registry
+and hosted toolchain downloads remain setup dependencies; removing this cache
+does not make setup independent of the network. Full Go test counts remain
 explicit. Historical `ci_bundle.py` v2 and its corruption/context regressions
 remain available for old evidence; the current workflow does not consume build
 artifacts or Host cache artifacts from another runner.
