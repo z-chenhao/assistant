@@ -74,12 +74,24 @@ stateDiagram-v2
     Completed --> Completed: duplicate inputs and restart
 ```
 
-The 33 additional assertions inspect this finite trace, including frozen
+The 34 additional assertions inspect this finite trace, including frozen
 completed model/Tool records, no stale result from Root 4, all five CLI-opened
 Artifacts with hashes/ownership, one completion per successful Root, retained
 denial and zero mail attempts. Mutation regressions reject wrong epochs, revived
 Roots, stale dates, missing read results, lost Artifacts and unexpected effects.
 They supplement the Task-control race/late-write tests, not replace them.
+
+The incomplete pause Tool is intentionally interrupted after its domain receipt
+commits but before its Tool result commits. Recovery starts one additional
+`safe` attempt with the same invocation/call hash and returns that receipt; it
+does not repeat the pause transition. Assertions require exactly one recorded
+pre-crash attempt and two final attempts for that invocation, unchanged frozen
+parameters and unchanged Task receipt tables. Every other successful Tool keeps
+one attempt, every previously completed call stays unchanged, and mail stays at
+zero attempts. The initial Ubuntu receipt exposed the incorrect assumption
+that even this incomplete call must have one attempt; the replacement
+regressions reject parameter drift, changed policy, extra attempts and duplicate
+domain receipts. The original failed CI remains failed evidence.
 
 **Open policy gap:** normal `task_manage(create)` currently defaults to
 `completion_policy=once`; only Automation explicitly creates `ongoing` Tasks.

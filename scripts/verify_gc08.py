@@ -159,6 +159,10 @@ def lifecycle_observe(row):
     artifacts=receipt['artifacts'];doc=artifacts[-1]['document']
     reads=[t for t in after['tools'] if t['run_id']==fresh['run_id'] and t['tool_name']=='builtin__artifact__manage' and
            json.loads(t['arguments_json']).get('operation')=='read']
+    pause_calls=[t for t in receipt['stop_committed']['tools'] if t['tool_name']=='builtin__task__manage' and
+                 json.loads(t['arguments_json']).get('operation')=='pause']
+    pause=pause_calls[0] if len(pause_calls)==1 else {}
+    recovered_pause=next((t for t in after['tools'] if t['invocation_id']==pause.get('invocation_id')), {})
     checks=task_assertions(after,1,5,4)
     checks.update(
         lifecycle_fixture=receipt['fixture']==fixture,
@@ -184,6 +188,13 @@ def lifecycle_observe(row):
             for prior in interrupted['tools'] if prior['status'] in ('succeeded','failed')) and
             all(next(g for g in after['generations'] if g['generation_id']==prior['generation_id'])==prior
                 for prior in interrupted['generations'] if prior['status']=='completed'),
+        incomplete_safe_pause_reattached=len(pause_calls)==1 and pause['status']=='running' and pause['attempt_count']==1 and
+            recovered_pause.get('status')=='succeeded' and recovered_pause.get('attempt_count')==2 and
+            pause['replay_policy']==recovered_pause['replay_policy']=='safe' and
+            pause['request_hash']==recovered_pause['request_hash']==call_hash(pause)==call_hash(recovered_pause) and
+            pause['run_id']==recovered_pause['run_id'] and pause['arguments_json']==recovered_pause['arguments_json'] and
+            receipt['stop_committed']['task_invocations']==paused['task_invocations'] and
+            receipt['stop_committed']['task_requests']==paused['task_requests'],
         no_late_result=active['run_id'] not in {u['root_run_id'] for u in after['updates']} and
             {u['root_run_id'] for u in after['updates']}=={r['run_id'] for r in workers(after) if r['status']=='completed'},
         resumed_reads_committed_artifact=len(reads)==1 and json.loads(reads[0]['arguments_json'])==dict(
@@ -202,7 +213,7 @@ def lifecycle_observe(row):
         lifecycle_tools_allowed=all(t['tool_name'] in {'mcp__wedding__read','mcp__wedding__send','builtin__task__search',
             'builtin__task__manage','builtin__artifact__manage'} and
             (t['tool_name']!='builtin__artifact__manage' or json.loads(t['arguments_json']).get('operation') in ('save','publish','read')) and
-            (t['status']=='succeeded' and t['attempt_count']==1 or t['tool_name']=='mcp__wedding__send' and
+            (t['status']=='succeeded' and (t['attempt_count']==1 or t['invocation_id']==pause.get('invocation_id') and t['attempt_count']==2) or t['tool_name']=='mcp__wedding__send' and
                 t['status']=='failed' and t['attempt_count']==0) for t in after['tools']),
         actual_crashes=receipt['crashes']==[dict(boundary='before_result_commit',returncode=-9),dict(boundary='after_stop_commit',returncode=-9)],
         durable_pause_intent=receipt['stop_committed']['tasks'][0]['status']=='paused' and receipt['stop_committed']['tasks'][0]['task_epoch']==5,

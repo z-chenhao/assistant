@@ -102,7 +102,9 @@ class WeddingTests(unittest.TestCase):
                  dict(operation='append',taskRef='task:existing',instruction=fixture['continue']),dict(operation='pause',taskRef='task:existing'),
                  dict(operation='append',taskRef='task:existing',instruction=fixture['resume'])]
         tools=[dict(invocation_id='control'+str(i),tool_name='builtin__task__manage',run_id='main',arguments_json=json.dumps(a),
-                    status='succeeded',attempt_count=1) for i,a in enumerate(actions)]
+                    status='succeeded',attempt_count=1,provider_call_id='wedding-fixture',replay_policy='safe') for i,a in enumerate(actions)]
+        for t in tools:t['request_hash']=journey.call_hash(t)
+        tools[4]['attempt_count']=2
         send=dict(invocation_id='mail',run_id='root2',tool_name='mcp__wedding__send',arguments_json='{}',status='failed',attempt_count=0)
         state=dict(tasks=[task],runs=roots[:3],artifact=metadata[:3],updates=updates,tools=tools[:3]+[send],
             generations=[],snapshots=[dict(snapshot_id='model')],capabilities=[dict(snapshot_id='worker',role='worker',tools_json='[]')],
@@ -112,6 +114,7 @@ class WeddingTests(unittest.TestCase):
         interrupted['runs'].append(dict(roots[3],status='running'));interrupted['artifact']=metadata[:4];interrupted['tools']=tools[:4]+[send]
         paused=copy.deepcopy(interrupted);paused['tasks'][0].update(status='paused',task_epoch=5)
         paused['runs'][-1].update(status='cancelled',error_code='task_paused')
+        paused['tools'].append(copy.deepcopy(tools[4]))
         after=copy.deepcopy(paused);after['tasks'][0].update(status='completed',task_epoch=6);after['runs'].append(roots[4])
         after['artifact']=metadata;after['updates'].append(dict(root_run_id='root4'))
         after['inbox'].append(dict(message_json=json.dumps(dict(origin='runtime',details={}))));after['reporter_dedup'].append({})
@@ -123,8 +126,9 @@ class WeddingTests(unittest.TestCase):
                   arguments_json=json.dumps(dict(operation='read',artifactRef=artifacts[3]['ref'],limit=4096)),
                   result_json=json.dumps(dict(text=json.dumps(dict(text=artifacts[3]['text'])))))
         after['tools']=tools+[send,read]
+        stop=copy.deepcopy(paused);stop['tools'][-1].update(status='running',attempt_count=1)
         return dict(variant=dict(source=source,turns=journey.TURNS),artifacts=artifacts[:3],denial=dict(state=state),
-                    lifecycle=dict(fixture=fixture,interrupted=interrupted,stop_committed=copy.deepcopy(paused),paused=paused,
+                    lifecycle=dict(fixture=fixture,interrupted=interrupted,stop_committed=stop,paused=paused,
                         resumed=after,artifacts=artifacts,remote=[],paused_replay=copy.deepcopy(paused),replay=copy.deepcopy(after),
                         crashes=[dict(boundary='before_result_commit',returncode=-9),dict(boundary='after_stop_commit',returncode=-9)]))
 
@@ -144,6 +148,19 @@ class WeddingTests(unittest.TestCase):
         for change in changes:
             bad=copy.deepcopy(row);change(bad['lifecycle'])
             self.assertFalse(all(journey.lifecycle_observe(bad).values()),change)
+
+    def test_only_incomplete_frozen_safe_pause_can_restart_one_attempt(self):
+        row=self.lifecycle_row()
+        self.assertTrue(journey.lifecycle_observe(row)['incomplete_safe_pause_reattached'])
+        for field,value in [('attempt_count',1),('attempt_count',3),('replay_policy','never'),
+                            ('request_hash','drift'),('provider_call_id','changed'),('arguments_json','{"operation":"pause","taskRef":"changed"}')]:
+            bad=copy.deepcopy(row)
+            # Detach this record from any other checkpoint: the test must
+            # reject drift independently of complete final-state replay equality.
+            bad['lifecycle']['resumed']['tools'][4]=dict(bad['lifecycle']['resumed']['tools'][4],**{field:value})
+            self.assertFalse(journey.lifecycle_observe(bad)['incomplete_safe_pause_reattached'])
+        bad=copy.deepcopy(row);bad['lifecycle']['paused']['task_requests'].append(dict(duplicate=True))
+        self.assertFalse(journey.lifecycle_observe(bad)['incomplete_safe_pause_reattached'])
 
     def test_lifecycle_rejects_old_dates_repeated_counts_and_guessed_tables(self):
         row=self.lifecycle_row()
