@@ -141,6 +141,11 @@ the Fake from closing the channel while the real client is still sending input.
 owns isolated Launch, selected-profile/Fake Doctor, CLI/Tool Drive, persisted
 Evidence and Cleanup. `make verify` repeats it five times in the security shard.
 See [maintenance operations](../docs/guides/memory-maintenance.md) and [ADR 003](../docs/adr/003-memory-forget-revokes-unfinished-context.md).
+Failure exits preserve bounded Run/Tool/model state and Memory/compaction readbacks
+before disposable cleanup in the requested evidence JSON, with `passed: false`.
+Snapshot/read/write errors retain the original failure; interrupt cleanup is unchanged.
+`test_memory_failure_evidence.py` verifies capture-before-cleanup and original-error
+retention when stores or the evidence destination fail.
 
 | Feature | User boundary | Authoritative implementation | Evidence |
 | --- | --- | --- | --- |
