@@ -751,10 +751,14 @@ var _ llm.ModelCatalog = (*Client)(nil)
 // Run calls the versioned probe RPC for provider-side connection checks, then
 // independently exercises the generation contract. Catalog claims cannot pass.
 func (c *Client) Run(ctx context.Context, p llm.Profile) (llm.ProbeResult, error) {
+	return c.RunWithProgress(ctx, p, nil)
+}
+
+func (c *Client) RunWithProgress(ctx context.Context, p llm.Profile, progress func(llm.ProbeStage)) (llm.ProbeResult, error) {
 	if err := c.call(ctx, "model.probe", p, nil); err != nil {
 		return llm.ProbeResult{}, err
 	}
-	return (llm.Prober{Provider: c}).Run(ctx, p)
+	return (llm.Prober{Provider: c}).RunWithProgress(ctx, p, progress)
 }
 
 var _ llm.ModelProbe = (*Client)(nil)
