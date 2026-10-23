@@ -152,11 +152,12 @@ versions/profile, relative paths, sizes and SHA-256. Same-host review verifies
 hashes and reuses raw evidence read-only, while independently checking a clean
 exact-SHA checkout. Missing evidence is inconclusive, never a passed check.
 
-[ERII-206 / PR #37](https://github.com/z-chenhao/erii/pull/37) owns the maintained
-collector and exact-artifact cache; reuse its documented entry point once that
-change is present in your revision. [ERII-207 / PR #38](https://github.com/z-chenhao/erii/pull/38)
-owns locked setup/cache diagnostics. Neither is assumed available in older
-checkouts. Reuse package-manager downloads and pinned browser binaries; do not
+Use [the maintained evidence collector](docs/guides/evidence.md) for collection,
+hash verification, same-host receipts and exact CI artifact retrieval (ERII-206 /
+[PR #37](https://github.com/z-chenhao/erii/pull/37)). [ERII-207 / PR #38](https://github.com/z-chenhao/erii/pull/38)
+owns locked setup/cache diagnostics; use its entry point when present in your
+revision. Check source identity before assuming tools exist in an older checkout.
+Reuse package-manager downloads and pinned browser binaries; do not
 share mutable `node_modules`. Default remote delivery is a compact manifest and
 necessary diagnostics, at most 1 MiB per run. Do not recursively bundle dependencies,
 browsers, prior ZIPs or historical logs. Required final exports remain required;
