@@ -57,6 +57,10 @@ func (c Control) CheckAuth(ctx context.Context, p Profile) (int64, error) {
 }
 
 func (c Control) Test(ctx context.Context, id string) (ProbeRecord, error) {
+	return c.TestWithProgress(ctx, id, nil)
+}
+
+func (c Control) TestWithProgress(ctx context.Context, id string, progress func(ProbeStage)) (ProbeRecord, error) {
 	if c.BridgeError != nil {
 		return ProbeRecord{}, c.BridgeError
 	}
@@ -77,7 +81,14 @@ func (c Control) Test(ctx context.Context, id string) (ProbeRecord, error) {
 	if err != nil {
 		return ProbeRecord{}, err
 	}
-	result, err := c.Probe.Run(ctx, p)
+	var result ProbeResult
+	if probe, ok := c.Probe.(interface {
+		RunWithProgress(context.Context, Profile, func(ProbeStage)) (ProbeResult, error)
+	}); ok {
+		result, err = probe.RunWithProgress(ctx, p, progress)
+	} else {
+		result, err = c.Probe.Run(ctx, p)
+	}
 	if err != nil {
 		return ProbeRecord{}, c.failedProbe(ctx, p, err)
 	}

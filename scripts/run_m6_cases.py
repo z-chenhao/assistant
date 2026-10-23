@@ -76,8 +76,8 @@ def execute(h, key, source, refs=(), images=(), approve=True, delegate=False, ta
 
 
 def save_report(body, name='result.json'):
-    return body + '\nconst saved=await tools.builtin__artifact__save({name:' + json.dumps(name) + ''',mediaType:"application/json",text:JSON.stringify(result)});
-await tools.builtin__artifact__publish({artifactRefs:saved.artifactRefs});
+    return body + '\nconst saved=await tools.builtin__artifact__manage({operation:"save",name:' + json.dumps(name) + ''',mediaType:"application/json",text:JSON.stringify(result)});
+await tools.builtin__artifact__manage({operation:"publish",artifactRefs:saved.artifactRefs});
 return {result,artifactRefs:saved.artifactRefs};'''
 
 
@@ -228,8 +228,8 @@ const days=11-3+1;
 const report="Visa window "+value(visa,"valid_from")+" to "+value(visa,"valid_until")+" covers October 3-11. Inclusive stay: "+days+" days <= "+value(visa,"duration_days")+" days; entries "+value(visa,"entries")+" (single).\\n"+
 "Return order year is masked/unknown; provide a clear screenshot or other order evidence to confirm 2026.\\n"+
 documents.map(d=>d.artifactRef+" sha256="+d.sha256+" regions="+JSON.stringify(d.fields)).join("\\n");
-const saved=await tools.builtin__artifact__save({name:"visa_check.md",mediaType:"text/markdown",text:report});
-await tools.builtin__artifact__publish({artifactRefs:saved.artifactRefs});
+const saved=await tools.builtin__artifact__manage({operation:"save",name:"visa_check.md",mediaType:"text/markdown",text:report});
+await tools.builtin__artifact__manage({operation:"publish",artifactRefs:saved.artifactRefs});
 return {days,return_year:value(order,"inbound_year"),artifactRefs:saved.artifactRefs};'''.replace('DOCS',json.dumps(documents)),refs=refs,images=refs)
             report_bytes=open_bytes(h,result['value']['artifactRefs'][0])
             checks.update(inclusive_nine_days=result['value']['days']==9,masked_year_unknown=result['value']['return_year'] is None,
@@ -359,7 +359,7 @@ def travel(h,world):
     # and continuation, then apply Main control while the Root is held.
     originals=[save_bytes(h,'itinerary_1003.md','text/markdown',b'Confirmed Seine cruise 2026-10-03 19:00'),save_bytes(h,'itinerary_1004.md','text/markdown',b'Confirmed Louvre 2026-10-04 09:30')]
     h.command('chat','send-parts','confirmed-inputs',text=json.dumps([dict(type='text',text='Prior confirmed itinerary sources'),*[dict(type='file',artifact_ref=d['artifact_ref']) for d in originals]]))
-    france='法国旅行\nCapabilities: '+json.dumps([{'name':'builtin__text__echo','arguments':{'text':json.dumps(world['tasks'][0],ensure_ascii=False)}}],ensure_ascii=False)
+    france='法国旅行\nCapabilities: '+json.dumps([{'name':'mcp__fixture__echo','arguments':{'text':json.dumps(world['tasks'][0],ensure_ascii=False)}}],ensure_ascii=False)
     seed=h.send('france-seed','Capabilities: '+json.dumps([dict(name='builtin__task__manage',arguments=dict(operation='create',task=france,artifactRefs=[d['artifact_ref'] for d in originals]))]))
     seed_scheduling=drain_with_publication_barrier(h,seed['run_id'],prefix='seed-')
     inv=next(i for i in reversed(h.state()['tools']) if i['tool_name']=='builtin__task__manage')

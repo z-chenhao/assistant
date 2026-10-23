@@ -260,7 +260,7 @@ func TestToolResultsCommitIndependentlyAndDeliverInDeclarationOrder(t *testing.T
 	started := make(chan struct{})
 	var once sync.Once
 	defer once.Do(func() { close(release) })
-	d, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	d, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 	original := d.Execute
 	d.Execute = func(ctx context.Context, args string) tool.Result {
 		if strings.Contains(args, "slow") {
@@ -306,7 +306,7 @@ func TestToolQuotasAndDynamicConflictKeys(t *testing.T) {
 		t.Run(scope, func(t *testing.T) {
 			ctx := context.Background()
 			var active, maxActive atomic.Int32
-			d, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+			d, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 			original := d.Execute
 			d.Execute = func(ctx context.Context, args string) tool.Result {
 				n := active.Add(1)
@@ -445,7 +445,7 @@ func TestToolUnknownReconcilesOnlyFromAuthoritativeEvidence(t *testing.T) {
 
 func TestToolArgumentDriftFailsWithExactReplayError(t *testing.T) {
 	ctx := context.Background()
-	d, _ := tool.EchoRegistry().Resolve("builtin__text__echo")
+	d, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
 	calls := []llm.ToolCall{{ID: "fixed-call", Name: d.Spec.Name, Arguments: `{"text":"original"}`}}
 	s, _, _, e, x := admitPolicy(t, []tool.Definition{d}, calls)
 	if _, err := e.Execute(ctx, x, calls); err != nil {

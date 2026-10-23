@@ -519,7 +519,7 @@ func TestChildMigrationPreservesExistingRootWithoutGrantingDelegation(t *testing
 	if _, err = db.Exec(`INSERT INTO model_generation(generation_id,run_id,step_index,request_json,request_hash,owner_token,status,created_at) VALUES('old-exchange',?,0,'{}','hash','owner','pending',100)`, rootID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.Exec(`INSERT INTO tool_invocation(invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,idempotency_key,status,delivery_seq,created_at,updated_at,version) VALUES('old-invocation',?,'old-exchange','old-call','builtin__text__echo','{}','hash','safe','key','queued',0,100,100,1)`, rootID); err != nil {
+	if _, err = db.Exec(`INSERT INTO tool_invocation(invocation_id,run_id,provider_exchange_id,provider_call_id,tool_name,arguments_json,request_hash,replay_policy,idempotency_key,status,delivery_seq,created_at,updated_at,version) VALUES('old-invocation',?,'old-exchange','old-call','mcp__fixture__echo','{}','hash','safe','key','queued',0,100,100,1)`, rootID); err != nil {
 		t.Fatal(err)
 	}
 	if err = migrate(ctx, db, migrations); err != nil {

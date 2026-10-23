@@ -49,7 +49,8 @@ write intents, model generations, ToolInvocations, reply/delivery records, and
 RunTrace. It preserves prior v1–v6 metadata and events. `conversation.db` has an
 independent v1 forward migration, WAL, foreign keys, busy timeout, monotonic
 per-Conversation sequences and immutable idempotent message IDs. An incompatible
-future version fails startup. Memory storage remains a later slice.
+future version fails startup. [Memory maintenance](memory-maintenance.md) owns the
+separate Memory database and its current migrations.
 
 | Run state | Legal next states in this slice |
 | --- | --- |
@@ -107,7 +108,11 @@ state is authoritative, and Outbox notifications remain available to the relay.
 
 | Tool | Input | Output | Permission | Replay | Limits |
 | --- | --- | --- | --- | --- | --- |
-| `builtin__text__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Main only in this slice | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
+| `mcp__fixture__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Main only in this slice | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
+
+This echo capability exists only under an explicit test bridge. Production does
+not register it. It returns data to the model, never a user message. Main final
+AssistantMessages use the shared Delivery/UISpec path.
 
 The registry describes the frozen schema and resolves only Host-registered
 definitions. The single Executor accepts/persists each invocation before
