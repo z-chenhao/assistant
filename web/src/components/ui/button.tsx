@@ -9,14 +9,9 @@ const buttonVariants = cva(
       variant: {
         default: "bg-foreground text-background hover:bg-foreground/86",
         secondary: "border border-border bg-background hover:bg-muted",
-        ghost: "hover:bg-muted",
-        destructive: "bg-destructive text-white hover:bg-destructive/90",
-        link: "h-auto p-0 underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 px-5",
         icon: "size-9",
       },
     },
