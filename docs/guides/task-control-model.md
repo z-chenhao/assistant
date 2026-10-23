@@ -7,13 +7,13 @@ runtime state, schema, Tool surface or extension API. Run it offline:
 python3 scripts/model_task_control.py --evidence evidence/task-model.json
 python3 scripts/model_task_control.py --unsafe --evidence evidence/task-model-unsafe.json
 python3 -m unittest discover -s scripts -p 'test_model_task_control.py'
-go test ./internal/agent/sqlite -run '^TestTaskControlModelCounterexample' -count=1
+go test ./internal/agent/sqlite -run '^TestTaskControlModel' -count=1
 ```
 
 The normal command exits 0 only after exhausting the finite reachable graph.
 `--unsafe` removes Task/owner fencing from business result and Child admission;
 it must exit 1 with a shortest counterexample. It does not mutate Go source.
-`make test` includes both model regressions. Required race, process recovery,
+`make test` includes the model regressions. Required race, process recovery,
 five-run gates and complete CI remain separate requirements.
 
 ## States and atomic boundaries
@@ -26,8 +26,8 @@ stateDiagram-v2
     Stopping --> Settled: owners join OR leases expire; leaf-first scan
     Settled --> Active: append transaction; instruction + epoch + new Root
     Active --> Active: append to live Root; instruction + frozen receipt
-    Active --> Completed: successful Root tree ends
-    Active --> Active: failed Run; Task stays active
+    Active --> Completed: Root succeeded; no live descendants or unknown effects
+    Active --> Active: Root failed; Task stays active
     Completed --> Active: append creates new Root
 ```
 
@@ -48,7 +48,7 @@ receipt dedup is modeled separately for append.
 | Late result / Child | `fence`, [`AcceptGeneration`](../../internal/agent/sqlite/generation.go), [`tools.Accept`](../../internal/agent/sqlite/tools.go), [`StartChildRun`](../../internal/agent/sqlite/children.go) | Old owner/Task epoch rejects writes and admission; usage/result and Tool/Child insertion roll back atomically |
 | Join / recovery scan | Actor joins current executor before `SettleStop`; ownership validation, claim release and `recoverStopsTx` transaction | Live owners cannot be scanned away; expired/unowned leaves settle first; parents wait for descendants; repeated scan is idempotent |
 | Unsafe effect | `recoverStopsTx` updates pending Tool status using `attempt_count` and `replay_policy`; existing [`ToolExecutor`](../../internal/tool/executor.go) | Dispatched unsafe effect becomes `unknown`; no replay; prior successful receipts stay successful; unexecuted/safe work cancels |
-| Completed / failed Run | `Runs.terminal`, [`finishTask`](../../internal/agent/sqlite/tasks.go) | Root failure leaves Task active; one-shot Task completion waits for its own tree; terminal Runs never revive |
+| Completed / failed Run | `Runs.terminal`, [`finishTask`](../../internal/agent/sqlite/reporter.go) | Read the Root outcome on each terminal transition; Root success completes a one-shot Task after all descendants end, including failed Children; unknown effects keep it active; Root failure leaves Task active; terminal Runs never revive |
 | Crash / restart | Existing claim persistence plus recovery scan | Crash changes Host availability only; leases do not disappear with the process; recovery must still wait for expiry |
 
 The abstraction serializes whole committed transactions, as `Runs.write` does.
@@ -73,6 +73,11 @@ greatest shortest-path depth, not an arbitrary execution-length limit. Reports
 give actual state/edge counts, attained epochs and per-action coverage. Changing
 the abstraction can change those counts; the executable report is authoritative.
 
+After correcting Root-outcome completion, the normal model exhausts 26,595
+states and 121,610 transitions, with greatest shortest-path depth 21 and 2,637
+recovery suffixes. Observed Task epoch reaches 4 and owner epoch reaches 2.
+The unsafe variant still returns the three-step fencing counterexample below.
+
 Safety checks one nonterminal Root, stale business/Child rejection, bounded
 ownership, four legal Task states and at most one unsafe dispatch. Leaf-first
 settlement and atomic append/receipt reuse are modeled transitions; the Go and
@@ -90,6 +95,18 @@ stated bounds. Crash before/after transaction commit is represented by the two
 adjacent committed states; real kill/restart gates validate that abstraction.
 
 ## Counterexample and implementation evidence
+
+`test_one_shot_completion_uses_root_outcome_after_child_drains` and
+`TestTaskControlModelCompletionUsesRootOutcome` pair eight traces: both Root
+outcomes, both Child outcomes, and both ending orders. For example,
+`claim root0 → admit child owner1 → claim child → completed root0 → failed child`
+must complete the Task and publish one completed Root update. The Go regression
+uses the existing synthetic Child admission fixture, the real Agent Loop for
+success, `Runs.Fail` for failure, and SQLite readback. Admission itself is not
+proven by this fixture. A failed Root stays active even if its Child succeeds.
+The unsafe-effect slot still belongs only to Root 0: an unknown effect in the
+current epoch prevents completion; an old epoch's unknown does not prevent a
+fresh Root from completing.
 
 The unsafe model finds `claim root0 → commit pause → accept old-owner result`.
 The Task epoch changes while the old owner still has a live lease. Checking only

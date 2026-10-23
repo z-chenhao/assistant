@@ -129,11 +129,15 @@ def transitions(s, unsafe=False):
             yield f"late result owner1 {name} ({'accept' if admitted else 'reject'})", s, (
                     "stale business write" if admitted and not allowed else None)
         if fenced(s, r, r.owner) and not (name == "root0" and s.effect == "dispatched"):
-            # Run failure never sets Task.failed. One-shot success waits for Child.
+            # finishTask reads the Root outcome, regardless of which Run ended.
+            # Terminal Child failure does not prevent one-shot Root success.
             for status in ("completed", "failed"):
                 n = put(s, name, replace(r, status=status, lease="none"))
-                tree = [n.roots[-1]] + ([n.child] if len(n.roots) == 1 and n.child else [])
-                if status == "completed" and all(x.status == "completed" for x in tree):
+                root = n.roots[-1]
+                descendants = [n.child] if len(n.roots) == 1 and n.child else []
+                unknown = len(n.roots) == 1 and n.effect == "unknown"
+                if (root.status == "completed" and not any(live(x) for x in descendants)
+                        and not unknown):
                     n = replace(n, task="completed")
                 yield f"{status} {name}", n, None
     r = s.roots[0]
