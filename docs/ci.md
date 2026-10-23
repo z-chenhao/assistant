@@ -35,7 +35,7 @@ flowchart LR
     Join --> Gate
 ```
 
-Each Required job independently installs pinned dependencies, provisions the
+Each Required job independently installs its pinned runtime dependencies, provisions the
 public fixture SDK and builds from its exact checked-out source. A small
 project-local composite action owns those mechanics. Its disposable Ubuntu runner
 uses the official HTTPS archive mirror for APT downloads. The Azure mirror
@@ -47,6 +47,13 @@ producer prerequisite. No executable crosses runner boundaries: GitHub image
 rollouts can assign different Ubuntu image versions within one workflow.
 The retained historical build-bundle utility still rejects image/context drift;
 its guards were not relaxed. The new pipeline avoids that reuse entirely.
+Frontend build/TypeScript dependencies install only in unit/lint. Playwright
+installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
+QuickJS still install everywhere, including providers' offline packaging gate.
+Across the eighteen execution jobs this removes seventeen frontend and eleven
+Playwright installs. Lockfile cache keys, per-job exact-source builds, every
+assertion and repetition count remain unchanged. Clean-runner complete CI is the
+dependency-closure proof; install counts alone are not wall-time measurements.
 All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
 SHA may identify GitHub's synthetic merge commit.
 Strict main ancestry and independent exact-SHA reviewer PASS remain required.
@@ -177,7 +184,7 @@ No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
 
 ## Launch, doctor, drive, evidence and cleanup
 
-Install the versions and pinned dependencies from [development.md](development.md).
+Install the versions and pinned dependencies from [CONTRIBUTING](../CONTRIBUTING.md).
 Linux coding tests need bubblewrap and enabled unprivileged user namespaces;
 CI configures these on its disposable runner. The unit/lint job installs the
 pinned Chromium binary/system dependencies, then runs the actual Browser fixture

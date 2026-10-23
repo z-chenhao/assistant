@@ -1,6 +1,12 @@
 name: Offline CI runtime
 description: Prepare pinned dependencies, isolated public SDK and exact-source binary
 inputs:
+  frontend:
+    description: Install frontend build and TypeScript dependencies (unit/lint only)
+    default: "false"
+  browser:
+    description: Install Playwright for Browser contract and UI journeys
+    default: "false"
   sandbox:
     description: Install the offline coding sandbox
     default: "true"
@@ -32,8 +38,14 @@ runs:
       run: |
         npm ci --prefix provider-bridge --ignore-scripts
         npm ci --prefix runtime/javascript --ignore-scripts
-        npm ci --prefix guest-browser --ignore-scripts
-        npm ci --prefix web --ignore-scripts
+    - name: Install pinned Browser dependencies
+      if: inputs.browser == 'true'
+      shell: bash
+      run: npm ci --prefix guest-browser --ignore-scripts
+    - name: Install pinned frontend build dependencies
+      if: inputs.frontend == 'true'
+      shell: bash
+      run: npm ci --prefix web --ignore-scripts
     - name: Provision copied public SDK
       shell: bash
       run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json

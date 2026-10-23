@@ -1,4 +1,19 @@
-# Foundation feature map
+# Feature map
+
+Start with the [capability and gate directory](../docs/guides/verification.md).
+`python3 scripts/verify_suite.py --list` reads the authoritative execution inventory;
+`--gate NAME` drives a selected capability with its complete repetition count.
+The detailed entries below preserve boundary, invariant and proof-limit records.
+
+## Repository coherence and verification (ERII-201)
+
+| Feature | Reach it | Authoritative entry point | Evidence and cleanup |
+| --- | --- | --- | --- |
+| CLI command ownership | Existing `erii model/chat/artifact/memory/skill/approval/automation/web/channel/delivery` commands | `cmd/erii/main.go` owns validation/admission/close; `models.go`, `conversation.go`, `resources.go`, `automation.go`, `channels.go` own parsing/presentation for their boundary | Existing CLI tests and complete suite drive unchanged commands, state, errors and crash/restart; every harness owns Launch/Doctor/Drive/Evidence/Cleanup. No schema or model-visible protocol changes. |
+| Discover and focus verification | `verify_suite.py --list`, `--gate NAME` (repeatable); full `make verify` | `SHARDS`, `catalogue`, `select_gates` in `verify_suite.py` | `test_verification_selection.py` proves no-binary discovery, rejected unknown/duplicate/wrong-shard input, full repetition counts, stop on failure, joined process groups and isolated focused evidence; focused runs never publish complete summaries; both CI joins reject focused inputs and mark completeness only after reconstructing the entire inventory. |
+| Documentation ownership | [README](../README.md), [documentation index](../docs/README.md), [contributor guide](../CONTRIBUTING.md) | README owns onboarding, docs index routes user guides, CONTRIBUTING owns development/layout/checks, verification guide maps capabilities to gates | `check_docs.py` checks local destinations and index reachability; redundant `docs/development.md` removed after consolidation, obsolete milestone claims updated. Historical reports retain their dates and limitations. |
+| CI setup dependencies | `.github/actions/ci-inputs/action.yml`, required CI matrices | Pi/QuickJS remain universal; only unit/lint installs frontend build dependencies; only unit/lint, delivery and five Browser M6 parts install Playwright | Selection/topology regressions preserve every required gate, both joins, five rounds and exact-source builds; full Ubuntu run supplies clean-runner dependency proof. Compared with 18 full installs, frontend installs fall to 1 and Playwright installs to 7; timing claims need workflow evidence. |
+
 
 ## Production operations (ERII-29)
 
@@ -42,11 +57,11 @@ Release model quality, semantic scores and live accounts remain separate claims.
 | Mixed deliverables and desktop materials | Three Main-created Tasks → Root work → Main; scoped video Artifacts and browser CUA | Same Agent Loop and Task/Tool/Artifact/Computer path | GC-18 later confirmed notes, standalone technical design, exact 416/128/16 CSV summary, three valid videos decoded/organized in real browser; screenshot and original-byte readback |
 | Five-run result integrity | `make verify`, `m6_report.aggregate` | Locked fixtures, exact binary/variant/assertion inventories | `m6-cases-1…5.json`, `m6-summary.json`; CI `ci_personal.py` requires seven fixed parts and rejects missing/duplicate/failed/drifted input; retained CLI-opened files/screenshots under `m6-cases-N-assets/`; all children joined and disposable state removed; semantic/product scores remain null, current L2 unexecuted |
 
-Browser launch Doctor uses `scripts/browser_readiness.mjs` in both the real
+Browser launch Doctor uses `guest-browser/readiness.mjs` in both the real
 Browser contract test and M6 Computer journeys. The pipe handshake is not proof
 that Chromium published `DevToolsActivePort`. Delayed, missing, empty/invalid
 port files wait within the shared five-second Browser readiness budget;
-non-transient filesystem errors fail immediately. `guest-browser/test.mjs`
+non-transient filesystem errors fail immediately. `guest-browser/readiness.test.mjs`
 reproduces delayed/partial publication and asserts timeout/error rejection.
 The M6 fifteen-second launch deadline and every product assertion remain intact.
 

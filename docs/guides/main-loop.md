@@ -49,7 +49,8 @@ write intents, model generations, ToolInvocations, reply/delivery records, and
 RunTrace. It preserves prior v1–v6 metadata and events. `conversation.db` has an
 independent v1 forward migration, WAL, foreign keys, busy timeout, monotonic
 per-Conversation sequences and immutable idempotent message IDs. An incompatible
-future version fails startup. Memory storage remains a later slice.
+future version fails startup. [Memory maintenance](memory-maintenance.md) owns the
+separate Memory database and its current migrations.
 
 | Run state | Legal next states in this slice |
 | --- | --- |

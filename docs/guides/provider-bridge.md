@@ -212,8 +212,8 @@ fails closed. Snapshots and credentials retain their existing boundaries.
 `provider_usage` stores the snapshot, generation/Run IDs, observed token counts,
 Host elapsed milliseconds, and normalized failure. Missing token usage is NULL,
 including cancellation/crash; zero is recorded only if supplied by the provider.
-Local monetary cost is zero. This is accounting, not a durable generation-result
-ledger. A Host crash can lose an in-flight usage record; Run recovery is later work.
+Local monetary cost is zero. The shared Run ledger atomically accepts generation results and usage under
+ownership fencing; see [Main recovery](main-loop.md#ownership-and-persistence).
 
 ## Verification and operations
 
@@ -235,15 +235,13 @@ ERII_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTr
 
 CI uses deterministic Fakes/environment references and requires no OS credential
 store or real model account. Real Qwen/vLLM/SGLang/LM Studio compatibility remains
-release-time Live Shadow evidence. Product Golden Cases remain not_applicable
-until their Main/Conversation slices; no product score is claimed here.
-
-## Deterministic fixtures
+release-time Live Shadow evidence. Golden Case conformance runs in the [complete verification suite](verification.md);
+provider contracts alone do not establish semantic product scores.
 
 ## Reproduce the CLI path
 
 Use an isolated absolute `ERII_DATA_ROOT`. Run `make build`, then provide metadata
-through `model add` as documented in `development.md`. Copy its `profile_id`.
+through `model add` as documented in [local model setup](#connect-a-local-model). Copy its `profile_id`.
 Profiles are unverified candidates, and metadata cannot activate one.
 
 ```sh
@@ -277,7 +275,7 @@ automatically. Every process that uses a test profile must explicitly supply
 unavailable/invalid active profiles, or stale Probe evidence also close ingress.
 Diagnostics and metadata remain usable for repair. A compatible, valid active
 profile reports `ready`; this readiness flag is a gate for later Agent admission,
-and does not add a Conversation/Task execution endpoint in M0.
+and governs the existing Main/Worker execution path.
 
 The Fake fixtures are named `success`, `incompatible`, `crash`, `partial-crash`,
 `completed-crash`, `no-tools`, `bad-sequence`, `drift`, `malformed`, `auth-required`,
@@ -288,7 +286,7 @@ a different provider or retries a generation automatically.
 
 ## Private protocol v1
 
-`internal/llm` owns consumer interfaces for the model control plane and future
+`internal/llm` owns consumer interfaces for the model control plane and the shared
 Agent Loop. They are repository-internal and may evolve with conformance tests;
 they are not a public plugin API. `internal/llm/bridge` implements the stdio client.
 `internal/llm/fake` implements deterministic provider fixtures behind it.
