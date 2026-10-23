@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io"
+	"os"
+
 	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/app"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/tui"
-	"io"
-	"os"
 )
 
 func runChat(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer) error {

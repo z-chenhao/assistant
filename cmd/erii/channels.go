@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io"
+	"net"
+	"time"
+
 	"github.com/z-chenhao/erii/internal/app"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/delivery"
 	"github.com/z-chenhao/erii/internal/interaction/web"
-	"io"
-	"net"
-	"time"
 )
 
 func runWeb(ctx context.Context, application *app.App, cfg config.Config, out io.Writer, foreground func(func(context.Context) error) error) error {

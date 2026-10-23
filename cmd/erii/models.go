@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/llm"
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/z-chenhao/erii/internal/app"
+	"github.com/z-chenhao/erii/internal/llm"
 )
 
 func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer, input llm.ProfileInput, fixture bool, errOut io.Writer) error {

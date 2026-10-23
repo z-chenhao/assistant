@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io"
+	"strconv"
+
 	"github.com/z-chenhao/erii/internal/app"
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/skill"
-	"io"
-	"strconv"
 )
 
 func runArtifact(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer) error {
