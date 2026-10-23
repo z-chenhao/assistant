@@ -63,7 +63,9 @@ jobs:
   race:
     name: Race detector (${{ matrix.racepart }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Main's approved ERII-222 bound leaves teardown room for either part.
+    # Keep the complete inventory, per-test deadlines and strict join unchanged.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

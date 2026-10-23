@@ -82,8 +82,12 @@ storage rejects their disk-conformance claim before tests start.
 All CI uses a ten-minute baseline from workflow creation through the final
 required verdict, with a five-minute target. Queue and dependency waits count
 in observed workflow wall time. Every job has an explicit timeout of at most
-ten minutes; the topology regression rejects missing or larger timeouts in any
-workflow. A job timeout is a stop boundary, not proof of end-to-end latency.
+ten minutes except the two race parts. Main's approved ERII-222 change gives
+the race job a fifteen-minute outer bound for test completion and teardown;
+both matrix parts inherit it. The topology regression rejects missing or larger
+timeouts and preserves that explicit race allowance. Test deadlines, repetitions,
+cleanup and the strict join remain unchanged. A job timeout is a stop boundary,
+not proof of end-to-end latency.
 Record actual exact-SHA timings with `ci_profile.py`; treat any workflow over
 ten minutes as a regression to diagnose before review. Do not remove coverage,
 reduce repetitions, extend fixture deadlines, or retry failures to meet it.
@@ -184,7 +188,7 @@ two. Local unpartitioned Core runs join case kinds in order. Part jobs use
 separate runners. Gate-series concurrency is two, with Go event/model checks
 isolated after other work. Local `make test-race` keeps its complete serial-Bridge
 runner. CI places `--part packages` and `--part sqlite` on two independent
-Required runners; both retain their ten-minute limit. The packages part runs
+Required runners; both use the approved fifteen-minute outer race limit. The packages part runs
 Bridge alone before the other packages (`-p=1`, GOMAXPROCS=1). The SQLite part
 discovers SQLite's complete
 Go Test/Example/Fuzz inventory. The Child approval contract whose original
@@ -213,7 +217,8 @@ SC conformance retains its existing unweighted partitions. The measured ERII-30
 timeout had static partition costs of about 330/379/449 seconds; the same
 retained costs balance to about 386 seconds each. These are scheduling estimates,
 not a latency PASS. Actual required race/cleanup and end-to-end timings must
-still pass on the delivered SHA within the unchanged ten-minute budget.
+still pass on the delivered SHA. The ten-minute workflow baseline remains a
+separate measured objective; the race teardown allowance does not certify it.
 
 The `f7808415f20968a58a1c8644bc2b3796f7d54034` run
 [39894692925](https://github.com/z-chenhao/erii/actions/runs/39894692925)
