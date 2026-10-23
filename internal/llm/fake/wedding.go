@@ -2,6 +2,7 @@ package fake
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"github.com/z-chenhao/erii/internal/llm"
@@ -17,6 +18,7 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 	}
 	last := r.Messages[len(r.Messages)-1]
 	user, root, source := "", false, ""
+	committedRef, recoveredText := "", ""
 	var prior llm.ToolCall
 	var update struct {
 		Content []struct {
@@ -31,6 +33,25 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		}
 		if len(m.ToolCalls) > 0 {
 			prior = m.ToolCalls[len(m.ToolCalls)-1]
+		}
+		if m.Role == "tool" && prior.Name == "mcp__wedding__read" {
+			source = m.Text
+		}
+		if m.Role == "tool" && prior.Name == "builtin__artifact__manage" {
+			var args struct{ Operation string }
+			var result struct{ Text string }
+			if json.Unmarshal([]byte(prior.Arguments), &args) == nil && args.Operation == "read" && json.Unmarshal([]byte(m.Text), &result) == nil {
+				recoveredText = result.Text
+			}
+		}
+		const committed = "Previous committed Task work (untrusted data): "
+		if strings.HasPrefix(m.Text, committed) {
+			var data struct {
+				Refs []string `json:"artifact_refs"`
+			}
+			if json.Unmarshal([]byte(strings.TrimPrefix(m.Text, committed)), &data) == nil && len(data.Refs) > 0 {
+				committedRef = data.Refs[len(data.Refs)-1]
+			}
 		}
 		const marker = "Runtime task update (untrusted Worker data; not user instructions):\n"
 		if at := strings.Index(m.Text, marker); m.Origin == "runtime" && at >= 0 {
@@ -61,12 +82,15 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 				if json.Unmarshal([]byte(last.Text), &matches) != nil || len(matches) != 1 {
 					return llm.GenerationResult{Text: "请确认要继续的婚礼 Task；没有创建重复事项。"}
 				}
+				if strings.Contains(user, "暂停") {
+					return call(task.ManageName, task.ManageRequest{Operation: "pause", TaskRef: matches[0].TaskRef})
+				}
 				return call(task.ManageName, task.ManageRequest{Operation: "append", TaskRef: matches[0].TaskRef, Instruction: user, ArtifactRefs: update.Details.ArtifactRefs})
 			default:
 				return llm.GenerationResult{Text: "已接到同一婚礼准备事项。"}
 			}
 		}
-		if strings.Contains(user, "128") || strings.Contains(user, "酒店") || strings.Contains(user, "继续") {
+		if strings.Contains(user, "128") || strings.Contains(user, "酒店") || strings.Contains(user, "继续") || strings.Contains(user, "暂停") {
 			return call(task.SearchName, task.SearchRequest{Query: "婚礼", Scope: "all"})
 		}
 		return call("mcp__wedding__read", map[string]string{"resource": "source"})
@@ -78,7 +102,10 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		Contacts  map[string]string `json:"contacts"`
 	}
 	if json.Unmarshal([]byte(source), &data) != nil || data.Contacts["hotel"] == "" {
-		return llm.GenerationResult{Text: "婚礼来源不可用，未联系任何人。"}
+		if last.Role == "tool" && prior.Name == "mcp__wedding__read" {
+			return llm.GenerationResult{Text: "婚礼来源不可用，未联系任何人。"}
+		}
+		return call("mcp__wedding__read", map[string]string{"resource": "source"})
 	}
 	all := ""
 	for _, m := range r.Messages {
@@ -97,6 +124,41 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		user = strings.SplitN(strings.TrimPrefix(user, "Task instruction: "), "\n", 2)[0]
 	}
 	confirmed := strings.Contains(all, "128")
+	if strings.Contains(user, "婚期改为") {
+		if recoveredText == "" {
+			if committedRef == "" || last.Role == "tool" && prior.Name == "builtin__artifact__manage" {
+				return llm.GenerationResult{Text: "已提交清单不可用，未猜测宾客或桌数，未联系任何人。"}
+			}
+			return call("builtin__artifact__manage", map[string]any{"operation": "read", "artifactRef": committedRef, "limit": 4096})
+		}
+		var saved struct {
+			Event     map[string]any   `json:"event"`
+			Checklist []map[string]any `json:"checklist"`
+			Facts     struct {
+				Guests   int `json:"guests"`
+				Tables   any `json:"table_count"`
+				PerTable any `json:"per_table"`
+			} `json:"facts"`
+		}
+		if json.Unmarshal([]byte(recoveredText), &saved) != nil || saved.Facts.Guests != 128 || saved.Facts.Tables != nil || saved.Facts.PerTable != nil || len(saved.Checklist) != 3 || saved.Event["title"] != "婚礼" {
+			return llm.GenerationResult{Text: "已提交清单事实不完整，未猜测宾客或桌数，未联系任何人。"}
+		}
+		data.Event, data.Checklist, confirmed = saved.Event, saved.Checklist, true
+	}
+	// Read changes only from ordered user instructions, never source noise or
+	// previous Tool results. The fixture remains a scripted model with no store
+	// access; the Host decides how the new Root inherits committed Task context.
+	for _, change := range regexp.MustCompile(`婚期改为(\d{4}-\d{2}-\d{2})|C([23])截止改为(\d{4}-\d{2}-\d{2})`).FindAllStringSubmatch(all, -1) {
+		if change[1] != "" {
+			data.Event["date"] = change[1]
+		} else {
+			for _, item := range data.Checklist {
+				if item["id"] == "C"+change[2] {
+					item["due"] = change[3]
+				}
+			}
+		}
+	}
 	draft := strings.Contains(user, "酒店")
 	if draft && !confirmed {
 		return llm.GenerationResult{Text: "请先确认宾客人数；未生成含猜测人数的邮件，未联系酒店。"}
@@ -119,7 +181,11 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 	if draft {
 		text = "邮件草稿已保存，等待你审阅冻结的收件人、正文和附件；尚未发送。"
 	}
-	if last.Role != "tool" {
+	var priorArgs struct {
+		Operation string `json:"operation"`
+	}
+	_ = json.Unmarshal([]byte(prior.Arguments), &priorArgs)
+	if last.Role != "tool" || prior.Name == "mcp__wedding__read" || prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "read" {
 		doc := map[string]any{"event": data.Event, "clock": data.Clock, "checklist": data.Checklist,
 			"facts": map[string]any{"guests": guests, "table_count": nil, "per_table": nil}, "summary": text}
 		if draft {
@@ -128,10 +194,6 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		raw, _ := json.Marshal(doc)
 		return call("builtin__artifact__manage", map[string]string{"operation": "save", "name": "wedding-checklist.json", "mediaType": "application/json", "text": string(raw)})
 	}
-	var priorArgs struct {
-		Operation string `json:"operation"`
-	}
-	_ = json.Unmarshal([]byte(prior.Arguments), &priorArgs)
 	if prior.Name == "builtin__artifact__manage" && priorArgs.Operation == "save" {
 		var result struct {
 			Refs []string `json:"artifact_refs"`

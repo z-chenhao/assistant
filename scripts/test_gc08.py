@@ -82,5 +82,81 @@ class WeddingTests(unittest.TestCase):
         for change in [{},dict(semantic_score=100),dict(cleanup=False),dict(status='inconclusive'),dict(fixture_lock={})]:
             with self.assertRaises(ValueError):evaluator.prepare(dict(base,**change))
 
+    def lifecycle_row(self):
+        """Small state receipts for rejection tests, not a substitute for CLI runs."""
+        source,docs=self.documents();fixture=json.loads(journey.LIFECYCLE.read_text())
+        docs.append(copy.deepcopy(docs[1]));docs.append(copy.deepcopy(docs[1]))
+        docs[-1]['event']=dict(source['event'],date=fixture['event_date'])
+        for item in docs[-1]['checklist']:
+            if item['id'] in fixture['deadlines']:item['due']=fixture['deadlines'][item['id']]
+        artifacts=[];metadata=[]
+        for i,doc in enumerate(docs):
+            text=json.dumps(doc);digest=journey.sha(text.encode());ref='artifact:'+str(i)
+            artifacts.append(dict(ref=ref,text=text,sha256=digest,document=doc))
+            metadata.append(dict(artifact_ref=ref,content_hash=digest,task_id='task-id',run_id='root'+str(i)))
+        roots=[dict(run_id='root'+str(i),kind='worker',task_id='task-id',parent_run_id=None,
+                    task_epoch=i+1 if i<4 else 6,status='completed',model_snapshot_id='model',capability_snapshot_id='worker') for i in range(5)]
+        task=dict(task_id='task-id',task_ref='task:existing',anchor_task='immutable',status='completed',task_epoch=3,completion_policy='once')
+        updates=[dict(root_run_id=r['run_id']) for r in roots[:3]]
+        actions=[dict(operation='create'),*[dict(operation='append',taskRef='task:existing',instruction=t) for t in journey.TURNS[1:]],
+                 dict(operation='append',taskRef='task:existing',instruction=fixture['continue']),dict(operation='pause',taskRef='task:existing'),
+                 dict(operation='append',taskRef='task:existing',instruction=fixture['resume'])]
+        tools=[dict(invocation_id='control'+str(i),tool_name='builtin__task__manage',run_id='main',arguments_json=json.dumps(a),
+                    status='succeeded',attempt_count=1) for i,a in enumerate(actions)]
+        send=dict(invocation_id='mail',run_id='root2',tool_name='mcp__wedding__send',arguments_json='{}',status='failed',attempt_count=0)
+        state=dict(tasks=[task],runs=roots[:3],artifact=metadata[:3],updates=updates,tools=tools[:3]+[send],
+            generations=[],snapshots=[dict(snapshot_id='model')],capabilities=[dict(snapshot_id='worker',role='worker',tools_json='[]')],
+            inbox=[dict(message_json=json.dumps(dict(origin='runtime',details={}))) for _ in range(3)],reporter_dedup=[{}]*3,
+            conversation=[],deliveries=[],usage=[],instructions=[],task_requests=[],task_invocations=[],approval=[dict(status='denied')],automation=[])
+        interrupted=copy.deepcopy(state);interrupted['tasks'][0].update(status='active',task_epoch=4)
+        interrupted['runs'].append(dict(roots[3],status='running'));interrupted['artifact']=metadata[:4];interrupted['tools']=tools[:4]+[send]
+        paused=copy.deepcopy(interrupted);paused['tasks'][0].update(status='paused',task_epoch=5)
+        paused['runs'][-1].update(status='cancelled',error_code='task_paused')
+        after=copy.deepcopy(paused);after['tasks'][0].update(status='completed',task_epoch=6);after['runs'].append(roots[4])
+        after['artifact']=metadata;after['updates'].append(dict(root_run_id='root4'))
+        after['inbox'].append(dict(message_json=json.dumps(dict(origin='runtime',details={}))));after['reporter_dedup'].append({})
+        inputs=journey.TURNS+[fixture[k] for k in ('continue','pause','resume')]
+        after['conversation']=[dict(role='user',source='local',sequence=i+1,content=[dict(text=t)]) for i,t in enumerate(inputs)]
+        after['instructions']=[dict(instruction=t) for t in journey.TURNS[1:]+[fixture['continue'],fixture['resume']]]
+        after['task_requests']=[{}]*6;after['task_invocations']=[{}]*6
+        read=dict(invocation_id='read',run_id='root4',tool_name='builtin__artifact__manage',status='succeeded',attempt_count=1,
+                  arguments_json=json.dumps(dict(operation='read',artifactRef=artifacts[3]['ref'],limit=4096)),
+                  result_json=json.dumps(dict(text=json.dumps(dict(text=artifacts[3]['text'])))))
+        after['tools']=tools+[send,read]
+        return dict(variant=dict(source=source,turns=journey.TURNS),artifacts=artifacts[:3],denial=dict(state=state),
+                    lifecycle=dict(fixture=fixture,interrupted=interrupted,stop_committed=copy.deepcopy(paused),paused=paused,
+                        resumed=after,artifacts=artifacts,remote=[],paused_replay=copy.deepcopy(paused),replay=copy.deepcopy(after),
+                        crashes=[dict(boundary='before_result_commit',returncode=-9),dict(boundary='after_stop_commit',returncode=-9)]))
+
+    def test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts(self):
+        row=self.lifecycle_row()
+        self.assertTrue(all(journey.lifecycle_observe(row).values()))
+        changes=[lambda l:l['paused']['tasks'][0].update(status='active'),lambda l:l['paused']['runs'][-1].update(error_code='task_cancelled'),
+            lambda l:l['resumed']['runs'][3].update(status='completed'),lambda l:l['resumed']['runs'][-1].update(task_epoch=5),
+            lambda l:l['resumed']['tasks'][0].update(task_epoch=5),lambda l:l['resumed']['tasks'][0].update(anchor_task='replaced'),
+            lambda l:l['resumed']['updates'][-1].update(root_run_id='root3'),lambda l:l['resumed']['tools'][0].update(attempt_count=2),
+            lambda l:l['resumed']['tools'][4].update(arguments_json=json.dumps(dict(operation='append'))),
+            lambda l:l['resumed']['tools'][-1].update(result_json=json.dumps(dict(text='{}'))),
+            lambda l:l['resumed']['artifact'][3].update(content_hash='lost'),lambda l:l['crashes'][0].update(returncode=0),
+            lambda l:l['stop_committed']['tasks'][0].update(status='active'),lambda l:l['remote'].append(dict(sent=True)),
+            lambda l:l['resumed']['approval'][0].update(status='approved'),lambda l:l['resumed']['automation'].append(dict(enabled=True)),
+            lambda l:l['resumed']['tools'][-2].update(attempt_count=1),lambda l:l['paused_replay']['tasks'][0].update(task_epoch=6)]
+        for change in changes:
+            bad=copy.deepcopy(row);change(bad['lifecycle'])
+            self.assertFalse(all(journey.lifecycle_observe(bad).values()),change)
+
+    def test_lifecycle_rejects_old_dates_repeated_counts_and_guessed_tables(self):
+        row=self.lifecycle_row()
+        changes=[lambda d:d['event'].update(date='2026-11-01'),lambda d:d['facts'].update(guests=None),
+            lambda d:d['facts'].update(table_count=13),lambda d:d['facts'].update(per_table=10),
+            lambda d:d['checklist'][1].update(due='2026-10-22'),lambda d:d['checklist'][2].update(status='completed'),
+            lambda d:d.update(draft=dict(recipient='banquet@example.test'))]
+        for change in changes:
+            bad=copy.deepcopy(row);change(bad['lifecycle']['artifacts'][-1]['document'])
+            self.assertFalse(all(journey.lifecycle_observe(bad).values()))
+        lock=json.loads(journey.LIFECYCLE.with_suffix('.lock.json').read_text())
+        self.assertEqual(lock['fixture_sha256'],journey.sha(journey.LIFECYCLE.read_bytes()))
+        self.assertNotIn('128',row['lifecycle']['fixture']['resume'])
+
 
 if __name__=='__main__':unittest.main()

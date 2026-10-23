@@ -986,7 +986,7 @@
       "area": "tasks",
       "full_case_status": "inconclusive",
       "semantic_score": null,
-      "gap": "Exact three-turn six-variant wedding mechanics now run through maintained CLI/Task/Artifact/MCP approval boundaries. Broader weeks/calendar/reminder/pause variants, actual unscripted model quality and constrained grading remain required."
+      "gap": "Six original three-turn wedding variants plus a locked pause/continue/date-change extension run through CLI, Task, Artifact read and frozen MCP approval boundaries. Normal Task creation still defaults to once, conflicting with continuous non-Automation intent; explicit owner policy is pending. Weeks/calendar/reminder variants, actual unscripted quality, constrained grades and current L2/human review remain due."
     },
     "GC-09": {
       "area": "main",
@@ -1819,7 +1819,7 @@
       "sha256": "d775664049cd921f5f65196c85e5211bc654ff4f744ef1d561e2c1affa7b796b",
       "disposition": "partial_mechanical",
       "observed": "Three original messages create one Task and three unique Root epochs; checklist dependency/fact Artifacts are read back.",
-      "remaining": "Other lifestyle events/weeks/variants remain required.",
+      "remaining": "One persisted identity is retained, but task_manage(create) defaults to once, completing Task between successful Roots. Continuous active lifecycle, reminders and other events remain gaps pending explicit owner policy; new Root creation alone does not prove ongoing intent.",
       "code": [
         "internal/llm/fake/wedding.go#weddingReply",
         "internal/agent/sqlite/tasks.go#createRoot",
@@ -1887,12 +1887,13 @@
       "line": 265,
       "sha256": "149fd02fc186fb1eb2f5789704e281491b340cc9c599ff639199ffa690145337",
       "disposition": "partial_mechanical",
-      "observed": "Two continuations use Main Task search/append, retaining immutable anchor and new Root IDs/epochs.",
-      "remaining": "Literal continue/pause/resume wording and broader lifecycle variants remain required beyond existing fragments.",
+      "observed": "Main literal continue/append, pause and continue create five unique Roots on one Task. Root 4 is cancelled with task_paused after actual result/stop crash boundaries. Root 5 recovers the committed checklist via Artifact read, adopts new dates and preserves 128 guests without the user repeating that number.",
+      "remaining": "Calendar/reminder/materials/other lifestyle events, real model planning and semantic/L2 acceptance remain due; normal Task creation still defaults to once, pending an owner decision on continuous Task intent.",
       "code": [
         "internal/llm/fake/wedding.go#weddingReply",
         "internal/agent/sqlite/tasks.go#createRoot",
-        "scripts/verify_gc08.py#observe"
+        "scripts/verify_gc08.py#observe",
+        "scripts/verify_gc08.py#lifecycle_observe"
       ],
       "tests": [
         "scripts/test_gc08.py",
@@ -1900,7 +1901,8 @@
       ],
       "evidence": [
         "docs/gc08-verification.md",
-        "scripts/verify_gc08.py#drive"
+        "scripts/verify_gc08.py#drive",
+        "scripts/verify_gc08.py#drive_lifecycle"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     },
@@ -2814,6 +2816,654 @@
       "evidence": [
         "docs/gc16-verification.md",
         "scripts/verify_gc16.py#drive"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 170,
+      "sha256": "04bb891036f6d8226bacdb229aff64c999544a51cca445525d09d3760d308045",
+      "disposition": "partial_mechanical",
+      "observed": "The stored Task rows use the four baseline states; the wedding CLI trace observes active, paused and completed.",
+      "remaining": "Cancelled Tasks and failed Roots use existing Task-control tests; no complete product acceptance is implied.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 174,
+      "sha256": "eb04000989eba02ee1775e278330d420080f8c0840baa9a03cb419a95ec45479",
+      "disposition": "partial_mechanical",
+      "observed": "The schema admits no failed Task status. Existing failed-Root coverage keeps Task active; the wedding trace creates no failed Task.",
+      "remaining": "Run-failure product variants and exact complete release evidence remain due.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 175,
+      "sha256": "2c1a5fd97f50466be7edd4d7b5851a52f00016375c2a0028f7ebf9ebd9f8bd5f",
+      "disposition": "partial_mechanical",
+      "observed": "The wedding Task remains paused across CLI restart and duplicate pause ingress, then Main append continues it.",
+      "remaining": "Other lifestyle events and real model intent selection remain unverified.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 176,
+      "sha256": "660cff0e8610ab84d29097e7f553c0fa229d56c655073cb8f510226eb753a0c2",
+      "disposition": "partial_mechanical",
+      "observed": "The wedding fixture uses the current once policy and completes after a successful Root; pause cancels the interrupted Root instead of completing it.",
+      "remaining": "Full descendant-completion semantics rely on the separately named Task-control tests; this journey has no Children.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 177,
+      "sha256": "2708ad74a0c8ccc07a517eddf326ab8f40c38e34449a778334e2a401f0520d15",
+      "disposition": "evidence_gap",
+      "observed": "Automation explicitly inserts ongoing Tasks, but normal task_manage(create) omits completion_policy and defaults to once. Wedding Roots therefore complete the Task between turns.",
+      "remaining": "Baseline ongoing semantics for a continuous non-Automation lifestyle event lack an explicit creation path. Owner decision is required before changing the model-visible Task Tool; do not infer a compatibility rule or certify GC-08 continuity.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 178,
+      "sha256": "e9ce739da20e03dc24905923852d70b77fe099a9ba0b9e401a63b0019aa76ee6",
+      "disposition": "partial_mechanical",
+      "observed": "Existing TestRootFailureDoesNotFailTaskOrStopOtherWork preserves an active Task after Root failure. Wedding pause uses cancelled rather than failed Root state.",
+      "remaining": "This wedding extension does not exercise model or infrastructure failure recovery; whole-case grades and release evidence remain due.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 179,
+      "sha256": "729fff52f1d5135257da8a10387321ec9bd1149e522e0bc98a8f135b51201e43",
+      "disposition": "partial_mechanical",
+      "observed": "stopTask updates Task epoch, disables bound Automation and marks the active tree for cancellation; recoverStopsTx fences and settles it. Existing cancellation tests inspect tree/Tool outcomes.",
+      "remaining": "The wedding extension pauses rather than cancels; scheduler cancellation, unknown effects and adversarial late writes require their separate conformance evidence.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.6",
+      "line": 180,
+      "sha256": "732dc0b20e473df6af559cf22b0871f062da25f57860a5bb39521baf6aaffa01",
+      "disposition": "partial_mechanical",
+      "observed": "Wedding append reactivates the completed Task for Root 4; after pause it reactivates the same Task for new Root 5. Old completed/cancelled Root rows remain identical.",
+      "remaining": "Cancelled Task reactivation is separately tested by verify_task_control; broader product variants and unscripted Main decisions remain unverified.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 319,
+      "sha256": "2c04e57ea1727962544ed21d88d13b5a97f7c379bea1878538bdd87eca1e9af0",
+      "disposition": "partial_mechanical",
+      "observed": "The normal Actor/Loop executes wedding Tools and persists stable checkpoints; the extension pauses after committed Tool output, before result commit.",
+      "remaining": "This is one bounded stable-boundary trace, not proof of every model/Tool wait transition.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 320,
+      "sha256": "e61bbdafbbc9a6108798a3cfa42715e700f1eeb370747e1cdc656ba66953dfc2",
+      "disposition": "partial_mechanical",
+      "observed": "Existing frozen-generation/compaction append tests check ordered input at the next stable step. Wedding continuation preserves separate ordered TaskInstruction strings.",
+      "remaining": "The wedding extension does not race Steering against a live external effect; protocol-wide concurrency evidence remains separate.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 321,
+      "sha256": "19fd6d45c839f4e76e6708fecf4ab118d4ad29e653589bbab2adc120bd754635",
+      "disposition": "partial_mechanical",
+      "observed": "Main pause durably marks the wedding Task paused before restart and the prior active Root settles cancelled; saved Tool/Artifact work is preserved.",
+      "remaining": "This trace has no active Child or dispatched unsafe Tool; safe Tool cancellation and unknown outcomes require the separate Task-control/conformance scenarios.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 322,
+      "sha256": "381c7199e22c52f54107ea502c14a32477776f5482d35128da4fac3f8d1246f1",
+      "disposition": "partial_mechanical",
+      "observed": "The fourth wedding Root becomes cancelled with task_paused. Its fourth committed Artifact and all completed Tool/model receipts remain unchanged across new Root execution.",
+      "remaining": "The trace establishes this finite root/context shape only; remaining protocol matrices and current product/L2 evidence are not certified.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 323,
+      "sha256": "719f48819525caba64ecb911cc3d85dabb90d98919b1c8098ee52d3df2ce184f",
+      "disposition": "partial_mechanical",
+      "observed": "Main search/append stores the literal continue instruction, creates epoch-6 Root 5 and retains all four previous Root rows. Root 5 reads the old committed Artifact through the ordinary scoped Tool and changes only instructed dates.",
+      "remaining": "The source anchor was compacted, so the Fake re-reads MCP source and inherited Artifact data; unscripted continuation quality remains unverified.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 324,
+      "sha256": "fdd0a9b49299b4e75b977ab558ee0262233eccecea5b7627e73cdeee56eaba55",
+      "disposition": "partial_mechanical",
+      "observed": "After_stop_commit SIGKILL recovers the same Main/stop intent. No replacement business Root appears until a distinct explicit continue input. The pending-mail restart similarly creates no new Root.",
+      "remaining": "Broader Sidecar/in-flight external-effect recovery relies on separate replay gates; this increment does not certify them.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 325,
+      "sha256": "661e4c61a0868c9d7456211855c47099f4ae09a9ddc73b142fa886b327b427ec",
+      "disposition": "partial_mechanical",
+      "observed": "The wedding Task epochs progress 4 active -> 5 paused -> 6 continued. The stopped epoch-4 Root never gets a Task update or new user result, and its row stays terminal across replay.",
+      "remaining": "Adversarial injected late epochs and concurrent owners require Task-control unit/race checks; absence of a late result in this bounded trace alone is not universal fencing proof.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 326,
+      "sha256": "dfa3b09d41acab92aea6b6fc2e1007f596fe2634027122994b1fad557afbdc6b",
+      "disposition": "partial_mechanical",
+      "observed": "The Host supplies previous committed Task work and opaque Artifact references to the new Root. The Fake reads that accessible reference, without constructing a Checkpoint or Run ID.",
+      "remaining": "Internal context/compaction formatting and all provider behavior remain subject to separate contract tests; semantic model ability is unverified.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 327,
+      "sha256": "607c49ba04977b5cb992a8b81212f200f824507cd7310af83c7fa4a4c48dcdab",
+      "disposition": "partial_mechanical",
+      "observed": "The original wedding draft persists provider call identity, complete frozen call hash and pending ToolInvocation across real SIGKILL; wrong-hash approval is rejected with zero attempts.",
+      "remaining": "This is a direct MCP call, not nested Code Mode; nested_call_key retention and positive approval are proven separately, not by this extension.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 328,
+      "sha256": "b6267f25b68e5b6b706793be5430a04c782199aab9058ab5dcb4bd96269ac169",
+      "disposition": "evidence_gap",
+      "observed": "The wedding fixture deliberately denies the only mail approval and verifies zero attempts; it supplies no user authorization to send.",
+      "remaining": "Positive consent/ToolResult/ContinueAgentLoop requires existing Tool/communication scenarios and real approved-account release evidence. Do not substitute denial for positive execution proof.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 329,
+      "sha256": "5f5b33eb2032b3834eed6023bc66a9569744e0737458aa36157b136541d05322",
+      "disposition": "partial_mechanical",
+      "observed": "After pause, foreground CLI drains to idle and exits; the persisted paused Task survives a new process and no waiting process is retained.",
+      "remaining": "No Pod architecture exists in this local application; this observation does not measure all goroutine/resource retention.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.10",
+      "line": 330,
+      "sha256": "64e97e8fb5444be1943aaa2d49f7697dc30cabea3b2e607fcd2046054467b357",
+      "disposition": "partial_mechanical",
+      "observed": "The maintained CLI process is killed and a new process resumes persisted stop/Task state. Existing ownership/claim tests enforce stale-owner rejection.",
+      "remaining": "Only one local Host executes this wedding trace; multi-owner interleavings and distributed safety are not established by sequential restarts.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 257,
+      "sha256": "c96619de8f05857783735677cf6f7e0ba92854fbf479afaa17d8838d8def7ea6",
+      "disposition": "partial_mechanical",
+      "observed": "Three original wedding inputs plus a locked pause/continue/date-change extension exercise Task/Artifact continuity.",
+      "remaining": "No passage-of-weeks scheduler/calendar/materials/appointments variant, real model or current L2 journey has been executed.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 259,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "disposition": "evidence_gap",
+      "observed": "This heading introduces the entire mandatory list; individual rows below retain partial observations and gaps.",
+      "remaining": "No heading or aggregate score can waive the ongoing/reminder/approved-action/semantic obligations.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 264,
+      "sha256": "e854f1dcbcdc781574f7d7ba79ef06dce7852e4f1fff3b0a4c0f2801fd074f70",
+      "disposition": "partial_mechanical",
+      "observed": "Frozen exact hotel draft, recipient, empty attachment list, pending/denied zero provider attempts survive restart and lifecycle continuation.",
+      "remaining": "No positive send, application submission, payment or attachment-version journey is present; real account writes require their exact approved action.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
+      ],
+      "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-08",
+      "line": 267,
+      "sha256": "c35be19c12335760fe2f8972af872e1d70e53b884a514bf11afb80d54dcf5480",
+      "disposition": "partial_mechanical",
+      "observed": "Locked extension exercises normal Main pause/append and scoped Artifact recovery in six existing wording/noise variants.",
+      "remaining": "Long-lived ongoing policy, calendar and reminder variants, other event types and full communication/semantic/L2 evidence remain due.",
+      "code": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/task_control.go#recoverStopsTx",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "scripts/verify_gc08.py#lifecycle_observe"
+      ],
+      "tests": [
+        "scripts/test_gc08.py#test_lifecycle_rejects_revived_roots_wrong_epoch_stale_result_and_lost_artifacts",
+        "internal/llm/fake/wedding_test.go#TestWeddingFixtureRecoversClippedAnchorThroughTools",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlPauseFencesLateWritesAndContinueNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork"
+      ],
+      "evidence": [
+        "docs/gc08-verification.md",
+        "scripts/verify_gc08.py#drive_lifecycle",
+        "scripts/verify_task_control.py"
       ],
       "pr": "https://github.com/z-chenhao/erii/pull/32 (unmerged; independent review required)"
     }

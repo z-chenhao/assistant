@@ -28,7 +28,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. Seventy-four blocks now have exact-hash
+can silently discard a mandatory clause. Ninety-eight blocks now have exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -47,7 +47,7 @@ the nonzero completion boundary through the actual CLI.
 | Gap | Inspectable current state | Required next evidence |
 | --- | --- | --- |
 | GC-02 semantic quality | The existing six-variant driver now processes all four turns in order and creates one monthly Automation through the Main Tool; it asserts no early Task/schedule, first fire 2026-11-29 20:00 +08 and duplicate-input idempotency | Unscripted interview/constraint selection and semantic grades remain unverified; scripted scheduling evidence is not a product Case score |
-| GC-08 | Six exact §8.9 three-turn CLI journeys now prove one Task/three Roots, C1→C2 dependency, 128 guests/unknown tables, Artifact bytes and frozen pending/denied zero-attempt hotel mail | Broader weeks/calendar/reminder/pause variants, actual model quality, constrained scores and current L2/human review remain required |
+| GC-08 | Six exact §8.9 three-turn CLI journeys plus a locked pause/continue extension prove one Task/five Roots, C1→C2, 128 guests/unknown tables, scoped Artifact recovery, changed dates, cancelled old Root, SIGKILL/restart and frozen pending/denied zero-attempt mail | Normal Task creation still defaults to once, conflicting with continuous non-Automation intent; owner decision, weeks/calendar/reminder variants, actual models, scores and current L2/human review remain required |
 | GC-09 | Six exact §8.10 CLI/TUI agenda variants now retain full source/request/state/replay and enforce every scripted agenda assertion | Broader §7 multi-connector/Worker question aggregation and Steering, actual model quality and constrained grades remain required |
 | GC-11 | Six locked variants now drive both original turns, three exact quotes/services/weights, actual MCP reads, user-visible scripted responses and two CLI-opened Artifacts; duplicate input creates no work | Unscripted recommendation, source selection and semantic calibration remain unverified; Fake output is not a product score |
 | GC-12 | `verify_gc12.py` drives six complete mechanical journeys plus denial/lost-response, five serial rounds, with independent mail/calendar readback | Actual model evaluation, real approved account actions, complete protected acceptance and constrained grades remain required |
