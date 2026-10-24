@@ -1349,7 +1349,19 @@
           "gap": "G-release",
           "detail": "确定性时钟/模型驱动真实SQLite与Actor；尚无当前release head下真实长期调度、多进程重启及全套保护五轮组合证据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "持久化fire身份": "required_v1",
+        "独立schedule version": "required_v1",
+        "Inbox收据幂等": "required_v1",
+        "修改失效旧排队fire": "required_v1",
+        "修改拒绝旧结果": "required_v1",
+        "取消沿Task epoch停止树且不新建Run": "required_v1",
+        "每个Automation绑定ongoing Task": "required_v1",
+        "每次触发按序新建Root": "required_v1",
+        "admission冻结Model与Capability": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1438,7 +1450,20 @@
           "gap": "G-release",
           "detail": "这些固定fixture未穷尽实际历史意图迁移、Forget与所有渠道并发、重启的发布保护五轮；须在最终同SHA证据组合保留。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "接受时冻结intent privacy epoch": "required_v1",
+        "创建首个Task前检查Forget屏障": "required_v1",
+        "撤销fire持久化skipped及Inbox": "required_v1",
+        "收据重放不能恢复旧意图": "required_v1",
+        "调度更新不能恢复旧意图": "required_v1",
+        "新Task时间戳不能恢复旧意图": "required_v1",
+        "升级缺provenance且已有Forget则保守跳过": "required_v1",
+        "撤销list只保留Host引用版本enabled": "required_v1",
+        "撤销list清空指令调度时区并省略nextFire/below": "required_v1",
+        "保留本地审计且新意图完整可见": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1503,7 +1528,16 @@
           "gap": "G-model",
           "detail": "真实来源观测准确性、Agent不造数据及完整GC14语义由实际双臂评分证明；Fake整数序列只证机制。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "below为可选整数": "required_v1",
+        "绑定Root的普通ToolInvocation记录观测": "required_v1",
+        "同fire多来源同值幂等": "required_v1",
+        "异值拒绝": "required_v1",
+        "仅阈值外进入阈值内通知完成": "required_v1",
+        "无有效观测报告needs_input且不造数据": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1533,7 +1567,13 @@
       ],
       "disposition": "background",
       "remaining": [],
-      "reason": "只引出L349，不省略或独立认证。"
+      "reason": "只引出L349，不省略或独立认证。",
+      "obligation_kinds": {
+        "引出统一Automation链路": "background"
+      },
+      "exemptions": {
+        "引出统一Automation链路": "只引出L349，不省略或独立认证。"
+      }
     },
     {
       "source": "docs/technical-design.md",
@@ -1598,7 +1638,16 @@
           "gap": "G-release",
           "detail": "本轮一次机械执行不是当前release全链长期真实环境证明。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Automation到trigger": "required_v1",
+        "trigger到RunScheduler": "required_v1",
+        "RunScheduler到AgentActor": "required_v1",
+        "Actor到Run": "required_v1",
+        "Run到AgentLoop": "required_v1",
+        "AgentLoop到Delivery": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1643,7 +1692,12 @@
           "gap": "G-release",
           "detail": "需最终协议版本/兼容说明逐义务复核；不得从当前依赖版本或通过类型检查推断完全符合Pi基线。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "以Pi 1.2.0消息语义作基线": "required_v1",
+        "只保留必要消息类型": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1682,7 +1736,11 @@
           "gap": "G-release",
           "detail": "真实多模态输入全部渠道组合尚未作当前发布验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "UserMessage承载用户输入": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1721,7 +1779,11 @@
           "gap": "G-model",
           "detail": "回复质量仍需独立Judge和真实模型证据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "AssistantMessage承载Agent面向用户语义回复": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1760,7 +1822,11 @@
           "gap": "G-release",
           "detail": "本轮契约覆盖关联与拒绝；最终真实模型连续Tool调用与全部恢复边界尚需组合。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "ToolMessage只在模型上下文承载Tool结果": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1799,7 +1865,11 @@
           "gap": "G-release",
           "detail": "类型存在不证明每种模态在模型和渠道中均可用；逐模态余项见L363–368。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "核心ContentPart一期保留最小必要多模态语义": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1838,7 +1908,11 @@
           "gap": "G-release",
           "detail": "本轮固定输入不代替最终长期会话/恢复完整证据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "支持text Part": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1883,7 +1957,12 @@
           "gap": "G-model",
           "detail": "当前真实image资料在被授权模型/渠道的端到端理解、显示与可访问性仍未验收；audio/video尤其只确认协议可表示。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "保留image语义类型": "required_v1",
+        "以Artifact引用承载image": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1928,7 +2007,12 @@
           "gap": "G-model",
           "detail": "当前真实audio资料在被授权模型/渠道的端到端理解、显示与可访问性仍未验收；audio/video尤其只确认协议可表示。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "保留audio语义类型": "required_v1",
+        "以Artifact引用承载audio": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -1973,7 +2057,12 @@
           "gap": "G-model",
           "detail": "当前真实video资料在被授权模型/渠道的端到端理解、显示与可访问性仍未验收；audio/video尤其只确认协议可表示。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "保留video语义类型": "required_v1",
+        "以Artifact引用承载video": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2018,7 +2107,12 @@
           "gap": "G-live",
           "detail": "当前真实file资料在被授权模型/渠道的端到端理解、显示与可访问性仍未验收；audio/video尤其只确认协议可表示。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "保留file语义类型": "required_v1",
+        "以Artifact引用承载file": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2063,7 +2157,12 @@
           "gap": "G-release",
           "detail": "未以类型存在推断所有真实模型Tool协议兼容；实际兼容和恢复组合仍需证明。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "核心支持tool_call Part": "required_v1",
+        "保留调用身份名称参数关联": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2120,7 +2219,14 @@
           "gap": "G-live",
           "detail": "媒体协议契约与渠道Fake不足以证明所有实际媒体、模型和渠道的完整投影。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "image/audio/video/file内部统一artifact_ref": "required_v1",
+        "引用机制不替代语义类型": "required_v1",
+        "Intelligent UI不进入核心Conversation/AgentMessage": "required_v1",
+        "Delivery生成并持久化渠道投影": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2165,7 +2271,12 @@
           "gap": "G-release",
           "detail": "需要当前发布的长会话/工具失败/恢复组合及可观测性完整性复核。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "完整Tool轨迹不混入用户Conversation": "required_v1",
+        "独立RunTrace/Observability存储": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2203,7 +2314,13 @@
       ],
       "disposition": "background",
       "remaining": [],
-      "reason": "保留引导，不把标点/导语当已实现要求。"
+      "reason": "保留引导，不把标点/导语当已实现要求。",
+      "obligation_kinds": {
+        "引出核心输出链路": "background"
+      },
+      "exemptions": {
+        "引出核心输出链路": "保留引导，不把标点/导语当已实现要求。"
+      }
     },
     {
       "source": "docs/technical-design.md",
@@ -2258,7 +2375,13 @@
           "gap": "G-release",
           "detail": "有限片段不证明完整发布链与所有渠道故障；unknown不能从未重试推成已送达。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "AssistantMessage语义输出": "required_v1",
+        "DeliveryRequest投递意图": "required_v1",
+        "Outbox可靠送达链路": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2301,7 +2424,11 @@
           "gap": "G-release",
           "detail": "真实模型语义输出及当前渠道长期历史仍需同SHA组合。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "AssistantMessage保存渠道无关语义内容": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2356,7 +2483,13 @@
           "gap": "G-release",
           "detail": "冻结收据和迁移/最终各渠道内容同义性需要发布整体复核。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "DeliveryRequest表达目标": "required_v1",
+        "表达交付意图与约束": "required_v1",
+        "不承载渠道专属最终消息结构": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2411,7 +2544,13 @@
           "gap": "G-live",
           "detail": "真实渠道receipt/idempotency时效与完整保护五轮仍未由本轮Fake证明。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Outbox可靠投递": "required_v1",
+        "已知无效果才重试": "required_v1",
+        "幂等与不确定结果恢复": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2460,7 +2599,12 @@
           "gap": "G-live",
           "detail": "实际飞书账户/L2和新渠道不能从接口存在推断支持；邮件若被发布范围要求须另有限实现。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Adapter将统一消息转渠道格式": "required_v1",
+        "支持飞书/Web等已有渠道边界": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2509,7 +2653,12 @@
           "gap": "G-model",
           "detail": "本轮只证明固定人格和会话输入；是否充分感知具体交互场景需真实模型及最终规范复核，不能凭prompt自报PASS。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Main感知Agent人格": "required_v1",
+        "Main感知当前交互场景": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2564,7 +2713,13 @@
           "gap": "G-release",
           "detail": "本轮有限任务未覆盖所有真实工作进度/长时重启的通知抑制组合。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "普通Task进度只写Progress Store": "required_v1",
+        "用户主动打开实时界面可见进度": "required_v1",
+        "普通进度不主动通知": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2631,7 +2786,15 @@
           "gap": "G-live",
           "detail": "实际模型事件分类与当前真实渠道噪声/漏发率需评测；四值枚举不是产品通知验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "只工作完成触发主动通知": "required_v1",
+        "只工作失败触发主动通知": "required_v1",
+        "只需要用户输入触发主动通知": "required_v1",
+        "只需要用户审批触发主动通知": "required_v1",
+        "渠道不扩大通知范围": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2692,7 +2855,14 @@
           "gap": "G-live",
           "detail": "实际平台限制与真实媒体呈现仍在当前L2验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "适配层负责长度": "required_v1",
+        "排版/卡片": "required_v1",
+        "附件": "required_v1",
+        "Intelligent UI呈现": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2747,7 +2917,13 @@
           "gap": "G-release",
           "detail": "源码边界观察不是全项目依赖证明；后续新增渠道须保持同一执行/审批链。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Tool不依赖具体渠道": "required_v1",
+        "Worker不依赖具体渠道": "required_v1",
+        "业务模块不依赖具体渠道": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2785,7 +2961,11 @@
           "gap": "G-release",
           "detail": "没有模型自由生成UI证明；当前声明式协议需最终同SHA验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Intelligent UI使用Delivery层声明式UISpec": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2859,7 +3039,17 @@
           "gap": "G-live",
           "detail": "组件集合存在不证明每种业务交互；表单语义和真实数据需当前渠道/L2观察。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "一期受控组件集合": "required_v1",
+        "Markdown": "required_v1",
+        "表格": "required_v1",
+        "Artifact卡片": "required_v1",
+        "任务进度": "required_v1",
+        "确认卡片": "required_v1",
+        "表单": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2909,7 +3099,13 @@
           "gap": "G-live",
           "detail": "实际飞书受控卡片与全部组件降级组合仍未在当前平台具名验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Web完整渲染": "required_v1",
+        "飞书映射消息卡片": "required_v1",
+        "TUI/不支持渠道降级文本": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -2965,7 +3161,14 @@
           "gap": "G-live",
           "detail": "本轮固定恶意样例不覆盖全部浏览器/平台渲染失败；须保留当前L2和发布回归义务。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "UISpec带schema_version": "required_v1",
+        "未知组件fail-soft": "required_v1",
+        "渲染失败降级语义文本": "required_v1",
+        "不阻塞消息投递": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3015,7 +3218,13 @@
           "gap": "G-release",
           "detail": "不能从几个XSS样例推全安全认证；当前发布需完整安全保护门禁与独立审查。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "模型不生成可执行HTML": "required_v1",
+        "不执行模型JavaScript": "required_v1",
+        "不执行模型React": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3065,7 +3274,13 @@
           "gap": "G-release",
           "detail": "当前Composer自动产出主要为markdown/artifact；任意结构化业务到table/form的语义映射尚无真实产品证明，最终审计需保留此限制。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Main输出渠道无关语义": "required_v1",
+        "Composer结合语义内容/结构化数据/渠道能力生成UISpec": "required_v1",
+        "Agent不必感知具体渠道": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3099,7 +3314,15 @@
       ],
       "disposition": "deferred",
       "remaining": [],
-      "reason": "L397明确“后续如需…可增加”；不把设想作为现有功能。"
+      "reason": "L397明确“后续如需…可增加”；不把设想作为现有功能。",
+      "obligation_kinds": {
+        "后续可增加builtin__ui__compose": "deferred",
+        "未来UIArtifact需Schema与安全校验": "deferred"
+      },
+      "exemptions": {
+        "后续可增加builtin__ui__compose": "L397明确“后续如需…可增加”；不把设想作为现有功能。",
+        "未来UIArtifact需Schema与安全校验": "L397明确“后续如需…可增加”；不把设想作为现有功能。"
+      }
     },
     {
       "source": "docs/technical-design.md",
@@ -3137,7 +3360,13 @@
       ],
       "disposition": "background",
       "remaining": [],
-      "reason": "参见关系；规范行为保留在对应其他源块。"
+      "reason": "参见关系；规范行为保留在对应其他源块。",
+      "obligation_kinds": {
+        "渠道实现与操作说明链接可追溯": "background"
+      },
+      "exemptions": {
+        "渠道实现与操作说明链接可追溯": "参见关系；规范行为保留在对应其他源块。"
+      }
     },
     {
       "source": "docs/technical-design.md",
@@ -3217,7 +3446,18 @@
           "gap": "G-release",
           "detail": "本轮浏览器观察不替代所有依赖授权/供应链审查；当前release资源/许可和生成资产freshness须最终同SHA验证。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "复用ad-agent固定React组件": "required_v1",
+        "复用OpenIntelligentUI原生DataTable": "required_v1",
+        "使用eri品牌资产": "required_v1",
+        "只渲染现有UISpec和Host表单": "required_v1",
+        "组件资源许可证本地嵌入Go二进制": "required_v1",
+        "无第二Agent/模型路由": "required_v1",
+        "不启用任意模型HTML/JS": "required_v1",
+        "保留来源与构建验证": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3272,7 +3512,13 @@
           "gap": "G-live",
           "detail": "video等真实媒体理解/投递仍需当前模型和渠道证据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "核心以artifact_ref引用文件": "required_v1",
+        "以artifact_ref引用图片": "required_v1",
+        "以artifact_ref引用视频等产物": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3315,7 +3561,11 @@
           "gap": "G-model",
           "detail": "尚未观察真实模型遵守该输出约束；普通text不受artifact_ref格式校验保护。不得以路径引用校验当成模型文本约束已通过。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "模型不得直接输出MEDIA:/绝对路径": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3370,7 +3620,13 @@
           "gap": "G-live",
           "detail": "当前真实Computer文件生命周期/权限和所有迁移组合需L2/最终审计。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Artifact/Computer解析真实位置": "required_v1",
+        "解析生命周期": "required_v1",
+        "解析访问方式": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3425,7 +3681,13 @@
           "gap": "G-release",
           "detail": "本轮有限大小及历史量不证明所有输出路径、长期增长或性能；未做长期会话容量基准。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "二进制不内联Conversation": "required_v1",
+        "二进制不内联可重放Run历史": "required_v1",
+        "避免Base64媒体随会话持续膨胀": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3534,7 +3796,22 @@
           "gap": "G-release",
           "detail": "ManageSearch独立契约不等于真实模型正确使用；最终必须核验当前权限、重放、发布选择与OS/data-root隔离组合。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "仅manage/search两个模型可见Artifact工具": "required_v1",
+        "同ToolInvocation/Executor": "required_v1",
+        "manage严格save/read/describe/publish联合Schema": "required_v1",
+        "search无query浏览": "required_v1",
+        "有query按名称或MIME子串": "required_v1",
+        "最近可访问1–50": "required_v1",
+        "manage整体artifact_write": "required_v1",
+        "仅不可变本地产物/读取/显式最终选择": "required_v1",
+        "禁止发送上传删除": "required_v1",
+        "search为read_only": "required_v1",
+        "principal绑定data root和OS用户": "required_v1",
+        "模型不能选user/Agent/Task/Run scope": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3589,7 +3866,13 @@
           "gap": "G-release",
           "detail": "跨进程完整树/真实双臂不是运行内路由；当前release完整树恢复仍需证据组合。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "任一时刻单一活动主模型": "required_v1",
+        "Main/Root/Child同一配置": "required_v1",
+        "不按任务动态路由": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3664,7 +3947,16 @@
           "gap": "G-live",
           "detail": "当前真实首次TUI/Web/login环境完整路径仍需具名L2与模型proof；不从Fake激活推实际可用。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "首次用户连接": "required_v1",
+        "用户认证": "required_v1",
+        "选择模型": "required_v1",
+        "能力验证": "required_v1",
+        "有效Active Profile前不启Actor": "required_v1",
+        "不接受Conversation/Task": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3739,7 +4031,16 @@
           "gap": "G-setup",
           "detail": "当前Web设置完整性缺口由ERII-334处理；实际登录与当前权限人审另由L2完成。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "设置/TUI可显式新增连接": "required_v1",
+        "重新登录": "required_v1",
+        "测试": "required_v1",
+        "切换活动模型": "required_v1",
+        "属于用户控制面": "required_v1",
+        "不暴露为模型Tool": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3800,7 +4101,14 @@
           "gap": "G-release",
           "detail": "本轮确定性模型与有限并发，不等价真实Root整树跨所有重启/endpoint变化的完整验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "切换只影响新Run": "required_v1",
+        "每Run创建冻结ModelSnapshot": "required_v1",
+        "Root全部Child继承": "required_v1",
+        "运行中不热切换": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3867,7 +4175,15 @@
           "gap": "G-model",
           "detail": "脚本指定决策无语义证据；必须由真实双臂20 Case评分与原生轨迹证明自主选择。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Agent决定是否用Tool": "required_v1",
+        "决定创建Task": "required_v1",
+        "决定启动Worker": "required_v1",
+        "决定召回": "required_v1",
+        "决定继续当前Run": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3922,7 +4238,13 @@
           "gap": "G-release",
           "detail": "本轮不能认证所有Tool/Computer权限；完整安全保护五轮、逐动作审批和独立review仍必须完成。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "模型输出不直接产生外部副作用": "required_v1",
+        "所有副作用经过Tooling": "required_v1",
+        "所有副作用经过Security": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -3973,7 +4295,12 @@
           "gap": "G-setup",
           "detail": "Web没有目录picker/能力上下文显示，与TUI仍不等价；精确UI修复路由ERII-334，真实登录另留L2。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "首次TUI/Web为阻塞Setup": "required_v1",
+        "只两条等价模型连接路径": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4024,7 +4351,12 @@
           "gap": "G-setup",
           "detail": "两标签存在不证明两路径等价；ERII-334补设置差距，真实两路径兼容须实际模型/L2。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "提供Local/OpenAI-compatible选项": "required_v1",
+        "提供OpenAI Sign in with ChatGPT选项": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4064,7 +4396,13 @@
       ],
       "disposition": "background",
       "remaining": [],
-      "reason": "导语不作为独立验证结论。"
+      "reason": "导语不作为独立验证结论。",
+      "obligation_kinds": {
+        "引出两路径统一步骤": "background"
+      },
+      "exemptions": {
+        "引出两路径统一步骤": "导语不作为独立验证结论。"
+      }
     },
     {
       "source": "docs/technical-design.md",
@@ -4115,7 +4453,12 @@
           "gap": "G-live",
           "detail": "真实授权账号、证书/代理/浏览器环境仍需当前L2；不使用owner凭据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "选择连接类型": "required_v1",
+        "完成URL配置或账号登录": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4166,7 +4509,12 @@
           "gap": "G-setup",
           "detail": "Web目录选择差距是实现工作；ERII-334有限修复并通过真实Web HTTP/Chromium路径验收。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "获取模型目录": "required_v1",
+        "目录不可发现可手填模型ID": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4229,7 +4577,14 @@
           "gap": "G-setup",
           "detail": "ERII-334补Web已确认状态与本地上下文控制；未知能力不得被UI宣称支持或自动授予。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "选择一个模型": "required_v1",
+        "仅显示已确认reasoning effort": "required_v1",
+        "仅显示已确认输入模态": "required_v1",
+        "显示该模型上下文设置": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4278,7 +4633,12 @@
           "gap": "G-model",
           "detail": "TLS/真实认证/模型存在性与模型行为兼容未由HTTP替身证明；真实profile仍需严格评测。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Connection Test": "required_v1",
+        "Agent Capability Probe": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4341,7 +4701,14 @@
           "gap": "G-live",
           "detail": "原子化针对激活事务，不谎称候选Profile创建也与选择同一事务；真实首次设置/中断后的交互仍需当前L2。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "通过测试后原子保存有效Profile": "required_v1",
+        "原子绑定AuthConnection引用": "required_v1",
+        "原子设置Agent Active Model": "required_v1",
+        "进入正常TUI": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4422,7 +4789,17 @@
           "gap": "G-live",
           "detail": "Fake替身与显式测试flags不说明真实安装无回退的全部路径；发布必须当前干净安装观察。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Wizard安全取消": "required_v1",
+        "取消保持setup_required": "required_v1",
+        "只可重进设置诊断或退出": "required_v1",
+        "AppReadiness与idle/busy AgentStatus分离": "required_v1",
+        "无Fake默认": "required_v1",
+        "无隐式无凭据Provider": "required_v1",
+        "无默认收费模型": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4491,7 +4868,15 @@
           "gap": "G-release",
           "detail": "本轮有限故障样例不穷尽生产认证/模型失效组合与并发旧结果；最终需保护门禁。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "AppReadiness仅setup_required/ready/degraded": "required_v1",
+        "仅ready开放Ingress": "required_v1",
+        "Active失效转degraded": "required_v1",
+        "degraded可看历史修连接切profile": "required_v1",
+        "degraded不接受新工作": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4554,7 +4939,14 @@
           "gap": "G-release",
           "detail": "真实模型提示注入与所有可选工具权限不能从surface一例推全安全；最终安全与权限审查仍需。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "用户控制list/add/login/logout/select/test": "required_v1",
+        "非builtin__model__ Agent Tool": "required_v1",
+        "模型不得自行换贵模型": "required_v1",
+        "不得自行换隐私边界或账号": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4819,7 +5211,48 @@
           "gap": "G-release",
           "detail": "38个字段/类型义务需最终逐字段协议/迁移/默认值审查；本轮索引与若干边界测试不能认证每个可选字段或真实能力支持。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "ProviderKind只openai_compatible/openai_account": "required_v1",
+        "AuthKind只api_key/chatgpt_oauth": "required_v1",
+        "ModelProfileStatus为unverified/ready/unavailable/reauth_required/invalid": "required_v1",
+        "ModelProfile.profileId:string": "required_v1",
+        "ModelProfile.name:string": "required_v1",
+        "ModelProfile.providerKind:ProviderKind": "required_v1",
+        "ModelProfile.endpoint?:string": "required_v1",
+        "ModelProfile.wireApi:openai_completions|openai_responses": "required_v1",
+        "ModelProfile.modelId:string": "required_v1",
+        "ModelProfile.authConnectionId?:string": "required_v1",
+        "ModelProfile.reasoningEffort?:string": "required_v1",
+        "ModelProfile.contextWindow:number": "required_v1",
+        "ModelProfile.maxOutputTokens:number": "required_v1",
+        "ModelProfile.generationDefaults可选temperature/topP:number": "required_v1",
+        "ModelProfile.compatibility:ModelCompatibility": "required_v1",
+        "ModelProfile.capabilities:ModelCapabilities": "required_v1",
+        "ModelProfile.status:ModelProfileStatus": "required_v1",
+        "ModelProfile.verifiedAt?:string": "required_v1",
+        "ModelProfile.version:number": "required_v1",
+        "ModelCompatibility.developerRole:boolean": "required_v1",
+        "ModelCompatibility.reasoningEffort:boolean": "required_v1",
+        "ModelCompatibility.parallelToolCalls:boolean": "required_v1",
+        "ModelCompatibility.streamUsage:boolean": "required_v1",
+        "ModelCompatibility.toolResultFormat:openai|provider_specific": "required_v1",
+        "ModelCapabilities.textInput:true": "required_v1",
+        "ModelCapabilities.imageInput:boolean": "required_v1",
+        "ModelCapabilities.audioInput:boolean": "required_v1",
+        "ModelCapabilities.toolCalls:boolean": "required_v1",
+        "ModelCapabilities.streaming:boolean": "required_v1",
+        "ModelCapabilities.reasoningEfforts:readonly string[]": "required_v1",
+        "AuthConnection.connectionId:string": "required_v1",
+        "AuthConnection.provider:string": "required_v1",
+        "AuthConnection.authKind:AuthKind": "required_v1",
+        "AuthConnection.status为connected/refreshing/reauth_required/logged_out": "required_v1",
+        "AuthConnection.accountLabel?:string": "required_v1",
+        "AuthConnection.workspaceLabel?:string": "required_v1",
+        "AuthConnection.expiresAt?:string": "required_v1",
+        "AuthConnection.version:number": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4880,7 +5313,14 @@
           "gap": "G-release",
           "detail": "只能证明合成secret在已扫范围不泄漏；实际OS凭据库和全部运维导出仍需当前发布安全证据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Profile仅连接和模型元数据": "required_v1",
+        "不存access token": "required_v1",
+        "不存refresh token": "required_v1",
+        "不存API Key": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -4983,7 +5423,21 @@
           "gap": "G-release",
           "detail": "固定测试不穷尽长时Root树全部恢复/刷新交错；不得从刷新成功推断可切账号或endpoint。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "创建Run复制Profile版本": "required_v1",
+        "模型ID": "required_v1",
+        "Wire API": "required_v1",
+        "兼容性": "required_v1",
+        "能力": "required_v1",
+        "生成参数": "required_v1",
+        "endpoint hash": "required_v1",
+        "Snapshot不可变": "required_v1",
+        "仅稳定auth_connection_id": "required_v1",
+        "不复制CredentialRef或Secret": "required_v1",
+        "同账号刷新不改变Snapshot": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5038,7 +5492,13 @@
           "gap": "G-release",
           "detail": "需最终复核ModelSnapshot与Capability Snapshot分工；本轮契约未覆盖所有上下文裁剪/恢复/工具版本变化组合。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Context Builder使用同一Snapshot": "required_v1",
+        "Tool Schema使用同一Snapshot": "required_v1",
+        "Provider request使用同一Snapshot": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5099,7 +5559,14 @@
           "gap": "G-release",
           "detail": "当前发布完整历史迁移/备份恢复及全部用量故障不能由本轮有限数据推断。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Profile变更创建新版本": "required_v1",
+        "切换只更新Agent active_model_profile_id": "required_v1",
+        "旧Snapshot可审计": "required_v1",
+        "历史用量可审计": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5172,7 +5639,16 @@
           "gap": "G-setup",
           "detail": "Web本地上下文目前固定，已路由ERII-334；实际目录可选能力/metadata需真实profile兼容验证，候选不是支持证明。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "目录价格只候选": "required_v1",
+        "目录context只候选": "required_v1",
+        "目录max output只候选": "required_v1",
+        "目录reasoning只候选": "required_v1",
+        "激活前归一化冻结": "required_v1",
+        "手填不突破Host上限": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5227,7 +5703,13 @@
           "gap": "G-live",
           "detail": "借鉴来源说明不单独带来行为证明；真实安装首链仍须当前L2观察。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "本地路径借鉴Pi models.json语义": "required_v1",
+        "落在ModelProfile": "required_v1",
+        "用户不必手写JSON": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5294,7 +5776,15 @@
           "gap": "G-model",
           "detail": "不宣称样例Qwen型号实际已测试；真实目标兼容由双臂profile及实际Probe证据完成。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "provider_kind=openai_compatible": "required_v1",
+        "endpoint示例为127.0.0.1:8000/v1": "required_v1",
+        "wire_api=openai_completions": "required_v1",
+        "model_id显式填写": "required_v1",
+        "auth_connection_id可null": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5355,7 +5845,14 @@
           "gap": "G-live",
           "detail": "没有实际TLS/反代或Guest部署环境证明；namespace语义是进程拓扑推断，需要L2网络环境核验。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "endpoint由用户显式HTTP/HTTPS URL": "required_v1",
+        "默认建议127.0.0.1:8000/v1": "required_v1",
+        "localhost在Go Host命名空间解析": "required_v1",
+        "不指向Computer Guest": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5422,7 +5919,15 @@
           "gap": "G-live",
           "detail": "使用显式environment测试store不证明实际OS backend保密/权限；当前安装凭据路径仍需L2与安全审查。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "API Key可空": "required_v1",
+        "需要时AuthConnection api_key": "required_v1",
+        "仅SecretStore保存key": "required_v1",
+        "不伪造SDK Key发送": "required_v1",
+        "任意Bearer只由用户显式配置": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5477,7 +5982,13 @@
           "gap": "G-model",
           "detail": "HTTP peer脚本只证协议；真实模型推理与目录行为需授权环境当前证据。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "GET /models尽力发现": "required_v1",
+        "目录不支持可手填ID": "required_v1",
+        "手填仍需真实推理Probe": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5556,7 +6067,17 @@
           "gap": "G-model",
           "detail": "暂无可选reasoning/sampling正面Probe；真实端点需要逐能力契约，不得将禁用当已支持。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "不能从OpenAI compatible声明推兼容": "required_v1",
+        "显式developer_role": "required_v1",
+        "显式reasoning_effort": "required_v1",
+        "显式parallel_tool_calls": "required_v1",
+        "显式stream_usage": "required_v1",
+        "显式Tool Result格式": "required_v1",
+        "未知Probe或保守默认": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5623,7 +6144,15 @@
           "gap": "G-model",
           "detail": "未运行实际Qwen/vLLM/SGLang/LM Studio兼容矩阵；任一真实profile支持不能泛化其他服务或Responses。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "支持常见Qwen Chat Completions": "required_v1",
+        "支持vLLM": "required_v1",
+        "支持SGLang": "required_v1",
+        "支持LM Studio风格": "required_v1",
+        "Responses仅实际端点契约通过才启用": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5678,7 +6207,13 @@
           "gap": "G-model",
           "detail": "当前无sampling正面支持，禁用满足保守边界但不证明所有声明支持模型路径；扩展前须实际能力Probe及契约。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "temperature/top_p仅模型声明支持时发": "required_v1",
+        "未设使用Provider默认": "required_v1",
+        "reasoning拒绝采样不得强注入": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5775,7 +6310,20 @@
           "gap": "G-model",
           "detail": "owned HTTP没有真实TLS/服务认证；错误模型和各部署TLS模式需真实兼容矩阵，不能以Fake通过代替。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Connection Test检查URL": "required_v1",
+        "TLS/连接": "required_v1",
+        "鉴权": "required_v1",
+        "模型存在性": "required_v1",
+        "最小流式生成": "required_v1",
+        "Probe验证Tool Call": "required_v1",
+        "Tool Result continuation": "required_v1",
+        "取消": "required_v1",
+        "长输出裁剪": "required_v1",
+        "无Tool Call可诊断但非ready且不能主模型": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5854,7 +6402,17 @@
           "gap": "G-model",
           "detail": "合成模型颜色响应与Fake截图不证明真实模型视觉质量；真实当前profile图像能力必须实际Probe和L2。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "声明image_input才发合成蓝色方块": "required_v1",
+        "现有resolver与Provider envelope": "required_v1",
+        "颜色响应正确才保留冻结image能力": "required_v1",
+        "旧Probe缺图像proof不授予": "required_v1",
+        "文本Profile不受影响": "required_v1",
+        "引用回退不变": "required_v1",
+        "失败image重测撤销readiness": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5933,7 +6491,17 @@
           "gap": "G-release",
           "detail": "307 owned loopback与有限恶意样例不覆盖真实TLS代理/全部redirect/完整运维导出，完整安全门禁保留。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "URL不可信": "required_v1",
+        "Header不可信": "required_v1",
+        "响应Body不可信": "required_v1",
+        "模型输出不可信": "required_v1",
+        "禁止跨Origin携带Authorization": "required_v1",
+        "不记录凭据": "required_v1",
+        "不记录完整Provider响应": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -5979,7 +6547,12 @@
           "gap": "G-live",
           "detail": "代码路径非实际订阅兼容证明；当前官方登录可用性和授权账号观察仍需L2。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "Sign in with ChatGPT采用当前OpenAI Provider语义": "required_v1",
+        "不使用legacy openai-codex": "required_v1"
+      },
+      "exemptions": {}
     },
     {
       "source": "docs/technical-design.md",
@@ -6092,7 +6665,25 @@
           "obligation": "Device Authorization按ADR001明确延期且不记已实现/已测试",
           "reason": "ADR001经owner批准明确延期；不算当前v1必须项，不记已交付/已测试。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "PKCE S256": "required_v1",
+        "state": "required_v1",
+        "OIDC nonce": "required_v1",
+        "loopback仅127.0.0.1随机端口": "required_v1",
+        "state单次短时有效": "required_v1",
+        "callback无access log": "required_v1",
+        "JWKS签名验证": "required_v1",
+        "issuer验证": "required_v1",
+        "issued-client audience验证": "required_v1",
+        "有效期验证": "required_v1",
+        "nonce验证": "required_v1",
+        "重新登录匹配所选账号身份": "required_v1",
+        "Device Authorization按ADR001明确延期且不记已实现/已测试": "deferred"
+      },
+      "exemptions": {
+        "Device Authorization按ADR001明确延期且不记已实现/已测试": "ADR001经owner批准明确延期；不算当前v1必须项，不记已交付/已测试。"
+      }
     },
     {
       "source": "docs/technical-design.md",
@@ -6162,7 +6753,16 @@
           "gap": "G-live",
           "detail": "没有真实OS凭据后端与订阅身份/Workspace显示人审；真实凭据安全和登录兼容须当前L2/安全门禁。"
         }
-      ]
+      ],
+      "obligation_kinds": {
+        "登录创建openai/chatgpt_oauth AuthConnection": "required_v1",
+        "刷新凭据仅SecretStore": "required_v1",
+        "state.db仅credential ref": "required_v1",
+        "账号Workspace脱敏显示": "required_v1",
+        "过期状态": "required_v1",
+        "版本": "required_v1"
+      },
+      "exemptions": {}
     }
   ],
   "native_root_relative": "ERII-233/e0544b36756a9ac561c3e7ace936768951c574e3/audit-20261024",

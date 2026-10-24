@@ -218,6 +218,12 @@ class Baseline03Tests(ReleasePackageTests):
             deferred_duties = {d['obligation'] for d in deferred}
             self.assertTrue(all(d['reason'] for d in deferred))
             remaining = {d['obligation'] for d in row['remaining']}
+            self.assertEqual(set(row['obligation_kinds']), set(row['obligations']))
+            self.assertEqual({o for o, kind in row['obligation_kinds'].items()
+                              if kind == 'deferred'}, deferred_duties)
+            self.assertEqual(set(row['exemptions']), deferred_duties)
+            self.assertEqual({o for o, kind in row['obligation_kinds'].items()
+                              if kind == 'required_v1'}, remaining)
             self.assertFalse(remaining & deferred_duties)
             self.assertEqual(set(row['obligations']), remaining | deferred_duties,
                              f"unaccounted sub-obligation at frozen line {row['line']}")

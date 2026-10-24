@@ -39,6 +39,14 @@ algorithm. ADR 006 changed only blocks outside this package. No source content
 was changed or silently resealed. Changed or ambiguous package content rejects
 and requires coordinator-approved old/new hash mapping.
 
+The main integration retains baseline-01, baseline-03 and baseline-04 commands,
+independent package digests and both neighboring ledgers. Baseline-03 now supplies
+the explicit `obligation_kinds` and `exemptions` required by the current validator:
+all 347 original duties and their routes remain unchanged. Background, future UI
+work and the approved Device Authorization deferral retain their original reasons.
+The production observations keep their original base SHA; merging audit metadata
+does not turn those receipts into newly executed product tests.
+
 ## Reproduce and inspect
 
 ```sh

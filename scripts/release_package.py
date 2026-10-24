@@ -16,6 +16,7 @@ MANIFEST_HASH = '0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c55
 PACKAGE_HASHES = {
     'baseline-01': 'b95fc9fa9861ff62d5551f820ae56dac90f9ad33ecdbd2ad2ef743fcc315db95',
     'baseline-03': '1b6367425a571b1bb0fcca0bc64a196a5f962bb28144dda17b06b23b453e7d67',
+    'baseline-04': '2e56b4c2b855c9c6a81e667f316e92444e2890a8a35568a36cdce566fb07639e',
 }
 
 
@@ -130,6 +131,19 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
             raise ValueError('duplicate sub-obligation')
         if any(not isinstance(o, str) or not o.strip() for o in review['obligations']):
             raise ValueError('empty sub-obligation')
+        # New audits explicitly distinguish mandatory duties from mixed-in
+        # background/deferred clauses. Preserve the first package's format.
+        if name != 'baseline-01' or 'obligation_kinds' in review:
+            kinds = review.get('obligation_kinds', {})
+            if (set(kinds) != set(review['obligations']) or
+                    not set(kinds.values()) <= {'required_v1', 'policy', 'background', 'deferred'}):
+                raise ValueError('missing or invalid sub-obligation scope')
+            exempt = {o for o, kind in kinds.items() if kind in ('background', 'deferred')}
+            reasons = review.get('exemptions', {})
+            remaining = {r['obligation'] for r in review['remaining']}
+            if (set(reasons) != exempt or any(not reason.strip() for reason in reasons.values())
+                    or remaining != set(kinds) - exempt):
+                raise ValueError('mandatory duty unrouted or exemption unexplained')
         if not set(review['references']) <= references.keys() or not set(review['prs']) <= ledger['merged_prs'].keys():
             raise ValueError('unknown current reference or PR')
         if not set(review['observations']) <= observations.keys():

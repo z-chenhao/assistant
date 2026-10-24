@@ -4,6 +4,10 @@
 sub-obligations, current evidence and remaining routes. Use `make audit-baseline-03`.
 Its completed dispositions do not certify product conformance or release.
 
+[baseline-04](baseline-04.md) records ERII-234's separate 80-block audit of
+account, Bridge, model failure and Code Mode contracts. Its ledger and current
+observations do not change baseline-01 or the preserved historical ledger.
+
 [baseline-01.json](baseline-01.json) disposes of the **80 exact blocks** assigned
 to ERII-231 in the owner's frozen work-package manifest. It records 257 authored
 sub-obligations: 48 blocks have partial mechanical evidence, 17 have evidence
