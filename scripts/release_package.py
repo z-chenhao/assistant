@@ -27,6 +27,7 @@ PACKAGE_HASHES = {
     'baseline-09': '680dd54a6cbc5587ceb348b70adda1956f38a0b03ffe9e622204e587991c5f46',
     'baseline-10': '33ebc44545bf9d3718771a4303266cca26f1923c1f234ee2e30474b5067fa911',
     'baseline-11': '46a87bc1728c849591bf6c45905e56fc3e83a849264dacdda83d92e3d8b04fca',
+    'baseline-12': 'aece4cdba5e23a174caf8c4ee1f1b6ae65679bd3b17bd0274304446d21154d65',
 }
 ORIGINAL_PACKAGE_HASHES = {
     'baseline-02': 'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63',
@@ -35,6 +36,7 @@ ORIGINAL_PACKAGE_HASHES = {
     'baseline-09': 'e4c26626df402e3f0f7e9ecf731901b9b17e33fa25cd62049a350d6148fdab53',
     'baseline-10': 'd312f7fa24d257858397fcee94246eb2c01910fb249ec971c7a874829c31ef0f',
     'baseline-11': '415396f2aa95fb071574356fe6cef9f03f8b81e729e0f8c9966bf9395886b534',
+    'baseline-12': '81e65f75d0be884021e2fbf9fc2a13a99613e2bd0cd40d52e6a26b8a3c63cfab',
 }
 
 
@@ -165,7 +167,7 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
         if (review['text'] != source['text'] or review['current_line'] != source['line']
                 or review['line'] != original['line']):
             raise ValueError('review source text or location drifted')
-        if name in ('baseline-07', 'baseline-08', 'baseline-09', 'baseline-10', 'baseline-11'):
+        if name in ('baseline-07', 'baseline-08', 'baseline-09', 'baseline-10', 'baseline-11', 'baseline-12'):
             # The pinned baseline-11 seal has one changed Task row. Its
             # original location comes from the exact old/new mapping above.
             if name == 'baseline-11':
@@ -175,6 +177,20 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
                              if identity(b) == identity(review))
             if review.get('original_line') != prior['line']:
                 raise ValueError('original package location drifted')
+        if name == 'baseline-12':
+            # The fenced minimum configuration list is one source block but
+            # each full key needs its own disposition and implementation map.
+            if source['text'].startswith('```text\napp.data_root'):
+                keys = set(re.findall(r'\b[a-z_]+\.[a-z_]+', source['text']))
+                mapping = review.get('config_mapping', {})
+                if (set(mapping) != keys or set(review['obligations']) != keys or
+                        any(not isinstance(v, str) or not v.strip() for v in mapping.values())):
+                    raise ValueError('minimum configuration key mapping incomplete')
+            if source['section'] == '16.7' and source['text'].startswith('- `'):
+                mapping = review.get('interface_mapping', {})
+                if (set(mapping) != set(review['obligations']) or
+                        any(not isinstance(v, str) or not v.strip() for v in mapping.values())):
+                    raise ValueError('consumer interface method mapping incomplete')
         if (name == 'baseline-11' and review['section'] == '16.2'
                 and source['text'].startswith('| `')):
             # Each minimum-model table row has one duty and physical mapping

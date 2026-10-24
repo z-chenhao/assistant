@@ -103,3 +103,7 @@ audit-baseline-10:
 .PHONY: audit-baseline-11
 audit-baseline-11:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-11.json --evidence evidence/baseline-11.json
+
+.PHONY: audit-baseline-12
+audit-baseline-12:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-12.json --evidence evidence/baseline-12.json
