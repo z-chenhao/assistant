@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen baseline-10 audit (ERII-240)
+
+| Feature | How to reach it | Authoritative entry point and evidence |
+| --- | --- | --- |
+| Memory, EventQueue, progress and module dispositions | `make audit-baseline-10`; existing `release_audit.py` / `release_package.audit_package` | Exactly 80 original/sealed blocks, 318 scoped duties, 87 current references, 17 merged PRs and seven observation groups. All 294 mandatory/policy duties stay routed; no certified requirement. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_baseline10.py` | Shared corruption suite plus both seals, original locations, scope/exemption handling, lifecycle/progress/layout/trace routes, exact AgentService reuse of ERII-345’s frozen duty and canonical documentation links. Launch/Doctor load sources; Drive uses the maintained CLI; Evidence is `evidence/baseline-10.json`; Cleanup removes disposable output only. |
+
+See [observations, finite routes and proof limits](../docs/audits/baseline-10.md).
+
 ## Frozen baseline-09 audit (ERII-239)
 
 | Feature | Reach / authoritative entry | Evidence |

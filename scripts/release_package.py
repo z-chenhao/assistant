@@ -24,12 +24,14 @@ PACKAGE_HASHES = {
     'baseline-07': 'd05cf38d322f6c69ad05e499d0caacafc0c520bec0e728170f05a3cf517fcd63',
     'baseline-08': '12528dae09407c3daa20caf9c1d1c5166920d70b50a3346b4ab875cd93d077e8',
     'baseline-09': '680dd54a6cbc5587ceb348b70adda1956f38a0b03ffe9e622204e587991c5f46',
+    'baseline-10': '33ebc44545bf9d3718771a4303266cca26f1923c1f234ee2e30474b5067fa911',
 }
 ORIGINAL_PACKAGE_HASHES = {
     'baseline-02': 'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63',
     'baseline-07': 'e4c7b80cf8886c25307f3b225c1970d4ff7234ca5f7e6a0cacb36ac4a0c5ace3',
     'baseline-08': '22f68315002ca724f5ce132ee02b9a8c1678f19d4decc3101c42bfa541cb30ee',
     'baseline-09': 'e4c26626df402e3f0f7e9ecf731901b9b17e33fa25cd62049a350d6148fdab53',
+    'baseline-10': 'd312f7fa24d257858397fcee94246eb2c01910fb249ec971c7a874829c31ef0f',
 }
 
 
@@ -147,7 +149,7 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
         if (review['text'] != source['text'] or review['current_line'] != source['line']
                 or review['line'] != original['line']):
             raise ValueError('review source text or location drifted')
-        if name in ('baseline-07', 'baseline-08', 'baseline-09'):
+        if name in ('baseline-07', 'baseline-08', 'baseline-09', 'baseline-10'):
             prior = next(b for b in ledger['original_frozen_blocks']
                          if identity(b) == identity(review))
             if review.get('original_line') != prior['line']:

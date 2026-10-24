@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-10](baseline-10.md) records ERII-240's 80-block Memory, EventQueue,
+progress and module audit. Its 318 scoped duties retain all 294 mandatory/policy
+routes, current native observations and four finite gap proposals. Use
+`make audit-baseline-10`; no product requirement is certified.
+
 [baseline-09](baseline-09.md) records ERII-239's 80-block CUA transfer, context
 and Memory audit. Its 284 scoped duties retain all 261 mandatory/policy routes,
 current native observations and two finite gap proposals. Use
