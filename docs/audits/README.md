@@ -4,6 +4,9 @@
 changed by ADR 006, the proposed old/new hash mapping and 78 unchanged relocations.
 ERII-232 remains inconclusive pending coordinator resealing; its preliminary
 reviews are not registered as a completed package ledger.
+[baseline-04](baseline-04.md) records ERII-234's separate 80-block audit of
+account, Bridge, model failure and Code Mode contracts. Its ledger and current
+observations do not change baseline-01 or the preserved historical ledger.
 
 [baseline-01.json](baseline-01.json) disposes of the **80 exact blocks** assigned
 to ERII-231 in the owner's frozen work-package manifest. It records 257 authored
