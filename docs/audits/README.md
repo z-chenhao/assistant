@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-02](baseline-02.md) records ERII-232's Task, prompt, Run and Automation
+audit: 83 current blocks after the owner-approved [ADR006 reseal](baseline-02-reseal.md).
+Original identities and remaining duties stay visible; no requirement is certified.
+Run `make audit-baseline-02` through the same maintained entry point.
+
 [baseline-03](baseline-03.md) records ERII-233's 80 frozen blocks, their 347
 sub-obligations, current evidence and remaining routes. Use `make audit-baseline-03`.
 Its completed dispositions do not certify product conformance or release.

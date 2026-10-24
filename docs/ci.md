@@ -2,7 +2,7 @@
 
 `Ubuntu checks` is the single branch-protection verdict. One workflow runs on
 PR heads and main pushes. It always requires unit/lint, race,
-every verification matrix cell, every Code Mode/M6 part and both evidence joins.
+every verification matrix cell, every providers/Code Mode/M6 part and all evidence joins.
 Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
 There is no impact-based omission, early-feedback tier or duplicate shadow
 workflow. Every full gate runs for documentation changes too.
@@ -22,7 +22,10 @@ weakens `Ubuntu checks`. No release is published by an ordinary PR.
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
-    SHA --> Verify[Runtime / security / delivery / providers]
+    SHA --> Verify[Runtime / security / delivery / communication]
+    SHA --> Providers[Providers CLI / models]
+    Providers --> ProviderJoin[Complete providers evidence]
+    ProviderJoin --> Gate
     SHA --> Personal[M6 independent parts]
     Personal --> M6Join[Complete M6 evidence]
     M6Join --> Gate
@@ -50,8 +53,8 @@ its guards were not relaxed. The new pipeline avoids that reuse entirely.
 Frontend build/TypeScript dependencies install only in unit/lint. Playwright
 installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
 QuickJS still install everywhere, including providers' offline packaging gate.
-Across the eighteen execution jobs this removes seventeen frontend and eleven
-Playwright installs. Lockfile inputs, per-job exact-source builds, every
+Across the twenty-two execution jobs only unit/lint installs frontend dependencies;
+seven jobs install Playwright. Lockfile inputs, per-job exact-source builds, every
 assertion and repetition count remain unchanged. Clean-runner complete CI is the
 dependency-closure proof; install counts alone are not wall-time measurements.
 All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
@@ -62,7 +65,7 @@ Unit/lint retains its ordinary Python execution and additionally runs all Python
 regressions on Python 3.10.22, the minimum supported interpreter series. This
 Required step guards portable SDK hashing and the maintained profiling tools.
 
-Providers and the complete race job use private 2 GiB tmpfs mounts for disposable
+Both providers parts and the complete race job use private 2 GiB tmpfs mounts for disposable
 test directories, through `ci_tmpfs.py setup/cleanup`. The full unit/lint suite,
 all five SC race rounds and every verification job except providers keep ordinary
 disk storage. Unit/lint also requires five disk-backed receipt recovery race runs.
@@ -100,6 +103,35 @@ Record actual exact-SHA timings with `ci_profile.py`; treat any workflow over
 ten minutes as a regression to diagnose before review. Do not remove coverage,
 reduce repetitions, extend fixture deadlines, or retry failures to meet it.
 
+Providers uses two Required parts, `cli` and `models`, with the unchanged
+logical inventory in `verify_suite.SHARDS`. The CLI part keeps startup, unscripted,
+local provider, initial account, capabilities ×5, TUI ×5, terminal input, Pi Bridge ×5
+and account ×5. The models part runs the original `go test -count=5 -json
+./internal/llm/... ./internal/agent/sqlite` alone. Both provision their own SDK,
+sandbox and private tmpfs; their SDK Doctor and exact fixture cleanup run through
+`ci_step.py --phase cleanup`, even after failure. Setup/build/test/cleanup receipts
+and native upload/post timestamps account for the whole job, not just verification.
+
+This addresses run `40096934203`, attempt 1, source
+`86abfa7efdac7bfee5f873c9a698d7cd25871aa4`, providers job `120881046698`:
+verification returned zero after 540.74190803 seconds, but the job was cancelled
+for exceeding 10 minutes. Native timestamps show 59 seconds from job start to
+test-step start, 541 seconds for that step, then 8 seconds through Doctor,
+cleanup, upload/post and job completion (608 seconds total; native timestamps
+have one-second precision). A successful test step did not satisfy the job.
+Splitting the already-isolated Go series removes it from the CLI critical path;
+it adds one independent setup and a small evidence join, without raising timeouts.
+This is a budget repair, not a measured p95 or runner-cost improvement.
+
+`ci_providers.py` requires both clean, stable, matching source/binary/workflow
+identities, exact gate/attempt inventories in serial order and drained owned
+groups. Missing, duplicate, reordered, failed or focused evidence rejects the
+join. The Required aggregate also requires both matrix success (including SDK
+Doctor/cleanup/upload) and the join. The joined `suite-providers.json` restores
+the original logical order and retains both part identities/timings. Individual
+artifacts retain raw reports; the join uploads only its canonical suite and phase
+receipt. `make verify` keeps its complete unpartitioned providers path.
+
 M6 reuses the existing `fixture_pool.py` with capacity four. Travel fixtures
 keep capacity two in a separate admission group because each drives Main and a
 held Root concurrently; they do not overlap ordinary CLI/browser fixtures. Each variant owns
@@ -118,7 +150,7 @@ Ubuntu evidence on `1eff344` measured about 259 seconds per complete M6 round;
 the ten-minute job budget stopped the third round. Local rounds on the macOS
 host took about 72 seconds and did not predict this Linux CPU-bound result.
 CI therefore uses seven independent M6 parts: context, memory, network, booking,
-and three pairs of GC-18 variants. All eighteen primary matrix jobs can start
+and three pairs of GC-18 variants. All twenty-two primary execution jobs can start
 independently; no binary producer or preceding test gates their admission.
 Each pair retains its complete five-run series on one runner. The fixed pair
 inventory is private to `m6_report.PARTS`, not a new product protocol.
@@ -262,6 +294,9 @@ python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence/joined
 python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --binary bin/erii --evidence evidence/m6-parts/desktop-1 --jobs 1
 # Run the other six fixed parts in their own folders, then require all seven:
 python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
+python3 scripts/verify_suite.py --shard providers --provider-part cli --binary bin/erii --evidence evidence/provider-parts/cli --jobs 1
+python3 scripts/verify_suite.py --shard providers --provider-part models --binary bin/erii --evidence evidence/provider-parts/models --jobs 1
+python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence/providers-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 

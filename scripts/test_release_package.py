@@ -13,6 +13,7 @@ import release_package as package
 
 class ReleasePackageTests(unittest.TestCase):
     ledger_path = 'docs/audits/baseline-01.json'
+    expected_blocks = 80
 
     @classmethod
     def setUpClass(cls):
@@ -30,8 +31,8 @@ class ReleasePackageTests(unittest.TestCase):
 
     def test_all_frozen_blocks_retained_without_certification(self):
         report = self.run_audit()
-        self.assertEqual(report['reviewed_blocks'], 80)
-        self.assertEqual(sum(report['dispositions'].values()), 80)
+        self.assertEqual(report['reviewed_blocks'], self.expected_blocks)
+        self.assertEqual(sum(report['dispositions'].values()), self.expected_blocks)
         self.assertEqual(report['status'], 'inconclusive')
         self.assertFalse(report['release_ready'])
         self.assertEqual(report['verified_requirements'], 0)
@@ -172,7 +173,7 @@ class ReleasePackageTests(unittest.TestCase):
             report = json.loads(output.read_text())
             self.assertFalse(report['release_ready'])
             self.assertEqual(report['individually_reviewed_blocks'], 122)
-            self.assertEqual(report['package_audit']['reviewed_blocks'], 80)
+            self.assertEqual(report['package_audit']['reviewed_blocks'], self.expected_blocks)
             self.ledger['reviews'].pop()
             ledger.write_text(json.dumps(self.ledger))
             result = subprocess.run(command, capture_output=True, text=True)

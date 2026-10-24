@@ -6,9 +6,12 @@ setup:
 install:
 	sh install.sh
 
-.PHONY: audit-baseline-01 audit-baseline-03 audit-baseline-04
+.PHONY: audit-baseline-01 audit-baseline-02 audit-baseline-03 audit-baseline-04
 audit-baseline-01:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-01.json --evidence evidence/baseline-01.json
+
+audit-baseline-02:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-02.json --evidence evidence/baseline-02.json
 
 audit-baseline-03:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-03.json --evidence evidence/baseline-03.json
