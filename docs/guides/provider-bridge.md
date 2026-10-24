@@ -7,9 +7,10 @@ SDK dependency tree; it adds no hosted service or account cost. Its SDK still
 brings other provider packages transitively, although Erii does not enable them.
 Current OpenAI account OAuth is also implemented; see the account lifecycle below.
 The [Main CLI](main-loop.md) uses the same Bridge for frozen Run requests,
-Direct Tool continuation and Conversation recovery. [Worker Runs](tasks.md) and
-[Code Mode Durable Replay](codemode.md) reuse frozen model snapshots through
-this Bridge. Bridge conformance alone does not establish M1 or release acceptance.
+Direct Tool continuation and Conversation recovery. Main and Worker use the
+same Agent Loop and frozen snapshots; [delegation](children.md) and
+[Code Mode](codemode.md) document the current recovery boundaries. Bridge conformance alone does not establish M1, real provider
+compatibility or release acceptance.
 
 ## ChatGPT account lifecycle
 
@@ -117,7 +118,7 @@ RPC before releasing storage. Failed disposal reaps its peer as usual.
 Authorization deferral. It remains a future requirement, not a passing check.
 Real interactive login/Keychain/provider Live Shadow remains **inconclusive**
 until explicitly performed; deterministic fixtures do not establish account
-eligibility or real service availability. Main/Conversation execution is later.
+eligibility or real service availability.
 
 ## Connect a local model
 

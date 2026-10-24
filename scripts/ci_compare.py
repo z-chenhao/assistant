@@ -16,6 +16,7 @@ import ci_profile as profile
 from evidence import artifact_archive, inventory
 from verify_suite import SHARDS, CODEMODE_PARTS, codemode_gates, personal_gates
 import m6_report
+import ci_race_join
 from ci_gate import REQUIRED
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +106,8 @@ def topology(text=None):
             values = json.loads(values[0])
             expected = (set(SHARDS) - {'codemode', 'personal'} if key == 'verify' else
                         set(CODEMODE_PARTS) if key == 'codemode' else
-                        set(m6_report.PARTS) if key == 'personal' else set())
+                        set(m6_report.PARTS) if key == 'personal' else
+                        set(ci_race_join.PARTS) if key == 'race' else set())
             if set(values) != expected or len(values) != len(expected):
                 raise ValueError('workflow and suite part inventory drift')
             names.extend(name.replace('${{ matrix.' + axis[0] + ' }}', v) for v in values)

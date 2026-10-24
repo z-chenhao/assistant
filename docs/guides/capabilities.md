@@ -151,9 +151,13 @@ This extends the M3 Tool/Approval/Artifact fragments in `verify_tools.py` and
 coding prerequisite here. This fixture marks GC-20 Child/recovery and full
 GC-19/20 Durable cases `not_applicable`; the [Core gate](core-evals.md) covers
 their additional mechanics. Production Computer has [separate verification](computer.md).
-The added GC-11 mechanical fragment reads three actual provider quote records,
-preserves oral-cashback uncertainty and reopens the saved comparison Artifact.
-Its deterministic scripted model does not establish live-model reasoning quality.
+The GC-11 checkpoint now drives both original turns in six locked variants,
+reads all three actual provider quotes with services and user weights, preserves
+oral-cashback uncertainty, delivers two scripted replies and reopens both
+comparison Artifacts. It also rejects purchase/approval/Task effects and proves
+duplicate-input state equality. The same five-round capability gate includes
+every variant. Its deterministic scripted model does not establish live-model
+reasoning quality; see [release evidence and remaining obligations](../v1-release-audit.md#gc-11-checkpoint).
 
 No new tables or domain states are needed: schema v12 already freezes arbitrary
 ToolSpecs, Skill set hashes, policy and invocation outcomes. Empty/prior schema

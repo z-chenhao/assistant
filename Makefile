@@ -1,4 +1,4 @@
-.PHONY: setup install run build test test-race lint verify
+.PHONY: setup install run build test test-race lint verify release-audit
 
 setup:
 	python3 scripts/setup.py $(SETUP_FLAGS)
@@ -47,6 +47,8 @@ VERIFY_SHARD ?=
 verify: build
 	python3 scripts/verify_suite.py --binary bin/erii --evidence "$(VERIFY_EVIDENCE)" --jobs "$(VERIFY_JOBS)" $(if $(VERIFY_SHARD),--shard "$(VERIFY_SHARD)")
 
+# A successful inventory is not release acceptance. This returns 2 while the
+# recorded whole-case/audit/model/L2 gaps remain; deterministic CI stays offline.
 # Use a fresh durable fixture root outside the checkout; never contacts GitHub.
 .PHONY: verify-evidence
 verify-evidence:

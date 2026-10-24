@@ -43,11 +43,6 @@ jobs:
         env:
           ERII_CI_PUBLIC_SDK_PROBE: "1"
         run: exec python3 scripts/ci_step.py --name sdk-conformance --phase test -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.10.22"
-      - name: Minimum supported Python compatibility tests
-        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -60,14 +55,44 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  race:
-    name: Race detector
+  python_compat:
+    name: Python 3.10 compatibility
     runs-on: ubuntu-24.04
-    # The full unchanged race inventory measured 9m40s on a 4-vCPU hosted
-    # runner before teardown, so the old 10-minute job limit cancelled valid
-    # work and then made cleanup report leftover state. Keep test deadlines and
-    # repetitions unchanged; bound only the outer hosted job with teardown room.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.10.22"
+      - name: Install pinned Browser module for setup rejection contracts
+        run: python3 scripts/setup.py --part packages --packages guest-browser --evidence evidence/setup-python310.json
+      - name: Minimum supported Python compatibility tests
+        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
+      - name: Retain exact-SHA Python compatibility evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-python-compat-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  race:
+    name: Race detector (${{ matrix.racepart }})
+    runs-on: ubuntu-24.04
+    # Main's approved ERII-222 bound leaves teardown room for either part.
+    # Keep the complete inventory, per-test deadlines and strict join unchanged.
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        racepart: ["packages", "sqlite"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,9 +102,9 @@ jobs:
         with:
           temporary-fixtures: "true"
       - name: Race detector
-        # Isolate the one-second Bridge burst/control fixture; preserve normal
-        # package parallelism for the complete remainder, with an audited inventory.
-        run: exec python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py
+        # Bridge remains isolated from other package tests; SQLite keeps the
+        # existing discovered root partitions. Both parts require a strict join.
+        run: exec python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py --part ${{ matrix.racepart }}
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -87,6 +112,42 @@ jobs:
         if: ${{ always() }}
         run: python3 scripts/ci_tmpfs.py cleanup
       - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-race-part-${{ matrix.racepart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  race_join:
+    name: Race detector
+    needs: race
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-race-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/race-parts
+      - name: Require successful parts and audit all packages and SQLite roots
+        env:
+          PART_RESULT: ${{ needs.race.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in packages sqlite; do
+            mv "evidence/race-parts/evidence-race-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/race-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name race-join --phase test -- python3 scripts/ci_race_join.py --parts evidence/race-parts --evidence evidence/race-joined.json
+      - name: Retain joined race inventory, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -105,7 +166,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "security", "delivery", "providers"]
+        shard: ["runtime", "security", "delivery", "providers", "communication"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -114,7 +175,7 @@ jobs:
       - uses: ./.github/actions/ci-inputs
         with:
           browser: ${{ matrix.shard == 'delivery' }}
-          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}
+          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' || matrix.shard == 'communication' }}
           temporary-fixtures: ${{ matrix.shard == 'providers' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}
@@ -279,7 +340,7 @@ jobs:
 
   checks:
     name: Ubuntu checks
-    needs: ["fast", "race", "verify", "codemode", "codemode_join", "personal", "personal_join"]
+    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
