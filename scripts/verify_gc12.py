@@ -247,6 +247,7 @@ if __name__ == '__main__':
     p.add_argument('--binary', type=Path, required=True)
     p.add_argument('--evidence', type=Path, required=True)
     args = p.parse_args()
+    args.evidence.unlink(missing_ok=True)
     result = run(args.binary.resolve(), args.evidence.resolve().with_suffix(''))
     args.evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
     print(json.dumps(dict(case='GC-12', variants=len(result['variants']), cleanup=result['cleanup'], semantic_score=None)))

@@ -18,6 +18,20 @@ six positive variants and denial/lost-response safety probes. A mechanical pass
 does not fill the original protected acceptance series or eight semantic grades.
 The lock binds the source fixture and unchanged Golden specification.
 
+The CLI removes the previous aggregate before fixture validation or startup.
+An unsuccessful rerun exits nonzero and leaves no current passing aggregate;
+variant diagnostics remain available, and Judge preparation rejects the missing
+report. To run the success → same-path startup failure → Judge rejection
+regression through the actual product CLI:
+
+```sh
+ERII_GC12_TEST_BINARY=bin/erii python3 -m unittest discover -s scripts -p test_gc12.py
+```
+
+Without that explicit binary, the Python regression seeds the complete synthetic
+observation fixture and exercises the same failure and consumer CLI boundaries.
+It does not require a product installation or claim a new product run.
+
 Launch creates a disposable installation, explicit model Fixture, bound fake
 channel and stdio MCP peer. Doctor selects the explicit profile and discovers
 only the configured read-only source/status Tool and external-effect invitation

@@ -1,6 +1,7 @@
 """GC-12 observation and external Fake contracts; no synthetic semantic grades."""
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -141,6 +142,40 @@ class MeetingTests(unittest.TestCase):
                 if mutation=='remote':row['remote_replay']['calendar']=[]
                 if mutation=='mode':report['variants'][-1]['variant']['mode']='success'
                 with self.assertRaises(ValueError):evaluator.prepare(report)
+
+    def test_failed_cli_rerun_removes_consumable_success_report(self):
+        folder=journey.ROOT/'evidence';folder.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=folder,prefix='gc12-rerun-') as temp:
+            root=Path(temp);output=root/'gc12.json';preview=root/'judge.json'
+            binary=os.environ.get('ERII_GC12_TEST_BINARY')
+            if binary:
+                success=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc12.py'),
+                                        '--binary',str(Path(binary).resolve()),'--evidence',str(output)],
+                                       capture_output=True,text=True,timeout=180)
+                self.assertEqual(success.returncode,0,success.stderr)
+                report=json.loads(output.read_text())
+                self.assertEqual(len(report['variants']),8)
+                self.assertTrue(report['cleanup'])
+                self.assertIsNone(report['semantic_score'])
+            else:
+                # Pure Python CI seeds the complete observation fixture;
+                # the explicit binary runs the same check through the product.
+                output.write_text(json.dumps(self.packets()))
+            prepare=[sys.executable,str(journey.ROOT/'scripts/prepare_release_eval.py'),
+                     '--input',str(output),'--evidence',str(preview)]
+            accepted=subprocess.run(prepare,capture_output=True,text=True,timeout=30)
+            self.assertEqual(accepted.returncode,0,accepted.stderr)
+            self.assertEqual(len(json.loads(preview.read_text())['judge_packets']),6)
+            missing=root/'deliberately-missing-erii'
+            failed=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc12.py'),
+                                   '--binary',str(missing),'--evidence',str(output)],
+                                  capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(failed.returncode,0)
+            self.assertIn(str(missing),failed.stderr)
+            self.assertFalse(output.exists(),'failed rerun retained a passing aggregate')
+            rejected=subprocess.run(prepare,capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(rejected.returncode,0)
+            self.assertFalse(preview.exists(),'Judge preparation retained the old preview')
 
 
 if __name__ == '__main__':
