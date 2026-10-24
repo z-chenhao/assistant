@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen baseline-13 audit (ERII-243)
+
+| Feature | Reach / authoritative entry | Evidence |
+| --- | --- | --- |
+| M5–M7, acceptance and deferred-choice dispositions | `make audit-baseline-13`; `release_audit.py` / `release_package.audit_package` | 58 original/sealed blocks, 352 scoped duties, all 324 current required/policy routes, 121 current references, 27 merged PRs and four native observation groups. Zero certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_baseline13.py` | Both seals, exact ADR006 Task lifecycle mapping and independent complete duty, mixed deferred/MVP clauses, each secret/sink and finite owner. Launch/Doctor load frozen sources; Drive uses existing CLI; Evidence is `evidence/baseline-13.json`; Cleanup removes disposable output only. |
+
+See [native observations, finite routes and proof limits](../docs/audits/baseline-13.md).
+
 ## Frozen baseline-11 audit (ERII-241)
 
 | Feature | Reach / authoritative entry | Evidence |

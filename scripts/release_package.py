@@ -27,6 +27,7 @@ PACKAGE_HASHES = {
     'baseline-09': '680dd54a6cbc5587ceb348b70adda1956f38a0b03ffe9e622204e587991c5f46',
     'baseline-10': '33ebc44545bf9d3718771a4303266cca26f1923c1f234ee2e30474b5067fa911',
     'baseline-11': '46a87bc1728c849591bf6c45905e56fc3e83a849264dacdda83d92e3d8b04fca',
+    'baseline-13': '9d86d5732f7addecb9001ad5cf9c9b521f212373c5a57149e8c08cb95661570d',
 }
 ORIGINAL_PACKAGE_HASHES = {
     'baseline-02': 'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63',
@@ -35,6 +36,7 @@ ORIGINAL_PACKAGE_HASHES = {
     'baseline-09': 'e4c26626df402e3f0f7e9ecf731901b9b17e33fa25cd62049a350d6148fdab53',
     'baseline-10': 'd312f7fa24d257858397fcee94246eb2c01910fb249ec971c7a874829c31ef0f',
     'baseline-11': '415396f2aa95fb071574356fe6cef9f03f8b81e729e0f8c9966bf9395886b534',
+    'baseline-13': '933565336b762b2dec8e8dc2b9459fda3d41dc3c8515bdc8ccce9bced7729e01',
 }
 
 
@@ -68,7 +70,7 @@ def git(root, *args):
 def audit_package(root, ledger, units, manifest=None, native_root=None, verify_git=False):
     name = ledger['package']
     frozen = ledger['frozen_blocks']
-    # ADR006 changes baseline-02 and baseline-11; other resealed packages
+    # ADR006 changes baseline-02, baseline-11 and baseline-13; other resealed packages
     # retain content identities with shifted lines. Keep original provenance.
     resealed = name in ORIGINAL_PACKAGE_HASHES
     manifest_hash = RESEALED_MANIFEST_HASH if resealed else MANIFEST_HASH
@@ -80,19 +82,27 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
                 frozen_digest(ledger.get('original_frozen_blocks', [])) !=
                 ORIGINAL_PACKAGE_HASHES[name]):
             raise ValueError('original manifest provenance changed')
-    if name == 'baseline-11':
+    if name in ('baseline-11', 'baseline-13'):
+        old_hash, new_hash, coordinator = {
+            'baseline-11': ('c158433cfab75928e00c5392a666e7af064ad0362ab39e3f8ac32fe8153294f1',
+                            'a719ccca98f823a521cd0bbd69518e1b8e0e959a42bea50bd72c7b00fe84fa86',
+                            '01a16e27-6501-716a-8a22-0487065ce998'),
+            'baseline-13': ('9602850bb1308669571ef7e86df0bf9bc91e3bee774426a3f263cb7faa21cfda',
+                            '1bbef426eb568fcf13f01f9caa4add3de302d98724f9f40fde377bb0cfe0824e',
+                            '01a16e27-6914-7c76-9607-efe9f00089c3'),
+        }[name]
         changed = [(old, new) for old, new in
                    zip(ledger['original_frozen_blocks'], frozen)
                    if identity(old) != identity(new)]
         mapping = ledger.get('reseal_mapping', [])
         if (len(changed) != 1 or len(mapping) != 1 or
-                changed[0][0]['sha256'] != 'c158433cfab75928e00c5392a666e7af064ad0362ab39e3f8ac32fe8153294f1' or
-                changed[0][1]['sha256'] != 'a719ccca98f823a521cd0bbd69518e1b8e0e959a42bea50bd72c7b00fe84fa86' or
+                changed[0][0]['sha256'] != old_hash or
+                changed[0][1]['sha256'] != new_hash or
                 mapping[0] != dict(original=changed[0][0], sealed=changed[0][1],
                                    authorization_comment='01a16e1d-3e2c-78fb-ba1d-5621d178a9bd',
-                                   coordinator_comment='01a16e27-6501-716a-8a22-0487065ce998',
+                                   coordinator_comment=coordinator,
                                    conclusion_inherited=False)):
-            raise ValueError('baseline-11 ADR006 source mapping changed')
+            raise ValueError(name + ' ADR006 source mapping changed')
     if manifest is not None:
         raw = manifest.read_bytes()
         if digest(raw) != manifest_hash:
@@ -165,10 +175,10 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
         if (review['text'] != source['text'] or review['current_line'] != source['line']
                 or review['line'] != original['line']):
             raise ValueError('review source text or location drifted')
-        if name in ('baseline-07', 'baseline-08', 'baseline-09', 'baseline-10', 'baseline-11'):
-            # The pinned baseline-11 seal has one changed Task row. Its
+        if name in ('baseline-07', 'baseline-08', 'baseline-09', 'baseline-10', 'baseline-11', 'baseline-13'):
+            # These pinned seals have changed Task rows. Their
             # original location comes from the exact old/new mapping above.
-            if name == 'baseline-11':
+            if name in ('baseline-11', 'baseline-13'):
                 prior = ledger['original_frozen_blocks'][frozen.index(original)]
             else:
                 prior = next(b for b in ledger['original_frozen_blocks']
