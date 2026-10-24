@@ -19,6 +19,11 @@ import (
 
 func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.GenerationResult, error)) (*Store, *Runs, agent.Actor) {
 	t.Helper()
+	return controlPolicyFixture(t, root, "")
+}
+
+func controlPolicyFixture(t *testing.T, root func(llm.GenerationRequest) (llm.GenerationResult, error), policy string) (*Store, *Runs, agent.Actor) {
+	t.Helper()
 	s, r, a, p := taskFixture(t)
 	defs := []tool.Definition{agent.AgentToolDefinition()}
 	for _, spec := range a.Registry.Describe() {
@@ -45,6 +50,7 @@ func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.Generati
 		request := task.ManageRequest{Operation: op}
 		if op == "create" {
 			request.Task = "Wedding plan with stable progress"
+			request.CompletionPolicy = policy
 		} else {
 			if err := s.db.QueryRow(`SELECT task_ref FROM task LIMIT 1`).Scan(&request.TaskRef); err != nil {
 				return llm.GenerationResult{}, err
@@ -53,9 +59,13 @@ func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.Generati
 				request.Instruction = "Continue with the new date"
 			}
 		}
-		if op == "race" {
+		if op == "race" || op == "complete-race" {
 			args := []string{}
-			for _, action := range []string{"pause", "append", "cancel"} {
+			actions := []string{"pause", "append", "cancel"}
+			if op == "complete-race" {
+				actions = []string{"complete", "append"}
+			}
+			for _, action := range actions {
 				q := task.ManageRequest{Operation: action, TaskRef: request.TaskRef}
 				if action == "append" {
 					q.Instruction = "Concurrent new date"
@@ -75,6 +85,8 @@ func controlFixture(t *testing.T, root func(llm.GenerationRequest) (llm.Generati
 	return s, r, a
 }
 
+// controlMain is only for a fixture without a live Drain. Once Drain starts,
+// submit inputs to it instead of competing for its Main Run claim.
 func controlMain(t *testing.T, r *Runs, a agent.Actor, key, text string) {
 	t.Helper()
 	receipt := mustSubmit(t, a, key, text)
@@ -100,8 +112,61 @@ func rootClaim(t *testing.T, s *Store, r *Runs) agent.RunClaim {
 	return c
 }
 
+// Replay the model's shortest fencing counterexample at the actual persisted
+// generation/Tool admission boundary: claim -> stop commit -> old owner write.
+func TestTaskControlModelCounterexampleRejectsOldOwner(t *testing.T) {
+	for _, stop := range []string{"pause", "cancel"} {
+		t.Run(stop, func(t *testing.T) {
+			s, r, a := controlFixture(t, nil)
+			ctx := context.Background()
+			controlMain(t, r, a, "create", "create")
+			c := rootClaim(t, s, r)
+			run, err := r.Load(ctx, c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gen, err := r.Generation(ctx, c, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := calls(agent.RunToolName, `{"task":"accepted before stop"}`)
+			if err = s.Models().RecordUsageAnd(ctx, gen.Request, response, 0, nil, s.AcceptGeneration); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Progress(ctx, c, "before stop"); err != nil {
+				t.Fatal(err)
+			}
+			controlMain(t, r, a, stop, stop)
+			// A live lease intentionally remains: ownership alone is insufficient.
+			if err = r.Renew(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Progress(ctx, c, "stale model result"); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatalf("model counterexample admitted stale write: %v", err)
+			}
+			if _, err = r.ToolStore(c).Accept(ctx, gen.Request.GenerationID, response.ToolCalls, run.Tools); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatalf("old owner admitted Child: %v", err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM task WHERE progress_summary='before stop' AND task_epoch=2`) != 1 ||
+				scalar(t, s, `SELECT count(*) FROM run WHERE worker_position='child'`) != 0 ||
+				scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE run_id=?`, c.RunID()) != 0 {
+				t.Fatal("rejected write/admission left partial state")
+			}
+			if stopped, err := r.SettleStop(ctx, c); err != nil || !stopped {
+				t.Fatal(stopped, err)
+			}
+		})
+	}
+}
+
 func TestTaskControlPauseFencesLateWritesAndContinueNewRoot(t *testing.T) {
-	s, r, a := controlFixture(t, nil)
+	for _, policy := range []string{"once", "ongoing"} {
+		t.Run(policy, func(t *testing.T) { testTaskControlPauseFencing(t, policy) })
+	}
+}
+
+func testTaskControlPauseFencing(t *testing.T, policy string) {
+	s, r, a := controlPolicyFixture(t, nil, policy)
 	ctx := context.Background()
 	controlMain(t, r, a, "create", "create")
 	c := rootClaim(t, s, r)
@@ -168,7 +233,11 @@ func TestTaskControlPauseFencesLateWritesAndContinueNewRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustDrain(t, a)
-	if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status='completed'`) != 1 {
+	want := "completed"
+	if policy == "ongoing" {
+		want = "active"
+	}
+	if scalar(t, s, `SELECT count(*) FROM task_update`) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status=? AND completion_policy=?`, want, policy) != 1 {
 		t.Fatal("stale result reported")
 	}
 }
@@ -294,7 +363,13 @@ func addControlChild(t *testing.T, s *Store, parent, id string) {
 }
 
 func TestTaskControlCancelTreeAndInvocationOutcomes(t *testing.T) {
-	s, r, a := controlFixture(t, nil)
+	for _, policy := range []string{"once", "ongoing"} {
+		t.Run(policy, func(t *testing.T) { testTaskControlCancelTreeAndInvocationOutcomes(t, policy) })
+	}
+}
+
+func testTaskControlCancelTreeAndInvocationOutcomes(t *testing.T, policy string) {
+	s, r, a := controlPolicyFixture(t, nil, policy)
 	ctx := context.Background()
 	controlMain(t, r, a, "create", "create")
 	c := rootClaim(t, s, r)
@@ -367,41 +442,104 @@ func TestTaskControlCancelTreeAndInvocationOutcomes(t *testing.T) {
 }
 
 func TestTaskControlCompletesOnlyFinishedOneShotTree(t *testing.T) {
-	s, r, a := controlFixture(t, nil)
-	ctx := context.Background()
-	controlMain(t, r, a, "create", "create")
-	c := rootClaim(t, s, r)
-	addControlChild(t, s, c.RunID(), "child")
-	if err := executeTaskRun(t, a, r, ctx, c); err != nil {
-		t.Fatal(err)
+	for _, policy := range []string{"once", "ongoing"} {
+		t.Run(policy, func(t *testing.T) {
+			s, r, a := controlPolicyFixture(t, nil, policy)
+			ctx := context.Background()
+			controlMain(t, r, a, "create", "create")
+			c := rootClaim(t, s, r)
+			addControlChild(t, s, c.RunID(), "child")
+			if err := executeTaskRun(t, a, r, ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM task WHERE status='active' AND completion_policy=?`, policy) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+				t.Fatal("Task completed before descendant")
+			}
+			child, err := r.Claim(ctx, "child")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = executeTaskRun(t, a, r, ctx, child); err != nil {
+				t.Fatal(err)
+			}
+			want := "completed"
+			if policy == "ongoing" {
+				want = "active"
+			}
+			if scalar(t, s, `SELECT count(*) FROM task WHERE status=? AND completion_policy=?`, want, policy) != 1 || scalar(t, s, `SELECT count(*) FROM task_update WHERE root_run_id=?`, c.RunID()) != 1 {
+				t.Fatal("final descendant policy/result mismatch")
+			}
+			mustDrain(t, a)
+			controlMain(t, r, a, "append", "append duplicate")
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM task WHERE status=? AND completion_policy=? AND task_epoch=2`, want, policy) != 1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 2 {
+				t.Fatal("append lost policy or duplicated work")
+			}
+		})
 	}
-	if scalar(t, s, `SELECT count(*) FROM task WHERE status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
-		t.Fatal("Task completed before descendant")
-	}
-	child, err := r.Claim(ctx, "child")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = executeTaskRun(t, a, r, ctx, child); err != nil {
-		t.Fatal(err)
-	}
-	if scalar(t, s, `SELECT count(*) FROM task WHERE status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update WHERE root_run_id=?`, c.RunID()) != 1 {
-		t.Fatal("final descendant did not complete Task/root result")
-	}
-	mustDrain(t, a)
-	// Ongoing is Host-owned policy; no extra model-visible creation parameter.
-	if err = r.write(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) SELECT 'ongoing','task:ongoing',agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,'active',1,created_at+1,updated_at+1,1,'ongoing' FROM task LIMIT 1`)
-		if err != nil {
-			return err
+}
+
+func TestTaskControlModelCompletionUsesRootOutcome(t *testing.T) {
+	// Same bounded traces as the Python model regression. Child admission uses
+	// the existing storage fixture; completion uses the real loop/terminal path.
+	for _, rootStatus := range []string{"completed", "failed"} {
+		for _, childStatus := range []string{"completed", "failed"} {
+			for _, childFirst := range []bool{false, true} {
+				name := rootStatus + "-root/" + childStatus + "-child/"
+				if childFirst {
+					name += "child-first"
+				} else {
+					name += "root-first"
+				}
+				t.Run(name, func(t *testing.T) {
+					s, r, a := controlFixture(t, nil)
+					ctx := context.Background()
+					controlMain(t, r, a, "create", "create")
+					root := rootClaim(t, s, r)
+					addControlChild(t, s, root.RunID(), "child")
+					child, err := r.Claim(ctx, "child")
+					if err != nil {
+						t.Fatal(err)
+					}
+					finish := func(c agent.RunClaim, status string) {
+						t.Helper()
+						if status == "completed" {
+							err = executeTaskRun(t, a, r, ctx, c)
+						} else {
+							var run agent.Run
+							run, err = r.Load(ctx, c)
+							if err == nil {
+								err = r.Fail(ctx, c, run.Version, "fixture_failure")
+							}
+						}
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					first, last := root, child
+					firstStatus, lastStatus := rootStatus, childStatus
+					if childFirst {
+						first, last = child, root
+						firstStatus, lastStatus = childStatus, rootStatus
+					}
+					finish(first, firstStatus)
+					if scalar(t, s, `SELECT count(*) FROM task WHERE status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+						t.Fatal("Task reported before its tree drained")
+					}
+					finish(last, lastStatus)
+					wantTask := "active"
+					if rootStatus == "completed" {
+						wantTask = "completed"
+					}
+					if scalar(t, s, `SELECT count(*) FROM task WHERE status=?`, wantTask) != 1 ||
+						scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status=?`, root.RunID(), rootStatus) != 1 ||
+						scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status=?`, child.RunID(), childStatus) != 1 ||
+						scalar(t, s, `SELECT count(*) FROM task_update WHERE root_run_id=? AND kind=?`, root.RunID(), rootStatus) != 1 {
+						t.Fatal("Task completion/update did not follow Root outcome")
+					}
+				})
+			}
 		}
-		return r.createRoot(ctx, tx, "ongoing")
-	}); err != nil {
-		t.Fatal(err)
-	}
-	mustDrain(t, a)
-	if scalar(t, s, `SELECT count(*) FROM task WHERE task_id='ongoing' AND status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE task_id='ongoing' AND status='completed'`) != 1 {
-		t.Fatal("ongoing Task ended with one Root")
 	}
 }
 
@@ -455,8 +593,14 @@ func TestTaskControlV8MigrationPreservesStateAndRollsBack(t *testing.T) {
 }
 
 func TestTaskControlAppendPauseCancelRace(t *testing.T) {
+	for _, policy := range []string{"once", "ongoing"} {
+		t.Run(policy, func(t *testing.T) { testTaskControlAppendPauseCancelRace(t, policy) })
+	}
+}
+
+func testTaskControlAppendPauseCancelRace(t *testing.T, policy string) {
 	for range 10 {
-		s, r, a := controlFixture(t, nil)
+		s, r, a := controlPolicyFixture(t, nil, policy)
 		controlMain(t, r, a, "create", "create")
 		controlMain(t, r, a, "race", "race")
 		if scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 {
@@ -542,28 +686,46 @@ func TestTaskControlPauseCancelsSafeToolBeforeNextStep(t *testing.T) {
 	a.Registry = registry
 	r.registry = registry
 	controlMain(t, r, a, "create", "create")
-	done := make(chan error, 1)
-	go func() { done <- a.Drain(context.Background()) }()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var drainErr error
+	go func() {
+		drainErr = a.Drain(ctx)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("Actor cleanup did not join")
+		}
+	})
 	select {
 	case <-entered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Tool did not start")
 	}
-	controlMain(t, r, a, "pause", "pause")
+	// The live Actor owns the queued Main. A manual controlMain claim races
+	// the scheduler and legitimately loses with ErrBusy on a loaded runner.
+	pause := mustSubmit(t, a, "pause", "pause")
 	select {
 	case <-cancelled:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Tool cancellation missing")
 	}
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
+	case <-done:
+		if drainErr != nil {
+			t.Fatal(drainErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("Actor did not join Tool")
 	}
 	if scalar(t, s, `SELECT count(*) FROM tool_invocation i JOIN run r USING(run_id) WHERE r.kind='worker' AND i.status='cancelled'`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
 		t.Fatal("safe Tool stop admitted new work or failed settlement")
+	}
+	if scalar(t, s, `SELECT count(*) FROM run r JOIN run_claim c USING(run_id) WHERE r.run_id=? AND r.kind='main' AND r.status='completed' AND c.epoch=1 AND c.token IS NULL`, pause.RunID) != 1 || scalar(t, s, `SELECT count(*) FROM task WHERE status='paused' AND task_epoch=2`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='cancelled' AND error_code='task_paused'`) != 1 || scalar(t, s, `SELECT count(*) FROM run_claim WHERE token IS NOT NULL`) != 0 {
+		t.Fatal("Actor did not own and settle the pause Main/Root exactly once")
 	}
 }

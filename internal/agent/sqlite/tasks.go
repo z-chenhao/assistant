@@ -11,11 +11,9 @@ import (
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
 )
 
 // createMain is shared by user ingress and durable Reporter follow-ups. Both
@@ -193,29 +191,9 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	return runEvent(ctx, tx, id, "run_ready", 1)
 }
 
-func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
-	var name string
-	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, inv.ID, t.claim.RunID()).Scan(&name); err != nil {
-		return tool.Result{}, agent.ErrStorage
-	}
-	if name == automation.ManageName || name == automation.ObserveName {
-		return t.executeAutomation(ctx, inv)
-	}
-	if name == codemode.ToolName {
-		return t.executeCode(ctx, inv)
-	}
-	if name == "builtin__computer__discover" || name == "builtin__computer__bind" || name == "builtin__computer__invoke" {
-		return t.executeComputer(ctx, inv)
-	}
-	if name == agent.RunToolName {
-		return t.AgentToolExecutor(ctx, inv.ID)
-	}
-	if name == memory.ManageName {
-		return t.manageMemory(ctx, inv)
-	}
-	if name == "builtin__memory__search" {
-		return t.searchMemory(ctx, inv)
-	}
+// executeTaskAdmission waits only for rolled-back Task admission. The shared
+// transactional fallback also serves Artifacts; only Task append returns ErrBusy.
+func (t *tools) executeTaskAdmission(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	for {
 		result, err := t.executeBuiltin(ctx, inv)
 		if !errors.Is(err, agent.ErrBusy) {
@@ -240,7 +218,9 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 
 func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	result := tool.Failure("PERMISSION_DENIED")
+	completion := false
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
+		completion = false
 		if err := t.fence(ctx, tx); err != nil {
 			return err
 		}
@@ -283,6 +263,7 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 			result = tool.Failure("INVALID_ARGUMENT")
 			return nil
 		}
+		completion = request.Operation == "complete"
 		scope, e := runScope(ctx, tx, t.claim.RunID())
 		if e != nil {
 			return e
@@ -327,7 +308,11 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 			refs, _ := encoded(request.ArtifactRefs)
 			if request.Operation == "create" {
 				taskID, ref = newID(), "task:"+newID()
-				if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1)`, taskID, ref, agentID, conv, task.Title(request.Task), request.Task, refs, now, now); err != nil {
+				policy := request.CompletionPolicy
+				if policy == "" {
+					policy = "once"
+				}
+				if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1,?)`, taskID, ref, agentID, conv, task.Title(request.Task), request.Task, refs, now, now, policy); err != nil {
 					return err
 				}
 				for _, ref := range request.ArtifactRefs {
@@ -357,7 +342,29 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 						return nil
 					}
 				}
-				if request.Operation == "pause" || request.Operation == "cancel" {
+				if request.Operation == "complete" {
+					// Complete is a control action, not a stop/drain request.
+					// Include orphaned invocations on terminal Runs: an unknown
+					// external outcome must never become a completion claim.
+					var pending bool
+					if err = tx.QueryRowContext(ctx, `SELECT
+                      EXISTS(SELECT 1 FROM run WHERE task_id=? AND task_epoch=? AND status IN ('queued','running','waiting'))
+                      OR EXISTS(SELECT 1 FROM tool_invocation i JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch=? AND i.status IN ('queued','running','waiting','unknown'))`, taskID, epoch, taskID, epoch).Scan(&pending); err != nil {
+						return err
+					}
+					if status != "active" || pending {
+						result = tool.Failure("INVALID_ARGUMENT")
+						return nil
+					}
+					res, err := tx.ExecContext(ctx, `UPDATE task SET status='completed',completed_at=?,updated_at=?,version=version+1 WHERE task_id=? AND status='active' AND task_epoch=? AND version=?`, now, now, taskID, epoch, version)
+					if err != nil {
+						return err
+					}
+					if n, _ := res.RowsAffected(); n != 1 {
+						return agent.ErrConflict
+					}
+					receiptStatus = "completed"
+				} else if request.Operation == "pause" || request.Operation == "cancel" {
 					receiptStatus = "paused"
 					if request.Operation == "cancel" {
 						receiptStatus = "cancelled"
@@ -443,10 +450,16 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 			return err
 		}
 		result = tool.Result{Text: receipt}
+		if completion {
+			t.runs.host.boundary("before_task_complete_commit")
+		}
 		t.runs.host.boundary("before_task_commit")
 		return nil
 	})
 	if err == nil && result.Error == nil {
+		if completion {
+			t.runs.host.boundary("after_task_complete_commit")
+		}
 		t.runs.host.boundary("after_task_commit")
 		var receipt task.Receipt
 		if json.Unmarshal([]byte(result.Text), &receipt) == nil && (receipt.Status == "paused" || receipt.Status == "cancelled") {
@@ -464,7 +477,7 @@ func (r *Runs) taskSteering(ctx context.Context, c agent.RunClaim, after int64) 
 			return err
 		}
 		var frozen int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.run_id=? AND g.step_index=json_extract(r.checkpoint_json,'$.step')`, c.RunID()).Scan(&frozen); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM model_generation g WHERE g.run_id=r.run_id AND g.step_index=json_extract(r.checkpoint_json,'$.step')) OR EXISTS(SELECT 1 FROM context_compaction c WHERE c.run_id=r.run_id AND c.step_index=json_extract(r.checkpoint_json,'$.step')) FROM run r WHERE r.run_id=?`, c.RunID()).Scan(&frozen); err != nil {
 			return err
 		}
 		if frozen > 0 {

@@ -7,7 +7,7 @@ import ci_compare as comparison
 
 class ComparisonTests(unittest.TestCase):
     def experiment(self, samples=5):
-        raw = dict(pairs=[], attempts={})
+        raw = dict(mode=comparison.HISTORICAL, pairs=[], attempts={})
         for number in range(1, samples + 1):
             pair = {}
             for side, run_id in [('before', 1), ('after', 2)]:
@@ -129,6 +129,241 @@ class ComparisonTests(unittest.TestCase):
             else:
                 data['reports']['suite-security.json']['hardware']['logical_cpus'] = 2
             self.assertFalse(comparison.compare(raw)['comparison_complete'])
+
+
+class CurrentComparisonTests(unittest.TestCase):
+    """Drive genuine strict joins, then mutate their small retained receipts."""
+    @classmethod
+    def setUpClass(cls):
+        import json
+        from pathlib import Path
+        import tempfile
+        import ci_codemode
+        import ci_personal
+        from test_ci_codemode import CodeModeJoinTests
+        from test_ci_personal import PersonalJoinTests
+        reports = ComparisonTests().experiment(1)['attempts']['1:1']['reports']
+        for shard in ('codemode', 'personal'):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                fixture = CodeModeJoinTests() if shard == 'codemode' else PersonalJoinTests()
+                fixture.fixture(root)
+                joined, _, summary = (ci_codemode if shard == 'codemode' else ci_personal).join(root)
+                reports['suite-' + shard + '.json'] = joined
+                reports['core-summary.json' if shard == 'codemode' else 'm6-summary.json'] = summary
+        for name, report in reports.items():
+            if not name.startswith('suite-'):
+                continue
+            for suite in [report, *report.get('parts', {}).values()]:
+                suite.update(binary_sha256='b' * 64, hardware=dict(logical_cpus=4),
+                             image_os='ubuntu24', image_version='fixed-image', selected_gates=None)
+                suite.setdefault('complete_inventory', True)
+                for rows in suite['shards'].values():
+                    for row in rows:
+                        row['owned_group_drained'] = True
+        cls.reports = reports
+
+    def experiment(self, samples=3):
+        raw = ComparisonTests().experiment(samples)
+        raw['mode'] = 'current'
+        for value in raw['attempts'].values():
+            value['reports'] = copy.deepcopy(self.reports)
+            value['run']['path'] = '.github/workflows/ci.yml'
+            value['jobs'] = [dict(id=i, name=name, conclusion='success', steps=[], head_sha='a'*40,
+                                 run_id=value['run']['id'], run_attempt=value['run']['run_attempt'],
+                                 started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:40Z')
+                             for i, name in enumerate(sorted(comparison.topology()))]
+            value['measurement_profile'] = dict(input_sha256='c'*64, tool_versions={'go': 'pinned', 'node': 'pinned'},
+                lock_sha256='d'*64, cache_state='warm-offline', environment='isolated fixture')
+        return raw
+
+    def test_three_current_pairs_pass_and_two_do_not_certify(self):
+        raw = self.experiment()
+        report = comparison.compare(raw)
+        self.assertTrue(report['performance_certified'], report)
+        self.assertEqual(len(comparison.topology()), 25)
+        self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
+                         'Race detector', 'Python 3.10 compatibility'} <= comparison.topology())
+        insufficient = comparison.compare(self.experiment(2))
+        self.assertFalse(insufficient['performance_certified'])
+        self.assertIsNone(insufficient['p50_wall_reduction'])
+
+    def test_every_job_part_and_join_is_required(self):
+        for name in comparison.topology():
+            for change in ('missing', 'duplicate', 'skipped', 'failure', 'cancelled'):
+                with self.subTest(name=name, change=change):
+                    raw = self.experiment(1)
+                    jobs = raw['attempts']['2:1']['jobs']
+                    job = next(j for j in jobs if j['name'] == name)
+                    if change == 'missing': jobs.remove(job)
+                    elif change == 'duplicate': jobs.append(copy.deepcopy(job))
+                    else: job['conclusion'] = change
+                    self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
+
+    def test_join_receipt_mutations_fail_closed(self):
+        for shard in ('codemode', 'personal'):
+            for change in ('missing-part', 'wrong-part', 'source', 'binary', 'image', 'cpu', 'round', 'duplicate',
+                           'reorder', 'undrained', 'focused', 'cleanup', 'join-members', 'summary'):
+                with self.subTest(shard=shard, change=change):
+                    raw = self.experiment(1)
+                    data = raw['attempts']['2:1']
+                    suite = data['reports']['suite-' + shard + '.json']
+                    part = next(iter(suite['parts']))
+                    fragment = suite['parts'][part]
+                    rows = fragment['shards'][shard]
+                    if change == 'missing-part': suite['parts'].pop(part)
+                    elif change == 'wrong-part': fragment[shard + '_part'] = 'other'
+                    elif change == 'source': fragment['source_sha'] = 'e'*40
+                    elif change == 'binary': fragment['binary_sha256'] = 'e'*64
+                    elif change == 'image': fragment['image_version'] = 'other'
+                    elif change == 'cpu': fragment['hardware']['logical_cpus'] = 2
+                    elif change == 'round': rows.pop()
+                    elif change == 'duplicate': rows.append(copy.deepcopy(rows[0]))
+                    elif change == 'reorder': rows.reverse()
+                    elif change == 'undrained': rows[0]['owned_group_drained'] = False
+                    elif change == 'focused': fragment['selected_gates'] = ['main']
+                    elif change == 'cleanup': suite['shards'][shard][-1]['owned_group_drained'] = False
+                    elif change == 'join-members': suite['shards'][shard][-1]['parts'].pop()
+                    else: data['reports']['core-summary.json' if shard == 'codemode' else 'm6-summary.json']['passed'] = False
+                    self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
+
+    def test_identity_profile_attempt_and_focus_mismatches_fail_closed(self):
+        for change in ('source', 'attempt', 'job-sha', 'job-attempt', 'job-missing-identity', 'profile', 'profile-missing', 'focus', 'historical'):
+            with self.subTest(change=change):
+                raw = self.experiment(1)
+                data = raw['attempts']['2:1']
+                if change == 'source': data['run']['head_sha'] = 'e'*40
+                elif change == 'attempt': data['run']['run_attempt'] = 2
+                elif change == 'job-sha': data['jobs'][0]['head_sha'] = 'e'*40
+                elif change == 'job-attempt': data['jobs'][0]['run_attempt'] = 2
+                elif change == 'job-missing-identity': data['jobs'][0].pop('head_sha')
+                elif change == 'profile': data['measurement_profile']['cache_state'] = 'cold'
+                elif change == 'profile-missing': data.pop('measurement_profile')
+                elif change == 'focus': data['reports']['suite-runtime.json']['complete_inventory'] = False
+                else: data['run']['path'] = '.github/workflows/ci-shadow.yml'
+                self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
+
+    def test_historical_data_requires_explicit_mode_and_never_certifies(self):
+        raw = ComparisonTests().experiment()
+        self.assertFalse(comparison.compare(raw)['performance_certified'])
+        raw.pop('mode')
+        self.assertEqual(comparison.compare(raw)['eligible_samples'], 0)
+
+    def test_profile_drift_between_internally_matching_pairs_rejects_cohort(self):
+        raw = self.experiment()
+        for key in ('1:2', '2:2'):
+            raw['attempts'][key]['measurement_profile']['cache_state'] = 'cold'
+        report = comparison.compare(raw)
+        self.assertEqual(report['eligible_samples'], 3)
+        self.assertFalse(report['performance_certified'])
+        raw = self.experiment(1)
+        raw['pairs'] *= 3
+        self.assertFalse(comparison.compare(raw)['performance_certified'])
+
+    def test_real_21_job_metadata_retains_timings_but_cannot_satisfy_current_inventory(self):
+        import json
+        from pathlib import Path
+        data = json.loads((Path(__file__).parent / 'fixtures/ci-39915092608-1.json').read_text())
+        self.assertIn('missing, duplicate or unsuccessful required part/join/job',
+                      comparison.validate_jobs(data, data['run']['head_sha']))
+        self.assertEqual(comparison.timing(data)['required_verdict_seconds'], 838)
+        self.assertAlmostEqual(comparison.timing(data)['runner_minutes'], 108.4)
+        data['reports'] = {}
+        self.assertTrue(comparison.validate(data, data['run']['head_sha'])[0])
+
+    def test_topology_drift_cannot_silently_reduce_inventory(self):
+        text = (comparison.ROOT / '.github/workflows/ci.yml').read_text()
+        for changed in (text.replace('"GC-17", ', ''), text.replace('codemode_join:', 'other_join:'),
+                        text.replace('"packages", "sqlite"', '"packages"'),
+                        text.replace('"packages", "sqlite"', '"packages", "packages"'),
+                        text.replace('  python_compat:', '  other_compat:'),
+                        text.replace('        part: [', '        part: ${{ fromJSON(')):
+            with self.assertRaises(ValueError):
+                comparison.topology(changed)
+
+    def test_offline_cli_retains_raw_hash_and_noncertification(self):
+        import hashlib
+        import json
+        from pathlib import Path
+        import subprocess
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'comparison.json'
+            raw = output.with_name('comparison-raw.json')
+            raw.write_text(json.dumps(self.experiment(1)))
+            result = subprocess.run([sys.executable, str(comparison.ROOT / 'scripts/ci_compare.py'),
+                                     '--offline', '--output', str(output)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            report = json.loads(output.read_text())
+            self.assertFalse(report['performance_certified'])
+            self.assertEqual(report['raw_sha256'], hashlib.sha256(raw.read_bytes()).hexdigest())
+            self.assertEqual(report['eligible_samples'], 1)
+
+
+class CollectorBoundaryTests(unittest.TestCase):
+    def test_exact_joined_artifacts_share_budget_and_unrelated_archives_are_not_requested(self):
+        import json
+        from pathlib import Path
+        import sys
+        import tempfile
+        from unittest.mock import patch
+        import zipfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts = [dict(id=i, name=f'evidence-{shard}-' + 'a'*40 + '-1')
+                         for i, shard in enumerate(comparison.SHARDS, 1)]
+            artifacts.append(dict(id=99, name='evidence-fast-' + 'a'*40 + '-1'))
+            metadata = dict(source_sha='a'*40, artifacts=artifacts)
+            calls = []
+            def archive(cache, meta, artifact_id, budget):
+                self.assertEqual(cache, root)
+                self.assertIs(meta, metadata)
+                self.assertEqual(budget, 100 - len(calls)*10)
+                calls.append(artifact_id)
+                path = root / f'{artifact_id}.zip'
+                shard = list(comparison.SHARDS)[artifact_id - 1]
+                with zipfile.ZipFile(path, 'w') as stream:
+                    stream.writestr('suite-' + shard + '.json', json.dumps({'shard': shard}))
+                    stream.writestr('unrelated.json', 'do not read this')
+                    if shard == 'codemode': stream.writestr('core-summary.json', '{}')
+                    if shard == 'personal': stream.writestr('m6-summary.json', '{}')
+                return path, dict(downloaded_bytes=10)
+            with patch.object(comparison, 'inventory', return_value=metadata), \
+                 patch.object(comparison, 'artifact_archive', side_effect=archive), patch.object(comparison.profile, 'gh',
+                    side_effect=[dict(id=1, run_attempt=1, head_sha='a'*40, path='.github/workflows/ci.yml',
+                        status='completed', conclusion='success'), [{'jobs': [dict(name=name, conclusion='success', head_sha='a'*40, run_id=1, run_attempt=1,
+                        started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:01Z')
+                        for name in comparison.topology()]}]]):
+                value = comparison.collect('z-chenhao/erii', '1:1', root, 100)
+            self.assertEqual(calls, list(range(1, len(comparison.SHARDS) + 1)))
+            self.assertEqual(len(value['reports']), len(comparison.SHARDS) + 2)
+            self.assertEqual(sum(r['downloaded_bytes'] for r in value['transfers']), 10 * len(comparison.SHARDS))
+
+    def test_metadata_only_keeps_exact_attempt_without_fetching_or_certifying(self):
+        from unittest.mock import patch
+        import os
+        metadata = dict(source_sha='a'*40, artifacts=[dict(id=7, size_in_bytes=20 << 20)])
+        run = dict(id=42, run_attempt=1, head_sha='a'*40)
+        with patch.dict(os.environ, {'ERII_EVIDENCE_ROOT': ''}), \
+             patch.object(comparison, 'inventory', return_value=metadata), \
+             patch.object(comparison.profile, 'gh', side_effect=[run, [{'jobs': []}]]), \
+             patch.object(comparison, 'artifact_archive') as fetch:
+            data = comparison.collect('owner/repo', '42:1', metadata_only=True)
+        fetch.assert_not_called()
+        self.assertEqual(data['collection_mode'], 'metadata-only')
+        self.assertEqual(data['artifacts'], metadata['artifacts'])
+        self.assertEqual(data['reports'], {})
+        self.assertEqual(data['transfers'], [])
+
+    def test_retired_experiment_cli_rejects_before_any_github_action(self):
+        import subprocess
+        import sys
+        result = subprocess.run([sys.executable, str(comparison.ROOT / 'scripts/ci_experiment.py'),
+                                 '--pr', '1', '--sha', 'a'*40, '--output', 'unused.json'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('retired shadow orchestrator', result.stderr)
 
 
 if __name__ == '__main__':

@@ -59,6 +59,35 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
                 with self.subTest(rows=rows), self.assertRaises(ValueError):
                     race.sqlite_verdict(path, names)
 
+    def test_measured_costs_balance_long_tests_without_changing_inventory(self):
+        costs = dict(TestA=6, TestB=5, TestC=4, TestD=3, TestE=2, TestF=1)
+        names = list(costs)
+        groups = race.partitions(names, 3, costs)
+        self.assertEqual(Counter(n for g in groups for n in g), Counter(names))
+        self.assertEqual([sum(costs[n] for n in g) for g in groups], [7, 7, 7])
+        self.assertEqual(groups, race.partitions(list(reversed(names)), 3, costs))
+
+    def test_timing_hints_cannot_select_tests_or_exclude_new_roots(self):
+        costs = dict(TestOld=20, TestRemoved=100)
+        names = ['TestOld', 'TestNew', 'ExampleNew', 'FuzzNew']
+        for workers in (1, 2, 3, 8):
+            groups = race.partitions(names, workers, costs)
+            self.assertEqual(Counter(n for g in groups for n in g), Counter(names))
+            self.assertLessEqual(len(groups), workers)
+        for value in (0, -1, float('nan'), float('inf'), True, '1'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                race.partitions(names, 3, dict(TestOld=value))
+
+    def test_retained_ubuntu_timings_reproduce_and_reduce_partition_skew(self):
+        costs = race.timing_hints()
+        # Discovery, not this historical file, remains the execution inventory.
+        names = [n for n in costs if n not in race.SERIAL_SQLITE]
+        peak = lambda groups: max(sum(costs[n] for n in g) for g in groups)
+        before = peak(race.partitions(names, 3))
+        after = peak(race.partitions(names, 3, costs))
+        self.assertLess(after, before - 30)
+        self.assertLess(after, sum(costs[n] for n in names) / 3 + max(costs.values()) / 10)
+
     def test_cpu_budget_respects_affinity_parent_limit_and_four_core_ceiling(self):
         with patch.object(race.os, 'cpu_count', return_value=16), \
              patch.object(race.os, 'sched_getaffinity', return_value=set(range(8)), create=True):
