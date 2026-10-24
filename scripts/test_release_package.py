@@ -72,7 +72,9 @@ class ReleasePackageTests(unittest.TestCase):
         for mutation in ('verified', 'empty', 'duplicate', 'limit', 'non_v1'):
             with self.subTest(mutation=mutation):
                 self.setUp()
-                row = self.ledger['reviews'][0]
+                # A package may begin with an explicitly deferred clause.
+                # Mutate an actual mandatory row so non_v1 changes its scope.
+                row = next(r for r in self.ledger['reviews'] if r['remaining'])
                 if mutation == 'verified': row['disposition'] = 'verified'
                 if mutation == 'empty': row['obligations'] = []
                 if mutation == 'duplicate': row['obligations'] *= 2
