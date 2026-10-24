@@ -19,6 +19,7 @@ class GoldenCommon01Tests(test_release_package.ReleasePackageTests):
         self.assertEqual((rows[-1]['section'], rows[-1]['line']), ('6', 137))
         self.assertTrue(all(r['source'] == 'evals/golden-cases.md' for r in rows))
         self.assertEqual(rows[-1]['text'].split('|')[1].strip(), 'GC-04')
+        self.assertIn('GC01–04四个总览行', rows[-6]['observed'])
         self.assertTrue(all(r['current_line'] == r['line'] for r in rows))
         self.assertNotIn('original_manifest_sha256', self.ledger)
 
@@ -27,7 +28,7 @@ class GoldenCommon01Tests(test_release_package.ReleasePackageTests):
         self.assertEqual(kinds, dict(required_v1=252, policy=50, background=57))
         self.assertEqual(sum(len(r['obligations']) for r in self.ledger['reviews']), 359)
         self.assertEqual({g['issue'] for g in self.ledger['gaps'].values()},
-                         {f'ERII-{n}' for n in list(range(247, 260)) + list(range(323, 333)) + [343]})
+                         {f'ERII-{n}' for n in list(range(247, 260)) + list(range(323, 333)) + [343, 366]})
         row = self.ledger['reviews'][0]
         row['remaining'].pop(0)
         with self.assertRaises(ValueError): self.run_audit()
@@ -50,7 +51,8 @@ class GoldenCommon01Tests(test_release_package.ReleasePackageTests):
         self.assertEqual(set(rows[69]['obligations']), {
             'L0/L1保存Run树', '保存Task状态', '保存ToolInvocation', '保存Approval',
             '保存Outbox', '保存Artifact清单', '保存最终外部状态快照'})
-        self.assertIn('Provider RNG seed不可控', rows[68]['proof_limit'])
+        self.assertIn('Provider RNG seed unsupported', rows[68]['proof_limit'])
+        self.assertIn('不据此推断要求冻结所有Host时间或模型输出确定性', rows[68]['proof_limit'])
 
     def test_all_eight_rubrics_and_hard_failures_remain_distinct(self):
         rows = {r['line']: r for r in self.ledger['reviews']}
@@ -68,6 +70,28 @@ class GoldenCommon01Tests(test_release_package.ReleasePackageTests):
                          {f'SC{n:02}硬断言连续5次' for n in range(3, 8)})
         self.assertTrue(all(self.ledger['gaps'][r['gap']]['issue'] == 'ERII-343'
                             for r in rows[108]['remaining']))
+
+    def test_clock_seed_preparation_cannot_be_owned_only_by_evaluation_or_report(self):
+        rows = {r['line']: r for r in self.ledger['reviews']}
+        self.assertIn('freeze-preparation', tuple(self.ledger['gaps']),
+                      'B1: clock/seed preparation needs an implementation owner')
+        preparation = self.ledger['gaps']['freeze-preparation']
+        self.assertEqual(preparation['issue'], 'ERII-366')
+        self.assertEqual(preparation['issue_url'],
+                         'https://multica.ai/erii-studio/issues/01a17025-2ae4-7e46-a945-443bc4599f4a')
+        self.assertEqual(preparation['contract_sha256'],
+                         '99e769f791a14e41f4b4d7973d0d06b667631706a1e41f2c3709358c75fe1f2c')
+        self.assertEqual(preparation['responsibility'], 'implementation_prerequisite')
+        self.assertEqual(preparation['owned_obligations'], ['固定时钟', '每次固定随机种子'])
+        self.assertEqual(preparation['source_blocks'], [
+            {key: rows[line][key] for key in ('source', 'section', 'line', 'sha256')}
+            for line in (66, 68)])
+        for line, duty, consumer in ((66, '固定时钟', 'release'),
+                                     (68, '每次固定随机种子', 'models')):
+            routes = [r for r in rows[line]['remaining'] if r['obligation'] == duty]
+            self.assertEqual([r['gap'] for r in routes], ['freeze-preparation'])
+            self.assertNotEqual(preparation['issue'], self.ledger['gaps'][consumer]['issue'])
+        self.assertEqual(preparation['downstream_consumers'], ['ERII-330', 'ERII-332'])
 
     def test_source_bound_mechanisms_are_ungraded_and_all_native_bytes_indexed(self):
         self.assertEqual(set(self.ledger['observations']), {

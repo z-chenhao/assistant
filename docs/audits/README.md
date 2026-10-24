@@ -2,9 +2,10 @@
 
 [golden-common-01](golden-common-01.md) records ERII-244's 80 unchanged Golden
 common blocks through the GC-04 overview row. Its 359 scoped duties preserve
-all 302 mandatory duties, 24 existing finite owners and current ungraded native
+all 302 mandatory duties, 25 finite owners and current ungraded native
 observations. Use `make audit-golden-common-01`; no product score or release
-is certified.
+is certified. ERII-366 owns clock/seed preparation; actual sampling and final
+reports remain downstream consumers.
 
 [baseline-13](baseline-13.md) records ERII-243's 58-block M5–M7, acceptance and
 deferred-choice audit. Its 352 scoped duties retain all 324 required/policy routes,

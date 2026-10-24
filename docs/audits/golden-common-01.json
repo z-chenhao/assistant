@@ -813,7 +813,7 @@
     "models": {
       "issue": "ERII-330",
       "issue_url": "https://multica.ai/erii-studio/issues/01a16bd2-3352-7bc8-8c8c-fc6045822909",
-      "remaining": "本包模型目标完成、证据/推断/未知、长期连续性、低打扰、八维评分、六变体五轮、pass@1/pass^5与完整比较条件仍需实际双臂和独立Judge。",
+      "remaining": "本包模型目标完成、证据/推断/未知、长期连续性、低打扰、八维评分、六变体五轮、pass@1/pass^5与已准备比较条件仍需实际双臂和独立Judge。时钟/seed准备/合同核对由ERII-366承担，不由本执行任务修复。",
       "exit_condition": "退出：给出当前 SHA 可重算的完整评测收据及独立评分证据；运行结束与阈值通过分别记录。缺账号/预算/Judge/适配或外部条件则记录精确 blocker 与已有部分结果，状态 inconclusive，不重试刷绿、不把历史 PASS 提升到当前、不授予发布权限。完整证据留注册 durable root，只上传小 manifest。该执行记录 Done 不能单独完成 ERII-223；最终证据仍由判定器和 owner 接受。",
       "deduplication": "已读父项全部78个子任务标题/描述。复用其现有冻结职责；Case机械适配归逐Case任务，实际模型归330，当前L2归331，最终join归332；343仅已知CodeExecution取消差异。本包不修产品、不新增重复任务。"
     },
@@ -855,7 +855,7 @@
     "release": {
       "issue": "ERII-332",
       "issue_url": "https://multica.ai/erii-studio/issues/01a16bd2-5d15-7af2-bb7f-7e5ff3c3c420",
-      "remaining": "本包完整L0/L1、Run/Task/Tool/Approval/Outbox/Artifact/外部状态、冻结时钟与版本、全部硬失败/保护序列和当前CI的最终逐义务join仍缺；维护测试存在不等于完整发布证据。",
+      "remaining": "本包完整L0/L1、Run/Task/Tool/Approval/Outbox/Artifact/外部状态、已准备冻结条件、全部硬失败/保护序列和当前CI的最终逐义务join仍缺；维护测试存在不等于完整发布证据。时钟/seed准备/合同核对由ERII-366承担。",
       "exit_condition": "退出：完整报告、必要恢复/运维说明与当前判定器输出可审查，通过 exact-SHA CI 与独立 acceptance review/helper；最终证据不完整不得宣称本合同完成。报告 PR 的合并只接受报告资产。只有父项 ERII-223 的全部证据已被接受才可向 owner 请求最终确认；不自行完成 ERII-4、不发布/tag/deploy、不扩大权限。",
       "deduplication": "已读父项全部78个子任务标题/描述。复用其现有冻结职责；Case机械适配归逐Case任务，实际模型归330，当前L2归331，最终join归332；343仅已知CodeExecution取消差异。本包不修产品、不新增重复任务。"
     },
@@ -970,6 +970,37 @@
       "remaining": "本包L1真实macOS VM/application/screenshot与L2鲜活搜索、只读/测试账号、兼容性、延迟、体验、采样时间及具名人审无当前完整原生证明。",
       "exit_condition": "退出：原合同全部当前 L2 与具名人审证据可供 ERII-224 判定器核验；缺外部资源或观察失败则精确记录 blocker、已有结果与 inconclusive，不冒称通过、不无限重试。不得自动发布/tag/deploy；最终发布接受仍在 ERII-223/owner。",
       "deduplication": "已读父项全部78个子任务标题/描述。复用其现有冻结职责；Case机械适配归逐Case任务，实际模型归330，当前L2归331，最终join归332；343仅已知CodeExecution取消差异。本包不修产品、不新增重复任务。"
+    },
+    "freeze-preparation": {
+      "issue": "ERII-366",
+      "issue_url": "https://multica.ai/erii-studio/issues/01a17025-2ae4-7e46-a945-443bc4599f4a",
+      "responsibility": "implementation_prerequisite",
+      "contract_sha256": "99e769f791a14e41f4b4d7973d0d06b667631706a1e41f2c3709358c75fe1f2c",
+      "source_blocks": [
+        {
+          "source": "evals/golden-cases.md",
+          "section": "3",
+          "line": 66,
+          "sha256": "f754c5e1d865c68c355639189fe8083447ae825b61300beacf9e6b59ab3cbb98"
+        },
+        {
+          "source": "evals/golden-cases.md",
+          "section": "3",
+          "line": 68,
+          "sha256": "da25e4dbb513ec0014afc87314b38d16ca59865d97b0abf72e5bad5eb822d71e"
+        }
+      ],
+      "owned_obligations": [
+        "固定时钟",
+        "每次固定随机种子"
+      ],
+      "downstream_consumers": [
+        "ERII-330",
+        "ERII-332"
+      ],
+      "remaining": "仅承接Golden §3 L66固定时钟与L68固定随机种子的准备/实现合同：准确区分fixture时钟/seed、Host实时计时与Provider随机控制，完成批准处置、必要最小准备机制及维护原生证据；不默选新规范含义。",
+      "exit_condition": "一个有限 PR 交付这两条准备合同的可复核批准处置、必要最小实现、维护入口/feature map、拒绝和原生 readback 证据，经 exact-SHA CI 及独立 acceptance review/helper 验收。不得只输出“仍缺时钟/seed”的诊断、把工作转回 ERII-330/332、放宽原 Golden 条件、降低重复数或把未支持写成通过；未解决 owner 决策/必要实现时本任务不能 Done。",
+      "deduplication": "已核对父项全部78个旧子任务标题/描述，未发现共通clock/seed准备合同owner。ERII-230为已交付输入片段入口；各Case仅拥有自身适配；228为模型资源readiness；346性能观测；363配置键。330不实现产品、332只join证据。新建ERII-366未分配Backlog有限提案，等待coordinator冻结注册准入，不改既有合同或启动Agent。"
     }
   },
   "observations": {
@@ -3484,12 +3515,12 @@
         "当前信息L2记录实际采样时间": "required_v1"
       },
       "exemptions": {},
-      "observed": "fixture clock/timezone被锁定；input runner只注入时间上下文而不冻结Host时钟，L2仍须实际采样。",
+      "observed": "case_runner明确scenario clock是fixture context，Host leases/telemetry保留真实时间；L2记录实际采样。固定时钟的原文覆盖/准备合同仍待ERII-366处置，本审计不选择新的时间协议。",
       "remaining": [
         {
           "obligation": "固定时钟",
-          "gap": "release",
-          "detail": "真实CLI和Pi Bridge仅对本机HTTP peer；12个Case各六个输入片段，八个Case无适配，均eligible_for_grading=false。固定fixture时间是上下文，不是Host虚拟时钟；Provider RNG seed不可控。"
+          "gap": "freeze-preparation",
+          "detail": "ERII-366先完成本义务的准备/实现合同与批准处置；现有fixture context/seed和Provider不支持边界不能由审计直接判定满足。ERII-330仅消费准备后的实际比较条件，ERII-332仅join最终证据。"
         },
         {
           "obligation": "固定时区",
@@ -3507,8 +3538,8 @@
           "detail": "真实CLI和Pi Bridge仅对本机HTTP peer；12个Case各六个输入片段，八个Case无适配，均eligible_for_grading=false。固定fixture时间是上下文，不是Host虚拟时钟；Provider RNG seed不可控。"
         }
       ],
-      "disposition": "partial_mechanical",
-      "proof_limit": "真实CLI和Pi Bridge仅对本机HTTP peer；12个Case各六个输入片段，八个Case无适配，均eligible_for_grading=false。固定fixture时间是上下文，不是Host虚拟时钟；Provider RNG seed不可控。",
+      "disposition": "evidence_gap",
+      "proof_limit": "现有fixture时钟/seed可记录，但不能凭字段存在确认原文覆盖。Host lease/telemetry仍用实时时间、Provider RNG seed unsupported；不据此推断要求冻结所有Host时间或模型输出确定性。准备/合同缺口由ERII-366独立处置；实际采样/最终join仍归330/332。",
       "references": [
         "scripts/unscripted_cases.py",
         "scripts/test_unscripted_cases.py",
@@ -3623,7 +3654,7 @@
         "每次固定随机种子": "required_v1"
       },
       "exemptions": {},
-      "observed": "freeze绑定source/binary/config/profile/fixture/input/seed，Host冻结Run snapshots；实际Provider RNG seed不受控，跨模型同条件仍缺完整适配。",
+      "observed": "freeze绑定source/binary/config/profile/fixture/input/seed，Host冻结Run snapshots；seed_policy明确Provider RNG seed unsupported。原文随机种子的覆盖/准备合同由ERII-366核对，不能仅交给执行采样的ERII-330。",
       "remaining": [
         {
           "obligation": "每次固定ModelSnapshot",
@@ -3652,12 +3683,12 @@
         },
         {
           "obligation": "每次固定随机种子",
-          "gap": "models",
-          "detail": "真实CLI和Pi Bridge仅对本机HTTP peer；12个Case各六个输入片段，八个Case无适配，均eligible_for_grading=false。固定fixture时间是上下文，不是Host虚拟时钟；Provider RNG seed不可控。"
+          "gap": "freeze-preparation",
+          "detail": "ERII-366先完成本义务的准备/实现合同与批准处置；现有fixture context/seed和Provider不支持边界不能由审计直接判定满足。ERII-330仅消费准备后的实际比较条件，ERII-332仅join最终证据。"
         }
       ],
       "disposition": "evidence_gap",
-      "proof_limit": "真实CLI和Pi Bridge仅对本机HTTP peer；12个Case各六个输入片段，八个Case无适配，均eligible_for_grading=false。固定fixture时间是上下文，不是Host虚拟时钟；Provider RNG seed不可控。",
+      "proof_limit": "现有fixture时钟/seed可记录，但不能凭字段存在确认原文覆盖。Host lease/telemetry仍用实时时间、Provider RNG seed unsupported；不据此推断要求冻结所有Host时间或模型输出确定性。准备/合同缺口由ERII-366独立处置；实际采样/最终join仍归330/332。",
       "references": [
         "scripts/unscripted_cases.py",
         "scripts/test_unscripted_cases.py",
@@ -6509,7 +6540,7 @@
       "exemptions": {
         "总览四列为ID场景代表输入主要能力": "场景/方法来源或表结构说明，不单独增加可执行义务；本行其余当前义务保留。"
       },
-      "observed": "只保留本包总览前五行，后续GC06–20源块属于下一冻结包，不扩大审计边界。",
+      "observed": "只保留本包GC01–04四个总览行，后续GC05–20源块属于下一冻结包，不扩大审计边界。",
       "remaining": [],
       "disposition": "background",
       "proof_limit": "本块仅解释场景或方法来源。没有获取或认证竞品/benchmark内部实现，也没有将其成绩当Erii证据；保留完整文本及解释。",

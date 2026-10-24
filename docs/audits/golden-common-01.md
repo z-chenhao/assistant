@@ -8,8 +8,8 @@ other packages. No content identity or line moved; no ADR reseal is needed.
 The ledger contains **359 authored sub-obligations**: 252 required-v1, 50 policy
 and 57 background explanations. None is explicitly deferred. All **302 mandatory
 duties remain routed**, with 397 route entries because five common deterministic/
-variant duties retain all 20 existing Case owners. There are 40 partial mechanical
-rows, eight evidence-gap rows, 14 policy rows and 18 background rows. A completed
+variant duties retain all 20 existing Case owners. There are 39 partial mechanical
+rows, nine evidence-gap rows, 14 policy rows and 18 background rows. A completed
 disposition certifies neither implementation, Golden scores nor release.
 
 ## Identity and preserved history
@@ -95,8 +95,12 @@ remain local. No historical ZIP was downloaded or uploaded.
 
 Current producer coverage is **12 Cases × six input variants**, all fragments;
 eight Cases lack adapters. Every current execution stays ineligible and ungraded.
-Fixture time is explicit context, not a frozen Host clock. Provider RNG seed is
-not controlled. Complete Outbox/external state, actual role/Memory/Coding journeys,
+Fixture time is explicit context; Host leases/telemetry use real time. Provider
+RNG seed is unsupported. Whether these existing controls cover the normative
+clock/seed duties remains unresolved; this audit neither requires freezing all
+Host time nor assumes deterministic model output. ERII-366 owns the bounded
+preparation/contract reconciliation and any necessary implementation. Complete
+Outbox/external state, actual role/Memory/Coding journeys,
 five protected native rounds, all L0/L1, full race/lint/e2e, real model quality,
 current L2 and named human review were **not** executed or certified here.
 The 90-point line remains an excellence benchmark; release thresholds stay
@@ -104,10 +108,24 @@ The 90-point line remains an excellence benchmark; release thresholds stay
 
 ## Finite remaining routes
 
-All 78 current release children were read for semantic deduplication. Existing
-Case owners receive common deterministic/variant duties within their original
+All 78 existing release children were read before adding the one finite B1
+preparation proposal, ERII-366. None owns the shared clock/seed preparation
+contract: ERII-330 executes evaluations and ERII-332 joins reports; neither
+implements the missing preparation. The ledger now routes those two duties to
+ERII-366, with exact source hashes, its native contract hash, a bounded
+implementation responsibility and independent exit. ERII-330/332 remain downstream
+consumers. ERII-366 is unassigned Backlog, awaiting coordinator registration and
+admission; its creation does not establish that the conditions are met.
+
+The maintained package regression reproduces B1 on the previous ledger and fixes
+these two duties to that preparation owner, separately from the consumers. The
+80 frozen identities, 359 duties, 397 route entries, existing observations and
+release thresholds are preserved. The L132 explanation now correctly ends at
+the four GC01–04 overview rows; GC05 starts the next package.
+
+Existing Case owners receive common deterministic/variant duties within their original
 frozen scope; the four overview rows retain their specific domain duties.
-The audit adds no duplicate task and repairs no product behavior.
+There are 25 finite receiving tasks. The audit repairs no product behavior.
 
 | Existing route | Bounded remaining scope |
 | --- | --- |
@@ -131,10 +149,11 @@ The audit adds no duplicate task and repairs no product behavior.
 | [ERII-327](https://multica.ai/erii-studio/issues/01a16bd0-d496-78f4-97f2-804d1b060d81) | 本包公共确定性/变体义务及适用总览能力仍需GC18在原冻结范围完成完整机械/无脚本适配。 |
 | [ERII-328](https://multica.ai/erii-studio/issues/01a16bd0-e84f-7117-8c46-d40ad1b8904a) | 本包公共确定性/变体义务及适用总览能力仍需GC19在原冻结范围完成完整机械/无脚本适配。 |
 | [ERII-329](https://multica.ai/erii-studio/issues/01a16bd0-fd2e-7889-9580-841a082c340e) | 本包公共确定性/变体义务及适用总览能力仍需GC20在原冻结范围完成完整机械/无脚本适配。 |
-| [ERII-330](https://multica.ai/erii-studio/issues/01a16bd2-3352-7bc8-8c8c-fc6045822909) | 本包模型目标完成、证据/推断/未知、长期连续性、低打扰、八维评分、六变体五轮、pass@1/pass^5与完整比较条件仍需实际双臂和独立Judge。 |
+| [ERII-330](https://multica.ai/erii-studio/issues/01a16bd2-3352-7bc8-8c8c-fc6045822909) | 本包模型目标完成、证据/推断/未知、长期连续性、低打扰、八维评分、六变体五轮、pass@1/pass^5与已准备比较条件仍需实际双臂和独立Judge。时钟/seed准备/合同核对由ERII-366承担，不由本执行任务修复。 |
 | [ERII-331](https://multica.ai/erii-studio/issues/01a16bd2-481b-7404-8db1-971204d4f839) | 本包L1真实macOS VM/application/screenshot与L2鲜活搜索、只读/测试账号、兼容性、延迟、体验、采样时间及具名人审无当前完整原生证明。 |
-| [ERII-332](https://multica.ai/erii-studio/issues/01a16bd2-5d15-7af2-bb7f-7e5ff3c3c420) | 本包完整L0/L1、Run/Task/Tool/Approval/Outbox/Artifact/外部状态、冻结时钟与版本、全部硬失败/保护序列和当前CI的最终逐义务join仍缺；维护测试存在不等于完整发布证据。 |
+| [ERII-332](https://multica.ai/erii-studio/issues/01a16bd2-5d15-7af2-bb7f-7e5ff3c3c420) | 本包完整L0/L1、Run/Task/Tool/Approval/Outbox/Artifact/外部状态、已准备冻结条件、全部硬失败/保护序列和当前CI的最终逐义务join仍缺；维护测试存在不等于完整发布证据。时钟/seed准备/合同核对由ERII-366承担。 |
 | [ERII-343](https://multica.ai/erii-studio/issues/01a16ef3-43c0-78cd-977f-840dce140018) | 本包Pause/Cancel迟到epoch要求保留CodeExecution取消原子execution_epoch及两阶段收敛的已知差异。 |
+| [ERII-366](https://multica.ai/erii-studio/issues/01a17025-2ae4-7e46-a945-443bc4599f4a) | Golden §3 L66固定时钟、L68固定随机种子的准备合同核对与批准处置、必要最小实现及原生拒绝/readback；不得只转回执行/汇总任务。 |
 
 The ledger retains each route's exact remaining scope, original independent exit
 and deduplication rationale. Case Done, an evaluation run ending or this audit's
