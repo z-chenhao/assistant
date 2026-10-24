@@ -9,7 +9,7 @@ import (
 )
 
 func TestTaskFixtureAppendedControlOnFollowup(t *testing.T) {
-	for _, input := range []string{"Cancel: Batch hold", "Pause: Batch hold", "Continue: Batch hold"} {
+	for _, input := range []string{"Cancel: Batch hold", "Pause: Batch hold", "Continue: Batch hold", "Complete: Batch hold"} {
 		t.Run(input, func(t *testing.T) {
 			req := llm.GenerationRequest{Messages: []llm.Message{
 				{Role: "system", Text: "Main conversation"},
