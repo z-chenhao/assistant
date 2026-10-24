@@ -1538,6 +1538,13 @@
       "remaining": "未见临时Tab的Run所有权与跨Run稳定引用保留策略；whole-browser checkpoint不等于Run Lease资源政策。",
       "exit_condition": "维护生产CLI/QuickJS/持久存储与browser peer驱动临时/用户已有/显式保留Tab，跨Cell与跨Root、取消、重复/旧epoch、close结果unknown与真实kill/restart；只清理由本Run拥有且策略允许的资源，checkpoint重建后稳定引用可重新发现；迁移空/旧库、CAS/race、feature map、一个有限PR、exact-SHA CI和独立review。真实Guest复核归ERII-331，完整发布不在此任务。",
       "deduplication": "已读取ERII-223全部59个现有子项；330/331评测、332汇总、335 Provider进程和338/341/343/344其他协议均不承担此实现；新提案互相分离，Backlog等待coordinator注册/准入，不启动实现。"
+    },
+    "G-provider": {
+      "issue": "ERII-351",
+      "issue_url": "https://multica.ai/erii-studio/issues/01a16f1a-5c83-794f-87df-07fefac2e3c3",
+      "remaining": "Provider四方法没有独立Pause；state/Provider能力职责的私有实现对应尚需核对，禁止默认为与idle destroy等价。",
+      "exit_condition": "逐项映射原文生命周期责任与实际状态owner/入口；差异经批准处置及必要最小修复/ADR重封存，维护契约/CAS/race/restart、exact-SHA CI和独立review。",
+      "deduplication": "已核对59个旧子项及347–350本包提案；349仅CUA表面参数，345仅CodeMode落位，其余实测/最终join不承担Provider生命周期职责；Backlog等待coordinator注册串行准入。"
     }
   },
   "reviews": [
@@ -1952,21 +1959,21 @@
       "obligations": [
         "Instance是承载Computer的一次运行",
         "支持启动",
-        "支持暂停或等价闲置回收",
+        "支持暂停",
         "支持销毁",
         "支持替换"
       ],
       "obligation_kinds": {
         "Instance是承载Computer的一次运行": "required_v1",
         "支持启动": "required_v1",
-        "支持暂停或等价闲置回收": "required_v1",
         "支持销毁": "required_v1",
-        "支持替换": "required_v1"
+        "支持替换": "required_v1",
+        "支持暂停": "required_v1"
       },
       "exemptions": {},
-      "observed": "Provider Ensure/Checkpoint/Restore/Destroy，闲置执行优雅停止而非Warm挂起；epoch分隔重建。",
+      "observed": "Provider Ensure/Checkpoint/Restore/Destroy，闲置执行优雅停止而非Warm挂起；epoch分隔重建。 未见独立Pause方法，不能从idle shutdown/destroy推定该职责已满足。",
       "proof_limit": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。",
-      "disposition": "partial_mechanical",
+      "disposition": "evidence_gap",
       "references": [
         "internal/computer/lifecycle.go",
         "internal/computer/manager.go",
@@ -1998,9 +2005,9 @@
           "detail": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。"
         },
         {
-          "obligation": "支持暂停或等价闲置回收",
-          "gap": "G-release",
-          "detail": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。"
+          "obligation": "支持暂停",
+          "gap": "G-provider",
+          "detail": "未见独立Pause方法；不能将优雅停止并销毁默认为规范暂停的获批等价实现。"
         },
         {
           "obligation": "支持销毁",
@@ -2471,7 +2478,7 @@
       "obligations": [
         "Provider负责分配",
         "负责启动",
-        "负责暂停或空闲回收",
+        "负责暂停",
         "负责销毁",
         "负责Checkpoint",
         "负责恢复",
@@ -2481,17 +2488,17 @@
       "obligation_kinds": {
         "Provider负责分配": "required_v1",
         "负责启动": "required_v1",
-        "负责暂停或空闲回收": "required_v1",
         "负责销毁": "required_v1",
         "负责Checkpoint": "required_v1",
         "负责恢复": "required_v1",
         "负责并发仲裁": "required_v1",
-        "负责资源回收": "required_v1"
+        "负责资源回收": "required_v1",
+        "负责暂停": "required_v1"
       },
       "exemptions": {},
-      "observed": "Provider锁及Manager/SQLite claim组合承担全链；无Warm pause方法，使用规范一期durable停止回收。",
+      "observed": "Provider锁及Manager/SQLite claim组合承担全链；无Warm pause方法，使用规范一期durable停止回收。 未见独立Pause方法，不能从idle shutdown/destroy推定该职责已满足。",
       "proof_limit": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。",
-      "disposition": "partial_mechanical",
+      "disposition": "evidence_gap",
       "references": [
         "internal/computer/lifecycle.go",
         "internal/computer/manager.go",
@@ -2523,9 +2530,9 @@
           "detail": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。"
         },
         {
-          "obligation": "负责暂停或空闲回收",
-          "gap": "G-release",
-          "detail": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。"
+          "obligation": "负责暂停",
+          "gap": "G-provider",
+          "detail": "未见独立Pause方法；不能将优雅停止并销毁默认为规范暂停的获批等价实现。"
         },
         {
           "obligation": "负责销毁",
@@ -3799,9 +3806,9 @@
         "不暴露type": "required_v1"
       },
       "exemptions": {},
-      "observed": "computer.Provider为生命周期接口；concrete macosvm实现另一个Driver接口，不将click加入生命周期接口。",
+      "observed": "computer.Provider为生命周期接口；concrete macosvm实现另一个Driver接口，不将click加入生命周期接口。 state/能力职责与私有adapter/SQLite/Compatibility的对应需独立核对。",
       "proof_limit": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。",
-      "disposition": "partial_mechanical",
+      "disposition": "evidence_gap",
       "references": [
         "internal/computer/lifecycle.go",
         "internal/computer/manager.go",
@@ -3854,13 +3861,13 @@
         },
         {
           "obligation": "状态",
-          "gap": "G-release",
-          "detail": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。"
+          "gap": "G-provider",
+          "detail": "状态由私有adapter/SQLite查询，Compatibility冻结身份；需明确Provider职责及能力对应，未认证四方法接口完全满足。"
         },
         {
           "obligation": "Provider能力",
-          "gap": "G-release",
-          "detail": "当前CLI/SQLite/HTTP/SSH确定性peer和局部race观察不等于真实Lume/Guest兼容性、跨宿主机迁移或完整发布五连过。"
+          "gap": "G-provider",
+          "detail": "状态由私有adapter/SQLite查询，Compatibility冻结身份；需明确Provider职责及能力对应，未认证四方法接口完全满足。"
         },
         {
           "obligation": "Provider接口不暴露click",

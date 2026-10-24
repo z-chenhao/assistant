@@ -57,7 +57,8 @@ class Baseline08Tests(test_release_package.ReleasePackageTests):
                                  (1326, 'G-browser-fixture', 'ERII-348'),
                                  (1445, 'G-api', 'ERII-349'),
                                  (1453, 'G-api', 'ERII-349'),
-                                 (1482, 'G-tab-policy', 'ERII-350')]:
+                                 (1482, 'G-tab-policy', 'ERII-350'),
+                                 (1282, 'G-provider', 'ERII-351')]:
             self.assertIn(gap, {r['gap'] for r in rows[line]['remaining']})
             self.assertEqual(self.ledger['gaps'][gap]['issue'], issue)
         # Preserve the large typed contracts, not just a title-level review.

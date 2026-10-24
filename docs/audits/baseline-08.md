@@ -8,7 +8,7 @@ Instance, durable lifecycle, image compatibility, three Computer Use layers,
 Inventory, Surface observations, App/Browser/Tab, waits and the first standard
 Capability. The clause after the final table row is outside this package.
 
-There are 56 partial mechanical rows, 13 evidence gaps, five policy rows, four
+There are 53 partial mechanical rows, 16 evidence gaps, five policy rows, four
 background rows and two deferred rows. Duties retain 366 required-v1, 18 policy,
 seven background and 11 explicitly optional/future statements. All **384
 required/policy duties remain routed**. Warm memory snapshots and future cloud
@@ -114,11 +114,12 @@ release suite or five consecutive protected runs is claimed. Output stays
 | [ERII-348](https://multica.ai/erii-studio/issues/01a16f0e-934e-72d5-bb40-ac815bf49005) | Original L1269/L1316/L1372/L1516: current Guest synthetic browser runtime/owned marker/LaunchAgents are missing. Reuse maintained deployment/Doctor/Drive/Evidence/Cleanup, fix identities/hashes and reject partial/wrong fixtures. Exit needs approved current Guest native observations; Host Chromium cannot substitute. |
 | [ERII-349](https://multica.ai/erii-studio/issues/01a16f0e-9633-7a2e-ad59-5daf19a28f93) | Original L1339/L1382/L1435/L1443/L1470: `getTab` browser option and some creation/pointer/input options are ignored or narrowed; `paste` rejects md/html, key duration is not forwarded and optional methods lack precise absence disclosure. Map every signature through the actual facade/Host/Driver, settle undefined option semantics, and preserve return/compatibility evidence. A bare numeric index binds the latest observation and cannot carry old revision identity; resolve the original old-index wording explicitly. Protocol changes need owner ADR and coordinator reseal. |
 | [ERII-350](https://multica.ai/erii-studio/issues/01a16f0e-9950-7853-8af7-d9ee9c2c342a) | Original L1471–1472: new Tabs have execution Handles but no observed Run-owned temporary Tab retention/cleanup policy or explicit cross-Run stable-reference retention. Implement approved Resource Policy with user-Tab protection, ownership, cancellation, unknown close outcomes and restart evidence. Whole-browser disk persistence is insufficient. |
+| [ERII-351](https://multica.ai/erii-studio/issues/01a16f1a-5c83-794f-87df-07fefac2e3c3) | Original L1261/L1272/L1314: the four-method Provider has no independent Pause; state and Provider-capability responsibilities require an explicit implementation mapping. Idle shutdown/destroy is not presumed equivalent to Pause. Resolve exact responsibilities, retain required Durable recovery, and obtain owner ADR/reseal for normative changes. |
 | [ERII-330](https://multica.ai/erii-studio/issues/01a16bd2-3352-7bc8-8c8c-fc6045822909) | Original frozen dual-arm real-model choices and judgments: structured Tools before GUI, AX/semantic actions before coordinates, result verification and interpreting new observations. Native state and independent Judge remain required. |
 | [ERII-331](https://multica.ai/erii-studio/issues/01a16bd2-481b-7404-8db1-971204d4f839) | Current isolated Guest/clean base/fixed Driver permissions, actual lifecycle and Browser, all Jianying compatibility groups, UI progress/privacy and named human review. Consume finite repairs; preserve unmet external conditions and actual cleanup evidence. |
 | [ERII-332](https://multica.ai/erii-studio/issues/01a16bd2-5d15-7af2-bb7f-7e5ff3c3c420) | Final per-duty current-head contract/merged PR/native CI/migration/race/kill-restart/approval/protected-five-run and independent-review join. Unobserved duties remain unmet; an implementation fault needs a finite repair, not a report-generated PASS. |
 
-The four new records are Backlog proposals, unassigned and awaiting coordinator
+The five new records are Backlog proposals, unassigned and awaiting coordinator
 registration/admission. Their sources, exclusions, semantic deduplication and
 independent exits are retained in each record. The audit changes neither
 Computer behavior nor release gates. Completing this package or a gap child
