@@ -6,6 +6,7 @@ checkout. Use the maintained harness to collect new evidence under ignored
 
 | Report | Records |
 | --- | --- |
+| [Delivered setup comparison](2026-10-24-ci-comparison.md) | Exact-attempt observations, setup source boundaries and explicit noncertification |
 | [CI baseline](ci-baseline.json) | Earlier workflow timing and controlled experiments |
 | [Computer L2 notes](computer-l2.md) | Live compatibility observations and limitations |
 | [Computer L2 results](computer-l2-result.json) | Earlier application compatibility evidence |
