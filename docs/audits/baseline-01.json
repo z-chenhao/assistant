@@ -1066,7 +1066,20 @@
           "sha256": "12c4701660d629ca7c35338b81348ce4026f41160f9ef082057ac68d09367807"
         }
       ],
-      "limits": "Actual CLI, SQLite, PTY and kill/restart with an explicitly scripted provider; not live-model semantic or VM evidence."
+      "limits": "Actual CLI, SQLite, PTY and kill/restart with an explicitly scripted provider; not live-model semantic or VM evidence.",
+      "binary": {
+        "path_at_execution": "bin/erii",
+        "sha256": "58fe74342f78e506ceaafd1108ab93c25312f7b0fedea4245c0a2fa650538d7c",
+        "size_bytes": 43669778,
+        "build_command": [
+          "go",
+          "build",
+          "-o",
+          "bin/erii",
+          "./cmd/erii"
+        ],
+        "source_sha": "fd2a3534f5b0602c5bf9376c14912f45b1ff4a5c"
+      }
     }
   },
   "gaps": {
