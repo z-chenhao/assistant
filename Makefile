@@ -87,3 +87,7 @@ verify-release-decision:
 .PHONY: audit-baseline-07
 audit-baseline-07:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-07.json --evidence evidence/baseline-07.json
+
+.PHONY: audit-baseline-08
+audit-baseline-08:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-08.json --evidence evidence/baseline-08.json
