@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-08](baseline-08.md) records ERII-238’s 80-block Security, Computer and
+CUA audit. Its 402 scoped duties retain 384 mandatory routes, current mechanical
+receipts and four finite gap proposals. Use `make audit-baseline-08`; no product
+requirement is certified.
+
 [baseline-07](baseline-07.md) records ERII-237's 80-block Claim/Wake/cancel,
 quota, monetary consent, Skill and Security audit. Its 362 scoped duties retain
 all mandatory routes, native receipt limits and four finite gap proposals. Use
