@@ -6,6 +6,10 @@ setup:
 install:
 	sh install.sh
 
+.PHONY: audit-baseline-01
+audit-baseline-01:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-01.json --evidence evidence/baseline-01.json
+
 run: build
 	./bin/erii start
 

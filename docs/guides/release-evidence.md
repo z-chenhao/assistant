@@ -8,6 +8,12 @@ Task state. ERII-224 completion does not certify v1.
 
 ## Inventory and history
 
+Bounded audit packages supplement this preserved index. The
+[baseline-01 ledger](../audits/README.md) records ERII-231's 80 frozen blocks and
+routes unmet obligations to existing finite release children. Use
+`make audit-baseline-01`; coverage never changes release readiness or upgrades a
+historical partial review to verified.
+
 ```sh
 python3 scripts/release_audit.py --evidence evidence/release-audit.json
 make release-audit
