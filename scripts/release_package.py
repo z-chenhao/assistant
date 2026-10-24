@@ -17,6 +17,7 @@ RESEALED_MANIFEST_HASH = 'f26df8fbb927746198612c9f5aa8921df6c51274953bff0cc0b0a8
 PACKAGE_HASHES = {
     'baseline-01': 'b95fc9fa9861ff62d5551f820ae56dac90f9ad33ecdbd2ad2ef743fcc315db95',
     'baseline-02': '7480b2bdfd3d86256d1d13a10f6b2cd9707fb62f365f07e7e244f17a0b510c69',
+    'baseline-03': '1b6367425a571b1bb0fcca0bc64a196a5f962bb28144dda17b06b23b453e7d67',
     'baseline-04': '2e56b4c2b855c9c6a81e667f316e92444e2890a8a35568a36cdce566fb07639e',
 }
 
