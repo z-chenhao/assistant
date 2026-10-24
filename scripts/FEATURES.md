@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen Golden common-01 audit (ERII-244)
+
+| Feature | Reach / authoritative entry | Evidence and limits |
+| --- | --- | --- |
+| Common conditions, rubric, hard failures and GC01–04 overview | `make audit-golden-common-01`; `release_audit.py` / `release_package.audit_package` | 80 frozen blocks, 359 scoped duties, 302 mandatory duties, 397 finite route entries, 25 finite owners, 37 current references and 12 merged PRs. Clock/seed preparation routes to ERII-366; actual sampling/reporting consume it. Zero certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_golden_common01.py` | Launch/Doctor load frozen identities/references; Drive reads the real CLI; Evidence is `evidence/golden-common-01.json`; Cleanup removes disposable output. Optional strong mode checks original manifest/native bytes/Git. Golden source provenance, all rubric/hard-failure/exception/repetition duties and 20 Case owners stay explicit. |
+
+See [native observations, finite routes and proof limits](../docs/audits/golden-common-01.md).
+
 ## Frozen baseline-13 audit (ERII-243)
 
 | Feature | Reach / authoritative entry | Evidence |
