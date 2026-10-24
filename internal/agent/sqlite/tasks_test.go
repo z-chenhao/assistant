@@ -59,6 +59,40 @@ func isFollowup(req llm.GenerationRequest) bool {
 	}
 	return false
 }
+
+func TestTaskCreateCompletionPolicyDedup(t *testing.T) {
+	s, _, a, p := taskFixture(t)
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "accepted result"}, nil
+		}
+		return calls(task.ManageName,
+			`{"operation":"create","task":"Same brief"}`,
+			`{"operation":"create","task":"Same brief","completionPolicy":"once"}`,
+			`{"completionPolicy":"once","task":"Same brief","operation":"create"}`,
+			`{"operation":"create","task":"Same brief","completionPolicy":"ongoing"}`,
+			`{"completionPolicy":"ongoing","task":"Same brief","operation":"create"}`), nil
+	}
+	mustSubmit(t, a, "create", "create both policies")
+	mustDrain(t, a)
+	for query, want := range map[string]int{
+		`SELECT count(*) FROM task WHERE completion_policy='once' AND status='completed'`:                          1,
+		`SELECT count(*) FROM task WHERE completion_policy='ongoing' AND status='active' AND completed_at IS NULL`: 1,
+		`SELECT count(*) FROM task_request`:            2,
+		`SELECT count(*) FROM task_invocation`:         5,
+		`SELECT count(*) FROM task_update`:             2,
+		`SELECT count(*) FROM run WHERE kind='worker'`: 2,
+	} {
+		if got := scalar(t, s, query); got != want {
+			t.Fatal(query, got, want)
+		}
+	}
+	// Re-read every receipt: omission/once share one Task; ongoing is distinct.
+	if scalar(t, s, `SELECT count(DISTINCT receipt_json) FROM task_invocation`) != 2 {
+		t.Fatal("policy receipt identity drift")
+	}
+}
+
 func TestTaskVerticalSliceDuplicateSourcesAndDurableReporter(t *testing.T) {
 	s, r, a, p := taskFixture(t)
 	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
@@ -630,7 +664,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "No change was accepted"}, nil
 		}
-		return calls(task.ManageName, `{"operation":"create","task":"x","model":"forbidden"}`, `{"operation":"create","task":"x","artifactRefs":["artifact:inaccessible"]}`, `{"operation":"append","taskRef":"not-visible","instruction":"continue"}`, `{"operation":"pause","taskRef":"not-visible"}`, `{"operation":"cancel","taskRef":"not-visible"}`), nil
+		return calls(task.ManageName, `{"operation":"create","task":"x","model":"forbidden"}`, `{"operation":"create","task":"x","completionPolicy":"invalid"}`, `{"operation":"create","task":"x","completionPolicy":null}`, `{"operation":"create","task":"x","artifactRefs":["artifact:inaccessible"]}`, `{"operation":"append","taskRef":"not-visible","instruction":"continue"}`, `{"operation":"pause","taskRef":"not-visible"}`, `{"operation":"cancel","taskRef":"not-visible"}`, `{"operation":"complete","taskRef":"not-visible"}`), nil
 	}
 	mustSubmit(t, a, "rejections", "invalid controls")
 	mustDrain(t, a)
@@ -642,7 +676,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rows.Close()
-	expected := []string{"INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
+	expected := []string{"INVALID_ARGUMENT", "INVALID_ARGUMENT", "INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
 	i := 0
 	for rows.Next() {
 		var raw string
@@ -687,6 +721,76 @@ func TestWorkerCapabilityDriftStopsDrainWithoutRetryLoop(t *testing.T) {
 	defer cancel()
 	if err = a.Drain(ctx); !errors.Is(err, llm.ModelIncompatible) {
 		t.Fatal("nonterminal capability failure was retried instead of reported", err)
+	}
+}
+
+func TestTaskAppendAfterCompactionBeforeGenerationAdmission(t *testing.T) {
+	s, r, a, p := taskFixture(t)
+	ctx := context.Background()
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if isRoot(req) {
+			if strings.Contains(fmt.Sprint(req.Messages), "Task instruction: new date") {
+				return llm.GenerationResult{Text: "Worker applied new date"}, nil
+			}
+			return llm.GenerationResult{Text: "Worker original result"}, nil
+		}
+		if isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "Result"}, nil
+		}
+		if req.Messages[len(req.Messages)-1].Text == "append" {
+			var ref string
+			if err := s.db.QueryRow(`SELECT task_ref FROM task`).Scan(&ref); err != nil {
+				return llm.GenerationResult{}, err
+			}
+			raw, _ := json.Marshal(task.ManageRequest{Operation: "append", TaskRef: ref, Instruction: "new date"})
+			return calls(task.ManageName, string(raw)), nil
+		}
+		return calls(task.ManageName, `{"operation":"create","task":"Original task anchor"}`), nil
+	}
+	receipt := mustSubmit(t, a, "create", "create")
+	claim, err := r.Claim(ctx, receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = executeTaskRun(t, a, r, ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(`CREATE TRIGGER fail_worker_admission BEFORE INSERT ON model_generation WHEN NEW.run_id IN (SELECT run_id FROM run WHERE kind='worker') BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.Drain(ctx); !errors.Is(err, agent.ErrStorage) {
+		t.Fatal("worker admission failure was not preserved", err)
+	}
+	if scalar(t, s, `SELECT count(*) FROM context_compaction c JOIN run r USING(run_id) WHERE r.kind='worker'`) != 1 || scalar(t, s, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker'`) != 0 {
+		t.Fatal("worker context was not frozen before the admission failure")
+	}
+	if _, err = s.db.Exec(`DROP TRIGGER fail_worker_admission`); err != nil {
+		t.Fatal(err)
+	}
+	receipt = mustSubmit(t, a, "append", "append")
+	claim, err = r.Claim(ctx, receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = executeTaskRun(t, a, r, ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	mustDrain(t, a)
+	workers := []llm.GenerationRequest{}
+	for _, request := range p.requests {
+		if isRoot(request) {
+			workers = append(workers, request)
+		}
+	}
+	if len(workers) != 2 || strings.Contains(fmt.Sprint(workers[0].Messages), "Task instruction: new date") || !strings.Contains(fmt.Sprint(workers[1].Messages), "Task instruction: new date") {
+		t.Fatal("append changed frozen context or was lost", workers)
+	}
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 1 {
+		t.Fatal("append duplicated a Root, instruction or completion")
+	}
+	var result string
+	if err = s.db.QueryRow(`SELECT content FROM task_update`).Scan(&result); err != nil || result != "Worker applied new date" {
+		t.Fatal("Root returned the superseded result", result, err)
 	}
 }
 

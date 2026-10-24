@@ -4,7 +4,8 @@ Main replies reach the local terminal through a durable Delivery Outbox. The
 Conversation stores semantic content; `state.db` stores delivery intent,
 transport state, and the terminal's immutable accepted-message projection.
 No online accounts, broker, or model inference are needed to drain accepted
-deliveries. Web/Feishu adapters and UISpec composition remain M7 work.
+deliveries. [Web/Feishu adapters and UISpec composition](channels.md) extend
+this delivery path and have separate transport/UI verification.
 
 ```mermaid
 sequenceDiagram

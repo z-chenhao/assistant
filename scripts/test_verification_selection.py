@@ -73,8 +73,8 @@ class SelectionTests(unittest.TestCase):
                 self.assertTrue(all(r['owned_group_drained'] for r in report['shards']['security']))
 
     def test_ci_parts_cannot_mix_with_focused_selection(self):
-        for part in ('--codemode-part', '--personal-part'):
-            with patch.object(sys, 'argv', ['verify_suite.py', '--gate', 'main', part, 'control' if part == '--codemode-part' else 'context']), \
+        for part in ('--codemode-part', '--personal-part', '--provider-part'):
+            with patch.object(sys, 'argv', ['verify_suite.py', '--gate', 'main', part, {'--codemode-part': 'control', '--personal-part': 'context', '--provider-part': 'cli'}[part]]), \
                  contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit) as error:
                     suite.main()
@@ -83,10 +83,33 @@ class SelectionTests(unittest.TestCase):
     def test_ci_installs_only_consumed_browser_and_frontend_dependencies(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
-        self.assertIn("if: inputs.browser == 'true'", action)
-        self.assertIn("if: inputs.frontend == 'true'", action)
-        self.assertIn('npm ci --prefix runtime/javascript --ignore-scripts', action)
-        self.assertIn('npm ci --prefix provider-bridge --ignore-scripts', action)
+        install = re.search(r'    - name: Install pinned dependencies\n      shell: bash\n      run: \|\n(.*?)(?=    - )',
+                            action, re.S)[1]
+        install = '\n'.join(line[8:] for line in install.splitlines())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake = root / 'python3'
+            fake.write_text(f'#!{sys.executable}\nimport json,os,sys\n'
+                            'open(os.environ["CAPTURE_ARGS"],"w").write(json.dumps(sys.argv[1:]))\n')
+            fake.chmod(0o755)
+            capture = root / 'args.json'
+            for browser in (False, True):
+                for frontend in (False, True):
+                    command = install.replace('${{ inputs.browser }}', str(browser).lower()).replace(
+                        '${{ inputs.frontend }}', str(frontend).lower())
+                    subprocess.run(['bash', '-eu', '-c', command], check=True,
+                                   env=dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
+                                            CAPTURE_ARGS=str(capture)))
+                    expected = ['scripts/setup.py', '--part', 'packages', '--packages',
+                                'provider-bridge', 'runtime/javascript']
+                    if browser:
+                        expected.append('guest-browser')
+                    if frontend:
+                        expected.append('web')
+                    self.assertEqual(json.loads(capture.read_text()), expected)
+        node_setup = action.split('uses: actions/setup-node@', 1)[1].split('    - name:', 1)[0]
+        self.assertNotRegex(node_setup, r'(?m)^\s+cache(?:-dependency-path)?:',
+                            'optional hosted npm restore must not block offline gates on cache egress limits')
         for name in ('fast', 'verify', 'personal', 'race', 'codemode'):
             # Extract the entire job (two-space names, not nested step names).
             block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]

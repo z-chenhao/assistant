@@ -1,6 +1,7 @@
 # 004 — Erii installation and repository layout
 
-Status: proposed in ERII-183; subject to the normal exact-SHA review.
+Status: implemented by ERII-183 and merged in [PR #33](https://github.com/z-chenhao/erii/pull/33).
+This record retains the installation/layout decision and its validation scope.
 
 ## Decision summary
 
