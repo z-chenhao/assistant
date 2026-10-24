@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "files": {
+    "evals/fixtures/gc11-v1.json": "3b0b50fca659d8f28c631ee04f328831bb703040807244f04d787b0bddb331b3",
+    "evals/fixtures/m3-capabilities-v1.json": "95846e804410cb304f963a0dab8fac1338d53c37bcfe92030555c06c5e7196bc",
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f",
+    "evals/scoring-v1.json": "6c7cca34d63300c7ec84bd971f89e72daf0c8dd7fadbde240783ab49cf0d4706"
+  }
+}

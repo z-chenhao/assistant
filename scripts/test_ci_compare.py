@@ -181,7 +181,9 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 21)
+        self.assertEqual(len(comparison.topology()), 25)
+        self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
+                         'Race detector', 'Python 3.10 compatibility'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
         self.assertFalse(insufficient['performance_certified'])
         self.assertIsNone(insufficient['p50_wall_reduction'])
@@ -258,11 +260,12 @@ class CurrentComparisonTests(unittest.TestCase):
         raw['pairs'] *= 3
         self.assertFalse(comparison.compare(raw)['performance_certified'])
 
-    def test_real_21_job_metadata_replays_without_claiming_missing_suite_proof(self):
+    def test_real_21_job_metadata_retains_timings_but_cannot_satisfy_current_inventory(self):
         import json
         from pathlib import Path
         data = json.loads((Path(__file__).parent / 'fixtures/ci-39915092608-1.json').read_text())
-        self.assertEqual(comparison.validate_jobs(data, data['run']['head_sha']), [])
+        self.assertIn('missing, duplicate or unsuccessful required part/join/job',
+                      comparison.validate_jobs(data, data['run']['head_sha']))
         self.assertEqual(comparison.timing(data)['required_verdict_seconds'], 838)
         self.assertAlmostEqual(comparison.timing(data)['runner_minutes'], 108.4)
         data['reports'] = {}
@@ -271,6 +274,9 @@ class CurrentComparisonTests(unittest.TestCase):
     def test_topology_drift_cannot_silently_reduce_inventory(self):
         text = (comparison.ROOT / '.github/workflows/ci.yml').read_text()
         for changed in (text.replace('"GC-17", ', ''), text.replace('codemode_join:', 'other_join:'),
+                        text.replace('"packages", "sqlite"', '"packages"'),
+                        text.replace('"packages", "sqlite"', '"packages", "packages"'),
+                        text.replace('  python_compat:', '  other_compat:'),
                         text.replace('        part: [', '        part: ${{ fromJSON(')):
             with self.assertRaises(ValueError):
                 comparison.topology(changed)
@@ -330,9 +336,9 @@ class CollectorBoundaryTests(unittest.TestCase):
                         started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:01Z')
                         for name in comparison.topology()]}]]):
                 value = comparison.collect('z-chenhao/erii', '1:1', root, 100)
-            self.assertEqual(calls, list(range(1, 7)))
-            self.assertEqual(len(value['reports']), 8)
-            self.assertEqual(sum(r['downloaded_bytes'] for r in value['transfers']), 60)
+            self.assertEqual(calls, list(range(1, len(comparison.SHARDS) + 1)))
+            self.assertEqual(len(value['reports']), len(comparison.SHARDS) + 2)
+            self.assertEqual(sum(r['downloaded_bytes'] for r in value['transfers']), 10 * len(comparison.SHARDS))
 
     def test_metadata_only_keeps_exact_attempt_without_fetching_or_certifying(self):
         from unittest.mock import patch

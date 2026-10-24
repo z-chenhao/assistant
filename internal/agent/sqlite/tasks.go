@@ -477,7 +477,7 @@ func (r *Runs) taskSteering(ctx context.Context, c agent.RunClaim, after int64) 
 			return err
 		}
 		var frozen int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE r.run_id=? AND g.step_index=json_extract(r.checkpoint_json,'$.step')`, c.RunID()).Scan(&frozen); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM model_generation g WHERE g.run_id=r.run_id AND g.step_index=json_extract(r.checkpoint_json,'$.step')) OR EXISTS(SELECT 1 FROM context_compaction c WHERE c.run_id=r.run_id AND c.step_index=json_extract(r.checkpoint_json,'$.step')) FROM run r WHERE r.run_id=?`, c.RunID()).Scan(&frozen); err != nil {
 			return err
 		}
 		if frozen > 0 {

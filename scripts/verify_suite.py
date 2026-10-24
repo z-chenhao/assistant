@@ -65,6 +65,10 @@ SHARDS = {
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
+    "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),
+                      Gate("gc08", "verify_gc08.py", "gc08"),
+                      Gate("gc14", "verify_gc14.py", "gc14"),
+                      Gate("gc16", "verify_gc16.py", "gc16")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("startup", "verify_startup.py", "startup"),
@@ -228,7 +232,7 @@ def run_command(args, env, output, stopped, metrics=None):
 
 def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_jobs=1, record=None):
     gates = SHARDS[name] if gates is None else gates
-    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security'):
+    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security', 'delivery'):
         return concurrent_gates(name, binary, evidence, stopped, gates, previous)
     rows = list(previous)
     for gate in gates:
