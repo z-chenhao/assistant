@@ -30,9 +30,10 @@ Artifact references return `NOT_FOUND`. Responses expose no Run/invocation IDs,
 credentials, SQL, budgets or internal traces. Infrastructure write failures stop
 at a recoverable boundary instead of becoming a misleading Tool success.
 
-The later M3 slices supply authoritative Artifact validation, external effects,
-approvals and delivery. ERII-17 adds [Direct Child delegation](children.md) to
-new Worker capabilities. JavaScript and general Durable Replay remain later work.
+[Artifact validation](artifacts.md), [external effects and approvals](tools.md),
+and [delivery](delivery.md) use the shared Tool pipeline. Workers can use
+[Direct Child delegation](children.md); [Code Mode](codemode.md) supplies
+JavaScript and fixed-source Durable Replay with frozen snapshots.
 
 ## Controlled stop and continuation
 
@@ -65,7 +66,7 @@ Only the same terminal Root's result is reported after its last descendant ends.
 `completion_policy` defaults to `once`; explicit create `completionPolicy: "ongoing"`
 keeps the Task active when one Root ends. `append` retains that policy. An idle
 ongoing Task does not start another Root on its own: Main must append work, or
-an existing Automation must fire. Ordinary Root success is still reported once
+an existing [Automation](automation.md) must fire. Ordinary Root success is still reported once
 to Main. Pause/cancel, unknown-effect handling and epoch fencing keep their
 existing behavior.
 
