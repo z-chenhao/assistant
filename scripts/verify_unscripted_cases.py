@@ -47,9 +47,12 @@ def verify(binary, evidence):
     try:
         with tempfile.TemporaryDirectory(prefix='erii-unscripted-') as tmp, endpoint() as server:
             base = Path(tmp)
+            prepared_roots = []
             def prepared(name, ready=True):
                 root = base/name
                 root.mkdir()
+                (root/'operator-sentinel').write_text('preserve operator state\n')
+                prepared_roots.append(root)
                 config = root/'config.json'
                 config.write_text(json.dumps(dict(version=1, llm=dict(provider_bridge_command='node',
                     provider_bridge_script=str(ROOT/'provider-bridge/bridge.mjs'), provider_bridge_version='pi-ai-1.3.0-v1'))))
@@ -166,7 +169,9 @@ def verify(binary, evidence):
                     require(server.stalled > 0, 'timeout did not reach the HTTP boundary')
                 server.mode = 'success'
                 report['checks'].append(mode+'_failure_propagates_with_cleanup')
-            require(all(p.exists() for p in base.iterdir()), 'operator state removed')
+            require(all((p/'operator-sentinel').read_text() == 'preserve operator state\n'
+                        and (p/'data/state.db').is_file() for p in prepared_roots), 'operator state removed')
+        require(not base.exists(), 'verifier temporary root leaked')
         report['cleanup'] = dict(operator_fixture_roots_removed=True, loopback_joined=True, children_joined=True)
         # Keep complete observations locally, with byte refs for independent readback.
         for path in sorted(raw.rglob('*.json')):
