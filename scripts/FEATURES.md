@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen Golden common-02 audit (ERII-245)
+
+| Feature | Reach / authoritative entry | Evidence and limits |
+| --- | --- | --- |
+| Shared contracts, GC05–20 overview, SC-01–13 and reporting | `make audit-golden-common-02`; `release_audit.py` / `release_package.audit_package` | 80 frozen blocks, 476 scoped duties, 467 mandatory/policy duties, three field maps and 28 finite owners. ERII-367/368 own metric and SC-13 receipt mechanisms. Zero certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_golden_common02.py` | Launch/Doctor load identities/references; Drive reads the actual CLI; Evidence is `evidence/golden-common-02.json`; Cleanup removes disposable reports. Strong mode checks original manifest/native bytes/Git. Native single-round race and CLI observations stay ungraded; all five-round and release obligations remain routed. |
+
+See [observations, finite routes and limits](../docs/audits/golden-common-02.md).
+
 ## Frozen Golden common-01 audit (ERII-244)
 
 | Feature | Reach / authoritative entry | Evidence and limits |
