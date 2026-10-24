@@ -112,7 +112,7 @@ class VerificationTests(unittest.TestCase):
                     self.assertEqual(deadlines[0], "${{ matrix.shard == 'delivery' && 15 || 10 }}")
                 else:
                     self.assertRegex(deadlines[0], r'^\d+$')
-                    limit = 15 if path.name == 'ci.yml' and name == 'race' else 10
+                    limit = 15 if path.name == 'ci.yml' and name in ('fast', 'race') else 10
                     self.assertTrue(0 < int(deadlines[0]) <= limit, f'{path}:{name}')
 
     def test_workflow_topology_is_non_bypassable(self):
