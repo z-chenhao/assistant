@@ -81,9 +81,10 @@ storage rejects their disk-conformance claim before tests start.
 
 All CI uses a ten-minute baseline from workflow creation through the final
 required verdict, with a five-minute target. Queue and dependency waits count
-in observed workflow wall time. Every job has an explicit timeout of at most
-ten minutes; the topology regression rejects missing or larger timeouts in any
-workflow. A job timeout is a stop boundary, not proof of end-to-end latency.
+in observed workflow wall time. Every job has an explicit timeout. The default ceiling is ten minutes;
+Fast, Race and Delivery have explicit fifteen-minute ceilings, including cleanup.
+The topology regression rejects missing timeouts and exceptions outside those
+three jobs. A job timeout is a stop boundary, not proof of end-to-end latency.
 Record actual exact-SHA timings with `ci_profile.py`; treat any workflow over
 ten minutes as a regression to diagnose before review. Do not remove coverage,
 reduce repetitions, extend fixture deadlines, or retry failures to meet it.
