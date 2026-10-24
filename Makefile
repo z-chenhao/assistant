@@ -83,3 +83,7 @@ release-audit:
 
 verify-release-decision:
 	python3 -m unittest discover -s scripts -p 'test_release_*.py'
+
+.PHONY: audit-baseline-07
+audit-baseline-07:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-07.json --evidence evidence/baseline-07.json
