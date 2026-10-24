@@ -11,11 +11,9 @@ import (
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
 )
 
 // createMain is shared by user ingress and durable Reporter follow-ups. Both
@@ -193,29 +191,9 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	return runEvent(ctx, tx, id, "run_ready", 1)
 }
 
-func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
-	var name string
-	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, inv.ID, t.claim.RunID()).Scan(&name); err != nil {
-		return tool.Result{}, agent.ErrStorage
-	}
-	if name == automation.ManageName || name == automation.ObserveName {
-		return t.executeAutomation(ctx, inv)
-	}
-	if name == codemode.ToolName {
-		return t.executeCode(ctx, inv)
-	}
-	if name == "builtin__computer__discover" || name == "builtin__computer__bind" || name == "builtin__computer__invoke" {
-		return t.executeComputer(ctx, inv)
-	}
-	if name == agent.RunToolName {
-		return t.AgentToolExecutor(ctx, inv.ID)
-	}
-	if name == memory.ManageName {
-		return t.manageMemory(ctx, inv)
-	}
-	if name == "builtin__memory__search" {
-		return t.searchMemory(ctx, inv)
-	}
+// executeTaskAdmission waits only for rolled-back Task admission. The shared
+// transactional fallback also serves Artifacts; only Task append returns ErrBusy.
+func (t *tools) executeTaskAdmission(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	for {
 		result, err := t.executeBuiltin(ctx, inv)
 		if !errors.Is(err, agent.ErrBusy) {

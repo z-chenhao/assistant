@@ -61,6 +61,9 @@ An append racing stop waits outside the database transaction for the old tree
 boundary, then atomically saves instruction/reactivation/new Root. The database
 retains its one nonterminal Root constraint. A call interrupted during admission
 remains recoverable under its frozen ToolInvocation and creates no partial append.
+The private [bounded state model](task-control-model.md) maps these transactions,
+records safety and recovery-suffix checks, and retains a fencing counterexample
+with a real SQLite regression.
 
 Only the same terminal Root's result is reported after its last descendant ends.
 `completion_policy` defaults to `once`; explicit create `completionPolicy: "ongoing"`

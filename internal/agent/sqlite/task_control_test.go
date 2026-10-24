@@ -110,6 +110,53 @@ func rootClaim(t *testing.T, s *Store, r *Runs) agent.RunClaim {
 	return c
 }
 
+// Replay the model's shortest fencing counterexample at the actual persisted
+// generation/Tool admission boundary: claim -> stop commit -> old owner write.
+func TestTaskControlModelCounterexampleRejectsOldOwner(t *testing.T) {
+	for _, stop := range []string{"pause", "cancel"} {
+		t.Run(stop, func(t *testing.T) {
+			s, r, a := controlFixture(t, nil)
+			ctx := context.Background()
+			controlMain(t, r, a, "create", "create")
+			c := rootClaim(t, s, r)
+			run, err := r.Load(ctx, c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gen, err := r.Generation(ctx, c, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := calls(agent.RunToolName, `{"task":"accepted before stop"}`)
+			if err = s.Models().RecordUsageAnd(ctx, gen.Request, response, 0, nil, s.AcceptGeneration); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Progress(ctx, c, "before stop"); err != nil {
+				t.Fatal(err)
+			}
+			controlMain(t, r, a, stop, stop)
+			// A live lease intentionally remains: ownership alone is insufficient.
+			if err = r.Renew(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.Progress(ctx, c, "stale model result"); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatalf("model counterexample admitted stale write: %v", err)
+			}
+			if _, err = r.ToolStore(c).Accept(ctx, gen.Request.GenerationID, response.ToolCalls, run.Tools); !errors.Is(err, agent.ErrClaimLost) {
+				t.Fatalf("old owner admitted Child: %v", err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM task WHERE progress_summary='before stop' AND task_epoch=2`) != 1 ||
+				scalar(t, s, `SELECT count(*) FROM run WHERE worker_position='child'`) != 0 ||
+				scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE run_id=?`, c.RunID()) != 0 {
+				t.Fatal("rejected write/admission left partial state")
+			}
+			if stopped, err := r.SettleStop(ctx, c); err != nil || !stopped {
+				t.Fatal(stopped, err)
+			}
+		})
+	}
+}
+
 func TestTaskControlPauseFencesLateWritesAndContinueNewRoot(t *testing.T) {
 	for _, policy := range []string{"once", "ongoing"} {
 		t.Run(policy, func(t *testing.T) { testTaskControlPauseFencing(t, policy) })
@@ -427,6 +474,70 @@ func TestTaskControlCompletesOnlyFinishedOneShotTree(t *testing.T) {
 				t.Fatal("append lost policy or duplicated work")
 			}
 		})
+	}
+}
+
+func TestTaskControlModelCompletionUsesRootOutcome(t *testing.T) {
+	// Same bounded traces as the Python model regression. Child admission uses
+	// the existing storage fixture; completion uses the real loop/terminal path.
+	for _, rootStatus := range []string{"completed", "failed"} {
+		for _, childStatus := range []string{"completed", "failed"} {
+			for _, childFirst := range []bool{false, true} {
+				name := rootStatus + "-root/" + childStatus + "-child/"
+				if childFirst {
+					name += "child-first"
+				} else {
+					name += "root-first"
+				}
+				t.Run(name, func(t *testing.T) {
+					s, r, a := controlFixture(t, nil)
+					ctx := context.Background()
+					controlMain(t, r, a, "create", "create")
+					root := rootClaim(t, s, r)
+					addControlChild(t, s, root.RunID(), "child")
+					child, err := r.Claim(ctx, "child")
+					if err != nil {
+						t.Fatal(err)
+					}
+					finish := func(c agent.RunClaim, status string) {
+						t.Helper()
+						if status == "completed" {
+							err = executeTaskRun(t, a, r, ctx, c)
+						} else {
+							var run agent.Run
+							run, err = r.Load(ctx, c)
+							if err == nil {
+								err = r.Fail(ctx, c, run.Version, "fixture_failure")
+							}
+						}
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					first, last := root, child
+					firstStatus, lastStatus := rootStatus, childStatus
+					if childFirst {
+						first, last = child, root
+						firstStatus, lastStatus = childStatus, rootStatus
+					}
+					finish(first, firstStatus)
+					if scalar(t, s, `SELECT count(*) FROM task WHERE status='active'`) != 1 || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {
+						t.Fatal("Task reported before its tree drained")
+					}
+					finish(last, lastStatus)
+					wantTask := "active"
+					if rootStatus == "completed" {
+						wantTask = "completed"
+					}
+					if scalar(t, s, `SELECT count(*) FROM task WHERE status=?`, wantTask) != 1 ||
+						scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status=?`, root.RunID(), rootStatus) != 1 ||
+						scalar(t, s, `SELECT count(*) FROM run WHERE run_id=? AND status=?`, child.RunID(), childStatus) != 1 ||
+						scalar(t, s, `SELECT count(*) FROM task_update WHERE root_run_id=? AND kind=?`, root.RunID(), rootStatus) != 1 {
+						t.Fatal("Task completion/update did not follow Root outcome")
+					}
+				})
+			}
+		}
 	}
 }
 
