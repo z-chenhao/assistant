@@ -57,7 +57,6 @@ func Compose(e delivery.Envelope) Spec {
 	s.Fallback = strings.TrimSpace(s.Fallback)
 	return s
 }
-func Text(s Spec) string { return s.Fallback }
 func valid(c Component) bool {
 	if len(c.Text) > 128<<10 {
 		return false

@@ -10,7 +10,6 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
-  --color-destructive: #b91c1c;
 }
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#111;background:#fff;font-synthesis:none;text-rendering:optimizeLegibility;--background:#fff;--foreground:#111;--card:#fff;--muted:#f4f4f5;--muted-foreground:#71717a;--border:#e4e4e7}
 *{box-sizing:border-box}body{margin:0;min-width:320px;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}a{color:inherit}button,input,textarea,select{font-family:inherit}button,a,input,textarea,select{outline-offset:4px}button:focus-visible,a:focus-visible{outline:2px solid #737373}button:disabled{opacity:.45;cursor:default}
