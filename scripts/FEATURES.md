@@ -1,5 +1,16 @@
 # Feature map
 
+## Release evidence decision (ERII-224)
+
+| Feature | Reach it | Authoritative entry point | Evidence and cleanup |
+| --- | --- | --- | --- |
+| Historical source inventory | `scripts/release_audit.py`; `make release-audit` | Preserved ERII-30 ledger, `inventory`, pinned historical reference index | All source text/identities and 122 partial/gap reviews survive; inventory stays inconclusive with zero certified requirements; unknown/stale references reject. Historical links do not import unmerged code or establish current proof. |
+| Current release decision | `scripts/release_decision.py --pack DIR/pack.json --pack-sha256 TRUSTED_HASH --require-complete` | Private `decide`, `release_receipts.trial`, existing `case_runner.score` and `ci_gate.passed` | Exact-source code/test/merged PR/native evidence/independent review; 20 Cases × six variants × five runs × two frozen arms; dimensions/thresholds/hard failures, protected SC/safety repetitions, current L2/member review, recovery/operations/native CI and final human acceptance. External acquisition supplies trust; consumer binds bytes and recomputes scores. Actual release remains unevidenced. |
+| Decision verification | `make verify-release-decision` | `test_release_decision.py:PackFixture` plus preserved inventory tests | Launch isolated synthetic file store; Doctor validates source/refs; Drive actual positive/inconclusive/rejected CLI paths; Evidence reads reports back; Cleanup removes owned stores/output. Complete joins retain all source blocks and both 20 × six × five cohorts; individual negative contracts call the production trial or `_operational_gates` validator directly. Positive combination is mechanism evidence only. No account/model/network calls, product changes or credentials. |
+
+See [release evidence operations](../docs/guides/release-evidence.md) for trust,
+private inputs, exit codes and remaining real release obligations.
+
 Start with the [capability and gate directory](../docs/guides/verification.md).
 `python3 scripts/verify_suite.py --list` reads the authoritative execution inventory;
 `--gate NAME` drives a selected capability with its complete repetition count.
@@ -43,6 +54,7 @@ Release model quality, semantic scores and live accounts remain separate claims.
 | Frontend source and documentation | `web/`; [documentation index](../docs/README.md); `make lint` | `web/build.mjs`, embedded assets in `internal/interaction/web/assets`, `check_docs.py` | `npm run check --prefix web` rejects stale assets; maintained channels browser drive proves composition/approval/fallback; local Markdown destinations checked offline. Historical measurements live in `docs/reports/`. |
 | Native release packaging | `sh scripts/package.sh "$PWD/dist"`; manual/tag package workflow | `.github/workflows/release.yml`, same installer | Native Ubuntu/macOS matrix produces archives/checksums; version tags create unpublished drafts. Local startup gate proves the host-native package; other OS/architecture results require their actual workflow evidence. PR safety gates are unchanged. |
 | Conservative branch cleanup | `python3 scripts/clean_branches.py` (plan), then `--apply` | `clean_branches.select/plan/apply` | Exact merge proof, protected main/worktrees/open PRs, local Git merged guard, remote exact-tip lease, stale tracking-ref pruning; audit in `evidence/branches.json`. Unique work stays intact. |
+| Locked repeatable dependency setup | `make setup`; `SETUP_FLAGS='--mode offline --measure-network'`; CI packages/browser parts | `scripts/setup.py`, `setup_browser.cjs`, native npm/Playwright caches | `setup.json` binds lock/toolchain/platform/architecture and stage timings; optional Node HTTP object/body-byte evidence. `test_setup.py` drives real npm against a local registry: cold/warm/offline, SRI corruption, missing/changed locks, platform/architecture rejection, concurrent independent installs, lock/timeout cleanup. Browser Doctor checks both locked Chromium variants and FFmpeg; offline misses never call install. Disposable fixture caches are removed; retained native caches are never wiped. [Recovery and measurement limits](../CONTRIBUTING.md#repeated-and-offline-setup). |
 
 ## M6 personal journeys (ERII-26)
 
