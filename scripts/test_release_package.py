@@ -177,6 +177,30 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(output.exists(), 'failed audit retained the previous report')
 
+    def test_cli_never_deletes_a_package_or_native_input(self):
+        folder = self.root / 'evidence'
+        folder.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=folder, prefix='package-input-test-') as temp:
+            root = Path(temp)
+            native = root / 'native'
+            native.mkdir()
+            raw = native / 'observation.json'
+            original = b'SYNTHETIC retained native input\n'
+            raw.write_bytes(original)
+            ledger = root / 'package.json'
+            ledger.write_text(json.dumps(self.ledger))
+            command = [sys.executable, str(self.root / 'scripts/release_audit.py'),
+                       '--package-ledger', str(ledger)]
+            result = subprocess.run(command + ['--native-root', str(native), '--evidence', str(raw)],
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertTrue(raw.exists(), 'output validation deleted retained native input')
+            self.assertEqual(raw.read_bytes(), original)
+            before = ledger.read_bytes()
+            result = subprocess.run(command + ['--evidence', str(ledger)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(ledger.read_bytes(), before)
+
 
 if __name__ == '__main__':
     unittest.main()

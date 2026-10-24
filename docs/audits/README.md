@@ -49,7 +49,8 @@ no network, account, model or VM. Doctor checks frozen identities, current
 reference bytes/symbols, complete dispositions and finite gap routes. Drive reads
 the ledger through the CLI. Evidence is `evidence/baseline-01.json`; inspect
 `package_audit` and `source_units`. Cleanup may remove that disposable output.
-Invalid reruns delete stale reports. `--require-complete` still exits 2:
+Output cannot overlap an input or retained native directory. Invalid reruns
+delete stale disposable reports. `--require-complete` still exits 2:
 finishing this audit is not release acceptance.
 
 For an independently acquired original manifest, retained native bytes and

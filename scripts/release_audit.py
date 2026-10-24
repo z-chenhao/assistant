@@ -217,6 +217,9 @@ def main():
     output = args.evidence.resolve()
     if not output.is_relative_to(evidence_root) or output == evidence_root:
         parser.error('--evidence must be a file under repository evidence/')
+    inputs = [path.resolve() for path in (args.ledger, args.package_ledger, args.work_packages) if path]
+    if output in inputs or (args.native_root and output.is_relative_to(args.native_root.resolve())):
+        parser.error('--evidence must not overlap an input or retained native directory')
     output.unlink(missing_ok=True)
     if (args.work_packages or args.native_root or args.verify_git) and not args.package_ledger:
         parser.error('--work-packages/--native-root/--verify-git require --package-ledger')
