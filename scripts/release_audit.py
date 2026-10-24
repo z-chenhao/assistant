@@ -12,6 +12,28 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
+LEGACY_SHA = '38faf6144d9ae0dc5e5d38aaf32d06052820d683'
+
+
+def check_reference(root, ref):
+    # The preserved ledger indexes an unmerged checkpoint. These are historical
+    # navigation links, never current-code or release evidence. Do not import
+    # all of that branch's product changes merely to make its links resolve.
+    path, _, symbol = ref.partition('#')
+    target = root / path
+    if not target.resolve().is_relative_to(root.resolve()) or Path(path).is_absolute():
+        raise ValueError('invalid review reference: ' + ref)
+    current = target.read_text() if target.is_file() else ''
+    if not current or (symbol and symbol not in current):
+        index = root / 'docs/v1-legacy-references.json'
+        if sha256(index) != '090865509132a0be9a998c8cce6cae720b7d0dead90492624e0b65f8532f043d':
+            raise ValueError('legacy reference index changed')
+        if ref not in json.loads(index.read_text())['references']:
+            raise ValueError('invalid legacy reference: ' + ref)
+        return LEGACY_SHA
+    if symbol and symbol not in current:
+        raise ValueError('missing review symbol: ' + ref)
+    return 'worktree'
 
 
 def sha256(path):
@@ -94,12 +116,7 @@ def apply_reviews(root, units, reviews):
             raise ValueError('unrecognized checkpoint PR disposition')
         for category in ('code', 'tests', 'evidence'):
             for ref in review[category]:
-                path, _, symbol = ref.partition('#')
-                target = root / path
-                if not target.is_file() or not target.resolve().is_relative_to(root.resolve()):
-                    raise ValueError('invalid review reference: ' + ref)
-                if symbol and symbol not in target.read_text():
-                    raise ValueError('missing review symbol: ' + ref)
+                check_reference(root, ref)
         by_key[key]['disposition'] = review['disposition']
         by_key[key]['review'] = review
     return len(seen)
@@ -114,12 +131,7 @@ def audit(root, ledger):
             if not area[category]:
                 raise ValueError('empty ' + category + ': ' + name)
             for ref in area[category]:
-                path, _, symbol = ref.partition('#')
-                target = root / path
-                if not target.is_file() or not target.resolve().is_relative_to(root.resolve()):
-                    raise ValueError('invalid reference: ' + ref)
-                if symbol and symbol not in target.read_text():
-                    raise ValueError('missing symbol: ' + ref)
+                check_reference(root, ref)
         if not area['prs'] or not set(area['prs']) <= set(ledger['merged_prs']):
             raise ValueError('missing PR mapping: ' + name)
     units, sources = [], {}
@@ -141,6 +153,7 @@ def audit(root, ledger):
     # Indexing source text, passing contracts and merged PRs are distinct facts.
     # This command intentionally has no path from those facts to release PASS.
     return dict(version=1, audited_base=ledger['audited_base'], sources=sources,
+                legacy_reference_sha=LEGACY_SHA,
                 status='inconclusive', release_ready=False,
                 scope='source inventory and evidence candidates, not completed normative audit',
                 individually_verified_requirements=0,

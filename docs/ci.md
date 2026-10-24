@@ -82,9 +82,12 @@ storage rejects their disk-conformance claim before tests start.
 All CI uses a ten-minute baseline from workflow creation through the final
 required verdict, with a five-minute target. Queue and dependency waits count
 in observed workflow wall time. Every job has an explicit timeout of at most
-ten minutes except the two race parts. Main's approved ERII-222 change gives
+ten minutes except the two race parts and the delivery verification shard.
+Main's approved ERII-222 change gives
 the race job a fifteen-minute outer bound for test completion and teardown;
-both matrix parts inherit it. The topology regression rejects missing or larger
+both matrix parts inherit it. The merged setup change retains the delivery
+shard's fifteen-minute outer bound; other verification shards stay at ten.
+The topology regression rejects missing or larger
 timeouts and preserves that explicit race allowance. Test deadlines, repetitions,
 cleanup and the strict join remain unchanged. A job timeout is a stop boundary,
 not proof of end-to-end latency.
@@ -302,13 +305,16 @@ upgrade tests remain. Failure rolls back; real child kills before/after commit
 prove restart/version/bootstrap behavior. Fixture tests still enter the public
 store boundary and initialize real databases.
 
-Setup-go retains its content-addressed cache keys. Optional hosted npm cache
-restore is disabled: [run 39930755535](https://github.com/z-chenhao/erii/actions/runs/39930755535)
-hit Azure's cache egress limit, then `setup-node` hung until the unchanged
-ten-minute job deadline before dependency installation or tests started. Jobs
-install the pinned lockfiles directly and build their own CLI. The npm registry
-and hosted toolchain downloads remain setup dependencies; removing this cache
-does not make setup independent of the network. Full Go test counts remain
+[Run 39930755535](https://github.com/z-chenhao/erii/actions/runs/39930755535)
+hit Azure cache egress limits and setup-node hung until the job deadline,
+before tests started. That failed observation is retained.
+
+Setup-go retains its existing SDK/module cache. Hosted npm-cache restoration is
+disabled: a clean or cache-disabled runner goes directly through bounded native
+installation, without the previously hanging optional cache transport. Local
+worktrees reuse npm/Playwright download caches through the same
+[setup entry point](../CONTRIBUTING.md#repeated-and-offline-setup). Every job
+still installs lockfiles and builds its own CLI. Full Go test counts remain
 explicit. Historical `ci_bundle.py` v2 and its corruption/context regressions
 remain available for old evidence; the current workflow does not consume build
 artifacts or Host cache artifacts from another runner.

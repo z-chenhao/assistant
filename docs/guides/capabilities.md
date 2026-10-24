@@ -71,7 +71,8 @@ without placing invalid text in model history.
 Changing a reference or scope changes the frozen set hash. A restarted old Run
 fails compatibility selection if its catalog no longer matches. Restore the old
 catalog to continue it; do not silently switch versions. Ordinary Main/Worker
-tools cannot manage Skills. Experience-review lifecycle is a later slice.
+tools cannot manage Skills. The trusted [Experience Reviewer](memory-maintenance.md)
+owns the separate propose/verify/promote/retire lifecycle.
 
 ## Coding fixture boundary
 
@@ -123,8 +124,9 @@ Linux requires bubblewrap and permission for unprivileged user namespaces. CI
 installs the distribution package and enables namespaces only on its disposable
 runner. macOS requires the system sandbox and Xcode/Command Line Tools. No new Go
 or Node production dependency is added. Kernel sandboxing is an interim isolation
-boundary; VM availability/resource isolation and real desktop compatibility remain
-M6 release work.
+boundary. [Computer operations](computer.md) and [Computer Use](computer-use.md)
+own VM lifecycle/resource isolation and the separately recorded live compatibility
+evidence; this coding fixture does not establish those results.
 
 ## Reproduction and evidence
 
@@ -146,8 +148,9 @@ denial, link escapes, catalog drift and executable Git config.
 
 This extends the M3 Tool/Approval/Artifact fragments in `verify_tools.py` and
 `verify_artifacts.py`; it does not assign a semantic Golden score. GC-19 is a
-coding prerequisite here. GC-20 Child/recovery and GC-19/20 full Durable cases
-remain not_applicable until M4/M5; production Computer behavior remains M6.
+coding prerequisite here. This fixture marks GC-20 Child/recovery and full
+GC-19/20 Durable cases `not_applicable`; the [Core gate](core-evals.md) covers
+their additional mechanics. Production Computer has [separate verification](computer.md).
 The GC-11 checkpoint now drives both original turns in six locked variants,
 reads all three actual provider quotes with services and user weights, preserves
 oral-cashback uncertainty, delivers two scripted replies and reopens both

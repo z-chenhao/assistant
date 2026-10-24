@@ -1,11 +1,7 @@
 .PHONY: setup install run build test test-race lint verify release-audit
 
 setup:
-	npm ci --prefix provider-bridge --ignore-scripts
-	npm ci --prefix runtime/javascript --ignore-scripts
-	npm ci --prefix guest-browser --ignore-scripts
-	npm ci --prefix web --ignore-scripts
-	node guest-browser/node_modules/playwright-core/cli.js install chromium
+	python3 scripts/setup.py $(SETUP_FLAGS)
 
 install:
 	sh install.sh
@@ -53,11 +49,16 @@ verify: build
 
 # A successful inventory is not release acceptance. This returns 2 while the
 # recorded whole-case/audit/model/L2 gaps remain; deterministic CI stays offline.
-release-audit:
-	python3 scripts/release_audit.py --require-complete
-
 # Use a fresh durable fixture root outside the checkout; never contacts GitHub.
 .PHONY: verify-evidence
 verify-evidence:
 	@test -n "$(EVIDENCE_ROOT)" || { echo 'Set EVIDENCE_ROOT to a fresh absolute durable fixture root'; exit 1; }
 	python3 scripts/evidence_harness.py --root "$(EVIDENCE_ROOT)" --sha "$$(git rev-parse HEAD)" --evidence "$(EVIDENCE_ROOT)/report.json"
+
+# Inventory is deliberately inconclusive. It never certifies release.
+.PHONY: release-audit verify-release-decision
+release-audit:
+	python3 scripts/release_audit.py --evidence evidence/release-audit.json --require-complete
+
+verify-release-decision:
+	python3 -m unittest discover -s scripts -p 'test_release_*.py'

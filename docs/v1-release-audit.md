@@ -5,6 +5,14 @@ ERII-4 must remain `in_progress`; ERII-30 must not be accepted as a completed
 release. This document and its ledger are an initial source/evidence inventory,
 not a claim that every normative requirement has passed.
 
+The owner-authorized finite migration separates PR #32's existing implementation,
+harnesses, fixtures and evidence assets from final release acceptance. ERII-223
+owns the original full v1 contract and remaining approved work packages. Acceptance
+of the finite ERII-30 asset delivery does not complete ERII-223 or ERII-4, change
+any pending disposition or null score, or certify v1. A fresh exact-SHA acceptance
+review must cover the complete PR, including the d11e543 model audit and subsequent
+main merges; historical checkpoint verdicts do not supply that acceptance.
+
 The current synchronized base is `0c6d964130168da1c93650e77c455d32556b3bf5`
 (human-merged #36; #33–35 remain integrated); ERII-29 #31 remains the prior release dependency.
 ERII-5–29 each have a merged implementation PR. The ledger records GitHub's

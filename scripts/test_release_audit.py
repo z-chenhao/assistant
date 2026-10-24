@@ -1,5 +1,6 @@
 """Source inventory integrity and refusal to manufacture release acceptance."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -13,6 +14,11 @@ import release_audit as audit
 class ReleaseAuditTests(unittest.TestCase):
     def setUp(self):
         self.ledger = json.loads((audit.ROOT / 'docs/v1-release-ledger.json').read_text())
+
+    def test_import_preserves_complete_checkpoint_ledger_bytes(self):
+        self.assertEqual(hashlib.sha256((audit.ROOT / 'docs/v1-release-ledger.json').read_bytes()).hexdigest(),
+                         '05063f1a2f83327baa74ae971bd61f31485e66211ec76309b566ff1c747d4181')
+        self.assertEqual(len(self.ledger['individual_reviews']), 122)
 
     def test_partial_reviews_cannot_certify_requirements_or_scores(self):
         # Even an added success-looking field cannot certify a release.
