@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "security", "delivery", "providers"]
+        shard: ["runtime", "security", "delivery"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,8 +110,7 @@ jobs:
       - uses: ./.github/actions/ci-inputs
         with:
           browser: ${{ matrix.shard == 'delivery' }}
-          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}
-          temporary-fixtures: ${{ matrix.shard == 'providers' }}
+          sandbox: ${{ matrix.shard == 'security' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}
         run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
@@ -120,15 +119,83 @@ jobs:
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
-      - name: Clean disposable fixture storage
-        if: ${{ always() && matrix.shard == 'providers' }}
-        run: python3 scripts/ci_tmpfs.py cleanup
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: evidence-${{ matrix.shard }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
           path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  providers:
+    name: Providers (${{ matrix.providerpart }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    strategy:
+      fail-fast: false
+      matrix:
+        providerpart: ["cli", "models"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          temporary-fixtures: "true"
+      - name: Providers part with unchanged repetitions
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard providers --provider-part ${{ matrix.providerpart }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: exec python3 scripts/ci_step.py --name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor
+      - name: Clean disposable fixture storage
+        if: ${{ always() }}
+        run: exec python3 scripts/ci_step.py --name fixture-cleanup --phase cleanup -- python3 scripts/ci_tmpfs.py cleanup
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-providers-part-${{ matrix.providerpart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  providers_join:
+    name: Complete providers evidence
+    needs: providers
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-providers-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/provider-parts
+      - name: Require both providers parts and the full logical inventory
+        env:
+          PART_RESULT: ${{ needs.providers.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in cli models; do
+            mv "evidence/provider-parts/evidence-providers-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/provider-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name providers-join --phase test -- python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence
+      - name: Retain complete providers evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-providers-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/suite-providers.json
+            evidence/steps/
           if-no-files-found: error
           retention-days: 14
 
@@ -275,7 +342,7 @@ jobs:
 
   checks:
     name: Ubuntu checks
-    needs: ["fast", "race", "verify", "codemode", "codemode_join", "personal", "personal_join"]
+    needs: ["fast", "race", "verify", "codemode", "codemode_join", "personal", "personal_join", "providers", "providers_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2

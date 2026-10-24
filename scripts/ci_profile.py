@@ -32,6 +32,8 @@ def stats(values):
 
 def phase(name):
     name = name.lower()
+    if any(s in name for s in ('immutable', 'clean disposable', 'sdk doctor')):
+        return 'cleanup'
     if 'upload' in name or 'retain' in name:
         return 'upload'
     if 'build' in name or 'bundle' in name:

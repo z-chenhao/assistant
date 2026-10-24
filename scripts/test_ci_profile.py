@@ -86,6 +86,8 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(profile.stats([1, 2])['p50'], 1.5)
         self.assertEqual(profile.phase('Retain exact-SHA evidence, including failures'), 'upload')
         self.assertEqual(profile.phase('Install pinned Bridge dependencies'), 'setup')
+        self.assertEqual(profile.phase('Verify the copied SDK stayed immutable'), 'cleanup')
+        self.assertEqual(profile.phase('Clean disposable fixture storage'), 'cleanup')
 
 
 if __name__ == '__main__':

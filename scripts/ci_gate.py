@@ -4,7 +4,7 @@ import json
 import os
 import sys
 
-REQUIRED = {'fast', 'race', 'verify', 'codemode', 'codemode_join', 'personal', 'personal_join'}
+REQUIRED = {'fast', 'race', 'verify', 'codemode', 'codemode_join', 'personal', 'personal_join', 'providers', 'providers_join'}
 
 
 def passed(needs):

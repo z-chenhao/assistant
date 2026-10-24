@@ -113,8 +113,8 @@ class VerificationTests(unittest.TestCase):
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal'})
-        self.assertEqual(len(shards), 4)
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers'})
+        self.assertEqual(len(shards), 3)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
         checks = workflow[workflow.index('  checks:'):]
@@ -128,16 +128,16 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 8)
-        self.assertIn("sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}", workflow)
-        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 5)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 10)
+        self.assertIn("sandbox: ${{ matrix.shard == 'security' }}", workflow)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 6)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
         self.assertIn('make build', action)
         self.assertNotIn('ci_bundle.py', action)
         # Full gates start independently; no slow test or build producer gates
         # their admission, and there is no cross-image executable reuse.
-        for name in ('fast', 'race', 'verify', 'codemode', 'personal'):
+        for name in ('fast', 'race', 'verify', 'codemode', 'personal', 'providers'):
             block = workflow.split('  ' + name + ':\n', 1)[1].split('    steps:', 1)[0]
             self.assertNotIn('needs:', block)
         join = workflow.split('  codemode_join:\n', 1)[1].split('  checks:', 1)[0]
@@ -156,7 +156,7 @@ class VerificationTests(unittest.TestCase):
         self.assertNotIn('ci_bundle.py', workflow)
         self.assertIn('python-version: "3.10.22"', workflow)
         self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", workflow)
-        self.assertEqual(workflow.count("temporary-fixtures: ${{ matrix.shard == 'providers' }}"), 1)
+        self.assertEqual(workflow.count('temporary-fixtures: "true"'), 2)
         for name in ('fast', 'codemode'):
             block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
             self.assertNotIn('temporary-fixtures:', block)
@@ -164,9 +164,19 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('temporary-fixtures: "true"', race)
         self.assertLess(race.index('ci_tmpfs.py cleanup'), race.index('Retain exact-SHA'))
         self.assertIn("--name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5", workflow)
-        verify = workflow.split('  verify:\n', 1)[1].split('  codemode:\n', 1)[0]
-        self.assertIn("if: ${{ always() && matrix.shard == 'providers' }}", verify)
-        self.assertLess(verify.index('ci_tmpfs.py cleanup'), verify.index('Retain exact-SHA'))
+        providers = workflow.split('  providers:\n', 1)[1].split('  providers_join:', 1)[0]
+        self.assertIn('temporary-fixtures: "true"', providers)
+        self.assertIn('--name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor', providers)
+        self.assertIn('--name fixture-cleanup --phase cleanup -- python3 scripts/ci_tmpfs.py cleanup', providers)
+        self.assertEqual(providers.count('if: ${{ always() }}'), 3)
+        self.assertLess(providers.index('ci_tmpfs.py cleanup'), providers.index('Retain exact-SHA'))
+        parts = json.loads(re.search(r'        providerpart: (\[.*\])', workflow)[1])
+        self.assertEqual(parts, list(suite.PROVIDER_PARTS))
+        self.assertIn('--shard providers --provider-part ${{ matrix.providerpart }} --jobs 1', providers)
+        provider_join = workflow.split('  providers_join:\n', 1)[1].split('  personal:', 1)[0]
+        self.assertIn('needs: providers', provider_join)
+        self.assertIn('test "$PART_RESULT" = success', provider_join)
+        self.assertIn('python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence', provider_join)
         self.assertIn('temporary-fixtures:', action)
         self.assertIn("inputs.temporary-fixtures == 'true' && 'setup' || 'disk'", action)
         self.assertIn('default: "false"', action.split('  temporary-fixtures:\n', 1)[1].split('runs:', 1)[0])

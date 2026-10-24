@@ -530,3 +530,9 @@ Each named harness owns isolated Launch/Doctor/Drive/Evidence/Cleanup. Commands:
 `python3 scripts/verify_codemode.py --binary bin/erii --evidence evidence/codemode.json`
 and `python3 scripts/verify_local_provider.py --binary bin/erii --evidence evidence/local-provider.json`.
 Compatibility and frozen-Run upgrade procedure: [ADR 005](../docs/adr/005-consolidated-tool-surface.md).
+
+## Providers CI budget (ERII-339)
+
+| Feature | Reach it | Authoritative entry point | Evidence and cleanup |
+| --- | --- | --- | --- |
+| Complete providers gates within the ten-minute job boundary | CI `Providers (cli/models)` → `Complete providers evidence` → `Ubuntu checks`; local `verify_suite.py --shard providers --provider-part cli` / `models`, then `ci_providers.py --parts DIR --evidence DIR` | Original `verify_suite.SHARDS['providers']`, fixed `provider_gates`, `ci_providers.join`, `.github/workflows/ci.yml` | All original gates and five-run series; model/storage `go test -count=5` on its own runner; fail-closed exact source/binary/workflow join; per-job SDK isolation/immutable Doctor and exact tmpfs cleanup retained. `steps/sdk-doctor.json` and `steps/fixture-cleanup.json` expose maintenance wall time; native run/job/step/artifact identity proves whole-job success. Full local `make verify` remains unpartitioned. |
