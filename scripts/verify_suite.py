@@ -69,6 +69,7 @@ SHARDS = {
     "providers": (
         Gate("startup", "verify_startup.py", "startup"),
         Gate("local-provider", "verify_local_provider.py", "local-provider"),
+        Gate("unscripted-entry", "verify_unscripted_cases.py", "unscripted-entry"),
         Gate("account-initial", "verify_account.py", "account"),
         Gate("capabilities", "verify_capabilities.py", "capabilities", 5),
         Gate("tui", "verify_tui.py", "tui", 5),
