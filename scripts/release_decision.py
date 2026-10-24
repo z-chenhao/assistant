@@ -251,7 +251,7 @@ def decide(root, pack_path, expected_hash, now=None):
     require(pack.get('version') == 1, 'unsupported private pack')
     sha = git(root, 'rev-parse', 'HEAD').decode().strip()
     require(pack['binding']['release_sha'] == sha, 'stale release SHA')
-    ledger = strict_json((root / 'docs/v1-release-ledger.json').read_bytes())
+    ledger = release_audit.current_ledger(root)
     inventory = release_audit.audit(root, ledger)
     sources = {p: v['sha256'] for p, v in inventory['sources'].items()}
     policy_path = root / 'evals/scoring-v1.json'

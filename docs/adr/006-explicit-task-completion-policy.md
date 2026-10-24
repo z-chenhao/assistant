@@ -39,6 +39,13 @@ Drain existing Main Runs with their original binary before upgrading. Stored
 results, Task policy, anchors and terminal Runs are not rewritten. New Runs
 receive the current schema; existing Worker snapshots have no Task tool.
 
+The approved baseline changes also require an explicit current release-source
+binding. Preserve the historical ledger bytes and all 122 review obligations.
+The audit/decision entry points bind current source hashes and relocate only
+unchanged section/content hashes; changed or ambiguous reviewed text rejects.
+New Task clauses remain pending individual review. This inventory maintenance
+does not supply release evidence, semantic scores or a release PASS.
+
 ## Explicit completion
 
 Extend the same Main-only manage union with `complete` and `taskRef`. Accept

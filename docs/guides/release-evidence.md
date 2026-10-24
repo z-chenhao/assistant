@@ -28,6 +28,15 @@ without importing unmerged product changes or fetching Git objects in CI.
 It is historical provenance, never proof of current code. The decision path
 requires current Git blobs, native observations and new independent reviews.
 Changes to normative source hashes fail closed and require deliberate re-audit.
+The current [source binding](../v1-release-source-bindings.json) explicitly pins
+both current sources and the immutable historical ledger. The audit and decision
+entry points use that binding. Only historical review line positions may move:
+each original section/content hash must still match exactly one current block.
+A changed or ambiguous reviewed block rejects instead of inheriting its old
+review. All other historical review fields and remaining obligations survive;
+new clauses stay pending individual review. `--ledger` accepts an explicit ledger
+without this rebinding and still enforces its exact source hashes. The binding
+is an inventory update, never release acceptance.
 
 ## Trust and acquisition
 

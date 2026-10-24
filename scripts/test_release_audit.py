@@ -13,12 +13,50 @@ import release_audit as audit
 
 class ReleaseAuditTests(unittest.TestCase):
     def setUp(self):
-        self.ledger = json.loads((audit.ROOT / 'docs/v1-release-ledger.json').read_text())
+        self.ledger = audit.current_ledger(audit.ROOT)
 
     def test_import_preserves_complete_checkpoint_ledger_bytes(self):
         self.assertEqual(hashlib.sha256((audit.ROOT / 'docs/v1-release-ledger.json').read_bytes()).hexdigest(),
                          '05063f1a2f83327baa74ae971bd61f31485e66211ec76309b566ff1c747d4181')
         self.assertEqual(len(self.ledger['individual_reviews']), 122)
+
+    def test_current_binding_preserves_every_historical_review_except_line(self):
+        historical = json.loads((audit.ROOT / 'docs/v1-release-ledger.json').read_text())
+        for before, after in zip(historical['individual_reviews'], self.ledger['individual_reviews']):
+            self.assertEqual({k: v for k, v in before.items() if k != 'line'},
+                             {k: v for k, v in after.items() if k != 'line'})
+        report = audit.audit(audit.ROOT, self.ledger)
+        complete = [u for u in report['source_units'] if 'task_manage(complete)' in u['text']]
+        self.assertTrue(complete)
+        self.assertTrue(all(u['disposition'] == 'pending_individual_review' for u in complete))
+
+    def test_current_binding_rejects_drift_changed_reviews_and_ambiguity(self):
+        for mutation in ('none', 'ledger', 'source', 'review', 'ambiguous', 'inventory'):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / 'docs').mkdir()
+                text = '## 3. Tasks\n\n- keep this obligation\n'
+                row = audit.inventory(text)[0]
+                ledger = dict(sources={'source.md': {'sha256': hashlib.sha256(text.encode()).hexdigest()}},
+                              individual_reviews=[dict(source='source.md', **row)])
+                original = json.dumps(ledger).encode()
+                (root / 'docs/v1-release-ledger.json').write_bytes(original)
+                binding = dict(version=1, ledger_sha256=hashlib.sha256(original).hexdigest(), sources={})
+                current = '\n\n' + text
+                if mutation == 'review': current = current.replace('keep this obligation', 'changed obligation')
+                if mutation == 'ambiguous': current += '\n- keep this obligation\n'
+                binding['sources']['source.md'] = hashlib.sha256(current.encode()).hexdigest()
+                if mutation == 'inventory': binding['sources']['extra.md'] = '0' * 64
+                (root / 'docs/v1-release-source-bindings.json').write_text(json.dumps(binding))
+                (root / 'source.md').write_text(current)
+                if mutation == 'source': (root / 'source.md').write_text(current + '\n- unbound change\n')
+                if mutation == 'ledger': (root / 'docs/v1-release-ledger.json').write_bytes(original + b'\n')
+                if mutation == 'none':
+                    bound = audit.current_ledger(root)
+                    self.assertEqual(bound['individual_reviews'][0]['line'], row['line'] + 2)
+                    self.assertEqual((root / 'docs/v1-release-ledger.json').read_bytes(), original)
+                else:
+                    with self.assertRaises(ValueError): audit.current_ledger(root)
 
     def test_partial_reviews_cannot_certify_requirements_or_scores(self):
         # Even an added success-looking field cannot certify a release.
