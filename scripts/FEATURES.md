@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen baseline-11 audit (ERII-241)
+
+| Feature | Reach / authoritative entry | Evidence |
+| --- | --- | --- |
+| Module, policy and minimum persistence dispositions | `make audit-baseline-11`; `release_audit.py` / `release_package.audit_package` | 80 original/sealed blocks, 487 scoped duties, all 480 mandatory routes, 19 per-field maps, 96 references, 16 merged PRs and five observation groups. Zero certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_baseline11.py` | Both seals, the exact ADR006 Task change, independent current disposition, optional fields and finite difference routes. Launch/Doctor load sources; Drive uses existing CLI; Evidence is `evidence/baseline-11.json`; Cleanup removes disposable output only. |
+
+See [observations, finite routes and limits](../docs/audits/baseline-11.md).
+
 ## Frozen baseline-10 audit (ERII-240)
 
 | Feature | How to reach it | Authoritative entry point and evidence |
