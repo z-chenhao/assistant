@@ -6,6 +6,8 @@ from pathlib import Path
 
 CASES = ('GC-01','GC-02','GC-03','GC-04','GC-05','GC-06','GC-07','GC-10','GC-13','GC-15','GC-18')
 VARIANTS = ('wording-1','wording-2','wording-3','noise-1','noise-2','order-1')
+GC02_SCHEDULE_ASSERTIONS = frozenset(('no_schedule_before_request','monthly_schedule','first_monthly_fire',
+                                    'main_creates_automation','duplicate_reminder_input','no_early_task_or_fire'))
 
 # Private CI admission groups; every pair remains in exactly one five-run series.
 PARTS = {name: tuple((case, variant) for case in cases for variant in VARIANTS)
@@ -36,7 +38,8 @@ def aggregate(reports):
         raise ValueError('binary/fixture/repetition drift')
     def passed(row):
         checks=row['assertions']
-        return bool(checks) and all(type(v) is bool and v for v in checks.values()) and not row['hard_failure'] and row['status']=='fragment_pass'
+        required=GC02_SCHEDULE_ASSERTIONS if row['case_id']=='GC-02' else set()
+        return bool(checks) and required<=checks.keys() and all(type(v) is bool and v for v in checks.values()) and not row['hard_failure'] and row['status']=='fragment_pass'
     cases={}
     for case in CASES:
         series=[rows for key,rows in groups.items() if key[0]==case]
@@ -48,7 +51,9 @@ def aggregate(reports):
                          semantic_metrics={'pass@1':None,'pass^5':None},scope='mechanical L0/L1 fragment; semantic evaluation inconclusive')
     return dict(version=1,cases=cases,passed=all(c['mechanical']['pass^5']==1 for c in cases.values()),
                 product_gate='inconclusive; no semantic Judge or current L2',suite_mean=None,suite_min=None,
-                not_applicable=['M7 scheduled/channel portions'],live_shadow=reports[0]['live_shadow'])
+                not_applicable=[],unverified=['Remaining M7 scheduled/channel journeys, semantic quality and current L2'],
+                coverage_extensions={'GC-02':'Four-turn journey and monthly Automation; mechanical assertions only'},
+                live_shadow=reports[0]['live_shadow'])
 
 
 def write(evidence):

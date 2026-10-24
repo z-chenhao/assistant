@@ -1,0 +1,10 @@
+{
+  "clock": "2026-10-15T16:00:00+08:00",
+  "event": {"title": "婚礼", "date": "2026-11-01", "task_id": "task_wedding"},
+  "checklist": [
+    {"id": "C1", "item": "确认宾客最终人数", "due": "2026-10-20", "status": "active"},
+    {"id": "C2", "item": "提交桌次给酒店", "due": "2026-10-22", "status": "blocked", "depends_on": "C1"},
+    {"id": "C3", "item": "确认摄影到场时间", "due": "2026-10-25", "status": "active"}
+  ],
+  "contacts": {"hotel": "banquet@example.test", "photographer": "photo@example.test"}
+}
