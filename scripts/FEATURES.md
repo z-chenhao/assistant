@@ -9,6 +9,15 @@
 
 See [native observations, finite routes and proof limits](../docs/audits/baseline-13.md).
 
+## Frozen baseline-12 audit (ERII-242)
+
+| Feature | Reach / authoritative entry point | Evidence and limits |
+| --- | --- | --- |
+| Error, configuration, startup, interface and milestone dispositions | `make audit-baseline-12`; `release_audit.py` / `release_package.audit_package` | 80 unchanged content identities, 452 scoped duties, all 445 mandatory/policy routes, 28 full configuration keys and 14 method maps. Zero certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_baseline12.py` | Launch/Doctor load frozen sources and retained ledger; Drive uses the existing CLI; Evidence is `evidence/baseline-12.json`; Cleanup removes disposable output. Strong mode checks supplied manifest/native bytes and Git. Missing keys, altered seals, stale references, missing routes and fabricated PASS reject. |
+
+See [observations, finite routes and limits](../docs/audits/baseline-12.md).
+
 ## Frozen baseline-11 audit (ERII-241)
 
 | Feature | Reach / authoritative entry | Evidence |

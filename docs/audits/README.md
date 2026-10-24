@@ -6,6 +6,11 @@ the independently audited ADR006 Task lifecycle change, current native observati
 and 19 existing finite owners. Use `make audit-baseline-13`; no product requirement
 or release is certified.
 
+[baseline-12](baseline-12.md) records ERII-242's 80-block error, configuration,
+startup, interface and M0–M5 audit. It retains 452 scoped duties, all 445
+mandatory/policy routes, 28 configuration keys, 14 method maps and three finite
+gap proposals. Use `make audit-baseline-12`; no product requirement is certified.
+
 [baseline-11](baseline-11.md) records ERII-241's 80-block module, policy and
 persistence audit. It retains 487 scoped duties, all 480 mandatory/policy routes,
 19 field maps, the changed ADR006 Task identity and four finite gap proposals.
