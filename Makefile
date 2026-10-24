@@ -10,6 +10,10 @@ install:
 audit-baseline-01:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-01.json --evidence evidence/baseline-01.json
 
+.PHONY: audit-baseline-02
+audit-baseline-02:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-02.json --evidence evidence/baseline-02.json
+
 .PHONY: audit-baseline-04
 audit-baseline-04:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-04.json --evidence evidence/baseline-04.json
