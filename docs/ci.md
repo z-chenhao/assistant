@@ -104,8 +104,8 @@ ten minutes as a regression to diagnose before review. Do not remove coverage,
 reduce repetitions, extend fixture deadlines, or retry failures to meet it.
 
 Providers uses two Required parts, `cli` and `models`, with the unchanged
-logical inventory in `verify_suite.SHARDS`. The CLI part keeps startup, local
-provider, initial account, capabilities ×5, TUI ×5, terminal input, Pi Bridge ×5
+logical inventory in `verify_suite.SHARDS`. The CLI part keeps startup, unscripted,
+local provider, initial account, capabilities ×5, TUI ×5, terminal input, Pi Bridge ×5
 and account ×5. The models part runs the original `go test -count=5 -json
 ./internal/llm/... ./internal/agent/sqlite` alone. Both provision their own SDK,
 sandbox and private tmpfs; their SDK Doctor and exact fixture cleanup run through

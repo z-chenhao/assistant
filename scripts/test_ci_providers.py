@@ -62,7 +62,10 @@ class ProvidersTests(unittest.TestCase):
                 if mutation == 'missing_part': del suites['models']
                 elif mutation == 'missing_round': rows.pop()
                 elif mutation == 'duplicate': rows.append(copy.deepcopy(rows[-1]))
-                elif mutation == 'reordered': rows[3], rows[4] = rows[4], rows[3]
+                elif mutation == 'reordered':
+                    positions = [i for i, row in enumerate(rows) if row['gate'] == 'capabilities']
+                    a, b = positions[:2]
+                    rows[a], rows[b] = rows[b], rows[a]
                 elif mutation == 'failed_round': rows[-1]['returncode'] = 130
                 elif mutation == 'leaked_group': rows[-1]['owned_group_drained'] = False
                 elif mutation == 'failed_suite': suite['passed'] = False

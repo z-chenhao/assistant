@@ -231,6 +231,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn("--name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5", workflow)
         providers = workflow.split('  providers:\n', 1)[1].split('  providers_join:', 1)[0]
         self.assertIn('temporary-fixtures: "true"', providers)
+        self.assertIn('timeout-minutes: 10', providers)
         self.assertIn('--name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor', providers)
         self.assertIn('--name fixture-cleanup --phase cleanup -- python3 scripts/ci_tmpfs.py cleanup', providers)
         self.assertEqual(providers.count('if: ${{ always() }}'), 3)
