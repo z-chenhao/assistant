@@ -1,9 +1,10 @@
 # Bounded baseline audits
 
-[baseline-02 reseal request](baseline-02-reseal.md) records two assigned blocks
-changed by ADR 006, the proposed old/new hash mapping and 78 unchanged relocations.
-ERII-232 remains inconclusive pending coordinator resealing; its preliminary
-reviews are not registered as a completed package ledger.
+[baseline-02](baseline-02.md) records ERII-232's Task, prompt, Run and Automation
+audit: 83 current blocks after the owner-approved [ADR006 reseal](baseline-02-reseal.md).
+Original identities and remaining duties stay visible; no requirement is certified.
+Run `make audit-baseline-02` through the same maintained entry point.
+
 [baseline-04](baseline-04.md) records ERII-234's separate 80-block audit of
 account, Bridge, model failure and Code Mode contracts. Its ledger and current
 observations do not change baseline-01 or the preserved historical ledger.
