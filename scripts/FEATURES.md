@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen baseline-09 audit (ERII-239)
+
+| Feature | Reach / authoritative entry | Evidence |
+| --- | --- | --- |
+| CUA transfer, context and Memory dispositions | `make audit-baseline-09`; existing `release_audit.py` / `release_package.audit_package` | Exactly 80 original/sealed blocks, 284 scoped duties, 44 current references, seven merged PRs and seven observation groups. All 261 mandatory/policy duties stay routed; no certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_baseline09.py` | Shared corruption/rejection suite plus original location, mandatory scope and token/Curator gap preservation. Launch/Doctor load sources; Drive uses the maintained CLI; Evidence is `evidence/baseline-09.json`; Cleanup removes disposable output only. |
+
+See [observations, finite routes and proof limits](../docs/audits/baseline-09.md).
+
 ## Frozen baseline-08 audit (ERII-238)
 
 | Feature | Entry point / authority | Evidence and limits |

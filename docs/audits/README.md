@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-09](baseline-09.md) records ERII-239's 80-block CUA transfer, context
+and Memory audit. Its 284 scoped duties retain all 261 mandatory/policy routes,
+current native observations and two finite gap proposals. Use
+`make audit-baseline-09`; no product requirement is certified.
+
 [baseline-08](baseline-08.md) records ERII-238’s 80-block Security, Computer and
 CUA audit. Its 402 scoped duties retain 384 mandatory routes, current mechanical
 receipts and five finite gap proposals. Use `make audit-baseline-08`; no product
