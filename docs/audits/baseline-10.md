@@ -114,12 +114,24 @@ current Guest compatibility or named human review is claimed. Output stays
 | [ERII-353](https://multica.ai/erii-studio/issues/01a16f33-2af9-73ad-af32-b0c29774632d) | Reuse the preceding package's different-text fact conflict repair; current serial/fingerprint handling and explicit supersedes do not complete automatic semantic merging. |
 | [ERII-335](https://multica.ai/erii-studio/issues/01a16dd9-6f96-7e35-88a3-c5f794a8e958) | Native Bridge permission and Secret RPC proof; directory separation alone is insufficient. |
 | [ERII-340](https://multica.ai/erii-studio/issues/01a16e1c-85c6-7b24-8ca6-89cca9f6caa5) | Frozen idempotency-key derivation and replay compatibility; do not silently normalize the observed specification/implementation difference. |
-| [ERII-342](https://multica.ai/erii-studio/issues/01a16e22-c621-76f5-bcde-9a4f1d79ac65), [ERII-345](https://multica.ai/erii-studio/issues/01a16ef3-4aea-7e6d-93a7-bf158e28d3ff) | Reuse the exact domain naming and Code Mode persistence/ownership mapping tasks. Do not add duplicate loops or empty API wrappers. |
+| [ERII-342](https://multica.ai/erii-studio/issues/01a16e46-7f12-7af5-b0f8-c5070324cf06) | Existing §3.8/§3.11 domain API and Context Builder naming reconciliation. This task does not own the AgentService dependency. |
+| [ERII-345](https://multica.ai/erii-studio/issues/01a16ef3-4aea-7e6d-93a7-bf158e28d3ff) | Code Mode persistence/ownership and dependency mapping. The §14.2 AgentService duty reuses this task's frozen §6.6.8 duty; no duplicate loop or empty wrapper. |
 | [ERII-351](https://multica.ai/erii-studio/issues/01a16f1a-5c83-794f-87df-07fefac2e3c3) | Existing ComputerProvider lifecycle/state/capability responsibility reconciliation. |
 | [ERII-352](https://multica.ai/erii-studio/issues/01a16f33-2755-76d6-a96f-5ac3e3e8f661) | Existing frozen token-budget versus byte-estimation threshold repair; current context duties remain unmet until actual proof. |
 | [ERII-330](https://multica.ai/erii-studio/issues/01a16bd2-3352-7bc8-8c8c-fc6045822909) | Actual-model Memory evidence/recall judgment, Main failure interpretation and meaningful progress, model/ChatGPT compatibility; original frozen dual-arm evaluations and independent Judge receipts. |
 | [ERII-331](https://multica.ai/erii-studio/issues/01a16bd2-481b-7404-8db1-971204d4f839) | Current approved Guest/channels and named human observations, exact approval, native state/Artifact and cleanup; deterministic peers do not substitute. |
 | [ERII-332](https://multica.ai/erii-studio/issues/01a16bd2-5d15-7af2-bb7f-7e5ff3c3c420) | Final current-release per-duty implementation, migration, replay, race, protected-five-run, native CI and independent-review join. Remaining duties stay unmet; discovered faults require finite repair rather than changing this audit to verified. |
+
+The §14.2 current L1884 / original L1874 duty “Code Mode through AgentService
+creates only Child Runs” routes to ERII-345, whose existing frozen scope includes
+§6.6.8 current L1203 / original L1193, SHA256
+`86b2574208ec60f8111bee492a57dd166a9c1e4b04571b0ea3bb9bae35715548`.
+That block in [baseline-07](baseline-07.json) explicitly requires the same
+AgentService Child-creation dependency. The remaining duty records this identity
+and its peer obligation in `scope_reuse`; it does not add a source block to this
+80-block audit or enlarge either downstream task's contract. The regression
+checks the exact route against that frozen peer duty and all documented issue
+links against the ledger's canonical routes.
 
 The four new records are unassigned Backlog proposals awaiting coordinator
 registration/admission. Deduplication inspected all 64 existing parent children

@@ -1,6 +1,8 @@
 """Frozen Memory/event/progress/organization audit integrity, never a release PASS."""
 import copy
 from collections import Counter
+import json
+import re
 
 import test_release_package
 from release_package import frozen_digest
@@ -8,6 +10,44 @@ from release_package import frozen_digest
 
 class Baseline10Tests(test_release_package.ReleasePackageTests):
     ledger_path = 'docs/audits/baseline-10.json'
+
+    def test_agent_service_reuses_the_frozen_duty_owned_by_erii345(self):
+        row = next(r for r in self.ledger['reviews'] if r['current_line'] == 1884)
+        duty = next(r for r in row['remaining']
+                    if r['obligation'] == 'CodeMode经AgentService只创建Child')
+        # ERII-342 owns only the named §3.8/§3.11 APIs. The same AgentService
+        # dependency is frozen in ERII-345's §6.6.8 scope, not that API task.
+        self.assertEqual(duty['gap'], 'G-code-layout')
+        target = self.ledger['gaps'][duty['gap']]
+        self.assertEqual(target['issue'], 'ERII-345')
+        self.assertEqual(target['issue_url'],
+                         'https://multica.ai/erii-studio/issues/01a16ef3-4aea-7e6d-93a7-bf158e28d3ff')
+        reuse = duty['scope_reuse']
+        self.assertEqual(reuse, dict(
+            ledger='docs/audits/baseline-07.json', source='docs/technical-design.md',
+            section='6.6.8', line=1203, original_line=1193,
+            sha256='86b2574208ec60f8111bee492a57dd166a9c1e4b04571b0ea3bb9bae35715548',
+            obligation='CodeMode通过AgentService建Child'))
+        peer = json.loads((self.root / reuse['ledger']).read_text())
+        identity = {k: reuse[k] for k in ('source', 'section', 'line', 'sha256')}
+        self.assertTrue(any(all(b[k] == v for k, v in identity.items())
+                            for b in peer['frozen_blocks']))
+        source = next(r for r in peer['reviews']
+                      if all(r[k] == v for k, v in identity.items()))
+        self.assertEqual(source['original_line'], reuse['original_line'])
+        peer_duty = next(r for r in source['remaining']
+                         if r['obligation'] == reuse['obligation'])
+        self.assertEqual(peer['gaps'][peer_duty['gap']]['issue_url'], target['issue_url'])
+        self.assertIn('ERII-345', row['proof_limit'])
+        self.assertNotIn('ERII-342', row['proof_limit'])
+        self.assertEqual(duty['detail'], row['proof_limit'])
+
+    def test_document_route_links_match_the_canonical_ledger(self):
+        text = (self.root / 'docs/audits/baseline-10.md').read_text()
+        links = set(re.findall(
+            r'\[(ERII-\d+)\]\((https://multica\.ai/erii-studio/issues/[0-9a-f-]+)\)', text))
+        self.assertEqual(links, {(g['issue'], g['issue_url'])
+                                 for g in self.ledger['gaps'].values()})
 
     def test_both_seals_preserve_identity_order_and_original_location(self):
         self.assertEqual(frozen_digest(self.ledger['frozen_blocks']),

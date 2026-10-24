@@ -6665,7 +6665,7 @@
         "不建Workflow模块"
       ],
       "observed": "Actor与统一agentLoop、sqlite Runs负责创建/调度/权限；Code Host通过ChildRunner依赖，不创建Task。",
-      "proof_limit": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。",
+      "proof_limit": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。",
       "disposition": "partial_mechanical",
       "obligation_kinds": {
         "agent拥有Actor": "required_v1",
@@ -6687,47 +6687,56 @@
         {
           "obligation": "agent拥有Actor",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "agent拥有共享Main Worker Loop",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "agent承担Task创建决策",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "agent拥有Run树生命周期",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "agent校验创建权限",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "agent限制深度",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "agent调度Worker",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         },
         {
           "obligation": "CodeMode经AgentService只创建Child",
-          "gap": "G-domain",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "gap": "G-code-layout",
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。",
+          "scope_reuse": {
+            "ledger": "docs/audits/baseline-07.json",
+            "source": "docs/technical-design.md",
+            "section": "6.6.8",
+            "line": 1203,
+            "original_line": 1193,
+            "sha256": "86b2574208ec60f8111bee492a57dd166a9c1e4b04571b0ea3bb9bae35715548",
+            "obligation": "CodeMode通过AgentService建Child"
+          }
         },
         {
           "obligation": "不建Workflow模块",
           "gap": "G-release",
-          "detail": "AgentService等私有命名/职责映射复用ERII-342；本轮选定claim测试不等于完整并发恢复证明。"
+          "detail": "Code Mode经AgentService创建Child的依赖/落位差异复用ERII-345已冻结的§6.6.8 current L1203/original L1193同义务；未据私有ChildRunner等价命名批准偏差。本轮选定claim测试不等于完整并发恢复证明。"
         }
       ],
       "references": [
