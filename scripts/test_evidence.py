@@ -194,28 +194,39 @@ class ExistingCollectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             archive = base / 'artifact.zip'
+            expected = {'suite-' + shard + '.json': {'passed': True} for shard in compare.SHARDS}
+            expected.update({'core-summary.json': {'passed': True}, 'm6-summary.json': {'passed': True}})
             with zipfile.ZipFile(archive, 'w') as output:
-                output.writestr('suite-runtime.json', '{"passed":true}')
+                for name, report in expected.items():
+                    output.writestr(name, json.dumps(report))
                 output.writestr('irrelevant.log', 'complete raw log stays in archive')
             sha = 'a' * 40
             payload = archive.read_bytes()
-            item = dict(id=7, name=f'evidence-runtime-{sha}-1', size_in_bytes=len(payload), expired=False,
+            item = dict(size_in_bytes=len(payload), expired=False,
                         digest='sha256:' + hashlib.sha256(payload).hexdigest(),
                         workflow_run=dict(id=42, head_sha=sha))
+            artifacts = [dict(item, id=i, name=f'evidence-{shard}-{sha}-1')
+                         for i, shard in enumerate(compare.SHARDS, 1)]
             meta = dict(repository='owner/repo', run=42, attempt=1, source_sha=sha,
-                        artifacts=[item, dict(item, id=8, name=f'evidence-fast-{sha}-1'),
-                                   dict(item, id=9, name=f'evidence-codemode-GC-17-{sha}-1')])
+                        artifacts=[*artifacts, dict(item, id=98, name=f'evidence-fast-{sha}-1'),
+                                   dict(item, id=99, name=f'evidence-codemode-GC-17-{sha}-1')])
+            run = dict(id=42, run_attempt=1, head_sha=sha, path='.github/workflows/ci.yml',
+                       status='completed', conclusion='success')
+            jobs = [dict(name=name, run_id=42, run_attempt=1, head_sha=sha, conclusion='success',
+                         started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:01Z')
+                    for name in compare.topology()]
             def download(*_args, stdout, **_kwargs): stdout.write(payload)
             with patch.dict('os.environ', ERII_EVIDENCE_ROOT=str(base / 'durable')), \
-                 patch.object(compare.profile, 'gh', side_effect=[dict(head_sha=sha), [dict(jobs=[])] ] * 2), \
+                 patch.object(compare.profile, 'gh', side_effect=[run, [dict(jobs=jobs)]] * 2), \
                  patch.object(compare, 'inventory', return_value=meta), \
                  patch.object(ev, 'read', side_effect=download) as fetch:
                 cold = compare.collect('owner/repo', '42:1')
                 warm = compare.collect('owner/repo', '42:1')
-            self.assertEqual(fetch.call_count, 1)
-            self.assertEqual(cold['reports'], {'suite-runtime.json': {'passed': True}})
+            self.assertEqual(fetch.call_count, len(compare.SHARDS))
+            self.assertEqual(cold['reports'], expected)
             self.assertEqual(cold['reports'], warm['reports'])
-            self.assertEqual(warm['transfers'][0]['downloaded_bytes'], 0)
+            self.assertEqual(sum(t['downloaded_bytes'] for t in cold['transfers']), len(payload)*len(compare.SHARDS))
+            self.assertTrue(all(t['downloaded_bytes'] == 0 for t in warm['transfers']))
 
 class ProcessRecoveryTests(unittest.TestCase):
     def test_sigkill_partial_download_then_foreground_resume(self):

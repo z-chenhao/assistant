@@ -2,6 +2,7 @@ package fake
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/z-chenhao/erii/internal/llm"
@@ -70,17 +71,25 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	if !found {
 		return llm.GenerationResult{Text: "Invalid fixture plan."}
 	}
-	count := 0
+	next := 0
 	last := ""
 	for _, m := range request.Messages[start+1:] {
 		if m.Role == "tool" {
-			count++
+			// Compaction may discard any older completed exchange. Keep plan
+			// progress in this Fake provider's call identity, which survives in
+			// the retained result, rather than count the remaining messages.
+			ordinal, ok := strings.CutPrefix(m.ToolCallID, "capability:")
+			i, err := strconv.Atoi(ordinal)
+			if !ok || err != nil || i < 0 || i >= len(plan) {
+				return llm.GenerationResult{Text: "Invalid fixture receipt."}
+			}
+			next = max(next, i+1)
 			last = m.Text
 		}
 	}
-	if count >= len(plan) {
+	if next >= len(plan) {
 		return llm.GenerationResult{Text: "Observed Tool result: " + last}
 	}
-	p := plan[count]
-	return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "capability", Name: p.Name, Arguments: string(p.Arguments)}}}
+	p := plan[next]
+	return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "capability:" + strconv.Itoa(next), Name: p.Name, Arguments: string(p.Arguments)}}}
 }
