@@ -34,6 +34,7 @@ and `run*cases` harness must be registered; `make test` rejects inventory drift.
 | Personal and multimodal journeys | personal | m6-cases |
 | Install, model setup and credentials | providers | startup, local-provider, account-initial, account, models |
 | Terminal and capability contracts | providers | tui, terminal-input, capabilities, pi-bridge |
+| Unscripted evaluation entry mechanism | providers | unscripted-entry |
 
 A shard runs its complete inventory:
 
