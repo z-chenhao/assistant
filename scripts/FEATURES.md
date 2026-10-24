@@ -30,6 +30,15 @@ private inputs, exit codes and remaining real release obligations.
 
 See the [bounded audit ledger and proof limits](../docs/audits/README.md).
 
+## Frozen baseline-04 audit (ERII-234)
+
+| Feature | Reach it | Authoritative entry point | Evidence and limits |
+| --- | --- | --- | --- |
+| Account, Bridge and Code Mode dispositions | `make audit-baseline-04` | Existing `release_audit.py`, `release_package.audit_package`, `docs/audits/baseline-04.json` | Exactly 80 independently pinned source blocks, 224 authored sub-obligations with explicit mandatory/background/deferred scopes, current code/test hashes, actual merged PR provenance, seven native observation receipts and finite gap routes. All mandatory duties remain routed; no verified requirements or semantic scores. |
+| Integrity and provenance | `make verify-release-decision`; optional manifest/native-root/`--verify-git` on the existing CLI | `test_release_baseline04.py` inherits maintained rejection contracts and checks explicit sub-obligation routing | Missing/duplicate/extra or changed blocks, stale references, unmerged PRs, altered native bytes and unexplained exemptions reject. CLI readback retains historical reviews and inconclusive release status; disposable reports are cleaned without touching inputs. |
+
+See [baseline-04 observations and routes](../docs/audits/baseline-04.md).
+
 Start with the [capability and gate directory](../docs/guides/verification.md).
 `python3 scripts/verify_suite.py --list` reads the authoritative execution inventory;
 `--gate NAME` drives a selected capability with its complete repetition count.
