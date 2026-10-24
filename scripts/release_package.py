@@ -29,6 +29,7 @@ PACKAGE_HASHES = {
     'baseline-11': '46a87bc1728c849591bf6c45905e56fc3e83a849264dacdda83d92e3d8b04fca',
     'baseline-12': 'aece4cdba5e23a174caf8c4ee1f1b6ae65679bd3b17bd0274304446d21154d65',
     'baseline-13': '9d86d5732f7addecb9001ad5cf9c9b521f212373c5a57149e8c08cb95661570d',
+    'golden-common-01': '3421f37dee8becf70cb964d7eb7a998f3a4bb19c006d0e2bcb3bbbb7cabd9d9e',
 }
 ORIGINAL_PACKAGE_HASHES = {
     'baseline-02': 'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63',
@@ -134,7 +135,8 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
     base = ledger['audited_base']
     if verify_git:
         git(root, 'merge-base', '--is-ancestor', base, 'HEAD')
-        if digest(git(root, 'show', base + ':docs/technical-design.md')) != ledger['source_sha256']:
+        source = frozen[0]['source']
+        if digest(git(root, 'show', base + ':' + source)) != ledger['source_sha256']:
             raise ValueError('audited source hash mismatch')
     references = ledger['references']
     for ref, value in references.items():
