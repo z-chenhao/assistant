@@ -110,5 +110,8 @@ func (r *Runs) compactMessages(ctx context.Context, c agent.RunClaim, run agent.
 		_, e := tx.ExecContext(ctx, `INSERT INTO context_compaction VALUES(?,?,?,?,?,?,?)`, run.ID, run.Checkpoint.Step, digest(policy), digest(input), raw, provenance, time.Now().UnixMicro())
 		return e
 	})
+	if e == nil {
+		r.host.boundary("after_compaction_commit")
+	}
 	return result.Messages, e
 }
