@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-02 reseal request](baseline-02-reseal.md) records two assigned blocks
+changed by ADR 006, the proposed old/new hash mapping and 78 unchanged relocations.
+ERII-232 remains inconclusive pending coordinator resealing; its preliminary
+reviews are not registered as a completed package ledger.
+
 [baseline-01.json](baseline-01.json) disposes of the **80 exact blocks** assigned
 to ERII-231 in the owner's frozen work-package manifest. It records 257 authored
 sub-obligations: 48 blocks have partial mechanical evidence, 17 have evidence
