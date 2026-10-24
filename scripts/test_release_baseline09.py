@@ -69,3 +69,25 @@ class Baseline09Tests(test_release_package.ReleasePackageTests):
         self.assertIn('curator-probe', rows[1738]['observations'])
         self.assertIn('不是产品通过', self.ledger['observations']['curator-probe']['limits'])
         self.assertEqual(self.run_audit()['verified_requirements'], 0)
+
+    def test_transfer_boundary_observation_binds_host_guest_and_json_rejection(self):
+        row = next(r for r in self.ledger['reviews'] if r['current_line'] == 1574)
+        observation = self.ledger['observations']['transfer-boundary']
+        for source in ('internal/computer/macosvm/use.go', 'internal/computer/macosvm/transfer.py'):
+            self.assertIn(source, row['references'])
+            self.assertEqual(observation['sources'][source], self.ledger['references'][source]['sha256'])
+        self.assertIn('transfer-boundary', row['observations'])
+        self.assertEqual(observation['limit_bytes'], 8 * 1024 * 1024)
+        cases = observation['observations']
+        self.assertEqual({(c['operation'], c['input_bytes']) for c in cases},
+                         {(op, size) for op in ('read', 'write') for size in (8388608, 8388609)})
+        for case in cases:
+            # The helper returns zero even on refusal; the JSON is authoritative.
+            self.assertEqual(case['exit_code'], 0)
+            if case['input_bytes'] == 8388608:
+                self.assertEqual(case['result'], 'accepted')
+                self.assertEqual(case['output_bytes'], case['input_bytes'])
+            else:
+                self.assertEqual(case['result'], {'error': 'PERMISSION_DENIED'})
+        self.assertIn('Host WriteFile仅源码核对', row['proof_limit'])
+        self.assertTrue(row['remaining'])

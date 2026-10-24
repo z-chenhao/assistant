@@ -1262,6 +1262,9 @@
     },
     "internal/app/runtime.go": {
       "sha256": "79263983ab9931ad54c7c25bc3d1560d7cc0d4c7c01c053913a9d23f5382d927"
+    },
+    "internal/computer/macosvm/transfer.py": {
+      "sha256": "432b3ef5a1f436c189f7d876dc8294cb175c3f746385d0aba7f8727e31607007"
     }
   },
   "merged_prs": {
@@ -1570,6 +1573,69 @@
           "./cmd/erii"
         ]
       }
+    },
+    "transfer-boundary": {
+      "source_sha": "87fecc5ba864aa0235bd711eb32c6ceaead19491",
+      "command": [
+        "/usr/local/bin/python3",
+        "/Users/zhuchenhao/Projects/erii/evidence/agent-delivery/ERII-239/87fecc5ba864aa0235bd711eb32c6ceaead19491/audit-20261025/transfer-repair-20261025/probe.py",
+        "/Users/zhuchenhao/Projects/erii/evidence/agent-delivery/ERII-239/87fecc5ba864aa0235bd711eb32c6ceaead19491/audit-20261025/transfer-repair-20261025/boundary.json"
+      ],
+      "started_at": "2026-10-24T19:00:52.870242+00:00",
+      "limits": "Frozen Guest helper read/write executed in a disposable local filesystem. Host WriteFile is source-inspected only. No end-to-end Host/SSH/VM, memory-use, disconnect or arbitrary large-file claim. JSON errors, not process exit zero, prove rejection.",
+      "limit_bytes": 8388608,
+      "sources": {
+        "internal/computer/macosvm/use.go": "59e0dbccdd1f30e487d459aac833f925bc4b05a0da766590276b7be6eb8c3ed9",
+        "internal/computer/macosvm/transfer.py": "432b3ef5a1f436c189f7d876dc8294cb175c3f746385d0aba7f8727e31607007"
+      },
+      "observations": [
+        {
+          "operation": "read",
+          "input_bytes": 8388608,
+          "exit_code": 0,
+          "result": "accepted",
+          "output_bytes": 8388608,
+          "output_sha256": "0c77bc0a0795a93612d45256897456d0fcb24f151c44c150d07ecd03f4ef5168"
+        },
+        {
+          "operation": "write",
+          "input_bytes": 8388608,
+          "exit_code": 0,
+          "result": "accepted",
+          "output_bytes": 8388608,
+          "output_sha256": "0c77bc0a0795a93612d45256897456d0fcb24f151c44c150d07ecd03f4ef5168"
+        },
+        {
+          "operation": "read",
+          "input_bytes": 8388609,
+          "exit_code": 0,
+          "result": {
+            "error": "PERMISSION_DENIED"
+          }
+        },
+        {
+          "operation": "write",
+          "input_bytes": 8388609,
+          "exit_code": 0,
+          "result": {
+            "error": "PERMISSION_DENIED"
+          }
+        }
+      ],
+      "cleanup": "All four subprocesses completed; temporary helper, transfer root and fixtures removed.",
+      "exit_code": 0,
+      "files": [
+        {
+          "path": "transfer-repair-20261025/probe.py",
+          "size_bytes": 3340,
+          "sha256": "fe1216cfc01ea792576db2068ae8bb74ace8c4a7c21dff21d029e85b0ea43d04"
+        },
+        {
+          "path": "transfer-repair-20261025/boundary.json",
+          "size_bytes": 1997,
+          "sha256": "5d65ea941feb068be6f40f0b3c6b175e1e25f0e79f7226ee19549fd15dfd9129"
+        }
+      ]
     }
   },
   "gaps": {
@@ -2515,8 +2581,8 @@
         "二进制和Base64不进RunTrace",
         "二进制和Base64不进模型Context"
       ],
-      "observed": "Host流式Artifact接口；macosvm传输内使用有界64MiB buffer/base64，该内部transport不进入JS/trace。CLI只见引用。",
-      "proof_limit": "CUA CLI观察使用HTTP/SSH peer，不是当前macOS Guest；未覆盖所有文件大小/故障边界、真实页面或模型选择，仍保留最终join。 本轮未做64MiB边界、内存测量或大文件断连，不能从小fixture证明任意大文件。",
+      "observed": "Host流式Artifact接口；macosvm Host WriteFile最多读8MiB+1字节并拒绝大于8MiB；Guest transfer.py写入和导出同为8MiB上限，内部buffer/base64不进入JS/trace。冻结Guest helper的本地直接读写实测均接受8,388,608字节并拒绝8,388,609字节（JSON PERMISSION_DENIED；进程exit0）。CLI只见引用。",
+      "proof_limit": "CUA CLI使用HTTP/SSH peer；补充观察直接执行冻结Guest helper，仅证明隔离本地文件的8MiB读写边界。Host WriteFile仅源码核对；未执行Host/SSH/真实Guest端到端大文件边界、内存测量或大文件断连，不证明任意大文件。完整发布义务继续最终join。",
       "disposition": "partial_mechanical",
       "obligation_kinds": {
         "大文件在JS仅引用": "required_v1",
@@ -2528,34 +2594,35 @@
       "observations": [
         "computer-use",
         "quickjs",
-        "surface-contracts"
+        "surface-contracts",
+        "transfer-boundary"
       ],
       "exemptions": {},
       "remaining": [
         {
           "obligation": "大文件在JS仅引用",
           "gap": "G-release",
-          "detail": "CUA CLI观察使用HTTP/SSH peer，不是当前macOS Guest；未覆盖所有文件大小/故障边界、真实页面或模型选择，仍保留最终join。 本轮未做64MiB边界、内存测量或大文件断连，不能从小fixture证明任意大文件。"
+          "detail": "CUA CLI使用HTTP/SSH peer；补充观察直接执行冻结Guest helper，仅证明隔离本地文件的8MiB读写边界。Host WriteFile仅源码核对；未执行Host/SSH/真实Guest端到端大文件边界、内存测量或大文件断连，不证明任意大文件。完整发布义务继续最终join。"
         },
         {
           "obligation": "大文件在JS仅元数据",
           "gap": "G-release",
-          "detail": "CUA CLI观察使用HTTP/SSH peer，不是当前macOS Guest；未覆盖所有文件大小/故障边界、真实页面或模型选择，仍保留最终join。 本轮未做64MiB边界、内存测量或大文件断连，不能从小fixture证明任意大文件。"
+          "detail": "CUA CLI使用HTTP/SSH peer；补充观察直接执行冻结Guest helper，仅证明隔离本地文件的8MiB读写边界。Host WriteFile仅源码核对；未执行Host/SSH/真实Guest端到端大文件边界、内存测量或大文件断连，不证明任意大文件。完整发布义务继续最终join。"
         },
         {
           "obligation": "二进制和Base64不进QuickJS",
           "gap": "G-release",
-          "detail": "CUA CLI观察使用HTTP/SSH peer，不是当前macOS Guest；未覆盖所有文件大小/故障边界、真实页面或模型选择，仍保留最终join。 本轮未做64MiB边界、内存测量或大文件断连，不能从小fixture证明任意大文件。"
+          "detail": "CUA CLI使用HTTP/SSH peer；补充观察直接执行冻结Guest helper，仅证明隔离本地文件的8MiB读写边界。Host WriteFile仅源码核对；未执行Host/SSH/真实Guest端到端大文件边界、内存测量或大文件断连，不证明任意大文件。完整发布义务继续最终join。"
         },
         {
           "obligation": "二进制和Base64不进RunTrace",
           "gap": "G-release",
-          "detail": "CUA CLI观察使用HTTP/SSH peer，不是当前macOS Guest；未覆盖所有文件大小/故障边界、真实页面或模型选择，仍保留最终join。 本轮未做64MiB边界、内存测量或大文件断连，不能从小fixture证明任意大文件。"
+          "detail": "CUA CLI使用HTTP/SSH peer；补充观察直接执行冻结Guest helper，仅证明隔离本地文件的8MiB读写边界。Host WriteFile仅源码核对；未执行Host/SSH/真实Guest端到端大文件边界、内存测量或大文件断连，不证明任意大文件。完整发布义务继续最终join。"
         },
         {
           "obligation": "二进制和Base64不进模型Context",
           "gap": "G-release",
-          "detail": "CUA CLI观察使用HTTP/SSH peer，不是当前macOS Guest；未覆盖所有文件大小/故障边界、真实页面或模型选择，仍保留最终join。 本轮未做64MiB边界、内存测量或大文件断连，不能从小fixture证明任意大文件。"
+          "detail": "CUA CLI使用HTTP/SSH peer；补充观察直接执行冻结Guest helper，仅证明隔离本地文件的8MiB读写边界。Host WriteFile仅源码核对；未执行Host/SSH/真实Guest端到端大文件边界、内存测量或大文件断连，不证明任意大文件。完整发布义务继续最终join。"
         }
       ],
       "references": [
@@ -2568,7 +2635,8 @@
         "runtime/javascript/src/prelude.mjs",
         "internal/agent/sqlite/codemode.go",
         "internal/tool/executor.go",
-        "scripts/verify_computer_use.py"
+        "scripts/verify_computer_use.py",
+        "internal/computer/macosvm/transfer.py"
       ],
       "prs": [
         "18",

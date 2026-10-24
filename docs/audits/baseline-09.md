@@ -36,7 +36,7 @@ once against the current inventory. Changed or ambiguous content rejects and
 requires coordinator resealing; this audit makes no normative change.
 
 Each row retains full source text, old/sealed/current locations, scoped duties,
-observations, limits and exact remaining routes. The 44 current file references
+observations, limits and exact remaining routes. The 45 current file references
 are byte-bound navigation evidence, not a claim that every indexed test ran.
 The seven merged PRs are 18/20/22/23/26/32/35; full local Git ancestry and audited
 blobs were checked. A merged PR proves provenance, not product conformance.
@@ -90,14 +90,28 @@ versions are retained. No historical ZIP was fetched.
 | Memory maintenance CLI | Twelve scenarios cover noisy reports, Main control/Worker refusal, immutable explicit correction/encryption, Curator commit/restart, frozen and queued Forget successors, post-barrier fresh remember provenance, long-context original retention, verified Skill lifecycle and persistent opt-out. Explicit corrections do not prove automatic semantic conflict merging. |
 | CUA CLI and QuickJS | Eight CUA check groups retain separate transfer/overwrite/export/upload approvals, file bytes, registration/scope refusal, navigation expiry, denied input, traversal and selected-image context. All 19 QuickJS tests passed. Peers represent SSH/Browser dependencies; no current Guest compatibility is claimed. |
 | Curator gap probe | Two successive current-home-city statements produce two live automatic records with no supersedes link. The probe reuses maintained CLI harness mechanics and retains source and state. Exit zero means the gap was reproduced, not product PASS; it does not decide which statement is true. |
+| Transfer boundary correction | Frozen Guest helper read and write each accept 8,388,608 bytes and reject 8,388,609 bytes with JSON `PERMISSION_DENIED`. All four subprocesses exit zero, so exit status alone does not prove acceptance. This executes the actual helper in disposable local files, without Host/SSH/VM transport. Host `WriteFile` is source-inspected only. |
+
+The transfer observation and probe source are retained in the native root's
+`transfer-repair-20261025/` subdirectory; earlier raw files remain unchanged.
+The probe extracts the helper from the audited Git revision and verifies that
+both Host and Guest bytes still match this checkout. Its receipt binds
+`internal/computer/macosvm/use.go` (`WriteFile`, lines 394–397) and
+`internal/computer/macosvm/transfer.py` (write/read guards, lines 33/50/52).
+The Guest helper SHA256 is
+`432b3ef5a1f436c189f7d876dc8294cb175c3f746385d0aba7f8727e31607007`.
+These source-bound observations correct the previous erroneous 64 MiB description;
+the current Host and Guest raw-file limit is **8 MiB**. Product limits are unchanged.
 
 All CLI harnesses/probe report cleanup of their children, HTTP peers and
 disposable databases/workspaces. Compaction uses a fixed three-byte-per-token
 approximation, not observed model token accounting. Core is a ranking tie-break;
 no static Core prefix/cache-hit measurement is claimed. Encrypted Memory builds
 FTS/vector working sets in private in-memory SQLite; index rebuild performance
-was not measured. Host transfer buffering stays outside JS/RunTrace, but this
-audit did not exercise the 64 MiB limit or arbitrary large-file failures.
+was not measured. Host transfer buffering stays outside JS/RunTrace. The helper's
+local 8 MiB boundary observation does not establish end-to-end Host/SSH/Guest
+large-file behavior, memory usage, disconnect handling or arbitrary file sizes;
+those checks remain unexecuted here.
 
 No actual-model quality, live account, current macOS Guest, full protected five
 runs or complete release suite is claimed. Output remains `inconclusive`,
