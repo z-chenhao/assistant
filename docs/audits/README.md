@@ -1,5 +1,9 @@
 # Bounded baseline audits
 
+[baseline-03](baseline-03.md) records ERII-233's 80 frozen blocks, their 347
+sub-obligations, current evidence and remaining routes. Use `make audit-baseline-03`.
+Its completed dispositions do not certify product conformance or release.
+
 [baseline-01.json](baseline-01.json) disposes of the **80 exact blocks** assigned
 to ERII-231 in the owner's frozen work-package manifest. It records 257 authored
 sub-obligations: 48 blocks have partial mechanical evidence, 17 have evidence
