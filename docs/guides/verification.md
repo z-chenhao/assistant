@@ -31,9 +31,11 @@ and `run*cases` harness must be registered; `make test` rejects inventory drift.
 | Computer lifecycle and input | codemode | computer, computer-use |
 | Memory, Tools and Artifact security | security | memory-maintenance, recall, tools, artifacts |
 | Delivery, Web and Feishu | delivery | delivery, channels |
+| Exact communication, monitoring and research journeys | communication | gc12, gc08, gc14, gc16 |
 | Personal and multimodal journeys | personal | m6-cases |
 | Install, model setup and credentials | providers | startup, local-provider, account-initial, account, models |
 | Terminal and capability contracts | providers | tui, terminal-input, capabilities, pi-bridge |
+| Unscripted evaluation entry mechanism | providers | unscripted-entry |
 
 A shard runs its complete inventory:
 

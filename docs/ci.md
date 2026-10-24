@@ -2,7 +2,7 @@
 
 `Ubuntu checks` is the single branch-protection verdict. One workflow runs on
 PR heads and main pushes. It always requires unit/lint, race,
-every verification matrix cell, every Code Mode/M6 part and both evidence joins.
+every verification matrix cell, every providers/Code Mode/M6 part and all evidence joins.
 Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
 There is no impact-based omission, early-feedback tier or duplicate shadow
 workflow. Every full gate runs for documentation changes too.
@@ -22,7 +22,10 @@ weakens `Ubuntu checks`. No release is published by an ordinary PR.
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
-    SHA --> Verify[Runtime / security / delivery / providers]
+    SHA --> Verify[Runtime / security / delivery / communication]
+    SHA --> Providers[Providers CLI / models]
+    Providers --> ProviderJoin[Complete providers evidence]
+    ProviderJoin --> Gate
     SHA --> Personal[M6 independent parts]
     Personal --> M6Join[Complete M6 evidence]
     M6Join --> Gate
@@ -50,8 +53,8 @@ its guards were not relaxed. The new pipeline avoids that reuse entirely.
 Frontend build/TypeScript dependencies install only in unit/lint. Playwright
 installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
 QuickJS still install everywhere, including providers' offline packaging gate.
-Across the eighteen execution jobs this removes seventeen frontend and eleven
-Playwright installs. Lockfile cache keys, per-job exact-source builds, every
+Across the twenty-two execution jobs only unit/lint installs frontend dependencies;
+seven jobs install Playwright. Lockfile inputs, per-job exact-source builds, every
 assertion and repetition count remain unchanged. Clean-runner complete CI is the
 dependency-closure proof; install counts alone are not wall-time measurements.
 All actions are pinned. Checkouts use the explicit PR head SHA; the workflow
@@ -62,7 +65,7 @@ Unit/lint retains its ordinary Python execution and additionally runs all Python
 regressions on Python 3.10.22, the minimum supported interpreter series. This
 Required step guards portable SDK hashing and the maintained profiling tools.
 
-Providers and the complete race job use private 2 GiB tmpfs mounts for disposable
+Both providers parts and the complete race job use private 2 GiB tmpfs mounts for disposable
 test directories, through `ci_tmpfs.py setup/cleanup`. The full unit/lint suite,
 all five SC race rounds and every verification job except providers keep ordinary
 disk storage. Unit/lint also requires five disk-backed receipt recovery race runs.
@@ -79,14 +82,55 @@ storage rejects their disk-conformance claim before tests start.
 
 ## Latency budget
 
+The complete Python 3.10.22 compatibility suite runs in its own Required job and
+isolated exact-head checkout, alongside unit/lint and the five disk-backed receipt
+race checks. [Run 40055562322](https://github.com/z-chenhao/erii/actions/runs/40055562322)
+passed unit/lint, receipt race and SDK isolation, then cancelled Python compatibility
+at the ten-minute job boundary. Splitting that existing full suite removes the
+serial accumulation; no test, repetition or job deadline is reduced or extended.
+The Python job installs only the pinned Browser module used by setup rejection
+contracts, not a browser binary or product runtime. Its separate exact-SHA evidence
+is retained, and a failed, cancelled, skipped or missing compatibility job rejects
+the stable `Ubuntu checks` gate.
+
 All CI uses a ten-minute baseline from workflow creation through the final
 required verdict, with a five-minute target. Queue and dependency waits count
-in observed workflow wall time. Every job has an explicit timeout of at most
-ten minutes; the topology regression rejects missing or larger timeouts in any
-workflow. A job timeout is a stop boundary, not proof of end-to-end latency.
+in observed workflow wall time. Every job has an explicit timeout. The default ceiling is ten minutes;
+Fast, Race and Delivery have explicit fifteen-minute ceilings, including cleanup.
+The topology regression rejects missing timeouts and exceptions outside those
+three jobs. A job timeout is a stop boundary, not proof of end-to-end latency.
 Record actual exact-SHA timings with `ci_profile.py`; treat any workflow over
 ten minutes as a regression to diagnose before review. Do not remove coverage,
 reduce repetitions, extend fixture deadlines, or retry failures to meet it.
+
+Providers uses two Required parts, `cli` and `models`, with the unchanged
+logical inventory in `verify_suite.SHARDS`. The CLI part keeps startup, unscripted,
+local provider, initial account, capabilities ×5, TUI ×5, terminal input, Pi Bridge ×5
+and account ×5. The models part runs the original `go test -count=5 -json
+./internal/llm/... ./internal/agent/sqlite` alone. Both provision their own SDK,
+sandbox and private tmpfs; their SDK Doctor and exact fixture cleanup run through
+`ci_step.py --phase cleanup`, even after failure. Setup/build/test/cleanup receipts
+and native upload/post timestamps account for the whole job, not just verification.
+
+This addresses run `40096934203`, attempt 1, source
+`86abfa7efdac7bfee5f873c9a698d7cd25871aa4`, providers job `120881046698`:
+verification returned zero after 540.74190803 seconds, but the job was cancelled
+for exceeding 10 minutes. Native timestamps show 59 seconds from job start to
+test-step start, 541 seconds for that step, then 8 seconds through Doctor,
+cleanup, upload/post and job completion (608 seconds total; native timestamps
+have one-second precision). A successful test step did not satisfy the job.
+Splitting the already-isolated Go series removes it from the CLI critical path;
+it adds one independent setup and a small evidence join, without raising timeouts.
+This is a budget repair, not a measured p95 or runner-cost improvement.
+
+`ci_providers.py` requires both clean, stable, matching source/binary/workflow
+identities, exact gate/attempt inventories in serial order and drained owned
+groups. Missing, duplicate, reordered, failed or focused evidence rejects the
+join. The Required aggregate also requires both matrix success (including SDK
+Doctor/cleanup/upload) and the join. The joined `suite-providers.json` restores
+the original logical order and retains both part identities/timings. Individual
+artifacts retain raw reports; the join uploads only its canonical suite and phase
+receipt. `make verify` keeps its complete unpartitioned providers path.
 
 M6 reuses the existing `fixture_pool.py` with capacity four. Travel fixtures
 keep capacity two in a separate admission group because each drives Main and a
@@ -106,7 +150,7 @@ Ubuntu evidence on `1eff344` measured about 259 seconds per complete M6 round;
 the ten-minute job budget stopped the third round. Local rounds on the macOS
 host took about 72 seconds and did not predict this Linux CPU-bound result.
 CI therefore uses seven independent M6 parts: context, memory, network, booking,
-and three pairs of GC-18 variants. All eighteen primary matrix jobs can start
+and three pairs of GC-18 variants. All twenty-two primary execution jobs can start
 independently; no binary producer or preceding test gates their admission.
 Each pair retains its complete five-run series on one runner. The fixed pair
 inventory is private to `m6_report.PARTS`, not a new product protocol.
@@ -123,6 +167,21 @@ read-only context/Memory fixtures. Unit/SC/GC-19 retain the coding workspace
 checks. All M6 fixtures remain disk-backed.
 
 ## Complete inventory
+
+Delivery now honors the same `ERII_VERIFY_GATE_JOBS=2` setting as the other
+eligible shards. On ERII-30 head `6a837f4`, all ten delivery/channel rounds
+passed, but the shard spent 517.6 seconds serially running the two series;
+setup and evidence retention took the job past its unchanged ten-minute ceiling.
+The old dispatch allowlist silently excluded delivery. The existing bounded
+two-worker executor now overlaps these independent series. Each series retains
+five consecutive rounds, its original timeouts/assertions and separate report
+paths. No production concurrency, fixture storage or job budget changes.
+`test_delivery_two_series_overlap_without_splitting_five_rounds` uses two real
+owned subprocesses with mutual admission barriers; it fails under the old
+serial dispatch and checks all ten canonical rows, per-series order and drained
+groups. Actual Web/Feishu/PTY, approval/restart and slow-send lease checks remain
+mandatory in every CI round. A successful run demonstrates capacity for that
+runner; it is not a controlled long-term performance claim.
 
 `scripts/verify_suite.py` is the authoritative logical inventory (105 gate
 invocations, including all five Computer lifecycle and Computer Use runs).
@@ -167,20 +226,51 @@ these acceptance boundaries. No partial job independently proves Code Mode.
 Independent fixture capacity is four; GC-17 checkpoint variants retain capacity
 two. Local unpartitioned Core runs join case kinds in order. Part jobs use
 separate runners. Gate-series concurrency is two, with Go event/model checks
-isolated after other work. The complete race runner isolates Bridge first. It discovers SQLite's complete
+isolated after other work. Local `make test-race` keeps its complete serial-Bridge
+runner. CI places `--part packages` and `--part sqlite` on two independent
+Required runners; both use the approved fifteen-minute outer race limit. The packages part runs
+Bridge alone before the other packages (`-p=1`, GOMAXPROCS=1). The SQLite part
+discovers SQLite's complete
 Go Test/Example/Fuzz inventory. The Child approval contract whose original
 five-second context spans three Drain/decision phases runs alone with the full
 CPU budget before overlap. All remaining top-level tests run exactly once in up
 to three separate processes. Each test retains its own Store/temp root, complete
 subtests and internal concurrency; process-local globals and environment remain
-isolated. A fourth worker runs the other packages with package concurrency one.
-All workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
+isolated. Ordinary SQLite workers use GOMAXPROCS=1; admission respects the parent/affinity limit and a
 four-CPU ceiling. Race instrumentation, count=1 and the 15-minute Go timeout
 remain required. Go JSON verdicts reject missing, duplicate, unexpected, failed
-or unfinished test roots. All fifty logical packages remain in the same Required
-race job; discovery automatically includes new tests. Per-worker commands,
+or unfinished test roots. Every discovered package remains required.
+`ci_race_join.py` requires both successful exact-source parts, validates the
+package/command inventory, and re-reads the native SQLite discovery and JSON
+events to reject missing/duplicate/failed/drifted roots or unjoined processes.
+Ubuntu checks requires both the matrix and this join; no part alone proves the
+complete race gate. Discovery automatically includes new tests. Per-worker commands,
 CPU/wall, test outcomes and cleanup remain in `race/inventory.json` and logs.
 No assertion, test count, lease, per-case deadline or fault boundary is relaxed.
+
+SQLite placement uses longest measured tests first, with elapsed-time hints in
+`scripts/ci_race_timings.json`. The hints retain their exact-SHA Ubuntu run
+provenance and only affect scheduling. Go discovery still owns the complete
+inventory; new tests use the mean known cost, and removed tests cannot execute
+through a stale hint. The receipt records the hints and unmeasured roots.
+SC conformance retains its existing unweighted partitions. The measured ERII-30
+timeout had static partition costs of about 330/379/449 seconds; the same
+retained costs balance to about 386 seconds each. These are scheduling estimates,
+not a latency PASS. Actual required race/cleanup and end-to-end timings must
+still pass on the delivered SHA. The ten-minute workflow baseline remains a
+separate measured objective; the race teardown allowance does not certify it.
+
+The `f7808415f20968a58a1c8644bc2b3796f7d54034` run
+[39894692925](https://github.com/z-chenhao/erii/actions/runs/39894692925)
+completed every race test and drained its groups in 509.7 seconds (Bridge 66.3,
+remainder 442.8). About 81 seconds of setup left almost no finalization margin.
+The native inventory, SDK immutability check, fixture cleanup and artifact upload
+all passed; the job itself was cancelled at the ten-minute finalization boundary
+(601 seconds overall). Ubuntu checks
+correctly failed. Both failed job logs and original manifested artifacts remain
+release evidence. Splitting package placement removes Bridge and other-package
+work from the SQLite critical path; all checks, cleanup and deadlines remain.
+This scheduling change needs successful exact-head CI; an estimate is not PASS.
 
 ## Launch, doctor, drive, evidence and cleanup
 
@@ -204,6 +294,9 @@ python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence/joined
 python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --binary bin/erii --evidence evidence/m6-parts/desktop-1 --jobs 1
 # Run the other six fixed parts in their own folders, then require all seven:
 python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
+python3 scripts/verify_suite.py --shard providers --provider-part cli --binary bin/erii --evidence evidence/provider-parts/cli --jobs 1
+python3 scripts/verify_suite.py --shard providers --provider-part models --binary bin/erii --evidence evidence/provider-parts/models --jobs 1
+python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence/providers-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
@@ -252,7 +345,15 @@ upgrade tests remain. Failure rolls back; real child kills before/after commit
 prove restart/version/bootstrap behavior. Fixture tests still enter the public
 store boundary and initialize real databases.
 
-Setup-go/npm caches retain their pinned content-addressed input keys. Every job
+[Run 39930755535](https://github.com/z-chenhao/erii/actions/runs/39930755535)
+hit Azure cache egress limits and setup-node hung until the job deadline,
+before tests started. That failed observation is retained.
+
+Setup-go retains its existing SDK/module cache. Hosted npm-cache restoration is
+disabled: a clean or cache-disabled runner goes directly through bounded native
+installation, without the previously hanging optional cache transport. Local
+worktrees reuse npm/Playwright download caches through the same
+[setup entry point](../CONTRIBUTING.md#repeated-and-offline-setup). Every job
 still installs lockfiles and builds its own CLI. Full Go test counts remain
 explicit. Historical `ci_bundle.py` v2 and its corruption/context regressions
 remain available for old evidence; the current workflow does not consume build
@@ -272,10 +373,97 @@ Use `ci_profile.py --limit 30 --output evidence/ci-history.json` for exact-attem
 wall time, runner-minutes and per-job/step evidence. Its raw API snapshots permit
 offline reproduction. Job duration is not billed CPU time. Queues, cache state
 and heterogeneous runner CPUs add noise; one successful run cannot establish
-p95 or a controlled causal speedup. Historical read-only comparison tools retain
-their strict five-pair acceptance rules, but no repeated measurement cohort is
-part of the delivery path. Supersession records never treat unknown outcomes or
-missing timestamps as zero.
+p95 or a controlled causal speedup. The comparison command below validates the
+current complete topology; retained nine-job shadow data requires an explicit historical mode. No repeated
+measurement cohort is part of the delivery path. Supersession records never
+treat unknown outcomes or missing timestamps as zero.
+
+`ci_compare.py` derives required job names and literal matrices from the maintained
+`ci.yml`, cross-checks parts against `verify_suite.py`/`m6_report.py`, and checks
+all seven logical suites against that same gate inventory. All three strict join jobs
+must succeed. Joined suite receipts must retain every original part, its clean
+source/build/image/CPU identity, full ordered repetitions and drained groups.
+The canonical joined rows must agree with those parts. Focused/feedback results,
+missing parts, duplicated jobs, cancelled/skipped runs and mismatched attempts
+cannot become eligible samples. The small Core/M6 summaries remain required;
+these checks consume strict-join evidence, not a new case scorer.
+
+The merged topology has 25 jobs, including both maintained race parts, their
+Required join and the independent Python compatibility job. Race matrix values
+are checked against `ci_race_join.PARTS`, just as Core/M6 values use their
+maintained inventories. The retained 21-job metadata fixture still replays its
+original timings, but cannot satisfy the current job inventory. No historical
+fixture is rewritten to claim a current successful cohort.
+
+Compare already authorized attempts; this command never launches or reruns CI:
+
+```sh
+python3 scripts/ci_compare.py --pair BEFORE_RUN:ATTEMPT,AFTER_RUN:ATTEMPT --artifact-root /absolute/durable/evidence --profile measurement-profile.json --output evidence/comparison.json
+python3 scripts/ci_compare.py --offline --output evidence/comparison.json
+```
+
+Online artifact retrieval requires ERII-206's `scripts/evidence.py` entry point.
+It reads exact run/attempt metadata first and selects only the seven canonical
+suite artifacts by SHA/attempt/name/immutable ID. Each join artifact embeds its
+parts; individual part archives, fast/race archives and unrelated archives are
+not fetched. Hash-verified local archives are reused. The entire invocation has
+a 1 MiB archive payload download budget across all attempts. A larger necessary
+object requires a separate owner decision; the command does not silently raise
+the budget. ZIP member filtering happens after fetching/reusing the whole ZIP;
+it is not a member-only network download. Raw JSON retains artifact metadata and
+transfer receipts; the output binds the raw file's SHA256. Keep both outside
+worktree cleanup for handoff. These private receipts are not a public schema.
+
+When only metadata is available or canonical archives exceed the allowed budget,
+retain exact-attempt observations without downloading archives:
+
+```sh
+python3 scripts/ci_compare.py --pair BEFORE_RUN:ATTEMPT,AFTER_RUN:ATTEMPT --metadata-only --output evidence/observations.json
+python3 scripts/ci_compare.py --offline --output evidence/observations.json
+```
+
+This uses ERII-206's metadata inventory, records sizes/IDs and zero archive
+transfers, and retains per-job/step timing. No suite success is inferred from
+green jobs: missing suites/profile or insufficient independent samples produce
+exit 1, `performance_certified=false` and null benefit ratios. This is the
+repeatable fallback for the contract's insufficient-evidence outcome, not a
+performance certification. See the [delivered setup comparison receipt](reports/2026-10-24-ci-comparison.md).
+
+Current comparisons require at least three independent complete pairs (three
+attempts per side), one frozen source/binary/image/CPU capacity, and a matching
+non-secret `measurement_profile` on every attempt. `--profile` supplies that
+profile for collection. It contains `input_sha256`, `tool_versions`,
+`lock_sha256`, `cache_state` and `environment`; values describe the actual
+inputs, pinned tools/locks, cache preparation and execution environment. Record
+cold, warm and offline cohorts separately. The profile is an explicit experiment
+record, not an inferred measurement of network traffic. Preserve commands and
+setup receipts alongside it. Do not use this same-source protocol to certify
+changed-code cohorts or compare runs with different gate/assertion inventories.
+
+`comparison_complete=false` and `performance_certified=false` mean the cohort
+is insufficient or incomparable; the CLI exits 1 while retaining observations
+and rejection reasons. Three pairs establish this tool's eligibility threshold,
+not release acceptance, p95 confidence or a causal speedup by themselves. Five
+safety repetitions inside a gate are never independent workflow samples. The
+report separates required-verdict wall time, job lifetime runner-minutes,
+per-job queue/dependency waits and name-classified setup/build/test/upload steps.
+Jobs API data cannot separate queue from dependency wait or prove the actual
+critical path. Missing CPU, cache-hit and outbound payload measurements remain
+null. Do not use delayed workflow `updated_at` as the required verdict time.
+
+Historical evidence is read-only and explicitly labelled:
+
+```sh
+python3 scripts/ci_compare.py --offline --historical-shadow --output evidence/historical-comparison.json
+```
+
+This retains the former nine-job/five-pair interpretation where its original
+gate inventory matches, and never sets `performance_certified=true`. It cannot
+mix with current topology. `ci_experiment.py`'s command-line entry now rejects
+before any GitHub request: its old shadow workflow no longer exists. Historical
+orchestration/checkpoint code and feedback tools remain for their retained
+consumers and regressions. Do not import the old orchestrator to start new runs,
+restore shadow workflows or treat feedback fragments as full verification.
 
 For the current topology, `ci_supersede.py collect` requires exactly one
 `ci.yml` attempt for the superseded head. It rejects duplicate/unknown workflows,
@@ -313,6 +501,17 @@ budget, proves unknown/no Artifact/no second effect, then verifies a fresh
 authoritative query. The existing real deadline, cancellation, unsafe receipt,
 identity and byte/hash assertions remain required. Preserve failed full-suite
 evidence; passing focused diagnostics alone do not supersede it.
+
+## GC-14 exact monitoring gate
+
+The communication shard also runs `verify_gc14.py` once with all six exact
+wording/noise/order variants. It reuses the existing MCP sandbox provisioning;
+the runtime shard remains independent of that dependency. Receipts retain six
+days per variant, Oct18/21-only notifications, two source observations per day,
+duplicate scheduling/replay, two SIGKILL boundaries, a profile change at later
+admission and cancellation. This adds no timeout changes or reductions to the
+existing GC-12 five-round and GC-08 gates. See
+[GC-14 verification](gc14-verification.md). All semantic scores remain null.
 
 ## Low-bandwidth evidence handoff
 
