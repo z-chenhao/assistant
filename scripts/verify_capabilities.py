@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """M3 stdio MCP, progressive Skills and actual controlled coding CLI proof."""
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -9,6 +10,8 @@ import signal
 import sqlite3
 import subprocess
 import tempfile
+import time
+import uuid
 from pathlib import Path
 
 from verify_main import MainHarness, require
@@ -25,8 +28,36 @@ class CapabilityHarness(MainHarness):
         run = self.processes.run if self.processes is not None else subprocess.run
         result = run(self.args(*args), input=text, text=True, capture_output=True,
                                 env=self.env, cwd=self.root, timeout=timeout)
+        if os.environ.get('ERII_CAPABILITY_DIAGNOSTICS') and (result.returncode or result.stderr):
+            self.capture_diagnostic(args, result)
         require(not ok or result.returncode == 0, f'{args}: {result.stderr}')
         return json.loads(result.stdout) if ok else result
+
+    def capture_diagnostic(self, args, result):
+        # Opt-in disposable Fake fixtures only. Never copy credential stores,
+        # configuration, stdin, or an arbitrary data-root directory.
+        folder = Path(os.environ['ERII_CAPABILITY_DIAGNOSTICS']) / uuid.uuid4().hex
+        folder.mkdir(parents=True)
+        if not hasattr(self, 'diagnostic_binary_sha256'):
+            self.diagnostic_binary_sha256 = digest(self.binary)
+        record = dict(command=list(args), returncode=result.returncode,
+                      stderr=result.stderr, binary_sha256=self.diagnostic_binary_sha256, databases={})
+        if result.returncode:
+            for name in ('state.db', 'conversation.db'):
+                source = self.root / 'data' / name
+                if source.is_file():
+                    try:
+                        deadline = time.monotonic() + 5
+                        def progress(*_):
+                            if time.monotonic() > deadline:
+                                raise TimeoutError('fixture backup deadline')
+                        with closing(sqlite3.connect(source.as_uri() + '?mode=ro', uri=True)) as db, \
+                             closing(sqlite3.connect(folder / name)) as backup:
+                            db.backup(backup, pages=128, progress=progress)
+                        record['databases'][name] = digest(folder / name)
+                    except (sqlite3.Error, TimeoutError) as error:
+                        record['databases'][name] = {'capture_error': str(error)}
+        (folder / 'command.json').write_text(json.dumps(record, indent=2) + '\n')
 
 
 def digest(path):
@@ -67,6 +98,8 @@ def prepare(binary, root, mode='edit'):
               '\n  protected: [docs/notes.md]\n')
     (root / 'config.yaml').write_text(config)
     h = CapabilityHarness(binary, root, fixture='capabilities')
+    if os.environ.get('ERII_CAPABILITY_DIAGNOSTICS'):
+        h.env['ERII_SQL_FIXTURE_DIAGNOSTIC'] = '1'
     h.setup()
     return h
 

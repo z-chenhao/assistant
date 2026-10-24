@@ -288,7 +288,23 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
       - name: Code Mode part with five consecutive repetitions
+        env:
+          ERII_CAPABILITY_DIAGNOSTICS: ${{ matrix.part == 'GC-19' && format('{0}/evidence/gc19-standard-failures', github.workspace) || '' }}
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard codemode --codemode-part ${{ matrix.part }} --jobs 1
+      - name: Bounded GC-19 transaction diagnosis (separate binary)
+        if: ${{ !cancelled() && matrix.part == 'GC-19' }}
+        run: exec python3 scripts/ci_step.py --name gc19-diagnostic --phase test -- python3 scripts/diagnose_gc19.py --evidence evidence/gc19-diagnostic
+      - name: Retain focused GC-19 diagnostics
+        if: ${{ always() && matrix.part == 'GC-19' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gc19-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/gc19-standard-failures/
+            evidence/gc19-diagnostic/fixtures/
+            evidence/gc19-diagnostic/diagnostic.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor

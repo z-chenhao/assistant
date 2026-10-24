@@ -62,6 +62,10 @@ while its effect is still dispatched. Main, model execution and I/O are
 abstracted to persisted boundary events. This is a protocol model, not a second
 execution implementation or a proof of these excluded subsystems.
 
+The model fixes the creation policy to `once` and excludes Main's explicit
+`complete` operation. Ongoing creation and explicit completion retain separate
+Go contract, race and CLI recovery coverage in [ADR 006](../adr/006-explicit-task-completion-policy.md).
+
 ## Bounds, safety and progress
 
 Bounds are one Task, at most two Root identities, one Child, two owner epochs
