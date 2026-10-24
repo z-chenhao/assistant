@@ -59,6 +59,40 @@ func isFollowup(req llm.GenerationRequest) bool {
 	}
 	return false
 }
+
+func TestTaskCreateCompletionPolicyDedup(t *testing.T) {
+	s, _, a, p := taskFixture(t)
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "accepted result"}, nil
+		}
+		return calls(task.ManageName,
+			`{"operation":"create","task":"Same brief"}`,
+			`{"operation":"create","task":"Same brief","completionPolicy":"once"}`,
+			`{"completionPolicy":"once","task":"Same brief","operation":"create"}`,
+			`{"operation":"create","task":"Same brief","completionPolicy":"ongoing"}`,
+			`{"completionPolicy":"ongoing","task":"Same brief","operation":"create"}`), nil
+	}
+	mustSubmit(t, a, "create", "create both policies")
+	mustDrain(t, a)
+	for query, want := range map[string]int{
+		`SELECT count(*) FROM task WHERE completion_policy='once' AND status='completed'`:                          1,
+		`SELECT count(*) FROM task WHERE completion_policy='ongoing' AND status='active' AND completed_at IS NULL`: 1,
+		`SELECT count(*) FROM task_request`:            2,
+		`SELECT count(*) FROM task_invocation`:         5,
+		`SELECT count(*) FROM task_update`:             2,
+		`SELECT count(*) FROM run WHERE kind='worker'`: 2,
+	} {
+		if got := scalar(t, s, query); got != want {
+			t.Fatal(query, got, want)
+		}
+	}
+	// Re-read every receipt: omission/once share one Task; ongoing is distinct.
+	if scalar(t, s, `SELECT count(DISTINCT receipt_json) FROM task_invocation`) != 2 {
+		t.Fatal("policy receipt identity drift")
+	}
+}
+
 func TestTaskVerticalSliceDuplicateSourcesAndDurableReporter(t *testing.T) {
 	s, r, a, p := taskFixture(t)
 	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
@@ -630,7 +664,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "No change was accepted"}, nil
 		}
-		return calls(task.ManageName, `{"operation":"create","task":"x","model":"forbidden"}`, `{"operation":"create","task":"x","artifactRefs":["artifact:inaccessible"]}`, `{"operation":"append","taskRef":"not-visible","instruction":"continue"}`, `{"operation":"pause","taskRef":"not-visible"}`, `{"operation":"cancel","taskRef":"not-visible"}`), nil
+		return calls(task.ManageName, `{"operation":"create","task":"x","model":"forbidden"}`, `{"operation":"create","task":"x","completionPolicy":"invalid"}`, `{"operation":"create","task":"x","completionPolicy":null}`, `{"operation":"create","task":"x","artifactRefs":["artifact:inaccessible"]}`, `{"operation":"append","taskRef":"not-visible","instruction":"continue"}`, `{"operation":"pause","taskRef":"not-visible"}`, `{"operation":"cancel","taskRef":"not-visible"}`), nil
 	}
 	mustSubmit(t, a, "rejections", "invalid controls")
 	mustDrain(t, a)
@@ -642,7 +676,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rows.Close()
-	expected := []string{"INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
+	expected := []string{"INVALID_ARGUMENT", "INVALID_ARGUMENT", "INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
 	i := 0
 	for rows.Next() {
 		var raw string

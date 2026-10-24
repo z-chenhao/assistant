@@ -7,7 +7,15 @@ one shared Agent Loop and one ToolInvocation pipeline.
 
 A self-contained delegation brief belongs in `task_manage(create).task`. Main
 must include necessary background, constraints, completion criteria and expected
-outputs. The Host generates an opaque TaskRef and a title; the receipt means
+outputs. For continuing work, Main can explicitly create with
+`completionPolicy: "ongoing"`; omission or `"once"` creates a one-shot Task.
+The policy is fixed at creation. For example:
+
+```json
+{"operation":"create","task":"Keep the wedding checklist current as guest counts and dates change; preserve confirmed facts and return the next dependencies to resolve.","completionPolicy":"ongoing"}
+```
+
+The Host generates an opaque TaskRef and a title; the receipt means
 accepted, not finished. Short synchronous questions remain in Main.
 
 | Canonical tool | Input | Output | Visibility / permission | Recovery |
@@ -54,9 +62,25 @@ retains its one nonterminal Root constraint. A call interrupted during admission
 remains recoverable under its frozen ToolInvocation and creates no partial append.
 
 Only the same terminal Root's result is reported after its last descendant ends.
-Host-owned `completion_policy` defaults to `once`; `ongoing` keeps the Task active
-when one Root ends. The current model-visible create Tool makes one-shot Tasks;
-no new policy argument is exposed. Future Automation uses the Host policy.
+`completion_policy` defaults to `once`; explicit create `completionPolicy: "ongoing"`
+keeps the Task active when one Root ends. `append` retains that policy. An idle
+ongoing Task does not start another Root on its own: Main must append work, or
+an existing Automation must fire. Ordinary Root success is still reported once
+to Main. Pause/cancel, unknown-effect handling and epoch fencing keep their
+existing behavior.
+
+The database allows explicit `active → completed`, but the current Tool union
+has no completion operation. ERII-226's explicit-completion acceptance remains
+unresolved pending an owner protocol decision; do not substitute cancellation
+for completion. See [ADR 006](../adr/006-explicit-task-completion-policy.md).
+
+No storage migration is needed: schema v9 already stores the immutable policy
+and migrates prior Tasks to `once`. New Main Runs freeze the extended schema.
+A pre-extension Main capability cannot run with the changed Tool Spec: registry
+selection fails `MODEL_INCOMPATIBLE`. Finish that Run with its original binary
+before upgrading; do not rewrite snapshots. Omitted and explicit once normalize
+to the prior request shape, retaining receipt hashes. Completed Tool results
+remain durable. Automation continues using its existing Host policy.
 The original M2 tests retain stored topology and conservative unsafe-stop
 fixtures. The M3 Tool harness verifies approvals and external reconciliation;
 the [Child harness](children.md) exercises actual admission, recursive execution

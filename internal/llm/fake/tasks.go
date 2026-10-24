@@ -96,6 +96,8 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{Text: "Main accepted the work."}, nil
 	}
 	switch {
+	case strings.HasPrefix(user, "Ongoing: "):
+		return call(task.ManageName, task.ManageRequest{Operation: "create", Task: strings.TrimPrefix(user, "Ongoing: "), CompletionPolicy: "ongoing"}), nil
 	case strings.HasPrefix(user, "Delegate: "), strings.HasPrefix(user, "Duplicate: "):
 		brief := strings.TrimPrefix(strings.TrimPrefix(user, "Delegate: "), "Duplicate: ")
 		result := call(task.ManageName, task.ManageRequest{Operation: "create", Task: brief})

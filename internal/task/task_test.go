@@ -4,7 +4,78 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/z-chenhao/erii/internal/tool"
 )
+
+func TestCreateCompletionPolicyContract(t *testing.T) {
+	for _, policy := range []string{"", "once", "ongoing"} {
+		raw := `{"operation":"create","task":"Keep the wedding checklist current"}`
+		if policy != "" {
+			raw = strings.TrimSuffix(raw, "}") + `,"completionPolicy":"` + policy + `"}`
+		}
+		r, err := ParseManage(raw)
+		if err != nil || !tool.Validate(ManageSchema, raw) {
+			t.Fatalf("policy %q rejected: %v", policy, err)
+		}
+		// once and omission share the pre-extension canonical request, so saved
+		// invocation/source hashes remain valid across an upgrade.
+		canonical, _ := json.Marshal(r)
+		if policy != "ongoing" && string(canonical) != `{"operation":"create","task":"Keep the wedding checklist current"}` {
+			t.Fatalf("one-shot canonical request changed: %s", canonical)
+		}
+		if policy == "ongoing" && !strings.Contains(string(canonical), `"completionPolicy":"ongoing"`) {
+			t.Fatalf("ongoing policy lost: %s", canonical)
+		}
+	}
+	for _, raw := range []string{
+		`{"operation":"create","task":"x","completionPolicy":""}`,
+		`{"operation":"create","task":"x","completionPolicy":"forever"}`,
+		`{"operation":"create","task":"x","completionPolicy":null}`,
+		`{"operation":"create","task":"x","completionPolicy":1}`,
+		`{"operation":"create","task":"x","completionPolicy":"once","completionPolicy":"ongoing"}`,
+		`{"operation":"append","taskRef":"x","instruction":"continue","completionPolicy":"ongoing"}`,
+		`{"operation":"pause","taskRef":"x","completionPolicy":"once"}`,
+		`{"operation":"cancel","taskRef":"x","completionPolicy":"ongoing"}`,
+	} {
+		if _, err := ParseManage(raw); err == nil {
+			t.Fatal("invalid policy accepted", raw)
+		}
+	}
+}
+
+func TestPriorManageSchemaFailsClosed(t *testing.T) {
+	// Simulate a frozen pre-extension v1 capability without rewriting it.
+	defs := Definitions()
+	var prior tool.Spec
+	for i := range defs {
+		if defs[i].Spec.Name != ManageName {
+			continue
+		}
+		var schema map[string]any
+		if err := json.Unmarshal([]byte(defs[i].Spec.InputSchema), &schema); err != nil {
+			t.Fatal(err)
+		}
+		create := schema["oneOf"].([]any)[0].(map[string]any)
+		delete(create["properties"].(map[string]any), "completionPolicy")
+		raw, _ := json.Marshal(schema)
+		defs[i].Spec.InputSchema, defs[i].Spec.Description = string(raw), ""
+		prior = defs[i].Spec
+	}
+	old, err := tool.NewRegistry(defs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = old.Select([]tool.Spec{prior}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = Registry().Select([]tool.Spec{prior}); err == nil {
+		t.Fatal("prior frozen schema silently replaced")
+	}
+	if tool.Validate(prior.InputSchema, `{"operation":"create","task":"x","completionPolicy":"ongoing"}`) {
+		t.Fatal("old schema gained new argument")
+	}
+}
 
 func TestCanonicalSchemasAndStrictUnion(t *testing.T) {
 	for _, input := range []string{`null`, `[]`, `{"operation":"create"}`, `{"operation":"create","task":""}`, `{"operation":"create","task":"ok","taskRef":"forbidden"}`, `{"operation":"create","task":"ok","context":"hidden"}`, `{"operation":"create","task":"ok","operation":"create"}`, `{"operation":"create","task":"ok","artifactRefs":null}`, `{"operation":"resume","taskRef":"x"}`, `{"operation":"append","taskRef":"x","instruction":null}`, `{"operation":"pause","taskRef":"x","instruction":"no"}`, `{"operation":"create","task":"ok"} {}`} {

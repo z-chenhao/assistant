@@ -327,7 +327,11 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 			refs, _ := encoded(request.ArtifactRefs)
 			if request.Operation == "create" {
 				taskID, ref = newID(), "task:"+newID()
-				if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1)`, taskID, ref, agentID, conv, task.Title(request.Task), request.Task, refs, now, now); err != nil {
+				policy := request.CompletionPolicy
+				if policy == "" {
+					policy = "once"
+				}
+				if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1,?)`, taskID, ref, agentID, conv, task.Title(request.Task), request.Task, refs, now, now, policy); err != nil {
 					return err
 				}
 				for _, ref := range request.ArtifactRefs {
