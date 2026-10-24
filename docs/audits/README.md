@@ -5,6 +5,15 @@ isolation, the JavaScript Host protocol, ToolInvocation and Main runtime message
 Its 363 sub-obligations retain explicit scopes, evidence limits and finite routes.
 Use `make audit-baseline-05`; no requirement is certified.
 
+[baseline-02](baseline-02.md) records ERII-232's Task, prompt, Run and Automation
+audit: 83 current blocks after the owner-approved [ADR006 reseal](baseline-02-reseal.md).
+Original identities and remaining duties stay visible; no requirement is certified.
+Run `make audit-baseline-02` through the same maintained entry point.
+
+[baseline-03](baseline-03.md) records ERII-233's 80 frozen blocks, their 347
+sub-obligations, current evidence and remaining routes. Use `make audit-baseline-03`.
+Its completed dispositions do not certify product conformance or release.
+
 [baseline-04](baseline-04.md) records ERII-234's separate 80-block audit of
 account, Bridge, model failure and Code Mode contracts. Its ledger and current
 observations do not change baseline-01 or the preserved historical ledger.

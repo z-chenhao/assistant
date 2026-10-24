@@ -21,11 +21,19 @@ See [unscripted evaluation operations](../docs/guides/unscripted-evals.md).
 See [release evidence operations](../docs/guides/release-evidence.md) for trust,
 private inputs, exit codes and remaining real release obligations.
 
+## Frozen baseline-03 audit (ERII-233)
+
+| Feature | Entry | Authoritative implementation | Evidence |
+| --- | --- | --- | --- |
+| Exact 80-block disposition, §3.11–§5.4 | `make audit-baseline-03` | Existing `release_audit.py`, `release_package.audit_package`, `docs/audits/baseline-03.json` | Owner package digest pinned independently; all 347 authored sub-obligations retained with current code/test hashes, merged PRs, native receipts, explicit background/deferrals and finite gap routes. Web setup gap routes to ERII-334. No verified requirements or release certification. |
+| Integrity and read-only provenance | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; optional original manifest/native-root/`--verify-git` | `test_release_package.Baseline03Tests` reuses the corruption/CLI suite, plus schema-fence and mixed-deferral coverage | Launch/Doctor frozen inputs and current references; Drive maintained CLI; Evidence `evidence/baseline-03.json`, native flags and immutable local receipts; Cleanup disposable output only. Missing/duplicate/stale/unknown/unmerged/tampered evidence rejects; release-complete still exits 2. [Scope and observations](../docs/audits/baseline-03.md). |
+
 ## Frozen baseline-01 audit (ERII-231)
 
 | Feature | Reach it | Authoritative entry point | Evidence and limits |
 | --- | --- | --- | --- |
 | Exact 80-block disposition | `make audit-baseline-01` | Existing `release_audit.py`, `release_package.audit_package`, `docs/audits/baseline-01.json` | Pins the owner package independently of review notes; retains source text, authored sub-obligations, current code/test hashes, merged PRs, native receipt identities and finite gap routes. Original 122 historical reviews stay separate. Always inconclusive, zero certified requirements and null semantic scores. |
+| Resealed Task/prompt/Automation audit | `make audit-baseline-02`; [scope and evidence](../docs/audits/baseline-02.md) | Same `release_audit.py`/`release_package.audit_package`; `docs/audits/baseline-02.json` | Pins the authorized 83-block package and original 80-block provenance; 295 scoped sub-obligations retain finite routes. Optional sealed-manifest verification compares all 1588 current identities exactly once. Native CLI/SQLite/PTY/SIGKILL receipts bind bytes and audited Git ancestry. No release certification or semantic scores. |
 | Audit integrity and stronger provenance | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; CLI optional manifest/native-root/`--verify-git` | `test_release_package.py`, existing inventory and decision tests | Isolated fixtures drive missing/duplicate/out-of-scope/stale text/ref/PR/gap rejection, native byte integrity, input/output overlap rejection and real CLI stale-output cleanup. Flags distinguish local integrity from original-manifest, retained-byte and Git-ancestry checks. No network fetch or copied credentials. |
 
 See the [bounded audit ledger and proof limits](../docs/audits/README.md).
@@ -631,3 +639,9 @@ Compatibility and frozen-Run upgrade procedure: [ADR 005](../docs/adr/005-consol
 | --- | --- | --- |
 | Primary-source research and report | `verify_gc16.py --binary bin/erii --evidence evidence/gc16.json`; CLI → Main Task → Root/Child → MCP → Artifact/Reporter/Delivery | Launch private roots/stdio corpus; Doctor explicit profile and lock; Drive original request with three wordings/order/two noise variants, two same-exchange Children with overlapping lifetimes, D2→D1→D3→D4 and independent D5; Evidence exact source transport/log, Atlas primary date/rename/extension/Aster exclusion, nearby direct citations and fact/inference/unknown separation, CLI-reopened Markdown bytes and one Main artifact delivery, empty Approval/Automation, two SIGKILL/restarts, completed-call/generation reuse, frozen snapshots, complete replay equality; Cleanup joins/removes state. See `docs/gc16-verification.md`; Judge recomputes receipts and leaves all six previews ineligible/null. Actual model research quality, longer contexts and current L2 remain unverified. |
 | CI dependency setup | Pinned `ci-inputs` action → Node → direct lockfile installs | Optional hosted npm restore is absent after observed cache-egress hangs prevented tests from starting. `test_verification_selection.py` rejects reintroduction; complete native CI retains unchanged assertions and rounds, with ten-minute job bounds except the approved fifteen-minute Fast/Race/Delivery outer bounds. See `docs/ci.md`. |
+
+## Providers CI budget (ERII-339)
+
+| Feature | Reach it | Authoritative entry point | Evidence and cleanup |
+| --- | --- | --- | --- |
+| Complete providers gates within the ten-minute job boundary | CI `Providers (cli/models)` → `Complete providers evidence` → `Ubuntu checks`; local `verify_suite.py --shard providers --provider-part cli` / `models`, then `ci_providers.py --parts DIR --evidence DIR` | Original `verify_suite.SHARDS['providers']`, fixed `provider_gates`, `ci_providers.join`, `.github/workflows/ci.yml` | All original gates and five-run series; model/storage `go test -count=5` on its own runner; fail-closed exact source/binary/workflow join; per-job SDK isolation/immutable Doctor and exact tmpfs cleanup retained. `steps/sdk-doctor.json` and `steps/fixture-cleanup.json` expose maintenance wall time; native run/job/step/artifact identity proves whole-job success. Full local `make verify` remains unpartitioned. |
