@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "level": "L0/L1 scripted mechanics; no semantic score",
+  "common": {
+    "user": {
+      "id": "user_eval_001",
+      "name": "陈屿",
+      "timezone": "Asia/Shanghai",
+      "locale": "zh-CN",
+      "city": "杭州",
+      "occupation": "后端工程师",
+      "household": "与伴侣共同生活"
+    },
+    "agent": {
+      "id": "agent_eval_001",
+      "language": "zh-CN"
+    },
+    "security": {
+      "external_writes_require_approval": true,
+      "secrets_are_never_model_visible": true
+    }
+  },
+  "variants": [
+    {
+      "id": "wording-1",
+      "wording": 0,
+      "noise": 0
+    },
+    {
+      "id": "wording-2",
+      "wording": 1,
+      "noise": 0
+    },
+    {
+      "id": "wording-3",
+      "wording": 2,
+      "noise": 0
+    },
+    {
+      "id": "noise-1",
+      "wording": 0,
+      "noise": 1
+    },
+    {
+      "id": "noise-2",
+      "wording": 0,
+      "noise": 2
+    },
+    {
+      "id": "order-1",
+      "wording": 0,
+      "noise": 0,
+      "reverse_world_keys": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "GC-11",
+      "clock": "2026-10-15T10:00:00+08:00",
+      "world": {
+        "coverage_equal": true,
+        "quotes": [
+          {
+            "id": "A",
+            "premium_cny": 5150,
+            "cashback_cny": 0,
+            "cashback_written": true,
+            "name": "阳光 A",
+            "services": [
+              "道路救援2次"
+            ]
+          },
+          {
+            "id": "B",
+            "premium_cny": 5738.49,
+            "cashback_cny": 700,
+            "cashback_written": false,
+            "name": "太保 B",
+            "services": [
+              "道路救援2次",
+              "代驾1次",
+              "代办年检"
+            ]
+          },
+          {
+            "id": "C",
+            "premium_cny": 5980,
+            "cashback_cny": 300,
+            "cashback_written": true,
+            "name": "平安 C",
+            "services": [
+              "道路救援2次",
+              "代驾1次",
+              "车辆检测",
+              "代办年检"
+            ]
+          }
+        ],
+        "weights": {
+          "reliability": 45,
+          "net_price": 35,
+          "services": 20
+        }
+      },
+      "events": [
+        {
+          "at": "2026-10-15T10:00:00+08:00",
+          "wordings": [
+            "帮我选一个，不要只比价格。",
+            "这三份车险怎么选？也考虑保障和服务。",
+            "按我的权重帮我挑车险，别只看最便宜。"
+          ]
+        },
+        {
+          "at": "2026-10-15T10:01:00+08:00",
+          "wordings": [
+            "太保销售说一定返 700，如果最后不返怎么办？",
+            "B销售口头保证返700元，没兑现怎么处理？",
+            "太保那700元只有口头承诺；最后没到账怎么办？"
+          ]
+        }
+      ]
+    }
+  ]
+}
