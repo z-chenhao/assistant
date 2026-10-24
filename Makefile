@@ -23,6 +23,10 @@ audit-baseline-04:
 audit-baseline-05:
 	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-05.json --evidence evidence/baseline-05.json
 
+.PHONY: audit-baseline-06
+audit-baseline-06:
+	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-06.json --evidence evidence/baseline-06.json
+
 run: build
 	./bin/erii start
 

@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-06](baseline-06.md) records ERII-236's separate 80-block audit of
+Loop messages/events, Child API, shared Tool execution and frozen replay.
+Its per-obligation evidence and finite gap routes do not certify release or
+alter previous package ledgers.
+
 [baseline-05](baseline-05.md) records ERII-235's separate 80-block audit of Store
 isolation, the JavaScript Host protocol, ToolInvocation and Main runtime messages.
 Its 363 sub-obligations retain explicit scopes, evidence limits and finite routes.
