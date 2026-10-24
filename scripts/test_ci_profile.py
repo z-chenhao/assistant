@@ -88,6 +88,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(profile.phase('Install pinned Bridge dependencies'), 'setup')
         self.assertEqual(profile.phase('Verify the copied SDK stayed immutable'), 'cleanup')
         self.assertEqual(profile.phase('Clean disposable fixture storage'), 'cleanup')
+        self.assertEqual(profile.phase('Providers part with unchanged repetitions'), 'test')
 
 
 if __name__ == '__main__':
