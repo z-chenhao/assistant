@@ -25,7 +25,7 @@ class PackFixture:
         self.folder = folder
         self.counter = 0
         self.sha = receipts.git(ROOT, 'rev-parse', 'HEAD').decode().strip()
-        self.inventory = audit.audit(ROOT, json.loads((ROOT / 'docs/v1-release-ledger.json').read_text()))
+        self.inventory = audit.audit(ROOT, audit.current_ledger(ROOT))
         model = dict(provider_kind='openai_compatible', model_id='qwen-synthetic', wire_api='openai_responses',
                      context_window=8192, max_output_tokens=1024, generation_defaults={},
                      compatibility={'tool_result_format': 'openai'}, capabilities={'text_input': True}, endpoint_hash='a' * 64)

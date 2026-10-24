@@ -107,6 +107,9 @@ class SelectionTests(unittest.TestCase):
                     if frontend:
                         expected.append('web')
                     self.assertEqual(json.loads(capture.read_text()), expected)
+        node_setup = action.split('uses: actions/setup-node@', 1)[1].split('    - name:', 1)[0]
+        self.assertNotRegex(node_setup, r'(?m)^\s+cache(?:-dependency-path)?:',
+                            'optional hosted npm restore must not block offline gates on cache egress limits')
         for name in ('fast', 'verify', 'personal', 'race', 'codemode'):
             # Extract the entire job (two-space names, not nested step names).
             block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]

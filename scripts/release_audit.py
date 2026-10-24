@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 import re
 
+from release_receipts import strict_json
+
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY_SHA = '38faf6144d9ae0dc5e5d38aaf32d06052820d683'
 
@@ -96,6 +98,38 @@ def route(section, mappings):
     return mappings[max(matches, key=len)]
 
 
+def current_ledger(root):
+    """Bind the preserved historical index to explicitly re-audited sources.
+
+    Only line positions may move: every historical review must still match
+    exactly one unchanged section/content hash. Changed clauses need a new
+    audit rather than inheriting a historical disposition.
+    """
+    original = (root / 'docs/v1-release-ledger.json').read_bytes()
+    binding = strict_json((root / 'docs/v1-release-source-bindings.json').read_bytes())
+    if (binding.get('version') != 1 or
+            hashlib.sha256(original).hexdigest() != binding['ledger_sha256']):
+        raise ValueError('historical release ledger changed')
+    ledger = strict_json(original)
+    if set(binding['sources']) != set(ledger['sources']):
+        raise ValueError('current source inventory mismatch')
+    for source, definition in ledger['sources'].items():
+        path = root / source
+        if sha256(path) != binding['sources'][source]:
+            raise ValueError('source changed; re-audit current binding: ' + source)
+        rows = inventory(path.read_text())
+        for review in ledger['individual_reviews']:
+            if review['source'] != source:
+                continue
+            matches = [row for row in rows if (row['section'], row['sha256']) ==
+                       (review['section'], review['sha256'])]
+            if len(matches) != 1:
+                raise ValueError('historical review text changed or ambiguous: ' + source)
+            review['line'] = matches[0]['line']
+        definition['sha256'] = binding['sources'][source]
+    return ledger
+
+
 def apply_reviews(root, units, reviews):
     """Bind bounded review notes to exact source blocks, without certifying PASS."""
     def identity(u):
@@ -168,7 +202,7 @@ def audit(root, ledger):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--ledger', type=Path, default=ROOT / 'docs/v1-release-ledger.json')
+    parser.add_argument('--ledger', type=Path, help='Explicit ledger; defaults to the current source binding')
     parser.add_argument('--evidence', type=Path, default=ROOT / 'evidence/release-audit.json')
     parser.add_argument('--require-complete', action='store_true')
     args = parser.parse_args()
@@ -179,7 +213,8 @@ def main():
     if not output.is_relative_to(evidence_root) or output == evidence_root:
         parser.error('--evidence must be a file under repository evidence/')
     output.unlink(missing_ok=True)
-    report = audit(ROOT, json.loads(args.ledger.read_text()))
+    ledger = strict_json(args.ledger.read_bytes()) if args.ledger else current_ledger(ROOT)
+    report = audit(ROOT, ledger)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(dict(status=report['status'], release_ready=False,
