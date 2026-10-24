@@ -24,6 +24,7 @@ semantics; feature guides describe the implemented paths and their proof limits.
 - [Verification feature map](../scripts/FEATURES.md)
 - [Local-first evidence collection and handoff](guides/evidence.md)
 - [Release evidence decisions and proof limits](guides/release-evidence.md)
+- [Unscripted evaluation entry and support matrix](guides/unscripted-evals.md)
 - [Main loop and recovery](guides/main-loop.md)
 - [Core conformance](guides/core-evals.md), [personal-assistant evaluation](guides/m6-evals.md)
 - [CI operations](ci.md), [Golden Cases](../evals/golden-cases.md)

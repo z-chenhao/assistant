@@ -13,7 +13,8 @@ any pending disposition or null score, or certify v1. A fresh exact-SHA acceptan
 review must cover the complete PR, including the d11e543 model audit and subsequent
 main merges; historical checkpoint verdicts do not supply that acceptance.
 
-The current synchronized base is `0c6d964130168da1c93650e77c455d32556b3bf5`
+The historical synchronized base at the 2026-10-23 checkpoint was
+`0c6d964130168da1c93650e77c455d32556b3bf5`
 (human-merged #36; #33–35 remain integrated); ERII-29 #31 remains the prior release dependency.
 ERII-5–29 each have a merged implementation PR. The ledger records GitHub's
 actual merge commit, actor, time and URL; #34–36 were refreshed on 2026-10-23. A merge records
@@ -36,7 +37,7 @@ and Golden §§1–16 to candidate implementation files, tests, merged PRs and
 maintained evidence producers. The report preserves each paragraph, list item,
 table row and fenced contract with its original section, line and SHA-256.
 It includes descriptive/future/reference text so no automated keyword filter
-can silently discard a mandatory clause. One hundred twenty-two blocks now have exact-hash
+can silently discard a mandatory clause. At the model-audit checkpoint, 122 blocks had exact-hash
 individual dispositions (`partial_mechanical` or `evidence_gap`); the other
 blocks remain `pending_individual_review`. Some blocks contain several obligations;
 each review must check every subclause, distinguish v1 requirements from explicit
@@ -248,6 +249,11 @@ Broader GC-08 lifecycle/reminders, GC-09 question aggregation/Steering and
 the exact GC-16 research journey remain required.
 
 ## Handoff and remaining work
+
+**Historical checkpoint record (2026-10-21–23).** The paragraphs below preserve
+the earlier release/checkpoint handoff and its evidence identities. Current
+ERII-30 acceptance follows the finite asset contract above; outstanding full v1
+release obligations remain with ERII-223.
 
 The user's 2026-10-21 coordination authorizes sequential bounded checkpoints
 inside this existing child and sole PR #32. No new child or competing PR is
