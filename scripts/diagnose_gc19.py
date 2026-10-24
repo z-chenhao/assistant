@@ -29,6 +29,14 @@ def overlay_source(source):
 ''')
 
 
+def build_environment(environment):
+    result = environment.copy()
+    if result.get('ERII_CI_BASE_GOROOT'):
+        result['GOROOT'] = result['ERII_CI_BASE_GOROOT']
+        result['PATH'] = result['GOROOT'] + '/bin:' + result['PATH']
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
@@ -45,10 +53,9 @@ def main():
         binary = temp / 'erii-diagnostic'
         build = ['go', 'build', '-overlay', str(overlay), '-o', str(binary), './cmd/erii']
         env = os.environ.copy()
-        if env.get('ERII_CI_BASE_GOROOT'):
-            env['GOROOT'] = env['ERII_CI_BASE_GOROOT']
-            env['PATH'] = env['GOROOT'] + '/bin:' + env['PATH']
-        subprocess.run(build, cwd=ROOT, env=env, check=True)
+        # Only compilation uses the original SDK. Fixtures must retain CI's
+        # frozen public SDK and cache environment, exactly like the normal gate.
+        subprocess.run(build, cwd=ROOT, env=build_environment(env), check=True)
         env['ERII_CAPABILITY_DIAGNOSTICS'] = str(evidence / 'fixtures')
         env['ERII_VERIFY_CASE_JOBS'] = '4'
         command = ['python3', 'scripts/verify_suite.py', '--binary', str(binary),
@@ -56,10 +63,14 @@ def main():
                    '--codemode-part', 'GC-19', '--jobs', '1']
         record = dict(source_sha=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                       diagnostic_only=True, build=build, command=command,
+                      fixture_goroot=env.get('GOROOT'), fixture_path=env.get('PATH'),
                       source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                       overlay_sha256=hashlib.sha256(replacement.read_bytes()).hexdigest(),
                       binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
+        record['diagnostic_status'] = 'running'
+        (evidence / 'diagnostic.json').write_text(json.dumps(record, indent=2) + '\n')
         result = subprocess.run(command, cwd=ROOT, env=env)
+        record['diagnostic_status'] = 'completed'
         record['returncode'] = result.returncode
         errors = Counter()
         failures = []
