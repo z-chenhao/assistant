@@ -664,7 +664,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "No change was accepted"}, nil
 		}
-		return calls(task.ManageName, `{"operation":"create","task":"x","model":"forbidden"}`, `{"operation":"create","task":"x","completionPolicy":"invalid"}`, `{"operation":"create","task":"x","completionPolicy":null}`, `{"operation":"create","task":"x","artifactRefs":["artifact:inaccessible"]}`, `{"operation":"append","taskRef":"not-visible","instruction":"continue"}`, `{"operation":"pause","taskRef":"not-visible"}`, `{"operation":"cancel","taskRef":"not-visible"}`), nil
+		return calls(task.ManageName, `{"operation":"create","task":"x","model":"forbidden"}`, `{"operation":"create","task":"x","completionPolicy":"invalid"}`, `{"operation":"create","task":"x","completionPolicy":null}`, `{"operation":"create","task":"x","artifactRefs":["artifact:inaccessible"]}`, `{"operation":"append","taskRef":"not-visible","instruction":"continue"}`, `{"operation":"pause","taskRef":"not-visible"}`, `{"operation":"cancel","taskRef":"not-visible"}`, `{"operation":"complete","taskRef":"not-visible"}`), nil
 	}
 	mustSubmit(t, a, "rejections", "invalid controls")
 	mustDrain(t, a)
@@ -676,7 +676,7 @@ func TestTaskToolRejectionsHaveNoStateEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rows.Close()
-	expected := []string{"INVALID_ARGUMENT", "INVALID_ARGUMENT", "INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
+	expected := []string{"INVALID_ARGUMENT", "INVALID_ARGUMENT", "INVALID_ARGUMENT", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND", "NOT_FOUND"}
 	i := 0
 	for rows.Next() {
 		var raw string

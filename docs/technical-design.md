@@ -222,11 +222,12 @@ builtin__task__manage
 ```
 
 - `task_search` 是统一的只读发现工具：省略 `query` 时按 `scope/status` 列出当前或最近 Task；提供 `query` 时对历史 Task 做关键词与语义混合检索。不另设 `task_list` 或 `task_query`。
-- `task_manage` 是统一的状态变更工具，使用判别联合支持 `create/append/pause/cancel`，不拆成四个工具；不向模型暴露独立的 `resume` 操作。
+- `task_manage` 是统一的状态变更工具，使用判别联合支持 `create/append/pause/cancel/complete`，不拆成多个工具；不向模型暴露独立的 `resume` 操作。
 - 两者复用统一的 `ToolSpec → ToolInvocation → ToolExecutor` 管线；Task Tool 是 Main 的控制面能力，Root/Child Worker 默认不可见。
 - `task_search` 返回内部 `TaskRef`、标题、目标摘要、状态、最近进度和更新时间，不返回 Root Run ID、Run 树或内部轨迹。唯一高置信匹配可继续；多个合理候选必须由 Main 向用户澄清。
 - `task_manage(create)` 原子创建 Task、保存 Task Anchor、创建首个 Root Worker Run 并发布 `run_ready`；它只返回接收凭证，不等待任务完成。
-- `task_manage(create).completionPolicy` 只允许 `once|ongoing`，省略等同 `once`；仅 create 接受此字段。普通 Root 成功不结束 ongoing Task，也不自动调度下一轮；后续 append 沿用同一策略并按既有规则创建新 Root。策略创建后不可改写。ERII-225 的批准、升级边界与显式完成入口缺口见 `docs/adr/006-explicit-task-completion-policy.md`。
+- `task_manage(create).completionPolicy` 只允许 `once|ongoing`，省略等同 `once`；仅 create 接受此字段。普通 Root 成功不结束 ongoing Task，也不自动调度下一轮；后续 append 沿用同一策略并按既有规则创建新 Root。策略创建后不可改写。ERII-225 的批准、升级边界与显式完成合同见 `docs/adr/006-explicit-task-completion-policy.md`。
+- `task_manage(complete)` 仅接受 `active` Task，且当前 epoch 没有非终态 Root/Child Run，也没有 queued/running/waiting/unknown ToolInvocation。存在未完成工作或未确认副作用、或 Task 为 paused/completed/cancelled 时返回不可重试的 `INVALID_ARGUMENT`，不取消、不排空、不等待。Host 在同一事务内校验 Main owner、Task version/epoch，保存 `completed`、`completed_at` 和普通幂等 receipt；不递增 epoch、不修改 completion policy、不生成 Worker TaskUpdate 或 Main Follow-up。重复来源/调用复用原 receipt；新的 complete 来源不能再次完成 completed Task。后续 append 沿既有规则重新激活并创建新 Root。
 - `task_manage(append)` 追加持久化 `TaskInstruction`，不覆盖原 Task Anchor。Task 为 `active` 且存在活动 Root 时，在稳定边界向该 Root 注入指令；Task 不是 `active`，或没有活动 Root 时，Host 将其置为 `active`、递增 `task_epoch` 并创建新的 Root Worker Run。
 - `append` 同时承担“追加要求”和“重新激活”语义。用户只说“继续”“接着做”或“恢复这个工作”时，Main 也可以把该自然语言原样保存为 `TaskInstruction`；这条明确的用户指令就是重新激活的授权，不需要再构造 `resume` 操作。
 - 领域层可以保留内部 `TaskService.Reactivate(...)` 动作供 `append` 实现状态迁移，但它不是模型可见 Tool，也不能被模型单独调用。
@@ -257,7 +258,7 @@ interface TaskSummary {
   updatedAt: string;
 }
 
-type TaskManageOperation = "create" | "append" | "pause" | "cancel";
+type TaskManageOperation = "create" | "append" | "pause" | "cancel" | "complete";
 
 interface TaskCreateRequest {
   operation: "create";
@@ -283,11 +284,17 @@ interface TaskCancelRequest {
   taskRef: TaskRef;
 }
 
+interface TaskCompleteRequest {
+  operation: "complete";
+  taskRef: TaskRef;
+}
+
 type TaskManageRequest =
   | TaskCreateRequest
   | TaskAppendRequest
   | TaskPauseRequest
-  | TaskCancelRequest;
+  | TaskCancelRequest
+  | TaskCompleteRequest;
 
 interface TaskManageReceipt {
   taskRef: TaskRef;
@@ -2186,7 +2193,7 @@ Go 测试必须运行 race detector；Sidecar 必须包含协议 fixture、资�
 | 登录刷新 | OAuth state/PKCE、防重复回调、并发单飞刷新、过期重登和 Logout 均不泄露或残留 Secret |
 | Provider 隔离 | Provider Bridge 无 Tool/Computer/数据库权限；Code Mode Sidecar 无模型凭据或任意网络 |
 | 单 Main | 并发消息只注入一个活动 Main Run，用户 Steering 优先于 Worker Follow-up |
-| Task 生命周期 | create/append/pause/cancel 与四状态一致；失败 Run 不产生 `failed` Task |
+| Task 生命周期 | create/append/pause/cancel/complete 与四状态一致；失败 Run 不产生 `failed` Task |
 | Root/Child | Main 不可直接创建 Child；`agent.run()` 永不创建 Task；Child 只回直接 Parent |
 | 权限 | Child 不获得用户交付、Task 管理、凭据管理或 Parent 没有的能力 |
 | 并发 | 100/1000 项在高上限内透明排队，用户无并发询问风暴 |

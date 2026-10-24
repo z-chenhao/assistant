@@ -8,6 +8,26 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
+func TestCompleteContract(t *testing.T) {
+	raw := `{"operation":"complete","taskRef":"task:opaque"}`
+	if _, err := ParseManage(raw); err != nil || !tool.Validate(ManageSchema, raw) {
+		t.Fatalf("complete rejected: %v", err)
+	}
+	for _, raw := range []string{
+		`{"operation":"complete"}`,
+		`{"operation":"complete","taskRef":null}`,
+		`{"operation":"complete","taskRef":""}`,
+		`{"operation":"complete","taskRef":"x","instruction":"finish"}`,
+		`{"operation":"complete","taskRef":"x","completionPolicy":"once"}`,
+		`{"operation":"complete","taskRef":"x","artifactRefs":[]}`,
+		`{"operation":"complete","taskRef":"x","taskRef":"y"}`,
+	} {
+		if _, err := ParseManage(raw); err == nil {
+			t.Fatal("invalid complete accepted", raw)
+		}
+	}
+}
+
 func TestCreateCompletionPolicyContract(t *testing.T) {
 	for _, policy := range []string{"", "once", "ongoing"} {
 		raw := `{"operation":"create","task":"Keep the wedding checklist current"}`
@@ -56,6 +76,7 @@ func TestPriorManageSchemaFailsClosed(t *testing.T) {
 		if err := json.Unmarshal([]byte(defs[i].Spec.InputSchema), &schema); err != nil {
 			t.Fatal(err)
 		}
+		schema["oneOf"] = schema["oneOf"].([]any)[:4]
 		create := schema["oneOf"].([]any)[0].(map[string]any)
 		delete(create["properties"].(map[string]any), "completionPolicy")
 		raw, _ := json.Marshal(schema)
@@ -71,6 +92,9 @@ func TestPriorManageSchemaFailsClosed(t *testing.T) {
 	}
 	if _, err = Registry().Select([]tool.Spec{prior}); err == nil {
 		t.Fatal("prior frozen schema silently replaced")
+	}
+	if tool.Validate(prior.InputSchema, `{"operation":"complete","taskRef":"x"}`) {
+		t.Fatal("old schema gained complete")
 	}
 	if tool.Validate(prior.InputSchema, `{"operation":"create","task":"x","completionPolicy":"ongoing"}`) {
 		t.Fatal("old schema gained new argument")

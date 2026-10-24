@@ -2,7 +2,8 @@
 
 Status: create policy accepted by the authenticated owner in ERII-225, comment
 `01a16954-32dd-7a14-a571-cd8ba4d33ed3`. ERII-226 implements this finite contract.
-The explicit-completion interface conflict below remains undecided.
+Explicit completion accepted by the same owner on ERII-226, comment
+`01a16b9e-d2ab-7398-b474-cd47164d4022`; it resolves the interface conflict.
 
 ## Decision and boundary
 
@@ -38,14 +39,34 @@ Drain existing Main Runs with their original binary before upgrading. Stored
 results, Task policy, anchors and terminal Runs are not rewritten. New Runs
 receive the current schema; existing Worker snapshots have no Task tool.
 
-## Explicit-completion conflict
+## Explicit completion
 
-ERII-226 says explicit completion can still end a Task. The current baseline
-§3.9 and implementation expose only create/append/pause/cancel. The database
-permits active → completed, but no callable explicit-completion path exists.
-Adding a `complete` operation changes the approved model-visible union. This
-requires an owner decision against ERII-225 before final acceptance; this change
-does not invent that operation or treat cancel as completion.
+Extend the same Main-only manage union with `complete` and `taskRef`. Accept
+only active Tasks with no nonterminal Root/Child and no queued/running/waiting/
+unknown ToolInvocation in the current epoch. This includes unresolved invocations
+on already terminal Runs. Reject with non-retryable `INVALID_ARGUMENT`; do not
+cancel, drain or wait for work. Paused/completed/cancelled Tasks reject a new
+complete action. Paused work must first append and reach an idle active boundary.
+
+Atomically store active → completed, `completed_at`, version +1, the ordinary
+source/invocation-deduplicated receipt and control Outbox event. Check Main owner
+and Task version/epoch; leave epoch and completion policy unchanged. Late writes
+still fail the existing ownership/status/epoch fences. No synthetic Worker
+TaskUpdate or Main follow-up is emitted. Once and ongoing use the same operation;
+an idle ongoing Task needs it to finish. A later append reactivates completed
+work, clears the completion timestamp and creates a new Root/epoch.
+
+```mermaid
+stateDiagram-v2
+    active --> completed: complete, terminal current epoch and resolved Tools
+    completed --> active: append, new Root and epoch
+    active --> active: reject complete while work is unresolved
+```
+
+`task.ParseManage` owns the strict union. `tools.executeBuiltin` owns validation,
+state CAS, receipt and Outbox in one transaction. `fence` rejects stale owners
+and Worker writes; append owns reactivation. These are existing mechanisms, with
+no new Tool, Task state, scheduler or execution loop.
 
 ## Verification
 
@@ -53,6 +74,8 @@ Contract and real SQLite tests cover default/explicit-once dedup, separate ongoi
 identity, frozen prior schema rejection, child-tree completion, append, controls,
 late writes and immutable policy. `scripts/verify_tasks.py` drives the actual CLI,
 reads stored state, kills before/after Task and Root-result commit, restarts and
-checks completed-call reuse. Existing five-run control and GC-08 fragment gates
-remain required. Scripted fixtures prove mechanical behavior, not semantic Golden
+checks completed-call reuse. Explicit-completion regressions cover both policies,
+all rejected state classes, complete/append races, owner fencing, invocation replay
+and SIGKILL before/after the completion transaction, without synthetic follow-ups.
+Existing five-run control and GC-08 fragment gates remain required. Scripted fixtures prove mechanical behavior, not semantic Golden
 Case quality or v1 release acceptance.

@@ -59,9 +59,13 @@ func controlPolicyFixture(t *testing.T, root func(llm.GenerationRequest) (llm.Ge
 				request.Instruction = "Continue with the new date"
 			}
 		}
-		if op == "race" {
+		if op == "race" || op == "complete-race" {
 			args := []string{}
-			for _, action := range []string{"pause", "append", "cancel"} {
+			actions := []string{"pause", "append", "cancel"}
+			if op == "complete-race" {
+				actions = []string{"complete", "append"}
+			}
+			for _, action := range actions {
 				q := task.ManageRequest{Operation: action, TaskRef: request.TaskRef}
 				if action == "append" {
 					q.Instruction = "Concurrent new date"

@@ -1,6 +1,6 @@
 # Task delegation and Root recovery
 
-The M2 slices add Main-only Task discovery, create/append/pause/cancel,
+The M2 slices add Main-only Task discovery, create/append/pause/cancel/complete,
 independent Root execution and durable Main follow-ups. Use a selected, probed
 model through the existing TUI or `chat send` / `chat work` commands. There is
 one shared Agent Loop and one ToolInvocation pipeline.
@@ -21,7 +21,7 @@ accepted, not finished. Short synchronous questions remain in Main.
 | Canonical tool | Input | Output | Visibility / permission | Recovery |
 | --- | --- | --- | --- | --- |
 | `builtin__task__search` v1 | Optional `query`, `scope`, `status[]`, `limit` | `TaskSummary[]` | Main, `read_only` | `safe`; bounded 64 KiB result |
-| `builtin__task__manage` v1 | Discriminated `create/append/pause/cancel` union | `{taskRef,status,accepted:true}` | Main, `task_control` | `safe`; transactional receipt dedup |
+| `builtin__task__manage` v1 | Discriminated `create/append/pause/cancel/complete` union | `{taskRef,status,accepted:true}` | Main, `task_control` | `safe`; transactional receipt dedup |
 
 The exact schemas and strict validators live in `internal/task/task.go`.
 Unknown fields, nulls, duplicate fields, wrong union arms, invalid limits and
@@ -36,12 +36,12 @@ new Worker capabilities. JavaScript and general Durable Replay remain later work
 
 ## Controlled stop and continuation
 
-| Current Task | pause | cancel | append |
-| --- | --- | --- | --- |
-| active | paused, epoch +1 | cancelled, epoch +1 | Stable Steering if a Root is active; otherwise new Root, epoch +1 |
-| paused | Same receipt state, no epoch change | cancelled, epoch +1 | active, new Root, epoch +1 |
-| completed | INVALID_ARGUMENT | INVALID_ARGUMENT | active, new Root, epoch +1 |
-| cancelled | INVALID_ARGUMENT | Same receipt state, no epoch change | active, new Root, epoch +1 |
+| Current Task | pause | cancel | append | complete |
+| --- | --- | --- | --- | --- |
+| active | paused, epoch +1 | cancelled, epoch +1 | Stable Steering if a Root is active; otherwise new Root, epoch +1 | completed if current epoch has no live Run or unresolved Tool; otherwise INVALID_ARGUMENT |
+| paused | Same receipt state, no epoch change | cancelled, epoch +1 | active, new Root, epoch +1 | INVALID_ARGUMENT |
+| completed | INVALID_ARGUMENT | INVALID_ARGUMENT | active, new Root, epoch +1 | INVALID_ARGUMENT |
+| cancelled | INVALID_ARGUMENT | Same receipt state, no epoch change | active, new Root, epoch +1 | INVALID_ARGUMENT |
 
 Stop acceptance atomically persists Task status/epoch, Run and invocation desired
 state, receipt and Outbox. This immediately closes business-write and new-work
@@ -69,10 +69,18 @@ an existing Automation must fire. Ordinary Root success is still reported once
 to Main. Pause/cancel, unknown-effect handling and epoch fencing keep their
 existing behavior.
 
-The database allows explicit `active → completed`, but the current Tool union
-has no completion operation. ERII-226's explicit-completion acceptance remains
-unresolved pending an owner protocol decision; do not substitute cancellation
-for completion. See [ADR 006](../adr/006-explicit-task-completion-policy.md).
+Main can explicitly end idle active work with
+`{"operation":"complete","taskRef":"<existing TaskRef>"}`. The Host rejects any
+nonterminal Root/Child or queued/running/waiting/unknown ToolInvocation in the
+current Task epoch with non-retryable `INVALID_ARGUMENT`. Complete does not cancel,
+drain or wait. Paused work must be reactivated through append before completion;
+completed/cancelled Tasks reject a fresh complete request. A repeated accepted
+source or invocation returns its original receipt.
+
+Completion stores status, timestamp and receipt atomically under Main ownership
+and Task version/epoch fencing. It changes neither epoch nor completion policy,
+and emits no Worker TaskUpdate or Main follow-up. Append can later reactivate
+that completed Task with a new Root and epoch. See [ADR 006](../adr/006-explicit-task-completion-policy.md).
 
 No storage migration is needed: schema v9 already stores the immutable policy
 and migrates prior Tasks to `once`. New Main Runs freeze the extended schema.

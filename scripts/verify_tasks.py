@@ -106,6 +106,17 @@ def run(binary):
                     and first["tasks"][0]["completed_at"] is None, "ordinary Root ended ongoing Task")
             h.command("chat", "work")
             require(state(h) == first, "idle ongoing Task started unsolicited work")
+            h.send("complete", "Complete: Wedding"); h.command("chat", "work")
+            completed = state(h); check(completed)
+            require(completed["tasks"][0]["status"] == "completed" and completed["tasks"][0]["task_epoch"] == 1
+                    and completed["tasks"][0]["completed_at"] is not None
+                    and completed["tasks"][0]["version"] == first["tasks"][0]["version"] + 1, "explicit completion transition incorrect")
+            require(completed["updates"] == first["updates"] and completed["inbox"] == first["inbox"], "complete emitted synthetic update/follow-up")
+            require(len(completed["task_requests"]) == len(first["task_requests"]) + 1
+                    and len(completed["task_invocations"]) == len(first["task_invocations"]) + 2, "complete duplicate did not reuse receipt")
+            h.send("complete-again", "Complete: Wedding"); h.command("chat", "work")
+            rejected = state(h)
+            require(rejected["tasks"] == completed["tasks"] and rejected["task_requests"] == completed["task_requests"], "new completion accepted on completed Task")
             h.send("append", "Continue: Wedding | Update the guest count.")
             h.command("chat", "work")
             appended = state(h); check(appended, roots=2, updates=2)
@@ -127,10 +138,10 @@ def run(binary):
                     "ongoing cancellation failed")
             h.command("chat", "work")
             require(state(h) == cancelled, "restart changed cancelled ongoing Task")
-            return {"first": first, "appended": appended, "paused": paused, "resumed": resumed, "cancelled": cancelled}
+            return {"first": first, "completed": completed, "rejected": rejected, "appended": appended, "paused": paused, "resumed": resumed, "cancelled": cancelled}
 
         report["ongoing"] = scenario("ongoing", ongoing)
-        report["checks"].append("Explicit ongoing create -> Root completion remains active -> idle restart -> append/new Root -> pause/continue/cancel with persistent policy")
+        report["checks"].append("Explicit ongoing create -> Root stays active -> complete and duplicate/rejection -> append/new Root -> pause/continue/cancel; no synthetic update")
 
         for boundary in ("before_task_commit", "after_task_commit", "before_result_commit", "after_result_commit"):
             def ongoing_crash(h):
@@ -151,6 +162,31 @@ def run(binary):
                 return {"boundary": boundary, "before_kill": before, "recovered": after}
             report["crashes"].append(scenario("ongoing-" + boundary, ongoing_crash))
         report["checks"].append("Explicit ongoing policy survives SIGKILL before/after Task creation and Root result; completed calls/results reused")
+
+        for boundary in ("before_task_complete_commit", "after_task_complete_commit"):
+            def complete_crash(h):
+                h.send("create", "Ongoing: Wedding completion restart."); h.command("chat", "work")
+                initial = state(h)
+                receipt = h.send("complete", "Complete: Wedding")
+                require(receipt == h.send("complete", "Complete: Wedding"), "duplicate completion ingress drift")
+                child = h.hold(boundary)
+                child.kill(); child.communicate(timeout=10)
+                before = state(h)
+                require(before["tasks"][0]["status"] == ("active" if boundary.startswith("before_") else "completed"), "completion boundary not atomic")
+                h.command("chat", "work")
+                after = state(h); check(after)
+                require(after["tasks"][0]["status"] == "completed" and after["tasks"][0]["task_epoch"] == 1
+                        and after["tasks"][0]["completion_policy"] == "ongoing"
+                        and after["tasks"][0]["version"] == initial["tasks"][0]["version"] + 1, "completion replay changed policy/epoch or repeated update")
+                require(after["updates"] == initial["updates"] and after["inbox"] == initial["inbox"], "recovered complete emitted synthetic follow-up")
+                require(len(after["task_requests"]) == 2 and len(after["task_invocations"]) == 3, "completion receipt duplicate/omission")
+                prior = {g["generation_id"]: g for g in before["generations"] if g["status"] == "completed"}
+                require(all(g["attempt_count"] == prior[g["generation_id"]]["attempt_count"] and g["request_hash"] == prior[g["generation_id"]]["request_hash"]
+                            for g in after["generations"] if g["generation_id"] in prior), "completion replay repeated completed model call")
+                h.command("chat", "work"); require(state(h) == after, "completed Task changed on restart")
+                return {"boundary": boundary, "before_kill": before, "recovered": after}
+            report["crashes"].append(scenario(boundary, complete_crash))
+        report["checks"].append("SIGKILL before/after explicit completion transaction: status/timestamp/receipt recover atomically, duplicate invocations reuse acceptance, no synthetic Worker follow-up")
 
         def responsive(h):
             with Terminal(h.args("-test-main-hold", "before_worker_generation", "tui"), h.env, h.root) as t:
