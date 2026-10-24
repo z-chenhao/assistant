@@ -1,5 +1,11 @@
 # Bounded baseline audits
 
+[golden-common-02](golden-common-02.md) records ERII-245's 80 exact blocks from
+GC-05's overview through the first three product references. Its 476 duties retain
+all 467 mandatory/policy routes, three field maps, SC-01–13 and current ungraded
+native observations. Use `make audit-golden-common-02`. ERII-367/368 own metric
+and SC-13 consumer mechanisms; this audit certifies no product or release.
+
 [golden-common-01](golden-common-01.md) records ERII-244's 80 unchanged Golden
 common blocks through the GC-04 overview row. Its 359 scoped duties preserve
 all 302 mandatory duties, 25 finite owners and current ungraded native
