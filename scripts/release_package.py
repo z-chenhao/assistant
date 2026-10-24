@@ -13,9 +13,13 @@ import subprocess
 from release_receipts import strict_json
 
 MANIFEST_HASH = '0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556'
+RESEALED_MANIFEST_HASH = 'f26df8fbb927746198612c9f5aa8921df6c51274953bff0cc0b0a83c20e93837'
 PACKAGE_HASHES = {
     'baseline-01': 'b95fc9fa9861ff62d5551f820ae56dac90f9ad33ecdbd2ad2ef743fcc315db95',
+    'baseline-02': '7480b2bdfd3d86256d1d13a10f6b2cd9707fb62f365f07e7e244f17a0b510c69',
+    'baseline-03': '1b6367425a571b1bb0fcca0bc64a196a5f962bb28144dda17b06b23b453e7d67',
     'baseline-04': '2e56b4c2b855c9c6a81e667f316e92444e2890a8a35568a36cdce566fb07639e',
+    'baseline-05': '3502b3aa7b733584a5ddfe624ab44b6f303201f6c752e38f650fd882ce45eb12',
     'baseline-06': 'b20a9f33e1b58b9b184f1a3004055d12f113546764f6b89a9c103016ab94668a',
 }
 
@@ -50,17 +54,28 @@ def git(root, *args):
 def audit_package(root, ledger, units, manifest=None, native_root=None, verify_git=False):
     name = ledger['package']
     frozen = ledger['frozen_blocks']
-    if (ledger.get('version') != 1 or ledger['manifest_sha256'] != MANIFEST_HASH
+    # Owner comment 01a16e1d-3e2c-78fb-ba1d-5621d178a9bd explicitly resealed
+    # baseline-02 after ADR006. Other audits retain their original identities.
+    manifest_hash = RESEALED_MANIFEST_HASH if name == 'baseline-02' else MANIFEST_HASH
+    if (ledger.get('version') != 1 or ledger['manifest_sha256'] != manifest_hash
             or name not in PACKAGE_HASHES or frozen_digest(frozen) != PACKAGE_HASHES[name]):
         raise ValueError('frozen package changed; coordinator must reseal it')
+    if name == 'baseline-02':
+        if (ledger.get('original_manifest_sha256') != MANIFEST_HASH or
+                frozen_digest(ledger.get('original_frozen_blocks', [])) !=
+                'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63'):
+            raise ValueError('original manifest provenance changed')
     if manifest is not None:
         raw = manifest.read_bytes()
-        if digest(raw) != MANIFEST_HASH:
+        if digest(raw) != manifest_hash:
             raise ValueError('owner manifest hash mismatch')
         definition = strict_json(raw)
         assigned = [identity(b) for p in definition['packages'].values() for b in p['blocks']]
-        if len(assigned) != 1585 or any(n != 1 for n in Counter(assigned).values()):
+        count = 1588 if name == 'baseline-02' else 1585
+        if len(assigned) != count or any(n != 1 for n in Counter(assigned).values()):
             raise ValueError('owner manifest assignment is not unique and complete')
+        if name == 'baseline-02' and Counter(assigned) != Counter(map(identity, units)):
+            raise ValueError('resealed manifest does not cover the current source inventory')
         if definition['packages'][name]['blocks'] != frozen:
             raise ValueError('package differs from owner manifest')
     by_key = {}

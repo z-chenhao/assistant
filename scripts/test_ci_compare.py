@@ -140,8 +140,10 @@ class CurrentComparisonTests(unittest.TestCase):
         import tempfile
         import ci_codemode
         import ci_personal
+        import ci_providers
         from test_ci_codemode import CodeModeJoinTests
         from test_ci_personal import PersonalJoinTests
+        from test_ci_providers import ProvidersTests
         reports = ComparisonTests().experiment(1)['attempts']['1:1']['reports']
         for shard in ('codemode', 'personal'):
             with tempfile.TemporaryDirectory() as directory:
@@ -151,6 +153,11 @@ class CurrentComparisonTests(unittest.TestCase):
                 joined, _, summary = (ci_codemode if shard == 'codemode' else ci_personal).join(root)
                 reports['suite-' + shard + '.json'] = joined
                 reports['core-summary.json' if shard == 'codemode' else 'm6-summary.json'] = summary
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = ProvidersTests()
+            fixture.write(root, fixture.fixture(root))
+            reports['suite-providers.json'] = json.loads(json.dumps(ci_providers.join(root)))
         for name, report in reports.items():
             if not name.startswith('suite-'):
                 continue
@@ -181,9 +188,10 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 25)
+        self.assertEqual(len(comparison.topology()), 27)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
-                         'Race detector', 'Python 3.10 compatibility'} <= comparison.topology())
+                         'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
+                         'Providers (models)', 'Complete providers evidence'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
         self.assertFalse(insufficient['performance_certified'])
         self.assertIsNone(insufficient['p50_wall_reduction'])
@@ -201,7 +209,7 @@ class CurrentComparisonTests(unittest.TestCase):
                     self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
 
     def test_join_receipt_mutations_fail_closed(self):
-        for shard in ('codemode', 'personal'):
+        for shard in ('codemode', 'personal', 'providers'):
             for change in ('missing-part', 'wrong-part', 'source', 'binary', 'image', 'cpu', 'round', 'duplicate',
                            'reorder', 'undrained', 'focused', 'cleanup', 'join-members', 'summary'):
                 with self.subTest(shard=shard, change=change):
@@ -212,7 +220,7 @@ class CurrentComparisonTests(unittest.TestCase):
                     fragment = suite['parts'][part]
                     rows = fragment['shards'][shard]
                     if change == 'missing-part': suite['parts'].pop(part)
-                    elif change == 'wrong-part': fragment[shard + '_part'] = 'other'
+                    elif change == 'wrong-part': fragment[('provider' if shard == 'providers' else shard) + '_part'] = 'other'
                     elif change == 'source': fragment['source_sha'] = 'e'*40
                     elif change == 'binary': fragment['binary_sha256'] = 'e'*64
                     elif change == 'image': fragment['image_version'] = 'other'
@@ -223,7 +231,10 @@ class CurrentComparisonTests(unittest.TestCase):
                     elif change == 'undrained': rows[0]['owned_group_drained'] = False
                     elif change == 'focused': fragment['selected_gates'] = ['main']
                     elif change == 'cleanup': suite['shards'][shard][-1]['owned_group_drained'] = False
-                    elif change == 'join-members': suite['shards'][shard][-1]['parts'].pop()
+                    elif change == 'join-members':
+                        if shard == 'providers': suite['shards'][shard][-1]['elapsed_seconds'] += 1
+                        else: suite['shards'][shard][-1]['parts'].pop()
+                    elif shard == 'providers': suite['passed'] = False
                     else: data['reports']['core-summary.json' if shard == 'codemode' else 'm6-summary.json']['passed'] = False
                     self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
 
@@ -277,6 +288,8 @@ class CurrentComparisonTests(unittest.TestCase):
                         text.replace('"packages", "sqlite"', '"packages"'),
                         text.replace('"packages", "sqlite"', '"packages", "packages"'),
                         text.replace('  python_compat:', '  other_compat:'),
+                        text.replace('"cli", "models"', '"cli"'),
+                        text.replace('"cli", "models"', '"cli", "cli"'),
                         text.replace('        part: [', '        part: ${{ fromJSON(')):
             with self.assertRaises(ValueError):
                 comparison.topology(changed)
