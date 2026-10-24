@@ -21,6 +21,15 @@ See [unscripted evaluation operations](../docs/guides/unscripted-evals.md).
 See [release evidence operations](../docs/guides/release-evidence.md) for trust,
 private inputs, exit codes and remaining real release obligations.
 
+## Frozen baseline-01 audit (ERII-231)
+
+| Feature | Reach it | Authoritative entry point | Evidence and limits |
+| --- | --- | --- | --- |
+| Exact 80-block disposition | `make audit-baseline-01` | Existing `release_audit.py`, `release_package.audit_package`, `docs/audits/baseline-01.json` | Pins the owner package independently of review notes; retains source text, authored sub-obligations, current code/test hashes, merged PRs, native receipt identities and finite gap routes. Original 122 historical reviews stay separate. Always inconclusive, zero certified requirements and null semantic scores. |
+| Audit integrity and stronger provenance | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; CLI optional manifest/native-root/`--verify-git` | `test_release_package.py`, existing inventory and decision tests | Isolated fixtures drive missing/duplicate/out-of-scope/stale text/ref/PR/gap rejection, native byte integrity and real CLI stale-output cleanup. Flags distinguish local integrity from original-manifest, retained-byte and Git-ancestry checks. No network fetch or copied credentials. |
+
+See the [bounded audit ledger and proof limits](../docs/audits/README.md).
+
 Start with the [capability and gate directory](../docs/guides/verification.md).
 `python3 scripts/verify_suite.py --list` reads the authoritative execution inventory;
 `--gate NAME` drives a selected capability with its complete repetition count.

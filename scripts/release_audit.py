@@ -205,6 +205,11 @@ def main():
     parser.add_argument('--ledger', type=Path, help='Explicit ledger; defaults to the current source binding')
     parser.add_argument('--evidence', type=Path, default=ROOT / 'evidence/release-audit.json')
     parser.add_argument('--require-complete', action='store_true')
+    parser.add_argument('--package-ledger', type=Path,
+                        help='Bounded current audit notes; preserves the historical ledger')
+    parser.add_argument('--work-packages', type=Path, help='Original owner manifest, checked by byte hash')
+    parser.add_argument('--native-root', type=Path, help='Retained native observation directory (read only)')
+    parser.add_argument('--verify-git', action='store_true', help='Check audited blobs and merged PR ancestry (full history required)')
     args = parser.parse_args()
     # Remove a prior report before validation; a failed re-audit cannot leave
     # an old result looking current. Output must be disposable evidence.
@@ -213,8 +218,15 @@ def main():
     if not output.is_relative_to(evidence_root) or output == evidence_root:
         parser.error('--evidence must be a file under repository evidence/')
     output.unlink(missing_ok=True)
+    if (args.work_packages or args.native_root or args.verify_git) and not args.package_ledger:
+        parser.error('--work-packages/--native-root/--verify-git require --package-ledger')
     ledger = strict_json(args.ledger.read_bytes()) if args.ledger else current_ledger(ROOT)
     report = audit(ROOT, ledger)
+    if args.package_ledger:
+        from release_package import audit_package
+        report['package_audit'] = audit_package(
+            ROOT, strict_json(args.package_ledger.read_bytes()), report['source_units'],
+            args.work_packages, args.native_root, args.verify_git)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(dict(status=report['status'], release_ready=False,
