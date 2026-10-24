@@ -1,5 +1,14 @@
 # Feature map
 
+## Unscripted evaluation entry (ERII-230)
+
+| Feature | Reach / authoritative entry point | Evidence and limits |
+| --- | --- | --- |
+| Explicit profile and frozen input execution | `unscripted_cases.py matrix/freeze/run`; locked `case_runner.variants`, production `chat send/work` and Pi Bridge | All 20 Cases have dispositions; 12 support six conversation input variants, eight lack adapters. Frozen source/binary/config/profile/input/limits reject drift. Native snapshots, requests, Tool/errors, Artifact bytes, spend/usage and restricted Judge packet retained; all current fragments remain ineligible and ungraded. |
+| Offline entry verification | `verify_unscripted_cases.py --binary bin/erii --evidence evidence/unscripted.json`; providers shard | Launch private roots/maintained HTTP peer; Doctor actual Probe/Select; Drive production entry; Evidence native receipts and drift/failure/timeout rejection; Cleanup joined groups/listener and disposable roots. Strict release consumer rejects fragments. Loopback earns no semantic scores. |
+
+See [unscripted evaluation operations](../docs/guides/unscripted-evals.md).
+
 ## Release evidence decision (ERII-224)
 
 | Feature | Reach it | Authoritative entry point | Evidence and cleanup |
