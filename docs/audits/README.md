@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-11](baseline-11.md) records ERII-241's 80-block module, policy and
+persistence audit. It retains 487 scoped duties, all 480 mandatory/policy routes,
+19 field maps, the changed ADR006 Task identity and four finite gap proposals.
+Use `make audit-baseline-11`; no product requirement is certified.
+
 [baseline-10](baseline-10.md) records ERII-240's 80-block Memory, EventQueue,
 progress and module audit. Its 318 scoped duties retain all 294 mandatory/policy
 routes, current native observations and four finite gap proposals. Use
