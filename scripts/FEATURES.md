@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen baseline-07 audit (ERII-237)
+
+| Feature | Entry point | Authority and evidence |
+| --- | --- | --- |
+| Claim, quota, Skill and Security dispositions | `make audit-baseline-07`; existing `release_audit.py` / `release_package.audit_package` | Exactly 80 sealed blocks and their original identities, 362 authored scoped duties, 42 current references, eight merged PRs and seven native observation groups. All 338 required/policy duties remain routed; zero certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_baseline07.py` | Shared missing/duplicate/drift/reference/native/Git/PASS rejection, plus old/new line provenance and mandatory scope checks. Launch/Doctor load audit inputs; Drive uses the real CLI; Evidence is `evidence/baseline-07.json`; Cleanup removes disposable output only. |
+
+See [observations, gaps and proof limits](../docs/audits/baseline-07.md).
+
 ## Frozen baseline-06 audit (ERII-236)
 
 | Feature | Reach / authoritative entry point | Evidence and limits |

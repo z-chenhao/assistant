@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[baseline-07](baseline-07.md) records ERII-237's 80-block Claim/Wake/cancel,
+quota, monetary consent, Skill and Security audit. Its 362 scoped duties retain
+all mandatory routes, native receipt limits and four finite gap proposals. Use
+`make audit-baseline-07`; zero requirements are certified.
+
 [baseline-06](baseline-06.md) records ERII-236's separate 80-block audit of
 Loop messages/events, Child API, shared Tool execution and frozen replay.
 Its per-obligation evidence and finite gap routes do not certify release or

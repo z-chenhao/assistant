@@ -21,6 +21,11 @@ PACKAGE_HASHES = {
     'baseline-04': '2e56b4c2b855c9c6a81e667f316e92444e2890a8a35568a36cdce566fb07639e',
     'baseline-05': '3502b3aa7b733584a5ddfe624ab44b6f303201f6c752e38f650fd882ce45eb12',
     'baseline-06': 'b20a9f33e1b58b9b184f1a3004055d12f113546764f6b89a9c103016ab94668a',
+    'baseline-07': 'd05cf38d322f6c69ad05e499d0caacafc0c520bec0e728170f05a3cf517fcd63',
+}
+ORIGINAL_PACKAGE_HASHES = {
+    'baseline-02': 'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63',
+    'baseline-07': 'e4c7b80cf8886c25307f3b225c1970d4ff7234ca5f7e6a0cacb36ac4a0c5ace3',
 }
 
 
@@ -54,16 +59,17 @@ def git(root, *args):
 def audit_package(root, ledger, units, manifest=None, native_root=None, verify_git=False):
     name = ledger['package']
     frozen = ledger['frozen_blocks']
-    # Owner comment 01a16e1d-3e2c-78fb-ba1d-5621d178a9bd explicitly resealed
-    # baseline-02 after ADR006. Other audits retain their original identities.
-    manifest_hash = RESEALED_MANIFEST_HASH if name == 'baseline-02' else MANIFEST_HASH
+    # baseline-02 was changed by ADR006; baseline-07 consumes that same owner
+    # seal with unchanged content identities and shifted lines. Keep originals.
+    resealed = name in ORIGINAL_PACKAGE_HASHES
+    manifest_hash = RESEALED_MANIFEST_HASH if resealed else MANIFEST_HASH
     if (ledger.get('version') != 1 or ledger['manifest_sha256'] != manifest_hash
             or name not in PACKAGE_HASHES or frozen_digest(frozen) != PACKAGE_HASHES[name]):
         raise ValueError('frozen package changed; coordinator must reseal it')
-    if name == 'baseline-02':
+    if resealed:
         if (ledger.get('original_manifest_sha256') != MANIFEST_HASH or
                 frozen_digest(ledger.get('original_frozen_blocks', [])) !=
-                'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63'):
+                ORIGINAL_PACKAGE_HASHES[name]):
             raise ValueError('original manifest provenance changed')
     if manifest is not None:
         raw = manifest.read_bytes()
@@ -71,10 +77,10 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
             raise ValueError('owner manifest hash mismatch')
         definition = strict_json(raw)
         assigned = [identity(b) for p in definition['packages'].values() for b in p['blocks']]
-        count = 1588 if name == 'baseline-02' else 1585
+        count = 1588 if resealed else 1585
         if len(assigned) != count or any(n != 1 for n in Counter(assigned).values()):
             raise ValueError('owner manifest assignment is not unique and complete')
-        if name == 'baseline-02' and Counter(assigned) != Counter(map(identity, units)):
+        if resealed and Counter(assigned) != Counter(map(identity, units)):
             raise ValueError('resealed manifest does not cover the current source inventory')
         if definition['packages'][name]['blocks'] != frozen:
             raise ValueError('package differs from owner manifest')
@@ -137,6 +143,11 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
         if (review['text'] != source['text'] or review['current_line'] != source['line']
                 or review['line'] != original['line']):
             raise ValueError('review source text or location drifted')
+        if name == 'baseline-07':
+            prior = next(b for b in ledger['original_frozen_blocks']
+                         if identity(b) == identity(review))
+            if review.get('original_line') != prior['line']:
+                raise ValueError('original package location drifted')
         if review['disposition'] not in ('partial_mechanical', 'evidence_gap', 'policy', 'background', 'deferred'):
             raise ValueError('package reviews cannot certify conformance')
         for field in ('obligations', 'observed', 'proof_limit', 'references', 'prs'):
