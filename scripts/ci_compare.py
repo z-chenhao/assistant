@@ -14,7 +14,7 @@ import zipfile
 
 import ci_profile as profile
 from evidence import artifact_archive, inventory
-from verify_suite import SHARDS, CODEMODE_PARTS, codemode_gates, personal_gates
+from verify_suite import SHARDS, CODEMODE_PARTS, PROVIDER_PARTS, codemode_gates, personal_gates, provider_gates
 import m6_report
 import ci_race_join
 from ci_gate import REQUIRED
@@ -104,9 +104,10 @@ def topology(text=None):
             if len(values) != 1 or 'include:' in block or 'exclude:' in block:
                 raise ValueError('unsupported workflow matrix')
             values = json.loads(values[0])
-            expected = (set(SHARDS) - {'codemode', 'personal'} if key == 'verify' else
+            expected = (set(SHARDS) - {'codemode', 'personal', 'providers'} if key == 'verify' else
                         set(CODEMODE_PARTS) if key == 'codemode' else
                         set(m6_report.PARTS) if key == 'personal' else
+                        set(PROVIDER_PARTS) if key == 'providers' else
                         set(ci_race_join.PARTS) if key == 'race' else set())
             if set(values) != expected or len(values) != len(expected):
                 raise ValueError('workflow and suite part inventory drift')
@@ -171,6 +172,24 @@ def validate(data, source, workflow='ci.yml'):
     for shard, gates in SHARDS.items():
         report = reports.get('suite-' + shard + '.json', {})
         rows = suite(report, shard, gates)
+        if shard == 'providers':
+            parts = report.get('parts', {})
+            if set(parts) != set(PROVIDER_PARTS):
+                errors.append('providers: missing or extra joined part')
+            members = []
+            for part in PROVIDER_PARTS:
+                fragment = parts.get(part, {})
+                members.extend(suite(fragment, shard, provider_gates(part), part))
+                if (fragment.get('provider_part') != part or
+                        any(fragment.get(k) != report.get(k) for k in
+                            ('source_sha', 'source_diff_sha256', 'binary_sha256', 'workflow_sha'))):
+                    errors.append('providers: part identity drift')
+            order = {(g.name, n): i for i, (g, n) in enumerate(
+                (g, n) for g in gates for n in range(1, g.attempts + 1))}
+            members.sort(key=lambda r: order.get((r.get('gate'), r.get('attempt')), -1))
+            if rows != members:
+                errors.append('providers: reconstructed join inventory drift')
+            continue
         if shard not in ('codemode', 'personal'):
             continue
         parts = report.get('parts', {})
