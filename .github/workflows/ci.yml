@@ -34,7 +34,7 @@ jobs:
           frontend: "true"
           browser: "true"
       - name: Install pinned offline Browser test runtime
-        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: Unit tests and lint
         run: exec python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
       - name: Five disk-backed receipt recovery race checks
@@ -101,7 +101,7 @@ jobs:
     env:
       ERII_VERIFY_CASE_JOBS: "4"
       ERII_VERIFY_GATE_JOBS: "2"
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.shard == 'delivery' && 15 || 10 }}
     strategy:
       fail-fast: false
       matrix:
@@ -118,7 +118,7 @@ jobs:
           temporary-fixtures: ${{ matrix.shard == 'providers' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}
-        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: CLI verification with timings
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1
       - name: Verify the copied SDK stayed immutable
@@ -157,7 +157,7 @@ jobs:
           sandbox: "true"
       - name: Install pinned offline M6 Browser runtime
         if: matrix.m6part != 'context' && matrix.m6part != 'memory'
-        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: M6 part with five consecutive repetitions
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard personal --personal-part ${{ matrix.m6part }} --jobs 1
       - name: Verify the copied SDK stayed immutable
