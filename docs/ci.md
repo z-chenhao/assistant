@@ -310,6 +310,21 @@ it is not a member-only network download. Raw JSON retains artifact metadata and
 transfer receipts; the output binds the raw file's SHA256. Keep both outside
 worktree cleanup for handoff. These private receipts are not a public schema.
 
+When only metadata is available or canonical archives exceed the allowed budget,
+retain exact-attempt observations without downloading archives:
+
+```sh
+python3 scripts/ci_compare.py --pair BEFORE_RUN:ATTEMPT,AFTER_RUN:ATTEMPT --metadata-only --output evidence/observations.json
+python3 scripts/ci_compare.py --offline --output evidence/observations.json
+```
+
+This uses ERII-206's metadata inventory, records sizes/IDs and zero archive
+transfers, and retains per-job/step timing. No suite success is inferred from
+green jobs: missing suites/profile or insufficient independent samples produce
+exit 1, `performance_certified=false` and null benefit ratios. This is the
+repeatable fallback for the contract's insufficient-evidence outcome, not a
+performance certification. See the [delivered setup comparison receipt](reports/2026-10-24-ci-comparison.md).
+
 Current comparisons require at least three independent complete pairs (three
 attempts per side), one frozen source/binary/image/CPU capacity, and a matching
 non-secret `measurement_profile` on every attempt. `--profile` supplies that

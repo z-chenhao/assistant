@@ -35,13 +35,13 @@ def pair(value):
     return dict(zip(('before', 'after'), map(attempt, values)))
 
 
-def collect(repo, key, root=None, max_bytes=1 << 20):
+def collect(repo, key, root=None, max_bytes=1 << 20, metadata_only=False):
     # ERII-206 owns metadata, immutable identity, budget and verified local reuse.
     # Do not duplicate its collector or silently fall back to unbounded ZIP reads.
     root = root or os.environ.get('ERII_EVIDENCE_ROOT')
-    if not root:
+    if not root and not metadata_only:
         raise ValueError('explicit artifact root or ERII_EVIDENCE_ROOT required')
-    root = Path(root)
+    root = Path(root) if root else None
     run_id, number = map(int, key.split(':'))
     prefix = f'repos/{repo}/actions/runs/{run_id}'
     run = profile.gh('api', prefix + '/attempts/' + str(number))
@@ -49,8 +49,9 @@ def collect(repo, key, root=None, max_bytes=1 << 20):
     pages = profile.gh('api', '--paginate', '--slurp', prefix + f'/attempts/{number}/jobs?per_page=100')
     jobs = [job for page in pages for job in page['jobs']]
     reports, receipts = {}, []
-    if validate_jobs(dict(run=run, jobs=jobs), run['head_sha']):
-        return dict(run=run, jobs=jobs, reports=reports, artifacts=metadata['artifacts'], transfers=receipts)
+    if metadata_only or validate_jobs(dict(run=run, jobs=jobs), run['head_sha']):
+        return dict(run=run, jobs=jobs, reports=reports, artifacts=metadata['artifacts'], transfers=receipts,
+                    collection_mode='metadata-only' if metadata_only else 'ineligible-jobs')
     # Joined suites embed every part receipt. Do not fetch large part archives
     # again, or fast/race artifacts that contain no comparator input.
     for shard in SHARDS:
@@ -349,19 +350,23 @@ def main():
     parser.add_argument('--historical-shadow', action='store_true', help='interpret retained nine-job shadow data only')
     parser.add_argument('--artifact-root', type=Path, help='ERII-206 durable evidence/cache root; required online')
     parser.add_argument('--profile', type=Path, help='frozen non-secret measurement profile JSON; required for certification')
+    parser.add_argument('--metadata-only', action='store_true',
+                        help='retain exact-attempt observations without fetching archives; never certifies performance')
     args = parser.parse_args()
     raw_path = args.output.with_name(args.output.stem + '-raw.json')
+    if args.offline and args.metadata_only:
+        parser.error('--metadata-only is an online collection option; --offline replays its retained raw JSON')
     if args.offline:
         raw = json.loads(raw_path.read_text())
     else:
         if not args.pair:
             parser.error('at least one explicit before/after attempt pair is required')
-        if args.historical_shadow or not args.artifact_root:
-            parser.error('online collection requires --artifact-root and the current workflow; historical data is offline only')
+        if args.historical_shadow or not (args.artifact_root or args.metadata_only):
+            parser.error('online collection requires --artifact-root or --metadata-only; historical data is offline only')
         keys = sorted({key for item in args.pair for key in item.values()})
         values, remaining = [], 1 << 20
         for key in keys:
-            value = collect(args.repo, key, args.artifact_root, remaining)
+            value = collect(args.repo, key, args.artifact_root, remaining, metadata_only=args.metadata_only)
             remaining -= sum(r['downloaded_bytes'] for r in value['transfers'])
             if args.profile:
                 value['measurement_profile'] = json.loads(args.profile.read_text())

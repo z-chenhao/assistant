@@ -334,6 +334,22 @@ class CollectorBoundaryTests(unittest.TestCase):
             self.assertEqual(len(value['reports']), 8)
             self.assertEqual(sum(r['downloaded_bytes'] for r in value['transfers']), 60)
 
+    def test_metadata_only_keeps_exact_attempt_without_fetching_or_certifying(self):
+        from unittest.mock import patch
+        import os
+        metadata = dict(source_sha='a'*40, artifacts=[dict(id=7, size_in_bytes=20 << 20)])
+        run = dict(id=42, run_attempt=1, head_sha='a'*40)
+        with patch.dict(os.environ, {'ERII_EVIDENCE_ROOT': ''}), \
+             patch.object(comparison, 'inventory', return_value=metadata), \
+             patch.object(comparison.profile, 'gh', side_effect=[run, [{'jobs': []}]]), \
+             patch.object(comparison, 'artifact_archive') as fetch:
+            data = comparison.collect('owner/repo', '42:1', metadata_only=True)
+        fetch.assert_not_called()
+        self.assertEqual(data['collection_mode'], 'metadata-only')
+        self.assertEqual(data['artifacts'], metadata['artifacts'])
+        self.assertEqual(data['reports'], {})
+        self.assertEqual(data['transfers'], [])
+
     def test_retired_experiment_cli_rejects_before_any_github_action(self):
         import subprocess
         import sys
