@@ -40,7 +40,9 @@ probe its capabilities, and explicitly confirm selection. Without a selected
 model, Erii stays `setup_required` and accepts no Agent work.
 
 After selection, type your message. `/models` lists profiles, `/setup` repairs a
-connection, and `/quit` or Ctrl-C closes the foreground application. No daemon is
+connection, and `/quit` or Ctrl-C closes the foreground application. Within a
+setup prompt, `/cancel` returns to conversation before `/quit`; Ctrl-C exits
+directly. No daemon is
 installed. Existing Task and Run recovery uses the same durable state on restart.
 
 ChatGPT credentials require the native macOS Keychain build. On other platforms,
