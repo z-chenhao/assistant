@@ -104,6 +104,9 @@ class Endpoint(BaseHTTPRequestHandler):
                 else:
                     chunk({"content": "Root business result through Pi." if root else "Main Task accepted through Pi."})
                 chunk({}, "stop", {"prompt_tokens": 7, "completion_tokens": 8, "total_tokens": 15})
+            elif self.server.mode == "gc11" and any("合成背景" in str(m.get("content", "")) for m in body["messages"]):
+                from gc11_fixture import reply
+                reply(body, chunk)
             elif self.server.mode == "memory-disabled":
                 if not any(m["role"] == "tool" for m in body["messages"]):
                     requests = [("builtin__memory__manage", {"operation": "remember", "content": "I prefer tea"}),
@@ -363,18 +366,30 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", default="bin/erii")
     parser.add_argument("--evidence", default="evidence/local-provider.json")
-    parser.add_argument("--live-endpoint", help="opt-in local Live Shadow; isolated Probe only")
-    parser.add_argument("--live-model")
-    parser.add_argument("--context-tokens", type=int, default=262144)
-    parser.add_argument("--output-tokens", type=int, default=32768)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--gc11-driver-only', action='store_true')
+    mode.add_argument('--live-endpoint', help='opt-in local Live Shadow; isolated Probe only')
+    parser.add_argument('--live-model')
+    parser.add_argument('--context-tokens', type=int, default=262144)
+    parser.add_argument('--output-tokens', type=int, default=32768)
     args = parser.parse_args()
+    Path(args.evidence).unlink(missing_ok=True)
+    if args.gc11_driver_only:
+        from gc11_fixture import verify as verify_gc11_driver
+        result = verify_gc11_driver(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve(), Endpoint, Path(args.evidence))
+        Path(args.evidence).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.evidence).write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
+        print(json.dumps(dict(status=result['status'], cleanup=result['cleanup'])))
+        raise SystemExit(0)
     if args.live_endpoint:
-        require(args.live_model, "--live-model is required")
-        result = verify_live_probe(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve(),
+        require(args.live_model, '--live-model is required')
+        result = verify_live_probe(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve(),
                                    args.live_endpoint, args.live_model, args.context_tokens, args.output_tokens)
     else:
-        result = verify(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
-        result["screenshot_projection"] = verify_screenshot_projection(Path(args.binary).resolve(), Path("provider-bridge/bridge.mjs").resolve())
+        result = verify(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve())
+        result['screenshot_projection'] = verify_screenshot_projection(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve())
+        from gc11_fixture import verify as verify_gc11_driver
+        result['gc11_driver'] = verify_gc11_driver(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve(), Endpoint, Path(args.evidence))
     Path(args.evidence).parent.mkdir(parents=True, exist_ok=True)
     Path(args.evidence).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"checks": len(result.get("checks", [])), "usage_rows": len(result["usage"]), "cleanup": result["cleanup"]}))
