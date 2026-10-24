@@ -1,5 +1,11 @@
 # Bounded baseline audits
 
+[baseline-13](baseline-13.md) records ERII-243's 58-block M5–M7, acceptance and
+deferred-choice audit. Its 352 scoped duties retain all 324 required/policy routes,
+the independently audited ADR006 Task lifecycle change, current native observations
+and 19 existing finite owners. Use `make audit-baseline-13`; no product requirement
+or release is certified.
+
 [baseline-12](baseline-12.md) records ERII-242's 80-block error, configuration,
 startup, interface and M0–M5 audit. It retains 452 scoped duties, all 445
 mandatory/policy routes, 28 configuration keys, 14 method maps and three finite
