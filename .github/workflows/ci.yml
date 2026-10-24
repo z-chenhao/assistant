@@ -43,11 +43,6 @@ jobs:
         env:
           ERII_CI_PUBLIC_SDK_PROBE: "1"
         run: exec python3 scripts/ci_step.py --name sdk-conformance --phase test -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.10.22"
-      - name: Minimum supported Python compatibility tests
-        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -56,6 +51,34 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: evidence-fast-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  python_compat:
+    name: Python 3.10 compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.10.22"
+      - name: Install pinned Browser module for setup rejection contracts
+        run: python3 scripts/setup.py --part packages --packages guest-browser --evidence evidence/setup-python310.json
+      - name: Minimum supported Python compatibility tests
+        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
+      - name: Retain exact-SHA Python compatibility evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-python-compat-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
           path: evidence/
           if-no-files-found: error
           retention-days: 14
@@ -317,7 +340,7 @@ jobs:
 
   checks:
     name: Ubuntu checks
-    needs: ["fast", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_join"]
+    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2

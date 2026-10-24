@@ -79,6 +79,17 @@ storage rejects their disk-conformance claim before tests start.
 
 ## Latency budget
 
+The complete Python 3.10.22 compatibility suite runs in its own Required job and
+isolated exact-head checkout, alongside unit/lint and the five disk-backed receipt
+race checks. [Run 40055562322](https://github.com/z-chenhao/erii/actions/runs/40055562322)
+passed unit/lint, receipt race and SDK isolation, then cancelled Python compatibility
+at the ten-minute job boundary. Splitting that existing full suite removes the
+serial accumulation; no test, repetition or job deadline is reduced or extended.
+The Python job installs only the pinned Browser module used by setup rejection
+contracts, not a browser binary or product runtime. Its separate exact-SHA evidence
+is retained, and a failed, cancelled, skipped or missing compatibility job rejects
+the stable `Ubuntu checks` gate.
+
 All CI uses a ten-minute baseline from workflow creation through the final
 required verdict, with a five-minute target. Queue and dependency waits count
 in observed workflow wall time. Every job has an explicit timeout of at most

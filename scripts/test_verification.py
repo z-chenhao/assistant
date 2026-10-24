@@ -177,7 +177,7 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 9)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 10)
         self.assertIn('racepart: ["packages", "sqlite"]', workflow)
         race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
         self.assertIn('needs: race', race_join)
@@ -192,7 +192,7 @@ class VerificationTests(unittest.TestCase):
         self.assertNotIn('ci_bundle.py', action)
         # Full gates start independently; no slow test or build producer gates
         # their admission, and there is no cross-image executable reuse.
-        for name in ('fast', 'race', 'verify', 'codemode', 'personal'):
+        for name in ('fast', 'python_compat', 'race', 'verify', 'codemode', 'personal'):
             block = workflow.split('  ' + name + ':\n', 1)[1].split('    steps:', 1)[0]
             self.assertNotIn('needs:', block)
         join = workflow.split('  codemode_join:\n', 1)[1].split('  checks:', 1)[0]
@@ -211,6 +211,15 @@ class VerificationTests(unittest.TestCase):
         self.assertNotIn('ci_bundle.py', workflow)
         self.assertIn('python-version: "3.10.22"', workflow)
         self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", workflow)
+        python_compat = re.search(r'^  python_compat:\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
+        self.assertIn('timeout-minutes: 10', python_compat)
+        self.assertIn('python-version: "3.10.22"', python_compat)
+        self.assertIn('--part packages --packages guest-browser', python_compat)
+        self.assertIn("--name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'", python_compat)
+        self.assertIn('evidence-python-compat-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}', python_compat)
+        fast = re.search(r'^  fast:\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
+        self.assertNotIn('--name python310', fast)
+        self.assertIn('python_compat', ci_gate.REQUIRED)
         self.assertEqual(workflow.count("temporary-fixtures: ${{ matrix.shard == 'providers' }}"), 1)
         for name in ('fast', 'codemode'):
             block = re.search(r'^  ' + name + r':\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
