@@ -71,6 +71,7 @@ SHARDS = {
                       Gate("gc16", "verify_gc16.py", "gc16")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
+        Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
         Gate("startup", "verify_startup.py", "startup"),
         Gate("local-provider", "verify_local_provider.py", "local-provider"),
         Gate("unscripted-entry", "verify_unscripted_cases.py", "unscripted-entry"),
