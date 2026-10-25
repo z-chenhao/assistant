@@ -29,6 +29,11 @@ class ReferenceMaintenanceTests(unittest.TestCase):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes((release_audit.ROOT / name).read_bytes())
+        # This independent synthetic audit starts from the copied current code,
+        # not the real ledger's historical blobs. Seal those fixture inputs
+        # before creating its base, then exercise normal drift/refresh below.
+        for ref, value in self.ledger['references'].items():
+            value['sha256'] = package.digest((self.root / ref.partition('#')[0]).read_bytes())
         self.git('init', '-q')
         self.base = self.commit('original synthetic code')
         self.ledger['audited_base'] = self.base

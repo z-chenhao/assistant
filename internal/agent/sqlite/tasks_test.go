@@ -338,6 +338,8 @@ func TestTaskCustomMessageConversionFailsClosed(t *testing.T) {
 
 func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
 	s, r, a, p := taskFixture(t)
+	started := time.Now()
+	phase := func(name string) { t.Logf("reserved-slot %s after %s", name, time.Since(started)) }
 	limits := agent.DefaultSchedulerLimits()
 	limits.Global = 4
 	r.ConfigureScheduler(limits)
@@ -375,6 +377,7 @@ func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
 			t.Fatal("Root concurrency missing")
 		}
 	}
+	phase("four Roots entered")
 	select {
 	case <-entered:
 		t.Fatal("host worker concurrency exceeded")
@@ -389,6 +392,7 @@ func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
 	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='main' AND status='completed'`) != 1 {
 		t.Fatal("initial Main acknowledgement did not complete")
 	}
+	phase("initial Main completed")
 	urgentReceipt := mustSubmit(t, a, "urgent", "urgent synchronous question")
 	if urgentReceipt.RunID == firstReceipt.RunID {
 		t.Fatal("urgent request did not create a distinct Main after completion")
@@ -403,10 +407,28 @@ func TestTasksRunConcurrentlyAndMainRetainsReservedSlot(t *testing.T) {
 	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status='completed'`) != 0 {
 		t.Fatal("blocked Root unexpectedly completed")
 	}
+	phase("urgent Main completed; releasing Roots")
 	close(release)
 	if err := <-done; err != nil {
+		rows, queryErr := s.db.Query(`SELECT kind,status,coalesce(wait_reason,''),json_extract(checkpoint_json,'$.phase'),count(*) FROM run GROUP BY 1,2,3,4`)
+		if queryErr == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var kind, status, wait string
+				var checkpoint sql.NullString
+				var count int
+				if scanErr := rows.Scan(&kind, &status, &wait, &checkpoint, &count); scanErr != nil {
+					t.Log(scanErr)
+					break
+				}
+				t.Logf("reserved-slot residue: kind=%s status=%s wait=%s phase=%s count=%d", kind, status, wait, checkpoint.String, count)
+			}
+		} else {
+			t.Log(queryErr)
+		}
 		t.Fatal(err)
 	}
+	phase("Drain joined")
 	if scalar(t, s, `SELECT count(*) FROM task WHERE status='completed'`) != 8 || scalar(t, s, `SELECT count(*) FROM main_inbox`) != 8 {
 		t.Fatal("Task/report lost")
 	}
