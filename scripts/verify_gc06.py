@@ -24,7 +24,7 @@ from verify_gc02 import native, kill, recorded
 from verify_gc03 import exact, recalled_context
 from verify_main import require
 from verify_memory_maintenance import manage, work, readback
-from verify_recall import Embeddings
+from verify_recall import Embeddings, drain_with_publication_barrier
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / 'evals/fixtures/gc06-journey-v1.json'
@@ -141,6 +141,28 @@ def transport(call,value):
     return recorded(call['parent'],value['tools']) and all(recorded(t,value['tools']) for t in call['nested'])
 
 
+def unrelated_task(h,row):
+    source = 'return await tools.builtin__memory__search({query:"wedding flowers",limit:20});'
+    plan = [dict(name='builtin__codemode__execute',arguments=dict(source=source))]
+    create = dict(name='builtin__task__manage',arguments=dict(operation='create',
+        task=fixture()['unrelated']+'\nCapabilities: '+json.dumps(plan,ensure_ascii=False)))
+    receipt = h.send('unrelated-task','Capabilities: '+json.dumps([create],ensure_ascii=False))
+    # Root's independent recall and Main's publication must use the maintained
+    # legal ordering. Concurrent pending appends intentionally fail closed in
+    # verify_recall.concurrent_append_case; never retry an unknown CLI error.
+    row['unrelated_scheduling'] = drain_with_publication_barrier(h,receipt['run_id'],prefix='unrelated-')
+    value = native(h)
+    workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
+    parents = [t for t in value['tools'] if t['run_id'] in workers and t['tool_name'] == 'builtin__codemode__execute']
+    require(len(parents) == 1,'GC-06 unrelated Task requires one native cell')
+    parent = parents[0]
+    output = strict_json(strict_json(parent['result_json'])['text'])
+    returned = [p['value'] for p in output if p['type'] == 'return']
+    require(parent['status'] == 'succeeded' and len(returned) == 1,'GC-06 unrelated Task failed')
+    return dict(parent=parent,nested=[t for t in value['tools'] if t['parent_invocation_id'] == parent['invocation_id']],
+        output=output,value=returned[0],decisions=[])
+
+
 def journey(h,variant_id,row):
     case,variant = inputs(variant_id); extra = fixture()
     row['variant'] = variant
@@ -192,8 +214,7 @@ def journey(h,variant_id,row):
     h.command('automation','tick'); h.command('chat','work'); work(h)
     row['quiet'] = native(h)
     select(h,'capabilities')
-    row['unrelated'] = execute(h,'unrelated-task',
-        'return await tools.builtin__memory__search({query:"wedding flowers",limit:20});',task=extra['unrelated'])
+    row['unrelated'] = unrelated_task(h,row)
     work(h); row['unrelated_state'] = native(h)
     # Only the explicit later request permits a review schedule. Its Root uses
     # the current Memory Tool result; no source record is embedded in the plan.
@@ -294,6 +315,9 @@ def observe(row):
     checks['pause_quiet'] = extra['pause'] in json.dumps(row['paused']['conversation'],ensure_ascii=False) and exact(row['paused'],row['quiet']) and \
         not row['quiet']['task'] and not row['quiet']['automation']
     unrelated = row['unrelated']; worker = unrelated['parent']['run_id']; value = row['unrelated_state']
+    checks['task_publication_order'] = exact(row['unrelated_scheduling'],dict(worker_requests_before_main_completion=0,
+        boundaries=dict(after_task_commit=1,before_worker_generation=1),root_recall_frozen_before_main_publication=True,
+        main_completed_before_worker_dispatch=True))
     checks['unrelated_task_privacy'] = transport(unrelated,value) and len(unrelated['nested']) == 1 and unrelated['nested'][0]['tool_name'] == 'builtin__memory__search' and exact(
         strict_json(unrelated['nested'][0]['arguments_json']),dict(query='wedding flowers',limit=20)) and exact(
         native_return(unrelated),strict_json(strict_json(unrelated['nested'][0]['result_json'])['text'])) and any(
@@ -376,6 +400,8 @@ def rejection_probes(row):
         false_fire_restart=lambda r:r['fire_restart'].update(returncode=0),
         cancelled_admission=lambda r:r['cancelled']['automation_fire'][-1].update(state='admitted'),
         raw_private_recall=lambda r:next(g for g in r['unrelated_state']['generations'] if g['run_id'] == r['unrelated']['parent']['run_id']).update(request_json=fixture()['private']),
+        bypassed_publication=lambda r:r['unrelated_scheduling'].update(main_completed_before_worker_dispatch=False),
+        early_worker_dispatch=lambda r:r['unrelated_scheduling'].update(worker_requests_before_main_completion=1),
         duplicate_attempt=lambda r:r['final']['tools'][0].update(attempt_count=2),
         external_effect=lambda r:r['final']['tools'].append(dict(tool_name='send_ticket',run_id=r['final']['runs'][0]['run_id'])),
         revived_owner=lambda r:next(n for n in r['final']['runs'] if n['run_id'] == r['revoked_receipt']['run_id']).update(status='completed'),
