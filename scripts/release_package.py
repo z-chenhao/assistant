@@ -31,6 +31,7 @@ PACKAGE_HASHES = {
     'baseline-13': '9d86d5732f7addecb9001ad5cf9c9b521f212373c5a57149e8c08cb95661570d',
     'golden-common-01': '3421f37dee8becf70cb964d7eb7a998f3a4bb19c006d0e2bcb3bbbb7cabd9d9e',
     'golden-common-02': '8915d2e0d8b4fd82564a0f2ce88988f645d7c24ded65f280b7edaa91f73802cc',
+    'golden-common-03': '64a9b52fbe9d60100a4263f8799611c925001895b41b0c6ddd1bcd15c400f60e',
 }
 ORIGINAL_PACKAGE_HASHES = {
     'baseline-02': 'a19a7c00e2ae1c3683e68ca1bee23210e5ee75cc19174ce2dc0177bacf2d0e63',
