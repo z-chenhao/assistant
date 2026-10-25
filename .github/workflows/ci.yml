@@ -191,12 +191,7 @@ jobs:
         if: ${{ matrix.shard == 'delivery' }}
         run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: CLI verification with timings
-        run: |
-          part=()
-          if [ "${{ matrix.shard }}" = communication ]; then
-            part=(--communication-part "${{ matrix.communicationpart }}")
-          fi
-          exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1 "${part[@]}"
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1 ${{ matrix.communicationpart && format('--communication-part {0}', matrix.communicationpart) || '' }}
       - name: Recompute native communication receipts and retain a compact manifest
         if: ${{ matrix.shard == 'communication' }}
         run: exec python3 scripts/ci_step.py --name native-validation --phase test -- python3 scripts/ci_communication.py collect --part ${{ matrix.communicationpart }} --binary bin/erii --evidence evidence

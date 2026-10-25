@@ -212,7 +212,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('evidence-communication-part-*', communication_join)
         verify = workflow.split('  verify:', 1)[1].split('  communication_join:', 1)[0]
         self.assertIn('scripts/ci_communication.py collect', verify)
-        self.assertIn('part=(--communication-part "${{ matrix.communicationpart }}")', verify)
+        self.assertIn("format('--communication-part {0}', matrix.communicationpart)", verify)
         self.assertIn('evidence/communication-receipts.json', verify)
         self.assertIn('--name sdk-doctor --phase cleanup', verify)
         checks = workflow[workflow.index('  checks:'):]
