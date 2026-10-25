@@ -141,6 +141,9 @@ class CurrentComparisonTests(unittest.TestCase):
         import ci_codemode
         import ci_personal
         import ci_providers
+        import ci_communication
+        from unittest.mock import patch
+        from test_ci_communication import CommunicationTests
         from test_ci_codemode import CodeModeJoinTests
         from test_ci_personal import PersonalJoinTests
         from test_ci_providers import ProvidersTests
@@ -158,6 +161,14 @@ class CurrentComparisonTests(unittest.TestCase):
             fixture = ProvidersTests()
             fixture.write(root, fixture.fixture(root))
             reports['suite-providers.json'] = json.loads(json.dumps(ci_providers.join(root)))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = CommunicationTests()
+            source, suites, manifests = fixture.fixture(root)
+            for manifest in manifests.values(): manifest['fixtures'] = ci_communication.fixtures()
+            fixture.write(root, suites, manifests)
+            with patch.object(ci_communication, 'source_state', return_value=source):
+                reports['suite-communication.json'] = ci_communication.join(root)
         for name, report in reports.items():
             if not name.startswith('suite-'):
                 continue
@@ -168,6 +179,9 @@ class CurrentComparisonTests(unittest.TestCase):
                 for rows in suite['shards'].values():
                     for row in rows:
                         row['owned_group_drained'] = True
+        communication = reports['suite-communication.json']
+        for part, manifest in communication['native_receipts'].items():
+            manifest['identity'] = {k: communication['parts'][part][k] for k in ci_communication.IDENTITY}
         cls.reports = reports
 
     def experiment(self, samples=3):
@@ -188,10 +202,12 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 27)
+        self.assertEqual(len(comparison.topology()), 30)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
-                         'Providers (models)', 'Complete providers evidence'} <= comparison.topology())
+                         'Providers (models)', 'Complete providers evidence', 'Complete communication evidence',
+                         'Verification (communication/gc01)', 'Verification (communication/gc02)',
+                         'Verification (communication/channels)'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
         self.assertFalse(insufficient['performance_certified'])
         self.assertIsNone(insufficient['p50_wall_reduction'])
@@ -237,6 +253,21 @@ class CurrentComparisonTests(unittest.TestCase):
                     elif shard == 'providers': suite['passed'] = False
                     else: data['reports']['core-summary.json' if shard == 'codemode' else 'm6-summary.json']['passed'] = False
                     self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
+
+    def test_communication_native_manifests_cannot_certify_partial_or_drifted_receipts(self):
+        for change in ('missing', 'fixture', 'identity', 'round', 'cleanup', 'assertion'):
+            with self.subTest(change=change):
+                raw = self.experiment(1)
+                suite = raw['attempts']['2:1']['reports']['suite-communication.json']
+                manifests = suite['native_receipts']
+                manifest = manifests['gc01']
+                if change == 'missing': manifests.pop('gc01')
+                elif change == 'fixture': manifest['fixtures'] = {}
+                elif change == 'identity': manifest['identity'] = {}
+                elif change == 'round': manifest['receipts'][0]['rows'].pop()
+                elif change == 'cleanup': manifest['receipts'][0]['rows'][0]['cleanup'] = {}
+                else: manifest['receipts'][0]['rows'][0]['assertions']['native'] = False
+                self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
 
     def test_identity_profile_attempt_and_focus_mismatches_fail_closed(self):
         for change in ('source', 'attempt', 'job-sha', 'job-attempt', 'job-missing-identity', 'profile', 'profile-missing', 'focus', 'historical'):
@@ -285,6 +316,9 @@ class CurrentComparisonTests(unittest.TestCase):
     def test_topology_drift_cannot_silently_reduce_inventory(self):
         text = (comparison.ROOT / '.github/workflows/ci.yml').read_text()
         for changed in (text.replace('"GC-17", ', ''), text.replace('codemode_join:', 'other_join:'),
+                        text.replace('communicationpart: gc02', 'communicationpart: gc01'),
+                        text.replace('communicationpart: channels', 'communicationpart: missing'),
+                        text.replace('  communication_join:', '  other_communication_join:'),
                         text.replace('"packages", "sqlite"', '"packages"'),
                         text.replace('"packages", "sqlite"', '"packages", "packages"'),
                         text.replace('  python_compat:', '  other_compat:'),

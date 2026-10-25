@@ -77,9 +77,14 @@ Builder retains the complete directory and executable in the registered durable
 local evidence root for same-host independent review; CI summaries alone do not
 replace that evidence or a clean exact-SHA rerun.
 
-The bounded two-worker communication pool keeps GC-01 and GC-12 as its initial
+The unpartitioned local two-worker communication pool keeps GC-01 and GC-12 as its initial
 series and admits GC-02 into the next free slot before the short gates. Run
 40160518580 measured the former queue-tail GC-02 being cancelled at the unchanged
 ten-minute job deadline after all 30 rounds, before receipt validation finished.
 No count, fixture, assertion, concurrency bound or deadline is reduced/raised;
 only independent-series queue order changes.
+
+CI now places GC-01, GC-02 and the remaining communication gates in three
+Required parts with a strict join, keeping the same commands and repetitions.
+See [CI operations](ci.md#communication-budget-and-evidence) for collection,
+native evidence retention, fixed job budgets and complete-inventory checks.

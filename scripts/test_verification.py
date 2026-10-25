@@ -166,10 +166,18 @@ class VerificationTests(unittest.TestCase):
         args, _, _ = suite.command(model, 1, Path('/binary'), Path('/evidence'))
         self.assertEqual(args, ['go', 'test', '-count=5', '-json', './internal/llm/...', './internal/agent/sqlite'])
 
-    def test_aggregate_rejects_every_non_success_combination(self):
-        for states in itertools.product(['success', 'failure', 'cancelled', 'skipped'], repeat=len(ci_gate.REQUIRED)):
-            needs = {name: {'result': value} for name, value in zip(sorted(ci_gate.REQUIRED), states)}
-            self.assertEqual(ci_gate.passed(needs), all(s == 'success' for s in states))
+    def test_aggregate_rejects_every_non_success_subset(self):
+        # Enumerate every subset of failing jobs, with each rejected status at
+        # every position and mixed statuses. Avoid the redundant 4**N product:
+        # failure/cancelled/skipped all have the same non-success semantics.
+        rejected = ['failure', 'cancelled', 'skipped']
+        names = sorted(ci_gate.REQUIRED)
+        for failed in itertools.product([False, True], repeat=len(names)):
+            for mixed in (False, True):
+                for offset in range(len(rejected)):
+                    needs = {name: {'result': rejected[((i if mixed else 0) + offset) % len(rejected)] if bad else 'success'}
+                             for i, (name, bad) in enumerate(zip(names, failed))}
+                    self.assertEqual(ci_gate.passed(needs), not any(failed))
         good = {name: {'result': 'success'} for name in ci_gate.REQUIRED}
         for name in good:
             self.assertFalse(ci_gate.passed({k: v for k, v in good.items() if k != name}))
@@ -198,10 +206,23 @@ class VerificationTests(unittest.TestCase):
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers'})
-        self.assertEqual(len(shards), 4)
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers','communication'})
+        self.assertEqual(len(shards), 3)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
+        matrix = workflow.split('  verify:', 1)[1].split('    steps:', 1)[0]
+        self.assertEqual(matrix.count('- shard: communication'), len(suite.COMMUNICATION_PARTS))
+        self.assertEqual(re.findall(r'communicationpart: (\S+)', matrix), list(suite.COMMUNICATION_PARTS))
+        communication_join = workflow.split('  communication_join:', 1)[1].split('  providers:', 1)[0]
+        self.assertIn('needs: verify', communication_join)
+        self.assertIn('test "$PART_RESULT" = success', communication_join)
+        self.assertIn('scripts/ci_communication.py join', communication_join)
+        self.assertIn('evidence-communication-part-*', communication_join)
+        verify = workflow.split('  verify:', 1)[1].split('  communication_join:', 1)[0]
+        self.assertIn('scripts/ci_communication.py collect', verify)
+        self.assertIn("format('--communication-part {0}', matrix.communicationpart)", verify)
+        self.assertIn('evidence/communication-receipts.json', verify)
+        self.assertIn('--name sdk-doctor --phase cleanup', verify)
         checks = workflow[workflow.index('  checks:'):]
         needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
@@ -213,7 +234,7 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 12)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 14)
         self.assertIn('racepart: ["packages", "sqlite"]', workflow)
         race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
         self.assertIn('needs: race', race_join)
@@ -221,13 +242,13 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('scripts/ci_race_join.py', race_join)
         self.assertIn('evidence-race-part-*', race_join)
         self.assertIn("sandbox: ${{ matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
-        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 6)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 7)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
         self.assertIn('make build', action)
         self.assertNotIn('ci_bundle.py', action)
-        # Full gates start independently; no slow test or build producer gates
-        # their admission, and there is no cross-image executable reuse.
+        # Long gates start independently. Only four shorter M6 cells wait for
+        # Python compatibility; no executable crosses a runner boundary.
         for name in ('fast', 'python_compat', 'race', 'verify', 'codemode', 'personal', 'providers'):
             block = workflow.split('  ' + name + ':\n', 1)[1].split('    steps:', 1)[0]
             self.assertNotIn('needs:', block)
@@ -236,12 +257,23 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('test "$PART_RESULT" = success', join)
         self.assertIn('python3 scripts/ci_codemode.py --parts evidence/parts --evidence evidence', join)
         import m6_report
-        parts = json.loads(re.search(r'        m6part: (\[.*\])', workflow)[1])
-        self.assertEqual(parts, list(m6_report.PARTS))
+        parts = [json.loads(p) for p in re.findall(r'        m6part: (\[.*\])', workflow)]
+        self.assertEqual(parts, [['memory', 'network', 'booking'],
+                                 ['context', 'desktop-1', 'desktop-2', 'desktop-3']])
+        self.assertCountEqual([p for group in parts for p in group], m6_report.PARTS)
+        deferred = workflow.split('  personal_deferred:\n', 1)[1].split('  personal_join:', 1)[0]
+        self.assertIn('needs: python_compat', deferred)
+        self.assertNotIn('if:', deferred.split('    steps:', 1)[0])
+        self.assertIn('personal_deferred', ci_gate.REQUIRED)
+        # Exactly 20 execution cells are initially runnable, independent of
+        # GitHub's unspecified matrix admission order. Four follow Python.
+        import ci_compare
+        self.assertEqual(len(ci_compare.topology()) - 6 - len(parts[1]), 20)
         personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
         self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
         personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]
-        self.assertIn('needs: personal',personal_join)
+        self.assertIn('needs: ["personal", "personal_deferred"]',personal_join)
+        self.assertIn("needs.personal.result == 'success' && needs.personal_deferred.result == 'success'", personal_join)
         self.assertIn('test "$PART_RESULT" = success',personal_join)
         self.assertIn('python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence',personal_join)
         self.assertNotIn('ci_bundle.py', workflow)
@@ -255,6 +287,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('evidence-python-compat-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}', python_compat)
         fast = re.search(r'^  fast:\n(.*?)(?=^  \w+:|\Z)', workflow, re.M | re.S)[1]
         self.assertNotIn('--name python310', fast)
+        self.assertNotIn('--name receipt-race-disk', fast)
         self.assertIn('python_compat', ci_gate.REQUIRED)
         self.assertEqual(workflow.count('temporary-fixtures: "true"'), 2)
         for name in ('fast', 'codemode'):
@@ -263,6 +296,11 @@ class VerificationTests(unittest.TestCase):
         race = workflow.split('  race:\n', 1)[1].split('  verify:\n', 1)[0]
         self.assertIn('temporary-fixtures: "true"', race)
         self.assertLess(race.index('ci_tmpfs.py cleanup'), race.index('Retain exact-SHA'))
+        self.assertLess(race.index('ci_tmpfs.py cleanup'), race.index('ci_tmpfs.py disk --receipt'))
+        self.assertLess(race.index('ci_tmpfs.py disk --receipt'), race.index('--name receipt-race-disk'))
+        self.assertLess(race.index('--name receipt-race-disk'), race.index('ci_sdk.py doctor'))
+        for label in ('Prove receipt recovery uses ordinary disk', 'Five disk-backed receipt recovery race checks'):
+            self.assertIn(label + "\n        if: ${{ matrix.racepart == 'packages' }}", race)
         self.assertIn("--name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5", workflow)
         providers = workflow.split('  providers:\n', 1)[1].split('  providers_join:', 1)[0]
         self.assertIn('temporary-fixtures: "true"', providers)

@@ -22,12 +22,17 @@ weakens `Ubuntu checks`. No release is published by an ordinary PR.
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
-    SHA --> Verify[Runtime / security / delivery / communication]
+    SHA --> Verify[Runtime / security / delivery / communication parts]
+    Verify --> CommunicationJoin[Complete communication evidence]
+    CommunicationJoin --> Gate
     SHA --> Providers[Providers CLI / models]
     Providers --> ProviderJoin[Complete providers evidence]
     ProviderJoin --> Gate
-    SHA --> Personal[M6 independent parts]
+    SHA --> Python[Python 3.10 compatibility]
+    SHA --> Personal[M6 memory / network / booking]
+    Python --> Deferred[M6 context / desktop parts]
     Personal --> M6Join[Complete M6 evidence]
+    Deferred --> M6Join
     M6Join --> Gate
     SHA --> Parts[Code Mode control / GC-17 / GC-19 / GC-20 / contracts]
     Parts --> Join[Complete Code Mode evidence]
@@ -45,15 +50,15 @@ uses the official HTTPS archive mirror for APT downloads. The Azure mirror
 repeatedly took 8–9 minutes to install browser prerequisites (one retained run
 fetched 25.9 MB in 7m48s), exhausting the ten-minute job limit before checks could
 finish. Package selection, browser installation and job limits are unchanged.
-There is no long test or
-producer prerequisite. No executable crosses runner boundaries: GitHub image
+Long gates start without a test or build prerequisite. Four shorter M6 cells
+wait for Python compatibility to bound initial admission. No executable crosses runner boundaries: GitHub image
 rollouts can assign different Ubuntu image versions within one workflow.
 The retained historical build-bundle utility still rejects image/context drift;
 its guards were not relaxed. The new pipeline avoids that reuse entirely.
 Frontend build/TypeScript dependencies install only in unit/lint. Playwright
 installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
 QuickJS still install everywhere, including providers' offline packaging gate.
-Across the twenty-two execution jobs only unit/lint installs frontend dependencies;
+Across the execution jobs only unit/lint installs frontend dependencies;
 seven jobs install Playwright. Lockfile inputs, per-job exact-source builds, every
 assertion and repetition count remain unchanged. Clean-runner complete CI is the
 dependency-closure proof; install counts alone are not wall-time measurements.
@@ -68,7 +73,12 @@ Required step guards portable SDK hashing and the maintained profiling tools.
 Both providers parts and the complete race job use private 2 GiB tmpfs mounts for disposable
 test directories, through `ci_tmpfs.py setup/cleanup`. The full unit/lint suite,
 all five SC race rounds and every verification job except providers keep ordinary
-disk storage. Unit/lint also requires five disk-backed receipt recovery race runs.
+disk storage. The packages race runner also requires five disk-backed receipt
+recovery race runs after tmpfs cleanup restores TMPDIR. A separate disk Doctor
+receipt proves ordinary block storage without overwriting the tmpfs cleanup
+receipt. The original command/count reuses that runner's race compiler cache;
+test processes, stores and temporary roots remain independent. SDK Doctor runs
+after both test phases, including on failure.
 Every migration, crash/restart and receipt test retains disk coverage. Provider
 commands, race flags/counts, SQLite WAL/sync policy and assertions are preserved.
 This targets runner disk-wait variance without
@@ -83,8 +93,8 @@ storage rejects their disk-conformance claim before tests start.
 ## Latency budget
 
 The complete Python 3.10.22 compatibility suite runs in its own Required job and
-isolated exact-head checkout, alongside unit/lint and the five disk-backed receipt
-race checks. [Run 40055562322](https://github.com/z-chenhao/erii/actions/runs/40055562322)
+isolated exact-head checkout, alongside unit/lint and packages' five disk-backed
+receipt race checks. [Run 40055562322](https://github.com/z-chenhao/erii/actions/runs/40055562322)
 passed unit/lint, receipt race and SDK isolation, then cancelled Python compatibility
 at the ten-minute job boundary. Splitting that existing full suite removes the
 serial accumulation; no test, repetition or job deadline is reduced or extended.
@@ -131,6 +141,90 @@ Doctor/cleanup/upload) and the join. The joined `suite-providers.json` restores
 the original logical order and retains both part identities/timings. Individual
 artifacts retain raw reports; the join uploads only its canonical suite and phase
 receipt. `make verify` keeps its complete unpartitioned providers path.
+
+## Communication budget and evidence
+
+Run [40166371506](https://github.com/z-chenhao/erii/actions/runs/40166371506),
+source `7a3c05e13f9e23f1995dca80ff4da1dd47bf1ce2`, completed every required
+check but took 665 seconds overall. Communication's three jobs took
+432/415/340 seconds including setup and teardown, and its join finished 443
+seconds after workflow creation. The remaining critical paths were unit/lint
+(654 seconds, including 189 seconds of cold receipt race compilation/execution)
+and Code Mode control (262 seconds waiting, then 380 seconds running).
+Those observations remain historical evidence, not acceptance for a newer SHA.
+
+The five receipt recovery race checks now follow the existing packages race
+job, after verified tmpfs cleanup and a separate disk-conformance receipt.
+The M6 matrix is placed in two Required jobs without changing its seven cells:
+memory/network/booking start immediately; context and the three desktop parts
+wait for the independent Python compatibility job. This admits exactly twenty
+execution cells initially, giving all long Code Mode cells an initial slot
+under the observed twenty-runner capacity without relying on matrix order or
+buying capacity. Each delayed cell still performs its own exact-source build,
+setup, original repetitions, Doctor and upload. The M6 join and Ubuntu checks
+require both groups; failed compatibility skips dependent cells and fails the
+aggregate. Queue/setup/join time still counts toward the unchanged 600-second
+whole-workflow objective. Only a new complete exact-SHA attempt proves that bound.
+
+The aggregate regression also avoids a redundant Cartesian product of rejected
+status spellings. It still visits every subset of failing dependencies, with
+failure/cancelled/skipped uniformly and in mixed rotations, plus missing,
+unexpected and malformed inputs. This keeps fail-closed assertions proportional
+to distinct success/non-success subsets as the Required inventory grows; the
+production gate still requires every job's exact `success` result.
+
+Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
+uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
+run the original health/goals commands, each retaining six independent variants
+and five serial repetitions per variant. `channels` keeps GC-12 ×5 and GC-08,
+GC-14 and GC-16 once each, with the original two gate workers. This changes
+placement only: fixture inputs, oracles, Host limits, approvals, deadlines,
+fault injection, state isolation and cleanup remain unchanged. Every cell keeps
+the ten-minute job timeout, its own locked setup/build, disk fixtures, sandbox,
+SDK Doctor and exact-head checkout. `make verify VERIFY_SHARD=communication`
+retains the complete unpartitioned local path and original bounded queue.
+
+Run [40164000101](https://github.com/z-chenhao/erii/actions/runs/40164000101),
+source `2354a4d7a8f82aec844232d600a473feb2cd2d3f`, exhausted the communication
+job's ten-minute limit. Native timestamps show 75 seconds before verification;
+GC-12's five rounds took 282.90 seconds, GC-01 took 438.50 seconds, and GC-02
+then shared the remaining slots with short gates. GC-02 and GC-14 returned 130
+when the outer job stopped; GC-16 had no completed evidence. SDK Doctor took
+four seconds and evidence upload took ten seconds; job completion followed at
+05:12:56Z. These are budget-cancellation observations, not product assertion failures or Case scores.
+Splitting the independent long series removes their accumulated queue delay;
+complete exact-SHA job results, including setup and teardown, establish the
+remaining budget rather than successful test-step times alone.
+
+`ci_communication.py collect` reopens the native reports and invokes their
+existing validators before writing a compact `communication-receipts.json`.
+It retains exact variant/repetition order, recomputed assertion results, cleanup,
+native file size/hash, source/binary/workflow identity and all tracked evaluation
+file hashes. Source, fixture and executable bytes must stay fixed throughout
+validation. GC-02's existing manifest is resolved and hash-checked locally.
+The raw reports stay in the producer's evidence directory; CI uploads the small
+manifest, source-bound suite, timings, profiles and phase receipts. Keep native
+local bytes in the durable evidence root for independent review; a manifest
+without them cannot independently certify a Golden Case or release.
+
+`Complete communication evidence` requires the entire verification matrix to
+succeed, including Doctor and upload, then joins exactly the three parts.
+It checks the current clean checkout, manifest/suite hashes, matching identities,
+frozen evaluation hashes, all original gate attempts and variant repetitions,
+true assertions and complete cleanup. Missing, duplicate, reordered, failed,
+cancelled, focused or drifted inputs fail closed. Both that join and the matrix
+are required by `Ubuntu checks`. Failed collection/join clears any prior success.
+The joined `suite-communication.json` restores the original logical order and
+retains each part's manifest; no native payload or semantic grade is invented.
+
+```sh
+ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard communication --communication-part gc01 --binary bin/erii --evidence evidence/communication-parts/gc01 --jobs 1
+python3 scripts/ci_communication.py collect --part gc01 --binary bin/erii --evidence evidence/communication-parts/gc01
+# Repeat these two commands for gc02 and channels, each with its own directory.
+python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence/communication-joined
+```
+
+## M6 scheduling
 
 M6 reuses the existing `fixture_pool.py` with capacity four. Travel fixtures
 keep capacity two in a separate admission group because each drives Main and a
@@ -400,7 +494,8 @@ missing parts, duplicated jobs, cancelled/skipped runs and mismatched attempts
 cannot become eligible samples. The small Core/M6 summaries remain required;
 these checks consume strict-join evidence, not a new case scorer.
 
-The merged topology has 25 jobs, including both maintained race parts, their
+The current topology has 30 jobs, including the three communication cells and
+their join, both maintained race parts, their
 Required join and the independent Python compatibility job. Race matrix values
 are checked against `ci_race_join.PARTS`, just as Core/M6 values use their
 maintained inventories. The retained 21-job metadata fixture still replays its
