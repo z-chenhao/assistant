@@ -47,8 +47,9 @@ ORIGINAL_PACKAGE_HASHES = {
     'baseline-13': '933565336b762b2dec8e8dc2b9459fda3d41dc3c8515bdc8ccce9bced7729e01',
 }
 
-# Original merged ledger seals for the five demonstrated shared-reference
-# consumers. Refreshes cannot rewrite frozen notes, receipts, gaps or provenance.
+# Original merged ledger seals for demonstrated shared-reference consumers:
+# five from ERII-369 and nine from ERII-373. Refreshes cannot rewrite frozen
+# notes, receipts, gaps or provenance.
 REFERENCE_LEDGER_ORIGINALS = {
     'baseline-12': {
         'commit': '49fc12899b3d07b5faee41c191bf9993217b7168',
@@ -79,6 +80,60 @@ REFERENCE_LEDGER_ORIGINALS = {
         'path': 'docs/audits/golden-common-03.json',
         'sha256': '25f3d5f361718ec4e6452295f4d1917fb0f2750922210c62b592328b5d7a5bd9',
         'content_sha256': '44801752156e998572d1d7e3e8c81c3ef12f9c55193cd29e37d8a74237a79ef0',
+    },
+    'baseline-01': {
+        'commit': '0f1d2ce24a7f8dfd10b59ea4655848997b4dfaeb',
+        'path': 'docs/audits/baseline-01.json',
+        'sha256': 'a373dc95471735834e411a34e40d239789e1fa627b35dd2e5c9a2ff060869805',
+        'content_sha256': '861d21d6aec6e3e026fbe06c1bf555e72a62f0d67484b7f5962975fa6eb4d80f',
+    },
+    'baseline-02': {
+        'commit': '782b3a0c2f437ff51a0937d673bd8681d7775062',
+        'path': 'docs/audits/baseline-02.json',
+        'sha256': '05538cdf6e381db0bd93c2d51ab0a1cb794a40a806033794acf10b2864d02bc6',
+        'content_sha256': '6dce889b57ad6df4a83f86e3523d11d315b9c52ab0a75f6007bdff9fd6f15b89',
+    },
+    'baseline-03': {
+        'commit': '352ef3c5748c3ae6b5c974d409069e2522bb8217',
+        'path': 'docs/audits/baseline-03.json',
+        'sha256': '8a9c7e0c401995f432bb47b4d9a8812b13d8df33500ecfcd2af8e16a5950edcd',
+        'content_sha256': 'f7744bae6f08354df21173aa2d51b1380c247fffdc64629b805d41dfbb2a1fb9',
+    },
+    'baseline-05': {
+        'commit': '49b68f1b163c93e873303d1ea0655e1e61498a1f',
+        'path': 'docs/audits/baseline-05.json',
+        'sha256': 'ff57e4bbdff1e004bae606932b1d93a3c48bbd8090785d4dee65b1cb974dbfef',
+        'content_sha256': 'dfb6e122d150d896754de1945b6bc1fe716038b2ac35f86d15176ff8fd332d5c',
+    },
+    'baseline-06': {
+        'commit': '61fdfc7de686435bf1c502ff838022daa578a9df',
+        'path': 'docs/audits/baseline-06.json',
+        'sha256': 'f169bd7982ee49bc7630f85b51bacd61bd8cca66a394812e8daf77ddcb85b893',
+        'content_sha256': '1fb0ac1c8551787ef896b15ba900cd014fe29ab240b0ebf4ededef30f66dcf54',
+    },
+    'baseline-07': {
+        'commit': 'c05adf5417c735077a8a4b91cb3664d3c457a792',
+        'path': 'docs/audits/baseline-07.json',
+        'sha256': '49b5e62af550e9bb47b4faf927746f390a50a117997bd62e68eb555a12250364',
+        'content_sha256': '6aac140f3881394cdbf1c45f8d714e71d75c231871757006fabe7d0f2bb4d5f2',
+    },
+    'baseline-09': {
+        'commit': 'ebca3e4a06ce77d5a8a8b91006cc99da7896acc2',
+        'path': 'docs/audits/baseline-09.json',
+        'sha256': 'adaa72f076c1b00d880877d4084caffc338e27d0a8c4116383bcf2a1b1f73943',
+        'content_sha256': 'faad3fbca2e4dc615f8701fb535da85e64d1c2d09c3506f4f91a058fdc329b3e',
+    },
+    'baseline-10': {
+        'commit': '463c6760b3d82abcb35dbc2f0a592e5752618d82',
+        'path': 'docs/audits/baseline-10.json',
+        'sha256': '5a01f5ad6e44d8e3b4090e9d87af3ace36670880f97003708ed5958f351a0e1d',
+        'content_sha256': '8521e1a5325be457d38a7fad154d3c03ef22299e4bc03da84d382eea6691f1f1',
+    },
+    'baseline-11': {
+        'commit': '333a5dae7446bb01f356a7eb187b90ec2bee769d',
+        'path': 'docs/audits/baseline-11.json',
+        'sha256': '03a66211e514f5c6eded6c9fc7cdf52581f9dd768e3013aa42d81d94e19b2027',
+        'content_sha256': '9ab8613d48379deef22562ac19701e330c2701064f1924499664be6af7178b22',
     },
 }
 

@@ -276,7 +276,7 @@ func (r *Runs) scheduledResult(ctx context.Context, id string, err error) (strin
 		var active int
 		// Stopping owners must join or expire before Drain can finish. They are
 		// never candidates for business claims, but still require recovery work.
-		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE (`+runnable+`) OR (r.desired_state!='running' AND r.status IN ('queued','running','waiting'))`, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
+		if err = r.host.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
 			return "", agent.ErrStorage
 		}
 		if active > 0 {

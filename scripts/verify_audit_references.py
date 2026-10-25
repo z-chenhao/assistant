@@ -1,4 +1,4 @@
-"""Drive the five audit CLIs through squash, fresh clones and consumer merges.
+"""Drive all registered audit CLIs through squash, fresh clones and consumer merges.
 
 All Git mutations stay in owned disposable repositories. File-protocol clones
 transfer reachable objects only; no remote service or product account is used.
