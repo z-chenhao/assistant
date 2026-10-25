@@ -112,6 +112,12 @@ def reference_identities(root, ledger, verify_git=False):
     base = ledger['audited_base']
     references = ledger['references']
     maintenance = ledger.get('reference_maintenance')
+    original = {k: v for k, v in ledger.items() if k != 'reference_maintenance'}
+    seal = REFERENCE_LEDGER_ORIGINALS.get(ledger['package'])
+    # Removing the maintenance envelope must not reopen the old mutable-hash
+    # path. The untouched original ledger remains inspectable on original bytes.
+    if seal and frozen_digest(original) != seal['content_sha256']:
+        raise ValueError('original audit ledger changed')
     current = {}
     if maintenance is not None:
         if maintenance.get('version') != 1:
@@ -119,9 +125,6 @@ def reference_identities(root, ledger, verify_git=False):
         provenance = maintenance.get('original_ledger', {})
         if provenance != REFERENCE_LEDGER_ORIGINALS.get(ledger['package']):
             raise ValueError('missing original ledger provenance')
-        original = {k: v for k, v in ledger.items() if k != 'reference_maintenance'}
-        if frozen_digest(original) != provenance['content_sha256']:
-            raise ValueError('original audit ledger changed')
         git(root, 'merge-base', '--is-ancestor', provenance['commit'], 'HEAD')
         raw = git(root, 'show', provenance['commit'] + ':' + provenance['path'])
         if digest(raw) != provenance['sha256'] or strict_json(raw) != original:
@@ -153,6 +156,8 @@ def reference_identities(root, ledger, verify_git=False):
             raise ValueError('missing current symbol: ' + ref)
         result[ref] = dict(historical_sha256=value['sha256'], current_sha256=expected,
                            current_source_sha=revision if ref in current else base,
+                           current_git_blob_checked=ref in current or verify_git,
+                           historical_git_blob_checked=verify_git,
                            revalidation='reference_identity_only' if ref in current else 'unchanged')
     return result
 

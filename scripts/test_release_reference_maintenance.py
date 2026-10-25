@@ -153,6 +153,13 @@ class ReferenceMaintenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'current Git blob mismatch'):
             package.audit_package(self.root, good, self.units)
 
+    def test_removing_refresh_and_rewriting_the_old_hash_cannot_bypass_the_seal(self):
+        good = self.refresh()
+        del good['reference_maintenance']
+        good['references'][self.ref]['sha256'] = package.digest(self.shared.read_bytes())
+        with self.assertRaisesRegex(ValueError, 'original audit ledger changed'):
+            package.audit_package(self.root, good, self.units)
+
     def test_stronger_source_ancestry_check_is_not_silently_relaxed(self):
         ledger = self.refresh()
         # An orphan source commit cannot borrow current provenance. No history

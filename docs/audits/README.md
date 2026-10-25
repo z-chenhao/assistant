@@ -42,8 +42,10 @@ CI fetches it only in the two jobs running Python regressions.
 
 `audit_package` independently validates the original seal, merged ledger blob,
 current SHA/ancestry/blob, current bytes and symbol on **every** maintained audit,
-including the ordinary CLI. Its report exposes both reference hashes and
-`current_reference_git_checked`. All old observations remain readable but have
+including the ordinary CLI. Removing the envelope and rewriting original
+hashes still fails the independent seal. Its report exposes both reference hashes,
+`current_reference_git_checked` for the explicit snapshot and per-reference
+`current_git_blob_checked` / `historical_git_blob_checked` flags. All old observations remain readable but have
 `observation_applicability.status=historical_only` and
 `current_native_revalidated=false`. A refresh runs no native commands. It never
 proves changed behavior, inherits PASS, fills a gap or certifies release. New

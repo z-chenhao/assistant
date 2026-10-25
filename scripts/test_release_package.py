@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import release_audit
 import release_package as package
@@ -166,6 +167,13 @@ class ReleasePackageTests(unittest.TestCase):
                 package.audit_package(root, self.ledger, self.units, verify_git=True)
 
     def synthetic_references(self):
+        # These synthetic receipts have no original seal. The real maintained
+        # ledger is independently tested, including envelope-removal attacks.
+        seals = {k: v for k, v in package.REFERENCE_LEDGER_ORIGINALS.items()
+                 if k != self.ledger['package']}
+        patcher = patch.dict(package.REFERENCE_LEDGER_ORIGINALS, seals, clear=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.ledger.pop('reference_maintenance', None)
         for ref, value in self.ledger['references'].items():
             value['sha256'] = package.digest((self.root / ref.partition('#')[0]).read_bytes())
