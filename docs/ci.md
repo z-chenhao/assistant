@@ -627,3 +627,10 @@ outside worktree cleanup, share one small receipt and verify same-host files.
 Inspect exact run/attempt metadata before downloading an immutable artifact ID;
 hash-verified warm retrieval transfers zero archive bytes. Mandatory CI part/join
 artifacts and final exports keep their existing completeness and retention rules.
+
+GC-03's `security` gate (`verify_gc03.py`) runs all six locked finance variants
+with five consecutive rounds each. It uses the existing MCP sandbox setup and
+retains a small `gc03_native_manifest`; hidden `.gc03-native/` state remains local
+under the uploader's default exclusion. The gate recomputes receipts and corruption
+probes; Fake mechanics supply no semantic grade or release acceptance.
+See [GC-03 verification](gc03-verification.md).

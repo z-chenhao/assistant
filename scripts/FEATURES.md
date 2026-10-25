@@ -1,5 +1,15 @@
 # Feature map
 
+## GC-03 complete deterministic finance journey (ERII-249)
+
+| Feature | Reach / authoritative entry | Evidence and cleanup |
+| --- | --- | --- |
+| Asset correction and scenario calculation | `verify_gc03.py`; CLI/TUI Main, existing capabilities/terminal-input Fakes, MCP, Memory/Curator, QuickJS | Six original locked variants × five serial rounds; current Memory supersedes baseline; live Tool values feed calculation; Python Decimal recomputes currency valuation, separate liquidity and three static spending scenarios; reopenable Artifact with dates, sources, formulas and explicit unknowns. |
+| Recovery and privacy | Same `security` suite gate | Generation/Memory SIGKILL recovery, duplicate ingress/replay equality, Forget fences frozen old owner, fresh requests/Recall exclude lineage; no Task/Child/Automation/financial effect/Approval. Owned processes/peers joined and roots removed. |
+| Recomputable evidence | `verify_gc03.py --validate`; `prepare_release_eval.py`; `test_gc03.py` | 30 ordered receipts, 21 frozen blocks, source/binary/environment/cleanup and 27 corruption probes; persisted parent Tool return drives finance and Artifact checks, with strict output/value binding; compact manifest retains hidden local native bytes. Semantic score null, grading ineligible, release false; model/connector/L2 gaps stay in ERII-223. |
+
+See [scope, frozen mapping and unscripted limits](../docs/gc03-verification.md).
+
 ## GC-02 complete deterministic goals journey (ERII-248)
 
 | Feature | Reach / authoritative entry | Evidence |
