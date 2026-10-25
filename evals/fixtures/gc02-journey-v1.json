@@ -8,5 +8,21 @@
     "2026-12-27T20:00:00+08:00"
   ],
   "cancel_pending_at": "2027-01-31T20:00:00+08:00",
-  "unrelated": "请介绍一个轻松的室内活动。"
+  "unrelated": "请介绍一个轻松的室内活动。",
+  "support": {
+    "conflicts": [
+      {
+        "goal": "技术自主性与长期积累",
+        "constraint": "收入下降最多一年且不影响家庭安全感",
+        "priority": null
+      }
+    ],
+    "dependencies": [
+      "确认家庭安全边界后再决定探索投入"
+    ],
+    "next_steps": [
+      "评估可逆的小规模技术产品探索"
+    ],
+    "decision": null
+  }
 }

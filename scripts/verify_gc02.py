@@ -85,8 +85,9 @@ def artifact_readback(h):
 def review_source():
     # Query current durable Memory at *each occurrence*. No corrected content or
     # Memory ID is embedded in the schedule, so it cannot replay a stale answer.
-    return save_report('''const goals=(await tools.builtin__memory__search({query:"人生 独立开发",limit:20})).filter(h=>h.source_type==="memory");
-const result={goals,ranking:null,scope:"scripted current-memory readback; values remain the user's decision"};''', 'goals-review.json')
+    support = json.dumps(load()[0]['support'],ensure_ascii=False)
+    return save_report('const support=' + support + ';\n' + '''const goals=(await tools.builtin__memory__search({query:"人生 独立开发",limit:20})).filter(h=>h.source_type==="memory");
+const result={goals,support,evidence_refs:goals.map(h=>h.source_ref),ranking:null,scope:"scripted current-memory readback; values remain the user's decision"};''', 'goals-review.json')
 
 
 def journey(h, variant_id, row):
@@ -96,6 +97,8 @@ def journey(h, variant_id, row):
     world = case['world']
     row['core_ref'] = remember(h, 'initial-core', world['memory'][0]['content'])
     row['old_ref'] = remember(h, 'initial-exploration', world['memory'][1]['content'])
+    row['initial_hits'] = recall(h,'initial-goals','人生 独立开发')
+    work(h)
     row['initial'] = native(h)
     def select(bridge):
         h.bridge = bridge
@@ -218,6 +221,8 @@ def observe(row):
                 t['arguments_json'] == a['arguments_json'] for a in before['tools']) for t in row['resumed']['nested']),
         no_early_tracking=not before['task'] and not before['automation'] and not before['automation_fire'] and
             all(t['tool_name'] != 'builtin__automation__manage' for t in before['tools']),
+        initial_contents=all(any(h['source_ref'] == ref and h['content'] == source['content'] for h in row['initial_hits'])
+            for ref, source in zip((row['core_ref'],old),case['world']['memory'])),
         initial_tiers=any(r['memory_id'] == row['core_ref'].removeprefix('memory:') and r['tier'] == 'core'
             for r in row['initial']['memory']['memory']['records']) and old_record['tier'] == current_record['tier'] == 'recall',
         constraint_main_tool=row['constraint_call']['status'] == 'succeeded' and
@@ -268,6 +273,7 @@ def observe(row):
             one_ongoing_task=len(value['task']) == 1 and value['task'][0]['status'] == 'active' and
                 value['task'][0]['completion_policy'] == 'ongoing' and len(workers) == index + 1 and
                 len({r['task_id'] for r in workers}) == 1 and len(value['updates']) == index + 1,
+            decision_support=body['support'] == fixture['support'] and body['evidence_refs'] == [h['source_ref'] for h in body['goals']],
             current_goals=body['ranking'] is None and any(h['source_ref'] == current and h['content'] == fixture['current'] for h in body['goals']) and
                 all(h['source_ref'] != old for h in body['goals']) and any(h['content'] == fixture['constraint'] for h in body['goals']),
             native_recall=any(t['tool_name'] == 'builtin__memory__search' and t['run_id'] == artifact['descriptor']['run_id'] and
