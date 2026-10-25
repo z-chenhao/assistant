@@ -310,6 +310,12 @@ def observe(row):
     checks['known_tool_outcomes'] = all(t['status'] in ('succeeded','failed','cancelled','unknown') and
         (t['status']!='failed' or strict_json(t['result_json']).get('error',{}).get('code')=='APPROVAL_DENIED') and
         (t['attempt_count']>=1 if t['tool_name'] in ('builtin__codemode__execute','builtin__agent__run') else t['attempt_count'] in (0,1)) for t in tools)
+    cancelled_task = next(t for t in final['task'] if t['task_id']==row['cancel']['task_id'])
+    old_runs = [r for r in runs if r['task_id']==cancelled_task['task_id']]
+    checks['old_epoch_fenced'] = cancelled_task['status']=='cancelled' and bool(old_runs) and all(
+        r['status']=='cancelled' and r['task_epoch']<cancelled_task['task_epoch'] for r in old_runs)
+    checks['exact_task_tree'] = len(final['task'])==3 and sorted(t['status'] for t in final['task'])==['cancelled','completed','completed'] and len([r for r in runs if r['kind']=='worker' and r['parent_run_id'] is None])==3
+    checks['main_capability_boundary'] = all(not c['can_spawn_agents'] and not any(t['name']=='builtin__agent__run' for t in strict_json(c['tools_json'])) for c in final['capabilities'] if c['role']=='main')
     checks['snapshot_lineage'] = all(c['model_snapshot_id']==by_run[c['parent_run_id']]['model_snapshot_id'] for c in runs if c['parent_run_id'] is not None)
     old = next(m for m in final['memory']['memory']['records'] if 'memory:'+m['memory_id']==row['old_ref'])
     current = next(m for m in final['memory']['memory']['records'] if 'memory:'+m['memory_id']==row['current_ref'])
@@ -438,6 +444,7 @@ def rejection_probes(row):
         unknown_retry=lambda r:next(t for t in r['final']['tools'] if t['status']=='unknown').update(attempt_count=2),
         unapproved=lambda r:next(a for a in r['final']['approval'] if a['status']=='denied').update(status='approved'),
         child_task_control=lambda r:next(c for c in r['final']['capabilities'] if c['snapshot_id']==next(n['capability_snapshot_id'] for n in r['final']['runs'] if n['parent_run_id'] is not None)).update(tools_json='[{"name":"builtin__task__manage"}]'),
+        old_epoch_admitted=lambda r:next(n for n in r['final']['runs'] if n['task_id']==r['cancel']['task_id']).update(task_epoch=r['cancelled']['task'][1]),
         cancelled_write=lambda r:r['after_cancel']['network'].update(protocols=2),
         false_effect_crash=lambda r:r['unknown']['crash'].update(returncode=0),
         false_restart=lambda r:r['input_restart'].update(returncode=0),
