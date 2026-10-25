@@ -65,7 +65,7 @@ class VerificationTests(unittest.TestCase):
             (root / 'logs').mkdir()
             gates = suite.SHARDS['communication']
             self.assertEqual([g.name for g in suite.gate_execution_order(gates)],
-                             ['gc01','gc12','gc02','gc08','gc14','gc16'])
+                             ['gc01','gc12','gc02','gc09','gc08','gc14','gc16'])
             def command(gate, attempt, *_):
                 script = ('from pathlib import Path\nimport time\n'
                           f'root=Path({str(root)!r})\n'
@@ -81,7 +81,7 @@ class VerificationTests(unittest.TestCase):
                           'else:\n'
                           ' assert all((root/(p+".started")).exists() for p in ("gc01","gc12"))\n'
                           ' if name=="gc02": (root/"gc02.started").touch()\n'
-                          ' if name in ("gc08","gc14","gc16"): assert (root/"gc02.started").exists()\n')
+                          ' if name in ("gc09","gc08","gc14","gc16"): assert (root/"gc02.started").exists()\n')
                 return [sys.executable,'-c',script], os.environ.copy(), root/'logs'/f'{gate.name}-{attempt}.log'
             with patch.object(suite, 'command', command):
                 rows = suite.run_shard('communication',Path('/binary'),root,threading.Event(),gates,gate_jobs=2)
@@ -91,6 +91,14 @@ class VerificationTests(unittest.TestCase):
             for gate in gates:
                 self.assertEqual((root/(gate.name+'.rounds')).read_text().splitlines(),
                                  [str(i) for i in range(1,gate.attempts+1)])
+
+    def test_agenda_uses_existing_sandbox_partition_and_precedes_short_series(self):
+        gates = suite.communication_gates('channels')
+        ordered = suite.gate_execution_order(gates)
+        self.assertEqual([g.name for g in ordered[:2]],['gc12','gc09'])
+        self.assertCountEqual(ordered,gates)
+        self.assertEqual([(g.name,g.attempts) for g in ordered if g.name == 'gc09'],[('gc09',1)])
+        self.assertNotIn('gc09',[g.name for g in suite.SHARDS['runtime']])
 
     def test_signal_eperm_can_only_accept_confirmed_absence_on_darwin(self):
         with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
@@ -144,7 +152,7 @@ class VerificationTests(unittest.TestCase):
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
             "verify_gc12.py": 5, "verify_gc08.py": 1, "verify_gc14.py": 1, "verify_gc16.py": 1,
-            "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc05.py": 1,
+            "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc05.py": 1, "verify_gc09.py": 1,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
