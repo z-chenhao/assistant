@@ -183,6 +183,18 @@ groups. Actual Web/Feishu/PTY, approval/restart and slow-send lease checks remai
 mandatory in every CI round. A successful run demonstrates capacity for that
 runner; it is not a controlled long-term performance claim.
 
+Communication also honors that existing two-worker pool. On ERII-247 head
+`e413acf`, [run 40156918081](https://github.com/z-chenhao/erii/actions/runs/40156918081)
+completed all five GC-12 rounds (about 266 seconds) and GC-08/14/16 (about 144
+seconds), then the unchanged ten-minute job boundary cancelled GC-01 after 131
+seconds. GC-01 now starts first alongside GC-12; the remaining independent gates
+use the same bounded workers. Every gate owns distinct reports and disposable
+state, and retains its original assertions, repetitions, fixture deadlines and
+cleanup. The real-subprocess admission-barrier regression rejects serial
+dispatch, delayed admission of the long pair, missing/reordered rounds and
+undrained groups. This fixes scheduling; only successful exact-head CI can prove
+that the complete shard fits the existing job budget.
+
 `scripts/verify_suite.py` is the authoritative logical inventory (105 gate
 invocations, including all five Computer lifecycle and Computer Use runs).
 

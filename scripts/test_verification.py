@@ -59,6 +59,35 @@ class VerificationTests(unittest.TestCase):
             for name in ('delivery','channels'):
                 self.assertEqual((root/(name+'.rounds')).read_text().splitlines(),list('12345'))
 
+    def test_communication_admits_long_series_before_short_gates_and_keeps_every_round(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'logs').mkdir()
+            gates = suite.SHARDS['communication']
+            def command(gate, attempt, *_):
+                script = ('from pathlib import Path\nimport time\n'
+                          f'root=Path({str(root)!r})\n'
+                          f'name={gate.name!r}; attempt={attempt}\n'
+                          'with (root/(name+".rounds")).open("a") as out: out.write(str(attempt)+"\\n")\n'
+                          'if name in ("gc01","gc12") and attempt==1:\n'
+                          ' (root/(name+".started")).touch()\n'
+                          ' peer="gc12" if name=="gc01" else "gc01"\n'
+                          ' deadline=time.monotonic()+2\n'
+                          ' while not (root/(peer+".started")).exists():\n'
+                          '  assert time.monotonic()<deadline, "long peer series never admitted"\n'
+                          '  time.sleep(.01)\n'
+                          'else:\n'
+                          ' assert all((root/(p+".started")).exists() for p in ("gc01","gc12"))\n')
+                return [sys.executable,'-c',script], os.environ.copy(), root/'logs'/f'{gate.name}-{attempt}.log'
+            with patch.object(suite, 'command', command):
+                rows = suite.run_shard('communication',Path('/binary'),root,threading.Event(),gates,gate_jobs=2)
+            self.assertEqual([(r['gate'],r['attempt']) for r in rows],
+                             [(g.name,i) for g in gates for i in range(1,g.attempts+1)])
+            self.assertTrue(all(r['returncode']==0 and r['owned_group_drained'] for r in rows))
+            for gate in gates:
+                self.assertEqual((root/(gate.name+'.rounds')).read_text().splitlines(),
+                                 [str(i) for i in range(1,gate.attempts+1)])
+
     def test_signal_eperm_can_only_accept_confirmed_absence_on_darwin(self):
         with patch.object(suite.os, 'killpg', side_effect=PermissionError), \
              patch.object(suite.sys, 'platform', 'darwin'), \

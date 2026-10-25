@@ -22,6 +22,11 @@ same gate. Two independent variants overlap by default; `--variant-jobs 1|2|4`
 changes only that bound. Each variant retains five serial repetitions, isolated
 roots/peers and owned process groups. No option lowers either count.
 
+The communication shard honors the existing `ERII_VERIFY_GATE_JOBS=2` pool.
+GC-01 starts alongside the independent GC-12 series; every gate keeps its full
+inventory, serial repetitions, separate evidence and cleanup. The ten-minute CI
+job limit and fixture deadlines remain unchanged. See [CI operations](ci.md).
+
 | Boundary | Observed evidence |
 | --- | --- |
 | Launch / Doctor | Disposable roots, explicit probe/select, the existing MCP and embedding Fakes, restricted QuickJS; no credentials or default provider |

@@ -243,6 +243,14 @@ Release model quality, semantic scores and live accounts remain separate claims.
 | Five-run result integrity | `make verify`, `m6_report.aggregate` | Locked fixtures, exact binary/variant/assertion inventories | `m6-cases-1…5.json`, `m6-summary.json`; CI `ci_personal.py` requires seven fixed parts and rejects missing/duplicate/failed/drifted input; retained CLI-opened files/screenshots under `m6-cases-N-assets/`; all children joined and disposable state removed; semantic/product scores remain null, current L2 unexecuted |
 | Delivery gate capacity and series integrity | `verify_suite.py --shard delivery --gate-jobs 2`; existing CI matrix | `run_shard` → existing two-worker executor; independent delivery/channel harnesses | Launch/Doctor isolated reports and roots; Drive overlaps the two complete five-round series; Evidence retains canonical ten rows, original actual UI/lease/approval/SIGKILL assertions and unchanged deadlines; Cleanup drains owned groups. Real-subprocess mutual-admission regression reproduces the former serial dispatch despite a two-worker request and requires per-series 1…5 order. No production concurrency or longer job budget. |
 
+Communication gate capacity uses the same bounded two-worker executor when
+`ERII_VERIFY_GATE_JOBS=2`: GC-01 starts with the independent GC-12 series, all
+gate/round inventories remain canonical, and each five-run series stays serial.
+The real-subprocess admission-barrier regression in `test_verification.py`
+rejects serial/delayed admission, missing rounds and undrained processes.
+Reports, temporary roots, fixture deadlines and the ten-minute CI budget stay
+separate and unchanged. See [CI evidence](../docs/ci.md#complete-inventory).
+
 Browser launch Doctor uses `guest-browser/readiness.mjs` in both the real
 Browser contract test and M6 Computer journeys. The pipe handshake is not proof
 that Chromium published `DevToolsActivePort`. Delayed, missing, empty/invalid
