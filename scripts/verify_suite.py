@@ -65,10 +65,18 @@ SHARDS = {
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
+    "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),
+                      Gate("gc08", "verify_gc08.py", "gc08"),
+                      Gate("gc14", "verify_gc14.py", "gc14"),
+                      Gate("gc16", "verify_gc16.py", "gc16"),
+                      Gate("gc01", "verify_gc01.py", "gc01"),
+                      Gate("gc02", "verify_gc02.py", "gc02")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
+        Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
         Gate("startup", "verify_startup.py", "startup"),
         Gate("local-provider", "verify_local_provider.py", "local-provider"),
+        Gate("unscripted-entry", "verify_unscripted_cases.py", "unscripted-entry"),
         Gate("account-initial", "verify_account.py", "account"),
         Gate("capabilities", "verify_capabilities.py", "capabilities", 5),
         Gate("tui", "verify_tui.py", "tui", 5),
@@ -92,6 +100,15 @@ def codemode_gates(part):
         raise ValueError('unknown Code Mode part')
     arguments = ('--contracts-only',) if part == 'contracts' else ('--case', part)
     return (Gate('core-' + part, 'run_core_cases.py', 'core-' + part, 5, arguments),)
+
+
+PROVIDER_PARTS = ('cli', 'models')
+
+
+def provider_gates(part):
+    if part not in PROVIDER_PARTS:
+        raise ValueError('unknown providers part')
+    return tuple(g for g in SHARDS['providers'] if (g.name == 'models') == (part == 'models'))
 
 
 def personal_gates(part):
@@ -227,7 +244,7 @@ def run_command(args, env, output, stopped, metrics=None):
 
 def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_jobs=1, record=None):
     gates = SHARDS[name] if gates is None else gates
-    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security'):
+    if gate_jobs == 2 and name in ('runtime', 'codemode', 'providers', 'security', 'delivery', 'communication'):
         return concurrent_gates(name, binary, evidence, stopped, gates, previous)
     rows = list(previous)
     for gate in gates:
@@ -256,10 +273,16 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_job
 
 
 def gate_execution_order(gates):
-    # Core dominates Code Mode; Pi Bridge retains a real thirty-second deadline
-    # per run. Start these measured long series first; retain inventory order in
-    # reports and keep every series' five repetitions on the same worker.
-    return sorted(gates, key=lambda gate: gate.name not in ('core-cases', 'pi-bridge'))
+    # Measured long series go first. GC-01 and GC-12 retain the initial pair;
+    # GC-02 must take the next free slot before short gates. Its former queue
+    # tail exceeded the CI deadline even with all 30 rounds finished. Keep two
+    # workers, report inventory order and every series' serial repetitions.
+    def priority(gate):
+        if gate.name in ('core-cases','pi-bridge','gc01'): return 0
+        if gate.name == 'gc12': return 1
+        if gate.name == 'gc02': return 2
+        return 3
+    return sorted(gates,key=priority)
 
 
 def concurrent_gates(name, binary, evidence, stopped, gates, previous):
@@ -327,23 +350,26 @@ def main():
     parser.add_argument("--shard", choices=SHARDS)
     parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
+    parser.add_argument('--provider-part', choices=PROVIDER_PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
     parser.add_argument("--binary", type=Path, default=Path("bin/erii"))
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.list:
-        if args.gate or args.codemode_part or args.personal_part:
+        if args.gate or args.codemode_part or args.personal_part or args.provider_part:
             parser.error('--list cannot be combined with gate/part execution')
         print(json.dumps([row for row in catalogue() if not args.shard or row['shard'] == args.shard], indent=2))
         return 0
-    if args.gate and (args.codemode_part or args.personal_part):
+    if args.gate and (args.codemode_part or args.personal_part or args.provider_part):
         parser.error('--gate cannot be combined with a CI part')
     plans = select_gates(parser, args.shard, args.gate)
     if args.codemode_part and args.shard != 'codemode':
         parser.error('--codemode-part requires --shard codemode')
     if args.personal_part and args.shard != 'personal':
         parser.error('--personal-part requires --shard personal')
+    if args.provider_part and args.shard != 'providers':
+        parser.error('--provider-part requires --shard providers')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -359,7 +385,9 @@ def main():
         plans['codemode'] = codemode_gates(args.codemode_part)
     if args.personal_part:
         plans['personal'] = personal_gates(args.personal_part)
-    part = args.codemode_part or args.personal_part
+    if args.provider_part:
+        plans['providers'] = provider_gates(args.provider_part)
+    part = args.codemode_part or args.personal_part or args.provider_part
     report_suffix = (args.shard or 'all') + ('-' + part if part else '')
     if args.gate:
         # Focused runs cannot overwrite or masquerade as a complete shard verdict.
@@ -417,6 +445,7 @@ def main():
                   gate_jobs=args.gate_jobs, selected_gates=args.gate,
                   complete_inventory=not bool(args.gate or part),
                   codemode_part=args.codemode_part, personal_part=args.personal_part,
+                  provider_part=args.provider_part,
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),
                   binary_sha256=binary_digest,
