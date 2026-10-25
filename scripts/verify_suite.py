@@ -68,7 +68,8 @@ SHARDS = {
     "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),
                       Gate("gc08", "verify_gc08.py", "gc08"),
                       Gate("gc14", "verify_gc14.py", "gc14"),
-                      Gate("gc16", "verify_gc16.py", "gc16")),
+                      Gate("gc16", "verify_gc16.py", "gc16"),
+                      Gate("gc01", "verify_gc01.py", "gc01")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("startup", "verify_startup.py", "startup"),

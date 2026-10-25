@@ -123,6 +123,26 @@ def verify(binary, evidence):
             report['checks'].append('production_cli_native_tool_usage_and_restricted_judge_packet')
             report['checks'].append('strict_release_consumer_rejects_loopback_fragment')
 
+            for journey in ('week', 'safety'):
+                from verify_gc01 import journey_inputs
+                root, config = prepared('gc01-' + journey)
+                frozen = command(root, config, 'freeze', 'gc01-' + journey + '-plan', '--case', 'GC-01',
+                    '--gc01-journey', journey, '--execution-kind', 'loopback_mechanism', '--seconds', '30') / 'plan.json'
+                plan_body = json.loads(frozen.read_text())
+                require(plan_body['input']['events'] == journey_inputs('wording-1', journey == 'safety')[0],
+                        'GC-01 frozen input drift')
+                out = command(root, config, 'run', 'gc01-' + journey, '--plan', str(frozen),
+                              '--plan-sha256', hashed(frozen.read_bytes()))
+                observation = json.loads((out/'observation.json').read_text())
+                value = json.loads((out/'native.json').read_text())
+                expected = [plan_body['input']['context']] + ['当前时间：' + e['at'] + '。' + e['text']
+                    for e in plan_body['input']['events']]
+                users = [p['text'] for m in value['conversation'] if m['role'] == 'user' for p in m['content']]
+                require(users == expected and observation['status'] == 'observed_fragment' and
+                        observation['eligible_for_grading'] is False and observation['final_score'] is None,
+                        'GC-01 loopback input/eligibility drift')
+                report['checks'].append('gc01_' + journey + '_production_cli_inputs_ungraded')
+
             root, config = prepared('drift')
             p, sha = plan(root, config, 'drift-plan')
             config.write_text(config.read_text()+'\n')

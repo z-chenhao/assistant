@@ -35,7 +35,9 @@ ASSETS = ROOT / 'evals/fixtures/m6-v1'
 
 class PersonalHarness(CapabilityHarness):
     def args(self, *args):
-        return super().args('-test-automation-now', self.automation_now, *args)
+        return [str(self.binary), '-config', str(self.root / 'config.yaml'),
+                '-test-bridge', getattr(self, 'bridge', 'capabilities'),
+                '-test-automation-now', self.automation_now, *args]
 
 
 def goal_schedule_state(h):
@@ -112,7 +114,7 @@ return {result,artifactRefs:saved.artifactRefs};'''
 
 
 @contextmanager
-def personal(binary, folder, case, embeddings):
+def personal(binary, folder, case, embeddings, bridge='capabilities'):
     provider = folder / 'provider'
     provider.mkdir()
     # Same MCP adapter configured in production. This deterministic peer has
@@ -133,6 +135,7 @@ def personal(binary, folder, case, embeddings):
                   embedding=dict(provider='openai_compatible', endpoint=f'http://127.0.0.1:{embeddings.server.server_port}/v1', model='semantic-fixture-v1', dimensions=5))
     (folder / 'config.yaml').write_text(json.dumps(config))
     h = PersonalHarness(binary, folder)
+    h.bridge = bridge
     h.automation_now = case['clock']
     h.env['ERII_MEMORY_KEY'] = 'M' * 32
     try:
