@@ -57,6 +57,9 @@ class Baseline02Tests(test_release_package.ReleasePackageTests):
         for mutation in ('valid', 'missing', 'duplicate', 'stale', 'extra', 'wrong_owner'):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
                 self.setUp()
+                # This synthetic manifest changes the declared digest. Keep the
+                # assignment-consumer fixture separate from sealed real receipts.
+                self.synthetic_references()
                 definition = copy.deepcopy(original)
                 other = definition['packages']['other-packages']['blocks']
                 if mutation == 'missing': other.pop()
