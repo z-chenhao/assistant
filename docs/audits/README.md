@@ -36,7 +36,7 @@ It writes only a disposable proposal under `evidence/`, removes stale output on
 failure, and never overwrites an input. Capture requires a committed source
 revision descending from the original merged ledger and reachable from HEAD.
 The original merged ledger must remain an ancestor of HEAD. Tests need its
-reachable history; CI fetches history only in the two Python regression jobs.
+reachable history; CI fetches history in the two Python regression jobs and the providers CLI part.
 
 Maintenance envelope version 2 uses the explicit binding
 `source_commit_tree_and_HEAD_blob`. It retains the exact source SHA and base64
@@ -92,13 +92,13 @@ rejected consumer drift, explicit consumer refresh, a real merge from advanced
 main, and another squash/fresh clone with the newly captured source absent:
 
 ```sh
-python3 scripts/verify_audit_references.py --evidence evidence/audit-reference-history.json
+python3 scripts/verify_audit_references.py --evidence evidence/audit-reference-history.json --raw-reports
 ```
 
 Run after committing the repair: it validates the committed HEAD tree. The report
 records source/base/squash/merge IDs and 26 command outcomes, including the
-post-squash baseline-12 regression. Adjacent raw reports are retained for manual
-runs. `RegisteredSquashAuditTests` includes the same path in the release/Python
+post-squash baseline-12 regression. Adjacent raw reports are retained when `--raw-reports` is requested. The
+registered providers `audit-references` gate emits compact success evidence. `RegisteredSquashAuditTests` includes the same path in the release/Python
 regressions; its disposable repositories and reports are cleaned. Neither the
 harness nor tests mutate the caller's branch or any remote reference. This
 mechanical history fixture certifies no product or release behavior.

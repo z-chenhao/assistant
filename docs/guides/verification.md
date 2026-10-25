@@ -36,6 +36,7 @@ and `run*cases` harness must be registered; `make test` rejects inventory drift.
 | Install, model setup and credentials | providers | startup, local-provider, account-initial, account, models |
 | Terminal and capability contracts | providers | tui, terminal-input, capabilities, pi-bridge |
 | Unscripted evaluation entry mechanism | providers | unscripted-entry |
+| Audit reference identity through squash and consumer merges | providers | audit-references |
 
 A shard runs its complete inventory:
 

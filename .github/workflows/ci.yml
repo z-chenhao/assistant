@@ -213,6 +213,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # The CLI part runs the committed audit-reference history gate.
+          fetch-depth: ${{ matrix.providerpart == 'cli' && '0' || '1' }}
       - uses: ./.github/actions/ci-inputs
         with:
           temporary-fixtures: "true"

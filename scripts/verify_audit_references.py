@@ -133,11 +133,13 @@ def run(root, source_sha, base_sha, raw_root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--binary', type=Path, help='Common suite argument; this gate checks Git/audit identity only')
     parser.add_argument('--evidence', type=Path, default=ROOT / 'evidence/audit-reference-history.json')
+    parser.add_argument('--raw-reports', action='store_true', help='Retain full adjacent audit reports for local inspection')
     args = parser.parse_args()
     sha = git(ROOT, 'rev-parse', 'HEAD').decode().strip()
     base = next(iter(REFERENCE_LEDGER_ORIGINALS.values()))['commit']
-    result = run(ROOT, sha, base, args.evidence.with_suffix(''))
+    result = run(ROOT, sha, base, args.evidence.with_suffix('') if args.raw_reports else None)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(dict(passed=result['passed'], checks=len(result['checks']), evidence=str(args.evidence))))
