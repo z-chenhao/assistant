@@ -132,6 +132,7 @@ def external(root):
 
 def select(h,bridge):
     h.bridge = bridge
+    h.args = lambda *args: [str(h.binary),'-config',str(h.root/'config.yaml'),'-test-bridge',h.bridge,*args]
     h.setup(metadata=dict(name='GC-07 explicit '+bridge,provider_kind='openai_compatible',
         endpoint='http://127.0.0.1:1/v1',wire_api='openai_completions',model_id='gc07-'+bridge+'-fixture',
         context_window=65536,max_output_tokens=4096,generation_defaults={},
@@ -201,7 +202,17 @@ def journey(h,peer,browser_root,variant,row):
         h.children.append(child);pending['child'] = child
         row['contended_state'] = h.wait_state(lambda state:any(t['invocation_id'] not in pending['before'] and t['status']=='waiting' and t['tool_name']=='builtin__computer__discover' for t in state['tools']),
             'independent Task waits for desktop',reader=native,timeout=20)
-    row['cancel'] = h.cancel_at('computer_ready',held_plan,during_hold=contender)
+    original_hold = h.hold
+    def hold_and_contend(*args,**kwargs):
+        child = original_hold(*args,**kwargs)
+        contender()
+        return child
+    h.hold = hold_and_contend
+    try:
+        row['cancel'] = h.cancel_at('computer_ready',held_plan)
+    finally:
+        h.hold = original_hold
+    row['ownership_after_cancel'] = read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM computer')[0]
     child = pending['child'];_,err = child.communicate(timeout=30)
     require(child.returncode == 0,'GC-07 contender failed: '+err)
     h.processes.retire(child)
@@ -276,7 +287,7 @@ def observe(row):
         native_replay=exact(final,row['replayed']) and exact(actions,row['actions_replayed']),
         cancelled_owner=row['cancel']['old_owner_exit']==0 and row['cancelled']['task'][0]=='cancelled' and
             all(r[1]=='cancelled' and r[2]=='task_cancelled' for r in row['cancelled']['runs']) and
-            exact(row['after_cancel'],row['after_repair']) and row['cancel']['after_cancel']['phase']=='checkpointed',
+            exact(row['after_cancel'],row['after_repair']) and row['ownership_after_cancel']['execution_id'] in (None,row['contender']['parent']['invocation_id']),
         desktop_contention=values['contender']=='observed_after_release' and any(t['status']=='waiting' and t['tool_name']=='builtin__computer__discover' and t['attempt_count']==0 for t in row['contended_state']['tools']) and len({r['task_id'] for r in row['contended_state']['runs'] if r['kind']=='worker'})>=2,
         desktop_released=row['computer']['phase']=='checkpointed',
         one_delivery_per_reply=len(final['deliveries'])==len([m for m in final['conversation'] if m['role']=='assistant']) and all(d['status']=='sent' for d in final['deliveries']),

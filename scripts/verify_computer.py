@@ -26,7 +26,7 @@ from verify_main import require
 class ComputerHarness(CapabilityHarness):
     def args(self, *args):
         return [str(self.binary), '-config', str(self.root / 'config.yaml'),
-                '-test-bridge', getattr(self, 'bridge', 'computer'), *args]
+                '-test-bridge', 'computer', *args]
 
     def guest_command(self, live_root, command):
         with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
@@ -34,14 +34,12 @@ class ComputerHarness(CapabilityHarness):
         from lume_live import Live
         return Live(live_root, 'product', instance['native_name']).guest(command)
 
-    def cancel_at(self, boundary, plan, during_hold=None):
+    def cancel_at(self, boundary, plan):
         """Cancel through Main while a Worker holds a real lifecycle boundary."""
         self.send('delegate-' + boundary, 'Delegate capabilities: ' + plan)
         release = self.root / ('release-' + boundary)
         child = self.hold(boundary, extra_flags=('-test-main-release', str(release)), timeout=30)
         held = self.command('computer', 'status')
-        if during_hold:
-            during_hold()
         state = Path(self.env['ERII_DATA_ROOT']) / 'state.db'
         with sqlite3.connect(state) as db:
             task_id, ref = db.execute("SELECT task_id,task_ref FROM task WHERE status='active'").fetchone()

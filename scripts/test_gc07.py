@@ -9,7 +9,6 @@ import unittest
 from unittest.mock import patch
 
 from case_runner import variants
-import prepare_release_eval
 import unscripted_cases
 import verify_gc07 as journey
 import verify_suite
@@ -111,20 +110,13 @@ class NetworkTests(unittest.TestCase):
             with self.assertRaises(ValueError):journey.read_report(path)
             self.assertNotIn('include-hidden-files: true',(journey.ROOT/'.github/workflows/ci.yml').read_text())
 
-    def test_failed_cli_removes_old_success_and_preview_cannot_grade_scripted_results(self):
+    def test_failed_cli_removes_old_success(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'gc07.json';path.write_text('{"status":"mechanical_pass"}')
             result=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc07.py'),'--binary',str(Path(tmp)/'missing'),
                 '--evidence',str(path)],capture_output=True,text=True)
             self.assertNotEqual(result.returncode,0)
             self.assertFalse(path.exists())
-        with patch.object(journey,'validate_report',return_value={'receipts':30}) as validate:
-            preview=prepare_release_eval.prepare(dict(case_id='GC-07'))
-        validate.assert_called_once()
-        self.assertEqual(preview['judge_packets'],[])
-        self.assertIs(preview['eligible_for_grading'],False)
-        self.assertIsNone(preview['scores']);self.assertIsNone(preview['winner'])
-        with self.assertRaises(RuntimeError):prepare_release_eval.prepare(dict(case_id='GC-07',semantic_score=100))
 
 
 if __name__=='__main__':unittest.main()

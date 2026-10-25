@@ -12,7 +12,6 @@ make setup
 make build
 python3 scripts/verify_gc07.py --binary bin/erii --evidence evidence/gc07.json
 python3 scripts/verify_gc07.py --binary bin/erii --evidence evidence/gc07.json --validate
-python3 scripts/prepare_release_eval.py --input evidence/gc07.json --evidence evidence/gc07-preview.json
 ```
 
 Launch creates isolated stores, an explicit selected Fake profile, loopback
