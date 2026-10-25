@@ -15,6 +15,25 @@ import verify_suite
 
 
 class HealthTests(unittest.TestCase):
+    def test_morning_requires_each_original_context_and_model_delivery_agreement(self):
+        import json
+        _, variant, _, _ = journey.inputs('wording-1')
+        users=[variant['context']] + ['当前时间：'+e['at']+'。'+e['text'] for e in variant['events']]
+        state=dict(conversation=[dict(role='user',content=[dict(text=t)]) for t in users] +
+            [dict(role='assistant',content=[dict(text='reply'+str(i))]) for i in range(3)],artifact=[],generations=[
+                dict(status='completed',request_json=json.dumps(dict(messages=[dict(role='user',text=t)
+                    for t in users[:2+i//2]])),result_json=json.dumps(dict(text='reply'+str(i//2)))) for i in range(6)])
+        row=dict(variant=variant,safety=False,state=state,replay_state=copy.deepcopy(state),
+            restart=dict(boundary='after_generation_commit',returncode=-9,state=dict(generations=[state['generations'][0]])))
+        with patch.object(journey,'result',return_value={'assertions':{}}), patch.object(journey,'main_checks',return_value={}):
+            self.assertTrue(all(journey.morning_observe(row,'wording-1').values()))
+            for index in range(6):
+                changed=copy.deepcopy(row)
+                changed['state']['generations'][index]['request_json']='{"messages":[]}'
+                self.assertFalse(journey.morning_observe(changed,'wording-1')['context_from_original'])
+            changed=copy.deepcopy(row);changed['state']['generations'][-1]['result_json']='{"text":"forged"}'
+            self.assertFalse(journey.morning_observe(changed,'wording-1')['delivered_model_text'])
+
     def test_mechanical_preparation_preserves_the_existing_cli_packet_contract(self):
         import prepare_release_eval
         with patch.object(journey,'validate_report',return_value={'receipts':30}):

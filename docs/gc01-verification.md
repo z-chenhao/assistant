@@ -61,7 +61,7 @@ it does not replace or narrow the original scenario.
 `validate_report` recomputes all row assertions and requires all 30 ordered
 receipts, current source/binary identity, locks, cleanup and null grades. Its
 negative probes corrupt actual observed receipts: missing safety, changed input,
-duplicate Tool attempt, unsafe reply, extra health field, forged Tool ID, stale
+missing request context, model/delivery disagreement, duplicate Tool attempt, unsafe reply, extra health field, forged Tool ID, stale
 medication, false restart, revived owner, deleted-data leak, bad Artifact hash,
 rehashed causal claim and replay drift. A stored `true` assertion cannot override
 the recomputed native evidence. This is consistency checking; an author receipt

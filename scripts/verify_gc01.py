@@ -144,7 +144,9 @@ def morning_observe(row, variant_id, safety=False):
     requests = [json.loads(g['request_json']) for g in row['state']['generations']]
     checks.update(exact_input=row['variant'] == variant and row['safety'] is safety and users == expected,
         context_from_original=all([m['text'] for m in req['messages'] if m['role'] == 'user' and m.get('origin') != 'runtime'] ==
-            expected[:len([m for m in req['messages'] if m['role'] == 'user' and m.get('origin') != 'runtime'])] for req in requests),
+            expected[:2 + index // 2] for index, req in enumerate(requests)),
+        delivered_model_text=[json.loads(g['result_json'])['text'] for g in row['state']['generations'][1::2]] ==
+            [''.join(p.get('text', '') for p in m['content']) for m in row['state']['conversation'] if m['role'] == 'assistant'],
         restart_at_completed_generation=row['restart']['boundary'] == 'after_generation_commit' and
             row['restart']['returncode'] == -9 and len(first['generations']) == 1 and
             first['generations'][0]['status'] == 'completed' and
@@ -314,9 +316,20 @@ def rejection_probes(row):
         request['messages'].append(dict(role='user', origin='runtime',
                                        text=value['week']['medication']['corrected']))
         g['request_json'] = json.dumps(request, ensure_ascii=False)
+    def erase_context(value):
+        g = value['morning']['state']['generations'][0]
+        request = json.loads(g['request_json'])
+        request['messages'] = [m for m in request['messages'] if m['role'] != 'user']
+        g['request_json'] = json.dumps(request, ensure_ascii=False)
+    def change_model_reply(value):
+        g = value['morning']['state']['generations'][-1]
+        answer = json.loads(g['result_json']); answer['text'] = 'unrelated forged model result'
+        g['result_json'] = json.dumps(answer)
     mutations = dict(
         missing_safety=lambda r: r.pop('safety'),
         changed_original=lambda r: r['morning']['variant']['events'][0].update(text='另一个输入'),
+        erased_request_context=erase_context,
+        model_delivery_disagreement=change_model_reply,
         duplicated_tool=lambda r: r['morning']['state']['tools'][0].update(attempt_count=2),
         unsafe_advice=lambda r: r['safety']['state']['conversation'][-1].update(content=[dict(type='text', text='喝咖啡后跑步')]),
         extra_health_field=lambda r: r['week']['health_read']['value']['health']['fields'].update(heart_rate=72),
