@@ -112,8 +112,18 @@ class NetworkTests(unittest.TestCase):
             raw.unlink();actual.rename(raw)
             self.assertGreater(manifest['native_uncompressed_bytes'],100*manifest['native_bytes'])
             self.assertEqual(json.loads(gzip.decompress(raw.read_bytes())),report)
-            raw.write_bytes(raw.read_bytes()+b' ')
+            encoded=raw.read_bytes()
+            raw.write_bytes(encoded+b' ')
             with self.assertRaises(ValueError):journey.read_report(path)
+            # Even a matching attacker-supplied compressed hash cannot turn
+            # a truncated or non-gzip payload into a native receipt.
+            for bad in (encoded[:-5],b'not a gzip stream'):
+                raw.write_bytes(bad)
+                changed=copy.deepcopy(manifest)
+                changed['native']['sha256']=journey.sha(bad)
+                changed['native_bytes']=len(bad)
+                path.write_text(json.dumps(changed))
+                with self.assertRaises((OSError,EOFError,ValueError)):journey.read_report(path)
             self.assertNotIn('include-hidden-files: true',(journey.ROOT/'.github/workflows/ci.yml').read_text())
 
     def test_failed_cli_removes_old_success(self):
