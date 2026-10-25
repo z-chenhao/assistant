@@ -5,11 +5,14 @@ authored dispositions. Native observations remain supporting evidence; only the
 release decision path can consume independently acquired release receipts.
 """
 from collections import Counter
+import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 from release_receipts import strict_json
 
@@ -44,6 +47,41 @@ ORIGINAL_PACKAGE_HASHES = {
     'baseline-13': '933565336b762b2dec8e8dc2b9459fda3d41dc3c8515bdc8ccce9bced7729e01',
 }
 
+# Original merged ledger seals for the five demonstrated shared-reference
+# consumers. Refreshes cannot rewrite frozen notes, receipts, gaps or provenance.
+REFERENCE_LEDGER_ORIGINALS = {
+    'baseline-12': {
+        'commit': '49fc12899b3d07b5faee41c191bf9993217b7168',
+        'path': 'docs/audits/baseline-12.json',
+        'sha256': 'e8320e67006fd3c0517609fe6256f578a042394ba661dda60d5008ede9320368',
+        'content_sha256': '8876fee8d5b42b820544d22321731335166b89c56f4dc3ffd208fd0b04c5976c',
+    },
+    'baseline-13': {
+        'commit': '49fc12899b3d07b5faee41c191bf9993217b7168',
+        'path': 'docs/audits/baseline-13.json',
+        'sha256': '290b7cda73cacd979ac84022f4560c3a1e5a5a4abe8868a05d3cc17d4323f784',
+        'content_sha256': '5dedd28f05e620f8324ff15bf3c62d096e4c14dafefe33ffc7f87bf491ad9782',
+    },
+    'golden-common-01': {
+        'commit': '49fc12899b3d07b5faee41c191bf9993217b7168',
+        'path': 'docs/audits/golden-common-01.json',
+        'sha256': '263d478aa272f20092ed83434794cc01d23686c3cd2fc3c483c2be3114545f43',
+        'content_sha256': '7ef80a12ca25b5f703df6ca0dd1b35360c29a295685dbac44be2aba440453c17',
+    },
+    'golden-common-02': {
+        'commit': '49fc12899b3d07b5faee41c191bf9993217b7168',
+        'path': 'docs/audits/golden-common-02.json',
+        'sha256': 'e3a76b87bb643f334d999270b8a25de8a9d27439d8cc1f39c6fb3c621f8d5f52',
+        'content_sha256': '15b301f614532dade8c6526693d5b7bdb32a78f6970d2ad54a5edff6dd3742fb',
+    },
+    'golden-common-03': {
+        'commit': '49fc12899b3d07b5faee41c191bf9993217b7168',
+        'path': 'docs/audits/golden-common-03.json',
+        'sha256': '25f3d5f361718ec4e6452295f4d1917fb0f2750922210c62b592328b5d7a5bd9',
+        'content_sha256': '44801752156e998572d1d7e3e8c81c3ef12f9c55193cd29e37d8a74237a79ef0',
+    },
+}
+
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -65,11 +103,125 @@ def local_file(root, name):
     return path
 
 
-def git(root, *args):
-    result = subprocess.run(['git', '-C', str(root), *args], capture_output=True)
+def git(root, *args, input=None, env=None):
+    result = subprocess.run(['git', '-C', str(root), *args], input=input, env=env, capture_output=True)
     if result.returncode:
         raise ValueError('package Git binding rejected: ' + ' '.join(args))
     return result.stdout
+
+
+def source_git_proof(root, revision, references):
+    """Retain only the commit and path trees; unchanged blobs survive squash."""
+    directories = {''}
+    for ref in references:
+        path = Path(ref.partition('#')[0])
+        directories.update(p.as_posix() for p in path.parents if p.as_posix() != '.')
+    trees = {}
+    for directory in sorted(directories):
+        spec = revision + (':' + directory if directory else '^{tree}')
+        oid = git(root, 'rev-parse', spec).decode().strip()
+        trees[oid] = base64.b64encode(git(root, 'cat-file', 'tree', oid)).decode()
+    return dict(commit=base64.b64encode(git(root, 'cat-file', 'commit', revision)).decode(),
+                trees=trees)
+
+
+def check_source_git_proof(root, revision, proof, references):
+    """Verify source identity with native Git, then bind each file to live HEAD.
+
+    The proof is always checked, including before merge. No ancestry fallback or
+    missing-object exception is used. Writes stay in a disposable object store.
+    """
+    if (not isinstance(proof, dict) or set(proof) != {'commit', 'trees'} or
+            not isinstance(proof['trees'], dict) or not proof['trees']):
+        raise ValueError('missing source Git proof')
+    with tempfile.TemporaryDirectory(prefix='erii-audit-git-proof-') as temp:
+        store = Path(temp)
+        # Git environment/config must not redirect writes or let omitted proof
+        # objects resolve from the caller's object database or alternates.
+        isolated = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        isolated.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+        def object_git(*args, input=None):
+            return git(store, *args, input=input, env=isolated)
+        object_git('init', '--bare', '--object-format=sha1', '-q')
+        objects = [('commit', revision, proof['commit'])]
+        objects.extend(('tree', oid, raw) for oid, raw in proof['trees'].items())
+        for kind, oid, encoded in objects:
+            if not isinstance(oid, str) or not re.fullmatch(r'[0-9a-f]{40}', oid):
+                raise ValueError('invalid source Git object identity')
+            try:
+                raw = base64.b64decode(encoded, validate=True)
+            except (ValueError, TypeError) as error:
+                raise ValueError('invalid source Git object bytes') from error
+            actual = object_git('hash-object', '-w', '-t', kind, '--stdin', input=raw).decode().strip()
+            if actual != oid:
+                raise ValueError('source Git object hash mismatch')
+        for ref in references:
+            path = ref.partition('#')[0]
+            entry = object_git('ls-tree', '-z', revision, '--', path)
+            header, separator, name = entry.partition(b'\t')
+            fields = header.split()
+            if (not separator or name != path.encode() + b'\0' or len(fields) != 3 or
+                    fields[0] not in (b'100644', b'100755') or fields[1] != b'blob'):
+                raise ValueError('missing source Git file: ' + ref)
+            data = local_file(root, path).read_bytes()
+            oid = object_git('hash-object', '--stdin', input=data).strip()
+            if oid != fields[2] or entry != git(root, 'ls-tree', '-z', 'HEAD', '--', path):
+                raise ValueError('current Git blob mismatch: ' + ref)
+
+
+def reference_identities(root, ledger, verify_git=False):
+    """Keep original observations bound to old bytes after an explicit refresh."""
+    base = ledger['audited_base']
+    references = ledger['references']
+    maintenance = ledger.get('reference_maintenance')
+    original = {k: v for k, v in ledger.items() if k != 'reference_maintenance'}
+    seal = REFERENCE_LEDGER_ORIGINALS.get(ledger['package'])
+    # Removing the maintenance envelope must not reopen the old mutable-hash
+    # path. The untouched original ledger remains inspectable on original bytes.
+    if seal and frozen_digest(original) != seal['content_sha256']:
+        raise ValueError('original audit ledger changed')
+    current = {}
+    if maintenance is not None:
+        if maintenance.get('version') != 2:
+            raise ValueError('unsupported reference maintenance')
+        provenance = maintenance.get('original_ledger', {})
+        if provenance != REFERENCE_LEDGER_ORIGINALS.get(ledger['package']):
+            raise ValueError('missing original ledger provenance')
+        git(root, 'merge-base', '--is-ancestor', provenance['commit'], 'HEAD')
+        raw = git(root, 'show', provenance['commit'] + ':' + provenance['path'])
+        if digest(raw) != provenance['sha256'] or strict_json(raw) != original:
+            raise ValueError('original ledger Git blob mismatch')
+        update = maintenance.get('current', {})
+        revision = update.get('source_sha', '')
+        current = update.get('references', {})
+        if (not re.fullmatch(r'[0-9a-f]{40}', revision) or
+                update.get('scope') != 'reference_identity_only' or
+                update.get('binding') != 'source_commit_tree_and_HEAD_blob' or
+                not isinstance(update.get('reason'), str) or not update['reason'].strip() or
+                not current or not current.keys() <= references.keys() or
+                update.get('invalidated_observations') != sorted(ledger['observations'])):
+            raise ValueError('missing current identity revalidation or observation invalidation')
+    result = {}
+    for ref, value in references.items():
+        path, _, symbol = ref.partition('#')
+        data = local_file(root, path).read_bytes()
+        expected = current.get(ref, value)['sha256']
+        if digest(data) != expected:
+            raise ValueError('stale current reference: ' + ref)
+        if verify_git:
+            if digest(git(root, 'show', base + ':' + path)) != value['sha256']:
+                raise ValueError('audited Git blob mismatch: ' + ref)
+        if symbol and symbol not in data.decode():
+            raise ValueError('missing current symbol: ' + ref)
+        result[ref] = dict(historical_sha256=value['sha256'], current_sha256=expected,
+                           current_source_sha=revision if ref in current else base,
+                           source_git_proof_checked=ref in current,
+                           current_git_blob_checked=ref in current or verify_git,
+                           historical_git_blob_checked=verify_git,
+                           revalidation='reference_identity_only' if ref in current else 'unchanged')
+    if maintenance is not None:
+        check_source_git_proof(root, revision, update.get('git_proof'), current)
+    return result
 
 
 def audit_package(root, ledger, units, manifest=None, native_root=None, verify_git=False):
@@ -132,8 +284,8 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
     for block in frozen:
         if len(by_key.get(identity(block), [])) != 1:
             raise ValueError('changed or ambiguous frozen source block; reseal required: ' + str(block))
-    # Current evidence candidates must resolve at the audited Git revision and
-    # in this checkout. Historical fallback is deliberately unavailable here.
+    # Historical identities stay immutable. An explicit maintenance record may
+    # bind new current bytes, but never lends them an old native observation.
     base = ledger['audited_base']
     if verify_git:
         git(root, 'merge-base', '--is-ancestor', base, 'HEAD')
@@ -141,15 +293,7 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
         if digest(git(root, 'show', base + ':' + source)) != ledger['source_sha256']:
             raise ValueError('audited source hash mismatch')
     references = ledger['references']
-    for ref, value in references.items():
-        path, _, symbol = ref.partition('#')
-        data = local_file(root, path).read_bytes()
-        if digest(data) != value['sha256']:
-            raise ValueError('stale current reference: ' + ref)
-        if verify_git and digest(git(root, 'show', base + ':' + path)) != value['sha256']:
-            raise ValueError('audited Git blob mismatch: ' + ref)
-        if symbol and symbol not in data.decode():
-            raise ValueError('missing current symbol: ' + ref)
+    reference_report = reference_identities(root, ledger, verify_git)
     for number, pr in ledger['merged_prs'].items():
         if (pr['state'] != 'MERGED' or pr['number'] != int(number)
                 or pr['url'] != 'https://github.com/z-chenhao/erii/pull/' + number
@@ -259,5 +403,12 @@ def audit_package(root, ledger, units, manifest=None, native_root=None, verify_g
                 frozen_package_sha256=PACKAGE_HASHES[name],
                 manifest_checked=manifest is not None, native_bytes_checked=native_root is not None,
                 git_provenance_checked=verify_git,
+                current_reference_git_checked=ledger.get('reference_maintenance') is not None or verify_git,
+                reference_identities=reference_report,
+                observation_applicability={key: dict(
+                    status='historical_only' if ledger.get('reference_maintenance') else 'audited_identity_only',
+                    current_native_revalidated=False,
+                    reason='Native observations bind audited_base; identity checks never rerun commands.')
+                    for key in observations},
                 status='inconclusive', release_ready=False, verified_requirements=0,
                 gaps=gaps, observations=observations, reviews=reviews)

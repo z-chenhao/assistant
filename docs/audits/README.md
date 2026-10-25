@@ -1,5 +1,110 @@
 # Bounded baseline audits
 
+
+## Maintaining shared references (ERII-369)
+
+The five ledgers `baseline-12`, `baseline-13`, `golden-common-01`,
+`golden-common-02` and `golden-common-03` now have explicit
+`reference_maintenance` records. Their entire original content is independently
+sealed in `release_package.REFERENCE_LEDGER_ORIGINALS`, with the merged ledger's
+commit/path, byte hash and canonical JSON hash. Original frozen blocks, reference
+hashes, `audited_base`, native observations, merged PRs, limits and gaps remain
+unchanged. The current record covers the 14 references affected by GC-01 plus the CI
+workflow changed to supply the required Git history. Each snapshot binds its
+explicit committed SHA; the workflow is the first changed reference exercised
+by this repair itself. This does **not** validate
+GC-01 PR #65's changed bytes; that branch must refresh after merging this repair.
+
+A normal committed shared-code change must fail the audit until explicitly
+refreshed. From that same branch, prepare each affected ledger through the
+maintained command (repeat for the five names above):
+
+```sh
+python3 scripts/maintain_audit_references.py \
+  --ledger docs/audits/baseline-12.json \
+  --source-sha "$(git rev-parse HEAD)" \
+  --reason 'Recheck committed shared-code identities; native reruns remain required' \
+  --output evidence/baseline-12-proposal.json
+# Inspect the proposal, then explicitly replace only this ledger.
+cp evidence/baseline-12-proposal.json docs/audits/baseline-12.json
+make audit-baseline-12
+```
+
+The command discovers drift and retains the previously explicit reference scope.
+`--reference PATH[#SYMBOL]` may additionally select an unchanged reference.
+It writes only a disposable proposal under `evidence/`, removes stale output on
+failure, and never overwrites an input. Capture requires a committed source
+revision descending from the original merged ledger and reachable from HEAD.
+The original merged ledger must remain an ancestor of HEAD. Tests need its
+reachable history; CI fetches history in the two Python regression jobs and the providers CLI part.
+
+Maintenance envelope version 2 uses the explicit binding
+`source_commit_tree_and_HEAD_blob`. It retains the exact source SHA and base64
+Git commit/path-tree object bodies (no duplicate blob bodies). Every audit
+reconstructs those objects in a disposable bare object store with native Git,
+checks their object IDs, resolves each exact file path/mode, and compares its blob
+with both current HEAD's committed entry and the current file bytes. SHA256 and
+symbol checks remain mandatory. The original merged ledger's raw/canonical seals
+and Git blob checks are unchanged. Object-store cleanup is automatic; no network
+fetch or write to the user's Git objects occurs.
+
+A source commit need not be an ancestor of the squash result: squash preserves
+file objects while replacing commit ancestry. The full source commit/tree proof
+remains independently checkable even when a fresh clone has **no** source commit
+object. This is an explicit file-identity binding, not an ancestry claim or a
+fallback on missing evidence. All audits always check the proof, even before
+merge; missing/corrupt proof objects or a HEAD/blob/mode mismatch reject. The
+unreleased version-1 envelope is rejected and must be explicitly refreshed.
+The source SHA, reference hashes and all original historical identities in these
+five migrated records are retained.
+
+`audit_package` independently validates the original seal, merged ledger blob,
+source commit/tree proof, HEAD blob, current bytes and symbol on **every** maintained audit,
+including the ordinary CLI. Removing the envelope and rewriting original
+hashes still fails the independent seal. Its report exposes both reference hashes,
+`current_reference_git_checked` for the explicit snapshot and per-reference
+`current_git_blob_checked` / `historical_git_blob_checked` flags plus
+`source_git_proof_checked`. All old observations remain readable but have
+`observation_applicability.status=historical_only` and
+`current_native_revalidated=false`. A refresh runs no native commands. It never
+proves changed behavior, inherits PASS, fills a gap or certifies release. New
+native observations require separate execution and receipts in the consumer's
+acceptance evidence. Existing proof limits and routes still apply.
+
+`--verify-git` additionally retains the original audited-source ancestry, source
+blob and all historical reference/merged-PR checks. It is deliberately stricter
+than reference maintenance. Some existing `audited_base` commits predate squash
+merges and are not ancestors of main: that strong mode still rejects them.
+Maintenance does not silently turn historical identity checks into ancestry
+proof. Missing original manifests/native roots or rejected full ancestry remain
+explicit evidence gaps. Normal reference maintenance is not a repair of those
+gaps. `--require-complete` still exits 2; scores remain null.
+
+The isolated Git fixtures in `test_release_reference_maintenance.py` reproduce
+normal edits and a second edit, then reject forged hashes/SHAs/blobs, changed old
+receipts/limits/gaps/PRs, absent provenance/revalidation/invalidation, missing
+symbols, uncommitted bytes, duplicate frozen blocks and ambiguous source units.
+Run `python3 -m unittest discover -s scripts -p 'test_release_*.py'`.
+
+The maintained delivery-history harness drives all five real audit CLIs through
+the registered squash shape, a fresh clone with pre-squash source commits absent,
+rejected consumer drift, explicit consumer refresh, a real merge from advanced
+main, and another squash/fresh clone with the newly captured source absent:
+
+```sh
+python3 scripts/verify_audit_references.py --evidence evidence/audit-reference-history.json --raw-reports
+```
+
+Run after committing the repair: it validates the committed HEAD tree. The report
+records source/base/squash/merge IDs and 26 command outcomes, including the
+post-squash baseline-12 regression. Adjacent raw reports are retained when `--raw-reports` is requested. The
+registered providers `audit-references` gate emits compact success evidence. `RegisteredSquashAuditTests` includes the same path in the release/Python
+regressions; its disposable repositories and reports are cleaned. Neither the
+harness nor tests mutate the caller's branch or any remote reference. This
+mechanical history fixture certifies no product or release behavior.
+Remove disposable `evidence/*-proposal.json` and audit reports after inspecting
+or retaining them; never remove the original ledger or native evidence root.
+
 [golden-common-03](golden-common-03.md) records ERII-246's final 18 Golden
 common blocks: 13 reference links and five evaluation-boundary clauses. Its
 36 scoped duties preserve every background/deferred reason and all 21 mandatory

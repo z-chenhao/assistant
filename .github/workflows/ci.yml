@@ -29,6 +29,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # Maintained audit references check committed current/merged ledger blobs.
+          fetch-depth: 0
       - uses: ./.github/actions/ci-inputs
         with:
           frontend: "true"
@@ -64,6 +66,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # Maintained audit references check committed current/merged ledger blobs.
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .node-version
@@ -209,6 +213,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # The CLI part runs the committed audit-reference history gate.
+          fetch-depth: ${{ matrix.providerpart == 'cli' && '0' || '1' }}
       - uses: ./.github/actions/ci-inputs
         with:
           temporary-fixtures: "true"
