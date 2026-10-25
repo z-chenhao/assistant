@@ -1,5 +1,14 @@
 # Feature map
 
+## GC-04 deterministic travel journey (ERII-250)
+
+| Feature | Reach / authoritative entry | Evidence and cleanup |
+| --- | --- | --- |
+| Existing travel / Steering / classification | `verify_gc04.py`; CLI/TUI Main → Task search/manage → held Root → MCP / QuickJS → Artifact / Reporter / Delivery | Six locked variants × five serial rounds; two existing Tasks, completed France append, paused NZ, same-Root Steering, new Root for grouping, immutable confirmed sources, independent ETA and reopened classified plans. Search uses the known completed status; language selection remains ungraded. |
+| Recovery / recomputation | Same `security` gate; `--validate`; `prepare_release_eval.py`; `test_gc04.py` | Input/report SIGKILL, exact replay, frozen model/schema/epoch, bounded paused old Root, 25 corruption probes including seven synchronized native/Artifact mutations; source/binary/environment and cleanup identity; compact manifest with full hidden local bytes. No Child/booking/approval action is requested; existing dedicated safety gates remain required. Semantic score null, release false; model/L2 gaps stay with ERII-223. |
+
+See [frozen source mapping and proof limits](../docs/gc04-verification.md).
+
 ## GC-03 complete deterministic finance journey (ERII-249)
 
 | Feature | Reach / authoritative entry | Evidence and cleanup |

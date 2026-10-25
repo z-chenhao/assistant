@@ -29,7 +29,7 @@ and `run*cases` harness must be registered; `make test` rejects inventory drift.
 | Proactive work and task scenarios | runtime | automation, cases, task-cases |
 | JavaScript, replay and coding | codemode | codemode, code-recovery, core-cases |
 | Computer lifecycle and input | codemode | computer, computer-use |
-| Memory, Tools and Artifact security | security | memory-maintenance, recall, tools, artifacts, gc03 |
+| Memory, Tools and Artifact security | security | memory-maintenance, recall, tools, artifacts, gc03, gc04 |
 | Delivery, Web and Feishu | delivery | delivery, channels |
 | Exact health, goals, communication, monitoring and research journeys | communication | gc01, gc02, gc12, gc08, gc14, gc16 |
 | Personal and multimodal journeys | personal | m6-cases |
