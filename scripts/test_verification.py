@@ -241,7 +241,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('test "$PART_RESULT" = success', race_join)
         self.assertIn('scripts/ci_race_join.py', race_join)
         self.assertIn('evidence-race-part-*', race_join)
-        self.assertIn("sandbox: ${{ matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
+        self.assertIn("sandbox: ${{ matrix.shard == 'runtime' || matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
         self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 7)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
