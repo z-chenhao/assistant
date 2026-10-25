@@ -65,3 +65,14 @@ Pi Bridge with an operator-prepared profile. It sends no scripted plans, expecte
 answers or assertions. See [unscripted operations](guides/unscripted-evals.md).
 Its Memory/schedule/logical-clock adapter remains incomplete: these input fragments
 are ineligible for grading. This PR does not close that parent release gap.
+
+The public `--evidence` file is a small `gc02_native_manifest`. Full native JSON
+lives beside it under `.gc02-native/`, with a relative path, byte count and
+SHA256 in the manifest. `--validate` and the preparation CLI require those bytes,
+reject unsafe/symlink paths and hash/summary drift, then recompute every assertion.
+A downloaded manifest without native bytes is inconclusive, never a passed Case.
+The pinned CI uploader defaults `include-hidden-files=false`: it uploads the
+small manifest, logs and source-bound suite report, and excludes raw GC-02 state.
+Builder retains the complete directory and executable in the registered durable
+local evidence root for same-host independent review; CI summaries alone do not
+replace that evidence or a clean exact-SHA rerun.

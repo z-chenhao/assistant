@@ -18,6 +18,7 @@ import threading
 from case_runner import load_contract, variants
 from fixture_pool import run_cases
 from release_audit import inventory
+from release_receipts import Receipts, strict_json
 from run_m6_cases import (personal, state, execute, save_report, remember,
                           open_bytes, no_external_writes)
 from terminal_driver import Terminal
@@ -405,6 +406,46 @@ def validate_report(report, binary=ROOT / 'bin/erii'):
     return dict(case_id='GC-02',status='mechanical_pass',semantic_score=None,eligible_for_grading=False,receipts=len(rows),frozen_blocks=24)
 
 
+def file_hash(path):
+    value = hashlib.sha256()
+    with path.open('rb') as source:
+        for block in iter(lambda: source.read(1 << 20), b''):
+            value.update(block)
+    return value.hexdigest()
+
+
+def retain_report(path, report):
+    # The pinned CI uploader excludes hidden files. Keep all native bytes on
+    # disk; only the small public manifest is collected/uploaded automatically.
+    raw = path.parent / '.gc02-native' / path.name
+    raw.parent.mkdir(parents=True,exist_ok=True)
+    raw.write_text(json.dumps(report,ensure_ascii=False)+'\n')
+    summary = dict(case_id='GC-02',status=report['status'],semantic_score=None,eligible_for_grading=False,
+        receipts=len(report['results']),frozen_blocks=24,cleanup=report['cleanup'],
+        source_sha=report['identity']['source_before']['sha'],binary_sha256=report['identity']['binary_sha256'])
+    manifest = dict(kind='gc02_native_manifest',version=1,summary=summary,
+        native=dict(path=str(raw.relative_to(path.parent)),sha256=file_hash(raw)),native_bytes=raw.stat().st_size,
+        proof_limit='Native bytes required for recomputation; summary alone cannot certify a Case or release.')
+    path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
+    return manifest
+
+
+def read_report(path):
+    manifest = strict_json(path.read_bytes())
+    require(set(manifest) == {'kind','version','summary','native','native_bytes','proof_limit'} and
+        manifest['kind'] == 'gc02_native_manifest' and type(manifest['version']) is int and manifest['version'] == 1,
+        'GC-02 native manifest required')
+    raw = Receipts(path.parent,None).bytes(manifest['native'])
+    require(type(manifest['native_bytes']) is int and len(raw) == manifest['native_bytes'], 'GC-02 native size mismatch')
+    report = strict_json(raw)
+    expected = dict(case_id='GC-02',status=report['status'],semantic_score=None,eligible_for_grading=False,
+        receipts=len(report['results']),frozen_blocks=24,cleanup=report['cleanup'],
+        source_sha=report['identity']['source_before']['sha'],binary_sha256=report['identity']['binary_sha256'])
+    require(manifest['summary'] == expected and all(type(manifest['summary'][k]) is type(v) for k,v in expected.items()),
+        'GC-02 manifest/native summary drift')
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,required=True)
@@ -413,9 +454,11 @@ def main():
     parser.add_argument('--variant-jobs',type=int,choices=(1,2,4),default=2)
     args = parser.parse_args(); binary = args.binary.resolve()
     if args.validate:
-        print(json.dumps(validate_report(json.loads(args.evidence.read_text()),binary))); return
+        print(json.dumps(validate_report(read_report(args.evidence),binary))); return
     args.evidence.unlink(missing_ok=True)
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
+    native_folder = args.evidence.parent / '.gc02-native'
+    native_folder.mkdir(exist_ok=True)
     report = dict(case_id='GC-02',status='inconclusive',semantic_score=None,eligible_for_grading=False,
         fixture_lock=load()[1],m6_lock=load_contract(ROOT,'m6-v1')[2],results=[],cleanup=False,
         identity=dict(source_before=source_identity(),binary_sha256=sha(binary.read_bytes()),environment=dict(
@@ -429,7 +472,7 @@ def main():
     mutex = threading.Lock()
     def series(variant_id):
         for repetition in range(1,REPEATS+1):
-            row = drive(binary,(variant_id,repetition),args.evidence.with_name(args.evidence.stem+'-'+variant_id+'.failure.json'))
+            row = drive(binary,(variant_id,repetition),native_folder / (args.evidence.stem+'-'+variant_id+'.failure.json'))
             with mutex: report['results'].append(row)
             print((variant_id,repetition),{k:v for k,v in row['assertions'].items() if not v},flush=True)
             require(all(row['assertions'].values()),'GC-02 native assertion failure')
@@ -445,7 +488,7 @@ def main():
         raise
     finally:
         report['results'].sort(key=lambda r:order[r['variant_id'],r['repetition']])
-        args.evidence.write_text(json.dumps(report,ensure_ascii=False)+'\n')
+        retain_report(args.evidence,report)
     print(json.dumps(summary))
 
 

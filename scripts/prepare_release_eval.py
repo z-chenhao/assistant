@@ -290,7 +290,11 @@ def main():
     if not output.is_relative_to((ROOT / 'evidence').resolve()):
         parser.error('--evidence must be under repository evidence/')
     output.unlink(missing_ok=True)
-    prepared = prepare(json.loads(args.input.read_text()))
+    report = json.loads(args.input.read_text())
+    if report.get('kind') == 'gc02_native_manifest':
+        from verify_gc02 import read_report
+        report = read_report(args.input)
+    prepared = prepare(report)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(prepared, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(dict(status=prepared['status'], packets=len(prepared['judge_packets']),

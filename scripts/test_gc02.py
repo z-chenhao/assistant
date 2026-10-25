@@ -72,6 +72,36 @@ class GoalsTests(unittest.TestCase):
             with patch.object(journey,'observe',return_value={'observed':False}):
                 with self.assertRaises(RuntimeError):journey.validate_report(report,binary)
 
+    def test_small_manifest_keeps_complete_native_bytes_and_rejects_drift_and_unsafe_paths(self):
+        report=dict(status='mechanical_pass',cleanup=True,results=[{'payload':'NATIVE_ONLY_SENTINEL' * 100000}],
+            identity=dict(source_before=dict(sha='a'*40),binary_sha256='b'*64))
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'gc02.json'
+            manifest=journey.retain_report(path,report)
+            self.assertLess(path.stat().st_size,2048)
+            self.assertNotIn('NATIVE_ONLY_SENTINEL',path.read_text())
+            raw=path.parent/manifest['native']['path']
+            self.assertGreater(raw.stat().st_size,1<<20)
+            self.assertEqual(raw.parent.name,'.gc02-native')
+            self.assertEqual(journey.read_report(path),report)
+            mutations=[lambda m:m['summary'].update(receipts=30),lambda m:m['summary'].update(semantic_score=100),
+                lambda m:m['summary'].update(cleanup=1),lambda m:m['native'].update(sha256='0'*64),
+                lambda m:m['native'].update(path='../outside.json'),lambda m:m['native'].update(path=str(raw)),
+                lambda m:m.update(native_bytes=True),lambda m:m.update(native_bytes=0),lambda m:m.update(version=True)]
+            for mutate in mutations:
+                changed=copy.deepcopy(manifest);mutate(changed);path.write_text(json.dumps(changed))
+                with self.assertRaises((ValueError,RuntimeError)):journey.read_report(path)
+            path.write_text(json.dumps(manifest))
+            actual=raw.with_suffix('.saved');raw.rename(actual);raw.symlink_to(actual)
+            with self.assertRaises(ValueError):journey.read_report(path)
+            raw.unlink();actual.rename(raw)
+            raw.write_text(raw.read_text()+' ')
+            with self.assertRaises(ValueError):journey.read_report(path)
+            # CI retains the public hash manifest while the pinned uploader
+            # excludes dot-directories by default; never opt in to raw upload.
+            workflow=(journey.ROOT/'.github/workflows/ci.yml').read_text()
+            self.assertNotIn('include-hidden-files: true',workflow)
+
     def test_preview_never_constructs_judge_packets_or_scores_for_scripted_run(self):
         with patch.object(journey,'validate_report',return_value={'receipts':30}) as validate:
             value=prepare_release_eval.prepare(dict(case_id='GC-02'))
