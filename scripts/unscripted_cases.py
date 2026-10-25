@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS = {f'GC-{n:02}': 'm6-v1' for n in (1, 2, 3, 4, 5, 6, 7, 10, 13, 15, 18)}
 INPUTS['GC-09'] = 'm1-v2'
 GAPS = {
-    'GC-01': 'health connector, durable memory and safety journey',
+    'GC-01': 'health connector and durable-memory adapter/clinical quality; --gc01-journey supplies week or safety inputs only',
     'GC-02': 'memory, scheduled quarterly follow-up and logical-clock driver',
     'GC-03': 'asset connector and correction/forget journey',
     'GC-04': 'travel files, calendar approvals and recovery journey',
@@ -56,7 +56,7 @@ def matrix():
                        missing=GAPS[case]) for case in sorted(CASES)}
 
 
-def inputs(case_id, variant_id):
+def inputs(case_id, variant_id, journey=None):
     require(case_id in INPUTS, 'ineligible: missing adapter: ' + GAPS[case_id])
     dataset, _, lock = load_contract(ROOT, INPUTS[case_id])
     case = next(c for c in dataset['cases'] if c['case_id'] == case_id)
@@ -64,10 +64,16 @@ def inputs(case_id, variant_id):
     require(variant is not None, 'unknown variant')
     # Gold, assertions, required_text, max_questions, wait_for, script plans and
     # expected state never enter the model. Noise/order use the maintained code.
-    return dict(case_id=case_id, case_version=case['version'], variant_id=variant_id,
+    value = dict(case_id=case_id, case_version=case['version'], variant_id=variant_id,
                 seed=variant['seed'], clock=variant['clock'], context=variant['context'],
                 events=[dict(at=e['at'], text=e['text']) for e in variant['events']],
                 fixture_digest=variant['fixture_digest'], lock=lock)
+    if journey is not None:
+        require(case_id == 'GC-01' and journey in ('week', 'safety'), 'GC-01 journey only')
+        from verify_gc01 import journey_inputs
+        value['events'], value['journey_lock'] = journey_inputs(variant_id, journey == 'safety')
+        value['journey'] = journey
+    return value
 
 
 def source_identity():
@@ -147,7 +153,7 @@ def configuration(path):
     return value
 
 
-def freeze(h, case_id, variant_id, kind, arm, repetition, seconds):
+def freeze(h, case_id, variant_id, kind, arm, repetition, seconds, journey=None):
     require(not rows(h.root, 'run') and not rows(h.root, 'main_input'), 'dedicated empty evaluation root required')
     config = configuration(h.config)
     profile = selected(h)
@@ -159,7 +165,7 @@ def freeze(h, case_id, variant_id, kind, arm, repetition, seconds):
     require((arm == 'account') == (profile['provider_kind'] == 'openai_account'), 'arm/profile mismatch')
     return dict(version=1, status='frozen', source=source_identity(),
         binary_sha256=hashed(h.binary.read_bytes()), configuration_sha256=hashed(h.config.read_bytes()),
-        configuration=config, profile=profile, input=inputs(case_id, variant_id),
+        configuration=config, profile=profile, input=inputs(case_id, variant_id, journey),
         execution_kind=kind, arm=arm, repetition=repetition, wall_budget_seconds=seconds,
         support=matrix(), scope='input_fragment', eligible_for_grading=False,
         seed_policy='fixture seed is recorded; provider RNG seed is unsupported, never claimed deterministic')
@@ -231,7 +237,8 @@ def execute(h, plan, output):
     admissions = []
     try:
         require(plan == freeze(h, plan['input']['case_id'], plan['input']['variant_id'],
-            plan['execution_kind'], plan['arm'], plan['repetition'], plan['wall_budget_seconds']), 'frozen conditions drift')
+            plan['execution_kind'], plan['arm'], plan['repetition'], plan['wall_budget_seconds'],
+            plan['input'].get('journey')), 'frozen conditions drift')
         item = plan['input']
         # Same ingress mechanics as run_cases: background is explicit user data.
         h.send('fixture-context', item['context'])
@@ -310,6 +317,7 @@ def main(argv=None):
     parser.add_argument('--output', type=Path, required=True, help='New directory, outside the prepared root')
     parser.add_argument('--case', choices=sorted(CASES), default='GC-09')
     parser.add_argument('--variant', default='wording-1')
+    parser.add_argument('--gc01-journey', choices=('week', 'safety'), help='GC-01 user inputs only; remains ineligible')
     parser.add_argument('--arm', choices=('local', 'account'), default='local')
     parser.add_argument('--repetition', type=int, choices=range(1, 6), default=1)
     parser.add_argument('--execution-kind', choices=('live_model', 'loopback_mechanism'), default='live_model')
@@ -345,7 +353,8 @@ def main(argv=None):
                                   plan['wall_budget_seconds'] if plan else args.seconds)
             try:
                 if args.action == 'freeze':
-                    plan = freeze(h, args.case, args.variant, args.execution_kind, args.arm, args.repetition, args.seconds)
+                    plan = freeze(h, args.case, args.variant, args.execution_kind, args.arm, args.repetition, args.seconds,
+                                  args.gc01_journey)
                     file_receipt(args.output, 'plan.json', plan)
                     print(json.dumps(dict(status=plan['status'], eligible_for_grading=False)))
                     return 2 if plan['status'] != 'frozen' else 0

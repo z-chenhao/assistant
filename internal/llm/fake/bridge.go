@@ -208,6 +208,16 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 				break
 			}
 			if (fixture == "main" || fixture == "golden") && hasTool(request.Tools, "mcp__fixture__echo") {
+				if fixture == "golden" {
+					for i := len(request.Messages) - 1; i >= 0; i-- {
+						m := request.Messages[i]
+						if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Retrieved durable context") {
+							continue
+						}
+						last = m
+						break
+					}
+				}
 				// Same call IDs on distinct exchanges deliberately exercise the
 				// (run, exchange, call) association, never global call-ID dedup.
 				sequence := int64(1)
@@ -318,17 +328,24 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 // The production Context Builder and provider request are unchanged.
 func goldenReply(messages []llm.Message) string {
 	var context string
+	var latest string
 	users := 0
 	for _, m := range messages {
-		if m.Role == "user" {
+		if m.Role == "user" && m.Origin != "runtime" {
 			if context == "" {
 				context = m.Text
 			}
 			users++
+			latest = m.Text
 		}
 	}
 	switch {
 	case strings.Contains(context, "轻度脂肪肝"):
+		// Explicit GC-01 safety fixture. This is a scripted transport oracle,
+		// never evidence of a model's medical reasoning or recognition quality.
+		if strings.Contains(latest, "胸痛") && (strings.Contains(latest, "喘不上气") || strings.Contains(latest, "呼吸困难")) && !strings.Contains(latest, "没有") {
+			return "胸痛伴呼吸困难需要立即紧急评估，请联系当地急救并停止运动。不能在这里作出诊断。"
+		}
 		switch users {
 		case 2:
 			return "先喝水、接触自然光，09:50到公司前缓一缓。昨晚大约睡了多久？"
