@@ -14,7 +14,7 @@ import zipfile
 
 import ci_profile as profile
 from evidence import artifact_archive, inventory
-from verify_suite import SHARDS, CODEMODE_PARTS, PROVIDER_PARTS, codemode_gates, personal_gates, provider_gates
+from verify_suite import SHARDS, CODEMODE_PARTS, PROVIDER_PARTS, COMMUNICATION_PARTS, codemode_gates, personal_gates, provider_gates, communication_gates
 import m6_report
 import ci_race_join
 from ci_gate import REQUIRED
@@ -81,7 +81,7 @@ def collect(repo, key, root=None, max_bytes=1 << 20, metadata_only=False):
 
 
 def topology(text=None):
-    """Read the maintained workflow's small, literal single-axis job matrices.
+    """Read maintained literal matrices, including fixed communication parts.
 
     Deliberately reject unsupported syntax instead of approximating YAML or
     maintaining another manually synchronized required-job table.
@@ -96,6 +96,21 @@ def topology(text=None):
         if not match:
             raise ValueError('workflow job name missing')
         name = match[1]
+        if key == 'verify':
+            expected_name = "Verification (${{ matrix.shard }}${{ matrix.communicationpart && format('/{0}', matrix.communicationpart) || '' }})"
+            match = re.search(r'^      matrix:\n(.*?)(?=^    steps:)', block, re.M | re.S)
+            base = sorted(set(SHARDS) - {'codemode', 'personal', 'providers', 'communication'})
+            values = re.findall(r'^        shard: (\[.*\])$', block, re.M)
+            if len(values) != 1 or set(json.loads(values[0])) != set(base) or len(json.loads(values[0])) != len(base):
+                raise ValueError('workflow and verification inventory drift')
+            literal = '        shard: ' + values[0] + '\n        include:\n' + ''.join(
+                '          - shard: communication\n            communicationpart: ' + p + '\n'
+                for p in COMMUNICATION_PARTS)
+            if name != expected_name or not match or match[1] != literal:
+                raise ValueError('unsupported or incomplete communication matrix')
+            names.extend('Verification (' + v + ')' for v in json.loads(values[0]))
+            names.extend('Verification (communication/' + p + ')' for p in COMMUNICATION_PARTS)
+            continue
         axis = re.findall(r'\$\{\{ matrix\.([a-z0-9_]+) \}\}', name)
         if axis:
             if len(axis) != 1:
@@ -106,7 +121,8 @@ def topology(text=None):
             values = json.loads(values[0])
             expected = (set(SHARDS) - {'codemode', 'personal', 'providers'} if key == 'verify' else
                         set(CODEMODE_PARTS) if key == 'codemode' else
-                        set(m6_report.PARTS) if key == 'personal' else
+                        {'memory', 'network', 'booking'} if key == 'personal' else
+                        set(m6_report.PARTS) - {'memory', 'network', 'booking'} if key == 'personal_deferred' else
                         set(PROVIDER_PARTS) if key == 'providers' else
                         set(ci_race_join.PARTS) if key == 'race' else set())
             if set(values) != expected or len(values) != len(expected):
@@ -172,23 +188,41 @@ def validate(data, source, workflow='ci.yml'):
     for shard, gates in SHARDS.items():
         report = reports.get('suite-' + shard + '.json', {})
         rows = suite(report, shard, gates)
-        if shard == 'providers':
+        if shard in ('providers', 'communication'):
+            expected_parts = PROVIDER_PARTS if shard == 'providers' else COMMUNICATION_PARTS
+            part_gates = provider_gates if shard == 'providers' else communication_gates
+            part_field = 'provider_part' if shard == 'providers' else 'communication_part'
             parts = report.get('parts', {})
-            if set(parts) != set(PROVIDER_PARTS):
-                errors.append('providers: missing or extra joined part')
+            if set(parts) != set(expected_parts):
+                errors.append(shard + ': missing or extra joined part')
             members = []
-            for part in PROVIDER_PARTS:
+            for part in expected_parts:
                 fragment = parts.get(part, {})
-                members.extend(suite(fragment, shard, provider_gates(part), part))
-                if (fragment.get('provider_part') != part or
+                members.extend(suite(fragment, shard, part_gates(part), part))
+                if (fragment.get(part_field) != part or
                         any(fragment.get(k) != report.get(k) for k in
                             ('source_sha', 'source_diff_sha256', 'binary_sha256', 'workflow_sha'))):
-                    errors.append('providers: part identity drift')
+                    errors.append(shard + ': part identity drift')
             order = {(g.name, n): i for i, (g, n) in enumerate(
                 (g, n) for g in gates for n in range(1, g.attempts + 1))}
             members.sort(key=lambda r: order.get((r.get('gate'), r.get('attempt')), -1))
             if rows != members:
-                errors.append('providers: reconstructed join inventory drift')
+                errors.append(shard + ': reconstructed join inventory drift')
+            if shard == 'communication':
+                from ci_communication import check_receipts, fixtures, IDENTITY
+                manifests = report.get('native_receipts', {})
+                if set(manifests) != set(expected_parts):
+                    errors.append('communication: missing native manifests')
+                for part in expected_parts:
+                    manifest = manifests.get(part, {})
+                    fragment = parts.get(part, {})
+                    if (manifest.get('fixtures') != fixtures() or
+                            manifest.get('identity') != {k: fragment.get(k) for k in IDENTITY}):
+                        errors.append('communication: native identity or fixture drift')
+                    try:
+                        check_receipts(manifest.get('receipts', []), communication_gates(part))
+                    except (ValueError, KeyError, TypeError):
+                        errors.append('communication: failed or incomplete native receipts')
             continue
         if shard not in ('codemode', 'personal'):
             continue

@@ -112,6 +112,16 @@ def provider_gates(part):
     return tuple(g for g in SHARDS['providers'] if (g.name == 'models') == (part == 'models'))
 
 
+COMMUNICATION_PARTS = ('gc01', 'gc02', 'channels')
+
+
+def communication_gates(part):
+    if part not in COMMUNICATION_PARTS:
+        raise ValueError('unknown communication part')
+    return tuple(g for g in SHARDS['communication'] if g.name == part or
+                 (part == 'channels' and g.name not in ('gc01', 'gc02')))
+
+
 def personal_gates(part):
     if part not in m6_report.PARTS:
         raise ValueError('unknown M6 part')
@@ -352,17 +362,18 @@ def main():
     parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
     parser.add_argument('--provider-part', choices=PROVIDER_PARTS)
+    parser.add_argument('--communication-part', choices=COMMUNICATION_PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
     parser.add_argument("--binary", type=Path, default=Path("bin/erii"))
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.list:
-        if args.gate or args.codemode_part or args.personal_part or args.provider_part:
+        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part:
             parser.error('--list cannot be combined with gate/part execution')
         print(json.dumps([row for row in catalogue() if not args.shard or row['shard'] == args.shard], indent=2))
         return 0
-    if args.gate and (args.codemode_part or args.personal_part or args.provider_part):
+    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part):
         parser.error('--gate cannot be combined with a CI part')
     plans = select_gates(parser, args.shard, args.gate)
     if args.codemode_part and args.shard != 'codemode':
@@ -371,6 +382,8 @@ def main():
         parser.error('--personal-part requires --shard personal')
     if args.provider_part and args.shard != 'providers':
         parser.error('--provider-part requires --shard providers')
+    if args.communication_part and args.shard != 'communication':
+        parser.error('--communication-part requires --shard communication')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -388,7 +401,9 @@ def main():
         plans['personal'] = personal_gates(args.personal_part)
     if args.provider_part:
         plans['providers'] = provider_gates(args.provider_part)
-    part = args.codemode_part or args.personal_part or args.provider_part
+    if args.communication_part:
+        plans['communication'] = communication_gates(args.communication_part)
+    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part
     report_suffix = (args.shard or 'all') + ('-' + part if part else '')
     if args.gate:
         # Focused runs cannot overwrite or masquerade as a complete shard verdict.
@@ -446,7 +461,7 @@ def main():
                   gate_jobs=args.gate_jobs, selected_gates=args.gate,
                   complete_inventory=not bool(args.gate or part),
                   codemode_part=args.codemode_part, personal_part=args.personal_part,
-                  provider_part=args.provider_part,
+                  provider_part=args.provider_part, communication_part=args.communication_part,
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),
                   binary_sha256=binary_digest,

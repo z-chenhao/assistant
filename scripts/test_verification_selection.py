@@ -73,8 +73,8 @@ class SelectionTests(unittest.TestCase):
                 self.assertTrue(all(r['owned_group_drained'] for r in report['shards']['security']))
 
     def test_ci_parts_cannot_mix_with_focused_selection(self):
-        for part in ('--codemode-part', '--personal-part', '--provider-part'):
-            with patch.object(sys, 'argv', ['verify_suite.py', '--gate', 'main', part, {'--codemode-part': 'control', '--personal-part': 'context', '--provider-part': 'cli'}[part]]), \
+        for part in ('--codemode-part', '--personal-part', '--provider-part', '--communication-part'):
+            with patch.object(sys, 'argv', ['verify_suite.py', '--gate', 'main', part, {'--codemode-part': 'control', '--personal-part': 'context', '--provider-part': 'cli', '--communication-part': 'gc01'}[part]]), \
                  contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit) as error:
                     suite.main()
