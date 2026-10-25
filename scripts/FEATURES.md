@@ -1,5 +1,14 @@
 # Feature map
 
+## Shared audit reference maintenance (ERII-369)
+
+| Feature | Reach / authoritative entry | Evidence and limits |
+| --- | --- | --- |
+| Explicit current identity refresh | `maintain_audit_references.py --ledger ... --source-sha FULL_SHA --reason ... --output evidence/proposal.json`; `release_package.reference_identities` | Launch/Doctor require committed code and the sealed original merged ledger; Drive prepares a separate proposal and the existing audit CLI rechecks it; Evidence exposes historical/current hashes, current Git checks and historical-only observations; Cleanup removes disposable proposals/reports. Five demonstrated ledgers, 14 GC-01 references plus the CI history prerequisite. Native commands are never rerun by identity maintenance. |
+| Drift, tamper and provenance rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_reference_maintenance.py` | Independent local Git histories reject omitted revalidation/invalidation, altered original notes/receipts/gaps, wrong SHA/blob/hash, missing symbol and repeated drift; frozen-source uniqueness stays strict. Strong audited-source ancestry is unchanged, including rejection of squashed historical bases. No requirement or release certification. |
+
+See [maintenance procedure and proof limits](../docs/audits/README.md#maintaining-shared-references-erii-369).
+
 ## Frozen Golden common-03 audit (ERII-246)
 
 | Feature | Reach / authoritative entry | Evidence and limits |

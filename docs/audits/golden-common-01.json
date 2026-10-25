@@ -6873,5 +6873,41 @@
         "scoring-contracts"
       ]
     }
-  ]
+  ],
+  "reference_maintenance": {
+    "version": 1,
+    "original_ledger": {
+      "commit": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "path": "docs/audits/golden-common-01.json",
+      "sha256": "263d478aa272f20092ed83434794cc01d23686c3cd2fc3c483c2be3114545f43",
+      "content_sha256": "7ef80a12ca25b5f703df6ca0dd1b35360c29a295685dbac44be2aba440453c17"
+    },
+    "current": {
+      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "scope": "reference_identity_only",
+      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "references": {
+        "scripts/prepare_release_eval.py": {
+          "sha256": "fb93cbd87ba1660e104f88b9ac4dfefa73cb4c8b82209bcbfef772d5fcd8c4ec"
+        },
+        "scripts/run_m6_cases.py": {
+          "sha256": "a1b394bf4dae4f278baba9788de186b7573649a95d96dc79b5bb8664df97b1d2"
+        },
+        "scripts/unscripted_cases.py": {
+          "sha256": "55f4d66649836c162f5bf2bcfcf7ac5afb567669f7b456ba7fdff3a2e9d15300"
+        },
+        "scripts/verify_unscripted_cases.py": {
+          "sha256": "2f0c783efdbf54477a8b41a3f7e4d1e3b077a5dc8747ac01184e889b049ae14c"
+        }
+      },
+      "invalidated_observations": [
+        "fixture-contracts",
+        "judge-packets",
+        "release-contracts",
+        "scoring-contracts",
+        "unscripted-cli",
+        "unscripted-contracts"
+      ]
+    }
+  }
 }

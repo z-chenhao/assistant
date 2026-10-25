@@ -1,5 +1,72 @@
 # Bounded baseline audits
 
+
+## Maintaining shared references (ERII-369)
+
+The five ledgers `baseline-12`, `baseline-13`, `golden-common-01`,
+`golden-common-02` and `golden-common-03` now have explicit
+`reference_maintenance` records. Their entire original content is independently
+sealed in `release_package.REFERENCE_LEDGER_ORIGINALS`, with the merged ledger's
+commit/path, byte hash and canonical JSON hash. Original frozen blocks, reference
+hashes, `audited_base`, native observations, merged PRs, limits and gaps remain
+unchanged. The current record covers the 14 references affected by GC-01 plus the CI
+workflow changed to supply the required Git history. Each snapshot binds its
+explicit committed SHA; the workflow is the first changed reference exercised
+by this repair itself. This does **not** validate
+GC-01 PR #65's changed bytes; that branch must refresh after merging this repair.
+
+A normal committed shared-code change must fail the audit until explicitly
+refreshed. From that same branch, prepare each affected ledger through the
+maintained command (repeat for the five names above):
+
+```sh
+python3 scripts/maintain_audit_references.py \
+  --ledger docs/audits/baseline-12.json \
+  --source-sha "$(git rev-parse HEAD)" \
+  --reason 'Recheck committed shared-code identities; native reruns remain required' \
+  --output evidence/baseline-12-proposal.json
+# Inspect the proposal, then explicitly replace only this ledger.
+cp evidence/baseline-12-proposal.json docs/audits/baseline-12.json
+make audit-baseline-12
+```
+
+The command discovers drift and retains the previously explicit reference scope.
+`--reference PATH[#SYMBOL]` may additionally select an unchanged reference.
+It writes only a disposable proposal under `evidence/`, removes stale output on
+failure, and never overwrites an input. The original merged ledger and current committed blobs,
+full source SHAs, ancestry, current bytes and symbols must resolve locally;
+missing Git objects fail closed without fetching. The original merged ledger
+must be an ancestor of the new code revision, which must be an ancestor of HEAD.
+Tests that consume maintained ledgers therefore need reachable Git history;
+CI fetches it only in the two jobs running Python regressions.
+
+`audit_package` independently validates the original seal, merged ledger blob,
+current SHA/ancestry/blob, current bytes and symbol on **every** maintained audit,
+including the ordinary CLI. Its report exposes both reference hashes and
+`current_reference_git_checked`. All old observations remain readable but have
+`observation_applicability.status=historical_only` and
+`current_native_revalidated=false`. A refresh runs no native commands. It never
+proves changed behavior, inherits PASS, fills a gap or certifies release. New
+native observations require separate execution and receipts in the consumer's
+acceptance evidence. Existing proof limits and routes still apply.
+
+`--verify-git` additionally retains the original audited-source ancestry, source
+blob and all historical reference/merged-PR checks. It is deliberately stricter
+than reference maintenance. Some existing `audited_base` commits predate squash
+merges and are not ancestors of main: that strong mode still rejects them.
+Maintenance does not silently turn historical identity checks into ancestry
+proof. Missing original manifests/native roots or rejected full ancestry remain
+explicit evidence gaps. Normal reference maintenance is not a repair of those
+gaps. `--require-complete` still exits 2; scores remain null.
+
+The isolated Git fixtures in `test_release_reference_maintenance.py` reproduce
+normal edits and a second edit, then reject forged hashes/SHAs/blobs, changed old
+receipts/limits/gaps/PRs, absent provenance/revalidation/invalidation, missing
+symbols, uncommitted bytes, duplicate frozen blocks and ambiguous source units.
+Run `python3 -m unittest discover -s scripts -p 'test_release_*.py'`.
+Remove disposable `evidence/*-proposal.json` and audit reports after inspecting
+or retaining them; never remove the original ledger or native evidence root.
+
 [golden-common-03](golden-common-03.md) records ERII-246's final 18 Golden
 common blocks: 13 reference links and five evaluation-boundary clauses. Its
 36 scoped duties preserve every background/deferred reason and all 21 mandatory

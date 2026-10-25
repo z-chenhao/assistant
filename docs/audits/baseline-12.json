@@ -8209,5 +8209,31 @@
         }
       ]
     }
-  ]
+  ],
+  "reference_maintenance": {
+    "version": 1,
+    "original_ledger": {
+      "commit": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "path": "docs/audits/baseline-12.json",
+      "sha256": "e8320e67006fd3c0517609fe6256f578a042394ba661dda60d5008ede9320368",
+      "content_sha256": "8876fee8d5b42b820544d22321731335166b89c56f4dc3ffd208fd0b04c5976c"
+    },
+    "current": {
+      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "scope": "reference_identity_only",
+      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "references": {
+        "internal/llm/fake/bridge.go": {
+          "sha256": "b430fcda25cf5e526a889288202086f7ef2b42cc7a8078da17712e3d9bceba30"
+        }
+      },
+      "invalidated_observations": [
+        "code-recovery-cli",
+        "delivery-cli",
+        "go-contracts",
+        "startup-cli",
+        "sync-error-probe-confirmed"
+      ]
+    }
+  }
 }

@@ -109,6 +109,9 @@ class ReleasePackageTests(unittest.TestCase):
                 with self.assertRaises(ValueError): self.run_audit()
 
     def test_raw_observation_binding_checks_bytes_size_and_safe_location(self):
+        # This test substitutes synthetic native files, so use a synthetic local
+        # reference ledger rather than mutate an anchored historical receipt.
+        self.synthetic_references()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             data = b'SYNTHETIC integrity fixture, not native product evidence\n'
@@ -136,6 +139,7 @@ class ReleasePackageTests(unittest.TestCase):
 
     def test_full_git_mode_checks_blobs_and_ancestry_without_fetch(self):
         # Synthetic local history tests only the provenance consumer mechanism.
+        self.synthetic_references()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             paths = {ref.partition('#')[0] for ref in self.ledger['references']}
@@ -160,6 +164,11 @@ class ReleasePackageTests(unittest.TestCase):
             next(iter(self.ledger['merged_prs'].values()))['mergeCommit']['oid'] = '0' * 40
             with self.assertRaises(ValueError):
                 package.audit_package(root, self.ledger, self.units, verify_git=True)
+
+    def synthetic_references(self):
+        self.ledger.pop('reference_maintenance', None)
+        for ref, value in self.ledger['references'].items():
+            value['sha256'] = package.digest((self.root / ref.partition('#')[0]).read_bytes())
 
     def test_real_cli_preserves_history_and_rejects_stale_report(self):
         folder = self.root / 'evidence'

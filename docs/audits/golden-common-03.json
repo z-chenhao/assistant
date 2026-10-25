@@ -1145,5 +1145,34 @@
         }
       ]
     }
-  ]
+  ],
+  "reference_maintenance": {
+    "version": 1,
+    "original_ledger": {
+      "commit": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "path": "docs/audits/golden-common-03.json",
+      "sha256": "25f3d5f361718ec4e6452295f4d1917fb0f2750922210c62b592328b5d7a5bd9",
+      "content_sha256": "44801752156e998572d1d7e3e8c81c3ef12f9c55193cd29e37d8a74237a79ef0"
+    },
+    "current": {
+      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "scope": "reference_identity_only",
+      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "references": {
+        "scripts/prepare_release_eval.py#def prepare": {
+          "sha256": "fb93cbd87ba1660e104f88b9ac4dfefa73cb4c8b82209bcbfef772d5fcd8c4ec"
+        },
+        "scripts/unscripted_cases.py#def configuration": {
+          "sha256": "55f4d66649836c162f5bf2bcfcf7ac5afb567669f7b456ba7fdff3a2e9d15300"
+        }
+      },
+      "invalidated_observations": [
+        "inputs",
+        "judge",
+        "release",
+        "scoring",
+        "tree"
+      ]
+    }
+  }
 }

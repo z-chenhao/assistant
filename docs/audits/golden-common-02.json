@@ -18659,5 +18659,46 @@
       ],
       "limits": "当前源码的单轮原生机械观察；外部依赖为明确测试peer/Fake。不产生语义分，不代表完整Case、SC保护五轮、当前L2或v1发布通过。"
     }
+  },
+  "reference_maintenance": {
+    "version": 1,
+    "original_ledger": {
+      "commit": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "path": "docs/audits/golden-common-02.json",
+      "sha256": "e3a76b87bb643f334d999270b8a25de8a9d27439d8cc1f39c6fb3c621f8d5f52",
+      "content_sha256": "15b301f614532dade8c6526693d5b7bdb32a78f6970d2ad54a5edff6dd3742fb"
+    },
+    "current": {
+      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "scope": "reference_identity_only",
+      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "references": {
+        "scripts/prepare_release_eval.py": {
+          "sha256": "fb93cbd87ba1660e104f88b9ac4dfefa73cb4c8b82209bcbfef772d5fcd8c4ec"
+        },
+        "scripts/run_m6_cases.py": {
+          "sha256": "a1b394bf4dae4f278baba9788de186b7573649a95d96dc79b5bb8664df97b1d2"
+        },
+        "scripts/unscripted_cases.py": {
+          "sha256": "55f4d66649836c162f5bf2bcfcf7ac5afb567669f7b456ba7fdff3a2e9d15300"
+        },
+        "scripts/verify_suite.py": {
+          "sha256": "99119dd8e4a2bf3e3050160910dfe17d6c71078e2b9465d2ee1037c8edbb002f"
+        },
+        "scripts/verify_unscripted_cases.py": {
+          "sha256": "2f0c783efdbf54477a8b41a3f7e4d1e3b077a5dc8747ac01184e889b049ae14c"
+        }
+      },
+      "invalidated_observations": [
+        "cli",
+        "fixtures",
+        "judge",
+        "release",
+        "scoring",
+        "spend-followup",
+        "systems",
+        "unscripted"
+      ]
+    }
   }
 }

@@ -6991,5 +6991,33 @@
         }
       ]
     }
-  ]
+  ],
+  "reference_maintenance": {
+    "version": 1,
+    "original_ledger": {
+      "commit": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "path": "docs/audits/baseline-13.json",
+      "sha256": "290b7cda73cacd979ac84022f4560c3a1e5a5a4abe8868a05d3cc17d4323f784",
+      "content_sha256": "5dedd28f05e620f8324ff15bf3c62d096e4c14dafefe33ffc7f87bf491ad9782"
+    },
+    "current": {
+      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "scope": "reference_identity_only",
+      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "references": {
+        "scripts/unscripted_cases.py": {
+          "sha256": "55f4d66649836c162f5bf2bcfcf7ac5afb567669f7b456ba7fdff3a2e9d15300"
+        },
+        "scripts/verify_suite.py": {
+          "sha256": "99119dd8e4a2bf3e3050160910dfe17d6c71078e2b9465d2ee1037c8edbb002f"
+        }
+      },
+      "invalidated_observations": [
+        "children",
+        "code-recovery",
+        "go-contracts",
+        "javascript"
+      ]
+    }
+  }
 }
