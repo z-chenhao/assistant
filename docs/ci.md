@@ -177,7 +177,8 @@ Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
 uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
 run the original health/goals commands, each retaining six independent variants
 and five serial repetitions per variant. `channels` keeps GC-12 ×5 and GC-08,
-GC-14 and GC-16 once each, with the original two gate workers. This changes
+GC-14 and GC-16 once each, plus the GC-09 and GC-10 complete native-receipt
+series, with the original two gate workers. This changes
 placement only: fixture inputs, oracles, Host limits, approvals, deadlines,
 fault injection, state isolation and cleanup remain unchanged. Every cell keeps
 the ten-minute job timeout, its own locked setup/build, disk fixtures, sandbox,
