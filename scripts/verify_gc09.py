@@ -222,6 +222,13 @@ def observe(row):
             all(json.loads(u['content']).get('answer') == mapping[key(task_by_id[u['task_id']])] for u in state['updates'] if u['task_epoch'] == 2),
         original_and_supplemental_users=[text(m) for m in state['conversation'] if m['role'] == 'user'] == expected_users+list(supplement(variant)),
         completed_calls_reused=all(t in state['tools'] for t in initial['tools']) and all(g in state['generations'] for g in initial['generations']),
+        complete_model_inventory=len(initial['generations']) == 2 and len(state['generations']) == 13 and
+            all(len([g for g in state['generations'] if g['run_id'] == r['run_id']]) == 1 for r in roots),
+        worker_result_update_matches_generation=len(state['worker_results']) == 4 and all(
+            len([g for g in state['generations'] if g['generation_id'] == result['exchange_id'] and
+                g['run_id'] == result['run_id'] and json.loads(g['result_json']).get('text') == result['content']]) == 1 and
+            len([u for u in state['updates'] if u['root_run_id'] == result['run_id'] and u['content'] == result['content']]) == 1
+            for result in state['worker_results']),
         completed_generation_and_delivery=all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in state['generations']) and
             all(len([m for m in state['conversation'] if m['role'] == 'assistant' and any(m['source_event_id'] == g['generation_id'] and json.loads(g['result_json']).get('text') == text(m) and not json.loads(g['result_json']).get('tool_calls')
                     for g in state['generations'] if g['run_id'] == r['run_id']) and
@@ -261,7 +268,7 @@ def drive(binary,variant_id,repetition,failure_path):
 def rejection_probes(row):
     require(all(observe(row).values()),'passing native receipt required for corruption probes')
     probes = {}
-    for name in ('source','priority','steering','restart','remote','mapping','epoch','old_root','request','batch','replay','effect','result'):
+    for name in ('source','priority','steering','restart','remote','mapping','epoch','old_root','request','batch','replay','effect','result','missing_generation','worker_result'):
         bad = copy.deepcopy(row); c = bad['connected']; state = c['state']
         if name == 'source': c['source_after']['mail'] = '{}'
         elif name == 'priority': bad['original']['state']['conversation'][-1]['content'][0]['text'] = 'E2 first'
@@ -275,6 +282,8 @@ def rejection_probes(row):
         elif name == 'batch': c['questions']['state']['inbox'][0]['run_id'] = None
         elif name == 'replay': c['replay_state']['tools'][0]['attempt_count'] = 2
         elif name == 'result': c['questions']['state']['generations'][-1]['result_json'] = '{"text":"[]"}'
+        elif name == 'missing_generation': state['generations'] = [g for g in state['generations'] if g['run_id'] != state['worker_results'][0]['run_id']]
+        elif name == 'worker_result': state['worker_results'][0]['content'] = '{"key":"wrong"}'
         else: state['tools'][0]['tool_name'] = 'mcp__mail__write'
         try:
             rejected = not all(observe(bad).values())

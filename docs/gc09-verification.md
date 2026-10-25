@@ -47,10 +47,10 @@ for Workers that become blocked at different times.
 
 `--validate` recomputes all 30 native receipts, source/Model/Capability identity,
 actual connector results, Worker/Task/update/inbox mapping, completed generation
-to visible delivery agreement, duplicate ingress and replay equality. Thirteen
+to visible delivery agreement, duplicate ingress and replay equality. Fifteen
 corruption probes reject source/output/Steering drift, false restart, connector
 write, answer misrouting, stale epoch, revived old Root, missing actual input,
-split batch, altered completed call, unexpected effect and forged model output.
+split batch, altered completed call, unexpected effect, forged model output, missing generation and drifted Worker result.
 Stored all-true flags cannot override recomputation.
 
 The compact public `gc09_native_manifest` binds size and SHA256 of complete raw
