@@ -67,6 +67,10 @@ compatibility failure; the four deferred M6 cells depend on that job, explaining
 their skipped/missing inventory. ERII-373 supplies the missing original ledger
 seals; this consumer must explicitly refresh affected identities. Historical
 observations remain historical and no release claim follows from a refresh.
+The independent synthetic-history tests also need initial hashes derived from
+the current files they copy into their own repository, before minting their
+synthetic audited base and seal. This fixture correction keeps `verify_git=True`
+and all drift/forgery checks; it changes no real ledger or production validator.
 GC-02 verification, native validation and cleanup returned zero, then GitHub's
 CreateArtifact service timed out; the missing artifact still failed the gate.
 
