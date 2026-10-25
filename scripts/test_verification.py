@@ -64,6 +64,8 @@ class VerificationTests(unittest.TestCase):
             root = Path(temp)
             (root / 'logs').mkdir()
             gates = suite.SHARDS['communication']
+            self.assertEqual([g.name for g in suite.gate_execution_order(gates)],
+                             ['gc01','gc12','gc02','gc08','gc14','gc16'])
             def command(gate, attempt, *_):
                 script = ('from pathlib import Path\nimport time\n'
                           f'root=Path({str(root)!r})\n'
@@ -77,7 +79,9 @@ class VerificationTests(unittest.TestCase):
                           '  assert time.monotonic()<deadline, "long peer series never admitted"\n'
                           '  time.sleep(.01)\n'
                           'else:\n'
-                          ' assert all((root/(p+".started")).exists() for p in ("gc01","gc12"))\n')
+                          ' assert all((root/(p+".started")).exists() for p in ("gc01","gc12"))\n'
+                          ' if name=="gc02": (root/"gc02.started").touch()\n'
+                          ' if name in ("gc08","gc14","gc16"): assert (root/"gc02.started").exists()\n')
                 return [sys.executable,'-c',script], os.environ.copy(), root/'logs'/f'{gate.name}-{attempt}.log'
             with patch.object(suite, 'command', command):
                 rows = suite.run_shard('communication',Path('/binary'),root,threading.Event(),gates,gate_jobs=2)

@@ -273,10 +273,16 @@ def run_shard(name, binary, evidence, stopped, gates=None, previous=(), gate_job
 
 
 def gate_execution_order(gates):
-    # Start measured long series first: Core, Pi Bridge and the complete GC-01
-    # journey. Retain inventory order in reports and every series' five serial
-    # repetitions on one worker; GC-01 also owns five rounds per variant.
-    return sorted(gates, key=lambda gate: gate.name not in ('core-cases', 'pi-bridge', 'gc01'))
+    # Measured long series go first. GC-01 and GC-12 retain the initial pair;
+    # GC-02 must take the next free slot before short gates. Its former queue
+    # tail exceeded the CI deadline even with all 30 rounds finished. Keep two
+    # workers, report inventory order and every series' serial repetitions.
+    def priority(gate):
+        if gate.name in ('core-cases','pi-bridge','gc01'): return 0
+        if gate.name == 'gc12': return 1
+        if gate.name == 'gc02': return 2
+        return 3
+    return sorted(gates,key=priority)
 
 
 def concurrent_gates(name, binary, evidence, stopped, gates, previous):
