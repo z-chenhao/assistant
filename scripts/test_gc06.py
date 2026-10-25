@@ -3,10 +3,11 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+import sqlite3
 import subprocess
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from case_runner import variants
 import prepare_release_eval
@@ -16,6 +17,25 @@ import verify_suite
 
 
 class LearningTests(unittest.TestCase):
+    def test_unrelated_task_binds_full_native_rows_when_snapshot_projects_parent_ids(self):
+        output=[dict(type='return',value=[])]
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'data').mkdir()
+            with sqlite3.connect(root/'data/state.db') as db:
+                db.execute('CREATE TABLE tool_invocation (invocation_id,run_id,tool_name,parent_invocation_id,status,result_json,created_at)')
+                db.executemany('INSERT INTO tool_invocation VALUES(?,?,?,?,?,?,?)',[
+                    ('parent','worker','builtin__codemode__execute',None,'succeeded',json.dumps(dict(text=json.dumps(output))),1),
+                    ('nested','worker','builtin__memory__search','parent','succeeded',json.dumps(dict(text='[]')),2)])
+            h=Mock(root=root);h.send.return_value={'run_id':'main'}
+            projected=dict(runs=[dict(kind='worker',run_id='worker')],tools=[dict(invocation_id='parent')])
+            row={}
+            with patch.object(journey,'native',return_value=projected),patch.object(journey,'drain_with_publication_barrier',return_value={'proof':'retained'}):
+                receipt=journey.unrelated_task(h,row)
+            self.assertEqual(receipt['parent']['invocation_id'],'parent')
+            self.assertEqual([t['invocation_id'] for t in receipt['nested']],['nested'])
+            self.assertEqual(receipt['value'],[])
+            self.assertEqual(row['unrelated_scheduling'],{'proof':'retained'})
+
     def test_original_nineteen_blocks_six_variants_and_unscripted_inputs(self):
         lock=journey.load()
         self.assertEqual(lock['manifest_sha256'],'0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556')

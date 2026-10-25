@@ -19,6 +19,7 @@ from run_m6_cases import personal, execute, save_report, remember, open_bytes, n
 from terminal_driver import Terminal
 from unscripted_cases import source_identity
 from verify_capabilities import call
+from verify_code_recovery import read
 from verify_gc01 import main_checks
 from verify_gc02 import native, kill, recorded
 from verify_gc03 import exact, recalled_context
@@ -153,13 +154,16 @@ def unrelated_task(h,row):
     row['unrelated_scheduling'] = drain_with_publication_barrier(h,receipt['run_id'],prefix='unrelated-')
     value = native(h)
     workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
-    parents = [t for t in value['tools'] if t['run_id'] in workers and t['tool_name'] == 'builtin__codemode__execute']
+    # The CLI snapshot deliberately projects Tool fields. Parent/Child cell
+    # association needs the authoritative invocation rows, as execute() does.
+    tools = read(h.root/'data/state.db','SELECT * FROM tool_invocation ORDER BY created_at,rowid')
+    parents = [t for t in tools if t['run_id'] in workers and t['tool_name'] == 'builtin__codemode__execute']
     require(len(parents) == 1,'GC-06 unrelated Task requires one native cell')
     parent = parents[0]
     output = strict_json(strict_json(parent['result_json'])['text'])
     returned = [p['value'] for p in output if p['type'] == 'return']
     require(parent['status'] == 'succeeded' and len(returned) == 1,'GC-06 unrelated Task failed')
-    return dict(parent=parent,nested=[t for t in value['tools'] if t['parent_invocation_id'] == parent['invocation_id']],
+    return dict(parent=parent,nested=[t for t in tools if t['parent_invocation_id'] == parent['invocation_id']],
         output=output,value=returned[0],decisions=[])
 
 
@@ -316,8 +320,8 @@ def observe(row):
         not row['quiet']['task'] and not row['quiet']['automation']
     unrelated = row['unrelated']; worker = unrelated['parent']['run_id']; value = row['unrelated_state']
     checks['task_publication_order'] = exact(row['unrelated_scheduling'],dict(worker_requests_before_main_completion=0,
-        boundaries=dict(after_task_commit=1,before_worker_generation=1),root_recall_frozen_before_main_publication=True,
-        main_completed_before_worker_dispatch=True))
+        boundaries=dict(after_task_commit=1,before_worker_generation=2),root_recall_frozen_before_main_publication=True,
+        main_completed_before_worker_dispatch=True)) and sum(g['run_id'] == worker for g in value['generations']) == 2
     checks['unrelated_task_privacy'] = transport(unrelated,value) and len(unrelated['nested']) == 1 and unrelated['nested'][0]['tool_name'] == 'builtin__memory__search' and exact(
         strict_json(unrelated['nested'][0]['arguments_json']),dict(query='wedding flowers',limit=20)) and exact(
         native_return(unrelated),strict_json(strict_json(unrelated['nested'][0]['result_json'])['text'])) and any(
