@@ -1,5 +1,15 @@
 # Feature map
 
+## GC-02 complete deterministic goals journey (ERII-248)
+
+| Feature | Reach / authoritative entry | Evidence |
+| --- | --- | --- |
+| Goals interview and revision | `verify_gc02.py`; CLI/TUI Main, capabilities Fake, MCP, Memory/Curator | Six locked variants × five serial rounds; all four original inputs, unanswered resume, explicit constraints, Core/Recall and real supersede; no unsolicited tracking. |
+| Monthly review / recovery / privacy | Same gate in `communication`; Actor Automation → ongoing Task / fresh Roots → Memory search / QuickJS / Artifact → Main delivery | Last-Sunday 20:00 Shanghai, Nov29 first fire, Dec27 current-version review; CLI-reopened Artifacts, real Memory/fire/report SIGKILL, duplicate replay, pending cancel, forgotten-owner fencing, empty Child/Approval/external effects. |
+| Recomputable receipts | `verify_gc02.py --validate`; `prepare_release_eval.py`; `test_gc02.py` | 30 ordered receipts, 24 frozen blocks, source/binary/environment/cleanup and tamper rejection. Semantic/model/L2 gaps stay with ERII-223; no release grade. |
+
+See [scope, frozen mapping and unscripted limits](../docs/gc02-verification.md).
+
 ## Shared audit reference maintenance (ERII-369)
 
 | Feature | Reach / authoritative entry | Evidence and limits |
