@@ -33,7 +33,7 @@ class UnscriptedCasesTests(unittest.TestCase):
     def test_every_case_has_an_explicit_ungraded_disposition(self):
         support = matrix()
         self.assertEqual(set(support), CASES)
-        self.assertEqual(len(INPUTS), 12)
+        self.assertEqual(len(INPUTS), 13)
         for case, row in support.items():
             self.assertFalse(row['eligible_for_grading'])
             self.assertTrue(row['missing'])
@@ -43,6 +43,16 @@ class UnscriptedCasesTests(unittest.TestCase):
 
     def test_all_input_variants_preserve_context_noise_order_and_never_send_gold(self):
         for case_id, fixture in INPUTS.items():
+            if case_id == 'GC-08':
+                from verify_gc08 import variants as wedding_variants, load
+                for variant in wedding_variants():
+                    value=inputs(case_id,variant['id'])
+                    self.assertEqual(json.loads(value['context']),variant['source'])
+                    self.assertEqual(value['events'],[dict(at=variant['source']['clock'],text=t) for t in variant['turns']])
+                    self.assertEqual(value['lock'],load())
+                    self.assertEqual(value['fixture_digest'],digest(variant))
+                    self.assertNotIn('Capabilities:',json.dumps(value))
+                continue
             dataset, _, lock = load_contract(ROOT, fixture)
             case = next(c for c in dataset['cases'] if c['case_id'] == case_id)
             for variant in variants(dataset, case):

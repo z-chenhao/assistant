@@ -123,6 +123,20 @@ def verify(binary, evidence):
             report['checks'].append('production_cli_native_tool_usage_and_restricted_judge_packet')
             report['checks'].append('strict_release_consumer_rejects_loopback_fragment')
 
+            from verify_gc08 import variants as wedding_variants
+            root, config = prepared('gc08-inputs')
+            frozen = command(root, config, 'freeze', 'gc08-plan', '--case', 'GC-08', '--variant', 'base',
+                '--execution-kind', 'loopback_mechanism', '--seconds', '30') / 'plan.json'
+            wedding = json.loads(frozen.read_text())['input']
+            original = wedding_variants()[0]
+            require(json.loads(wedding['context']) == original['source'] and
+                [e['text'] for e in wedding['events']] == original['turns'], 'GC-08 source/input drift')
+            out = command(root, config, 'run', 'gc08-inputs', '--plan', str(frozen), '--plan-sha256', hashed(frozen.read_bytes()))
+            observed = json.loads((out/'observation.json').read_text())
+            require(observed['status'] == 'observed_fragment' and observed['final_score'] is None and
+                not observed['eligible_for_grading'], 'GC-08 loopback graded')
+            report['checks'].append('GC08_original_source_and_three_turns_through_production_bridge_ungraded')
+
             for journey in ('week', 'safety'):
                 from verify_gc01 import journey_inputs
                 root, config = prepared('gc01-' + journey)

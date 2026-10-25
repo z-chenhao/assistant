@@ -43,7 +43,9 @@ def serve(root):
         elif req['method']=='tools/call':
             p=req['params']
             if p['name']=='read': value=json.loads((root/'source.json').read_text())
-            elif p['name']=='send': value=send(root,p['arguments'])
+            elif p['name']=='send':
+                value=send(root,p['arguments'])
+                if (root/'drop-reply').exists(): return  # Committed effect, lost acknowledgement.
             else: raise ValueError('unknown Tool')
             result=dict(content=[dict(type='text',text=json.dumps(value,ensure_ascii=False))],isError=False)
         else: raise ValueError('unknown method')

@@ -22,7 +22,7 @@ class VerificationTests(unittest.TestCase):
         # GC-08 reaches stdio MCP at chat ingress. Runtime intentionally omits
         # bubblewrap; communication already provisions the same sandbox as GC-12.
         self.assertEqual([(name,g.attempts) for name,gates in suite.SHARDS.items()
-                          for g in gates if g.script == 'verify_gc08.py'], [('communication',1)])
+                          for g in gates if g.script == 'verify_gc08.py'], [('communication',5)])
         workflow = (suite.ROOT/'.github/workflows/ci.yml').read_text()
         self.assertIn("matrix.shard == 'communication'", workflow)
 
@@ -143,7 +143,7 @@ class VerificationTests(unittest.TestCase):
             "verify_capabilities.py": 5, "run_cases.py": 1, "run_task_cases.py": 1,
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
-            "verify_gc12.py": 5, "verify_gc08.py": 1, "verify_gc14.py": 1, "verify_gc16.py": 1,
+            "verify_gc12.py": 5, "verify_gc08.py": 5, "verify_gc14.py": 1, "verify_gc16.py": 1,
             "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc05.py": 1,
         }
         counts, paths = {}, set()

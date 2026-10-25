@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Exact GC-08 three-turn mechanics at CLI/Task/Artifact/approval/MCP boundaries.
 
-The explicit scripted model is not semantic or L2 evidence. Mail stays pending
-or is denied; there is no positive consent in this fixture. Failed receipts are
-retained. Launch/Doctor/Cleanup use the maintained MainHarness.
+The explicit scripted model is not semantic or L2 evidence. The original draft
+stays pending, then is denied. Separate synthetic probes grant exact consent,
+lose acknowledgement, crash or cancel. Launch/Doctor/Cleanup use MainHarness.
 """
 import argparse
 import copy
 import hashlib
 import json
 from pathlib import Path
+import platform
 import sqlite3
 import subprocess
 import sys
@@ -19,14 +20,29 @@ from verify_main import MainHarness, require
 from verify_tasks import state as task_state, assertions as task_assertions
 from wedding_sandbox import state as remote_state
 from verify_suite import source_state
+from release_audit import inventory
+from release_receipts import Receipts, strict_json
+from fixture_pool import run_cases
 
 ROOT=Path(__file__).resolve().parents[1]
 FIXTURE=ROOT/'evals/fixtures/gc08-v1.json'
 LIFECYCLE=ROOT/'evals/fixtures/gc08-lifecycle-v1.json'
+JOURNEY=ROOT/'evals/fixtures/gc08-journey-v1.json'
 TURNS=['婚礼准备现在最应该处理什么？','宾客人数已经定了，128 人。','给酒店写封邮件确认桌次，但发之前给我看。']
 
 
 def sha(data): return hashlib.sha256(data).hexdigest()
+
+
+def load():
+    lock=strict_json(JOURNEY.with_suffix('.lock.json').read_bytes())
+    for path,digest in lock['files'].items():
+        require(sha((ROOT/path).read_bytes())==digest,'GC-08 lock drift: '+path)
+    current={(b['line'],b['sha256']) for b in inventory((ROOT/'evals/golden-cases.md').read_text())}
+    blocks=lock['frozen_blocks']
+    require(len(blocks)==len({b['line'] for b in blocks})==19 and all(
+        b['source']=='evals/golden-cases.md' and (b['line'],b['sha256']) in current for b in blocks),'GC-08 frozen block drift')
+    return lock
 
 
 def call_hash(invocation):
@@ -47,6 +63,9 @@ def variants():
         elif name=='contact-order': data['contacts']=dict(reversed(list(data['contacts'].items())))
         else: data['unrelated_note']='同事周末聚餐，与婚礼依赖无关。'
         rows.append(dict(id=name,source=data,turns=TURNS.copy()))
+    data=copy.deepcopy(source)
+    data['unrelated_note']='周末读书会已确认8人，每桌4人；与婚礼无关。'
+    rows.append(dict(id='unrelated-counts',source=data,turns=TURNS.copy()))
     return rows
 
 
@@ -61,6 +80,8 @@ def native(h):
         db.row_factory=sqlite3.Row
         for name in ('approval','artifact','automation'):
             value[name]=[dict(r) for r in db.execute('SELECT * FROM '+name+' ORDER BY rowid')]
+        errors={r['invocation_id']:r['error_json'] for r in db.execute('SELECT invocation_id,error_json FROM tool_invocation')}
+        for invocation in value['tools']: invocation['error_json']=errors[invocation['invocation_id']]
     return value
 
 
@@ -105,11 +126,13 @@ def observe(row):
             [r['status'] for r in roots]==['completed','completed','waiting'] and
             len(value['tasks'])==1 and value['tasks'][0]['status']=='active' and value['tasks'][0]['task_epoch']==3 and
             len({r['task_id'] for r in roots})==1 and len({r['run_id'] for r in roots})==3,
-        main_create_then_append=[a['operation'] for a in actions]==['create','append','append'] and
+        main_create_then_append=[a['operation'] for a in actions]==['create','append','append'] and actions[0].get('completionPolicy')=='ongoing' and
             [a['instruction'] for a in actions[1:]]==variant['turns'][1:] and
             len(value['task_requests'])==3 and len(value['task_invocations'])==3 and
             len(value['instructions'])==2 and '128' in value['instructions'][0]['instruction'],
         anchor_immutable=all(s['state']['tasks'][0]['anchor_task']==value['tasks'][0]['anchor_task'] for s in steps),
+        ongoing_between_roots=all(s['state']['tasks'][0]['status']=='active' and
+            s['state']['tasks'][0]['completion_policy']=='ongoing' for s in steps),
         checklist_artifacts_reopened=len(docs)==3 and len(value['artifact'])==3 and all(
             a['sha256']==sha(a['text'].encode())==stored['content_hash'] and json.loads(a['text'])==a['document'] and
             a['ref']==stored['artifact_ref'] and stored['task_id']==roots[i]['task_id'] and stored['run_id']==roots[i]['run_id']
@@ -209,7 +232,7 @@ def lifecycle_observe(row):
             stopped['task_epoch']==4 and paused['artifact']==interrupted['artifact'] and paused['updates']==before['updates'],
         continue_new_root=len(workers(after))==5 and fresh['status']=='completed' and fresh['task_epoch']==6 and
             fresh['run_id'] not in {r['run_id'] for r in workers(paused)} and after['tasks'][0]['task_epoch']==6 and
-            after['tasks'][0]['status']=='completed' and after['tasks'][0]['completion_policy']=='once',
+            after['tasks'][0]['status']=='active' and after['tasks'][0]['completion_policy']=='ongoing',
         old_roots_never_revived=workers(after)[:3]==old and workers(after)[3]==stopped,
         anchor_and_instructions=all(s['tasks'][0]['anchor_task']==before['tasks'][0]['anchor_task'] and len(s['tasks'])==1
             for s in (interrupted,paused,after)) and
@@ -277,7 +300,99 @@ def drive_lifecycle(h,row,provider):
     require(all(row['lifecycle_assertions'].values()),'GC-08 lifecycle assertions: '+json.dumps(row['lifecycle_assertions']))
 
 
-def drive(binary,evidence,variant):
+def completion_observe(row):
+    receipt=row['completion'];before=row['lifecycle']['resumed'];after=receipt['state']
+    original=before['tasks'][0];task=after['tasks'][0]
+    calls=[t for t in after['tools'] if t['tool_name']=='builtin__task__manage' and
+           json.loads(t['arguments_json']).get('operation')=='complete']
+    return dict(
+        exact_completion=receipt['text']==strict_json(JOURNEY.read_bytes())['complete'] and len(calls)==1 and
+            json.loads(calls[0]['arguments_json'])==dict(operation='complete',taskRef=original['task_ref']) and
+            calls[0]['status']=='succeeded' and calls[0]['attempt_count']==2,
+        same_ongoing_task=len(after['tasks'])==1 and task['task_id']==original['task_id'] and task['status']=='completed' and
+            task['completion_policy']=='ongoing' and task['task_epoch']==original['task_epoch'] and
+            task['anchor_task']==original['anchor_task'] and task['version']==original['version']+1 and task['completed_at'] is not None,
+        no_new_root_or_result=[r for r in after['runs'] if r['kind']=='worker']==[r for r in before['runs'] if r['kind']=='worker'] and
+            all(after[k]==before[k] for k in ('updates','worker_results','inbox','reporter_dedup','artifact','instructions')),
+        retained_checklists=receipt['artifacts']==row['lifecycle']['artifacts'],
+        no_effect=receipt['remote']==[] and after['approval']==before['approval'] and not after['automation'],
+        completed_calls_reused=all(next(t for t in after['tools'] if t['invocation_id']==old['invocation_id'])==old for old in before['tools']) and
+            all(next(g for g in after['generations'] if g['generation_id']==old['generation_id'])==old for old in before['generations']),
+        real_completion_crash=receipt['crash']==dict(boundary='after_task_complete_commit',returncode=-9) and
+            receipt['committed']['tasks']==after['tasks'] and len(receipt['committed']['task_requests'])==len(before['task_requests'])+1,
+        completion_replay=receipt['state']==receipt['replay'] and receipt['input']==receipt['duplicate_input'])
+
+
+def drive_completion(h,row,provider):
+    text=strict_json(JOURNEY.read_bytes())['complete']
+    receipt=dict(text=text,input=h.send('gc08-complete',text))
+    child=h.hold('after_task_complete_commit');child.kill();child.communicate(timeout=10)
+    receipt['crash']=dict(boundary='after_task_complete_commit',returncode=child.returncode)
+    receipt['committed']=native(h)
+    h.command('chat','work');receipt['state']=native(h)
+    receipt['artifacts']=reopen(h);receipt['remote']=remote_state(provider)
+    receipt['duplicate_input']=h.send('gc08-complete',text)
+    h.command('chat','work');receipt['replay']=native(h)
+    row['completion']=receipt;row['completion_assertions']=completion_observe(row)
+    require(all(row['completion_assertions'].values()),'GC-08 completion: '+json.dumps(row['completion_assertions']))
+
+
+def safety_observe(row):
+    receipt=row['safety'];mode=receipt['mode'];before=row['state'];after=receipt['state']
+    old=next(t for t in before['tools'] if t['tool_name']=='mcp__wedding__send')
+    sends=[t for t in after['tools'] if t['tool_name']=='mcp__wedding__send']
+    send=sends[0] if len(sends)==1 else {}
+    root=next(r for r in after['runs'] if r['run_id']==old['run_id'])
+    task=after['tasks'][0]
+    expected='cancelled' if mode=='cancelled' else 'succeeded' if mode=='approved' else 'unknown'
+    updates=[u for u in after['updates'] if u['root_run_id']==root['run_id']]
+    replies=''.join(p.get('text','') for m in after['conversation'] if m['role']=='assistant' for p in m['content'])
+    return dict(
+        unchanged_frozen_action=len(sends)==1 and all(send[k]==old[k] for k in
+            ('invocation_id','run_id','arguments_json','request_hash','replay_policy','provider_call_id')) and
+            send['request_hash']==call_hash(send) and send['replay_policy']=='never',
+        exact_effect_and_attempt=send.get('status')==expected and send.get('attempt_count')==(0 if mode=='cancelled' else 1) and
+            receipt['remote']==([] if mode=='cancelled' else [json.loads(old['arguments_json'])]),
+        native_outcome=task['completion_policy']=='ongoing' and task['task_id']==before['tasks'][0]['task_id'] and
+            task['status']==('cancelled' if mode=='cancelled' else 'active') and
+            root['status']==('cancelled' if mode=='cancelled' else 'completed') and
+            (not updates if mode=='cancelled' else len(updates)==1 and updates[0]['kind']==('completed' if mode=='approved' else 'unknown')),
+        exact_consent=after['approval'][0]['status']==('invalidated' if mode=='cancelled' else 'approved') and
+            after['approval'][0]['frozen_arguments_hash']==old['request_hash'],
+        outcome_not_overclaimed=('已核实酒店邮件发送成功' in replies if mode=='approved' else '已核实酒店邮件发送成功' not in replies) and
+            (mode not in ('lost-reply','crash-after-effect') or '不重试不确定副作用' in replies and
+             json.loads(send['error_json'])['code']=='UNKNOWN_SIDE_EFFECT'),
+        committed_checklists_preserved=after['artifact']==before['artifact'] and receipt['artifacts']==row['artifacts'] and not after['automation'],
+        real_fault=receipt['crash']==(dict(boundary='before_tool_commit',returncode=-9) if mode=='crash-after-effect' else
+            dict(boundary='after_stop_commit',returncode=-9) if mode=='cancelled' else None) and
+            (mode!='crash-after-effect' or receipt['interrupted_remote']==[json.loads(old['arguments_json'])]),
+        no_replay_or_retry=after==receipt['replay'] and receipt['remote']==receipt['remote_replay'])
+
+
+def drive_safety(h,row,provider,mode):
+    a=row['state']['approval'][0];receipt=dict(mode=mode,crash=None)
+    if mode=='cancelled':
+        h.send('gc08-cancel',strict_json(JOURNEY.read_bytes())['cancel'])
+        boundary='after_stop_commit'
+    else:
+        if mode=='lost-reply': (provider/'drop-reply').touch()
+        h.command('approval','approve',a['approval_id'],a['frozen_arguments_hash'])
+        boundary='before_tool_commit' if mode=='crash-after-effect' else None
+    if boundary:
+        child=h.hold(boundary);child.kill();child.communicate(timeout=10)
+        receipt['crash']=dict(boundary=boundary,returncode=child.returncode)
+        receipt['interrupted']=native(h);receipt['interrupted_remote']=remote_state(provider)
+    h.command('chat','work');receipt['state']=native(h)
+    receipt['remote']=remote_state(provider);receipt['artifacts']=reopen(h)
+    for i,text in enumerate(row['variant']['turns']): h.send('gc08-'+str(i),text)
+    if mode=='cancelled':h.send('gc08-cancel',strict_json(JOURNEY.read_bytes())['cancel'])
+    else:h.command('approval','approve',a['approval_id'],a['frozen_arguments_hash'],ok=False)
+    h.command('chat','work');receipt['replay']=native(h);receipt['remote_replay']=remote_state(provider)
+    row['safety']=receipt;row['safety_assertions']=safety_observe(row)
+    require(all(row['safety_assertions'].values()),'GC-08 safety: '+json.dumps(row['safety_assertions']))
+
+
+def drive(binary,evidence,variant,mode=None):
     receipt=dict(variant=variant,scope='scripted_whole_case_mechanics',semantic_score=None,checkpoints=[])
     failure=None
     with tempfile.TemporaryDirectory(prefix='erii-gc08-') as temp:
@@ -310,47 +425,146 @@ def drive(binary,evidence,variant):
             receipt.update(state=value,replay_state=native(h),remote=before,remote_replay=remote_state(provider),artifacts=artifacts)
             receipt['assertions']=observe(receipt)
             require(all(receipt['assertions'].values()),'GC-08 assertions: '+json.dumps(receipt['assertions']))
+            if mode:
+                drive_safety(h,receipt,provider,mode)
             # Deny rather than invent user consent. Duplicate denial must not
             # create a send; retain separate terminal readback and replay proof.
-            a=pending[0]
-            h.command('approval','deny',a['approval_id'],a['frozen_arguments_hash'])
-            h.command('chat','work')
-            denied=native(h)
-            duplicate=h.command('approval','deny',a['approval_id'],a['frozen_arguments_hash'],ok=False)
-            h.command('chat','work')
-            receipt['denial']=dict(state=denied,replay_state=native(h),duplicate_exit=duplicate.returncode,remote=remote_state(provider))
-            receipt['denial_assertions']=denial_observe(receipt)
-            require(all(receipt['denial_assertions'].values()),'GC-08 denial failed')
-            drive_lifecycle(h,receipt,provider)
+            else:
+                a=pending[0]
+                h.command('approval','deny',a['approval_id'],a['frozen_arguments_hash'])
+                h.command('chat','work')
+                denied=native(h)
+                duplicate=h.command('approval','deny',a['approval_id'],a['frozen_arguments_hash'],ok=False)
+                h.command('chat','work')
+                receipt['denial']=dict(state=denied,replay_state=native(h),duplicate_exit=duplicate.returncode,remote=remote_state(provider))
+                receipt['denial_assertions']=denial_observe(receipt)
+                require(all(receipt['denial_assertions'].values()),'GC-08 denial failed')
+                drive_lifecycle(h,receipt,provider)
+                drive_completion(h,receipt,provider)
         except BaseException as error:
             receipt.update(failure=str(error),failure_state=h.failure_state())
             failure=error
         finally:
             h.cleanup()
             receipt['owned_processes_joined']=True
-            (evidence/(variant['id']+'.json')).write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+            (evidence/(variant['id']+('-'+mode if mode else '')+'.json')).write_text(json.dumps(receipt,ensure_ascii=False)+'\n')
     receipt['cleanup']=dict(owned_processes_joined=True,disposable_root_removed=not root.exists())
-    (evidence/(variant['id']+'.json')).write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+    (evidence/(variant['id']+('-'+mode if mode else '')+'.json')).write_text(json.dumps(receipt,ensure_ascii=False)+'\n')
     if failure: raise failure
     return receipt
 
 
+SAFETY_MODES=('approved','lost-reply','crash-after-effect','cancelled')
+
+
+def artifact_trace(state,artifacts):
+    saves=[t for t in state['tools'] if t['tool_name']=='builtin__artifact__manage' and
+           json.loads(t['arguments_json']).get('operation')=='save']
+    return len(saves)==len(artifacts) and all(
+        t['status']=='succeeded' and t['attempt_count']==1 and t['request_hash']==call_hash(t) and
+        json.loads(t['arguments_json'])['text']==a['text'] and
+        json.loads(t['result_json'])['artifact_refs']==[a['ref']] and
+        sha(a['text'].encode())==a['sha256'] and json.loads(a['text'])==a['document']
+        for t,a in zip(saves,artifacts))
+
+
+def validate_report(report,binary=None):
+    """Recompute observed boundaries; no author flag can waive missing evidence."""
+    expected=variants()
+    require(report.get('case_id')=='GC-08' and report.get('status')=='mechanical_pass' and
+        report.get('cleanup') is True and report.get('semantic_score','missing') is None and
+        report.get('eligible_for_grading') is False and report.get('release_ready') is False and
+        report.get('acceptance_complete') is False and report.get('journey_lock')==load(),
+        'complete locked ungraded GC-08 receipts required')
+    for key,path in [('fixture_lock',FIXTURE),('lifecycle_lock',LIFECYCLE)]:
+        require(report[key]==strict_json(path.with_suffix('.lock.json').read_bytes()),'GC-08 lock drift')
+    provenance=report['source_provenance']
+    environment=report['environment']
+    require(provenance['before']==provenance['after'] and
+        set(environment)=={'platform','python','node','go','binary_build'} and
+        all(isinstance(v,str) and v for v in environment.values()), 'GC-08 identity drift')
+    if binary is not None:
+        current=dict(**source_state(),binary_sha256=sha(binary.read_bytes()))
+        require(provenance['before']==current and report['binary_sha256']==current['binary_sha256'], 'GC-08 source/binary drift')
+    rows=report['variants']
+    require([r['variant'] for r in rows]==expected,'all original variants and supplemental count-noise required')
+    for row in rows:
+        validate_row(row,dict(assertions=observe(row),denial_assertions=denial_observe(row),
+            lifecycle_assertions=lifecycle_observe(row),completion_assertions=completion_observe(row)))
+        require(artifact_trace(row['completion']['state'],row['completion']['artifacts']), 'GC-08 native Artifact trace drift')
+    require([r['safety']['mode'] for r in report['safety_probes']]==list(SAFETY_MODES),'GC-08 safety inventory drift')
+    for row in report['safety_probes']:
+        require(row['variant']==expected[0],'GC-08 safety source drift')
+        validate_row(row,dict(assertions=observe(row),safety_assertions=safety_observe(row)))
+        require(artifact_trace(row['safety']['state'],row['safety']['artifacts']), 'GC-08 safety Artifact trace drift')
+    return dict(case_id='GC-08',status='mechanical_pass',variants=len(rows),safety_probes=len(SAFETY_MODES),
+        frozen_blocks=19,semantic_score=None,release_ready=False,acceptance_complete=False,dependency='ERII-377')
+
+
+def validate_row(row,groups):
+    require(row['scope']=='scripted_whole_case_mechanics' and row['semantic_score'] is None and
+        row['cleanup']==dict(owned_processes_joined=True,disposable_root_removed=True) and
+        all(type(v) is bool and v for v in row['cleanup'].values()), 'GC-08 failed or unclean receipt')
+    for key,checks in groups.items():
+        require(row[key]==checks and all(type(v) is bool and v for v in checks.values()) and
+            all(type(v) is bool for v in row[key].values()),'GC-08 failed, drifted or forged '+key)
+
+
+def retain_report(path,report):
+    raw=path.parent/'.gc08-native'/path.name
+    raw.parent.mkdir(parents=True,exist_ok=True)
+    raw.write_text(json.dumps(report,ensure_ascii=False)+'\n')
+    summary=dict(case_id='GC-08',status=report['status'],variants=len(report['variants']),
+        safety_probes=len(report['safety_probes']),cleanup=report['cleanup'],semantic_score=None,release_ready=False,
+        acceptance_complete=False,source_sha=report['source_provenance']['before']['source_sha'],binary_sha256=report['binary_sha256'])
+    path.write_text(json.dumps(dict(kind='gc08_native_manifest',version=1,summary=summary,
+        native=dict(path=str(raw.relative_to(path.parent)),sha256=sha(raw.read_bytes())),native_bytes=raw.stat().st_size),indent=2)+'\n')
+
+
+def read_report(path):
+    manifest=strict_json(path.read_bytes())
+    require(set(manifest)=={'kind','version','summary','native','native_bytes'} and manifest['kind']=='gc08_native_manifest' and
+        type(manifest['version']) is int and manifest['version']==1,'GC-08 native manifest required')
+    data=Receipts(path.parent,None).bytes(manifest['native'])
+    require(type(manifest['native_bytes']) is int and len(data)==manifest['native_bytes'],'GC-08 native size mismatch')
+    report=strict_json(data)
+    expected=dict(case_id='GC-08',status=report['status'],variants=len(report['variants']),
+        safety_probes=len(report['safety_probes']),cleanup=report['cleanup'],semantic_score=None,release_ready=False,
+        acceptance_complete=False,source_sha=report['source_provenance']['before']['source_sha'],binary_sha256=report['binary_sha256'])
+    require(manifest['summary']==expected and all(type(manifest['summary'][k]) is type(v) for k,v in expected.items()),
+        'GC-08 manifest/native summary drift')
+    return report
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--binary',type=Path,required=True);p.add_argument('--evidence',type=Path,required=True)
-    p.add_argument('--variant',choices=[v['id'] for v in variants()]);args=p.parse_args()
-    args.evidence.unlink(missing_ok=True);folder=args.evidence.with_suffix('');folder.mkdir(parents=True,exist_ok=True)
+    p.add_argument('--variant',choices=[v['id'] for v in variants()]);p.add_argument('--validate',action='store_true')
+    p.add_argument('--variant-jobs',type=int,choices=(1,2),default=2);args=p.parse_args()
+    if args.validate:
+        print(json.dumps(validate_report(read_report(args.evidence),args.binary.resolve())));return
+    args.evidence.unlink(missing_ok=True);args.evidence.parent.mkdir(parents=True,exist_ok=True)
+    folder=args.evidence.parent/'.gc08-native'/args.evidence.stem;folder.mkdir(parents=True,exist_ok=True)
     initial=dict(**source_state(),binary_sha256=sha(args.binary.read_bytes()))
-    lock=json.loads(FIXTURE.with_suffix('.lock.json').read_text())
-    require(lock==dict(fixture_sha256=sha(FIXTURE.read_bytes()),golden_sha256=sha((ROOT/'evals/golden-cases.md').read_bytes())),'GC-08 fixture lock drift')
-    lifecycle_lock=json.loads(LIFECYCLE.with_suffix('.lock.json').read_text())
-    require(lifecycle_lock==dict(fixture_sha256=sha(LIFECYCLE.read_bytes()),golden_sha256=lock['golden_sha256']),'GC-08 lifecycle lock drift')
-    rows=[drive(args.binary.resolve(),folder,v) for v in variants() if not args.variant or v['id']==args.variant]
+    journey_lock=load()
+    lock=strict_json(FIXTURE.with_suffix('.lock.json').read_bytes())
+    lifecycle_lock=strict_json(LIFECYCLE.with_suffix('.lock.json').read_bytes())
+    selected=[v for v in variants() if not args.variant or v['id']==args.variant]
+    rows=run_cases(selected,lambda v:drive(args.binary.resolve(),folder,v),args.variant_jobs)
+    probes=run_cases(SAFETY_MODES,lambda mode:drive(args.binary.resolve(),folder,variants()[0],mode),args.variant_jobs) if not args.variant else []
     final=dict(**source_state(),binary_sha256=sha(args.binary.read_bytes()))
     require(initial==final,'source or binary changed during GC-08 execution')
-    report=dict(source_provenance=dict(before=initial,after=final),case_id='GC-08',status='mechanical_pass',scope='scripted_whole_case_mechanics',semantic_score=None,
-        fixture_lock=lock,lifecycle_lock=lifecycle_lock,binary_sha256=sha(args.binary.read_bytes()),variants=rows,cleanup=all(all(r['cleanup'].values()) for r in rows))
-    args.evidence.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
-    print(json.dumps(dict(status=report['status'],variants=len(rows),cleanup=report['cleanup'])))
+    report=dict(source_provenance=dict(before=initial,after=final),case_id='GC-08',status='mechanical_pass',
+        scope='scripted_whole_case_mechanics',semantic_score=None,eligible_for_grading=False,release_ready=False,acceptance_complete=False,
+        fixture_lock=lock,lifecycle_lock=lifecycle_lock,journey_lock=journey_lock,binary_sha256=sha(args.binary.read_bytes()),
+        environment=dict(platform=platform.platform(),python=platform.python_version(),
+            node=subprocess.check_output(['node','--version'],text=True).strip(),go=subprocess.check_output(['go','version'],text=True).strip(),
+            binary_build=subprocess.check_output(['go','version','-m',str(args.binary)],text=True)),
+        variants=rows,safety_probes=probes,cleanup=all(all(r['cleanup'].values()) for r in rows+probes),
+        remaining=dict(parent='ERII-223',dependency='ERII-377',reminders='not implemented against existing Task',
+            semantic_score=None,current_L2='unexecuted',release_ready=False))
+    if not args.variant: validate_report(report,args.binary.resolve())
+    retain_report(args.evidence,report)
+    print(json.dumps(dict(status=report['status'],variants=len(rows),safety_probes=len(probes),cleanup=report['cleanup'],acceptance_complete=False)))
 
 
 if __name__=='__main__':main()

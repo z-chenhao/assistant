@@ -65,7 +65,7 @@ def check_suite(suite, part, source):
 def native_receipt(gate, attempt, folder, binary, suite):
     driver = importlib.import_module('verify_' + gate.name)
     path = folder / report_name(gate, attempt)
-    report = driver.read_report(path) if gate.name == 'gc02' else json.loads(path.read_text())
+    report = driver.read_report(path) if gate.name in ('gc02','gc08') else json.loads(path.read_text())
     if gate.name in ('gc01', 'gc02'):
         driver.validate_report(report, binary)
         rows = report['results']
@@ -89,12 +89,15 @@ def native_receipt(gate, attempt, folder, binary, suite):
         key = row['variant_id'] if gate.name in ('gc01', 'gc02') else row['variant']['id']
         checks = dict(row['assertions'])
         if gate.name == 'gc08':
-            for field in ('denial_assertions', 'lifecycle_assertions'):
+            for field in ('denial_assertions', 'lifecycle_assertions', 'completion_assertions'):
                 checks.update({field + '/' + k: v for k, v in row[field].items()})
+            # All four native safety branches are recomputed by prepare().
+            for probe in report['safety_probes']:
+                checks.update({'safety/'+probe['safety']['mode']+'/'+k:v for k,v in probe['safety_assertions'].items()})
         receipts.append(dict(variant_id=key, repetition=row.get('repetition', 1),
                              assertions=checks, cleanup=row['cleanup']))
     raw = path
-    if gate.name == 'gc02':
+    if gate.name in ('gc02','gc08'):
         raw = path.parent / json.loads(path.read_text())['native']['path']
     return dict(gate=gate.name, attempt=attempt, native=file_record(raw),
                 status=report['status'], semantic_score=report['semantic_score'],

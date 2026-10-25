@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Reuse locked, non-scripted inputs. Never import scripted execute()/plans.
 INPUTS = {f'GC-{n:02}': 'm6-v1' for n in (1, 2, 3, 4, 5, 6, 7, 10, 13, 15, 18)}
 INPUTS['GC-09'] = 'm1-v2'
+INPUTS['GC-08'] = 'gc08-v1'
 GAPS = {
     'GC-01': 'health connector and durable-memory adapter/clinical quality; --gc01-journey supplies week or safety inputs only',
     'GC-02': 'memory, scheduled quarterly follow-up and logical-clock driver',
@@ -34,7 +35,7 @@ GAPS = {
     'GC-05': 'historical recall and opportunity sources',
     'GC-06': 'durable learning memory and correction journey',
     'GC-07': 'device/network fixture and approved diagnostics',
-    'GC-08': 'non-scripted full event fixture and wedding Task lifecycle',
+    'GC-08': 'input transport only; weeks, reminders on the existing Task (ERII-377), live sources and wedding lifecycle quality unverified',
     'GC-09': 'complete Inbox/calendar sources and interruption journey',
     'GC-10': 'fresh local sources and stale-source adversary',
     'GC-11': 'catalog/source fixture adapter (PR32 driver remains unmerged provenance)',
@@ -58,6 +59,17 @@ def matrix():
 
 def inputs(case_id, variant_id, journey=None):
     require(case_id in INPUTS, 'ineligible: missing adapter: ' + GAPS[case_id])
+    if case_id == 'GC-08':
+        # Reuse data/wording only. No scripted reply, Tool plan, Gold or control
+        # instruction is imported into the production provider request.
+        from verify_gc08 import variants as wedding_variants, load
+        lock=load()
+        variant=next((v for v in wedding_variants() if v['id']==variant_id),None)
+        require(variant is not None and journey is None,'unknown GC-08 variant or journey')
+        return dict(case_id=case_id,case_version=1,variant_id=variant_id,seed=1701,
+            clock=variant['source']['clock'],context=json.dumps(variant['source'],ensure_ascii=False),
+            events=[dict(at=variant['source']['clock'],text=t) for t in variant['turns']],
+            fixture_digest=digest(variant),lock=lock)
     dataset, _, lock = load_contract(ROOT, INPUTS[case_id])
     case = next(c for c in dataset['cases'] if c['case_id'] == case_id)
     variant = next((v for v in variants(dataset, case) if v['variant_id'] == variant_id), None)

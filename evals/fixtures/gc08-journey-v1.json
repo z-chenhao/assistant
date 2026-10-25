@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "scope": "Supplemental controls; original wedding source, turns and lifecycle fixture unchanged",
+  "complete": "完成婚礼筹备，保留已提交的可审计清单。",
+  "cancel": "取消婚礼筹备，不再联系酒店，保留已提交清单。",
+  "blocked_by": "ERII-377: reminders against the existing ongoing Task; no second event Task",
+  "remaining_parent": "ERII-223"
+}

@@ -76,7 +76,7 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		if last.Role == "tool" {
 			switch prior.Name {
 			case "mcp__wedding__read":
-				return call(task.ManageName, task.ManageRequest{Operation: "create", Task: "婚礼准备\nWedding source: " + last.Text + "\n" + user})
+				return call(task.ManageName, task.ManageRequest{Operation: "create", CompletionPolicy: "ongoing", Task: "婚礼准备\nWedding source: " + last.Text + "\n" + user})
 			case task.SearchName:
 				var matches []task.Summary
 				if json.Unmarshal([]byte(last.Text), &matches) != nil || len(matches) != 1 {
@@ -85,12 +85,18 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 				if strings.Contains(user, "暂停") {
 					return call(task.ManageName, task.ManageRequest{Operation: "pause", TaskRef: matches[0].TaskRef})
 				}
+				if strings.Contains(user, "完成婚礼筹备") {
+					return call(task.ManageName, task.ManageRequest{Operation: "complete", TaskRef: matches[0].TaskRef})
+				}
+				if strings.Contains(user, "取消婚礼筹备") {
+					return call(task.ManageName, task.ManageRequest{Operation: "cancel", TaskRef: matches[0].TaskRef})
+				}
 				return call(task.ManageName, task.ManageRequest{Operation: "append", TaskRef: matches[0].TaskRef, Instruction: user, ArtifactRefs: update.Details.ArtifactRefs})
 			default:
 				return llm.GenerationResult{Text: "已接到同一婚礼准备事项。"}
 			}
 		}
-		if strings.Contains(user, "128") || strings.Contains(user, "酒店") || strings.Contains(user, "继续") || strings.Contains(user, "暂停") {
+		if strings.Contains(user, "128") || strings.Contains(user, "酒店") || strings.Contains(user, "继续") || strings.Contains(user, "暂停") || strings.Contains(user, "完成婚礼筹备") || strings.Contains(user, "取消婚礼筹备") {
 			return call(task.SearchName, task.SearchRequest{Query: "婚礼", Scope: "all"})
 		}
 		return call("mcp__wedding__read", map[string]string{"resource": "source"})
@@ -225,6 +231,10 @@ func weddingReply(r llm.GenerationRequest) llm.GenerationResult {
 		return call("mcp__wedding__send", mail)
 	}
 	if prior.Name == "mcp__wedding__send" {
+		var receipt struct{ Status string }
+		if json.Unmarshal([]byte(last.Text), &receipt) == nil && receipt.Status == "sent" {
+			return llm.GenerationResult{Text: "已核实酒店邮件发送成功，收件人、正文与附件使用已审批的冻结版本。"}
+		}
 		return llm.GenerationResult{Text: "没有已核实的发送结果，保留草稿，不重试不确定副作用。"}
 	}
 	return llm.GenerationResult{Text: text}

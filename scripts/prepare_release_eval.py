@@ -159,8 +159,12 @@ def prepare_monitor(report):
 
 
 def prepare_wedding(report):
-    """Six exact, ungraded GC-08 previews; raw Task/runtime data stays private."""
+    """Exact, ungraded GC-08 previews; raw Task/runtime data stays private."""
     import verify_gc08 as driver
+    try:
+        driver.validate_report(report)
+    except RuntimeError as error:
+        raise ValueError(str(error)) from error
     lock=json.loads(driver.FIXTURE.with_suffix('.lock.json').read_text())
     lifecycle_lock=json.loads(driver.LIFECYCLE.with_suffix('.lock.json').read_text())
     expected=driver.variants()
@@ -169,7 +173,7 @@ def prepare_wedding(report):
     if (report.get('cleanup') is not True or report.get('semantic_score') is not None or
             report.get('status')!='mechanical_pass' or report.get('fixture_lock')!=lock or report.get('lifecycle_lock')!=lifecycle_lock or
             not provenance.get('before') or provenance['before']!=provenance.get('after') or
-            len(rows)!=6 or {r['variant']['id'] for r in rows}!={v['id'] for v in expected}):
+            len(rows)!=len(expected) or {r['variant']['id'] for r in rows}!={v['id'] for v in expected}):
         raise ValueError('complete locked ungraded GC-08 receipts required')
     packets=[]
     for row in rows:
@@ -301,6 +305,9 @@ def main():
         parser.error('--evidence must be under repository evidence/')
     output.unlink(missing_ok=True)
     report = json.loads(args.input.read_text())
+    if report.get('kind') == 'gc08_native_manifest':
+        from verify_gc08 import read_report
+        report = read_report(args.input)
     if report.get('kind') == 'gc05_native_manifest':
         from verify_gc05 import read_report
         report = read_report(args.input)

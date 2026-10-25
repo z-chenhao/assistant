@@ -1,6 +1,7 @@
 """GC-08 assertions reject lost facts, guessed tables and premature dispatch."""
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +15,64 @@ import prepare_release_eval as evaluator
 
 
 class WeddingTests(unittest.TestCase):
+    def test_frozen_nineteen_source_blocks_and_existing_locks(self):
+        lock=journey.load()
+        self.assertEqual(lock['manifest_sha256'],'0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556')
+        self.assertEqual([b['line'] for b in lock['frozen_blocks']],
+            [257,259,261,262,263,264,265,267,726,728,738,740,741,742,744,746,747,748,749])
+
+    def test_native_artifact_trace_rejects_self_consistent_forged_summary(self):
+        text='{"facts":{"guests":128}}';ref='artifact:original'
+        artifact=dict(text=text,ref=ref,sha256=journey.sha(text.encode()),document=json.loads(text))
+        tool=dict(tool_name='builtin__artifact__manage',provider_call_id='save',status='succeeded',attempt_count=1,
+            arguments_json=json.dumps(dict(operation='save',text=text)),result_json=json.dumps(dict(artifact_refs=[ref])))
+        tool['request_hash']=journey.call_hash(tool)
+        self.assertTrue(journey.artifact_trace(dict(tools=[tool]),[artifact]))
+        bad=dict(artifact,text='{"facts":{"guests":130}}',document=dict(facts=dict(guests=130)))
+        bad['sha256']=journey.sha(bad['text'].encode())
+        self.assertFalse(journey.artifact_trace(dict(tools=[tool]),[bad]))
+        for change in (dict(attempt_count=2),dict(request_hash='forged'),dict(status='failed'),dict(result_json='{"artifact_refs":[]}')):
+            self.assertFalse(journey.artifact_trace(dict(tools=[dict(tool,**change)]),[artifact]))
+
+    def test_native_manifest_rejects_missing_corrupt_unsafe_and_summary_drift(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'gc08.json'
+            report=dict(status='mechanical_pass',variants=[],safety_probes=[],cleanup=True,
+                source_provenance=dict(before=dict(source_sha='a'*40)),binary_sha256='b'*64)
+            journey.retain_report(path,report)
+            self.assertEqual(journey.read_report(path),report)
+            original=path.read_text();manifest=json.loads(original)
+            raw=path.parent/manifest['native']['path'];data=raw.read_bytes()
+            raw.write_bytes(data+b' ')
+            with self.assertRaises(ValueError):journey.read_report(path)
+            raw.write_bytes(data)
+            for mutate in (lambda m:m.update(native_bytes=1),lambda m:m['summary'].update(cleanup=False),
+                           lambda m:m['summary'].update(variants=False),lambda m:m['native'].update(path='../outside')):
+                bad=json.loads(original);mutate(bad);path.write_text(json.dumps(bad))
+                with self.assertRaises((ValueError,RuntimeError)):journey.read_report(path)
+            path.write_text(original);raw.unlink()
+            with self.assertRaises(ValueError):journey.read_report(path)
+
+    @unittest.skipUnless(os.environ.get('ERII_GC08_TEST_REPORT'),'native CLI report supplied by verification run')
+    def test_complete_cli_consumer_rejects_corruption_with_all_saved_flags_true(self):
+        report=journey.read_report(Path(os.environ['ERII_GC08_TEST_REPORT']))
+        journey.validate_report(report)
+        self.assertEqual(len(evaluator.prepare(report)['judge_packets']),7)
+        changes=[lambda r:r['variants'].pop(),lambda r:r['variants'].append(copy.deepcopy(r['variants'][0])),
+            lambda r:r['safety_probes'].pop(),lambda r:r.update(semantic_score=100),lambda r:r.update(cleanup=False),
+            lambda r:r['source_provenance']['after'].update(source_sha='forged'),lambda r:r.update(journey_lock={}),
+            lambda r:r['variants'][0]['completion']['state']['tasks'][0].update(status='active'),
+            lambda r:r['variants'][0]['lifecycle']['resumed']['tasks'][0].update(completion_policy='once'),
+            lambda r:r['variants'][0]['completion']['crash'].update(returncode=0),
+            lambda r:r['variants'][0]['completion']['artifacts'].clear(),
+            lambda r:r['safety_probes'][0]['safety']['remote'][0].update(recipient='wrong@example.test'),
+            lambda r:r['safety_probes'][1]['safety']['remote'].append(dict(duplicate=True)),
+            lambda r:next(t for t in r['safety_probes'][2]['safety']['state']['tools'] if t['tool_name']=='mcp__wedding__send').update(attempt_count=2),
+            lambda r:r['safety_probes'][3]['safety']['state']['tasks'][0].update(status='active')]
+        for change in changes:
+            bad=copy.deepcopy(report);change(bad)
+            with self.assertRaises((ValueError,RuntimeError,KeyError,IndexError,TypeError)):evaluator.prepare(bad)
+
     def documents(self):
         source=journey.variants()[0]['source']
         first=dict(event=source['event'],clock=source['clock'],checklist=copy.deepcopy(source['checklist']),
@@ -67,7 +126,7 @@ class WeddingTests(unittest.TestCase):
 
     def test_lock_variants_and_original_inputs_have_no_plans_or_answers(self):
         variants=journey.variants()
-        self.assertEqual(len(variants),6)
+        self.assertEqual(len(variants),7)
         self.assertEqual(variants[0]['turns'],journey.TURNS)
         lock=json.loads(journey.FIXTURE.with_suffix('.lock.json').read_text())
         self.assertEqual(lock['fixture_sha256'],journey.sha(journey.FIXTURE.read_bytes()))
@@ -97,7 +156,7 @@ class WeddingTests(unittest.TestCase):
             metadata.append(dict(artifact_ref=ref,content_hash=digest,task_id='task-id',run_id='root'+str(i)))
         roots=[dict(run_id='root'+str(i),kind='worker',task_id='task-id',parent_run_id=None,
                     task_epoch=i+1 if i<4 else 6,status='completed',model_snapshot_id='model',capability_snapshot_id='worker') for i in range(5)]
-        task=dict(task_id='task-id',task_ref='task:existing',anchor_task='immutable',status='completed',task_epoch=3,completion_policy='once')
+        task=dict(task_id='task-id',task_ref='task:existing',anchor_task='immutable',status='active',task_epoch=3,completion_policy='ongoing')
         updates=[dict(root_run_id=r['run_id']) for r in roots[:3]]
         actions=[dict(operation='create'),*[dict(operation='append',taskRef='task:existing',instruction=t) for t in journey.TURNS[1:]],
                  dict(operation='append',taskRef='task:existing',instruction=fixture['continue']),dict(operation='pause',taskRef='task:existing'),
@@ -116,7 +175,7 @@ class WeddingTests(unittest.TestCase):
         paused=copy.deepcopy(interrupted);paused['tasks'][0].update(status='paused',task_epoch=5)
         paused['runs'][-1].update(status='cancelled',error_code='task_paused')
         paused['tools'].append(copy.deepcopy(tools[4]))
-        after=copy.deepcopy(paused);after['tasks'][0].update(status='completed',task_epoch=6);after['runs'].append(roots[4])
+        after=copy.deepcopy(paused);after['tasks'][0].update(status='active',task_epoch=6);after['runs'].append(roots[4])
         after['artifact']=metadata;after['updates'].append(dict(root_run_id='root4'))
         after['inbox'].append(dict(message_json=json.dumps(dict(origin='runtime',details={}))));after['reporter_dedup'].append({})
         inputs=journey.TURNS+[fixture[k] for k in ('continue','pause','resume')]
@@ -206,7 +265,9 @@ class WeddingTests(unittest.TestCase):
         # Isolate the new native delivery gate while keeping the real lifecycle
         # observer. Original three-turn and denial gates have separate tests.
         checks=dict(unrelated=True)
-        with patch.object(journey,'observe',return_value=checks), patch.object(journey,'denial_observe',return_value=checks):
+        # This synthetic unit isolates the original lifecycle gate. Complete
+        # manifests/completion/safety are checked against CLI receipts below.
+        with patch.object(journey,'validate_report'), patch.object(journey,'observe',return_value=checks), patch.object(journey,'denial_observe',return_value=checks):
             rows=[]
             for variant in journey.variants():
                 row=self.lifecycle_row();row.update(variant=variant,assertions=checks,denial_assertions=checks,
@@ -231,7 +292,7 @@ class WeddingTests(unittest.TestCase):
                 fixture_lock=json.loads(journey.FIXTURE.with_suffix('.lock.json').read_text()),
                 lifecycle_lock=json.loads(journey.LIFECYCLE.with_suffix('.lock.json').read_text()),
                 source_provenance=dict(before=dict(sha='fixture'),after=dict(sha='fixture')))
-            self.assertEqual(len(evaluator.prepare(report)['judge_packets']),6)
+            self.assertEqual(len(evaluator.prepare(report)['judge_packets']),7)
             # Judge must reject B1 even if the author forges every saved check.
             base=rows[0];state=base['lifecycle']['resumed']
             failure='已提交清单不可用，未猜测宾客或桌数，未联系任何人。'

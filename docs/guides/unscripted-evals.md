@@ -17,12 +17,13 @@ The command emits the authoritative 20-row matrix with individual gaps.
 | Cases | Executable boundary | Missing full adapter |
 | --- | --- | --- |
 | GC-01–07 | Locked `m6-v1` context and events, six variants | Sources, durable Memory, correction/forget, files, schedules and approvals as applicable |
+| GC-08 | Locked `gc08-v1` source and three original turns, seven data/wording variants | Weeks, existing-Task reminders (ERII-377), calendar/live connectors and lifecycle adapter |
 | GC-09 | Locked `m1-v2` context and events, six variants | Full Inbox/calendar and interruption journey |
 | GC-10 | Locked `m6-v1` context and events, six variants | Fresh local sources and stale-source adversary |
 | GC-13 | Locked `m6-v1` context and events, six variants | Booking browser, approval and unknown outcome |
 | GC-15 | Locked `m6-v1` context and events, six variants | Native files, multimodal evidence and Artifacts |
 | GC-18 | Locked `m6-v1` context and events, six variants | Files, concurrent Tasks, pause/append and delivery |
-| GC-08, 11, 12, 14, 16, 17, 19, 20 | Missing; freeze returns `ineligible`, exit 2 | Non-scripted fixture and maintained lifecycle adapter |
+| GC-11, 12, 14, 16, 17, 19, 20 | Missing; freeze returns `ineligible`, exit 2 | Non-scripted fixture and maintained lifecycle adapter |
 
 Every current execution has `scope=input_fragment`, `eligible_for_grading=false`
 and `final_score=null`. A profile cannot upgrade coverage. A text mention of a

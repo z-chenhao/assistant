@@ -171,6 +171,28 @@ func TestWeddingFixturePauseUsesMainControlWithoutInstructionOrNewTask(t *testin
 	}
 }
 
+func TestWeddingFixtureUsesOngoingPolicyAndExplicitTerminalControls(t *testing.T) {
+	r := llm.GenerationRequest{Messages: []llm.Message{{Role: "user", Text: "婚礼准备现在最应该处理什么？"},
+		{Role: "assistant", ToolCalls: []llm.ToolCall{{Name: "mcp__wedding__read", Arguments: `{}`}}},
+		{Role: "tool", Text: `{"event":{"title":"婚礼"}}`}}}
+	created := weddingReply(r)
+	if len(created.ToolCalls) != 1 || !strings.Contains(created.ToolCalls[0].Arguments, `"completionPolicy":"ongoing"`) {
+		t.Fatal(created)
+	}
+	for _, tc := range []struct{ input, operation string }{{"完成婚礼筹备，保留清单。", "complete"}, {"取消婚礼筹备，不再联系酒店。", "cancel"}} {
+		r.Messages = []llm.Message{{Role: "user", Text: tc.input}}
+		search := weddingReply(r)
+		if len(search.ToolCalls) != 1 || search.ToolCalls[0].Name != "builtin__task__search" {
+			t.Fatal(search)
+		}
+		r.Messages = append(r.Messages, llm.Message{Role: "assistant", ToolCalls: search.ToolCalls}, llm.Message{Role: "tool", Text: `[{"taskRef":"task:existing","status":"active"}]`})
+		control := weddingReply(r)
+		if len(control.ToolCalls) != 1 || control.ToolCalls[0].Name != "builtin__task__manage" || control.ToolCalls[0].Arguments != fmt.Sprintf(`{"operation":%q,"taskRef":"task:existing"}`, tc.operation) {
+			t.Fatal(control)
+		}
+	}
+}
+
 func TestWeddingFixtureFinishesRecoveredChecklistAfterCompaction(t *testing.T) {
 	source, err := os.ReadFile("../../../evals/fixtures/gc08-v1.json")
 	if err != nil {
