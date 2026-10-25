@@ -1,5 +1,14 @@
 # Feature map
 
+## Frozen Golden common-03 audit (ERII-246)
+
+| Feature | Reach / authoritative entry | Evidence and limits |
+| --- | --- | --- |
+| Reference and evaluation-boundary dispositions | `make audit-golden-common-03`; `release_audit.py` / `release_package.audit_package` | 18 frozen blocks, 36 scoped duties, all 21 mandatory/policy duties routed to three existing owners. References, optional smoke and peer cooperation retain explicit background/deferred reasons. No certified requirements. |
+| Integrity and rejection | `python3 -m unittest discover -s scripts -p 'test_release_*.py'`; `test_release_golden_common03.py` | Launch/Doctor load exact identities/references; Drive reads the real CLI; Evidence is `evidence/golden-common-03.json`; Cleanup removes disposable reports. Strong mode checks original manifest/native bytes/Git. Both Fake and pre-approval Live Shadow boundaries, mixed deferred/v1 tree duties and observable-only grading stay explicit. |
+
+See [observations, finite routes and limits](../docs/audits/golden-common-03.md).
+
 ## Frozen Golden common-02 audit (ERII-245)
 
 | Feature | Reach / authoritative entry | Evidence and limits |

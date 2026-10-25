@@ -1,5 +1,10 @@
 # Bounded baseline audits
 
+[golden-common-03](golden-common-03.md) records ERII-246's final 18 Golden
+common blocks: 13 reference links and five evaluation-boundary clauses. Its
+36 scoped duties preserve every background/deferred reason and all 21 mandatory
+routes. Use `make audit-golden-common-03`; audit completion certifies no release.
+
 [golden-common-02](golden-common-02.md) records ERII-245's 80 exact blocks from
 GC-05's overview through the first three product references. Its 476 duties retain
 all 467 mandatory/policy routes, three field maps, SC-01–13 and current ungraded
