@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 
 from case_runner import load_contract, variants
 from fixture_pool import run_cases
@@ -279,6 +280,8 @@ def main():
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--evidence',type=Path,required=True)
     parser.add_argument('--validate',action='store_true')
+    parser.add_argument('--variant-jobs',type=int,choices=(1,2),default=2,
+        help='Independent fixture workers; each variant retains five serial repetitions')
     args = parser.parse_args(); binary = args.binary.resolve()
     if args.validate:
         print(json.dumps(validate_report(read_report(args.evidence),binary))); return
@@ -291,14 +294,19 @@ def main():
         remaining=dict(parent='ERII-223',semantic_score=None,current_L2='unexecuted',release_ready=False,
             unscripted='unscripted_cases.py freeze --case GC-10; original conversation inputs only; connected freshness/location/failure adapter still required before whole-case live grading',
             child_approval_unknown='Synchronous Main only; no Task/Child/Artifact or authorized external action. Significant cost stops at GC-13 handoff; unknown effects, cancel and old Task epochs are inapplicable.'))
+    order = {(v['variant_id'],n):i*REPEATS+n for i,v in enumerate(variants(*inputs())) for n in range(1,REPEATS+1)}
+    mutex = threading.Lock()
     try:
         def series(variant):
             for repetition in range(1,REPEATS+1):
-                row = drive(binary,variant['variant_id'],repetition,args.evidence.with_suffix('.failure.json'))
-                report['results'].append(row)
-                print((row['variant_id'],repetition),{k:v for k,v in row['assertions'].items() if not v},flush=True)
+                failure = args.evidence.with_suffix('.'+variant['variant_id']+'.failure.json')
+                row = drive(binary,variant['variant_id'],repetition,failure)
+                with mutex:
+                    report['results'].append(row)
+                    print((row['variant_id'],repetition),{k:v for k,v in row['assertions'].items() if not v},flush=True)
                 require(all(row['assertions'].values()),'GC-10 assertion failure')
-        run_cases(list(variants(*inputs())),series,1)
+        run_cases(list(variants(*inputs())),series,args.variant_jobs)
+        report['results'].sort(key=lambda r:order[r['variant_id'],r['repetition']])
         report['identity']['source_after'] = source_identity()
         report.update(status='mechanical_pass',cleanup=True)
         report['rejection_probes'] = rejection_probes(report['results'][0])
@@ -307,6 +315,7 @@ def main():
         report['status'] = 'inconclusive'
         raise
     finally:
+        report['results'].sort(key=lambda r:order[r['variant_id'],r['repetition']])
         retain_report(args.evidence,report)
     print(json.dumps(result))
 

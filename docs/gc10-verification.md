@@ -17,7 +17,11 @@ python3 scripts/prepare_release_eval.py --input evidence/gc10.json --evidence ev
 The maintained suite runs this entry as the communication/channels `gc10` gate.
 The CI collector independently recomputes the native receipt before emitting its
 compact manifest. It preserves all six variants and five serial repetitions per
-variant. There is no reduced success mode.
+variant. Two independent fixture workers share the existing bounded fixture pool;
+`--variant-jobs 1` selects serial execution. Each variant owns its temporary root,
+processes and failure file. Joined results retain canonical inventory order.
+The existing CI job deadline and gate-worker limits are unchanged. There is no
+reduced success mode.
 
 The original M6 context and event pass unchanged through CLI ingress. The
 explicit `local` test Bridge reads weather through an actual sandboxed, read-only
