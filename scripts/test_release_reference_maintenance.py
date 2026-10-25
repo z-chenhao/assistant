@@ -1,6 +1,7 @@
 """Independent Git histories: edited shared code cannot borrow an audited PASS."""
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -177,6 +178,23 @@ class ReferenceMaintenanceTests(unittest.TestCase):
                 if mutation == 'old_version': ledger['reference_maintenance']['version'] = 1
                 with self.assertRaises(ValueError):
                     package.audit_package(self.root, ledger, self.units)
+
+    def test_proof_store_cannot_use_or_reinitialize_the_callers_git_objects(self):
+        current = self.refresh()['reference_maintenance']['current']
+        original_config = (self.root / '.git/config').read_bytes()
+        before = {p.relative_to(self.root / '.git/objects')
+                  for p in (self.root / '.git/objects').rglob('*') if p.is_file()}
+        with patch.dict(os.environ, {'GIT_DIR': str(self.root / '.git'),
+                        'GIT_OBJECT_DIRECTORY': str(self.root / '.git/objects'),
+                        'GIT_ALTERNATE_OBJECT_DIRECTORIES': str(self.root / '.git/objects')}):
+            package.check_source_git_proof(self.root, self.current_sha, current['git_proof'], current['references'])
+            incomplete = copy.deepcopy(current['git_proof'])
+            incomplete['trees'].popitem()
+            with self.assertRaises(ValueError):
+                package.check_source_git_proof(self.root, self.current_sha, incomplete, current['references'])
+        self.assertEqual((self.root / '.git/config').read_bytes(), original_config)
+        self.assertEqual({p.relative_to(self.root / '.git/objects')
+                          for p in (self.root / '.git/objects').rglob('*') if p.is_file()}, before)
 
     def test_squash_and_fresh_consumer_revalidate_without_the_old_source_object(self):
         ledger = self.refresh()

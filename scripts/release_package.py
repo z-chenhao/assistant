@@ -8,6 +8,7 @@ from collections import Counter
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -102,8 +103,8 @@ def local_file(root, name):
     return path
 
 
-def git(root, *args, input=None):
-    result = subprocess.run(['git', '-C', str(root), *args], input=input, capture_output=True)
+def git(root, *args, input=None, env=None):
+    result = subprocess.run(['git', '-C', str(root), *args], input=input, env=env, capture_output=True)
     if result.returncode:
         raise ValueError('package Git binding rejected: ' + ' '.join(args))
     return result.stdout
@@ -135,7 +136,13 @@ def check_source_git_proof(root, revision, proof, references):
         raise ValueError('missing source Git proof')
     with tempfile.TemporaryDirectory(prefix='erii-audit-git-proof-') as temp:
         store = Path(temp)
-        git(store, 'init', '--bare', '--object-format=sha1', '-q')
+        # Git environment/config must not redirect writes or let omitted proof
+        # objects resolve from the caller's object database or alternates.
+        isolated = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        isolated.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+        def object_git(*args, input=None):
+            return git(store, *args, input=input, env=isolated)
+        object_git('init', '--bare', '--object-format=sha1', '-q')
         objects = [('commit', revision, proof['commit'])]
         objects.extend(('tree', oid, raw) for oid, raw in proof['trees'].items())
         for kind, oid, encoded in objects:
@@ -145,19 +152,19 @@ def check_source_git_proof(root, revision, proof, references):
                 raw = base64.b64decode(encoded, validate=True)
             except (ValueError, TypeError) as error:
                 raise ValueError('invalid source Git object bytes') from error
-            actual = git(store, 'hash-object', '-w', '-t', kind, '--stdin', input=raw).decode().strip()
+            actual = object_git('hash-object', '-w', '-t', kind, '--stdin', input=raw).decode().strip()
             if actual != oid:
                 raise ValueError('source Git object hash mismatch')
         for ref in references:
             path = ref.partition('#')[0]
-            entry = git(store, 'ls-tree', '-z', revision, '--', path)
+            entry = object_git('ls-tree', '-z', revision, '--', path)
             header, separator, name = entry.partition(b'\t')
             fields = header.split()
             if (not separator or name != path.encode() + b'\0' or len(fields) != 3 or
                     fields[0] not in (b'100644', b'100755') or fields[1] != b'blob'):
                 raise ValueError('missing source Git file: ' + ref)
             data = local_file(root, path).read_bytes()
-            oid = git(store, 'hash-object', '--stdin', input=data).strip()
+            oid = object_git('hash-object', '--stdin', input=data).strip()
             if oid != fields[2] or entry != git(root, 'ls-tree', '-z', 'HEAD', '--', path):
                 raise ValueError('current Git blob mismatch: ' + ref)
 
