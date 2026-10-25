@@ -2,10 +2,46 @@
   "insurance_quotes": {
     "coverage_equal": true,
     "quotes": [
-      {"id": "A", "premium_cny": 5150, "cashback_cny": 0, "cashback_written": true},
-      {"id": "B", "premium_cny": 5738.49, "cashback_cny": 700, "cashback_written": false},
-      {"id": "C", "premium_cny": 5980, "cashback_cny": 300, "cashback_written": true}
+      {
+        "id": "A",
+        "premium_cny": 5150,
+        "cashback_cny": 0,
+        "cashback_written": true,
+        "name": "阳光 A",
+        "services": [
+          "道路救援2次"
+        ]
+      },
+      {
+        "id": "B",
+        "premium_cny": 5738.49,
+        "cashback_cny": 700,
+        "cashback_written": false,
+        "name": "太保 B",
+        "services": [
+          "道路救援2次",
+          "代驾1次",
+          "代办年检"
+        ]
+      },
+      {
+        "id": "C",
+        "premium_cny": 5980,
+        "cashback_cny": 300,
+        "cashback_written": true,
+        "name": "平安 C",
+        "services": [
+          "道路救援2次",
+          "代驾1次",
+          "车辆检测",
+          "代办年检"
+        ]
+      }
     ],
-    "weights": {"reliability": 45, "net_price": 35, "services": 20}
+    "weights": {
+      "reliability": 45,
+      "net_price": 35,
+      "services": 20
+    }
   }
 }
