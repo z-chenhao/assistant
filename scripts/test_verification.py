@@ -198,10 +198,23 @@ class VerificationTests(unittest.TestCase):
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers'})
-        self.assertEqual(len(shards), 4)
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers','communication'})
+        self.assertEqual(len(shards), 3)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
+        matrix = workflow.split('  verify:', 1)[1].split('    steps:', 1)[0]
+        self.assertEqual(matrix.count('- shard: communication'), len(suite.COMMUNICATION_PARTS))
+        self.assertEqual(re.findall(r'communicationpart: (\S+)', matrix), list(suite.COMMUNICATION_PARTS))
+        communication_join = workflow.split('  communication_join:', 1)[1].split('  providers:', 1)[0]
+        self.assertIn('needs: verify', communication_join)
+        self.assertIn('test "$PART_RESULT" = success', communication_join)
+        self.assertIn('scripts/ci_communication.py join', communication_join)
+        self.assertIn('evidence-communication-part-*', communication_join)
+        verify = workflow.split('  verify:', 1)[1].split('  communication_join:', 1)[0]
+        self.assertIn('scripts/ci_communication.py collect', verify)
+        self.assertIn('part=(--communication-part "${{ matrix.communicationpart }}")', verify)
+        self.assertIn('evidence/communication-receipts.json', verify)
+        self.assertIn('--name sdk-doctor --phase cleanup', verify)
         checks = workflow[workflow.index('  checks:'):]
         needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
@@ -213,7 +226,7 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 12)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 13)
         self.assertIn('racepart: ["packages", "sqlite"]', workflow)
         race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
         self.assertIn('needs: race', race_join)

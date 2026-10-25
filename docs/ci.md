@@ -22,7 +22,9 @@ weakens `Ubuntu checks`. No release is published by an ordinary PR.
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
-    SHA --> Verify[Runtime / security / delivery / communication]
+    SHA --> Verify[Runtime / security / delivery / communication parts]
+    Verify --> CommunicationJoin[Complete communication evidence]
+    CommunicationJoin --> Gate
     SHA --> Providers[Providers CLI / models]
     Providers --> ProviderJoin[Complete providers evidence]
     ProviderJoin --> Gate
@@ -53,7 +55,7 @@ its guards were not relaxed. The new pipeline avoids that reuse entirely.
 Frontend build/TypeScript dependencies install only in unit/lint. Playwright
 installs only in unit/lint, delivery and the five Browser-using M6 parts. Pi and
 QuickJS still install everywhere, including providers' offline packaging gate.
-Across the twenty-two execution jobs only unit/lint installs frontend dependencies;
+Across the execution jobs only unit/lint installs frontend dependencies;
 seven jobs install Playwright. Lockfile inputs, per-job exact-source builds, every
 assertion and repetition count remain unchanged. Clean-runner complete CI is the
 dependency-closure proof; install counts alone are not wall-time measurements.
@@ -131,6 +133,61 @@ Doctor/cleanup/upload) and the join. The joined `suite-providers.json` restores
 the original logical order and retains both part identities/timings. Individual
 artifacts retain raw reports; the join uploads only its canonical suite and phase
 receipt. `make verify` keeps its complete unpartitioned providers path.
+
+## Communication budget and evidence
+
+Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
+uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
+run the original health/goals commands, each retaining six independent variants
+and five serial repetitions per variant. `channels` keeps GC-12 ×5 and GC-08,
+GC-14 and GC-16 once each, with the original two gate workers. This changes
+placement only: fixture inputs, oracles, Host limits, approvals, deadlines,
+fault injection, state isolation and cleanup remain unchanged. Every cell keeps
+the ten-minute job timeout, its own locked setup/build, disk fixtures, sandbox,
+SDK Doctor and exact-head checkout. `make verify VERIFY_SHARD=communication`
+retains the complete unpartitioned local path and original bounded queue.
+
+Run [40164000101](https://github.com/z-chenhao/erii/actions/runs/40164000101),
+source `2354a4d7a8f82aec844232d600a473feb2cd2d3f`, exhausted the communication
+job's ten-minute limit. Native timestamps show 75 seconds before verification;
+GC-12's five rounds took 282.90 seconds, GC-01 took 438.50 seconds, and GC-02
+then shared the remaining slots with short gates. GC-02 and GC-14 returned 130
+when the outer job stopped; GC-16 had no completed evidence. SDK Doctor took
+four seconds and evidence upload took ten seconds; job completion followed at
+05:12:56Z. These are budget-cancellation observations, not product assertion failures or Case scores.
+Splitting the independent long series removes their accumulated queue delay;
+complete exact-SHA job results, including setup and teardown, establish the
+remaining budget rather than successful test-step times alone.
+
+`ci_communication.py collect` reopens the native reports and invokes their
+existing validators before writing a compact `communication-receipts.json`.
+It retains exact variant/repetition order, recomputed assertion results, cleanup,
+native file size/hash, source/binary/workflow identity and all tracked evaluation
+file hashes. Source, fixture and executable bytes must stay fixed throughout
+validation. GC-02's existing manifest is resolved and hash-checked locally.
+The raw reports stay in the producer's evidence directory; CI uploads the small
+manifest, source-bound suite, timings, profiles and phase receipts. Keep native
+local bytes in the durable evidence root for independent review; a manifest
+without them cannot independently certify a Golden Case or release.
+
+`Complete communication evidence` requires the entire verification matrix to
+succeed, including Doctor and upload, then joins exactly the three parts.
+It checks the current clean checkout, manifest/suite hashes, matching identities,
+frozen evaluation hashes, all original gate attempts and variant repetitions,
+true assertions and complete cleanup. Missing, duplicate, reordered, failed,
+cancelled, focused or drifted inputs fail closed. Both that join and the matrix
+are required by `Ubuntu checks`. Failed collection/join clears any prior success.
+The joined `suite-communication.json` restores the original logical order and
+retains each part's manifest; no native payload or semantic grade is invented.
+
+```sh
+ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard communication --communication-part gc01 --binary bin/erii --evidence evidence/communication-parts/gc01 --jobs 1
+python3 scripts/ci_communication.py collect --part gc01 --binary bin/erii --evidence evidence/communication-parts/gc01
+# Repeat these two commands for gc02 and channels, each with its own directory.
+python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence/communication-joined
+```
+
+## M6 scheduling
 
 M6 reuses the existing `fixture_pool.py` with capacity four. Travel fixtures
 keep capacity two in a separate admission group because each drives Main and a
