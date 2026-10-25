@@ -18,7 +18,7 @@ import threading
 from case_runner import load_contract, variants
 from fixture_pool import run_cases
 from release_audit import inventory
-from run_m6_cases import (personal, state, execute, save_report, remember, recall,
+from run_m6_cases import (personal, state, execute, save_report, remember,
                           open_bytes, no_external_writes)
 from terminal_driver import Terminal
 from unscripted_cases import source_identity
@@ -90,6 +90,13 @@ def review_source():
 const result={goals,support,evidence_refs:goals.map(h=>h.source_ref),ranking:null,scope:"scripted current-memory readback; values remain the user's decision"};''', 'goals-review.json')
 
 
+def goal_recall(h, key):
+    # Keep the real mixed-source ToolInvocation as evidence, but do not echo
+    # Conversation/code plans back into later model replies and retrieval.
+    observed = execute(h,key,'return (await tools.builtin__memory__search({query:"人生 独立开发",limit:20})).filter(h=>h.source_type==="memory");')
+    return observed
+
+
 def journey(h, variant_id, row):
     fixture, _ = load()
     case, variant = inputs(variant_id)
@@ -97,7 +104,8 @@ def journey(h, variant_id, row):
     world = case['world']
     row['core_ref'] = remember(h, 'initial-core', world['memory'][0]['content'])
     row['old_ref'] = remember(h, 'initial-exploration', world['memory'][1]['content'])
-    row['initial_hits'] = recall(h,'initial-goals','人生 独立开发')
+    row['initial_recall'] = goal_recall(h,'initial-goals')
+    row['initial_hits'] = row['initial_recall']['value']
     work(h)
     row['initial'] = native(h)
     def select(bridge):
@@ -140,7 +148,8 @@ answered_income:null,ranking:null};''', 'interview-resume.json'))
     records = readback(h)['memory']['records']
     row['current_ref'] = 'memory:' + next(r['memory_id'] for r in records if r['memory_id'].startswith(row['memory_event_id']))
     select('capabilities')
-    row['corrected_hits'] = recall(h, 'current-goal', '人生 独立开发')
+    row['corrected_recall'] = goal_recall(h, 'current-goal')
+    row['corrected_hits'] = row['corrected_recall']['value']
     work(h)
     row['before_request'] = native(h)
     send_event(3)
@@ -184,12 +193,18 @@ answered_income:null,ranking:null};''', 'interview-resume.json'))
     row['fresh_receipt'] = h.send('unrelated', fixture['unrelated'])
     h.command('chat', 'work'); work(h)
     row['after_forget'] = native(h)
-    row['forgotten_hits'] = recall(h, 'forgotten-goal', '人生 独立开发')
+    row['forgotten_recall'] = goal_recall(h, 'forgotten-goal')
+    row['forgotten_hits'] = row['forgotten_recall']['value']
     work(h)
     row['final'] = native(h)
     require(h.send('monthly', plan) == row['schedule_receipt'], 'cancelled input receipt drift')
     h.command('automation', 'tick'); h.command('chat', 'work'); work(h)
     row['replayed'] = native(h)
+
+
+def recorded(call, tools):
+    keys = ('invocation_id','run_id','tool_name','arguments_json','request_hash','status','result_json','attempt_count')
+    return any(all(call[k] == t[k] for k in keys) for t in tools)
 
 
 def observe(row):
@@ -221,6 +236,11 @@ def observe(row):
                 t['arguments_json'] == a['arguments_json'] for a in before['tools']) for t in row['resumed']['nested']),
         no_early_tracking=not before['task'] and not before['automation'] and not before['automation_fire'] and
             all(t['tool_name'] != 'builtin__automation__manage' for t in before['tools']),
+        recall_transport=all(len(r['nested']) == 1 and r['nested'][0]['tool_name'] == 'builtin__memory__search' and
+            recorded(r['nested'][0],final['tools']) and recorded(r['parent'],final['tools']) and r['value'] == hits ==
+            [h for h in json.loads(json.loads(r['nested'][0]['result_json'])['text']) if h['source_type'] == 'memory']
+            for r,hits in ((row['initial_recall'],row['initial_hits']),(row['corrected_recall'],row['corrected_hits']),
+                (row['forgotten_recall'],row['forgotten_hits']))),
         initial_contents=all(any(h['source_ref'] == ref and h['content'] == source['content'] for h in row['initial_hits'])
             for ref, source in zip((row['core_ref'],old),case['world']['memory'])),
         initial_tiers=any(r['memory_id'] == row['core_ref'].removeprefix('memory:') and r['tier'] == 'core'
