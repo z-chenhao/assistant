@@ -15,9 +15,23 @@ explicit committed SHA; the workflow is the first changed reference exercised
 by this repair itself. This does **not** validate
 GC-01 PR #65's changed bytes; that branch must refresh after merging this repair.
 
+ERII-373 adds exactly nine original-ledger seals: `baseline-01`, `baseline-02`,
+`baseline-03`, `baseline-05`, `baseline-06`, `baseline-07`, `baseline-09`,
+`baseline-10` and `baseline-11`. Each seal uses that ledger's original merged
+commit/path and independently computed whole-file/canonical SHA256, rather than
+unmerged PR #70. The existing five seals and their original identities stay
+unchanged. The nine envelopes explicitly recheck the reference scope demonstrated
+by ERII-372 against this maintenance branch's committed source, even where main
+has no drift yet. They do not certify PR #70 or promote historical observations.
+The exact seals are in `release_package.REFERENCE_LEDGER_ORIGINALS`; retained
+ERII-373 evidence records old/new complete and canonical hashes, source SHA,
+reference scope and audit receipt digests. `release_ready=false` and semantic
+scores remain null. ERII-372 must refresh its own references after this repair
+merges, then complete its original CI and independent acceptance.
+
 A normal committed shared-code change must fail the audit until explicitly
 refreshed. From that same branch, prepare each affected ledger through the
-maintained command (repeat for the five names above):
+maintained command (repeat for each affected registered name):
 
 ```sh
 python3 scripts/maintain_audit_references.py \
@@ -86,7 +100,7 @@ receipts/limits/gaps/PRs, absent provenance/revalidation/invalidation, missing
 symbols, uncommitted bytes, duplicate frozen blocks and ambiguous source units.
 Run `python3 -m unittest discover -s scripts -p 'test_release_*.py'`.
 
-The maintained delivery-history harness drives all five real audit CLIs through
+The maintained delivery-history harness drives all fourteen real audit CLIs through
 the registered squash shape, a fresh clone with pre-squash source commits absent,
 rejected consumer drift, explicit consumer refresh, a real merge from advanced
 main, and another squash/fresh clone with the newly captured source absent:
@@ -96,7 +110,7 @@ python3 scripts/verify_audit_references.py --evidence evidence/audit-reference-h
 ```
 
 Run after committing the repair: it validates the committed HEAD tree. The report
-records source/base/squash/merge IDs and 26 command outcomes, including the
+records source/base/squash/merge IDs and 71 command outcomes, including the
 post-squash baseline-12 regression. Adjacent raw reports are retained when `--raw-reports` is requested. The
 registered providers `audit-references` gate emits compact success evidence. `RegisteredSquashAuditTests` includes the same path in the release/Python
 regressions; its disposable repositories and reports are cleaned. Neither the

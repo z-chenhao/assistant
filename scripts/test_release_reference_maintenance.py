@@ -21,6 +21,7 @@ class ReferenceMaintenanceTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.ledger = json.loads((release_audit.ROOT / 'docs/audits/baseline-01.json').read_text())
+        self.ledger.pop('reference_maintenance', None)
         self.units = [dict(source=source, **row)
                       for source in ('docs/technical-design.md', 'evals/golden-cases.md')
                       for row in release_audit.inventory((release_audit.ROOT / source).read_text())]
@@ -44,7 +45,7 @@ class ReferenceMaintenanceTests(unittest.TestCase):
         self.shared = self.root / self.ref.partition('#')[0]
         self.shared.write_bytes(self.shared.read_bytes() + b'\n// normal shared code edit\n')
         self.current_sha = self.commit('normal synthetic shared edit')
-        # The production seals pin the five real merged ledgers. This independent
+        # Production seals pin real merged ledgers. This independent
         # synthetic history needs its own original seal; all Git checks stay real.
         seal = dict(commit=self.anchor, path='docs/audits/baseline-01.json',
                     sha256=package.digest(self.original_bytes),
@@ -262,7 +263,49 @@ class ReferenceMaintenanceTests(unittest.TestCase):
 
 
 class RegisteredSquashAuditTests(unittest.TestCase):
-    def test_five_real_ledgers_through_two_squashes_and_consumer_main_merge(self):
+    def test_registered_originals_are_exact_merged_blobs_with_unchanged_content(self):
+        names = {f'baseline-{n:02}' for n in (1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13)}
+        names.update(f'golden-common-{n:02}' for n in (1, 2, 3))
+        self.assertEqual(set(package.REFERENCE_LEDGER_ORIGINALS), names)
+        root = release_audit.ROOT
+        for name, seal in package.REFERENCE_LEDGER_ORIGINALS.items():
+            with self.subTest(package=name):
+                package.git(root, 'merge-base', '--is-ancestor', seal['commit'], 'HEAD')
+                raw = package.git(root, 'show', seal['commit'] + ':' + seal['path'])
+                original = json.loads(raw)
+                self.assertNotIn('reference_maintenance', original)
+                self.assertEqual(package.digest(raw), seal['sha256'])
+                self.assertEqual(package.frozen_digest(original), seal['content_sha256'])
+                ledger = json.loads((root / seal['path']).read_text())
+                self.assertEqual({k: v for k, v in ledger.items() if k != 'reference_maintenance'},
+                                 original)
+                self.assertEqual(ledger['reference_maintenance']['original_ledger'], seal)
+                package.reference_identities(root, ledger)
+
+    def test_nine_new_consumers_reject_forged_originals_and_source_proofs(self):
+        root = release_audit.ROOT
+        for n in (1, 2, 3, 5, 6, 7, 9, 10, 11):
+            name = f'baseline-{n:02}'
+            original = json.loads((root / f'docs/audits/{name}.json').read_text())
+            for mutation in ('seal', 'historical_blob', 'content', 'provenance', 'source_proof'):
+                with self.subTest(package=name, mutation=mutation):
+                    ledger = copy.deepcopy(original)
+                    seal = copy.deepcopy(package.REFERENCE_LEDGER_ORIGINALS[name])
+                    if mutation == 'seal':
+                        ledger['reference_maintenance']['original_ledger']['content_sha256'] = '0' * 64
+                    if mutation == 'historical_blob':
+                        # Even a matching declared seal must agree with real Git bytes.
+                        seal['sha256'] = '0' * 64
+                        ledger['reference_maintenance']['original_ledger'] = seal
+                    if mutation == 'content': ledger['reviews'][0]['proof_limit'] = 'current PASS'
+                    if mutation == 'provenance': del ledger['reference_maintenance']['original_ledger']
+                    if mutation == 'source_proof':
+                        ledger['reference_maintenance']['current']['git_proof']['commit'] = 'Zm9yZ2Vk'
+                    with patch.dict(package.REFERENCE_LEDGER_ORIGINALS, {name: seal}):
+                        with self.assertRaises(ValueError):
+                            package.reference_identities(root, ledger)
+
+    def test_all_registered_ledgers_through_two_squashes_and_consumer_main_merge(self):
         root = release_audit.ROOT
         sha = package.git(root, 'rev-parse', 'HEAD').decode().strip()
         base = next(iter(package.REFERENCE_LEDGER_ORIGINALS.values()))['commit']
@@ -270,8 +313,9 @@ class RegisteredSquashAuditTests(unittest.TestCase):
         self.assertTrue(report['passed'])
         self.assertTrue(report['cleanup'])
         self.assertFalse(report['release_ready'])
-        self.assertEqual(len(report['checks']), 26)
-        self.assertEqual(sum(c['expected_exit'] == 1 for c in report['checks']), 5)
+        self.assertEqual(len(report['checks']), 5 * len(package.REFERENCE_LEDGER_ORIGINALS) + 1)
+        self.assertEqual(sum(c['expected_exit'] == 1 for c in report['checks']),
+                         len(package.REFERENCE_LEDGER_ORIGINALS))
 
 
 if __name__ == '__main__':
