@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "delegate": [
+    "GC09 delegate：另请后台分别准备 release 风险说明和 interview 面试，两项缺少时段时一起问我。",
+    "GC09 delegate：将 release 和 interview 准备各交给后台，缺少的可用时段合并询问。",
+    "GC09 delegate：另外启动 release、interview 两项后台准备；需要时段请一次问清。"
+  ],
+  "answers": [
+    "GC09 answers：release 可用09:00–09:30，interview 可用12:30–13:00，请分别继续。",
+    "GC09 answers：分别继续：release 09:00–09:30；interview 12:30–13:00。",
+    "GC09 answers：将09:00–09:30给 release，12:30–13:00给 interview，各自继续。"
+  ],
+  "mapping": {
+    "release": "release answer=09:00–09:30",
+    "interview": "interview answer=12:30–13:00"
+  }
+}

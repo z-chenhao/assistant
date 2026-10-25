@@ -49,6 +49,7 @@ SHARDS = {
         Gate("spend", "verify_spend.py", "spend", 5),
         Gate("task-control", "verify_task_control.py", "task-control", 5),
         Gate("cases", "run_cases.py", "cases"),
+        Gate("gc09", "verify_gc09.py", "gc09"),
         Gate("task-cases", "run_task_cases.py", "task-cases"),
         Gate("events", "", "events"),
     ),

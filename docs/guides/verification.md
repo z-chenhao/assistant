@@ -26,7 +26,7 @@ and `run*cases` harness must be registered; `make test` rejects inventory drift.
 | --- | --- | --- |
 | Persistence, recovery and operations | runtime | foundation, operations, capacity, events |
 | Conversation, Tasks and delegation | runtime | main, tasks, children, task-control, scheduling, spend |
-| Proactive work and task scenarios | runtime | automation, cases, task-cases |
+| Proactive work and task scenarios | runtime | automation, cases, task-cases, gc09 |
 | JavaScript, replay and coding | codemode | codemode, code-recovery, core-cases |
 | Computer lifecycle and input | codemode | computer, computer-use |
 | Memory, Tools and Artifact security | security | memory-maintenance, recall, tools, artifacts, gc03, gc05 |
