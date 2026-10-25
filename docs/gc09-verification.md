@@ -11,7 +11,7 @@ python3 scripts/prepare_release_eval.py --input /path/to/gc09.json --evidence ev
 python3 -m unittest discover -s scripts -p 'test_gc09.py'
 ```
 
-The runtime `gc09` gate executes six unchanged M1 variants, each in five
+The communication/channels `gc09` gate executes six unchanged M1 variants, each in five
 consecutive repetitions. It reuses `run_cases.drive` for the exact short
 Main-only agenda and separately locked `gc09-steering-v1` same-day update.
 Three original wordings, two 10–30% noise variants and one source-key ordering
@@ -31,6 +31,15 @@ it, and requires all completed reads/generations to remain identical without
 another connector call. It observes zero Task, schedule, Approval and Artifact
 for the original short request. No real account or network source is used.
 
+CI uses the existing communication/channels sandbox partition and its two gate
+workers. The original deadlines and repetition counts stay fixed. GC-09 starts
+before short series, preserving the full shard's GC-01/GC-12 initial pair and
+GC-02 priority. Barrier readiness polls only SQLite counts; full native snapshots
+are captured at held boundaries. Conversation observation reads persisted bytes
+without initializing three connectors on every readback; the settled journey
+separately compares complete CLI history, including exact timestamps, to that
+native view. CLI/TUI ingress and execution remain unchanged.
+
 The separately locked `gc09-boundary-v1` inputs explicitly request two background
 preparations. This supplemental request does not alter the original Gold's
 requirement that the short agenda create no Task. Main creates two ongoing Tasks;
@@ -47,10 +56,10 @@ for Workers that become blocked at different times.
 
 `--validate` recomputes all 30 native receipts, source/Model/Capability identity,
 actual connector results, Worker/Task/update/inbox mapping, completed generation
-to visible delivery agreement, duplicate ingress and replay equality. Fifteen
+to visible delivery agreement, duplicate ingress and replay equality. Sixteen
 corruption probes reject source/output/Steering drift, false restart, connector
 write, answer misrouting, stale epoch, revived old Root, missing actual input,
-split batch, altered completed call, unexpected effect, forged model output, missing generation and drifted Worker result.
+split batch, altered completed call, unexpected effect, forged model output, missing generation, drifted Worker result and changed CLI history.
 Stored all-true flags cannot override recomputation.
 
 The compact public `gc09_native_manifest` binds size and SHA256 of complete raw

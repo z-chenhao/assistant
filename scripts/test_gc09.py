@@ -1,10 +1,13 @@
 """GC-09 frozen scope, strict native bytes and ungraded preview contracts."""
 import copy
+from contextlib import closing
 import json
 from pathlib import Path
 import subprocess
+import sqlite3
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -16,6 +19,39 @@ import verify_suite
 
 
 class AgendaBoundaryTests(unittest.TestCase):
+    def test_cli_history_time_normalization_is_exact_and_keeps_payload(self):
+        message = dict(created_at='2026-10-16T08:30:00.123456+08:00',content=[{'type':'text','text':'actual reply'}])
+        normalized = journey.canonical_history([message])
+        self.assertEqual(normalized[0]['created_at'],1792110600123456)
+        self.assertEqual(normalized[0]['content'],message['content'])
+        self.assertIsInstance(message['created_at'],str)
+        with self.assertRaises(RuntimeError): journey.canonical_history([dict(message,created_at='2026-10-16T08:30:00')])
+
+    def test_batch_polling_captures_each_held_boundary_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); (root/'data').mkdir()
+            with closing(sqlite3.connect(root/'data/state.db')) as db, db:
+                db.execute('CREATE TABLE main_inbox(sequence INTEGER)')
+            h = SimpleNamespace(root=root,send=lambda *args:{'accepted':True})
+            with patch.object(journey,'native',return_value={'captured':True}) as native:
+                def drive(barriers,observe,progress):
+                    for _ in range(10): progress()
+                    self.assertEqual(native.call_count,0)
+                    observe('before_worker_generation'); observe('before_worker_generation')
+                    progress()
+                    self.assertEqual(native.call_count,1)
+                    self.assertTrue(barriers['before_worker_generation'].exists())
+                    with closing(sqlite3.connect(root/'data/state.db')) as db, db:
+                        db.executemany('INSERT INTO main_inbox VALUES(?)',[(1,),(2,)])
+                    for _ in range(10): progress()
+                    self.assertEqual(native.call_count,2)
+                    self.assertTrue(barriers['after_delivery_commit'].exists())
+                    return SimpleNamespace(returncode=0,stderr='')
+                h.drive_boundaries = drive
+                row = {}; journey.batched(h,'delegate','explicit background request',row)
+                self.assertEqual(native.call_count,3)  # two held boundaries and final state
+                self.assertEqual(set(row),{'receipt','concurrent_workers','before_release','state'})
+
     def test_original_seventeen_blocks_and_variants_remain_locked(self):
         lock = journey.load()
         self.assertEqual(lock['manifest_sha256'],'0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556')
@@ -33,7 +69,7 @@ class AgendaBoundaryTests(unittest.TestCase):
             self.assertNotIn('GC09 delegate',json.dumps(original))
         self.assertIs(unscripted_cases.matrix()['GC-09']['eligible_for_grading'],False)
         self.assertEqual(journey.REPEATS,5)
-        self.assertEqual([(s,g.attempts) for s,gs in verify_suite.SHARDS.items() for g in gs if g.script == 'verify_gc09.py'],[('runtime',1)])
+        self.assertEqual([(s,g.attempts) for s,gs in verify_suite.SHARDS.items() for g in gs if g.script == 'verify_gc09.py'],[('communication',1)])
 
     def test_native_manifest_rejects_summary_size_hash_path_and_symlink_forgery(self):
         report = dict(status='mechanical_pass',cleanup=True,results=[{'native':'RAW_ONLY'*200000}],

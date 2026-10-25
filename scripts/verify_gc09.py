@@ -2,6 +2,8 @@
 """GC-09 original agenda, connectors and batched Worker mapping; no grades."""
 import argparse
 import copy
+from contextlib import closing
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -61,10 +63,33 @@ class AgendaHarness(MainHarness):
     def args(self,*args):
         return [str(self.binary),'-config',str(self.root/'config.yaml'),'-test-bridge','agenda',*args]
 
+    def history(self):
+        # Read-only observation must not initialize every MCP connector. The
+        # settled journey separately checks the actual CLI history against this
+        # persisted view, including timestamps and the complete message payload.
+        with closing(sqlite3.connect(self.root/'data/conversation.db')) as db:
+            db.row_factory = sqlite3.Row
+            rows = [dict(r) for r in db.execute('SELECT * FROM conversation_message ORDER BY sequence')]
+        for row in rows:
+            row['content'] = strict_json(row.pop('content_json'))
+            row['source_event_id'] = row['source_event_id'] or ''
+        return rows
+
+
+def canonical_history(history):
+    rows = copy.deepcopy(history)
+    epoch = datetime(1970,1,1,tzinfo=timezone.utc)
+    for row in rows:
+        instant = datetime.fromisoformat(row['created_at'].replace('Z','+00:00'))
+        require(instant.tzinfo is not None,'CLI history timestamp requires timezone')
+        delta = instant.astimezone(timezone.utc)-epoch
+        row['created_at'] = (delta.days*86400+delta.seconds)*1000000+delta.microseconds
+    return rows
+
 
 def native(h):
     value = task_state(h)
-    with sqlite3.connect(h.root/'data/state.db') as db:
+    with closing(sqlite3.connect(h.root/'data/state.db')) as db:
         db.row_factory = sqlite3.Row
         for key,table in (('approvals','approval'),('artifacts','artifact'),('automations','automation')):
             value[key] = [dict(r) for r in db.execute('SELECT * FROM '+table+' ORDER BY rowid')]
@@ -81,15 +106,23 @@ def batched(h,key,text,row):
     workers_release = h.root/(key+'.workers-release')
     barriers_seen = []
     def progress():
-        state = native(h)
-        expected = 2 if key == 'delegate' else 4
+        # Read complete CLI/native evidence only at the two held boundaries.
+        # Polling chat history starts three sandboxed MCP discovery processes;
+        # repeated observation must not compete with the work being observed.
+        if release.exists() and workers_release.exists():
+            return
         if barriers_seen.count('before_worker_generation') == 2 and not workers_release.exists():
-            row['concurrent_workers'] = state
+            row['concurrent_workers'] = native(h)
             workers_release.touch()
-        if len(state['inbox']) == expected and not release.exists():
+        if release.exists():
+            return
+        expected = 2 if key == 'delegate' else 4
+        with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+            queued = db.execute('SELECT count(*) FROM main_inbox').fetchone()[0]
+        if queued == expected:
             # Main is held outside a transaction. Roots run concurrently;
             # Reporter queues both results before Main becomes idle.
-            row['before_release'] = state
+            row['before_release'] = native(h)
             release.touch()
     result = h.drive_boundaries({'after_delivery_commit':release,'before_worker_generation':workers_release},barriers_seen.append,progress)
     require(result.returncode == 0,'GC-09 batch drive failed: '+result.stderr)
@@ -128,7 +161,8 @@ def connected_drive(binary,folder,case,variant,row):
             expected = row['initial_receipt'] if key == 'initial' else row['questions' if key == 'delegate' else 'answers']['receipt']
             require(receipt == expected,'duplicate ingress receipt drift')
         h.command('chat','work')
-        row.update(state=state,replay_state=native(h),remote=remote(peer),source_after={k:(peer/k/'source.json').read_text() for k in source})
+        row.update(state=state,replay_state=native(h),cli_history=h.command('chat','history'),
+            remote=remote(peer),source_after={k:(peer/k/'source.json').read_text() for k in source})
         return row
     except BaseException:
         row['failure_state'] = h.failure_state()
@@ -229,7 +263,8 @@ def observe(row):
                 g['run_id'] == result['run_id'] and json.loads(g['result_json']).get('text') == result['content']]) == 1 and
             len([u for u in state['updates'] if u['root_run_id'] == result['run_id'] and u['content'] == result['content']]) == 1
             for result in state['worker_results']),
-        completed_generation_and_delivery=all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in state['generations']) and
+        completed_generation_and_delivery=canonical_history(connected['cli_history']) == state['conversation'] and
+            all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in state['generations']) and
             all(len([m for m in state['conversation'] if m['role'] == 'assistant' and any(m['source_event_id'] == g['generation_id'] and json.loads(g['result_json']).get('text') == text(m) and not json.loads(g['result_json']).get('tool_calls')
                     for g in state['generations'] if g['run_id'] == r['run_id']) and
                 any(d['message_id'] == m['message_id'] and d['status'] == 'sent' for d in state['deliveries'])]) == 1
@@ -268,7 +303,7 @@ def drive(binary,variant_id,repetition,failure_path):
 def rejection_probes(row):
     require(all(observe(row).values()),'passing native receipt required for corruption probes')
     probes = {}
-    for name in ('source','priority','steering','restart','remote','mapping','epoch','old_root','request','batch','replay','effect','result','missing_generation','worker_result'):
+    for name in ('source','priority','steering','restart','remote','mapping','epoch','old_root','request','batch','replay','effect','result','missing_generation','worker_result','cli_history'):
         bad = copy.deepcopy(row); c = bad['connected']; state = c['state']
         if name == 'source': c['source_after']['mail'] = '{}'
         elif name == 'priority': bad['original']['state']['conversation'][-1]['content'][0]['text'] = 'E2 first'
@@ -284,6 +319,7 @@ def rejection_probes(row):
         elif name == 'result': c['questions']['state']['generations'][-1]['result_json'] = '{"text":"[]"}'
         elif name == 'missing_generation': state['generations'] = [g for g in state['generations'] if g['run_id'] != state['worker_results'][0]['run_id']]
         elif name == 'worker_result': state['worker_results'][0]['content'] = '{"key":"wrong"}'
+        elif name == 'cli_history': c['cli_history'][-1]['content'][0]['text'] = 'forged visible history'
         else: state['tools'][0]['tool_name'] = 'mcp__mail__write'
         try:
             rejected = not all(observe(bad).values())

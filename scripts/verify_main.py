@@ -152,8 +152,11 @@ class MainHarness:
                 "trace": "SELECT run_id,sequence,event_json,occurred_at FROM run_trace ORDER BY run_id,sequence",
             }.items():
                 result[name] = [dict(row) for row in db.execute(query)]
-        result["conversation"] = self.command("chat", "history")
+        result["conversation"] = self.history()
         return result
+
+    def history(self):
+        return self.command("chat", "history")
 
     def cleanup(self):
         for child in self.children:

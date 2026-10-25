@@ -192,7 +192,7 @@ jobs:
       - uses: ./.github/actions/ci-inputs
         with:
           browser: ${{ matrix.shard == 'delivery' }}
-          sandbox: ${{ matrix.shard == 'runtime' || matrix.shard == 'security' || matrix.shard == 'communication' }}
+          sandbox: ${{ matrix.shard == 'security' || matrix.shard == 'communication' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}
         run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
