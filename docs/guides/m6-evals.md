@@ -6,6 +6,11 @@ wordings, two 10–30% irrelevant-Conversation variants and one world-key order
 variant. `m6-v1.lock.json` freezes the dataset, scoring policy, normative source,
 documents, images, source regions and three valid H.264 MOV inputs.
 
+ERII-30 extends GC-02 through its fourth turn and the implemented M7 Automation
+boundary without changing these locked inputs. Its historical fixture annotation
+deferring Automation no longer describes the executed coverage. Reports record
+the extension explicitly and leave other missing M7 journeys unverified.
+
 Run the portable gate with:
 
 ```sh
@@ -57,7 +62,7 @@ or failed results cannot pass. A failed run clears the previous success report.
 | Case | Mechanical evidence | Proof limits |
 | --- | --- | --- |
 | GC-01 | Exact health fields, source/time metadata, preserved three input events, low-confidence Recall, no Task, invented vitals or external writes; isolated Turn-2 red-flag replacement routes to urgent evaluation with no lifestyle advice | Unscripted red-flag recognition and advice quality need semantic model evaluation |
-| GC-02 | Unanswered interview question, exploratory constraint, real supersede and deletion, future context excludes forgotten content | Monthly Automation is `not_applicable` until M7; interview quality ungraded |
+| GC-02 | Four ordered turns, unanswered interview question, exploratory constraint, real supersede/deletion; no Task or Automation before the request; one Main Automation Tool call, last-Sunday 20:00 Asia/Shanghai schedule, first fire Nov29 20:00 +08, duplicate input creates no new generation/schedule; future context excludes forgotten content | Interview/constraint selection is scripted and ungraded; no claim of a real model choosing the plan |
 | GC-03 | Real corrected Memory, old recall excluded; 54,995.60 USD, 370,120.39 CNY, 520,000 liquid; 30/35/40万 scenarios; unknown tax | Financial explanation quality ungraded; no trading adapter enabled |
 | GC-04 | Two existing travel Tasks, NZ paused, completed France append creates one new Root, steering accepted during a held Root, confirmed source bytes unchanged, booking groups; shared Recall/Main publication barriers choose the maintained legal ordering before Root dispatch and before releasing held work | Itinerary selection/explanation ungraded |
 | GC-05 | Scoped stable career preference, exact offers, five verification topics, no resignation decision | Ranking and interview guidance ungraded |

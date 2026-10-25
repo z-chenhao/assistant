@@ -2,10 +2,10 @@
 
 Every Direct Tool enters `tool.Executor`: persisted provider response → frozen
 admission → input validation → security/approval → bounded dispatch → normalized
-result commit. Future Runtime facades must use this same entry point. MCP stdio,
-progressive Skills and the controlled M3 coding fixture use this path; see
-[capability operations](capabilities.md). Code Mode, Child Runs and the production
-Computer adapter remain later milestones. No implicit Fake is enabled.
+result commit. MCP stdio, progressive Skills and the controlled coding fixture
+use this path; see [capability operations](capabilities.md). [Code Mode](codemode.md),
+[Child Runs](children.md) and the configured [Computer adapter](computer.md) use
+the same pipeline. No implicit Fake is enabled.
 
 `approval list` shows the local user's approval requests, complete final arguments,
 frozen hash, status and expiry. To decide the displayed action:
@@ -19,9 +19,9 @@ erii approval reconcile
 ```
 
 These are local user control commands. The principal comes from the private data
-root's Agent identity; neither a model nor tool arguments can select it. Future
-remote channels must authenticate the principal before calling the same decision
-boundary. IDs, hashes and provider keys do not enter model-visible tool schemas.
+root's Agent identity; neither a model nor tool arguments can select it.
+[Web/Feishu channels](channels.md) authenticate the principal before calling the
+same decision boundary. IDs, hashes and provider keys do not enter model-visible tool schemas.
 Approval is bound to one invocation, principal and request hash. A matching
 callback can repeat after completion; a conflicting decision fails. Expiry,
 denial and steering fail closed. New Main input invalidates every unexecuted
@@ -137,6 +137,7 @@ argument drift guards, unsupported schema rejection, resource limits/conflicts,
 independent out-of-order completion, unknown reconciliation and migration
 rollback. `go test -race ./...` covers their concurrent boundaries. These are
 SC-06/07 and GC-11/12/13 approval/recovery **fragments**; full real purchase,
-calendar and booking integrations remain due in their later slices. Artifact
-spillover and remote delivery are separate M3 slices; excess inline output fails
-`RESOURCE_LIMIT` in this slice.
+calendar and booking quality requires separate Live evidence. [Artifact handling](artifacts.md)
+and [channel delivery](channels.md) have their own maintained harnesses; excess
+inline output still fails `RESOURCE_LIMIT`. These Tool fragments alone do not
+establish those capabilities or full Golden Case scores.
