@@ -178,7 +178,20 @@ def recalled_context(generations, run_id):
         for hit in json.loads(m['text'].split('\n',1)[1])]
 
 
+def calculation_return(calculation):
+    # The persisted Tool result is authoritative. output/value are retained
+    # convenience copies, not independent evidence of what the Tool returned.
+    output = strict_json(strict_json(calculation['parent']['result_json'])['text'])
+    require(type(output) is list, 'GC-03 native calculation output must be a list')
+    returned = [p['value'] for p in output if p['type']=='return']
+    require(len(returned)==1, 'GC-03 requires one native calculation return')
+    require(exact(output,calculation['output']) and exact(returned[0],calculation['value']),
+        'GC-03 native calculation output/value drift')
+    return returned[0]
+
+
 def observe(row):
+    returned = calculation_return(row['calculation'])
     case, variant = inputs(row['variant_id'])
     value, final = row['calculated'], row['final']
     old, current = row['old_ref'], row['current_ref']
@@ -218,11 +231,11 @@ def observe(row):
             row['memory_restart']['boundary']=='after_memory_commit:'+row['memory_event_id'] and
             corrected in row['memory_restart']['state']['memory']['memory']['records'] and
             sum(r['event_id']==row['memory_event_id'] for r in value['memory']['memory']['receipts'])==1,
-        independently_recomputed_finance=exact(calculation['value']['result'],expected),
+        independently_recomputed_finance=exact(returned['result'],expected),
         artifacts_reopened=len(row['artifacts'])==len(value['artifact'])==1 and all(
             a['descriptor'] in value['artifact'] and a['sha256']==sha(a['text'].encode())==a['descriptor']['content_hash'] and
             a['bytes']==len(a['text'].encode())==a['descriptor']['byte_size'] and exact(strict_json(a['text'].encode()),expected) and
-            a['descriptor']['artifact_ref'] in calculation['value']['artifactRefs'] and any(
+            returned['artifactRefs']==[a['descriptor']['artifact_ref']] and any(
                 p['artifact_ref']==a['descriptor']['artifact_ref'] for p in value['artifact_publication']) for a in row['artifacts']),
         all_tools_once=all(t['status']=='succeeded' and t['attempt_count']==1 for t in final['tools']),
         final_replay_equal=final==row['replayed'])
@@ -250,7 +263,38 @@ def rejection_probes(row):
         a=r['artifacts'][0];body=json.loads(a['text']);body['assets']['options']['tax']=0
         a['text']=json.dumps(body);a['sha256']=sha(a['text'].encode());a['bytes']=len(a['text'].encode())
         a['descriptor'].update(content_hash=a['sha256'],byte_size=a['bytes'])
+    def native_return(r, mutate, sync_summary=False):
+        calculation = r['calculation']
+        parent = calculation['parent']
+        envelope = strict_json(parent['result_json'])
+        output = strict_json(envelope['text'])
+        returned = next(p['value'] for p in output if p['type']=='return')
+        mutate(returned)
+        envelope['text'] = json.dumps(output,ensure_ascii=False)
+        result_json = json.dumps(envelope,ensure_ascii=False)
+        # Keep all persisted copies consistent so rejection must detect the
+        # native return/summary or finance/Artifact contradiction itself.
+        def replace(value):
+            if isinstance(value,dict):
+                if value.get('invocation_id')==parent['invocation_id'] and 'result_json' in value:
+                    value['result_json'] = result_json
+                for child in value.values():
+                    replace(child)
+            elif isinstance(value,list):
+                for child in value:
+                    replace(child)
+        replace(r)
+        if sync_summary:
+            calculation['output'] = copy.deepcopy(output)
+            calculation['value'] = copy.deepcopy(returned)
     mutations = dict(
+        native_stale_price=lambda r:native_return(r,lambda v:v['result']['update'].update(buyback_usd=240)),
+        native_tax_certainty=lambda r:native_return(r,lambda v:v['result']['assets']['options'].update(tax=0)),
+        native_artifact_ref=lambda r:native_return(r,lambda v:v.update(artifactRefs=['artifact:forged'])),
+        synced_native_stale_price=lambda r:native_return(r,lambda v:v['result']['update'].update(buyback_usd=240),True),
+        synced_native_tax_certainty=lambda r:native_return(r,lambda v:v['result']['assets']['options'].update(tax=0),True),
+        synced_native_artifact_ref=lambda r:native_return(r,lambda v:v.update(artifactRefs=['artifact:forged']),True),
+        parsed_output_drift=lambda r:r['calculation']['output'].append(dict(type='text',text='forged')),
         changed_input=lambda r:r['variant']['events'][0].update(text='替换原文'),
         stale_price=lambda r:r['calculation']['value']['result']['update'].update(buyback_usd=240),
         stale_quantity=lambda r:r['calculation']['value']['result']['update'].update(vested_remaining=200),

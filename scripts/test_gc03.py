@@ -54,6 +54,44 @@ class FinanceTests(unittest.TestCase):
         self.assertFalse(expected['assets']['options']['window_execution_guaranteed'])
         self.assertFalse(journey.exact({'pre_tax':1},{'pre_tax':True}))
 
+    def test_observe_rejects_native_return_and_cached_summary_contradictions(self):
+        returned = dict(result=journey.expected_report('memory:current'),artifactRefs=['artifact:finance'])
+        output = [dict(type='return',value=returned)]
+        calculation = dict(parent=dict(result_json=json.dumps(dict(text=json.dumps(output)))),
+            output=copy.deepcopy(output),value=copy.deepcopy(returned))
+        self.assertEqual(journey.calculation_return(calculation),returned)
+        for field, mutate in (
+                ('stale price',lambda v:v['result']['update'].update(buyback_usd=240)),
+                ('certain tax',lambda v:v['result']['assets']['options'].update(tax=0)),
+                ('Artifact ref',lambda v:v.update(artifactRefs=['artifact:forged']))):
+            with self.subTest(field=field):
+                changed=copy.deepcopy(calculation)
+                native_output=copy.deepcopy(output)
+                mutate(native_output[0]['value'])
+                changed['parent']['result_json']=json.dumps(dict(text=json.dumps(native_output)))
+                # No mock of observe: the contradiction must fail at the
+                # native boundary, before unrelated receipt fields are read.
+                with self.assertRaisesRegex(RuntimeError,'native calculation output/value drift'):
+                    journey.observe(dict(calculation=changed))
+        for mutate in (lambda c:c['output'].append(dict(type='text',text='forged')),
+                lambda c:c['value']['result']['assets']['options'].update(tax=0)):
+            changed=copy.deepcopy(calculation);mutate(changed)
+            with self.assertRaisesRegex(RuntimeError,'native calculation output/value drift'):
+                journey.observe(dict(calculation=changed))
+
+    def test_native_return_is_strict_and_unambiguous(self):
+        returned=dict(result=journey.expected_report('memory:current'),artifactRefs=['artifact:finance'])
+        output=[dict(type='return',value=returned)]
+        for invalid in ([],output*2,dict(value=returned)):
+            calculation=dict(parent=dict(result_json=json.dumps(dict(text=json.dumps(invalid)))),
+                output=invalid,value=returned)
+            with self.assertRaisesRegex(RuntimeError,'native calculation'):
+                journey.calculation_return(calculation)
+        for invalid in ('[{"type":"return","value":{},"value":null}]',
+                '[{"type":"return","value":NaN}]'):
+            with self.assertRaises(ValueError):
+                journey.calculation_return(dict(parent=dict(result_json=json.dumps(dict(text=invalid)))))
+
     def test_identity_counts_locks_cleanup_and_assertions_cannot_be_waived(self):
         source = dict(sha='a'*40,files={'runner':'hash'})
         report = dict(case_id='GC-03',status='mechanical_pass',release_ready=False,semantic_score=None,eligible_for_grading=False,

@@ -39,11 +39,19 @@ and exactly its 21 GC-03 blocks.
 
 `--validate` requires all 30 ordered native receipts, source/binary identity,
 locks and cleanup. It recomputes every assertion instead of trusting stored flags.
+The persisted parent Tool `result_json` supplies the authoritative calculation
+return and Artifact references. Retained `calculation.output` and
+`calculation.value` must exactly match that native return; a correct summary
+cannot mask a stale or contradictory Tool result.
 Negative probes reject changed input, stale price/quantity, liquidity conflation,
 fabricated tax/insurance/guaranteed returns, missing FX date, wrong scenario,
 forged Tool identity, broken supersede, false restart, duplicate dispatch, external
 action, corrupt/rehashed Artifact, revived old owner, deleted Recall and replay
-drift. Independent exact-SHA review and a clean rerun remain necessary; receipts
+drift. Six native-return probes additionally synchronize every persisted copy
+and reject stale prices, invented tax certainty and forged Artifact references,
+including when parsed summaries are changed to match; output-only drift is also
+rejected. All 27 probes call the real observation consumer. Independent exact-SHA
+review and a clean rerun remain necessary; receipts
 are inspectable consistency evidence, not cryptographic execution attestation.
 
 | Original frozen Golden source lines | Coverage / semantic boundary |
