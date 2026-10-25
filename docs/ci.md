@@ -307,6 +307,16 @@ Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus r
 cancellation). Each case part runs all six locked variants five times. Contracts
 also run five times; splitting cases cannot omit them.
 
+The security pool starts the long GC-03/GC-04 series before memory-maintenance,
+recall, tools and artifacts whenever those cases are in the selected inventory.
+It retains two gate lanes, each Case's existing variant capacity and thirty
+receipts, and the four protection series' five serial rounds. Reports keep the
+original inventory order regardless of execution order. This scheduling does
+not add GC-04 to main: its owning Case change supplies that gate. It does not
+change workflow timeouts, runner resources, cancellation or required checks.
+Compare complete security runs on the same host/source/binary before making
+a timing claim; a local run cannot certify the Ubuntu ten-minute boundary.
+
 SC conformance partitions its unchanged root-test inventory within each round,
 using the existing `ci_race` CPU budget/partition helpers and `fixture_pool`
 process ownership. At most four workers each receive one CPU and one Go package
