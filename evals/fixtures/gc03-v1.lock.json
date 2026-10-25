@@ -1,0 +1,156 @@
+{
+  "files": {
+    "evals/fixtures/m6-v1.json": "3a18255727ffe51d832ac4e1888e4aed2f2988dbb1b7d7438008f863d7f4bd1b",
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f"
+  },
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "frozen_blocks": [
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 187,
+      "sha256": "ff0440665cae3f1fca6afaff451eff3bc769cf95199c146c62a1cc53c797d0b2",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 189,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 191,
+      "sha256": "1169b4bbf4ec13c1c08e4d5fe6d84ff8bcf9837f505d00706395110ea57a807b",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 192,
+      "sha256": "98b9b6138de780c19f04dc522d59da7162ab86460d399676043485b39f3c4535",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 193,
+      "sha256": "bb2461db4ddbdeeaf072611ef0e2f47da8703066644d35e557c45ed18a9c197d",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 194,
+      "sha256": "ad3cf9118124b6e73d311a6d94ec72923ed26173ac6cfd9b4b40a4b2f704c5ad",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 195,
+      "sha256": "562874a421388abdfd275dbed804c2b19f2e9109d22ae901400668c007e9e848",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-03",
+      "line": 197,
+      "sha256": "84e37ba4c00f1779f696984aff3a5cb19400709179729d44ade2a2c5ef77948b",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 554,
+      "sha256": "0914cd01829a0b60911eb2c331a0aed75eee7b09f3e0792d6563430f8f3eaa58",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 556,
+      "sha256": "e746fdd3d88cddb324b7f956f36bfa767325faa1d3bafef7ff572312c31a705f",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 572,
+      "sha256": "a019d4dd35433274ace5a5ca4e79897cb7c0f10516595903c1c4bea0985304dc",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 574,
+      "sha256": "601f838cbf05ea5789eec36c4154c5d0efc4ea6a08d6e027ed2d81b4fffb7516",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 575,
+      "sha256": "509d98d3fbe5e74002e2b22071ba347cfadfb33779adafe9a339e16aba62035f",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 576,
+      "sha256": "69a4f1359fd02117588c8cdb2783e65a7616f53f1eeb558e622d1dd5fafa57fa",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 578,
+      "sha256": "1084c97903cf406fb47da875d4955403cae82d78e525addb87d32dfd77205678",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 580,
+      "sha256": "d52c1f0483132d4bc0848629274fcd03a8c3baf321571e61c982a51c5eaec631",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 581,
+      "sha256": "9d9b298a000e0d0a3930df64db15e83ae82b794e47e4e46f26aa3ad225e9f743",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 582,
+      "sha256": "21bd356266b55642f396f79483ffaa1e8918b78960e2226d66c7e8f59a809e33",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 583,
+      "sha256": "4cbc074d0556cac064d984aa52a1bd801af748a37c4595c81f9ae89a4dd5de3e",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 584,
+      "sha256": "9f64bcccd322a152decb3dba7273a0680fa2cb3cf5a34f806fa8bd0e158f4165",
+      "area": "memory"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.4",
+      "line": 586,
+      "sha256": "e2e85e264b7be4ad99bbfc4eeca04ca9be010aba5e597c3021202de8115ec73b",
+      "area": "memory"
+    }
+  ]
+}

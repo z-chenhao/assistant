@@ -66,10 +66,14 @@ func (r *Runs) scheduleArgs() []any {
 	return []any{sql.Named("now", time.Now().UnixMicro()), sql.Named("global", l.Global), sql.Named("user", l.User), sql.Named("agent", l.Agent), sql.Named("provider", l.Provider), sql.Named("children", l.Children)}
 }
 
+const nextRunSQL = schedulerCTE + `SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) JOIN model_snapshot s ON s.snapshot_id=r.model_snapshot_id LEFT JOIN scheduler_tree q ON q.root_run_id=r.root_run_id WHERE ` + runnable + ` AND (c.token IS NULL OR c.expires_at<=:now) AND ` + capacity + `
+ ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,coalesce(q.last_served,0),r.depth DESC,r.created_at,r.run_id LIMIT 1`
+
+const activeRunSQL = `SELECT count(*) FROM run r WHERE (` + runnable + `) OR (r.desired_state!='running' AND r.status IN ('queued','running','waiting'))`
+
 func (r *Runs) nextScheduled(ctx context.Context) (string, error) {
 	var id string
-	err := r.host.db.QueryRowContext(ctx, schedulerCTE+`SELECT r.run_id FROM run r JOIN run_claim c USING(run_id) JOIN model_snapshot s ON s.snapshot_id=r.model_snapshot_id LEFT JOIN scheduler_tree q ON q.root_run_id=r.root_run_id WHERE `+runnable+` AND (c.token IS NULL OR c.expires_at<=:now) AND `+capacity+`
- ORDER BY CASE r.kind WHEN 'main' THEN 0 ELSE 1 END,coalesce(q.last_served,0),r.depth DESC,r.created_at,r.run_id LIMIT 1`, r.scheduleArgs()...).Scan(&id)
+	err := r.host.nextRun.QueryRowContext(ctx, r.scheduleArgs()...).Scan(&id)
 	return id, err
 }
 
