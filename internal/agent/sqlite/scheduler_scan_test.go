@@ -2,11 +2,55 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"runtime/pprof"
 	"testing"
+	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
 )
+
+// This bounded counterfactual keeps the database, rows, SQL, arguments and
+// process identical. Only statement reuse differs. Labels permit CPU attribution
+// with go test -race -cpuprofile; timings are observations, never a flaky gate
+// or a claim that the archived Ubuntu deadline failure has been reproduced.
+func TestSchedulerScanCompilationDiagnostic(t *testing.T) {
+	s, r, a, _ := taskFixture(t)
+	want := mustSubmit(t, a, "scan-diagnostic", "hello")
+	ctx := context.Background()
+	const pairs = 16
+	var elapsed [2]time.Duration
+	for i := 0; i < pairs; i++ {
+		args := r.scheduleArgs()
+		for j := 0; j < 2; j++ {
+			mode := (i + j) % 2 // Alternate order to limit warmup/order bias.
+			label := []string{"reused", "recompiled"}[mode]
+			pprof.Do(ctx, pprof.Labels("scheduler_scan", label), func(ctx context.Context) {
+				start := time.Now()
+				var id string
+				var active int
+				var err error
+				if mode == 0 {
+					err = s.nextRun.QueryRowContext(ctx, args...).Scan(&id)
+					if err == nil {
+						err = s.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1))).Scan(&active)
+					}
+				} else {
+					err = s.db.QueryRowContext(ctx, nextRunSQL, args...).Scan(&id)
+					if err == nil {
+						err = s.db.QueryRowContext(ctx, activeRunSQL, sql.Named("now", int64(1<<63-1))).Scan(&active)
+					}
+				}
+				elapsed[mode] += time.Since(start)
+				if err != nil || id != want.RunID || active != 1 {
+					t.Fatalf("%s scan changed admission: id=%s active=%d err=%v", label, id, active, err)
+				}
+			})
+		}
+	}
+	t.Logf("scheduler scan diagnostic: pairs=%d queries_per_mode=%d reused_wall=%s recompiled_wall=%s", pairs, pairs*2, elapsed[0], elapsed[1])
+}
 
 func TestSchedulerScansReadFreshStateAcrossConnectionReplacement(t *testing.T) {
 	s, r, a, _ := taskFixture(t)
