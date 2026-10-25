@@ -34,6 +34,10 @@ class AgendaBoundaryTests(unittest.TestCase):
         self.assertIs(unscripted_cases.matrix()['GC-09']['eligible_for_grading'],False)
         self.assertEqual(journey.REPEATS,5)
         self.assertEqual([(s,g.attempts) for s,gs in verify_suite.SHARDS.items() for g in gs if g.script == 'verify_gc09.py'],[('runtime',1)])
+        # The connector gate starts real sandboxed stdio peers. Runtime did not
+        # need Bubblewrap before this gate; Linux must provision its dependency.
+        workflow = (journey.ROOT/'.github/workflows/ci.yml').read_text()
+        self.assertIn("sandbox: ${{ matrix.shard == 'runtime' || matrix.shard == 'security' || matrix.shard == 'communication' }}",workflow)
 
     def test_native_manifest_rejects_summary_size_hash_path_and_symlink_forgery(self):
         report = dict(status='mechanical_pass',cleanup=True,results=[{'native':'RAW_ONLY'*200000}],
