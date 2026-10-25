@@ -39,8 +39,6 @@ jobs:
         run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: Unit tests and lint
         run: exec python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
-      - name: Five disk-backed receipt recovery race checks
-        run: exec python3 scripts/ci_step.py --name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5
       - name: Public SDK isolation and cache-miss conformance
         env:
           ERII_CI_PUBLIC_SDK_PROBE: "1"
@@ -109,12 +107,20 @@ jobs:
         # Bridge remains isolated from other package tests; SQLite keeps the
         # existing discovered root partitions. Both parts require a strict join.
         run: exec python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py --part ${{ matrix.racepart }}
-      - name: Verify the copied SDK stayed immutable
-        if: ${{ always() }}
-        run: python3 scripts/ci_sdk.py doctor
       - name: Clean disposable fixture storage
         if: ${{ always() }}
         run: python3 scripts/ci_tmpfs.py cleanup
+      # Cleanup restores TMPDIR via GITHUB_ENV before these disk-only checks.
+      # Reuse this runner's race compiler cache without sharing fixture state.
+      - name: Prove receipt recovery uses ordinary disk
+        if: ${{ matrix.racepart == 'packages' }}
+        run: python3 scripts/ci_tmpfs.py disk --receipt evidence/receipt-race-storage.json
+      - name: Five disk-backed receipt recovery race checks
+        if: ${{ matrix.racepart == 'packages' }}
+        run: exec python3 scripts/ci_step.py --name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
       - name: Retain exact-SHA evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -338,7 +344,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        m6part: ["context", "memory", "network", "booking", "desktop-1", "desktop-2", "desktop-3"]
+        m6part: ["memory", "network", "booking"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          browser: ${{ matrix.m6part != 'context' && matrix.m6part != 'memory' }}
+          sandbox: "true"
+      - name: Install pinned offline M6 Browser runtime
+        if: matrix.m6part != 'context' && matrix.m6part != 'memory'
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
+      - name: M6 part with five consecutive repetitions
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard personal --personal-part ${{ matrix.m6part }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-personal-part-${{ matrix.m6part }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Twenty execution cells start immediately. The four shorter M6 cells
+  # wait for Python compatibility, leaving long Code Mode cells admission room.
+  personal_deferred:
+    name: M6 (${{ matrix.m6part }})
+    needs: python_compat
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+    strategy:
+      fail-fast: false
+      matrix:
+        m6part: ["context", "desktop-1", "desktop-2", "desktop-3"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -367,7 +412,7 @@ jobs:
 
   personal_join:
     name: Complete M6 evidence
-    needs: personal
+    needs: ["personal", "personal_deferred"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
@@ -382,7 +427,7 @@ jobs:
           path: evidence/m6-parts
       - name: Require every M6 part and reconstruct the full inventory
         env:
-          PART_RESULT: ${{ needs.personal.result }}
+          PART_RESULT: ${{ needs.personal.result == 'success' && needs.personal_deferred.result == 'success' && 'success' || 'failure' }}
         run: |
           test "$PART_RESULT" = success
           for part in context memory network booking desktop-1 desktop-2 desktop-3; do
@@ -488,7 +533,7 @@ jobs:
 
   checks:
     name: Ubuntu checks
-    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_join", "providers", "providers_join", "communication_join"]
+    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_deferred", "personal_join", "providers", "providers_join", "communication_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2

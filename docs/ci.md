@@ -28,8 +28,11 @@ flowchart LR
     SHA --> Providers[Providers CLI / models]
     Providers --> ProviderJoin[Complete providers evidence]
     ProviderJoin --> Gate
-    SHA --> Personal[M6 independent parts]
+    SHA --> Python[Python 3.10 compatibility]
+    SHA --> Personal[M6 memory / network / booking]
+    Python --> Deferred[M6 context / desktop parts]
     Personal --> M6Join[Complete M6 evidence]
+    Deferred --> M6Join
     M6Join --> Gate
     SHA --> Parts[Code Mode control / GC-17 / GC-19 / GC-20 / contracts]
     Parts --> Join[Complete Code Mode evidence]
@@ -47,8 +50,8 @@ uses the official HTTPS archive mirror for APT downloads. The Azure mirror
 repeatedly took 8–9 minutes to install browser prerequisites (one retained run
 fetched 25.9 MB in 7m48s), exhausting the ten-minute job limit before checks could
 finish. Package selection, browser installation and job limits are unchanged.
-There is no long test or
-producer prerequisite. No executable crosses runner boundaries: GitHub image
+Long gates start without a test or build prerequisite. Four shorter M6 cells
+wait for Python compatibility to bound initial admission. No executable crosses runner boundaries: GitHub image
 rollouts can assign different Ubuntu image versions within one workflow.
 The retained historical build-bundle utility still rejects image/context drift;
 its guards were not relaxed. The new pipeline avoids that reuse entirely.
@@ -70,7 +73,12 @@ Required step guards portable SDK hashing and the maintained profiling tools.
 Both providers parts and the complete race job use private 2 GiB tmpfs mounts for disposable
 test directories, through `ci_tmpfs.py setup/cleanup`. The full unit/lint suite,
 all five SC race rounds and every verification job except providers keep ordinary
-disk storage. Unit/lint also requires five disk-backed receipt recovery race runs.
+disk storage. The packages race runner also requires five disk-backed receipt
+recovery race runs after tmpfs cleanup restores TMPDIR. A separate disk Doctor
+receipt proves ordinary block storage without overwriting the tmpfs cleanup
+receipt. The original command/count reuses that runner's race compiler cache;
+test processes, stores and temporary roots remain independent. SDK Doctor runs
+after both test phases, including on failure.
 Every migration, crash/restart and receipt test retains disk coverage. Provider
 commands, race flags/counts, SQLite WAL/sync policy and assertions are preserved.
 This targets runner disk-wait variance without
@@ -85,8 +93,8 @@ storage rejects their disk-conformance claim before tests start.
 ## Latency budget
 
 The complete Python 3.10.22 compatibility suite runs in its own Required job and
-isolated exact-head checkout, alongside unit/lint and the five disk-backed receipt
-race checks. [Run 40055562322](https://github.com/z-chenhao/erii/actions/runs/40055562322)
+isolated exact-head checkout, alongside unit/lint and packages' five disk-backed
+receipt race checks. [Run 40055562322](https://github.com/z-chenhao/erii/actions/runs/40055562322)
 passed unit/lint, receipt race and SDK isolation, then cancelled Python compatibility
 at the ten-minute job boundary. Splitting that existing full suite removes the
 serial accumulation; no test, repetition or job deadline is reduced or extended.
@@ -135,6 +143,28 @@ artifacts retain raw reports; the join uploads only its canonical suite and phas
 receipt. `make verify` keeps its complete unpartitioned providers path.
 
 ## Communication budget and evidence
+
+Run [40166371506](https://github.com/z-chenhao/erii/actions/runs/40166371506),
+source `7a3c05e13f9e23f1995dca80ff4da1dd47bf1ce2`, completed every required
+check but took 665 seconds overall. Communication's three jobs took
+432/415/340 seconds including setup and teardown, and its join finished 443
+seconds after workflow creation. The remaining critical paths were unit/lint
+(654 seconds, including 189 seconds of cold receipt race compilation/execution)
+and Code Mode control (262 seconds waiting, then 380 seconds running).
+Those observations remain historical evidence, not acceptance for a newer SHA.
+
+The five receipt recovery race checks now follow the existing packages race
+job, after verified tmpfs cleanup and a separate disk-conformance receipt.
+The M6 matrix is placed in two Required jobs without changing its seven cells:
+memory/network/booking start immediately; context and the three desktop parts
+wait for the independent Python compatibility job. This admits exactly twenty
+execution cells initially, giving all long Code Mode cells an initial slot
+under the observed twenty-runner capacity without relying on matrix order or
+buying capacity. Each delayed cell still performs its own exact-source build,
+setup, original repetitions, Doctor and upload. The M6 join and Ubuntu checks
+require both groups; failed compatibility skips dependent cells and fails the
+aggregate. Queue/setup/join time still counts toward the unchanged 600-second
+whole-workflow objective. Only a new complete exact-SHA attempt proves that bound.
 
 Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
 uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
@@ -457,7 +487,8 @@ missing parts, duplicated jobs, cancelled/skipped runs and mismatched attempts
 cannot become eligible samples. The small Core/M6 summaries remain required;
 these checks consume strict-join evidence, not a new case scorer.
 
-The merged topology has 25 jobs, including both maintained race parts, their
+The current topology has 30 jobs, including the three communication cells and
+their join, both maintained race parts, their
 Required join and the independent Python compatibility job. Race matrix values
 are checked against `ci_race_join.PARTS`, just as Core/M6 values use their
 maintained inventories. The retained 21-job metadata fixture still replays its

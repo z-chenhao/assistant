@@ -121,7 +121,8 @@ def topology(text=None):
             values = json.loads(values[0])
             expected = (set(SHARDS) - {'codemode', 'personal', 'providers'} if key == 'verify' else
                         set(CODEMODE_PARTS) if key == 'codemode' else
-                        set(m6_report.PARTS) if key == 'personal' else
+                        {'memory', 'network', 'booking'} if key == 'personal' else
+                        set(m6_report.PARTS) - {'memory', 'network', 'booking'} if key == 'personal_deferred' else
                         set(PROVIDER_PARTS) if key == 'providers' else
                         set(ci_race_join.PARTS) if key == 'race' else set())
             if set(values) != expected or len(values) != len(expected):
