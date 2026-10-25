@@ -291,12 +291,12 @@ def gate_execution_order(gates):
     # GC-02 must take the next free slot before short gates. Its former queue
     # tail exceeded the CI deadline even with all 30 rounds finished. Security's
     # GC-03/GC-04 likewise start before the shorter protection series. GC-09
-    # follows GC-02 and precedes short communication gates. Keep two
+    # and GC-10 follow GC-02 and precede short communication gates. Keep two
     # workers, report inventory order and every series' serial repetitions.
     def priority(gate):
         if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04','gc05'): return 0
         if gate.name == 'gc12': return 1
-        if gate.name in ('gc02','gc09'): return 2
+        if gate.name in ('gc02','gc09','gc10'): return 2
         return 3
     return sorted(gates,key=priority)
 

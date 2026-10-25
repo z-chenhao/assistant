@@ -20,7 +20,9 @@ compact manifest. It preserves all six variants and five serial repetitions per
 variant. Two independent fixture workers share the existing bounded fixture pool;
 `--variant-jobs 1` selects serial execution. Each variant owns its temporary root,
 processes and failure file. Joined results retain canonical inventory order.
-The existing CI job deadline and gate-worker limits are unchanged. There is no
+The existing CI job deadline and gate-worker limits are unchanged. GC-10 joins
+GC-09 ahead of short communication gates in the existing bounded queue; this
+avoids leaving a complete native series in the deadline tail. There is no
 reduced success mode.
 
 The original M6 context and event pass unchanged through CLI ingress. The
