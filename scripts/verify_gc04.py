@@ -27,7 +27,7 @@ from verify_gc02 import native, recorded
 from verify_gc03 import exact
 from verify_main import require
 from verify_memory_maintenance import work
-from verify_recall import Embeddings, drain_with_publication_barrier
+from verify_recall import Embeddings, drain_with_publication_barrier, main_completed, worker_requests
 from verify_tasks import assertions as task_assertions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,6 +108,49 @@ const result={date:"2026-10-05",source:{tool:"mcp__fixture__read",sampled_at:con
         'itinerary_1005_grouped.json' if prior else 'itinerary_1005.json')
 
 
+
+def group_report_crash(h, main_run):
+    """Use the same Recall/Main ordering before the real Reporter SIGKILL.
+
+    The grouping append is a new Root too. Its publication ordering must be
+    explicit even though the preceding itinerary already finished.
+    """
+    publish=h.root/'group-publish.release'
+    worker=h.root/'group-worker.release'
+    report=h.root/'group-report.release'
+    require(not any(p.exists() for p in (publish,worker,report)), 'occupied group barriers')
+    baseline=worker_requests(h)
+    seen=dict(after_task_commit=0,before_worker_generation=0,after_report_commit=0)
+    receipt={}
+    def observe(name):
+        require(name in seen,'unexpected grouping barrier')
+        seen[name]+=1
+        if name=='before_worker_generation':publish.touch(exist_ok=True)
+        if name=='after_report_commit':
+            child=h.children[-1]
+            receipt.update(boundary=name,state=native(h))
+            child.kill()
+    def advance():
+        if publish.exists() and not worker.exists() and main_completed(h,main_run):
+            receipt['worker_requests_before_main_completion']=worker_requests(h)-baseline
+            require(receipt['worker_requests_before_main_completion']==0,'group Worker dispatched before Main publication')
+            worker.touch(exist_ok=False)
+    result=h.drive_boundaries(dict(after_task_commit=publish,before_worker_generation=worker,after_report_commit=report),observe,advance)
+    require(result.returncode==-9 and all(seen.values()) and worker.exists() and not report.exists(),
+        'group report crash failed: '+repr(dict(returncode=result.returncode,stdout=result.stdout,stderr=result.stderr)))
+    return (dict(boundary=receipt['boundary'],returncode=result.returncode,state=receipt['state']),
+        dict(worker_requests_before_main_completion=receipt['worker_requests_before_main_completion'],boundaries=seen,
+             root_recall_frozen_before_main_publication=True,main_completed_before_worker_dispatch=True))
+
+
+def recover_group(h):
+    # Keep the actual failed command outcome. A sibling's cancellation must not
+    # erase the first exception or turn an empty stderr into an opaque failure.
+    result=h.command('chat','work',ok=False)
+    require(result.returncode==0,'group recovery failed: '+repr(dict(returncode=result.returncode,
+        stdout=result.stdout[:2000],stderr=result.stderr[:2000])))
+    return result
+
 def journey(h, variant_id, row):
     case, variant = inputs(variant_id)
     row['variant'] = variant
@@ -176,8 +219,8 @@ def journey(h, variant_id, row):
         dict(type='text',text='Capabilities: '+json.dumps(group_plan,ensure_ascii=False)),
         *[dict(type='file',artifact_ref=ref) for ref in [*refs,prior]]]))
     row['group_receipt'] = group
-    row['report_restart'] = kill(h,'after_report_commit')
-    h.command('chat','work'); work(h)
+    row['report_restart'],row['group_barrier'] = group_report_crash(h,group['run_id'])
+    recover_group(h); work(h)
     row['artifacts'] = []
     for descriptor in native(h)['artifact']:
         raw = open_bytes(h,descriptor['artifact_ref'])
@@ -286,7 +329,7 @@ def observe(row):
                 for m in strict_json(g['request_json'])['messages']),
         root_publication_barriers=all(g['worker_requests_before_main_completion']==0 and g['root_recall_frozen_before_main_publication'] is True and
             g['main_completed_before_worker_dispatch'] is True and all(g['boundaries'].values()) for g in
-            (row['seed_barrier'],row['nz_guard']['scheduling'],row['france_guard']['scheduling'])),
+            (row['seed_barrier'],row['nz_guard']['scheduling'],row['france_guard']['scheduling'],row['group_barrier'])),
         readonly_world_tool=all(any(t['run_id']==a['run_id'] and t['tool_name']=='mcp__fixture__read' and t['status']=='succeeded' and
             strict_json(t['arguments_json'])==dict(text='world') and strict_json(strict_json(t['result_json'])['text'])==case['world'] for t in final['tools']) for a in (first,last)),
         artifacts_reopened=len(row['artifacts'])==len(final['artifact'])==4 and all(
@@ -372,6 +415,7 @@ def rejection_probes(row):
         revived_paused_owner=lambda r:next(n for n in r['final']['runs'] if n['error_code']=='task_paused').update(status='completed'),
         wrong_epoch=lambda r:next(n for n in r['final']['runs'] if n['task_epoch']==2).update(task_epoch=1),
         discarded_steering=lambda r:r['steered']['task_instruction'].clear(),
+        group_prepublication_dispatch=lambda r:r['group_barrier'].update(worker_requests_before_main_completion=1),
         prepublication_dispatch=lambda r:r['france_guard']['scheduling'].update(worker_requests_before_main_completion=1),
         corrupt_artifact=lambda r:r['artifacts'][0].update(sha256='0'*64),
         false_restart=lambda r:r['report_restart'].update(returncode=0),
@@ -401,7 +445,9 @@ def drive(binary, item, failure_evidence):
             with personal(binary,root,inputs(variant_id)[0],embeddings) as h:
                 try:
                     journey(h,variant_id,row)
-                except BaseException:
+                except BaseException as error:
+                    row['failure']=dict(kind=type(error).__name__,message=str(error))
+                    print('GC-04 first failure:',variant_id,repetition,row['failure'],flush=True)
                     row['failure_state'] = h.failure_state()
                     raise
         row['cleanup'] = dict(disposable_root_removed=not root.exists(),owned_processes_joined=True)

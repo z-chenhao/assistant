@@ -76,6 +76,46 @@ class TravelTests(unittest.TestCase):
             changed=copy.deepcopy(value);mutate(changed)
             self.assertFalse(journey.tool_outcomes(changed,'nz'))
 
+    def test_grouping_freezes_recall_publishes_main_then_kills_after_report(self):
+        class Child:
+            killed=False
+            def kill(self): self.killed=True
+        class Harness:
+            def __init__(self,root):self.root=root;self.children=[Child()]
+            def drive_boundaries(self,barriers,observe,advance):
+                self.barriers=barriers
+                self.assert_keys=set(barriers)
+                observe('after_task_commit');advance()
+                self.before_publish=not barriers['before_worker_generation'].exists()
+                observe('before_worker_generation');advance()
+                self.worker_waits=not barriers['before_worker_generation'].exists()
+                published[0]=True;advance()
+                self.worker_released=barriers['before_worker_generation'].exists()
+                observe('after_report_commit')
+                return type('Result',(),dict(returncode=-9 if self.children[0].killed else 0,stdout='',stderr=''))()
+        with tempfile.TemporaryDirectory() as temp:
+            h=Harness(Path(temp));published=[False]
+            with patch.object(journey,'main_completed',side_effect=lambda *_:published[0]), \
+                 patch.object(journey,'worker_requests',return_value=0),patch.object(journey,'native',return_value={'committed':'report'}):
+                crash,scheduling=journey.group_report_crash(h,'main')
+            self.assertEqual(h.assert_keys,{'after_task_commit','before_worker_generation','after_report_commit'})
+            self.assertTrue(h.before_publish and h.worker_waits and h.worker_released and h.children[0].killed)
+            self.assertFalse(h.barriers['after_report_commit'].exists())
+            self.assertEqual(crash,dict(boundary='after_report_commit',returncode=-9,state={'committed':'report'}))
+            self.assertEqual(scheduling['worker_requests_before_main_completion'],0)
+            self.assertTrue(all(scheduling['boundaries'].values()))
+
+    def test_group_recovery_preserves_nonzero_exit_and_never_retries(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        for code in (1,-9,130):
+            h=SimpleNamespace(command=Mock(return_value=SimpleNamespace(returncode=code,stdout='native failure',stderr='')))
+            with self.assertRaisesRegex(RuntimeError,'returncode.*'+str(code)):
+                journey.recover_group(h)
+            h.command.assert_called_once_with('chat','work',ok=False)
+        h=SimpleNamespace(command=Mock(return_value=SimpleNamespace(returncode=0,stdout='{}',stderr='')))
+        self.assertEqual(journey.recover_group(h).returncode,0)
+
     def test_identity_counts_locks_cleanup_and_assertions_cannot_be_waived(self):
         source = dict(sha='a'*40,files={'runner':'hash'})
         report = dict(case_id='GC-04',status='mechanical_pass',release_ready=False,semantic_score=None,eligible_for_grading=False,
