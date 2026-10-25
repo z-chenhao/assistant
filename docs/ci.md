@@ -166,6 +166,13 @@ require both groups; failed compatibility skips dependent cells and fails the
 aggregate. Queue/setup/join time still counts toward the unchanged 600-second
 whole-workflow objective. Only a new complete exact-SHA attempt proves that bound.
 
+The aggregate regression also avoids a redundant Cartesian product of rejected
+status spellings. It still visits every subset of failing dependencies, with
+failure/cancelled/skipped uniformly and in mixed rotations, plus missing,
+unexpected and malformed inputs. This keeps fail-closed assertions proportional
+to distinct success/non-success subsets as the Required inventory grows; the
+production gate still requires every job's exact `success` result.
+
 Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
 uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
 run the original health/goals commands, each retaining six independent variants

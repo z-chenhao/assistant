@@ -173,10 +173,11 @@ class VerificationTests(unittest.TestCase):
         rejected = ['failure', 'cancelled', 'skipped']
         names = sorted(ci_gate.REQUIRED)
         for failed in itertools.product([False, True], repeat=len(names)):
-            for offset in range(len(rejected)):
-                needs = {name: {'result': rejected[(i + offset) % len(rejected)] if bad else 'success'}
-                         for i, (name, bad) in enumerate(zip(names, failed))}
-                self.assertEqual(ci_gate.passed(needs), not any(failed))
+            for mixed in (False, True):
+                for offset in range(len(rejected)):
+                    needs = {name: {'result': rejected[((i if mixed else 0) + offset) % len(rejected)] if bad else 'success'}
+                             for i, (name, bad) in enumerate(zip(names, failed))}
+                    self.assertEqual(ci_gate.passed(needs), not any(failed))
         good = {name: {'result': 'success'} for name in ci_gate.REQUIRED}
         for name in good:
             self.assertFalse(ci_gate.passed({k: v for k, v in good.items() if k != name}))
