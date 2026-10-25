@@ -239,7 +239,7 @@ def run(binary):
         report["concurrent"] = scenario("concurrent", concurrent)
         report["checks"].append("16 simultaneous CLI inputs; one Main; ordered history; idempotency and drift rejection")
 
-        for boundary in ("before_generation_dispatch", "before_generation_commit", "after_generation_commit",
+        for boundary in ("after_compaction_commit", "before_generation_dispatch", "before_generation_commit", "after_generation_commit",
                          "before_conversation_append", "after_conversation_append", "before_reply_checkpoint",
                          "after_reply_checkpoint", "before_tool_commit", "after_tool_commit"):
             def crash(h):
@@ -248,8 +248,15 @@ def run(binary):
                 child = h.hold(boundary)
                 child.kill()
                 child.communicate(timeout=10)
-                if boundary == "after_generation_commit":
+                steered = boundary in ("after_compaction_commit", "after_generation_commit")
+                if steered:
                     h.send("late", "late crash steering")
+                frozen = None
+                if boundary == "after_compaction_commit":
+                    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+                        frozen = db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone()
+                        require(frozen is not None and db.execute("SELECT count(*) FROM model_generation").fetchone()[0] == 0,
+                                "kill did not separate compaction and generation admission")
                 # Read state directly before recovery; history readback may
                 # itself fill an immutable Conversation intent, by design.
                 before = h.state()
@@ -257,7 +264,6 @@ def run(binary):
                 accepted_tools = {t["invocation_id"]: t for t in before["tools"] if t["status"] == "succeeded"}
                 h.command("chat", "work")
                 after = h.state()
-                steered = boundary == "after_generation_commit"
                 assert_final(after, 2 if steered else 1)
                 require(len(after["generations"]) == (3 if steered else 2) and len(after["tools"]) == (4 if steered else 2), "crash repeated a logical generation/Tool")
                 for g in after["generations"]:
@@ -266,6 +272,10 @@ def run(binary):
                 for t in after["tools"]:
                     if t["invocation_id"] in accepted_tools:
                         require(t == accepted_tools[t["invocation_id"]], "completed Tool replayed")
+                if frozen is not None:
+                    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+                        require(db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone() == frozen,
+                                "steering changed the frozen pre-admission context")
                 return {"boundary": boundary, "signal": "SIGKILL", "before": before, "after": after}
             report["crashes"].append(scenario(boundary, crash))
 
@@ -295,7 +305,7 @@ def run(binary):
             return final
         report["steering"] = scenario("steering", steering)
         report["checks"].append("SIGTERM preserves business work; separate steering at stable boundary; frozen model and new-Run switch")
-        report["checks"].append("SIGKILL at nine model/Tool/Conversation/checkpoint boundaries; completed results reused; missing writes filled")
+        report["checks"].append("SIGKILL at ten compaction/model/Tool/Conversation/checkpoint boundaries; frozen pre-admission context recovered before steering; completed results reused; missing writes filled")
     report["checks"].append("cleanup: all owned processes reaped and disposable databases removed")
     return report
 
