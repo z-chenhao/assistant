@@ -29,7 +29,7 @@ from verify_gc02 import recorded
 from verify_gc03 import exact
 from verify_main import require
 from verify_memory_maintenance import work
-from verify_recall import Embeddings
+from verify_recall import Embeddings, drain_with_publication_barrier, main_completed, worker_requests
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / 'evals/fixtures/gc07-v1.lock.json'
@@ -75,6 +75,34 @@ def topology(current=True):
     return dict(topic='家庭网络',kind='当前拓扑',world=world)
 
 
+def start_task(h,key,source,title):
+    plan=[dict(name='builtin__task__manage',arguments=dict(operation='create',task=title+'\nCapabilities: '+json.dumps([
+        dict(name='builtin__codemode__execute',arguments=dict(source=source))],ensure_ascii=False)))]
+    return h.send(key,'Capabilities: '+json.dumps(plan,ensure_ascii=False))
+
+
+def task_drain(h,receipt,key):
+    return drain_with_publication_barrier(h,receipt['run_id'],prefix=key+'-')
+
+
+def task_cell(h,key,source,title):
+    receipt=start_task(h,key,source,title)
+    scheduling=task_drain(h,receipt,key)
+    decisions=[]
+    db=Path(h.env['ERII_DATA_ROOT'])/'state.db'
+    for _ in range(48):
+        pending=[a for a in h.command('approval','list') if a['status']=='pending']
+        if not pending:break
+        for approval in pending:
+            inv=read(db,'SELECT i.* FROM tool_invocation i JOIN approval a USING(invocation_id) WHERE a.approval_id=?',(approval['approval_id'],))[0]
+            require(inv['attempt_count']==0,'GC-07 Task effect reached provider before approval')
+            decisions.append(dict(approval=approval,invocation=inv))
+            h.command('approval','approve',approval['approval_id'],approval['frozen_arguments_hash'])
+        h.command('chat','work')
+    else:raise RuntimeError('GC-07 Task approvals did not settle')
+    return dict(decisions=decisions,scheduling=scheduling,main_receipt=receipt)
+
+
 def cell(h,key,source,crash_after_approval=False,**options):
     # execute()'s last Code return may belong to a nested Child. Select this
     # cell's first newly accepted execution, then bind its persisted native rows.
@@ -96,6 +124,8 @@ def cell(h,key,source,crash_after_approval=False,**options):
         crash = kill(h,'after_tool_commit')
         h.command('chat','work')
         executed = dict(decisions=decisions)
+    elif options.get('task'):
+        executed = task_cell(h,key,source,options['task'])
     else:
         executed = execute(h,key,source,**options)
     rows = read(db,'SELECT * FROM tool_invocation ORDER BY created_at,rowid')
@@ -105,7 +135,7 @@ def cell(h,key,source,crash_after_approval=False,**options):
     returned = [p['value'] for p in output if p['type'] == 'return']
     require(len(returned) == 1,'GC-07 requires one cell return')
     return dict(parent=parent,output=output,value=returned[0],nested=[t for t in rows if t['parent_invocation_id'] == parent['invocation_id']],
-        decisions=executed['decisions'],crash=crash)
+        decisions=executed['decisions'],crash=crash,scheduling=executed.get('scheduling'))
 
 
 def observation(url):
@@ -189,41 +219,7 @@ def journey(h,peer,browser_root,variant,row):
     row['verified'] = cell(h,'verify-all-paths',observation(peer['url']))
     row['after_repair'] = external(browser_root)
     row['report'] = cell(h,'network-report',report_source(peer['url']))
-    # A held old desktop owner competes with an independent Task. The second
-    # waits at the desktop barrier; Main then cancels the first before it resumes.
-    held_plan = json.dumps([dict(name='builtin__codemode__execute',arguments=dict(source=PREFIX+PW+'await pw.locator("#repair-fail").click();return "must not write";'))])
-    contender_source = 'await cua.listTabs();return "observed_after_release";'
-    pending = {}
-    def contender():
-        db = Path(h.env['ERII_DATA_ROOT'])/'state.db'
-        pending['before'] = {t['invocation_id'] for t in read(db,'SELECT * FROM tool_invocation')}
-        plan = [dict(name='builtin__task__manage',arguments=dict(operation='create',task='GC-07 independent desktop observation\nCapabilities: '+json.dumps([
-            dict(name='builtin__codemode__execute',arguments=dict(source=contender_source))])))]
-        h.send('desktop-contender','Capabilities: '+json.dumps(plan))
-        child = h.processes.start(h.args('chat','work'),stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=h.env,cwd=h.root)
-        h.children.append(child);pending['child'] = child
-        row['contended_state'] = h.wait_state(lambda state:any(t['invocation_id'] not in pending['before'] and t['status']=='waiting' and t['tool_name']=='builtin__computer__discover' for t in state['tools']),
-            'independent Task waits for desktop',reader=native,timeout=20)
-    original_hold = h.hold
-    def hold_and_contend(*args,**kwargs):
-        child = original_hold(*args,**kwargs)
-        contender()
-        return child
-    h.hold = hold_and_contend
-    try:
-        row['cancel'] = h.cancel_at('computer_ready',held_plan)
-    finally:
-        h.hold = original_hold
-    row['ownership_after_cancel'] = read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM computer')[0]
-    child = pending['child'];_,err = child.communicate(timeout=30)
-    require(child.returncode == 0,'GC-07 contender failed: '+err)
-    h.processes.retire(child)
-    rows = read(Path(h.env['ERII_DATA_ROOT'])/'state.db','SELECT * FROM tool_invocation ORDER BY created_at,rowid')
-    parent = next(t for t in rows if t['invocation_id'] not in pending['before'] and t['tool_name']=='builtin__codemode__execute')
-    output = strict_json(strict_json(parent['result_json'])['text'])
-    row['contender'] = dict(parent=parent,output=output,value=next(p['value'] for p in output if p['type']=='return'),
-        nested=[t for t in rows if t['parent_invocation_id']==parent['invocation_id']])
-    row['cancelled'] = h.cancelled_state(row['cancel']['task_id'])
+    desktop_contention(h,row)
     row['after_cancel'] = external(browser_root)
     work(h)
     row['final'] = native(h)
@@ -239,6 +235,64 @@ def journey(h,peer,browser_root,variant,row):
     h.command('chat','work');work(h)
     row['replayed'] = native(h)
     row['actions_replayed'] = strict_json((browser_root/'network-actions.json').read_bytes())
+
+
+def desktop_contention(h,row):
+    # One foreground Actor owns both Tasks. Reuse the CLI boundary driver and
+    # the maintained recall/publication ordering for each creation; resetting
+    # release files while the first Code is held prevents another scheduler
+    # from admitting the second Root before its Main publishes.
+    db=Path(h.env['ERII_DATA_ROOT'])/'state.db'
+    publish,worker,computer=[h.root/('desktop-'+name+'.release') for name in ('publish','worker','computer')]
+    old_source=PREFIX+PW+'await pw.locator("#repair-fail").click();return "must not write";'
+    original=start_task(h,'cancel-owner',old_source,'GC-07 cancellable desktop owner')
+    phase=dict(name='owner',receipt=original,baseline=worker_requests(h),seen=dict(after_task_commit=0,before_worker_generation=0))
+    schedules={};held={};control={};contender={}
+    def observe(name):
+        if name in phase['seen']:phase['seen'][name]+=1
+        if name=='before_worker_generation' and not publish.exists():publish.touch(exist_ok=False)
+        if name=='computer_ready' and not held:
+            held['computer']=h.command('computer','status')
+            owner=read(db,'SELECT execution_id FROM computer')[0]['execution_id']
+            held['task_id']=read(db,'SELECT r.task_id FROM run r JOIN tool_invocation i USING(run_id) WHERE i.invocation_id=?',(owner,))[0]['task_id']
+            contender['before']={t['invocation_id'] for t in read(db,'SELECT * FROM tool_invocation')}
+            require('owner' in schedules,'GC-07 owner bypassed the publication barrier')
+            publish.unlink();worker.unlink()
+            receipt=start_task(h,'desktop-contender','await cua.listTabs();return "observed_after_release";','GC-07 independent desktop observation')
+            phase.update(name='contender',receipt=receipt,baseline=worker_requests(h),seen=dict(after_task_commit=0,before_worker_generation=0))
+    def advance():
+        if publish.exists() and not worker.exists() and main_completed(h,phase['receipt']['run_id']):
+            requests=worker_requests(h)-phase['baseline']
+            require(requests==0,'GC-07 Worker dispatched before Main publication')
+            require(all(phase['seen'].values()),'GC-07 Task did not cross the recall/publication barriers')
+            schedules[phase['name']]=dict(worker_requests_before_main_completion=requests,
+                root_recall_frozen_before_main_publication=True,main_completed_before_worker_dispatch=True,boundaries=copy.deepcopy(phase['seen']))
+            worker.touch(exist_ok=False)
+        if held and not control:
+            waiting=read(db,"SELECT * FROM tool_invocation WHERE tool_name='builtin__computer__discover' AND status='waiting'")
+            if any(t['invocation_id'] not in contender['before'] for t in waiting):
+                row['contended_state']=native(h)
+                task=read(db,'SELECT * FROM task WHERE task_id=?',(held['task_id'],))[0]
+                plan=[dict(name='builtin__task__manage',arguments=dict(operation='cancel',taskRef=task['task_ref']))]
+                control['receipt']=h.send('cancel-desktop-owner','Capabilities: '+json.dumps(plan))
+        if control and main_completed(h,control['receipt']['run_id']):
+            require(read(db,'SELECT status FROM task WHERE task_id=?',(held['task_id'],))[0]['status']=='cancelled','GC-07 cancel Main did not commit')
+            computer.touch(exist_ok=True)
+    try:
+        result=h.drive_boundaries({'after_task_commit':publish,'before_worker_generation':worker,'computer_ready':computer},observe,advance)
+        require(result.returncode==0,'GC-07 desktop contention failed: '+result.stderr)
+        require(control and computer.exists() and set(schedules)=={'owner','contender'},'GC-07 incomplete desktop control boundaries')
+        rows=read(db,'SELECT * FROM tool_invocation ORDER BY created_at,rowid')
+        parent=next(t for t in rows if t['invocation_id'] not in contender['before'] and t['tool_name']=='builtin__codemode__execute')
+        output=strict_json(strict_json(parent['result_json'])['text'])
+        row['contender']=dict(parent=parent,output=output,value=next(p['value'] for p in output if p['type']=='return'),
+            nested=[t for t in rows if t['parent_invocation_id']==parent['invocation_id']],scheduling=schedules['contender'])
+        row['cancel']=dict(boundary='computer_ready',task_id=held['task_id'],held=held['computer'],old_owner_exit=result.returncode,
+            after_cancel=h.command('computer','status'),scheduling=schedules['owner'])
+        row['cancelled']=h.cancelled_state(held['task_id'])
+        row['ownership_after_cancel']=read(db,'SELECT * FROM computer')[0]
+    finally:
+        for path in (publish,worker,computer):path.touch(exist_ok=True)
 
 
 def returned(call,final):
@@ -318,6 +372,9 @@ def observe(row):
         r['status']=='cancelled' and type(r['task_epoch']) is int and type(cancelled_task['task_epoch']) is int and r['task_epoch']<cancelled_task['task_epoch'] for r in old_runs)
     checks['exact_task_tree'] = len(final['task'])==3 and sorted(t['status'] for t in final['task'])==['cancelled','completed','completed'] and len([r for r in runs if r['kind']=='worker' and r['parent_run_id'] is None])==3
     checks['main_capability_boundary'] = all(not c['can_spawn_agents'] and not any(t['name']=='builtin__agent__run' for t in strict_json(c['tools_json'])) for c in final['capabilities'] if c['role']=='main')
+    checks['task_publication_barriers'] = all(row[name]['scheduling']['worker_requests_before_main_completion']==0 and
+        row[name]['scheduling']['root_recall_frozen_before_main_publication'] is True and
+        row[name]['scheduling']['main_completed_before_worker_dispatch'] is True for name in ('diagnosis','cancel','contender'))
     checks['snapshot_lineage'] = all(c['model_snapshot_id']==by_run[c['parent_run_id']]['model_snapshot_id'] for c in runs if c['parent_run_id'] is not None)
     old = next(m for m in final['memory']['memory']['records'] if 'memory:'+m['memory_id']==row['old_ref'])
     current = next(m for m in final['memory']['memory']['records'] if 'memory:'+m['memory_id']==row['current_ref'])
@@ -461,6 +518,7 @@ def rejection_probes(row):
         unknown_retry=lambda r:next(t for t in r['final']['tools'] if t['status']=='unknown').update(attempt_count=2),
         unapproved=lambda r:next(a for a in r['final']['approval'] if a['status']=='denied').update(status='approved'),
         child_task_control=lambda r:next(c for c in r['final']['capabilities'] if c['snapshot_id']==next(n['capability_snapshot_id'] for n in r['final']['runs'] if n['parent_run_id'] is not None)).update(tools_json='[{"name":"builtin__task__manage"}]'),
+        early_worker_dispatch=lambda r:r['cancel']['scheduling'].update(worker_requests_before_main_completion=1),
         old_epoch_admitted=lambda r:next(n for n in r['final']['runs'] if n['task_id']==r['cancel']['task_id']).update(task_epoch=r['cancelled']['task'][1]),
         cancelled_write=lambda r:r['after_cancel']['network'].update(protocols=2),
         false_effect_crash=lambda r:r['unknown']['crash'].update(returncode=0),
@@ -476,6 +534,19 @@ def rejection_probes(row):
         except (KeyError,IndexError,TypeError,ValueError,RuntimeError,StopIteration):result[name] = True
         require(result[name],'GC-07 consumer accepted corruption: '+name)
     return result
+
+
+def failure_summary(row,error):
+    state=row.get('failure_state',{})
+    summary=dict(kind='gc07_failure_summary',variant_id=row['variant_id'],repetition=row['repetition'],
+        error_type=type(error).__name__,error=str(error)[:1024],
+        completed_stages=[key for key in ('diagnosis','denied','failed','rollback','unknown','verified','report','cancel','contender') if key in row])
+    for name in ('runs','claims','code','computer','computer_operations'):
+        summary[name]=state.get(name,[])[:12]
+    summary['tools']=[{k:t.get(k) for k in ('invocation_id','tool_name','status')} for t in state.get('tools',[])[:16]]
+    summary['models']=[{k:g.get(k) for k in ('generation_id','status')} for g in state.get('models',[])[:3]]
+    require(len(json.dumps(summary,ensure_ascii=False).encode())<32<<10,'GC-07 failure summary exceeded its public budget')
+    return summary
 
 
 def drive(binary,item,failure_evidence):
@@ -494,9 +565,17 @@ def drive(binary,item,failure_evidence):
                     raise
         row['cleanup'] = dict(disposable_root_removed=not root.exists(),owned_processes_joined=True)
         row['assertions'] = observe(row)
-    except BaseException:
+    except BaseException as error:
         failure_evidence.parent.mkdir(parents=True,exist_ok=True)
-        failure_evidence.write_text(json.dumps(row,ensure_ascii=False)+'\n')
+        summary=failure_summary(row,error)
+        public_root=failure_evidence.parent.parent if failure_evidence.parent.name=='.gc07-native' else failure_evidence.parent
+        public=public_root/(failure_evidence.stem+'.summary.json')
+        public.write_text(json.dumps(summary,ensure_ascii=False,indent=2)+'\n')
+        print(json.dumps(summary,ensure_ascii=False),flush=True)
+        # Complete native failure bytes stay local; CI publishes only the
+        # bounded structural summary, never full model requests or Tool data.
+        with gzip.open(failure_evidence.with_suffix('.json.gz'),'wt',encoding='utf-8',compresslevel=1) as target:
+            json.dump(row,target,ensure_ascii=False)
         raise
     finally:embeddings.close()
     return row

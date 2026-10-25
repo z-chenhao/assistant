@@ -126,6 +126,19 @@ class NetworkTests(unittest.TestCase):
                 with self.assertRaises((OSError,EOFError,ValueError)):journey.read_report(path)
             self.assertNotIn('include-hidden-files: true',(journey.ROOT/'.github/workflows/ci.yml').read_text())
 
+    def test_failure_summary_retains_structural_state_without_raw_requests_or_results(self):
+        row=dict(variant_id='wording-1',repetition=1,diagnosis={},failure_state=dict(
+            runs=[dict(run_id='root',status='running')],claims=[],code=[dict(state='suspended')],computer=[],computer_operations=[],
+            models=[dict(generation_id='generation',status='accepted',request_json='PRIVATE_REQUEST_SENTINEL'*10000)],
+            tools=[dict(invocation_id='call',tool_name='computer',status='waiting',result_json='PRIVATE_RESULT_SENTINEL'*10000)]))
+        summary=journey.failure_summary(row,RuntimeError('run storage unavailable'))
+        self.assertEqual(summary['runs'],row['failure_state']['runs'])
+        self.assertEqual(summary['completed_stages'],['diagnosis'])
+        self.assertEqual(summary['models'],[dict(generation_id='generation',status='accepted')])
+        self.assertEqual(summary['tools'],[dict(invocation_id='call',tool_name='computer',status='waiting')])
+        self.assertLess(len(json.dumps(summary)),32768)
+        self.assertNotIn('PRIVATE_',json.dumps(summary))
+
     def test_failed_cli_removes_old_success(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'gc07.json';path.write_text('{"status":"mechanical_pass"}')

@@ -47,6 +47,21 @@ contradictory native returns, stale topology, bad rollback, denied effects,
 unknown retries, revived owners and changed Artifact bytes. Hashes bind bytes;
 they do not establish independent trust. Reviewer uses a clean exact-SHA checkout.
 
+Task creation uses the maintained Recall publication barriers: freeze Root
+Recall, publish Main, then dispatch Root. The desktop probe keeps both Tasks
+and cancellation inside one foreground Actor, with separate observed barriers
+for each Task. This preserves the existing fail-closed concurrent-pending-append
+protocol; it adds no storage retry or runtime change. The maintained Recall
+conformance gate covers the rejected ordering. A forced GC-07 reproduction
+retains the same storage rejection with one pending assistant vector and zero
+Worker model requests. Successful journey evidence describes the controlled
+legal ordering, rather than success under every interleaving.
+
+Unexpected failures retain full compressed native state locally and publish a
+bounded structural summary (under 32 KiB) with Run/claim/Code/Computer states.
+It excludes raw model requests and Tool result contents, so a failed hosted run
+remains diagnosable within the transfer budget.
+
 Registering this gate changes `verify_suite.py`. The `baseline-13` and
 `golden-common-02` reference-maintenance envelopes explicitly refresh that
 committed file identity through `maintain_audit_references.py`. Their original
