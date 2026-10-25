@@ -3,6 +3,8 @@
 import argparse
 import base64
 import copy
+import gzip
+import io
 import hashlib
 import json
 import os
@@ -307,13 +309,13 @@ def observe(row):
         d['approval']['status']=='pending' and d['invocation']['attempt_count']==0 and
         d['approval']['arguments']==d['invocation']['arguments_json']==next(t['arguments_json'] for t in tools if t['invocation_id']==d['invocation']['invocation_id']) and
         d['approval']['frozen_arguments_hash']==next(a['frozen_arguments_hash'] for a in approvals if a['approval_id']==d['approval']['approval_id']) for d in decisions)
-    checks['known_tool_outcomes'] = all(t['status'] in ('succeeded','failed','cancelled','unknown') and
+    checks['known_tool_outcomes'] = all(type(t['attempt_count']) is int and t['status'] in ('succeeded','failed','cancelled','unknown') and
         (t['status']!='failed' or strict_json(t['result_json']).get('error',{}).get('code')=='APPROVAL_DENIED') and
         (t['attempt_count']>=1 if t['tool_name'] in ('builtin__codemode__execute','builtin__agent__run') else t['attempt_count'] in (0,1)) for t in tools)
     cancelled_task = next(t for t in final['task'] if t['task_id']==row['cancel']['task_id'])
     old_runs = [r for r in runs if r['task_id']==cancelled_task['task_id']]
     checks['old_epoch_fenced'] = cancelled_task['status']=='cancelled' and bool(old_runs) and all(
-        r['status']=='cancelled' and r['task_epoch']<cancelled_task['task_epoch'] for r in old_runs)
+        r['status']=='cancelled' and type(r['task_epoch']) is int and type(cancelled_task['task_epoch']) is int and r['task_epoch']<cancelled_task['task_epoch'] for r in old_runs)
     checks['exact_task_tree'] = len(final['task'])==3 and sorted(t['status'] for t in final['task'])==['cancelled','completed','completed'] and len([r for r in runs if r['kind']=='worker' and r['parent_run_id'] is None])==3
     checks['main_capability_boundary'] = all(not c['can_spawn_agents'] and not any(t['name']=='builtin__agent__run' for t in strict_json(c['tools_json'])) for c in final['capabilities'] if c['role']=='main')
     checks['snapshot_lineage'] = all(c['model_snapshot_id']==by_run[c['parent_run_id']]['model_snapshot_id'] for c in runs if c['parent_run_id'] is not None)
@@ -391,14 +393,22 @@ def file_hash(path):
 def retain_report(path, report):
     # The pinned CI uploader excludes hidden files. Keep all native bytes on
     # disk; only the small public manifest is collected/uploaded automatically.
-    raw = path.parent / '.gc07-native' / path.name
+    raw = path.parent / '.gc07-native' / (path.name+'.gz')
     raw.parent.mkdir(parents=True,exist_ok=True)
-    raw.write_text(json.dumps(report,ensure_ascii=False)+'\n')
+    # Stream complete native bytes into a lossless archive. A full series is
+    # hundreds of MiB of repeated request/state snapshots; materializing a second
+    # giant JSON string or requiring that much free disk is unnecessary.
+    uncompressed_bytes = 0
+    with raw.open('wb') as target, gzip.GzipFile(fileobj=target,mode='wb',compresslevel=1,mtime=0) as archive:
+        for chunk in json.JSONEncoder(ensure_ascii=False).iterencode(report):
+            data = chunk.encode('utf-8');uncompressed_bytes += len(data);archive.write(data)
+        archive.write(b'\n');uncompressed_bytes += 1
     summary = dict(case_id='GC-07',status=report['status'],release_ready=False,semantic_score=None,eligible_for_grading=False,
         receipts=len(report['results']),frozen_blocks=20,cleanup=report['cleanup'],
         source_sha=report['identity']['source_before']['sha'],binary_sha256=report['identity']['binary_sha256'])
     manifest = dict(kind='gc07_native_manifest',version=1,summary=summary,
         native=dict(path=str(raw.relative_to(path.parent)),sha256=file_hash(raw)),native_bytes=raw.stat().st_size,
+        native_encoding='gzip',native_uncompressed_bytes=uncompressed_bytes,
         proof_limit='Native bytes required for recomputation; summary alone cannot certify a Case or release.')
     path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
     return manifest
@@ -406,12 +416,18 @@ def retain_report(path, report):
 
 def read_report(path):
     manifest = strict_json(path.read_bytes())
-    require(set(manifest) == {'kind','version','summary','native','native_bytes','proof_limit'} and
+    require(set(manifest) == {'kind','version','summary','native','native_bytes','native_encoding','native_uncompressed_bytes','proof_limit'} and
         manifest['kind'] == 'gc07_native_manifest' and type(manifest['version']) is int and manifest['version'] == 1,
         'GC-07 native manifest required')
     raw = Receipts(path.parent,None).bytes(manifest['native'])
     require(type(manifest['native_bytes']) is int and len(raw) == manifest['native_bytes'], 'GC-07 native size mismatch')
-    report = strict_json(raw)
+    size = manifest['native_uncompressed_bytes']
+    require(manifest['native_encoding']=='gzip' and type(size) is int and 0<size<=2<<30,
+        'GC-07 bounded gzip native receipt required')
+    with gzip.GzipFile(fileobj=io.BytesIO(raw)) as archive:
+        decoded = archive.read(size+1)
+    require(len(decoded)==size,'GC-07 decompressed size mismatch')
+    report = strict_json(decoded)
     expected = dict(case_id='GC-07',status=report['status'],release_ready=False,semantic_score=None,eligible_for_grading=False,
         receipts=len(report['results']),frozen_blocks=20,cleanup=report['cleanup'],
         source_sha=report['identity']['source_before']['sha'],binary_sha256=report['identity']['binary_sha256'])
@@ -441,6 +457,7 @@ def rejection_probes(row):
         dirty_config=lambda r:r['after_repair']['network'].update(protocols=2),
         failed_rollback=lambda r:r['after_rollback']['network'].update(ordinary=True),
         denial_effect=lambda r:r['after_denial']['network'].update(gateway=True),
+        boolean_attempt=lambda r:next(t for t in r['final']['tools'] if t['status']=='unknown').update(attempt_count=True),
         unknown_retry=lambda r:next(t for t in r['final']['tools'] if t['status']=='unknown').update(attempt_count=2),
         unapproved=lambda r:next(a for a in r['final']['approval'] if a['status']=='denied').update(status='approved'),
         child_task_control=lambda r:next(c for c in r['final']['capabilities'] if c['snapshot_id']==next(n['capability_snapshot_id'] for n in r['final']['runs'] if n['parent_run_id'] is not None)).update(tools_json='[{"name":"builtin__task__manage"}]'),

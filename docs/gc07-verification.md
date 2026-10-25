@@ -38,7 +38,8 @@ quality evidence.
 | Recovery and delivery | SIGKILL after generation commit and after the unknown effect/Tool commit reuses completed calls; duplicate input preserves native state and action ledger. Old cancelled Task epoch cannot write or revive. Screenshots and JSON report reopen through the CLI; native Tool returns, Artifact bytes/hashes, Task/Run tree and Main delivery intents are retained. |
 
 The public JSON is a small hash/size-bound manifest. Complete native evidence,
-including actual Artifact bytes, remains beside it in `.gc07-native/`; the pinned
+including actual Artifact bytes, is streamed losslessly into gzip beside it in
+`.gc07-native/`; compressed hash/size and bounded decompressed size are checked; the pinned
 CI uploader excludes that hidden directory. Validation requires native bytes,
 recomputes assertions and corruption probes, and rejects missing/duplicate/
 reordered rounds, changed input/source/binary, failed cleanup, false grades,

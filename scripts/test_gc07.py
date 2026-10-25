@@ -1,5 +1,6 @@
 """Frozen GC-07 inputs and fail-closed receipt boundaries."""
 import copy
+import gzip
 import json
 from pathlib import Path
 import subprocess
@@ -99,14 +100,19 @@ class NetworkTests(unittest.TestCase):
             self.assertEqual(journey.read_report(path),report)
             for mutate in (lambda m:m['summary'].update(semantic_score=100),lambda m:m['summary'].update(cleanup=1),
                     lambda m:m['native'].update(sha256='0'*64),lambda m:m['native'].update(path='../outside.json'),
-                    lambda m:m['native'].update(path=str(raw)),lambda m:m.update(native_bytes=True),lambda m:m.update(version=True)):
+                    lambda m:m['native'].update(path=str(raw)),lambda m:m.update(native_bytes=True),lambda m:m.update(version=True),
+                    lambda m:m.update(native_encoding='plain'),lambda m:m.update(native_uncompressed_bytes=True),
+                    lambda m:m.update(native_uncompressed_bytes=0),lambda m:m.update(native_uncompressed_bytes=3<<30),
+                    lambda m:m.update(native_uncompressed_bytes=m['native_uncompressed_bytes']+1)):
                 changed=copy.deepcopy(manifest);mutate(changed);path.write_text(json.dumps(changed))
                 with self.assertRaises((ValueError,RuntimeError)):journey.read_report(path)
             path.write_text(json.dumps(manifest))
             actual=raw.with_suffix('.saved');raw.rename(actual);raw.symlink_to(actual)
             with self.assertRaises(ValueError):journey.read_report(path)
             raw.unlink();actual.rename(raw)
-            raw.write_text(raw.read_text()+' ')
+            self.assertGreater(manifest['native_uncompressed_bytes'],100*manifest['native_bytes'])
+            self.assertEqual(json.loads(gzip.decompress(raw.read_bytes())),report)
+            raw.write_bytes(raw.read_bytes()+b' ')
             with self.assertRaises(ValueError):journey.read_report(path)
             self.assertNotIn('include-hidden-files: true',(journey.ROOT/'.github/workflows/ci.yml').read_text())
 
