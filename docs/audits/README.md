@@ -33,19 +33,38 @@ make audit-baseline-12
 The command discovers drift and retains the previously explicit reference scope.
 `--reference PATH[#SYMBOL]` may additionally select an unchanged reference.
 It writes only a disposable proposal under `evidence/`, removes stale output on
-failure, and never overwrites an input. The original merged ledger and current committed blobs,
-full source SHAs, ancestry, current bytes and symbols must resolve locally;
-missing Git objects fail closed without fetching. The original merged ledger
-must be an ancestor of the new code revision, which must be an ancestor of HEAD.
-Tests that consume maintained ledgers therefore need reachable Git history;
-CI fetches it only in the two jobs running Python regressions.
+failure, and never overwrites an input. Capture requires a committed source
+revision descending from the original merged ledger and reachable from HEAD.
+The original merged ledger must remain an ancestor of HEAD. Tests need its
+reachable history; CI fetches history only in the two Python regression jobs.
+
+Maintenance envelope version 2 uses the explicit binding
+`source_commit_tree_and_HEAD_blob`. It retains the exact source SHA and base64
+Git commit/path-tree object bodies (no duplicate blob bodies). Every audit
+reconstructs those objects in a disposable bare object store with native Git,
+checks their object IDs, resolves each exact file path/mode, and compares its blob
+with both current HEAD's committed entry and the current file bytes. SHA256 and
+symbol checks remain mandatory. The original merged ledger's raw/canonical seals
+and Git blob checks are unchanged. Object-store cleanup is automatic; no network
+fetch or write to the user's Git objects occurs.
+
+A source commit need not be an ancestor of the squash result: squash preserves
+file objects while replacing commit ancestry. The full source commit/tree proof
+remains independently checkable even when a fresh clone has **no** source commit
+object. This is an explicit file-identity binding, not an ancestry claim or a
+fallback on missing evidence. All audits always check the proof, even before
+merge; missing/corrupt proof objects or a HEAD/blob/mode mismatch reject. The
+unreleased version-1 envelope is rejected and must be explicitly refreshed.
+The source SHA, reference hashes and all original historical identities in these
+five migrated records are retained.
 
 `audit_package` independently validates the original seal, merged ledger blob,
-current SHA/ancestry/blob, current bytes and symbol on **every** maintained audit,
+source commit/tree proof, HEAD blob, current bytes and symbol on **every** maintained audit,
 including the ordinary CLI. Removing the envelope and rewriting original
 hashes still fails the independent seal. Its report exposes both reference hashes,
 `current_reference_git_checked` for the explicit snapshot and per-reference
-`current_git_blob_checked` / `historical_git_blob_checked` flags. All old observations remain readable but have
+`current_git_blob_checked` / `historical_git_blob_checked` flags plus
+`source_git_proof_checked`. All old observations remain readable but have
 `observation_applicability.status=historical_only` and
 `current_native_revalidated=false`. A refresh runs no native commands. It never
 proves changed behavior, inherits PASS, fills a gap or certifies release. New
@@ -66,6 +85,23 @@ normal edits and a second edit, then reject forged hashes/SHAs/blobs, changed ol
 receipts/limits/gaps/PRs, absent provenance/revalidation/invalidation, missing
 symbols, uncommitted bytes, duplicate frozen blocks and ambiguous source units.
 Run `python3 -m unittest discover -s scripts -p 'test_release_*.py'`.
+
+The maintained delivery-history harness drives all five real audit CLIs through
+the registered squash shape, a fresh clone with pre-squash source commits absent,
+rejected consumer drift, explicit consumer refresh, a real merge from advanced
+main, and another squash/fresh clone with the newly captured source absent:
+
+```sh
+python3 scripts/verify_audit_references.py --evidence evidence/audit-reference-history.json
+```
+
+Run after committing the repair: it validates the committed HEAD tree. The report
+records source/base/squash/merge IDs and 26 command outcomes, including the
+post-squash baseline-12 regression. Adjacent raw reports are retained for manual
+runs. `RegisteredSquashAuditTests` includes the same path in the release/Python
+regressions; its disposable repositories and reports are cleaned. Neither the
+harness nor tests mutate the caller's branch or any remote reference. This
+mechanical history fixture certifies no product or release behavior.
 Remove disposable `evidence/*-proposal.json` and audit reports after inspecting
 or retaining them; never remove the original ledger or native evidence root.
 

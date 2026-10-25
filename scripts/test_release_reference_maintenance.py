@@ -11,6 +11,7 @@ from unittest.mock import patch
 import maintain_audit_references as maintenance
 import release_audit
 import release_package as package
+import verify_audit_references
 
 
 class ReferenceMaintenanceTests(unittest.TestCase):
@@ -160,6 +161,52 @@ class ReferenceMaintenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'original audit ledger changed'):
             package.audit_package(self.root, good, self.units)
 
+    def test_source_commit_tree_proof_is_mandatory_and_tampering_rejects(self):
+        good = self.refresh()
+        for mutation in ('absent', 'commit', 'tree', 'missing_tree', 'binding', 'old_version'):
+            with self.subTest(mutation=mutation):
+                ledger = copy.deepcopy(good)
+                current = ledger['reference_maintenance']['current']
+                if mutation == 'absent': del current['git_proof']
+                if mutation == 'commit': current['git_proof']['commit'] = 'Zm9yZ2Vk'
+                if mutation == 'tree':
+                    key = next(iter(current['git_proof']['trees']))
+                    current['git_proof']['trees'][key] = 'Zm9yZ2Vk'
+                if mutation == 'missing_tree': current['git_proof']['trees'].popitem()
+                if mutation == 'binding': current['binding'] = 'unchecked_ancestry_fallback'
+                if mutation == 'old_version': ledger['reference_maintenance']['version'] = 1
+                with self.assertRaises(ValueError):
+                    package.audit_package(self.root, ledger, self.units)
+
+    def test_squash_and_fresh_consumer_revalidate_without_the_old_source_object(self):
+        ledger = self.refresh()
+        self.path.write_text(json.dumps(ledger))
+        tip = self.commit('synthetic prepared ledger')
+        tree = self.git('rev-parse', tip + '^{tree}').decode().strip()
+        squash = self.git('-c', 'user.name=Synthetic Fixture', '-c', 'user.email=fixture@example.invalid',
+                          'commit-tree', tree, '-p', self.anchor, '-m', 'synthetic squash').decode().strip()
+        self.git('update-ref', 'HEAD', squash, tip)
+        self.assertEqual(self.git('rev-parse', 'HEAD^{tree}').decode().strip(), tree)
+        self.assertEqual(self.git('status', '--porcelain'), b'')
+        self.audit(ledger)
+        # A protocol clone transfers only reachable objects, so the pre-squash
+        # source commit is actually absent, not merely outside HEAD's ancestry.
+        with tempfile.TemporaryDirectory() as temp:
+            fresh = Path(temp) / 'consumer'
+            subprocess.run(['git', 'clone', '-q', '--no-local', '--single-branch',
+                            self.root.as_uri(), str(fresh)], check=True, capture_output=True)
+            missing = subprocess.run(['git', '-C', str(fresh), 'cat-file', '-e', self.current_sha],
+                                     capture_output=True)
+            self.assertNotEqual(missing.returncode, 0)
+            package.audit_package(fresh, ledger, self.units, verify_git=True)
+            self.root, self.path = fresh, fresh / 'docs/audits/baseline-01.json'
+            self.shared = fresh / self.ref.partition('#')[0]
+            self.shared.write_bytes(self.shared.read_bytes() + b'\n// consumer edit\n')
+            self.current_sha = self.commit('synthetic downstream consumer change')
+            with self.assertRaisesRegex(ValueError, 'stale current reference'):
+                self.audit(ledger)
+            self.audit(self.refresh())
+
     def test_stronger_source_ancestry_check_is_not_silently_relaxed(self):
         ledger = self.refresh()
         # An orphan source commit cannot borrow current provenance. No history
@@ -194,6 +241,19 @@ class ReferenceMaintenanceTests(unittest.TestCase):
         with patch.object(maintenance, 'ROOT', self.root), patch.object(sys, 'argv', command):
             with self.assertRaises(SystemExit): maintenance.main()
         self.assertEqual(self.path.read_bytes(), self.original_bytes)
+
+
+class RegisteredSquashAuditTests(unittest.TestCase):
+    def test_five_real_ledgers_through_two_squashes_and_consumer_main_merge(self):
+        root = release_audit.ROOT
+        sha = package.git(root, 'rev-parse', 'HEAD').decode().strip()
+        base = next(iter(package.REFERENCE_LEDGER_ORIGINALS.values()))['commit']
+        report = verify_audit_references.run(root, sha, base)
+        self.assertTrue(report['passed'])
+        self.assertTrue(report['cleanup'])
+        self.assertFalse(report['release_ready'])
+        self.assertEqual(len(report['checks']), 26)
+        self.assertEqual(sum(c['expected_exit'] == 1 for c in report['checks']), 5)
 
 
 if __name__ == '__main__':

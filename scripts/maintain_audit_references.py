@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from release_package import digest, frozen_digest, git, local_file, reference_identities
+from release_package import digest, frozen_digest, git, local_file, reference_identities, source_git_proof
 from release_receipts import strict_json
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,9 +35,13 @@ def prepare(root, ledger_path, source_sha, reason, references=()):
                     if digest(local_file(root, ref.partition('#')[0]).read_bytes()) != value['sha256'])
     if not selected or not selected <= ledger['references'].keys():
         raise ValueError('select known references or change a referenced file first')
+    git(root, 'merge-base', '--is-ancestor', provenance['commit'], source_sha)
+    git(root, 'merge-base', '--is-ancestor', source_sha, 'HEAD')
     ledger['reference_maintenance'] = dict(
-        version=1, original_ledger=provenance,
+        version=2, original_ledger=provenance,
         current=dict(source_sha=source_sha, scope='reference_identity_only', reason=reason,
+                     binding='source_commit_tree_and_HEAD_blob',
+                     git_proof=source_git_proof(root, source_sha, selected),
                      references={ref: dict(sha256=digest(local_file(root, ref.partition('#')[0]).read_bytes()))
                                  for ref in sorted(selected)},
                      invalidated_observations=sorted(ledger['observations'])))

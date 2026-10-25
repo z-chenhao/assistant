@@ -5,11 +5,13 @@ authored dispositions. Native observations remain supporting evidence; only the
 release decision path can consume independently acquired release receipts.
 """
 from collections import Counter
+import base64
 import hashlib
 import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 from release_receipts import strict_json
 
@@ -100,11 +102,64 @@ def local_file(root, name):
     return path
 
 
-def git(root, *args):
-    result = subprocess.run(['git', '-C', str(root), *args], capture_output=True)
+def git(root, *args, input=None):
+    result = subprocess.run(['git', '-C', str(root), *args], input=input, capture_output=True)
     if result.returncode:
         raise ValueError('package Git binding rejected: ' + ' '.join(args))
     return result.stdout
+
+
+def source_git_proof(root, revision, references):
+    """Retain only the commit and path trees; unchanged blobs survive squash."""
+    directories = {''}
+    for ref in references:
+        path = Path(ref.partition('#')[0])
+        directories.update(p.as_posix() for p in path.parents if p.as_posix() != '.')
+    trees = {}
+    for directory in sorted(directories):
+        spec = revision + (':' + directory if directory else '^{tree}')
+        oid = git(root, 'rev-parse', spec).decode().strip()
+        trees[oid] = base64.b64encode(git(root, 'cat-file', 'tree', oid)).decode()
+    return dict(commit=base64.b64encode(git(root, 'cat-file', 'commit', revision)).decode(),
+                trees=trees)
+
+
+def check_source_git_proof(root, revision, proof, references):
+    """Verify source identity with native Git, then bind each file to live HEAD.
+
+    The proof is always checked, including before merge. No ancestry fallback or
+    missing-object exception is used. Writes stay in a disposable object store.
+    """
+    if (not isinstance(proof, dict) or set(proof) != {'commit', 'trees'} or
+            not isinstance(proof['trees'], dict) or not proof['trees']):
+        raise ValueError('missing source Git proof')
+    with tempfile.TemporaryDirectory(prefix='erii-audit-git-proof-') as temp:
+        store = Path(temp)
+        git(store, 'init', '--bare', '--object-format=sha1', '-q')
+        objects = [('commit', revision, proof['commit'])]
+        objects.extend(('tree', oid, raw) for oid, raw in proof['trees'].items())
+        for kind, oid, encoded in objects:
+            if not isinstance(oid, str) or not re.fullmatch(r'[0-9a-f]{40}', oid):
+                raise ValueError('invalid source Git object identity')
+            try:
+                raw = base64.b64decode(encoded, validate=True)
+            except (ValueError, TypeError) as error:
+                raise ValueError('invalid source Git object bytes') from error
+            actual = git(store, 'hash-object', '-w', '-t', kind, '--stdin', input=raw).decode().strip()
+            if actual != oid:
+                raise ValueError('source Git object hash mismatch')
+        for ref in references:
+            path = ref.partition('#')[0]
+            entry = git(store, 'ls-tree', '-z', revision, '--', path)
+            header, separator, name = entry.partition(b'\t')
+            fields = header.split()
+            if (not separator or name != path.encode() + b'\0' or len(fields) != 3 or
+                    fields[0] not in (b'100644', b'100755') or fields[1] != b'blob'):
+                raise ValueError('missing source Git file: ' + ref)
+            data = local_file(root, path).read_bytes()
+            oid = git(store, 'hash-object', '--stdin', input=data).strip()
+            if oid != fields[2] or entry != git(root, 'ls-tree', '-z', 'HEAD', '--', path):
+                raise ValueError('current Git blob mismatch: ' + ref)
 
 
 def reference_identities(root, ledger, verify_git=False):
@@ -120,7 +175,7 @@ def reference_identities(root, ledger, verify_git=False):
         raise ValueError('original audit ledger changed')
     current = {}
     if maintenance is not None:
-        if maintenance.get('version') != 1:
+        if maintenance.get('version') != 2:
             raise ValueError('unsupported reference maintenance')
         provenance = maintenance.get('original_ledger', {})
         if provenance != REFERENCE_LEDGER_ORIGINALS.get(ledger['package']):
@@ -134,12 +189,11 @@ def reference_identities(root, ledger, verify_git=False):
         current = update.get('references', {})
         if (not re.fullmatch(r'[0-9a-f]{40}', revision) or
                 update.get('scope') != 'reference_identity_only' or
+                update.get('binding') != 'source_commit_tree_and_HEAD_blob' or
                 not isinstance(update.get('reason'), str) or not update['reason'].strip() or
                 not current or not current.keys() <= references.keys() or
                 update.get('invalidated_observations') != sorted(ledger['observations'])):
             raise ValueError('missing current identity revalidation or observation invalidation')
-        git(root, 'merge-base', '--is-ancestor', provenance['commit'], revision)
-        git(root, 'merge-base', '--is-ancestor', revision, 'HEAD')
     result = {}
     for ref, value in references.items():
         path, _, symbol = ref.partition('#')
@@ -150,15 +204,16 @@ def reference_identities(root, ledger, verify_git=False):
         if verify_git:
             if digest(git(root, 'show', base + ':' + path)) != value['sha256']:
                 raise ValueError('audited Git blob mismatch: ' + ref)
-        if ref in current and digest(git(root, 'show', revision + ':' + path)) != expected:
-            raise ValueError('current Git blob mismatch: ' + ref)
         if symbol and symbol not in data.decode():
             raise ValueError('missing current symbol: ' + ref)
         result[ref] = dict(historical_sha256=value['sha256'], current_sha256=expected,
                            current_source_sha=revision if ref in current else base,
+                           source_git_proof_checked=ref in current,
                            current_git_blob_checked=ref in current or verify_git,
                            historical_git_blob_checked=verify_git,
                            revalidation='reference_identity_only' if ref in current else 'unchanged')
+    if maintenance is not None:
+        check_source_git_proof(root, revision, update.get('git_proof'), current)
     return result
 
 
