@@ -41,7 +41,7 @@ manifest SHA256
 `--validate` requires 30 ordered receipts, all locks and source/binary/cleanup
 identity. It recomputes assertions from native records rather than trusting
 stored booleans. Parent Code Mode returns, native Artifact save arguments,
-CLI-reopened bytes and descriptor hashes must agree. Twenty-five corruption
+CLI-reopened bytes and descriptor hashes must agree. Twenty-eight corruption
 probes call the real observer. Seven synchronize native returns, save arguments,
 Artifact bytes/descriptors and replay copies, then reject late ETA, missing
 sampling, countryside, changed confirmed bookings, conflated groups, wrong

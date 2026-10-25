@@ -61,6 +61,21 @@ class TravelTests(unittest.TestCase):
             changed=copy.deepcopy(document);mutate(changed)
             self.assertFalse(all(journey.document_checks(changed,'wording-1',['a','b'],None).values()))
 
+    def test_only_the_paused_nz_tool_pair_may_be_cancelled(self):
+        value=dict(task=[dict(task_ref='nz',task_id='nz-id')],runs=[dict(run_id='root',task_id='nz-id',status='cancelled'),
+            dict(run_id='main',task_id=None,status='completed')],tools=[
+                dict(run_id='root',tool_name=name,status='cancelled',attempt_count=1)
+                for name in ('builtin__codemode__execute','mcp__fixture__read')]+[
+                dict(run_id='main',tool_name='builtin__task__manage',status='succeeded',attempt_count=1)])
+        self.assertTrue(journey.tool_outcomes(value,'nz'))
+        for status in ('failed','unknown','waiting','running','cancelled'):
+            changed=copy.deepcopy(value);changed['tools'][-1]['status']=status
+            self.assertFalse(journey.tool_outcomes(changed,'nz'))
+        for mutate in (lambda v:v['tools'].pop(0),lambda v:v['runs'][0].update(task_id='other'),
+                lambda v:v['tools'][0].update(attempt_count=2),lambda v:v['tools'][0].update(tool_name='buy')):
+            changed=copy.deepcopy(value);mutate(changed)
+            self.assertFalse(journey.tool_outcomes(changed,'nz'))
+
     def test_identity_counts_locks_cleanup_and_assertions_cannot_be_waived(self):
         source = dict(sha='a'*40,files={'runner':'hash'})
         report = dict(case_id='GC-04',status='mechanical_pass',release_ready=False,semantic_score=None,eligible_for_grading=False,

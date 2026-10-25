@@ -228,6 +228,18 @@ def document_checks(document, variant_id, originals, prior):
             document['date']=='2026-10-05' and document['scope']=='synthetic read-only plan; no booking or payment performed')
 
 
+
+def tool_outcomes(value, nz_ref):
+    nz_id=next(t['task_id'] for t in value['task'] if t['task_ref']==nz_ref)
+    runs={r['run_id']:r for r in value['runs']}
+    cancelled=[t for t in value['tools'] if t['status']=='cancelled']
+    return len(cancelled)==2 and all(
+        t['attempt_count']==1 and (t['status']=='succeeded' or
+            t['status']=='cancelled' and runs[t['run_id']]['task_id']==nz_id and
+            runs[t['run_id']]['status']=='cancelled' and
+            t['tool_name'] in ('builtin__codemode__execute','mcp__fixture__read'))
+        for t in value['tools'])
+
 def observe(row):
     case, variant = inputs(row['variant_id'])
     initial, steered, final = row['initial'], row['steered'], row['final']
@@ -247,6 +259,9 @@ def observe(row):
     roots = lambda value:[r for r in value['runs'] if r['task_id']==france(value)['task_id']]
     search = strict_json(strict_json(row['search']['result_json'])['text'])
     checks.update(
+        expected_tool_outcomes=tool_outcomes(final,row['nz_ref']),
+        consistent_native_views=all(value[a]==value[b] for value in (initial,steered,final)
+            for a,b in (('task','tasks'),('task_instruction','instructions'),('task_update','updates'))),
         exact_original_inputs=row['variant']==variant and min(positions)>=0 and positions==sorted(set(positions)) and
             all(users.count(t)==1 for t in originals),
         originals_in_frozen_requests=all(any(t==m.get('text') or
@@ -348,6 +363,9 @@ def rejection_probes(row):
         synced_wrong_transit=lambda r:synced(r,lambda d:d['transit_minutes'].update(hotel_return=5)),
         synced_false_purchase=lambda r:synced(r,lambda d:d.update(booking_actions=['paid'])),
         rehashed_artifact=rehash,
+        unexpected_tool_failure=lambda r:r['final']['tools'][0].update(status='failed'),
+        unknown_tool_outcome=lambda r:r['final']['tools'][0].update(status='unknown'),
+        native_view_drift=lambda r:r['final']['task'].clear(),
         forged_source=lambda r:r['search'].update(invocation_id='forged'),
         wrong_task=lambda r:r.update(france_ref=r['nz_ref']),
         new_third_task=lambda r:r['final']['tasks'].append(r['final']['tasks'][0]),
