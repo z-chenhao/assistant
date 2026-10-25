@@ -66,7 +66,8 @@ SHARDS = {
         Gate("gc05", "verify_gc05.py", "gc05"),
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
-                 Gate("channels", "verify_channels.py", "channels", 5)),
+                 Gate("channels", "verify_channels.py", "channels", 5),
+                 Gate("gc07", "verify_gc07.py", "gc07")),
     "communication": (Gate("gc12", "verify_gc12.py", "gc12", 5),
                       Gate("gc08", "verify_gc08.py", "gc08"),
                       Gate("gc14", "verify_gc14.py", "gc14"),
@@ -291,7 +292,7 @@ def gate_execution_order(gates):
     # GC-03/GC-04 likewise start before the shorter protection series. Keep two
     # workers, report inventory order and every series' serial repetitions.
     def priority(gate):
-        if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04','gc05'): return 0
+        if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04','gc05','gc07'): return 0
         if gate.name == 'gc12': return 1
         if gate.name == 'gc02': return 2
         return 3
