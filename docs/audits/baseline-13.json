@@ -7001,10 +7001,13 @@
       "content_sha256": "5dedd28f05e620f8324ff15bf3c62d096e4c14dafefe33ffc7f87bf491ad9782"
     },
     "current": {
-      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "source_sha": "97db30ececfe9168ab047fdd87754f777c81793b",
       "scope": "reference_identity_only",
-      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "reason": "ERII-369: committed shared-reference identity revalidation, including the CI Git-history prerequisite. Original observations remain historical only; no native execution or release PASS is inherited.",
       "references": {
+        ".github/workflows/ci.yml": {
+          "sha256": "4673ca6b5c4e248334304c92fe2478cae701927e2592eba46949c1bec8b724ac"
+        },
         "scripts/unscripted_cases.py": {
           "sha256": "55f4d66649836c162f5bf2bcfcf7ac5afb567669f7b456ba7fdff3a2e9d15300"
         },

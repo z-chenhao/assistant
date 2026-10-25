@@ -8219,9 +8219,9 @@
       "content_sha256": "8876fee8d5b42b820544d22321731335166b89c56f4dc3ffd208fd0b04c5976c"
     },
     "current": {
-      "source_sha": "49fc12899b3d07b5faee41c191bf9993217b7168",
+      "source_sha": "97db30ececfe9168ab047fdd87754f777c81793b",
       "scope": "reference_identity_only",
-      "reason": "ERII-369: recheck the shared-reference scope affected by GC-01 against current main. Identity checks only; GC-01 must refresh again at its new committed source SHA. Original native observations are historical only; new native execution is required for changed code.",
+      "reason": "ERII-369: committed shared-reference identity revalidation, including the CI Git-history prerequisite. Original observations remain historical only; no native execution or release PASS is inherited.",
       "references": {
         "internal/llm/fake/bridge.go": {
           "sha256": "b430fcda25cf5e526a889288202086f7ef2b42cc7a8078da17712e3d9bceba30"
