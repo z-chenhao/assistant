@@ -16,7 +16,7 @@ from verify_suite import run_command, source_state, runner_hardware
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--name', required=True)
-    parser.add_argument('--phase', choices=['setup', 'build', 'test'], required=True)
+    parser.add_argument('--phase', choices=['setup', 'build', 'test', 'cleanup'], required=True)
     parser.add_argument('--evidence', type=Path, default=Path('evidence/steps'), help='phase record directory')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()

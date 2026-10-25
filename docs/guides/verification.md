@@ -29,11 +29,14 @@ and `run*cases` harness must be registered; `make test` rejects inventory drift.
 | Proactive work and task scenarios | runtime | automation, cases, task-cases |
 | JavaScript, replay and coding | codemode | codemode, code-recovery, core-cases |
 | Computer lifecycle and input | codemode | computer, computer-use |
-| Memory, Tools and Artifact security | security | memory-maintenance, recall, tools, artifacts |
+| Memory, Tools and Artifact security | security | memory-maintenance, recall, tools, artifacts, gc03, gc05 |
 | Delivery, Web and Feishu | delivery | delivery, channels |
+| Exact health, goals, communication, monitoring and research journeys | communication | gc01, gc02, gc12, gc08, gc14, gc16, gc09 |
 | Personal and multimodal journeys | personal | m6-cases |
 | Install, model setup and credentials | providers | startup, local-provider, account-initial, account, models |
 | Terminal and capability contracts | providers | tui, terminal-input, capabilities, pi-bridge |
+| Unscripted evaluation entry mechanism | providers | unscripted-entry |
+| Audit reference identity through squash and consumer merges | providers | audit-references |
 
 A shard runs its complete inventory:
 
