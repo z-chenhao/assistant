@@ -62,6 +62,7 @@ SHARDS = {
         Gate("recall", "verify_recall.py", "recall", 5),
         Gate("tools", "verify_tools.py", "tools", 5),
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),
+        Gate("gc03", "verify_gc03.py", "gc03"),
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
