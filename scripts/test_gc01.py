@@ -15,6 +15,15 @@ import verify_suite
 
 
 class HealthTests(unittest.TestCase):
+    def test_mechanical_preparation_preserves_the_existing_cli_packet_contract(self):
+        import prepare_release_eval
+        with patch.object(journey,'validate_report',return_value={'receipts':30}):
+            prepared=prepare_release_eval.prepare(dict(case_id='GC-01'))
+        self.assertEqual(prepared['judge_packets'],[])
+        self.assertEqual(len(prepared['judge_packets']),0)
+        self.assertFalse(prepared['eligible_for_grading'])
+        self.assertIsNone(prepared['scores'])
+
     def test_bounded_variants_keep_each_five_round_series_serial_and_output_ordered(self):
         active, peak = set(), 0
         starts = {}
