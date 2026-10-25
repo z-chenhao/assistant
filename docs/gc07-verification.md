@@ -46,6 +46,12 @@ contradictory native returns, stale topology, bad rollback, denied effects,
 unknown retries, revived owners and changed Artifact bytes. Hashes bind bytes;
 they do not establish independent trust. Reviewer uses a clean exact-SHA checkout.
 
+Registering this gate changes `verify_suite.py`. The `baseline-13` and
+`golden-common-02` reference-maintenance envelopes explicitly refresh that
+committed file identity through `maintain_audit_references.py`. Their original
+content, frozen blocks, assertions, thresholds and historical observations are
+unchanged. This reference-only refresh supplies no new native PASS.
+
 The result is `mechanical_pass`, with `semantic_score: null`,
 `eligible_for_grading: false` and `release_ready: false`. The maintained
 `unscripted_cases.py freeze --case GC-07` entry supplies original user inputs
