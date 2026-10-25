@@ -3,6 +3,8 @@ import copy
 import hashlib
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +15,38 @@ import verify_suite
 
 
 class HealthTests(unittest.TestCase):
+    def test_bounded_variants_keep_each_five_round_series_serial_and_output_ordered(self):
+        active, peak = set(), 0
+        starts = {}
+        lock = threading.Lock()
+        def drive(binary, item, failure):
+            nonlocal peak
+            variant, repetition = item
+            with lock:
+                self.assertNotIn(variant,active)
+                active.add(variant);peak=max(peak,len(active))
+                starts.setdefault(variant,[]).append(repetition)
+            time.sleep(.005)
+            with lock:active.remove(variant)
+            return dict(variant_id=variant,repetition=repetition,assertions={'observed':True})
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);binary=root/'erii';binary.write_bytes(b'binary')
+            output=root/'receipt.json'
+            with patch.object(journey,'drive',side_effect=drive), \
+                    patch.object(journey,'source_identity',return_value={'sha':'test'}), \
+                    patch.object(journey,'rejection_probes',return_value={'corrupt':True}), \
+                    patch.object(journey,'validate_report',return_value={'receipts':30}), \
+                    patch.object(journey.platform,'platform',return_value='test'), \
+                    patch.object(journey.subprocess,'check_output',return_value='test'), \
+                    patch('sys.argv',['verify_gc01.py','--binary',str(binary),'--evidence',str(output),'--variant-jobs','2']):
+                journey.main()
+            import json
+            report=json.loads(output.read_text())
+            self.assertEqual(peak,2)
+            self.assertTrue(all(rounds==[1,2,3,4,5] for rounds in starts.values()))
+            self.assertEqual([(r['variant_id'],r['repetition']) for r in report['results']],
+                [(v['variant_id'],n) for v in variants(*journey._case_dataset()) for n in range(1,6)])
+
     def test_twenty_five_frozen_blocks_and_all_original_variants_are_retained(self):
         fixture, lock = journey.load()
         self.assertEqual(len(lock['frozen_blocks']), 25)

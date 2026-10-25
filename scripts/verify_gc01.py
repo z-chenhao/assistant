@@ -12,6 +12,8 @@ from pathlib import Path
 import platform
 import subprocess
 import tempfile
+import threading
+import time
 
 from case_runner import digest, load_contract, result, variants
 from fixture_pool import run_cases
@@ -109,7 +111,7 @@ def native(h):
 def morning(h, variant_id, safety=False):
     case, variant, policy, _ = inputs(variant_id, safety)
     h.bridge = 'golden'
-    started = timestamp()
+    started, tick = timestamp(), time.monotonic()
     h.send('context', variant['context'])
     first = variant['events'][0]
     receipt = h.send('event-0', '当前时间：' + first['at'] + '。' + first['text'])
@@ -128,7 +130,8 @@ def morning(h, variant_id, safety=False):
             'GC-01 duplicate input receipt drift')
     h.command('chat', 'work'); work(h)
     return dict(variant=variant, safety=safety, started_at=started, finished_at=timestamp(),
-        wall_time_ms=0, transcript=transcript, restart=crashed, state=value, replay_state=native(h))
+        wall_time_ms=round((time.monotonic() - tick) * 1000), transcript=transcript,
+        restart=crashed, state=value, replay_state=native(h))
 
 
 def morning_observe(row, variant_id, safety=False):
@@ -404,6 +407,8 @@ def main():
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--validate', action='store_true')
+    parser.add_argument('--variant-jobs', type=int, choices=(1, 2, 4), default=2,
+                        help='Independent variants only; each keeps five serial repetitions')
     args = parser.parse_args()
     binary = args.binary.resolve()
     if args.validate:
@@ -427,20 +432,27 @@ def main():
             human_review='unexecuted', unscripted='unscripted_cases.py; input fragments remain ineligible',
             task_child_approval_unknown='not requested by GC-01; native inventories prove no such work'))
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
-    items = [(v['variant_id'], n) for v in variants(*_case_dataset()) for n in range(1, REPEATS + 1)]
-    def run(item):
-        row = drive(binary, item, args.evidence.with_suffix('.failure.json'))
-        report['results'].append(row)
-        print(item, {k: v for k, v in row['assertions'].items() if not v}, flush=True)
-        require(all(row['assertions'].values()), 'GC-01 native assertion failure')
-        return row
+    ids = [v['variant_id'] for v in variants(*_case_dataset())]
+    order = {(v, n): i * REPEATS + n for i, v in enumerate(ids) for n in range(1, REPEATS + 1)}
+    lock = threading.Lock()
+    def run_variant(variant_id):
+        for repetition in range(1, REPEATS + 1):
+            item = variant_id, repetition
+            failure = args.evidence.with_name(args.evidence.stem + '-' + variant_id + '.failure.json')
+            row = drive(binary, item, failure)
+            with lock:
+                report['results'].append(row)
+            print(item, {k: v for k, v in row['assertions'].items() if not v}, flush=True)
+            require(all(row['assertions'].values()), 'GC-01 native assertion failure')
     try:
-        run_cases(items, run, 1)
+        run_cases(ids, run_variant, args.variant_jobs)
+        report['results'].sort(key=lambda r: order[r['variant_id'], r['repetition']])
         report['identity']['source_after'] = source_identity()
         report.update(status='mechanical_pass', cleanup=True)
         report['rejection_probes'] = rejection_probes(report['results'][0])
         summary = validate_report(report, binary)
     finally:
+        report['results'].sort(key=lambda r: order[r['variant_id'], r['repetition']])
         args.evidence.write_text(json.dumps(report, ensure_ascii=False) + '\n')
     print(json.dumps(summary))
 

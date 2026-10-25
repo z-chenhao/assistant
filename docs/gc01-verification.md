@@ -18,7 +18,9 @@ go test -race ./internal/llm/fake
 
 The command always runs all six locked wording/noise/order variants, with five
 serial repetitions of each. `make verify VERIFY_SHARD=communication` runs this
-same gate. No option lowers the variant or repetition count.
+same gate. Two independent variants overlap by default; `--variant-jobs 1|2|4`
+changes only that bound. Each variant retains five serial repetitions, isolated
+roots/peers and owned process groups. No option lowers either count.
 
 | Boundary | Observed evidence |
 | --- | --- |
@@ -78,4 +80,4 @@ See [unscripted operations](guides/unscripted-evals.md) for profile/root prepara
 
 Keep complete JSON receipts and failure logs in the durable evidence root. Publish
 only their small hash manifest. A failed drive retains a `.failure.json` partial
-receipt and an inconclusive main report; it never preserves a previous pass.
+receipt (`*-VARIANT.failure.json`) and an inconclusive main report; it never preserves a previous pass.
