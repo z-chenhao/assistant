@@ -14,7 +14,7 @@ import tempfile
 import threading
 
 from case_runner import load_contract, variants
-from fixture_pool import run_cases
+from fixture_pool import Scope, run_cases
 from local_sandbox import state as remote_state
 from release_audit import inventory
 from release_receipts import Receipts, strict_json
@@ -238,6 +238,7 @@ def validate_report(report,binary=None):
     expected = [(v['variant_id'],n) for v in variants(*inputs()) for n in range(1,REPEATS+1)]
     require([(r['variant_id'],r['repetition']) for r in report['results']] == expected and
         all(type(r['repetition']) is int for r in report['results']),'all six variants and five repetitions required')
+    independent_executions(report['results'])
     for row in report['results']:
         checks = observe(row)
         require(row['assertions'] == checks and all(type(v) is bool and v for v in checks.values()) and
@@ -246,6 +247,56 @@ def validate_report(report,binary=None):
             all(type(v) is bool for v in row['cleanup'].values()),'failed or forged GC-10 native receipt')
     require(report['rejection_probes'] == rejection_probes(report['results'][0]),'missing GC-10 corruption probes')
     return dict(case_id='GC-10',status='mechanical_pass',receipts=30,frozen_blocks=16,semantic_score=None,release_ready=False)
+
+
+def independent_executions(rows):
+    # Only the final inventory: restart cuts and replay must reuse these IDs
+    # within a journey. Separate disposable journeys must never reuse them.
+    for table,key in (('runs','run_id'),('tools','invocation_id'),('generations','generation_id'),
+                      ('deliveries','delivery_id'),('conversation','message_id')):
+        seen = set()
+        for row in rows:
+            ids = [item[key] for item in row['state'][table]]
+            require(bool(ids) and all(type(value) is str and value for value in ids),
+                'invalid GC-10 native execution identity: '+table+'/'+key)
+            require(len(set(ids)) == len(ids) and seen.isdisjoint(ids),
+                'reused GC-10 native execution identity: '+table+'/'+key)
+            seen.update(ids)
+
+
+def repetition_rejection_probes(report,binary,folder):
+    """Copy real passing journeys, reseal bytes, and exercise both consumers."""
+    from ci_communication import native_receipt, check_receipts
+    from verify_suite import SHARDS, report_name
+    gate = next(g for g in SHARDS['communication'] if g.name == 'gc10')
+    folder.mkdir(parents=True,exist_ok=True)
+    forged = copy.deepcopy(report)
+    for offset in range(0,len(forged['results']),REPEATS):
+        for index in range(1,REPEATS):
+            row = copy.deepcopy(forged['results'][offset])
+            row['repetition'] = index+1
+            forged['results'][offset+index] = row
+    path = folder/report_name(gate,1)
+    retain_report(path,forged)
+    expected = 'reused GC-10 native execution identity: runs/run_id'
+    scope = Scope()
+    try:
+        cli = scope.run([sys.executable,str(ROOT/'scripts/verify_gc10.py'),'--binary',str(binary),
+            '--evidence',str(path),'--validate'],capture_output=True,text=True,timeout=60)
+    finally:
+        scope.finish()
+    require(cli.returncode != 0 and expected in cli.stderr,'GC-10 copied repetitions not rejected by CLI')
+    ci_error = None
+    try:
+        receipt = native_receipt(gate,1,folder,binary,{})
+        check_receipts([receipt],[gate])
+    except RuntimeError as error:
+        ci_error = str(error)
+    require(ci_error == expected,'GC-10 copied repetitions not rejected by CI consumer')
+    result = dict(claimed_journeys=30,distinct_journeys=6,cli_exit_code=cli.returncode,
+        cli_rejected=True,ci_rejected=True,reason=ci_error)
+    (folder/'rejection.json').write_text(json.dumps(result,indent=2)+'\n')
+    return result
 
 
 def summary(report):
@@ -311,6 +362,8 @@ def main():
         report.update(status='mechanical_pass',cleanup=True)
         report['rejection_probes'] = rejection_probes(report['results'][0])
         result = validate_report(report,binary)
+        report['repetition_rejection_probes'] = repetition_rejection_probes(report,binary,
+            args.evidence.parent/'.gc10-native'/(args.evidence.stem+'-copied-repetitions'))
     except BaseException:
         report['status'] = 'inconclusive'
         raise

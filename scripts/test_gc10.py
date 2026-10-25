@@ -16,6 +16,38 @@ import verify_suite
 
 
 class LocalBoundaryTests(unittest.TestCase):
+    @staticmethod
+    def native_state(prefix):
+        return {table:[{key:prefix+'/'+key}] for table,key in
+            (('runs','run_id'),('tools','invocation_id'),('generations','generation_id'),
+             ('deliveries','delivery_id'),('conversation','message_id'))}
+
+    def test_native_executions_are_disjoint_but_restart_and_replay_reuse_ids(self):
+        rows = [dict(state=self.native_state(str(n))) for n in range(30)]
+        for row in rows:
+            row.update(restarts=[dict(state=copy.deepcopy(row['state']))],replay_state=copy.deepcopy(row['state']))
+        journey.independent_executions(rows)
+        for table in rows[0]['state']:
+            for other in (1,5,29):
+                with self.subTest(table=table,other=other):
+                    bad = copy.deepcopy(rows)
+                    bad[other]['state'][table] = copy.deepcopy(bad[0]['state'][table])
+                    with self.assertRaisesRegex(RuntimeError,'reused GC-10 native execution identity: '+table):
+                        journey.independent_executions(bad)
+            for value in (None,True,0,''):
+                bad = copy.deepcopy(rows)
+                key = next(iter(bad[0]['state'][table][0]))
+                bad[0]['state'][table][0][key] = value
+                with self.assertRaisesRegex(RuntimeError,'invalid GC-10 native execution identity: '+table):
+                    journey.independent_executions(bad)
+            bad = copy.deepcopy(rows)
+            bad[0]['state'][table] *= 2
+            with self.assertRaisesRegex(RuntimeError,'reused GC-10 native execution identity: '+table):
+                journey.independent_executions(bad)
+            bad[0]['state'][table] = []
+            with self.assertRaisesRegex(RuntimeError,'invalid GC-10 native execution identity: '+table):
+                journey.independent_executions(bad)
+
     def test_original_sixteen_blocks_and_variants_remain_locked(self):
         lock = journey.load()
         self.assertEqual(lock['manifest_sha256'],'0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556')
@@ -85,6 +117,7 @@ class LocalBoundaryTests(unittest.TestCase):
                 eligible_for_grading=False,release_ready=False,cleanup=True,rejection_probes={'native':True},
                 identity=dict(source_before=identity,source_after=identity,binary_sha256=journey.sha(binary.read_bytes()),environment={'test':True}),
                 results=[dict(variant_id=v['variant_id'],repetition=n,assertions={'native':True},
+                    state=self.native_state(v['variant_id']+'/'+str(n)),
                     cleanup=dict(disposable_root_removed=True,owned_processes_joined=True))
                     for v in variants(*journey.inputs()) for n in range(1,6)])
             # Native corruption is exercised on real receipts by rejection_probes;
@@ -98,6 +131,7 @@ class LocalBoundaryTests(unittest.TestCase):
                     lambda r:r['results'].append(r['results'][0]),lambda r:r['results'].reverse(),
                     lambda r:r['results'][0].update(repetition=True),lambda r:r['results'][0].update(cleanup={}),
                     lambda r:r['results'][0].update(assertions={'native':1}),lambda r:r.update(rejection_probes={})]
+                mutations.append(lambda r:r['results'][1].update(state=copy.deepcopy(r['results'][0]['state'])))
                 for mutate in mutations:
                     changed = copy.deepcopy(report); mutate(changed)
                     with self.assertRaises(RuntimeError): journey.validate_report(changed,binary)

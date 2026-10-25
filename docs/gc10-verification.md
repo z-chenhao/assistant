@@ -62,7 +62,14 @@ Each report has source SHA and working-file hashes before/after, binary hash and
 Go build identity, OS/Python/Node/Go versions, timestamps, raw native state and
 process/root cleanup observations. `--validate` recomputes every assertion and
 17 native corruption probes, rejects incomplete/reordered/graded receipts, and
-checks the current source/binary identity. A small public manifest binds hidden
+checks the current source/binary identity. Final native Run, ToolInvocation,
+generation, Delivery and message IDs must be disjoint across all 30 journeys;
+restart cuts and replay snapshots retain their required within-journey ID reuse.
+The producer also copies each variant's first real receipt into repetitions 2–5,
+reseals the native manifest, and requires both the actual `--validate` CLI and
+CI native-receipt consumer to reject those six journeys claimed as 30.
+The rejection diagnostic and forged bytes stay under `.gc10-native/` for review.
+A small public manifest binds hidden
 `.gc10-native/` bytes by size and SHA256; these bytes must be retained for review.
 Hash binding proves consistency, not authorship. Independent exact-SHA review
 and required CI remain mandatory. The preview produces no Judge packets.
