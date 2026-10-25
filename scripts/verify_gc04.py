@@ -146,19 +146,17 @@ def journey(h, variant_id, row):
     hold_source = 'return await tools.mcp__fixture__read({text:"world",behavior:"hold"});'
     receipt = send_plan(h,'continue-france',[plan('builtin__task__manage',dict(operation='append',taskRef=row['france_ref'],
         instruction=instruction(hold_source,variant['events'][0]['text'])))])
-    def steer():
-        # This original event reaches Main while the actual Root is held. A
-        # separate scripted append then carries it to the same running Root.
-        select(h,'terminal-input')
-        event = variant['events'][1]
-        row['steering_receipt'] = h.send('event-1',event['at']+' '+event['text'])
-        row['steering_input_restart'] = kill(h,'after_generation_commit')
-        select(h,'capabilities')
-        return [plan('builtin__task__manage',dict(operation='append',taskRef=row['france_ref'],
-            instruction=instruction(itinerary_source(variant_id,refs),event['text'])))]
+    event = variant['events'][1]
+    steering = [plan('builtin__task__manage',dict(operation='append',taskRef=row['france_ref'],
+        instruction=instruction(itinerary_source(variant_id,refs),event['text'])))]
     france_id = next(t['task_id'] for t in row['initial']['task'] if t['task_ref']==row['france_ref'])
-    row['france_guard'] = travel_control(h,receipt,'france',steer,lambda:any(variant['events'][1]['text'] in r['instruction']
-        for r in native(h)['task_instruction'] if r['task_id']==france_id))
+    # One atomic ingress has two explicit content parts: unchanged original
+    # event and scripted driver. Either live drainer can safely own this Main;
+    # no race to intercept a generation belonging to a different process.
+    row['france_guard'] = travel_control(h,receipt,'france',steering,lambda:any(event['text'] in r['instruction']
+        for r in native(h)['task_instruction'] if r['task_id']==france_id),
+        input_parts=[dict(type='text',text=event['at']+' '+event['text'])])
+    row['steering_receipt'] = row['france_guard']['control_receipt']
     h.command('chat','work'); work(h)
     row['steered'] = native(h)
     prior = next(a['artifact_ref'] for a in row['steered']['artifact'] if a['name']=='itinerary_1005.json')
@@ -242,13 +240,18 @@ def observe(row):
     users = [p['text'] for m in final['conversation'] if m['role']=='user' for p in m['content'] if p['type']=='text']
     originals = [variant['context']]+[e['at']+' '+e['text'] for e in variant['events']]
     positions = [users.index(t) if t in users else -1 for t in originals]
+    steering_input = originals[2] + 'Capabilities: ' + json.dumps([plan('builtin__task__manage',
+        dict(operation='append',taskRef=row['france_ref'],instruction=instruction(
+            itinerary_source(row['variant_id'],refs),variant['events'][1]['text'])))],ensure_ascii=False)
     france = lambda value:next(t for t in value['task'] if t['task_ref']==row['france_ref'])
     roots = lambda value:[r for r in value['runs'] if r['task_id']==france(value)['task_id']]
     search = strict_json(strict_json(row['search']['result_json'])['text'])
     checks.update(
         exact_original_inputs=row['variant']==variant and min(positions)>=0 and positions==sorted(set(positions)) and
             all(users.count(t)==1 for t in originals),
-        originals_in_frozen_requests=all(any(t==m.get('text') for g in final['generations'] for m in strict_json(g['request_json'])['messages']) for t in originals),
+        originals_in_frozen_requests=all(any(t==m.get('text') or
+            (t==originals[2] and m.get('text')==steering_input)
+            for g in final['generations'] for m in strict_json(g['request_json'])['messages']) for t in originals),
         tui_input=variant['events'][2]['text'] in row['transcript'],
         actual_task_search=recorded(row['search'],final['tools']) and row['search']['tool_name']=='builtin__task__search' and
             strict_json(row['search']['arguments_json'])==dict(query='法国旅行',scope='all',status=['completed']) and len(search)==1 and
@@ -285,7 +288,7 @@ def observe(row):
             if next(r['kind'] for r in final['runs'] if r['run_id']==g['run_id'])=='main'
             for m in strict_json(g['request_json'])['messages'] if m.get('origin')=='runtime') for a in (first,last)),
         published_task_results=all(any(u['root_run_id']==a['run_id'] and a['artifact_ref'] in strict_json(u['artifact_refs']) for u in final['task_update']) for a in (first,last)),
-        input_and_report_kill=row['input_restart']['returncode']==row['steering_input_restart']['returncode']==row['report_restart']['returncode']==-9 and
+        input_and_report_kill=row['input_restart']['returncode']==row['report_restart']['returncode']==-9 and
             row['input_restart']['boundary']=='after_generation_commit' and row['report_restart']['boundary']=='after_report_commit',
         committed_generation_reused=all(any(
             g['generation_id']==before['generation_id'] and g['result_json']==before['result_json'] and

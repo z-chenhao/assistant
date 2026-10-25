@@ -381,7 +381,7 @@ def export_artifacts(h,folder):
     return exported
 
 
-def travel_control(h, receipt, phase, control_plan, applied):
+def travel_control(h, receipt, phase, control_plan, applied, *, input_parts=()):
     provider=h.root/'provider'
     control=None
     control_receipt=None
@@ -390,7 +390,12 @@ def travel_control(h, receipt, phase, control_plan, applied):
         nonlocal control,control_receipt,held_state
         if control is None and (provider/'hold-accepted').exists():
             held_state=state(h)
-            control_receipt=h.send(phase+'-control','Capabilities: '+json.dumps(control_plan() if callable(control_plan) else control_plan,ensure_ascii=False))
+            text='Capabilities: '+json.dumps(control_plan() if callable(control_plan) else control_plan,ensure_ascii=False)
+            if input_parts:
+                control_receipt=h.command('chat','send-parts',phase+'-control',text=json.dumps(
+                    [*input_parts,dict(type='text',text=text)],ensure_ascii=False))
+            else:
+                control_receipt=h.send(phase+'-control',text)
             control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,
                                       stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             h.children.append(control)
@@ -405,7 +410,7 @@ def travel_control(h, receipt, phase, control_plan, applied):
     _,error=control.communicate(timeout=30)
     require(control.returncode==0,'travel control failed: '+error)
     require(main_completed(h,control_receipt['run_id']) and applied(),'travel control Main did not publish')
-    return dict(scheduling=scheduling,held_state=held_state,control_main_completed=True)
+    return dict(scheduling=scheduling,held_state=held_state,control_main_completed=True,control_receipt=control_receipt)
 
 
 def travel(h,world):
