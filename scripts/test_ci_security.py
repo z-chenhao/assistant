@@ -34,7 +34,9 @@ class SecurityTests(unittest.TestCase):
 
     def test_original_and_consumer_inventory_join_without_rewriting_any_gate(self):
         for consumer in (False, True):
-            gates = suite.SHARDS['security']
+            # Retain the mechanism's pre-consumer inventory as well as the
+            # real consumer inventory, without registering GC-04 twice.
+            gates = tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04')
             if consumer:
                 gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
             with self.subTest(consumer=consumer), patch.dict(suite.SHARDS, security=gates), tempfile.TemporaryDirectory() as temp:
@@ -55,7 +57,8 @@ class SecurityTests(unittest.TestCase):
                 selected = [g for p in suite.SECURITY_PARTS for g in suite.security_gates(p)]
                 self.assertCountEqual(selected, gates)
                 self.assertTrue(all(any(g is original for original in gates) for g in selected))
-                GateSchedulingTests().drive('security', gates=suite.security_gates('cases'), first_pair=('gc03','gc05'))
+                GateSchedulingTests().drive('security', gates=suite.security_gates('cases'),
+                                            first_pair=('gc03', 'gc04' if consumer else 'gc05'))
                 GateSchedulingTests().drive('security', gates=suite.security_gates('protection'))
         with patch.dict(suite.SHARDS, security=(*gates, suite.Gate('new', '', 'new'))):
             with self.assertRaises(ValueError): suite.security_gates('cases')
