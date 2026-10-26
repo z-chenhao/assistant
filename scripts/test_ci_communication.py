@@ -40,7 +40,9 @@ class CommunicationTests(unittest.TestCase):
                             owned_processes_joined=True, disposable_root_removed=True,
                             **({'http_peer_joined':True} if g.name=='gc12' else {})),
                             **({'execution_ids':{table:[f'{n}/{v}/{table}'] for table in
-                                ('runs','tools','generations','requests','conversation')}} if g.name=='gc12' else {}))
+                                ('runs','tools','generations','requests','conversation')}} if g.name=='gc12' else {}),
+                            **({'execution_ids':{table:[f'{g.name}/{v}/{r}/{table}'] for table in
+                                ('runs','tools','generations','messages','deliveries','artifacts')}} if g.script=='verify_gc13.py' else {}))
                             for v,r in ci.pairs(g)])
                     for g in gates for n in range(1,g.attempts+1)])
         return source, suites, manifests
@@ -57,12 +59,15 @@ class CommunicationTests(unittest.TestCase):
         planned=[g for part in COMMUNICATION_PARTS for g in communication_gates(part)]
         self.assertCountEqual(planned,SHARDS['communication'])
         self.assertEqual([g.name for g in communication_gates('gc01')],['gc01'])
-        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','gc13','channels'))
+        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','gc13-wording','gc13-noise','channels'))
         for part in COMMUNICATION_PARTS[:-1]:
             self.assertEqual([g.name for g in communication_gates(part)],[part])
         self.assertEqual([g.name for g in communication_gates('channels')],['gc12','gc08','gc14','gc16','gc11'])
         for gate in planned:
             original=next(g for g in SHARDS['communication'] if g.name==gate.name)
+            if gate.script=='verify_gc13.py':
+                self.assertEqual(gate.arguments,('--ci-part',gate.name.removeprefix('gc13-')))
+                continue
             self.assertEqual(command(gate,1,Path('/binary'),Path('/evidence')),
                              command(original,1,Path('/binary'),Path('/evidence')))
         with self.assertRaises(ValueError): communication_gates('unknown')
@@ -203,6 +208,18 @@ class CommunicationTests(unittest.TestCase):
                 self.write(root,suites,manifests)
                 with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
                     with self.assertRaisesRegex(ValueError,'reused or invalid GC-12 execution identities: '+field):ci.join(root)
+
+    def test_join_rejects_resealed_gc13_reuse_across_fixed_parts(self):
+        fields=('runs','tools','generations','messages','deliveries','artifacts')
+        for field in fields:
+            with self.subTest(field=field),tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);source,suites,manifests=self.fixture(root)
+                first=manifests['gc13-wording']['receipts'][0]['rows'][0]
+                second=manifests['gc13-noise']['receipts'][0]['rows'][0]
+                second['execution_ids'][field]=copy.deepcopy(first['execution_ids'][field])
+                self.write(root,suites,manifests)
+                with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
+                    with self.assertRaisesRegex(ValueError,'reused or invalid GC-13 execution identities: '+field):ci.join(root)
 
     def test_part_selection_rejects_wrong_shard_and_listing(self):
         import contextlib

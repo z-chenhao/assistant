@@ -79,7 +79,8 @@ SHARDS = {
                       Gate("gc09", "verify_gc09.py", "gc09"),
                       Gate("gc10", "verify_gc10.py", "gc10"),
                       Gate("gc11", "verify_gc11.py", "gc11"),
-                      Gate("gc13", "verify_gc13.py", "gc13")),
+                      Gate("gc13-wording", "verify_gc13.py", "gc13-wording", arguments=("--ci-part", "wording")),
+                      Gate("gc13-noise", "verify_gc13.py", "gc13-noise", arguments=("--ci-part", "noise"))),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
@@ -168,7 +169,9 @@ def provider_gates(part):
     return tuple(g for g in SHARDS['providers'] if (g.name == 'models') == (part == 'models'))
 
 
-COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'gc13', 'channels')
+GC13_VARIANTS = {'wording': ('wording-1','wording-2','wording-3'),
+                 'noise': ('noise-1','noise-2','order-1')}
+COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'gc13-wording', 'gc13-noise', 'channels')
 
 
 def communication_gates(part):

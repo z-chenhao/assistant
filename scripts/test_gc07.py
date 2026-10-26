@@ -33,7 +33,7 @@ class NetworkTests(unittest.TestCase):
             self.assertNotIn('Capabilities:',json.dumps(live['events']))
         self.assertIs(unscripted_cases.matrix()['GC-07']['eligible_for_grading'],False)
         self.assertEqual([(s,g.attempts) for s,gs in verify_suite.SHARDS.items() for g in gs if g.script=='verify_gc07.py'],[('delivery',1)])
-        self.assertIn("browser: ${{ matrix.shard == 'delivery' || matrix.communicationpart == 'gc13' }}",(journey.ROOT/'.github/workflows/ci.yml').read_text())
+        self.assertIn("browser: ${{ matrix.shard == 'delivery' || startsWith(matrix.communicationpart, 'gc13-') }}",(journey.ROOT/'.github/workflows/ci.yml').read_text())
 
     def test_report_reads_actual_scoped_dom_and_never_injects_expected_state(self):
         source = journey.report_source('http://127.0.0.1:12345')

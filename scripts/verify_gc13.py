@@ -28,6 +28,7 @@ from verify_gc03 import exact
 # Reuse the existing native cell, approval and Main publication boundary driver.
 from verify_gc07 import cell, returned, start_task, PREFIX, PW, file_hash
 from verify_gc11 import environment
+from verify_suite import GC13_VARIANTS
 from verify_main import require
 from verify_memory_maintenance import work
 from verify_recall import main_completed, worker_requests
@@ -354,15 +355,23 @@ def execution_ids(row):
         ('messages','conversation','message_id'),('deliveries','deliveries','delivery_id'),('artifacts','artifact','artifact_ref'))}
 
 
-def validate_report(report,binary=ROOT/'bin/erii'):
+def pairs(part=None):
+    require(part is None or part in GC13_VARIANTS,'unknown GC-13 CI part')
+    ids = sum(GC13_VARIANTS.values(), ()) if part is None else GC13_VARIANTS[part]
+    return [(key,n) for key in ids for n in range(1,REPEATS+1)]
+
+
+def validate_report(report,binary=ROOT/'bin/erii',*,part=None):
+    expected=pairs(part)
+    require(report.get('ci_part')==part,'GC-13 report/selector drift')
     require(report.get('case_id')=='GC-13' and report.get('status')=='mechanical_pass' and report.get('release_ready') is False and
         'semantic_score' in report and report['semantic_score'] is None and report.get('eligible_for_grading') is False and report.get('cleanup') is True and
         report.get('fixture_lock')==load() and report.get('m6_lock')==load_contract(ROOT,'m6-v1')[2], 'complete locked ungraded GC-13 receipts required')
     ident=report['identity']
     require(ident['source_before']==ident['source_after']==source_identity() and ident['binary_sha256']==sha(binary.read_bytes()) and
         exact(ident['environment'],environment(binary)), 'GC-13 source/binary/environment drift')
-    rows=report['results'];expected=[(v['variant_id'],n) for v in variants(*inputs()) for n in range(1,REPEATS+1)]
-    require([(r['variant_id'],r['repetition']) for r in rows]==expected and all(type(r['repetition']) is int for r in rows),'GC-13 thirty ordered receipts required')
+    rows=report['results']
+    require([(r['variant_id'],r['repetition']) for r in rows]==expected and all(type(r['repetition']) is int for r in rows),'GC-13 all selected variants and five ordered repetitions required')
     seen={}
     for row in rows:
         checks=observe(row)
@@ -373,7 +382,7 @@ def validate_report(report,binary=ROOT/'bin/erii'):
             seen[key].update(ids)
         require(isinstance(row['started_at'],str) and row['started_at']<row['finished_at'],'GC-13 execution timestamps required')
     require(exact(report.get('rejection_probes'),rejection_probes(rows[0])),'GC-13 corruption probes required')
-    return dict(case_id='GC-13',status='mechanical_pass',receipts=30,frozen_blocks=19,cleanup=True,semantic_score=None,eligible_for_grading=False,release_ready=False)
+    return dict(case_id='GC-13',status='mechanical_pass',receipts=len(rows),frozen_blocks=19,cleanup=True,semantic_score=None,eligible_for_grading=False,release_ready=False)
 
 
 def drive(binary,item,failure_evidence):
@@ -406,19 +415,20 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--evidence',type=Path,required=True)
     parser.add_argument('--validate',action='store_true')
+    parser.add_argument('--ci-part',choices=tuple(GC13_VARIANTS))
     parser.add_argument('--variant-jobs',type=int,choices=(1,2,4),default=int(os.environ.get('ERII_VERIFY_CASE_JOBS','2')))
     args=parser.parse_args();binary=args.binary.resolve()
     if args.validate:
-        print(json.dumps(validate_report(read_report(args.evidence),binary)));return
+        print(json.dumps(validate_report(read_report(args.evidence),binary,part=args.ci_part)));return
     args.evidence.unlink(missing_ok=True);args.evidence.parent.mkdir(parents=True,exist_ok=True)
     folder=args.evidence.parent/'.gc13-native';folder.mkdir(exist_ok=True)
-    report=dict(case_id='GC-13',status='inconclusive',release_ready=False,eligible_for_grading=False,semantic_score=None,cleanup=False,
+    report=dict(case_id='GC-13',ci_part=args.ci_part,status='inconclusive',release_ready=False,eligible_for_grading=False,semantic_score=None,cleanup=False,
         fixture_lock=load(),m6_lock=load_contract(ROOT,'m6-v1')[2],results=[],
         identity=dict(source_before=source_identity(),binary_sha256=sha(binary.read_bytes()),environment=environment(binary)),
         remaining=dict(parent='ERII-223',current_L2='unexecuted',semantic_score=None,release_ready=False,
             unscripted='unscripted_cases.py freeze --case GC-13; original input fragment only; approved booking adapter still required',
             proof_limit='Real Chromium/production browser adapter, explicit Fake model/Lume/SSH; choice, handoff and report are scripted. No real account/VM or semantic quality claim.'))
-    ids=[v['variant_id'] for v in variants(*inputs())];mutex=threading.Lock()
+    ids=list(dict.fromkeys(key for key,_ in pairs(args.ci_part)));mutex=threading.Lock()
     def series(variant_id):
         for n in range(1,REPEATS+1):
             row=drive(binary,(variant_id,n),folder/(variant_id+f'-{n}.failure.gz'))
@@ -429,7 +439,7 @@ def main():
         run_cases(ids,series,args.variant_jobs)
         report['results'].sort(key=lambda r:(ids.index(r['variant_id']),r['repetition']))
         report['identity']['source_after']=source_identity();report.update(status='mechanical_pass',cleanup=True)
-        report['rejection_probes']=rejection_probes(report['results'][0]);summary=validate_report(report,binary)
+        report['rejection_probes']=rejection_probes(report['results'][0]);summary=validate_report(report,binary,part=args.ci_part)
     finally:
         retain_report(args.evidence,report)
     print(json.dumps(summary))

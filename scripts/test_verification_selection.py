@@ -119,7 +119,7 @@ class SelectionTests(unittest.TestCase):
             else:
                 self.assertNotIn('frontend:', block)
             if name == 'verify':
-                self.assertIn("browser: ${{ matrix.shard == 'delivery' || matrix.communicationpart == 'gc13' }}", block)
+                self.assertIn("browser: ${{ matrix.shard == 'delivery' || startsWith(matrix.communicationpart, 'gc13-') }}", block)
             elif name == 'personal':
                 self.assertIn("browser: ${{ matrix.m6part != 'context' && matrix.m6part != 'memory' }}", block)
             elif name != 'fast':

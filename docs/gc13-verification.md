@@ -52,12 +52,22 @@ manifest binds compressed native bytes in `.gc13-native/`; it cannot independent
 certify completion. Preserve those bytes locally for independent review. Hashes
 prove consistency, not authorship.
 
-CI runs the same entry point in the fixed communication `gc13` part, with browser
-setup and native receipt validation. The fail-closed join now requires ten logical
-gates and fourteen suite rows; all existing parts, repetition counts, deadlines
-and resource limits remain intact. The finite resource delta is one Ubuntu job
-with the existing ten-minute deadline, four fixture workers and no extra accounts.
-The original M6 booking fragments and five-round series remain required.
+CI runs the same entry point in fixed `gc13-wording` and `gc13-noise` parts,
+selected with `--ci-part wording` or `--ci-part noise`. Each contains exactly
+three original variants and all five serial repetitions. The original full CLI
+still requires all thirty receipts. A part cannot validate as a full report or
+under the other selector. Both collectors recompute identical native oracles;
+the fail-closed join and CI comparison reject reused execution identities across
+parts and require eleven logical gates and fifteen suite rows. The original M6
+booking fragments and five-round series remain required.
+
+The e430e69 job 121867994536 (run 40407022499, attempt 1) hit its existing ten-minute
+deadline: setup finished at 21:48:24Z; verification was cancelled at 21:57:01Z,
+returned 130 after 521.66 seconds, and drained owned processes. This is a budget
+cancellation, not a product assertion failure or a passed Case. Splitting adds
+one finite Ubuntu setup job relative to that revision. Every existing timeout,
+per-job four-fixture/two-gate limit, input, assertion, repetition and cleanup
+requirement remains unchanged. No credentials or additional accounts are used.
 
 `unscripted_cases.py freeze --case GC-13` remains the original input-only model
 entry; it contains no plans or answers. A connected owner-approved booking
