@@ -5,6 +5,9 @@ through the production CLI, Context Builder and pinned Pi Bridge. It never
 logs in, adds/tests/selects a profile or supplies an answer/Tool plan. Actual
 model quality, all semantic metrics and current L2 remain unverified.
 
+The complete deterministic boundary and strict native receipts are documented in
+[GC-11 verification](gc11-verification.md). They preserve this model trial path.
+
 ## Offline contract
 
 ```sh

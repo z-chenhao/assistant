@@ -74,7 +74,8 @@ SHARDS = {
                       Gate("gc01", "verify_gc01.py", "gc01"),
                       Gate("gc02", "verify_gc02.py", "gc02"),
                       Gate("gc09", "verify_gc09.py", "gc09"),
-                      Gate("gc10", "verify_gc10.py", "gc10")),
+                      Gate("gc10", "verify_gc10.py", "gc10"),
+                      Gate("gc11", "verify_gc11.py", "gc11")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
@@ -290,13 +291,13 @@ def gate_execution_order(gates):
     # Measured long series go first. GC-01 and GC-12 retain the initial pair;
     # GC-02 must take the next free slot before short gates. Its former queue
     # tail exceeded the CI deadline even with all 30 rounds finished. Security's
-    # GC-03/GC-04 likewise start before the shorter protection series. GC-09
-    # and GC-10 follow GC-02 and precede short communication gates. Keep two
+    # GC-03/GC-04 likewise start before the shorter protection series. GC-09,
+    # GC-10 and GC-11 follow GC-02 and precede short communication gates. Keep two
     # workers, report inventory order and every series' serial repetitions.
     def priority(gate):
         if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04','gc05'): return 0
         if gate.name == 'gc12': return 1
-        if gate.name in ('gc02','gc09','gc10'): return 2
+        if gate.name in ('gc02','gc09','gc10','gc11'): return 2
         return 3
     return sorted(gates,key=priority)
 

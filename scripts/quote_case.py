@@ -87,17 +87,22 @@ def digest_bytes(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def input_text(variant, i, text):
+    plan = [dict(name='mcp__fixture__read', arguments=dict(text='insurance_quotes')),
+            dict(name='builtin__artifact__manage', arguments=dict(
+                operation='save', name=f'quote-comparison-{i+1}.md', mediaType='text/markdown', text=text)),
+            dict(name='mcp__fixture__echo', arguments=dict(text=text))]
+    event = variant['events'][i]
+    prompt = (variant['context'] + '\n' if i == 0 else '') + event['at'] + ' ' + event['text']
+    return prompt + '\nExplicit scripted Fake plan (not a user instruction in live evaluation):\nCapabilities: ' + json.dumps(plan, ensure_ascii=False)
+
+
 def drive(h, variant, unwrap):
     data = json.loads((h.root / 'provider/mcp-data.json').read_text())['insurance_quotes']
     texts = answers(data)
     artifacts, inputs = [], []
-    for i, (event, text) in enumerate(zip(variant['events'], texts)):
-        plan = [dict(name='mcp__fixture__read', arguments=dict(text='insurance_quotes')),
-                dict(name='builtin__artifact__manage', arguments=dict(
-                    operation='save', name=f'quote-comparison-{i+1}.md', mediaType='text/markdown', text=text)),
-                dict(name='mcp__fixture__echo', arguments=dict(text=text))]
-        prompt = (variant['context'] + '\n' if i == 0 else '') + event['at'] + ' ' + event['text']
-        prompt += '\nExplicit scripted Fake plan (not a user instruction in live evaluation):\nCapabilities: ' + json.dumps(plan, ensure_ascii=False)
+    for i, text in enumerate(texts):
+        prompt = input_text(variant, i, text)
         inputs.append(prompt)
         h.send(f'quote-turn-{i}', prompt)
         h.command('chat', 'work')
@@ -128,5 +133,5 @@ def drive(h, variant, unwrap):
     _, policy, _ = load_contract(ROOT, 'gc11-v1')
     return dict(name='GC-11_two_turn_scripted_journey', variant=variant,
                 assertions=checks, grading=score(policy, checks, []), source=data,
-                artifacts=artifacts, state=value, replay_state_digest=digest(replayed),
+                artifacts=artifacts, state=value, replay_state=replayed, replay_state_digest=digest(replayed),
                 semantic_evaluation='inconclusive; scripted plans, not independent recommendations')

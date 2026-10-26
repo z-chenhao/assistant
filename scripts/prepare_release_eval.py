@@ -15,6 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if report.get('case_id') == 'GC-11' and report.get('kind') == 'gc11_boundary':
+        from verify_gc11 import validate_report
+        summary = validate_report(report)
+        return dict(version=1, status='prepared; GC-11 mechanical receipts only; semantic grading unexecuted',
+                    mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
     if report.get('case_id') == 'GC-10':
         from verify_gc10 import validate_report
         summary = validate_report(report)
@@ -311,6 +316,9 @@ def main():
         parser.error('--evidence must be under repository evidence/')
     output.unlink(missing_ok=True)
     report = json.loads(args.input.read_text())
+    if report.get('kind') == 'gc11_native_manifest':
+        from verify_gc11 import read_report
+        report = read_report(args.input)
     if report.get('kind') == 'gc10_native_manifest':
         from verify_gc10 import read_report
         report = read_report(args.input)
