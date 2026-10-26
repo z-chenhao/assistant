@@ -230,12 +230,12 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 40)
+        self.assertEqual(len(comparison.topology()), 44)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
                          'Providers (models)', 'Complete providers evidence', 'GC-07 (wording)', 'GC-07 (noise)', 'Complete delivery evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
                          'Verification (communication/gc01)', 'Verification (communication/gc02)',
-                         'Verification (communication/gc09)', 'Verification (communication/gc10)', 'Verification (communication/gc13-wording)', 'Verification (communication/gc13-noise)',
+                         'Verification (communication/gc09)', 'Verification (communication/gc10)', 'Verification (communication/gc13-wording-1)', 'Verification (communication/gc13-wording-2)', 'Verification (communication/gc13-wording-3)', 'Verification (communication/gc13-noise-1)', 'Verification (communication/gc13-noise-2)', 'Verification (communication/gc13-order-1)',
                          'Verification (communication/channels)'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
         self.assertFalse(insufficient['performance_certified'])
@@ -305,8 +305,8 @@ class CurrentComparisonTests(unittest.TestCase):
             with self.subTest(field=field):
                 raw=self.experiment(1)
                 manifests=raw['attempts']['2:1']['reports']['suite-communication.json']['native_receipts']
-                first=manifests['gc13-wording']['receipts'][0]['rows'][0]
-                second=manifests['gc13-noise']['receipts'][0]['rows'][0]
+                first=manifests['gc13-wording-1']['receipts'][0]['rows'][0]
+                second=manifests['gc13-noise-1']['receipts'][0]['rows'][0]
                 second['execution_ids'][field]=copy.deepcopy(first['execution_ids'][field])
                 self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
 

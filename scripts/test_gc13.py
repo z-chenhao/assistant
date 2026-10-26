@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import sys
 from unittest.mock import patch
 
 from case_runner import variants
@@ -25,7 +26,7 @@ class BookingTests(unittest.TestCase):
         self.assertEqual(ci.pairs(gate),[(v['variant_id'],n) for v in rows for n in range(1,6)])
         workflow=(journey.ROOT/'.github/workflows/ci.yml').read_text()
         self.assertIn('communicationpart: gc13',workflow)
-        self.assertIn('for part in gc01 gc02 gc09 gc10 gc13-wording gc13-noise channels;',workflow)
+        self.assertIn('for part in gc01 gc02 gc09 gc10 gc13-wording-1 gc13-wording-2 gc13-wording-3 gc13-noise-1 gc13-noise-2 gc13-order-1 channels;',workflow)
         self.assertIn("matrix.shard == 'delivery' || startsWith(matrix.communicationpart, 'gc13-')",workflow)
 
     @staticmethod
@@ -81,7 +82,7 @@ class BookingTests(unittest.TestCase):
                 gate,=verify_suite.communication_gates('gc13-'+part)
                 report=copy.deepcopy(full);report['ci_part']=part
                 report['results']=[r for r in report['results'] if r['variant_id'] in journey.GC13_VARIANTS[part]]
-                self.assertEqual(journey.validate_report(report,binary,part=part)['receipts'],15)
+                self.assertEqual(journey.validate_report(report,binary,part=part)['receipts'],5)
                 all_pairs+=ci.pairs(gate)
                 path=Path(temp)/verify_suite.report_name(gate,1);journey.retain_report(path,report)
                 receipt=ci.native_receipt(gate,1,Path(temp),binary,{})
@@ -110,6 +111,21 @@ class BookingTests(unittest.TestCase):
                 with self.assertRaises((RuntimeError,ValueError,FileNotFoundError)):journey.read_report(path)
             path.write_text(json.dumps(manifest));raw=path.parent/manifest['native']['path'];raw.write_bytes(b'broken')
             with self.assertRaises((RuntimeError,ValueError)):journey.read_report(path)
+
+    def test_interrupted_series_retains_started_progress_without_completion_claim(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'binary');path=root/'gc13-wording-1.json'
+            with patch.object(sys,'argv',['verify_gc13','--binary',str(binary),'--evidence',str(path),'--ci-part','wording-1']),\
+                    patch.object(journey,'source_identity',return_value={'sha':'a'*40}),\
+                    patch.object(journey,'environment',return_value={}),\
+                    patch.object(journey,'drive',side_effect=RuntimeError('fixture stopped')):
+                with self.assertRaisesRegex(RuntimeError,'fixture stopped'):journey.main()
+            progress=[json.loads(line) for line in path.with_suffix('.progress.jsonl').read_text().splitlines()]
+            self.assertEqual([(r['variant_id'],r['repetition'],r['stage']) for r in progress],[('wording-1',1,'started')])
+            report=journey.read_report(path)
+            self.assertEqual(report['status'],'inconclusive')
+            self.assertFalse(report['cleanup'])
+            self.assertEqual(report['results'],[])
 
 
 if __name__=='__main__':unittest.main()

@@ -11,12 +11,15 @@ from verify_suite import SHARDS, command, communication_gates, COMMUNICATION_PAR
 
 
 class CommunicationTests(unittest.TestCase):
-    def test_ci_retains_only_gc12_failure_projection_beside_compact_manifests(self):
+    def test_ci_retains_compact_failure_diagnostics_beside_manifests(self):
         workflow=(ci.ROOT/'.github/workflows/ci.yml').read_text()
         upload=workflow.split('- name: Retain compact communication evidence, including failures\n',1)[1].split('\n  communication_join:',1)[0]
         self.assertIn("always() && matrix.shard == 'communication'",upload)
         paths=upload.split('          path: |\n',1)[1].split('          if-no-files-found:',1)[0]
         self.assertIn('            evidence/gc12-*/failure/\n',paths)
+        self.assertIn('            evidence/gc13-*.progress.jsonl\n',paths)
+        self.assertIn('            evidence/*.failure.summary.json\n',paths)
+        self.assertNotIn('.gc13-native',paths)
         self.assertNotIn('rejected-report.json',paths)
         self.assertNotIn('            evidence/\n',paths)
 
@@ -59,7 +62,7 @@ class CommunicationTests(unittest.TestCase):
         planned=[g for part in COMMUNICATION_PARTS for g in communication_gates(part)]
         self.assertCountEqual(planned,SHARDS['communication'])
         self.assertEqual([g.name for g in communication_gates('gc01')],['gc01'])
-        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','gc13-wording','gc13-noise','channels'))
+        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','gc13-wording-1','gc13-wording-2','gc13-wording-3','gc13-noise-1','gc13-noise-2','gc13-order-1','channels'))
         for part in COMMUNICATION_PARTS[:-1]:
             self.assertEqual([g.name for g in communication_gates(part)],[part])
         self.assertEqual([g.name for g in communication_gates('channels')],['gc12','gc08','gc14','gc16','gc11'])
@@ -214,8 +217,8 @@ class CommunicationTests(unittest.TestCase):
         for field in fields:
             with self.subTest(field=field),tempfile.TemporaryDirectory() as temp:
                 root=Path(temp);source,suites,manifests=self.fixture(root)
-                first=manifests['gc13-wording']['receipts'][0]['rows'][0]
-                second=manifests['gc13-noise']['receipts'][0]['rows'][0]
+                first=manifests['gc13-wording-1']['receipts'][0]['rows'][0]
+                second=manifests['gc13-noise-1']['receipts'][0]['rows'][0]
                 second['execution_ids'][field]=copy.deepcopy(first['execution_ids'][field])
                 self.write(root,suites,manifests)
                 with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):

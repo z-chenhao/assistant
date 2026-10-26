@@ -788,10 +788,14 @@ assertions and rejects reused execution identities before joining compact
 receipts. See [GC-11 verification](gc11-verification.md); no semantic score or
 release readiness is inferred.
 
-GC-13 uses fixed communication `gc13-wording` / `gc13-noise` parts with real
-Chromium setup after run 40407022499 exhausted the original unsplit job budget.
-Each retains the existing ten-minute deadline and four-fixture worker limit;
-the split adds one finite setup job. `verify_gc13.validate_report` validates each
-selector's fifteen native receipts. The aggregate and CI comparison require all
-thirty disjoint executions, eleven communication gates and fifteen suite rows.
+GC-13 uses six fixed communication variant parts with real Chromium setup.
+Run 40407022499 exhausted the unsplit budget; run 40411110600 passed wording but
+cancelled the three-variant noise part at the same deadline. Each current part
+contains one complete five-round variant series; all 30 receipts remain required.
+This adds four finite setup jobs relative to the two-part revision, with unchanged
+per-job deadlines/resources. `verify_gc13.validate_report` validates each selected
+native report; the full CLI still requires all six variants. Both joins reject
+reused run/tool/generation/message/delivery/Artifact identities across parts.
+Compact per-stage progress and bounded failure summaries survive failed-job
+uploads without exporting large native reports; progress cannot certify a Case.
 The original M6 booking series remains required. See [GC-13 proof limits](gc13-verification.md).

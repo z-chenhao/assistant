@@ -255,9 +255,17 @@ jobs:
           - shard: communication
             communicationpart: gc10
           - shard: communication
-            communicationpart: gc13-wording
+            communicationpart: gc13-wording-1
           - shard: communication
-            communicationpart: gc13-noise
+            communicationpart: gc13-wording-2
+          - shard: communication
+            communicationpart: gc13-wording-3
+          - shard: communication
+            communicationpart: gc13-noise-1
+          - shard: communication
+            communicationpart: gc13-noise-2
+          - shard: communication
+            communicationpart: gc13-order-1
           - shard: communication
             communicationpart: channels
     steps:
@@ -301,6 +309,8 @@ jobs:
             evidence/suite-communication-*.json
             evidence/communication-receipts.json
             evidence/gc12-*/failure/
+            evidence/gc13-*.progress.jsonl
+            evidence/*.failure.summary.json
             evidence/timings-communication.json
             evidence/profiles/
             evidence/steps/
@@ -399,7 +409,7 @@ jobs:
           PART_RESULT: ${{ needs.verify.result }}
         run: |
           test "$PART_RESULT" = success
-          for part in gc01 gc02 gc09 gc10 gc13-wording gc13-noise channels; do
+          for part in gc01 gc02 gc09 gc10 gc13-wording-1 gc13-wording-2 gc13-wording-3 gc13-noise-1 gc13-noise-2 gc13-order-1 channels; do
             mv "evidence/communication-parts/evidence-communication-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/communication-parts/$part"
           done
           exec python3 scripts/ci_step.py --name communication-join --phase test -- python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence

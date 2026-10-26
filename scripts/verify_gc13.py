@@ -120,7 +120,11 @@ def cancel_before_submit(h,row):
         for path in (publish,worker,computer):path.touch(exist_ok=True)
 
 
-def journey(h,peer,root,variant,row):
+def journey(h,peer,root,variant,row,progress):
+    def step(name,source,**kwargs):
+        progress(name)
+        return cell(h,name,source,**kwargs)
+    progress('input-restart')
     select(h,'terminal-input')
     h.send('context',variant['context'])
     event=variant['events'][0];text=event['at']+' '+event['text']
@@ -130,20 +134,21 @@ def journey(h,peer,root,variant,row):
     select(h,'computer')
     # This is an explicit scripted Child plan, not evidence of model selection.
     child='Capabilities: '+json.dumps([dict(name='builtin__codemode__execute',arguments=dict(source='return '+json.dumps(inputs()[1]['world'],ensure_ascii=False)+';'))],ensure_ascii=False)
-    row['confirmation']=cell(h,'final-confirmation','const child=await agent.run({task:'+json.dumps(child,ensure_ascii=False)+'});\n'+
+    row['confirmation']=step('final-confirmation','const child=await agent.run({task:'+json.dumps(child,ensure_ascii=False)+'});\n'+
         view(peer['url'],'/booking','#confirmation').replace('return {state:','return {child,state:'),task='GC-13 prepare final confirmation')
     row['before']=external(root)
-    row['denied']=cell(h,'denied-submit',SUBMIT,approve=False)
+    row['denied']=step('denied-submit',SUBMIT,approve=False)
     row['after_denial']=external(root)
     # Separate failure probes leave the original world/wordings and Gold intact.
-    row['challenge']=cell(h,'user-challenge',view(peer['url'],'/booking/auth','#challenge'))
-    row['handoff']=cell(h,'sensitive-step-handoff','return {needs_user:true,reason:"请用户在浏览器完成验证码或密码；完成前不提交",submitted:false};')
+    row['challenge']=step('user-challenge',view(peer['url'],'/booking/auth','#challenge'))
+    row['handoff']=step('sensitive-step-handoff','return {needs_user:true,reason:"请用户在浏览器完成验证码或密码；完成前不提交",submitted:false};')
     row['after_challenge']=external(root)
-    row['extras']=cell(h,'observe-default-addon',view(peer['url'],'/booking?probe=addons','#confirmation'))
-    row['decline']=cell(h,'decline-addon',PREFIX+PW+'await pw.locator("#addon").click();await tab.capabilities.list();const fresh=await tab.capabilities.get("playwright");return JSON.parse(await fresh.locator("#confirmation").textContent());')
-    row['ready']=cell(h,'recheck-final',view(peer['url'],'/booking','#confirmation'))
+    row['extras']=step('observe-default-addon',view(peer['url'],'/booking?probe=addons','#confirmation'))
+    row['decline']=step('decline-addon',PREFIX+PW+'await pw.locator("#addon").click();await tab.capabilities.list();const fresh=await tab.capabilities.get("playwright");return JSON.parse(await fresh.locator("#confirmation").textContent());')
+    row['ready']=step('recheck-final',view(peer['url'],'/booking','#confirmation'))
     row['preapproval']=native(h)
     # Original script step 3 arrives only after the final page is observable.
+    progress('tui-approval')
     select(h,'terminal-input')
     with Terminal(h.args('tui'),h.env,h.root) as terminal:
         terminal.expect('State: ready');terminal.expect('You> ')
@@ -151,16 +156,18 @@ def journey(h,peer,root,variant,row):
         require(terminal.stop()==0,'GC-13 TUI did not stop')
         row['transcript']=terminal.transcript()
     work(h);select(h,'computer')
-    row['submitted']=cell(h,'submit-unknown',SUBMIT,crash_after_approval=True)
+    row['submitted']=step('submit-unknown',SUBMIT,crash_after_approval=True)
     row['unknown_state']=native(h)
     row['after_submit']=external(root)
-    row['reconciled']=cell(h,'query-orders',view(peer['url'],'/orders','#orders'))
-    row['report']=cell(h,'booking-receipt',PREFIX+'await tab.goto('+json.dumps(peer['url']+'/orders')+');\n'+PW+save_report('''
+    row['reconciled']=step('query-orders',view(peer['url'],'/orders','#orders'))
+    row['report']=step('booking-receipt',PREFIX+'await tab.goto('+json.dumps(peer['url']+'/orders')+');\n'+PW+save_report('''
 const orders=JSON.parse(await pw.locator("#orders").textContent());
 const result={orders,confirmation:orders[0].order_id,original_invocation:"unknown",verification:"read-only My Orders",live_verified:false};''','booking-receipt.json'))
+    progress('cancel-before-submit')
     cancel_before_submit(h,row)
-    row['post_cancel']=cell(h,'post-cancel-orders',view(peer['url'],'/orders','#orders'))
+    row['post_cancel']=step('post-cancel-orders',view(peer['url'],'/orders','#orders'))
     row['after_cancel']=external(root)
+    progress('replay-artifacts')
     work(h);row['final']=native(h);row['computer']=h.command('computer','status')
     row['artifacts']=[]
     for descriptor in row['final']['artifact']:
@@ -385,14 +392,14 @@ def validate_report(report,binary=ROOT/'bin/erii',*,part=None):
     return dict(case_id='GC-13',status='mechanical_pass',receipts=len(rows),frozen_blocks=19,cleanup=True,semantic_score=None,eligible_for_grading=False,release_ready=False)
 
 
-def drive(binary,item,failure_evidence):
+def drive(binary,item,failure_evidence,progress):
     variant_id,repetition=item;case,variant=inputs(variant_id)
     row=dict(variant_id=variant_id,repetition=repetition,variant=variant,started_at=timestamp())
     try:
         with tempfile.TemporaryDirectory(prefix='erii-gc13-') as temp:
             root=Path(temp).resolve()
             with browser(root,case['world']) as (peer,browser_root),launch(binary,root,browser_peer=peer['endpoint']) as h:
-                try:journey(h,peer,browser_root,variant,row)
+                try:journey(h,peer,browser_root,variant,row,progress)
                 except BaseException:
                     row['failure_state']=h.failure_state()
                     calls=browser_root/'browser-calls.jsonl'
@@ -429,12 +436,19 @@ def main():
             unscripted='unscripted_cases.py freeze --case GC-13; original input fragment only; approved booking adapter still required',
             proof_limit='Real Chromium/production browser adapter, explicit Fake model/Lume/SSH; choice, handoff and report are scripted. No real account/VM or semantic quality claim.'))
     ids=list(dict.fromkeys(key for key,_ in pairs(args.ci_part)));mutex=threading.Lock()
+    progress_path=args.evidence.with_suffix('.progress.jsonl');progress_path.unlink(missing_ok=True)
+    def progress(variant_id,repetition,stage):
+        with mutex,progress_path.open('a',encoding='utf-8') as target:
+            target.write(json.dumps(dict(variant_id=variant_id,repetition=repetition,stage=stage,at=timestamp()))+'\n')
     def series(variant_id):
         for n in range(1,REPEATS+1):
-            row=drive(binary,(variant_id,n),folder/(variant_id+f'-{n}.failure.gz'))
+            record=lambda stage:progress(variant_id,n,stage)
+            record('started')
+            row=drive(binary,(variant_id,n),folder/(variant_id+f'-{n}.failure.gz'),record)
             with mutex:report['results'].append(row)
             print((variant_id,n),{k:v for k,v in row['assertions'].items() if not v},flush=True)
             require(all(row['assertions'].values()),'GC-13 native assertion failure')
+            record('completed')
     try:
         run_cases(ids,series,args.variant_jobs)
         report['results'].sort(key=lambda r:(ids.index(r['variant_id']),r['repetition']))

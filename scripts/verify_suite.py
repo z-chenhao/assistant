@@ -79,8 +79,12 @@ SHARDS = {
                       Gate("gc09", "verify_gc09.py", "gc09"),
                       Gate("gc10", "verify_gc10.py", "gc10"),
                       Gate("gc11", "verify_gc11.py", "gc11"),
-                      Gate("gc13-wording", "verify_gc13.py", "gc13-wording", arguments=("--ci-part", "wording")),
-                      Gate("gc13-noise", "verify_gc13.py", "gc13-noise", arguments=("--ci-part", "noise"))),
+                      Gate("gc13-wording-1", "verify_gc13.py", "gc13-wording-1", arguments=("--ci-part", "wording-1")),
+                      Gate("gc13-wording-2", "verify_gc13.py", "gc13-wording-2", arguments=("--ci-part", "wording-2")),
+                      Gate("gc13-wording-3", "verify_gc13.py", "gc13-wording-3", arguments=("--ci-part", "wording-3")),
+                      Gate("gc13-noise-1", "verify_gc13.py", "gc13-noise-1", arguments=("--ci-part", "noise-1")),
+                      Gate("gc13-noise-2", "verify_gc13.py", "gc13-noise-2", arguments=("--ci-part", "noise-2")),
+                      Gate("gc13-order-1", "verify_gc13.py", "gc13-order-1", arguments=("--ci-part", "order-1"))),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
@@ -169,9 +173,9 @@ def provider_gates(part):
     return tuple(g for g in SHARDS['providers'] if (g.name == 'models') == (part == 'models'))
 
 
-GC13_VARIANTS = {'wording': ('wording-1','wording-2','wording-3'),
-                 'noise': ('noise-1','noise-2','order-1')}
-COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'gc13-wording', 'gc13-noise', 'channels')
+GC13_VARIANTS = {variant: (variant,) for variant in
+                 ('wording-1', 'wording-2', 'wording-3', 'noise-1', 'noise-2', 'order-1')}
+COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'gc13-wording-1', 'gc13-wording-2', 'gc13-wording-3', 'gc13-noise-1', 'gc13-noise-2', 'gc13-order-1', 'channels')
 
 
 def communication_gates(part):
