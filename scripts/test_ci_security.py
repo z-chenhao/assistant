@@ -20,8 +20,8 @@ class SecurityTests(unittest.TestCase):
     def test_fixed_three_part_membership(self):
         self.assertEqual(suite.SECURITY_PARTS, ('finance', 'cases', 'protection'))
         self.assertEqual([g.name for g in suite.security_gates('finance')], ['gc03'])
-        self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05'])
-        gates = (*suite.SHARDS['security'], suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
+        self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04'])
+        gates = (*tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04'), suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
         with patch.dict(suite.SHARDS, security=gates):
             self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04'])
 
@@ -45,7 +45,9 @@ class SecurityTests(unittest.TestCase):
 
     def test_original_and_consumer_inventory_join_without_rewriting_any_gate(self):
         for consumer in (False, True):
-            gates = suite.SHARDS['security']
+            # Retain the mechanism's pre-consumer inventory as well as the
+            # real consumer inventory, without registering GC-04 twice.
+            gates = tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04')
             if consumer:
                 gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
             with self.subTest(consumer=consumer), patch.dict(suite.SHARDS, security=gates), tempfile.TemporaryDirectory() as temp:
@@ -68,7 +70,7 @@ class SecurityTests(unittest.TestCase):
                 self.assertTrue(all(any(g is original for original in gates) for g in selected))
                 GateSchedulingTests().drive('security', gates=suite.security_gates('finance'))
                 GateSchedulingTests().drive('security', gates=suite.security_gates('cases'),
-                                            first_pair=('gc05','gc04') if consumer else None)
+                                            first_pair=('gc04','gc05') if consumer else None)
                 GateSchedulingTests().drive('security', gates=suite.security_gates('protection'))
         with patch.dict(suite.SHARDS, security=(*gates, suite.Gate('new', '', 'new'))):
             with self.assertRaises(ValueError): suite.security_gates('cases')
@@ -117,7 +119,7 @@ class SecurityTests(unittest.TestCase):
             with self.assertRaises(ValueError): ci_security.validate(suites)
 
     def test_each_part_is_mandatory_and_cannot_exchange_case_members(self):
-        gates = (*suite.SHARDS['security'], suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
+        gates = (*tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04'), suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
         with patch.dict(suite.SHARDS, security=gates), tempfile.TemporaryDirectory() as temp:
             original = self.fixture(Path(temp))
             for part in suite.SECURITY_PARTS:
@@ -148,7 +150,7 @@ class SecurityTests(unittest.TestCase):
             with self.subTest(part=part, consumer=consumer), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 (root / 'logs').mkdir()
-                gates = suite.SHARDS['security']
+                gates = tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04')
                 if consumer:
                     gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
                 with patch.dict(suite.SHARDS, security=gates):

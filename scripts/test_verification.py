@@ -154,7 +154,7 @@ class VerificationTests(unittest.TestCase):
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
             "verify_gc12.py": 5, "verify_gc08.py": 1, "verify_gc14.py": 1, "verify_gc16.py": 1,
-            "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc05.py": 1, "verify_gc09.py": 1, "verify_gc10.py": 1,
+            "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc04.py": 1, "verify_gc05.py": 1, "verify_gc09.py": 1, "verify_gc10.py": 1,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
