@@ -199,7 +199,7 @@ def observe(row):
         approval_causal_order='用户批准。' not in json.dumps(row['preapproval']['conversation'],ensure_ascii=False) and '用户批准。' in row['transcript'],
         lost_ack=vals['submitted']=='UNKNOWN_SIDE_EFFECT' and len(unknown)==1 and type(unknown[0]['attempt_count']) is int and unknown[0]['attempt_count']==1 and
             unknown[0]['replay_policy']=='never' and unknown[0] in row['unknown_state']['tools'],
-        only_one_exact_order=row['after_submit']['orders']==row['after_cancel']['orders']==row['external_replayed']['orders']==orders and
+        only_one_exact_order=all(exact(row[k]['orders'],orders) for k in ('after_submit','after_cancel','external_replayed')) and
             row['after_submit']['submissions']==row['after_cancel']['submissions']==row['external_replayed']['submissions']==1,
         readonly_reconciliation=vals['reconciled']['data']==orders and 'order_781' in vals['reconciled']['state'] and all(
             strict_json(t['arguments_json']).get('method') not in ('playwright.click','playwright.fill') for t in row['reconciled']['nested']),
@@ -219,7 +219,7 @@ def observe(row):
             strict_json(strict_json(strict_json(reads[0]['result_json'])['text'])['value']),vals[key]['data'])
     decisions=[d for key in CALLS for d in row[key]['decisions']]
     checks['frozen_approvals']=len(decisions)==len(approvals) and bool(decisions) and all(
-        d['approval']['status']=='pending' and d['invocation']['attempt_count']==0 and d['approval']['arguments']==d['invocation']['arguments_json']==by_tool[d['invocation']['invocation_id']]['arguments_json'] and
+        d['approval']['status']=='pending' and type(d['invocation']['attempt_count']) is int and d['invocation']['attempt_count']==0 and d['approval']['arguments']==d['invocation']['arguments_json']==by_tool[d['invocation']['invocation_id']]['arguments_json'] and
         d['approval']['frozen_arguments_hash']==by_tool[d['invocation']['invocation_id']]['request_hash'] for d in decisions) and all(
         a['frozen_arguments_hash']==by_tool[a['invocation_id']]['request_hash'] and by_tool[a['invocation_id']]['replay_policy']=='never' and
         by_tool[a['invocation_id']]['attempt_count']==(0 if a['status']=='denied' else 1) and a['status'] in ('approved','denied') for a in approvals)
@@ -248,12 +248,13 @@ def observe(row):
     checks['confirmation_from_order_evidence']=exact(report['result'],expected_report) and len(receipt)==1 and exact(strict_json(base64.b64decode(receipt[0]['data_b64'])),expected_report) and any(
         'order_781' in p.get('text','') for m in final['conversation'] if m['role']=='assistant' for p in m['content'])
     checks['real_screenshots']=sum(base64.b64decode(a['data_b64'],validate=True).startswith(b'\x89PNG\r\n\x1a\n') for a in artifacts)==6
+    checks['typed_external_counters']=all(type(row[k]['submissions']) is int for k in ('before','after_denial','after_challenge','after_submit','after_cancel','external_replayed'))
     checks['exact_approval_inventory']=len(approvals)==10 and sorted(a['status'] for a in approvals)==['approved']*9+['denied']
     submits=[t for t in tools if strict_json(t['arguments_json']).get('method')=='playwright.click' and
         strict_json(t['arguments_json']).get('args',[{}])[0].get('selector')==SELECTOR]
     checks['exact_submit_inventory']=len(submits)==2 and sorted(t['status'] for t in submits)==['failed','unknown'] and sorted(t['attempt_count'] for t in submits)==[0,1]
     checks['completed_generations_reused']=all(g in final['generations'] for g in row['input_restart']['state']['generations'] if g['status']=='completed')
-    checks['model_usage_settled']=len(final['usage'])==len(final['generations']) and all(g['status']=='completed' and g['attempt_count']==1 for g in final['generations']) and all(not u['error_code'] for u in final['usage'])
+    checks['model_usage_settled']=len(final['usage'])==len(final['generations']) and all(g['status']=='completed' and type(g['attempt_count']) is int and g['attempt_count']==1 for g in final['generations']) and all(not u['error_code'] for u in final['usage'])
     checks['code_claims_released']=bool(final['code_execution_state']) and all(c['state'] in ('completed','cancelled') and c['claim_token'] is None and c['owner_run_token'] is None for c in final['code_execution_state'])
     shots=[(p['data'],row[key]['parent']['run_id']) for key in CALLS for p in row[key]['output'] if p['type']=='image']
     checks['screenshot_lineage']=len(shots)==6 and all(any(a['artifact_ref']==ref and a['run_id']==run for a in descriptors) for ref,run in shots)
@@ -331,6 +332,7 @@ def rejection_probes(row):
         missing_delivery=lambda r:r['final']['deliveries'].pop(),
         replay_drift=lambda r:r['replayed']['tools'].pop(),
         false_drift=lambda r:r.update(drift_exit=0),
+        boolean_effect_count=lambda r:r['after_denial'].update(submissions=False),
         retained_code_claim=lambda r:r['final']['code_execution_state'][0].update(claim_token='stale'),
         missing_usage=lambda r:r['final']['usage'].pop(),
         screenshot_owner=lambda r:r['artifacts'][0]['descriptor'].update(run_id='forged'),
@@ -383,7 +385,10 @@ def drive(binary,item,failure_evidence):
             with browser(root,case['world']) as (peer,browser_root),launch(binary,root,browser_peer=peer['endpoint']) as h:
                 try:journey(h,peer,browser_root,variant,row)
                 except BaseException:
-                    row['failure_state']=h.failure_state();raise
+                    row['failure_state']=h.failure_state()
+                    calls=browser_root/'browser-calls.jsonl'
+                    row['browser_calls']=[strict_json(line) for line in calls.read_bytes().splitlines()] if calls.exists() else []
+                    raise
             joined=all(c.poll() is not None for c in h.children)
         row.update(finished_at=timestamp(),cleanup=dict(disposable_root_removed=not root.exists(),owned_processes_joined=joined))
         row['assertions']=observe(row)

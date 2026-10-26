@@ -2,7 +2,7 @@
 // Browser adapter. No model-supplied executable, script, CDP endpoint or path.
 import {chromium} from '../guest-browser/node_modules/playwright-core/index.mjs';
 import {createServer} from 'node:http';
-import {readFile,writeFile,mkdir,symlink,copyFile,realpath} from 'node:fs/promises';
+import {readFile,writeFile,appendFile,mkdir,symlink,copyFile,realpath} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
@@ -40,7 +40,13 @@ const server=createServer(async(req,res)=>{
   let body='';for await(const chunk of req){body+=chunk;if(body.length>1<<20)throw new Error('frame too large');}
   if(req.url==='/call'){
    const {method,args={}}=JSON.parse(body);
-   const result=JSON.parse((await exec(process.execPath,['--input-type=module','-e',driver,JSON.stringify({module,port,root:join(root,'transfer'),method,args})],{timeout:15000,maxBuffer:12<<20})).stdout);
+   const started=Date.now();
+   const record=entry=>appendFile(join(root,'browser-calls.jsonl'),JSON.stringify({method,selector:args.selector??null,...entry})+'\n');
+   await record({phase:'start',at:started});
+   let result;
+   try {result=JSON.parse((await exec(process.execPath,['--input-type=module','-e',driver,JSON.stringify({module,port,root:join(root,'transfer'),method,args})],{timeout:15000,maxBuffer:12<<20})).stdout);}
+   catch(error){await record({phase:'failure',elapsed_ms:Date.now()-started,code:error.code??null,signal:error.signal??null,message:error.message.slice(0,512),stderr:String(error.stderr??'').slice(-2048)});throw error;}
+   await record({phase:'complete',elapsed_ms:Date.now()-started,error:result.error??null});
    // Disconnect exactly after the real submit reached the external state.
    // This models an SSH/Driver acknowledgement lost after an accepted action.
    if(method==='playwright.click'&&args.selector.startsWith('#submit[')&&!result.error){

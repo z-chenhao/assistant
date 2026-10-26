@@ -42,9 +42,10 @@ A later read-only observation proves the desktop can be acquired and checkpointe
 Duplicate input reuses its receipt; changed parameters under the same input key
 are rejected. Final native state and external orders must survive replay unchanged.
 Cleanup joins owned process groups and removes disposable roots. Failure bytes
-stay in the local hidden evidence directory with a bounded public summary.
+stay in the local hidden evidence directory with a bounded public summary. Browser
+transport failures retain method, selector, elapsed time and bounded process diagnostics.
 
-The validator recomputes native assertions, corruption probes, exact source and
+The validator recomputes 47 native assertions, 23 corruption probes, exact source and
 binary/build/environment identity, six reopened PNGs and the report bytes, and
 rejects copied execution identities across all thirty journeys. The small public
 manifest binds compressed native bytes in `.gc13-native/`; it cannot independently
