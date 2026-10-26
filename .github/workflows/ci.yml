@@ -292,6 +292,7 @@ jobs:
           path: |
             evidence/suite-communication-*.json
             evidence/communication-receipts.json
+            evidence/gc12-*/failure/
             evidence/timings-communication.json
             evidence/profiles/
             evidence/steps/
