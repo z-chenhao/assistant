@@ -34,6 +34,7 @@ class MainHarness:
         self.children = []
         self.fixture = fixture
         self.processes = current()
+        self.hold_observation = None
 
     def args(self, *args):
         return [str(self.binary), "-test-bridge", self.fixture, *args]
@@ -70,18 +71,71 @@ class MainHarness:
         raise RuntimeError("state boundary not reached: " + description)
 
     def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work")):
+        started = time.monotonic()
         start = self.processes.start if self.processes is not None else subprocess.Popen
         child = start(self.args("-test-main-hold", boundary, *extra_flags, *command),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
-        with selectors.DefaultSelector() as selector:
-            selector.register(child.stdout, selectors.EVENT_READ)
-            require(selector.select(timeout), f"boundary never reached: {boundary}")
-        line = child.stdout.readline()
-        require(line and json.loads(line).get("boundary") == boundary,
-                f"exited before boundary {boundary}: {line} {child.stderr.read() if not line else ''}")
-        return child
+        self.hold_observation = dict(boundary=boundary, timeout_seconds=timeout,
+                                     pid=child.pid, reached=False)
+        output, errors, pending = bytearray(), bytearray(), bytearray()
+        counts = dict(stdout=0, stderr=0)
+        deadline = started + timeout
+        reason = 'waiting'
+        try:
+            with selectors.DefaultSelector() as streams:
+                streams.register(child.stdout, selectors.EVENT_READ)
+                streams.register(child.stderr, selectors.EVENT_READ)
+                while streams.get_map():
+                    if self.processes is not None:
+                        self.processes.check()
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        reason = 'timeout'
+                        raise RuntimeError(f"boundary never reached: {boundary}")
+                    events = streams.select(min(.025, remaining))
+                    for key, _ in sorted(events, key=lambda event: event[0].fileobj is child.stdout):
+                        name = 'stdout' if key.fileobj is child.stdout else 'stderr'
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        if not chunk:
+                            streams.unregister(key.fileobj)
+                            if name == 'stdout':
+                                reason = 'stdout_closed'
+                                raise RuntimeError(f"exited before boundary {boundary}")
+                            continue
+                        counts[name] += len(chunk)
+                        tail = output if name == 'stdout' else errors
+                        tail.extend(chunk)
+                        del tail[:-8000]
+                        if name == 'stderr':
+                            continue
+                        pending.extend(chunk)
+                        reason = 'invalid_record'
+                        require(len(pending) <= 8000, f"oversized boundary record: {boundary}")
+                        if b'\n' in pending:
+                            line, _, _ = pending.partition(b'\n')
+                            value = json.loads(line)
+                            require(isinstance(value, dict) and value.get('boundary') == boundary,
+                                    f"unexpected boundary record: {boundary}")
+                            reason = 'reached'
+                            self.hold_observation['reached'] = True
+                            return child
+                        reason = 'waiting'
+                reason = 'streams_closed'
+                raise RuntimeError(f"exited before boundary {boundary}")
+        finally:
+            # Never readline()/read() an incomplete record or an unclosed pipe.
+            # The owning fixture still joins the process through cleanup().
+            self.hold_observation.update(reason=reason, returncode=child.poll(),
+                elapsed_seconds=time.monotonic() - started, bytes_read=counts,
+                stdout=output.decode(errors='replace'), stderr=errors.decode(errors='replace'))
+            if reason != 'reached':
+                try:
+                    self.hold_observation['process_usage'] = subprocess.check_output(
+                        ['ps', '-p', str(child.pid), '-o', 'pid=,ppid=,stat=,time=,pcpu='], text=True, timeout=.5)
+                except (OSError, subprocess.SubprocessError) as error:
+                    self.hold_observation['process_usage_error_type'] = type(error).__name__
 
     def drive_boundaries(self, barriers, observe, progress, timeout=20):
         """Drive one CLI call with independent, explicitly released test barriers.
