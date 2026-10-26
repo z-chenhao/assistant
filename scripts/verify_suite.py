@@ -77,7 +77,8 @@ SHARDS = {
                       Gate("gc01", "verify_gc01.py", "gc01"),
                       Gate("gc02", "verify_gc02.py", "gc02"),
                       Gate("gc09", "verify_gc09.py", "gc09"),
-                      Gate("gc10", "verify_gc10.py", "gc10")),
+                      Gate("gc10", "verify_gc10.py", "gc10"),
+                      Gate("gc11", "verify_gc11.py", "gc11")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
@@ -347,7 +348,7 @@ def gate_execution_order(gates):
     def priority(gate):
         if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04'): return 0
         if gate.name in ('gc12','gc05','gc06'): return 1
-        if gate.name in ('gc02','gc09','gc10'): return 2
+        if gate.name in ('gc02','gc09','gc10','gc11'): return 2
         return 3
     return sorted(gates,key=priority)
 

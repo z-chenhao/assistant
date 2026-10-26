@@ -37,7 +37,7 @@ GAPS = {
     'GC-08': 'non-scripted full event fixture and wedding Task lifecycle',
     'GC-09': 'complete Inbox/calendar sources and interruption journey',
     'GC-10': 'fresh local sources and stale-source adversary',
-    'GC-11': 'catalog/source fixture adapter (PR32 driver remains unmerged provenance)',
+    'GC-11': 'gc11_driver.py original two-turn fixture; approved profiles, official-source adapters and semantic grades remain due under ERII-223',
     'GC-12': 'Mail/Calendar frozen approvals and steering adapter',
     'GC-13': 'booking browser, approval and unknown-outcome adapter',
     'GC-14': 'scheduled source/threshold and notification adapter',

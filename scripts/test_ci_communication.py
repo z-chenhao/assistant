@@ -60,7 +60,7 @@ class CommunicationTests(unittest.TestCase):
         self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','channels'))
         for part in COMMUNICATION_PARTS[:-1]:
             self.assertEqual([g.name for g in communication_gates(part)],[part])
-        self.assertEqual([g.name for g in communication_gates('channels')],['gc12','gc08','gc14','gc16'])
+        self.assertEqual([g.name for g in communication_gates('channels')],['gc12','gc08','gc14','gc16','gc11'])
         for gate in planned:
             original=next(g for g in SHARDS['communication'] if g.name==gate.name)
             self.assertEqual(command(gate,1,Path('/binary'),Path('/evidence')),

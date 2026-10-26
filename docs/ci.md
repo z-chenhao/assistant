@@ -779,3 +779,11 @@ retains a small `gc03_native_manifest`; hidden `.gc03-native/` state remains loc
 under the uploader's default exclusion. The gate recomputes receipts and corruption
 probes; Fake mechanics supply no semantic grade or release acceptance.
 See [GC-03 verification](gc03-verification.md).
+
+The communication/channels `gc11` gate uses `verify_gc11.py` for the frozen
+23-block comparison boundary: six variants × five serial repetitions, real
+Tool/Delivery restart cuts and strict native manifests. The existing bounded
+workers and deadlines remain unchanged. The collector recomputes all native
+assertions and rejects reused execution identities before joining compact
+receipts. See [GC-11 verification](gc11-verification.md); no semantic score or
+release readiness is inferred.
