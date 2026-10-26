@@ -159,7 +159,10 @@ class MeetingTests(unittest.TestCase):
                 for tool in cut['tools']:tool['attempt_count']=0
                 checkpoints.append(dict(name=name,state=cut,remote=copy.deepcopy(before)))
             checkpoints.append(dict(name='completed',state=copy.deepcopy(value),remote=copy.deepcopy(remote)))
+            crash=copy.deepcopy(checkpoints[0])
+            crash['state']['approvals'][0]['status']='invalidated'
             rows.append(dict(variant=variant,scope='scripted_whole_case_mechanics',assertions=checks,state=value,
+                             steering_crash_cut=dict(state=crash['state'],remote=copy.deepcopy(before)),
                              replay_state=copy.deepcopy(value),remote=remote,remote_replay=copy.deepcopy(remote),
                              replay_digest=journey.digest(journey.semantic_state(value)),checkpoints=checkpoints,
                              fixture_sha256=journey.hashlib.sha256(journey.FIXTURE.read_bytes()).hexdigest(),
@@ -236,7 +239,7 @@ class MeetingTests(unittest.TestCase):
             with self.subTest(condition=condition), tempfile.TemporaryDirectory() as temp:
                 root=Path(temp);report=self.packets();row=report['variants'][3]
                 # Full prompts/exchanges must not enter the uploaded projection.
-                for state in [row['state'],row['replay_state'],*[c['state'] for c in row['checkpoints']]]:
+                for state in [row['state'],row['replay_state'],row['steering_crash_cut']['state'],*[c['state'] for c in row['checkpoints']]]:
                     generation=state['generations'][0]
                     request=json.loads(generation['request_json'])
                     request['messages']=[dict(content='PRIVATE_MODEL_REQUEST')]
@@ -340,6 +343,36 @@ class MeetingTests(unittest.TestCase):
                 report=self.packets();report['cleanup']=value
                 with self.assertRaises(RuntimeError):journey.validate_report(report)
 
+    def test_steering_crash_cut_rejects_an_admitted_pending_generation(self):
+        report=self.packets();row=report['variants'][2]
+        generation=copy.deepcopy(row['state']['generations'][0])
+        generation.update(generation_id='newly-admitted',status='pending')
+        row['steering_crash_cut']['state']['generations'].append(generation)
+        with self.assertRaisesRegex(journey.ReceiptFailure,'wording-2.*boundary/steering_before_generation'):
+            journey.validate_report(report)
+
+    def test_completed_recovered_generation_still_fails_original_one_attempt_oracle(self):
+        report=self.packets();row=report['variants'][2]
+        for state in (row['state'],row['replay_state'],row['checkpoints'][-1]['state']):
+            generation=copy.deepcopy(state['generations'][0])
+            generation.update(generation_id='recovered-steering-generation',attempt_count=2)
+            state['generations'].append(generation)
+        row['replay_digest']=journey.digest(journey.semantic_state(row['replay_state']))
+        self.assertTrue(all(row['assertions'].values()))
+        with self.assertRaises(journey.ReceiptFailure) as error:journey.validate_report(report)
+        self.assertEqual(error.exception.failed,['boundary/frozen_generations'])
+
+    def test_boundary_reader_handles_fragmented_and_combined_frames(self):
+        read_fd,write_fd=os.pipe()
+        with os.fdopen(read_fd,'rb',buffering=0) as stream:
+            try:
+                os.write(write_fd,b'readable')
+                h=SimpleNamespace(process=SimpleNamespace(stdout=stream))
+                with patch.object(journey.os,'read',side_effect=[b'{"boundary":"after_compaction_',
+                        b'commit"}\n{"boundary":"before_delivery_send"}\n']):
+                    journey.wait_boundary(h,'before_delivery_send',timeout=1)
+            finally:os.close(write_fd)
+
     def test_cli_and_ci_keep_precise_refusal_with_true_author_flags(self):
         from ci_communication import native_receipt
         from verify_suite import Gate
@@ -380,7 +413,7 @@ class MeetingTests(unittest.TestCase):
             report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
             report['identity']['binary_sha256']=report['binary_sha256']
             results=journey.rejection_probes(report,binary,root/'probes')
-            self.assertEqual(len(results),17)
+            self.assertEqual(len(results),18)
             self.assertTrue(all(r['ci_rejected'] for r in results.values()))
             for marker in ('owned_processes_joined','http_peer_joined','disposable_root_removed'):
                 self.assertIn('cleanup/'+marker,results['aggregate_'+marker]['reason'])

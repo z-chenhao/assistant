@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import gzip
 import json
+import os
 from pathlib import Path
 import platform
 import selectors
@@ -17,6 +18,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 
 from case_runner import digest
 from feishu_sandbox import Sandbox
@@ -201,6 +203,7 @@ def boundary_checks(row):
     require([s['name'] for s in steps] == ['Monday_frozen_before_notice', 'Tuesday_frozen_before_consent', 'completed'],
             'GC-12 checkpoint inventory drift')
     before, pending, completed = steps
+    crash = row['steering_crash_cut']
     old, new = value['approvals']
     empty = dict(mail=[], calendar=[], attempts=[])
     def approval_cut(step, expected):
@@ -216,6 +219,13 @@ def boundary_checks(row):
     capabilities = {c['snapshot_id']:c for c in value['capabilities']}
     runs = {r['run_id']:r for r in value['runs']}
     return dict(
+        steering_before_generation=crash['remote'] == empty and
+            [a['status'] for a in crash['state']['approvals']] == ['invalidated'] and
+            [g['generation_id'] for g in crash['state']['generations']] ==
+                [g['generation_id'] for g in before['state']['generations']] and
+            all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in crash['state']['generations']) and
+            [p['text'] for m in crash['state']['conversation'] if m['role'] == 'user'
+             for p in m['content']] == [row['variant']['first'], row['variant']['steer']],
         monday_pending_without_effect=approval_cut(before, ['pending']),
         tuesday_pending_without_effect=approval_cut(pending, ['invalidated', 'pending']),
         completed_cut_exact=semantic_state(completed['state']) == semantic_state(value) and completed['remote'] == row['remote'],
@@ -303,6 +313,7 @@ def diagnostic_receipt(row):
 
     result.update(state=state(row['state']), replay_state=state(row['replay_state']),
         checkpoints=[dict(name=cut['name'], state=state(cut['state']), remote=cut['remote']) for cut in row['checkpoints']])
+    result['steering_crash_cut'] = dict(state=state(row['steering_crash_cut']['state']), remote=row['steering_crash_cut']['remote'])
     result['observed_checks'] = dict(assertions=receipt_checks(row), boundaries=boundary_checks(row))
     result['semantic_digests'] = {key: digest(semantic_state(row[key])) for key in ('state', 'replay_state')}
     return result
@@ -354,6 +365,7 @@ def rejection_probes(report, binary, folder):
         replay=lambda r:r['variants'][0].update(replay_digest='0'*64),
         frozen_hash=lambda r:r['variants'][0]['state']['approvals'][0].update(frozen_arguments_hash='0'*64),
         pending_cut=lambda r:r['variants'][0]['checkpoints'][0]['state']['approvals'][0].update(status='approved'),
+        steering_admission=lambda r:r['variants'][0]['steering_crash_cut']['state']['generations'][0].update(attempt_count=2),
         remote=lambda r:r['variants'][0]['remote']['calendar'].clear(),
         score=lambda r:r.update(semantic_score=90),
         copied_execution=lambda r:r['variants'][1]['state']['runs'][0].update(run_id=r['variants'][0]['state']['runs'][0]['run_id']))
@@ -399,6 +411,23 @@ def rejection_probes(report, binary, folder):
     return results
 
 
+def wait_boundary(h, expected, timeout=20):
+    """Drain JSON boundary frames without TextIO read-ahead hiding queued lines."""
+    pending = b''
+    deadline = time.monotonic()+timeout
+    with selectors.DefaultSelector() as ready:
+        ready.register(h.process.stdout, selectors.EVENT_READ)
+        while True:
+            require(ready.select(max(0, deadline-time.monotonic())), 'GC-12 boundary not reached: '+expected)
+            data = os.read(h.process.stdout.fileno(), 65536)
+            require(data, 'GC-12 server exited before boundary: '+expected)
+            pending += data
+            while b'\n' in pending:
+                line, pending = pending.split(b'\n', 1)
+                if json.loads(line)['boundary'] == expected:
+                    return
+
+
 def drive(binary, evidence, variant):
     mode = variant.get('mode', 'success')
     with tempfile.TemporaryDirectory(prefix='erii-gc12-') as temp, Sandbox() as platform:
@@ -423,20 +452,31 @@ def drive(binary, evidence, variant):
                        fixture_sha256=hashlib.sha256(FIXTURE.read_bytes()).hexdigest(), checkpoints=[])
         try:
             h.setup()
-            h.start('before_delivery_send')
+            generation_release = root/'generation-release'
+            generation_release.touch()
+            h.start('before_delivery_send', extra_flags=(
+                '-test-main-barrier', 'after_compaction_commit='+str(generation_release)))
             h.callback('gc12-first', variant['first'])
-            with selectors.DefaultSelector() as ready:
-                ready.register(h.process.stdout, selectors.EVENT_READ)
-                require(ready.select(20), 'Monday approval did not reach pre-delivery boundary')
-            require(json.loads(h.process.stdout.readline())['boundary'] == 'before_delivery_send', 'wrong approval boundary')
+            wait_boundary(h, 'before_delivery_send')
             value = native(h)
             old = value['approvals'][0]
             require(old['status'] == 'pending', 'Monday approval missing')
             before = remote_state(provider)
             require(before == dict(mail=[], calendar=[], attempts=[]), 'side effect before approval')
             receipt['checkpoints'].append(dict(name='Monday_frozen_before_notice', state=value, remote=before))
+            # Delivery is held on another goroutine. Arm the existing
+            # pre-admission boundary before Steering, so SIGKILL cannot race
+            # a newly accepted pending generation and force an extra attempt.
+            generation_release.unlink()
             h.http('/api/message', dict(source_id='gc12-steer', content=[dict(type='text', text=variant['steer'])]))
             h.callback('obsolete-approval', '/approve '+old['approval_id']+' '+old['frozen_arguments_hash'], expected=409)
+            wait_boundary(h, 'after_compaction_commit')
+            cut = native(h)
+            require([g['generation_id'] for g in cut['generations']] ==
+                    [g['generation_id'] for g in value['generations']] and
+                    all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in cut['generations']),
+                    'GC-12 Steering admitted a generation before SIGKILL')
+            receipt['steering_crash_cut'] = dict(state=cut, remote=remote_state(provider))
             # Real server SIGKILL while first approval transport is held. New
             # input is already durable; restart must not revive Monday consent.
             h.stop(kill=True)
