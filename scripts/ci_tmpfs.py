@@ -178,9 +178,15 @@ def setup():
 
 
 def main():
+    global RECEIPT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('setup', 'cleanup', 'disk'))
+    parser.add_argument('--receipt', type=Path, help='separate disk-conformance receipt (disk only)')
     args = parser.parse_args()
+    if args.receipt is not None:
+        if args.action != 'disk':
+            parser.error('--receipt is only valid for disk conformance')
+        RECEIPT = args.receipt
     {'setup': setup, 'cleanup': cleanup, 'disk': disk}[args.action]()
     if RECEIPT.exists():
         print(RECEIPT.read_text(), end='')

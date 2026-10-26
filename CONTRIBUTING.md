@@ -8,7 +8,7 @@ and use the [verification guide](docs/guides/verification.md) to drive the real 
 ## Prerequisites and setup
 
 Use Go 1.26.2+, Node 24.21.0, Python 3.10.12+ with SQLite and safe tar extraction
-filters, and a C compiler for Go's race detector. Source dependency installation
+filters, and a C compiler for Go's race detector. Cold dependency installation
 needs network access. Once installed, tests use deterministic peers and disposable
 state; they need no online account or separately installed broker.
 
@@ -19,9 +19,72 @@ make run
 ```
 
 On Ubuntu, install browser system libraries with
-`node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium`.
+`python3 scripts/setup.py --part browser --with-deps` after package setup.
 Coding sandbox tests also need Bubblewrap; CI provisions it through
 [ci-inputs](.github/actions/ci-inputs/action.yml).
+
+### Repeated and offline setup
+
+`make setup` is the maintained development/test installation entry point. CI uses
+the same `scripts/setup.py` in two parts: packages once, then browsers only in
+jobs that need them. CI selects its consumed package roots with `--packages`;
+local setup still installs all four by default. Checks never reinstall dependencies. Source/release installer
+tests deliberately install into their own isolated destinations; those are real
+installation contracts, not redundant development setup.
+
+```sh
+make setup SETUP_FLAGS=--measure-network
+make setup SETUP_FLAGS='--mode offline --measure-network'
+# Select a disposable cold cache, or a retained download cache shared by worktrees:
+npm_config_cache=/absolute/path/npm-cache make setup SETUP_FLAGS=--measure-network
+```
+
+Keep npm's native download cache (default from `npm config get cache`) and
+Playwright's native browser cache (or an absolute `PLAYWRIGHT_BROWSERS_PATH`).
+Do not copy or share `node_modules`. Local setup runs `npm ci` against all four
+lockfiles; CI installs its selected lockfiles, retaining the existing `--ignore-scripts` policy and online audit.
+`--prefer-offline` reuses content first; online mode fetches missing objects.
+Offline mode never falls back to online. npm verifies cached tarballs with its
+native integrity checks. Its offline "0 vulnerabilities" output does **not**
+establish advisory coverage; run online setup/audit for current advisories.
+
+`evidence/setup.json` records Node/npm/platform/architecture, each lock's SHA256,
+actual cache locations, stage timings and failure. Node must match `.node-version`.
+The cache is content addressed rather than partitioned by lock digest: npm uses
+the current lock/integrity and platform constraints for every installation, so
+unchanged objects remain reusable across lock changes. Playwright uses its pinned
+package's platform/revision mapping. A browser Doctor checks install markers,
+executability, both Chromium variants' reported version against `browsers.json`,
+real page creation, and FFmpeg execution. This is a compatibility/smoke check,
+not a cryptographic attestation of the entire browser tree. Browser garbage
+collection is disabled during setup so another worktree's revision stays intact.
+Go retains its native module/build caches; the copied offline CI SDK and private
+product workspace caches keep their existing isolation contracts.
+
+`--measure-network` additionally records request attempts, distinct successful
+URL objects and response-body bytes by category, without credentials, headers or
+URL queries. It observes Node `http(s).request/get`, as used by the pinned npm and
+Playwright downloaders. It excludes TLS/IP overhead, sent bytes, undici/fetch,
+browser subprocess traffic, apt and Go. Do not call it whole-machine egress.
+Cold/warm describe cache state, not how many times an install command ran. A cold
+npm cache with a warm browser cache is a partial cold measurement; label it.
+
+Each stage (including native cross-worktree cache lock waits) has a 180-second
+deadline, configurable with `--timeout` up to 600 seconds. HTTP attempts use a
+30-second timeout with no npm transport retries. Playwright retains its native
+bounded mirror fallback under the stage deadline. Timeout kills the owned process
+group. Same-worktree setup serializes under `evidence/setup.lock`; separate
+worktrees install privately and can concurrently read the native download caches.
+
+If offline setup reports a missing/corrupt npm object, run online setup to fill
+only missing objects, then retry offline. Lock/manifest conflicts require fixing
+the lockfile, not deleting it or using `npm install`. A missing browser fails
+offline immediately; online setup installs its locked revision. For a damaged or
+incompatible browser, stop its consumers and remove only the named revision
+directory shown by the Doctor, then run online setup. Do not wipe shared caches.
+`--with-deps` is online only; offline hosts must already have OS browser libraries.
+Inspect the failed stage and logs when its deadline expires; no required check is
+skipped and no cache failure silently authorizes different dependencies.
 
 ## Layout and ownership
 
@@ -62,6 +125,121 @@ owns its temporary state and exact child processes. Evidence describes observati
 and limitations, including unexecuted Live Shadow work. See the feature map before
 inventing a new drive script. [CI operations](docs/ci.md) documents required shards,
 exact-SHA artifacts and fail-closed joins.
+
+## Working on a change
+
+1. Define the observable result, non-goals and evidence that will prove completion.
+2. Inspect the entry point, callers, state owner, failure path and nearby tests.
+   Read only the relevant baseline/Golden Cases. Identify exact conflicts between
+   specification and code; ask when a choice changes product behavior, protocol,
+   compatibility, security or Durable Replay. Continue safe diagnosis meanwhile.
+3. Reproduce a bug before editing, or record why a safe reproduction is infeasible.
+4. Build one complete slice through the real boundary. Include required migration,
+   deterministic Fake, regression and minimal documentation. Do not edit `sources/`.
+5. Drive the CLI/UI/API or restart path and inspect authoritative output/state.
+   Run the risk-based checks below, fix failures caused by the change and rerun
+   affected checks. A build or an agent's self-report alone is not proof.
+6. Inspect the diff and remove temporary artifacts, debug code, dead paths and
+   unrelated changes. Documentation must match observed behavior.
+7. Report outcome, exact checks/results, cleanup, risk/proof gaps and unresolved
+   decisions (`None` when empty). An unavailable required check is `inconclusive`.
+
+Proceed autonomously with scoped reversible edits, local inspection, disposable
+services, Fakes and tests. Preserve user changes; never overwrite, revert,
+reorder or include unrelated edits. Do not use destructive Git commands, bypass
+hooks, swallow failures, weaken tests or relax assertions. Ask only for a real
+product decision, missing credential, permission boundary, destructive operation,
+production/external side effect or material scope expansion. Explain material
+license, cost, security or architecture impact before adding a production dependency;
+add one only for a current requirement.
+
+### Match verification to risk
+
+| Change | Minimum evidence |
+| --- | --- |
+| Docs, comments, local naming | Inspect diff/rendered text; format when relevant |
+| Logic or bug fix | Focused regression and important boundaries |
+| State, schema, persistence | Legal/illegal transitions, empty/prior migration, CAS/conflicts |
+| Tool, approval, side effect | Contract, frozen parameters, rejection/retry, crash before/after effect |
+| Concurrency, cancellation, replay | Duplicate/late/out-of-order events, old epoch, race detector, kill/restart |
+| UI, CLI, API, Artifact | Running user path and inspectable output |
+| Performance | Same environment/input/harness before and after; samples and noise |
+| Milestone/release | All required checks, fault injection and due Golden Cases |
+
+Every external dependency needs a deterministic CI Fake. Real accounts, websites
+and macOS VM compatibility belong to release-time Live Shadow evidence.
+`M0 → M7` are runnable slices: M0–M5 is Core MVP; M6–M7 completes the defined
+first release. An earlier red milestone blocks an alternative architecture.
+Each milestone includes migrations, Fakes, tests, CLI reproduction, operations
+notes, kill/restart evidence and due Golden Cases. Internal M2/M4 builds must not
+claim unimplemented Durable/Security semantics. Golden Cases require 80+ each,
+85+ suite average, no hard failures; security, approval, cancellation, Durable
+Replay and coding workspace protection require five consecutive passes. Record
+an approved architecture deviation in an ADR and update the baseline before merge.
+
+### Maintain the verification path
+
+Use an existing harness before writing new drive mechanics. Each important UI,
+CLI, API and Computer workflow needs isolated Launch, dependency/Fake/state
+Doctor, Drive through the real boundary, inspectable Evidence and joined-process
+Cleanup that preserves user data. Keep the feature map current in the same change.
+Promote repeated mechanical actions into reusable commands. Harness observations
+do not replace code review, measured performance, security or replay tests.
+Prove one real task end to end before widening parallelism or unattended automation.
+
+Parallel slices need independent scope/file ownership, concrete inputs and finish
+conditions, their own checks/output and one named integrator. Do not parallelize
+an unknown root cause, shared state machine, migration or competing implementations
+of one protocol. The integrator inspects diffs and evidence. Improve weak
+verification before adding agents.
+
+### Find history and exact-source evidence
+
+Check the source identity first; a local checkout may predate `origin/main`:
+
+```sh
+git status --short --branch
+git rev-parse HEAD origin/main
+git log -S 'search text' --oneline -- path/to/file
+git log --follow --oneline -- path/to/file
+gh pr view PR_NUMBER --json url,headRefOid,mergeCommit,statusCheckRollup
+gh run list --commit FULL_SHA --workflow ci.yml --limit 5 --json databaseId,headSha,attempt,status,conclusion
+```
+
+PR identity, source SHA and run **attempt** must match the evidence being assessed.
+Read [the verification reports](docs/guides/verification.md#evidence-and-failure-diagnosis)
+and [CI artifact identities](docs/ci.md) before downloading. Keep complete evidence
+under the registered durable local root, outside disposable worktrees. A small
+manifest records issue/repository/full SHA/run/attempt, commands, exit codes,
+versions/profile, relative paths, sizes and SHA-256. Same-host review verifies
+hashes and reuses raw evidence read-only, while independently checking a clean
+exact-SHA checkout. Missing evidence is inconclusive, never a passed check.
+
+Use [the maintained evidence collector](docs/guides/evidence.md) for collection,
+hash verification, same-host receipts and exact CI artifact retrieval (ERII-206 /
+[PR #37](https://github.com/z-chenhao/erii/pull/37)). [ERII-207 / PR #38](https://github.com/z-chenhao/erii/pull/38)
+owns locked setup/cache diagnostics; use its entry point when present in your
+revision. Check source identity before assuming tools exist in an older checkout.
+Reuse package-manager downloads and pinned browser binaries; do not
+share mutable `node_modules`. Default remote delivery is a compact manifest and
+necessary diagnostics, at most 1 MiB per run. Do not recursively bundle dependencies,
+browsers, prior ZIPs or historical logs. Required final exports remain required;
+prepare them once with explicit size/purpose. Retain raw evidence until the issue
+and review/repair resolve; worktree cleanup must not remove it.
+
+### Turn repeated corrections into infrastructure
+
+Prefer, in order: an architecture/API that prevents the bad state; compiler/types/
+lint/CI; regression/fault test/harness; focused Skill or nested instructions; a root
+rule only for repeated cross-repository invariants. Review comments discover the
+missing control. Remove bad examples and stale workarounds. Keep Skill descriptions
+short and route to relevant resources. Audit root instructions for stale/duplicate/
+contradictory rules and remove rules made redundant by stronger controls.
+
+Use short active sentences, stable terms and concrete evidence. Cross-agent briefs
+state goal, inputs, constraints, evidence and stop condition. Use tables for exact
+mappings and diagrams for state/ownership/branches. Review aids are disposable
+unless requested as product artifacts. Do not omit uncertainty to shorten a report.
 
 ## Frontend changes
 

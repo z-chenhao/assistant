@@ -22,7 +22,9 @@ creates temporary configuration and databases, activates the explicit
 `codemode` model fixture, then drives `chat send`/`chat work`. The model fixture
 selects requests; the real Node/Pi/QuickJS VM executes the JavaScript. The
 Computer Fake is injected only with this test fixture. Production has no Fake
-Computer fallback. Its future Driver remains M6 work.
+Computer fallback. The configured production [Computer](computer.md) and
+[Computer Use](computer-use.md) adapters have separate harnesses and provisioning
+requirements.
 
 The report includes exact explicit outputs, nested invocation identities,
 source/Store/event readback, a real Child Worker result with inherited frozen
@@ -206,8 +208,11 @@ Runtime before deploying v2. Frozen incompatible capabilities are rejected
 rather than switched. Empty/v16 migration, rollback and preservation are tested.
 
 This slice proves deterministic protocol/recovery behavior. It does not award
-Golden Case semantic scores or complete M5; ERII-21 owns the due scored cases.
-The real Computer Driver and macOS compatibility remain M6 work.
+Golden Case semantic scores or complete M5. The [Core evaluation guide](core-evals.md)
+records the due case evidence and ungraded dimensions. Production Computer
+lifecycle/input and the dated macOS compatibility result are documented in
+[Computer operations](computer.md) and [L2 notes](../reports/computer-l2.md);
+this Code Mode fixture does not prove live compatibility.
 
 The M5 exact dataset and five-run Core gate is documented in [Core evaluations](core-evals.md). It adds GC-17/19/20 evidence to these protocol/recovery checks without assigning semantic scores to scripted providers.
 
