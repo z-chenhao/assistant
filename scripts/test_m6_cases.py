@@ -11,13 +11,40 @@ import time
 import threading
 
 from case_runner import load_contract, variants
-from m6_report import aggregate, CASES, VARIANTS
+from m6_report import aggregate, CASES, VARIANTS, GC02_SCHEDULE_ASSERTIONS
 from m6_sources import validate
 
 ROOT=Path(__file__).resolve().parents[1]
 
 
 class M6Cases(unittest.TestCase):
+    def test_monthly_review_judge_rejects_wrong_schedule_duplicates_and_early_work(self):
+        from run_m6_cases import goal_schedule_checks
+        before=dict(automation=[],automation_fire=[],task=[],manage_calls=[],generations=5,run_kinds={})
+        after=dict(automation=[dict(automation_id='automation:one',next_fire_at=1795953600000000)],automation_fire=[],task=[],
+                   manage_calls=[dict(run_id='main',status='succeeded')],generations=7,run_kinds=dict(main='main'))
+        views=[dict(automationRef='automation:one',enabled=True,triggerType='cron',triggerSpec='0 20 * * 0L',
+                    timezone='Asia/Shanghai',nextFire='2026-11-29T12:00:00Z')]
+        self.assertTrue(all(goal_schedule_checks(before,after,copy.deepcopy(after),views).values()))
+        for field,value in (('nextFire','2026-11-22T12:00:00Z'),('timezone','UTC'),
+                            ('triggerSpec','0 20 * * 0'),('triggerType','at'),('enabled',False),
+                            ('automationRef','automation:other')):
+            bad=copy.deepcopy(views);bad[0][field]=value
+            with self.subTest(field=field):
+                self.assertFalse(all(goal_schedule_checks(before,after,after,bad).values()))
+        for field,value in (('task',[dict(task_id='unsolicited')]),('automation_fire',[dict(event_id='early')]),
+                            ('manage_calls',[]),('run_kinds',dict(main='worker')),
+                            ('automation',[dict(automation_id='one'),dict(automation_id='two')])):
+            bad=copy.deepcopy(after);bad[field]=value
+            with self.subTest(field=field):
+                self.assertFalse(all(goal_schedule_checks(before,bad,bad,views).values()))
+        replayed=copy.deepcopy(after);replayed['generations']+=1
+        self.assertFalse(all(goal_schedule_checks(before,after,replayed,views).values()))
+        wrong_db=copy.deepcopy(after);wrong_db['automation'][0]['next_fire_at']+=1000000
+        self.assertFalse(all(goal_schedule_checks(before,wrong_db,wrong_db,views).values()))
+        early=copy.deepcopy(before);early['automation']=after['automation']
+        self.assertFalse(all(goal_schedule_checks(early,after,after,views).values()))
+
     def test_browser_cleanup_preserves_primary_failure_and_still_rejects_bad_exit(self):
         from m6_desktop import browser
         popen=subprocess.Popen
@@ -125,7 +152,20 @@ class M6Cases(unittest.TestCase):
 
     def reports(self):
         rows=[dict(case_id=c,variant_id=v,fixture_digest=c+v,assertions=dict(observed=True),hard_failure=False,status='fragment_pass',final_score=None) for c in CASES for v in VARIANTS]
+        for row in rows:
+            if row['case_id']=='GC-02':
+                row['assertions'].update(dict.fromkeys(GC02_SCHEDULE_ASSERTIONS,True))
         return [copy.deepcopy(dict(binary_sha256='binary',dataset_digest='fixture',driver_digest='driver',contract_lock={},cleanup=True,results=rows,live_shadow={})) for _ in range(5)]
+
+    def test_same_omitted_monthly_assertion_in_all_rounds_cannot_pass(self):
+        for assertion in GC02_SCHEDULE_ASSERTIONS:
+            reports=self.reports()
+            for report in reports:
+                for row in report['results']:
+                    if row['case_id']=='GC-02':
+                        del row['assertions'][assertion]
+            with self.subTest(assertion=assertion):
+                self.assertFalse(aggregate(reports)['passed'])
 
     def test_missing_failed_repetition_or_invented_score_cannot_pass(self):
         good=self.reports()

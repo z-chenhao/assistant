@@ -1,0 +1,4657 @@
+{
+  "version": 1,
+  "package": "baseline-01",
+  "issue": "ERII-231",
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "manifest_baseline": "d11e543ea32efdf784478f5959ea6565af87b646",
+  "audited_base": "fd2a3534f5b0602c5bf9376c14912f45b1ff4a5c",
+  "source_hash_note": "ADR006/PR45只改变本包之外的源块；按section/content hash复用80个未变块，不以整文件hash自动覆盖旧清单。",
+  "source_sha256": "bbb7e5db3f0bd6aa672e8704e7329d0ecd6d067769c9e49bf3997af5d9268a67",
+  "frozen_blocks": [
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 10,
+      "sha256": "487f23baf7641994c637e197a32f778839e8c594691ad69a47648ad6f2fb76d0",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 12,
+      "sha256": "0bcbeeea0581622f1986e5b304e087ed5d857037fca19a41eef476cb086ecd87",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 13,
+      "sha256": "f9e17f1d5ec57593c3ebb3b583ed0d6e9bac2e72a76d450277879cd469948d36",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 14,
+      "sha256": "772b73945212eb67a5da356095add7ec6fd7e901f1ef58d1dc27869933f9fab3",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 15,
+      "sha256": "96393e01e2252d1512ba303c7968d4009cc5690d72b40c26efb3aa71635113bb",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 16,
+      "sha256": "99d589a799faa3d52ebfcb9a15d9b65d19228938595147ffd12889712cb336f2",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 17,
+      "sha256": "fc9fe9b1416cc339367b8ab26c50974ebaff61035d31bf2c2d9415dc3675f336",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 19,
+      "sha256": "be57fe2c986b925714e8f2ad53480e0e6c23ea78a48cff088028b5a251de8ccf",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 21,
+      "sha256": "600be2171bef1dd4d7e1ed6f565a536f4791fbe3a149604c42b19d83523fc5ec",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 23,
+      "sha256": "c3f87c1210f2ea4d74897c404abc4225456542a78b84b1e05013862eb218a4f5",
+      "area": "evaluation"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1",
+      "line": 27,
+      "sha256": "875210428e845ceec3fca7b8bd8a8339af574c28dc8269f34dd7c12ae6e10d8d",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 31,
+      "sha256": "4089d1eb8b09d5f15267cb0c1d413eb61b64451d2436e8a58f9b4f3a5ca5fb41",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 32,
+      "sha256": "cef5d46bad1d8b8b387c32050f8727c6c9332010d04026c16edbdf84d5a8b103",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 33,
+      "sha256": "7c05456dc891a7acbd0f20fb572c144bf754b34a83125ec8d5b27916e15abd33",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 34,
+      "sha256": "b3533554331724d254afc9f67e7f25d73e6b29725c11cfc7cd6699dbe9b897ca",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 35,
+      "sha256": "11546e7c8577d52c22da8a6a6c97853b8a1a4a5f1d3af217e5d62ae8bbcf6d98",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.2",
+      "line": 39,
+      "sha256": "af820fbebd7c34fe87add6fbc2d22b294a70382314991ff5976a3ae28c1889fc",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.2",
+      "line": 40,
+      "sha256": "a41d4aee73ae138e897e8a8b705aceded79097690a391b08efae9d4e8c73bdcb",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.2",
+      "line": 41,
+      "sha256": "fb09fb1be5606bfb023d549137c8686f899647add1c5aa3d0efa542ce0583363",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 45,
+      "sha256": "f4b27ae8e39c688a40364939396b2632174fcbeb5c8c3d6f8ab900026f9ce26e",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 46,
+      "sha256": "cf6056cd692a6276186e7fd7bb6426f44014386ac5ad246ae73822e61ddfb0d7",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 47,
+      "sha256": "c3d6e4dbc842a18f7c5d6fb0628323bd10850de34829a10679cb7ac71ecb7494",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 48,
+      "sha256": "1698d648292884475c3edb59c0a104968cf58fda92309446071799c728464d8a",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 49,
+      "sha256": "0acba39333bc957247396ea7dad02debafca94b301408c18961e19d4cdd40d91",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 50,
+      "sha256": "22904d488293658cbee959f7f0e0020195351c2228288f8eb059d0978c870cb5",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 51,
+      "sha256": "2d819f2ec3aed8c4e3192507902dda618488ba3fa0682faa4a8860fe5f09b70a",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 55,
+      "sha256": "ca26ad151751e6154d4807415a69fd05df31d7e88a690d5b37d0b21031175762",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 75,
+      "sha256": "66537b7bdc1d96a28dfc8eefb1d45bdefc81df954b9ef39eb80e94894796d32a",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 77,
+      "sha256": "b5a4b8db22ef1301c098d4aa2567dd6e556f0fee145ff4399a4bd0e49e46e945",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 79,
+      "sha256": "4ae1fab30ab6067bf5d7631152a11cc83c9995762784b0f332c7afac783ec25f",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 81,
+      "sha256": "9d7a634bcd9ba9d034edcbbe1b684c333d8ae0ad4e15479a976681884e1a4c82",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 85,
+      "sha256": "4f24214b5a1714df73e27868281dfae666d8a85f8c3d65045357a9747bd9112d",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 86,
+      "sha256": "de1bf5e4b507f578925b9c729fd8fdc958aab1ffb8653cf78b3ede38f4385aab",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 87,
+      "sha256": "c90a64e42f4ad9e3b4c0be01b2498ea8af8ee13d9004f042790d6e4a1bc8ab70",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 88,
+      "sha256": "797a70af1a47797ea9c6cea45781d98e3983b104fd3663a9eec109954042d157",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 92,
+      "sha256": "f13baa78d5d5c201f8f016097f5647a65eb0f07ee78e3904c150fe9805725e9b",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 93,
+      "sha256": "0d594c379603af5f994c9ea78ac2d1bb73dee2c88c3c670466c0eca18934ee43",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 94,
+      "sha256": "8fdce486a02ed7234229bb974f7772856e53a71eff895bc6ad35b34ef8bf3904",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 95,
+      "sha256": "90fa766e08ffdc340cd1a227aee9782a365a1fe1086ad5badb5d50ccff2285da",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 96,
+      "sha256": "6e5b7be17775d9ec4019dbe699971dc66b743f54354b3545b5fe5e52f6e03dfb",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 97,
+      "sha256": "9323c8d65367c7138744d1f8b973ec2ef29efaa51dd5ad3ba6862bcd522f259d",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 98,
+      "sha256": "5b8b445ce8de59c9ebef70c5b58d3021f08b8cfefa11cc3b0ec4e82c26387af4",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 99,
+      "sha256": "9d640d55229b216dd1f172f4a0deeaf0611bc2cc4460f922b5124c6a79471582",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 100,
+      "sha256": "448c39da4bd419035e902415da33cd48b5e54adc96dfc91ab082003a0aa0320c",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 101,
+      "sha256": "502990b83ed278746b786459331d2b6289b4445324d48498905e921c4a03dd88",
+      "area": "scope"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 107,
+      "sha256": "f026def891ad1dda4332bb4560b96fb46a94cba26176982b251f5e073da2f145",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 108,
+      "sha256": "fa205c069ead6799f79ff30c45052b0a2e8114826e4f2879f4ae74e85367d489",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 109,
+      "sha256": "18f6d905fabd8ce908d702ed99c11747bf86ae08a19c3c0b807f3e486e4b0e97",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 110,
+      "sha256": "580bb22b0e3d466ac9f0add2b1e7c99822a598534503c2013cdb2ae70da22e90",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 111,
+      "sha256": "04d5484d7f0d12808e68473f41d0ea69325abd3347f7d8ce59b641b5295bd1a3",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 112,
+      "sha256": "53e9e7fb33fdb8f36baeee07f9fa5e2fb6583dd10bcd5f8a97c5a04e8ab12edd",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 113,
+      "sha256": "a0a03f48cd281a4c3b874a162d5c6af9b0f46def61088a7dd020e3490303f96e",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 114,
+      "sha256": "01a5e9cca79a8acce1e75784d486865aa4c211c5888bf0acae9880762bacba71",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 116,
+      "sha256": "a005aa277c541d66de257ef87301dd577e653c17027cd1b1d2da84aecf7cbfe2",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 120,
+      "sha256": "f86298b0ee0f858018124e5f6f0a2cd9c1160d15b3c4bc405c0390f66ecabc5d",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 121,
+      "sha256": "02e82268600d95bf63687d8a32c1bc5cffded2a454dd17aaf714b9d0db8c09b3",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 122,
+      "sha256": "deac8afdb618a1a0ab56e5e934f363bb892289c3559aae142aba7c886ece702f",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 123,
+      "sha256": "4d8dac65628f87bee2a5a134b520a038ce784439c22e3c493fb5c09e0f59e1a8",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 127,
+      "sha256": "c0fc974b1619a9f72401f9dc2ccc53447320929231d9da4590b85f80011abf21",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 128,
+      "sha256": "d55918dbaefbcb88dd03574adfae3480a6fc70143ae58420ce337cd28ae17a0e",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 129,
+      "sha256": "74b831eb34daa5c349e3fcd33dbd40794a4441f6dbea7f0f6356fc54af019afc",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 130,
+      "sha256": "c74e9aadc6a0a54ab6c146bf0daec33f596c0151684cb5398d41ad31fc5e9ee0",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 131,
+      "sha256": "a7930667f7020493eac236124dd460ecd7e3674032bc344dea3376bf2f387da8",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 132,
+      "sha256": "900219be4c88c98cced9d3d560d9277eca11837215a1b3dad770beaeb0eaafd2",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 133,
+      "sha256": "846cb3be696b50b6b3d753d754fa9e6474d404d399d217073d7028c2e47da6bb",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 134,
+      "sha256": "7558784e2cdb84479fcce4a476638854e010de76aa0dcd7d305c0201e43d6683",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 138,
+      "sha256": "c7f5b0d9f6f403007e212c229369878970443818854f8e8fac94292f0211c647",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 139,
+      "sha256": "d6b9c3f42bda77457ddb7b5c9a308d0454440d426e69ba61f673d40896bc0097",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 140,
+      "sha256": "cc385cb4fbd8e5bf2ffcd76bb3988737fe3f5fab1fddfba42c15f6f8b585710a",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 141,
+      "sha256": "cea0c061945028bb0ea72f0caf69daad899cae44aea33b3981aa55875b502826",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 142,
+      "sha256": "5a2743ceb07b24403cf4355160d9f204e64528458f8cd7c027b5364feb6dcef3",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 143,
+      "sha256": "3d6ad3a1110d069fa6ed6ac834fb6944861eb0d9e71f76005af3ff5020c6c23b",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 144,
+      "sha256": "2b9acf21a5dce4e58c922871fb8dd039f9926a76e54b3c441a95c00235757793",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 145,
+      "sha256": "7aa83caab3b88a512708e9c47afe3bd1a42788b2f3d414b58a94a52a358813b8",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 146,
+      "sha256": "c2c0ffb73bacbdedf76a32eca338d205cf06936aca5765c088032e6fe69abb74",
+      "area": "main"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 150,
+      "sha256": "4a6003872f10d8f4dbfb47ff2a4580d054789a3387fcfe1cc558d99cead57d64",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 154,
+      "sha256": "34f59a365d56096b79b0b11cd63acda36765c02a00a8690947ea5a5fea521fbf",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 156,
+      "sha256": "c8362bea68bf2f0898d8d22c2a2c02c2316ae3a33ce3551dc558add068de2bbf",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 163,
+      "sha256": "4d82ea709a2e2273079c7a38cd43bb0675f89229d62d4343d4d5eeb577af611d",
+      "area": "tasks"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 164,
+      "sha256": "3c61868acb228556a6a56722bbc7df6c77d9bae73c5e67aeaf2212ed917f29ce",
+      "area": "tasks"
+    }
+  ],
+  "references": {
+    "CONTRIBUTING.md": {
+      "sha256": "109aac61d6e5954b6f0b2bff89377c0108493263494440a0e1a9c593926d931b",
+      "kind": "policy"
+    },
+    "docs/adr/006-explicit-task-completion-policy.md": {
+      "sha256": "6d3f9bbd98a9b7a87e518e9a18e2e0373b01975415fca9a423be96caba5500d3",
+      "kind": "policy"
+    },
+    "scripts/test_release_audit.py": {
+      "sha256": "597f4ca4c87853891eb17af18acf7e51fda92783099af9dc48a53b8bbf462206",
+      "kind": "test"
+    },
+    "internal/agent/actor.go": {
+      "sha256": "b7f25086a9aaf7733f676d11bdf6ef1fea3161aa3ed8fc4a76ddc3a3a76cbf99",
+      "kind": "code"
+    },
+    "internal/agent/loop.go": {
+      "sha256": "842cc2a9533581aa5ff822871bd5116e1138a5078ba2f4b289625f0ca82d9802",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/tasks.go": {
+      "sha256": "8816e8db6764fcfa1d142dff63904d8b7c92bfac54fbb91178b826da288270b6",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/children.go": {
+      "sha256": "129f95e7564ac0df94b15cd222a94074d6128d1a13e30585a4b4ecdd8924e165",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/reporter.go": {
+      "sha256": "77ff946532cbdb6ea4dbb9c4bb847348c180382248300deccb444ca19a9b071a",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild": {
+      "sha256": "6e0d7f56ea8b4c6f8157078410149c8ca19427f8f562e8b224357f7cf763e923",
+      "kind": "test"
+    },
+    "scripts/verify_children.py": {
+      "sha256": "1b25168b6fb9ff66c7c937a73afb859b0e7be0c44cac0747fc750b7bd553d299",
+      "kind": "harness"
+    },
+    "scripts/verify_codemode.py": {
+      "sha256": "0feadd38d418045cf0281b5b106eaa49297a6fac299669079baa260b94abd157",
+      "kind": "harness"
+    },
+    "scripts/verify_delivery.py": {
+      "sha256": "dca4db33788e9f119c7e6c0efb7e61ee2223e4c841ed74e0006c75528d38ae51",
+      "kind": "harness"
+    },
+    "internal/agent/sqlite/models_test.go#TestModelMetadataRestartCASAndAtomicEvents": {
+      "sha256": "65407cfd485619d44edfe348213f8cfc72a13578ff7b5f4d299ff69087967235",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/tasks.go#createMain": {
+      "sha256": "8816e8db6764fcfa1d142dff63904d8b7c92bfac54fbb91178b826da288270b6",
+      "kind": "code"
+    },
+    "scripts/verify_startup.py": {
+      "sha256": "d3766b332b7468312fc0bcfb514e23cbfe0827308cf38a78ea7aca4c4a604da1",
+      "kind": "harness"
+    },
+    "scripts/verify_account.py": {
+      "sha256": "3bf5a3d6320032cc0866e2dec93b96d73c4350df44ced7c3152f2395b27eafba",
+      "kind": "harness"
+    },
+    "scripts/verify_local_provider.py": {
+      "sha256": "a58f2a201ec038d8efe0f753609148f1a78f2c5ce1f0e9cd935c0cbb0d4cbce8",
+      "kind": "harness"
+    },
+    "cmd/erii/main.go": {
+      "sha256": "5688b637351b34e279efc8fbdca5ba1c5ccb647097226545399677e36405f277",
+      "kind": "code"
+    },
+    "internal/app/app.go": {
+      "sha256": "b414616ed28be0a1f9caf553ba9faff5d50f3f65b46941698529eee70607caef",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration": {
+      "sha256": "2e458d802e1a482430a64fe2b2f33004a6c376c19d40feafd7942a4f53a2a889",
+      "kind": "test"
+    },
+    "internal/computer/macosvm/guest.go": {
+      "sha256": "73ef5c4a9efbba39c3bb990ecc370b94dc823251eac415850309b9570948c4c7",
+      "kind": "code"
+    },
+    "internal/computer/macosvm/provider.go": {
+      "sha256": "4eff7b78e6c5b45826fbb220d6c984bc9523e5dd927378807a25fef0f0ff7991",
+      "kind": "code"
+    },
+    "internal/computer/macosvm/provider_test.go#TestNoCheckpointOrPoweroffWhileNativeLockHeld": {
+      "sha256": "7d48a18de0140f895cdc81a889374d17ed7d3e14670dd0069cef1c9d9b38cef3",
+      "kind": "test"
+    },
+    "internal/computer/use_test.go#TestUseRevisionsLeaseAndIndependentScreenshots": {
+      "sha256": "80dde333946457d1b19ec9d39676d9a3fae566d8ec4572e6329f34294d625161",
+      "kind": "test"
+    },
+    "scripts/lume_live.py": {
+      "sha256": "b13523e14a9dabeeee7cdd1eefcf1a4367b18b282a04fc80b7b7e0a7537ebb99",
+      "kind": "harness"
+    },
+    "internal/interaction/web/server.go": {
+      "sha256": "2b0459aecacc80a71331c94a3885254c97bd5f9ba7740a5d69d3cdcc54af2c3a",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/channels.go#freezeMessageRoute": {
+      "sha256": "214dda176daae14fa0f48c57b59b42a531b9bff3c55ff0b8e45a2fc9c09b76e2",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation": {
+      "sha256": "a9fa036fec83acdfc6f12173355c1637c109e7067394d38cd696d86deda29782",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault": {
+      "sha256": "a9fa036fec83acdfc6f12173355c1637c109e7067394d38cd696d86deda29782",
+      "kind": "test"
+    },
+    "scripts/verify_channels.py": {
+      "sha256": "6388a16effeb41166235c0a692ca39e89874858e3abb97b31005780211f7032f",
+      "kind": "harness"
+    },
+    "internal/agent/sqlite/tasks.go#createRoot": {
+      "sha256": "8816e8db6764fcfa1d142dff63904d8b7c92bfac54fbb91178b826da288270b6",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/reporter.go#promoteFollowups": {
+      "sha256": "77ff946532cbdb6ea4dbb9c4bb847348c180382248300deccb444ca19a9b071a",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "scripts/verify_tasks.py": {
+      "sha256": "b379b419b746c76e88206e633c6bdddf5a06da39cd22b5697004d23c882e50e8",
+      "kind": "harness"
+    },
+    "internal/agent/sqlite/progress.go#Activity": {
+      "sha256": "faade26a90595f5b2382cdc8d1ee4bc8faedabc3a2c8d4f9d82b9e1cf28e6c63",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/channels.go#AgentStatus": {
+      "sha256": "214dda176daae14fa0f48c57b59b42a531b9bff3c55ff0b8e45a2fc9c09b76e2",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify": {
+      "sha256": "5c08f940f250aa45177511b34e0d4dec7688417491753e79c059e44f08cf9a67",
+      "kind": "test"
+    },
+    "internal/agent/loop.go#replyTurn": {
+      "sha256": "842cc2a9533581aa5ff822871bd5116e1138a5078ba2f4b289625f0ca82d9802",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/reporter.go#finishTask": {
+      "sha256": "77ff946532cbdb6ea4dbb9c4bb847348c180382248300deccb444ca19a9b071a",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/actor.go#Drain": {
+      "sha256": "b7f25086a9aaf7733f676d11bdf6ef1fea3161aa3ed8fc4a76ddc3a3a76cbf99",
+      "kind": "code"
+    },
+    "internal/agent/loop.go#ContinueAgentLoop": {
+      "sha256": "842cc2a9533581aa5ff822871bd5116e1138a5078ba2f4b289625f0ca82d9802",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation": {
+      "sha256": "162b87cc6c221bdcd62039f0f12bdb587aee668f58b3480d6609a7e5a24f8353",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns": {
+      "sha256": "162b87cc6c221bdcd62039f0f12bdb587aee668f58b3480d6609a7e5a24f8353",
+      "kind": "test"
+    },
+    "scripts/verify_main.py": {
+      "sha256": "07149cb397301f82698464700b280e335102c00d45268886535c79221e4b05de",
+      "kind": "harness"
+    },
+    "internal/agent/scheduler.go#DefaultSchedulerLimits": {
+      "sha256": "99b4a1f0c014c2cc5ab2493ae0bf705ee988dd4273d3d8188a3f98ea2e91aafc",
+      "kind": "code"
+    },
+    "internal/agent/child.go#DefaultChildLimits": {
+      "sha256": "607951385a7d09e1e9cfd54f32651ac001f98ec5925d04e860c692bb896d9223",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/scheduler.go#capacity": {
+      "sha256": "aeb77c99a343b257f0f4ae1288565443315d7e5d1518d53296a174701a65758c",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner": {
+      "sha256": "5c08f940f250aa45177511b34e0d4dec7688417491753e79c059e44f08cf9a67",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket": {
+      "sha256": "5c08f940f250aa45177511b34e0d4dec7688417491753e79c059e44f08cf9a67",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/child.go#ChildContext": {
+      "sha256": "607951385a7d09e1e9cfd54f32651ac001f98ec5925d04e860c692bb896d9223",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/children.go#StartChildRun": {
+      "sha256": "129f95e7564ac0df94b15cd222a94074d6128d1a13e30585a4b4ecdd8924e165",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch": {
+      "sha256": "6e0d7f56ea8b4c6f8157078410149c8ca19427f8f562e8b224357f7cf763e923",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions": {
+      "sha256": "6e0d7f56ea8b4c6f8157078410149c8ca19427f8f562e8b224357f7cf763e923",
+      "kind": "test"
+    },
+    "scripts/verify_children.py#check": {
+      "sha256": "1b25168b6fb9ff66c7c937a73afb859b0e7be0c44cac0747fc750b7bd553d299",
+      "kind": "harness"
+    },
+    "internal/agent/run.go#RootContext": {
+      "sha256": "2a635bda99715a5e9c57711fe9031e3e7c365dd75f43493871f60d5487141096",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/recall.go#recallMessages": {
+      "sha256": "c6a408c3c6285d3cfafd653a84edc73061c1d772274638718f697132ffcb10a2",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/recall_test.go#TestRecallFrozenPerTurnAndFenced": {
+      "sha256": "6a3828e184fcce9fc3f8542ee7f6a6a5bedf3b76cb15f1eb2cfc2d12dd0de6f1",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/schema.sql": {
+      "sha256": "6053b327473fed8662bdb374ee4f06c36d7bc924496a1f8f89c0da4243da0604",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/runs.go#Wait": {
+      "sha256": "ca6fd64e3e131b7268881b9ab12dfbf2004654f974d91403d94a1da6baad56b2",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/scheduler.go#runnable": {
+      "sha256": "aeb77c99a343b257f0f4ae1288565443315d7e5d1518d53296a174701a65758c",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion": {
+      "sha256": "6e0d7f56ea8b4c6f8157078410149c8ca19427f8f562e8b224357f7cf763e923",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts": {
+      "sha256": "33c31d5c02a9dc6f03b821d96de30300bfaea1f35dbd7163b5065ee13aea0ff5",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance": {
+      "sha256": "162b87cc6c221bdcd62039f0f12bdb587aee668f58b3480d6609a7e5a24f8353",
+      "kind": "test"
+    },
+    "internal/agent/loop.go#modelTurn": {
+      "sha256": "842cc2a9533581aa5ff822871bd5116e1138a5078ba2f4b289625f0ca82d9802",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/runs.go#Steering": {
+      "sha256": "ca6fd64e3e131b7268881b9ab12dfbf2004654f974d91403d94a1da6baad56b2",
+      "kind": "code"
+    },
+    "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor": {
+      "sha256": "e8a0741a7671b77edf6918cb603c0737d8983019058270103a97a4ba3053cac7",
+      "kind": "test"
+    },
+    "internal/agent/sqlite/loop_test.go#TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit": {
+      "sha256": "162b87cc6c221bdcd62039f0f12bdb587aee668f58b3480d6609a7e5a24f8353",
+      "kind": "test"
+    }
+  },
+  "merged_prs": {
+    "8": {
+      "number": 8,
+      "url": "https://github.com/z-chenhao/erii/pull/8",
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T08:41:11Z",
+      "mergeCommit": {
+        "oid": "3cc4ad94c99370b783f4ca796f2ef345b51f1a6f"
+      },
+      "title": "ERII-9: Run a durable Main Agent Loop with Conversation and Direct Tools"
+    },
+    "9": {
+      "number": 9,
+      "url": "https://github.com/z-chenhao/erii/pull/9",
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T11:43:58Z",
+      "mergeCommit": {
+        "oid": "ab223ccc7c16267fd9bb73f25521c3d7b5ff35a9"
+      },
+      "title": "ERII-10: ship terminal setup, conversation and the M1 Case Runner"
+    },
+    "10": {
+      "number": 10,
+      "url": "https://github.com/z-chenhao/erii/pull/10",
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T13:11:12Z",
+      "mergeCommit": {
+        "oid": "f0bb7de33c7d4cee4dc0abb494fd1aeb8179f2ab"
+      },
+      "title": "ERII-11: delegate durable Tasks to Root Workers and deliver Main follow-ups"
+    },
+    "11": {
+      "number": 11,
+      "url": "https://github.com/z-chenhao/erii/pull/11",
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T14:32:58Z",
+      "mergeCommit": {
+        "oid": "7ba0c4b21546201f4a17a8aa02c0b322e4f5653f"
+      },
+      "title": "ERII-12: implement controlled Task pause, cancel and continuation"
+    },
+    "12": {
+      "number": 12,
+      "url": "https://github.com/z-chenhao/erii/pull/12",
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T17:04:06Z",
+      "mergeCommit": {
+        "oid": "db1302017b44212d58ae7d478a2d194e81746da5"
+      },
+      "title": "ERII-13: enforce unified Tool policy and recover frozen approvals"
+    },
+    "14": {
+      "number": 14,
+      "url": "https://github.com/z-chenhao/erii/pull/14",
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T21:50:28Z",
+      "mergeCommit": {
+        "oid": "be932f4c92637adc7337650fba86a9b5ba35407a"
+      },
+      "title": "ERII-15: deliver semantic replies through a recoverable Delivery Outbox"
+    },
+    "16": {
+      "number": 16,
+      "url": "https://github.com/z-chenhao/erii/pull/16",
+      "state": "MERGED",
+      "mergedAt": "2026-10-17T02:37:59Z",
+      "mergeCommit": {
+        "oid": "c2d441700863b54c704a25b4890e73b18485f3ed"
+      },
+      "title": "ERII-17: admit bounded Child Runs through the canonical Agent Tool"
+    },
+    "17": {
+      "number": 17,
+      "url": "https://github.com/z-chenhao/erii/pull/17",
+      "state": "MERGED",
+      "mergedAt": "2026-10-17T07:06:27Z",
+      "mergeCommit": {
+        "oid": "e654f2ef751df9a706a6a837b01bcb399da9c442"
+      },
+      "title": "ERII-18: authorize account spend once across fair Child batches"
+    },
+    "22": {
+      "number": 22,
+      "url": "https://github.com/z-chenhao/erii/pull/22",
+      "state": "MERGED",
+      "mergedAt": "2026-10-18T08:59:50Z",
+      "mergeCommit": {
+        "oid": "620ae2649e3044f8dc3e16d7e5168a791fbfaadf"
+      },
+      "title": "ERII-22: recall scoped Memory and Conversation with FTS5, vectors and RRF"
+    },
+    "23": {
+      "number": 23,
+      "url": "https://github.com/z-chenhao/erii/pull/23",
+      "state": "MERGED",
+      "mergedAt": "2026-10-18T18:50:53Z",
+      "mergeCommit": {
+        "oid": "3c275f21f80b7612dff832b252998e171d09dd55"
+      },
+      "title": "ERII-23: curate Memory, revoke forgotten context, and verify Skill experience"
+    },
+    "25": {
+      "number": 25,
+      "url": "https://github.com/z-chenhao/erii/pull/25",
+      "state": "MERGED",
+      "mergedAt": "2026-10-20T02:23:35Z",
+      "mergeCommit": {
+        "oid": "882de0f8c7126783d62d3bbd3fa4fe81c012b058"
+      },
+      "title": "ERII-24: restore logical Computers through durable Lume checkpoints"
+    },
+    "26": {
+      "number": 26,
+      "url": "https://github.com/z-chenhao/erii/pull/26",
+      "state": "MERGED",
+      "mergedAt": "2026-10-20T08:09:59Z",
+      "mergeCommit": {
+        "oid": "03ef68d4ebb014d13e6a894c235ba72ef42f796a"
+      },
+      "title": "ERII-25: operate Guest CUA and Playwright with fenced observations and scoped transfer"
+    },
+    "29": {
+      "number": 29,
+      "url": "https://github.com/z-chenhao/erii/pull/29",
+      "state": "MERGED",
+      "mergedAt": "2026-10-21T04:56:02Z",
+      "mergeCommit": {
+        "oid": "6a4dd3d3c3a4ec4cb883e9a77f51b42e74577850"
+      },
+      "title": "ERII-28: Unify Web and Feishu interaction with safe UISpec delivery"
+    },
+    "33": {
+      "number": 33,
+      "url": "https://github.com/z-chenhao/erii/pull/33",
+      "state": "MERGED",
+      "mergedAt": "2026-10-21T16:02:54Z",
+      "mergeCommit": {
+        "oid": "68150f1ec567c1babae7d03b3c6ef91d301966bc"
+      },
+      "title": "ERII-183: standardize Erii installation, layout and shared loop"
+    },
+    "45": {
+      "number": 45,
+      "url": "https://github.com/z-chenhao/erii/pull/45",
+      "state": "MERGED",
+      "mergedAt": "2026-10-24T08:11:02Z",
+      "mergeCommit": {
+        "oid": "4dd530b9b7dbe8f74db18efb3fc3c9812cff9d2d"
+      },
+      "title": "ERII-226: create and explicitly complete ongoing Tasks"
+    }
+  },
+  "observations": {
+    "contracts": {
+      "source_sha": "fd2a3534f5b0602c5bf9376c14912f45b1ff4a5c",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "./internal/agent",
+        "./internal/agent/sqlite",
+        "./internal/interaction/web",
+        "./internal/computer",
+        "./internal/computer/macosvm",
+        "-run",
+        "Test(RuntimeNormalization|AgentRunSchema|Child|Loop|SteeringAfter|Task|RootFailure|FollowupBatch|ConcurrentAppends|WorkerCannot|Scheduler|Channel|RecallFrozen|Use|EveryMutation|NoCheckpoint|Authentication|DeliveryRuns|ModelMetadata|SnapshotImmutability)",
+        "-count=1"
+      ],
+      "started_at": "2026-10-24T09:05:27.271958+00:00",
+      "exit_code": 0,
+      "files": [
+        {
+          "path": "contracts.jsonl",
+          "size_bytes": 158461,
+          "sha256": "fb2ef4d26d6cba40744c9b4bda29ebc24bd4700012725d1e1f865756311a2a04"
+        }
+      ],
+      "limits": "Deterministic Go peers and real SQLite; no live model/account/current VM or semantic score."
+    },
+    "children": {
+      "source_sha": "fd2a3534f5b0602c5bf9376c14912f45b1ff4a5c",
+      "command": [
+        "python3",
+        "scripts/verify_children.py",
+        "--binary",
+        "bin/erii",
+        "--evidence",
+        "/Users/zhuchenhao/Projects/erii/evidence/agent-delivery/ERII-231/fd2a3534f5b0602c5bf9376c14912f45b1ff4a5c/audit-20261024/children.json"
+      ],
+      "started_at": "2026-10-24T09:06:00.428582+00:00",
+      "exit_code": 0,
+      "files": [
+        {
+          "path": "children-drive.log",
+          "size_bytes": 1101,
+          "sha256": "617e23f0239c64976a9faa20fa7ece0bfc5c4560a51b7f5f8d37a4b99ec21f39"
+        },
+        {
+          "path": "children.json",
+          "size_bytes": 3169807,
+          "sha256": "12c4701660d629ca7c35338b81348ce4026f41160f9ef082057ac68d09367807"
+        }
+      ],
+      "limits": "Actual CLI, SQLite, PTY and kill/restart with an explicitly scripted provider; not live-model semantic or VM evidence.",
+      "binary": {
+        "path_at_execution": "bin/erii",
+        "sha256": "58fe74342f78e506ceaafd1108ab93c25312f7b0fedea4245c0a2fa650538d7c",
+        "size_bytes": 43669778,
+        "build_command": [
+          "go",
+          "build",
+          "-o",
+          "bin/erii",
+          "./cmd/erii"
+        ],
+        "source_sha": "fd2a3534f5b0602c5bf9376c14912f45b1ff4a5c"
+      }
+    }
+  },
+  "gaps": {
+    "G-model": {
+      "issue": "ERII-330",
+      "issue_url": "https://multica.ai/erii-studio/issues/01a16bd2-3352-7bc8-8c8c-fc6045822909",
+      "remaining": "实际模型的异步/耗时/并行Task判断、续接相关性、检索和最终表达；本地与订阅首链的当前原生证据。",
+      "exit_condition": "在原冻结双臂评测中，保留相关原文义务的实际Main/Root/Child/Tool/Artifact/Delivery状态与独立评分；缺Profile/预算/Judge保持inconclusive。",
+      "deduplication": "复用父发布stage2实际模型评测；ERII-230只交入口，不能将入口Done当执行通过；未创建重复采样任务。"
+    },
+    "G-live": {
+      "issue": "ERII-331",
+      "issue_url": "https://multica.ai/erii-studio/issues/01a16bd2-481b-7404-8db1-971204d4f839",
+      "remaining": "当前获授权Web/飞书/VM/Computer/浏览器/剪映操作与具名人审；隔离与资源锁冲突和无冲突并行的实际观察。",
+      "exit_condition": "在当前release SHA保留渠道/Guest原生状态、Artifact、时间/失败类、精确审批及cleanup，并由具名人复核相同对象；历史截图/Fake不得替代。",
+      "deduplication": "复用父发布stage2当前L2；ERII-229只接受过环境快照，Computer机制修复由ERII-238审计路由，不在本PR实施。"
+    },
+    "G-release": {
+      "issue": "ERII-332",
+      "issue_url": "https://multica.ai/erii-studio/issues/01a16bd2-5d15-7af2-bb7f-7e5ff3c3c420",
+      "remaining": "原始各子义务的当前head整体证据组合、协议兼容/版本与审计汇总、四Run等待原因、idle ongoing Task状态真值表；本包有界测试不覆盖整个发布合同。",
+      "exit_condition": "最终逐义务核验代码/契约/已合并PR/原生证据和独立review；external_event及Task-status未证切面必须保留unmet或另路由有限实现，不能从枚举/合并数推PASS。",
+      "deduplication": "复用原stage3汇总报告子任务，不把未知storage错误当已修，不将本包80块已处置改成80要求已实现。"
+    }
+  },
+  "reviews": [
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 10,
+      "sha256": "487f23baf7641994c637e197a32f778839e8c594691ad69a47648ad6f2fb76d0",
+      "area": "evaluation",
+      "current_line": 10,
+      "text": "本文是 Erii MVP 的实现源文件。Coding Agent 开工时遵循以下优先级：",
+      "disposition": "policy",
+      "obligations": [
+        "规范源文件优先级"
+      ],
+      "observed": "CONTRIBUTING要求实现遵守规范，ADR006保留批准来源与兼容语义；本审计不改变优先级。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 12,
+      "sha256": "0bcbeeea0581622f1986e5b304e087ed5d857037fca19a41eef476cb086ecd87",
+      "area": "evaluation",
+      "current_line": 12,
+      "text": "1. 本文中的状态机、权限边界、持久化时序、模型可见 Tool Schema 与验收场景属于规范性要求。",
+      "disposition": "policy",
+      "obligations": [
+        "状态机具有规范性",
+        "权限边界具有规范性",
+        "持久化时序具有规范性",
+        "模型可见Schema具有规范性",
+        "验收场景具有规范性"
+      ],
+      "observed": "领域状态/Schema/事务与回归分别存在；仅审计本包列出的切面，不能据其认证全部五类规范。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "状态机具有规范性",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "权限边界具有规范性",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "持久化时序具有规范性",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "模型可见Schema具有规范性",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "验收场景具有规范性",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 13,
+      "sha256": "f9e17f1d5ec57593c3ebb3b583ed0d6e9bac2e72a76d450277879cd469948d36",
+      "area": "evaluation",
+      "current_line": 13,
+      "text": "2. TypeScript、Go 和表结构片段用于定义协议与最小字段，不要求逐字采用命名，但实现必须保持同等语义，并用测试证明兼容。",
+      "disposition": "policy",
+      "obligations": [
+        "代码与表片段定义协议及最小字段",
+        "允许命名差异",
+        "语义等价",
+        "契约测试证明兼容"
+      ],
+      "observed": "Run字段及Task联合按语义实现，ADR006记录Schema冻结和旧Run升级约束，原生契约只支持所列路径。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "语义等价",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "契约测试证明兼容",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 14,
+      "sha256": "772b73945212eb67a5da356095add7ec6fd7e901f1ef58d1dc27869933f9fab3",
+      "area": "evaluation",
+      "current_line": 14,
+      "text": "3. “一期不做”与“后置决策事项”不得被擅自扩展为首期功能；内部可以预留接口，但不得为假设中的未来需求建立第二套领域模型。",
+      "disposition": "policy",
+      "obligations": [
+        "不擅自实现一期不做项",
+        "不扩展后置决策",
+        "可保留内部接口",
+        "不为假设需求建第二领域模型"
+      ],
+      "observed": "单体结构与一个Loop可见；§1.2三条明确记为延期，不作为缺失的v1功能。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 15,
+      "sha256": "96393e01e2252d1512ba303c7968d4009cc5690d72b40c26efb3aa71635113bb",
+      "area": "evaluation",
+      "current_line": 15,
+      "text": "4. 若实现细节存在歧义，优先选择能够保持数据可恢复、权限不扩大、外部副作用不重复的最小方案，并提交 ADR；不得以猜测修改模型可见协议。",
+      "disposition": "policy",
+      "obligations": [
+        "歧义选择可恢复的最小方案",
+        "权限不扩大",
+        "副作用不重复",
+        "提交ADR",
+        "不猜改模型可见协议"
+      ],
+      "observed": "ADR006列出owner批准、既有机制及兼容计划；本次没有产品协议变更。不能由一份ADR证明所有历史决策。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "提交ADR",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 16,
+      "sha256": "99d589a799faa3d52ebfcb9a15d9b65d19228938595147ffd12889712cb336f2",
+      "area": "evaluation",
+      "current_line": 16,
+      "text": "5. 任何协议变更先更新本文及契约测试，再修改实现。数据库内部字段可以向后兼容地增加，模型可见 Tool Schema、事件版本和 Artifact 引用格式必须显式版本化。",
+      "disposition": "policy",
+      "obligations": [
+        "协议变更先更新基线与契约",
+        "数据库内部字段可兼容增加",
+        "模型ToolSchema显式版本",
+        "事件显式版本",
+        "Artifact引用格式显式版本"
+      ],
+      "observed": "基线/ADR/冻结Spec与契约存在。ADR006沿用v1 Spec格式但旧能力快照精确选择失败，不能把该兼容策略等同所有协议版本均已证明。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "协议变更先更新基线与契约",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "模型ToolSchema显式版本",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "事件显式版本",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Artifact引用格式显式版本",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 17,
+      "sha256": "fc9fe9b1416cc339367b8ab26c50974ebaff61035d31bf2c2d9415dc3675f336",
+      "area": "evaluation",
+      "current_line": 17,
+      "text": "6. 《Erii Baseline Golden Cases》是本文的配套产品验收规范。本文定义协议与不变量，Golden Cases 定义端到端用户场景、测试夹具、评分和发布门禁；两者冲突时先停止实现并更新文档，不得由代码自行选择解释。",
+      "disposition": "policy",
+      "obligations": [
+        "Golden是配套验收",
+        "基线定义协议不变量",
+        "Golden定义场景夹具评分发布门禁",
+        "冲突停止并先更新文档"
+      ],
+      "observed": "维护release_decision消费二者；本包未更改任一源文档，全部80个hash保持原样；全规范冲突核验仍属于发布汇总。",
+      "references": [
+        "CONTRIBUTING.md",
+        "docs/adr/006-explicit-task-completion-policy.md",
+        "scripts/test_release_audit.py"
+      ],
+      "prs": [
+        "33",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "冲突停止并先更新文档",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 19,
+      "sha256": "be57fe2c986b925714e8f2ad53480e0e6c23ea78a48cff088028b5a251de8ccf",
+      "area": "evaluation",
+      "current_line": 19,
+      "text": "MVP 的启动门禁与首条纵向链路是：",
+      "disposition": "background",
+      "obligations": [
+        "介绍启动门禁和首条纵向链路"
+      ],
+      "observed": "引出L21链路，本行没有额外动作或独立验收项。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "引出L21链路，本行没有额外动作或独立验收项。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 21,
+      "sha256": "600be2171bef1dd4d7e1ed6f565a536f4791fbe3a149604c42b19d83523fc5ec",
+      "area": "evaluation",
+      "current_line": 21,
+      "text": "`首次启动 → 模型连接/登录 → Model Probe → 激活 ModelProfile → TUI 输入 → Main Run → task_manage(create) → Root Worker Run → agent.run() → Child Run → Root 汇总 → Main 回复 → TUI 展示`",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "首次启动",
+        "连接或登录",
+        "Probe",
+        "激活Profile",
+        "TUI输入",
+        "Main",
+        "显式Task create",
+        "Root",
+        "agent.run创建Child",
+        "Root汇总",
+        "Main回复",
+        "TUI展示"
+      ],
+      "observed": "verify_children维护PTY/Main/Task/Root/Child/Grandchild/Reporter/展示/清理，setup与登录另有维护入口。脚本化Provider并未证明真实双臂模型能够自主完成整条选择链路。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py",
+        "internal/agent/sqlite/models_test.go#TestModelMetadataRestartCASAndAtomicEvents",
+        "internal/agent/sqlite/tasks.go#createMain",
+        "scripts/verify_startup.py",
+        "scripts/verify_account.py",
+        "scripts/verify_local_provider.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33",
+        "9"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "首次启动",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "连接或登录",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Probe",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "激活Profile",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "TUI输入",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Main",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "显式Task create",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Root",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "agent.run创建Child",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Root汇总",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Main回复",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "TUI展示",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "0",
+      "line": 23,
+      "sha256": "c3f87c1210f2ea4d74897c404abc4225456542a78b84b1e05013862eb218a4f5",
+      "area": "evaluation",
+      "current_line": 23,
+      "text": "Code Mode、Durable Replay、Approval、Artifact 与 Outbox 必须沿这条链路逐步接入；Web、飞书、多 Agent、云端拆分不得阻塞首条链路。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "Code Mode逐步接首链",
+        "Durable Replay逐步接首链",
+        "Approval逐步接首链",
+        "Artifact逐步接首链",
+        "Outbox逐步接首链",
+        "Web不阻塞首链",
+        "飞书不阻塞首链",
+        "多Agent和云拆分不阻塞首链"
+      ],
+      "observed": "独立CLI与共用Tool/Run/Artifact/Delivery入口存在。Direct Child链与Code Mode/Approval/Replay分属维护门禁，本次没有同一条真实模型链的完整组合收据。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Code Mode逐步接首链",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Durable Replay逐步接首链",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Approval逐步接首链",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Artifact逐步接首链",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Outbox逐步接首链",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1",
+      "line": 27,
+      "sha256": "875210428e845ceec3fca7b8bd8a8339af574c28dc8269f34dd7c12ae6e10d8d",
+      "area": "scope",
+      "current_line": 27,
+      "text": "Erii 是一个通用私人助理，目标能力对标 Muse、dots、Manus Cue、Grok Bot、Hermes Agent，并参考 Pi 1.2.0 的 Agent Harness 设计。",
+      "disposition": "background",
+      "obligations": [
+        "通用私人助理定位",
+        "对标能力与Pi Harness参考背景"
+      ],
+      "observed": "竞品与Pi参考是设计背景，不是必须逐项复刻竞品的v1验收义务。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "竞品与Pi参考是设计背景，不是必须逐项复刻竞品的v1验收义务。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 31,
+      "sha256": "4089d1eb8b09d5f15267cb0c1d413eb61b64451d2436e8a58f9b4f3a5ca5fb41",
+      "area": "scope",
+      "current_line": 31,
+      "text": "- 一期只做好一个 Agent。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "一期只做好一个Agent"
+      ],
+      "observed": "本地agent_config singleton和每Agent协调入口存在，没有加入多Agent管理面。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 32,
+      "sha256": "cef5d46bad1d8b8b387c32050f8727c6c9332010d04026c16edbdf84d5a8b103",
+      "area": "scope",
+      "current_line": 32,
+      "text": "- 一期采用本地部署，不依赖云端运行时。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "本地部署",
+        "无需云端运行时"
+      ],
+      "observed": "cmd/erii本地单进程组合根与本地Sidecar/NATS边界明确；模型订阅网络依赖不等于云端运行时。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 33,
+      "sha256": "7c05456dc891a7acbd0f20fb572c144bf754b34a83125ec8d5b27916e15abd33",
+      "area": "scope",
+      "current_line": 33,
+      "text": "- 首次启动必须完成模型连接与主模型选择；一期同时支持本地 OpenAI-compatible 模型端点和 OpenAI “Sign in with ChatGPT” 订阅登录。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "首次连接模型",
+        "首次选择主模型",
+        "本地OpenAI-compatible端点",
+        "ChatGPT订阅登录"
+      ],
+      "observed": "无活跃Profile进入setup_required，Probe/select及账户入口存在；当前测试是确定性同伴，不是当前真实账户和本地模型就绪收据。",
+      "references": [
+        "internal/agent/sqlite/models_test.go#TestModelMetadataRestartCASAndAtomicEvents",
+        "internal/agent/sqlite/tasks.go#createMain",
+        "scripts/verify_startup.py",
+        "scripts/verify_account.py",
+        "scripts/verify_local_provider.py"
+      ],
+      "prs": [
+        "9",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "本地OpenAI-compatible端点",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "ChatGPT订阅登录",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 34,
+      "sha256": "b3533554331724d254afc9f67e7f25d73e6b29725c11cfc7cd6699dbe9b897ca",
+      "area": "scope",
+      "current_line": 34,
+      "text": "- Agent 运行在与宿主机器隔离的 macOS 虚拟机中，可以在虚拟机内安装剪映等桌面应用，并通过 Computer Use 或 MCP 操作应用。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "与宿主隔离macOS VM",
+        "VM内安装剪映等桌面应用",
+        "通过Computer Use或MCP操作应用"
+      ],
+      "observed": "Lume逻辑Computer/Guest与CUA适配器存在；Fake生命周期及锁测试不能证明当前VM隔离、剪映安装或实际操作。",
+      "references": [
+        "internal/computer/macosvm/guest.go",
+        "internal/computer/macosvm/provider.go",
+        "internal/computer/macosvm/provider_test.go#TestNoCheckpointOrPoweroffWhileNativeLockHeld",
+        "internal/computer/use_test.go#TestUseRevisionsLeaseAndIndependentScreenshots",
+        "scripts/lume_live.py"
+      ],
+      "prs": [
+        "25",
+        "26"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "与宿主隔离macOS VM",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "VM内安装剪映等桌面应用",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "通过Computer Use或MCP操作应用",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.1",
+      "line": 35,
+      "sha256": "11546e7c8577d52c22da8a6a6c97853b8a1a4a5f1d3af217e5d62ae8bbcf6d98",
+      "area": "scope",
+      "current_line": 35,
+      "text": "- 一期采用模块化单体；模块边界和协议提前抽象，以便未来拆分为云服务。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "一期模块化单体",
+        "提前定义模块边界协议",
+        "未来拆云不要求现在建云服务"
+      ],
+      "observed": "cmd/erii组合internal/app和消费者接口，无本PR新增远程RPC或另一执行模型。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.2",
+      "line": 39,
+      "sha256": "af820fbebd7c34fe87add6fbc2d22b294a70382314991ff5976a3ae28c1889fc",
+      "area": "scope",
+      "current_line": 39,
+      "text": "- 一个用户可以创建多个 Agent。",
+      "disposition": "deferred",
+      "obligations": [
+        "长期形态允许一个用户多个Agent"
+      ],
+      "observed": "§1.2长期形态，§1.1一期单Agent优先；当前没有多Agent创建UI不算v1缺口。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "§1.2长期形态，§1.1一期单Agent优先；当前没有多Agent创建UI不算v1缺口。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.2",
+      "line": 40,
+      "sha256": "a41d4aee73ae138e897e8a8b705aceded79097690a391b08efae9d4e8c73bdcb",
+      "area": "scope",
+      "current_line": 40,
+      "text": "- 多个 Agent 彼此平等，均由用户直接调用，不设置默认的上下级关系。",
+      "disposition": "deferred",
+      "obligations": [
+        "长期多个Agent平等且用户直接调用",
+        "不设默认上下级"
+      ],
+      "observed": "这是未来多个Agent之间的产品关系，不能混同当前Worker树的执行归属。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "这是未来多个Agent之间的产品关系，不能混同当前Worker树的执行归属。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.2",
+      "line": 41,
+      "sha256": "fb09fb1be5606bfb023d549137c8686f899647add1c5aa3d0efa542ce0583363",
+      "area": "scope",
+      "current_line": 41,
+      "text": "- 本地与云端使用相同的核心协议和接口，仅替换底层 Provider 与部署组件。",
+      "disposition": "deferred",
+      "obligations": [
+        "长期本地云端协议相同",
+        "仅替换Provider与部署组件"
+      ],
+      "observed": "明确长期形态，当前消费者接口可观察；不要求本期部署云服务来验收。",
+      "references": [
+        "cmd/erii/main.go",
+        "internal/app/app.go",
+        "internal/agent/sqlite/store_test.go#TestFreshAndRepeatedStartupPreserveConfiguration"
+      ],
+      "prs": [
+        "33"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "明确长期形态，当前消费者接口可观察；不要求本期部署云服务来验收。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 45,
+      "sha256": "f4b27ae8e39c688a40364939396b2632174fcbeb5c8c3d6f8ab900026f9ce26e",
+      "area": "scope",
+      "current_line": 45,
+      "text": "- 用户与 Agent 的主要交互永远是自然语言对话，而不是任务管理页面。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "主要交互自然语言",
+        "不是以任务管理页为主"
+      ],
+      "observed": "Web消息POST与TUI进入同一Main，进度GET只读；真实模型对自然语言Task意图的选择仍无本包原生采样。",
+      "references": [
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py"
+      ],
+      "prs": [
+        "29",
+        "10",
+        "11",
+        "45"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "主要交互自然语言",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "不是以任务管理页为主",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 46,
+      "sha256": "cf6056cd692a6276186e7fd7bb6426f44014386ac5ad246ae73822e61ddfb0d7",
+      "area": "scope",
+      "current_line": 46,
+      "text": "- Web 用于用户在电脑前交代和查看工作。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "Web交代工作",
+        "Web查看工作"
+      ],
+      "observed": "Web入站、Conversation、Artifact及进度投影存在；本次没有当前获授权实际渠道与具名人审观察。",
+      "references": [
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py"
+      ],
+      "prs": [
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Web交代工作",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "Web查看工作",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 47,
+      "sha256": "c3d6e4dbc842a18f7c5d6fb0628323bd10850de34829a10679cb7ac71ecb7494",
+      "area": "scope",
+      "current_line": 47,
+      "text": "- TUI 用于研发、测试与调试。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "TUI支持研发",
+        "TUI支持测试",
+        "TUI支持调试"
+      ],
+      "observed": "维护PTY驱动与CLI子命令可达，Child harness将完整transcript和SQLite状态留证；这些不是模型语义评分。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 48,
+      "sha256": "1698d648292884475c3edb59c0a104968cf58fda92309446071799c728464d8a",
+      "area": "scope",
+      "current_line": 48,
+      "text": "- 飞书是未来便携下达任务和接收通知的主要渠道，默认通知到飞书，但可配置。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "飞书作为未来便携交互渠道",
+        "默认通知飞书",
+        "允许配置通知路由"
+      ],
+      "observed": "channel preference auto在没有用户消息路由时优先启用Feishu绑定，固定后不被后续配置重定向；无绑定保留本地。默认/配置已有契约，当前实际飞书远端收据未取。",
+      "references": [
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py"
+      ],
+      "prs": [
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "飞书作为未来便携交互渠道",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "默认通知飞书",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "允许配置通知路由",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 49,
+      "sha256": "0acba39333bc957247396ea7dad02debafca94b301408c18961e19d4cdd40d91",
+      "area": "scope",
+      "current_line": 49,
+      "text": "- 用户只感知 Agent 是“空闲”还是“忙碌”，以及当前有哪些持续进行中的工作。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "用户感知idle或busy",
+        "展示持续进行中的工作"
+      ],
+      "observed": "AgentStatus从非终态Run推导，Activity返回Task/Child聚合，Web只读展示。持续Task空闲与技术字段展示的实际人机理解未观察，不能把状态字段存在当体验通过。",
+      "references": [
+        "internal/agent/sqlite/progress.go#Activity",
+        "internal/agent/sqlite/channels.go#AgentStatus",
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify",
+        "internal/interaction/web/server.go"
+      ],
+      "prs": [
+        "10",
+        "17",
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "用户感知idle或busy",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "展示持续进行中的工作",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 50,
+      "sha256": "22904d488293658cbee959f7f0e0020195351c2228288f8eb059d0978c870cb5",
+      "area": "scope",
+      "current_line": 50,
+      "text": "- 用户通过对话追加指令、暂停、恢复或取消工作；进度页面只提供读取能力。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "对话追加",
+        "对话暂停",
+        "对话恢复",
+        "对话取消",
+        "进度页只读"
+      ],
+      "observed": "TaskTool与Task控制回归覆盖append/pause/cancel、epoch和新Root；Web进度GET无直接管理按钮。自然语言理解和当前渠道体验仍需观察。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/sqlite/progress.go#Activity",
+        "internal/agent/sqlite/channels.go#AgentStatus",
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify",
+        "internal/interaction/web/server.go"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "17",
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "对话追加",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "对话暂停",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "对话恢复",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "对话取消",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "1.3",
+      "line": 51,
+      "sha256": "2d819f2ec3aed8c4e3192507902dda618488ba3fa0682faa4a8860fe5f09b70a",
+      "area": "scope",
+      "current_line": 51,
+      "text": "- 原始模型调用、工具调用和工具返回轨迹仅对研发调试开放。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "原始模型轨迹仅调试",
+        "原始Tool调用轨迹仅调试",
+        "原始Tool返回轨迹仅调试"
+      ],
+      "observed": "Web只读取语义History/投影/Activity；Host保留run_trace。代码入口没有给普通Web开放trace，但本包未执行当前浏览器/飞书完整泄露审查。",
+      "references": [
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py"
+      ],
+      "prs": [
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "原始模型轨迹仅调试",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "原始Tool调用轨迹仅调试",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "原始Tool返回轨迹仅调试",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 55,
+      "sha256": "ca26ad151751e6154d4807415a69fd05df31d7e88a690d5b37d0b21031175762",
+      "area": "scope",
+      "current_line": 55,
+      "text": "```mermaid\nflowchart TD\n    C[\"Web / TUI / 飞书\"] --> I[\"Interaction / InboundEvent\"]\n    I --> A[\"Agent Actor\"]\n    A --> R[\"Run\"]\n    R --> M[\"Main Agent Loop\"]\n    M --> K[\"Task\"]\n    K --> W[\"Root Worker Run\"]\n    M --> L[\"Model Provider Bridge\"]\n    W --> L\n    M --> T[\"Tooling / Security\"]\n    W --> T\n    T --> X[\"Computer / MCP\"]\n    X --> P[\"结果与 Artifact 持久化\"]\n    P --> M\n    M --> D[\"AssistantMessage / DeliveryRequest\"]\n    D --> O[\"Outbox / Delivery\"]\n    O --> C\n```",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Web/TUI/飞书入Interaction",
+        "Interaction生成InboundEvent",
+        "Actor创建Run",
+        "Main调用模型Bridge",
+        "Task创建Root",
+        "Root使用同一Bridge",
+        "Main和Worker经Tooling/Security",
+        "Computer或MCP执行",
+        "结果与Artifact持久化",
+        "Main生成AssistantMessage及DeliveryRequest",
+        "Outbox送回Channel"
+      ],
+      "observed": "维护入口在单体内组合这些边。原生Child测试支持角色/返回路径；示意图不要求为每条箭头建立独立进程。Computer/MCP和全部渠道组合仍未形成当前发布整体证据。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py",
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py",
+        "internal/computer/macosvm/guest.go",
+        "internal/computer/macosvm/provider.go",
+        "internal/computer/macosvm/provider_test.go#TestNoCheckpointOrPoweroffWhileNativeLockHeld",
+        "internal/computer/use_test.go#TestUseRevisionsLeaseAndIndependentScreenshots",
+        "scripts/lume_live.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33",
+        "29",
+        "25",
+        "26"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Web/TUI/飞书入Interaction",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Interaction生成InboundEvent",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Actor创建Run",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Main调用模型Bridge",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Task创建Root",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Root使用同一Bridge",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Main和Worker经Tooling/Security",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Computer或MCP执行",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "结果与Artifact持久化",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Main生成AssistantMessage及DeliveryRequest",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Outbox送回Channel",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 75,
+      "sha256": "66537b7bdc1d96a28dfc8eefb1d45bdefc81df954b9ef39eb80e94894796d32a",
+      "area": "scope",
+      "current_line": 75,
+      "text": "主链路定义为：",
+      "disposition": "background",
+      "obligations": [
+        "引出主链路的顺序定义"
+      ],
+      "observed": "连接L77的介绍语，无独立于L77的新义务。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "连接L77的介绍语，无独立于L77的新义务。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 77,
+      "sha256": "b5a4b8db22ef1301c098d4aa2567dd6e556f0fee145ff4399a4bd0e49e46e945",
+      "area": "scope",
+      "current_line": 77,
+      "text": "`ChannelMessage → Interaction → InboundEvent → AgentActor → Run → MainAgentLoop → Tooling → Security → Computer/MCP → ResultPersistence → MainAgentLoop → AssistantMessage → DeliveryRequest → Outbox → Delivery → Channel`",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "ChannelMessage归一到InboundEvent",
+        "Actor创建Run进入Main",
+        "Tooling和Security先于Computer或MCP",
+        "持久化结果后供Main处理",
+        "AssistantMessage到DeliveryRequest",
+        "Outbox/Delivery回Channel"
+      ],
+      "observed": "Actor/Tool/Reporter/Delivery路径可定位；本次原生Child收据覆盖其中一条有状态链，非每种连接器与副作用的全组合证明。",
+      "references": [
+        "internal/agent/actor.go",
+        "internal/agent/loop.go",
+        "internal/agent/sqlite/tasks.go",
+        "internal/agent/sqlite/children.go",
+        "internal/agent/sqlite/reporter.go",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "scripts/verify_children.py",
+        "scripts/verify_codemode.py",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "33"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "ChannelMessage归一到InboundEvent",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Actor创建Run进入Main",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Tooling和Security先于Computer或MCP",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "持久化结果后供Main处理",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "AssistantMessage到DeliveryRequest",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "Outbox/Delivery回Channel",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 79,
+      "sha256": "4ae1fab30ab6067bf5d7631152a11cc83c9995762784b0f332c7afac783ec25f",
+      "area": "scope",
+      "current_line": 79,
+      "text": "创建异步任务时，从 Main Agent Loop 分支为：",
+      "disposition": "background",
+      "obligations": [
+        "引出异步Task分支"
+      ],
+      "observed": "本行只引出L81，不另建独立协议。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "本行只引出L81，不另建独立协议。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2",
+      "line": 81,
+      "sha256": "9d7a634bcd9ba9d034edcbbe1b684c333d8ae0ad4e15479a976681884e1a4c82",
+      "area": "scope",
+      "current_line": 81,
+      "text": "`MainAgentLoop → Task → WorkerRun → WorkerAgentLoop → ResultEvent → MainAgentLoop`",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main创建Task",
+        "Task创建WorkerRun",
+        "WorkerLoop产出ResultEvent",
+        "Main处理结果"
+      ],
+      "observed": "createRoot、finishTask、Report、promoteFollowups构成同一持久化分支，Worker不会把结果直接发送给用户。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "14"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 85,
+      "sha256": "4f24214b5a1714df73e27868281dfae666d8a85f8c3d65045357a9747bd9112d",
+      "area": "main",
+      "current_line": 85,
+      "text": "- `Agent Actor` 是每个 Agent 的运行协调器，负责接收事件、创建 Run、处理并发、顺序和生命周期。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Actor每Agent协调",
+        "接收事件",
+        "创建Run",
+        "处理并发",
+        "处理顺序",
+        "处理生命周期"
+      ],
+      "observed": "Actor.Submit/Drain/execute负责入口和租约，SQLite执行同对象唯一性与fencing；Loop不持有调度队列。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "8",
+        "33",
+        "17"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 86,
+      "sha256": "de1bf5e4b507f578925b9c729fd8fdc958aab1ffb8653cf78b3ede38f4385aab",
+      "area": "main",
+      "current_line": 86,
+      "text": "- `Main Agent Loop` 是面向用户的主推理循环，负责理解对话、做决策、调用工具、解释结果和生成回复。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main理解对话",
+        "Main做决策",
+        "Main调用工具",
+        "Main解释结果",
+        "Main生成回复"
+      ],
+      "observed": "共享Loop按model/tools/reply/settle执行，mainPrompt规定用户关系与Task决策；算法路径存在不证明智能质量。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py"
+      ],
+      "prs": [
+        "8",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Main理解对话",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Main做决策",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Main解释结果",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Main生成回复",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 87,
+      "sha256": "c90a64e42f4ad9e3b4c0be01b2498ea8af8ee13d9004f042790d6e4a1bc8ab70",
+      "area": "main",
+      "current_line": 87,
+      "text": "- 两者不能合并：Actor 管运行秩序，Main Agent Loop 管智能行为。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Actor与Main Loop不能合并",
+        "Actor管秩序",
+        "Loop管智能行为"
+      ],
+      "observed": "actor.go的领取/续租/停止与loop.go的推理阶段分离。RunAgentLoop与ContinueAgentLoop复用同一私有dispatcher。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py"
+      ],
+      "prs": [
+        "8",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.1",
+      "line": 88,
+      "sha256": "797a70af1a47797ea9c6cea45781d98e3983b104fd3663a9eec109954042d157",
+      "area": "main",
+      "current_line": 88,
+      "text": "- 用户可见消息只能由 Main Agent Loop 产生。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "用户可见消息只由Main产生"
+      ],
+      "observed": "replyTurn将Worker结果留存，Reporter转Main follow-up，只有Main走用户Delivery；Child结果仅给直接Parent。",
+      "references": [
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "10",
+        "14",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 92,
+      "sha256": "f13baa78d5d5c201f8f016097f5647a65eb0f07ee78e3904c150fe9805725e9b",
+      "area": "scope",
+      "current_line": 92,
+      "text": "- 当前对话由 Main Agent Loop 负责。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main负责当前对话"
+      ],
+      "observed": "MainContext装载Conversation，Worker构造独立上下文，不复制当前Main checkpoint。",
+      "references": [
+        "internal/agent/run.go#RootContext",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/recall.go#recallMessages",
+        "internal/agent/sqlite/recall_test.go#TestRecallFrozenPerTurnAndFenced",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py"
+      ],
+      "prs": [
+        "16",
+        "22",
+        "23",
+        "8",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 93,
+      "sha256": "0d594c379603af5f994c9ea78ac2d1bb73dee2c88c3c670466c0eca18934ee43",
+      "area": "scope",
+      "current_line": 93,
+      "text": "- 实现层只有一套可复用 Agent Loop 内核。`Main` 与 `Worker` 是两种运行角色；`Root Worker` 与 `Child Worker` 又是 Worker Run 在 Run 树中的两种位置，不实现第三套 Child Agent Loop。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "一套可复用Loop内核",
+        "Main/Worker是角色",
+        "Root/Child是Worker位置",
+        "没有第三套Child Loop"
+      ],
+      "observed": "Actor对所有角色调用RunAgentLoop，ContinueAgentLoop进入同一agentLoop.run。Worker位置由存储归属和Prompt决定。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "8",
+        "33",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 94,
+      "sha256": "8fdce486a02ed7234229bb974f7772856e53a71eff895bc6ad35b34ef8bf3904",
+      "area": "scope",
+      "current_line": 94,
+      "text": "- 只要工作是异步、耗时，或计划中包含并行 Child Run，Main Agent Loop 就在执行前显式创建一个 Task，并启动一个 Root Worker Run；`agent.run()` 和 Runtime 都不会把正在执行的工作自动“升级”为 Task。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "异步工作先建Task",
+        "耗时工作先建Task",
+        "计划含并行Child先建Task",
+        "启动Root",
+        "agent.run不建Task",
+        "Runtime不自动升级工作为Task"
+      ],
+      "observed": "Main capabilities无agent.run，Child admission只允许Worker且不插Task。mainPrompt要求异步工作Task化；耗时和并行意图的模型选择未实测。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "异步工作先建Task",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "耗时工作先建Task",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "计划含并行Child先建Task",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "启动Root",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "agent.run不建Task",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Runtime不自动升级工作为Task",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 95,
+      "sha256": "90fa766e08ffdc340cd1a227aee9782a365a1fe1086ad5badb5d50ccff2285da",
+      "area": "scope",
+      "current_line": 95,
+      "text": "- Main Run 默认不能创建 Child Run，也不暴露 `agent.run()`。短时、同步且不需要独立 Agent Loop 的工作可以留在 Main Run 中直接推理或调用普通 Tool；一旦需要另一个 Agent Loop，即由 Main 创建 Task 并委派给 Root Worker Run。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "Main默认不能建Child",
+        "Main不暴露agent.run",
+        "短同步工作可留Main",
+        "需要另一Loop时Main创建Task委派Root"
+      ],
+      "observed": "createMain剔除RunToolName，Child admission拒Main；短同步/委派分支在脚本夹具中可达。真实模型的分界选择仍待评测。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Main默认不能建Child",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Main不暴露agent.run",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "短同步工作可留Main",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "需要另一Loop时Main创建Task委派Root",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 96,
+      "sha256": "6e5b7be17775d9ec4019dbe699971dc66b743f54354b3545b5fe5e52f6e03dfb",
+      "area": "scope",
+      "current_line": 96,
+      "text": "- 这一限制是当前产品的默认 Capability Policy，不写死为 Agent Loop 内核限制；未来若需要允许 Main 直接创建 Child，只调整工具暴露与 Parent 校验，不重构 Run、ToolInvocation 或 Worker Loop。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main禁Child属默认Capability Policy",
+        "不写死Loop限制",
+        "未来改暴露和Parent校验",
+        "不重构Run/ToolInvocation/WorkerLoop"
+      ],
+      "observed": "禁用位于createMain与StartChildRun，Loop只消费冻结Tools；不为未来策略预先加开关或第三循环。未来修改仍须新批准契约。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "8",
+        "33",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 97,
+      "sha256": "9323c8d65367c7138744d1f8b973ec2ef29efaa51dd5ad3ba6862bcd522f259d",
+      "area": "scope",
+      "current_line": 97,
+      "text": "- 同一 Task 同时最多只有一个活动 Root Worker Run；任务内部的并发统一由该 Run 的 Child Run 表达。不同 Task 的 Root Worker Run 可以并行。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "同Task至多一个活动Root",
+        "Task内并发由Child",
+        "不同Task的Root可并行"
+      ],
+      "observed": "one_root唯一索引和Worker tree归属约束配合Host调度容量。并发与幂等回归读取真实SQLite。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 98,
+      "sha256": "5b8b445ce8de59c9ebef70c5b58d3021f08b8cfefa11cc3b0ec4e82c26387af4",
+      "area": "scope",
+      "current_line": 98,
+      "text": "- Root Worker Run 拥有独立上下文，可以与 Main Agent Loop 及其他 Task 的 Worker 并行运行。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Root独立上下文",
+        "Root可与Main并行",
+        "Root可与其他Task Worker并行"
+      ],
+      "observed": "createRoot用Task Anchor和已存Task历史，Actor并发Drain及Main保留槽；Child不共享可变checkpoint。",
+      "references": [
+        "internal/agent/run.go#RootContext",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/recall.go#recallMessages",
+        "internal/agent/sqlite/recall_test.go#TestRecallFrozenPerTurnAndFenced",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "16",
+        "22",
+        "23",
+        "17"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 99,
+      "sha256": "9d640d55229b216dd1f172f4a0deeaf0611bc2cc4460f922b5124c6a79471582",
+      "area": "scope",
+      "current_line": 99,
+      "text": "- Worker 不直接向用户发消息。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Worker不直接向用户发消息"
+      ],
+      "observed": "WorkerTools去Task/交付权限，replyTurn将业务结果写worker_result；仅Main发布语义消息。",
+      "references": [
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "10",
+        "14",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 100,
+      "sha256": "448c39da4bd419035e902415da33cd48b5e54adc96dfc91ab082003a0aa0320c",
+      "area": "scope",
+      "current_line": 100,
+      "text": "- Worker 的完成、失败和异常都以事件返回 Main Agent Loop，由 Main Agent Loop 结合当前对话、人格和渠道决定如何告知用户。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Worker完成事件回Main",
+        "Worker失败事件回Main",
+        "Worker异常回Main",
+        "Main结合对话人格渠道决定通知"
+      ],
+      "observed": "finishTask保留completed/failed/unknown，需求输入走needs_input；Reporter批量排队，Main生成最终消息。真实模型的措辞/人格与渠道决策未评分。",
+      "references": [
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "10",
+        "14"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Main结合对话人格渠道决定通知",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "2.2",
+      "line": 101,
+      "sha256": "502990b83ed278746b786459331d2b6289b4445324d48498905e921c4a03dd88",
+      "area": "scope",
+      "current_line": 101,
+      "text": "- 即时 Run 通过当前对话自然呈现，不额外作为用户界面中的任务项目展示。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "即时Run随当前对话呈现",
+        "不额外成为UI任务项"
+      ],
+      "observed": "Activity仅查询task表，Main即时Run不建Task；Web conversation与progress分开投影。",
+      "references": [
+        "internal/agent/sqlite/progress.go#Activity",
+        "internal/agent/sqlite/channels.go#AgentStatus",
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify",
+        "internal/interaction/web/server.go",
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py"
+      ],
+      "prs": [
+        "10",
+        "17",
+        "29",
+        "8",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 107,
+      "sha256": "f026def891ad1dda4332bb4560b96fb46a94cba26176982b251f5e073da2f145",
+      "area": "tasks",
+      "current_line": 107,
+      "text": "- `Task` 是可跨多个 Run 持久化的工作对象。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Task工作对象跨多个Run持久化"
+      ],
+      "observed": "task和task_instruction独立持久化，append新epoch/Root，历史终态Run保留。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "8",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 108,
+      "sha256": "fa205c069ead6799f79ff30c45052b0a2e8114826e4f2879f4ae74e85367d489",
+      "area": "tasks",
+      "current_line": 108,
+      "text": "- 不额外区分“长期 Task”和“短期 Task”。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "不额外区分长期短期Task"
+      ],
+      "observed": "同task表/四状态/Tool，once和ongoing是完成策略而非第二Task类型。ADR006与PR45现已实现。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 109,
+      "sha256": "18f6d905fabd8ce908d702ed99c11747bf86ae08a19c3c0b807f3e486e4b0e97",
+      "area": "tasks",
+      "current_line": 109,
+      "text": "- `Run` 是一次有明确开始和结束的执行实例。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Run是有开始结束的一次执行实例"
+      ],
+      "observed": "run保存started_at/ended_at及终态约束；受控暂停保留旧Run状态，继续工作创建新Root。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 110,
+      "sha256": "580bb22b0e3d466ac9f0add2b1e7c99822a598534503c2013cdb2ae70da22e90",
+      "area": "tasks",
+      "current_line": 110,
+      "text": "- `Root Worker Run` 是直接推进某个 Task 的执行实例，必须关联该 Task。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Root直接推进Task",
+        "Root必须关联Task"
+      ],
+      "observed": "createRoot在Task事务中创建worker/root，Schema要求task_id非空且parent为空。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "8",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 111,
+      "sha256": "04d5484d7f0d12808e68473f41d0ea69325abd3347f7d8ce59b641b5295bd1a3",
+      "area": "tasks",
+      "current_line": 111,
+      "text": "- `Child Run` 是由 `agent.run()` 创建的子执行实例，只通过 `parent_run_id` 形成 Run 树；每次 `agent.run()` 永远只创建一个 Child Run，不创建 Task。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "agent.run创建Child",
+        "parent_run_id形成Run树",
+        "每调用恰好一Child",
+        "绝不创建Task"
+      ],
+      "observed": "StartChildRun复用ToolInvocation，agent_invocation链接唯一Child；重复接收复用现有调用，不重复插Task或Child。",
+      "references": [
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 112,
+      "sha256": "53e9e7fb33fdb8f36baeee07f9fa5e2fb6583dd10bcd5f8a97c5a04e8ab12edd",
+      "area": "tasks",
+      "current_line": 112,
+      "text": "- Root Worker 与 Child Run 都执行同一套 Worker Agent Loop：前者是 Task 的根执行者，后者是某个 Worker Run 委派出的通用 Worker。两者共享工作面能力，但在 Prompt、归属、输入来源、结果去向和生命周期上不同。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Root/Child同WorkerLoop",
+        "Root是Task根",
+        "Child通用Worker",
+        "工作能力共享",
+        "Prompt/归属/输入/结果去向/生命周期有位置差异"
+      ],
+      "observed": "同Loop入口、WorkerTools/ChildTools固定缩减；RootContext及ChildContext、task/root/parent关系和直接Parent结果落点分开。",
+      "references": [
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check",
+        "internal/agent/run.go#RootContext",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/recall.go#recallMessages",
+        "internal/agent/sqlite/recall_test.go#TestRecallFrozenPerTurnAndFenced",
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "16",
+        "17",
+        "22",
+        "23",
+        "10",
+        "14"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 113,
+      "sha256": "a0a03f48cd281a4c3b874a162d5c6af9b0f46def61088a7dd020e3490303f96e",
+      "area": "tasks",
+      "current_line": 113,
+      "text": "- Root Worker 额外获得精简的 Agent Identity/人格片段与完整 Task Context，对 Task 结果负责；Child 不自动继承 Agent 人格、Conversation、Memory 内容或 Parent 模型上下文，只接收通用 Worker 规则、显式 `task` 和可访问的 ArtifactRef。Root 与 Child 均可在当前用户与 Agent 数据作用域内，按需调用只读 Memory/Conversation 检索工具补充持久化上下文。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Root精简Identity",
+        "Root完整Task Context并对结果负责",
+        "Child不自动继承人格",
+        "Child不继承Conversation",
+        "Child不继承Memory内容或Parent上下文",
+        "Child只接通用规则与显式task和可访问Artifact",
+        "Root/Child在用户Agent域按需只读Memory/Conversation"
+      ],
+      "observed": "RootContext附Identity与Anchor，createRoot附Task历史；ChildContext仅规则/task/refs，Child不接后来Task指令。只读recall按Run冻结和隔离，检索不是共享checkpoint。真实模型是否正确使用检索与完成汇总尚未评分。",
+      "references": [
+        "internal/agent/run.go#RootContext",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/recall.go#recallMessages",
+        "internal/agent/sqlite/recall_test.go#TestRecallFrozenPerTurnAndFenced",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "16",
+        "22",
+        "23",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Root完整Task Context并对结果负责",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "Root/Child在用户Agent域按需只读Memory/Conversation",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 114,
+      "sha256": "01a5e9cca79a8acce1e75784d486865aa4c211c5888bf0acae9880762bacba71",
+      "area": "tasks",
+      "current_line": 114,
+      "text": "- Main Agent Loop 和 Worker Agent Loop 都会产生 Run，但通过所属 Agent、Task、Conversation 和 Run ID 隔离，不发生语义冲突。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main/Worker都产生Run",
+        "Agent/Task/Conversation/Run身份隔离"
+      ],
+      "observed": "所有位置使用run表；一致性触发器与Child ancestry检验绑定agent/task/epoch/parent/root。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.1",
+      "line": 116,
+      "sha256": "a005aa277c541d66de257ef87301dd577e653c17027cd1b1d2da84aecf7cbfe2",
+      "area": "tasks",
+      "current_line": 116,
+      "text": "“分析 100 条数据”的典型结构是 `1 Task + 1 Root Worker Run + 100 Child Run`，而不是 100 个 Task。",
+      "disposition": "background",
+      "obligations": [
+        "100条数据的示例为1Task+1Root+100Child",
+        "不是100Task"
+      ],
+      "observed": "这是结构举例，不承诺把100条输入强制拆100Child或同时运行100个。Host限制与Tree归属另行验收。",
+      "references": [
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "16",
+        "17"
+      ],
+      "observations": [],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [],
+      "reason": "这是结构举例，不承诺把100条输入强制拆100Child或同时运行100个。Host限制与Tree归属另行验收。"
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 120,
+      "sha256": "f86298b0ee0f858018124e5f6f0a2cd9c1160d15b3c4bc405c0390f66ecabc5d",
+      "area": "tasks",
+      "current_line": 120,
+      "text": "- Task 是后台为了异步、并行和持续执行而设计的内部抽象，用户不需要理解 Task 概念。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "Task后台抽象支持异步并行持续工作",
+        "用户无需理解Task术语"
+      ],
+      "observed": "数据面持久化Task存在且Main可自然语言调用；用户是否需要理解内部术语属于实际交互质量，不由表结构证明。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Task后台抽象支持异步并行持续工作",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "用户无需理解Task术语",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 121,
+      "sha256": "02e82268600d95bf63687d8a32c1bc5cffded2a454dd17aaf714b9d0db8c09b3",
+      "area": "tasks",
+      "current_line": 121,
+      "text": "- 用户看到的是“持续进行中的工作”，而不是技术性的 Task/Run 列表。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "用户看到持续工作",
+        "不展示技术性Task/Run列表"
+      ],
+      "observed": "Web进度由Activity汇总，源码中TaskRef/status及Child计数仍存在；没有当前人审证据证明普通视图不造成技术术语负担，不能据API投影直接宣布本条通过。",
+      "references": [
+        "internal/agent/sqlite/progress.go#Activity",
+        "internal/agent/sqlite/channels.go#AgentStatus",
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify",
+        "internal/interaction/web/server.go"
+      ],
+      "prs": [
+        "10",
+        "17",
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "用户看到持续工作",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "不展示技术性Task/Run列表",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 122,
+      "sha256": "deac8afdb618a1a0ab56e5e934f363bb892289c3559aae142aba7c886ece702f",
+      "area": "tasks",
+      "current_line": 122,
+      "text": "- “完成”只表示本轮工作暂时结束，不代表用户目标永久结束。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "完成只表示本轮结束",
+        "用户目标不被永久关闭"
+      ],
+      "observed": "completed/cancelled Task可由append激活，新Root/epoch而旧Run保留终态；ongoing Root结束保持Task active。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.2",
+      "line": 123,
+      "sha256": "4d8dac65628f87bee2a5a134b520a038ce784439c22e3c493fb5c09e0f59e1a8",
+      "area": "tasks",
+      "current_line": 123,
+      "text": "- 健身计划、客户关系维护等工作可以在完成后再次恢复和继续。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "健身计划完成后可继续",
+        "客户关系工作完成后可继续"
+      ],
+      "observed": "通用append支持completed Task，不对健康/客户建立专用Task类型。例示业务领域未在本包作真实语义评分。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "健身计划完成后可继续",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "客户关系工作完成后可继续",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 127,
+      "sha256": "c0fc974b1619a9f72401f9dc2ccc53447320929231d9da4590b85f80011abf21",
+      "area": "tasks",
+      "current_line": 127,
+      "text": "- 不同 Task 的 Root Worker Run 可以并行；同一 Task 只允许一个活动 Root Worker Run。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "不同Task Root可并行",
+        "同Task只有一个活动Root"
+      ],
+      "observed": "SQLite one_root与调度原子容量约束，TasksRunConcurrently和SchedulerQuota测试覆盖并发领取。",
+      "references": [
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot",
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "17",
+        "8",
+        "11",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 128,
+      "sha256": "d55918dbaefbcb88dd03574adfae3480a6fc70143ae58420ce337cd28ae17a0e",
+      "area": "tasks",
+      "current_line": 128,
+      "text": "- 同一 Root Worker Run 可以通过 `agent.run()` 创建多个并行 Child Run；Child Run 也可以继续创建后代 Child Run。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "同Root多个并行Child",
+        "Child可继续创建后代Child"
+      ],
+      "observed": "ChildTools按Parent固定缩减仍可spawn，StartChildRun应用depth/descendants限制；Root/Child/Grandchild原生链和并发admission有回归。",
+      "references": [
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 129,
+      "sha256": "74b831eb34daa5c349e3fcd33dbd40794a4441f6dbea7f0f6356fc54af019afc",
+      "area": "tasks",
+      "current_line": 129,
+      "text": "- RunScheduler 对实际并发、Run 树深度、后代总数和安全配额实施宿主限制，JavaScript 创建的 Promise 数量不等于实际并发数。除并发额度外，其余系统硬上限保持较高，只用于防止递归爆炸、无限循环和资源失控；不以较小的 Root 级 Token、费用或总运行时长预算截断正常复杂任务。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Host限制实际并发",
+        "Host限制树深",
+        "Host限制后代数",
+        "Host限制安全配额",
+        "Promise数量不等实际并发",
+        "硬限制较高且仅安全用途",
+        "不用小Root Token/费用/总时长截断复杂任务"
+      ],
+      "observed": "默认Child16/全局32、depth8、descendants4096、tools10000、turns256冻结，容量在claim时实施；费用授权另行持久化且不是小Root Token预算。45s单次模型deadline不等于Root总时长。真实任务分布的充分性未据Fake认证。",
+      "references": [
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "17",
+        "16"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "不用小Root Token/费用/总时长截断复杂任务",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 130,
+      "sha256": "c74e9aadc6a0a54ab6c146bf0daec33f596c0151684cb5398d41ad31fc5e9ee0",
+      "area": "tasks",
+      "current_line": 130,
+      "text": "- Main Agent Loop 在 Worker 执行时仍可继续接收用户消息。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Worker执行时Main继续收用户消息"
+      ],
+      "observed": "Actor并发调度，Main保留槽，main_input记录Steering；并发Tasks/Main测试不等待Worker结束。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "8",
+        "33",
+        "17"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 131,
+      "sha256": "a7930667f7020493eac236124dd460ecd7e3674032bc344dea3376bf2f387da8",
+      "area": "tasks",
+      "current_line": 131,
+      "text": "- 新消息若与现有工作相关，在下一个稳定边界注入该 Task 的活动 Root Worker Run；若当前没有活动 Root Worker，则为原 Task 创建新的 Root Worker Run。无关工作按创建条件决定是否创建新 Task。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "相关新消息注入活动Root稳定边界",
+        "无活动Root则同Task创建新Root",
+        "无关工作按创建条件决定是否新Task"
+      ],
+      "observed": "Task append和冻结generation边界、新Root去重已测；Main对消息相关性及创建条件的模型判断未在真实双臂观察。",
+      "references": [
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter",
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot",
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall",
+        "scripts/verify_tasks.py",
+        "internal/agent/loop.go#modelTurn",
+        "internal/agent/sqlite/runs.go#Steering",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit"
+      ],
+      "prs": [
+        "10",
+        "11",
+        "45",
+        "8"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "相关新消息注入活动Root稳定边界",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        },
+        {
+          "obligation": "无关工作按创建条件决定是否新Task",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 132,
+      "sha256": "900219be4c88c98cced9d3d560d9277eca11837215a1b3dad770beaeb0eaafd2",
+      "area": "tasks",
+      "current_line": 132,
+      "text": "- macOS 操作也应尽可能并行，例如桌面应用操作和浏览器操作在不冲突时可同时进行。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "macOS不冲突操作尽可能并行",
+        "桌面与浏览器不冲突时可并行"
+      ],
+      "observed": "Computer lease及原生锁按资源约束，Fake观察不能证明当前Guest桌面和浏览器实际重叠或无冲突。",
+      "references": [
+        "internal/computer/macosvm/guest.go",
+        "internal/computer/macosvm/provider.go",
+        "internal/computer/macosvm/provider_test.go#TestNoCheckpointOrPoweroffWhileNativeLockHeld",
+        "internal/computer/use_test.go#TestUseRevisionsLeaseAndIndependentScreenshots",
+        "scripts/lume_live.py"
+      ],
+      "prs": [
+        "25",
+        "26"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "macOS不冲突操作尽可能并行",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "桌面与浏览器不冲突时可并行",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 133,
+      "sha256": "846cb3be696b50b6b3d753d754fa9e6474d404d399d217073d7028c2e47da6bb",
+      "area": "tasks",
+      "current_line": 133,
+      "text": "- 是否允许具体 Computer 操作并行，由 Computer/VM 层根据资源占用和锁冲突判断。",
+      "disposition": "evidence_gap",
+      "obligations": [
+        "Computer/VM资源占用决定可并行性",
+        "锁冲突决定可并行性"
+      ],
+      "observed": "Use/Provider锁测试覆盖资源竞争和checkpoint锁，真实Guest兼容性及跨应用冲突观测未取得。",
+      "references": [
+        "internal/computer/macosvm/guest.go",
+        "internal/computer/macosvm/provider.go",
+        "internal/computer/macosvm/provider_test.go#TestNoCheckpointOrPoweroffWhileNativeLockHeld",
+        "internal/computer/use_test.go#TestUseRevisionsLeaseAndIndependentScreenshots",
+        "scripts/lume_live.py"
+      ],
+      "prs": [
+        "25",
+        "26"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Computer/VM资源占用决定可并行性",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        },
+        {
+          "obligation": "锁冲突决定可并行性",
+          "gap": "G-live",
+          "detail": "此子义务仍缺当前获授权环境的实际状态及具名人审；Fake/历史快照不替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.3",
+      "line": 134,
+      "sha256": "7558784e2cdb84479fcce4a476638854e010de76aa0dcd7d305c0201e43d6683",
+      "area": "tasks",
+      "current_line": 134,
+      "text": "- 系统只保证同一聚合对象内部的必要顺序，不使用全局串行执行。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "只保证同一聚合必要顺序",
+        "不全局串行"
+      ],
+      "observed": "Actor并发、SQLite短事务与独立Tree调度并存；全局容量限额不等于全局单线程工作执行。",
+      "references": [
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot",
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py"
+      ],
+      "prs": [
+        "17",
+        "8",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 138,
+      "sha256": "c7f5b0d9f6f403007e212c229369878970443818854f8e8fac94292f0211c647",
+      "area": "main",
+      "current_line": 138,
+      "text": "- 一个 Agent 只有一条跨 Web、TUI 和飞书共享的主 Conversation。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "每Agent一条跨Web/TUI/飞书共享主Conversation"
+      ],
+      "observed": "SubmitInbound归一来源，agent_config单一身份，ChannelConcurrentCallback测试读取相同Conversation；当前真实飞书仍非本测试。",
+      "references": [
+        "internal/interaction/web/server.go",
+        "internal/agent/sqlite/channels.go#freezeMessageRoute",
+        "internal/agent/sqlite/channels_test.go#TestChannelConcurrentCallbackAndSourceDedupSharedConversation",
+        "internal/agent/sqlite/channels_test.go#TestChannelRouteFreezeCASRevocationAndDefault",
+        "scripts/verify_channels.py"
+      ],
+      "prs": [
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 139,
+      "sha256": "d6b9c3f42bda77457ddb7b5c9a308d0454440d426e69ba61f673d40896bc0097",
+      "area": "main",
+      "current_line": 139,
+      "text": "- Worker 只维护独立执行上下文，不创建用户可见 Conversation。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Worker独立执行上下文",
+        "不创建用户可见Conversation"
+      ],
+      "observed": "Root/Child持有scope归属conversation_id但不用Worker结果写用户Conversation；独立checkpoint，Reporter仅提供Main输入。",
+      "references": [
+        "internal/agent/run.go#RootContext",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/tasks.go#createRoot",
+        "internal/agent/sqlite/recall.go#recallMessages",
+        "internal/agent/sqlite/recall_test.go#TestRecallFrozenPerTurnAndFenced",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "16",
+        "22",
+        "23",
+        "10",
+        "14"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 140,
+      "sha256": "cc385cb4fbd8e5bf2ffcd76bb3988737fe3f5fab1fddfba42c15f6f8b585710a",
+      "area": "main",
+      "current_line": 140,
+      "text": "- 每个 Agent 同时最多只有一个活动 Main Run，但可并行存在多个 Task 的 Root Worker Run，以及受配额限制的 Child Run。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "每Agent至多一个活动Main",
+        "可并行多Task Root",
+        "可有受配额Child"
+      ],
+      "observed": "Main唯一性/新消息合并，one_root索引按Task，Host容量独立限定Child；并发回归检查真实持久化计数。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py",
+        "internal/agent/scheduler.go#DefaultSchedulerLimits",
+        "internal/agent/child.go#DefaultChildLimits",
+        "internal/agent/sqlite/scheduler.go#capacity",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerAtomicQuotasAcrossProcessesAndExpiredOwner",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerFairSecondTaskAndDurableTicket",
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot"
+      ],
+      "prs": [
+        "8",
+        "33",
+        "17"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 141,
+      "sha256": "cea0c061945028bb0ea72f0caf69daad899cae44aea33b3981aa55875b502826",
+      "area": "main",
+      "current_line": 141,
+      "text": "- Main Run 忙碌时的新消息作为事件注入当前 Main Run，而不启动第二个 Main Run。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main忙时新消息注入当前Run",
+        "不启动第二Main"
+      ],
+      "observed": "Submit查询活动Main并追加不可变main_input，唯一性/fencing守住并发入口。",
+      "references": [
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py",
+        "internal/agent/loop.go#modelTurn",
+        "internal/agent/sqlite/runs.go#Steering",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit"
+      ],
+      "prs": [
+        "8",
+        "33",
+        "10"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 142,
+      "sha256": "5a2743ceb07b24403cf4355160d9f204e64528458f8cd7c027b5364feb6dcef3",
+      "area": "main",
+      "current_line": 142,
+      "text": "- 活动 Main Run 在下一个稳定边界优先接收用户 Steering，不等待整个 Run 结束。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main在下个稳定边界优先收Steering",
+        "不等Run结束"
+      ],
+      "observed": "modelTurn先Steering再Generation，PrepareReply与终态提交检查新input；包括冻结generation和最终回复竞争回归。",
+      "references": [
+        "internal/agent/loop.go#modelTurn",
+        "internal/agent/sqlite/runs.go#Steering",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit",
+        "internal/agent/actor.go#Drain",
+        "internal/agent/loop.go#ContinueAgentLoop",
+        "internal/agent/sqlite/loop_test.go#TestLoopConcurrentIngressOneMainAndIdempotentConversation",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns",
+        "scripts/verify_main.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "33"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 143,
+      "sha256": "3d6ad3a1110d069fa6ed6ac834fb6944861eb0d9e71f76005af3ff5020c6c23b",
+      "area": "main",
+      "current_line": 143,
+      "text": "- Root Worker 只在完成、失败、需要用户信息或外部副作用状态无法确认时生成 Main Follow-up；Child Run 的结果只返回直接 Parent，由 Root Worker 汇总后决定是否形成 Main Follow-up。Main Run 活动则排队到当前 Run 结束后，Main Run 空闲则触发新的 Main Run。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Root只在完成失败需用户信息unknown副作用时Main Followup",
+        "Child只回直接Parent",
+        "Root汇总后再通知",
+        "Main忙排队到结束",
+        "Main空闲建新Main"
+      ],
+      "observed": "task_update限制四kind，childFinished唤醒Parent，promoteFollowups等待活动Main退出；普通Progress不进Reporter。真实模型的聚合质量仍需评测。",
+      "references": [
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "scripts/verify_delivery.py",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check",
+        "internal/agent/sqlite/progress.go#Activity",
+        "internal/agent/sqlite/channels.go#AgentStatus",
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify",
+        "internal/interaction/web/server.go"
+      ],
+      "prs": [
+        "10",
+        "14",
+        "16",
+        "17",
+        "29"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Root汇总后再通知",
+          "gap": "G-model",
+          "detail": "此子义务的实际模型选择/业务表现尚无本包原生实测；所列脚本化机制证据不能替代。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 144,
+      "sha256": "2b9acf21a5dce4e58c922871fb8dd039f9926a76e54b3c441a95c00235757793",
+      "area": "main",
+      "current_line": 144,
+      "text": "- 多条用户 Steering 可以批量注入，多条 Worker Follow-up 也可以批量注入，但用户消息与 Worker 消息不进入同一批次；用户 Steering 优先于 Worker Follow-up。Worker Follow-up 默认一次 Drain 当前可用的全部更新，避免多个 Task 同时结束导致 Main 连续启动多轮。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "用户Steering可批量",
+        "Worker Followup可批量",
+        "用户与Worker不混批",
+        "用户优先",
+        "Worker一次Drain全部可用更新",
+        "避免多Task完成连续多轮Main"
+      ],
+      "observed": "Steering与main_inbox分表，promoteFollowups仅在无活动Main时批量创建；FollowupBatch测试验证顺序和独立消息。不能证明永远没有将来才到的更新。",
+      "references": [
+        "internal/agent/loop.go#modelTurn",
+        "internal/agent/sqlite/runs.go#Steering",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit",
+        "internal/agent/loop.go#replyTurn",
+        "internal/agent/sqlite/reporter.go#finishTask",
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork",
+        "scripts/verify_delivery.py"
+      ],
+      "prs": [
+        "8",
+        "10",
+        "14"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 145,
+      "sha256": "7aa83caab3b88a512708e9c47afe3bd1a42788b2f3d414b58a94a52a358813b8",
+      "area": "main",
+      "current_line": 145,
+      "text": "- 同一批次保留为多条独立消息，不拼接原始文本；Steering 的处理优先级高于 Follow-up。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "同批多条独立消息",
+        "不拼接原文",
+        "Steering优先Followup"
+      ],
+      "observed": "Steering逐条append，Reporter将每条taskMessage保留在slice；固定边界回归检验优先级和非拼接。",
+      "references": [
+        "internal/agent/loop.go#modelTurn",
+        "internal/agent/sqlite/runs.go#Steering",
+        "internal/agent/sqlite/reporter.go#promoteFollowups",
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins",
+        "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor",
+        "internal/agent/sqlite/loop_test.go#TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit"
+      ],
+      "prs": [
+        "8",
+        "10"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.4",
+      "line": 146,
+      "sha256": "c2c0ffb73bacbdedf76a32eca338d205cf06936aca5765c088032e6fe69abb74",
+      "area": "main",
+      "current_line": 146,
+      "text": "- `AgentStatus` 不单独持久化，而是根据活动 Main Run、Worker Run 和 Task 动态推导为 `idle` 或 `busy`。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "AgentStatus不独立持久化",
+        "从活动Main/Worker/Task导出idle或busy"
+      ],
+      "observed": "AgentStatus当前直接数非终态Run，Task通过其Run活动体现；ongoing Task无可执行Run时idle。基线未给空闲ongoing的真值表，不能从此函数推导所有Task状态组合都已验收。",
+      "references": [
+        "internal/agent/sqlite/progress.go#Activity",
+        "internal/agent/sqlite/channels.go#AgentStatus",
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress",
+        "internal/agent/sqlite/scheduler_test.go#TestSchedulerActivityCountsDoNotNotify",
+        "internal/interaction/web/server.go"
+      ],
+      "prs": [
+        "10",
+        "17",
+        "29"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "AgentStatus不独立持久化",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        },
+        {
+          "obligation": "从活动Main/Worker/Task导出idle或busy",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 150,
+      "sha256": "4a6003872f10d8f4dbfb47ff2a4580d054789a3387fcfe1cc558d99cead57d64",
+      "area": "tasks",
+      "current_line": 150,
+      "text": "```text\nqueued → running ↔ waiting → completed / failed / cancelled\n```",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "queued到running",
+        "running与waiting互转",
+        "completed终态",
+        "failed终态",
+        "cancelled终态"
+      ],
+      "observed": "run Schema枚举/ended_at约束和claim/Wait/terminal保持状态机；旧owner写入与控制状态回归支持法定路径。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 154,
+      "sha256": "34f59a365d56096b79b0b11cd63acda36765c02a00a8690947ea5a5fea521fbf",
+      "area": "tasks",
+      "current_line": 154,
+      "text": "`waiting` 通过独立的 `wait_reason` 说明原因：",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "waiting用独立wait_reason解释"
+      ],
+      "observed": "run.wait_reason独立列且仅waiting非空；ToolInvocation有不同等待枚举，不能混成Run状态或新增状态。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 156,
+      "sha256": "c8362bea68bf2f0898d8d22c2a2c02c2316ae3a33ce3551dc558add068de2bbf",
+      "area": "tasks",
+      "current_line": 156,
+      "text": "```text\nuser_input\napproval\nexternal_event\nresource\n```",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Run等待user_input",
+        "Run等待approval",
+        "Run等待external_event",
+        "Run等待resource"
+      ],
+      "observed": "Runs.Wait与Schema允许四种原因；Tool批次把Child/Code Mode/重试等待汇总为resource，approval有专用唤醒。独立external_event的端到端唤醒未在本包观察，枚举存在不等于该路径证明。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16"
+      ],
+      "observations": [
+        "contracts"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": [
+        {
+          "obligation": "Run等待external_event",
+          "gap": "G-release",
+          "detail": "此子义务尚未形成当前发布头的完整原生证明或独立规范裁定；保留未满足，不从局部证据推断通过。"
+        }
+      ]
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 163,
+      "sha256": "4d82ea709a2e2273079c7a38cd43bb0675f89229d62d4343d4d5eeb577af611d",
+      "area": "tasks",
+      "current_line": 163,
+      "text": "- Main Run、Root Worker Run 与 Child Run 共用同一个 Run 模型和存储；`kind: main | worker` 区分主循环与工作循环，`task_id` 和 `parent_run_id` 表达归属关系。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Main/Root/Child同Run模型存储",
+        "kind区分main/worker",
+        "task_id表达Task",
+        "parent_run_id表达Parent"
+      ],
+      "observed": "同run表，worker_position辅助定位并由Schema与ancestry触发器约束；没有第三个Child存储循环。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    },
+    {
+      "source": "docs/technical-design.md",
+      "section": "3.5",
+      "line": 164,
+      "sha256": "3c61868acb228556a6a56722bbc7df6c77d9bae73c5e67aeaf2212ed917f29ce",
+      "area": "tasks",
+      "current_line": 164,
+      "text": "- Root Worker Run 必须关联 `task_id` 且没有 `parent_run_id`；Child Run 必须关联一个 Worker `parent_run_id`，并继承同一 `task_id`。当前默认策略下不存在由 Main Run 直接创建、没有 `task_id` 的 Child Run。",
+      "disposition": "partial_mechanical",
+      "obligations": [
+        "Root必须关联Task且无Parent",
+        "ChildParent必须Worker",
+        "Child继承同Task",
+        "当前不允许Main直接创建无Task Child"
+      ],
+      "observed": "CHECK约束以及StartChildRun校验Parent kind/task/capability，异常ancestry与能力扩大回归拒绝；不按普通Agent ID另开工作。",
+      "references": [
+        "internal/agent/sqlite/schema.sql",
+        "internal/agent/sqlite/runs.go#Wait",
+        "internal/agent/sqlite/scheduler.go#runnable",
+        "internal/agent/sqlite/children_test.go#TestChildStorageRejectsAncestryAndCapabilityExpansion",
+        "internal/agent/sqlite/task_control_test.go#TestTaskControlTransitionsAndIdempotentReceipts",
+        "internal/agent/sqlite/loop_test.go#TestLoopOldClaimsFenceEveryMutationAndModelAcceptance",
+        "internal/agent/child.go#ChildContext",
+        "internal/agent/sqlite/children.go#StartChildRun",
+        "internal/agent/sqlite/children_test.go#TestChildDirectToolRootChildGrandchild",
+        "internal/agent/sqlite/children_test.go#TestChildFrozenModelAndCapabilitiesAfterProfileSwitch",
+        "internal/agent/sqlite/children_test.go#TestChildDoesNotReceiveAppendedTaskInstructions",
+        "scripts/verify_children.py#check"
+      ],
+      "prs": [
+        "8",
+        "11",
+        "16",
+        "17"
+      ],
+      "observations": [
+        "contracts",
+        "children"
+      ],
+      "proof_limit": "上述引用及原生收据只支持列出的机制和观察；不产生verified要求、Golden语义分或v1发布结论。",
+      "remaining": []
+    }
+  ],
+  "reference_maintenance": {
+    "version": 2,
+    "original_ledger": {
+      "commit": "0f1d2ce24a7f8dfd10b59ea4655848997b4dfaeb",
+      "path": "docs/audits/baseline-01.json",
+      "sha256": "a373dc95471735834e411a34e40d239789e1fa627b35dd2e5c9a2ff060869805",
+      "content_sha256": "861d21d6aec6e3e026fbe06c1bf555e72a62f0d67484b7f5962975fa6eb4d80f"
+    },
+    "current": {
+      "source_sha": "eb8e345a93a30ad34b33a1afc022d4815455623e",
+      "scope": "reference_identity_only",
+      "reason": "ERII-375 fixed security CI parts/join; identity maintenance only, invalidate prior observations",
+      "binding": "source_commit_tree_and_HEAD_blob",
+      "git_proof": {
+        "commit": "dHJlZSA5YjMxMGZiY2JhODMzNDBlNDA2OTllYTY3YjMzZDc5MTdmYjBmNzlmCnBhcmVudCBjN2JkM2YzZjhmZGI1NjU0ODA3MThkYzI4MzFkNTJjMDc2YjZmODMzCmF1dGhvciB6aHVjaGVuaGFvIDx6aHVjaGVuaGFvMDcyNkBnbWFpbC5jb20+IDE3OTI5Nzc1ODUgKzA4MDAKY29tbWl0dGVyIHpodWNoZW5oYW8gPHpodWNoZW5oYW8wNzI2QGdtYWlsLmNvbT4gMTc5Mjk3NzU4NSArMDgwMAoKRVJJSS0zNzU6IHNwbGl0IHNlY3VyaXR5IENJIGludG8gZml4ZWQgY29tcGxldGUgcGFydHMK",
+        "trees": {
+          "9b310fbcba83340e40699ea67b33d7917fb0f79f": "NDAwMDAgLmdpdGh1YgDfQVhi9WdIhuKOjRNr/VLDBa4r7zEwMDY0NCAuZ2l0aWdub3JlAPAVpdaM7r/nb+PeSSUmTxYpmF1LMTAwNjQ0IC5ub2RlLXZlcnNpb24A32rjNw+fiSctiGKcRCz1VNbB+fsxMDA2NDQgQUdFTlRTLm1kAE31t3xS4ubuD9dCrrwT2nQFJbcNMTAwNjQ0IENPTlRSSUJVVElORy5tZAAAiMzSJYbhf+c9WGEs0yYbxWj3hzEwMDY0NCBNYWtlZmlsZQB7zANrbtX96Zo+zdhp82bokDpQTzEwMDY0NCBSRUFETUUubWQAv/w36VEF/mMYqpn6o5JFD07XIB4xMDA2NDQgU0VDVVJJVFkubWQApynIisWmuzoF15cFwrYYA7HvIss0MDAwMCBjbWQAOOpRxsaX4o7nCANpHh+0wqBTV5oxMDA2NDQgY29uZmlnLmV4YW1wbGUueWFtbAAmwMa1XYlGs8uYpe45KhbX6TgjsjQwMDAwIGRvY3MA79Jf37USkOkgIlCbaSG17+CYk800MDAwMCBldmFscwD6WtV2liqcodUc2TQdgey5zcWfODEwMDY0NCBnby5tb2QAzJs1Nlsq1fxcnRq2dNhGAa3cIrAxMDA2NDQgZ28uc3VtADBBfQeDfIqJtYnLyQ6nqzK+B4tYNDAwMDAgZ3Vlc3QtYnJvd3NlcgAtkkcJVv9ymzRZh2ogby4XQjoTWjEwMDc1NSBpbnN0YWxsLnNoAHa21w7PSHjiBUpCCKgBPloFd+LnNDAwMDAgaW50ZXJuYWwA6oPtrXPWtnF4nhoXCo6D7DOTBKc0MDAwMCBwcm92aWRlci1icmlkZ2UAkbMP4g0ceMq5AV4SBDkOzqzMcaw0MDAwMCBydW50aW1lADdZkJFNa4y0gKLN8k6ZbBVGwLCANDAwMDAgc2NyaXB0cwBvkF7aoS0F7lZbg+/qQq71wIdZFzQwMDAwIHdlYgAJNEtiyh5btH2da+42exAXH3yQtA==",
+          "ea83edad73d6b671789e1a170a8e83ec339304a7": "NDAwMDAgYWdlbnQAYBtpTAhL0XuHoqHJ+ePYmiDAavQ0MDAwMCBhcHAAxj2EHllTrKG4yx0KCcjTSpxhoc00MDAwMCBhcnRpZmFjdADcSnYTybx2GUgdr1OHnY+mziWgBDQwMDAwIGF1dG9tYXRpb24AFFXEDennvWaM67J43BH2fZ6dYC00MDAwMCBjb21wdXRlcgCP3qxT/WGMj58RCBjvI53EcD12XTQwMDAwIGNvbmZpZwDeDtEd1me1KuEaFVoFzi8gC4GixzQwMDAwIGNvbnRleHQALyTgvmaN7WilQ9Us+JdDyIlhCzc0MDAwMCBjb252ZXJzYXRpb24Ai2/45YIvNgl9SQOxt4f1pcUEeoU0MDAwMCBkZWxpdmVyeQCjhznGFV4Q5GNVPKZrdPSYXqrx0TQwMDAwIGV2ZW50AN/lTweNk8mcp85iufabR22cuxqgNDAwMDAgaW50ZXJhY3Rpb24AlTwEML22y0cdY2iQjJY5Q/acqQM0MDAwMCBsbG0ALQiG+XuNYYe/k6vbagEyOgArtEY0MDAwMCBtYWludGVuYW5jZQB8HRIIoU2p+guMKtAVE0w88i4dsjQwMDAwIG1lbW9yeQDNSyxCuGUAebxUD01LjPh5yMb6XzQwMDAwIG9ic2VydmFiaWxpdHkAnRfWBi75PPfNfsS/EmbN6yPRfPU0MDAwMCByZWNhbGwAIpMJrOK/1oaofpWcSseqhqX+vEo0MDAwMCBza2lsbABoZGtOrD5ZBu7GE8AdsIF59i7kFzQwMDAwIHN0YXJ0dXAAn9L2TRtoPBi2w2PRtNsz0DcMVXc0MDAwMCB0YXNrAI2bEqX4dNYpyDaLWE2O/04Y9f1INDAwMDAgdG9vbAB64yrduSpWN6neM3Fpyc5Oze2mczQwMDAwIHR1aQC0tRmIo9Tz0QM1NgyWvXXsRS9Pgw==",
+          "601b694c084bd17b87a2a1c9f9e3d89a20c06af4": "MTAwNjQ0IGFjdG9yLmdvACZJbGMV6Hon8KZRRN5yBwauYXfvMTAwNjQ0IGNoaWxkLmdvAO5Oke/TsDPlw14En5wUo9JPWkqtMTAwNjQ0IGNoaWxkX3Rlc3QuZ28AbPzDw2lSMgcJLc720X8ASw12oFgxMDA2NDQgZGlhZ25vc3RpY3MuZ28AK7rQmaZbcrp6Phkt7lbC/NQjOrgxMDA2NDQgbG9vcC5nbwBCOao/VtvWjfBaJ/uNRdSRgYfiAzEwMDY0NCBsb29wX3Rlc3QuZ28Abp2YBq1acbKmosJXl876TBHxfT4xMDA2NDQgcnVuLmdvAIqIqnmRcTDZbJiO10vBCZ2a1L/VMTAwNjQ0IHNjaGVkdWxlci5nbwB2/AFIK7drUh5BqnjFS9vAQuxOIzEwMDY0NCBzcGVuZC5nbwBHMEg/kdl3LdV7AaO7VFAG8PxFwTQwMDAwIHNxbGl0ZQDkkXsFVqoB2wc69UnZr0FF4OBRgQ==",
+          "e4917b0556aa01db073af549d9af4145e0e05181": "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",
+          "6f905edaa12d05ee565b83efea42aef5c0875917": "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NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUwNC5weQBJWBjRILaEiqfM/xZj0Tq2Bn4RrjEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUwNS5weQD7arr+j/emj/XKR/9jU28yTo7p3TEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUwNi5weQBBJ/ApYIClFy6zfwcQVrQ8n6mbcDEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUwNy5weQBtbuG7IlL/ijWW0hUddAhR90y8bjEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUwOC5weQD28bh9ejUD7kGZlVXpKP94TAbshzEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUwOS5weQCyCPpqJ9qkK1W1lbG2IfQHm7QWQjEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUxMC5weQAT+kOMvJsxZg5CgTmYOFKTiCbbHTEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUxMS5weQAkLBp6aVKzvG/MTdR6KeaG8R2hvDEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUxMi5weQB47e2HdArvoYjFkGC8FFkgHszyLjEwMDY0NCB0ZXN0X3JlbGVhc2VfYmFzZWxpbmUxMy5weQAdJ7Attxr4jgjnRngAgeWN+U0I1zEwMDY0NCB0ZXN0X3JlbGVhc2VfZGVjaXNpb24ucHkAbnmEVFMHY7t6gEU/j3GH8OdKN84xMDA2NDQgdGVzdF9yZWxlYXNlX2dvbGRlbl9jb21tb24wMS5weQAYsP/PHO0VvJ16LZ3zcQHOJRcRVTEwMDY0NCB0ZXN0X3JlbGVhc2VfZ29sZGVuX2NvbW1vbjAyLnB5ANQcLV6XD2tdToqyQvQm28v3GKa8MTAwNjQ0IHRlc3RfcmVsZWFzZV9nb2xkZW5fY29tbW9uMDMucHkAmP6pQEr6m75d//mKkUqgiroJArgxMDA2NDQgdGVzdF9yZWxlYXNlX3BhY2thZ2UucHkAAFYu94nLkS4sGI/YsiDuVjrgYuIxMDA2NDQgdGVzdF9yZWxlYXNlX3JlZmVyZW5jZV9tYWludGVuYW5jZS5weQCjB59RRpfVelEfDSk4aRIMGcCPVjEwMDY0NCB0ZXN0X3NldHVwLnB5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"
+        }
+      },
+      "references": {
+        "internal/agent/sqlite/runs.go#Steering": {
+          "sha256": "09c9aa6fdd5d1c6a19c210e3ff22183e0b2d23c0fc0ac772076ee7d2057ef9b0"
+        },
+        "internal/agent/sqlite/runs.go#Wait": {
+          "sha256": "09c9aa6fdd5d1c6a19c210e3ff22183e0b2d23c0fc0ac772076ee7d2057ef9b0"
+        },
+        "internal/agent/sqlite/scheduler.go#capacity": {
+          "sha256": "b375fca26af2567cd7f50f801bbd9862961f2842d1298c561da27d53ef3646a4"
+        },
+        "internal/agent/sqlite/scheduler.go#runnable": {
+          "sha256": "b375fca26af2567cd7f50f801bbd9862961f2842d1298c561da27d53ef3646a4"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestConcurrentAppendsShareRootAndPreserveAnchor": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestFollowupBatchWaitsForMainAndUserSteeringWins": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestRootFailureDoesNotFailTaskOrStopOtherWork": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestTaskAppendAtFrozenGenerationAndContinueCreatesNewRoot": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestTaskSearchRoleScopeFiltersAndReadOnlyProgress": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestTaskVerticalSliceDuplicateSourcesAndDurableReporter": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestTasksRunConcurrentlyAndMainRetainsReservedSlot": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "internal/agent/sqlite/tasks_test.go#TestWorkerCannotInvokeTaskControlsEvenWithForgedCall": {
+          "sha256": "59cf4878b519720a056b0d3c883db60a4da453f87d350a91c507343ffd45f995"
+        },
+        "scripts/verify_main.py": {
+          "sha256": "61e485a8a25a8e559dd1bc10153e5ef21901f343924c873fd8bd4bd496790d35"
+        }
+      },
+      "invalidated_observations": [
+        "children",
+        "contracts"
+      ]
+    }
+  }
+}

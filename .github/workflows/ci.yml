@@ -23,31 +23,26 @@ jobs:
   fast:
     name: Unit tests and lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # Maintained audit references check committed current/merged ledger blobs.
+          fetch-depth: 0
       - uses: ./.github/actions/ci-inputs
         with:
           frontend: "true"
           browser: "true"
       - name: Install pinned offline Browser test runtime
-        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: Unit tests and lint
         run: exec python3 scripts/ci_step.py --name unit-lint --phase test -- make test lint
-      - name: Five disk-backed receipt recovery race checks
-        run: exec python3 scripts/ci_step.py --name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5
       - name: Public SDK isolation and cache-miss conformance
         env:
           ERII_CI_PUBLIC_SDK_PROBE: "1"
         run: exec python3 scripts/ci_step.py --name sdk-conformance --phase test -- go test ./internal/computer/workspace -run '^TestCIInstalledSDKConformance$' -count=1
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.10.22"
-      - name: Minimum supported Python compatibility tests
-        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -60,10 +55,46 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  race:
-    name: Race detector
+  python_compat:
+    name: Python 3.10 compatibility
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          # Maintained audit references check committed current/merged ledger blobs.
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.10.22"
+      - name: Install pinned Browser module for setup rejection contracts
+        run: python3 scripts/setup.py --part packages --packages guest-browser --evidence evidence/setup-python310.json
+      - name: Minimum supported Python compatibility tests
+        run: exec python3 scripts/ci_step.py --name python310 --phase test -- python -m unittest discover -s scripts -p 'test_*.py'
+      - name: Retain exact-SHA Python compatibility evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-python-compat-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  race:
+    name: Race detector (${{ matrix.racepart }})
+    runs-on: ubuntu-24.04
+    # Main's approved ERII-222 bound leaves teardown room for either part.
+    # Keep the complete inventory, per-test deadlines and strict join unchanged.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        racepart: ["packages", "sqlite"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -73,16 +104,60 @@ jobs:
         with:
           temporary-fixtures: "true"
       - name: Race detector
-        # Isolate the one-second Bridge burst/control fixture; preserve normal
-        # package parallelism for the complete remainder, with an audited inventory.
-        run: exec python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py
-      - name: Verify the copied SDK stayed immutable
-        if: ${{ always() }}
-        run: python3 scripts/ci_sdk.py doctor
+        # Bridge remains isolated from other package tests; SQLite keeps the
+        # existing discovered root partitions. Both parts require a strict join.
+        run: exec python3 scripts/ci_step.py --name race --phase test -- python3 scripts/ci_race.py --part ${{ matrix.racepart }}
       - name: Clean disposable fixture storage
         if: ${{ always() }}
         run: python3 scripts/ci_tmpfs.py cleanup
+      # Cleanup restores TMPDIR via GITHUB_ENV before these disk-only checks.
+      # Reuse this runner's race compiler cache without sharing fixture state.
+      - name: Prove receipt recovery uses ordinary disk
+        if: ${{ matrix.racepart == 'packages' }}
+        run: python3 scripts/ci_tmpfs.py disk --receipt evidence/receipt-race-storage.json
+      - name: Five disk-backed receipt recovery race checks
+        if: ${{ matrix.racepart == 'packages' }}
+        run: exec python3 scripts/ci_step.py --name receipt-race-disk --phase test -- go test -race ./internal/agent/sqlite -run '^TestArtifactQueryRecovery' -count=5
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
       - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-race-part-${{ matrix.racepart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  race_join:
+    name: Race detector
+    needs: race
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-race-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/race-parts
+      - name: Require successful parts and audit all packages and SQLite roots
+        env:
+          PART_RESULT: ${{ needs.race.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in packages sqlite; do
+            mv "evidence/race-parts/evidence-race-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/race-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name race-join --phase test -- python3 scripts/ci_race_join.py --parts evidence/race-parts --evidence evidence/race-joined.json
+      - name: Retain joined race inventory, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -91,8 +166,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  verify:
-    name: Verification (${{ matrix.shard }})
+  security:
+    name: Security (${{ matrix.securitypart }})
     runs-on: ubuntu-24.04
     env:
       ERII_VERIFY_CASE_JOBS: "4"
@@ -101,7 +176,82 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "security", "delivery", "providers"]
+        securitypart: ["finance", "cases", "protection"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          sandbox: "true"
+      - name: CLI verification with timings
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard security --security-part ${{ matrix.securitypart }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: exec python3 scripts/ci_step.py --name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-security-part-${{ matrix.securitypart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  security_join:
+    name: Complete security evidence
+    needs: security
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-security-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/security-parts
+      - name: Require successful parts and reconstruct full logical inventory
+        env:
+          PART_RESULT: ${{ needs.security.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in finance cases protection; do
+            mv "evidence/security-parts/evidence-security-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/security-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name security-join --phase test -- python3 scripts/ci_security.py --parts evidence/security-parts --evidence evidence
+      - name: Retain full security evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-security-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/suite-security.json
+            evidence/steps/
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    name: Verification (${{ matrix.shard }}${{ matrix.communicationpart && format('/{0}', matrix.communicationpart) || '' }})
+    runs-on: ubuntu-24.04
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    timeout-minutes: ${{ matrix.shard == 'delivery' && 15 || 10 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["runtime", "delivery"]
+        include:
+          - shard: communication
+            communicationpart: gc01
+          - shard: communication
+            communicationpart: gc02
+          - shard: communication
+            communicationpart: channels
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,25 +260,146 @@ jobs:
       - uses: ./.github/actions/ci-inputs
         with:
           browser: ${{ matrix.shard == 'delivery' }}
-          sandbox: ${{ matrix.shard == 'providers' || matrix.shard == 'security' }}
-          temporary-fixtures: ${{ matrix.shard == 'providers' }}
+          sandbox: ${{ matrix.shard == 'communication' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}
-        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: CLI verification with timings
-        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1 ${{ matrix.communicationpart && format('--communication-part {0}', matrix.communicationpart) || '' }}
+      - name: Recompute native communication receipts and retain a compact manifest
+        if: ${{ matrix.shard == 'communication' }}
+        run: exec python3 scripts/ci_step.py --name native-validation --phase test -- python3 scripts/ci_communication.py collect --part ${{ matrix.communicationpart }} --binary bin/erii --evidence evidence
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
-        run: python3 scripts/ci_sdk.py doctor
-      - name: Clean disposable fixture storage
-        if: ${{ always() && matrix.shard == 'providers' }}
-        run: python3 scripts/ci_tmpfs.py cleanup
+        run: exec python3 scripts/ci_step.py --name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor
       - name: Retain exact-SHA evidence, including failures
-        if: ${{ always() }}
+        if: ${{ always() && matrix.shard != 'communication' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: evidence-${{ matrix.shard }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
           path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Retain compact communication evidence, including failures
+        if: ${{ always() && matrix.shard == 'communication' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-communication-part-${{ matrix.communicationpart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/suite-communication-*.json
+            evidence/communication-receipts.json
+            evidence/timings-communication.json
+            evidence/profiles/
+            evidence/steps/
+          if-no-files-found: error
+          retention-days: 14
+
+  communication_join:
+    name: Complete communication evidence
+    needs: verify
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-communication-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/communication-parts
+      - name: Require successful parts and the complete communication inventory
+        env:
+          PART_RESULT: ${{ needs.verify.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in gc01 gc02 channels; do
+            mv "evidence/communication-parts/evidence-communication-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/communication-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name communication-join --phase test -- python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence
+      - name: Retain complete communication manifest, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-communication-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/suite-communication.json
+            evidence/steps/
+          if-no-files-found: error
+          retention-days: 14
+
+  providers:
+    name: Providers (${{ matrix.providerpart }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    strategy:
+      fail-fast: false
+      matrix:
+        providerpart: ["cli", "models"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          # The CLI part runs the committed audit-reference history gate.
+          fetch-depth: ${{ matrix.providerpart == 'cli' && '0' || '1' }}
+      - uses: ./.github/actions/ci-inputs
+        with:
+          temporary-fixtures: "true"
+      - name: Providers part with unchanged repetitions
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard providers --provider-part ${{ matrix.providerpart }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: exec python3 scripts/ci_step.py --name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor
+      - name: Clean disposable fixture storage
+        if: ${{ always() }}
+        run: exec python3 scripts/ci_step.py --name fixture-cleanup --phase cleanup -- python3 scripts/ci_tmpfs.py cleanup
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-providers-part-${{ matrix.providerpart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  providers_join:
+    name: Complete providers evidence
+    needs: providers
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-providers-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/provider-parts
+      - name: Require both providers parts and the full logical inventory
+        env:
+          PART_RESULT: ${{ needs.providers.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in cli models; do
+            mv "evidence/provider-parts/evidence-providers-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/provider-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name providers-join --phase test -- python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence
+      - name: Retain complete providers evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-providers-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/suite-providers.json
+            evidence/steps/
           if-no-files-found: error
           retention-days: 14
 
@@ -141,7 +412,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        m6part: ["context", "memory", "network", "booking", "desktop-1", "desktop-2", "desktop-3"]
+        m6part: ["memory", "network", "booking"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -153,7 +424,46 @@ jobs:
           sandbox: "true"
       - name: Install pinned offline M6 Browser runtime
         if: matrix.m6part != 'context' && matrix.m6part != 'memory'
-        run: node guest-browser/node_modules/playwright-core/cli.js install --with-deps chromium
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
+      - name: M6 part with five consecutive repetitions
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard personal --personal-part ${{ matrix.m6part }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-personal-part-${{ matrix.m6part }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Twenty-one execution cells start immediately. The four shorter M6 cells
+  # wait for Python compatibility, leaving long Code Mode cells admission room.
+  personal_deferred:
+    name: M6 (${{ matrix.m6part }})
+    needs: python_compat
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+    strategy:
+      fail-fast: false
+      matrix:
+        m6part: ["context", "desktop-1", "desktop-2", "desktop-3"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          browser: ${{ matrix.m6part != 'context' && matrix.m6part != 'memory' }}
+          sandbox: "true"
+      - name: Install pinned offline M6 Browser runtime
+        if: matrix.m6part != 'context' && matrix.m6part != 'memory'
+        run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: M6 part with five consecutive repetitions
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard personal --personal-part ${{ matrix.m6part }} --jobs 1
       - name: Verify the copied SDK stayed immutable
@@ -170,7 +480,7 @@ jobs:
 
   personal_join:
     name: Complete M6 evidence
-    needs: personal
+    needs: ["personal", "personal_deferred"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
@@ -185,7 +495,7 @@ jobs:
           path: evidence/m6-parts
       - name: Require every M6 part and reconstruct the full inventory
         env:
-          PART_RESULT: ${{ needs.personal.result }}
+          PART_RESULT: ${{ needs.personal.result == 'success' && needs.personal_deferred.result == 'success' && 'success' || 'failure' }}
         run: |
           test "$PART_RESULT" = success
           for part in context memory network booking desktop-1 desktop-2 desktop-3; do
@@ -223,7 +533,23 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
       - name: Code Mode part with five consecutive repetitions
+        env:
+          ERII_CAPABILITY_DIAGNOSTICS: ${{ matrix.part == 'GC-19' && format('{0}/evidence/gc19-standard-failures', github.workspace) || '' }}
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard codemode --codemode-part ${{ matrix.part }} --jobs 1
+      - name: Bounded GC-19 transaction diagnosis (separate binary)
+        if: ${{ !cancelled() && matrix.part == 'GC-19' }}
+        run: exec python3 scripts/ci_step.py --name gc19-diagnostic --phase test -- python3 scripts/diagnose_gc19.py --evidence evidence/gc19-diagnostic
+      - name: Retain focused GC-19 diagnostics
+        if: ${{ always() && matrix.part == 'GC-19' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gc19-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/gc19-standard-failures/
+            evidence/gc19-diagnostic/fixtures/
+            evidence/gc19-diagnostic/diagnostic.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify the copied SDK stayed immutable
         if: ${{ always() }}
         run: python3 scripts/ci_sdk.py doctor
@@ -275,7 +601,7 @@ jobs:
 
   checks:
     name: Ubuntu checks
-    needs: ["fast", "race", "verify", "codemode", "codemode_join", "personal", "personal_join"]
+    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_deferred", "personal_join", "providers", "providers_join", "communication_join", "security", "security_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
