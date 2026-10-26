@@ -14,6 +14,21 @@ import ci_step
 
 
 class StepCancellationTests(unittest.TestCase):
+    def test_cleanup_phase_records_success_and_failure(self):
+        for code in (0, 9):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
+                result = subprocess.run([sys.executable, 'scripts/ci_step.py', '--name', 'cleanup',
+                    '--phase', 'cleanup', '--evidence', directory, '--', sys.executable,
+                    '-c', f'raise SystemExit({code})'], capture_output=True, text=True)
+                self.assertEqual(result.returncode, code, result.stderr)
+                record = json.loads((Path(directory) / 'cleanup.json').read_text())
+                self.assertEqual(record['phase'], 'cleanup')
+                self.assertEqual(record['returncode'], code)
+                self.assertTrue(record['owned_group_drained'])
+                self.assertGreater(record['wall_seconds'], 0)
+                self.assertTrue(record['started_at'])
+                self.assertTrue(record['finished_at'])
+
     def test_uncooperative_child_stops_before_actions_sigterm_escalation(self):
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
