@@ -2,7 +2,6 @@
 import copy
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,6 +16,16 @@ import verify_suite
 
 
 class QuoteBoundaryTests(unittest.TestCase):
+    @staticmethod
+    def build_binary(root):
+        # PATH's go may be the maintained CI SDK shell wrapper. Inspect a
+        # compiled fixture, never assume the compiler command is a Go binary.
+        source = root/'main.go'
+        source.write_text('package main\nfunc main() {}\n')
+        binary = root/'erii'
+        subprocess.run(['go','build','-o',str(binary),str(source)],check=True,capture_output=True)
+        return binary
+
     @staticmethod
     def native_state(prefix):
         return {table:[{key:prefix+'/'+key}] for table,key in
@@ -118,7 +127,7 @@ class QuoteBoundaryTests(unittest.TestCase):
         # Identity-only synthetic rows exercise the negative consumer path.
         # They are never accepted as successful mechanical observations.
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp); binary = Path(shutil.which('go')).resolve()
+            root = Path(tmp); binary = self.build_binary(root)
             identity = journey.source_identity()
             report = dict(case_id='GC-11',kind='gc11_boundary',status='mechanical_pass',
                 fixture_lock=journey.load(),semantic_score=None,eligible_for_grading=False,
@@ -136,7 +145,7 @@ class QuoteBoundaryTests(unittest.TestCase):
 
     def test_resealed_environment_forgery_reaches_real_cli_and_ci_rejection(self):
         with tempfile.TemporaryDirectory() as tmp:
-            binary = Path(shutil.which('go')).resolve()
+            binary = self.build_binary(Path(tmp))
             source = journey.source_identity()
             report = dict(case_id='GC-11',kind='gc11_boundary',status='mechanical_pass',
                 fixture_lock=journey.load(),semantic_score=None,eligible_for_grading=False,
@@ -147,10 +156,13 @@ class QuoteBoundaryTests(unittest.TestCase):
             self.assertTrue(all(r['cli_rejected'] and r['ci_rejected'] for r in results.values()))
 
     def test_environment_normalizes_only_binary_path_and_preserves_build_version(self):
+        real_output = subprocess.check_output
         def output(args,**kwargs):
             if args[:3] == ['go','version','-m']:
                 return args[3]+': go1.26.2\n\tbuild\tvcs.revision=exact\n'
-            return 'runtime version\n'
+            if args in (['go','version'],['node','--version']):
+                return 'runtime version\n'
+            return real_output(args,**kwargs)
         with patch.object(journey.subprocess,'check_output',side_effect=output):
             original = journey.environment(Path('/original/erii'))
             relocated = journey.environment(Path('/relocated/erii'))
