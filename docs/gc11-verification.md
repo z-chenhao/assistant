@@ -14,7 +14,11 @@ python3 scripts/verify_gc11.py --binary bin/erii --evidence evidence/gc11-bounda
 python3 scripts/prepare_release_eval.py --input evidence/gc11-boundary.json --evidence evidence/gc11-boundary-preview.json
 ```
 
-The suite's communication/channels `gc11` gate calls this same entry point. It
+The suite's communication/channels `gc11` gate calls this same entry point.
+After ERII-378, the fixed parts are gc01, gc02, gc09, gc10 and channels; GC-11
+stays in channels. Their fail-closed join must reconstruct all nine gates and
+thirteen suite rows, including the original GC-12 five-round series. The shared
+repair's PASS does not certify this combined consumer inventory. This gate
 retains all six original wording/noise/order variants and five serial repetitions
 per variant. Two independent fixture workers use the existing pool; select
 `--variant-jobs 1` for serial execution. CI resources, deadlines and worker limits
