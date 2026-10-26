@@ -142,6 +142,8 @@ class CurrentComparisonTests(unittest.TestCase):
         import ci_personal
         import ci_providers
         import ci_communication
+        import ci_security
+        from test_ci_security import SecurityTests
         from unittest.mock import patch
         from test_ci_communication import CommunicationTests
         from test_ci_codemode import CodeModeJoinTests
@@ -169,6 +171,9 @@ class CurrentComparisonTests(unittest.TestCase):
             fixture.write(root, suites, manifests)
             with patch.object(ci_communication, 'source_state', return_value=source):
                 reports['suite-communication.json'] = ci_communication.join(root)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports['suite-security.json'] = ci_security.validate(SecurityTests().fixture(root))
         for name, report in reports.items():
             if not name.startswith('suite-'):
                 continue
@@ -182,7 +187,7 @@ class CurrentComparisonTests(unittest.TestCase):
         communication = reports['suite-communication.json']
         for part, manifest in communication['native_receipts'].items():
             manifest['identity'] = {k: communication['parts'][part][k] for k in ci_communication.IDENTITY}
-        cls.reports = reports
+        cls.reports = json.loads(json.dumps(reports))
 
     def experiment(self, samples=3):
         raw = ComparisonTests().experiment(samples)
@@ -190,6 +195,10 @@ class CurrentComparisonTests(unittest.TestCase):
         for value in raw['attempts'].values():
             value['reports'] = copy.deepcopy(self.reports)
             value['run']['path'] = '.github/workflows/ci.yml'
+            security = value['reports']['suite-security.json']
+            for fragment in [security, *security['parts'].values()]:
+                fragment.update(run_id=str(value['run']['id']), run_attempt=str(value['run']['run_attempt']))
+
             value['jobs'] = [dict(id=i, name=name, conclusion='success', steps=[], head_sha='a'*40,
                                  run_id=value['run']['id'], run_attempt=value['run']['run_attempt'],
                                  started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:40Z')
@@ -202,10 +211,10 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 30)
+        self.assertEqual(len(comparison.topology()), 32)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
-                         'Providers (models)', 'Complete providers evidence', 'Complete communication evidence',
+                         'Providers (models)', 'Complete providers evidence', 'Complete communication evidence', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
                          'Verification (communication/gc01)', 'Verification (communication/gc02)',
                          'Verification (communication/channels)'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
@@ -225,7 +234,7 @@ class CurrentComparisonTests(unittest.TestCase):
                     self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
 
     def test_join_receipt_mutations_fail_closed(self):
-        for shard in ('codemode', 'personal', 'providers'):
+        for shard in ('codemode', 'personal', 'providers', 'security'):
             for change in ('missing-part', 'wrong-part', 'source', 'binary', 'image', 'cpu', 'round', 'duplicate',
                            'reorder', 'undrained', 'focused', 'cleanup', 'join-members', 'summary'):
                 with self.subTest(shard=shard, change=change):
@@ -248,9 +257,9 @@ class CurrentComparisonTests(unittest.TestCase):
                     elif change == 'focused': fragment['selected_gates'] = ['main']
                     elif change == 'cleanup': suite['shards'][shard][-1]['owned_group_drained'] = False
                     elif change == 'join-members':
-                        if shard == 'providers': suite['shards'][shard][-1]['elapsed_seconds'] += 1
+                        if shard in ('providers','security'): suite['shards'][shard][-1]['elapsed_seconds'] = 99
                         else: suite['shards'][shard][-1]['parts'].pop()
-                    elif shard == 'providers': suite['passed'] = False
+                    elif shard in ('providers','security'): suite['passed'] = False
                     else: data['reports']['core-summary.json' if shard == 'codemode' else 'm6-summary.json']['passed'] = False
                     self.assertFalse(comparison.compare(raw)['pairs'][0]['eligible'])
 

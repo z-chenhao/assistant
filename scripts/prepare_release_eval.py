@@ -20,6 +20,21 @@ def prepare(report):
         summary = validate_report(report)
         return dict(version=1, status='prepared; GC-04 mechanical receipts only; semantic grading unexecuted',
                     mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
+    if report.get('case_id') == 'GC-10':
+        from verify_gc10 import validate_report
+        summary = validate_report(report)
+        return dict(version=1, status='prepared; GC-10 mechanical receipts only; semantic grading unexecuted',
+                    mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
+    if report.get('case_id') == 'GC-09':
+        from verify_gc09 import validate_report
+        summary = validate_report(report)
+        return dict(version=1, status='prepared; GC-09 mechanical receipts only; semantic grading unexecuted',
+                    mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
+    if report.get('case_id') == 'GC-05':
+        from verify_gc05 import validate_report
+        summary = validate_report(report)
+        return dict(version=1, status='prepared; GC-05 mechanical receipts only; semantic grading unexecuted',
+                    mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
     if report.get('case_id') == 'GC-03':
         from verify_gc03 import validate_report
         summary = validate_report(report)
@@ -303,6 +318,15 @@ def main():
     report = json.loads(args.input.read_text())
     if report.get('kind') == 'gc04_native_manifest':
         from verify_gc04 import read_report
+        report = read_report(args.input)
+    if report.get('kind') == 'gc10_native_manifest':
+        from verify_gc10 import read_report
+        report = read_report(args.input)
+    if report.get('kind') == 'gc09_native_manifest':
+        from verify_gc09 import read_report
+        report = read_report(args.input)
+    if report.get('kind') == 'gc05_native_manifest':
+        from verify_gc05 import read_report
         report = read_report(args.input)
     if report.get('kind') == 'gc03_native_manifest':
         from verify_gc03 import read_report
