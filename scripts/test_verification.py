@@ -234,7 +234,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('evidence/communication-receipts.json', verify)
         self.assertIn('--name sdk-doctor --phase cleanup', verify)
         security = workflow.split('  security:\n', 1)[1].split('  security_join:', 1)[0]
-        self.assertIn('securitypart: ["cases", "protection"]', security)
+        self.assertIn('securitypart: ["finance", "cases", "protection"]', security)
         self.assertIn('ERII_VERIFY_GATE_JOBS: "2"', security)
         self.assertIn('ERII_VERIFY_CASE_JOBS: "4"', security)
         self.assertIn('sandbox: "true"', security)
@@ -246,6 +246,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('test "$PART_RESULT" = success', security_join)
         self.assertIn('scripts/ci_security.py --parts evidence/security-parts --evidence evidence', security_join)
         self.assertIn('evidence-security-part-*', security_join)
+        self.assertIn('for part in finance cases protection; do', security_join)
         checks = workflow[workflow.index('  checks:'):]
         needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
@@ -288,10 +289,10 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('needs: python_compat', deferred)
         self.assertNotIn('if:', deferred.split('    steps:', 1)[0])
         self.assertIn('personal_deferred', ci_gate.REQUIRED)
-        # Exactly 21 execution cells are initially runnable, independent of
+        # Exactly 22 execution cells are initially runnable, independent of
         # GitHub's unspecified matrix admission order. Four follow Python.
         import ci_compare
-        self.assertEqual(len(ci_compare.topology()) - 7 - len(parts[1]), 21)
+        self.assertEqual(len(ci_compare.topology()) - 7 - len(parts[1]), 22)
         personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
         self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
         personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]

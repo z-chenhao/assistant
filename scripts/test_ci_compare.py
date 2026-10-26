@@ -211,10 +211,10 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 32)
+        self.assertEqual(len(comparison.topology()), 33)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
-                         'Providers (models)', 'Complete providers evidence', 'Complete communication evidence', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
+                         'Providers (models)', 'Complete providers evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
                          'Verification (communication/gc01)', 'Verification (communication/gc02)',
                          'Verification (communication/channels)'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
@@ -241,7 +241,7 @@ class CurrentComparisonTests(unittest.TestCase):
                     raw = self.experiment(1)
                     data = raw['attempts']['2:1']
                     suite = data['reports']['suite-' + shard + '.json']
-                    part = next(iter(suite['parts']))
+                    part = 'protection' if shard == 'security' and change == 'reorder' else next(iter(suite['parts']))
                     fragment = suite['parts'][part]
                     rows = fragment['shards'][shard]
                     if change == 'missing-part': suite['parts'].pop(part)
@@ -252,7 +252,9 @@ class CurrentComparisonTests(unittest.TestCase):
                     elif change == 'cpu': fragment['hardware']['logical_cpus'] = 2
                     elif change == 'round': rows.pop()
                     elif change == 'duplicate': rows.append(copy.deepcopy(rows[0]))
-                    elif change == 'reorder': rows.reverse()
+                    elif change == 'reorder':
+                        self.assertGreater(len(rows), 1, 'reordering must change the receipt')
+                        rows.reverse()
                     elif change == 'undrained': rows[0]['owned_group_drained'] = False
                     elif change == 'focused': fragment['selected_gates'] = ['main']
                     elif change == 'cleanup': suite['shards'][shard][-1]['owned_group_drained'] = False
