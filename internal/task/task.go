@@ -15,12 +15,12 @@ import (
 const SearchName = "builtin__task__search"
 const ManageName = "builtin__task__manage"
 const SearchSchema = `{"type":"object","properties":{"query":{"type":"string"},"scope":{"type":"string","enum":["active","recent","all"]},"status":{"type":"array","items":{"type":"string","enum":["active","paused","completed","cancelled"]}},"limit":{"type":"integer","minimum":1,"maximum":50}},"additionalProperties":false}`
-const ManageSchema = `{"oneOf":[{"type":"object","properties":{"operation":{"const":"create"},"task":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","task"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"append"},"taskRef":{"type":"string"},"instruction":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","taskRef","instruction"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"pause"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"cancel"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false}]}`
+const ManageSchema = `{"oneOf":[{"type":"object","properties":{"operation":{"const":"create"},"task":{"type":"string"},"completionPolicy":{"type":"string","enum":["once","ongoing"],"description":"Defaults to once. Use ongoing for continuing work; ordinary Root completion keeps the Task active."},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","task"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"append"},"taskRef":{"type":"string"},"instruction":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","taskRef","instruction"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"pause"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"cancel"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"complete"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false}]}`
 
 func Definitions() []tool.Definition {
 	return []tool.Definition{
 		{Spec: tool.Spec{Name: SearchName, Version: 1, InputSchema: SearchSchema, ReplayPolicy: "safe", Permission: "read_only"}, Host: true},
-		{Spec: tool.Spec{Name: ManageName, Version: 1, InputSchema: ManageSchema, ReplayPolicy: "safe", Permission: "task_control"}, Host: true},
+		{Spec: tool.Spec{Name: ManageName, Version: 1, Description: "Create or control a Task. Create defaults to once; ongoing keeps continuing work active after a Root returns. Append continues work with a new Root when needed. Complete ends only an active Task with a terminal current-epoch tree and no unresolved Tool effects; it never stops work.", InputSchema: ManageSchema, ReplayPolicy: "safe", Permission: "task_control"}, Host: true},
 	}
 }
 func Registry() *tool.Registry {
@@ -32,11 +32,12 @@ func Registry() *tool.Registry {
 }
 
 type ManageRequest struct {
-	Operation    string   `json:"operation"`
-	Task         string   `json:"task,omitempty"`
-	TaskRef      string   `json:"taskRef,omitempty"`
-	Instruction  string   `json:"instruction,omitempty"`
-	ArtifactRefs []string `json:"artifactRefs,omitempty"`
+	Operation        string   `json:"operation"`
+	Task             string   `json:"task,omitempty"`
+	TaskRef          string   `json:"taskRef,omitempty"`
+	Instruction      string   `json:"instruction,omitempty"`
+	ArtifactRefs     []string `json:"artifactRefs,omitempty"`
+	CompletionPolicy string   `json:"completionPolicy,omitempty"`
 }
 type SearchRequest struct {
 	Query  string   `json:"query,omitempty"`
@@ -112,7 +113,10 @@ func ParseManage(raw string) (ManageRequest, error) {
 	allowed := map[string]bool{"operation": true, "taskRef": true}
 	switch r.Operation {
 	case "create":
-		allowed = map[string]bool{"operation": true, "task": true, "artifactRefs": true}
+		allowed = map[string]bool{"operation": true, "task": true, "artifactRefs": true, "completionPolicy": true}
+		if _, present := fields["completionPolicy"]; present && r.CompletionPolicy != "once" && r.CompletionPolicy != "ongoing" {
+			return r, ErrInvalid
+		}
 		if !validText(r.Task) {
 			return r, ErrInvalid
 		}
@@ -122,7 +126,7 @@ func ParseManage(raw string) (ManageRequest, error) {
 		if !validText(r.Instruction) {
 			return r, ErrInvalid
 		}
-	case "pause", "cancel":
+	case "pause", "cancel", "complete":
 	default:
 		return r, ErrInvalid
 	}
@@ -144,6 +148,10 @@ func ParseManage(raw string) (ManageRequest, error) {
 	}
 	if r.ArtifactRefs == nil {
 		r.ArtifactRefs = []string{}
+	}
+	// Omitted and explicit once are the same action. Preserve legacy receipt hashes.
+	if r.CompletionPolicy == "once" {
+		r.CompletionPolicy = ""
 	}
 	return r, nil
 }

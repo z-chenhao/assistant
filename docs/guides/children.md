@@ -238,4 +238,5 @@ recoverable approval, live cancellation and six SIGKILL/restart boundaries.
 separately cover admission rollback, simultaneous duplicate callers, old claims,
 late Task epochs, profile changes, ceilings, fixed reductions and per-invocation
 approvals. A successful protocol fixture is not model-quality evidence. Full
-Golden Cases remain marked not applicable until their required integrations land.
+Golden Cases are not scored by this Child fixture; [Core](core-evals.md) and
+[M6](m6-evals.md) gates cover additional mechanics with their own proof limits.
