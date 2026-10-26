@@ -166,6 +166,74 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  security:
+    name: Security (${{ matrix.securitypart }})
+    runs-on: ubuntu-24.04
+    env:
+      ERII_VERIFY_CASE_JOBS: "4"
+      ERII_VERIFY_GATE_JOBS: "2"
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        securitypart: ["cases", "protection"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          sandbox: "true"
+      - name: CLI verification with timings
+        run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard security --security-part ${{ matrix.securitypart }} --jobs 1
+      - name: Verify the copied SDK stayed immutable
+        if: ${{ always() }}
+        run: exec python3 scripts/ci_step.py --name sdk-doctor --phase cleanup -- python3 scripts/ci_sdk.py doctor
+      - name: Retain exact-SHA evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-security-part-${{ matrix.securitypart }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  security_join:
+    name: Complete security evidence
+    needs: security
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: evidence-security-part-*-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: evidence/security-parts
+      - name: Require successful parts and reconstruct full logical inventory
+        env:
+          PART_RESULT: ${{ needs.security.result }}
+        run: |
+          test "$PART_RESULT" = success
+          for part in cases protection; do
+            mv "evidence/security-parts/evidence-security-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/security-parts/$part"
+          done
+          exec python3 scripts/ci_step.py --name security-join --phase test -- python3 scripts/ci_security.py --parts evidence/security-parts --evidence evidence
+      - name: Retain full security evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-security-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            evidence/suite-security.json
+            evidence/steps/
+          if-no-files-found: error
+          retention-days: 14
+
   verify:
     name: Verification (${{ matrix.shard }}${{ matrix.communicationpart && format('/{0}', matrix.communicationpart) || '' }})
     runs-on: ubuntu-24.04
@@ -176,7 +244,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["runtime", "security", "delivery"]
+        shard: ["runtime", "delivery"]
         include:
           - shard: communication
             communicationpart: gc01
@@ -192,7 +260,7 @@ jobs:
       - uses: ./.github/actions/ci-inputs
         with:
           browser: ${{ matrix.shard == 'delivery' }}
-          sandbox: ${{ matrix.shard == 'security' || matrix.shard == 'communication' }}
+          sandbox: ${{ matrix.shard == 'communication' }}
       - name: Install pinned offline Web test browser
         if: ${{ matrix.shard == 'delivery' }}
         run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
@@ -371,7 +439,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Twenty execution cells start immediately. The four shorter M6 cells
+  # Twenty-one execution cells start immediately. The four shorter M6 cells
   # wait for Python compatibility, leaving long Code Mode cells admission room.
   personal_deferred:
     name: M6 (${{ matrix.m6part }})
@@ -533,7 +601,7 @@ jobs:
 
   checks:
     name: Ubuntu checks
-    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_deferred", "personal_join", "providers", "providers_join", "communication_join"]
+    needs: ["fast", "python_compat", "race", "race_join", "verify", "codemode", "codemode_join", "personal", "personal_deferred", "personal_join", "providers", "providers_join", "communication_join", "security", "security_join"]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
