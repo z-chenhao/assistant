@@ -64,6 +64,8 @@ SHARDS = {
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),
         Gate("gc03", "verify_gc03.py", "gc03"),
         Gate("gc05", "verify_gc05.py", "gc05"),
+        Gate("gc04", "verify_gc04.py", "gc04"),
+        Gate("gc06", "verify_gc06.py", "gc06"),
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5),
@@ -73,7 +75,9 @@ SHARDS = {
                       Gate("gc14", "verify_gc14.py", "gc14"),
                       Gate("gc16", "verify_gc16.py", "gc16"),
                       Gate("gc01", "verify_gc01.py", "gc01"),
-                      Gate("gc02", "verify_gc02.py", "gc02")),
+                      Gate("gc02", "verify_gc02.py", "gc02"),
+                      Gate("gc09", "verify_gc09.py", "gc09"),
+                      Gate("gc10", "verify_gc10.py", "gc10")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
@@ -95,6 +99,36 @@ SHARDS = {
 # original logical Code Mode inventory; no partial job is a merge verdict.
 CODEMODE_PARTS = ('control', 'GC-17', 'GC-19', 'GC-20', 'contracts')
 
+# GC-07's native driver belongs to its consumer PR. These fixed selectors are
+# usable before registration, without inventing a Case PASS on current main.
+DELIVERY_PARTS = ('control', 'wording', 'noise')
+GC07_VARIANTS = {
+    'wording': ('wording-1', 'wording-2', 'wording-3'),
+    'noise': ('noise-1', 'noise-2', 'order-1'),
+}
+
+
+def gc07_pairs(part):
+    return [(variant, n) for variant in GC07_VARIANTS[part] for n in range(1, 6)]
+
+
+def delivery_gates(part):
+    if part not in DELIVERY_PARTS:
+        raise ValueError('unknown delivery part')
+    gates = SHARDS['delivery']
+    if ([g.name for g in gates if g.name != 'gc07'] != ['delivery', 'channels'] or
+            len([g for g in gates if g.name == 'gc07']) > 1):
+        raise ValueError('unassigned or duplicate delivery gate')
+    if part == 'control':
+        return tuple(g for g in gates if g.name != 'gc07')
+    case = next((g for g in gates if g.name == 'gc07'), None)
+    if case is None:
+        return ()
+    if case != Gate('gc07', 'verify_gc07.py', 'gc07'):
+        raise ValueError('GC-07 original gate drift')
+    return (Gate('gc07-' + part, case.script, 'gc07-' + part,
+                 arguments=('--ci-part', part)),)
+
 
 def codemode_gates(part):
     if part == 'control':
@@ -103,6 +137,24 @@ def codemode_gates(part):
         raise ValueError('unknown Code Mode part')
     arguments = ('--contracts-only',) if part == 'contracts' else ('--case', part)
     return (Gate('core-' + part, 'run_core_cases.py', 'core-' + part, 5, arguments),)
+
+
+SECURITY_PARTS = ('finance', 'cases', 'protection')
+SECURITY_GATES = {
+    'finance': ('gc03', 'gc06'),
+    'cases': ('gc04', 'gc05'),
+    'protection': ('memory-maintenance', 'recall', 'tools', 'artifacts'),
+}
+
+
+def security_gates(part):
+    if part not in SECURITY_PARTS:
+        raise ValueError('unknown security part')
+    # Every registered gate must belong to a fixed part; unknown additions fail closed.
+    gates = SHARDS['security']
+    if any(g.name not in sum(SECURITY_GATES.values(), ()) for g in gates):
+        raise ValueError('unassigned security gate')
+    return tuple(g for g in gates if g.name in SECURITY_GATES[part])
 
 
 PROVIDER_PARTS = ('cli', 'models')
@@ -289,12 +341,13 @@ def gate_execution_order(gates):
     # Measured long series go first. GC-01 and GC-12 retain the initial pair;
     # GC-02 must take the next free slot before short gates. Its former queue
     # tail exceeded the CI deadline even with all 30 rounds finished. Security's
-    # GC-03/GC-04 likewise start before the shorter protection series. Keep two
+    # GC-03/GC-04 likewise start before the shorter protection series. GC-09
+    # and GC-10 follow GC-02 and precede short communication gates. Keep two
     # workers, report inventory order and every series' serial repetitions.
     def priority(gate):
-        if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04','gc05','gc07'): return 0
-        if gate.name == 'gc12': return 1
-        if gate.name == 'gc02': return 2
+        if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04'): return 0
+        if gate.name in ('gc12','gc05','gc06'): return 1
+        if gate.name in ('gc02','gc09','gc10'): return 2
         return 3
     return sorted(gates,key=priority)
 
@@ -365,6 +418,8 @@ def main():
     parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
     parser.add_argument('--provider-part', choices=PROVIDER_PARTS)
+    parser.add_argument('--security-part', choices=SECURITY_PARTS)
+    parser.add_argument('--delivery-part', choices=DELIVERY_PARTS)
     parser.add_argument('--communication-part', choices=COMMUNICATION_PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
@@ -372,11 +427,11 @@ def main():
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.list:
-        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part:
+        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part or args.delivery_part:
             parser.error('--list cannot be combined with gate/part execution')
         print(json.dumps([row for row in catalogue() if not args.shard or row['shard'] == args.shard], indent=2))
         return 0
-    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part):
+    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part or args.delivery_part):
         parser.error('--gate cannot be combined with a CI part')
     plans = select_gates(parser, args.shard, args.gate)
     if args.codemode_part and args.shard != 'codemode':
@@ -387,6 +442,13 @@ def main():
         parser.error('--provider-part requires --shard providers')
     if args.communication_part and args.shard != 'communication':
         parser.error('--communication-part requires --shard communication')
+    if args.security_part and args.shard != 'security':
+        parser.error('--security-part requires --shard security')
+    if args.delivery_part and args.shard != 'delivery':
+        parser.error('--delivery-part requires --shard delivery')
+    if sum(bool(p) for p in (args.codemode_part, args.personal_part, args.provider_part,
+                            args.communication_part, args.security_part, args.delivery_part)) > 1:
+        parser.error('only one CI part can be selected')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -406,7 +468,11 @@ def main():
         plans['providers'] = provider_gates(args.provider_part)
     if args.communication_part:
         plans['communication'] = communication_gates(args.communication_part)
-    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part
+    if args.security_part:
+        plans['security'] = security_gates(args.security_part)
+    if args.delivery_part:
+        plans['delivery'] = delivery_gates(args.delivery_part)
+    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part or args.delivery_part
     report_suffix = (args.shard or 'all') + ('-' + part if part else '')
     if args.gate:
         # Focused runs cannot overwrite or masquerade as a complete shard verdict.
@@ -465,6 +531,8 @@ def main():
                   complete_inventory=not bool(args.gate or part),
                   codemode_part=args.codemode_part, personal_part=args.personal_part,
                   provider_part=args.provider_part, communication_part=args.communication_part,
+                  security_part=args.security_part, delivery_part=args.delivery_part,
+                  run_id=os.environ.get("GITHUB_RUN_ID"), run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"),
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),
                   binary_sha256=binary_digest,

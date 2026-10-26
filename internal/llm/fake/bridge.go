@@ -19,7 +19,7 @@ func ValidFixture(f string) bool {
 		return llm.NormalizeError(code).Error() == code
 	}
 	switch f {
-	case "research", "monitor", "wedding", "meeting", "automation", "computer", "recall", "core", "codemode", "children", "capabilities", "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
+	case "local", "agenda", "research", "monitor", "wedding", "meeting", "automation", "computer", "recall", "core", "codemode", "children", "capabilities", "artifacts", "approval", "approval-never", "tasks", "terminal-input", "golden", "main", "success", "incompatible", "crash", "partial-crash", "completed-crash", "no-tools", "bad-sequence", "drift", "malformed", "auth-required", "raw-error", "event-error":
 		return true
 	}
 	return false
@@ -128,7 +128,7 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
-			if (fixture == "research" || fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
+			if (fixture == "local" || fixture == "agenda" || fixture == "research" || fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
 				// Hold an actual accepted Worker generation while keeping the RPC
 				// peer responsive to cancellation. A new Root gets the appended
 				// instruction as its last message and can finish normally.
@@ -144,7 +144,11 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 					waiting[request.GenerationID] = 2
 					break
 				}
-				if fixture == "research" {
+				if fixture == "local" {
+					value = localReply(request)
+				} else if fixture == "agenda" {
+					value = agendaReply(request)
+				} else if fixture == "research" {
 					value = researchReply(request)
 				} else if fixture == "monitor" {
 					value = monitorReply(request)
@@ -340,6 +344,19 @@ func goldenReply(messages []llm.Message) string {
 		}
 	}
 	switch {
+	case strings.Contains(context, "learning_goal") && strings.Contains(context, "last_score"):
+		// GC-06 transport oracle, selected by fixture context and turn ordinal.
+		// This does not evaluate language understanding or teaching quality.
+		switch users {
+		case 2:
+			return "I am the ticket agent. How can I help you with the name on your train ticket?"
+		case 3:
+			return "Could you give me your ticket number, the name on your identity document, and your ticket type? I need to check the fare rules before confirming any change or refund."
+		case 4:
+			return "1. 更自然表达：The name on my ticket is incorrect.\n2. 时态与被动：My name was written incorrectly.\n3. 礼貌请求：Could you please help me correct it?"
+		default:
+			return "Learning fixture context received."
+		}
 	case strings.Contains(context, "轻度脂肪肝"):
 		// Explicit GC-01 safety fixture. This is a scripted transport oracle,
 		// never evidence of a model's medical reasoning or recognition quality.

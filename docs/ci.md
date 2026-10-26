@@ -2,7 +2,7 @@
 
 `Ubuntu checks` is the single branch-protection verdict. One workflow runs on
 PR heads and main pushes. It always requires unit/lint, race,
-every verification matrix cell, every providers/Code Mode/M6 part and all evidence joins.
+every verification matrix cell, every security/providers/Code Mode/M6 part and all evidence joins.
 Missing, skipped, cancelled, failed or unexpected dependencies fail closed.
 There is no impact-based omission, early-feedback tier or duplicate shadow
 workflow. Every full gate runs for documentation changes too.
@@ -22,7 +22,11 @@ weakens `Ubuntu checks`. No release is published by an ordinary PR.
 flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
-    SHA --> Verify[Runtime / security / delivery / communication parts]
+    SHA --> Verify[Runtime / delivery / communication parts]
+    SHA --> Security[Security finance / cases / protection]
+    Security --> SecurityJoin[Complete security evidence]
+    Security --> Gate
+    SecurityJoin --> Gate
     Verify --> CommunicationJoin[Complete communication evidence]
     CommunicationJoin --> Gate
     SHA --> Providers[Providers CLI / models]
@@ -157,10 +161,12 @@ The five receipt recovery race checks now follow the existing packages race
 job, after verified tmpfs cleanup and a separate disk-conformance receipt.
 The M6 matrix is placed in two Required jobs without changing its seven cells:
 memory/network/booking start immediately; context and the three desktop parts
-wait for the independent Python compatibility job. This admits exactly twenty
-execution cells initially, giving all long Code Mode cells an initial slot
-under the observed twenty-runner capacity without relying on matrix order or
-buying capacity. Each delayed cell still performs its own exact-source build,
+wait for the independent Python compatibility job. This originally admitted twenty execution cells initially. The bounded ERII-375
+security split adds one execution cell and one join (twenty-one initially
+runnable cells). ERII-380 adds one fixed finance execution cell and build/setup,
+with the same join count (twenty-two initially runnable cells). Neither split
+promises initial admission under the observed
+twenty-runner capacity. Queue time must be measured on the new exact SHA. Each delayed cell still performs its own exact-source build,
 setup, original repetitions, Doctor and upload. The M6 join and Ubuntu checks
 require both groups; failed compatibility skips dependent cells and fails the
 aggregate. Queue/setup/join time still counts toward the unchanged 600-second
@@ -177,7 +183,9 @@ Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
 uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
 run the original health/goals commands, each retaining six independent variants
 and five serial repetitions per variant. `channels` keeps GC-12 ×5 and GC-08,
-GC-14 and GC-16 once each, with the original two gate workers. This changes
+GC-14 and GC-16 once each, plus the GC-09 and GC-10 complete native-receipt
+series, with the original two gate workers. GC-09 and GC-10 start before the
+short communication gates in that same bounded queue. This changes
 placement only: fixture inputs, oracles, Host limits, approvals, deadlines,
 fault injection, state isolation and cleanup remain unchanged. Every cell keeps
 the ten-minute job timeout, its own locked setup/build, disk fixtures, sandbox,
@@ -296,7 +304,7 @@ invocations, including all five Computer lifecycle and Computer Use runs).
 | --- | --- |
 | runtime | Foundation, Main, Tasks; five Child/scheduling/spend/task-control runs; Main/Task fragments; embedded JetStream and real CLI relay |
 | codemode | Five Code Mode, Computer lifecycle, Computer Use and fixed-source recovery runs; six variants × five rounds for each GC-17/19/20; five SC conformance and real nested cancellation probes |
-| security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs |
+| security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs; complete GC-03, GC-04, GC-05 and GC-06 gates |
 | delivery | Five complete delivery runs, each containing all twenty kill/restart boundaries |
 | personal | Eleven exact M6 worlds × six variants × five rounds, plus isolated red-flag routing; all state, openable Artifacts and cleanup |
 | providers | Local provider, initial account; five capability/TUI/Pi Bridge/account runs; terminal input; five selected Go model/storage runs |
@@ -307,15 +315,88 @@ Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus r
 cancellation). Each case part runs all six locked variants five times. Contracts
 also run five times; splitting cases cannot omit them.
 
-The security pool starts the long GC-03/GC-04 series before memory-maintenance,
-recall, tools and artifacts whenever those cases are in the selected inventory.
-It retains two gate lanes, each Case's existing variant capacity and thirty
-receipts, and the four protection series' five serial rounds. Reports keep the
-original inventory order regardless of execution order. This scheduling does
-not add GC-04 to main: its owning Case change supplies that gate. It does not
-change workflow timeouts, runner resources, cancellation or required checks.
-Compare complete security runs on the same host/source/binary before making
-a timing claim; a local run cannot certify the Ubuntu ten-minute boundary.
+Delivery CI retains the existing delivery/channels execution job as `control`,
+with both original complete five-run series. Two additional fixed Case jobs run
+`wording` (wording-1/2/3) and `noise` (noise-1/noise-2/order-1). Each variant keeps
+all five consecutive repetitions on one worker. Both new jobs use Ubuntu 24.04,
+the same build/browser setup, four Case workers, two gate lanes and the existing
+fifteen-minute delivery limit. A three-minute `delivery_join` requires control,
+both Case jobs and their Doctor/uploads to succeed; `Ubuntu checks` requires the
+Case matrix and join. The finite cost is two execution jobs plus one join; no
+configured resource limit increases. No speed claim follows from this topology.
+
+`ci_delivery.py collect` binds the exact suite file, source/binary/fixtures,
+workflow/run/attempt, command parameters and native validation results. The join
+rejects missing, duplicate, reordered, failed, cancelled, focused, dirty, unclean
+or drifted receipts and reconstructs the canonical variant-major 30-row order.
+Assertions must all be strict true booleans with one unchanged inventory across
+all 30 rows. Semantic score remains null and release readiness remains false.
+As with the original GC-07 collection policy, full hidden native bytes stay on
+the executing host; the uploaded compact receipts alone cannot certify a Case
+or replace independent recomputation from retained native evidence.
+
+Current main registers only delivery and channels. The two required Case parts
+therefore record empty inventories and the canonical join says
+`gc07.status=not_registered`, not a Case PASS. ERII-376 acceptance covers this
+current-main inventory and synthetic selection/aggregation/refusal fixtures.
+Actual GC-07 source stays with ERII-253. After merging main, that consumer must
+register its original `Gate('gc07', 'verify_gc07.py', 'gc07')`, accept
+`--ci-part wording/noise` in its driver, use `gc07_pairs(part)` to select three
+whole five-round series, and support
+`validate_report(report, binary, part=part)` alongside its unchanged full-report
+validation. `read_report` must read and hash-check the native bytes; partial
+native validation must preserve the original frozen inputs, oracles, corruption
+probes, identity and cleanup checks. Old drivers fail closed. The consumer owns
+actual 30 native receipts, its new exact-SHA full CI and independent acceptance
+review. Synthetic fixtures cannot satisfy that contract.
+
+```sh
+# Repeat for control, wording and noise, in separate folders:
+ERII_VERIFY_GATE_JOBS=2 ERII_VERIFY_CASE_JOBS=4 python3 scripts/verify_suite.py --shard delivery --delivery-part control --binary bin/erii --evidence evidence/delivery-parts/control --jobs 1
+python3 scripts/ci_delivery.py collect --part control --binary bin/erii --evidence evidence/delivery-parts/control
+python3 scripts/ci_delivery.py join --parts evidence/delivery-parts --evidence evidence/delivery-joined
+```
+
+Security CI has three fixed Required parts: `finance` owns the complete
+GC-03 and GC-06 gates; `cases` owns GC-05 and GC-04;
+`protection` owns
+memory-maintenance, recall, tools and artifacts. Each part builds the exact
+source on the same Ubuntu 24.04 runner class, retains two gate lanes and a
+**ten-minute** outer limit. Cases retain their original six-variant/five-round
+harness, variant concurrency, assertions and timeouts; each protection series
+retains five serial consecutive rounds on one worker. Local `make verify`
+continues to run the complete unpartitioned inventory.
+
+The two-part consumer attempt [40257156127, attempt 1](https://github.com/z-chenhao/erii/actions/runs/40257156127),
+source `561421ab8fd96a4e6a44ba2c1efe95398b057451`, timed out on Ubuntu 24.04
+with four AMD EPYC 7763 CPUs. GC-03 completed in 295.76 seconds and GC-04 in
+370.12 seconds; GC-05 then ran 246.32 seconds before cancellation (exit 130).
+The verification phase lasted 542.255 seconds; cancellation cleanup took 1.805
+seconds with `owned_group_drained=true`. These observations motivate isolating
+GC-03 from the two cases lanes. They remain failed-attempt evidence, not proof
+that the three-part topology passes or accelerates the combined consumer.
+
+`ci_security.py` requires all three successful parts and restores the exact
+`SHARDS['security']` order (currently 24 gate invocations). It rejects missing,
+extra, duplicate, reordered, failed, cancelled, focused or undrained receipts,
+changed harness arguments, and source/binary/workflow/run/attempt drift. All three
+parts and the join are required by `Ubuntu checks`. Original native reports,
+logs, timings, CPU/hardware/image and cleanup evidence remain in the part
+artifacts; the compact canonical suite embeds all three original suite receipts.
+Relative to the ERII-375 two-part baseline, the finite cost is one additional
+Ubuntu execution job/build/setup; the join count stays unchanged;
+no single job gains lanes, resources or time. More initially runnable cells can
+add queue delay. Compare same-environment full inventories before any timing
+claim; one pass does not establish stable acceleration.
+
+GC-06 joins the existing finance part alongside GC-03; both start immediately
+on its two lanes. GC-04 and GC-05 occupy the cases part's two lanes,
+while reports retain the original inventory order. Regressions cover both the
+pre-consumer and combined inventory without duplicate registration. The real
+combined gates still require exact-SHA Ubuntu CI and independent review.
+Mechanical receipts retain `semantic_score=null`, `release_ready=false`. If the
+fixed topology is still insufficient, report measurements and stop; do not
+increase limits or weaken gates.
 
 SC conformance partitions its unchanged root-test inventory within each round,
 using the existing `ci_race` CPU budget/partition helpers and `fixture_pool`
@@ -412,6 +493,11 @@ python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --bin
 python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
 python3 scripts/verify_suite.py --shard providers --provider-part cli --binary bin/erii --evidence evidence/provider-parts/cli --jobs 1
 python3 scripts/verify_suite.py --shard providers --provider-part models --binary bin/erii --evidence evidence/provider-parts/models --jobs 1
+# Require all three security parts, with their original commands/counts:
+ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part finance --binary bin/erii --evidence evidence/security-parts/finance --jobs 1
+ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part cases --binary bin/erii --evidence evidence/security-parts/cases --jobs 1
+ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part protection --binary bin/erii --evidence evidence/security-parts/protection --jobs 1
+python3 scripts/ci_security.py --parts evidence/security-parts --evidence evidence/security-joined
 python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence/providers-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
@@ -496,7 +582,7 @@ treat unknown outcomes or missing timestamps as zero.
 
 `ci_compare.py` derives required job names and literal matrices from the maintained
 `ci.yml`, cross-checks parts against `verify_suite.py`/`m6_report.py`, and checks
-all seven logical suites against that same gate inventory. All three strict join jobs
+all seven logical suites against that same gate inventory. All strict join jobs
 must succeed. Joined suite receipts must retain every original part, its clean
 source/build/image/CPU identity, full ordered repetitions and drained groups.
 The canonical joined rows must agree with those parts. Focused/feedback results,
@@ -504,7 +590,7 @@ missing parts, duplicated jobs, cancelled/skipped runs and mismatched attempts
 cannot become eligible samples. The small Core/M6 summaries remain required;
 these checks consume strict-join evidence, not a new case scorer.
 
-The current topology has 30 jobs, including the three communication cells and
+The current topology has 33 jobs, including the three communication cells and
 their join, both maintained race parts, their
 Required join and the independent Python compatibility job. Race matrix values
 are checked against `ci_race_join.PARTS`, just as Core/M6 values use their

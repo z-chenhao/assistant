@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "scope": "Supplemental objective field-completion, continuation, privacy and explicit reminder probes; original GC-06 inputs unchanged.",
+  "rubric": {
+    "ticket_number": "TK-042",
+    "document_name": "Alex Chen",
+    "ticket_type": "flexible"
+  },
+  "attempts": [
+    {
+      "ticket_number": "",
+      "document_name": "Alex Chen",
+      "ticket_type": ""
+    },
+    {
+      "ticket_number": "TK-042",
+      "document_name": "Alex Chen",
+      "ticket_type": "flexible"
+    }
+  ],
+  "private": "Private train ticket draft: SYNTHETIC_LEARNING_PRIVATE_PASSPORT_042",
+  "pause": "今天先暂停学习，不要催我，也不要安排提醒。",
+  "unrelated": "Choose wedding flowers for a small ceremony.",
+  "reminder": "请每天晚上20点提醒我复习火车票姓名更正，从明天开始，使用上海时区。",
+  "fire_at": "2026-10-21T20:00:00+08:00",
+  "cancel_at": "2026-10-22T20:00:00+08:00"
+}

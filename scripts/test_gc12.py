@@ -7,6 +7,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 import meeting_sandbox as peer
 import prepare_release_eval as evaluator
@@ -14,6 +16,23 @@ import verify_gc12 as journey
 
 
 class MeetingTests(unittest.TestCase):
+    def test_unscripted_freeze_admits_gc12_inputs_without_grading_or_external_adapters(self):
+        import unscripted_cases as driver
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit binary identity only')
+            config=root/'config.json';config.write_text('{}')
+            h=SimpleNamespace(root=root,binary=binary,config=config)
+            with patch.object(driver,'rows',return_value=[]),patch.object(driver,'configuration',return_value={}),\
+                 patch.object(driver,'selected',return_value=dict(provider_kind='openai_compatible')):
+                plan=driver.freeze(h,'GC-12','base','loopback_mechanism','local',1,30)
+                self.assertEqual(plan['status'],'frozen')
+                self.assertEqual(plan['scope'],'input_fragment')
+                self.assertIs(plan['eligible_for_grading'],False)
+                self.assertEqual([e['text'] for e in plan['input']['events']],[journey.FIRST,journey.STEER])
+                self.assertEqual(driver.freeze(h,'GC-11','base','loopback_mechanism','local',1,30)['status'],'ineligible')
+                with patch.object(driver,'selected',return_value=None):
+                    self.assertEqual(driver.freeze(h,'GC-12','base','loopback_mechanism','local',1,30)['status'],'setup_required')
+
     def sample(self):
         args=dict(action='send_mail_and_create_calendar',recipient='alex.chen@example.test',
                   subject='Erii review',body='Alex，聊 Erii，30 分钟。',start='2026-10-20T11:00:00+08:00',
@@ -113,11 +132,104 @@ class MeetingTests(unittest.TestCase):
             else:checks=journey.observe(value,remote,old,current,before,remote)
             checks.update(journey.source_observe(value,variant))
             self.assertTrue(all(checks.values()))
+            # Synthetic observations for validator unit tests; these are never
+            # retained as evidence of a product execution.
+            prefix=variant['id']+'/'
+            value['runs']=[dict(run_id=prefix+'run',kind='main',status='completed',
+                model_snapshot_id='model',capability_snapshot_id='capability')]
+            value['snapshots']=[dict(snapshot_id='model')]
+            value['capabilities']=[dict(snapshot_id='capability',can_spawn_agents=False)]
+            value['generations']=[dict(generation_id=prefix+'generation',run_id=prefix+'run',status='completed',
+                attempt_count=1,request_json=json.dumps(dict(model_snapshot=dict(snapshot_id='model'))))]
+            for index,item in enumerate(value['tools']):
+                item.update(invocation_id=prefix+'tool/'+str(index),provider_call_id='fixture')
+                item['request_hash']=journey.call_hash(item)
+            for approval,tool in zip(value['approvals'],value['tools']):
+                approval.update(approval_id=tool['invocation_id']+'/approval',invocation_id=tool['invocation_id'],
+                    frozen_arguments_hash=tool['request_hash'])
+            for table,key in (('requests','delivery_id'),('conversation','message_id')):
+                for index,item in enumerate(value[table]):item[key]=prefix+table+'/'+str(index)
+            checkpoints=[]
+            for name,statuses in [('Monday_frozen_before_notice',['pending']),
+                                  ('Tuesday_frozen_before_consent',['invalidated','pending'])]:
+                cut=copy.deepcopy(value);cut['approvals']=cut['approvals'][:len(statuses)]
+                cut['tools']=cut['tools'][:len(statuses)]
+                for approval,status in zip(cut['approvals'],statuses):approval['status']=status
+                for tool in cut['tools']:tool['attempt_count']=0
+                checkpoints.append(dict(name=name,state=cut,remote=copy.deepcopy(before)))
+            checkpoints.append(dict(name='completed',state=copy.deepcopy(value),remote=copy.deepcopy(remote)))
             rows.append(dict(variant=variant,scope='scripted_whole_case_mechanics',assertions=checks,state=value,
                              replay_state=copy.deepcopy(value),remote=remote,remote_replay=copy.deepcopy(remote),
-                             semantic_score=None,cleanup=dict(owned_processes_joined=True,disposable_root_removed=True),
+                             replay_digest=journey.digest(journey.semantic_state(value)),checkpoints=checkpoints,
+                             fixture_sha256=journey.hashlib.sha256(journey.FIXTURE.read_bytes()).hexdigest(),
+                             semantic_score=None,cleanup=dict(owned_processes_joined=True,http_peer_joined=True,disposable_root_removed=True),
                              private_trace='PRIVATE_TRACE_MUST_NOT_LEAK',private_provider='PRIVATE_MODEL_MUST_NOT_LEAK'))
-        return dict(case_id='GC-12',variants=rows,status='mechanical_pass',cleanup=True,semantic_score=None)
+        identity=journey.source_identity()
+        return dict(case_id='GC-12',variants=rows,status='mechanical_pass',cleanup=True,semantic_score=None,
+            fixture_lock=journey.load(),binary_sha256='b'*64,
+            identity=dict(source_before=identity,source_after=identity,binary_sha256='b'*64,environment=dict(test=True)))
+
+    def test_frozen_nineteen_blocks_and_original_inputs_unchanged(self):
+        lock=journey.load()
+        self.assertEqual(lock['manifest_sha256'],'0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556')
+        self.assertEqual([b['line'] for b in lock['frozen_blocks']],
+            [313,315,317,318,319,320,321,323,827,829,840,842,843,844,846,848,849,850,851])
+        from verify_suite import SHARDS
+        self.assertEqual([(s,g.attempts) for s,gs in SHARDS.items() for g in gs if g.name=='gc12'],[('communication',5)])
+        from unscripted_cases import inputs, matrix
+        self.assertEqual(matrix()['GC-12']['adapter'],'conversation_fragment')
+        self.assertIs(matrix()['GC-12']['eligible_for_grading'],False)
+        for variant in journey.variants():
+            observed=inputs('GC-12',variant['id'])
+            self.assertEqual([e['text'] for e in observed['events']],[variant['first'],variant['steer']])
+            self.assertEqual(json.loads(observed['context'].split('：',1)[1]),variant['source'])
+            self.assertNotIn('Capabilities:',json.dumps(observed))
+
+    def test_validator_rejects_identity_checkpoint_hash_cleanup_or_reused_execution(self):
+        report=self.packets()
+        self.assertEqual(journey.validate_report(report)['receipts'],8)
+        mutations=[lambda r:r['variants'].reverse(),lambda r:r['identity'].update(source_after={}),
+            lambda r:r['identity'].update(environment={}),lambda r:r.update(binary_sha256='0'*64),
+            lambda r:r['variants'][0].update(cleanup={}),lambda r:r['variants'][0]['cleanup'].update(http_peer_joined=1),
+            lambda r:r['variants'][0].update(replay_digest='0'*64),
+            lambda r:r['variants'][0]['checkpoints'].pop(),
+            lambda r:r['variants'][0]['checkpoints'][0]['state']['approvals'][0].update(status='approved'),
+            lambda r:r['variants'][0]['state']['approvals'][0].update(frozen_arguments_hash='bad'),
+            lambda r:r['variants'][0]['state']['generations'][0].update(attempt_count=2),
+            lambda r:r['variants'][0]['state']['capabilities'][0].update(can_spawn_agents=True),
+            lambda r:r['variants'][0].update(fixture_sha256='0'*64),
+            lambda r:r['variants'][1]['state']['runs'][0].update(run_id=r['variants'][0]['state']['runs'][0]['run_id'])]
+        for mutate in mutations:
+            changed=copy.deepcopy(report);mutate(changed)
+            with self.assertRaises((RuntimeError,ValueError,KeyError)):journey.validate_report(changed)
+            with self.assertRaises(ValueError):evaluator.prepare(changed)
+
+    def test_series_cli_reads_focused_suite_output_and_rejects_copied_round(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+            key=journey.hashlib.sha256(json.dumps(['gc12']).encode()).hexdigest()[:12]
+            folder=root/'focused'/key;folder.mkdir(parents=True)
+            report=self.packets()
+            report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
+            report['identity']['binary_sha256']=report['binary_sha256']
+            for n in range(1,6):
+                (folder/f'gc12-{n}.json').write_text(json.dumps(report))
+            failed=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc12.py'),
+                '--binary',str(binary),'--evidence',str(root),'--validate-series'],capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(failed.returncode,0)
+            self.assertIn('reused or invalid GC-12 execution identities',failed.stderr)
+            self.assertNotIn('FileNotFoundError',failed.stderr)
+
+    def test_corruption_probe_cli_and_ci_consumers_with_synthetic_observations(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+            report=self.packets()
+            report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
+            report['identity']['binary_sha256']=report['binary_sha256']
+            results=journey.rejection_probes(report,binary,root/'probes')
+            self.assertEqual(len(results),14)
+            self.assertTrue(all(r['ci_rejected'] for r in results.values()))
+            self.assertIn('reused or invalid GC-12 execution identities',results['copied_round']['reason'])
 
     def test_judge_packets_are_allowlisted_and_ineligible_for_scoring(self):
         prepared=evaluator.prepare(self.packets())

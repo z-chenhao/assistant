@@ -32,7 +32,7 @@ def fixtures():
 
 def pairs(gate):
     driver = importlib.import_module('verify_' + gate.name)
-    if gate.name in ('gc01', 'gc02'):
+    if gate.name in ('gc01', 'gc02', 'gc09', 'gc10'):
         from case_runner import variants
         data = driver._case_dataset() if gate.name == 'gc01' else driver.inputs()
         return [(v['variant_id'], n) for v in variants(*data) for n in range(1, 6)]
@@ -65,8 +65,8 @@ def check_suite(suite, part, source):
 def native_receipt(gate, attempt, folder, binary, suite):
     driver = importlib.import_module('verify_' + gate.name)
     path = folder / report_name(gate, attempt)
-    report = driver.read_report(path) if gate.name == 'gc02' else json.loads(path.read_text())
-    if gate.name in ('gc01', 'gc02'):
+    report = driver.read_report(path) if gate.name in ('gc02','gc09','gc10') else json.loads(path.read_text())
+    if gate.name in ('gc01', 'gc02', 'gc09', 'gc10'):
         driver.validate_report(report, binary)
         rows = report['results']
     else:
@@ -74,6 +74,7 @@ def native_receipt(gate, attempt, folder, binary, suite):
         prepare(report)  # Recompute existing native oracles; stored flags cannot override them.
         rows = report['variants']
         if gate.name == 'gc12':
+            driver.validate_report(report, binary)
             if report.get('binary_sha256') != suite['binary_sha256']:
                 raise ValueError('GC-12 binary drift')
             fixture_sha = file_record(driver.FIXTURE)['sha256']
@@ -86,15 +87,17 @@ def native_receipt(gate, attempt, folder, binary, suite):
                 raise ValueError('native source/binary drift')
     receipts = []
     for row in rows:
-        key = row['variant_id'] if gate.name in ('gc01', 'gc02') else row['variant']['id']
+        key = row['variant_id'] if gate.name in ('gc01', 'gc02', 'gc09', 'gc10') else row['variant']['id']
         checks = dict(row['assertions'])
         if gate.name == 'gc08':
             for field in ('denial_assertions', 'lifecycle_assertions'):
                 checks.update({field + '/' + k: v for k, v in row[field].items()})
         receipts.append(dict(variant_id=key, repetition=row.get('repetition', 1),
                              assertions=checks, cleanup=row['cleanup']))
+        if gate.name == 'gc12':
+            receipts[-1]['execution_ids'] = driver.execution_ids(row)
     raw = path
-    if gate.name == 'gc02':
+    if gate.name in ('gc02','gc09','gc10'):
         raw = path.parent / json.loads(path.read_text())['native']['path']
     return dict(gate=gate.name, attempt=attempt, native=file_record(raw),
                 status=report['status'], semantic_score=report['semantic_score'],
@@ -105,6 +108,7 @@ def check_receipts(receipts, gates):
     expected = [(g.name, n) for g in gates for n in range(1, g.attempts + 1)]
     if [(r['gate'], r['attempt']) for r in receipts] != expected:
         raise ValueError('missing, duplicate or reordered native reports')
+    gc12_seen = {}
     for receipt in receipts:
         gate = next(g for g in gates if g.name == receipt['gate'])
         native = receipt['native']
@@ -126,6 +130,15 @@ def check_receipts(receipts, gates):
                     any(v is not True for v in row['assertions'].values()) or
                     any(v is not True for v in row['cleanup'].values())):
                 raise ValueError('failed assertion or unclean native variant')
+            if gate.name == 'gc12':
+                identities = row.get('execution_ids', {})
+                if set(identities) != {'runs', 'tools', 'generations', 'requests', 'conversation'}:
+                    raise ValueError('missing GC-12 execution identities')
+                for table, ids in identities.items():
+                    if (not ids or any(type(i) is not str or not i for i in ids) or
+                            len(set(ids)) != len(ids) or not gc12_seen.setdefault(table, set()).isdisjoint(ids)):
+                        raise ValueError('reused or invalid GC-12 execution identities: '+table)
+                    gc12_seen[table].update(ids)
 
 
 def collect(folder, part, binary):
