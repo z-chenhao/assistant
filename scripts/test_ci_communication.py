@@ -28,7 +28,10 @@ class CommunicationTests(unittest.TestCase):
                         cleanup=True, native=dict(path=ci.report_name(g,n), bytes=100, sha256='e'*64),
                         rows=[dict(variant_id=v, repetition=r, assertions={'native':True}, cleanup=dict(
                             owned_processes_joined=True, disposable_root_removed=True,
-                            **({'http_peer_joined':True} if g.name=='gc12' else {}))) for v,r in ci.pairs(g)])
+                            **({'http_peer_joined':True} if g.name=='gc12' else {})),
+                            **({'execution_ids':{table:[f'{n}/{v}/{table}'] for table in
+                                ('runs','tools','generations','requests','conversation')}} if g.name=='gc12' else {}))
+                            for v,r in ci.pairs(g)])
                     for g in gates for n in range(1,g.attempts+1)])
         return source, suites, manifests
 
@@ -120,18 +123,30 @@ class CommunicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);gate=next(g for g in SHARDS['communication'] if g.name=='gc12')
             report=MeetingTests().packets()
-            report['binary_sha256']='b'*64
+            binary=root/'erii';binary.write_bytes(b'unit test binary identity only')
+            report['binary_sha256']=ci.file_record(binary)['sha256']
+            report['identity']['binary_sha256']=report['binary_sha256']
             for row in report['variants']:
                 row['fixture_sha256']=ci.file_record(driver.FIXTURE)['sha256']
                 row['cleanup']['http_peer_joined']=True
             path=root/'gc12-1.json';path.write_text(json.dumps(report))
-            suite={'binary_sha256':'b'*64}
-            receipt=ci.native_receipt(gate,1,root,Path('/unused'),suite)
+            suite={'binary_sha256':report['binary_sha256']}
+            receipt=ci.native_receipt(gate,1,root,binary,suite)
             ci.check_receipts([receipt], [type(gate)(gate.name,gate.script,'gc12-1',1)])
             # Keep all author flags true while corrupting an observed side effect.
             report['variants'][0]['remote']['mail'][0]['recipient']='wrong@example.test'
             path.write_text(json.dumps(report))
-            with self.assertRaises(ValueError): ci.native_receipt(gate,1,root,Path('/unused'),suite)
+            with self.assertRaises(ValueError): ci.native_receipt(gate,1,root,binary,suite)
+
+    def test_join_rejects_native_journey_reuse_across_gc12_rounds(self):
+        for field in ('runs','tools','generations','requests','conversation'):
+            with self.subTest(field=field),tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);source,suites,manifests=self.fixture(root)
+                gc12=[r for r in manifests['channels']['receipts'] if r['gate']=='gc12']
+                gc12[1]['rows'][0]['execution_ids'][field]=copy.deepcopy(gc12[0]['rows'][0]['execution_ids'][field])
+                self.write(root,suites,manifests)
+                with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
+                    with self.assertRaisesRegex(ValueError,'reused or invalid GC-12 execution identities: '+field):ci.join(root)
 
     def test_part_selection_rejects_wrong_shard_and_listing(self):
         import contextlib
