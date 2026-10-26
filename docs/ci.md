@@ -787,3 +787,59 @@ workers and deadlines remain unchanged. The collector recomputes all native
 assertions and rejects reused execution identities before joining compact
 receipts. See [GC-11 verification](gc11-verification.md); no semantic score or
 release readiness is inferred.
+
+GC-13 uses six fixed communication variant parts with real Chromium setup.
+Run 40407022499 exhausted the unsplit budget; run 40411110600 passed wording but
+cancelled the three-variant noise part at the same deadline. Each current part
+contains one complete five-round variant series; all 30 receipts remain required.
+This adds four finite setup jobs relative to the two-part revision, with unchanged
+per-job deadlines/resources. `verify_gc13.validate_report` validates each selected
+native report; the full CLI still requires all six variants. Both joins reject
+reused run/tool/generation/message/delivery/Artifact identities across parts.
+Compact per-stage progress and bounded failure summaries survive failed-job
+uploads without exporting large native reports; progress cannot certify a Case.
+The original M6 booking series remains required. See [GC-13 proof limits](gc13-verification.md).
+
+### Local verification storage recovery
+
+GC-13 review of `ed3326667f615ae592b54da2953201a166b7f874` was
+INCONCLUSIVE despite green exact-SHA CI. The registered historical audit test
+failed twice while writing reports with `ENOSPC`, including golden-common-02's
+squashed-main stage. Current-ledger checks did not replace the missing
+two-squash/consumer-main-merge proof; the preview process also failed without
+producing an output file. A concurrent generic maintenance-lock/backup error
+does not independently establish backup corruption or its root cause.
+
+The authorized recovery removed only Go's disposable compile cache with
+`go clean -cache`: available bytes increased from 533,893,120 to 2,785,075,200.
+Before/after filesystem observations and exit zero were retained with the
+ERII-223 coordinator recovery evidence, alongside the original Reviewer logs.
+Raw receipts, failures, source/worktrees, binaries, module downloads, npm and
+Playwright caches were preserved. Subsequent compilation starts with a cold
+build cache and can consume that space again.
+
+For an authorized local recovery:
+
+1. Record `df -h .`, `go env GOCACHE`, cache size, active consumers and a real
+   write/flush/fsync probe in the intended evidence directory. Check both the
+   temporary-fixture and durable-evidence filesystems. Free bytes and a small
+   successful probe are observations, not a reservation or a passed test.
+2. When compile-cache disposal is authorized and no compiler is using it, use
+   `go clean -cache`; retain its exit status and before/after free bytes. Do not
+   delete raw evidence, user data or unrelated work to obtain a green run.
+3. Recheck writable space before each missing check, then rerun the original
+   maintained entry points without changing assertions, counts or deadlines:
+
+   ```sh
+   PYTHONPATH=scripts python3 -m unittest test_release_reference_maintenance.RegisteredSquashAuditTests.test_all_registered_ledgers_through_two_squashes_and_consumer_main_merge
+   python3 scripts/prepare_release_eval.py --input evidence/gc13.json --evidence evidence/gc13-preview.json
+   ```
+
+The preview requires a complete native report bound to the current source,
+binary and environment; old-SHA reports must not be relabelled. Its output must
+be under repository `evidence/`, then copied to the durable root with hashes.
+Keep failed attempts separately and record each replacement command's exit,
+output, source identity, space observations and joined cleanup. Another storage
+failure remains inconclusive. After a documentation/operations recovery creates
+a new SHA, require that SHA's full CI and a new independent acceptance verdict;
+neither the old green CI nor the old INCONCLUSIVE verdict authorizes merge.

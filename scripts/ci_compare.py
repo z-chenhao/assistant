@@ -250,6 +250,7 @@ def validate(data, source, workflow='ci.yml'):
                 manifests = report.get('native_receipts', {})
                 if set(manifests) != set(expected_parts):
                     errors.append('communication: missing native manifests')
+                combined_receipts={}
                 for part in expected_parts:
                     manifest = manifests.get(part, {})
                     fragment = parts.get(part, {})
@@ -261,8 +262,13 @@ def validate(data, source, workflow='ci.yml'):
                             dict(workflow_sha=report.get('workflow_sha'), run_id=str(data['run']['id']),
                                  run_attempt=str(data['run']['run_attempt'])))
                         check_receipts(manifest.get('receipts', []), communication_gates(part))
+                        combined_receipts.update({(r['gate'],r['attempt']):r for r in manifest['receipts']})
                     except (ValueError, KeyError, TypeError):
                         errors.append('communication: failed or incomplete native receipts')
+                try:
+                    check_receipts([combined_receipts[g.name,n] for g in gates for n in range(1,g.attempts+1)],gates)
+                except (ValueError,KeyError,TypeError):
+                    errors.append('communication: reused or incomplete combined native identities')
             continue
         if shard not in ('codemode', 'personal'):
             continue

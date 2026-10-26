@@ -72,13 +72,13 @@ class QuoteBoundaryTests(unittest.TestCase):
             self.assertEqual(prompts,[row['context']+'\n'+row['events'][0]['text'],row['events'][1]['text']])
             self.assertNotIn('Capabilities:',json.dumps(prompts))
         self.assertEqual(journey.REPEATS,5)
-        self.assertEqual(verify_suite.COMMUNICATION_PARTS,('gc01','gc02','gc09','gc10','channels'))
+        self.assertEqual(verify_suite.COMMUNICATION_PARTS,('gc01','gc02','gc09','gc10','gc13-wording-1','gc13-wording-2','gc13-wording-3','gc13-noise-1','gc13-noise-2','gc13-order-1','channels'))
         self.assertEqual([g.name for g in verify_suite.communication_gates('channels')],
             ['gc12','gc08','gc14','gc16','gc11'])
         planned = [g for part in verify_suite.COMMUNICATION_PARTS for g in verify_suite.communication_gates(part)]
         self.assertCountEqual(planned,verify_suite.SHARDS['communication'])
-        self.assertEqual(len(planned),9)
-        self.assertEqual(sum(g.attempts for g in planned),13)
+        self.assertEqual(len(planned),15)
+        self.assertEqual(sum(g.attempts for g in planned),19)
         self.assertEqual([(s,g.attempts) for s,gs in verify_suite.SHARDS.items() for g in gs if g.script == 'verify_gc11.py'],[('communication',1)])
 
     def test_native_manifest_rejects_summary_size_hash_path_and_symlink_forgery(self):

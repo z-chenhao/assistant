@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "frozen_blocks": [
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 327,
+      "sha256": "f46d0a7e267ca9d38e37308e2119c448862816ae00ee738dcd3e84efcce7429c",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 329,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 331,
+      "sha256": "58504854fdc2cbbe6d89e61dd6f9feea3ac03ae61e9505cca30c0fbad7ef1fd9",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 332,
+      "sha256": "7b4c63cc5cad39b8fb11746ea45f43f9b2876622824d8f88c41190b73c0bccec",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 333,
+      "sha256": "7333d2c15f08c9b32a67a247f8c95c6aa7b23bb8a1382ed0d53e1b39af187f3f",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 334,
+      "sha256": "962f796f6ee0f246ec20ed31a25a892056faa76cb7818406b596bed0995ad90a",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 335,
+      "sha256": "cd1fedbb7804e80d90edd3771c708fe14a78534d1fe0dc10b123098daf9f8a0b",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-13",
+      "line": 337,
+      "sha256": "7ed5dd508f254b8ef3ef083effdf1931f29f5bbff9c9223fdd1b6370c5493dda",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 855,
+      "sha256": "2e4e0973f2618947c0d6e9add9bed7fd434f63cad9c9387e818a70e62b88e139",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 857,
+      "sha256": "3bb100be1bdf2bbbd1fcb0df7f6cbb1800db1f3e17317d32ccfc86ce1d6d8d51",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 866,
+      "sha256": "5879d5698b597987e9caea8a1d1c25759fb6cd3067b0aa2555d49ffb7b184672",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 868,
+      "sha256": "2fbd6209697ba30a6932075611584a9065e950602386992ad5d26a510076b1ca",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 869,
+      "sha256": "74db04c2098b3b5624696b6cb98f49f6d0efaec962f32273d5d373e0495f56af",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 870,
+      "sha256": "58d456175db77437f20aa92f27871ecdf2e7f54f4fd84a1c2225770bc7f14fbb",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 871,
+      "sha256": "d16bbe5bb491e7de66114144608e0f6a0d38fb3193fa29b6e69efda8bb3a5b00",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 873,
+      "sha256": "22f742d1bf7cc1c9ce71c979f1972fda371e62e4a3d33d5f5950e77ac23252f8",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 875,
+      "sha256": "1f3c5be27d02cf2da23d19d2327f50e9ffeb6c78e4c9f96467f21b2c0dbaa11c",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 876,
+      "sha256": "0d4c63ebd35efa6697294867d4005e2274cabc0104b2dc89b264a60894612904",
+      "area": "cua"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.14",
+      "line": 877,
+      "sha256": "f3cf223411e4340ebd7d1794f7f9700511d30c77a778fd234ca70b9f98210ee9",
+      "area": "cua"
+    }
+  ],
+  "files": {
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f",
+    "evals/fixtures/m6-v1.json": "3a18255727ffe51d832ac4e1888e4aed2f2988dbb1b7d7438008f863d7f4bd1b",
+    "evals/fixtures/m6-v1.lock.json": "474b9c8e54d4e9df2b7c0809a06e9dd6bb45875227d6bd87e3830d5aee0b59a6",
+    "evals/scoring-v1.json": "6c7cca34d63300c7ec84bd971f89e72daf0c8dd7fadbde240783ab49cf0d4706"
+  }
+}
