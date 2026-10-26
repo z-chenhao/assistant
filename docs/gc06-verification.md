@@ -67,3 +67,8 @@ The maintained `unscripted_cases.py freeze --case GC-06` sends only original use
 context/events through the production Pi Bridge and an operator-prepared profile.
 Its durable learning/assessment/schedule adapter is incomplete and ineligible for
 grading; see [unscripted operations](guides/unscripted-evals.md).
+
+GC-06 is registered in the fixed `security` finance part alongside GC-03.
+The three-part join requires all 24 logical invocations, including GC-04/GC-05
+and every five-round protection series. This adds no job, lane, timeout or
+runner resource; combined exact-SHA CI and independent acceptance remain required.

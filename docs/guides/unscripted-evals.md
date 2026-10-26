@@ -22,7 +22,8 @@ The command emits the authoritative 20-row matrix with individual gaps.
 | GC-13 | Locked `m6-v1` context and events, six variants | Booking browser, approval and unknown outcome |
 | GC-15 | Locked `m6-v1` context and events, six variants | Native files, multimodal evidence and Artifacts |
 | GC-18 | Locked `m6-v1` context and events, six variants | Files, concurrent Tasks, pause/append and delivery |
-| GC-08, 11, 12, 14, 16, 17, 19, 20 | Missing; freeze returns `ineligible`, exit 2 | Non-scripted fixture and maintained lifecycle adapter |
+| GC-12 | Original two inputs and allowed contacts/slots; `--variant base` plus two wordings and three source-noise/order variants | Connected mail/calendar and pre-approval Steering; current entry is an ungraded conversation fragment |
+| GC-08, 11, 14, 16, 17, 19, 20 | Missing; freeze returns `ineligible`, exit 2 | Non-scripted fixture and maintained lifecycle adapter |
 
 Every current execution has `scope=input_fragment`, `eligible_for_grading=false`
 and `final_score=null`. A profile cannot upgrade coverage. A text mention of a

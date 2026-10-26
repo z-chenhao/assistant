@@ -55,7 +55,7 @@ class GateSchedulingTests(unittest.TestCase):
                     if gate == isolated and kind == 'start':
                         self.assertEqual(active, 1, 'isolated Go checks overlapped another harness')
                         self.assertGreaterEqual(stamp, max(e[3] for e in events if e[0] == 'end' and e[1] != isolated))
-                self.assertEqual(peak, 2)
+                self.assertEqual(peak, min(2, len(gates)))
                 self.assertEqual(active, 0)
                 for gate in gates:
                     series = [e for e in events if e[1] == gate.name]
@@ -63,24 +63,20 @@ class GateSchedulingTests(unittest.TestCase):
                                      [(kind, n) for n in range(1, gate.attempts + 1) for kind in ('start', 'end')])
 
     def test_security_long_cases_start_first_with_unchanged_inventory_and_reports(self):
-        # GC-04 is on the frozen consumer PR, not main yet. Exercise that
-        # inventory without importing its business implementation into this PR.
         gates = suite.SHARDS['security']
-        if not any(g.name == 'gc04' for g in gates):
-            gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
         self.assertEqual([(g.name, g.attempts, g.arguments) for g in gates],
                          [('memory-maintenance', 5, ()), ('recall', 5, ()),
                           ('tools', 5, ()), ('artifacts', 5, ()),
-                          ('gc03', 1, ()), ('gc05', 1, ()), ('gc06', 1, ()), ('gc04', 1, ())])
+                          ('gc03', 1, ()), ('gc05', 1, ()), ('gc04', 1, ()), ('gc06', 1, ())])
         ordered = suite.gate_execution_order(gates)
         self.assertEqual([g.name for g in ordered],
-                         ['gc03', 'gc05', 'gc06', 'gc04', 'memory-maintenance', 'recall', 'tools', 'artifacts'])
+                         ['gc03', 'gc04', 'gc05', 'gc06', 'memory-maintenance', 'recall', 'tools', 'artifacts'])
         self.assertCountEqual(ordered, gates)
-        for gate in gates[-4:]:
+        for gate in gates[-3:]:
             args, _, _ = suite.command(gate, 1, Path('/binary'), Path('/evidence'))
             self.assertEqual(args[2:], ['scripts/' + gate.script, '--binary', '/binary',
                                        '--evidence', '/evidence/' + gate.report + '.json'])
-        self.drive('security', gates=gates, first_pair=('gc03', 'gc05'))
+        self.drive('security', gates=gates, first_pair=('gc03', 'gc04'))
 
     def test_long_provider_series_starts_first_without_changing_any_gate(self):
         gates = (suite.Gate('short', '', 'short', 5), suite.Gate('pi-bridge', '', 'pi', 5),
