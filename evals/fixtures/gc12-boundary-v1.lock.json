@@ -1,0 +1,144 @@
+{
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "frozen_blocks": [
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 313,
+      "sha256": "2e59fab8dfa533f5f43d86419081b4e1f7d20f0005cb612ef611671e82aa38b7",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 315,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 317,
+      "sha256": "07fbbdc426a54868fb6a511d7e52ae3d9fc36f354c65efb6f0da33e66259c049",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 318,
+      "sha256": "b92f3379aba55961dc1d7f318918a9827722dfe376e13d95b5a8705e043aebff",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 319,
+      "sha256": "09107cf69dfde87b1af115fe72346bca4476ba4cfb0e48676084b04e67401ea9",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 320,
+      "sha256": "065edd63f54292a6a01cded5fecb1839d02a01c26c62c0202450a4653335c08a",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 321,
+      "sha256": "b5ccad76eec125850bb7337dd1f848e4b74630fb59a364923d7dda7d116b15b2",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-12",
+      "line": 323,
+      "sha256": "6fe58e71b91ba3455c05c9d3bde8e527d3387ece1166eab3aeb6b6aff9d070ad",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 827,
+      "sha256": "2e4e0973f2618947c0d6e9add9bed7fd434f63cad9c9387e818a70e62b88e139",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 829,
+      "sha256": "c8bfec2bef13ced4c65ebf11db0c7ba2cd29aed0fcd52435385d133e12f5a633",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 840,
+      "sha256": "a019d4dd35433274ace5a5ca4e79897cb7c0f10516595903c1c4bea0985304dc",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 842,
+      "sha256": "56086215f0fd7110dfbe1d6e94ecda2fe17a8e1800157112fbcdc34aaac48ec3",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 843,
+      "sha256": "485177bd250d668ee3861ebef98914519024841e27293436331805e2d30fd88a",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 844,
+      "sha256": "3ab1d280d7b807520c6e382211a4fac3028b3dd706dc52c20bef70bb61dfc26a",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 846,
+      "sha256": "22f742d1bf7cc1c9ce71c979f1972fda371e62e4a3d33d5f5950e77ac23252f8",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 848,
+      "sha256": "866c856164ba87b4e3881c01089f3aa863f492277414be8ad0d39829bbd73d81",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 849,
+      "sha256": "c43599abda32faefa4b535c6815c250c40749b371e592c7cf7565a96cfda078a",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 850,
+      "sha256": "712700ca00f332a5bcc5f59fc370580af1ba21eee52271cd650122b7ee172a51",
+      "area": "tools"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.13",
+      "line": 851,
+      "sha256": "35b63f8bc275d91fe289cdb2bb9893c58495672c6917fc7ff0d8e124f511850e",
+      "area": "tools"
+    }
+  ],
+  "files": {
+    "evals/fixtures/gc12-v1.json": "a17b53d62817e9b6e9068a589e8669cdfa3d5136b2f41178df87cddb494c81b5",
+    "evals/fixtures/gc12-v1.lock.json": "f84f7a9675132cff1f8e7f5541fce1d9ad82a037b875894a6f1e977124496a7c",
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f",
+    "evals/scoring-v1.json": "6c7cca34d63300c7ec84bd971f89e72daf0c8dd7fadbde240783ab49cf0d4706"
+  }
+}

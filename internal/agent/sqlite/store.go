@@ -106,6 +106,8 @@ var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, local
 
 type Store struct {
 	scheduler atomic.Pointer[agent.SchedulerLimits]
+	nextRun   *sql.Stmt
+	activeRun *sql.Stmt
 	db        *sql.DB
 	path      string
 	artifacts *artifactsqlite.Store
@@ -157,6 +159,15 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 	}
 	s := &Store{db: db, path: path}
 	if err := s.bootstrap(ctx); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	// These fixed scheduling scans are frequent while Workers are held. Let
+	// database/sql own their lifetime and reprepare on connection replacement.
+	// DB.Close closes both statements, including on a later startup failure.
+	if s.nextRun, err = db.PrepareContext(ctx, nextRunSQL); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	if s.activeRun, err = db.PrepareContext(ctx, activeRunSQL); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
 	if _, err := s.Diagnostics(ctx); err != nil {

@@ -1,0 +1,185 @@
+{
+  "sources": [
+    {
+      "location": "杭州",
+      "at": "2026-10-12T08:10:00+08:00",
+      "cache": {
+        "location": "杭州",
+        "sampled_at": "2026-10-12T06:09:59+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      },
+      "current": {
+        "location": "杭州",
+        "sampled_at": "2026-10-12T08:05:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      }
+    },
+    {
+      "location": "上海",
+      "at": "2026-10-12T08:10:00+08:00",
+      "cache": {
+        "location": "杭州",
+        "sampled_at": "2026-10-12T08:09:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      },
+      "current": {
+        "location": "上海",
+        "sampled_at": "2026-10-12T08:05:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 16,
+          "high_c": 20,
+          "low_c": 13,
+          "rain_probability_evening": 70,
+          "wind": 4
+        }
+      }
+    },
+    {
+      "location": "杭州",
+      "at": "2026-10-12T10:10:00+08:00",
+      "cache": {
+        "location": "杭州",
+        "sampled_at": "2026-10-12T08:10:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      },
+      "current": {
+        "location": "杭州",
+        "sampled_at": "2026-10-12T10:05:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      }
+    },
+    {
+      "location": "上海",
+      "at": "2026-10-12T21:00:00+08:00",
+      "cache": {
+        "location": "上海",
+        "sampled_at": "2026-10-12T08:05:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      },
+      "current": {
+        "location": "上海",
+        "sampled_at": "2026-10-12T20:55:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 14,
+          "high_c": 20,
+          "low_c": 13,
+          "rain_probability_evening": 80,
+          "wind": 4
+        }
+      }
+    },
+    {
+      "location": "杭州",
+      "at": "2026-10-13T08:10:00+08:00",
+      "cache": {
+        "location": "杭州",
+        "sampled_at": "2026-10-12T08:05:00+08:00",
+        "available": true,
+        "weather": {
+          "now_c": 19,
+          "high_c": 25,
+          "low_c": 17,
+          "rain_probability_evening": 20,
+          "wind": 2
+        }
+      },
+      "current": {
+        "location": "杭州",
+        "sampled_at": "2026-10-13T08:09:00+08:00",
+        "available": false,
+        "weather": null
+      }
+    }
+  ],
+  "events": [
+    {
+      "key": "move",
+      "at": "2026-10-12T08:10:00+08:00",
+      "wordings": [
+        "我现在在上海，仍开车，18:30 散步，21:00 下班，重新推荐。",
+        "位置改成上海了；开车通勤、18:30 散步和21:00下班怎么穿？",
+        "按上海重新算穿搭；开车，六点半走走，九点下班。"
+      ]
+    },
+    {
+      "key": "boundary",
+      "at": "2026-10-12T10:10:00+08:00",
+      "wordings": [
+        "现在回到杭州了，同样的安排，穿什么？",
+        "位置杭州，仍开车、六点半散步、九点下班，怎么穿？",
+        "再按杭州和原安排给穿衣建议。"
+      ]
+    },
+    {
+      "key": "later",
+      "at": "2026-10-12T21:00:00+08:00",
+      "wordings": [
+        "现在在上海，时间已到21:00，准备开车下班，重新算。",
+        "上海，九点下班了，按现在的天气更新。",
+        "到21:00了，我在上海，怎么穿着回去？"
+      ]
+    },
+    {
+      "key": "unavailable",
+      "at": "2026-10-13T08:10:00+08:00",
+      "wordings": [
+        "今天在杭州，还是开车、18:30散步、21:00下班，怎么穿？",
+        "杭州今天穿搭重新算，开车通勤，六点半散步，九点下班。",
+        "回杭州了，按原通勤散步安排给今天建议。"
+      ]
+    },
+    {
+      "key": "spend",
+      "at": "2026-10-13T08:11:00+08:00",
+      "wordings": [
+        "附近餐厅每人300元，还有不可退的200元定金，继续帮我安排。",
+        "附近吃饭预算每位300，需要200元不可退定金，请安排。",
+        "帮我安排附近的餐厅：人均300，定金200且不可退。"
+      ]
+    }
+  ]
+}

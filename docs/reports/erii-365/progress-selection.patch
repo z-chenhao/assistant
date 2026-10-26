@@ -1,0 +1,82 @@
+--- a/scripts/delivery.py
++++ b/scripts/delivery.py
+@@ -316,7 +316,10 @@
+     marker = "delivery-progress:" + agent
+     rules = rows(mc("issue", "wakeup", "list", i["id"], "--output", "json"), "wakeups")
+     matches = [r for r in rules if (r.get("instruction") or "").startswith(marker)]
+-    require(len(matches) <= 1, "DUPLICATE_PROGRESS_RULES")
++    enabled = [r for r in matches if r.get("enabled")]
++    require(len(enabled) <= 1, "DUPLICATE_PROGRESS_RULES")
++    if enabled:
++        return enabled[0]
+     if matches:
+         # Preserve platform loop/expiry/manual suppression. Periodic reconciliation remains the fallback.
+         return matches[0]
+--- a/scripts/test_delivery.py
++++ b/scripts/test_delivery.py
+@@ -574,6 +574,65 @@
+         with patch.object(d,'mc',return_value=[rule]) as m:
+             self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),rule)
+         self.assertEqual(m.call_count,1)
++    def progress_rule(self, key, enabled, **fields):
++        return dict(id=key, enabled=enabled, kind='event',
++                    agent_id=d.POLICY['coordinator_id'],
++                    event_types=['task.completed','task.failed'],
++                    filter_agent_id=d.POLICY['builder_id'],
++                    instruction='delivery-progress:'+d.POLICY['builder_id']+' task end', **fields)
++    def test_progress_selects_enabled_rule_with_disabled_history_in_either_order(self):
++        active=self.progress_rule('01a169b1-8859-7aa6-843e-87db54e961f0',True)
++        history=self.progress_rule('01a169b1-8b01-7dde-9f35-03506d5a85ca',False)
++        for rules in ([active,history],[history,active]):
++            for response in (rules,{'wakeups':rules}):
++                with self.subTest(response=response), patch.object(d,'mc',return_value=response) as m:
++                    self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),active)
++                    m.assert_called_once_with('issue','wakeup','list','owner','--output','json')
++    def test_progress_rejects_multiple_enabled_rules_with_or_without_history(self):
++        active=self.progress_rule('active',True)
++        other=self.progress_rule('other',True)
++        history=self.progress_rule('history',False)
++        for rules in ([active,other],[history,active,other],[other,history,active]):
++            with self.subTest(rules=rules), patch.object(d,'mc',return_value=rules) as m:
++                with self.assertRaisesRegex(d.Stop,'DUPLICATE_PROGRESS_RULES'):
++                    d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id'])
++                m.assert_called_once_with('issue','wakeup','list','owner','--output','json')
++    def test_progress_preserves_suppressed_and_expired_rules_without_mutation(self):
++        rules=[self.progress_rule('disabled',False),
++               self.progress_rule('expired',False,expires_at='2020-01-01T00:00:00Z'),
++               self.progress_rule('loop',False,paused_reason='loop'),
++               self.progress_rule('limit',False,paused_reason='max_fires'),
++               self.progress_rule('enabled-expired',True,expires_at='2020-01-01T00:00:00Z')]
++        for rule in rules:
++            with self.subTest(rule=rule), patch.object(d,'mc',return_value=[rule]) as m:
++                self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),rule)
++                m.assert_called_once_with('issue','wakeup','list','owner','--output','json')
++        for history in (rules[:4],list(reversed(rules[:4]))):
++            with self.subTest(history=history), patch.object(d,'mc',return_value=history) as m:
++                self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),history[0])
++                self.assertEqual(m.call_count,1)
++    def test_progress_ignores_unrelated_markers(self):
++        unrelated=[{'id':'reviewer','enabled':True,'instruction':'delivery-progress:'+d.POLICY['reviewer_id']},
++                   {'id':'repair','enabled':True,'instruction':'repair listener'},
++                   {'id':'empty','enabled':True,'instruction':None}]
++        active=self.progress_rule('active',True)
++        with patch.object(d,'mc',return_value=unrelated+[active]) as m:
++            self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),active)
++            self.assertEqual(m.call_count,1)
++        with patch.object(d,'mc',side_effect=[unrelated,{'id':'created'}]) as m:
++            self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),{'id':'created'})
++            self.assertEqual(m.call_args.args[:4],('issue','wakeup','create','owner'))
++    def test_progress_no_rules_preserves_creation_contract(self):
++        with patch.object(d,'mc',side_effect=[[],{'id':'created'}]) as m:
++            self.assertEqual(d.ensure_progress(self.w.data['owner'],d.POLICY['builder_id']),{'id':'created'})
++            self.assertEqual(m.call_count,2)
++            args=m.call_args.args
++            self.assertEqual(args[:4],('issue','wakeup','create','owner'))
++            for flag,value in {'--agent-id':d.POLICY['coordinator_id'], '--kind':'event',
++                               '--event':'task.completed,task.failed','--filter-agent-id':d.POLICY['builder_id'],
++                               '--mode':'continuous','--max-fires':'20','--expires-in':'720h','--output':'json'}.items():
++                self.assertEqual(args[args.index(flag)+1],value)
++            self.assertTrue(args[args.index('--instruction')+1].startswith('delivery-progress:'+d.POLICY['builder_id']+' '))
+     def test_publication_recovery_rejects_mismatched_report_hash(self):
+         r,_=self.checkpoint();rec=d.metadata(self.w.data[r['id']]);rec['publication_intent']={'reviewer_agent_id':d.POLICY['reviewer_id'],'verdict':'PASS','report_sha256':'wrong'};d.put(r,rec)
+         self.w.reviews=[{'id':8,'commit_id':S,'body':'Tampered report\n\nDelivery review issue: '+r['id']+'\nVerdict: PASS\nReviewed head SHA: '+S+'\nReview mode: checkpoint\nReview scope SHA256: '+rec['scope_hash']+'\n'}]
