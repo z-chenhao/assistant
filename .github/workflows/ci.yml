@@ -255,6 +255,8 @@ jobs:
           - shard: communication
             communicationpart: gc10
           - shard: communication
+            communicationpart: gc13
+          - shard: communication
             communicationpart: channels
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -263,10 +265,10 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ci-inputs
         with:
-          browser: ${{ matrix.shard == 'delivery' }}
+          browser: ${{ matrix.shard == 'delivery' || matrix.communicationpart == 'gc13' }}
           sandbox: ${{ matrix.shard == 'communication' }}
       - name: Install pinned offline Web test browser
-        if: ${{ matrix.shard == 'delivery' }}
+        if: ${{ matrix.shard == 'delivery' || matrix.communicationpart == 'gc13' }}
         run: python3 scripts/setup.py --part browser --with-deps --evidence evidence/setup-browser.json
       - name: CLI verification with timings
         run: exec python3 scripts/ci_step.py --name verification --phase test -- python3 scripts/verify_suite.py --binary bin/erii --evidence evidence --shard ${{ matrix.shard }} --jobs 1 ${{ matrix.communicationpart && format('--communication-part {0}', matrix.communicationpart) || '' }} ${{ matrix.shard == 'delivery' && '--delivery-part control' || '' }}
@@ -395,7 +397,7 @@ jobs:
           PART_RESULT: ${{ needs.verify.result }}
         run: |
           test "$PART_RESULT" = success
-          for part in gc01 gc02 gc09 gc10 channels; do
+          for part in gc01 gc02 gc09 gc10 gc13 channels; do
             mv "evidence/communication-parts/evidence-communication-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/communication-parts/$part"
           done
           exec python3 scripts/ci_step.py --name communication-join --phase test -- python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence

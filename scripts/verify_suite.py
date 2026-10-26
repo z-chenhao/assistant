@@ -78,7 +78,8 @@ SHARDS = {
                       Gate("gc02", "verify_gc02.py", "gc02"),
                       Gate("gc09", "verify_gc09.py", "gc09"),
                       Gate("gc10", "verify_gc10.py", "gc10"),
-                      Gate("gc11", "verify_gc11.py", "gc11")),
+                      Gate("gc11", "verify_gc11.py", "gc11"),
+                      Gate("gc13", "verify_gc13.py", "gc13")),
     "personal": (Gate("m6-cases", "run_m6_cases.py", "m6-cases", 5),),
     "providers": (
         Gate("audit-references", "verify_audit_references.py", "audit-reference-history"),
@@ -167,7 +168,7 @@ def provider_gates(part):
     return tuple(g for g in SHARDS['providers'] if (g.name == 'models') == (part == 'models'))
 
 
-COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'channels')
+COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'gc13', 'channels')
 
 
 def communication_gates(part):

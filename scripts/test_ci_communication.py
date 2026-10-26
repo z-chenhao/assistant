@@ -57,7 +57,7 @@ class CommunicationTests(unittest.TestCase):
         planned=[g for part in COMMUNICATION_PARTS for g in communication_gates(part)]
         self.assertCountEqual(planned,SHARDS['communication'])
         self.assertEqual([g.name for g in communication_gates('gc01')],['gc01'])
-        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','channels'))
+        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','gc13','channels'))
         for part in COMMUNICATION_PARTS[:-1]:
             self.assertEqual([g.name for g in communication_gates(part)],[part])
         self.assertEqual([g.name for g in communication_gates('channels')],['gc12','gc08','gc14','gc16','gc11'])
