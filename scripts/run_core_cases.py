@@ -6,6 +6,7 @@ noise/order variants. Mechanical evidence never supplies semantic Judge grades.
 """
 import argparse
 from collections import Counter
+from contextlib import closing
 import csv
 import hashlib
 import io
@@ -112,7 +113,7 @@ def feedback_state(h):
         'recent_trace': 'SELECT event_json,occurred_at FROM run_trace ORDER BY occurred_at DESC LIMIT 8',
     }
     try:
-        with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=.01) as db:
+        with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=.01)) as db:
             deadline = time.monotonic() + .1
             db.set_progress_handler(lambda: time.monotonic() >= deadline, 100)
             db.row_factory = sqlite3.Row
