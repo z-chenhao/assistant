@@ -200,6 +200,16 @@ def independent_executions(rows):
             seen.update(ids)
 
 
+def environment(binary):
+    build = subprocess.check_output(['go','version','-m',str(binary)],text=True)
+    prefix = str(binary)+': '
+    require(build.startswith(prefix),'GC-11 binary build identity unavailable')
+    return dict(platform=platform.platform(),python=platform.python_version(),
+        node=subprocess.check_output(['node','--version'],text=True).strip(),
+        go=subprocess.check_output(['go','version'],text=True).strip(),
+        binary_build=build[len(prefix):])  # Only the incidental executable path is omitted.
+
+
 def validate_report(report,binary=None):
     lock = load()
     require(report.get('case_id') == 'GC-11' and report.get('kind') == 'gc11_boundary' and report.get('status') == 'mechanical_pass' and
@@ -207,8 +217,12 @@ def validate_report(report,binary=None):
         report.get('eligible_for_grading') is False and report.get('release_ready') is False and report.get('cleanup') is True,
         'complete ungraded GC-11 native report required')
     identity = report['identity']; binary = Path(binary or identity['binary_path'])
-    require(identity['source_before'] == identity['source_after'] == source_identity() and identity['binary_sha256'] == sha(binary.read_bytes()) and
-        bool(identity['environment']),'GC-11 source/binary identity drift')
+    require(identity['source_before'] == identity['source_after'] == source_identity() and identity['binary_sha256'] == sha(binary.read_bytes()),
+        'GC-11 source/binary identity drift')
+    observed = environment(binary); recorded = identity.get('environment')
+    require(type(recorded) is dict and set(recorded) == set(observed) and
+        all(type(v) is str and v for v in recorded.values()) and recorded == observed,
+        'GC-11 environment identity drift')
     expected = [(v['variant_id'],n) for v in quote_case.case_variants() for n in range(1,REPEATS+1)]
     require([(r['variant_id'],r['repetition']) for r in report['results']] == expected and all(type(r['repetition']) is int for r in report['results']),
         'all six GC-11 variants and five repetitions required')
@@ -257,6 +271,47 @@ def repetition_rejection_probes(report,binary,folder):
     return result
 
 
+def environment_rejection_probes(report,binary,folder):
+    """Reseal corrupted environment identities and require both consumers to refuse."""
+    from ci_communication import native_receipt, check_receipts
+    from verify_suite import SHARDS, report_name
+    gate = next(g for g in SHARDS['communication'] if g.name == 'gc11')
+    folder.mkdir(parents=True,exist_ok=True)
+    expected = 'GC-11 environment identity drift'
+    mutations = dict(boolean=True,incomplete={'test':True})
+    for field in environment(binary):
+        for mode in ('missing','type','altered'):
+            value = dict(report['identity']['environment'])
+            if mode == 'missing':
+                del value[field]
+            else:
+                value[field] = True if mode == 'type' else 'FORGED'
+            mutations[field+'/'+mode] = value
+    results = {}
+    forged = copy.deepcopy(report)
+    path = folder/report_name(gate,1)
+    for name,value in mutations.items():
+        forged['identity']['environment'] = value
+        retain_report(path,forged)
+        scope = Scope()
+        try:
+            cli = scope.run([sys.executable,str(ROOT/'scripts/verify_gc11.py'),'--binary',str(binary),
+                '--evidence',str(path),'--validate'],capture_output=True,text=True,timeout=60)
+        finally:
+            scope.finish()
+        require(cli.returncode != 0 and expected in cli.stderr,'GC-11 forged environment accepted by CLI: '+name)
+        ci_error = None
+        try:
+            receipt = native_receipt(gate,1,folder,binary,{})
+            check_receipts([receipt],[gate])
+        except RuntimeError as error:
+            ci_error = str(error)
+        require(ci_error == expected,'GC-11 forged environment accepted by CI: '+name)
+        results[name] = dict(cli_exit_code=cli.returncode,cli_rejected=True,ci_rejected=True,reason=ci_error)
+    (folder/'rejection.json').write_text(json.dumps(results,indent=2)+'\n')
+    return results
+
+
 def summary(report):
     return dict(case_id='GC-11',status=report['status'],receipts=len(report['results']),cleanup=report['cleanup'],
         semantic_score=None,release_ready=False,eligible_for_grading=False,frozen_blocks=23,
@@ -296,9 +351,7 @@ def main():
     args.evidence.unlink(missing_ok=True); args.evidence.parent.mkdir(parents=True,exist_ok=True)
     report = dict(case_id='GC-11',kind='gc11_boundary',status='inconclusive',fixture_lock=load(),semantic_score=None,eligible_for_grading=False,
         release_ready=False,cleanup=False,results=[],identity=dict(source_before=source_identity(),binary_path=str(binary),
-            binary_sha256=sha(binary.read_bytes()),environment=dict(platform=platform.platform(),python=platform.python_version(),
-                node=subprocess.check_output(['node','--version'],text=True).strip(),go=subprocess.check_output(['go','version'],text=True).strip(),
-                binary_build=subprocess.check_output(['go','version','-m',str(binary)],text=True))),
+            binary_sha256=sha(binary.read_bytes()),environment=environment(binary)),
         remaining=dict(parent='ERII-223',semantic_score=None,current_L2='unexecuted',release_ready=False,
             unscripted='gc11_driver.py --trial; approved isolated profile and independent semantic grading required',
             task_child_approval_unknown='Two short synchronous Main turns. No authorized purchase, Task or Child. Buying transfers to GC-13; Task cancel/old epoch and unknown external effects are inapplicable here.'))
@@ -320,6 +373,8 @@ def main():
         result = validate_report(report,binary)
         report['repetition_rejection_probes'] = repetition_rejection_probes(report,binary,
             args.evidence.parent/'.gc11-native'/(args.evidence.stem+'-copied-repetitions'))
+        report['environment_rejection_probes'] = environment_rejection_probes(report,binary,
+            args.evidence.parent/'.gc11-native'/(args.evidence.stem+'-forged-environment'))
     except BaseException:
         report['status'] = 'inconclusive'
         raise

@@ -66,6 +66,14 @@ reuse the same identities within one journey. Copying six real journeys and
 renumbering them as 30, even with resealed manifests, must fail both the actual
 validator CLI and the CI native-receipt consumer.
 
+Environment identity requires exactly five nonempty string fields: platform,
+Python, Node, Go and binary build metadata. Both consumers compare these with
+fresh local observations, normalizing only the executable path in Go's build
+header while retaining compiler version and all build settings. Seventeen
+resealed corruption probes reject Boolean/incomplete identities and each missing,
+mistyped or altered field through the actual CLI and CI consumer. Validate on the
+recorded execution environment; another environment requires a new execution.
+
 A small public manifest binds retained `.gc11-native/` bytes by size and SHA256.
 Keep those bytes and the copied-repetition rejection diagnostic locally for
 independent review. Hashes bind consistency, not authorship. Missing, tampered,

@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -117,12 +118,12 @@ class QuoteBoundaryTests(unittest.TestCase):
         # Identity-only synthetic rows exercise the negative consumer path.
         # They are never accepted as successful mechanical observations.
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp); binary = root/'erii'; binary.write_bytes(b'identity only')
+            root = Path(tmp); binary = Path(shutil.which('go')).resolve()
             identity = journey.source_identity()
             report = dict(case_id='GC-11',kind='gc11_boundary',status='mechanical_pass',
                 fixture_lock=journey.load(),semantic_score=None,eligible_for_grading=False,
                 release_ready=False,cleanup=True,identity=dict(source_before=identity,source_after=identity,
-                    binary_path=str(binary),binary_sha256=journey.sha(binary.read_bytes()),environment={'test':True}),
+                    binary_path=str(binary),binary_sha256=journey.sha(binary.read_bytes()),environment=journey.environment(binary)),
                 results=[dict(variant_id=v['variant_id'],repetition=n,
                     journey=dict(state=self.native_state(v['variant_id']+'/'+str(n))))
                     for v in variants(*journey.inputs()) for n in range(1,6)])
@@ -132,6 +133,29 @@ class QuoteBoundaryTests(unittest.TestCase):
             self.assertTrue(result['cli_rejected'])
             self.assertTrue(result['ci_rejected'])
             self.assertNotEqual(result['cli_exit_code'],0)
+
+    def test_resealed_environment_forgery_reaches_real_cli_and_ci_rejection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = Path(shutil.which('go')).resolve()
+            source = journey.source_identity()
+            report = dict(case_id='GC-11',kind='gc11_boundary',status='mechanical_pass',
+                fixture_lock=journey.load(),semantic_score=None,eligible_for_grading=False,
+                release_ready=False,cleanup=True,results=[],identity=dict(source_before=source,source_after=source,
+                    binary_path=str(binary),binary_sha256=journey.sha(binary.read_bytes()),environment=journey.environment(binary)))
+            results = journey.environment_rejection_probes(report,binary,Path(tmp))
+            self.assertEqual(len(results),17)
+            self.assertTrue(all(r['cli_rejected'] and r['ci_rejected'] for r in results.values()))
+
+    def test_environment_normalizes_only_binary_path_and_preserves_build_version(self):
+        def output(args,**kwargs):
+            if args[:3] == ['go','version','-m']:
+                return args[3]+': go1.26.2\n\tbuild\tvcs.revision=exact\n'
+            return 'runtime version\n'
+        with patch.object(journey.subprocess,'check_output',side_effect=output):
+            original = journey.environment(Path('/original/erii'))
+            relocated = journey.environment(Path('/relocated/erii'))
+        self.assertEqual(original,relocated)
+        self.assertEqual(original['binary_build'],'go1.26.2\n\tbuild\tvcs.revision=exact\n')
 
     def test_validator_requires_complete_inventory_identity_cleanup_and_recomputation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -146,12 +170,16 @@ class QuoteBoundaryTests(unittest.TestCase):
                     for v in variants(*journey.inputs()) for n in range(1,6)])
             # Native corruption is exercised on real receipts by rejection_probes;
             # this unit test isolates the enclosing inventory/identity contract.
-            with patch.object(journey,'observe',return_value={'native':True}), patch.object(journey,'rejection_probes',return_value={'native':True}):
+            with patch.object(journey,'observe',return_value={'native':True}), patch.object(journey,'rejection_probes',return_value={'native':True}), \
+                    patch.object(journey,'environment',return_value={'test':'observed'}):
+                report['identity']['environment'] = {'test':'observed'}
                 self.assertEqual(journey.validate_report(report,binary)['receipts'],30)
                 mutations = [lambda r:r.update(cleanup=False),lambda r:r.update(semantic_score=0),
                     lambda r:r.update(eligible_for_grading=True),lambda r:r.update(release_ready=True),
                     lambda r:r['identity'].update(binary_sha256='0'*64),lambda r:r['identity'].update(source_after={}),
-                    lambda r:r['identity'].update(environment={}),lambda r:r['results'].pop(),
+                    lambda r:r['identity'].update(environment={}),lambda r:r['identity'].update(environment=True),
+                    lambda r:r['identity'].update(environment={'test':True}),
+                    lambda r:r['identity'].update(environment={'test':'FORGED'}),lambda r:r['results'].pop(),
                     lambda r:r['results'].append(r['results'][0]),lambda r:r['results'].reverse(),
                     lambda r:r['results'][0].update(repetition=True),lambda r:r['results'][0].update(cleanup={}),
                     lambda r:r['results'][0].update(assertions={'native':1}),lambda r:r.update(rejection_probes={})]
