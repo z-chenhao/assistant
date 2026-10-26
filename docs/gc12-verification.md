@@ -44,15 +44,51 @@ manifest carries native execution IDs and rejects reused Run, ToolInvocation,
 generation, Delivery or message IDs across all five rounds. Restart snapshots
 within one journey retain their original IDs. Hashes prove consistency;
 independent exact-SHA review and required CI remain mandatory.
-The optional rejection probe corrupts real passing bytes in 13 ways and requires
+The optional rejection probe corrupts real passing bytes in 17 ways and requires
 both the actual validator CLI and native CI consumer to reject them. It also
 submits a copied complete round to the CI join and requires identity rejection.
+Three corruptions set the denied variant's process, HTTP peer or disposable-root
+cleanup flag false and recompute the aggregate exactly as `run()` does. Both
+consumers must still reject and name that variant and exact cleanup condition.
+Another corruption rejects a generation admitted at the Steering crash cut.
 Full diagnostics stay beside the input report in its `.rejections` directory.
 
 The CLI removes the previous aggregate before fixture validation or startup.
 An unsuccessful rerun exits nonzero and leaves no current passing aggregate;
 variant diagnostics remain available, and Judge preparation rejects the missing
-report. To run the success → same-path startup failure → Judge rejection
+report. Final native-validation refusals name the variant and each failed
+assertion, checkpoint/replay/hash boundary or cleanup condition. They retain
+`gc12-N/rejected-report.json` locally, including the full failed aggregate, before
+unwinding. Only `gc12-N/failure/summary.json` and `receipt.json.gz` enter the compact
+CI artifact. The summary binds source, binary and rejected bytes with hashes.
+The compressed receipt contains the rejected variant's native observations;
+model generations retain snapshot IDs and hashes instead of full requests or
+responses. Original semantic-state digests and recomputed checks accompany this
+diagnostic projection. It cannot replace raw native acceptance evidence.
+Evidence-write failures preserve the original nonzero refusal. No retry occurs.
+A fresh drive clears its own previous failure files as well as the aggregate.
+Row cleanup failures are diagnosed before the computed aggregate is rejected;
+the aggregate must still be exactly true before any report can pass. Regression
+tests cover all three cleanup flags through `run()` and the actual validator CLI,
+including failed-byte/projection hashes and a clean rerun clearing stale failure
+files. Fault injection changes receipt flags only; it never leaves real processes
+or peers running to manufacture a cleanup failure.
+
+The ERII-253 fourth-round CI refusal lacks the original native bytes; its exact
+cause remains inconclusive. A subsequent ERII-382 CI failure did retain the
+`wording-2` receipt: `frozen_generations` rejected one completed generation with
+attempt_count=2. Steering could start that generation while the approval notice
+was held on a separate goroutine; SIGKILL then left it pending for Host recovery.
+The harness now arms the existing `after_compaction_commit` barrier before
+Steering and captures `steering_crash_cut` before new generation admission.
+Validation recomputes that no generation was added and the original inputs are
+durable. The original one-attempt oracle remains intact; Runtime recovery is
+unchanged. This fixes the demonstrated crash-cut race without claiming the
+missing historical failure had the same cause. Deterministic regressions
+exercise the same final-validation rejection through run, validator CLI and CI
+consumer, while preserving all 19 blocks, eight journeys and five serial rounds.
+
+To run the success → same-path startup failure → Judge rejection
 regression through the actual product CLI:
 
 ```sh
@@ -73,7 +109,9 @@ uses `/usr/bin/python3` inside the existing sandbox.
 
 Drive submits the original request, reads the exact contacts/recent thread and
 common slots through MCP, and holds Monday's frozen approval before channel
-transport. It persists “不要周一。”, rejects obsolete approval, SIGKILLs that
+transport. It arms the pre-admission barrier, persists “不要周一。”, rejects
+obsolete approval, observes the frozen compaction before any new generation,
+SIGKILLs that
 server and starts the same installation again. The new frozen action identifies
 Alex Chen, Tuesday 11:00–11:30 +08, subject, short body and both actions. Wrong
 hashes reject; concurrent signed callbacks and repeated source IDs approve once.
