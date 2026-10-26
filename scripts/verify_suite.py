@@ -98,6 +98,36 @@ SHARDS = {
 # original logical Code Mode inventory; no partial job is a merge verdict.
 CODEMODE_PARTS = ('control', 'GC-17', 'GC-19', 'GC-20', 'contracts')
 
+# GC-07's native driver belongs to its consumer PR. These fixed selectors are
+# usable before registration, without inventing a Case PASS on current main.
+DELIVERY_PARTS = ('control', 'wording', 'noise')
+GC07_VARIANTS = {
+    'wording': ('wording-1', 'wording-2', 'wording-3'),
+    'noise': ('noise-1', 'noise-2', 'order-1'),
+}
+
+
+def gc07_pairs(part):
+    return [(variant, n) for variant in GC07_VARIANTS[part] for n in range(1, 6)]
+
+
+def delivery_gates(part):
+    if part not in DELIVERY_PARTS:
+        raise ValueError('unknown delivery part')
+    gates = SHARDS['delivery']
+    if ([g.name for g in gates if g.name != 'gc07'] != ['delivery', 'channels'] or
+            len([g for g in gates if g.name == 'gc07']) > 1):
+        raise ValueError('unassigned or duplicate delivery gate')
+    if part == 'control':
+        return tuple(g for g in gates if g.name != 'gc07')
+    case = next((g for g in gates if g.name == 'gc07'), None)
+    if case is None:
+        return ()
+    if case != Gate('gc07', 'verify_gc07.py', 'gc07'):
+        raise ValueError('GC-07 original gate drift')
+    return (Gate('gc07-' + part, case.script, 'gc07-' + part,
+                 arguments=('--ci-part', part)),)
+
 
 def codemode_gates(part):
     if part == 'control':
@@ -388,6 +418,7 @@ def main():
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
     parser.add_argument('--provider-part', choices=PROVIDER_PARTS)
     parser.add_argument('--security-part', choices=SECURITY_PARTS)
+    parser.add_argument('--delivery-part', choices=DELIVERY_PARTS)
     parser.add_argument('--communication-part', choices=COMMUNICATION_PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
@@ -395,11 +426,11 @@ def main():
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.list:
-        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part:
+        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part or args.delivery_part:
             parser.error('--list cannot be combined with gate/part execution')
         print(json.dumps([row for row in catalogue() if not args.shard or row['shard'] == args.shard], indent=2))
         return 0
-    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part):
+    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part or args.delivery_part):
         parser.error('--gate cannot be combined with a CI part')
     plans = select_gates(parser, args.shard, args.gate)
     if args.codemode_part and args.shard != 'codemode':
@@ -412,6 +443,11 @@ def main():
         parser.error('--communication-part requires --shard communication')
     if args.security_part and args.shard != 'security':
         parser.error('--security-part requires --shard security')
+    if args.delivery_part and args.shard != 'delivery':
+        parser.error('--delivery-part requires --shard delivery')
+    if sum(bool(p) for p in (args.codemode_part, args.personal_part, args.provider_part,
+                            args.communication_part, args.security_part, args.delivery_part)) > 1:
+        parser.error('only one CI part can be selected')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -433,7 +469,9 @@ def main():
         plans['communication'] = communication_gates(args.communication_part)
     if args.security_part:
         plans['security'] = security_gates(args.security_part)
-    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part
+    if args.delivery_part:
+        plans['delivery'] = delivery_gates(args.delivery_part)
+    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part or args.delivery_part
     report_suffix = (args.shard or 'all') + ('-' + part if part else '')
     if args.gate:
         # Focused runs cannot overwrite or masquerade as a complete shard verdict.
@@ -492,7 +530,7 @@ def main():
                   complete_inventory=not bool(args.gate or part),
                   codemode_part=args.codemode_part, personal_part=args.personal_part,
                   provider_part=args.provider_part, communication_part=args.communication_part,
-                  security_part=args.security_part,
+                  security_part=args.security_part, delivery_part=args.delivery_part,
                   run_id=os.environ.get("GITHUB_RUN_ID"), run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"),
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),

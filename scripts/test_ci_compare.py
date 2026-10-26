@@ -143,6 +143,8 @@ class CurrentComparisonTests(unittest.TestCase):
         import ci_providers
         import ci_communication
         import ci_security
+        import ci_delivery
+        from test_ci_delivery import DeliveryTests
         from test_ci_security import SecurityTests
         from unittest.mock import patch
         from test_ci_communication import CommunicationTests
@@ -174,6 +176,11 @@ class CurrentComparisonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             reports['suite-security.json'] = ci_security.validate(SecurityTests().fixture(root))
+        with tempfile.TemporaryDirectory() as directory:
+            source, suites, manifests = DeliveryTests().fixture(Path(directory))
+            for manifest in manifests.values(): manifest['fixtures'] = ci_communication.fixtures()
+            reports['suite-delivery.json'] = ci_delivery.validate(suites, manifests, source,
+                dict(workflow_sha=None, run_id=None, run_attempt=None), ci_communication.fixtures())
         for name, report in reports.items():
             if not name.startswith('suite-'):
                 continue
@@ -199,6 +206,11 @@ class CurrentComparisonTests(unittest.TestCase):
             for fragment in [security, *security['parts'].values()]:
                 fragment.update(run_id=str(value['run']['id']), run_attempt=str(value['run']['run_attempt']))
 
+            delivery = value['reports']['suite-delivery.json']
+            for part, fragment in delivery['parts'].items():
+                fragment.update(run_id=str(value['run']['id']), run_attempt=str(value['run']['run_attempt']))
+                from ci_delivery import DELIVERY_IDENTITY
+                delivery['native_receipts'][part]['identity'] = {k:fragment[k] for k in DELIVERY_IDENTITY}
             value['jobs'] = [dict(id=i, name=name, conclusion='success', steps=[], head_sha='a'*40,
                                  run_id=value['run']['id'], run_attempt=value['run']['run_attempt'],
                                  started_at='2026-10-19T00:00:00Z', completed_at='2026-10-19T00:00:40Z')
@@ -211,10 +223,10 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 33)
+        self.assertEqual(len(comparison.topology()), 36)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
-                         'Providers (models)', 'Complete providers evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
+                         'Providers (models)', 'Complete providers evidence', 'GC-07 (wording)', 'GC-07 (noise)', 'Complete delivery evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
                          'Verification (communication/gc01)', 'Verification (communication/gc02)',
                          'Verification (communication/channels)'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))

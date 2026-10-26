@@ -14,7 +14,7 @@ import zipfile
 
 import ci_profile as profile
 from evidence import artifact_archive, inventory
-from verify_suite import SHARDS, CODEMODE_PARTS, PROVIDER_PARTS, COMMUNICATION_PARTS, SECURITY_PARTS, codemode_gates, personal_gates, provider_gates, communication_gates
+from verify_suite import SHARDS, GC07_VARIANTS, CODEMODE_PARTS, PROVIDER_PARTS, COMMUNICATION_PARTS, SECURITY_PARTS, codemode_gates, personal_gates, provider_gates, communication_gates
 import m6_report
 import ci_race_join
 from ci_gate import REQUIRED
@@ -125,6 +125,7 @@ def topology(text=None):
                         set(m6_report.PARTS) - {'memory', 'network', 'booking'} if key == 'personal_deferred' else
                         set(PROVIDER_PARTS) if key == 'providers' else
                         set(SECURITY_PARTS) if key == 'security' else
+                        set(GC07_VARIANTS) if key == 'delivery' else
                         set(ci_race_join.PARTS) if key == 'race' else set())
             if set(values) != expected or len(values) != len(expected):
                 raise ValueError('workflow and suite part inventory drift')
@@ -189,6 +190,24 @@ def validate(data, source, workflow='ci.yml'):
     for shard, gates in SHARDS.items():
         report = reports.get('suite-' + shard + '.json', {})
         rows = suite(report, shard, gates)
+        if shard == 'delivery':
+            from ci_delivery import validate as validate_delivery
+            from ci_communication import fixtures
+            try:
+                joined = validate_delivery(report.get('parts', {}), report.get('native_receipts', {}),
+                    {'source_sha': source, 'source_dirty': False,
+                     'source_diff_sha256': hashlib.sha256(b'').hexdigest()},
+                    dict(workflow_sha=report.get('workflow_sha'), run_id=str(data['run']['id']),
+                         run_attempt=str(data['run']['run_attempt'])), fixtures())
+                if (report.get('delivery_part') is not None or joined['shards']['delivery'] != rows or
+                        joined['gc07'] != report.get('gc07')):
+                    errors.append('delivery: reconstructed join inventory drift')
+            except (ValueError, KeyError, TypeError):
+                errors.append('delivery: failed or incomplete part receipts')
+            for fragment in report.get('parts', {}).values():
+                identities.add((fragment.get('binary_sha256'), fragment.get('image_os'), fragment.get('image_version'),
+                                fragment.get('hardware', {}).get('logical_cpus')))
+            continue
         if shard == 'security':
             from ci_security import validate as validate_security
             try:

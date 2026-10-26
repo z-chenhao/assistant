@@ -208,7 +208,7 @@ class VerificationTests(unittest.TestCase):
                     self.assertEqual(deadlines[0], "${{ matrix.shard == 'delivery' && 15 || 10 }}")
                 else:
                     self.assertRegex(deadlines[0], r'^\d+$')
-                    limit = 15 if path.name == 'ci.yml' and name in ('fast', 'race') else 10
+                    limit = 15 if path.name == 'ci.yml' and name in ('fast', 'race', 'delivery') else 10
                     self.assertTrue(0 < int(deadlines[0]) <= limit, f'{path}:{name}')
                     if path.name == 'ci.yml' and name == 'race':
                         self.assertEqual(int(deadlines[0]), 15, 'retain the approved teardown allowance for both race parts')
@@ -247,6 +247,24 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('scripts/ci_security.py --parts evidence/security-parts --evidence evidence', security_join)
         self.assertIn('evidence-security-part-*', security_join)
         self.assertIn('for part in finance cases protection; do', security_join)
+        delivery = workflow.split('  delivery:\n', 1)[1].split('  delivery_join:', 1)[0]
+        self.assertIn('deliverypart: ["wording", "noise"]', delivery)
+        self.assertIn('timeout-minutes: 15', delivery)
+        self.assertIn('ERII_VERIFY_GATE_JOBS: "2"', delivery)
+        self.assertIn('ERII_VERIFY_CASE_JOBS: "4"', delivery)
+        self.assertIn('browser: "true"', delivery)
+        self.assertIn('--shard delivery --delivery-part ${{ matrix.deliverypart }} --jobs 1', delivery)
+        self.assertIn('scripts/ci_delivery.py collect', delivery)
+        self.assertNotIn('needs:', delivery)
+        self.assertNotIn('include-hidden-files:', delivery)
+        self.assertIn("matrix.shard == 'delivery' && '--delivery-part control'", verify)
+        delivery_join = workflow.split('  delivery_join:\n', 1)[1].split('  communication_join:', 1)[0]
+        self.assertIn('needs: ["verify", "delivery"]', delivery_join)
+        self.assertIn('timeout-minutes: 3', delivery_join)
+        self.assertIn('test "$PART_RESULT" = success', delivery_join)
+        self.assertIn('for part in control wording noise; do', delivery_join)
+        self.assertIn('scripts/ci_delivery.py join --parts evidence/delivery-parts --evidence evidence', delivery_join)
+        self.assertIn('evidence-delivery-part-*', delivery_join)
         checks = workflow[workflow.index('  checks:'):]
         needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
@@ -258,7 +276,7 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 16)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 18)
         self.assertIn('racepart: ["packages", "sqlite"]', workflow)
         race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
         self.assertIn('needs: race', race_join)
@@ -266,7 +284,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('scripts/ci_race_join.py', race_join)
         self.assertIn('evidence-race-part-*', race_join)
         self.assertIn("sandbox: ${{ matrix.shard == 'communication' }}", workflow)
-        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 8)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 9)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
         self.assertIn('make build', action)
@@ -289,10 +307,10 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('needs: python_compat', deferred)
         self.assertNotIn('if:', deferred.split('    steps:', 1)[0])
         self.assertIn('personal_deferred', ci_gate.REQUIRED)
-        # Exactly 22 execution cells are initially runnable, independent of
+        # Exactly 24 execution cells are initially runnable, independent of
         # GitHub's unspecified matrix admission order. Four follow Python.
         import ci_compare
-        self.assertEqual(len(ci_compare.topology()) - 7 - len(parts[1]), 22)
+        self.assertEqual(len(ci_compare.topology()) - 8 - len(parts[1]), 24)
         personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
         self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
         personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]
