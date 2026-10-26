@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Join both fixed security parts; preserve every original gate receipt."""
+"""Join all three fixed security parts; preserve every original gate receipt."""
 import argparse
 from collections import Counter
 import json
@@ -16,7 +16,7 @@ SECURITY_IDENTITY = (*IDENTITY, 'run_id', 'run_attempt')
 
 def validate(suites, source=None, run=None):
     if set(suites) != set(SECURITY_PARTS):
-        raise ValueError('exactly both security parts required')
+        raise ValueError('exactly all three security parts required')
     expected = [(g.name, n) for g in SHARDS['security'] for n in range(1, g.attempts + 1)]
     if Counter((g.name, n) for p in SECURITY_PARTS for g in security_gates(p)
                for n in range(1, g.attempts + 1)) != Counter(expected):
