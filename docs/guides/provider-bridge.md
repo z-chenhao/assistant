@@ -7,8 +7,10 @@ SDK dependency tree; it adds no hosted service or account cost. Its SDK still
 brings other provider packages transitively, although Erii does not enable them.
 Current OpenAI account OAuth is also implemented; see the account lifecycle below.
 The [Main CLI](main-loop.md) uses the same Bridge for frozen Run requests,
-Direct Tool continuation and Conversation recovery. Worker Runs and general
-Durable Replay remain later slices. This is not complete M1.
+Direct Tool continuation and Conversation recovery. Main and Worker use the
+same Agent Loop and frozen snapshots; [delegation](children.md) and
+[Code Mode](codemode.md) document the current recovery boundaries. Bridge conformance alone does not establish M1, real provider
+compatibility or release acceptance.
 
 ## ChatGPT account lifecycle
 
@@ -116,7 +118,7 @@ RPC before releasing storage. Failed disposal reaps its peer as usual.
 Authorization deferral. It remains a future requirement, not a passing check.
 Real interactive login/Keychain/provider Live Shadow remains **inconclusive**
 until explicitly performed; deterministic fixtures do not establish account
-eligibility or real service availability. Main/Conversation execution is later.
+eligibility or real service availability.
 
 ## Connect a local model
 
@@ -266,7 +268,8 @@ responsive replacement Bridge alone cannot restore readiness. A failed commit
 changes neither the profile, Probe version, config nor events. Existing SecretStore registration
 writes credentials first and removes a new orphan on failed metadata commit.
 SecretStore/SQLite still have no distributed transaction: a hard crash between
-those commits can orphan a credential; reconciliation is later work.
+those commits can orphan a credential; automatic orphan enumeration/reconciliation
+is not implemented.
 
 `model cancel` cancels setup without changing durable state. No model is chosen
 automatically. Every process that uses a test profile must explicitly supply
@@ -316,8 +319,11 @@ one sequence and rejects gaps/out-of-order new events. A completion is delivered
 once per generation call. Complete frames already received before process EOF
 are drained before reporting a crash; incomplete generation returns an explicit
 error with no partial result. Only the next independent operation restarts and
-re-handshakes the same Bridge. There is no durable generation-result ledger yet;
-A later M1 slice will persist model-call/Conversation completion and recovery decisions.
+re-handshakes the same Bridge. The Bridge process itself does not own durable
+results: the Host persists frozen requests and accepted results in its
+`model_generation` ledger. [Main recovery](main-loop.md) checkpoints model and
+Conversation completion; [Code Mode](codemode.md) retains its fixed-source replay
+ledger through the same Host pipeline.
 
 Frames are bounded to 1 MiB; generation output to the smaller of 64 KiB and four
 bytes per requested output token, on a UTF-8 boundary. This is a byte safety bound,

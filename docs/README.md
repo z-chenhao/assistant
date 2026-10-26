@@ -23,9 +23,13 @@ semantics; feature guides describe the implemented paths and their proof limits.
 - [End-to-end verification](guides/verification.md)
 - [Verification feature map](../scripts/FEATURES.md)
 - [Local-first evidence collection and handoff](guides/evidence.md)
+- [Release evidence decisions and proof limits](guides/release-evidence.md)
+- [Unscripted evaluation entry and support matrix](guides/unscripted-evals.md)
 - [Main loop and recovery](guides/main-loop.md)
 - [Core conformance](guides/core-evals.md), [personal-assistant evaluation](guides/m6-evals.md)
 - [CI operations](ci.md), [Golden Cases](../evals/golden-cases.md)
+- [v1 release audit](v1-release-audit.md), [live evaluation preflight](v1-live-preflight.md)
+- Exact case mechanics: [GC-01 health](gc01-verification.md), [GC-03 finance](gc03-verification.md), [GC-08 wedding](gc08-verification.md), [GC-09 agenda](gc09-verification.md), [GC-10 local life](gc10-verification.md), [GC-11 evaluation](gc11-evaluation.md), [GC-12 invitation](gc12-verification.md), [GC-14 monitoring](gc14-verification.md), [GC-16 research](gc16-verification.md)
 
 ## Architecture and historical evidence
 
@@ -38,4 +42,6 @@ belong in `adr/`. Dated measurements and compatibility results belong in
 `reports/`; they are historical observations, not current release certification.
 Generated local verification output stays in ignored `evidence/`. Update this
 index and the feature map when changing a user path. `make lint` checks local
-Markdown destinations so moves cannot silently break navigation.
+Markdown destinations and heading anchors, including repository AGENTS links, so moves
+cannot silently break navigation. Code examples and runtime-injected policy are
+not repository navigation.
