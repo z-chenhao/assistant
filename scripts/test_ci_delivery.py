@@ -59,8 +59,11 @@ class DeliveryTests(unittest.TestCase):
             manifests[part]['suite']=delivery.file_record(path)
             (root/part/'delivery-receipts.json').write_text(json.dumps(manifests[part]))
 
+    def controls(self):
+        return tuple(g for g in suite.SHARDS['delivery'] if g.name != 'gc07')
+
     def consumer(self):
-        return patch.dict(suite.SHARDS, delivery=(*suite.SHARDS['delivery'],
+        return patch.dict(suite.SHARDS, delivery=(*self.controls(),
                                                 suite.Gate('gc07','verify_gc07.py','gc07')))
 
     def validate(self, source, suites, manifests):
@@ -70,9 +73,10 @@ class DeliveryTests(unittest.TestCase):
     def test_fixed_selectors_preserve_whole_variant_series(self):
         self.assertEqual(suite.GC07_VARIANTS,dict(wording=('wording-1','wording-2','wording-3'),
                                                 noise=('noise-1','noise-2','order-1')))
-        self.assertEqual(suite.delivery_gates('control'),suite.SHARDS['delivery'])
-        self.assertEqual(suite.delivery_gates('wording'),())
-        self.assertEqual(suite.delivery_gates('noise'),())
+        self.assertEqual(suite.delivery_gates('control'),self.controls())
+        with patch.dict(suite.SHARDS,delivery=self.controls()):
+            self.assertEqual(suite.delivery_gates('wording'),())
+            self.assertEqual(suite.delivery_gates('noise'),())
         with self.consumer():
             for part in suite.GC07_VARIANTS:
                 gate,=suite.delivery_gates(part)
@@ -118,7 +122,7 @@ class DeliveryTests(unittest.TestCase):
         for consumer in (False,True):
             with self.subTest(consumer=consumer), tempfile.TemporaryDirectory() as temp:
                 root=Path(temp)
-                with self.consumer() if consumer else patch.dict(suite.SHARDS,{}):
+                with self.consumer() if consumer else patch.dict(suite.SHARDS,delivery=self.controls()):
                     source,suites,manifests=self.fixture(root)
                     self.write(root,suites,manifests)
                     with patch.object(delivery,'source_state',return_value=source), \
@@ -253,7 +257,7 @@ class DeliveryTests(unittest.TestCase):
                         self.assertEqual(suite.main(),0)
                     report=json.loads((root/f'suite-delivery-{part}.json').read_text())
                     self.assertFalse(report['complete_inventory'])
-                    self.assertEqual(len(report['shards']['delivery']),10 if part=='control' else 0)
+                    self.assertEqual(len(report['shards']['delivery']),10 if part=='control' else 1)
                     self.assertEqual((root/'suite-delivery.json').read_text(),'canonical sentinel')
                     self.assertEqual((root/'suite-delivery-other.json').read_text(),'other sentinel')
                 finally:
