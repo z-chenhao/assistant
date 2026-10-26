@@ -180,12 +180,11 @@ to distinct success/non-success subsets as the Required inventory grows; the
 production gate still requires every job's exact `success` result.
 
 Communication keeps the complete logical inventory in `verify_suite.SHARDS` and
-uses three Required matrix cells: `gc01`, `gc02`, and `channels`. The first two
-run the original health/goals commands, each retaining six independent variants
-and five serial repetitions per variant. `channels` keeps GC-12 ×5 and GC-08,
-GC-14 and GC-16 once each, plus the GC-09 and GC-10 complete native-receipt
-series, with the original two gate workers. GC-09 and GC-10 start before the
-short communication gates in that same bounded queue. This changes
+uses five Required matrix cells: `gc01`, `gc02`, `gc09`, `gc10`, and `channels`.
+Each of the first four runs its original complete native driver, retaining six
+independent variants and five serial repetitions per variant. `channels` keeps
+GC-12 ×5 and GC-08, GC-14 and GC-16 once each, and owns future communication
+gates. The eight gates / twelve suite rows remain unchanged. This changes
 placement only: fixture inputs, oracles, Host limits, approvals, deadlines,
 fault injection, state isolation and cleanup remain unchanged. Every cell keeps
 the ten-minute job timeout, its own locked setup/build, disk fixtures, sandbox,
@@ -204,6 +203,20 @@ Splitting the independent long series removes their accumulated queue delay;
 complete exact-SHA job results, including setup and teardown, establish the
 remaining budget rather than successful test-step times alone.
 
+ERII-378 separates GC-09 and GC-10 after consumer PR #80's Ubuntu
+[run 40249391383 attempt 1](https://github.com/z-chenhao/erii/actions/runs/40249391383/attempts/1)
+cancelled channels at the original ten-minute limit (verification 533.380 seconds,
+exit 130; cleanup 0.451 seconds, owned group drained). The old failure remains
+evidence. Relative to three parts, this adds exactly two ubuntu-24.04 execution
+jobs with setup included in each unchanged ten-minute limit: at most 20 extra
+runner-minutes, not measured expenditure. CASE_JOBS=4, GATE_JOBS=2, `--jobs 1`,
+gate deadlines, serial repetitions and the three-minute join stay unchanged.
+The repair proves current-main partition/collector/join mechanics and required
+exact-SHA CI; it does not import the waiting consumer's full GC-11 gate. After
+repair acceptance, ERII-257 merges main and separately proves its combined
+inventory and full GC-11 journey on a new SHA. Mechanical tests retain
+`semantic_score=null`, `release_ready=false`.
+
 `ci_communication.py collect` reopens the native reports and invokes their
 existing validators before writing a compact `communication-receipts.json`.
 It retains exact variant/repetition order, recomputed assertion results, cleanup,
@@ -216,9 +229,11 @@ local bytes in the durable evidence root for independent review; a manifest
 without them cannot independently certify a Golden Case or release.
 
 `Complete communication evidence` requires the entire verification matrix to
-succeed, including Doctor and upload, then joins exactly the three parts.
-It checks the current clean checkout, manifest/suite hashes, matching identities,
-frozen evaluation hashes, all original gate attempts and variant repetitions,
+succeed, including Doctor and upload, then joins exactly the five parts.
+It checks the current clean checkout, manifest/suite hashes, matching
+source/binary/workflow run/attempt identities, original commands, one shard
+worker and two gate workers, frozen evaluation hashes, all original gate
+attempts and variant repetitions,
 true assertions and complete cleanup. Missing, duplicate, reordered, failed,
 cancelled, focused or drifted inputs fail closed. Both that join and the matrix
 are required by `Ubuntu checks`. Failed collection/join clears any prior success.
@@ -228,7 +243,7 @@ retains each part's manifest; no native payload or semantic grade is invented.
 ```sh
 ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard communication --communication-part gc01 --binary bin/erii --evidence evidence/communication-parts/gc01 --jobs 1
 python3 scripts/ci_communication.py collect --part gc01 --binary bin/erii --evidence evidence/communication-parts/gc01
-# Repeat these two commands for gc02 and channels, each with its own directory.
+# Repeat these two commands for gc02, gc09, gc10 and channels, each in its own directory.
 python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence/communication-joined
 ```
 
@@ -586,7 +601,7 @@ missing parts, duplicated jobs, cancelled/skipped runs and mismatched attempts
 cannot become eligible samples. The small Core/M6 summaries remain required;
 these checks consume strict-join evidence, not a new case scorer.
 
-The current topology has 33 jobs, including the three communication cells and
+The current topology has 38 jobs, including the five communication cells and
 their join, both maintained race parts, their
 Required join and the independent Python compatibility job. Race matrix values
 are checked against `ci_race_join.PARTS`, just as Core/M6 values use their

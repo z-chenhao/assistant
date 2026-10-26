@@ -251,6 +251,10 @@ jobs:
           - shard: communication
             communicationpart: gc02
           - shard: communication
+            communicationpart: gc09
+          - shard: communication
+            communicationpart: gc10
+          - shard: communication
             communicationpart: channels
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -391,7 +395,7 @@ jobs:
           PART_RESULT: ${{ needs.verify.result }}
         run: |
           test "$PART_RESULT" = success
-          for part in gc01 gc02 channels; do
+          for part in gc01 gc02 gc09 gc10 channels; do
             mv "evidence/communication-parts/evidence-communication-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/communication-parts/$part"
           done
           exec python3 scripts/ci_step.py --name communication-join --phase test -- python3 scripts/ci_communication.py join --parts evidence/communication-parts --evidence evidence

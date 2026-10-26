@@ -166,14 +166,14 @@ def provider_gates(part):
     return tuple(g for g in SHARDS['providers'] if (g.name == 'models') == (part == 'models'))
 
 
-COMMUNICATION_PARTS = ('gc01', 'gc02', 'channels')
+COMMUNICATION_PARTS = ('gc01', 'gc02', 'gc09', 'gc10', 'channels')
 
 
 def communication_gates(part):
     if part not in COMMUNICATION_PARTS:
         raise ValueError('unknown communication part')
     return tuple(g for g in SHARDS['communication'] if g.name == part or
-                 (part == 'channels' and g.name not in ('gc01', 'gc02')))
+                 (part == 'channels' and g.name not in COMMUNICATION_PARTS[:-1]))
 
 
 def personal_gates(part):
