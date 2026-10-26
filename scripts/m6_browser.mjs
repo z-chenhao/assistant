@@ -14,6 +14,15 @@ const repository=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const driver=await readFile(join(repository,'internal/computer/macosvm/browser.mjs'),'utf8');
 const world=JSON.parse(await readFile(join(root,'world.json'),'utf8'));
 const state={orders:[],submissions:0,network:{ethernet:'Not Connected',gateway:false,ordinary:false,proxy:false,apple_tv:false,protocols:1},clips:[]};
+// GC-07's opt-in failure probes share the existing real page/Driver boundary.
+// The locked world is unchanged; these are external fault controls, never Gold
+// or plans supplied to a model. Keep an independently persisted action ledger.
+const initialNetwork=structuredClone(state.network);
+const networkActions=[];
+const recordNetwork=async action=>{
+ networkActions.push({action,before:structuredClone(state.network)});
+ await writeFile(join(root,'network-actions.json'),JSON.stringify(networkActions));
+};
 await mkdir(join(root,'playwright'));
 const module=join(root,'playwright/index.mjs');
 for(const file of ['index.mjs','package.json'])await symlink(join(repository,'guest-browser/node_modules/playwright-core',file),join(root,'playwright',file));
@@ -36,6 +45,7 @@ const server=createServer(async(req,res)=>{
     if(state.orders.length!==1)throw new Error('submit did not commit');
     res.destroy();return;
    }
+   if(method==='playwright.click'&&args.selector==='#repair-unknown'&&!result.error){res.destroy();return;}
    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));return;
   }
   if(req.url==='/book'){
@@ -49,9 +59,24 @@ const server=createServer(async(req,res)=>{
   }
   if(req.url==='/orders'){res.end(html('<pre id="orders">'+JSON.stringify(state.orders)+'</pre>'));return;}
   if(req.url==='/network/repair'){
+   await recordNetwork('repair');
    state.network={ethernet:'Connected',gateway:true,ordinary:true,proxy:true,apple_tv:true,protocols:1};await persist();res.end(html('<h1>Network repaired</h1>'));return;
   }
-  if(req.url==='/network'){res.end(html('<pre id="network">'+JSON.stringify(state.network)+'</pre><button id="repair" onclick="location.href=\'/network/repair\'">Reconnect Ethernet; one protocol; interrupts gateway temporarily</button>'));return;}
+  if(req.url==='/network/fail'){
+   await recordNetwork('failed-repair');
+   state.network={...initialNetwork,ethernet:'Connected',protocols:2};await persist();res.end(html('<h1>Validation failed: gateway still offline; rollback required</h1>'));return;
+  }
+  if(req.url==='/network/rollback'){
+   await recordNetwork('rollback');state.network=structuredClone(initialNetwork);await persist();res.end(html('<h1>Original configuration restored</h1>'));return;
+  }
+  if(req.url==='/network/unknown'){
+   await recordNetwork('repair-unknown');
+   state.network={ethernet:'Connected',gateway:true,ordinary:true,proxy:true,apple_tv:true,protocols:1};await persist();res.end(html('<h1>Network restored; transport acknowledgement will be lost</h1>'));return;
+  }
+  if(req.url==='/network'){
+   const topology=world.network?'<pre id="topology">'+JSON.stringify({network:world.network,devices:world.devices,interface:'Ethernet',ip:world.network.mac_gateway,physical_link:state.network.ethernet})+'</pre>':'';
+   res.end(html(topology+'<pre id="network">'+JSON.stringify(state.network)+'</pre><button id="repair" onclick="location.href=\'/network/repair\'">Reconnect Ethernet; one protocol; interrupts gateway temporarily</button><button id="repair-fail" onclick="location.href=\'/network/fail\'">Test repair; interrupts gateway; validation may fail</button><button id="rollback" onclick="location.href=\'/network/rollback\'">Rollback to original configuration; interrupts gateway</button><button id="repair-unknown" onclick="location.href=\'/network/unknown\'">Reconnect Ethernet with one protocol; interrupts gateway; acknowledgement fault</button>'));return;
+  }
   if(req.url==='/clips'){
    const media=['red.mov','blue.mov','third.mov'].map((name,i)=>`<section><video width="320" height="180" controls preload="metadata" src="/media/${name}" onloadedmetadata="document.getElementById('info-${i}').textContent='${name} '+this.duration+'s '+this.videoWidth+'x'+this.videoHeight"></video><div id="info-${i}">${name} loading</div></section>`).join('');
    res.end(html('<h1>Desktop materials</h1>'+media+'<input id="label" aria-label="Clip label"><button id="save" onclick="location.href=\'/clips/save?label=\'+encodeURIComponent(document.querySelector(\'#label\').value)">Save label</button><pre id="clips">'+JSON.stringify(state.clips)+'</pre>'));return;

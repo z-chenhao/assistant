@@ -33,6 +33,38 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'evals/fixtures/m6-v1'
 
 
+class PersonalHarness(CapabilityHarness):
+    def args(self, *args):
+        return [str(self.binary), '-config', str(self.root / 'config.yaml'),
+                '-test-bridge', getattr(self, 'bridge', 'capabilities'),
+                '-test-automation-now', self.automation_now, *args]
+
+
+def goal_schedule_state(h):
+    value = h.state()
+    db = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
+    calls = [t for t in value['tools'] if t['tool_name'] == 'builtin__automation__manage']
+    return dict(automation=read(db, 'SELECT * FROM automation'),
+                automation_fire=read(db, 'SELECT * FROM automation_fire'),
+                task=read(db, 'SELECT * FROM task'), manage_calls=calls,
+                generations=len(value['generations']),
+                run_kinds={r['run_id']:r['kind'] for r in value['runs'] if any(t['run_id']==r['run_id'] for t in calls)})
+
+
+def goal_schedule_checks(before, after, replayed, views):
+    one = len(views) == 1 and len(after['automation']) == 1
+    return dict(no_schedule_before_request=not before['automation'] and not before['task'] and not before['manage_calls'],
+                monthly_schedule=one and views[0]['automationRef']==after['automation'][0]['automation_id'] and
+                    views[0]['enabled'] and views[0]['triggerType']=='cron' and
+                    views[0]['triggerSpec']=='0 20 * * 0L' and views[0]['timezone']=='Asia/Shanghai',
+                first_monthly_fire=one and views[0].get('nextFire')=='2026-11-29T12:00:00Z' and
+                    after['automation'][0]['next_fire_at']==1795953600000000,
+                main_creates_automation=len(after['manage_calls'])==1 and after['manage_calls'][0]['status']=='succeeded' and
+                    after['run_kinds'].get(after['manage_calls'][0]['run_id'])=='main',
+                duplicate_reminder_input=after==replayed and len(after['automation'])==1,
+                no_early_task_or_fire=not after['task'] and not after['automation_fire'])
+
+
 def state(h):
     result = h.state()
     db = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
@@ -82,7 +114,7 @@ return {result,artifactRefs:saved.artifactRefs};'''
 
 
 @contextmanager
-def personal(binary, folder, case, embeddings):
+def personal(binary, folder, case, embeddings, bridge='capabilities'):
     provider = folder / 'provider'
     provider.mkdir()
     # Same MCP adapter configured in production. This deterministic peer has
@@ -102,7 +134,9 @@ def personal(binary, folder, case, embeddings):
                   memory=dict(encryption_key_ref='env:ERII_MEMORY_KEY'),
                   embedding=dict(provider='openai_compatible', endpoint=f'http://127.0.0.1:{embeddings.server.server_port}/v1', model='semantic-fixture-v1', dimensions=5))
     (folder / 'config.yaml').write_text(json.dumps(config))
-    h = CapabilityHarness(binary, folder)
+    h = PersonalHarness(binary, folder)
+    h.bridge = bridge
+    h.automation_now = case['clock']
     h.env['ERII_MEMORY_KEY'] = 'M' * 32
     try:
         h.setup(metadata=dict(name='M6 explicit fixture', provider_kind='openai_compatible', endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions', model_id='fixture-model', context_window=65536, max_output_tokens=4096, generation_defaults={}, compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True,image_input=True)))
@@ -149,8 +183,12 @@ def personal_case(binary, folder, case, variant, embeddings, artifact_folder=Non
         # Original event text and frozen scenario timestamps remain inspectable
         # Conversation evidence; scripted plans are separate explicit inputs.
         h.send('context', variant['context'])
-        for i, event in enumerate(variant['events']):
+        def send_event(i):
+            event = variant['events'][i]
             h.send('event-' + str(i), event['at'] + ' ' + event['text'])
+        if cid != 'GC-02':
+            for i in range(len(variant['events'])):
+                send_event(i)
         if cid == 'GC-01':
             result = execute(h, 'health', save_report('''
 const health=await tools.mcp__fixture__read({text:"health:age,sex,diagnoses,current_red_flags"});
@@ -165,12 +203,28 @@ const result={health,calendar:world.calendar,weather:world.weather,diagnosis:nul
             evidence['red_flag_variant'] = dict(input='同时胸痛、喘不上气', status='inconclusive; requires semantic model evaluation; no scripted medical advice scored')
         elif cid == 'GC-02':
             old=remember(h,'goals-old','曾探索创业公司或独立开发，尚未决定')
+            send_event(0)
+            resumed=execute(h,'goals-resume',save_report(WORLD+'''const result={resume:world.conversation_session_2026_09_20.unanswered_question};''','interview_resume.json'))
+            send_event(1)
+            remember(h,'goals-constraints','人生规划约束：收入下降最多一年，不影响家庭安全感')
+            send_event(2)
             current=remember(h,'goals-new','人生目标：独立开发只是探索，尚未决定；收入下降最多一年，不影响家庭安全感',old)
             hits=recall(h,'goals-recall','独立开发')
             checks.update(corrected_goals=any(hit['source_ref']==current for hit in hits), superseded_absent=not any(hit['source_ref']==old for hit in hits))
-            result=execute(h,'goals',save_report(WORLD+'''const result={resume:world.conversation_session_2026_09_20.unanswered_question,independent_development:"exploratory",income_decrease_years:1,family_security:true,automation:"not_applicable; M7"};'''))
-            checks['resume_unanswered']=result['value']['result']['resume']=='如果收入短期下降，你愿意承受多久？'
-            evidence.update(old=old,current=current,recall=hits)
+            result=execute(h,'goals',save_report('''const result={independent_development:"exploratory",income_decrease_years:1,family_security:true};'''))
+            checks['resume_unanswered']=resumed['value']['result']['resume']=='如果收入短期下降，你愿意承受多久？'
+            before=goal_schedule_state(h)
+            send_event(3)
+            request=dict(operation='create',instruction='每月复盘当前人生目标：独立开发仅为探索；收入下降最多一年，保留家庭安全感。',
+                         triggerType='cron',triggerSpec='0 20 * * 0L',timezone='Asia/Shanghai')
+            call(h,'goals-monthly','builtin__automation__manage',request)
+            views=json.loads(h.command('automation','list')['text'])
+            after=goal_schedule_state(h)
+            call(h,'goals-monthly','builtin__automation__manage',request)
+            replayed=goal_schedule_state(h)
+            checks.update(goal_schedule_checks(before,after,replayed,views))
+            evidence.update(old=old,current=current,recall=hits,resumed=resumed,
+                            monthly_review=dict(request=request,views=views,before=before,after=after,replayed=replayed))
         elif cid == 'GC-03':
             old=remember(h,'finance-old','我的期权回购价 240 美元，剩余已归属 200 份，仅公司回购窗口可售')
             current=remember(h,'finance-new','我的期权回购价 250 美元，剩余已归属 220 份，仅公司回购窗口可售',old)
@@ -327,7 +381,7 @@ def export_artifacts(h,folder):
     return exported
 
 
-def travel_control(h, receipt, phase, control_plan, applied):
+def travel_control(h, receipt, phase, control_plan, applied, *, input_parts=()):
     provider=h.root/'provider'
     control=None
     control_receipt=None
@@ -336,7 +390,12 @@ def travel_control(h, receipt, phase, control_plan, applied):
         nonlocal control,control_receipt,held_state
         if control is None and (provider/'hold-accepted').exists():
             held_state=state(h)
-            control_receipt=h.send(phase+'-control','Capabilities: '+json.dumps(control_plan() if callable(control_plan) else control_plan,ensure_ascii=False))
+            text='Capabilities: '+json.dumps(control_plan() if callable(control_plan) else control_plan,ensure_ascii=False)
+            if input_parts:
+                control_receipt=h.command('chat','send-parts',phase+'-control',text=json.dumps(
+                    [*input_parts,dict(type='text',text=text)],ensure_ascii=False))
+            else:
+                control_receipt=h.send(phase+'-control',text)
             control=h.processes.start(h.args('chat','work'),env=h.env,cwd=h.root,
                                       stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             h.children.append(control)
@@ -351,7 +410,7 @@ def travel_control(h, receipt, phase, control_plan, applied):
     _,error=control.communicate(timeout=30)
     require(control.returncode==0,'travel control failed: '+error)
     require(main_completed(h,control_receipt['run_id']) and applied(),'travel control Main did not publish')
-    return dict(scheduling=scheduling,held_state=held_state,control_main_completed=True)
+    return dict(scheduling=scheduling,held_state=held_state,control_main_completed=True,control_receipt=control_receipt)
 
 
 def travel(h,world):
@@ -414,7 +473,8 @@ def run(binary,selected=None,destination=None,scenario_jobs=1,part=None):
                 driver_digest=digest({name:file_hash(ROOT/name) for name in ('scripts/run_m6_cases.py','scripts/m6_desktop.py','scripts/m6_browser.mjs','scripts/m6_sources.py','scripts/verify_recall.py','guest-browser/readiness.mjs')}),
                 product_gate='inconclusive; semantic Judge and current L2 not run',
                 live_shadow=dict(lume='prior evidence: docs/reports/computer-provider-l2-result.json',jianying='prior evidence: docs/reports/computer-l2-result.json',current_run='not_run'),
-                not_applicable=['M7 scheduled/channel portions'])
+                not_applicable=[],unverified=['Remaining M7 scheduled/channel journeys, semantic quality and current L2'],
+                coverage_extensions={'GC-02':'Four-turn journey and monthly Automation; mechanical assertions only'})
     artifact_root=None
     if destination:
         destination.parent.mkdir(parents=True,exist_ok=True)
