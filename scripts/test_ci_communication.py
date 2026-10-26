@@ -28,8 +28,9 @@ class CommunicationTests(unittest.TestCase):
             gates = communication_gates(part)
             suites[part] = dict(**source, passed=True, source_stable=True, selected_gates=None,
                 communication_part=part, complete_inventory=False, binary_sha256='c'*64,
-                workflow_sha='d'*40, elapsed_seconds=12, shards={'communication': [
-                    dict(gate=g.name, attempt=n, returncode=0, owned_group_drained=True)
+                **ci.run_identity(), jobs=1, gate_jobs=2, elapsed_seconds=12, shards={'communication': [
+                    dict(gate=g.name, attempt=n, returncode=0, owned_group_drained=True,
+                         command=command(g,n,Path('/binary'),root/part)[0])
                     for g in gates for n in range(1, g.attempts+1)]})
             manifests[part] = dict(version=1, part=part, fixtures={'fixture':'sha'},
                 identity={k:suites[part][k] for k in ci.IDENTITY}, receipts=[
@@ -56,7 +57,10 @@ class CommunicationTests(unittest.TestCase):
         planned=[g for part in COMMUNICATION_PARTS for g in communication_gates(part)]
         self.assertCountEqual(planned,SHARDS['communication'])
         self.assertEqual([g.name for g in communication_gates('gc01')],['gc01'])
-        self.assertEqual([g.name for g in communication_gates('gc02')],['gc02'])
+        self.assertEqual(COMMUNICATION_PARTS, ('gc01','gc02','gc09','gc10','channels'))
+        for part in COMMUNICATION_PARTS[:-1]:
+            self.assertEqual([g.name for g in communication_gates(part)],[part])
+        self.assertEqual([g.name for g in communication_gates('channels')],['gc12','gc08','gc14','gc16'])
         for gate in planned:
             original=next(g for g in SHARDS['communication'] if g.name==gate.name)
             self.assertEqual(command(gate,1,Path('/binary'),Path('/evidence')),
@@ -68,6 +72,8 @@ class CommunicationTests(unittest.TestCase):
             with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
                 full=ci.join(root)
             self.assertTrue(full['complete_inventory'])
+            self.assertIsNone(full['semantic_score'])
+            self.assertIs(full['release_ready'], False)
             self.assertIsNone(full['communication_part'])
             self.assertEqual([(r['gate'],r['attempt']) for r in full['shards']['communication']],
                 [(g.name,n) for g in SHARDS['communication'] for n in range(1,g.attempts+1)])
@@ -125,6 +131,47 @@ class CommunicationTests(unittest.TestCase):
                     value=json.loads(path.read_text());value['suite']['sha256']='f'*64;path.write_text(json.dumps(value))
                 with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
                     with self.assertRaises((ValueError,OSError,KeyError)): ci.join(root)
+
+    def test_each_fixed_part_rejects_failed_or_mismatched_receipts(self):
+        for part in COMMUNICATION_PARTS:
+            for mutation in ('missing','failed','cancelled','unclean','focused','command',
+                             'jobs','gate_jobs','run_id','run_attempt','workflow_sha','missing_identity',
+                             'missing_native','duplicate_native','reordered_variant','assertion','cleanup'):
+                with self.subTest(part=part,mutation=mutation),tempfile.TemporaryDirectory() as temp:
+                    root=Path(temp);source,suites,manifests=self.fixture(root)
+                    suite=suites[part];row=suite['shards']['communication'][0]
+                    receipt=manifests[part]['receipts'][0]
+                    if mutation=='missing': del suites[part]
+                    elif mutation=='failed': row['returncode']=1
+                    elif mutation=='cancelled': row['returncode']=130
+                    elif mutation=='unclean': row['owned_group_drained']=False
+                    elif mutation=='focused': suite['selected_gates']=[row['gate']]
+                    elif mutation=='command': row['command'].append('--focused')
+                    elif mutation in ('jobs','gate_jobs'): suite[mutation]=3
+                    elif mutation in ('run_id','run_attempt','workflow_sha'): suite[mutation]='other'
+                    elif mutation=='missing_identity': del suite['run_attempt']
+                    elif mutation=='missing_native': manifests[part]['receipts'].pop()
+                    elif mutation=='duplicate_native': manifests[part]['receipts'].append(copy.deepcopy(receipt))
+                    elif mutation=='reordered_variant': receipt['rows'].reverse()
+                    elif mutation=='assertion': receipt['rows'][0]['assertions']['native']=False
+                    elif mutation=='cleanup': receipt['rows'][0]['cleanup']['owned_processes_joined']=False
+                    # Reseal the manifest: independently validated fields must still reject it.
+                    if mutation in ('run_id','run_attempt','workflow_sha'):
+                        manifests[part]['identity'][mutation]='other'
+                    self.write(root,suites,manifests)
+                    with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
+                        with self.assertRaises((ValueError,OSError,KeyError)): ci.join(root)
+
+    def test_matched_old_run_or_attempt_cannot_be_joined_in_current_workflow(self):
+        for field in ('run_id','run_attempt','workflow_sha'):
+            with self.subTest(field=field),tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);source,suites,manifests=self.fixture(root)
+                for part in COMMUNICATION_PARTS:
+                    suites[part][field]='old'
+                    manifests[part]['identity'][field]='old'
+                self.write(root,suites,manifests)
+                with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
+                    with self.assertRaises(ValueError): ci.join(root)
 
     def test_collector_recomputes_native_oracle_before_emitting_a_manifest(self):
         from test_gc12 import MeetingTests

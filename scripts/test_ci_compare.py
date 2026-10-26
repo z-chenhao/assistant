@@ -206,6 +206,13 @@ class CurrentComparisonTests(unittest.TestCase):
             for fragment in [security, *security['parts'].values()]:
                 fragment.update(run_id=str(value['run']['id']), run_attempt=str(value['run']['run_attempt']))
 
+            communication = value['reports']['suite-communication.json']
+            from ci_communication import IDENTITY
+            for fragment in [communication, *communication['parts'].values()]:
+                fragment.update(run_id=str(value['run']['id']), run_attempt=str(value['run']['run_attempt']))
+            for part, fragment in communication['parts'].items():
+                communication['native_receipts'][part]['identity']={k:fragment[k] for k in IDENTITY}
+
             delivery = value['reports']['suite-delivery.json']
             for part, fragment in delivery['parts'].items():
                 fragment.update(run_id=str(value['run']['id']), run_attempt=str(value['run']['run_attempt']))
@@ -223,11 +230,12 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 36)
+        self.assertEqual(len(comparison.topology()), 38)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
                          'Providers (models)', 'Complete providers evidence', 'GC-07 (wording)', 'GC-07 (noise)', 'Complete delivery evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
                          'Verification (communication/gc01)', 'Verification (communication/gc02)',
+                         'Verification (communication/gc09)', 'Verification (communication/gc10)',
                          'Verification (communication/channels)'} <= comparison.topology())
         insufficient = comparison.compare(self.experiment(2))
         self.assertFalse(insufficient['performance_certified'])

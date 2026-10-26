@@ -246,7 +246,7 @@ def validate(data, source, workflow='ci.yml'):
             if rows != members:
                 errors.append(shard + ': reconstructed join inventory drift')
             if shard == 'communication':
-                from ci_communication import check_receipts, fixtures, IDENTITY
+                from ci_communication import check_receipts, check_suite, fixtures, IDENTITY
                 manifests = report.get('native_receipts', {})
                 if set(manifests) != set(expected_parts):
                     errors.append('communication: missing native manifests')
@@ -257,6 +257,9 @@ def validate(data, source, workflow='ci.yml'):
                             manifest.get('identity') != {k: fragment.get(k) for k in IDENTITY}):
                         errors.append('communication: native identity or fixture drift')
                     try:
+                        check_suite(fragment, part, {'source_sha': source},
+                            dict(workflow_sha=report.get('workflow_sha'), run_id=str(data['run']['id']),
+                                 run_attempt=str(data['run']['run_attempt'])))
                         check_receipts(manifest.get('receipts', []), communication_gates(part))
                     except (ValueError, KeyError, TypeError):
                         errors.append('communication: failed or incomplete native receipts')
