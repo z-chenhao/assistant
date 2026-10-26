@@ -201,6 +201,17 @@ class MeetingTests(unittest.TestCase):
             self.assertIn('reused or invalid GC-12 execution identities',failed.stderr)
             self.assertNotIn('FileNotFoundError',failed.stderr)
 
+    def test_corruption_probe_cli_and_ci_consumers_with_synthetic_observations(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+            report=self.packets()
+            report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
+            report['identity']['binary_sha256']=report['binary_sha256']
+            results=journey.rejection_probes(report,binary,root/'probes')
+            self.assertEqual(len(results),14)
+            self.assertTrue(all(r['ci_rejected'] for r in results.values()))
+            self.assertIn('reused or invalid GC-12 execution identities',results['copied_round']['reason'])
+
     def test_judge_packets_are_allowlisted_and_ineligible_for_scoring(self):
         prepared=evaluator.prepare(self.packets())
         self.assertEqual(len(prepared['judge_packets']),6)

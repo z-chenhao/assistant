@@ -296,8 +296,9 @@ def rejection_probes(report, binary, folder):
     path.write_text(json.dumps(report, ensure_ascii=False)+'\n')
     receipt = native_receipt(gate, 1, folder, binary, {'binary_sha256':report['binary_sha256']})
     duplicate = copy.deepcopy(receipt); duplicate['attempt'] = 2
+    duplicate['native']['path'] = 'gc12-2.json'
     try:
-        check_receipts([receipt, duplicate], [Gate('gc12', gate.script, gate.report, 2)])
+        check_receipts([receipt, duplicate], [Gate('gc12', gate.script, 'gc12', 2)])
     except ValueError as error:
         require('reused or invalid GC-12 execution identities' in str(error), 'unexpected round rejection')
         results['copied_round'] = dict(ci_rejected=True, reason=str(error))
