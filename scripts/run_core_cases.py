@@ -14,7 +14,9 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -93,6 +95,32 @@ def owned_sidecar(process, script):
             and int(p[1]) == process.pid and p[2].endswith(str(script))]
     require(len(pids) == 1, 'exact owned Sidecar not identified')
     return pids[0]
+
+
+def feedback_state(h):
+    """Read only bounded fixture state before cleanup, without starting a CLI."""
+    result = {}
+    database = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
+    if not database.exists():
+        return dict(database='not created')
+    queries = {
+        'child_status_counts': 'SELECT r.status,count(*) AS count FROM agent_invocation a JOIN run r ON r.run_id=a.child_run_id GROUP BY r.status',
+        'run_status_counts': 'SELECT kind,status,wait_reason,count(*) AS count FROM run GROUP BY kind,status,wait_reason',
+        'generation_status_counts': 'SELECT status,error_code,count(*) AS count FROM model_generation GROUP BY status,error_code',
+        'tool_status_counts': 'SELECT tool_name,status,count(*) AS count FROM tool_invocation GROUP BY tool_name,status',
+        'executions': 'SELECT state,desired_state,execution_epoch,claim_expires_at FROM code_execution_state LIMIT 4',
+        'recent_trace': 'SELECT event_json,occurred_at FROM run_trace ORDER BY occurred_at DESC LIMIT 8',
+    }
+    try:
+        with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=.01) as db:
+            deadline = time.monotonic() + .1
+            db.set_progress_handler(lambda: time.monotonic() >= deadline, 100)
+            db.row_factory = sqlite3.Row
+            for name, query in queries.items():
+                result[name] = [dict(row) for row in db.execute(query)]
+    except sqlite3.Error as error:
+        result['capture_error_type'] = type(error).__name__
+    return result
 
 
 def feedback_case(binary, folder, variant):
@@ -193,6 +221,19 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
                     completed_provider_dispatch_counts={g:dispatches[g] for g in done}, drift=drift),
                     artifact=dict(ref=output['artifact_ref'], sha256=hashlib.sha256(opened.stdout.encode()).hexdigest(),text=opened.stdout),
                     inputs=assets, source=source)
+    except BaseException as error:
+        failure = dict(fixture=folder.name, error_type=type(error).__name__, error=str(error)[:2000],
+                       hold=h.hold_observation, runtime=feedback_state(h))
+        print('Core fixture failure: ' + json.dumps(failure), file=sys.stderr, flush=True)
+        destination = os.environ.get('ERII_CORE_DIAGNOSTICS')
+        if destination:
+            try:
+                output = Path(destination) / ('failure-' + folder.name + '.json')
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(json.dumps(failure, indent=2) + '\n')
+            except OSError as capture_error:
+                print('Core failure evidence: ' + type(capture_error).__name__, file=sys.stderr, flush=True)
+        raise
     finally:
         h.cleanup()
 
