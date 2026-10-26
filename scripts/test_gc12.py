@@ -185,6 +185,22 @@ class MeetingTests(unittest.TestCase):
             with self.assertRaises((RuntimeError,ValueError,KeyError)):journey.validate_report(changed)
             with self.assertRaises(ValueError):evaluator.prepare(changed)
 
+    def test_series_cli_reads_focused_suite_output_and_rejects_copied_round(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+            key=journey.hashlib.sha256(json.dumps(['gc12']).encode()).hexdigest()[:12]
+            folder=root/'focused'/key;folder.mkdir(parents=True)
+            report=self.packets()
+            report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
+            report['identity']['binary_sha256']=report['binary_sha256']
+            for n in range(1,6):
+                (folder/f'gc12-{n}.json').write_text(json.dumps(report))
+            failed=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc12.py'),
+                '--binary',str(binary),'--evidence',str(root),'--validate-series'],capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(failed.returncode,0)
+            self.assertIn('reused or invalid GC-12 execution identities',failed.stderr)
+            self.assertNotIn('FileNotFoundError',failed.stderr)
+
     def test_judge_packets_are_allowlisted_and_ineligible_for_scoring(self):
         prepared=evaluator.prepare(self.packets())
         self.assertEqual(len(prepared['judge_packets']),6)

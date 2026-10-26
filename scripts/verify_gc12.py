@@ -436,7 +436,12 @@ if __name__ == '__main__':
         gate = next(g for g in SHARDS['communication'] if g.name == 'gc12')
         binary = args.binary.resolve()
         suite = dict(binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
-        receipts = [native_receipt(gate, n, args.evidence, binary, suite) for n in range(1, gate.attempts+1)]
+        folder = args.evidence
+        if not (folder/'gc12-1.json').exists():
+            # verify_suite isolates focused output from complete CI inventories.
+            key = hashlib.sha256(json.dumps(['gc12']).encode()).hexdigest()[:12]
+            folder = folder/'focused'/key
+        receipts = [native_receipt(gate, n, folder, binary, suite) for n in range(1, gate.attempts+1)]
         check_receipts(receipts, [gate])
         print(json.dumps(dict(case_id='GC-12', rounds=gate.attempts, receipts=sum(len(r['rows']) for r in receipts),
             cleanup=True, semantic_score=None, release_ready=False)))
