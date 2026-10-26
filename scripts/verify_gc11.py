@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import threading
 
@@ -73,7 +74,12 @@ def drive(binary, variant_id, repetition, failure_path):
     with tempfile.TemporaryDirectory(prefix='erii-gc11-') as temp:
         root = Path(temp)
         # Reuse the original fixture/configuration; no separate Tool pipeline.
-        h = prepare(binary,root,harness=QuoteHarness)
+        prepared = prepare(binary,root)
+        # Preparation finishes all setup commands. The observer uses those same
+        # ready stores/configuration and owns the subsequent recovery processes.
+        prepared.cleanup()
+        h = QuoteHarness(binary,root,fixture='capabilities')
+        h.env = prepared.env
         try:
             row['journey'] = quote_case.drive(h,variant,content)
             row['restarts'] = h.restarts

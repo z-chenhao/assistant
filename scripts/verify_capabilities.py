@@ -68,7 +68,7 @@ def tree(root):
     return {str(p.relative_to(root)): digest(p) for p in sorted(root.rglob('*')) if p.is_file()}
 
 
-def prepare(binary, root, mode='edit', harness=CapabilityHarness):
+def prepare(binary, root, mode='edit'):
     repo = root / 'repo'
     shutil.copytree(Path(__file__).resolve().parents[1] / 'evals/fixtures/coding-v1', repo)
     for args in [('init', '-q', '-b', 'feature/eval'), ('add', '.'),
@@ -97,7 +97,7 @@ def prepare(binary, root, mode='edit', harness=CapabilityHarness):
               'workspace:\n  root: ' + json.dumps(str(repo)) + '\n  mode: ' + mode +
               '\n  protected: [docs/notes.md]\n')
     (root / 'config.yaml').write_text(config)
-    h = harness(binary, root, fixture='capabilities')
+    h = CapabilityHarness(binary, root, fixture='capabilities')
     if os.environ.get('ERII_CAPABILITY_DIAGNOSTICS'):
         h.env['ERII_SQL_FIXTURE_DIAGNOSTIC'] = '1'
     h.setup()

@@ -106,6 +106,26 @@ class QuoteBoundaryTests(unittest.TestCase):
             self.assertNotEqual(failed.returncode,0)
             self.assertFalse(path.exists())
 
+    def test_copied_id_probe_reaches_real_cli_and_ci_rejection(self):
+        # Identity-only synthetic rows exercise the negative consumer path.
+        # They are never accepted as successful mechanical observations.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); binary = root/'erii'; binary.write_bytes(b'identity only')
+            identity = journey.source_identity()
+            report = dict(case_id='GC-11',kind='gc11_boundary',status='mechanical_pass',
+                fixture_lock=journey.load(),semantic_score=None,eligible_for_grading=False,
+                release_ready=False,cleanup=True,identity=dict(source_before=identity,source_after=identity,
+                    binary_path=str(binary),binary_sha256=journey.sha(binary.read_bytes()),environment={'test':True}),
+                results=[dict(variant_id=v['variant_id'],repetition=n,
+                    journey=dict(state=self.native_state(v['variant_id']+'/'+str(n))))
+                    for v in variants(*journey.inputs()) for n in range(1,6)])
+            result = journey.repetition_rejection_probes(report,binary,root/'forged')
+            self.assertEqual(result['claimed_journeys'],30)
+            self.assertEqual(result['distinct_journeys'],6)
+            self.assertTrue(result['cli_rejected'])
+            self.assertTrue(result['ci_rejected'])
+            self.assertNotEqual(result['cli_exit_code'],0)
+
     def test_validator_requires_complete_inventory_identity_cleanup_and_recomputation(self):
         with tempfile.TemporaryDirectory() as tmp:
             binary = Path(tmp)/'erii'; binary.write_bytes(b'test identity only')
