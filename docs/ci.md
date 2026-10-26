@@ -315,6 +315,48 @@ Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus r
 cancellation). Each case part runs all six locked variants five times. Contracts
 also run five times; splitting cases cannot omit them.
 
+Delivery CI retains the existing delivery/channels execution job as `control`,
+with both original complete five-run series. Two additional fixed Case jobs run
+`wording` (wording-1/2/3) and `noise` (noise-1/noise-2/order-1). Each variant keeps
+all five consecutive repetitions on one worker. Both new jobs use Ubuntu 24.04,
+the same build/browser setup, four Case workers, two gate lanes and the existing
+fifteen-minute delivery limit. A three-minute `delivery_join` requires control,
+both Case jobs and their Doctor/uploads to succeed; `Ubuntu checks` requires the
+Case matrix and join. The finite cost is two execution jobs plus one join; no
+configured resource limit increases. No speed claim follows from this topology.
+
+`ci_delivery.py collect` binds the exact suite file, source/binary/fixtures,
+workflow/run/attempt, command parameters and native validation results. The join
+rejects missing, duplicate, reordered, failed, cancelled, focused, dirty, unclean
+or drifted receipts and reconstructs the canonical variant-major 30-row order.
+Assertions must all be strict true booleans with one unchanged inventory across
+all 30 rows. Semantic score remains null and release readiness remains false.
+As with the original GC-07 collection policy, full hidden native bytes stay on
+the executing host; the uploaded compact receipts alone cannot certify a Case
+or replace independent recomputation from retained native evidence.
+
+Current main registers only delivery and channels. The two required Case parts
+therefore record empty inventories and the canonical join says
+`gc07.status=not_registered`, not a Case PASS. ERII-376 acceptance covers this
+current-main inventory and synthetic selection/aggregation/refusal fixtures.
+Actual GC-07 source stays with ERII-253. After merging main, that consumer must
+register its original `Gate('gc07', 'verify_gc07.py', 'gc07')`, accept
+`--ci-part wording/noise` in its driver, use `gc07_pairs(part)` to select three
+whole five-round series, and support
+`validate_report(report, binary, part=part)` alongside its unchanged full-report
+validation. `read_report` must read and hash-check the native bytes; partial
+native validation must preserve the original frozen inputs, oracles, corruption
+probes, identity and cleanup checks. Old drivers fail closed. The consumer owns
+actual 30 native receipts, its new exact-SHA full CI and independent acceptance
+review. Synthetic fixtures cannot satisfy that contract.
+
+```sh
+# Repeat for control, wording and noise, in separate folders:
+ERII_VERIFY_GATE_JOBS=2 ERII_VERIFY_CASE_JOBS=4 python3 scripts/verify_suite.py --shard delivery --delivery-part control --binary bin/erii --evidence evidence/delivery-parts/control --jobs 1
+python3 scripts/ci_delivery.py collect --part control --binary bin/erii --evidence evidence/delivery-parts/control
+python3 scripts/ci_delivery.py join --parts evidence/delivery-parts --evidence evidence/delivery-joined
+```
+
 Security CI has three fixed Required parts: `finance` owns the complete
 GC-03 and GC-06 gates; `cases` owns GC-05 and GC-04;
 `protection` owns
