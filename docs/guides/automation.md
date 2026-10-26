@@ -153,4 +153,5 @@ children and deletes disposable state. `make verify` runs it five consecutive
 times. `evals/fixtures/automation-v1.json` pins GC-02/14 scheduling fragments;
 GC-08 covers reminders and delayed cancellation. These are deterministic L0/L1
 protocol checks. They do not award full Golden Case semantic/model scores or
-claim channels and all M7 hardening are implemented.
+establish channel or full M7 hardening acceptance. See [channels](channels.md)
+and [operations](operations.md) for those implementations and their own evidence.

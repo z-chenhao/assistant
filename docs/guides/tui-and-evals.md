@@ -180,8 +180,10 @@ quality pass. Deterministic repetitions prove mechanical boundaries, not model
 sampling stability. A real-model five-run comparison and semantic Judge have
 not executed. L2 Live Shadow remains **inconclusive**.
 
-M1 supplies facts as explicit context. It does not claim Health/Weather/Calendar/
-email connectors, stale-weather refresh, Memory, Automation, Task/Worker/Child,
-general M3 approval/security, external delivery or M5 JavaScript Durable Replay.
-These gaps stay visible per result. M3 local transport and approval evidence is
-maintained separately in [Delivery operations](delivery.md). No full release or 80/85-point product acceptance is claimed here.
+These M1 fixtures supply facts as explicit context. They do not establish live
+Health/Weather/Calendar/email connectors or stale-weather refresh. Implemented
+[Memory](memory-maintenance.md), [Automation](automation.md), [Task/Child](tasks.md),
+[approval](tools.md), [delivery](delivery.md) and [Code Mode replay](codemode.md)
+have separate harnesses. This fixture's `not_applicable` dimensions are proof
+limits, not a statement that those features are absent. No full release or
+80/85-point product acceptance is claimed here.
