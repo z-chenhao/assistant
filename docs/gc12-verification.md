@@ -44,9 +44,12 @@ manifest carries native execution IDs and rejects reused Run, ToolInvocation,
 generation, Delivery or message IDs across all five rounds. Restart snapshots
 within one journey retain their original IDs. Hashes prove consistency;
 independent exact-SHA review and required CI remain mandatory.
-The optional rejection probe corrupts real passing bytes in 13 ways and requires
+The optional rejection probe corrupts real passing bytes in 16 ways and requires
 both the actual validator CLI and native CI consumer to reject them. It also
 submits a copied complete round to the CI join and requires identity rejection.
+Three corruptions set the denied variant's process, HTTP peer or disposable-root
+cleanup flag false and recompute the aggregate exactly as `run()` does. Both
+consumers must still reject and name that variant and exact cleanup condition.
 Full diagnostics stay beside the input report in its `.rejections` directory.
 
 The CLI removes the previous aggregate before fixture validation or startup.
@@ -63,6 +66,12 @@ responses. Original semantic-state digests and recomputed checks accompany this
 diagnostic projection. It cannot replace raw native acceptance evidence.
 Evidence-write failures preserve the original nonzero refusal. No retry occurs.
 A fresh drive clears its own previous failure files as well as the aggregate.
+Row cleanup failures are diagnosed before the computed aggregate is rejected;
+the aggregate must still be exactly true before any report can pass. Regression
+tests cover all three cleanup flags through `run()` and the actual validator CLI,
+including failed-byte/projection hashes and a clean rerun clearing stale failure
+files. Fault injection changes receipt flags only; it never leaves real processes
+or peers running to manufacture a cleanup failure.
 
 The ERII-253 fourth-round CI refusal lacks the original native bytes; its exact
 cause remains inconclusive. ERII-382 repairs this demonstrated diagnostic gap,

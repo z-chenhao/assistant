@@ -239,7 +239,7 @@ class ReceiptFailure(RuntimeError):
 
 def validate_report(report, binary=None):
     require(report.get('case_id') == 'GC-12' and report.get('status') == 'mechanical_pass' and
-        report.get('cleanup') is True and 'semantic_score' in report and report['semantic_score'] is None and
+        'semantic_score' in report and report['semantic_score'] is None and
         report.get('fixture_lock') == load(), 'complete locked ungraded GC-12 report required')
     identity = report['identity']
     require(identity['source_before'] == identity['source_after'] == source_identity() and
@@ -266,6 +266,9 @@ def validate_report(report, binary=None):
         failed = [key for key, passed in conditions.items() if not passed]
         if failed:
             raise ReceiptFailure(index, cases()[index]['id'], failed)
+    # Diagnose a real row failure before rejecting its computed aggregate.
+    # A false/missing/non-boolean aggregate still cannot pass with clean rows.
+    require(report.get('cleanup') is True, 'GC-12 aggregate cleanup must be true')
     return dict(case_id='GC-12', receipts=len(rows), frozen_blocks=19, cleanup=True, semantic_score=None,
                 release_ready=False, source_sha=identity['source_before']['sha'], binary_sha256=identity['binary_sha256'])
 
@@ -354,6 +357,11 @@ def rejection_probes(report, binary, folder):
         remote=lambda r:r['variants'][0]['remote']['calendar'].clear(),
         score=lambda r:r.update(semantic_score=90),
         copied_execution=lambda r:r['variants'][1]['state']['runs'][0].update(run_id=r['variants'][0]['state']['runs'][0]['run_id']))
+    def unclean(report, marker):
+        report['variants'][6]['cleanup'][marker] = False
+        report['cleanup'] = all(all(row['cleanup'].values()) for row in report['variants'])
+    for marker in ('owned_processes_joined', 'http_peer_joined', 'disposable_root_removed'):
+        mutations['aggregate_'+marker] = lambda r, marker=marker:unclean(r, marker)
     results = {}
     for name, mutate in mutations.items():
         bad = copy.deepcopy(report); mutate(bad)
@@ -369,6 +377,10 @@ def rejection_probes(report, binary, folder):
         except (RuntimeError, ValueError, KeyError) as failure:
             error = str(failure)
         require(error is not None, 'GC-12 CI accepted corruption: '+name)
+        if name.startswith('aggregate_'):
+            condition = 'cleanup/'+name.removeprefix('aggregate_')
+            require(all('denied' in message and condition in message for message in (cli.stderr, error)),
+                    'GC-12 aggregate cleanup refusal lost variant/condition: '+name)
         results[name] = dict(cli_exit_code=cli.returncode, ci_rejected=True, reason=error)
     path.unlink()
     # Reusing a complete passing round is rejected by the compact CI join too.

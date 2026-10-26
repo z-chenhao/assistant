@@ -288,6 +288,58 @@ class MeetingTests(unittest.TestCase):
             self.assertTrue((root/'gc12/failure/receipt.json.gz').exists())
             self.assertFalse((root/'gc12.json').exists())
 
+    def test_recomputed_cleanup_failure_is_retained_by_run_and_validator_cli(self):
+        # run() must compute the aggregate itself; leaving it true masks the
+        # early report-level refusal that originally bypassed diagnostics.
+        for marker in ('owned_processes_joined', 'http_peer_joined', 'disposable_root_removed'):
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+                report=self.packets();report['variants'][6]['cleanup'][marker]=False
+                report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
+                report['identity']['binary_sha256']=report['binary_sha256']
+                report['cleanup']=all(all(r['cleanup'].values()) for r in report['variants'])
+                self.assertIs(report['cleanup'],False)
+                condition='cleanup/'+marker
+                check_output=journey.subprocess.check_output
+                def environment(command, **options):
+                    return 'unit binary build identity' if command[:3]==['go','version','-m'] else check_output(command,**options)
+                with patch.object(journey,'run_cases',return_value=report['variants']) as drive, \
+                     patch.object(journey.subprocess,'check_output',side_effect=environment):
+                    with self.assertRaisesRegex(journey.ReceiptFailure,'denied.*'+condition):
+                        journey.run(binary,root/'run')
+                drive.assert_called_once()
+                path=root/'gc12-1.json';path.write_text(json.dumps(report))
+                failed=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc12.py'),
+                    '--binary',str(binary),'--evidence',str(path),'--validate'],capture_output=True,text=True,timeout=30)
+                self.assertNotEqual(failed.returncode,0)
+                self.assertIn('denied',failed.stderr)
+                self.assertIn(condition,failed.stderr)
+                for folder in (root/'run',root/'gc12-1'):
+                    saved=(folder/'rejected-report.json').read_bytes()
+                    native=json.loads(saved)
+                    self.assertIs(native['cleanup'],False)
+                    self.assertIs(native['variants'][6]['cleanup'][marker],False)
+                    summary=json.loads((folder/'failure/summary.json').read_text())
+                    self.assertEqual(summary['variant_id'],'denied')
+                    self.assertIn(condition,summary['failed_conditions'])
+                    self.assertEqual(summary['rejected_report']['sha256'],journey.hashlib.sha256(saved).hexdigest())
+                    data=(folder/'failure/receipt.json.gz').read_bytes()
+                    self.assertEqual(summary['native']['sha256'],journey.hashlib.sha256(data).hexdigest())
+                    self.assertIs(json.loads(gzip.decompress(data))['cleanup'][marker],False)
+                self.assertFalse((root/'run.json').exists())
+                report['variants'][6]['cleanup'][marker]=True
+                with patch.object(journey,'run_cases',return_value=report['variants']), \
+                     patch.object(journey.subprocess,'check_output',side_effect=environment):
+                    self.assertIs(journey.run(binary,root/'run')['cleanup'],True)
+                for name in ('rejected-report.json','failure/receipt.json.gz','failure/summary.json'):
+                    self.assertFalse((root/'run'/name).exists())
+
+    def test_report_cleanup_flag_still_rejects_when_native_rows_are_clean(self):
+        for value in (False, None, 1):
+            with self.subTest(value=value):
+                report=self.packets();report['cleanup']=value
+                with self.assertRaises(RuntimeError):journey.validate_report(report)
+
     def test_cli_and_ci_keep_precise_refusal_with_true_author_flags(self):
         from ci_communication import native_receipt
         from verify_suite import Gate
@@ -313,6 +365,7 @@ class MeetingTests(unittest.TestCase):
         import contextlib
         import io
         report=self.packets();report['variants'][0]['cleanup']['http_peer_joined']=False
+        report['cleanup']=all(all(r['cleanup'].values()) for r in report['variants'])
         with tempfile.TemporaryDirectory() as temp,contextlib.redirect_stderr(io.StringIO()) as log:
             with patch.object(Path,'write_bytes',side_effect=OSError('PRIVATE_PATH')):
                 with self.assertRaisesRegex(journey.ReceiptFailure,'cleanup/http_peer_joined'):
@@ -327,8 +380,10 @@ class MeetingTests(unittest.TestCase):
             report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
             report['identity']['binary_sha256']=report['binary_sha256']
             results=journey.rejection_probes(report,binary,root/'probes')
-            self.assertEqual(len(results),14)
+            self.assertEqual(len(results),17)
             self.assertTrue(all(r['ci_rejected'] for r in results.values()))
+            for marker in ('owned_processes_joined','http_peer_joined','disposable_root_removed'):
+                self.assertIn('cleanup/'+marker,results['aggregate_'+marker]['reason'])
             self.assertIn('reused or invalid GC-12 execution identities',results['copied_round']['reason'])
 
     def test_judge_packets_are_allowlisted_and_ineligible_for_scoring(self):
