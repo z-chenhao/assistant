@@ -7,6 +7,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 import meeting_sandbox as peer
 import prepare_release_eval as evaluator
@@ -14,6 +16,23 @@ import verify_gc12 as journey
 
 
 class MeetingTests(unittest.TestCase):
+    def test_unscripted_freeze_admits_gc12_inputs_without_grading_or_external_adapters(self):
+        import unscripted_cases as driver
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit binary identity only')
+            config=root/'config.json';config.write_text('{}')
+            h=SimpleNamespace(root=root,binary=binary,config=config)
+            with patch.object(driver,'rows',return_value=[]),patch.object(driver,'configuration',return_value={}),\
+                 patch.object(driver,'selected',return_value=dict(provider_kind='openai_compatible')):
+                plan=driver.freeze(h,'GC-12','base','loopback_mechanism','local',1,30)
+                self.assertEqual(plan['status'],'frozen')
+                self.assertEqual(plan['scope'],'input_fragment')
+                self.assertIs(plan['eligible_for_grading'],False)
+                self.assertEqual([e['text'] for e in plan['input']['events']],[journey.FIRST,journey.STEER])
+                self.assertEqual(driver.freeze(h,'GC-11','base','loopback_mechanism','local',1,30)['status'],'ineligible')
+                with patch.object(driver,'selected',return_value=None):
+                    self.assertEqual(driver.freeze(h,'GC-12','base','loopback_mechanism','local',1,30)['status'],'setup_required')
+
     def sample(self):
         args=dict(action='send_mail_and_create_calendar',recipient='alex.chen@example.test',
                   subject='Erii review',body='Alex，聊 Erii，30 分钟。',start='2026-10-20T11:00:00+08:00',

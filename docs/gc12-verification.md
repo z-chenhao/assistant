@@ -111,6 +111,8 @@ Run or Artifact; their empty inventories are evidence, and Task cancellation or
 old Task epochs are inapplicable. Steering and obsolete approval, process
 restart, duplicate callbacks and unknown effects are exercised here.
 
+The maintained `verify_unscripted_cases.py` gate freezes and runs these original inputs through the production CLI/bridge with an explicit loopback peer, retaining the ungraded input-fragment boundary.
+
 Subsequent model evaluation uses `unscripted_cases.py freeze --case GC-12 --variant base`
 with an explicitly configured, approved evaluation profile and isolated root
 following [the unscripted guide](guides/unscripted-evals.md). The maintained

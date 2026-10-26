@@ -181,7 +181,7 @@ def freeze(h, case_id, variant_id, kind, arm, repetition, seconds, journey=None)
     profile = selected(h)
     if profile is None:
         return dict(status='setup_required', eligible_for_grading=False, support=matrix())
-    if case_id not in INPUTS:
+    if case_id not in INPUTS and case_id != 'GC-12':
         return dict(status='ineligible', case_id=case_id, missing=GAPS[case_id],
                     eligible_for_grading=False, support=matrix())
     require((arm == 'account') == (profile['provider_kind'] == 'openai_account'), 'arm/profile mismatch')
