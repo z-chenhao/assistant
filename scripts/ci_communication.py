@@ -9,12 +9,21 @@ from collections import Counter
 import hashlib
 import importlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 
-from ci_codemode import IDENTITY
+from ci_codemode import IDENTITY as SOURCE_IDENTITY
 from verify_suite import ROOT, SHARDS, report_name, source_state
+
+IDENTITY = (*SOURCE_IDENTITY, 'run_id', 'run_attempt')
+
+
+def run_identity():
+    return {key: os.environ.get(env) for key, env in
+            (('workflow_sha', 'GITHUB_SHA'), ('run_id', 'GITHUB_RUN_ID'),
+             ('run_attempt', 'GITHUB_RUN_ATTEMPT'))}
 
 
 def file_record(path):
@@ -42,14 +51,16 @@ def pairs(gate):
     return [(key, 1) for key in ids]
 
 
-def check_suite(suite, part, source):
+def check_suite(suite, part, source, run=None):
     from verify_suite import communication_gates
+    run = run_identity() if run is None else run
     if (suite.get('passed') is not True or suite.get('source_stable') is not True or
             suite.get('source_dirty') is not False or suite.get('selected_gates') is not None or
             suite.get('communication_part') != part or suite.get('complete_inventory') is not False or
             set(suite.get('shards', {})) != {'communication'} or
-            any(suite.get(k) is not None for k in ('codemode_part', 'personal_part', 'provider_part')) or
-            any(suite.get(k) != v for k, v in source.items()) or
+            any(suite.get(k) is not None for k in ('codemode_part', 'personal_part', 'provider_part', 'security_part', 'delivery_part')) or
+            suite.get('jobs') != 1 or suite.get('gate_jobs') != 2 or
+            any(k not in suite or suite[k] != v for k, v in {**source, **run}.items()) or
             not re.fullmatch('[0-9a-f]{64}', suite.get('binary_sha256', ''))):
         raise ValueError('failed, dirty, focused or drifted communication part: ' + part)
     rows = suite['shards']['communication']
@@ -59,6 +70,14 @@ def check_suite(suite, part, source):
             any(type(r['attempt']) is not int or type(r.get('returncode')) is not int or
                 r['returncode'] != 0 or r.get('owned_group_drained') is not True for r in rows)):
         raise ValueError('missing, duplicate, reordered, failed or unclean communication repetition')
+    for row in rows:
+        gate = next(g for g in gates if g.name == row['gate'])
+        command = row.get('command', [])
+        if (len(command) != 7 + len(gate.arguments) or
+                command[1:4] != ['scripts/profile_harness.py', 'scripts/' + gate.script, '--binary'] or
+                command[5] != '--evidence' or Path(command[6]).name != report_name(gate, row['attempt']) or
+                command[7:] != list(gate.arguments)):
+            raise ValueError('communication command/parameter drift')
     return gates, rows
 
 
@@ -74,6 +93,7 @@ def native_receipt(gate, attempt, folder, binary, suite):
         prepare(report)  # Recompute existing native oracles; stored flags cannot override them.
         rows = report['variants']
         if gate.name == 'gc12':
+            driver.validate_report(report, binary)
             if report.get('binary_sha256') != suite['binary_sha256']:
                 raise ValueError('GC-12 binary drift')
             fixture_sha = file_record(driver.FIXTURE)['sha256']
@@ -93,6 +113,8 @@ def native_receipt(gate, attempt, folder, binary, suite):
                 checks.update({field + '/' + k: v for k, v in row[field].items()})
         receipts.append(dict(variant_id=key, repetition=row.get('repetition', 1),
                              assertions=checks, cleanup=row['cleanup']))
+        if gate.name == 'gc12':
+            receipts[-1]['execution_ids'] = driver.execution_ids(row)
     raw = path
     if gate.name in ('gc02','gc09','gc10','gc11'):
         raw = path.parent / json.loads(path.read_text())['native']['path']
@@ -105,6 +127,7 @@ def check_receipts(receipts, gates):
     expected = [(g.name, n) for g in gates for n in range(1, g.attempts + 1)]
     if [(r['gate'], r['attempt']) for r in receipts] != expected:
         raise ValueError('missing, duplicate or reordered native reports')
+    gc12_seen = {}
     for receipt in receipts:
         gate = next(g for g in gates if g.name == receipt['gate'])
         native = receipt['native']
@@ -126,6 +149,15 @@ def check_receipts(receipts, gates):
                     any(v is not True for v in row['assertions'].values()) or
                     any(v is not True for v in row['cleanup'].values())):
                 raise ValueError('failed assertion or unclean native variant')
+            if gate.name == 'gc12':
+                identities = row.get('execution_ids', {})
+                if set(identities) != {'runs', 'tools', 'generations', 'requests', 'conversation'}:
+                    raise ValueError('missing GC-12 execution identities')
+                for table, ids in identities.items():
+                    if (not ids or any(type(i) is not str or not i for i in ids) or
+                            len(set(ids)) != len(ids) or not gc12_seen.setdefault(table, set()).isdisjoint(ids)):
+                        raise ValueError('reused or invalid GC-12 execution identities: '+table)
+                    gc12_seen[table].update(ids)
 
 
 def collect(folder, part, binary):
@@ -176,7 +208,8 @@ def join(root):
     rows.sort(key=lambda r: order[r['gate'], r['attempt']])
     return dict(first, communication_part=None, complete_inventory=True,
                 shards={'communication': rows}, parts=suites, native_receipts=manifests,
-                elapsed_seconds=max(s['elapsed_seconds'] for s in suites.values()))
+                elapsed_seconds=max(s['elapsed_seconds'] for s in suites.values()),
+                semantic_score=None, release_ready=False)
 
 
 def main():

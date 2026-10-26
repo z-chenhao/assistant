@@ -51,12 +51,34 @@ GAPS = {
 
 
 def matrix():
-    return {case: dict(adapter='conversation_fragment' if case in INPUTS else None,
-                       fixture=INPUTS.get(case), eligible_for_grading=False,
+    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case == 'GC-12' else None,
+                       fixture='gc12-v1' if case == 'GC-12' else INPUTS.get(case), eligible_for_grading=False,
                        missing=GAPS[case]) for case in sorted(CASES)}
 
 
 def inputs(case_id, variant_id, journey=None):
+    if case_id == 'GC-12':
+        require(journey is None, 'GC-01 journey only')
+        lock = strict_json((ROOT/'evals/fixtures/gc12-v1.lock.json').read_bytes())
+        for name, expected in lock.items():
+            require(hashed((ROOT/name).read_bytes()) == expected, 'GC-12 input lock drift')
+        source = strict_json((ROOT/'evals/fixtures/gc12-v1.json').read_bytes())
+        wordings = dict(base='和 Alex 约下周 30 分钟聊 Erii，邮件简洁一点。',
+            **{'wording-1':'下周想和 Alex 聊 Erii，约 30 分钟，邮件写简短些。',
+               'wording-2':'请用简洁邮件和 Alex 约下周半小时讨论 Erii。'})
+        require(variant_id in (*wordings, 'contact-order', 'slot-order', 'unrelated-contact'), 'unknown variant')
+        if variant_id == 'contact-order': source['contacts'].reverse()
+        elif variant_id == 'slot-order':
+            for slots in source['free_slots'].values(): slots.reverse()
+        elif variant_id == 'unrelated-contact':
+            source['contacts'].insert(0, dict(name='Alex Smith', email='alex.smith@example.test', relation='不相关联系人'))
+        # Input-only fragment. No Tool plan/Gold or simulated approval timing;
+        # a connected pre-approval Steering adapter is still required.
+        events = [dict(at=source['clock'], text=text) for text in
+            (wordings.get(variant_id, wordings['base']), '不要周一。')]
+        return dict(case_id=case_id, case_version=1, variant_id=variant_id, seed=0, clock=source['clock'],
+            context='以下是本次对话明确提供的合成背景：'+json.dumps(source, ensure_ascii=False), events=events,
+            fixture_digest=digest(dict(source=source, events=events)), lock=lock)
     require(case_id in INPUTS, 'ineligible: missing adapter: ' + GAPS[case_id])
     dataset, _, lock = load_contract(ROOT, INPUTS[case_id])
     case = next(c for c in dataset['cases'] if c['case_id'] == case_id)
@@ -159,7 +181,7 @@ def freeze(h, case_id, variant_id, kind, arm, repetition, seconds, journey=None)
     profile = selected(h)
     if profile is None:
         return dict(status='setup_required', eligible_for_grading=False, support=matrix())
-    if case_id not in INPUTS:
+    if case_id not in INPUTS and case_id != 'GC-12':
         return dict(status='ineligible', case_id=case_id, missing=GAPS[case_id],
                     eligible_for_grading=False, support=matrix())
     require((arm == 'account') == (profile['provider_kind'] == 'openai_account'), 'arm/profile mismatch')

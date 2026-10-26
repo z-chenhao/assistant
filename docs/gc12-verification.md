@@ -1,3 +1,7 @@
+ERII-258 owns the 19 original GC-12 blocks in the frozen replan manifest
+`0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556`.
+`gc12-boundary-v1.lock.json` records their exact source lines/hashes and pins
+the unchanged Golden specification, scoring, original fixture and original lock.
 GC-12 uses the exact §8.13 source and original two inputs through the maintained
 ChannelHarness, production Main/Context Builder, Security, ToolInvocation and
 stdio MCP boundaries. It is an explicitly scripted model with independent local
@@ -9,7 +13,9 @@ Run the complete offline checkpoint:
 ```sh
 make build
 python3 scripts/verify_gc12.py --binary bin/erii --evidence evidence/gc12.json
-python3 scripts/verify_suite.py --binary bin/erii --evidence evidence/gc12-series --shard communication --jobs 1
+python3 scripts/verify_gc12.py --binary bin/erii --evidence evidence/gc12.json --validate --probe-rejections
+python3 scripts/verify_suite.py --binary bin/erii --evidence evidence/gc12-series --shard communication --gate gc12 --jobs 1
+python3 scripts/verify_gc12.py --binary bin/erii --evidence evidence/gc12-series --validate-series
 python3 scripts/prepare_release_eval.py --input evidence/gc12.json --evidence evidence/gc12-judge.json
 ```
 
@@ -17,11 +23,72 @@ The communication gate runs five consecutive complete rounds, each containing
 six positive variants and denial/lost-response safety probes. A mechanical pass
 does not fill the original protected acceptance series or eight semantic grades.
 The lock binds the source fixture and unchanged Golden specification.
+The focused command retains all five rounds but cannot claim the complete
+communication inventory. Required CI still runs its fixed parts and full join.
+
+| Frozen blocks | Mechanically observed boundary |
+| --- | --- |
+| 313, 842–844 | Original two inputs; Monday frozen before notice, Steering durable before SIGKILL, new Tuesday approval after restart |
+| 317, 848 | MCP source contacts/recent thread/common slots, exact Alex Chen recipient and Tuesday 11:00–11:30 +08; ambiguous/missing-slot no-write Fake regressions |
+| 318–319, 849–850 | Recipient/body/timezone/time/action frozen; native request hashes recomputed, obsolete approval invalidated, wrong hash rejected, concurrent/repeated callbacks produce one mail and one event |
+| 320–321, 851 | Short scripted body, actual remote status readback and one completion; model style and unauthorized-commitment judgment remain ungraded |
+| 315, 323, 827, 829, 840, 846 | Normative labels and exact source/fixture identities; these confer no semantic score |
+
+Every aggregate records source SHA and tracked source hashes before/after,
+binary SHA256/Go build identity, OS/Python/Node/Go versions, native checkpoints,
+model/capability snapshots and cleanup. `--validate`, Judge preparation and the
+CI collector recompute native observations. They reject missing/reordered
+variants, changed source/binary/fixture, incomplete cleanup, altered pending or
+completed cuts, frozen hashes, generation snapshots and replay state. The CI
+manifest carries native execution IDs and rejects reused Run, ToolInvocation,
+generation, Delivery or message IDs across all five rounds. Restart snapshots
+within one journey retain their original IDs. Hashes prove consistency;
+independent exact-SHA review and required CI remain mandatory.
+The optional rejection probe corrupts real passing bytes in 17 ways and requires
+both the actual validator CLI and native CI consumer to reject them. It also
+submits a copied complete round to the CI join and requires identity rejection.
+Three corruptions set the denied variant's process, HTTP peer or disposable-root
+cleanup flag false and recompute the aggregate exactly as `run()` does. Both
+consumers must still reject and name that variant and exact cleanup condition.
+Another corruption rejects a generation admitted at the Steering crash cut.
+Full diagnostics stay beside the input report in its `.rejections` directory.
 
 The CLI removes the previous aggregate before fixture validation or startup.
 An unsuccessful rerun exits nonzero and leaves no current passing aggregate;
 variant diagnostics remain available, and Judge preparation rejects the missing
-report. To run the success → same-path startup failure → Judge rejection
+report. Final native-validation refusals name the variant and each failed
+assertion, checkpoint/replay/hash boundary or cleanup condition. They retain
+`gc12-N/rejected-report.json` locally, including the full failed aggregate, before
+unwinding. Only `gc12-N/failure/summary.json` and `receipt.json.gz` enter the compact
+CI artifact. The summary binds source, binary and rejected bytes with hashes.
+The compressed receipt contains the rejected variant's native observations;
+model generations retain snapshot IDs and hashes instead of full requests or
+responses. Original semantic-state digests and recomputed checks accompany this
+diagnostic projection. It cannot replace raw native acceptance evidence.
+Evidence-write failures preserve the original nonzero refusal. No retry occurs.
+A fresh drive clears its own previous failure files as well as the aggregate.
+Row cleanup failures are diagnosed before the computed aggregate is rejected;
+the aggregate must still be exactly true before any report can pass. Regression
+tests cover all three cleanup flags through `run()` and the actual validator CLI,
+including failed-byte/projection hashes and a clean rerun clearing stale failure
+files. Fault injection changes receipt flags only; it never leaves real processes
+or peers running to manufacture a cleanup failure.
+
+The ERII-253 fourth-round CI refusal lacks the original native bytes; its exact
+cause remains inconclusive. A subsequent ERII-382 CI failure did retain the
+`wording-2` receipt: `frozen_generations` rejected one completed generation with
+attempt_count=2. Steering could start that generation while the approval notice
+was held on a separate goroutine; SIGKILL then left it pending for Host recovery.
+The harness now arms the existing `after_compaction_commit` barrier before
+Steering and captures `steering_crash_cut` before new generation admission.
+Validation recomputes that no generation was added and the original inputs are
+durable. The original one-attempt oracle remains intact; Runtime recovery is
+unchanged. This fixes the demonstrated crash-cut race without claiming the
+missing historical failure had the same cause. Deterministic regressions
+exercise the same final-validation rejection through run, validator CLI and CI
+consumer, while preserving all 19 blocks, eight journeys and five serial rounds.
+
+To run the success → same-path startup failure → Judge rejection
 regression through the actual product CLI:
 
 ```sh
@@ -42,7 +109,9 @@ uses `/usr/bin/python3` inside the existing sandbox.
 
 Drive submits the original request, reads the exact contacts/recent thread and
 common slots through MCP, and holds Monday's frozen approval before channel
-transport. It persists “不要周一。”, rejects obsolete approval, SIGKILLs that
+transport. It arms the pre-admission barrier, persists “不要周一。”, rejects
+obsolete approval, observes the frozen compaction before any new generation,
+SIGKILLs that
 server and starts the same installation again. The new frozen action identifies
 Alex Chen, Tuesday 11:00–11:30 +08, subject, short body and both actions. Wrong
 hashes reject; concurrent signed callbacks and repeated source IDs approve once.
@@ -74,3 +143,19 @@ Judge preparation admits only complete ungraded six-variant receipts and
 allowlists source, visible dialogue, empty Artifact summary and assertions.
 Every packet is ineligible for grading; missing real-model/L2/human evidence
 remains INCONCLUSIVE. The final release-completion command remains nonzero.
+
+This short synchronous journey stays in Main. It creates no Task, Root/Child
+Run or Artifact; their empty inventories are evidence, and Task cancellation or
+old Task epochs are inapplicable. Steering and obsolete approval, process
+restart, duplicate callbacks and unknown effects are exercised here.
+
+The maintained `verify_unscripted_cases.py` gate freezes and runs these original inputs through the production CLI/bridge with an explicit loopback peer, retaining the ungraded input-fragment boundary.
+
+Subsequent model evaluation uses `unscripted_cases.py freeze --case GC-12 --variant base`
+with an explicitly configured, approved evaluation profile and isolated root
+following [the unscripted guide](guides/unscripted-evals.md). The maintained
+entry exposes the original inputs; its connected mail/calendar adapter is still
+missing and it remains ineligible for whole-case grading. ERII-223 retains that
+semantic gap, current L2 real-account/channel evidence and release acceptance.
+No credentials or accounts are borrowed. `semantic_score=null` and
+`release_ready=false` throughout this mechanical gate.

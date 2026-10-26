@@ -8,25 +8,60 @@ import argparse
 import copy
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import gzip
 import json
+import os
 from pathlib import Path
+import platform
 import selectors
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 
 from case_runner import digest
 from feishu_sandbox import Sandbox
 from fixture_pool import run_cases
 from meeting_sandbox import state as remote_state
+from release_audit import inventory
+from release_receipts import strict_json
+from unscripted_cases import source_identity
+from verify_gc08 import call_hash
 from verify_channels import ChannelHarness
 from verify_main import require
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT/'evals/fixtures/gc12-v1.json'
+BOUNDARY_LOCK = ROOT/'evals/fixtures/gc12-boundary-v1.lock.json'
 FIRST = '和 Alex 约下周 30 分钟聊 Erii，邮件简洁一点。'
 STEER = '不要周一。'
+
+
+class MeetingHarness(ChannelHarness):
+    def args(self, *args):
+        # Only GC-12's first server needs both independent crash barriers.
+        if args[:2] == ('-test-main-hold', 'before_delivery_send'):
+            args = ('-test-main-barrier', 'after_compaction_commit='+str(self.root/'generation-release'), *args)
+        return super().args(*args)
+
+
+def load():
+    lock = strict_json(BOUNDARY_LOCK.read_bytes())
+    for name, expected in lock['files'].items():
+        require(hashlib.sha256((ROOT/name).read_bytes()).hexdigest() == expected, 'GC-12 lock drift: '+name)
+    current = {(b['line'], b['sha256']) for b in inventory((ROOT/'evals/golden-cases.md').read_text())}
+    blocks = lock['frozen_blocks']
+    require(len(blocks) == len({b['line'] for b in blocks}) == 19 and all(
+        b['source'] == 'evals/golden-cases.md' and (b['line'], b['sha256']) in current for b in blocks),
+        'GC-12 frozen source drift')
+    return lock
+
+
+def cases():
+    rows = variants()
+    rows.extend(dict(rows[0], id=mode, mode=mode) for mode in ('denied', 'lost-reply'))
+    return rows
 
 
 def variants():
@@ -139,6 +174,268 @@ def source_observe(value, variant):
                              for p in m['content']] == [variant['first'], variant['steer']])
 
 
+def execution_ids(row):
+    """Identity sets distinguish independent journeys from replay snapshots."""
+    value = row['state']
+    result = {}
+    for table, key in (('runs', 'run_id'), ('tools', 'invocation_id'),
+                       ('generations', 'generation_id'), ('requests', 'delivery_id'),
+                       ('conversation', 'message_id')):
+        ids = [item[key] for item in value[table]]
+        require(bool(ids) and all(type(i) is str and i for i in ids) and len(set(ids)) == len(ids),
+                'invalid GC-12 execution identities: '+table)
+        result[table] = ids
+    return result
+
+
+def independent_executions(rows):
+    seen = {}
+    for row in rows:
+        for table, ids in execution_ids(row).items():
+            require(seen.setdefault(table, set()).isdisjoint(ids), 'reused GC-12 execution identities: '+table)
+            seen[table].update(ids)
+
+
+def receipt_checks(row):
+    value = row['state']; remote = row['remote']; variant = row['variant']
+    empty = dict(mail=[], calendar=[], attempts=[])
+    mode = variant.get('mode', 'success')
+    checks = (observe(value, remote, value['approvals'][0], value['approvals'][-1], empty, row['remote_replay'])
+              if mode == 'success' else safety_observe(value, remote, mode, empty, row['remote_replay']))
+    checks.update(source_observe(value, variant))
+    return checks
+
+
+def boundary_checks(row):
+    value = row['state']; steps = row['checkpoints']
+    require([s['name'] for s in steps] == ['Monday_frozen_before_notice', 'Tuesday_frozen_before_consent', 'completed'],
+            'GC-12 checkpoint inventory drift')
+    before, pending, completed = steps
+    crash = row['steering_crash_cut']
+    old, new = value['approvals']
+    empty = dict(mail=[], calendar=[], attempts=[])
+    def approval_cut(step, expected):
+        approvals = step['state']['approvals']
+        effects = [t for t in step['state']['tools'] if t['tool_name'] == 'mcp__meeting__invite']
+        return ([a['status'] for a in approvals] == expected and len(effects) == len(expected) and
+                step['remote'] == empty and all(t['attempt_count'] == 0 for t in effects) and
+                all(a['approval_id'] == final['approval_id'] and
+                    a['frozen_arguments_hash'] == final['frozen_arguments_hash'] and
+                    frozen(step['state'], a) == frozen(value, final)
+                    for a, final in zip(approvals, (old, new))))
+    models = {m['snapshot_id']:m for m in value['snapshots']}
+    capabilities = {c['snapshot_id']:c for c in value['capabilities']}
+    runs = {r['run_id']:r for r in value['runs']}
+    return dict(
+        steering_before_generation=crash['remote'] == empty and
+            [a['status'] for a in crash['state']['approvals']] == ['invalidated'] and
+            [g['generation_id'] for g in crash['state']['generations']] ==
+                [g['generation_id'] for g in before['state']['generations']] and
+            all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in crash['state']['generations']) and
+            [p['text'] for m in crash['state']['conversation'] if m['role'] == 'user'
+             for p in m['content']] == [row['variant']['first'], row['variant']['steer']],
+        monday_pending_without_effect=approval_cut(before, ['pending']),
+        tuesday_pending_without_effect=approval_cut(pending, ['invalidated', 'pending']),
+        completed_cut_exact=semantic_state(completed['state']) == semantic_state(value) and completed['remote'] == row['remote'],
+        frozen_approval_hashes=all(a['frozen_arguments_hash'] == t['request_hash'] == call_hash(t)
+            for a in value['approvals'] for t in value['tools'] if t['invocation_id'] == a['invocation_id']),
+        frozen_generations=bool(value['generations']) and all(g['status'] == 'completed' and g['attempt_count'] == 1 and
+            json.loads(g['request_json'])['model_snapshot']['snapshot_id'] == runs[g['run_id']]['model_snapshot_id']
+            for g in value['generations']) and all(r['model_snapshot_id'] in models and
+                r['capability_snapshot_id'] in capabilities and not capabilities[r['capability_snapshot_id']]['can_spawn_agents']
+                for r in runs.values()),
+        exact_replay=row['replay_digest'] == digest(semantic_state(row['replay_state'])) and
+            semantic_state(value) == semantic_state(row['replay_state']),
+    )
+
+
+class ReceiptFailure(RuntimeError):
+    def __init__(self, index, variant_id, failed):
+        self.index, self.failed = index, failed
+        super().__init__(f'GC-12 native receipt {index} ({variant_id}) rejected: '+', '.join(failed))
+
+
+def validate_report(report, binary=None):
+    require(report.get('case_id') == 'GC-12' and report.get('status') == 'mechanical_pass' and
+        'semantic_score' in report and report['semantic_score'] is None and
+        report.get('fixture_lock') == load(), 'complete locked ungraded GC-12 report required')
+    identity = report['identity']
+    require(identity['source_before'] == identity['source_after'] == source_identity() and
+        bool(identity['environment']) and len(identity['binary_sha256']) == 64 and
+        report['binary_sha256'] == identity['binary_sha256'], 'GC-12 source/environment identity drift')
+    if binary is not None:
+        require(hashlib.sha256(binary.read_bytes()).hexdigest() == identity['binary_sha256'], 'GC-12 binary drift')
+    rows = report['variants']
+    require([r['variant'] for r in rows] == cases(), 'GC-12 complete ordered variant inventory required')
+    independent_executions(rows)
+    for index, row in enumerate(rows):
+        checks = receipt_checks(row)
+        conditions = {f'assertion/{key}': value is True for key, value in checks.items()}
+        conditions.update({f'stored_assertion/{key}': row['assertions'].get(key) is True and
+            row['assertions'].get(key) == value for key, value in checks.items()})
+        conditions['assertion_inventory'] = row['assertions'].keys() == checks.keys()
+        conditions.update({'boundary/'+key: bool(value) for key, value in boundary_checks(row).items()})
+        conditions.update(scope=row['scope'] == 'scripted_whole_case_mechanics',
+            semantic_score=row['semantic_score'] is None,
+            fixture_sha256=row['fixture_sha256'] == hashlib.sha256(FIXTURE.read_bytes()).hexdigest(),
+            cleanup_inventory=row['cleanup'].keys() == {'owned_processes_joined', 'http_peer_joined', 'disposable_root_removed'})
+        conditions.update({'cleanup/'+key: row['cleanup'].get(key) is True for key in
+                           ('owned_processes_joined', 'http_peer_joined', 'disposable_root_removed')})
+        failed = [key for key, passed in conditions.items() if not passed]
+        if failed:
+            raise ReceiptFailure(index, cases()[index]['id'], failed)
+    # Diagnose a real row failure before rejecting its computed aggregate.
+    # A false/missing/non-boolean aggregate still cannot pass with clean rows.
+    require(report.get('cleanup') is True, 'GC-12 aggregate cleanup must be true')
+    return dict(case_id='GC-12', receipts=len(rows), frozen_blocks=19, cleanup=True, semantic_score=None,
+                release_ready=False, source_sha=identity['source_before']['sha'], binary_sha256=identity['binary_sha256'])
+
+
+def diagnostic_receipt(row):
+    """Retain the rejected native observations, excluding full model exchanges.
+
+    Request snapshot IDs remain available to the frozen-generation oracle.
+    Hashes preserve equality/drift evidence for omitted generation bytes. This
+    projection is diagnostic only, never a substitute for native acceptance.
+    """
+    result = {key: copy.deepcopy(row[key]) for key in ('variant', 'scope', 'semantic_score',
+        'fixture_sha256', 'assertions', 'cleanup', 'remote', 'remote_replay', 'replay_digest')}
+
+    def state(value):
+        projected = {key: copy.deepcopy(value[key]) for key in ('approvals', 'requests', 'tasks',
+            'artifacts', 'tools', 'conversation', 'runs', 'snapshots', 'capabilities')}
+        # These native metadata tables also participate in exact state cuts.
+        # Keep them so a late trace/input/delivery change remains inspectable.
+        for key in ('trace', 'inputs', 'usage', 'deliveries'):
+            if key in value:
+                projected[key] = copy.deepcopy(value[key])
+        projected['generations'] = []
+        for generation in value['generations']:
+            request = json.loads(generation['request_json'])
+            projected['generations'].append(dict(
+                generation_id=generation['generation_id'], run_id=generation['run_id'],
+                status=generation['status'], attempt_count=generation['attempt_count'],
+                request_json=json.dumps(dict(model_snapshot=dict(snapshot_id=request['model_snapshot']['snapshot_id']))),
+                native_sha256=digest(generation)))
+        return projected
+
+    result.update(state=state(row['state']), replay_state=state(row['replay_state']),
+        checkpoints=[dict(name=cut['name'], state=state(cut['state']), remote=cut['remote']) for cut in row['checkpoints']])
+    result['steering_crash_cut'] = dict(state=state(row['steering_crash_cut']['state']), remote=row['steering_crash_cut']['remote'])
+    result['observed_checks'] = dict(assertions=receipt_checks(row), boundaries=boundary_checks(row))
+    result['semantic_digests'] = {key: digest(semantic_state(row[key])) for key in ('state', 'replay_state')}
+    return result
+
+
+def validate_with_evidence(report, binary, evidence):
+    try:
+        return validate_report(report, binary)
+    except ReceiptFailure as error:
+        # Keep complete bytes locally before unwinding. CI uploads only the
+        # small diagnostic projection, never this report's model requests.
+        try:
+            evidence.mkdir(parents=True, exist_ok=True)
+            raw = json.dumps(report, ensure_ascii=False, indent=2).encode()+b'\n'
+            (evidence/'rejected-report.json').write_bytes(raw)
+            folder = evidence/'failure'
+            folder.mkdir(exist_ok=True)
+            row = report['variants'][error.index]
+            native = gzip.compress(json.dumps(diagnostic_receipt(row), ensure_ascii=False).encode(), mtime=0)
+            path = folder/'receipt.json.gz'
+            path.write_bytes(native)
+            summary = dict(case_id='GC-12', diagnostic_only=True, phase='native_validation',
+                variant_id=cases()[error.index]['id'], variant_index=error.index, failed_conditions=error.failed,
+                source_sha=report['identity']['source_before']['sha'], binary_sha256=report['binary_sha256'],
+                rejected_report=dict(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()),
+                native=dict(path=path.name, bytes=len(native), sha256=hashlib.sha256(native).hexdigest()),
+                semantic_score=None, release_ready=False)
+            (folder/'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
+        except (OSError, ValueError, KeyError, TypeError) as capture_error:
+            print('GC-12 failure evidence capture failed: '+type(capture_error).__name__, file=sys.stderr)
+        raise
+
+
+def rejection_probes(report, binary, folder):
+    """Corrupt real receipts; exercise the actual CLI and CI native consumer."""
+    from ci_communication import native_receipt, check_receipts
+    from verify_suite import Gate
+    validate_report(report, binary)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder/'gc12-1.json'; gate = Gate('gc12', 'verify_gc12.py', 'gc12-1', 1)
+    mutations = dict(
+        missing_variant=lambda r:r['variants'].pop(),
+        reordered=lambda r:r['variants'].reverse(),
+        empty_cleanup=lambda r:r['variants'][0].update(cleanup={}),
+        false_cleanup=lambda r:r['variants'][0]['cleanup'].update(http_peer_joined=False),
+        source=lambda r:r['identity'].update(source_after={}),
+        binary=lambda r:r.update(binary_sha256='0'*64),
+        fixture=lambda r:r['variants'][0].update(fixture_sha256='0'*64),
+        replay=lambda r:r['variants'][0].update(replay_digest='0'*64),
+        frozen_hash=lambda r:r['variants'][0]['state']['approvals'][0].update(frozen_arguments_hash='0'*64),
+        pending_cut=lambda r:r['variants'][0]['checkpoints'][0]['state']['approvals'][0].update(status='approved'),
+        steering_admission=lambda r:r['variants'][0]['steering_crash_cut']['state']['generations'][0].update(attempt_count=2),
+        remote=lambda r:r['variants'][0]['remote']['calendar'].clear(),
+        score=lambda r:r.update(semantic_score=90),
+        copied_execution=lambda r:r['variants'][1]['state']['runs'][0].update(run_id=r['variants'][0]['state']['runs'][0]['run_id']))
+    def unclean(report, marker):
+        report['variants'][6]['cleanup'][marker] = False
+        report['cleanup'] = all(all(row['cleanup'].values()) for row in report['variants'])
+    for marker in ('owned_processes_joined', 'http_peer_joined', 'disposable_root_removed'):
+        mutations['aggregate_'+marker] = lambda r, marker=marker:unclean(r, marker)
+    results = {}
+    for name, mutate in mutations.items():
+        bad = copy.deepcopy(report); mutate(bad)
+        path.write_text(json.dumps(bad, ensure_ascii=False)+'\n')
+        cli = subprocess.run([sys.executable, str(ROOT/'scripts/verify_gc12.py'), '--binary', str(binary),
+            '--evidence', str(path), '--validate'], capture_output=True, text=True, timeout=60)
+        (folder/(name+'.stderr')).write_text(cli.stderr)
+        require(cli.returncode != 0, 'GC-12 CLI accepted corruption: '+name)
+        error = None
+        try:
+            receipt = native_receipt(gate, 1, folder, binary, {'binary_sha256':report['binary_sha256']})
+            check_receipts([receipt], [gate])
+        except (RuntimeError, ValueError, KeyError) as failure:
+            error = str(failure)
+        require(error is not None, 'GC-12 CI accepted corruption: '+name)
+        if name.startswith('aggregate_'):
+            condition = 'cleanup/'+name.removeprefix('aggregate_')
+            require(all('denied' in message and condition in message for message in (cli.stderr, error)),
+                    'GC-12 aggregate cleanup refusal lost variant/condition: '+name)
+        results[name] = dict(cli_exit_code=cli.returncode, ci_rejected=True, reason=error)
+    path.unlink()
+    # Reusing a complete passing round is rejected by the compact CI join too.
+    path.write_text(json.dumps(report, ensure_ascii=False)+'\n')
+    receipt = native_receipt(gate, 1, folder, binary, {'binary_sha256':report['binary_sha256']})
+    duplicate = copy.deepcopy(receipt); duplicate['attempt'] = 2
+    duplicate['native']['path'] = 'gc12-2.json'
+    try:
+        check_receipts([receipt, duplicate], [Gate('gc12', gate.script, 'gc12', 2)])
+    except ValueError as error:
+        require('reused or invalid GC-12 execution identities' in str(error), 'unexpected round rejection')
+        results['copied_round'] = dict(ci_rejected=True, reason=str(error))
+    require('copied_round' in results, 'GC-12 CI accepted copied round')
+    path.unlink()
+    (folder/'rejections.json').write_text(json.dumps(results, indent=2)+'\n')
+    return results
+
+
+def wait_boundary(h, expected, timeout=20):
+    """Drain JSON boundary frames without TextIO read-ahead hiding queued lines."""
+    pending = b''
+    deadline = time.monotonic()+timeout
+    with selectors.DefaultSelector() as ready:
+        ready.register(h.process.stdout, selectors.EVENT_READ)
+        while True:
+            require(ready.select(max(0, deadline-time.monotonic())), 'GC-12 boundary not reached: '+expected)
+            data = os.read(h.process.stdout.fileno(), 65536)
+            require(data, 'GC-12 server exited before boundary: '+expected)
+            pending += data
+            while b'\n' in pending:
+                line, pending = pending.split(b'\n', 1)
+                if json.loads(line)['boundary'] == expected:
+                    return
+
+
 def drive(binary, evidence, variant):
     mode = variant.get('mode', 'success')
     with tempfile.TemporaryDirectory(prefix='erii-gc12-') as temp, Sandbox() as platform:
@@ -149,7 +446,7 @@ def drive(binary, evidence, variant):
         # the peer source there; never loosen it to read the workspace/data DB.
         (provider/'meeting_sandbox.py').write_bytes((ROOT/'scripts/meeting_sandbox.py').read_bytes())
         (provider/'source.json').write_text(json.dumps(variant['source'], ensure_ascii=False))
-        h = ChannelHarness(binary, root, platform, 'meeting')
+        h = MeetingHarness(binary, root, platform, 'meeting')
         with h.config.open('a') as config:
             # The shipped macOS sandbox allows system/Xcode runtimes, not an
             # arbitrary Homebrew interpreter's framework outside this scope.
@@ -163,20 +460,30 @@ def drive(binary, evidence, variant):
                        fixture_sha256=hashlib.sha256(FIXTURE.read_bytes()).hexdigest(), checkpoints=[])
         try:
             h.setup()
+            generation_release = root/'generation-release'
+            generation_release.touch()
             h.start('before_delivery_send')
             h.callback('gc12-first', variant['first'])
-            with selectors.DefaultSelector() as ready:
-                ready.register(h.process.stdout, selectors.EVENT_READ)
-                require(ready.select(20), 'Monday approval did not reach pre-delivery boundary')
-            require(json.loads(h.process.stdout.readline())['boundary'] == 'before_delivery_send', 'wrong approval boundary')
+            wait_boundary(h, 'before_delivery_send')
             value = native(h)
             old = value['approvals'][0]
             require(old['status'] == 'pending', 'Monday approval missing')
             before = remote_state(provider)
             require(before == dict(mail=[], calendar=[], attempts=[]), 'side effect before approval')
             receipt['checkpoints'].append(dict(name='Monday_frozen_before_notice', state=value, remote=before))
+            # Delivery is held on another goroutine. Arm the existing
+            # pre-admission boundary before Steering, so SIGKILL cannot race
+            # a newly accepted pending generation and force an extra attempt.
+            generation_release.unlink()
             h.http('/api/message', dict(source_id='gc12-steer', content=[dict(type='text', text=variant['steer'])]))
             h.callback('obsolete-approval', '/approve '+old['approval_id']+' '+old['frozen_arguments_hash'], expected=409)
+            wait_boundary(h, 'after_compaction_commit')
+            cut = native(h)
+            require([g['generation_id'] for g in cut['generations']] ==
+                    [g['generation_id'] for g in value['generations']] and
+                    all(g['status'] == 'completed' and g['attempt_count'] == 1 for g in cut['generations']),
+                    'GC-12 Steering admitted a generation before SIGKILL')
+            receipt['steering_crash_cut'] = dict(state=cut, remote=remote_state(provider))
             # Real server SIGKILL while first approval transport is held. New
             # input is already durable; restart must not revive Monday consent.
             h.stop(kill=True)
@@ -221,32 +528,72 @@ def drive(binary, evidence, variant):
         finally:
             h.stop()
             h.cleanup()
-            receipt['owned_processes_joined'] = True
+            receipt['owned_processes_joined'] = all(child.poll() is not None for child in h.children)
             (evidence/(variant['id']+'.json')).write_text(json.dumps(receipt, ensure_ascii=False, indent=2)+'\n')
-    receipt['cleanup'] = dict(owned_processes_joined=True, http_peer_joined=not platform.thread.is_alive(), disposable_root_removed=not root.exists())
+    receipt['cleanup'] = dict(owned_processes_joined=receipt['owned_processes_joined'], http_peer_joined=not platform.thread.is_alive(), disposable_root_removed=not root.exists())
     (evidence/(variant['id']+'.json')).write_text(json.dumps(receipt, ensure_ascii=False, indent=2)+'\n')
     return receipt
 
 
 def run(binary, evidence):
     evidence.mkdir(parents=True, exist_ok=True)
+    for name in ('rejected-report.json', 'failure/receipt.json.gz', 'failure/summary.json'):
+        (evidence/name).unlink(missing_ok=True)
+    boundary_lock = load()
+    identity = dict(source_before=source_identity(), binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
+        environment=dict(platform=platform.platform(), python=platform.python_version(),
+            node=subprocess.check_output(['node','--version'], text=True).strip(),
+            go=subprocess.check_output(['go','version'], text=True).strip(),
+            binary_build=subprocess.check_output(['go','version','-m',str(binary)], text=True)))
     lock = json.loads(FIXTURE.with_suffix('.lock.json').read_text())
     for path, expected in lock.items():
         require(hashlib.sha256((ROOT/path).read_bytes()).hexdigest() == expected, 'GC-12 locked source drift: '+path)
-    cases = variants()
-    for mode in ('denied', 'lost-reply'):
-        cases.append(dict(cases[0], id=mode, mode=mode))
-    results = run_cases(cases, lambda v:drive(binary, evidence, v), 1)
-    return dict(case_id='GC-12', status='mechanical_pass', semantic_score=None, live_shadow='inconclusive',
-                binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(), variants=results,
-                cleanup=all(all(r['cleanup'].values()) for r in results))
+    results = run_cases(cases(), lambda v:drive(binary, evidence, v), 1)
+    identity['source_after'] = source_identity()
+    report = dict(case_id='GC-12', status='mechanical_pass', semantic_score=None, live_shadow='inconclusive',
+        fixture_lock=boundary_lock, identity=identity, binary_sha256=identity['binary_sha256'], variants=results,
+        cleanup=all(all(r['cleanup'].values()) for r in results),
+        remaining=dict(parent='ERII-223', semantic_score=None, current_L2='unexecuted', release_ready=False,
+            unscripted='unscripted_cases.py freeze --case GC-12; original inputs only; connected mail/calendar adapter still required',
+            applicability='Synchronous Main only; no Task/Root/Child/Artifact. Task cancellation and old Task epochs are inapplicable; Steering, SIGKILL/restart, obsolete approval and unknown external effects are exercised.'))
+    validate_with_evidence(report, binary, evidence)
+    return report
 
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--binary', type=Path, required=True)
     p.add_argument('--evidence', type=Path, required=True)
+    modes = p.add_mutually_exclusive_group()
+    modes.add_argument('--validate', action='store_true')
+    modes.add_argument('--validate-series', action='store_true', help='Recompute all five original gc12 rounds in an evidence directory')
+    p.add_argument('--probe-rejections', action='store_true', help='With --validate, corrupt real receipts and require CLI/CI rejection')
     args = p.parse_args()
+    if args.probe_rejections and not args.validate:
+        p.error('--probe-rejections requires --validate')
+    if args.validate_series:
+        from ci_communication import native_receipt, check_receipts
+        from verify_suite import SHARDS
+        gate = next(g for g in SHARDS['communication'] if g.name == 'gc12')
+        binary = args.binary.resolve()
+        suite = dict(binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
+        folder = args.evidence
+        if not (folder/'gc12-1.json').exists():
+            # verify_suite isolates focused output from complete CI inventories.
+            key = hashlib.sha256(json.dumps(['gc12']).encode()).hexdigest()[:12]
+            folder = folder/'focused'/key
+        receipts = [native_receipt(gate, n, folder, binary, suite) for n in range(1, gate.attempts+1)]
+        check_receipts(receipts, [gate])
+        print(json.dumps(dict(case_id='GC-12', rounds=gate.attempts, receipts=sum(len(r['rows']) for r in receipts),
+            cleanup=True, semantic_score=None, release_ready=False)))
+        sys.exit(0)
+    if args.validate:
+        report = strict_json(args.evidence.read_bytes())
+        result = validate_with_evidence(report, args.binary.resolve(), args.evidence.resolve().with_suffix(''))
+        if args.probe_rejections:
+            result['rejection_probes'] = len(rejection_probes(report, args.binary.resolve(), args.evidence.with_suffix('.rejections')))
+        print(json.dumps(result))
+        sys.exit(0)
     args.evidence.unlink(missing_ok=True)
     result = run(args.binary.resolve(), args.evidence.resolve().with_suffix(''))
     args.evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')

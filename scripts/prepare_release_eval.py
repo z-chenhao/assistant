@@ -20,6 +20,16 @@ def prepare(report):
         summary = validate_report(report)
         return dict(version=1, status='prepared; GC-11 mechanical receipts only; semantic grading unexecuted',
                     mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
+    if report.get('case_id') == 'GC-06':
+        from verify_gc06 import validate_report
+        summary = validate_report(report)
+        return dict(version=1, status='prepared; GC-06 mechanical receipts only; semantic grading unexecuted',
+                    mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
+    if report.get('case_id') == 'GC-04':
+        from verify_gc04 import validate_report
+        summary = validate_report(report)
+        return dict(version=1, status='prepared; GC-04 mechanical receipts only; semantic grading unexecuted',
+                    mechanical=summary, judge_packets=[], eligible_for_grading=False, scores=None, winner=None)
     if report.get('case_id') == 'GC-10':
         from verify_gc10 import validate_report
         summary = validate_report(report)
@@ -246,29 +256,12 @@ def prepare_agenda(report):
 def prepare_meeting(report):
     """Allowlisted GC-12 packet previews; scripted evidence can never be graded."""
     import verify_gc12 as driver
-    if report.get('cleanup') is not True or report.get('semantic_score') is not None or report.get('status') != 'mechanical_pass':
-        raise ValueError('complete ungraded GC-12 evidence required')
-    rows = report['variants']
-    expected = driver.variants()
-    if len(rows) != 8 or len({r['variant']['id'] for r in rows}) != 8:
-        raise ValueError('six variants and two safety probes required')
+    try:
+        driver.validate_report(report)
+    except (RuntimeError, KeyError, TypeError, IndexError) as error:
+        raise ValueError('GC-12 native validation failed: '+str(error)) from error
     packets = []
-    for row in rows:
-        if row['variant'].get('mode'):
-            mode = row['variant']['mode']
-            if mode not in ('denied','lost-reply') or row['variant'] != dict(expected[0],id=mode,mode=mode):
-                raise ValueError('GC-12 safety variant drift')
-            checks = driver.safety_observe(row['state'],row['remote'],mode,dict(mail=[],calendar=[],attempts=[]),row['remote_replay'])
-        else:
-            variant = next(v for v in expected if v['id']==row['variant']['id'])
-            if row['variant'] != variant: raise ValueError('GC-12 variant drift')
-            checks = driver.observe(row['state'],row['remote'],row['state']['approvals'][0],row['state']['approvals'][-1],
-                                    dict(mail=[],calendar=[],attempts=[]),row['remote_replay'])
-        checks.update(driver.source_observe(row['state'],row['variant']))
-        if (not all(checks.values()) or row['assertions'] != checks or row['scope'] != 'scripted_whole_case_mechanics' or
-                not all(row['assertions'].values()) or row['semantic_score'] is not None or
-                not all(row['cleanup'].values()) or driver.semantic_state(row['state']) != driver.semantic_state(row['replay_state'])):
-            raise ValueError('GC-12 failed, graded or incomplete receipt')
+    for row in report['variants']:
         if row['variant'].get('mode'): continue
         packets.append(dict(variant_id=row['variant']['id'],eligible_for_grading=False,
             reason='explicit scripted model and independent mail/calendar Fake; preview only',
@@ -318,6 +311,12 @@ def main():
     report = json.loads(args.input.read_text())
     if report.get('kind') == 'gc11_native_manifest':
         from verify_gc11 import read_report
+        report = read_report(args.input)
+    if report.get('kind') == 'gc06_native_manifest':
+        from verify_gc06 import read_report
+        report = read_report(args.input)
+    if report.get('kind') == 'gc04_native_manifest':
+        from verify_gc04 import read_report
         report = read_report(args.input)
     if report.get('kind') == 'gc10_native_manifest':
         from verify_gc10 import read_report
