@@ -38,6 +38,14 @@ FIRST = '和 Alex 约下周 30 分钟聊 Erii，邮件简洁一点。'
 STEER = '不要周一。'
 
 
+class MeetingHarness(ChannelHarness):
+    def args(self, *args):
+        # Only GC-12's first server needs both independent crash barriers.
+        if args[:2] == ('-test-main-hold', 'before_delivery_send'):
+            args = ('-test-main-barrier', 'after_compaction_commit='+str(self.root/'generation-release'), *args)
+        return super().args(*args)
+
+
 def load():
     lock = strict_json(BOUNDARY_LOCK.read_bytes())
     for name, expected in lock['files'].items():
@@ -438,7 +446,7 @@ def drive(binary, evidence, variant):
         # the peer source there; never loosen it to read the workspace/data DB.
         (provider/'meeting_sandbox.py').write_bytes((ROOT/'scripts/meeting_sandbox.py').read_bytes())
         (provider/'source.json').write_text(json.dumps(variant['source'], ensure_ascii=False))
-        h = ChannelHarness(binary, root, platform, 'meeting')
+        h = MeetingHarness(binary, root, platform, 'meeting')
         with h.config.open('a') as config:
             # The shipped macOS sandbox allows system/Xcode runtimes, not an
             # arbitrary Homebrew interpreter's framework outside this scope.
@@ -454,8 +462,7 @@ def drive(binary, evidence, variant):
             h.setup()
             generation_release = root/'generation-release'
             generation_release.touch()
-            h.start('before_delivery_send', extra_flags=(
-                '-test-main-barrier', 'after_compaction_commit='+str(generation_release)))
+            h.start('before_delivery_send')
             h.callback('gc12-first', variant['first'])
             wait_boundary(h, 'before_delivery_send')
             value = native(h)

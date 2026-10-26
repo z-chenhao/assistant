@@ -44,8 +44,8 @@ class ChannelHarness(MainHarness):
     def args(self, *args):
         return [str(self.binary), '-config', str(self.config), '-test-bridge', self.fixture, *(['-test-automation-now',self.now] if hasattr(self,'now') else []), *args]
 
-    def start(self, boundary=None, extra_flags=()):
-        args = (*extra_flags, *(('-test-main-hold',boundary) if boundary is not None else ()), 'web','serve')
+    def start(self, boundary=None):
+        args = ('web','serve') if boundary is None else ('-test-main-hold',boundary,'web','serve')
         start=self.processes.start if self.processes is not None else subprocess.Popen
         self.process = start(self.args(*args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                         text=True, cwd=self.root, env=self.env)
