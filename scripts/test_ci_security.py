@@ -1,10 +1,13 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import signal
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -14,6 +17,14 @@ from test_gate_scheduling import GateSchedulingTests
 
 
 class SecurityTests(unittest.TestCase):
+    def test_fixed_three_part_membership(self):
+        self.assertEqual(suite.SECURITY_PARTS, ('finance', 'cases', 'protection'))
+        self.assertEqual([g.name for g in suite.security_gates('finance')], ['gc03'])
+        self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05'])
+        gates = (*suite.SHARDS['security'], suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
+        with patch.dict(suite.SHARDS, security=gates):
+            self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04'])
+
     def fixture(self, root):
         suites = {}
         for part in suite.SECURITY_PARTS:
@@ -55,7 +66,9 @@ class SecurityTests(unittest.TestCase):
                 selected = [g for p in suite.SECURITY_PARTS for g in suite.security_gates(p)]
                 self.assertCountEqual(selected, gates)
                 self.assertTrue(all(any(g is original for original in gates) for g in selected))
-                GateSchedulingTests().drive('security', gates=suite.security_gates('cases'), first_pair=('gc03','gc05'))
+                GateSchedulingTests().drive('security', gates=suite.security_gates('finance'))
+                GateSchedulingTests().drive('security', gates=suite.security_gates('cases'),
+                                            first_pair=('gc05','gc04') if consumer else None)
                 GateSchedulingTests().drive('security', gates=suite.security_gates('protection'))
         with patch.dict(suite.SHARDS, security=(*gates, suite.Gate('new', '', 'new'))):
             with self.assertRaises(ValueError): suite.security_gates('cases')
@@ -102,6 +115,74 @@ class SecurityTests(unittest.TestCase):
             suites = self.fixture(Path(temp))
             for fragment in suites.values(): fragment['binary_sha256'] = ''
             with self.assertRaises(ValueError): ci_security.validate(suites)
+
+    def test_each_part_is_mandatory_and_cannot_exchange_case_members(self):
+        gates = (*suite.SHARDS['security'], suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
+        with patch.dict(suite.SHARDS, security=gates), tempfile.TemporaryDirectory() as temp:
+            original = self.fixture(Path(temp))
+            for part in suite.SECURITY_PARTS:
+                with self.subTest(missing=part):
+                    fragments = copy.deepcopy(original)
+                    fragments.pop(part)
+                    with self.assertRaises(ValueError): ci_security.validate(fragments)
+            for case in ('gc03', 'gc04', 'gc05'):
+                for change in ('missing', 'duplicate', 'failed', 'cancelled', 'argument', 'unclean', 'misplaced'):
+                    with self.subTest(case=case, change=change):
+                        fragments = copy.deepcopy(original)
+                        part = 'finance' if case == 'gc03' else 'cases'
+                        rows = fragments[part]['shards']['security']
+                        row = next(r for r in rows if r['gate'] == case)
+                        if change == 'missing': rows.remove(row)
+                        elif change == 'duplicate': rows.append(copy.deepcopy(row))
+                        elif change == 'failed': row['returncode'] = 7
+                        elif change == 'cancelled': row['returncode'] = 130
+                        elif change == 'argument': row['command'].append('--feedback')
+                        elif change == 'unclean': row['owned_group_drained'] = False
+                        else:
+                            rows.remove(row)
+                            fragments['cases' if part == 'finance' else 'finance']['shards']['security'].append(row)
+                        with self.assertRaises(ValueError): ci_security.validate(fragments)
+
+    def test_case_parts_cancel_and_join_owned_subprocess_cleanup(self):
+        for part, consumer in (('finance', False), ('cases', False), ('cases', True)):
+            with self.subTest(part=part, consumer=consumer), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / 'logs').mkdir()
+                gates = suite.SHARDS['security']
+                if consumer:
+                    gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
+                with patch.dict(suite.SHARDS, security=gates):
+                    selected = suite.security_gates(part)
+                fixture = root / 'held.py'
+                fixture.write_text('from pathlib import Path\nimport sys,time\n'
+                    f'root=Path({str(root)!r})\nname=sys.argv[1]\n'
+                    'try:\n (root/(name+".ready")).touch()\n time.sleep(60)\n'
+                    'finally:\n (root/(name+".cleaned")).touch()\n')
+                stopped = threading.Event()
+                def interrupt():
+                    deadline = time.monotonic() + 5
+                    while not all((root / (g.name + '.ready')).exists() for g in selected) and time.monotonic() < deadline:
+                        time.sleep(.01)
+                    stopped.set()
+                def command(gate, attempt, *_):
+                    return ([sys.executable, 'scripts/profile_harness.py', str(fixture), gate.name],
+                            dict(os.environ, ERII_PROFILE_DIR=str(root / gate.name)),
+                            root / 'logs' / (gate.name + '.log'))
+                thread = threading.Thread(target=interrupt)
+                thread.start()
+                try:
+                    with patch.object(suite, 'command', side_effect=command):
+                        rows = suite.run_shard('security', Path('/unused'), root, stopped, selected, gate_jobs=2)
+                finally:
+                    stopped.set()
+                    thread.join(timeout=6)
+                self.assertEqual({r['gate'] for r in rows}, {g.name for g in selected})
+                self.assertTrue(all(r['returncode'] == 130 and r['owned_group_drained'] is True and
+                                    r['cancel_cleanup_seconds'] is not None for r in rows))
+                self.assertEqual(json.loads((root / 'timings-security.json').read_text()), rows)
+                for gate in selected:
+                    self.assertTrue((root / (gate.name + '.ready')).exists())
+                    self.assertTrue((root / (gate.name + '.cleaned')).exists())
 
     def test_current_checkout_and_workflow_run_are_authoritative(self):
         with tempfile.TemporaryDirectory() as temp:

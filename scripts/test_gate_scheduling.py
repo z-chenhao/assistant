@@ -55,7 +55,7 @@ class GateSchedulingTests(unittest.TestCase):
                     if gate == isolated and kind == 'start':
                         self.assertEqual(active, 1, 'isolated Go checks overlapped another harness')
                         self.assertGreaterEqual(stamp, max(e[3] for e in events if e[0] == 'end' and e[1] != isolated))
-                self.assertEqual(peak, 2)
+                self.assertEqual(peak, min(2, len(gates)))
                 self.assertEqual(active, 0)
                 for gate in gates:
                     series = [e for e in events if e[1] == gate.name]
