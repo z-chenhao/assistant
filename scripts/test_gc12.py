@@ -225,6 +225,7 @@ class MeetingTests(unittest.TestCase):
         mutations = [
             ('cleanup/http_peer_joined', lambda r:r['cleanup'].update(http_peer_joined=False)),
             ('boundary/completed_cut_exact', lambda r:r['checkpoints'][-1]['state']['requests'][-1].update(status='unknown')),
+            ('boundary/completed_cut_exact', lambda r:r['checkpoints'][-1]['state'].update(trace=[dict(sequence=99, event_json='{"kind":"late_event"}')])),
             ('boundary/exact_replay', lambda r:r['replay_state']['tools'][1].update(attempt_count=2)),
             ('boundary/frozen_approval_hashes', lambda r:r['state']['approvals'][0].update(frozen_arguments_hash='wrong')),
             ('assertion/no_unapproved_dispatch', lambda r:r['state']['tools'][0].update(attempt_count=1)),
@@ -264,6 +265,8 @@ class MeetingTests(unittest.TestCase):
                 self.assertEqual(projected['cleanup'],row['cleanup'])
                 self.assertEqual(projected['state']['approvals'],row['state']['approvals'])
                 self.assertEqual(projected['observed_checks']['boundaries'],journey.boundary_checks(row))
+                if 'trace' in row['checkpoints'][-1]['state']:
+                    self.assertEqual(projected['checkpoints'][-1]['state']['trace'],row['checkpoints'][-1]['state']['trace'])
                 self.assertEqual(projected['semantic_digests']['replay_state'],
                                  journey.digest(journey.semantic_state(row['replay_state'])))
                 self.assertNotIn('PRIVATE_',gzip.decompress(data).decode())

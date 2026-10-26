@@ -283,6 +283,11 @@ def diagnostic_receipt(row):
     def state(value):
         projected = {key: copy.deepcopy(value[key]) for key in ('approvals', 'requests', 'tasks',
             'artifacts', 'tools', 'conversation', 'runs', 'snapshots', 'capabilities')}
+        # These native metadata tables also participate in exact state cuts.
+        # Keep them so a late trace/input/delivery change remains inspectable.
+        for key in ('trace', 'inputs', 'usage', 'deliveries'):
+            if key in value:
+                projected[key] = copy.deepcopy(value[key])
         projected['generations'] = []
         for generation in value['generations']:
             request = json.loads(generation['request_json'])
