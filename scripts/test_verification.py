@@ -154,7 +154,7 @@ class VerificationTests(unittest.TestCase):
             "run_core_cases.py": 5, "verify_code_recovery.py": 5, "verify_tui.py": 5, "verify_terminal_input.py": 1, "verify_codemode.py": 5,
             "run_m6_cases.py": 5,
             "verify_gc12.py": 5, "verify_gc08.py": 1, "verify_gc14.py": 1, "verify_gc16.py": 1,
-            "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc05.py": 1, "verify_gc09.py": 1, "verify_gc10.py": 1,
+            "verify_gc01.py": 1, "verify_gc02.py": 1, "verify_gc03.py": 1, "verify_gc04.py": 1, "verify_gc05.py": 1, "verify_gc09.py": 1, "verify_gc10.py": 1,
         }
         counts, paths = {}, set()
         gates = [gate for group in suite.SHARDS.values() for gate in group]
@@ -216,8 +216,8 @@ class VerificationTests(unittest.TestCase):
     def test_workflow_topology_is_non_bypassable(self):
         workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
         shards = json.loads(re.search(r'        shard: (\[.*\])', workflow)[1])
-        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers','communication'})
-        self.assertEqual(len(shards), 3)
+        self.assertEqual(set(shards), set(suite.SHARDS) - {'codemode','personal','providers','communication','security'})
+        self.assertEqual(len(shards), 2)
         parts = json.loads(re.search(r'        part: (\[.*\])', workflow)[1])
         self.assertEqual(parts, list(suite.CODEMODE_PARTS))
         matrix = workflow.split('  verify:', 1)[1].split('    steps:', 1)[0]
@@ -233,6 +233,20 @@ class VerificationTests(unittest.TestCase):
         self.assertIn("format('--communication-part {0}', matrix.communicationpart)", verify)
         self.assertIn('evidence/communication-receipts.json', verify)
         self.assertIn('--name sdk-doctor --phase cleanup', verify)
+        security = workflow.split('  security:\n', 1)[1].split('  security_join:', 1)[0]
+        self.assertIn('securitypart: ["finance", "cases", "protection"]', security)
+        self.assertIn('ERII_VERIFY_GATE_JOBS: "2"', security)
+        self.assertIn('ERII_VERIFY_CASE_JOBS: "4"', security)
+        self.assertIn('sandbox: "true"', security)
+        self.assertIn('timeout-minutes: 10', security)
+        self.assertIn('--shard security --security-part ${{ matrix.securitypart }} --jobs 1', security)
+        self.assertNotIn('needs:', security)
+        security_join = workflow.split('  security_join:\n', 1)[1].split('  verify:', 1)[0]
+        self.assertIn('needs: security', security_join)
+        self.assertIn('test "$PART_RESULT" = success', security_join)
+        self.assertIn('scripts/ci_security.py --parts evidence/security-parts --evidence evidence', security_join)
+        self.assertIn('evidence-security-part-*', security_join)
+        self.assertIn('for part in finance cases protection; do', security_join)
         checks = workflow[workflow.index('  checks:'):]
         needs = json.loads(re.search(r'    needs: (\[.*\])', checks)[1])
         self.assertEqual(set(needs), ci_gate.REQUIRED)
@@ -244,15 +258,15 @@ class VerificationTests(unittest.TestCase):
         for forbidden in ('continue-on-error', 'paths-ignore:', 'fromJSON', 'ci_feedback.py', 'ci_impact.py'):
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((suite.ROOT / '.github/workflows/ci-shadow.yml').exists())
-        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 14)
+        self.assertEqual(workflow.count('ref: ${{ github.event.pull_request.head.sha || github.sha }}'), 16)
         self.assertIn('racepart: ["packages", "sqlite"]', workflow)
         race_join = workflow[workflow.index('  race_join:'):workflow.index('  verify:')]
         self.assertIn('needs: race', race_join)
         self.assertIn('test "$PART_RESULT" = success', race_join)
         self.assertIn('scripts/ci_race_join.py', race_join)
         self.assertIn('evidence-race-part-*', race_join)
-        self.assertIn("sandbox: ${{ matrix.shard == 'security' || matrix.shard == 'communication' }}", workflow)
-        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 7)
+        self.assertIn("sandbox: ${{ matrix.shard == 'communication' }}", workflow)
+        self.assertEqual(workflow.count('uses: ./.github/actions/ci-inputs'), 8)
         action = (suite.ROOT / '.github/actions/ci-inputs/action.yml').read_text()
         self.assertIn("if: inputs.sandbox == 'true'", action)
         self.assertIn('make build', action)
@@ -275,10 +289,10 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('needs: python_compat', deferred)
         self.assertNotIn('if:', deferred.split('    steps:', 1)[0])
         self.assertIn('personal_deferred', ci_gate.REQUIRED)
-        # Exactly 20 execution cells are initially runnable, independent of
+        # Exactly 22 execution cells are initially runnable, independent of
         # GitHub's unspecified matrix admission order. Four follow Python.
         import ci_compare
-        self.assertEqual(len(ci_compare.topology()) - 6 - len(parts[1]), 20)
+        self.assertEqual(len(ci_compare.topology()) - 7 - len(parts[1]), 22)
         personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
         self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
         personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]

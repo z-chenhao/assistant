@@ -64,6 +64,7 @@ SHARDS = {
         Gate("artifacts", "verify_artifacts.py", "artifacts", 5),
         Gate("gc03", "verify_gc03.py", "gc03"),
         Gate("gc05", "verify_gc05.py", "gc05"),
+        Gate("gc04", "verify_gc04.py", "gc04"),
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
@@ -104,6 +105,25 @@ def codemode_gates(part):
         raise ValueError('unknown Code Mode part')
     arguments = ('--contracts-only',) if part == 'contracts' else ('--case', part)
     return (Gate('core-' + part, 'run_core_cases.py', 'core-' + part, 5, arguments),)
+
+
+SECURITY_PARTS = ('finance', 'cases', 'protection')
+SECURITY_GATES = {
+    'finance': ('gc03',),
+    'cases': ('gc04', 'gc05'),
+    'protection': ('memory-maintenance', 'recall', 'tools', 'artifacts'),
+}
+
+
+def security_gates(part):
+    if part not in SECURITY_PARTS:
+        raise ValueError('unknown security part')
+    # GC-04 belongs to the waiting consumer. Include it only when registered;
+    # never drop a new/unknown gate silently from the complete logical inventory.
+    gates = SHARDS['security']
+    if any(g.name not in sum(SECURITY_GATES.values(), ()) for g in gates):
+        raise ValueError('unassigned security gate')
+    return tuple(g for g in gates if g.name in SECURITY_GATES[part])
 
 
 PROVIDER_PARTS = ('cli', 'models')
@@ -294,8 +314,8 @@ def gate_execution_order(gates):
     # and GC-10 follow GC-02 and precede short communication gates. Keep two
     # workers, report inventory order and every series' serial repetitions.
     def priority(gate):
-        if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04','gc05'): return 0
-        if gate.name == 'gc12': return 1
+        if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04'): return 0
+        if gate.name in ('gc12','gc05'): return 1
         if gate.name in ('gc02','gc09','gc10'): return 2
         return 3
     return sorted(gates,key=priority)
@@ -367,6 +387,7 @@ def main():
     parser.add_argument('--codemode-part', choices=CODEMODE_PARTS)
     parser.add_argument('--personal-part', choices=m6_report.PARTS)
     parser.add_argument('--provider-part', choices=PROVIDER_PARTS)
+    parser.add_argument('--security-part', choices=SECURITY_PARTS)
     parser.add_argument('--communication-part', choices=COMMUNICATION_PARTS)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--gate-jobs", type=int, choices=[1, 2], default=int(os.environ.get('ERII_VERIFY_GATE_JOBS', '1')))
@@ -374,11 +395,11 @@ def main():
     parser.add_argument("--evidence", type=Path, default=Path("evidence"))
     args = parser.parse_args()
     if args.list:
-        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part:
+        if args.gate or args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part:
             parser.error('--list cannot be combined with gate/part execution')
         print(json.dumps([row for row in catalogue() if not args.shard or row['shard'] == args.shard], indent=2))
         return 0
-    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part):
+    if args.gate and (args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part):
         parser.error('--gate cannot be combined with a CI part')
     plans = select_gates(parser, args.shard, args.gate)
     if args.codemode_part and args.shard != 'codemode':
@@ -389,6 +410,8 @@ def main():
         parser.error('--provider-part requires --shard providers')
     if args.communication_part and args.shard != 'communication':
         parser.error('--communication-part requires --shard communication')
+    if args.security_part and args.shard != 'security':
+        parser.error('--security-part requires --shard security')
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     if args.gate_jobs not in (1, 2):
@@ -408,7 +431,9 @@ def main():
         plans['providers'] = provider_gates(args.provider_part)
     if args.communication_part:
         plans['communication'] = communication_gates(args.communication_part)
-    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part
+    if args.security_part:
+        plans['security'] = security_gates(args.security_part)
+    part = args.codemode_part or args.personal_part or args.provider_part or args.communication_part or args.security_part
     report_suffix = (args.shard or 'all') + ('-' + part if part else '')
     if args.gate:
         # Focused runs cannot overwrite or masquerade as a complete shard verdict.
@@ -467,6 +492,8 @@ def main():
                   complete_inventory=not bool(args.gate or part),
                   codemode_part=args.codemode_part, personal_part=args.personal_part,
                   provider_part=args.provider_part, communication_part=args.communication_part,
+                  security_part=args.security_part,
+                  run_id=os.environ.get("GITHUB_RUN_ID"), run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"),
                   image_os=os.environ.get('ImageOS'), image_version=os.environ.get('ImageVersion'),
                   hardware=runner_hardware(),
                   binary_sha256=binary_digest,
