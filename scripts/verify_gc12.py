@@ -8,6 +8,7 @@ import argparse
 import copy
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import gzip
 import json
 from pathlib import Path
 import platform
@@ -230,6 +231,12 @@ def boundary_checks(row):
     )
 
 
+class ReceiptFailure(RuntimeError):
+    def __init__(self, index, variant_id, failed):
+        self.index, self.failed = index, failed
+        super().__init__(f'GC-12 native receipt {index} ({variant_id}) rejected: '+', '.join(failed))
+
+
 def validate_report(report, binary=None):
     require(report.get('case_id') == 'GC-12' and report.get('status') == 'mechanical_pass' and
         report.get('cleanup') is True and 'semantic_score' in report and report['semantic_score'] is None and
@@ -243,15 +250,82 @@ def validate_report(report, binary=None):
     rows = report['variants']
     require([r['variant'] for r in rows] == cases(), 'GC-12 complete ordered variant inventory required')
     independent_executions(rows)
-    for row in rows:
+    for index, row in enumerate(rows):
         checks = receipt_checks(row)
-        require(row['assertions'] == checks and all(v is True for v in row['assertions'].values()) and
-            all(boundary_checks(row).values()) and row['scope'] == 'scripted_whole_case_mechanics' and
-            row['semantic_score'] is None and row['fixture_sha256'] == hashlib.sha256(FIXTURE.read_bytes()).hexdigest() and
-            row['cleanup'] == dict(owned_processes_joined=True, http_peer_joined=True, disposable_root_removed=True) and
-            all(v is True for v in row['cleanup'].values()), 'GC-12 failed, graded, unclean or drifted native receipt')
+        conditions = {f'assertion/{key}': value is True for key, value in checks.items()}
+        conditions.update({f'stored_assertion/{key}': row['assertions'].get(key) is True and
+            row['assertions'].get(key) == value for key, value in checks.items()})
+        conditions['assertion_inventory'] = row['assertions'].keys() == checks.keys()
+        conditions.update({'boundary/'+key: bool(value) for key, value in boundary_checks(row).items()})
+        conditions.update(scope=row['scope'] == 'scripted_whole_case_mechanics',
+            semantic_score=row['semantic_score'] is None,
+            fixture_sha256=row['fixture_sha256'] == hashlib.sha256(FIXTURE.read_bytes()).hexdigest(),
+            cleanup_inventory=row['cleanup'].keys() == {'owned_processes_joined', 'http_peer_joined', 'disposable_root_removed'})
+        conditions.update({'cleanup/'+key: row['cleanup'].get(key) is True for key in
+                           ('owned_processes_joined', 'http_peer_joined', 'disposable_root_removed')})
+        failed = [key for key, passed in conditions.items() if not passed]
+        if failed:
+            raise ReceiptFailure(index, cases()[index]['id'], failed)
     return dict(case_id='GC-12', receipts=len(rows), frozen_blocks=19, cleanup=True, semantic_score=None,
                 release_ready=False, source_sha=identity['source_before']['sha'], binary_sha256=identity['binary_sha256'])
+
+
+def diagnostic_receipt(row):
+    """Retain the rejected native observations, excluding full model exchanges.
+
+    Request snapshot IDs remain available to the frozen-generation oracle.
+    Hashes preserve equality/drift evidence for omitted generation bytes. This
+    projection is diagnostic only, never a substitute for native acceptance.
+    """
+    result = {key: copy.deepcopy(row[key]) for key in ('variant', 'scope', 'semantic_score',
+        'fixture_sha256', 'assertions', 'cleanup', 'remote', 'remote_replay', 'replay_digest')}
+
+    def state(value):
+        projected = {key: copy.deepcopy(value[key]) for key in ('approvals', 'requests', 'tasks',
+            'artifacts', 'tools', 'conversation', 'runs', 'snapshots', 'capabilities')}
+        projected['generations'] = []
+        for generation in value['generations']:
+            request = json.loads(generation['request_json'])
+            projected['generations'].append(dict(
+                generation_id=generation['generation_id'], run_id=generation['run_id'],
+                status=generation['status'], attempt_count=generation['attempt_count'],
+                request_json=json.dumps(dict(model_snapshot=dict(snapshot_id=request['model_snapshot']['snapshot_id']))),
+                native_sha256=digest(generation)))
+        return projected
+
+    result.update(state=state(row['state']), replay_state=state(row['replay_state']),
+        checkpoints=[dict(name=cut['name'], state=state(cut['state']), remote=cut['remote']) for cut in row['checkpoints']])
+    result['observed_checks'] = dict(assertions=receipt_checks(row), boundaries=boundary_checks(row))
+    result['semantic_digests'] = {key: digest(semantic_state(row[key])) for key in ('state', 'replay_state')}
+    return result
+
+
+def validate_with_evidence(report, binary, evidence):
+    try:
+        return validate_report(report, binary)
+    except ReceiptFailure as error:
+        # Keep complete bytes locally before unwinding. CI uploads only the
+        # small diagnostic projection, never this report's model requests.
+        try:
+            evidence.mkdir(parents=True, exist_ok=True)
+            raw = json.dumps(report, ensure_ascii=False, indent=2).encode()+b'\n'
+            (evidence/'rejected-report.json').write_bytes(raw)
+            folder = evidence/'failure'
+            folder.mkdir(exist_ok=True)
+            row = report['variants'][error.index]
+            native = gzip.compress(json.dumps(diagnostic_receipt(row), ensure_ascii=False).encode(), mtime=0)
+            path = folder/'receipt.json.gz'
+            path.write_bytes(native)
+            summary = dict(case_id='GC-12', diagnostic_only=True, phase='native_validation',
+                variant_id=cases()[error.index]['id'], variant_index=error.index, failed_conditions=error.failed,
+                source_sha=report['identity']['source_before']['sha'], binary_sha256=report['binary_sha256'],
+                rejected_report=dict(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()),
+                native=dict(path=path.name, bytes=len(native), sha256=hashlib.sha256(native).hexdigest()),
+                semantic_score=None, release_ready=False)
+            (folder/'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
+        except (OSError, ValueError, KeyError, TypeError) as capture_error:
+            print('GC-12 failure evidence capture failed: '+type(capture_error).__name__, file=sys.stderr)
+        raise
 
 
 def rejection_probes(report, binary, folder):
@@ -399,6 +473,8 @@ def drive(binary, evidence, variant):
 
 def run(binary, evidence):
     evidence.mkdir(parents=True, exist_ok=True)
+    for name in ('rejected-report.json', 'failure/receipt.json.gz', 'failure/summary.json'):
+        (evidence/name).unlink(missing_ok=True)
     boundary_lock = load()
     identity = dict(source_before=source_identity(), binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
         environment=dict(platform=platform.platform(), python=platform.python_version(),
@@ -416,7 +492,7 @@ def run(binary, evidence):
         remaining=dict(parent='ERII-223', semantic_score=None, current_L2='unexecuted', release_ready=False,
             unscripted='unscripted_cases.py freeze --case GC-12; original inputs only; connected mail/calendar adapter still required',
             applicability='Synchronous Main only; no Task/Root/Child/Artifact. Task cancellation and old Task epochs are inapplicable; Steering, SIGKILL/restart, obsolete approval and unknown external effects are exercised.'))
-    validate_report(report, binary)
+    validate_with_evidence(report, binary, evidence)
     return report
 
 
@@ -449,7 +525,7 @@ if __name__ == '__main__':
         sys.exit(0)
     if args.validate:
         report = strict_json(args.evidence.read_bytes())
-        result = validate_report(report, args.binary.resolve())
+        result = validate_with_evidence(report, args.binary.resolve(), args.evidence.resolve().with_suffix(''))
         if args.probe_rejections:
             result['rejection_probes'] = len(rejection_probes(report, args.binary.resolve(), args.evidence.with_suffix('.rejections')))
         print(json.dumps(result))

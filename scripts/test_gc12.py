@@ -1,5 +1,6 @@
 """GC-12 observation and external Fake contracts; no synthetic semantic grades."""
 import copy
+import gzip
 import json
 import os
 from pathlib import Path
@@ -219,6 +220,102 @@ class MeetingTests(unittest.TestCase):
             self.assertNotEqual(failed.returncode,0)
             self.assertIn('reused or invalid GC-12 execution identities',failed.stderr)
             self.assertNotIn('FileNotFoundError',failed.stderr)
+
+    def test_native_refusal_identifies_variant_condition_and_keeps_rejected_bytes(self):
+        mutations = [
+            ('cleanup/http_peer_joined', lambda r:r['cleanup'].update(http_peer_joined=False)),
+            ('boundary/completed_cut_exact', lambda r:r['checkpoints'][-1]['state']['requests'][-1].update(status='unknown')),
+            ('boundary/exact_replay', lambda r:r['replay_state']['tools'][1].update(attempt_count=2)),
+            ('boundary/frozen_approval_hashes', lambda r:r['state']['approvals'][0].update(frozen_arguments_hash='wrong')),
+            ('assertion/no_unapproved_dispatch', lambda r:r['state']['tools'][0].update(attempt_count=1)),
+            ('assertion/monday_invalidated', lambda r:r['state']['approvals'][0].update(status='approved')),
+            ('stored_assertion/exact_recipient', lambda r:r['assertions'].update(exact_recipient=False)),
+        ]
+        for condition, mutate in mutations:
+            with self.subTest(condition=condition), tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);report=self.packets();row=report['variants'][3]
+                # Full prompts/exchanges must not enter the uploaded projection.
+                for state in [row['state'],row['replay_state'],*[c['state'] for c in row['checkpoints']]]:
+                    generation=state['generations'][0]
+                    request=json.loads(generation['request_json'])
+                    request['messages']=[dict(content='PRIVATE_MODEL_REQUEST')]
+                    generation['request_json']=json.dumps(request)
+                    generation['result_json']='PRIVATE_MODEL_RESPONSE'
+                # The same extra exchange bytes in each snapshot preserve the
+                # passing comparison until the specified fault is injected.
+                row['replay_digest']=journey.digest(journey.semantic_state(row['replay_state']))
+                journey.validate_report(report)
+                mutate(row)
+                with self.assertRaises(journey.ReceiptFailure) as error:
+                    journey.validate_with_evidence(report,None,root)
+                self.assertEqual(error.exception.index,3)
+                self.assertIn(condition,error.exception.failed)
+                self.assertIn('contact-order',str(error.exception))
+                self.assertNotIn('PRIVATE_',str(error.exception))
+                raw=(root/'rejected-report.json').read_bytes()
+                self.assertEqual(json.loads(raw),report)
+                summary=json.loads((root/'failure/summary.json').read_text())
+                self.assertEqual(summary['variant_id'],'contact-order')
+                self.assertIn(condition,summary['failed_conditions'])
+                self.assertEqual(summary['rejected_report']['sha256'],journey.hashlib.sha256(raw).hexdigest())
+                path=root/'failure'/summary['native']['path'];data=path.read_bytes()
+                self.assertEqual(summary['native']['sha256'],journey.hashlib.sha256(data).hexdigest())
+                projected=json.loads(gzip.decompress(data))
+                self.assertEqual(projected['cleanup'],row['cleanup'])
+                self.assertEqual(projected['state']['approvals'],row['state']['approvals'])
+                self.assertEqual(projected['observed_checks']['boundaries'],journey.boundary_checks(row))
+                self.assertEqual(projected['semantic_digests']['replay_state'],
+                                 journey.digest(journey.semantic_state(row['replay_state'])))
+                self.assertNotIn('PRIVATE_',gzip.decompress(data).decode())
+                self.assertLess(sum(p.stat().st_size for p in (root/'failure').iterdir()),1<<20)
+
+    def test_aggregate_refusal_stays_nonzero_without_publishing_passing_report(self):
+        # Reproduce the original run -> final native-validation rejection point.
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+            rows=self.packets()['variants']
+            rows[2]['checkpoints'][-1]['state']['requests'][-1]['status']='unknown'
+            check_output=journey.subprocess.check_output
+            def environment(command, **options):
+                return 'unit binary build identity' if command[:3]==['go','version','-m'] else check_output(command,**options)
+            with patch.object(journey,'run_cases',return_value=rows), \
+                 patch.object(journey.subprocess,'check_output',side_effect=environment):
+                with self.assertRaisesRegex(journey.ReceiptFailure,'wording-2.*boundary/completed_cut_exact'):
+                    journey.run(binary,root/'gc12')
+            self.assertTrue((root/'gc12/failure/receipt.json.gz').exists())
+            self.assertFalse((root/'gc12.json').exists())
+
+    def test_cli_and_ci_keep_precise_refusal_with_true_author_flags(self):
+        from ci_communication import native_receipt
+        from verify_suite import Gate
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);binary=root/'erii';binary.write_bytes(b'unit identity only')
+            report=self.packets()
+            report['binary_sha256']=journey.hashlib.sha256(binary.read_bytes()).hexdigest()
+            report['identity']['binary_sha256']=report['binary_sha256']
+            report['variants'][4]['checkpoints'][-1]['state']['requests'][-1]['status']='unknown'
+            path=root/'gc12-1.json';path.write_text(json.dumps(report))
+            failed=subprocess.run([sys.executable,str(journey.ROOT/'scripts/verify_gc12.py'),
+                '--binary',str(binary),'--evidence',str(path),'--validate'],capture_output=True,text=True,timeout=30)
+            self.assertNotEqual(failed.returncode,0)
+            self.assertIn('slot-order',failed.stderr)
+            self.assertIn('boundary/completed_cut_exact',failed.stderr)
+            self.assertTrue((root/'gc12-1/failure/receipt.json.gz').exists())
+            self.assertEqual(json.loads(path.read_text()),report)
+            with self.assertRaisesRegex(ValueError,'slot-order.*boundary/completed_cut_exact'):
+                native_receipt(Gate('gc12','verify_gc12.py','gc12',5),1,root,binary,
+                               dict(binary_sha256=report['binary_sha256']))
+
+    def test_diagnostic_io_failure_preserves_the_native_refusal(self):
+        import contextlib
+        import io
+        report=self.packets();report['variants'][0]['cleanup']['http_peer_joined']=False
+        with tempfile.TemporaryDirectory() as temp,contextlib.redirect_stderr(io.StringIO()) as log:
+            with patch.object(Path,'write_bytes',side_effect=OSError('PRIVATE_PATH')):
+                with self.assertRaisesRegex(journey.ReceiptFailure,'cleanup/http_peer_joined'):
+                    journey.validate_with_evidence(report,None,Path(temp))
+        self.assertIn('OSError',log.getvalue())
+        self.assertNotIn('PRIVATE_PATH',log.getvalue())
 
     def test_corruption_probe_cli_and_ci_consumers_with_synthetic_observations(self):
         with tempfile.TemporaryDirectory() as temp:

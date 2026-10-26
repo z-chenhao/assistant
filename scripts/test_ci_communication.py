@@ -11,6 +11,15 @@ from verify_suite import SHARDS, command, communication_gates, COMMUNICATION_PAR
 
 
 class CommunicationTests(unittest.TestCase):
+    def test_ci_retains_only_gc12_failure_projection_beside_compact_manifests(self):
+        workflow=(ci.ROOT/'.github/workflows/ci.yml').read_text()
+        upload=workflow.split('- name: Retain compact communication evidence, including failures\n',1)[1].split('\n  communication_join:',1)[0]
+        self.assertIn("always() && matrix.shard == 'communication'",upload)
+        paths=upload.split('          path: |\n',1)[1].split('          if-no-files-found:',1)[0]
+        self.assertIn('            evidence/gc12-*/failure/\n',paths)
+        self.assertNotIn('rejected-report.json',paths)
+        self.assertNotIn('            evidence/\n',paths)
+
     def fixture(self, root):
         source = dict(source_sha='a'*40, source_dirty=False, source_diff_sha256='b'*64)
         suites, manifests = {}, {}
