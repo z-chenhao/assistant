@@ -65,6 +65,7 @@ SHARDS = {
         Gate("gc03", "verify_gc03.py", "gc03"),
         Gate("gc05", "verify_gc05.py", "gc05"),
         Gate("gc04", "verify_gc04.py", "gc04"),
+        Gate("gc06", "verify_gc06.py", "gc06"),
     ),
     "delivery": (Gate("delivery", "verify_delivery.py", "delivery", 5),
                  Gate("channels", "verify_channels.py", "channels", 5)),
@@ -109,7 +110,7 @@ def codemode_gates(part):
 
 SECURITY_PARTS = ('finance', 'cases', 'protection')
 SECURITY_GATES = {
-    'finance': ('gc03',),
+    'finance': ('gc03', 'gc06'),
     'cases': ('gc04', 'gc05'),
     'protection': ('memory-maintenance', 'recall', 'tools', 'artifacts'),
 }
@@ -118,8 +119,7 @@ SECURITY_GATES = {
 def security_gates(part):
     if part not in SECURITY_PARTS:
         raise ValueError('unknown security part')
-    # GC-04 belongs to the waiting consumer. Include it only when registered;
-    # never drop a new/unknown gate silently from the complete logical inventory.
+    # Every registered gate must belong to a fixed part; unknown additions fail closed.
     gates = SHARDS['security']
     if any(g.name not in sum(SECURITY_GATES.values(), ()) for g in gates):
         raise ValueError('unassigned security gate')
@@ -315,7 +315,7 @@ def gate_execution_order(gates):
     # workers, report inventory order and every series' serial repetitions.
     def priority(gate):
         if gate.name in ('core-cases','pi-bridge','gc01','gc03','gc04'): return 0
-        if gate.name in ('gc12','gc05'): return 1
+        if gate.name in ('gc12','gc05','gc06'): return 1
         if gate.name in ('gc02','gc09','gc10'): return 2
         return 3
     return sorted(gates,key=priority)

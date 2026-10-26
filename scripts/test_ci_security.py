@@ -19,7 +19,7 @@ from test_gate_scheduling import GateSchedulingTests
 class SecurityTests(unittest.TestCase):
     def test_fixed_three_part_membership(self):
         self.assertEqual(suite.SECURITY_PARTS, ('finance', 'cases', 'protection'))
-        self.assertEqual([g.name for g in suite.security_gates('finance')], ['gc03'])
+        self.assertEqual([g.name for g in suite.security_gates('finance')], ['gc03', 'gc06'])
         self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04'])
         gates = (*tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04'), suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
         with patch.dict(suite.SHARDS, security=gates):
@@ -45,11 +45,10 @@ class SecurityTests(unittest.TestCase):
 
     def test_original_and_consumer_inventory_join_without_rewriting_any_gate(self):
         for consumer in (False, True):
-            # Retain the mechanism's pre-consumer inventory as well as the
-            # real consumer inventory, without registering GC-04 twice.
-            gates = tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04')
+            # Keep main's GC-04 inventory and verify admission of GC-06 too.
+            gates = tuple(g for g in suite.SHARDS['security'] if g.name != 'gc06')
             if consumer:
-                gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
+                gates = (*gates, suite.Gate('gc06', 'verify_gc06.py', 'gc06'))
             with self.subTest(consumer=consumer), patch.dict(suite.SHARDS, security=gates), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 suites = self.fixture(root)
@@ -59,7 +58,7 @@ class SecurityTests(unittest.TestCase):
                     full = ci_security.join(root)
                 self.assertEqual([(r['gate'], r['attempt']) for r in full['shards']['security']],
                                  [(g.name, n) for g in gates for n in range(1, g.attempts+1)])
-                self.assertEqual(len(full['shards']['security']), 23 if consumer else 22)
+                self.assertEqual(len(full['shards']['security']), 24 if consumer else 23)
                 self.assertTrue(full['complete_inventory'])
                 self.assertIsNone(full['security_part'])
                 self.assertIsNone(full['semantic_score'])
@@ -68,9 +67,10 @@ class SecurityTests(unittest.TestCase):
                 selected = [g for p in suite.SECURITY_PARTS for g in suite.security_gates(p)]
                 self.assertCountEqual(selected, gates)
                 self.assertTrue(all(any(g is original for original in gates) for g in selected))
-                GateSchedulingTests().drive('security', gates=suite.security_gates('finance'))
+                GateSchedulingTests().drive('security', gates=suite.security_gates('finance'),
+                                            first_pair=('gc03','gc06') if consumer else None)
                 GateSchedulingTests().drive('security', gates=suite.security_gates('cases'),
-                                            first_pair=('gc04','gc05') if consumer else None)
+                                            first_pair=('gc04','gc05'))
                 GateSchedulingTests().drive('security', gates=suite.security_gates('protection'))
         with patch.dict(suite.SHARDS, security=(*gates, suite.Gate('new', '', 'new'))):
             with self.assertRaises(ValueError): suite.security_gates('cases')
@@ -127,11 +127,11 @@ class SecurityTests(unittest.TestCase):
                     fragments = copy.deepcopy(original)
                     fragments.pop(part)
                     with self.assertRaises(ValueError): ci_security.validate(fragments)
-            for case in ('gc03', 'gc04', 'gc05'):
+            for case in ('gc03', 'gc04', 'gc05', 'gc06'):
                 for change in ('missing', 'duplicate', 'failed', 'cancelled', 'argument', 'unclean', 'misplaced'):
                     with self.subTest(case=case, change=change):
                         fragments = copy.deepcopy(original)
-                        part = 'finance' if case == 'gc03' else 'cases'
+                        part = 'finance' if case in ('gc03', 'gc06') else 'cases'
                         rows = fragments[part]['shards']['security']
                         row = next(r for r in rows if r['gate'] == case)
                         if change == 'missing': rows.remove(row)

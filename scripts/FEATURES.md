@@ -1,5 +1,13 @@
 # Feature map
 
+## GC-06 complete deterministic learning journey (ERII-252)
+
+| Feature | Reach / authoritative entry | Evidence and limits |
+| --- | --- | --- |
+| Learning conversation and progress | `verify_gc06.py`; CLI/TUI Main, existing Golden/capabilities Fakes, MCP, Memory/Curator, QuickJS, Artifact/Delivery | Six unchanged original variants × five serial rounds; English turns then three Chinese corrections; declared field-completion rubric, guided/independent practice, preserved mastered topics, supersede/current recall and four reopened Artifacts. Scripted mechanics only; no English-quality grade. |
+| Pause, reminder, privacy and recovery | Same `security` gate | Pause/clock advance stays silent; explicit Shanghai schedule → recovered fire → Root/current progress/Task update; pending cancel skips without a Run. Unrelated wedding Task uses the maintained recall/publication barrier and excludes private raw draft; forced conflicting append remains a separate fail-closed recall regression. Forget fences dependent old Main. Generation/Memory/fire SIGKILL and full replay equality; zero Child/Approval/external effect. Owned processes and private roots cleaned. |
+| Recomputable receipts | `verify_gc06.py --validate`; `prepare_release_eval.py`; `test_gc06.py`; [scope and commands](../docs/gc06-verification.md) | 30 ordered receipts, 19 frozen blocks, source/binary/environment/cleanup, strict native return and Artifact binding, corruption rejection, compact manifest with local full bytes. Semantic score null, grading ineligible, release false; maintained original-only unscripted entry and full model/adapter/L2 gaps remain with ERII-223. |
+
 ## GC-04 deterministic travel journey (ERII-250)
 
 | Feature | Reach / authoritative entry | Evidence and cleanup |

@@ -304,7 +304,7 @@ invocations, including all five Computer lifecycle and Computer Use runs).
 | --- | --- |
 | runtime | Foundation, Main, Tasks; five Child/scheduling/spend/task-control runs; Main/Task fragments; embedded JetStream and real CLI relay |
 | codemode | Five Code Mode, Computer lifecycle, Computer Use and fixed-source recovery runs; six variants × five rounds for each GC-17/19/20; five SC conformance and real nested cancellation probes |
-| security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs; complete GC-03, GC-05 and GC-04 gates |
+| security | Five memory-maintenance, recall, Tool approval/recovery and Artifact runs; complete GC-03, GC-04, GC-05 and GC-06 gates |
 | delivery | Five complete delivery runs, each containing all twenty kill/restart boundaries |
 | personal | Eleven exact M6 worlds × six variants × five rounds, plus isolated red-flag routing; all state, openable Artifacts and cleanup |
 | providers | Local provider, initial account; five capability/TUI/Pi Bridge/account runs; terminal input; five selected Go model/storage runs |
@@ -315,8 +315,8 @@ Computer Use and recovery), `GC-17`, `GC-19`, `GC-20` and `contracts` (SC plus r
 cancellation). Each case part runs all six locked variants five times. Contracts
 also run five times; splitting cases cannot omit them.
 
-Security CI has three fixed Required parts: `finance` owns only the complete
-GC-03 gate; `cases` owns GC-05 and GC-04;
+Security CI has three fixed Required parts: `finance` owns the complete
+GC-03 and GC-06 gates; `cases` owns GC-05 and GC-04;
 `protection` owns
 memory-maintenance, recall, tools and artifacts. Each part builds the exact
 source on the same Ubuntu 24.04 runner class, retains two gate lanes and a
@@ -335,7 +335,7 @@ GC-03 from the two cases lanes. They remain failed-attempt evidence, not proof
 that the three-part topology passes or accelerates the combined consumer.
 
 `ci_security.py` requires all three successful parts and restores the exact
-`SHARDS['security']` order (currently 23 gate invocations). It rejects missing,
+`SHARDS['security']` order (currently 24 gate invocations). It rejects missing,
 extra, duplicate, reordered, failed, cancelled, focused or undrained receipts,
 changed harness arguments, and source/binary/workflow/run/attempt drift. All three
 parts and the join are required by `Ubuntu checks`. Original native reports,
@@ -347,8 +347,8 @@ no single job gains lanes, resources or time. More initially runnable cells can
 add queue delay. Compare same-environment full inventories before any timing
 claim; one pass does not establish stable acceleration.
 
-GC-04's consumer registers its real gate after the existing inventory. The
-measured longer GC-03/GC-04 series start first; GC-05 takes the next free lane,
+GC-06 joins the existing finance part alongside GC-03; both start immediately
+on its two lanes. GC-04 and GC-05 occupy the cases part's two lanes,
 while reports retain the original inventory order. Regressions cover both the
 pre-consumer and combined inventory without duplicate registration. The real
 combined gates still require exact-SHA Ubuntu CI and independent review.

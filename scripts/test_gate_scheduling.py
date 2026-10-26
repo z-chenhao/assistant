@@ -63,18 +63,14 @@ class GateSchedulingTests(unittest.TestCase):
                                      [(kind, n) for n in range(1, gate.attempts + 1) for kind in ('start', 'end')])
 
     def test_security_long_cases_start_first_with_unchanged_inventory_and_reports(self):
-        # GC-04 is on the frozen consumer PR, not main yet. Exercise that
-        # inventory without importing its business implementation into this PR.
         gates = suite.SHARDS['security']
-        if not any(g.name == 'gc04' for g in gates):
-            gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
         self.assertEqual([(g.name, g.attempts, g.arguments) for g in gates],
                          [('memory-maintenance', 5, ()), ('recall', 5, ()),
                           ('tools', 5, ()), ('artifacts', 5, ()),
-                          ('gc03', 1, ()), ('gc05', 1, ()), ('gc04', 1, ())])
+                          ('gc03', 1, ()), ('gc05', 1, ()), ('gc04', 1, ()), ('gc06', 1, ())])
         ordered = suite.gate_execution_order(gates)
         self.assertEqual([g.name for g in ordered],
-                         ['gc03', 'gc04', 'gc05', 'memory-maintenance', 'recall', 'tools', 'artifacts'])
+                         ['gc03', 'gc04', 'gc05', 'gc06', 'memory-maintenance', 'recall', 'tools', 'artifacts'])
         self.assertCountEqual(ordered, gates)
         for gate in gates[-3:]:
             args, _, _ = suite.command(gate, 1, Path('/binary'), Path('/evidence'))
