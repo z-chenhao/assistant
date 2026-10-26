@@ -420,6 +420,44 @@ This addresses the measured M7 Ubuntu run where SC took about 91 seconds per
 warm round and the ten-minute job limit cancelled the fifth cancellation probe.
 The job limit and the probe's readiness/cleanup deadlines remain unchanged.
 
+The shared `MainHarness.hold` reader drains stdout and stderr together, accepts
+only a complete matching boundary record, and retains bounded stream tails and
+byte counts. A partial stdout record cannot escape the original hold deadline;
+fixture cancellation interrupts the wait. The deterministic regression writes
+1 MiB to stderr before emitting the checkpoint: the old stdout-only reader
+times out, while the drained reader reaches the same checkpoint. This proves a
+harness pipe defect. The original ERII-383 Ubuntu failure did not retain stderr
+or fixture state, so attributing that historical failure to this defect remains
+inconclusive; subsequent green runs do not establish its cause.
+
+`ci_cancel.py` keeps four real fixtures, the 37 completed / 8 active assertion,
+the fifteen-second hold, twenty-second readiness cutoff and fifteen-second
+cleanup bound. Before a failed fixture cleans up, `feedback_case` records bounded
+read-only state counts, execution state, recent traces and the hold observation.
+If workers have not produced all receipts near the readiness cutoff, the owner
+takes bounded state/process/load snapshots within that same deadline. Diagnostic
+read failures are recorded and never turn a missing checkpoint into success.
+No extra runner, setup, fixture worker, timeout or stability round is introduced.
+
+Run either maintained entry directly; the contracts part retains its original
+five consecutive direct probes:
+
+```sh
+python3 scripts/ci_cancel.py --binary bin/erii --entry direct --evidence evidence/cancel-direct.json
+python3 scripts/ci_cancel.py --binary bin/erii --entry make-step --evidence evidence/cancel-make.json
+python3 scripts/verify_suite.py --binary bin/erii --shard codemode --codemode-part contracts --jobs 1 --evidence evidence/contracts
+```
+
+The standalone command retains a `passed:false` report on a rejected probe.
+Contracts failures retain the same bounded diagnosis in the suite's failed-gate
+log. Successful probes still require four distinct checkpoint/ownership receipts,
+an observed cancellation trigger, exit 130, drained owned groups, no new queued
+fixtures, no surviving Go/Node descendants and no disposable fixture state.
+The Make entry also requires its phase cancellation receipt. Missing, duplicate,
+forged, failed and undrained evidence is rejected by `test_ci_cancel.py` and the
+existing Code Mode joins. These are harness observations, not consumer Golden
+Case acceptance or semantic scores.
+
 `ci_codemode.py` requires every part and round, successful owned-process cleanup,
 clean stable source, identical source/build/fixture identities. Every part records its runner image;
 independent builds may join across a host image rollout only if binary hashes
