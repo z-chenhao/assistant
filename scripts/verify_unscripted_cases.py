@@ -123,6 +123,22 @@ def verify(binary, evidence):
             report['checks'].append('production_cli_native_tool_usage_and_restricted_judge_packet')
             report['checks'].append('strict_release_consumer_rejects_loopback_fragment')
 
+            root, config = prepared('gc12')
+            frozen = command(root, config, 'freeze', 'gc12-plan', '--case', 'GC-12', '--variant', 'base',
+                '--execution-kind', 'loopback_mechanism', '--seconds', '30')/'plan.json'
+            plan_body = json.loads(frozen.read_text())
+            out = command(root, config, 'run', 'gc12', '--plan', str(frozen),
+                          '--plan-sha256', hashed(frozen.read_bytes()))
+            observation = json.loads((out/'observation.json').read_text())
+            value = json.loads((out/'native.json').read_text())
+            expected = [plan_body['input']['context']] + ['当前时间：'+e['at']+'。'+e['text']
+                for e in plan_body['input']['events']]
+            users = [p['text'] for m in value['conversation'] if m['role'] == 'user' for p in m['content']]
+            require(users == expected and observation['status'] == 'observed_fragment' and
+                    observation['eligible_for_grading'] is False and observation['final_score'] is None,
+                    'GC-12 production input/eligibility drift')
+            report['checks'].append('gc12_production_cli_inputs_ungraded')
+
             for journey in ('week', 'safety'):
                 from verify_gc01 import journey_inputs
                 root, config = prepared('gc01-' + journey)
