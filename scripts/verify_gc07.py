@@ -27,6 +27,7 @@ from verify_computer_use import launch
 from verify_gc01 import native, kill
 from verify_gc02 import recorded
 from verify_gc03 import exact
+from verify_suite import GC07_VARIANTS, gc07_pairs
 from verify_main import require
 from verify_memory_maintenance import work
 from verify_recall import Embeddings, drain_with_publication_barrier, main_completed, worker_requests
@@ -416,9 +417,12 @@ def environment(binary):
         binary_build='\n'.join(subprocess.check_output(['go','version','-m',str(binary)],text=True).splitlines()[1:]))
 
 
-def validate_report(report, binary=ROOT / 'bin/erii'):
+def validate_report(report, binary=ROOT / 'bin/erii', *, part=None):
     lock = load()
-    expected = [(v['variant_id'], n) for v in variants(*inputs()) for n in range(1,REPEATS+1)]
+    require(part is None or part in GC07_VARIANTS, 'unknown GC-07 CI part')
+    expected = (gc07_pairs(part) if part is not None else
+                [(v['variant_id'], n) for v in variants(*inputs()) for n in range(1,REPEATS+1)])
+    require(report.get('ci_part') == part, 'GC-07 report/selector drift')
     require(report.get('case_id') == 'GC-07' and report.get('status') == 'mechanical_pass' and
         report.get('release_ready') is False and 'semantic_score' in report and report['semantic_score'] is None and report.get('eligible_for_grading') is False and
         report.get('fixture_lock') == lock and report.get('m6_lock') == load_contract(ROOT,'m6-v1')[2] and report.get('cleanup') is True,
@@ -428,7 +432,7 @@ def validate_report(report, binary=ROOT / 'bin/erii'):
         identity['binary_sha256'] == sha(binary.read_bytes()) and exact(identity['environment'],environment(binary)), 'GC-07 source/binary identity drift')
     rows = report['results']
     require([(r['variant_id'],r['repetition']) for r in rows] == expected and all(type(r['repetition']) is int for r in rows),
-        'all six variants and five ordered repetitions required')
+        'all selected variants and five ordered repetitions required')
     for row in rows:
         checks = observe(row)
         require(row['assertions'] == checks and all(type(v) is bool and v for v in checks.values()) and
@@ -586,20 +590,22 @@ def main():
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--evidence',type=Path,required=True)
     parser.add_argument('--validate',action='store_true')
+    parser.add_argument('--ci-part',choices=tuple(GC07_VARIANTS))
     parser.add_argument('--variant-jobs',type=int,choices=(1,2,4),default=int(os.environ.get('ERII_VERIFY_CASE_JOBS','2')))
     args = parser.parse_args();binary = args.binary.resolve()
     if args.validate:
-        print(json.dumps(validate_report(read_report(args.evidence),binary)));return
+        print(json.dumps(validate_report(read_report(args.evidence),binary,part=args.ci_part)));return
     args.evidence.unlink(missing_ok=True)
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     native_folder = args.evidence.parent/'.gc07-native';native_folder.mkdir(exist_ok=True)
-    report = dict(case_id='GC-07',status='inconclusive',release_ready=False,semantic_score=None,eligible_for_grading=False,
+    report = dict(case_id='GC-07',ci_part=args.ci_part,status='inconclusive',release_ready=False,semantic_score=None,eligible_for_grading=False,
         fixture_lock=load(),m6_lock=load_contract(ROOT,'m6-v1')[2],results=[],cleanup=False,
         identity=dict(source_before=source_identity(),binary_sha256=sha(binary.read_bytes()),environment=environment(binary)),
         remaining=dict(parent='ERII-223',semantic_score=None,current_L2='unexecuted',release_ready=False,
             unscripted='unscripted_cases.py freeze --case GC-07; original input fragments; device/network adapter still required',
             proof_limit='Real Chromium/production browser adapter; explicit Fake Lume/SSH. Diagnostic choice and report are scripted. No real home network/native macOS or model-quality claim.'))
-    ids = [v['variant_id'] for v in variants(*inputs())]
+    ids = (list(GC07_VARIANTS[args.ci_part]) if args.ci_part is not None else
+           [v['variant_id'] for v in variants(*inputs())])
     order = {(v,n):i*REPEATS+n for i,v in enumerate(ids) for n in range(1,REPEATS+1)}
     mutex = threading.Lock()
     def series(variant_id):
@@ -614,7 +620,7 @@ def main():
         report['identity']['source_after'] = source_identity()
         report.update(status='mechanical_pass',cleanup=True)
         report['rejection_probes'] = rejection_probes(report['results'][0])
-        summary = validate_report(report,binary)
+        summary = validate_report(report,binary,part=args.ci_part)
     except BaseException:
         report['status'] = 'inconclusive'
         raise

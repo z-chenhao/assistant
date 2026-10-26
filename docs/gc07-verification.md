@@ -23,7 +23,12 @@ writes domain stores. Case clock/timezone are fixture data; Host leases use
 wall time. Cleanup joins owned processes and removes disposable state.
 
 All six original variants (three wordings, two noise, one reordered background)
-run five consecutive times. Separate explicit scripted plans leave each original
+run five consecutive times. CI uses the maintained fixed `wording` and `noise`
+parts, each holding three whole five-round series. `--ci-part` binds native
+validation to that exact 15-row selection; full validation still requires all
+30 rows. The fail-closed Delivery join requires both parts and all original
+control rounds on the same source, binary, fixtures and workflow attempt.
+Separate explicit scripted plans leave each original
 user event intact. Main/TUI receive the two original turns, with observation
 between diagnosis and the authorization turn. Scripted choices are not model
 quality evidence.

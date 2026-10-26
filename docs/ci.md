@@ -335,20 +335,16 @@ As with the original GC-07 collection policy, full hidden native bytes stay on
 the executing host; the uploaded compact receipts alone cannot certify a Case
 or replace independent recomputation from retained native evidence.
 
-Current main registers only delivery and channels. The two required Case parts
-therefore record empty inventories and the canonical join says
-`gc07.status=not_registered`, not a Case PASS. ERII-376 acceptance covers this
-current-main inventory and synthetic selection/aggregation/refusal fixtures.
-Actual GC-07 source stays with ERII-253. After merging main, that consumer must
-register its original `Gate('gc07', 'verify_gc07.py', 'gc07')`, accept
-`--ci-part wording/noise` in its driver, use `gc07_pairs(part)` to select three
-whole five-round series, and support
-`validate_report(report, binary, part=part)` alongside its unchanged full-report
-validation. `read_report` must read and hash-check the native bytes; partial
-native validation must preserve the original frozen inputs, oracles, corruption
-probes, identity and cleanup checks. Old drivers fail closed. The consumer owns
-actual 30 native receipts, its new exact-SHA full CI and independent acceptance
-review. Synthetic fixtures cannot satisfy that contract.
+ERII-253 registers the original GC-07 gate alongside delivery and channels.
+The driver accepts `--ci-part wording/noise`, selecting three complete five-round
+series through `gc07_pairs(part)`. Its native `validate_report(report, binary,
+part=part)` binds the selector and preserves the same inputs, oracles, corruption
+probes, identity and cleanup checks as full 30-row validation. Neither part can
+validate as a full report. `read_report` hash-checks the actual native bytes.
+The required join combines both 15-row parts into the canonical 30-row inventory;
+control retains every original delivery/channel round. ERII-376's synthetic
+mechanism tests retain absent-registration coverage but never certify this Case.
+The combined consumer requires new exact-SHA CI and independent acceptance review.
 
 ```sh
 # Repeat for control, wording and noise, in separate folders:

@@ -85,6 +85,28 @@ class NetworkTests(unittest.TestCase):
             for mutate in mutations:
                 changed=copy.deepcopy(report);mutate(changed)
                 with self.assertRaises(RuntimeError):journey.validate_report(changed,binary)
+            # Both CI parts use the real native validator, with identical oracles.
+            # Neither a relabelled full report nor a misplaced/short series passes.
+            for part in verify_suite.GC07_VARIANTS:
+                selected=copy.deepcopy(report)
+                selected['ci_part']=part
+                selected['results']=[r for r in selected['results']
+                    if r['variant_id'] in verify_suite.GC07_VARIANTS[part]]
+                self.assertEqual(journey.validate_report(selected,binary,part=part)['receipts'],15)
+                with self.assertRaises(RuntimeError):journey.validate_report(selected,binary)
+                other='noise' if part=='wording' else 'wording'
+                with self.assertRaises(RuntimeError):journey.validate_report(selected,binary,part=other)
+                for mutate in (lambda r:r['results'].pop(),lambda r:r['results'].reverse(),
+                        lambda r:r['results'].append(r['results'][0]),
+                        lambda r:r['results'][0].update(variant_id='foreign'),
+                        lambda r:r['results'][0].update(cleanup={}),
+                        lambda r:r['identity'].update(binary_sha256='0'*64),
+                        lambda r:r.update(rejection_probes={}),lambda r:r.update(semantic_score=100)):
+                    changed=copy.deepcopy(selected);mutate(changed)
+                    with self.assertRaises(RuntimeError):journey.validate_report(changed,binary,part=part)
+                relabelled=copy.deepcopy(report);relabelled['ci_part']=part
+                with self.assertRaises(RuntimeError):journey.validate_report(relabelled,binary,part=part)
+            with self.assertRaises(RuntimeError):journey.validate_report(report,binary,part='control')
             with patch.object(journey,'observe',return_value={'observed':False}):
                 with self.assertRaises(RuntimeError):journey.validate_report(report,binary)
 
