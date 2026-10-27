@@ -230,10 +230,10 @@ class CurrentComparisonTests(unittest.TestCase):
         raw = self.experiment()
         report = comparison.compare(raw)
         self.assertTrue(report['performance_certified'], report)
-        self.assertEqual(len(comparison.topology()), 44)
+        self.assertEqual(len(comparison.topology()), 45)
         self.assertTrue({'Race detector (packages)', 'Race detector (sqlite)',
                          'Race detector', 'Python 3.10 compatibility', 'Providers (cli)',
-                         'Providers (models)', 'Complete providers evidence', 'GC-07 (wording)', 'GC-07 (noise)', 'Complete delivery evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Complete security evidence',
+                         'Providers (models)', 'Complete providers evidence', 'GC-07 (wording)', 'GC-07 (noise)', 'Complete delivery evidence', 'Complete communication evidence', 'Security (finance)', 'Security (cases)', 'Security (protection)', 'Security (multimodal)', 'Complete security evidence',
                          'Verification (communication/gc01)', 'Verification (communication/gc02)',
                          'Verification (communication/gc09)', 'Verification (communication/gc10)', 'Verification (communication/gc13-wording-1)', 'Verification (communication/gc13-wording-2)', 'Verification (communication/gc13-wording-3)', 'Verification (communication/gc13-noise-1)', 'Verification (communication/gc13-noise-2)', 'Verification (communication/gc13-order-1)',
                          'Verification (communication/channels)'} <= comparison.topology())

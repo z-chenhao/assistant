@@ -147,11 +147,12 @@ def codemode_gates(part):
     return (Gate('core-' + part, 'run_core_cases.py', 'core-' + part, 5, arguments),)
 
 
-SECURITY_PARTS = ('finance', 'cases', 'protection')
+SECURITY_PARTS = ('finance', 'cases', 'protection', 'multimodal')
 SECURITY_GATES = {
     'finance': ('gc03', 'gc06'),
-    'cases': ('gc04', 'gc05', 'gc15'),
+    'cases': ('gc04', 'gc05'),
     'protection': ('memory-maintenance', 'recall', 'tools', 'artifacts'),
+    'multimodal': ('gc15',),
 }
 
 

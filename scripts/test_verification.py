@@ -235,7 +235,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('evidence/communication-receipts.json', verify)
         self.assertIn('--name sdk-doctor --phase cleanup', verify)
         security = workflow.split('  security:\n', 1)[1].split('  security_join:', 1)[0]
-        self.assertIn('securitypart: ["finance", "cases", "protection"]', security)
+        self.assertIn('securitypart: ["finance", "cases", "protection", "multimodal"]', security)
         self.assertIn('ERII_VERIFY_GATE_JOBS: "2"', security)
         self.assertIn('ERII_VERIFY_CASE_JOBS: "4"', security)
         self.assertIn('sandbox: "true"', security)
@@ -247,7 +247,7 @@ class VerificationTests(unittest.TestCase):
         self.assertIn('test "$PART_RESULT" = success', security_join)
         self.assertIn('scripts/ci_security.py --parts evidence/security-parts --evidence evidence', security_join)
         self.assertIn('evidence-security-part-*', security_join)
-        self.assertIn('for part in finance cases protection; do', security_join)
+        self.assertIn('for part in finance cases protection multimodal; do', security_join)
         delivery = workflow.split('  delivery:\n', 1)[1].split('  delivery_join:', 1)[0]
         self.assertIn('deliverypart: ["wording", "noise"]', delivery)
         self.assertIn('timeout-minutes: 15', delivery)
@@ -311,7 +311,7 @@ class VerificationTests(unittest.TestCase):
         # Exactly 32 execution cells are initially runnable, independent of
         # GitHub's unspecified matrix admission order. Four follow Python.
         import ci_compare
-        self.assertEqual(len(ci_compare.topology()) - 8 - len(parts[1]), 32)
+        self.assertEqual(len(ci_compare.topology()) - 8 - len(parts[1]), 33)
         personal = workflow.split('  personal:\n',1)[1].split('  personal_join:',1)[0]
         self.assertIn('sandbox: "true"',personal,'configured MCP requires the Linux sandbox even for read-only fixtures')
         personal_join = workflow.split('  personal_join:\n',1)[1].split('  codemode:',1)[0]

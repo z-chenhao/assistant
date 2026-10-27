@@ -17,11 +17,19 @@ python3 -m unittest discover -s scripts -p 'test_gc15.py'
 
 The driver runs all six locked M6 wording/noise/order variants with five serial
 repetitions per variant. At most two fixture workers run locally by default. Its
-`security/cases` registration adds one finite gate to the existing CI part,
-preserving its two gate workers, four fixture workers, ten-minute job deadline
-and every existing safety series. Original M6 and Artifact fragment gates remain
-required. Native IDs must be disjoint across all 30 fresh journeys; restart and
+`security/multimodal` registration adds one finite Required Ubuntu 24.04 job
+for GC-15. The original finance/cases/protection parts stay unchanged. Every job
+retains two gate workers, four fixture workers, the ten-minute deadline and all
+existing safety series; no runner class, per-job resources or join count changes.
+Original M6 and Artifact fragment gates remain required. Native IDs must be disjoint across all 30 fresh journeys; restart and
 repeated ingress retain IDs within each journey.
+
+The initial combined cases attempt (run `40431324510`, job `121949923085`,
+SHA `cf73fbe97e40a7fa6b3663e29f6b383a10a56338`) was cancelled at the
+ten-minute limit: GC-05 took 312.34s, GC-04 345.53s, and GC-15 was cancelled
+after its remaining 228.14s. It remains failed evidence. The dedicated GC-15
+part removes the new serial queue behind the two existing cases; it claims no performance
+certification and cannot waive any missing/failed part.
 
 | Frozen duty | Observed mechanical evidence |
 | --- | --- |

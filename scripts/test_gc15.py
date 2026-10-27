@@ -31,7 +31,7 @@ class MultimodalTests(unittest.TestCase):
         self.assertFalse(unscripted_cases.matrix()['GC-15']['eligible_for_grading'])
         self.assertEqual(journey.REPEATS,5)
         self.assertEqual([(s,g.attempts) for s,gs in verify_suite.SHARDS.items() for g in gs if g.script=='verify_gc15.py'],[('security',1)])
-        self.assertIn('gc15',[g.name for g in verify_suite.security_gates('cases')])
+        self.assertEqual(['gc15'],[g.name for g in verify_suite.security_gates('multimodal')])
         self.assertEqual(next(g.attempts for g in verify_suite.SHARDS['security'] if g.name=='artifacts'),5)
 
     def test_independent_date_mask_and_region_oracle(self):

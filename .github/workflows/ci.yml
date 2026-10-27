@@ -176,7 +176,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        securitypart: ["finance", "cases", "protection"]
+        securitypart: ["finance", "cases", "protection", "multimodal"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -219,7 +219,7 @@ jobs:
           PART_RESULT: ${{ needs.security.result }}
         run: |
           test "$PART_RESULT" = success
-          for part in finance cases protection; do
+          for part in finance cases protection multimodal; do
             mv "evidence/security-parts/evidence-security-part-$part-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}" "evidence/security-parts/$part"
           done
           exec python3 scripts/ci_step.py --name security-join --phase test -- python3 scripts/ci_security.py --parts evidence/security-parts --evidence evidence

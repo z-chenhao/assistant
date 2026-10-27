@@ -23,7 +23,7 @@ flowchart LR
     SHA[Exact head SHA] --> Unit[Unit tests and lint]
     SHA --> Race[Complete race inventory]
     SHA --> Verify[Runtime / delivery / communication parts]
-    SHA --> Security[Security finance / cases / protection]
+    SHA --> Security[Security finance / cases / protection / multimodal]
     Security --> SecurityJoin[Complete security evidence]
     Security --> Gate
     SecurityJoin --> Gate
@@ -368,10 +368,10 @@ python3 scripts/ci_delivery.py collect --part control --binary bin/erii --eviden
 python3 scripts/ci_delivery.py join --parts evidence/delivery-parts --evidence evidence/delivery-joined
 ```
 
-Security CI has three fixed Required parts: `finance` owns the complete
+Security CI has four fixed Required parts: `finance` owns the complete
 GC-03 and GC-06 gates; `cases` owns GC-05 and GC-04;
 `protection` owns
-memory-maintenance, recall, tools and artifacts. Each part builds the exact
+memory-maintenance, recall, tools and artifacts; `multimodal` owns GC-15. Each part builds the exact
 source on the same Ubuntu 24.04 runner class, retains two gate lanes and a
 **ten-minute** outer limit. Cases retain their original six-variant/five-round
 harness, variant concurrency, assertions and timeouts; each protection series
@@ -387,18 +387,28 @@ seconds with `owned_group_drained=true`. These observations motivate isolating
 GC-03 from the two cases lanes. They remain failed-attempt evidence, not proof
 that the three-part topology passes or accelerates the combined consumer.
 
-`ci_security.py` requires all three successful parts and restores the exact
-`SHARDS['security']` order (currently 24 gate invocations). It rejects missing,
+`ci_security.py` requires all four successful parts and restores the exact
+`SHARDS['security']` order (currently 25 gate invocations). It rejects missing,
 extra, duplicate, reordered, failed, cancelled, focused or undrained receipts,
-changed harness arguments, and source/binary/workflow/run/attempt drift. All three
+changed harness arguments, and source/binary/workflow/run/attempt drift. All four
 parts and the join are required by `Ubuntu checks`. Original native reports,
 logs, timings, CPU/hardware/image and cleanup evidence remain in the part
-artifacts; the compact canonical suite embeds all three original suite receipts.
-Relative to the ERII-375 two-part baseline, the finite cost is one additional
-Ubuntu execution job/build/setup; the join count stays unchanged;
+artifacts; the compact canonical suite embeds all four original suite receipts.
+Relative to the original ERII-375 two-part baseline, the finite cost is two additional
+Ubuntu execution jobs/builds/setups; the join count stays unchanged;
 no single job gains lanes, resources or time. More initially runnable cells can
 add queue delay. Compare same-environment full inventories before any timing
 claim; one pass does not establish stable acceleration.
+
+ERII-324 added GC-15 to cases in run `40431324510`, exact SHA
+`cf73fbe97e40a7fa6b3663e29f6b383a10a56338`. Job `121949923085` reached
+the ten-minute limit and was cancelled: GC-05 took 312.34s, GC-04 345.53s,
+and queued GC-15 had only 228.14s before cancellation. The verification receipt
+records `owned_group_drained=true`; this is failed evidence.
+GC-15 therefore gets one dedicated finite Required `multimodal` job. Relative
+to the three-part topology, its cost is one Ubuntu execution job/build/setup;
+per-job limits, all original parts and the one fail-closed join stay unchanged.
+No timing or acceleration certification follows from this split.
 
 GC-06 joins the existing finance part alongside GC-03; both start immediately
 on its two lanes. GC-04 and GC-05 occupy the cases part's two lanes,
@@ -542,10 +552,11 @@ python3 scripts/verify_suite.py --shard personal --personal-part desktop-1 --bin
 python3 scripts/ci_personal.py --parts evidence/m6-parts --evidence evidence/m6-joined
 python3 scripts/verify_suite.py --shard providers --provider-part cli --binary bin/erii --evidence evidence/provider-parts/cli --jobs 1
 python3 scripts/verify_suite.py --shard providers --provider-part models --binary bin/erii --evidence evidence/provider-parts/models --jobs 1
-# Require all three security parts, with their original commands/counts:
+# Require all four security parts, with their original commands/counts:
 ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part finance --binary bin/erii --evidence evidence/security-parts/finance --jobs 1
 ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part cases --binary bin/erii --evidence evidence/security-parts/cases --jobs 1
 ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part protection --binary bin/erii --evidence evidence/security-parts/protection --jobs 1
+ERII_VERIFY_GATE_JOBS=2 python3 scripts/verify_suite.py --shard security --security-part multimodal --binary bin/erii --evidence evidence/security-parts/multimodal --jobs 1
 python3 scripts/ci_security.py --parts evidence/security-parts --evidence evidence/security-joined
 python3 scripts/ci_providers.py --parts evidence/provider-parts --evidence evidence/providers-joined
 python3 -m unittest discover -s scripts -p 'test_*.py'
