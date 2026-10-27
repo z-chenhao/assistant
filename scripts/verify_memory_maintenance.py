@@ -68,7 +68,7 @@ def run(binary):
         # This success fixture needs a complete Root recall before Main appends
         # its reply. The recall gate separately forces and rejects the opposite
         # interleaving. Never retry a failed drive or admit partial evidence.
-        ordering = drain_with_publication_barrier(h, main_run)
+        ordering = drain_with_publication_barrier(h, main_run, prefix=main_run + '-')
         report['delegation_ordering'].append(dict(main_run_id=main_run, **ordering))
 
     with tempfile.TemporaryDirectory(prefix='erii-memory-maintenance-') as temp:
