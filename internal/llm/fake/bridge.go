@@ -162,7 +162,9 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 					value = recallReply(request)
 				} else if fixture == "children" {
 					value, cause = childrenReply(request)
-				} else if fixture == "computer" || fixture == "core" || fixture == "capabilities" || fixture == "codemode" {
+				} else if fixture == "core" {
+					value = coreReply(request)
+				} else if fixture == "computer" || fixture == "capabilities" || fixture == "codemode" {
 					value = capabilitiesReply(request)
 				} else if fixture == "artifacts" {
 					value = artifactsReply(request)

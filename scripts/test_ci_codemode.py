@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from ci_codemode import join
 import test_core_cases
@@ -10,6 +11,21 @@ from verify_suite import CODEMODE_PARTS, SHARDS, codemode_gates, report_name
 
 
 class CodeModeJoinTests(unittest.TestCase):
+    def setUp(self):
+        # Partition/inventory unit fixtures intentionally contain no native DB.
+        # Real native recomputation is required by the driver and refusal below.
+        self.native = patch('gc17.validate_report')
+        self.native.start()
+        self.addCleanup(self.native.stop)
+
+    def test_flag_only_part_cannot_satisfy_gc17_join(self):
+        self.native.stop()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            with self.assertRaises(ValueError):
+                join(root)
+
     def fixture(self, root):
         reports = test_core_cases.CoreTests().reports()
         for part in CODEMODE_PARTS:

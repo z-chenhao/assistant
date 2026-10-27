@@ -7,9 +7,8 @@ noise/order variants. Mechanical evidence never supplies semantic Judge grades.
 import argparse
 from collections import Counter
 from contextlib import closing
-import csv
 import hashlib
-import io
+import gzip
 import json
 import os
 from pathlib import Path
@@ -23,7 +22,6 @@ import time
 
 from case_runner import digest, load_contract, score, variants
 from core_conformance import run as conformance
-from core_fixtures import feedback, csv_text, CATEGORIES, SEVERITIES, PAIRS
 from run_cases import timestamp
 from verify_capabilities import tree
 from verify_codemode import CodeHarness
@@ -129,36 +127,10 @@ def feedback_case(binary, folder, variant):
     h = CoreHarness(binary, folder)
     try:
         h.setup()
-        h.send('fixture', variant['context'] + '\n' + variant['events'][0]['text'])
-        rows, gold = feedback()
-        # Import the exact CSV and all five attachments through ArtifactStore.
-        assets = [dict(name='feedback_100.csv', mediaType='text/csv', text=csv_text(rows))]
-        assets.extend(dict(name=r['attachment_ref'], mediaType='text/plain',
-                           text=(ROOT / 'evals/fixtures/core-v1' / r['attachment_ref']).read_text())
-                      for r in rows if r['attachment_ref'])
-        source = '''
-const assets = ASSETS;
-const inputs = [];
-for (const asset of assets) { const saved = await tools.builtin__artifact__manage({...asset,operation:"save"}); inputs.push(...saved.artifactRefs); }
-const rows = assets[0].text.trimEnd().split("\\n").slice(1).map(line => {
- const [row_id,text,attachment_ref] = line.split(","); return {row_id,text,attachment_ref};
-});
-async function classify(row, hold) {
- const result = await agent.run({task:"Classify feedback: " + JSON.stringify({...row, hold}), artifactRefs:inputs});
- return JSON.parse(result.text);
-}
-const first = await Promise.all(rows.slice(0,37).map(row=>classify(row,false)));
-const active = await Promise.all(rows.slice(37,45).map(row=>classify(row,true)));
-const rest = await Promise.all(rows.slice(45).map(row=>classify(row,false)));
-const results = [...first,...active,...rest].map(row=>({...row,evidence:row.row_id}));
-const columns = ["row_id","category","severity","evidence","attachment_ref"];
-function quote(x) { return '"' + String(x).replace(/"/g,'""') + '"'; }
-const csv = columns.join(",")+"\\n"+results.map(row=>columns.map(c=>quote(row[c])).join(",")).join("\\n")+"\\n";
-const saved = await tools.builtin__artifact__manage({operation:"save",name:"feedback_analysis.csv",mediaType:"text/csv",text:csv});
-await tools.builtin__artifact__manage({operation:"publish",artifactRefs:saved.artifactRefs});
-return {count:results.length,artifactRefs:saved.artifactRefs};
-'''.replace('ASSETS', json.dumps(assets, ensure_ascii=False)).replace('ROWS', json.dumps(rows, ensure_ascii=False))
-        execute(h, 'feedback', source, work=False)
+        from gc17 import assets as feedback_assets, prompt, source_for, native, observe
+        assets = feedback_assets()
+        source = source_for(assets)
+        h.send('fixture', prompt(variant, assets))
         release = folder / 'release'
         process = h.hold('code_37_completed_8_active', ('-test-main-release', str(release)))
         db = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
@@ -169,6 +141,7 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
         generations = read(db, "SELECT generation_id,run_id FROM model_generation WHERE status='completed'")
         done = {g['generation_id'] for g in generations if g['run_id'] in completed}
         require(len(done) == 37, '37 completed feedback calls not observed')
+        checkpoint = native(h)
         sidecar = owned_sidecar(process, ROOT / 'runtime/javascript/src/sidecar.mjs')
         os.kill(sidecar, signal.SIGKILL)
         process.send_signal(signal.SIGKILL)
@@ -178,10 +151,8 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
         pending = approve(h)
         require(len(pending) == 8, 'active calls did not retain 8 exact boundary approvals')
         h.command('chat', 'work', timeout=180)
-        value = snapshot(h)
-        calls = value['agent_invocation']
-        invocations = {i['invocation_id']: i for i in value['tools']}
-        children = {r['run_id']: r for r in value['runs'] if r['parent_run_id']}
+        value = native(h)
+        sidecar_exit = subprocess.run(['ps','-p',str(sidecar),'-o','stat='],capture_output=True,text=True,timeout=5)
         dispatches = Counter(g['generation_id'] for g in value['external_provider_dispatches'])
         drift = json.loads((Path(h.env['ERII_DATA_ROOT']) / 'f055-drift.json').read_text())
         artifacts = value['artifact']
@@ -189,39 +160,18 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
         opened = fixture_run(h.args('artifact', 'open', output['artifact_ref']), env=h.env, cwd=h.root,
                                 capture_output=True, text=True, timeout=20)
         require(opened.returncode == 0, 'analysis Artifact not openable')
-        classified = list(csv.DictReader(io.StringIO(opened.stdout)))
-        answers = {r['row_id']: {k: r[k] for k in ('row_id', 'category', 'severity')} for r in classified}
-        originals = {r['row_id']: r for r in rows}
-        duplicates = {}
-        for row in rows:
-            duplicates.setdefault(row['text'], []).append(int(row['row_id'][1:]))
-        checks = dict(
-            exact_duplicate_pairs=sorted(sorted(ids) for ids in duplicates.values() if len(ids) > 1) == sorted([list(pair) for pair in PAIRS]),
-            input_artifacts_immutable=all(any(a['name'] == asset['name'] and a['content_hash'] == hashlib.sha256(asset['text'].encode()).hexdigest() for a in artifacts) for asset in assets),
-            exact_100_rows=len(classified) == 100 and set(answers) == set(originals),
-            exact_row_classification=answers == {r['row_id']: r for r in gold},
-            category_distribution=dict(Counter(r['category'] for r in classified)) == CATEGORIES,
-            severity_distribution=dict(Counter(r['severity'] for r in classified)) == SEVERITIES,
-            row_evidence=all(r['evidence'] == r['row_id'] and r['attachment_ref'] == originals[r['row_id']]['attachment_ref'] for r in classified),
-            one_task_one_root=len(value['task']) == 1 and sum(r['worker_position'] == 'root' for r in read(db, 'SELECT worker_position FROM run')) == 1,
-            hundred_children=len(children) == len(calls) == 100 and all(r['status'] == 'completed' for r in children.values()),
-            accepted_identities_reattached=all(any(a['child_run_id'] == old['child_run_id'] and a['invocation_id'] == old['invocation_id'] for a in calls) for old in before),
-            completed_calls_not_redispatched=all(dispatches[g] == 1 for g in done),
-            all_generations_dispatched_once=all(n == 1 for n in dispatches.values()),
-            f055_drift_rejected=drift['rejection'].get('error', {}).get('code') == 'NON_DETERMINISTIC_REPLAY',
-            f055_original_restored=not drift['restored'].get('error') and drift['changed']['callKey'] == drift['original']['callKey'],
-            eight_checkpoint_effects_once=len(value['external_effects']) == 8 and len({e['key'] for e in value['external_effects']}) == 8,
-            only_original_f055_admitted=sum('F055' in invocations[a['invocation_id']]['arguments_json'] for a in calls) == 1,
-            frozen_tree_model=len({r['model_snapshot_id'] for r in value['runs'] if r['kind'] == 'worker'}) == 1,
-            child_only_direct_parent=all(invocations[a['invocation_id']]['run_id'] == children[a['child_run_id']]['parent_run_id'] for a in calls),
-            one_completion_notice=len([i for i in read(db, 'SELECT * FROM task_update') if i['kind'] == 'completed']) == 1,
-            bounded_questions=sum(json.dumps(m['content'], ensure_ascii=False).count('？') for m in value['conversation'] if m['role'] == 'assistant') <= 1,
-            no_leaked_execution_claim=all(s['state'] == 'completed' and s['claim_token'] is None for s in value['code_execution_state']),
-        )
-        return dict(assertions=checks, state=value, fault=dict(signals=['Sidecar SIGKILL','Go SIGKILL'], before=before,
+        row = dict(state=value, fault=dict(signals=['Sidecar SIGKILL','Go SIGKILL'],
+                    returncodes=[process.returncode],sidecar=dict(pid=sidecar,parent_pid=process.pid,signal_sent=signal.SIGKILL,
+                        ps_returncode=sidecar_exit.returncode,ps_stdout=sidecar_exit.stdout,ps_stderr=sidecar_exit.stderr),
+                    before=before,checkpoint=checkpoint,
                     completed_provider_dispatch_counts={g:dispatches[g] for g in done}, drift=drift),
-                    artifact=dict(ref=output['artifact_ref'], sha256=hashlib.sha256(opened.stdout.encode()).hexdigest(),text=opened.stdout),
-                    inputs=assets, source=source)
+                    artifact=dict(ref=output['artifact_ref'],sha256=hashlib.sha256(opened.stdout.encode()).hexdigest(),text=opened.stdout),
+                    inputs=assets,source=source,variant=variant)
+        h.send('fixture',prompt(variant,assets))
+        h.command('chat','work',timeout=180)
+        row['replay_state'] = native(h)
+        row['assertions'] = observe(row)
+        return row
     except BaseException as error:
         failure = dict(fixture=folder.name, error_type=type(error).__name__, error=str(error)[:2000],
                        hold=h.hold_observation, runtime=feedback_state(h))
@@ -232,11 +182,16 @@ return {count:results.length,artifactRefs:saved.artifactRefs};
                 output = Path(destination) / ('failure-' + folder.name + '.json')
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_text(json.dumps(failure, indent=2) + '\n')
+                if 'row' in locals():
+                    output.with_suffix('.native.json.gz').write_bytes(gzip.compress(
+                        json.dumps(row,ensure_ascii=False,separators=(',',':')).encode(),compresslevel=1,mtime=0))
             except OSError as capture_error:
                 print('Core failure evidence: ' + type(capture_error).__name__, file=sys.stderr, flush=True)
         raise
     finally:
         h.cleanup()
+        if 'row' in locals() and isinstance(row,dict) and 'state' in row:
+            row['owned_processes_joined'] = all(c.poll() is not None for c in h.children)
 
 
 MIGRATION = '''package migration
@@ -386,6 +341,10 @@ def run_case_groups(dataset, selected, action, scenario_jobs):
 def run(binary, selected=None, scenario_jobs=1, contracts_only=False):
     require(not (selected and contracts_only), 'case and contracts-only are mutually exclusive')
     dataset, policy, lock = load_contract(ROOT, 'core-v1')
+    from unscripted_cases import source_identity
+    from verify_gc11 import environment
+    identity = dict(source_before=source_identity(),binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
+                    environment=environment(binary)) if not contracts_only and selected in (None,'GC-17') else None
     report = dict(version=1, milestone='M5', provider='explicit deterministic core Bridge',
                   contract_lock=lock, dataset_digest=digest(dataset), binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                   results=[], cleanup=False, scenario_jobs=scenario_jobs, full_case_status='not_applicable; future adapters and semantic evaluation unexecuted')
@@ -404,12 +363,35 @@ def run(binary, selected=None, scenario_jobs=1, contracts_only=False):
                      hard_failure=not all(assertions.values()),final_score=grading['final_score'],
                      semantic_grading=grading['semantic_grading'],dimensions={d:None for d in policy['weights']},evidence=evidence)
             print(f"{case['case_id']} {variant['variant_id']}: {row['status']} ({row['wall_time_ms']}ms)",flush=True)
+            if not all(assertions.values()) and case['case_id']=='GC-17':
+                failed = Path(os.environ['ERII_CORE_DIAGNOSTICS'])/(variant['variant_id']+'.native.json.gz')
+                failed.parent.mkdir(parents=True,exist_ok=True)
+                failed.write_bytes(gzip.compress(json.dumps(evidence,ensure_ascii=False,separators=(',',':')).encode(),compresslevel=1,mtime=0))
             require(all(assertions.values()),'core assertions failed: '+json.dumps(assertions))
             return row
         if not contracts_only:
             report['results'] = run_case_groups(dataset, selected, variant_case, scenario_jobs)
         report['cleanup']=True
     require(not Path(temp).exists(), 'disposable root leaked')
+    if identity:
+        from gc17 import pack, load, validate_report
+        identity['source_after'] = source_identity()
+        for result in report['results']:
+            if result['case_id']=='GC-17':
+                native = result['evidence']
+                native.update(identity=identity,boundary_lock=load(),semantic_score=None,release_ready=False,
+                    scope='scripted_whole_case_mechanics',eligible_for_grading=False,
+                    cleanup=dict(owned_processes_joined=native['owned_processes_joined'],disposable_root_removed=not Path(temp).exists()))
+                result['evidence'] = pack(native)
+        try:
+            validate_report(report,binary)
+        except BaseException:
+            destination=os.environ.get('ERII_CORE_DIAGNOSTICS')
+            if destination:
+                failed=Path(destination)/'complete-native-failure.json.gz'
+                failed.parent.mkdir(parents=True,exist_ok=True)
+                failed.write_bytes(gzip.compress(json.dumps(report,ensure_ascii=False,separators=(',',':')).encode(),compresslevel=1,mtime=0))
+            raise
     if not selected:
         report['conformance'] = conformance(ROOT)
         require(report['conformance']['passed'], 'core conformance failed')
@@ -428,9 +410,20 @@ def main():
     selection=parser.add_mutually_exclusive_group()
     selection.add_argument('--case',choices=['GC-17','GC-19','GC-20'])
     selection.add_argument('--contracts-only',action='store_true')
+    parser.add_argument('--validate',action='store_true',help='Recompute all six GC-17 native receipts without running a model')
     parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
-    args=parser.parse_args();args.evidence.unlink(missing_ok=True)
+    args=parser.parse_args()
+    if args.validate:
+        from gc17 import validate_report
+        print(json.dumps(validate_report(json.loads(args.evidence.read_text()),args.binary.resolve())))
+        return
+    args.evidence.unlink(missing_ok=True)
+    os.environ.setdefault('ERII_CORE_DIAGNOSTICS',str(args.evidence.parent/('.'+args.evidence.stem+'-failures')))
     result=run(args.binary.resolve(),args.case,args.scenario_jobs,args.contracts_only)
+    if any(r['case_id']=='GC-17' for r in result['results']):
+        from gc17 import consumer_probes
+        result['gc17_consumer_probes']=consumer_probes(result,args.binary.resolve(),
+            args.evidence.parent/('.'+args.evidence.stem+'-consumer-probes'))
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     args.evidence.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(result['summary']))

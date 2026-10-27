@@ -43,7 +43,7 @@ GAPS = {
     'GC-14': 'original input fragment available; approved live price sources, clock/notification adapter and semantic grades remain under ERII-223',
     'GC-15': 'native file ingress and multimodal Artifact adapter',
     'GC-16': 'research sources, Child work and Artifact adapter',
-    'GC-17': 'exact 100-row attachments, assertions and kill/restart adapter',
+    'GC-17': 'exact CSV/attachments input fragment available; connected Child/Artifact/recovery adapter, actual model quality and current L2 remain under ERII-223',
     'GC-18': 'native files, concurrent Tasks and pause/append adapter',
     'GC-19': 'isolated coding workspace and protection adapter',
     'GC-20': 'engineering workspace, migration and recovery adapter',
@@ -51,12 +51,24 @@ GAPS = {
 
 
 def matrix():
-    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case in ('GC-12','GC-14','GC-16') else None,
-                       fixture={'GC-12':'gc12-v1','GC-14':'gc14-v1','GC-16':'gc16-v1'}.get(case,INPUTS.get(case)), eligible_for_grading=False,
+    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case in ('GC-12','GC-14','GC-16','GC-17') else None,
+                       fixture={'GC-12':'gc12-v1','GC-14':'gc14-v1','GC-16':'gc16-v1','GC-17':'core-v1'}.get(case,INPUTS.get(case)), eligible_for_grading=False,
                        missing=GAPS[case]) for case in sorted(CASES)}
 
 
 def inputs(case_id, variant_id, journey=None):
+    if case_id == 'GC-17':
+        from gc17 import assets, load
+        require(journey is None, 'GC-01 journey only')
+        dataset, _, _ = load_contract(ROOT,'core-v1')
+        variant = next((v for v in variants(dataset,dataset['cases'][0]) if v['variant_id']==variant_id),None)
+        require(variant is not None,'unknown variant')
+        # Allowed source data only: no classification Gold, Code Mode source,
+        # call keys, expected state or automatic approval enters this adapter.
+        events=[dict(at=e['at'],text=e['text']+'\nFeedback assets:\n'+json.dumps(assets(),ensure_ascii=False))
+                for e in variant['events']]
+        return dict(case_id=case_id,case_version=1,variant_id=variant_id,seed=1701,clock=variant['clock'],
+                    context=variant['context'],events=events,fixture_digest=digest(dict(variant=variant,events=events)),lock=load())
     if case_id == 'GC-16':
         from verify_gc16 import load, variants as research_variants
         require(journey is None, 'GC-01 journey only')
@@ -204,7 +216,7 @@ def freeze(h, case_id, variant_id, kind, arm, repetition, seconds, journey=None)
     profile = selected(h)
     if profile is None:
         return dict(status='setup_required', eligible_for_grading=False, support=matrix())
-    if case_id not in INPUTS and case_id not in ('GC-12','GC-14','GC-16'):
+    if matrix()[case_id]['adapter'] is None:
         return dict(status='ineligible', case_id=case_id, missing=GAPS[case_id],
                     eligible_for_grading=False, support=matrix())
     require((arm == 'account') == (profile['provider_kind'] == 'openai_account'), 'arm/profile mismatch')

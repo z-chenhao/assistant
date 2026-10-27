@@ -15,6 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(report):
+    if any(r.get('case_id')=='GC-17' for r in report.get('results',[])):
+        from gc17 import validate_report
+        return dict(version=1,status='prepared; GC-17 mechanics only; semantic grading unexecuted',
+                    mechanical=validate_report(report),judge_packets=[],eligible_for_grading=False,scores=None,winner=None)
     if report.get('case_id') == 'GC-15':
         from verify_gc15 import validate_report
         return dict(version=1,status='prepared; GC-15 mechanical receipts only; semantic grading unexecuted',

@@ -13,6 +13,11 @@ IDENTITY = ('source_sha', 'source_dirty', 'source_diff_sha256', 'binary_sha256',
             'workflow_sha')
 
 
+def validate_gc17(report):
+    from gc17 import validate_report
+    return validate_report(report)
+
+
 def join(root):
     suites, cores = {}, {}
     for part in CODEMODE_PARTS:
@@ -39,6 +44,11 @@ def join(root):
                     if report.get('binary_sha256') != suite['binary_sha256'] or report.get('cleanup') is not True:
                         raise ValueError('Core binary/cleanup drift: ' + part)
                     cores[part, i] = report
+                    if part == 'GC-17':
+                        try:
+                            validate_gc17(report)
+                        except (RuntimeError, KeyError, TypeError, StopIteration) as error:
+                            raise ValueError('invalid GC-17 native part: '+str(error)) from error
         suites[part] = suite
     first = suites['control']
     if any(any(s.get(key) != first.get(key) for key in IDENTITY) for s in suites.values()):

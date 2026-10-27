@@ -5,6 +5,7 @@ from pathlib import Path
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 from case_runner import load_contract, score, variants
 from core_fixtures import feedback, csv_text, CATEGORIES, SEVERITIES, EDGES, PAIRS
@@ -80,6 +81,16 @@ class CoreTests(unittest.TestCase):
             self.assertFalse(judge(bad,0))
         self.assertEqual(set(TESTS),{f'SC-{i:02d}' for i in range(1,13)})
 
+    def aggregate_structure(self, reports):
+        # These tests isolate five-round inventory/scoring. Native rejection is
+        # exercised separately here and by the maintained real CLI probes.
+        with patch("gc17.validate_report"):
+            return aggregate(reports)
+
+    def test_flag_only_reports_cannot_satisfy_native_gc17_acceptance(self):
+        with self.assertRaises(ValueError):
+            aggregate(self.reports())
+
     def reports(self):
         results=[dict(case_id=case,variant_id=f'v{i}',fixture_digest=f'd-{case}-{i}',
                       status='fragment_pass',assertions={'state':True},hard_failure=False)
@@ -90,14 +101,14 @@ class CoreTests(unittest.TestCase):
 
     def test_five_run_summary_rechecks_hard_assertions_and_never_invents_scores(self):
         reports=self.reports()
-        good=aggregate(reports)
+        good=self.aggregate_structure(reports)
         self.assertTrue(good['passed'])
         self.assertEqual(good['cases']['GC-17']['hard_assertions']['pass^5'],1)
         self.assertIsNone(good['cases']['GC-17']['final_score'])
         self.assertTrue(all(v is None for v in good['cases']['GC-17']['dimensions'].values()))
         reports[-1]['results'][0]['assertions']['state']=False
         reports[-1]['results'][0]['final_score']=100
-        bad=aggregate(reports)
+        bad=self.aggregate_structure(reports)
         self.assertFalse(bad['passed'])
         self.assertEqual(bad['cases']['GC-17']['hard_assertions']['pass@1'],1)
         self.assertLess(bad['cases']['GC-17']['hard_assertions']['pass^5'],1)
@@ -115,7 +126,7 @@ class CoreTests(unittest.TestCase):
             elif mutation=='assertions':reports[0]['results'][0]['assertions']['extra']=True
             elif mutation=='ci_cancel_missing':reports[0].pop('ci_cancellation')
             elif mutation=='ci_cancel_failed':reports[0]['ci_cancellation']['passed']=False
-            with self.subTest(mutation=mutation),self.assertRaises(ValueError):aggregate(reports)
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):self.aggregate_structure(reports)
 
 
 if __name__=='__main__':unittest.main()

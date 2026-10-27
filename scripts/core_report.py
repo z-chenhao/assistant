@@ -9,8 +9,14 @@ def aggregate(reports):
     if len(reports) != 5:
         raise ValueError('five complete consecutive reports required')
     signatures = set()
+    native_ids = set()
     rows = defaultdict(list)
     for report in reports:
+        from gc17 import validate_report
+        try:
+            validate_report(report,seen=native_ids)
+        except (RuntimeError, KeyError, TypeError, StopIteration) as error:
+            raise ValueError('GC-17 native recomputation failed: '+str(error)) from error
         if not report.get('cleanup') or not report.get('conformance', {}).get('passed'):
             raise ValueError('cleanup/conformance evidence missing or failed')
         if report.get('ci_cancellation', {}).get('passed') is not True:
@@ -42,7 +48,8 @@ def aggregate(reports):
                           final_score=None, dimensions={d:None for d in 'OFPATSRC'},
                           product_metrics={'pass@1':None,'pass^5':None},
                           score_status='ungraded; scripted Fake cannot provide semantic Judge scores',
-                          scope='L0/L1 mechanical fragment; full case not_applicable')
+                          scope=('L0/L1 complete scripted GC-17 mechanics; actual model/connected unscripted adapter unexecuted'
+                                 if case=='GC-17' else 'L0/L1 mechanical fragment; full case not_applicable'))
     return dict(version=1, cases=cases, passed=all(c['hard_assertions']['pass^5'] == 1 for c in cases.values()),
                 ci_cancellation=dict(passed=True, consecutive_runs=5,
                                      cleanup_seconds=[r['ci_cancellation'].get('cleanup_seconds') for r in reports]),
