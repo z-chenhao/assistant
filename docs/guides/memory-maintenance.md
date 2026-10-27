@@ -178,3 +178,12 @@ request Evidence, and process/thread/filesystem Cleanup. It covers health/goal/
 finance/learning fragments, correction, encryption, restart, privacy revocation,
 long history provenance and verified Skill promotion/retirement. It does not score
 full GC-01–07, Computer cases or release-time Live Shadow behavior.
+
+The two delegated success checks reuse the recall harness's publication barriers:
+Root freezes its complete first recall, Main publishes, then Root dispatches.
+`delegation_ordering` records both boundaries and zero Worker model requests
+before Main completion. Exact workspace approval and the later resume still use
+the ordinary CLI. An unexpected failure stops the check without retry. The recall
+gate separately forces Main's append into the catch-up/query gap and requires
+failure without partial model admission. These fixtures prove the two orderings;
+they do not identify a historical failure whose Run/index state was not retained.

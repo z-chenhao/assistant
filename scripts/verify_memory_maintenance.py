@@ -9,7 +9,7 @@ import tempfile
 
 from verify_main import require
 from verify_capabilities import prepare, call, content
-from verify_recall import Embeddings
+from verify_recall import Embeddings, drain_with_publication_barrier
 
 
 def readback(h):
@@ -62,7 +62,15 @@ def skill_list(h, key):
 
 def run(binary):
     report = {'scope': 'M6 memory/context/Skill contracts and GC-01/02/03/06 fragments; not full product scores',
-              'scenarios': [], 'passed': False}
+              'scenarios': [], 'delegation_ordering': [], 'passed': False}
+
+    def delegated_drain(h, main_run):
+        # This success fixture needs a complete Root recall before Main appends
+        # its reply. The recall gate separately forces and rejects the opposite
+        # interleaving. Never retry a failed drive or admit partial evidence.
+        ordering = drain_with_publication_barrier(h, main_run)
+        report['delegation_ordering'].append(dict(main_run_id=main_run, **ordering))
+
     with tempfile.TemporaryDirectory(prefix='erii-memory-maintenance-') as temp:
         root = Path(temp)
         embeddings = Embeddings()
@@ -99,7 +107,8 @@ def run(binary):
             work(h)
             before = len(readback(h)['state']['events'])
             denied = call(h, 'worker-remember', 'builtin__memory__manage',
-                          {'operation': 'remember', 'content': 'Worker may not overwrite preferences'}, worker=True)
+                          {'operation': 'remember', 'content': 'Worker may not overwrite preferences'},
+                          worker=True, drain=delegated_drain)
             require(content(denied).get('error', {}).get('code') in ('NOT_FOUND', 'PERMISSION_DENIED'),
                     'Worker gained Memory control')
             require(not any(row['operation'] == 'remember' and row['source_ref'] == denied['invocation_id']
@@ -271,7 +280,8 @@ def run(binary):
                                                  'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")')
             require(replacement != source['text'], 'fixture correction did not apply')
             call(h, 'cli-fix', 'builtin__workspace__edit', {'path': 'cmd/taskctl/main.go', 'before_hash': source['hash'],
-                                                          'rules_hash': rules['hash'], 'text': replacement}, worker=True)
+                                                          'rules_hash': rules['hash'], 'text': replacement},
+                 worker=True, drain=delegated_drain)
             tests = [call(h, 'verified-' + str(i), 'builtin__workspace__test', {}) for i in range(2)]
             require(all(json.loads(content(inv)['text'])['passed'] for inv in tests), 'real workspace verification failed')
             # Isolate catalog cardinality from the earlier small-profile context

@@ -70,10 +70,13 @@ def prepare(binary, root, mode='edit'):
     return h
 
 
-def call(h, key, name, arguments, worker=False, approve=True):
+def call(h, key, name, arguments, worker=False, approve=True, drain=None):
     plan = json.dumps([{'name': name, 'arguments': arguments}])
-    h.send(key, ('Delegate capabilities: ' if worker else 'Capabilities: ') + plan)
-    h.command('chat', 'work')
+    receipt = h.send(key, ('Delegate capabilities: ' if worker else 'Capabilities: ') + plan)
+    if drain is None:
+        h.command('chat', 'work')
+    else:
+        drain(h, receipt['run_id'])
     pending = [a for a in h.command('approval', 'list') if a['status'] == 'pending']
     if pending:
         require(len(pending) == 1, 'unexpected pending approvals')
