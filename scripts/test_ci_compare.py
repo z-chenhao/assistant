@@ -132,7 +132,7 @@ class ComparisonTests(unittest.TestCase):
 
 
 class CurrentComparisonTests(unittest.TestCase):
-    """Drive genuine strict joins, then mutate their small retained receipts."""
+    """Drive inventory joins on synthetic receipts, then mutate their evidence."""
     @classmethod
     def setUpClass(cls):
         import json
@@ -157,7 +157,14 @@ class CurrentComparisonTests(unittest.TestCase):
                 root = Path(directory)
                 fixture = CodeModeJoinTests() if shard == 'codemode' else PersonalJoinTests()
                 fixture.fixture(root)
-                joined, _, summary = (ci_codemode if shard == 'codemode' else ci_personal).join(root)
+                if shard == 'codemode':
+                    # This synthetic inventory tests CI comparison/topology.
+                    # Real native acceptance and flag-only refusal have their
+                    # own Core gate and test_ci_codemode regressions.
+                    with patch('gc17.validate_report'):
+                        joined, _, summary = ci_codemode.join(root)
+                else:
+                    joined, _, summary = ci_personal.join(root)
                 reports['suite-' + shard + '.json'] = joined
                 reports['core-summary.json' if shard == 'codemode' else 'm6-summary.json'] = summary
         with tempfile.TemporaryDirectory() as directory:
