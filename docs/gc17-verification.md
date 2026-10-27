@@ -74,13 +74,16 @@ those mechanics; they do not substitute their synthetic rows for native proof.
 
 Failed assertion claims reject before decompression and native recomputation.
 This preserves the original ten-minute CI job and every five-round input/check;
-declared failures cannot certify a receipt. Two additional attacks forge all
-claims true while retaining a wrong delivered reference or missing dispatch,
+declared failures cannot certify a receipt. Three additional attacks forge all
+claims true while retaining a wrong delivered reference, missing dispatch or a
+whole Worker tree whose epoch differs from the actual completed Task,
 so all three consumers must still recompute the native evidence to reject them.
 Corruption construction decodes its immutable control once, then copies that
 already validated JSON tree. Incoming consumer receipts always use the strict
-reader. A retained before/after comparison proves all 33 candidate payloads are
-byte-identical; the optimization changes no input or assertion.
+reader. A retained before/after comparison proves the original 33 candidate payloads
+were byte-identical across this construction optimization. The final oracle also
+binds every Worker to the completed Task identity/epoch and adds the whole-tree
+epoch attack, for 34 candidates (one control and 33 corruptions).
 
 The Core JSON embeds size/hash-bound compressed native bytes, avoiding repeated
 large uncompressed states. Complete consumer evidence stays in a hidden sibling

@@ -270,7 +270,10 @@ def observe(row):
         elif kind=='agent_end':
             active.discard(event['run_id']);ended.add(event['run_id'])
     checks['host_bounded_lifetimes'] = not active and ended==set(children) and 1<peak<=16
-    checks['completed_task'] = exact(value['task'],value['tasks']) and value['task'][0]['status']=='completed'
+    task=value['task'][0]
+    checks['completed_task'] = exact(value['task'],value['tasks']) and task['status']=='completed' and all(
+        r['task_id']==task['task_id'] and r['task_epoch']==task['task_epoch']
+        for r in value['runs'] if r['kind']=='worker')
     return checks
 
 
@@ -386,6 +389,8 @@ def mutations():
         forged_source=lambda r:r['state']['code_manifest'][0].update(source='return 100;'))
     cases['forged_claims_wrong_delivered_ref']=cases['wrong_delivered_ref']
     cases['forged_claims_missing_dispatch']=cases['missing_dispatch']
+    cases['forged_claims_stale_tree_epoch']=lambda r:[c.update(task_epoch=99)
+        for c in r['state']['runs'] if c['kind']=='worker']
     return cases
 
 
