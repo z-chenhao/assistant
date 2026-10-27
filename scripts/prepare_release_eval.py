@@ -134,23 +134,14 @@ def prepare(report):
 def prepare_research(report):
     """Recompute six native research receipts; Fake previews cannot be graded."""
     import verify_gc16 as driver
-    lock = json.loads(driver.FIXTURE.with_suffix('.lock.json').read_text())
-    rows = report['variants']; expected = driver.variants()
-    provenance = report.get('source_provenance', {})
-    if (report.get('cleanup') is not True or report.get('semantic_score') is not None or
-            report.get('status') != 'mechanical_pass' or report.get('fixture_lock') != lock or
-            report.get('scope') != 'scripted_whole_case_mechanics' or
-            not provenance.get('before') or provenance['before'] != provenance.get('after') or
-            len(rows) != 6 or {r['variant']['id'] for r in rows} != {v['id'] for v in expected}):
-        raise ValueError('complete locked ungraded GC-16 receipts required')
+    try:
+        driver.validate_report(report)
+    except RuntimeError as error:
+        raise ValueError(str(error)) from error
     packets = []
-    for row in rows:
-        variant = next(v for v in expected if v['id'] == row['variant']['id'])
+    for row in report['variants']:
+        variant = row['variant']
         checks = driver.observe(row)
-        if (row['variant'] != variant or row['assertions'] != checks or not all(checks.values()) or
-                row['scope'] != 'scripted_whole_case_mechanics' or row['semantic_score'] is not None or
-                row['cleanup'] != dict(owned_processes_joined=True, disposable_root_removed=True)):
-            raise ValueError('GC-16 failed, drifted, graded or incomplete receipt')
         packets.append(dict(variant_id=variant['id'], eligible_for_grading=False,
             reason='explicit scripted model and synthetic offline corpus; preview only', judge_input=dict(
                 goal=variant['text'], allowed_fixture=variant['source'],
@@ -306,6 +297,9 @@ def main():
         parser.error('--evidence must be under repository evidence/')
     output.unlink(missing_ok=True)
     report = json.loads(args.input.read_text())
+    if report.get('kind') == 'gc16_native_manifest':
+        from verify_gc16 import read_report
+        report = read_report(args.input)
     if report.get('kind') == 'gc15_native_manifest':
         from verify_gc15 import read_report
         report = read_report(args.input)

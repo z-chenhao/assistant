@@ -38,14 +38,16 @@ class CommunicationTests(unittest.TestCase):
             manifests[part] = dict(version=1, part=part, fixtures={'fixture':'sha'},
                 identity={k:suites[part][k] for k in ci.IDENTITY}, receipts=[
                     dict(gate=g.name, attempt=n, status='mechanical_pass', semantic_score=None,
-                        cleanup=True, native=dict(path=ci.report_name(g,n), bytes=100, sha256='e'*64),
+                        cleanup=True, native=dict(path=('.'+Path(ci.report_name(g,n)).stem+'-native.json.gz' if g.name=='gc16' else ci.report_name(g,n)), bytes=100, sha256='e'*64),
                         rows=[dict(variant_id=v, repetition=r, assertions={'native':True}, cleanup=dict(
                             owned_processes_joined=True, disposable_root_removed=True,
                             **({'http_peer_joined':True} if g.name=='gc12' else {})),
                             **({'execution_ids':{table:[f'{n}/{v}/{table}'] for table in
                                 ('runs','tools','generations','requests','conversation')}} if g.name=='gc12' else {}),
                             **({'execution_ids':{table:[f'{g.name}/{v}/{r}/{table}'] for table in
-                                ('runs','tools','generations','messages','deliveries','artifacts')}} if g.script=='verify_gc13.py' else {}))
+                                ('runs','tools','generations','messages','deliveries','artifacts')}} if g.script=='verify_gc13.py' else {}),
+                            **({'execution_ids':{table:[f'{g.name}/{v}/{table}'] for table in
+                                ('runs','tools','generations','deliveries','conversation')}} if g.name=='gc16' else {}))
                             for v,r in ci.pairs(g)])
                     for g in gates for n in range(1,g.attempts+1)])
         return source, suites, manifests
@@ -201,6 +203,16 @@ class CommunicationTests(unittest.TestCase):
             report['variants'][0]['remote']['mail'][0]['recipient']='wrong@example.test'
             path.write_text(json.dumps(report))
             with self.assertRaises(ValueError): ci.native_receipt(gate,1,root,binary,suite)
+
+    def test_join_rejects_gc16_copied_executions_even_with_resealed_manifests(self):
+        for field in ('runs','tools','generations','deliveries','conversation'):
+            with self.subTest(field=field),tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);source,suites,manifests=self.fixture(root)
+                gc16=next(r for r in manifests['channels']['receipts'] if r['gate']=='gc16')
+                gc16['rows'][1]['execution_ids'][field]=copy.deepcopy(gc16['rows'][0]['execution_ids'][field])
+                self.write(root,suites,manifests)
+                with patch.object(ci,'source_state',return_value=source),patch.object(ci,'fixtures',return_value={'fixture':'sha'}):
+                    with self.assertRaisesRegex(ValueError,'reused or invalid GC-16 execution identities: '+field):ci.join(root)
 
     def test_join_rejects_native_journey_reuse_across_gc12_rounds(self):
         for field in ('runs','tools','generations','requests','conversation'):

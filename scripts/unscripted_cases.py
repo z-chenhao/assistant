@@ -51,12 +51,23 @@ GAPS = {
 
 
 def matrix():
-    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case in ('GC-12','GC-14') else None,
-                       fixture={'GC-12':'gc12-v1','GC-14':'gc14-v1'}.get(case,INPUTS.get(case)), eligible_for_grading=False,
+    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case in ('GC-12','GC-14','GC-16') else None,
+                       fixture={'GC-12':'gc12-v1','GC-14':'gc14-v1','GC-16':'gc16-v1'}.get(case,INPUTS.get(case)), eligible_for_grading=False,
                        missing=GAPS[case]) for case in sorted(CASES)}
 
 
 def inputs(case_id, variant_id, journey=None):
+    if case_id == 'GC-16':
+        from verify_gc16 import load, variants as research_variants
+        require(journey is None, 'GC-01 journey only')
+        variant = next((v for v in research_variants() if v['id'] == variant_id),None)
+        require(variant is not None, 'unknown variant')
+        # The corpus belongs behind a connected search/open adapter. Do not
+        # preload its documents, discovered links or Gold into the conversation.
+        events = [dict(at='2026-10-15T08:00:00+08:00',text=variant['text'])]
+        return dict(case_id=case_id,case_version=1,variant_id=variant_id,seed=variant['seed'],
+            clock=events[0]['at'],context='',events=events,
+            fixture_digest=digest(dict(events=events,fixture_sha256=variant['fixture_sha256'])),lock=load())
     if case_id == 'GC-14':
         from verify_gc14 import load, variants as monitor_variants
         require(journey is None, 'GC-01 journey only')
@@ -193,7 +204,7 @@ def freeze(h, case_id, variant_id, kind, arm, repetition, seconds, journey=None)
     profile = selected(h)
     if profile is None:
         return dict(status='setup_required', eligible_for_grading=False, support=matrix())
-    if case_id not in INPUTS and case_id not in ('GC-12','GC-14'):
+    if case_id not in INPUTS and case_id not in ('GC-12','GC-14','GC-16'):
         return dict(status='ineligible', case_id=case_id, missing=GAPS[case_id],
                     eligible_for_grading=False, support=matrix())
     require((arm == 'account') == (profile['provider_kind'] == 'openai_account'), 'arm/profile mismatch')
@@ -275,7 +286,8 @@ def execute(h, plan, output):
             plan['input'].get('journey')), 'frozen conditions drift')
         item = plan['input']
         # Same ingress mechanics as run_cases: background is explicit user data.
-        h.send('fixture-context', item['context'])
+        if item['context']:
+            h.send('fixture-context', item['context'])
         for index, event in enumerate(item['events']):
             require(selected(h) == plan['profile'], 'active profile drift')
             require(hashed(h.config.read_bytes()) == plan['configuration_sha256'], 'configuration drift')

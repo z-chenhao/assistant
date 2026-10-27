@@ -139,6 +139,22 @@ def verify(binary, evidence):
                     'GC-12 production input/eligibility drift')
             report['checks'].append('gc12_production_cli_inputs_ungraded')
 
+            root, config = prepared('gc16')
+            frozen = command(root, config, 'freeze', 'gc16-plan', '--case', 'GC-16', '--variant', 'base',
+                '--execution-kind', 'loopback_mechanism', '--seconds', '30')/'plan.json'
+            plan_body = json.loads(frozen.read_text())
+            out = command(root, config, 'run', 'gc16', '--plan', str(frozen),
+                          '--plan-sha256', hashed(frozen.read_bytes()))
+            observation = json.loads((out/'observation.json').read_text())
+            value = json.loads((out/'native.json').read_text())
+            users = [p['text'] for m in value['conversation'] if m['role']=='user' for p in m['content']]
+            event = plan_body['input']['events'][0]
+            require(users == ['当前时间：'+event['at']+'。'+event['text']] and
+                observation['status']=='observed_fragment' and observation['eligible_for_grading'] is False and
+                observation['final_score'] is None and not value['task'] and not value['artifact'],
+                'GC-16 original-only production input/eligibility drift')
+            report['checks'].append('gc16_production_cli_original_input_only_ungraded')
+
             for journey in ('week', 'safety'):
                 from verify_gc01 import journey_inputs
                 root, config = prepared('gc01-' + journey)

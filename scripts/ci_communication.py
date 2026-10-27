@@ -87,7 +87,7 @@ def native_receipt(gate, attempt, folder, binary, suite):
     driver = importlib.import_module(Path(gate.script).stem)
     case = Path(gate.script).stem.removeprefix('verify_')
     path = folder / report_name(gate, attempt)
-    report = driver.read_report(path) if case in ('gc02','gc09','gc10','gc11','gc13','gc14') else json.loads(path.read_text())
+    report = driver.read_report(path) if case in ('gc02','gc09','gc10','gc11','gc13','gc14','gc16') else json.loads(path.read_text())
     if case in ('gc01', 'gc02', 'gc09', 'gc10', 'gc11', 'gc13'):
         if case == 'gc13':
             driver.validate_report(report, binary, part=gate.arguments[1] if gate.arguments else None)
@@ -95,7 +95,7 @@ def native_receipt(gate, attempt, folder, binary, suite):
             driver.validate_report(report, binary)
         rows = report['results']
     else:
-        if case == 'gc14':
+        if case in ('gc14','gc16'):
             driver.validate_report(report,binary)
         from prepare_release_eval import prepare
         prepare(report)  # Recompute existing native oracles; stored flags cannot override them.
@@ -121,10 +121,10 @@ def native_receipt(gate, attempt, folder, binary, suite):
                 checks.update({field + '/' + k: v for k, v in row[field].items()})
         receipts.append(dict(variant_id=key, repetition=row.get('repetition', 1),
                              assertions=checks, cleanup=row['cleanup']))
-        if case in ('gc12','gc13'):
+        if case in ('gc12','gc13','gc16'):
             receipts[-1]['execution_ids'] = driver.execution_ids(row)
     raw = path
-    if case in ('gc02','gc09','gc10','gc11','gc13'):
+    if case in ('gc02','gc09','gc10','gc11','gc13','gc16'):
         raw = path.parent / json.loads(path.read_text())['native']['path']
     return dict(gate=gate.name, attempt=attempt, native=file_record(raw),
                 status=report['status'], semantic_score=report['semantic_score'],
@@ -143,7 +143,8 @@ def check_receipts(receipts, gates):
                 'semantic_score' not in receipt or receipt['semantic_score'] is not None or
                 type(native.get('bytes')) is not int or native['bytes'] <= 0 or
                 not re.fullmatch('[0-9a-f]{64}', native.get('sha256', '')) or
-                native.get('path') != report_name(gate, receipt['attempt'])):
+                native.get('path') != ('.'+Path(report_name(gate,receipt['attempt'])).stem+'-native.json.gz'
+                    if gate.script=='verify_gc16.py' else report_name(gate,receipt['attempt']))):
             raise ValueError('failed, graded, unclean or missing native report')
         rows = receipt['rows']
         if [(r['variant_id'], r['repetition']) for r in rows] != pairs(gate):
@@ -157,11 +158,12 @@ def check_receipts(receipts, gates):
                     any(v is not True for v in row['assertions'].values()) or
                     any(v is not True for v in row['cleanup'].values())):
                 raise ValueError('failed assertion or unclean native variant')
-            if gate.script in ('verify_gc12.py','verify_gc13.py'):
-                case='GC-12' if gate.script=='verify_gc12.py' else 'GC-13'
+            if gate.script in ('verify_gc12.py','verify_gc13.py','verify_gc16.py'):
+                case={'verify_gc12.py':'GC-12','verify_gc13.py':'GC-13','verify_gc16.py':'GC-16'}[gate.script]
                 identities = row.get('execution_ids', {})
                 expected_ids = ({'runs','tools','generations','requests','conversation'} if case=='GC-12' else
-                                {'runs','tools','generations','messages','deliveries','artifacts'})
+                                {'runs','tools','generations','messages','deliveries','artifacts'} if case=='GC-13' else
+                                {'runs','tools','generations','deliveries','conversation'})
                 if set(identities) != expected_ids:
                     raise ValueError('missing '+case+' execution identities')
                 for table, ids in identities.items():

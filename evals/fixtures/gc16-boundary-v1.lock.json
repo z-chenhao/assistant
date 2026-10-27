@@ -1,0 +1,121 @@
+{
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "files": {
+    "evals/fixtures/gc16-v1.json": "95f9ee2411e5079d660c131f15f1a64e898c78c7f2737f39c09cfa7396db34ff",
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f"
+  },
+  "frozen_blocks": [
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 369,
+      "sha256": "fceac8837eeca657f7795bc145e6e1097e21e94ab3b4b06966a6ceb5bf25c03e",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 371,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 373,
+      "sha256": "f59a1b7c80d893f985982f0c0022b243d11dabc7e6dcbb2c6038b4448902587a",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 374,
+      "sha256": "532f25b6273b4dafba790bddd44d62bf2c60ba5c16e8848cdbac7fe419019d81",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 375,
+      "sha256": "f5c1955f2df836aca84b4cafc9df32460b463d23440938b0adb330ce2889a643",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 376,
+      "sha256": "9dc3e0f9de3fc75948a5ff235faf7d775c3a066548b704fe1a6fa0245d45e775",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 377,
+      "sha256": "371a421c95eda797379e60e61aa08921cc9a96733a07ceb9aa28f1d01b00a08d",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-16",
+      "line": 379,
+      "sha256": "db0c01ab3c28fc98596e280df2d766c968660108bd8ca334e0f5675f7e0a6f23",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 932,
+      "sha256": "f3bb20c393c60c5ac21abaaff252a6993b63b2c33b17d091325da7db38c678be",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 934,
+      "sha256": "f189c74ee715c99f5ed9dab35406885a488acb2c9152227dbd99320832db7219",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 943,
+      "sha256": "723004e0ff53831dcb2c87b3efcfe10976ad15c72afff87fb8f23b5ae7e8a51b",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 945,
+      "sha256": "22f742d1bf7cc1c9ce71c979f1972fda371e62e4a3d33d5f5950e77ac23252f8",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 947,
+      "sha256": "4639e9795a2e6ac18c069bb8de2e10aa58d72657861c9ca17b182295945a7033",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 948,
+      "sha256": "ff612ef7ee5f36a2700cbc054ae32f98d9b33d2713b2e1a22bf918d4a626a74e",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 949,
+      "sha256": "69e397492a282f7ac68d83f87ca8d654bdab2aba9f01791808ede28d3d12e555",
+      "area": "children"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.17",
+      "line": 950,
+      "sha256": "8df2b462bfe5e8cbc2e5adade6d82a562c469cbc8252724ba9bf0609159955f2",
+      "area": "children"
+    }
+  ]
+}
