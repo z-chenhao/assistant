@@ -40,7 +40,7 @@ GAPS = {
     'GC-11': 'gc11_driver.py original two-turn fixture; approved profiles, official-source adapters and semantic grades remain due under ERII-223',
     'GC-12': 'Mail/Calendar frozen approvals and steering adapter',
     'GC-13': 'booking browser, approval and unknown-outcome adapter',
-    'GC-14': 'scheduled source/threshold and notification adapter',
+    'GC-14': 'original input fragment available; approved live price sources, clock/notification adapter and semantic grades remain under ERII-223',
     'GC-15': 'native file ingress and multimodal Artifact adapter',
     'GC-16': 'research sources, Child work and Artifact adapter',
     'GC-17': 'exact 100-row attachments, assertions and kill/restart adapter',
@@ -51,12 +51,24 @@ GAPS = {
 
 
 def matrix():
-    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case == 'GC-12' else None,
-                       fixture='gc12-v1' if case == 'GC-12' else INPUTS.get(case), eligible_for_grading=False,
+    return {case: dict(adapter='conversation_fragment' if case in INPUTS or case in ('GC-12','GC-14') else None,
+                       fixture={'GC-12':'gc12-v1','GC-14':'gc14-v1'}.get(case,INPUTS.get(case)), eligible_for_grading=False,
                        missing=GAPS[case]) for case in sorted(CASES)}
 
 
 def inputs(case_id, variant_id, journey=None):
+    if case_id == 'GC-14':
+        from verify_gc14 import load, variants as monitor_variants
+        require(journey is None, 'GC-01 journey only')
+        lock = load()
+        variant = next((v for v in monitor_variants() if v['id'] == variant_id),None)
+        require(variant is not None, 'unknown variant')
+        # Inputs only: no Fake branch, Tool plan, Gold or future daily prices.
+        source = {k:v for k,v in variant['source'].items() if k != 'daily_prices'}
+        events = [dict(at=source['clock'],text=variant['text'])]
+        return dict(case_id=case_id,case_version=1,variant_id=variant_id,seed=0,clock=source['clock'],
+            context='以下是本次对话明确提供的合成背景：'+json.dumps(source,ensure_ascii=False),events=events,
+            fixture_digest=digest(dict(source=source,events=events)),lock=lock)
     if case_id == 'GC-12':
         require(journey is None, 'GC-01 journey only')
         lock = strict_json((ROOT/'evals/fixtures/gc12-v1.lock.json').read_bytes())
@@ -181,7 +193,7 @@ def freeze(h, case_id, variant_id, kind, arm, repetition, seconds, journey=None)
     profile = selected(h)
     if profile is None:
         return dict(status='setup_required', eligible_for_grading=False, support=matrix())
-    if case_id not in INPUTS and case_id != 'GC-12':
+    if case_id not in INPUTS and case_id not in ('GC-12','GC-14'):
         return dict(status='ineligible', case_id=case_id, missing=GAPS[case_id],
                     eligible_for_grading=False, support=matrix())
     require((arm == 'account') == (profile['provider_kind'] == 'openai_account'), 'arm/profile mismatch')

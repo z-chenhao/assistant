@@ -12,6 +12,20 @@ from release_receipts import hashed
 
 
 class UnscriptedCasesTests(unittest.TestCase):
+    def test_monitor_input_fragment_preserves_wordings_without_future_prices_or_plans(self):
+        from verify_gc14 import variants as monitor_variants, load
+        for variant in monitor_variants():
+            value=inputs('GC-14',variant['id'])
+            self.assertEqual(value['events'],[dict(at=variant['source']['clock'],text=variant['text'])])
+            source=json.loads(value['context'].split('：',1)[1])
+            self.assertEqual(source,{k:v for k,v in variant['source'].items() if k!='daily_prices'})
+            self.assertEqual(value['lock'],load())
+            self.assertNotIn('daily_prices',json.dumps(value['context']))
+            self.assertNotIn('Capabilities:',json.dumps(value))
+        self.assertEqual(matrix()['GC-14']['adapter'],'conversation_fragment')
+        self.assertFalse(matrix()['GC-14']['eligible_for_grading'])
+        with self.assertRaisesRegex(ValueError,'unknown variant'):inputs('GC-14','invented')
+
     def test_export_requires_native_artifact_size_hash_and_safe_storage_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
