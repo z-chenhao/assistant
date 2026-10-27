@@ -297,6 +297,8 @@ def unpack(value):
 
 
 def validate_result(result, binary=None):
+    require(type(result.get('assertions')) is dict and bool(result['assertions']) and
+        all(v is True for v in result['assertions'].values()),'GC-17 failed assertions cannot certify a receipt')
     from unscripted_cases import source_identity
     from verify_gc11 import environment
     row = unpack(result['evidence'])
@@ -351,7 +353,7 @@ def mutations():
         generation=row['state']['generations'][-1]['generation_id']
         row['state']['external_provider_dispatches']=[g for g in row['state']['external_provider_dispatches']
                                                    if g['generation_id']!=generation]
-    return dict(
+    cases = dict(
         wrong_delivered_ref=lambda r:r['state']['conversation'][-1]['content'][-1].update(artifact_ref='artifact:'+'0'*64),
         missing_file=lambda r:r['state']['conversation'][-1]['content'].pop(),
         duplicate_file=lambda r:r['state']['conversation'][-1]['content'].append(copy.deepcopy(r['state']['conversation'][-1]['content'][-1])),
@@ -382,6 +384,9 @@ def mutations():
         fake_crash=lambda r:r['fault'].update(returncodes=[0,0]),
         erased_drift=lambda r:r['fault']['drift']['rejection'].clear(),
         forged_source=lambda r:r['state']['code_manifest'][0].update(source='return 100;'))
+    cases['forged_claims_wrong_delivered_ref']=cases['wrong_delivered_ref']
+    cases['forged_claims_missing_dispatch']=cases['missing_dispatch']
+    return cases
 
 
 def consumer_probes(report, binary, folder):
@@ -404,7 +409,10 @@ def consumer_probes(report, binary, folder):
                     checks = observe(row)
                 except (KeyError,IndexError,TypeError,ValueError,RuntimeError,StopIteration):
                     checks = dict(invalid_native_state=False)
-                row['assertions']=target['assertions']=checks
+                # A declared failure rejects immediately. These two additional
+                # attacks forge every flag true, forcing full native recomputation.
+                claims={key:True for key in checks} if name.startswith('forged_claims_') else checks
+                row['assertions']=target['assertions']=claims
                 # Preserve forged passing claims; the consumer must recheck.
                 target['evidence']=pack(row)
             data=json.dumps(candidate,ensure_ascii=False,separators=(',',':')).encode()

@@ -72,6 +72,12 @@ drift and provider dispatch evidence reject. Unit regressions reject flag-only
 reports and hash/size/type drift. Existing Core inventory/scoring tests isolate
 those mechanics; they do not substitute their synthetic rows for native proof.
 
+Failed assertion claims reject before decompression and native recomputation.
+This preserves the original ten-minute CI job and every five-round input/check;
+declared failures cannot certify a receipt. Two additional attacks forge all
+claims true while retaining a wrong delivered reference or missing dispatch,
+so all three consumers must still recompute the native evidence to reject them.
+
 The Core JSON embeds size/hash-bound compressed native bytes, avoiding repeated
 large uncompressed states. Complete consumer evidence stays in a hidden sibling
 directory. `control.json.gz` retains the full control; each other archive retains
