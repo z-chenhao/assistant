@@ -118,11 +118,16 @@ ceiling and does not grant approval. Missing evidence is not a passing result.
 The historical `ci_compare.py` collector now requires `ERII_EVIDENCE_ROOT`, uses
 this verified cache and selects only canonical shard archives; fast/race/part
 archives cannot supply its structural suite reports. Comparisons retain their
-original complete-sample rules. Current CI's mandatory part/join uploads and
-14-day retention remain unchanged: ephemeral hosted runners have no access to
+original complete-sample rules. Current CI's mandatory part/join uploads retain
+14-day retention: ephemeral hosted runners have no access to
 the registered host root, and those uploads are the existing complete-evidence
-contract. They are not routine Builder/Reviewer attachments. No required raw CI
-evidence is removed or replaced with an ungraded summary.
+contract. They are not routine Builder/Reviewer attachments. Communication parts
+now recompute their native oracles locally and upload
+compact source/fixture/assertion/cleanup manifests for the required join; see
+[communication operations](../ci.md#communication-budget-and-evidence). Retain
+their full local native bytes for independent recomputation. This deterministic
+completion record cannot certify a Golden Case or release. Other joins retain
+the raw input reports their existing consumers require.
 
 ## Reproduce and clean up
 

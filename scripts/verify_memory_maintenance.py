@@ -5,6 +5,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
+import sys
 import tempfile
 
 from verify_main import require
@@ -60,7 +61,7 @@ def skill_list(h, key):
     return json.loads(result['text'])
 
 
-def run(binary):
+def run(binary, failure_evidence=None):
     report = {'scope': 'M6 memory/context/Skill contracts and GC-01/02/03/06 fragments; not full product scores',
               'scenarios': [], 'delegation_ordering': [], 'passed': False}
 
@@ -393,6 +394,23 @@ def run(binary):
             report['scenarios'].append(dict(name='persistent-category-opt-out', before=before['memory']['records'],
                                             after=after['memory']['records']))
             report['final'] = readback(h)
+        except Exception as error:
+            # Capture before the disposable stores disappear. Preserve the
+            # original failure even when a damaged store cannot be inspected.
+            failure = dict(passed=False, error_type=type(error).__name__)
+            if h is not None:
+                for name, capture in (('runtime', h.failure_state), ('memory', lambda: readback(h))):
+                    try:
+                        failure[name] = capture()
+                    except Exception as capture_error:
+                        failure[name] = dict(capture_error_type=type(capture_error).__name__)
+            if failure_evidence is not None:
+                try:
+                    failure_evidence.parent.mkdir(parents=True, exist_ok=True)
+                    failure_evidence.write_text(json.dumps(failure, indent=2)+'\n')
+                except (OSError, TypeError, ValueError) as capture_error:
+                    print('failure evidence unavailable: '+type(capture_error).__name__, file=sys.stderr)
+            raise
         finally:
             if h is not None:
                 h.cleanup()
@@ -406,7 +424,8 @@ def main():
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     args = parser.parse_args()
-    result = run(args.binary.resolve())
+    args.evidence.unlink(missing_ok=True)
+    result = run(args.binary.resolve(), args.evidence)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(dict(passed=True, scenarios=len(result['scenarios']), cleanup=result['cleanup'])))

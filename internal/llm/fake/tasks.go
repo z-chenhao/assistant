@@ -70,7 +70,7 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 			if json.Unmarshal([]byte(last.Text), &results) != nil {
 				return llm.GenerationResult{Text: "Search was not available."}, nil
 			}
-			if strings.HasPrefix(user, "Pause: ") || strings.HasPrefix(user, "Cancel: ") {
+			if strings.HasPrefix(user, "Pause: ") || strings.HasPrefix(user, "Cancel: ") || strings.HasPrefix(user, "Complete: ") {
 				if len(results) != 1 {
 					return llm.GenerationResult{Text: "Please clarify which work you mean."}, nil
 				}
@@ -78,7 +78,16 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 				if strings.HasPrefix(user, "Cancel: ") {
 					op = "cancel"
 				}
-				return call(task.ManageName, task.ManageRequest{Operation: op, TaskRef: results[0].TaskRef}), nil
+				if strings.HasPrefix(user, "Complete: ") {
+					op = "complete"
+				}
+				result := call(task.ManageName, task.ManageRequest{Operation: op, TaskRef: results[0].TaskRef})
+				if op == "complete" {
+					second := result.ToolCalls[0]
+					second.ID = "duplicate-complete"
+					result.ToolCalls = append(result.ToolCalls, second)
+				}
+				return result, nil
 			}
 			if strings.HasPrefix(user, "Continue: ") {
 				if len(results) != 1 {
@@ -96,6 +105,8 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{Text: "Main accepted the work."}, nil
 	}
 	switch {
+	case strings.HasPrefix(user, "Ongoing: "):
+		return call(task.ManageName, task.ManageRequest{Operation: "create", Task: strings.TrimPrefix(user, "Ongoing: "), CompletionPolicy: "ongoing"}), nil
 	case strings.HasPrefix(user, "Delegate: "), strings.HasPrefix(user, "Duplicate: "):
 		brief := strings.TrimPrefix(strings.TrimPrefix(user, "Delegate: "), "Duplicate: ")
 		result := call(task.ManageName, task.ManageRequest{Operation: "create", Task: brief})
@@ -118,6 +129,8 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 	case strings.HasPrefix(user, "Continue: "):
 		query := strings.SplitN(strings.TrimPrefix(user, "Continue: "), " | ", 2)[0]
 		return call(task.SearchName, task.SearchRequest{Query: query}), nil
+	case strings.HasPrefix(user, "Complete: "):
+		return call(task.SearchName, task.SearchRequest{Query: strings.TrimPrefix(user, "Complete: ")}), nil
 	case strings.HasPrefix(user, "Pause: "), strings.HasPrefix(user, "Cancel: "):
 		return call(task.SearchName, task.SearchRequest{Query: strings.TrimPrefix(strings.TrimPrefix(user, "Pause: "), "Cancel: ")}), nil
 	default:

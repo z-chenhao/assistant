@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Collect five complete CI/shadow pairs on one frozen Draft PR head.
+"""Retired shadow orchestrator, retained for historical checkpoint regressions.
+
+The CLI rejects new work. Use ci_compare offline for retained evidence.
+Original semantics: collect five complete CI/shadow pairs on one frozen Draft PR head.
 
 Every rerun follows a successful complete pair. A failed/unknown request or
 failed test stops the experiment; failures are never retried to obtain green.
@@ -9,7 +12,6 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-import re
 import subprocess
 import time
 
@@ -166,16 +168,16 @@ def run(pr, sha, output, resume=False):
             raise
         resume = False
         raw_path = output.with_name(output.stem + f'-round-{number}-raw.json')
-        save(raw_path, dict(pairs=[pair], attempts=attempts))
+        save(raw_path, dict(mode=ci_compare.HISTORICAL, pairs=[pair], attempts=attempts))
         state['rounds'].append(dict(number=number, pair=pair, raw=str(raw_path), watch_returncode=result.returncode))
         state['stage'] = 'collected'
         save(output, state)
-        report = ci_compare.compare(dict(pairs=[pair], attempts=attempts))
+        report = ci_compare.compare(dict(mode=ci_compare.HISTORICAL, pairs=[pair], attempts=attempts))
         if result.returncode or not report['pairs'][0]['eligible']:
             state.update(stage='failed', failure=report['pairs'][0]['errors'])
             save(output, state)
             return 1
-    raw = dict(pairs=[], attempts={})
+    raw = dict(mode=ci_compare.HISTORICAL, pairs=[], attempts={})
     for row in state['rounds']:
         item = json.loads(Path(row['raw']).read_text())
         raw['pairs'].extend(item['pairs'])
@@ -198,10 +200,8 @@ def main():
     parser.add_argument('--sha', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--resume-observation', action='store_true', help='read the same accepted attempts; never rerun the interrupted pair')
-    args = parser.parse_args()
-    if not re.fullmatch('[0-9a-f]{40}', args.sha):
-        parser.error('--sha must be a full source SHA')
-    return run(args.pr, args.sha, args.output, resume=args.resume_observation)
+    parser.parse_args()
+    parser.error("retired shadow orchestrator: use ci_compare.py --offline --historical-shadow for retained evidence; no new runs")
 
 
 if __name__ == '__main__':

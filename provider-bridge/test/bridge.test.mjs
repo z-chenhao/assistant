@@ -7,13 +7,13 @@ import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
-async function fixture(t, mode='success') {
+async function fixture(t, mode='success', redirectURL='/trap') {
  const requests=[]; let trapped=0, closed=0;
  const server=http.createServer(async(req,res)=> {
   let body=''; for await(const c of req) body+=c;
   requests.push({path:req.url,auth:req.headers.authorization,body:body ? JSON.parse(body):null,session:req.headers.session_id});
   if(req.url==='/trap'){trapped++;res.end();return;}
-  if(mode==='redirect'){res.writeHead(307,{location:'/trap'});res.end();return;}
+  if(mode==='redirect'){res.writeHead(307,{location:redirectURL});res.end();return;}
   if(req.url==='/v1/models') {
    if(mode==='manual'){res.writeHead(404);res.end('unsafe-secret');return;}
    res.setHeader('content-type','application/json');res.end(JSON.stringify({data:[{id:'fixture-model'}]}));return;
@@ -90,6 +90,25 @@ for(const key of [undefined,'explicit-user-key'])test(`catalog and Pi streaming 
 test('manual ID still generates when catalog unavailable',{timeout:10000},async t=>{
  const f=await fixture(t,'manual');await assert.rejects(f.rpc('models.list',{connection:{endpoint:f.endpoint}}),/MODEL_NOT_FOUND/);
  await f.rpc('generation.start',f.request());await f.wait(e=>e.kind==='completed');
+});
+
+test('cross-origin redirects reach neither catalog nor generation receiver',{timeout:10000},async t=>{
+ const received=[];
+ const receiver=http.createServer((req,res)=>{received.push({method:req.method,auth:req.headers.authorization});req.resume();res.end('{}');});
+ receiver.listen(0,'127.0.0.1');await once(receiver,'listening');
+ t.after(async()=>{receiver.closeAllConnections();await new Promise(r=>receiver.close(r));});
+ const target=`http://127.0.0.1:${receiver.address().port}/trap`;
+ const f=await fixture(t,'redirect',target);
+ assert.notEqual(new URL(f.endpoint).origin,new URL(target).origin);
+ const connection={endpoint:f.endpoint,api_key:'explicit-user-key'};
+ await assert.rejects(f.rpc('models.list',{connection}),/MODEL_INCOMPATIBLE/);
+ await f.rpc('generation.start',f.request({connection}));
+ assert.equal((await f.wait(e=>e.kind==='error')).error_code,'MODEL_INCOMPATIBLE');
+ assert.deepEqual(f.requests.map(r=>r.path),['/v1/models','/v1/chat/completions']);
+ assert(f.requests.every(r=>r.auth==='Bearer explicit-user-key'));
+ assert.equal(f.events.filter(e=>e.kind==='error').length,1);
+ assert(!f.events.some(e=>e.kind==='completed'));
+ assert.deepEqual(received,[]);
 });
 
 test('Pi tool call and result continuation',{timeout:10000},async t=>{

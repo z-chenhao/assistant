@@ -38,7 +38,8 @@ The installer builds Erii and installs pinned model/JavaScript runtimes. It crea
 `erii` under `~/.local/bin`; add that directory to your `PATH` to invoke it directly.
 First launch guides you through model setup, probing and explicit selection.
 Erii starts its local event broker and stores data in `~/.local/share/erii`.
-Type `/quit` or press Ctrl-C to stop.
+After setup, type `/quit` to stop. Within setup, use `/cancel` to return to
+conversation first. Ctrl-C exits either screen.
 
 ```sh
 erii doctor       # Check installation without opening user databases

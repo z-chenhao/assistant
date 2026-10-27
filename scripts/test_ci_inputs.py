@@ -66,8 +66,21 @@ class ImpactTests(unittest.TestCase):
         self.assertEqual(full.attempts, 5)
         self.assertNotIn('--feedback', full_args)
         self.assertIn('--feedback', early_args)
+        # GC-13's six fixed parts form one complete Case inventory. No early/focused
+        # fragment may replace another gate or omit/duplicate a protected round.
+        from verify_gc13 import pairs
+        selected=[]
         for gates in suite.SHARDS.values():
-            self.assertTrue(all(not g.arguments for g in gates), 'full inventory must never select partial evidence')
+            for gate in gates:
+                if gate.name in ('gc13-wording-1','gc13-wording-2','gc13-wording-3','gc13-noise-1','gc13-noise-2','gc13-order-1'):
+                    self.assertEqual(gate.arguments,('--ci-part',gate.name.removeprefix('gc13-')))
+                    self.assertEqual(gate.attempts,1)
+                    selected.extend(pairs(gate.arguments[1]))
+                else:
+                    self.assertFalse(gate.arguments,'full inventory must never select early fragments')
+        self.assertEqual(selected,pairs())
+        self.assertEqual(len(selected),30)
+        self.assertEqual(len(set(selected)),30)
 
     def test_real_git_base_trust_drift_deleted_and_unknown_paths(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -244,7 +257,7 @@ class FeedbackSchedulingTests(unittest.TestCase):
 
     def test_all_selected_shards_remain_in_early_schedule(self):
         self.assertEqual(ci_feedback.feedback_order(list(ci_feedback.GATES)),
-                         ['security','runtime','codemode','providers','delivery','personal'])
+                         ['security','runtime','codemode','providers','delivery','personal','communication'])
         self.assertEqual(ci_feedback.feedback_order(['delivery','runtime']), ['runtime','delivery'])
         self.assertEqual(ci_feedback.feedback_order([]), [])
         for names in (['unknown'], ['security','security']):
