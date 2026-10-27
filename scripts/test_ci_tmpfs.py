@@ -218,3 +218,22 @@ class FixtureStorageTests(unittest.TestCase):
                     else:
                         with self.assertRaisesRegex(ValueError, 'ordinary block filesystem'):
                             fixtures.disk()
+
+    def test_separate_disk_receipt_preserves_completed_tmpfs_cleanup(self):
+        fixtures.setup()
+        fixtures.cleanup()
+        retained = self.receipt.read_bytes()
+        disk_receipt = self.parent / 'receipt-race-storage.json'
+        response = json.dumps({'filesystems': [dict(target='/', source='/dev/root',
+                                                    fstype='ext4', options='rw')]})
+        with patch.object(fixtures.sys, 'argv', ['ci_tmpfs.py', 'disk', '--receipt', str(disk_receipt)]), \
+             patch.object(fixtures, 'command', return_value=response):
+            fixtures.main()
+        self.assertEqual(self.receipt.read_bytes(), retained)
+        self.assertTrue(json.loads(retained)['cleanup'])
+        self.assertEqual(json.loads(disk_receipt.read_text())['storage'], 'disk')
+        for action in ('setup', 'cleanup'):
+            with patch.object(fixtures.sys, 'argv', ['ci_tmpfs.py', action, '--receipt', str(disk_receipt)]):
+                with self.assertRaises(SystemExit) as error:
+                    fixtures.main()
+                self.assertEqual(error.exception.code, 2)

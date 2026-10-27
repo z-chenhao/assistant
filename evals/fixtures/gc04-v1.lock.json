@@ -1,0 +1,177 @@
+{
+  "files": {
+    "evals/fixtures/m6-v1.json": "3a18255727ffe51d832ac4e1888e4aed2f2988dbb1b7d7438008f863d7f4bd1b",
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f"
+  },
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "frozen_blocks": [
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 201,
+      "sha256": "ad9d64d8368377638ee4d4dc6f83721b0d6dfac415757888c6e6421b299a6890",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 203,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 205,
+      "sha256": "94d7ef9738e532273692104370727958a3f26e58cc31af90571e8263f705c5f7",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 206,
+      "sha256": "2ac9077d9684cb61e4f13a26c079ab32202d50d4d2552bcdca77dbdff93a3d52",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 207,
+      "sha256": "70e169f74575cb4bb03bf147771116c1e4f8f78869aa2125794c9b095949cf01",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 208,
+      "sha256": "d0acff287ee58f030a700d073ff959392f138991de3daf7431f1c5bfd4cebf6b",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 209,
+      "sha256": "be9db30c69e24434eb50415861a416ce7305b79d45283fe2ae9b2ce0a7dfc3c0",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-04",
+      "line": 211,
+      "sha256": "a07c2330c84c5e86dbc2eca334f88eeba2758a9891bb83e9bb5dd73ffab1b149",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 590,
+      "sha256": "0914cd01829a0b60911eb2c331a0aed75eee7b09f3e0792d6563430f8f3eaa58",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 592,
+      "sha256": "d50825123300cbd8cae812e4896fe8469447dcf6468ad7bb132162125c4891b8",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 610,
+      "sha256": "a019d4dd35433274ace5a5ca4e79897cb7c0f10516595903c1c4bea0985304dc",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 612,
+      "sha256": "a819ee5318101f8ea2803c0e4ce84d3b546f705ea00545d9cc3c68963d17f9d3",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 613,
+      "sha256": "0cd0a3dac5b2b69da5c1f01503efe3f0b239289102a2520a6a4da362f3b07035",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 614,
+      "sha256": "25f8210d3f9cbc1638b9b6ff9b3bbb28304b79d6ba4db3cce3caf20b3b381260",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 616,
+      "sha256": "42c0cc49655e1bac7face258efc7ba5fce53ac9fd5923ef396af528a2d6d03b2",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 618,
+      "sha256": "0c2998879060b3299cc73e7a653e139de43d0a1ff5d2a3ad88789b3579df94c7",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 619,
+      "sha256": "4604b2467a9a3e2bdee9da0166e83abb0878994dccca8facd41bd30414d60e65",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 620,
+      "sha256": "9d60a907dc80fb5f0e9fa5ccc2716315a7118283791dadb16b04295867531a62",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 621,
+      "sha256": "6d23dd0f9d2f8ed5db98e0b449228f65b5c7f806319dcd49bf1813fbca04a123",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 623,
+      "sha256": "c8d4cf6d199838bb1bc081040e7e9d37215fd8422593cd79330dbeec482cdc04",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 625,
+      "sha256": "864987c360744f761ebf5cbf32d132c16c1a1f2c7361336025fe2e1e2a2eb53f",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 626,
+      "sha256": "6282edd7cbbfced5caae34e752844427f22ff91c11b4aa67c45cac346339817c",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 627,
+      "sha256": "4ba2e3814c6c95c375ef1901501bb8c4387a9ccefd851588c4a389ea3724198e",
+      "area": "tasks"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.5",
+      "line": 628,
+      "sha256": "b635627a8b86b4cc585f676598a98c32871fd64179d9c997ccd6070162898d22",
+      "area": "tasks"
+    }
+  ]
+}
