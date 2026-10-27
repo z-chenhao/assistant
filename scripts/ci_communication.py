@@ -87,7 +87,7 @@ def native_receipt(gate, attempt, folder, binary, suite):
     driver = importlib.import_module(Path(gate.script).stem)
     case = Path(gate.script).stem.removeprefix('verify_')
     path = folder / report_name(gate, attempt)
-    report = driver.read_report(path) if case in ('gc02','gc09','gc10','gc11','gc13') else json.loads(path.read_text())
+    report = driver.read_report(path) if case in ('gc02','gc09','gc10','gc11','gc13','gc14') else json.loads(path.read_text())
     if case in ('gc01', 'gc02', 'gc09', 'gc10', 'gc11', 'gc13'):
         if case == 'gc13':
             driver.validate_report(report, binary, part=gate.arguments[1] if gate.arguments else None)
@@ -95,6 +95,8 @@ def native_receipt(gate, attempt, folder, binary, suite):
             driver.validate_report(report, binary)
         rows = report['results']
     else:
+        if case == 'gc14':
+            driver.validate_report(report,binary)
         from prepare_release_eval import prepare
         prepare(report)  # Recompute existing native oracles; stored flags cannot override them.
         rows = report['variants']

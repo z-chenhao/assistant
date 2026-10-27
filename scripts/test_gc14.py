@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import monitor_sandbox as peer
 import prepare_release_eval as evaluator
@@ -94,7 +95,49 @@ class MonitorTests(unittest.TestCase):
         base = dict(case_id='GC-14', variants=[], cleanup=True, status='mechanical_pass', semantic_score=None,
                     fixture_lock=json.loads(journey.FIXTURE.with_suffix('.lock.json').read_text()))
         for change in [{},dict(semantic_score=100),dict(cleanup=False),dict(status='inconclusive'),dict(fixture_lock={})]:
-            with self.assertRaises(ValueError): evaluator.prepare(dict(base,**change))
+            with self.assertRaises(RuntimeError): evaluator.prepare(dict(base,**change))
+
+    def test_frozen_package_keeps_all_sixteen_original_blocks_and_files(self):
+        lock = journey.load()
+        self.assertEqual(lock['manifest_sha256'],'0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556')
+        self.assertEqual(len(lock['frozen_blocks']),16)
+        self.assertEqual({b['section'] for b in lock['frozen_blocks']},{'7.GC-14','8.15'})
+
+    def test_identity_validation_rejects_the_reproduced_forged_provenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            binary=Path(tmp)/'binary';binary.write_bytes(b'explicit binary fixture')
+            identity=dict(source_before={'sha':'a'*40},source_after={'sha':'a'*40},
+                binary_path=str(binary),binary_sha256=journey.sha(binary.read_bytes()),environment={'go':'fixture'})
+            report=dict(case_id='GC-14',status='mechanical_pass',scope='scripted_whole_case_mechanics',
+                cleanup=True,semantic_score=None,eligible_for_grading=False,release_ready=False,
+                boundary_lock=journey.load(),fixture_lock=json.loads(journey.FIXTURE.with_suffix('.lock.json').read_text()),identity=identity,
+                source_provenance={'before':{'forged':True},'after':{'forged':True}},variants=[])
+            with patch.object(journey,'source_identity',return_value={'sha':'a'*40}),patch.object(journey,'environment',return_value={'go':'fixture'}):
+                for change in ({}, {'binary_sha256':'0'*64}, {'environment':{}}, {'source_after':{'sha':'b'*40}}):
+                    value=copy.deepcopy(report);value['identity'].update(change)
+                    with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'identity drift|provenance drift'):
+                        journey.validate_report(value,binary)
+
+    def test_native_manifest_rejects_corruption_summary_size_duplicates_and_escape(self):
+        report=dict(status='mechanical_pass',variants=[],cleanup=True,
+            identity=dict(source_before={'sha':'a'*40},binary_sha256='b'*64))
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'report.json';journey.write_report(path,report)
+            self.assertEqual(journey.read_report(path),report)
+            original=json.loads(path.read_text());raw=path.parent/original['native']['path'];data=raw.read_bytes()
+            for name,change in [('hash',{'native':dict(original['native'],sha256='0'*64)}),
+                                ('size',{'native_bytes':1}),('decoded_size',{'native_uncompressed_bytes':1}),
+                                ('bool_version',{'version':True}),('summary',{'summary':dict(original['summary'],cleanup=1)}),
+                                ('escape',{'native':dict(original['native'],path='../escape')})]:
+                path.write_text(json.dumps(dict(original,**change)))
+                with self.subTest(name=name),self.assertRaises((ValueError,RuntimeError)):
+                    journey.read_report(path)
+            path.write_text(json.dumps(original));raw.write_bytes(data+b'corrupt')
+            with self.assertRaisesRegex(ValueError,'hash mismatch'):journey.read_report(path)
+            raw.write_bytes(data);path.write_text('{"kind":"gc14_native_manifest","kind":"forged"}')
+            with self.assertRaisesRegex(ValueError,'duplicate JSON key'):journey.read_report(path)
+            path.write_text(json.dumps(original));raw.rename(raw.with_suffix('.saved'));raw.symlink_to(raw.with_suffix('.saved'))
+            with self.assertRaisesRegex(ValueError,'symlink'):journey.read_report(path)
 
 
 if __name__ == '__main__':

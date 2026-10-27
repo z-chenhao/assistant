@@ -161,22 +161,11 @@ def prepare_research(report):
 def prepare_monitor(report):
     """Recompute native GC-14 results before creating ineligible previews."""
     import verify_gc14 as driver
-    lock = json.loads(driver.FIXTURE.with_suffix('.lock.json').read_text())
-    rows = report['variants']; expected = driver.variants()
-    provenance = report.get('source_provenance', {})
-    if (report.get('cleanup') is not True or report.get('semantic_score') is not None or
-            report.get('status') != 'mechanical_pass' or report.get('fixture_lock') != lock or
-            not provenance.get('before') or provenance['before'] != provenance.get('after') or
-            len(rows) != 6 or {r['variant']['id'] for r in rows} != {v['id'] for v in expected}):
-        raise ValueError('complete locked ungraded GC-14 receipts required')
+    driver.validate_report(report)
     packets = []
-    for row in rows:
-        variant = next(v for v in expected if v['id'] == row['variant']['id'])
+    for row in report['variants']:
+        variant = row['variant']
         checks = driver.observe(row)
-        if (row['variant'] != variant or row['assertions'] != checks or not all(checks.values()) or
-                row['scope'] != 'scripted_whole_case_mechanics' or row['semantic_score'] is not None or
-                row['cleanup'] != dict(owned_processes_joined=True, disposable_root_removed=True)):
-            raise ValueError('GC-14 failed, drifted, graded or incomplete receipt')
         packets.append(dict(variant_id=variant['id'], eligible_for_grading=False,
             reason='explicit scripted model and offline prices; preview only', judge_input=dict(
                 goal='每日08:00监控指定航班，仅进入1800元以下时通知；取消后停止。', allowed_fixture=variant['source'],
@@ -313,6 +302,9 @@ def main():
         parser.error('--evidence must be under repository evidence/')
     output.unlink(missing_ok=True)
     report = json.loads(args.input.read_text())
+    if report.get('kind') == 'gc14_native_manifest':
+        from verify_gc14 import read_report
+        report = read_report(args.input)
     if report.get('kind') == 'gc13_native_manifest':
         from verify_gc13 import read_report
         report = read_report(args.input)
