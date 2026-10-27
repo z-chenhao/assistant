@@ -103,6 +103,35 @@ def report_observe(text, source):
             docs['D2']['url'] not in text and '未发现公开证据支持早于 2024-03-01' in text)
 
 
+def delivered_report(value, report_ref, publishes):
+    """Bind each Main reply's exact parts to its generation, publish and send."""
+    replies = [m for m in value['conversation'] if m['role'] == 'assistant']
+    if len(replies) != 2:
+        return False
+    generations = {g['generation_id']:g for g in value['generations']}
+    runs = {r['run_id']:r for r in value['runs']}
+    for index, message in enumerate(replies):
+        generation = generations.get(message['source_event_id'])
+        if (not generation or message['message_id'] != 'reply:'+generation['generation_id'] or
+                message['source'] != 'main' or runs[generation['run_id']]['kind'] != 'main'):
+            return False
+        result = strict_json(generation['result_json'])
+        parts = [dict(type='text',text=result['text'])]
+        if index == 1:
+            parts.append(dict(type='file',artifact_ref=report_ref))
+        own_publishes = [t for t in publishes if t['run_id'] == generation['run_id']]
+        if (result['tool_calls'] or not exact(message['content'],parts) or len(own_publishes) != index):
+            return False
+        if index == 1 and {t['run_id'] for t in publishes} != {generation['run_id'],value['artifacts'][0]['run_id']}:
+            return False
+        deliveries = [d for d in value['deliveries'] if d['message_id'] == message['message_id']]
+        expected = dict(delivery_id='delivery:'+message['message_id'],message_id=message['message_id'],
+                        idempotency_key='delivery:'+message['message_id'],status='sent')
+        if not exact(deliveries,[expected]):
+            return False
+    return True
+
+
 def bindings(value, documents, opened):
     """Join provider output, accepted Tool, Child result and reopened report."""
     generations = {g['generation_id']:g for g in value['generations']}
@@ -150,7 +179,7 @@ def bindings(value, documents, opened):
         {(p['run_id'],p['artifact_ref']) for p in value['publications']} == {(t['run_id'],report['ref']) for t in publishes} and
         strict_json(value['updates'][0]['artifact_refs']) == [report['ref']] and
         {d['message_id'] for d in value['deliveries']} == {m['message_id'] for m in value['conversation'] if m['role']=='assistant'} and
-        all(d['status'] == 'sent' for d in value['deliveries']))
+        delivered_report(value,report['ref'],publishes))
 
 
 def observe(row):
@@ -206,7 +235,8 @@ def observe(row):
         artifact_reopened=len(artifacts)==len(value['artifacts'])==1 and all(a['sha256']==sha(a['text'].encode())==stored['content_hash'] and
             a['ref']==stored['artifact_ref'] and stored['run_id']==roots[0]['run_id'] for a,stored in zip(artifacts,value['artifacts'])),
         artifact_delivered=len(value['publications'])==2 and len({p['artifact_ref'] for p in value['publications']})==1 and
-            any('artifact_ref' in json.dumps(m['content']) for m in value['conversation'] if m['role']=='assistant'),
+            bool(artifacts) and exact([p for m in value['conversation'] if m['role']=='assistant'
+                for p in m['content'] if p['type']=='file'],[dict(type='file',artifact_ref=artifacts[0]['ref'])]),
         actual_two_restarts=len(row['restarts'])==2 and all(r['returncode']==-9 for r in row['restarts']) and
             [r['boundary'] for r in row['restarts']]==['after_child_accept_commit','after_report_commit'],
         # Admission hooks run concurrently: the peer can commit before SIGKILL.
@@ -281,6 +311,25 @@ def execution_ids(row):
     return result
 
 
+def delivery_mutations():
+    # All cases are replay-synchronized and manifest-resealed by the consumers'
+    # regression below. Stored flags or a fresh hash cannot rescue a bad send.
+    return dict(
+        wrong_delivered_ref=lambda r:r['state']['conversation'][-1]['content'][-1].update(artifact_ref='artifact:'+'0'*64),
+        missing_delivered_file=lambda r:r['state']['conversation'][-1]['content'].pop(),
+        extra_delivered_file=lambda r:r['state']['conversation'][-1]['content'].append(dict(type='file',artifact_ref='artifact:'+'0'*64)),
+        duplicate_delivered_file=lambda r:r['state']['conversation'][-1]['content'].append(copy.deepcopy(r['state']['conversation'][-1]['content'][-1])),
+        wrong_delivered_type=lambda r:r['state']['conversation'][-1]['content'][-1].update(type='image'),
+        early_delivered_file=lambda r:r['state']['conversation'][1]['content'].append(copy.deepcopy(r['state']['conversation'][-1]['content'][-1])),
+        wrong_publish_owner=lambda r:next(t for t in r['state']['tools'] if t['tool_name']=='builtin__artifact__manage' and
+            strict_json(t['arguments_json'])['operation']=='publish' and t['run_id']!=r['state']['artifacts'][0]['run_id']).update(run_id=r['state']['artifacts'][0]['run_id']),
+        wrong_publication_owner=lambda r:next(p for p in r['state']['publications'] if p['run_id']!=r['state']['artifacts'][0]['run_id']).update(run_id='other-main'),
+        unsent_report=lambda r:r['state']['deliveries'][-1].update(status='pending'),
+        wrong_delivery_key=lambda r:r['state']['deliveries'][-1].update(idempotency_key='other-delivery'),
+        wrong_reply_generation=lambda r:r['state']['conversation'][-1].update(source_event_id=r['state']['conversation'][1]['source_event_id']),
+        changed_reply_text=lambda r:r['state']['conversation'][-1]['content'][0].update(text='forged delivery'))
+
+
 def rejection_probes(row):
     require(all(observe(row).values()),'passing native GC-16 receipt required')
     mutations = dict(
@@ -310,6 +359,7 @@ def rejection_probes(row):
         completed_call=lambda r:r['restarts'][1]['before']['tools'][0].update(arguments_json='{}'),
         replay=lambda r:r['replay_state']['tools'].clear(),
         lease=lambda r:r['state']['claims'][0].update(token='retained'))
+    mutations.update(delivery_mutations())
     # Synchronize replay and recorded flags to defeat equality-only validation.
     result = {}
     for name, mutate in mutations.items():
@@ -388,6 +438,50 @@ def read_report(path):
     return report
 
 
+def delivery_consumer_rejections(report, binary, folder):
+    """Re-seal real native corruptions; CLI, CI and Judge must all reject."""
+    from ci_communication import native_receipt, check_receipts
+    from prepare_release_eval import prepare
+    from verify_suite import SHARDS, report_name
+    gate = next(g for g in SHARDS['communication'] if g.name == 'gc16')
+    folder.mkdir(parents=True,exist_ok=True)
+    def consume(name, candidate):
+        case = folder / name
+        case.mkdir(exist_ok=True)
+        path = case / report_name(gate,1)
+        write_report(path,candidate)
+        # Always reread the fresh size/hash-bound bytes before each consumer.
+        command = [sys.executable,str(ROOT/'scripts/verify_gc16.py'),'--binary',str(binary),
+                   '--evidence',str(path),'--validate']
+        cli = subprocess.run(command,capture_output=True,text=True,timeout=30)
+        (case/'cli.json').write_text(json.dumps(dict(command=command,returncode=cli.returncode,
+            stdout=cli.stdout,stderr=cli.stderr),ensure_ascii=False,indent=2)+'\n')
+        accepted = dict(cli=cli.returncode == 0)
+        for consumer, action in (
+                ('ci',lambda:check_receipts([native_receipt(gate,1,case,binary,report['source_provenance']['before'])],[gate])),
+                ('judge',lambda:prepare(read_report(path)))):
+            try:
+                action()
+                accepted[consumer] = True
+            except (RuntimeError,ValueError):
+                accepted[consumer] = False
+        return accepted
+    control = consume('control',report)
+    require(all(control.values()),'GC-16 passing delivery control rejected: '+str(control))
+    results = {}
+    for name, mutate in delivery_mutations().items():
+        changed = copy.deepcopy(report)
+        row = changed['variants'][0]
+        mutate(row)
+        row['replay_state'] = copy.deepcopy(row['state'])
+        row['assertions'] = observe(row)
+        denied = {k:not v for k,v in consume(name,changed).items()}
+        results[name] = denied
+        (folder/'results.json').write_text(json.dumps(dict(control_accepted=control,rejections=results),indent=2)+'\n')
+        require(all(denied.values()),'GC-16 consumer accepted resealed delivery corruption: '+name+' '+str(denied))
+    return results
+
+
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--binary',type=Path,required=True); p.add_argument('--evidence',type=Path,required=True)
     p.add_argument('--variant',choices=[v['id'] for v in variants()]); p.add_argument('--validate',action='store_true'); args=p.parse_args()
@@ -414,7 +508,9 @@ def main():
         report.update(status='mechanical_pass',source_provenance=dict(before=before,after=after),
             cleanup=all(all(r['cleanup'].values()) for r in report['variants']))
         report['rejection_probes']=rejection_probes(report['variants'][0])
-        if not args.variant: validate_report(report,args.binary)
+        if not args.variant:
+            validate_report(report,args.binary)
+            delivery_consumer_rejections(report,args.binary.resolve(),args.evidence.parent/('.'+args.evidence.stem+'-delivery-rejections'))
     except BaseException:
         report['status']='inconclusive'
         raise

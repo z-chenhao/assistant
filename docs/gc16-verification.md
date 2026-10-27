@@ -71,7 +71,17 @@ The consumer joins model-emitted calls to accepted Tool parameters, Child links
 to WorkerResult and final generation/source bytes, and report save/publish to
 CLI-reopened bytes, publication owners and delivered messages. This closes the
 previous hole where empty persisted Child results still passed the oracle.
-Twenty-six actual native corruption probes exercise these joins, old epochs,
+ERII-325 rework also binds each Main reply to its final generation and exact
+content parts: the initial acknowledgement has no file, and the final message
+has exactly the stored report's file part. Its own Main publish, Publication,
+sent Delivery and idempotency key must agree. Wrong, missing, duplicate or extra
+attachments, wrong message/publication ownership and unsent deliveries reject.
+The maintained six-variant run first proves a positive control through CLI, CI
+and Judge, then synchronizes replay, recomputes assertions and reseals each of
+12 delivery corruptions. All three consumers must reject every corrupted file.
+Full control/corruption bytes and CLI results stay in a hidden evidence sibling;
+this regression changes no input, timeout, resource limit or gate repetition.
+Thirty-eight actual native corruption probes exercise these joins, old epochs,
 capability/model drift, attempts/unknown status, source logs, crash cuts and
 replay. Unit regressions additionally reject typed identity/cleanup drift,
 missing/reordered/copied executions, forged flags and resealed manifest metadata.

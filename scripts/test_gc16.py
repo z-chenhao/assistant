@@ -155,13 +155,52 @@ class ResearchTests(unittest.TestCase):
         self.assertFalse(producer.matrix()['GC-16']['eligible_for_grading'])
         with self.assertRaisesRegex(ValueError,'unknown variant'):producer.inputs('GC-16','invented')
 
+    def test_exact_main_file_publish_and_sent_delivery_join(self):
+        ref='artifact:report';publishes=[dict(run_id='root'),dict(run_id='final')]
+        value=dict(conversation=[],generations=[],runs=[dict(run_id=r,kind=k) for r,k in
+            (('root','worker'),('initial','main'),('final','main'))],artifacts=[dict(run_id='root')],deliveries=[])
+        for run,text in (('initial','starting'),('final','done')):
+            event=run+'-generation';message='reply:'+event
+            parts=[dict(type='text',text=text)]
+            if run=='final':parts.append(dict(type='file',artifact_ref=ref))
+            value['conversation'].append(dict(message_id=message,source_event_id=event,role='assistant',source='main',content=parts))
+            value['generations'].append(dict(generation_id=event,run_id=run,result_json=json.dumps(dict(text=text,tool_calls=[]))))
+            value['deliveries'].append(dict(delivery_id='delivery:'+message,message_id=message,
+                idempotency_key='delivery:'+message,status='sent'))
+        self.assertTrue(journey.delivered_report(value,ref,publishes))
+        mutations=[lambda v:v['conversation'][-1]['content'][-1].update(artifact_ref='artifact:wrong'),
+            lambda v:v['conversation'][-1]['content'].pop(),
+            lambda v:v['conversation'][-1]['content'].append(dict(type='file',artifact_ref=ref)),
+            lambda v:v['conversation'][-1]['content'][-1].update(type='image'),
+            lambda v:v['conversation'][0]['content'].append(dict(type='file',artifact_ref=ref)),
+            lambda v:v['conversation'][-1].update(source_event_id='initial-generation'),
+            lambda v:v['deliveries'][-1].update(status='pending'),
+            lambda v:v['deliveries'][-1].update(idempotency_key='wrong'),
+            lambda v:v['runs'][-1].update(kind='worker')]
+        for mutate in mutations:
+            changed=copy.deepcopy(value);mutate(changed)
+            self.assertFalse(journey.delivered_report(changed,ref,publishes))
+        for changed in ([dict(run_id='root'),dict(run_id='initial')],
+                        [dict(run_id='other-root'),dict(run_id='final')]):
+            self.assertFalse(journey.delivered_report(value,ref,changed))
+
     @unittest.skipUnless(os.environ.get('ERII_GC16_NATIVE_ROW'),'requires retained actual CLI receipt')
     def test_actual_corruption_recomputed_without_trusting_flags(self):
         row=json.loads(Path(os.environ['ERII_GC16_NATIVE_ROW']).read_text())
         self.assertTrue(all(journey.observe(row).values()))
         probes=journey.rejection_probes(row)
-        self.assertEqual(len(probes),26)
+        self.assertEqual(len(probes),38)
         self.assertTrue(all(probes.values()))
+
+    @unittest.skipUnless(os.environ.get('ERII_GC16_NATIVE_ROW'),'requires retained actual CLI receipt')
+    def test_wrong_delivered_reference_rejects_synchronized_native_receipt(self):
+        row=json.loads(Path(os.environ['ERII_GC16_NATIVE_ROW']).read_text())
+        self.assertTrue(all(journey.observe(row).values()))
+        final=row['state']['conversation'][-1]
+        next(p for p in final['content'] if p['type']=='file')['artifact_ref']='artifact:'+'0'*64
+        row['replay_state']=copy.deepcopy(row['state'])
+        row['assertions']=journey.observe(row)
+        self.assertFalse(all(row['assertions'].values()))
 
     def test_gate_runs_with_required_mcp_sandbox(self):
         self.assertEqual([(name,g.attempts) for name,gates in suite.SHARDS.items()
