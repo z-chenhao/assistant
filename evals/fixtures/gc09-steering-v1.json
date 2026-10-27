@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "scope": "Additional same-day Steering variant for Golden 7.GC-09; original 8.10 source and event remain unchanged",
+  "at": "2026-10-16T11:30:00+08:00",
+  "wordings": [
+    "E1/T1已完成，E4已核对；13:00–14:00处理私人事务。请更新安排，面试仍在14:00，不再安排已完成事项。",
+    "发布风险E1/T1已经处理完，E4也核对过了。13:00–14:00有私人事务，14:00面试不变，请调整余下安排，别重复已完成的事。",
+    "更新今天计划：E1/T1已完成、E4已核对；13:00–14:00留给私人事务，14:00仍要面试。只列剩余事项。"
+  ],
+  "completed": ["E1", "T1", "E4"],
+  "personal_window": "13:00–14:00",
+  "preparation_window": "12:30–13:00"
+}

@@ -1,0 +1,133 @@
+{
+  "manifest_sha256": "0120228762abfe54dd477bc27853b3b45338d0ea5f19363a3d3b742224f5c556",
+  "frozen_blocks": [
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 271,
+      "sha256": "d7d200f3af629940df772163d9cd22e2ab516c114d3d39e1c346e8096d804ba1",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 273,
+      "sha256": "8322859d19e9558ef224f4f3260101fd2293c51c63ae551f39e6e5f876bea4c8",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 275,
+      "sha256": "0eff4af10ea77d24f90c31242588921b72fb466fefec3d766a5b01e8678a6bc4",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 276,
+      "sha256": "c5acfc62bfc3aff5485cb05397bbef6eecdbd65e58a0998a2ce607132c1411ea",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 277,
+      "sha256": "cb202657603a11a29192b4be84f9986e35a51540c29f484d6d8c31b7e36cd0a6",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 278,
+      "sha256": "f44dec817bcaa85c5d3c913f5f129de3de1991635ce474ab04770e417f823049",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 279,
+      "sha256": "309521620a0148f258a3be9a61601081f2ad6c722648f9e2e9ebd2efd194c54b",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "7.GC-09",
+      "line": 281,
+      "sha256": "30dfcbb03fe8823a243d984672c1302816080add25a62f3f56a17063ab926c59",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 753,
+      "sha256": "2e4e0973f2618947c0d6e9add9bed7fd434f63cad9c9387e818a70e62b88e139",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 755,
+      "sha256": "5e8e72b0d76d4750d7ba79c584f5264c87b5949a7f103233f3378db90380a561",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 771,
+      "sha256": "8004e29e9f80eb0ac0155783d212431009a6b0004749be7fb6c0a115bf5f2ebc",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 773,
+      "sha256": "22f742d1bf7cc1c9ce71c979f1972fda371e62e4a3d33d5f5950e77ac23252f8",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 775,
+      "sha256": "67521dca17ea3c2f3c4f6001c3faee9b34df078ffc231ff2467e9bab4b259e1b",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 776,
+      "sha256": "6d09eeb2b3f24bd8c3436980c07d5632416b7c6c33c0d9ef4bf66437d7120451",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 777,
+      "sha256": "75001688ae68f85c355071c9fcb285cf53a993b82d201bcfffdd5bd0c101b244",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 778,
+      "sha256": "3b6150445dbd10bebe457d255fd77640718770a00792cd12825722eb8fa0d47d",
+      "area": "main"
+    },
+    {
+      "source": "evals/golden-cases.md",
+      "section": "8.10",
+      "line": 779,
+      "sha256": "ca507f0f5084268b4a1ffb9384983d14ac84a8a27f154a6cced0c7c8395ce323",
+      "area": "main"
+    }
+  ],
+  "files": {
+    "evals/fixtures/gc09-boundary-v1.json": "624d9bf848966cd8ede85b52ec9f944c383a9febb3cc48f45e0859d409135245",
+    "evals/fixtures/m1-v2.json": "eb0ffc020b92e945131ded929b92ef2513cf279e7a91462f91f51045e1b5720c",
+    "evals/fixtures/m1-v2.lock.json": "80bf4bd61269f4c5c275be2a8bdf84aabbfe01a94f469c0a9f4a2dc6c80e1746",
+    "evals/fixtures/gc09-steering-v1.json": "9b8dd369579d7645c5abbd694dc67744055272c319dd408e014c518b732c221a",
+    "evals/fixtures/gc09-steering-v1.lock.json": "b9b3f019ffd66377c45825103f20346203f88e0ec1b9d89fc0b2d1f1a2ba0338",
+    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f",
+    "evals/scoring-v1.json": "6c7cca34d63300c7ec84bd971f89e72daf0c8dd7fadbde240783ab49cf0d4706"
+  }
+}

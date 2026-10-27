@@ -1,0 +1,12 @@
+{
+  "clock": "2026-10-15T10:00:00+08:00",
+  "contacts": [
+    {"name": "Alex Chen", "email": "alex.chen@example.test", "relation": "当前项目设计师"},
+    {"name": "Alex Wang", "email": "alex.wang@example.test", "relation": "两年前候选人"}
+  ],
+  "recent_thread": {"participants": ["user_eval_001", "alex.chen@example.test"], "subject": "Erii review"},
+  "free_slots": {
+    "user": ["2026-10-19T10:00", "2026-10-19T15:00", "2026-10-20T11:00"],
+    "alex_chen": ["2026-10-19T15:00", "2026-10-20T11:00"]
+  }
+}

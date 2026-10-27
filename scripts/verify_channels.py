@@ -54,7 +54,7 @@ class ChannelHarness(MainHarness):
             selector.register(self.process.stdout,selectors.EVENT_READ)
             require(selector.select(15),'Web launch did not report listener')
         line=self.process.stdout.readline()
-        require(line, 'Web launch exited')
+        require(line, 'Web launch exited: '+(self.process.stderr.read() if not line else ''))
         self.url=json.loads(line)['url']
         return self.process
 
