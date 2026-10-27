@@ -63,6 +63,12 @@ environment. Portable CI/Judge consumers check the recorded identity and native
 joins; the CI part separately binds the binary digest to its suite. Unique
 execution IDs are required across variants and all five aggregate rounds.
 
+Every persisted model exchange also binds its actual user messages: Main sees
+the original question/data; Root sees the accepted Task anchor; each Child sees
+only its accepted explicit task and ordered Artifact references. The same input
+must survive every Tool continuation. Assistant/Tool continuation messages and
+Main's runtime-origin Task updates remain allowed.
+
 Each ordinary runner invocation proves a positive control and runs all native
 corruptions through the actual CLI, CI consumer and Judge preparation. Attacks
 synchronize replay, recompute assertions and reseal compressed bytes. Wrong,
@@ -83,7 +89,12 @@ already validated JSON tree. Incoming consumer receipts always use the strict
 reader. A retained before/after comparison proves the original 33 candidate payloads
 were byte-identical across this construction optimization. The final oracle also
 binds every Worker to the completed Task identity/epoch and adds the whole-tree
-epoch attack, for 34 candidates (one control and 33 corruptions).
+epoch attack. Input-binding regressions additionally clear all model inputs,
+change the F001 Child row, alter Main/Root input, or remove Child references.
+These attacks also synchronize checkpoint generations and forge passing claims,
+so neither replay equality nor declared failures can mask a missing input join.
+All 39 candidates (one control and the existing 33 plus five new corruptions)
+run through each consumer in every round.
 
 The Core JSON embeds size/hash-bound compressed native bytes, avoiding repeated
 large uncompressed states. Complete consumer evidence stays in a hidden sibling

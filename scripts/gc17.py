@@ -177,6 +177,40 @@ def bindings(row):
             deliveries=[d for d in value['deliveries'] if d['message_id'] in main_ids]),output['ref'],publishes))
 
 
+def model_inputs_bound(row):
+    """Bind every model exchange to its user/Task/explicit delegation input.
+
+    Assistant and Tool messages may follow the input on continuation. Main
+    additionally receives runtime-origin Task updates, not new user requests.
+    """
+    value=row['state']; task=value['task'][0]; original=prompt(row['variant'])
+    nodes={r['run_id']:r for r in value['runs']}
+    tools={t['invocation_id']:t for t in value['tools']}
+    creates=[t for t in tools.values() if t['tool_name']=='builtin__task__manage']
+    if (len(creates)!=1 or nodes[creates[0]['run_id']]['kind']!='main' or
+            not exact(strict_json(creates[0]['arguments_json']),dict(operation='create',task=original)) or
+            task['anchor_task']!=original or not exact(strict_json(task['anchor_artifact_refs']),[])):
+        return False
+    expected={r['run_id']:[dict(role='user',text=original)] for r in nodes.values() if r['kind']=='main'}
+    expected.update({r['run_id']:[dict(role='user',text='Task anchor: '+task['title']+'\n'+task['anchor_task'])]
+                     for r in nodes.values() if r['kind']=='worker' and not r['parent_run_id']})
+    for link in value['child_links']:
+        args=strict_json(tools[link['invocation_id']]['arguments_json'])
+        expected[link['child_run_id']]=[dict(role='user',text=args['task']),
+            *[dict(role='user',text='Explicit artifact reference: '+ref) for ref in args['artifactRefs']]]
+    seen=set()
+    for generation in value['generations']:
+        run_id=generation['run_id']; messages=strict_json(generation['request_json'])['messages']
+        if type(messages) is not list:
+            return False
+        actual=[m for m in messages if m['role']=='user' and
+                (nodes[run_id]['kind']!='main' or m.get('origin')!='runtime')]
+        if not exact(actual,expected[run_id]):
+            return False
+        seen.add(run_id)
+    return seen==set(expected)
+
+
 def observe(row):
     from verify_gc14 import frozen_generations
     from verify_children import check
@@ -234,6 +268,7 @@ def observe(row):
             value['code_manifest'][0]['source']==row['source']==source_for(assets()) and
             value['code_execution'][0]['source_hash']==sha(row['source'].encode()),
         native_bindings=bindings(row),
+        model_inputs_bound=model_inputs_bound(row),
         artifact_readback=sha(row['artifact']['text'].encode())==row['artifact']['sha256'],
         no_automation=not value['automation'])
     try:
@@ -352,6 +387,28 @@ def validate_report(report, binary=None, seen=None):
 
 
 def mutations():
+    def change_inputs(row, kind, change):
+        nodes={r['run_id']:r for r in row['state']['runs']}
+        # Mutate the checkpoint as well, so committed-call reuse cannot mask a
+        # missing input binding. mutation_report synchronizes the final replay.
+        for state in (row['state'],row['fault']['checkpoint']):
+            for generation in state['generations']:
+                run=nodes[generation['run_id']]
+                role='child' if run['parent_run_id'] else run['kind']
+                if kind=='all' or role==kind:
+                    request=strict_json(generation['request_json'])
+                    request['messages']=change(request['messages'])
+                    generation['request_json']=json.dumps(request,ensure_ascii=False,separators=(',',':'))
+    def wrong_row(messages):
+        for message in messages:
+            if message['text'].startswith('Classify feedback: ') and 'F001' in message['text']:
+                task=strict_json(message['text'].removeprefix('Classify feedback: '))
+                task['text']='This is a different row, not the supplied CSV data.'
+                message['text']='Classify feedback: '+json.dumps(task,ensure_ascii=False,separators=(',',':'))
+        return messages
+    def wrong_user(messages):
+        return [dict(m,text='different task') if m['role']=='user' and m.get('origin')!='runtime' else m
+                for m in messages]
     def remove_dispatch(row):
         generation=row['state']['generations'][-1]['generation_id']
         row['state']['external_provider_dispatches']=[g for g in row['state']['external_provider_dispatches']
@@ -391,6 +448,12 @@ def mutations():
     cases['forged_claims_missing_dispatch']=cases['missing_dispatch']
     cases['forged_claims_stale_tree_epoch']=lambda r:[c.update(task_epoch=99)
         for c in r['state']['runs'] if c['kind']=='worker']
+    cases['forged_claims_wrong_child_input']=lambda r:change_inputs(r,'child',wrong_row)
+    cases['forged_claims_empty_model_inputs']=lambda r:change_inputs(r,'all',lambda m:[])
+    cases['forged_claims_wrong_main_input']=lambda r:change_inputs(r,'main',wrong_user)
+    cases['forged_claims_wrong_root_input']=lambda r:change_inputs(r,'worker',wrong_user)
+    cases['forged_claims_missing_child_refs']=lambda r:change_inputs(r,'child',
+        lambda messages:[m for m in messages if not m['text'].startswith('Explicit artifact reference: ')])
     return cases
 
 
