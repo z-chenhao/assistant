@@ -67,10 +67,10 @@ class GateSchedulingTests(unittest.TestCase):
         self.assertEqual([(g.name, g.attempts, g.arguments) for g in gates],
                          [('memory-maintenance', 5, ()), ('recall', 5, ()),
                           ('tools', 5, ()), ('artifacts', 5, ()),
-                          ('gc03', 1, ()), ('gc05', 1, ()), ('gc04', 1, ()), ('gc06', 1, ())])
+                          ('gc03', 1, ()), ('gc05', 1, ()), ('gc04', 1, ()), ('gc06', 1, ()), ('gc15', 1, ())])
         ordered = suite.gate_execution_order(gates)
         self.assertEqual([g.name for g in ordered],
-                         ['gc03', 'gc04', 'gc05', 'gc06', 'memory-maintenance', 'recall', 'tools', 'artifacts'])
+                         ['gc03', 'gc04', 'gc05', 'gc06', 'memory-maintenance', 'recall', 'tools', 'artifacts', 'gc15'])
         self.assertCountEqual(ordered, gates)
         for gate in gates[-3:]:
             args, _, _ = suite.command(gate, 1, Path('/binary'), Path('/evidence'))

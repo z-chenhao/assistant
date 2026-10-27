@@ -20,10 +20,10 @@ class SecurityTests(unittest.TestCase):
     def test_fixed_three_part_membership(self):
         self.assertEqual(suite.SECURITY_PARTS, ('finance', 'cases', 'protection'))
         self.assertEqual([g.name for g in suite.security_gates('finance')], ['gc03', 'gc06'])
-        self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04'])
+        self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04', 'gc15'])
         gates = (*tuple(g for g in suite.SHARDS['security'] if g.name != 'gc04'), suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
         with patch.dict(suite.SHARDS, security=gates):
-            self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc04'])
+            self.assertEqual([g.name for g in suite.security_gates('cases')], ['gc05', 'gc15', 'gc04'])
 
     def fixture(self, root):
         suites = {}
@@ -58,7 +58,7 @@ class SecurityTests(unittest.TestCase):
                     full = ci_security.join(root)
                 self.assertEqual([(r['gate'], r['attempt']) for r in full['shards']['security']],
                                  [(g.name, n) for g in gates for n in range(1, g.attempts+1)])
-                self.assertEqual(len(full['shards']['security']), 24 if consumer else 23)
+                self.assertEqual(len(full['shards']['security']), 25 if consumer else 24)
                 self.assertTrue(full['complete_inventory'])
                 self.assertIsNone(full['security_part'])
                 self.assertIsNone(full['semantic_score'])
@@ -127,7 +127,7 @@ class SecurityTests(unittest.TestCase):
                     fragments = copy.deepcopy(original)
                     fragments.pop(part)
                     with self.assertRaises(ValueError): ci_security.validate(fragments)
-            for case in ('gc03', 'gc04', 'gc05', 'gc06'):
+            for case in ('gc03', 'gc04', 'gc05', 'gc06', 'gc15'):
                 for change in ('missing', 'duplicate', 'failed', 'cancelled', 'argument', 'unclean', 'misplaced'):
                     with self.subTest(case=case, change=change):
                         fragments = copy.deepcopy(original)
@@ -155,6 +155,7 @@ class SecurityTests(unittest.TestCase):
                     gates = (*gates, suite.Gate('gc04', 'verify_gc04.py', 'gc04'))
                 with patch.dict(suite.SHARDS, security=gates):
                     selected = suite.security_gates(part)
+                admitted = suite.gate_execution_order(selected)[:2]
                 fixture = root / 'held.py'
                 fixture.write_text('from pathlib import Path\nimport sys,time\n'
                     f'root=Path({str(root)!r})\nname=sys.argv[1]\n'
@@ -163,7 +164,7 @@ class SecurityTests(unittest.TestCase):
                 stopped = threading.Event()
                 def interrupt():
                     deadline = time.monotonic() + 5
-                    while not all((root / (g.name + '.ready')).exists() for g in selected) and time.monotonic() < deadline:
+                    while not all((root / (g.name + '.ready')).exists() for g in admitted) and time.monotonic() < deadline:
                         time.sleep(.01)
                     stopped.set()
                 def command(gate, attempt, *_):
@@ -178,13 +179,17 @@ class SecurityTests(unittest.TestCase):
                 finally:
                     stopped.set()
                     thread.join(timeout=6)
-                self.assertEqual({r['gate'] for r in rows}, {g.name for g in selected})
+                self.assertEqual({r['gate'] for r in rows}, {g.name for g in admitted})
                 self.assertTrue(all(r['returncode'] == 130 and r['owned_group_drained'] is True and
                                     r['cancel_cleanup_seconds'] is not None for r in rows))
                 self.assertEqual(json.loads((root / 'timings-security.json').read_text()), rows)
-                for gate in selected:
+                for gate in admitted:
                     self.assertTrue((root / (gate.name + '.ready')).exists())
                     self.assertTrue((root / (gate.name + '.cleaned')).exists())
+                for gate in selected:
+                    if gate not in admitted:
+                        self.assertFalse((root / (gate.name + '.ready')).exists())
+                        self.assertFalse((root / (gate.name + '.cleaned')).exists())
 
     def test_current_checkout_and_workflow_run_are_authoritative(self):
         with tempfile.TemporaryDirectory() as temp:
