@@ -34,6 +34,7 @@ class MainHarness:
         self.children = []
         self.fixture = fixture
         self.processes = current()
+        self.hold_observation = None
 
     def args(self, *args):
         return [str(self.binary), "-test-bridge", self.fixture, *args]
@@ -70,18 +71,71 @@ class MainHarness:
         raise RuntimeError("state boundary not reached: " + description)
 
     def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work")):
+        started = time.monotonic()
         start = self.processes.start if self.processes is not None else subprocess.Popen
         child = start(self.args("-test-main-hold", boundary, *extra_flags, *command),
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
-        with selectors.DefaultSelector() as selector:
-            selector.register(child.stdout, selectors.EVENT_READ)
-            require(selector.select(timeout), f"boundary never reached: {boundary}")
-        line = child.stdout.readline()
-        require(line and json.loads(line).get("boundary") == boundary,
-                f"exited before boundary {boundary}: {line} {child.stderr.read() if not line else ''}")
-        return child
+        self.hold_observation = dict(boundary=boundary, timeout_seconds=timeout,
+                                     pid=child.pid, reached=False)
+        output, errors, pending = bytearray(), bytearray(), bytearray()
+        counts = dict(stdout=0, stderr=0)
+        deadline = started + timeout
+        reason = 'waiting'
+        try:
+            with selectors.DefaultSelector() as streams:
+                streams.register(child.stdout, selectors.EVENT_READ)
+                streams.register(child.stderr, selectors.EVENT_READ)
+                while streams.get_map():
+                    if self.processes is not None:
+                        self.processes.check()
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        reason = 'timeout'
+                        raise RuntimeError(f"boundary never reached: {boundary}")
+                    events = streams.select(min(.025, remaining))
+                    for key, _ in sorted(events, key=lambda event: event[0].fileobj is child.stdout):
+                        name = 'stdout' if key.fileobj is child.stdout else 'stderr'
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        if not chunk:
+                            streams.unregister(key.fileobj)
+                            if name == 'stdout':
+                                reason = 'stdout_closed'
+                                raise RuntimeError(f"exited before boundary {boundary}")
+                            continue
+                        counts[name] += len(chunk)
+                        tail = output if name == 'stdout' else errors
+                        tail.extend(chunk)
+                        del tail[:-8000]
+                        if name == 'stderr':
+                            continue
+                        pending.extend(chunk)
+                        reason = 'invalid_record'
+                        require(len(pending) <= 8000, f"oversized boundary record: {boundary}")
+                        if b'\n' in pending:
+                            line, _, _ = pending.partition(b'\n')
+                            value = json.loads(line)
+                            require(isinstance(value, dict) and value.get('boundary') == boundary,
+                                    f"unexpected boundary record: {boundary}")
+                            reason = 'reached'
+                            self.hold_observation['reached'] = True
+                            return child
+                        reason = 'waiting'
+                reason = 'streams_closed'
+                raise RuntimeError(f"exited before boundary {boundary}")
+        finally:
+            # Never readline()/read() an incomplete record or an unclosed pipe.
+            # The owning fixture still joins the process through cleanup().
+            self.hold_observation.update(reason=reason, returncode=child.poll(),
+                elapsed_seconds=time.monotonic() - started, bytes_read=counts,
+                stdout=output.decode(errors='replace'), stderr=errors.decode(errors='replace'))
+            if reason != 'reached':
+                try:
+                    self.hold_observation['process_usage'] = subprocess.check_output(
+                        ['ps', '-p', str(child.pid), '-o', 'pid=,ppid=,stat=,time=,pcpu='], text=True, timeout=.5)
+                except (OSError, subprocess.SubprocessError) as error:
+                    self.hold_observation['process_usage_error_type'] = type(error).__name__
 
     def drive_boundaries(self, barriers, observe, progress, timeout=20):
         """Drive one CLI call with independent, explicitly released test barriers.
@@ -152,8 +206,11 @@ class MainHarness:
                 "trace": "SELECT run_id,sequence,event_json,occurred_at FROM run_trace ORDER BY run_id,sequence",
             }.items():
                 result[name] = [dict(row) for row in db.execute(query)]
-        result["conversation"] = self.command("chat", "history")
+        result["conversation"] = self.history()
         return result
+
+    def history(self):
+        return self.command("chat", "history")
 
     def cleanup(self):
         for child in self.children:
@@ -239,7 +296,7 @@ def run(binary):
         report["concurrent"] = scenario("concurrent", concurrent)
         report["checks"].append("16 simultaneous CLI inputs; one Main; ordered history; idempotency and drift rejection")
 
-        for boundary in ("before_generation_dispatch", "before_generation_commit", "after_generation_commit",
+        for boundary in ("after_compaction_commit", "before_generation_dispatch", "before_generation_commit", "after_generation_commit",
                          "before_conversation_append", "after_conversation_append", "before_reply_checkpoint",
                          "after_reply_checkpoint", "before_tool_commit", "after_tool_commit"):
             def crash(h):
@@ -248,8 +305,15 @@ def run(binary):
                 child = h.hold(boundary)
                 child.kill()
                 child.communicate(timeout=10)
-                if boundary == "after_generation_commit":
+                steered = boundary in ("after_compaction_commit", "after_generation_commit")
+                if steered:
                     h.send("late", "late crash steering")
+                frozen = None
+                if boundary == "after_compaction_commit":
+                    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+                        frozen = db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone()
+                        require(frozen is not None and db.execute("SELECT count(*) FROM model_generation").fetchone()[0] == 0,
+                                "kill did not separate compaction and generation admission")
                 # Read state directly before recovery; history readback may
                 # itself fill an immutable Conversation intent, by design.
                 before = h.state()
@@ -257,7 +321,6 @@ def run(binary):
                 accepted_tools = {t["invocation_id"]: t for t in before["tools"] if t["status"] == "succeeded"}
                 h.command("chat", "work")
                 after = h.state()
-                steered = boundary == "after_generation_commit"
                 assert_final(after, 2 if steered else 1)
                 require(len(after["generations"]) == (3 if steered else 2) and len(after["tools"]) == (4 if steered else 2), "crash repeated a logical generation/Tool")
                 for g in after["generations"]:
@@ -266,6 +329,10 @@ def run(binary):
                 for t in after["tools"]:
                     if t["invocation_id"] in accepted_tools:
                         require(t == accepted_tools[t["invocation_id"]], "completed Tool replayed")
+                if frozen is not None:
+                    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+                        require(db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone() == frozen,
+                                "steering changed the frozen pre-admission context")
                 return {"boundary": boundary, "signal": "SIGKILL", "before": before, "after": after}
             report["crashes"].append(scenario(boundary, crash))
 
@@ -295,7 +362,7 @@ def run(binary):
             return final
         report["steering"] = scenario("steering", steering)
         report["checks"].append("SIGTERM preserves business work; separate steering at stable boundary; frozen model and new-Run switch")
-        report["checks"].append("SIGKILL at nine model/Tool/Conversation/checkpoint boundaries; completed results reused; missing writes filled")
+        report["checks"].append("SIGKILL at ten compaction/model/Tool/Conversation/checkpoint boundaries; frozen pre-admission context recovered before steering; completed results reused; missing writes filled")
     report["checks"].append("cleanup: all owned processes reaped and disposable databases removed")
     return report
 

@@ -57,6 +57,14 @@ def run(binary):
                 # A persisted delta proves the real peer accepted the generation,
                 # beyond Host queue admission.
                 h.wait_state(lambda v: any("Worker waiting for cancellation" in e["event_json"] for e in v["trace"]), "Worker peer accepted generation")
+                active = state(h)
+                t.send("Complete: Wedding")
+                t.expect("Main accepted the work.")
+                rejected = state(h)
+                require(rejected["tasks"] == active["tasks"], "complete stopped/changed live work")
+                require(any(json.loads(i["arguments_json"]).get("operation") == "complete"
+                            and json.loads(i["result_json"]).get("error", {}).get("code") == "INVALID_ARGUMENT"
+                            for i in rejected["tools"] if i["result_json"]), "live completion did not fail closed")
                 t.send(operation + ": Wedding")
                 t.expect("Main accepted the work."); t.expect("Erii: idle")
                 before = state(h)

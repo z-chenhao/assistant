@@ -276,7 +276,7 @@ func (r *Runs) scheduledResult(ctx context.Context, id string, err error) (strin
 		var active int
 		// Stopping owners must join or expire before Drain can finish. They are
 		// never candidates for business claims, but still require recovery work.
-		if err = r.host.db.QueryRowContext(ctx, `SELECT count(*) FROM run r WHERE (`+runnable+`) OR (r.desired_state!='running' AND r.status IN ('queued','running','waiting'))`, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
+		if err = r.host.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
 			return "", agent.ErrStorage
 		}
 		if active > 0 {
@@ -502,11 +502,11 @@ func (r *Runs) Steering(ctx context.Context, c agent.RunClaim, after int64) ([]a
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
-		// An accepted exchange owns this step's frozen context, even if its
-		// result has not reached the Run checkpoint yet. Recover it before
-		// injecting newly arrived steering, or request-hash drift would result.
+		// Compaction freezes the step before generation admission. Recover that
+		// context too when a crash separates the two commits; new steering must
+		// wait for the next step instead of changing its input hash.
 		var frozen int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM model_generation g JOIN run r USING(run_id) WHERE g.run_id=? AND g.step_index=json_extract(r.checkpoint_json,'$.step')`, c.RunID()).Scan(&frozen); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM model_generation g WHERE g.run_id=r.run_id AND g.step_index=json_extract(r.checkpoint_json,'$.step')) OR EXISTS(SELECT 1 FROM context_compaction c WHERE c.run_id=r.run_id AND c.step_index=json_extract(r.checkpoint_json,'$.step')) FROM run r WHERE r.run_id=?`, c.RunID()).Scan(&frozen); err != nil {
 			return err
 		}
 		if frozen > 0 {
