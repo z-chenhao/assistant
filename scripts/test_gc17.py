@@ -50,16 +50,18 @@ class FeedbackReceiptTests(unittest.TestCase):
         gc17.validate_report(report,seen=seen)
         with self.assertRaisesRegex(RuntimeError,'duplicated execution identity'):
             gc17.validate_report(report,seen=seen)
+        control=copy.deepcopy(report)
+        row_json=json.dumps(row,ensure_ascii=False,separators=(',',':'),allow_nan=False)
         for name,mutate in gc17.mutations().items():
-            changed=copy.deepcopy(row)
-            mutate(changed)
-            changed['replay_state']=copy.deepcopy(changed['state'])
+            candidate=gc17.mutation_report(report,row_json,name,mutate)
+            changed=gc17.unpack(candidate['results'][0]['evidence'])
             try:
                 accepted=all(gc17.observe(changed).values())
             except (KeyError,IndexError,TypeError,ValueError,RuntimeError,StopIteration):
                 accepted=False
             with self.subTest(name=name):
                 self.assertFalse(accepted)
+                self.assertEqual(report,control,'corruption mutated the shared control')
 
 
 if __name__=='__main__':

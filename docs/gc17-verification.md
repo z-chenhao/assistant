@@ -77,6 +77,10 @@ This preserves the original ten-minute CI job and every five-round input/check;
 declared failures cannot certify a receipt. Two additional attacks forge all
 claims true while retaining a wrong delivered reference or missing dispatch,
 so all three consumers must still recompute the native evidence to reject them.
+Corruption construction decodes its immutable control once, then copies that
+already validated JSON tree. Incoming consumer receipts always use the strict
+reader. A retained before/after comparison proves all 33 candidate payloads are
+byte-identical; the optimization changes no input or assertion.
 
 The Core JSON embeds size/hash-bound compressed native bytes, avoiding repeated
 large uncompressed states. Complete consumer evidence stays in a hidden sibling

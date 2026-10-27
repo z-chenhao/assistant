@@ -389,32 +389,40 @@ def mutations():
     return cases
 
 
+def mutation_report(report, row_json, name, mutate):
+    """Copy only the changed result; the serialized control is already strict JSON."""
+    candidate=dict(report,results=[dict(result) for result in report['results']])
+    if mutate:
+        target=candidate['results'][0]
+        # This is an internal copy of a previously decoded control, not an
+        # alternate reader for incoming receipts. The encoder cannot emit
+        # duplicate keys; the public consumers still call strict_json.
+        row=json.loads(row_json)
+        mutate(row)
+        row['replay_state']=row['state']
+        try:
+            checks=observe(row)
+        except (KeyError,IndexError,TypeError,ValueError,RuntimeError,StopIteration):
+            checks=dict(invalid_native_state=False)
+        claims={key:True for key in checks} if name.startswith('forged_claims_') else checks
+        row['assertions']=target['assertions']=claims
+        target['evidence']=pack(row)
+    return candidate
+
+
 def consumer_probes(report, binary, folder):
     """Positive control plus replay-synchronized, recomputed, resealed attacks."""
     from ci_codemode import validate_gc17
     from prepare_release_eval import prepare
     folder.mkdir(parents=True,exist_ok=True)
     result = {}
+    row_json=json.dumps(unpack(report['results'][0]['evidence']),ensure_ascii=False,
+                        separators=(',',':'),allow_nan=False)
     with tempfile.TemporaryDirectory(prefix='erii-gc17-consumers-') as temporary:
         path = Path(temporary)/'candidate.json'
         control = json.dumps(report,ensure_ascii=False,separators=(',',':')).encode()
         for name, mutate in [('control',None),*mutations().items()]:
-            candidate = copy.deepcopy(report)
-            if mutate:
-                target = candidate['results'][0]
-                row = unpack(target['evidence'])
-                mutate(row)
-                row['replay_state'] = copy.deepcopy(row['state'])
-                try:
-                    checks = observe(row)
-                except (KeyError,IndexError,TypeError,ValueError,RuntimeError,StopIteration):
-                    checks = dict(invalid_native_state=False)
-                # A declared failure rejects immediately. These two additional
-                # attacks forge every flag true, forcing full native recomputation.
-                claims={key:True for key in checks} if name.startswith('forged_claims_') else checks
-                row['assertions']=target['assertions']=claims
-                # Preserve forged passing claims; the consumer must recheck.
-                target['evidence']=pack(row)
+            candidate=mutation_report(report,row_json,name,mutate)
             data=json.dumps(candidate,ensure_ascii=False,separators=(',',':')).encode()
             path.write_bytes(data)
             # Retain every byte without repeating the unchanged five receipts
