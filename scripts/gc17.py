@@ -204,7 +204,8 @@ def observe(row):
         hundred_children=len(children)==len(calls)==100 and all(r['status']=='completed' for r in children.values()),
         accepted_identities_reattached=len(before)==45 and all(any(a['child_run_id']==old['child_run_id'] and a['invocation_id']==old['invocation_id'] for a in calls) for old in before),
         completed_calls_not_redispatched=len(done)==37 and all(dispatches[g]==1 for g in done),
-        all_generations_dispatched_once=bool(dispatches) and all(n==1 for n in dispatches.values()),
+        all_generations_dispatched_once=bool(dispatches) and all(n==1 for n in dispatches.values()) and
+            all(dispatches[g['generation_id']]==1 for g in value['generations']),
         f055_drift_rejected=drift['rejection'].get('error',{}).get('code')=='NON_DETERMINISTIC_REPLAY',
         f055_original_restored=not drift['restored'].get('error') and drift['changed']['callKey']==drift['original']['callKey'] and
             drift['changed']['arguments']!=drift['original']['arguments'] and 'F055' in str(drift['original']['arguments']),
@@ -346,6 +347,10 @@ def validate_report(report, binary=None, seen=None):
 
 
 def mutations():
+    def remove_dispatch(row):
+        generation=row['state']['generations'][-1]['generation_id']
+        row['state']['external_provider_dispatches']=[g for g in row['state']['external_provider_dispatches']
+                                                   if g['generation_id']!=generation]
     return dict(
         wrong_delivered_ref=lambda r:r['state']['conversation'][-1]['content'][-1].update(artifact_ref='artifact:'+'0'*64),
         missing_file=lambda r:r['state']['conversation'][-1]['content'].pop(),
@@ -372,6 +377,7 @@ def mutations():
         changed_effect=lambda r:r['state']['external_effects'][0].update(args='{}'),
         unknown=lambda r:r['state']['tools'][0].update(status='unknown'),
         redispatch=lambda r:r['state']['external_provider_dispatches'].append(copy.deepcopy(r['state']['external_provider_dispatches'][0])),
+        missing_dispatch=remove_dispatch,
         wrong_cut=lambda r:r['fault']['before'].pop(),
         fake_crash=lambda r:r['fault'].update(returncodes=[0,0]),
         erased_drift=lambda r:r['fault']['drift']['rejection'].clear(),
