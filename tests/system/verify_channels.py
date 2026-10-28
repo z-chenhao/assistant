@@ -23,6 +23,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from feishu_sandbox import Sandbox
+from event_broker import Broker
 from fixture_pool import run_cases
 from verify_main import MainHarness, require
 from terminal_driver import Terminal
@@ -40,9 +41,10 @@ class ChannelHarness(MainHarness):
                         ERII_FEISHU_ENCRYPT='sandbox-encrypt-key', ERII_FEISHU_ACCESS='sandbox-access-token')
         self.bind = self.command('channel','manage',text=json.dumps(dict(op='bind',channel='feishu',subject='sandbox-tenant:sandbox-app:owner',destination='bound-chat',enabled=True,version=0)))
         self.process = None
+        self.production_events = False
 
     def args(self, *args):
-        return [str(self.binary), '-config', str(self.config), '-test-bridge', self.fixture, *(['-test-automation-now',self.now] if hasattr(self,'now') else []), *args]
+        return [str(self.binary), '-config', str(self.config), '-test-bridge', self.fixture, *(['-test-events'] if self.production_events else []), *(['-test-automation-now',self.now] if hasattr(self,'now') else []), *args]
 
     def start(self, boundary=None):
         args = ('web','serve') if boundary is None else ('-test-main-hold',boundary,'web','serve')
@@ -204,10 +206,12 @@ def run(binary,evidence):
 
 
 def dependency_recovery(binary, report):
-    with tempfile.TemporaryDirectory(prefix='erii-channel-repair-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='erii-channel-repair-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
         h = ChannelHarness(binary, Path(temp), platform)
         try:
             h.setup()
+            h.production_events = True
+            h.env['ERII_NATS_URL'] = broker.url
             catalog = h.root / 'repaired-skills'
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
