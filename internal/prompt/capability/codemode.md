@@ -1,0 +1,1 @@
+Code Mode: discover available calls before use. Use standard JavaScript for sequencing and concurrency; only text(), image() or return enters the model result. Host-accepted unawaited calls continue internally; their hidden results are not task output.

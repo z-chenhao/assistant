@@ -1,12 +1,44 @@
 package agent
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/z-chenhao/erii/internal/prompt"
 	"github.com/z-chenhao/erii/internal/tool"
 )
+
+// These hashes capture the complete pre-extraction projection, including
+// whitespace, section order, frozen resources and explicit Artifact inputs.
+func TestContextPromptBytes(t *testing.T) {
+	t.Chdir(t.TempDir())
+	specs := []tool.Spec{
+		{Name: "builtin__workspace__read", PromptContext: []tool.PromptContext{{Kind: "project_instructions", Source: "workspace:AGENTS.md:frozen", Text: "Keep project rules."}}},
+		{Name: "builtin__codemode__execute"},
+		{Name: RunToolName},
+		{Name: "builtin__artifact__manage"},
+		{Name: "builtin__memory__search"},
+		{Name: "builtin__skill__view"},
+		{Name: "builtin__skill__list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:frozen", Text: "research"}}},
+		{Name: "builtin__computer__observe", Internal: true},
+	}
+	for _, tc := range []struct{ position, hash string }{{"main", "adc41631bba36cd896eabe56cd61559cce166bf50ac3513c7f48615613e11190"}, {"root", "99b25c813061af61fe3fc16e4808988784b67a794726c76bd650dd03691f27ca"}, {"child", "20fb3a61f78f7648f4fb6f9a569add725b734cf4bbede268e0ad8250884c4430"}} {
+		t.Run(tc.position, func(t *testing.T) {
+			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := json.Marshal(messages)
+			got := fmt.Sprintf("%x", sha256.Sum256(raw))
+			if got != tc.hash {
+				t.Fatalf("model message bytes changed: %s", got)
+			}
+		})
+	}
+}
 
 func TestContextRolesAndFrozenResources(t *testing.T) {
 	specs := []tool.Spec{
@@ -22,7 +54,7 @@ func TestContextRolesAndFrozenResources(t *testing.T) {
 	root[0].Content[0].Text = "frozen parent safety"
 	child := InitialContext(ContextOptions{Position: "child", Tools: specs, Task: "explicit subtask", ParentSystem: append(root, TextMessage("user", "PARENT_PRIVATE"))})
 	raw, _ := json.Marshal(child)
-	if !strings.Contains(string(raw), "frozen parent safety") || strings.Contains(string(raw), "PARENT_PRIVATE") || strings.Contains(string(raw), rootIdentity) {
+	if !strings.Contains(string(raw), "frozen parent safety") || strings.Contains(string(raw), "PARENT_PRIVATE") || strings.Contains(string(raw), prompt.Identity()) {
 		t.Fatal("child scope or frozen rules drift", string(raw))
 	}
 	for _, needle := range []string{"project_instructions", "workspace:AGENTS.md:hash", "skill_index", "frozen", "Delegation:"} {

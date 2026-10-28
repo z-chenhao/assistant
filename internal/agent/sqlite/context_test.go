@@ -10,9 +10,9 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
-	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/prompt"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
 )
@@ -166,7 +166,7 @@ func TestSemanticCompactionRecoversAcceptedSummaryWithoutToolReplay(t *testing.T
 	a.Provider = summaryStreamProvider{p}
 	a.Sink = func(e agent.Event) { userStream.WriteString(e.Text) }
 	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
-		if req.Messages[0].Text == contextbuilder.SummarySystem {
+		if req.Messages[0].Text == prompt.SummarySystem() {
 			summaryCalls++
 			if len(req.Tools) != 0 {
 				t.Fatal("summarizer received executable tools")
@@ -336,7 +336,7 @@ type summaryStreamProvider struct{ *loopProvider }
 func (p summaryStreamProvider) Generate(ctx context.Context, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (llm.GenerationResult, error) {
 	if sink != nil {
 		text := "PUBLIC_RESULT_DELTA"
-		if r.Messages[0].Text == contextbuilder.SummarySystem {
+		if r.Messages[0].Text == prompt.SummarySystem() {
 			text = "PRIVATE_SUMMARY_DELTA"
 		}
 		sink(llm.GenerationEvent{Kind: "text_delta", Text: text})

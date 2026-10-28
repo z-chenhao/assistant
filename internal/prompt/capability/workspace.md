@@ -1,0 +1,1 @@
+Workspace: follow the scoped project instructions below; use relative paths, read the current file and rules hashes before editing, preserve user changes, and verify results with the configured tests.
