@@ -31,3 +31,32 @@ html{overflow-anchor:none}
 #new-messages{position:fixed;right:40px;bottom:205px;z-index:3;border-radius:20px;box-shadow:0 2px 12px #0002}
 #new-messages[hidden]{display:none}
 @media(max-width:700px){#new-messages{right:16px;bottom:185px}#live-update-status{font-size:10px;margin:0 8px}}
+
+/* Developer inspection owns its layout; conversation islands stay independent. */
+.developer-nav{margin:22px 0 0;border-top:1px solid #e8e8e8;padding-top:12px}
+.developer-nav summary{font-size:12px;color:#777;padding:10px 14px;cursor:pointer}
+.developer-nav nav{margin-top:5px}
+.inspection{max-width:1152px;padding:32px 36px 60px;margin:auto;overflow-wrap:anywhere}
+.inspection h1{margin:12px 0 16px}.inspection-intro{max-width:720px;color:#777;font-size:14px;line-height:1.8}
+.inspection-links{display:flex;flex-wrap:wrap;gap:12px 24px;margin:20px 0;font-size:12px;color:#555}
+.inspection-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px}
+.inspection-filters label{min-width:0}.inspection-filters input,.inspection-filters select{min-width:0}
+.filter-actions{display:flex;align-items:center;gap:20px;font-size:12px}
+.execution-table{max-width:100%;overflow-x:auto;border:1px solid #eee;border-radius:12px;margin-top:18px}
+.execution-table table{min-width:650px}.execution-table td{font-size:12px;vertical-align:top}.execution-table td:first-child{min-width:220px}
+.execution-id{display:block;font-size:11px;overflow-wrap:anywhere;margin:7px 0;color:#777}
+.execution-table small{display:block;color:#888;margin-top:7px}
+.inspection time{font-size:11px;font-variant-numeric:tabular-nums}
+.execution-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}
+.execution-facts dd{font-size:12px;margin:6px 0 0}
+.task-context{border-top:1px solid #eee;border-bottom:1px solid #eee;padding:20px 0;margin:20px 0}
+.task-context code,.task-timeline code,.run-node code{font-size:11px}
+.inspection-note{font-size:12px;color:#888;line-height:1.8;margin:12px 0}
+.execution-tree,.task-timeline{list-style:none;padding:0;margin:20px 0}
+.run-node,.task-timeline li{border:1px solid #eee;border-radius:10px;padding:16px;margin:12px 0}
+.tree-heading{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}
+.tree-indent{width:10px;height:14px;border-left:1px solid #ccc;flex-shrink:0}.epoch{font-size:11px;color:#888}
+.run-node p{margin:8px 0 0}.task-timeline li p{font-size:12px}.inspection-detail>h2{margin-top:10px}
+.root-boundary{border-left:2px solid #ccc;padding-left:12px}
+@media(max-width:700px){.inspection{padding:24px 16px 40px}.inspection-filters{grid-template-columns:minmax(0,1fr)}.developer-nav{margin:8px 0 0;padding-top:4px}.developer-nav summary{font-size:11px;padding:8px 12px}.developer-nav nav{margin:0}.inspection-detail{padding:18px}.tree-indent{width:5px}.run-node{padding:12px}.inspection h1{font-size:27px}}
+.execution-table td:nth-child(2){min-width:100px;white-space:nowrap}.execution-table th{white-space:nowrap}.execution-table td:last-child{min-width:180px}

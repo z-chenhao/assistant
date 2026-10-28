@@ -239,6 +239,14 @@ reconcile `unknown`; a cold snapshot cannot promise exactly-once effects or
 recover work accepted only after its recovery point. The existing fixed-source
 and frozen-snapshot compatibility checks still apply after restore.
 
+Preserve the frozen execution environment configuration when continuing accepted
+Runs. In particular, the default local workspace is derived from `data_root`;
+restoring to a different root changes that default and fails compatibility
+checks. An explicit `execution.root` can preserve the original environment after
+the source is retired. Workspace files and toolchains are outside this archive:
+provision them separately. Installing different OCR language data or changing
+other frozen capabilities likewise does not upgrade existing Runs in place.
+
 <a id="security-security"></a>
 
 ## Security

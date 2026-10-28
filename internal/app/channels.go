@@ -49,7 +49,7 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 	return a.store.WebProjection(ctx, m)
 }
 func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Config) error {
-	s := web.Server{Config: cfg, Core: a, Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
+	s := web.Server{Config: cfg, Core: a, Inspector: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
 	if a.feishu != nil {
 		s.Callback = feishu.Handler{Client: *a.feishu, Core: a, Wake: func() {
 			if s.Wake != nil {

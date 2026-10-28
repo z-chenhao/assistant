@@ -60,6 +60,48 @@ try{
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
  }
 
+ if(phase==='inspection'){
+  const facts=JSON.parse(process.env.ERII_INSPECTION_FACTS);
+  const main=facts.main,root=facts.runs.find(r=>r.role==='root'),child=facts.runs.find(r=>r.role==='child'&&r.parent!==root.id);
+  await page.getByText('Developer',{exact:true}).click();
+  await page.getByRole('link',{name:'Observability',exact:true}).click();
+  await page.getByRole('heading',{name:'Execution relationships',exact:true}).waitFor();
+  const row=page.locator('[data-execution-id="'+main+'"]');
+  await row.getByRole('link',{name:'Main',exact:true}).click();
+  await page.locator('.task-timeline .inspect-task').click();
+  await page.locator('.execution-tree .run-node').first().waitFor();
+  if(await page.locator('.run-node[data-role="root"]').count()!==1||await page.locator('.run-node[data-role="child"]').count()!==2)throw new Error('inspector lost Root/Child tree');
+  if(await page.locator('.run-node[data-role="root"]').getAttribute('data-parent-run')!=='')throw new Error('Main was made the Root parent');
+  for(const expected of facts.runs.filter(r=>r.role!=='main')){
+   const node=page.locator('.run-node[data-run-id="'+expected.id+'"]');
+   if(await node.getAttribute('data-parent-run')!==expected.parent||await node.getAttribute('data-root-run')!==expected.root)throw new Error('rendered ancestry differs from stored relationships');
+  }
+  if(await page.locator('.task-context img').count()||!await page.locator('.task-context').innerText().then(text=>text.includes('<img src=x')))throw new Error('Task title was interpreted as HTML');
+  await page.locator('.run-node[data-run-id="'+child.id+'"] .tree-heading a').click();
+  if(!await page.locator('.parent-run').innerText().then(text=>text.includes(child.parent)))throw new Error('selected Child lost parent navigation');
+  await page.locator('.parent-run').click();
+  await page.locator('.creator-run').click();
+  if(await page.locator('.run-node').count())throw new Error('Main page presented Task Roots as its Child Runs');
+  await page.getByLabel('Role',{exact:true}).selectOption('child');
+  await page.getByLabel('Status',{exact:true}).selectOption('completed');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  if(await page.locator('[data-execution-id]').count()!==2||await page.locator('[data-execution-id]:not([data-role="child"])').count())throw new Error('execution filters ignored');
+  await page.getByLabel('Created before (UTC)').fill('2000-01-01T00:00');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await page.getByText('No executions match these filters.',{exact:true}).waitFor();
+  await page.getByRole('link',{name:'Reset',exact:true}).click();
+  await page.locator('[data-execution-id="'+root.id+'"] td').first().getByRole('link').click();
+  await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
+  await page.screenshot({path:evidence+'/inspection-tree.png',fullPage:true});
+  const compact=await context.newPage();
+  try{
+   await compact.setViewportSize({width:390,height:844});await compact.goto(page.url());
+   if(await compact.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('mobile inspection overflowed viewport');
+   await compact.screenshot({path:evidence+'/inspection-tree-mobile.png',fullPage:true});
+  }finally{await compact.close()}
+  const plain=await browser.newContext({javaScriptEnabled:false});
+  try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());if(await fallback.locator('.run-node').count()!==3)throw new Error('inspector requires JavaScript')}finally{await plain.close()}
+ }
  if(phase==='image'){
   await page.getByRole('link',{name:'Settings',exact:false}).click();
   const capability=process.env.ERII_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
@@ -207,7 +249,7 @@ try{
    await fallback.screenshot({path:evidence+'/'+phase+'-no-script.png',fullPage:true});
   }finally{await plain.close()}
  }
- await page.getByRole('link',{name:'Ongoing work',exact:false}).click();
+ await page.locator('aside').getByRole('link',{name:'Ongoing work',exact:false}).click();
  if(await page.locator('main').getByRole('button').count())throw new Error('progress became a management surface');
  await page.screenshot({path:evidence+'/'+phase+'-progress.png',fullPage:true});
  if(remote.length)throw new Error('UI contacted an external service: '+remote.join(', '));

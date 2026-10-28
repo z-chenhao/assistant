@@ -1,0 +1,3 @@
+{{define "progress-page"}}<section class="settings"><p class="eyebrow">A LITTLE PEACE OF MIND</p><h1>Your ongoing work</h1><p>Progress updates appear here as work moves forward. Continue, pause or cancel work in conversation.</p><div id="ongoing-work">{{template "progress" .}}</div></section>
+{{end}}
+{{define "progress"}}{{range .Activity}}<article class="panel" id="{{.TaskRef}}" data-live-key="task:{{.TaskRef}}"><h2>{{.Title}}</h2><p class="state">{{.Status}}</p><p>{{.ProgressSummary}}</p></article>{{else}}<div class="empty" data-live-key="empty"><h2>All clear for now.</h2><p>When you hand something over, you can follow it here.</p></div>{{end}}{{end}}

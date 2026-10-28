@@ -22,7 +22,7 @@ import (
 // Reconstruct the actual historical schema while retaining every accepted
 // business row. Later additive Outbox columns must also be removed, otherwise
 // the forward migration test is exercising a mislabeled current schema.
-const removeChannelFixtureSchema = `DROP INDEX event_outbox_live; ALTER TABLE event_outbox DROP COLUMN dead_at; ALTER TABLE event_outbox DROP COLUMN failure_code; ALTER TABLE event_outbox DROP COLUMN failure_count; DROP TABLE channel_resource; DROP TABLE channel_receipt; DROP TABLE delivery_projection; DROP TABLE channel_preference; DROP TABLE message_route; DROP TABLE channel_callback; DROP TABLE channel_source; DROP TABLE channel_binding; `
+const removeChannelFixtureSchema = removeInspectionFixtureSchema + `DROP INDEX event_outbox_live; ALTER TABLE event_outbox DROP COLUMN dead_at; ALTER TABLE event_outbox DROP COLUMN failure_code; ALTER TABLE event_outbox DROP COLUMN failure_count; DROP TABLE channel_resource; DROP TABLE channel_receipt; DROP TABLE delivery_projection; DROP TABLE channel_preference; DROP TABLE message_route; DROP TABLE channel_callback; DROP TABLE channel_source; DROP TABLE channel_binding; `
 
 func TestChannelConcurrentCallbackAndSourceDedupSharedConversation(t *testing.T) {
 	s, r, h, a, _ := loopFixture(t)

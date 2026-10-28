@@ -15,7 +15,7 @@ import sqlite3
 import subprocess
 import tempfile
 
-STATE_SCHEMA_VERSION = 29
+STATE_SCHEMA_VERSION = 30
 
 def require(condition, message):
     if not condition:
