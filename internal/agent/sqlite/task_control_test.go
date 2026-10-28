@@ -360,6 +360,9 @@ func addControlChild(t *testing.T, s *Store, parent, id string) {
 	if _, err := s.db.Exec(`INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.db.Exec(`INSERT INTO run_context_policy SELECT ?,policy_json FROM run_context_policy WHERE run_id=?`, id, parent); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestTaskControlCancelTreeAndInvocationOutcomes(t *testing.T) {

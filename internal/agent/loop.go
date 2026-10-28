@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/conversation"
@@ -158,15 +159,18 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 	}
 	result := generation.Result
 	if result == nil {
-		l.emit(r, "turn_start", "", "")
-		l.emit(r, "message_start", "", "")
+		visible := generation.Compaction == nil
+		if visible {
+			l.emit(r, "turn_start", "", "")
+			l.emit(r, "message_start", "", "")
+		}
 		callCtx, cancel := context.WithTimeout(l.execution, 45*time.Second)
 		generate := l.options.Provider.Generate
 		if cp.Step > 0 {
 			generate = l.options.Provider.Continue
 		}
 		value, callErr := generate(callCtx, generation.Request, func(e llm.GenerationEvent) {
-			if e.Kind == "text_delta" {
+			if visible && e.Kind == "text_delta" {
 				l.emit(r, "message_update", e.Text, "")
 			}
 		})
@@ -207,6 +211,17 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 		}
 		result = &value
 	}
+	if plan := generation.Compaction; plan != nil {
+		if result.Clipped || len(result.ToolCalls) > 0 || strings.TrimSpace(result.Text) == "" || len(result.Text) > plan.MaxBytes {
+			return false, l.fail(r, llm.InvalidProviderResponse.Error())
+		}
+		cp.WorkingState = &WorkingState{Through: plan.Through, Text: result.Text, SourceRefs: plan.SourceRefs, ArchiveRef: plan.ArchiveRef}
+		cp.Step++
+		cp.Result = nil
+		cp.ExchangeID = ""
+		cp.Phase = ModelPhase
+		return false, l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp)
+	}
 	cp.ContextRetries = 0
 	// Bridge acceptance has durably saved the complete result already.
 	parts := conversation.Text(result.Text)
@@ -244,12 +259,32 @@ func (l agentLoop) toolsTurn(r Run) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	unknownExchange := false
+	for _, result := range results {
+		if result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT" {
+			unknownExchange = true
+		}
+	}
+	if unknownExchange {
+		// Preserve the complete native exchange, including all sibling results,
+		// rather than inserting a user message between Tool calls and replies.
+		for i := len(cp.Messages) - 1; i >= 0; i-- {
+			if cp.Messages[i].Type == "assistant" {
+				cp.Messages[i].Source = &llm.ContextSource{Kind: "unknown_exchange", Protected: true}
+				break
+			}
+		}
+	}
 	for i, result := range results {
 		parts := conversation.Text(result.ModelText())
 		for _, ref := range result.ImageRefs {
 			parts = append(parts, conversation.ContentPart{Type: "image", ArtifactRef: ref})
 		}
-		cp.Messages = append(cp.Messages, AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: parts})
+		message := AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: parts}
+		if unknownExchange {
+			message.Source = &llm.ContextSource{Kind: "unknown_exchange", Protected: true}
+		}
+		cp.Messages = append(cp.Messages, message)
 	}
 	cp.Step++
 	cp.Phase = ModelPhase

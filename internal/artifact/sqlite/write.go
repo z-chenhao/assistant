@@ -110,12 +110,15 @@ func (s *Store) CommitTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, st *
 	if err := s.scope(ctx, tx, a); err != nil {
 		return "", err
 	}
+	if st.input.RunOnly && a.RunID == "" {
+		return "", artifact.ErrInvalid
+	}
 	var err error
 	if key != "" {
-		var ref, oldHash, name, media, runID string
-		err = tx.QueryRowContext(ctx, `SELECT artifact_ref,content_hash,name,media_type,coalesce(run_id,'') FROM artifact WHERE put_key=?`, key).Scan(&ref, &oldHash, &name, &media, &runID)
+		var ref, oldHash, name, media, runID, visibility string
+		err = tx.QueryRowContext(ctx, `SELECT artifact_ref,content_hash,name,media_type,coalesce(run_id,''),visibility FROM artifact WHERE put_key=?`, key).Scan(&ref, &oldHash, &name, &media, &runID, &visibility)
 		if err == nil {
-			if oldHash != st.sum || name != st.input.Name || media != st.input.MediaType || runID != a.RunID {
+			if oldHash != st.sum || name != st.input.Name || media != st.input.MediaType || runID != a.RunID || st.input.RunOnly && visibility != "run" {
 				return "", artifact.ErrConflict
 			}
 			_, err = s.DescribeTx(ctx, tx, a, ref, true)
@@ -145,7 +148,9 @@ func (s *Store) CommitTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, st *
 	id := uuid.Must(uuid.NewV7()).String()
 	now := time.Now().UTC()
 	visibility := "agent"
-	if a.TaskID != "" {
+	if st.input.RunOnly {
+		visibility = "run"
+	} else if a.TaskID != "" {
 		visibility = "task"
 	} else if a.RunID != "" {
 		visibility = "run"

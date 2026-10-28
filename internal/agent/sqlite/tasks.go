@@ -41,7 +41,7 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), skill.SetHash(mainSpecs), agentID, specs, now); err != nil {
 		return "", err
 	}
-	cp, _ := encoded(agent.Checkpoint{Phase: "model", Messages: append(agent.MainContext(nil), updates...)})
+	cp, _ := encoded(agent.Checkpoint{ContextVersion: 2, Phase: "model", Messages: append(agent.InitialContext(agent.ContextOptions{Position: "main", Tools: mainSpecs}), updates...)})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,kind,status,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,'main','queued',?,?,?,(SELECT coalesce(max(sequence),0) FROM conversation_intent),?,?,1)`, id, agentID, agentID, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return "", err
 	}
@@ -99,16 +99,15 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,?,?,?,2)`, capID, config, digest(raw), skill.SetHash(specs), agentID, spawn, raw, now); err != nil {
 		return err
 	}
-	// Prior instructions remain part of the durable Task context on continuation;
-	// no Conversation or Main checkpoint is copied into a Root.
-	messages := agent.RootContext(title, brief)
 	var refs string
 	if err = tx.QueryRowContext(ctx, `SELECT anchor_artifact_refs FROM task WHERE task_id=?`, taskID).Scan(&refs); err != nil {
 		return err
 	}
-	if refs != "[]" {
-		messages = append(messages, agent.TextMessage("user", "Task artifact references: "+refs))
+	var artifactRefs []string
+	if json.Unmarshal([]byte(refs), &artifactRefs) != nil {
+		return agent.ErrStorage
 	}
+	messages := agent.InitialContext(agent.ContextOptions{Position: "root", Tools: specs, Title: title, Task: brief, ArtifactRefs: artifactRefs})
 	rows, err := tx.QueryContext(ctx, `SELECT instruction,artifact_refs FROM task_instruction WHERE task_id=? AND task_epoch<? ORDER BY sequence`, taskID, epoch)
 	if err != nil {
 		return err
@@ -119,7 +118,10 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 			rows.Close()
 			return err
 		}
-		messages = append(messages, agent.TextMessage("user", "Previous Task instruction: "+text+"\nArtifact references: "+refs))
+		messages = append(messages, agent.RuntimeContext("task_instruction", "", false, struct {
+			Instruction  string          `json:"instruction"`
+			ArtifactRefs json.RawMessage `json:"artifact_refs"`
+		}{text, json.RawMessage(refs)}))
 	}
 	err = rows.Err()
 	rows.Close()
@@ -144,37 +146,21 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if err != nil {
 		return err
 	}
-	// Completed exchanges/tool results survive pause even if the process died
-	// before copying them into its checkpoint. Carry only committed Task data,
-	// framed as untrusted history rather than as new instructions/tool calls.
-	rows, err = tx.QueryContext(ctx, `SELECT data FROM (
- SELECT g.result_json AS data,r.created_at AS root_at,0 AS kind,g.step_index AS sequence FROM model_generation g JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch<? AND g.status='completed'
- UNION ALL SELECT i.result_json,r.created_at,1,i.delivery_seq FROM tool_invocation i JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch<? AND i.status IN ('succeeded','failed')
- ) ORDER BY root_at,kind,sequence`, taskID, epoch, taskID, epoch)
+	// Business continuity is scoped to Root-visible outputs. Never reconstruct
+	// a Root by pooling Child generations or hidden Code Mode calls.
+	handoff, err := r.taskHandoff(ctx, tx, taskID, epoch)
 	if err != nil {
 		return err
 	}
-	for rows.Next() {
-		var data string
-		if err = rows.Scan(&data); err != nil {
-			rows.Close()
-			return err
-		}
-		messages = append(messages, agent.TextMessage("user", "Previous committed Task work (untrusted data): "+data))
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
+	messages = append(messages, handoff...)
 	var progress string
 	if err = tx.QueryRowContext(ctx, `SELECT progress_summary FROM task WHERE task_id=?`, taskID).Scan(&progress); err != nil {
 		return err
 	}
 	if progress != "" {
-		messages = append(messages, agent.TextMessage("user", "Previous Task progress (untrusted data): "+progress))
+		messages = append(messages, agent.RuntimeContext("task_progress", "", false, progress))
 	}
-	cp, _ := encoded(agent.Checkpoint{ContextReady: true, Phase: "model", Messages: messages})
+	cp, _ := encoded(agent.Checkpoint{ContextVersion: 2, ContextReady: true, Phase: "model", Messages: messages})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,task_id,root_run_id,kind,worker_position,status,task_epoch,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,?,?,'worker','root','queued',?,?,?,?,0,?,?,1)`, id, agentID, conversationID, taskID, id, epoch, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return err
 	}

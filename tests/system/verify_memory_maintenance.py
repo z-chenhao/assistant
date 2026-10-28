@@ -257,8 +257,23 @@ def run(binary, failure_evidence=None):
             h.command('chat', 'work')
             snapshot = readback(h)
             summaries = [row for row in snapshot['state']['compaction']
-                         if json.loads(row['provenance_json'])['stage'] == 'summary']
+                         if json.loads(row['provenance_json'])['stage'] == 'summary_request'
+                         and row['run_id'] in {source['run_id'] for source in submitted}]
             require(summaries and snapshot['conversation']['summaries'], 'long context was not summarized and persisted')
+            with closing(sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db')) as db:
+                for summary in summaries:
+                    generation = db.execute('SELECT status,request_json,result_json FROM model_generation WHERE run_id=? AND step_index=?',
+                                            (summary['run_id'], summary['step_index'])).fetchone()
+                    require(generation and generation[0] == 'completed' and not json.loads(generation[1]).get('tools')
+                            and json.loads(generation[2])['text'], 'tool-free summary was not actually accepted')
+                checkpoint = json.loads(db.execute('SELECT checkpoint_json FROM run WHERE run_id=?',
+                                                   (submitted[0]['run_id'],)).fetchone()[0])
+                require(checkpoint['context_version'] == 2 and checkpoint['working_state']['through'] > 0,
+                        'semantic working state was not applied to the same Run')
+                archive = checkpoint['working_state']['archive_ref']
+                require(db.execute("SELECT count(*) FROM artifact WHERE artifact_ref=? AND visibility='run'",
+                                   (archive,)).fetchone()[0] == 1, 'summary source is not Run-private')
+            require(h.command('artifact', 'open', archive), 'original summary evidence cannot be reopened')
             history = h.command('chat', 'history')
             require(all(any(m['message_id'] == source['message_id'] for m in history) for source in submitted),
                     'compaction destroyed originals')

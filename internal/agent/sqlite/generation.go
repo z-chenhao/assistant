@@ -9,6 +9,7 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/delivery"
 	deliverysqlite "github.com/z-chenhao/erii/internal/delivery/sqlite"
@@ -20,28 +21,49 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 	if !ok {
 		return agent.Generation{}, agent.ErrClaimLost
 	}
-	messages, err := agent.ProviderMessages(run.Checkpoint.Messages)
+	var messages []llm.Message
+	var compaction *agent.Compaction
+	var legacy bool
+	err := r.host.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM legacy_context_generation l JOIN model_generation g USING(generation_id) WHERE g.run_id=? AND g.step_index=?)`, run.ID, run.Checkpoint.Step).Scan(&legacy)
 	if err != nil {
-		return agent.Generation{}, err
+		return agent.Generation{}, agent.ErrStorage
 	}
-	messages, err = r.recallMessages(ctx, c, run, messages)
-	if err != nil {
-		return agent.Generation{}, err
-	}
-	messages, err = r.compactMessages(ctx, c, run, messages)
-	if err != nil {
-		return agent.Generation{}, err
+	if run.Checkpoint.ContextVersion >= 2 && !legacy {
+		prepared, e := r.prepareWorkingContext(ctx, c, run)
+		if e != nil {
+			return agent.Generation{}, e
+		}
+		messages, compaction = prepared.Messages, prepared.Compaction
+	} else {
+		messages, err = agent.ProviderMessages(run.Checkpoint.Messages)
+		if err == nil {
+			messages, err = r.recallMessages(ctx, c, run, messages, -1)
+		}
+		if err == nil {
+			messages, err = r.compactMessages(ctx, c, run, messages)
+		}
+		if err != nil {
+			return agent.Generation{}, err
+		}
 	}
 	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
 	request.Tools = agent.ProviderTools(run.Tools)
+	if compaction != nil {
+		request.Tools = nil
+		request.OutputLimitBytes = compaction.MaxBytes
+	}
 	// Compaction is threshold-based; this final bound rejects an irreducible turn.
 	wire, _ := encoded(request.Messages)
-	if int64(len(wire)) > run.Snapshot.ContextWindow*3 {
+	inputBytes := len(wire)
+	if run.Checkpoint.ContextVersion >= 2 && !legacy {
+		inputBytes = contextbuilder.ModelSize(request.Messages)
+	}
+	if int64(inputBytes) > run.Snapshot.ContextWindow*3 {
 		return agent.Generation{}, llm.ContextLengthExceeded
 	}
 	var gen agent.Generation
 	err = r.write(ctx, func(tx *sql.Tx) error {
-		gen = agent.Generation{}
+		gen = agent.Generation{Compaction: compaction}
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/bridge"
 )
@@ -128,11 +129,12 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
-			if (fixture == "local" || fixture == "agenda" || fixture == "research" || fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
+			summarizing := len(request.Messages) > 0 && request.Messages[0].Text == contextbuilder.SummarySystem
+			if summarizing || (fixture == "local" || fixture == "agenda" || fixture == "research" || fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
 				// Hold an actual accepted Worker generation while keeping the RPC
 				// peer responsive to cancellation. A new Root gets the appended
 				// instruction as its last message and can finish normally.
-				if fixture == "tasks" && strings.Contains(last.Text, "Task anchor:") && strings.Contains(last.Text, "Hold worker") {
+				if !summarizing && fixture == "tasks" && strings.Contains(last.Text, "Task anchor:") && strings.Contains(last.Text, "Hold worker") {
 					err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "Worker waiting for cancellation"})
 					waiting[request.GenerationID] = 2
 					break
@@ -144,7 +146,9 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 					waiting[request.GenerationID] = 2
 					break
 				}
-				if fixture == "automation" {
+				if summarizing {
+					value = contextReply(request)
+				} else if fixture == "automation" {
 					value = automationReply(request)
 				} else if fixture == "recall" {
 					value = recallReply(request)

@@ -14,12 +14,12 @@ func approvalReply(r llm.GenerationRequest) llm.GenerationResult {
 	user := ""
 	for _, m := range r.Messages {
 		root = root || strings.Contains(m.Text, "general Worker executing")
-		followup = followup || m.Origin == "runtime"
+		followup = followup || m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update")
 		if m.Role == "user" && m.Origin == "" {
 			user = m.Text
 		}
 	}
-	if followup {
+	if followup && !hasAppendedUser(r.Messages) {
 		return llm.GenerationResult{Text: "Observed Worker update: " + last.Text}
 	}
 	if !root && (strings.HasPrefix(user, "Pause: ") || strings.HasPrefix(user, "Cancel: ")) {

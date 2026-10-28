@@ -28,13 +28,20 @@ func batchReply(req llm.GenerationRequest, input string, root bool) (llm.Generat
 		return llm.GenerationResult{Text: text}, nil
 	}
 	count := 0
+	state := fixtureBatchSummary{}
 	for _, m := range req.Messages {
+		if summary := contextSummary(m); summary.Fixture && summary.Batch.Next > state.Next {
+			state = summary.Batch
+		}
 		for _, c := range m.ToolCalls {
 			if c.Name == agent.RunToolName {
-				count++
+				if row, ok := fixtureRow(c.ID); ok {
+					count = max(count, row)
+				}
 			}
 		}
 	}
+	count = max(count, state.Next)
 	target := 100
 	if strings.Contains(input, "Batch 1000") {
 		target = 1000
@@ -51,10 +58,16 @@ func batchReply(req llm.GenerationRequest, input string, root bool) (llm.Generat
 		}
 		return result, nil
 	}
-	success, failed := 0, 0
+	success, failed := state.Succeeded, state.Failed
 	blockers := map[string]bool{}
+	if state.NeedsInput {
+		blockers["Needs input: confirm region"] = true
+	}
 	for _, m := range req.Messages {
 		if m.Role == "tool" {
+			if row, ok := fixtureRow(m.ToolCallID); ok && row <= state.Next {
+				continue
+			}
 			var result agent.AgentResult
 			if json.Unmarshal([]byte(m.Text), &result) == nil && result.Text != "" {
 				success++

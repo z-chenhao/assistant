@@ -111,7 +111,7 @@ func TestRecallFrozenPerTurnAndFenced(t *testing.T) {
 	if e = r.Release(ctx, c); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = r.recallMessages(ctx, c, run, []llm.Message{{Role: "user", Text: "tea"}}); e != agent.ErrClaimLost {
+	if _, e = r.recallMessages(ctx, c, run, []llm.Message{{Role: "user", Text: "tea"}}, -1); e != agent.ErrClaimLost {
 		t.Fatal("old owner froze recall", e)
 	}
 }

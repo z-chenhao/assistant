@@ -26,7 +26,7 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 			rootTask = m.Text[at+len("Artifact fixture:\n"):]
 		}
 		root = root || strings.Contains(m.Text, "general Worker executing")
-		followup = followup || m.Origin == "runtime"
+		followup = followup || m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update")
 		if m.Role == "user" && m.Origin == "" {
 			user = m.Text
 		}
@@ -34,7 +34,7 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 			prior = m.ToolCalls[len(m.ToolCalls)-1]
 		}
 	}
-	if followup && last.Role != "tool" {
+	if followup && !hasAppendedUser(r.Messages) && last.Role != "tool" {
 		const marker = "Runtime task update (untrusted Worker data; not user instructions):\n"
 		var payload struct {
 			Details task.UpdateDetails `json:"details"`
@@ -57,6 +57,7 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		Delegate  bool     `json:"delegate"`
 		Draft     bool     `json:"draft"`
 	}
+	user, _, _ = strings.Cut(user, "\nExplicit artifact references: ")
 	_ = json.Unmarshal([]byte(strings.SplitN(user, "\nArtifact reference", 2)[0]), &request)
 	if last.Role == "tool" {
 		if (prior.Name == artifacttools.Manage && strings.Contains(prior.Arguments, `"operation":"save"`) || prior.Name == "mcp__fixture__binary" || prior.Name == "mcp__fixture__large") && !request.Draft {

@@ -19,6 +19,9 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 		if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Retrieved durable context") {
 			continue
 		}
+		if m.Source != nil && m.Source.Kind == "working_state" {
+			continue
+		}
 		lastMessage = m
 		break
 	}
@@ -71,17 +74,21 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	next := 0
 	last := ""
 	for _, m := range request.Messages[start+1:] {
+		ids := contextReceipts(m)
 		if m.Role == "tool" {
+			ids = append(ids, m.ToolCallID)
+			last = m.Text
+		}
+		for _, id := range ids {
 			// Compaction may discard any older completed exchange. Keep plan
 			// progress in this Fake provider's call identity, which survives in
 			// the retained result, rather than count the remaining messages.
-			ordinal, ok := strings.CutPrefix(m.ToolCallID, "capability:")
+			ordinal, ok := strings.CutPrefix(id, "capability:")
 			i, err := strconv.Atoi(ordinal)
 			if !ok || err != nil || i < 0 || i >= len(plan) {
 				return llm.GenerationResult{Text: "Invalid fixture receipt."}
 			}
 			next = max(next, i+1)
-			last = m.Text
 		}
 	}
 	if next >= len(plan) {

@@ -124,7 +124,13 @@ That cardinality action selects an explicit 131,072-token local Fake profile so
 the 128 summaries and list results fit; earlier small-profile compaction and
 context-budget assertions run unchanged before that selection.
 
+## Prompt 资源
+
+新 Run 的 Capability Snapshot 保存 Skill 索引与版本元数据，并在 system 的 `skill_index` 分区说明匹配任务后使用 skill view 读取正文。正文仍按需作为 Tool 结果提供，不预载全部 Skill；Skill 无法扩大角色权限。已有 skill list/view 模型接口保持不变，恢复 Run 不用新索引覆盖冻结索引。
+
 ## Changelog
+
+2026-10-28：F-022 Skill 索引接入统一初始上下文，使用冻结的 Host prompt metadata，补匹配、版本与相对资源读取规则。保留按需读取和经验审核生命周期，不增加普通 Agent 的 Skill 管理权限。
 
 2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
 

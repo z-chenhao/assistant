@@ -13,7 +13,7 @@ func TestTaskFixtureAppendedControlOnFollowup(t *testing.T) {
 		t.Run(input, func(t *testing.T) {
 			req := llm.GenerationRequest{Messages: []llm.Message{
 				{Role: "system", Text: "Main conversation"},
-				{Role: "user", Origin: "runtime", Text: "Completed independent work"},
+				{Role: "user", Origin: "runtime", Text: "Runtime task update: Completed independent work"},
 				{Role: "user", Text: input},
 			}}
 			result, err := childrenReply(req)
@@ -33,7 +33,7 @@ func TestTaskFixtureFollowupWithoutFreshInput(t *testing.T) {
 		{Role: "system", Text: "Main conversation"},
 		{Role: "user", Text: "Delegate: already handled"},
 		{Role: "assistant", Text: "Main accepted the work."},
-		{Role: "user", Origin: "runtime", Text: "Completed independent work"},
+		{Role: "user", Origin: "runtime", Text: "Runtime task update: Completed independent work"},
 	}})
 	if err != nil || len(result.ToolCalls) != 0 || result.Text != "Main follow-up: the delegated work has returned." {
 		t.Fatal(result, err)

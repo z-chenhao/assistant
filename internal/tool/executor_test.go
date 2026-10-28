@@ -5,6 +5,38 @@ import (
 	"testing"
 )
 
+func TestPromptResourcesAreCopiedAndFrozenOnSelection(t *testing.T) {
+	d, _ := FixtureRegistry().Resolve("mcp__fixture__echo")
+	d.Spec.PromptContext = []PromptContext{{Kind: "project_instructions", Source: "frozen", Text: "old rules"}}
+	r, e := NewRegistry([]Definition{d})
+	if e != nil {
+		t.Fatal(e)
+	}
+	d.Spec.PromptContext[0].Text = "caller mutation"
+	frozen := r.Describe()
+	if frozen[0].PromptContext[0].Text != "old rules" {
+		t.Fatal("mutable registry input")
+	}
+	frozen[0].PromptContext[0].Text = "local mutation"
+	if r.Describe()[0].PromptContext[0].Text != "old rules" {
+		t.Fatal("mutable registry output")
+	}
+	frozen = r.Describe()
+	live, _ := r.Resolve(d.Spec.Name)
+	live.Spec.PromptContext[0].Text = "newly loaded rules"
+	refreshed, e := NewRegistry([]Definition{live})
+	if e != nil {
+		t.Fatal(e)
+	}
+	selected, e := refreshed.Select(frozen)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if selected.Describe()[0].PromptContext[0].Text != "old rules" {
+		t.Fatal("frozen Run acquired new instructions")
+	}
+}
+
 func TestEchoSchemaAndPolicyDefaults(t *testing.T) {
 	registry := FixtureRegistry()
 	definition, ok := registry.Resolve("mcp__fixture__echo")

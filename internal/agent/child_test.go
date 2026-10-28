@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/z-chenhao/erii/internal/tool"
+	"reflect"
 	"testing"
 )
 
@@ -41,7 +42,7 @@ func TestChildFixedReductionDoesNotAddCapabilities(t *testing.T) {
 		t.Fatal(got)
 	}
 	for i, s := range got {
-		if s != in[i+6] {
+		if !reflect.DeepEqual(s, in[i+6]) {
 			t.Fatal("capability changed", got)
 		}
 	}

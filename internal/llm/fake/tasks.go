@@ -14,7 +14,7 @@ import (
 func hasAppendedUser(messages []llm.Message) bool {
 	user, notice := -1, -1
 	for i, m := range messages {
-		if m.Origin == "runtime" {
+		if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update") {
 			notice = i
 		} else if m.Role == "user" && m.Origin == "" {
 			user = i
@@ -29,7 +29,7 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 	root, followup := false, false
 	for _, m := range r.Messages {
 		root = root || strings.Contains(m.Text, "general Worker executing")
-		followup = followup || m.Origin == "runtime"
+		followup = followup || m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update")
 	}
 	last := r.Messages[len(r.Messages)-1]
 	call := func(name string, value any) llm.GenerationResult {

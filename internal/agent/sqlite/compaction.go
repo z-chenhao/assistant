@@ -40,14 +40,16 @@ func (r *Runs) compactMessages(ctx context.Context, c agent.RunClaim, run agent.
 	if legacy {
 		return in, nil
 	}
-	p := contextbuilder.DefaultPolicy()
+	p := contextbuilder.Policy{}
 	var policy string
 	e := r.host.db.QueryRowContext(ctx, `SELECT policy_json FROM run_context_policy WHERE run_id=?`, run.ID).Scan(&policy)
 	if e == nil {
 		if json.Unmarshal([]byte(policy), &p) != nil {
 			return nil, agent.ErrStorage
 		}
-	} else if e != sql.ErrNoRows {
+	} else if e == sql.ErrNoRows {
+		p = contextbuilder.DefaultPolicy()
+	} else {
 		return nil, agent.ErrStorage
 	}
 	if !p.Valid() {

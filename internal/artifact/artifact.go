@@ -19,6 +19,8 @@ type Scope struct {
 const LocalUser = "local"
 
 type Input struct {
+	// RunOnly is a Host choice for private execution evidence, never a model field.
+	RunOnly   bool   `json:"-"`
 	Name      string `json:"name"`
 	MediaType string `json:"media_type"`
 }

@@ -672,6 +672,7 @@ func TestChildLargeResultUsesSharedArtifactNormalizationAndKeepsEnvelope(t *test
 	s, _, a, p := childFixture(t)
 	input := modelInput()
 	input.ModelID = "large-output"
+	input.ContextWindow = 32768
 	input.MaxOutputTokens = 8192
 	activateLoop(t, s, input)
 	large := strings.Repeat("bounded detail ", 1800)
