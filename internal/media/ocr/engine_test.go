@@ -3,7 +3,6 @@ package ocr
 import (
 	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,16 +85,8 @@ func TestMissingOCR(t *testing.T) {
 	}
 }
 
-func TestOCROutputCapSurvivesStreamCopy(t *testing.T) {
-	var output limitedBuffer
-	output.limit = 20
-	// LimitReader has no WriterTo. Embedding bytes.Buffer would promote its
-	// ReaderFrom, letting io.Copy bypass Write and silently exceed the bound.
-	n, err := io.Copy(&output, io.LimitReader(strings.NewReader(strings.Repeat("x", 100)), 100))
-	if err != nil || n != 100 || len(output.Bytes()) != 20 || !output.overflow {
-		t.Fatal("stream bypassed output cap", n, len(output.Bytes()), output.overflow, err)
-	}
-	if _, err = commandOutput(context.Background(), "/bin/bash", "-c", "head -c 100000 /dev/zero"); !errors.Is(err, ErrUnavailable) {
+func TestOCRMetadataOutputCap(t *testing.T) {
+	if _, err := commandOutput(context.Background(), "/bin/bash", "-c", "head -c 100000 /dev/zero"); !errors.Is(err, ErrUnavailable) {
 		t.Fatal("subprocess output bypassed cap", err)
 	}
 }

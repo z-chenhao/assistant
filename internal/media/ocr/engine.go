@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/computer/sandbox"
@@ -38,10 +39,9 @@ func commandOutput(ctx context.Context, exe string, args ...string) ([]byte, err
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.Env = cleanEnv()
-	var output limitedBuffer
-	output.limit = 32 << 10
-	cmd.Stdout = &output
-	if err := cmd.Run(); err != nil || output.overflow {
+	output := sandbox.NewOutput(32 << 10)
+	cmd.Stdout = output
+	if _, err := sandbox.Run(cmd, syscall.SIGKILL); err != nil || output.Overflow() {
 		return nil, ErrUnavailable
 	}
 	return output.Bytes(), nil
@@ -165,22 +165,4 @@ func (e *Engine) verify(ctx context.Context) error {
 		return ErrChanged
 	}
 	return nil
-}
-
-type limitedBuffer struct {
-	buffer   bytes.Buffer
-	limit    int
-	overflow bool
-}
-
-func (b *limitedBuffer) Bytes() []byte { return b.buffer.Bytes() }
-
-func (b *limitedBuffer) Write(p []byte) (int, error) {
-	n := len(p)
-	if len(p) > b.limit-b.buffer.Len() {
-		p = p[:max(0, b.limit-b.buffer.Len())]
-		b.overflow = true
-	}
-	_, err := b.buffer.Write(p)
-	return n, err
 }

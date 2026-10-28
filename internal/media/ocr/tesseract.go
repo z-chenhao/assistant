@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/z-chenhao/erii/internal/computer/sandbox"
 	"github.com/z-chenhao/erii/internal/media"
@@ -58,21 +57,13 @@ func (e *Engine) Extract(ctx context.Context, kind string, data []byte) (Documen
 	cmd.Env = cleanEnv()
 	cmd.Dir = root
 	cmd.Stdin = bytes.NewReader(data)
-	var output limitedBuffer
-	output.limit = 2 << 20
-	cmd.Stdout = &output
-	cmd.WaitDelay = time.Second
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
-	if err = cmd.Start(); err != nil {
-		return Document{}, ErrUnavailable
-	}
-	defer syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	err = cmd.Wait()
+	output := sandbox.NewOutput(2 << 20)
+	cmd.Stdout = output
+	_, err = sandbox.Run(cmd, syscall.SIGKILL)
 	if ctx.Err() != nil {
 		return Document{}, ctx.Err()
 	}
-	if output.overflow {
+	if output.Overflow() {
 		return Document{}, media.ErrLimit
 	}
 	if err != nil {

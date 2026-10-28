@@ -75,6 +75,7 @@ sequenceDiagram
 - [internal/agent/sqlite/image_ocr.go](../../internal/agent/sqlite/image_ocr.go)
 - [internal/media/image.go](../../internal/media/image.go)
 - [internal/media/ocr/engine.go](../../internal/media/ocr/engine.go)
+- [internal/computer/sandbox/process.go](../../internal/computer/sandbox/process.go)
 - [internal/llm/images.go](../../internal/llm/images.go)
 - [internal/llm/bridge/images.go](../../internal/llm/bridge/images.go)
 - [internal/agent/sqlite/codemode.go](../../internal/agent/sqlite/codemode.go)
@@ -190,6 +191,7 @@ transaction before storage can be reclaimed. After Task protection ends, effecti
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-013 增强中的结构收敛 | 发现 OCR 与原生环境工具重复维护进程组、取消、等待和输出捕获，将其归入现有 sandbox 模块；图像解码与授权读取也由各自单一入口复用。 | 修复流复制绕过输出上限的问题，并移除环境工具中同类实现。保持原生工具 SIGTERM 清理、OCR SIGKILL、启动前/后失败区别、审批和 unknown 重放规则；不引入通用 Provider 框架。 | F-013 / F-026 |
 | 2026-10-28 | F-013 增强：本地 OCR | 明确区分像素输入与文字识别，新增默认 `builtin__image_ocr`，共用授权读图与单图校验，Tesseract 处理原图。 | 比较 Codex 的视觉专用 view_image 后保留 Artifact 语义；无需另一模型、外部服务、DB 迁移或新评测平台。冻结引擎/语言身份，依赖变更需重启并创建新 Run；既有快照不获得新工具。 | F-013 |
 | 2026-10-28 | F-013：用户图片进入视觉输入 | 从 Run 类型/生成存储文件拆出统一消息投影与授权图像 resolver，缩图过程分职责；复用既有 Probe 与 Bridge。 | 采用冻结 context policy 标记保留旧引用表示，不改已有请求或扩大 Child 权限；相比把 base64 放入历史或增加专用看图工具，保持引用持久化和统一执行路径。无需 schema 迁移，升级进程统一版本。 | F-013 |
 | 2026-10-28 | F-039：流读取/校验移出 SQLite，保留短事务配额及结果接纳；活跃对象由文件锁保护。 | 避免长流阻塞 lease 和结果接纳；增加文件所有权协议，需停止旧版本后升级，禁止不同回收协议混跑。 |

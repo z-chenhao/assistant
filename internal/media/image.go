@@ -15,7 +15,7 @@ const MaxImagePixels = 32 << 20
 var ErrInvalid = errors.New("invalid image")
 var ErrLimit = errors.New("image limit exceeded")
 
-func ImageConfig(kind string, data []byte) (image.Config, error) {
+func imageConfig(kind string, data []byte) (image.Config, error) {
 	if len(data) > MaxImageBytes {
 		return image.Config{}, ErrLimit
 	}
@@ -33,7 +33,7 @@ func ImageConfig(kind string, data []byte) (image.Config, error) {
 }
 
 func DecodeImage(kind string, data []byte) (image.Image, error) {
-	if _, err := ImageConfig(kind, data); err != nil {
+	if _, err := imageConfig(kind, data); err != nil {
 		return nil, err
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
