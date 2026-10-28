@@ -114,7 +114,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                     return [dict(r) for r in db.execute('SELECT * FROM tool_invocation ORDER BY created_at,rowid')]
 
             def execute(key, source, approve=True, refs=()):
-                plan = json.dumps([{'name': 'builtin__codemode__execute', 'arguments': {'source': cell}} for cell in (source if isinstance(source,list) else [source])])
+                plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': cell}} for cell in (source if isinstance(source,list) else [source])])
                 key_label = key
                 if live_config: key = key + ':' + drive_nonce
                 if refs:
@@ -185,7 +185,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                         h.command('approval', 'approve' if approve else 'deny', a['approval_id'], a['frozen_arguments_hash'])
                 else: raise AssertionError('drive did not settle')
                 invocations = rows()
-                parent = [r for r in invocations if r['tool_name'] == 'builtin__codemode__execute'][-1]
+                parent = [r for r in invocations if r['tool_name'] == 'builtin__codemode_execute'][-1]
                 require(parent['status'] == 'succeeded', f'cell failed: {parent["result_json"]}')
                 nested = [r for r in invocations if r['parent_invocation_id'] == parent['invocation_id']]
                 require(all(json.loads(r['conflict_keys']) for r in nested), 'read/action missed desktop barrier')

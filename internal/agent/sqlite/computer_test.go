@@ -361,7 +361,7 @@ func TestComputerCannotBypassAcceptedCodeBoundary(t *testing.T) {
 	ctx := context.Background()
 	f := &lifecycleFake{}
 	r.ConfigureComputer(f, computer.Compatibility{}, computer.RestorationManifest{Version: 1})
-	result, err := b[0].t.executeComputer(ctx, tool.Invocation{Call: llm.ToolCall{Name: "builtin__computer__discover", Arguments: `{"method":"getState"}`}})
+	result, err := b[0].t.executeComputer(ctx, tool.Invocation{Call: llm.ToolCall{Name: "builtin__computer_discover", Arguments: `{"method":"getState"}`}})
 	if err != nil || result.Error == nil || result.Error.Code != "PERMISSION_DENIED" || f.ensures != 0 {
 		t.Fatal(result, err)
 	}

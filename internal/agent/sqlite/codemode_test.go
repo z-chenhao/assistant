@@ -202,7 +202,7 @@ func TestCodeModeStoreAndEventCommitFailuresDoNotLeakSuccess(t *testing.T) {
 			}
 			mustSubmit(t, a, boundary, "execute")
 			mustDrain(t, a)
-			if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__codemode__execute' AND status='failed'`) != 1 {
+			if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__codemode_execute' AND status='failed'`) != 1 {
 				t.Fatal("reported success before commit")
 			}
 			if scalar(t, s, `SELECT count(*) FROM code_store`) != 0 {

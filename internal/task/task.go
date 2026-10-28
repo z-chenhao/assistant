@@ -12,8 +12,8 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
-const SearchName = "builtin__task__search"
-const ManageName = "builtin__task__manage"
+const SearchName = "builtin__task_search"
+const ManageName = "builtin__task_manage"
 const SearchSchema = `{"type":"object","properties":{"query":{"type":"string"},"scope":{"type":"string","enum":["active","recent","all"]},"status":{"type":"array","items":{"type":"string","enum":["active","paused","completed","cancelled"]}},"limit":{"type":"integer","minimum":1,"maximum":50}},"additionalProperties":false}`
 const ManageSchema = `{"oneOf":[{"type":"object","properties":{"operation":{"const":"create"},"task":{"type":"string"},"completionPolicy":{"type":"string","enum":["once","ongoing"],"description":"Defaults to once. Use ongoing for continuing work; ordinary Root completion keeps the Task active."},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","task"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"append"},"taskRef":{"type":"string"},"instruction":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","taskRef","instruction"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"pause"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"cancel"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"complete"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false}]}`
 

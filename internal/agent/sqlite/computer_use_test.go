@@ -38,7 +38,7 @@ func TestComputerApprovalControlledLeaseResumeAndUnknownNeverDispatchesAgain(t *
 			executor := func(bridge *codeBridge) tool.Executor {
 				return tool.Executor{Registry: bridge.registry, Store: nestedTools{bridge.t.forCode(bridge), bridge.req.ExecutionID}}
 			}
-			bind := []llm.ToolCall{{ID: b.req.ExecutionID + "/" + digest("bind"), Name: "builtin__computer__bind", Arguments: `{"method":"getApp","args":["notes"]}`}}
+			bind := []llm.ToolCall{{ID: b.req.ExecutionID + "/" + digest("bind"), Name: "builtin__computer_bind", Arguments: `{"method":"getApp","args":["notes"]}`}}
 			result, err := executor(b).Execute(ctx, b.exchange, bind)
 			if err != nil || result[0].Error != nil {
 				t.Fatal(result, err)
@@ -48,7 +48,7 @@ func TestComputerApprovalControlledLeaseResumeAndUnknownNeverDispatchesAgain(t *
 			}
 			json.Unmarshal([]byte(result[0].Text), &handle)
 			raw, _ := encoded(map[string]any{"method": "typeText", "handle_token": handle.Token, "args": []any{"approved fixture"}})
-			action := []llm.ToolCall{{ID: b.req.ExecutionID + "/" + digest("action"), Name: "builtin__computer__invoke", Arguments: raw}}
+			action := []llm.ToolCall{{ID: b.req.ExecutionID + "/" + digest("action"), Name: "builtin__computer_invoke", Arguments: raw}}
 			if _, err = executor(b).Execute(ctx, b.exchange, action); !errors.Is(err, tool.ErrSuspended) {
 				t.Fatal(err)
 			}
@@ -98,7 +98,7 @@ func TestComputerApprovalControlledLeaseResumeAndUnknownNeverDispatchesAgain(t *
 			if err != nil || provider.Text != "approved fixture" {
 				t.Fatal("replayed mutation", result, err, provider.Text)
 			}
-			if scalar(t, s, `SELECT attempt_count FROM tool_invocation WHERE tool_name='builtin__computer__invoke'`) != 1 {
+			if scalar(t, s, `SELECT attempt_count FROM tool_invocation WHERE tool_name='builtin__computer_invoke'`) != 1 {
 				t.Fatal("effect was retried")
 			}
 		})
@@ -110,7 +110,7 @@ func TestComputerDesktopBarrierAppliesAcrossAppAndRead(t *testing.T) {
 	p := &surfaceProvider{}
 	r.ConfigureComputer(p, computer.Compatibility{}, computer.RestorationManifest{Version: 1})
 	nested := nestedTools{b[0].t.forCode(b[0]), b[0].req.ExecutionID}
-	calls := []llm.ToolCall{{ID: b[0].req.ExecutionID + "/" + digest("one"), Name: "builtin__computer__discover", Arguments: `{"method":"getState"}`}, {ID: b[0].req.ExecutionID + "/" + digest("two"), Name: "builtin__computer__discover", Arguments: `{"method":"listApps"}`}}
+	calls := []llm.ToolCall{{ID: b[0].req.ExecutionID + "/" + digest("one"), Name: "builtin__computer_discover", Arguments: `{"method":"getState"}`}, {ID: b[0].req.ExecutionID + "/" + digest("two"), Name: "builtin__computer_discover", Arguments: `{"method":"listApps"}`}}
 	invs, err := nested.Accept(ctx, b[0].exchange, calls, b[0].registry.Describe())
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +127,7 @@ func TestComputerDesktopBarrierAppliesAcrossAppAndRead(t *testing.T) {
 	if err = nested.Start(ctx, invs[1].ID); err != nil {
 		t.Fatal("barrier did not release", err)
 	}
-	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name LIKE 'builtin__computer__%' AND json_array_length(conflict_keys)>0`) != 2 {
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name LIKE 'builtin__computer_%' AND json_array_length(conflict_keys)>0`) != 2 {
 		t.Fatal("conflict keys not frozen")
 	}
 }
@@ -196,9 +196,9 @@ func TestComputerScreenshotNormalizationCommitsArtifactAndReadinessTogether(t *t
 	executor := tool.Executor{Registry: b.registry, Store: nestedTools{b.t.forCode(b), b.req.ExecutionID}}
 	run := func(key, method, token string) tool.Result {
 		args, _ := encoded(map[string]any{"method": method, "handle_token": token, "args": []any{"notes"}})
-		name := "builtin__computer__invoke"
+		name := "builtin__computer_invoke"
 		if method == "getApp" {
-			name = "builtin__computer__bind"
+			name = "builtin__computer_bind"
 		}
 		out, err := executor.Execute(ctx, b.exchange, []llm.ToolCall{{ID: b.req.ExecutionID + "/" + digest(key), Name: name, Arguments: args}})
 		if err != nil || len(out) != 1 {

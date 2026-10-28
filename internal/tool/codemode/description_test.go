@@ -8,7 +8,7 @@ import (
 )
 
 func TestDescriptionIncludesSchemaDeclarationsAndInstructions(t *testing.T) {
-	spec := tool.Spec{Name: "builtin__agent__run", Description: "Create one Child, never a Task.", InputSchema: `{"type":"object","properties":{"task":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["task"],"additionalProperties":false}`}
+	spec := tool.Spec{Name: "builtin__agent_run", Description: "Create one Child, never a Task.", InputSchema: `{"type":"object","properties":{"task":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["task"],"additionalProperties":false}`}
 	d := Describe(spec)
 	for _, fragment := range []string{`"task": string`, `"artifactRefs"?: ReadonlyArray<string>`, `readonly artifactRefs: readonly string[]`} {
 		if !strings.Contains(d.Declaration, fragment) {
@@ -28,6 +28,28 @@ func TestDefinitionExplainsUnifiedCapabilities(t *testing.T) {
 	for _, required := range []string{"tools[name](args)", `describeNamespace("cua")`, "cua.getState()", "documentation()", "observe after actions", `describeNamespace("agent")`, "agent.run({task,artifactRefs})", "Main has no agent namespace", "{text,artifactRefs}", "unawaited", "Approval"} {
 		if !strings.Contains(description, required) {
 			t.Fatalf("missing %q in %s", required, description)
+		}
+	}
+}
+
+func TestNamespacePreservesSingleUnderscoresAndSourceBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		name, namespace string
+		want            bool
+	}{
+		{"builtin__task_search", "task", true},
+		{"builtin__task_search", "builtin__task", true},
+		{"builtin__task_search", "tasks", false},
+		{"builtin__task__search", "task", false},
+		{"mcp__browser_use__click_button", "browser_use", true},
+		{"mcp__browser_use__click_button", "mcp__browser_use", true},
+		{"mcp__browser_use__click_button", "browser", false},
+		{"mcp__browser_use__click_button", "builtin__browser_use", false},
+		{"mcp__browser_use__click_button", "click_button", false},
+		{"mcp____click_button", "", false},
+	} {
+		if got := NamespaceMatches(tc.name, tc.namespace); got != tc.want {
+			t.Errorf("NamespaceMatches(%q, %q)=%v, want %v", tc.name, tc.namespace, got, tc.want)
 		}
 	}
 }

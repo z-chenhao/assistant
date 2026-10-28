@@ -4,8 +4,8 @@ package tools
 
 import "github.com/z-chenhao/erii/internal/tool"
 
-const Manage = "builtin__artifact__manage"
-const Search = "builtin__artifact__search"
+const Manage = "builtin__artifact_manage"
+const Search = "builtin__artifact_search"
 
 const ManageSchema = `{"oneOf":[{"type":"object","properties":{"operation":{"const":"save"},"name":{"type":"string","maxLength":255},"mediaType":{"type":"string","maxLength":128},"text":{"type":"string","maxLength":8192}},"required":["operation","name","mediaType","text"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"read"},"artifactRef":{"type":"string","maxLength":256},"offset":{"type":"integer","minimum":0,"maximum":1073741824},"limit":{"type":"integer","minimum":1,"maximum":4096}},"required":["operation","artifactRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"describe"},"artifactRef":{"type":"string","maxLength":256}},"required":["operation","artifactRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"publish"},"artifactRefs":{"type":"array","maxItems":127,"items":{"type":"string","maxLength":256}}},"required":["operation","artifactRefs"],"additionalProperties":false}]}`
 const SearchSchema = `{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"limit":{"type":"integer","minimum":1,"maximum":50}},"additionalProperties":false}`

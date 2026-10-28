@@ -112,7 +112,7 @@ func definition(t *testing.T, c Config, name string) tool.Definition {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok := r.Resolve("builtin__workspace__" + name)
+	d, ok := r.Resolve("builtin__workspace_" + name)
 	if !ok {
 		t.Fatal(name)
 	}
@@ -156,7 +156,7 @@ func TestEditProtectsDirtyFilesAndPreimages(t *testing.T) {
 		t.Fatal(err)
 	}
 	reg, _ := tool.NewRegistry(defs)
-	if _, ok := reg.Resolve("builtin__workspace__edit"); ok {
+	if _, ok := reg.Resolve("builtin__workspace_edit"); ok {
 		t.Fatal("audit edit visible")
 	}
 }
@@ -273,7 +273,7 @@ func TestWorkspaceMetadataSnapshotIgnoresTransientLocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, _ := registry.Resolve("builtin__workspace__git")
+	d, _ := registry.Resolve("builtin__workspace_git")
 	if got := d.Execute(context.Background(), `{"operation":"status"}`); got.Error != nil {
 		t.Fatal(got)
 	}

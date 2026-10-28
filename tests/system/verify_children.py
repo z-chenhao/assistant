@@ -44,9 +44,9 @@ def check(value, children=2, completed=True):
     for c in value["capabilities"]:
         specs = json.loads(c["tools_json"])
         if c["role"] == "main":
-            require(not c["can_spawn_agents"] and not any(s["name"] == "builtin__agent__run" for s in specs), "Main delegation exposed")
+            require(not c["can_spawn_agents"] and not any(s["name"] == "builtin__agent_run" for s in specs), "Main delegation exposed")
         else:
-            require(not any(s["name"].startswith("builtin__task__") for s in specs), "Worker Task control")
+            require(not any(s["name"].startswith("builtin__task_") for s in specs), "Worker Task control")
     for child in child_nodes:
         parent = nodes[child["parent_run_id"]]
         cc, pc = caps[child["capability_snapshot_id"]], caps[parent["capability_snapshot_id"]]
@@ -61,7 +61,7 @@ def check(value, children=2, completed=True):
         require(all(r["status"] in ("completed", "failed") for r in value["runs"]), "tree left unfinished")
         require(len(value["updates"]) == 1 and len(value["inbox"]) == 1 and sum(m["source"] == "main" and m["role"] == "assistant" for m in value["conversation"]) == 2 and len(value["deliveries"]) == sum(m["role"] == "assistant" for m in value["conversation"]), "Child bypassed direct Parent")
         for inv in value["tools"]:
-            if inv["tool_name"] == "builtin__agent__run" and inv["status"] == "succeeded":
+            if inv["tool_name"] == "builtin__agent_run" and inv["status"] == "succeeded":
                 result = json.loads(json.loads(inv["result_json"])["text"])
                 require(set(result) == {"text", "artifactRefs"} and isinstance(result["artifactRefs"], list), "AgentResult Host state leak")
     require(all(c["token"] is None for c in value["claims"]), "leases retained")
@@ -109,7 +109,7 @@ def run(binary, scenario_jobs=1):
             h.command("chat", "work")
             value = state(h)
             check(value, children=1)
-            inv = next(i for i in value["tools"] if i["tool_name"] == "builtin__agent__run")
+            inv = next(i for i in value["tools"] if i["tool_name"] == "builtin__agent_run")
             result = json.loads(json.loads(inv["result_json"])["text"])
             require(len(result["artifactRefs"]) == 1 and result["artifactRefs"] == json.loads(inv["arguments_json"])["artifactRefs"], "explicit Artifact input/result lost")
             require(len(value["artifacts"]) == 1 and len(value["publications"]) == 2, "child Artifact duplicated or not returned to Root")
@@ -120,7 +120,7 @@ def run(binary, scenario_jobs=1):
             h.command("chat", "work")
             value = state(h)
             check(value, children=1)
-            invocation = next(i for i in value["tools"] if i["tool_name"] == "builtin__agent__run")
+            invocation = next(i for i in value["tools"] if i["tool_name"] == "builtin__agent_run")
             result = json.loads(json.loads(invocation["result_json"])["text"])
             require(len(result["artifactRefs"]) == 1 and len(result["text"]) < 16384 and len(value["artifacts"]) == 1, "large Child result not normalized")
             content = h.output(result["artifactRefs"][0])
@@ -145,7 +145,7 @@ def run(binary, scenario_jobs=1):
                 h.command("chat", "work")
                 value = state(h)
                 check(value, children=children)
-                results = [json.loads(i["result_json"]) for i in value["tools"] if i["tool_name"] == "builtin__agent__run"]
+                results = [json.loads(i["result_json"]) for i in value["tools"] if i["tool_name"] == "builtin__agent_run"]
                 require(len(results) == 1 and results[0]["error"]["code"] == expected and results[0]["error"]["retryable"] == (expected == "PROVIDER_UNAVAILABLE"), "wrong Host error")
                 return value
             report[name] = scenario(name, reject)

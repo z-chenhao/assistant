@@ -99,7 +99,7 @@ func (s Service) Search(ctx context.Context, scope Scope, q Query, budget int) (
 // UnconfiguredIdentity freezes a disabled recall surface without selecting a provider.
 const UnconfiguredIdentity = "recall:unconfigured-v1"
 
-const ToolName = "builtin__memory__search"
+const ToolName = "builtin__memory_search"
 const ToolSchema = `{"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":4096},"limit":{"type":"integer","minimum":1,"maximum":50},"time_range":{"type":"object","properties":{"start":{"type":"string","maxLength":40},"end":{"type":"string","maxLength":40}},"additionalProperties":false}},"required":["query"],"additionalProperties":false}`
 
 func Definition(identity string) tool.Definition {

@@ -35,7 +35,7 @@ func (s *store) OpenArtifact(_ context.Context, ref string) (io.ReadCloser, erro
 func call(t *testing.T, r computer.UseRuntime, operation, token, method string, args ...any) tool.Result {
 	t.Helper()
 	raw, _ := json.Marshal(map[string]any{"method": method, "handle_token": token, "args": args})
-	v, e := r.Call(context.Background(), "builtin__computer__"+operation, string(raw))
+	v, e := r.Call(context.Background(), "builtin__computer_"+operation, string(raw))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -143,13 +143,13 @@ func TestUseInventoryCapabilitiesWaitAndTransfers(t *testing.T) {
 func TestEveryMutationHasFrozenApprovalAndNeverReplay(t *testing.T) {
 	p := tool.Spec{Permission: "read_only"}.Policy()
 	for _, m := range []string{"click", "setValue", "goto", "playwright.upload", "playwright.download"} {
-		v := computer.CallPolicy("builtin__computer__invoke", `{"method":"`+m+`","args":[]}`, p)
+		v := computer.CallPolicy("builtin__computer_invoke", `{"method":"`+m+`","args":[]}`, p)
 		if v.Risk != "high" || v.Replay != "never" {
 			t.Fatal(m, v)
 		}
 	}
 	for _, m := range []string{"importArtifact", "exportArtifact", "launchApp"} {
-		v := computer.CallPolicy("builtin__computer__discover", `{"method":"`+m+`","args":[]}`, p)
+		v := computer.CallPolicy("builtin__computer_discover", `{"method":"`+m+`","args":[]}`, p)
 		if v.Risk != "high" || v.Replay != "never" {
 			t.Fatal(m, v)
 		}

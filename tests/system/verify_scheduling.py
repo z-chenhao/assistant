@@ -106,7 +106,7 @@ def run(binary, evidence=None):
             check(value, children=100)
             children = [r for r in value['runs'] if r['parent_run_id']]
             require(sum(r['status'] == 'completed' for r in children) == 98 and sum(r['status'] == 'failed' for r in children) == 2, 'business failures aborted or duplicated batch')
-            invocations = [i for i in value['tools'] if i['tool_name'] == 'builtin__agent__run']
+            invocations = [i for i in value['tools'] if i['tool_name'] == 'builtin__agent_run']
             require({i['provider_call_id'] for i in invocations} == {f'row-{i:03d}' for i in range(1, 101)}, 'row adoption missing or duplicated')
             for invocation in invocations:
                 row = int(invocation['provider_call_id'].removeprefix('row-'))

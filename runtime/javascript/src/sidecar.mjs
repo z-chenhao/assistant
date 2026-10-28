@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 
 export const VERSION = 'erii-js-v2';
-const PRELUDE = 'erii-prelude-v2';
+const PRELUDE = 'erii-prelude-v3';
 const MAX_MESSAGE = 1048576;
 const executions = new Map();
 const replies = new Map();
@@ -62,7 +62,7 @@ function valid(req) {
     ['main', 'worker'].includes(req.kind) && typeof req.source === 'string' &&
     Buffer.byteLength(req.source) <= 65536 && req.sourceHash === createHash('sha256').update(req.source).digest('hex') &&
     Array.isArray(req.tools) && req.tools.length <= 1024 &&
-    req.tools.every(s => typeof s.name === 'string' && s.name.length <= 256 && (req.kind === 'worker' || s.name !== 'builtin__agent__run')) &&
+    req.tools.every(s => typeof s.name === 'string' && s.name.length <= 256 && (req.kind === 'worker' || s.name !== 'builtin__agent_run')) &&
     req.limits && Number.isInteger(req.limits.timeoutMs) && req.limits.timeoutMs > 0 && req.limits.timeoutMs <= 300000 &&
     Number.isInteger(req.limits.memoryBytes) && req.limits.memoryBytes >= 1048576 && req.limits.memoryBytes <= 67108864 &&
     Number.isInteger(req.limits.outputBytes) && req.limits.outputBytes > 0 && req.limits.outputBytes <= 262144 &&

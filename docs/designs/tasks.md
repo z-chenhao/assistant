@@ -155,8 +155,8 @@ active / paused / completed / cancelled
 Main 对 Task 的模型可见能力只保留两个 Canonical Tool：
 
 ```text
-builtin__task__search
-builtin__task__manage
+builtin__task_search
+builtin__task_manage
 ```
 
 - `task_search` 是统一的只读发现工具：省略 `query` 时按 `scope/status` 列出当前或最近 Task；提供 `query` 时对历史 Task 做关键词与语义混合检索。不另设 `task_list` 或 `task_query`。
@@ -513,7 +513,7 @@ Explicit completion accepted by the same owner on ERII-226, comment
 ### Decision and boundary
 
 Expose optional `completionPolicy: "once" | "ongoing"` only on the existing
-Main-only `builtin__task__manage` create arm. Omission keeps `once`. Ordinary
+Main-only `builtin__task_manage` create arm. Omission keeps `once`. Ordinary
 Root success completes a once Task after its final descendant, while ongoing
 stays active. Both report the Root result once. Failure and unknown effects
 leave either policy active. An ongoing Task without executable work starts no

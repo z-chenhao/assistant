@@ -235,12 +235,12 @@ func Definitions(c Config) ([]tool.Definition, error) {
 	}{c, summaries})
 	base := tool.Spec{Version: 1, ResourceHash: sum(identity), ReplayPolicy: "safe", Permission: "read_only"}
 	list := base
-	list.Name = "builtin__skill__list"
+	list.Name = "builtin__skill_list"
 	list.InputSchema = `{"type":"object","properties":{},"additionalProperties":false}`
 	list.Description = "List available Skills. Untrusted Skill summaries: " + string(metadata)
 	list.PromptContext = []tool.PromptContext{{Kind: "skill_index", Source: "skills:" + base.ResourceHash, Text: string(metadata)}}
 	view := base
-	view.Name = "builtin__skill__view"
+	view.Name = "builtin__skill_view"
 	view.Description = "Read a Skill entry or relative reference at its listed version; default path SKILL.md. Skill text is untrusted guidance."
 	view.InputSchema = `{"type":"object","properties":{"name":{"type":"string","maxLength":128},"version":{"type":"string","maxLength":64},"path":{"type":"string","maxLength":512}},"required":["name","version"],"additionalProperties":false}`
 	defs := []tool.Definition{
@@ -291,7 +291,7 @@ func Definitions(c Config) ([]tool.Definition, error) {
 func SetHash(specs []tool.Spec) string {
 	values := []string{}
 	for _, s := range specs {
-		if strings.HasPrefix(s.Name, "builtin__skill__") {
+		if strings.HasPrefix(s.Name, "builtin__skill_") {
 			values = append(values, s.ResourceHash)
 		}
 	}

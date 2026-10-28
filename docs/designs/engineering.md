@@ -96,7 +96,7 @@ Computer 的 Begin 拆为已接纳计划读取、当前实例决策和原子计�
 | 部署形态 | 一期模块化单体，未来可拆服务 |
 | 模型 Provider | 独立 Node.js Model Provider Bridge：复用 Pi AI 行为；支持本地 OpenAI-compatible 与 OpenAI Sign in with ChatGPT |
 | Code Mode | 独立 Node.js JavaScript 沙箱 |
-| Agent Tool | `builtin__agent__run`、Code Mode `agent.run()` 与 `tools.*`、`cua.*` 共用 ToolInvocation 管线；复用 QuickJS 和父 ToolInvocation 的内部恢复协议 |
+| Agent Tool | `builtin__agent_run`、Code Mode `agent.run()` 与 `tools.*`、`cua.*` 共用 ToolInvocation 管线；复用 QuickJS 和父 ToolInvocation 的内部恢复协议 |
 | 本地隔离环境 | Lume macOS VM + Guest 内 Cua Driver |
 | Memory/Conversation 权威存储 | 分离的 SQLite 数据库 |
 | 事件队列 | NATS JetStream |

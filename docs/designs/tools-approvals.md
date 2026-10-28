@@ -51,20 +51,23 @@ flowchart TD
 
 ```text
 mcp__<server_name>__<tool_name>
-builtin__<domain>__<tool_name>
+builtin__<tool_name>
 ```
 
 示例：
 
 ```text
+mcp__browser_use__click_button
 mcp__gmail__read_email
-builtin__memory__search
-builtin__skill__list
-builtin__task__search
-builtin__task__manage
+builtin__memory_search
+builtin__skill_list
+builtin__task_search
+builtin__task_manage
 ```
 
 该命名方式可作为 JavaScript 对象属性或字符串键使用，不要求工具名必须是 JavaScript 标识符。
+
+`__` 仅用于来源/服务器的结构分界；名字内部保留单下划线。因此 `task_search` 是完整的 builtin 工具名，`browser_use` 和 `click_button` 分别是完整的 MCP server 名与工具名。MCP 配置拒绝名字内部的 `__`，防止分界歧义。Code Mode 的 `describeNamespace("task")` / `describeNamespace("builtin__task")` 按 `task_` 前缀发现内置工具；`browser_use` / `mcp__browser_use` 精确匹配 MCP server。
 
 生产 Registry 不注册演示 echo 工具；`mcp__fixture__echo` 仅在显式 `-test-bridge` 中存在，返回模型数据，不发送用户消息。用户交付继续由 Main 的最终 AssistantMessage → DeliveryRequest/Outbox → Delivery Composer → UISpec 完成，Web 复用 OpenIntelligentUI 原生表格；Worker 没有用户发送能力。此次不新增第二个发送入口或模型 UI 代码。
 
@@ -224,6 +227,8 @@ Do not retry such an action manually without resolving the original outcome.
 
 ## Changelog
 
+2026-10-28：按用户确认的命名规则统一为 `builtin__<tool_name>` 与 `mcp__<server_name>__<tool_name>`。更新直接调用、Code Mode 发现、Computer 桥接、角色裁剪和提示文案；JavaScript prelude 升至 v3。state schema 28 仅更新 Child 权限与 Code Mode 终态守卫，保留历史迁移、冻结快照、请求、审批与 hash 的原始字节。旧名不作为运行时别名，含旧名的冻结 Run 明确失败 `MODEL_INCOMPATIBLE`；升级前完成 Main 与未决外部效果核实，暂停的 Worker Task 可在升级后由新 Main append 创建新 Root。所有共享 data root 的进程需统一升级。
+
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 
 2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
@@ -246,8 +251,8 @@ Do not retry such an action manually without resolving the original outcome.
 
 Status: accepted for the user-requested ERII-192 Tool consolidation.
 
-Artifact exposes exactly `builtin__artifact__manage` and
-`builtin__artifact__search`. Manage keeps strict operation-specific fields for
+Artifact exposes exactly `builtin__artifact_manage` and
+`builtin__artifact_search`. Manage keeps strict operation-specific fields for
 save/read/describe/publish; search browses or filters scoped metadata. The coarse
 manage permission remains local `artifact_write`, with operation validation
 before execution and before publication. Neither Tool grants external writes.
@@ -271,6 +276,10 @@ Worker-only `agent.run` remains singular and uses the same ToolInvocation path.
 <a id="decision-005-compatibility-and-upgrade"></a>
 
 ### Compatibility and upgrade
+
+工具命名升级遵循下述冻结契约。升级前排空 Main，并完成需要保留的旧 Run 和外部效果核实；新二进制不会以新名称执行旧快照。state schema 28 不重命名历史数据，只将 SQL 守卫适配为新命名；旧 Code Mode 名称仅保留在终态清理守卫中，不是可调用别名。升级后的数据库不能再由旧二进制打开，所有进程必须统一升级；Worker Task 可先暂停，升级后用新 Main 的 `task_manage(append)` 创建新 Root 接续。
+
+以下为历史 Artifact 契约调整的升级说明；当前命名升级额外需要 schema 28。
 
 No database schema changes or stored snapshot rewrites are required. This is a
 model-visible contract break: the five old Artifact Tool names and production

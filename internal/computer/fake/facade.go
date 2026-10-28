@@ -19,7 +19,7 @@ func Definitions() []tool.Definition {
 	definitions := []tool.Definition{}
 	for _, operation := range []string{"discover", "bind", "invoke"} {
 		operation := operation
-		definitions = append(definitions, tool.Definition{Spec: tool.Spec{Name: "builtin__computer__" + operation, Version: 1, Description: "Computer " + operation + " bridge; use cua facade.", InputSchema: `{"type":"object"}`, Permission: "read_only", ReplayPolicy: "safe"}, Execute: func(ctx context.Context, args string) tool.Result {
+		definitions = append(definitions, tool.Definition{Spec: tool.Spec{Name: "builtin__computer_" + operation, Version: 1, Description: "Computer " + operation + " bridge; use cua facade.", InputSchema: `{"type":"object"}`, Permission: "read_only", ReplayPolicy: "safe"}, Execute: func(ctx context.Context, args string) tool.Result {
 			scope := computer.Execution(ctx)
 			if scope == "" {
 				return tool.Failure("PERMISSION_DENIED")

@@ -139,7 +139,7 @@ func TestSpendDenialDrainsAcceptedChildrenAndInvocations(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustDrain(t, a)
-	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status IN ('queued','running','waiting')`) != 0 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__agent__run' AND status='failed'`) != 3 {
+	if scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status IN ('queued','running','waiting')`) != 0 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__agent_run' AND status='failed'`) != 3 {
 		t.Fatal("denial orphaned accepted Child invocations")
 	}
 	if scalar(t, s, `SELECT count(*) FROM provider_usage u JOIN run r USING(run_id) WHERE r.kind='worker'`) != 2 {

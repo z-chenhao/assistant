@@ -110,7 +110,7 @@ def list_after_forget(h):
         fresh = h.send(key, 'Automation: ' + json.dumps(dict(operation='list')))
         h.command('chat', 'work')
         value = h.evidence()
-        calls = [t for t in value['tool_invocation'] if t['run_id'] == fresh['run_id'] and t['tool_name'] == 'builtin__automation__manage']
+        calls = [t for t in value['tool_invocation'] if t['run_id'] == fresh['run_id'] and t['tool_name'] == 'builtin__automation_manage']
         require(len(calls) == 1 and calls[0]['status'] == 'succeeded', 'real Main list Tool call missing')
         views = json.loads(json.loads(calls[0]['result_json'])['text'])
         old = next(v for v in views if v['automationRef'] == receipt['automationRef'])

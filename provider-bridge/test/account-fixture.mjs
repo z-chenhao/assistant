@@ -72,8 +72,8 @@ export async function startFixture() {
       const hasResult=b.input.some(i=>i.type==='function_call_output');
       if(b.tools?.length && !hasResult){
         const names=b.tools[0].tools.map(t=>t.name);
-        const name=names.includes('builtin__artifact__search')?'builtin__artifact__search':names[0];
-        const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'erii',arguments:name==='builtin__artifact__search'?'{}':'{"value":"OK"}'};
+        const name=names.includes('builtin__artifact_search')?'builtin__artifact_search':names[0];
+        const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'erii',arguments:name==='builtin__artifact_search'?'{}':'{"value":"OK"}'};
         emit('response.output_item.added',{output_index:0,item:{...item,arguments:''}});
         emit('response.function_call_arguments.delta',{output_index:0,item_id:item.id,delta:item.arguments});
         emit('response.output_item.done',{output_index:0,item});

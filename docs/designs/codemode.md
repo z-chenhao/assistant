@@ -48,12 +48,12 @@ flowchart TD
 #### 6.2 Code Mode
 
 - 采用类似 Pi 1.2.0 / CUA REPL 的 JavaScript Code Mode。
-- 模型侧只暴露一个**代码执行入口** `builtin__codemode__execute`；这不排斥经过 Tool Exposure Policy 选出的普通 Direct Tool。输入直接使用 JavaScript 源码，不再另设 `builtin__computer__run`、Agent 专用 Code Cell 或第二个 CUA JavaScript 工具。
+- 模型侧只暴露一个**代码执行入口** `builtin__codemode_execute`；这不排斥经过 Tool Exposure Policy 选出的普通 Direct Tool。输入直接使用 JavaScript 源码，不再另设 `builtin__computer_run`、Agent 专用 Code Cell 或第二个 CUA JavaScript 工具。
 - Agent 可以在 Code Mode 中搜索、组合和调用工具。
 - Code Mode 在同一个 JavaScript Code Cell 中按 Capability Policy 注入 `tools.*`、`cua.*` 与可选的 `agent.*`：三者只是同一 Tool Registry 和 ToolInvocation 管线的不同 Facade，不创建第二种 Code Cell 或 Agent 专用执行协议。Main 默认不注入 `agent.*`，Worker 在允许委派时注入。
 - 简单工具调用仍允许直接执行；复杂工作可在一次 JavaScript 执行中组织多个工具调用。
 - 核心后端使用 Go；模型生成的 JavaScript 运行在独立的 QuickJS 隔离环境中，不直接拥有 Node.js、文件系统、网络或定时器能力，只能通过宿主注入的受控能力访问外部世界。MVP 固定采用独立 Node.js Sidecar 承载 Pi Code Mode 的 QuickJS Worker；Node.js 只是宿主，不是脚本的安全边界。
-- 每次 `builtin__codemode__execute` 都创建一次性 QuickJS 执行环境，调用完成、失败或取消后销毁；不提供跨调用持久 JavaScript REPL。长期状态保存在 Task/Run、ToolInvocation、Code Mode Store、Computer Checkpoint 和 ArtifactStore 中，而不是 JS Heap 中。
+- 每次 `builtin__codemode_execute` 都创建一次性 QuickJS 执行环境，调用完成、失败或取消后销毁；不提供跨调用持久 JavaScript REPL。长期状态保存在 Task/Run、ToolInvocation、Code Mode Store、Computer Checkpoint 和 ArtifactStore 中，而不是 JS Heap 中。
 - Code Mode 不获得绕过 Tooling、Security、权限和审计的能力。
 - 单次脚本内可以持有 CUA Surface 句柄；跨脚本只保存稳定的逻辑引用并重新获取对象，不依赖 JavaScript 内存延续。
 
@@ -111,9 +111,9 @@ declare const cua: {
 - 所有句柄都携带当前 Computer、Instance、Surface 与 Lease 身份；恢复或迁移后旧 Lease 失效，调用方必须通过稳定逻辑引用重新绑定。
 - 每次界面操作后必须重新观察，再使用新的元素引用；一次脚本可以批量执行确定性动作，但结束前必须获取并输出可验证的最新状态。
 
-<a id="contract-622-builtin__codemode__execute-描述策略"></a>
+<a id="contract-622-builtin__codemode_execute-描述策略"></a>
 
-##### 6.2.2 `builtin__codemode__execute` 描述策略
+##### 6.2.2 `builtin__codemode_execute` 描述策略
 
 顶层工具描述保持短小、稳定，只包含：
 
@@ -140,7 +140,7 @@ MVP 不在 Go 中重新实现 Pi Code Mode，也不把业务执行权交给 Node
 
 ```text
 Agent Loop
-  → builtin__codemode__execute
+  → builtin__codemode_execute
   → Node Sidecar / QuickJS Worker
   → Host Bridge
   → Go ToolExecutor / ToolInvocation
@@ -161,7 +161,7 @@ __cuaInvoke(handle_token, method, args)
 ```
 
 - App、Tab、Browser 等对象只是 QuickJS 内持有 `handle_token` 的轻量 Proxy。`__cuaInvoke` 回到 Go 后必须创建嵌套 `ToolInvocation` 并进入统一 `ToolExecutor`，不能直接调用 Driver。
-- `agent.run()` 以 Canonical Tool `builtin__agent__run` 进入同一个 `host.invoke`、Tool Registry 和 ToolExecutor；Sidecar 不识别“Agent 调用”这种特殊协议，只等待普通 Tool Promise。
+- `agent.run()` 以 Canonical Tool `builtin__agent_run` 进入同一个 `host.invoke`、Tool Registry 和 ToolExecutor；Sidecar 不识别“Agent 调用”这种特殊协议，只等待普通 Tool Promise。
 - Sidecar 或 Go 进程故障时不恢复正在运行的 JavaScript 栈；依赖已持久化的 CodeExecutionState、CodeCall、ToolInvocation 和 Child Run 判断外部效果，再由父 Code Mode ToolInvocation 重放或 Agent Loop 重新规划。
 
 <a id="contract-624-go--node-sidecar-内部协议"></a>
@@ -229,7 +229,7 @@ interface HostInvokeRequest extends RuntimeEnvelope {
 - `execution_id` 只标识 Code Mode ToolInvocation 的一次内部执行状态；`call_id` 标识脚本内一次 Host Call；领域执行身份仍是 Go 创建的 `ToolInvocation.invocation_id` 或 Child Run ID。
 - `sequence` 在单个 `execution_id` 内严格递增。Go 按序消费事件并以 `(execution_id, sequence)` 去重；JSON-RPC 响应只能解决请求，不能代替权威状态事件。
 - `execution.start` 必须声明执行类型、源码哈希、资源限制、可访问能力集合和父 Run 身份。Sidecar 不能仅凭脚本中的工具名扩大权限。
-- 所有 `host.invoke` 都按 `toolName` 进入 Tool Registry 和 ToolExecutor。`builtin__agent__run` 的 Executor 在 ToolInvocation 内部创建 Child Run；CUA Tool 的 Executor 绑定 ComputerUseRuntime。Facade 不构成不同执行协议。
+- 所有 `host.invoke` 都按 `toolName` 进入 Tool Registry 和 ToolExecutor。`builtin__agent_run` 的 Executor 在 ToolInvocation 内部创建 Child Run；CUA Tool 的 Executor 绑定 ComputerUseRuntime。Facade 不构成不同执行协议。
 - 审批在 Go 内暂停对应 Host Call；Sidecar 只看到 Promise 仍未完成。批准、拒绝和超时由 Go 以正常结果或结构化错误解决该调用，不把审批逻辑复制到 JavaScript Runtime。
 - 取消由 Go 传播到 Sidecar、QuickJS 和尚可取消的下游调用；Parent Run 或 ToolInvocation 的取消意图沿 Run 树递归传播。已经形成外部副作用的调用仍按 `ToolInvocation` 恢复策略处理，不能把“脚本已取消”等同于“副作用未发生”。
 - Sidecar 断线后，Go 将活跃 JavaScript 标记为 `interrupted` 并回收 Runtime；不恢复 JS 栈。可恢复的 Code Mode ToolInvocation 从 CodeCall Ledger 重放，不能安全恢复的短时执行交给 Agent Loop 重新规划。
@@ -267,7 +267,7 @@ type ExecutionOutcome struct {
 
 ## JavaScript Code Mode runtime (ERII-19 / ERII-20)
 
-The configured `builtin__codemode__execute` Tool runs one fresh QuickJS VM per
+The configured `builtin__codemode_execute` Tool runs one fresh QuickJS VM per
 invocation through the normal Agent Loop and ToolExecutor. Its `source` argument
 contains the raw async JavaScript body: top-level `await` and `return` work.
 There is no second Agent Loop or JavaScript interpreter. Every nested Tool,

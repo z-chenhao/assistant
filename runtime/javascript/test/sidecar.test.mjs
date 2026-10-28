@@ -22,10 +22,10 @@ async function fixture(t, host = async () => ({value: 'ok'})) {
  p.once('exit',()=>{for(const f of pending.values()) f({error:{message:'sidecar exited: '+stderr}})});
  t.after(async()=>{p.stdin.end();p.kill();await closed;lines.close()});
  const rpc=(method,params)=>new Promise(resolve=>{const id=++next;pending.set(id,resolve);send({id,method,params})});
- const identity=(await rpc('runtime.initialize',{protocolVersion:'1',runtimeVersion:'erii-js-v2',preludeVersion:'erii-prelude-v2'})).result;assert.ok(identity,stderr);
+ const identity=(await rpc('runtime.initialize',{protocolVersion:'1',runtimeVersion:'erii-js-v2',preludeVersion:'erii-prelude-v3'})).result;assert.ok(identity,stderr);
  let execution=0;
  async function run(source, tools=[], options={}){
-  const req={protocolVersion:'1',runtimeVersion:'erii-js-v2',preludeVersion:'erii-prelude-v2',executionId:'execution-'+ ++execution,
+  const req={protocolVersion:'1',runtimeVersion:'erii-js-v2',preludeVersion:'erii-prelude-v3',executionId:'execution-'+ ++execution,
    runtimeHash:identity.runtimeHash,preludeHash:identity.preludeHash,claimToken:'claim',executionEpoch:1,providerCallId:'provider-call',parentInvocationId:'invocation-'+execution,runId:'run',kind:'worker',source,sourceHash:createHash('sha256').update(source).digest('hex'),tools,
    limits:{timeoutMs:3000,memoryBytes:32<<20,outputBytes:65536,pendingCalls:128,interruptBudget:10000},...options};
   return (await rpc('execution.start',req));
@@ -70,7 +70,7 @@ test('Main hides delegation and rejects forged exposure',async t=>{
  const f=await fixture(t);
  const r=await f.run('return typeof agent;',[],{kind:'main'});
  assert.deepEqual(r.result?.output,[{type:'return',value:'undefined'}]);
- assert.ok((await f.run('return 1;',[{name:'builtin__agent__run'}],{kind:'main'})).error);
+ assert.ok((await f.run('return 1;',[{name:'builtin__agent_run'}],{kind:'main'})).error);
 });
 
 test('canonical names survive alias collisions', async t => {
@@ -111,9 +111,9 @@ test('dynamic imports cannot access modules',async t=>{
  assert.deepEqual(r.result?.output,[{type:'return',value:'blocked'}]);
 });
 test('Computer bridge tokens are private to bound Surface facades',async t=>{
- const f=await fixture(t,async m=>({value:m.params.toolName==='builtin__computer__bind'?{handle_token:'PRIVATE_LEASE_TOKEN'}:{text:'observed'}}));
- const tools=['discover','bind','invoke'].map(op=>({name:'builtin__computer__'+op}));
- const r=await f.run('const app = await cua.getApp("notes"); let blocked=false;try {store("lease",{app});} catch{blocked=true;} let raw=false;try {await tools.builtin__computer__bind({});} catch{raw=true;} return {blocked, raw, inventory:ALL_TOOLS.length, state:await app.observe()};',tools);
+ const f=await fixture(t,async m=>({value:m.params.toolName==='builtin__computer_bind'?{handle_token:'PRIVATE_LEASE_TOKEN'}:{text:'observed'}}));
+ const tools=['discover','bind','invoke'].map(op=>({name:'builtin__computer_'+op}));
+ const r=await f.run('const app = await cua.getApp("notes"); let blocked=false;try {store("lease",{app});} catch{blocked=true;} let raw=false;try {await tools.builtin__computer_bind({});} catch{raw=true;} return {blocked, raw, inventory:ALL_TOOLS.length, state:await app.observe()};',tools);
  assert.deepEqual(r.result?.output,[{type:'return',value:{blocked:true,raw:true,inventory:0,state:{text:'observed'}}}]);
  assert.ok(!JSON.stringify(r.result).includes('PRIVATE_LEASE_TOKEN'));
 });

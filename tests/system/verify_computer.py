@@ -44,7 +44,7 @@ class ComputerHarness(CapabilityHarness):
         with sqlite3.connect(state) as db:
             task_id, ref = db.execute("SELECT task_id,task_ref FROM task WHERE status='active'").fetchone()
         self.send('cancel-' + boundary, 'Capabilities: ' + json.dumps([
-            {'name': 'builtin__task__manage', 'arguments': {'operation': 'cancel', 'taskRef': ref}}]))
+            {'name': 'builtin__task_manage', 'arguments': {'operation': 'cancel', 'taskRef': ref}}]))
         control = subprocess.Popen(self.args('chat', 'work'), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    text=True, env=self.env, cwd=self.root)
         self.children.append(control)
@@ -119,7 +119,7 @@ def run(binary):
             computer['manifest']['artifact_refs'] = [artifact['artifact_ref']]
             computer['manifest']['applications'] = [{'bundle_id': 'com.apple.TextEdit', 'documents': ['/Users/lume/work.txt']}]
             config_path.write_text(json.dumps(config))
-            plan = json.dumps([{'name': 'builtin__codemode__execute', 'arguments': {'source': 'return await cua.getState();'}}])
+            plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': 'return await cua.getState();'}}])
             h.send('first', 'Capabilities: ' + plan)
             child = h.hold('computer_ready')
             before = h.command('computer', 'status')
@@ -154,7 +154,7 @@ def run(binary):
                 require(opened.returncode == 0 and opened.stdout == 'stable Artifact across VM instances', 'Artifact bytes/identity lost')
                 with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
                     phases = db.execute('SELECT kind,status FROM computer_operation ORDER BY rowid').fetchall()
-                    nested = db.execute("SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__computer__discover' AND parent_invocation_id IS NOT NULL AND status='succeeded'").fetchone()[0]
+                    nested = db.execute("SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__computer_discover' AND parent_invocation_id IS NOT NULL AND status='succeeded'").fetchone()[0]
                     require(nested >= 1, 'Computer bypassed ToolInvocation')
                     require(not db.execute('PRAGMA foreign_key_check').fetchone(), 'foreign key integrity failed')
                 return {'state': state, 'files': hashes, 'manifest': receipt['manifest'], 'operations': phases,
@@ -190,7 +190,7 @@ def run(binary):
             require(fresh['computer_id'] == recovered['computer_id'] and fresh['instance_epoch'] == recovered['instance_epoch'] + 1,
                     'fresh cell cannot restore after interrupted disposal')
             with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
-                results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode__execute' ORDER BY created_at").fetchall()
+                results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at").fetchall()
                 require(len(results) == 5 and all(row[0] == 'succeeded' for row in results),
                         'resumed or fresh cell failed after disposal')
             report['checks'].append(evidence(fresh))
@@ -214,7 +214,7 @@ def run(binary):
                 require(restored['phase'] == 'checkpointed', 'fresh invocation failed after Task cancellation')
                 require(h.cancelled_state(cancelled['task_id']) == terminal, 'recovery changed cancelled terminal state')
                 with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
-                    status = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode__execute' ORDER BY created_at DESC LIMIT 1").fetchone()[0]
+                    status = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at DESC LIMIT 1").fetchone()[0]
                     require(status == 'succeeded', 'fresh cell failed after cancellation')
                     if boundary == 'computer_after_destroy':
                         cp = db.execute("SELECT checkpoint_json FROM computer_operation WHERE kind='ensure' ORDER BY rowid DESC LIMIT 1").fetchone()[0]
@@ -263,7 +263,7 @@ def run_live(binary, live_root, config_path):
     report = {'version': 1, 'scope': 'real CLI/Code Mode/Lume/macOS Guest production lifecycle; deterministic model fixture only',
               'guest_file_sha256': expected, 'checks': [], 'cleanup': False}
     script = Path(__file__).resolve().parent / 'lume_live.py'
-    plan = json.dumps([{'name': 'builtin__codemode__execute', 'arguments': {'source': 'return await cua.getState();'}}])
+    plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': 'return await cua.getState();'}}])
 
     def guest(command):
         with sqlite3.connect(root / 'data/state.db') as db:
@@ -399,7 +399,7 @@ def run_live(binary, live_root, config_path):
         require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('erii-*')),
                 'fresh native cell retained resources')
         with sqlite3.connect(root / 'data/state.db') as db:
-            results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode__execute' ORDER BY created_at DESC LIMIT 2").fetchall()
+            results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at DESC LIMIT 2").fetchall()
             require(len(results) == 2 and all(r[0] == 'succeeded' for r in results), 'native resumed/fresh Tool result failed')
         report['checks'].append({'action': 'fresh-cell-after-disposal-recovery', 'state': final, 'guest': reopened,
                                  'artifact_ref': artifact['artifact_ref']})

@@ -9,9 +9,9 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
-const ToolName = "builtin__codemode__execute"
+const ToolName = "builtin__codemode_execute"
 const RuntimeVersion = "erii-js-v2"
-const PreludeVersion = "erii-prelude-v2"
+const PreludeVersion = "erii-prelude-v3"
 const ProtocolVersion = "1"
 const Schema = `{"type":"object","properties":{"source":{"type":"string","minLength":1,"maxLength":65536}},"required":["source"],"additionalProperties":false}`
 

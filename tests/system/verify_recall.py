@@ -206,7 +206,7 @@ class Harness(MainHarness):
 
 
 def verify(value):
-    tools = [t for t in value['tools'] if t['tool_name'] == 'builtin__memory__search']
+    tools = [t for t in value['tools'] if t['tool_name'] == 'builtin__memory_search']
     runs = {r['run_id']: r for r in value['runs']}
     require(len(tools) == 3 and all(t['status'] == 'succeeded' for t in tools), 'missing real Main/Root/Child Tool search')
     roles = {runs[t['run_id']]['kind'] if runs[t['run_id']]['kind'] == 'main' else

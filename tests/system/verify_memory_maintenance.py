@@ -52,7 +52,7 @@ def latest_memory(h):
 
 
 def skill_list(h, key):
-    result = content(call(h, key, 'builtin__skill__list', {}))
+    result = content(call(h, key, 'builtin__skill_list', {}))
     require(not result.get('error'), 'Skill list Tool failed')
     refs = result.get('artifact_refs', [])
     if refs:
@@ -94,12 +94,12 @@ def run(binary, failure_evidence=None):
                 require(len(h.command('delivery', 'list')) == deliveries, 'maintenance notified user')
                 report['scenarios'].append(dict(name=name, source=text, record=records[-1], deliveries=deliveries - before))
 
-            accepted = call(h, 'main-remember', 'builtin__memory__manage',
+            accepted = call(h, 'main-remember', 'builtin__memory_manage',
                             {'operation': 'remember', 'content': 'I prefer concise answers'})
             require(accepted['status'] == 'succeeded' and not content(accepted).get('error'), 'Main memory control failed')
             work(h)
             before = len(readback(h)['state']['events'])
-            denied = call(h, 'worker-remember', 'builtin__memory__manage',
+            denied = call(h, 'worker-remember', 'builtin__memory_manage',
                           {'operation': 'remember', 'content': 'Worker may not overwrite preferences'}, worker=True)
             require(content(denied).get('error', {}).get('code') in ('NOT_FOUND', 'PERMISSION_DENIED'),
                     'Worker gained Memory control')
@@ -117,7 +117,7 @@ def run(binary, failure_evidence=None):
             manage(h, 'finance-v2', operation='remember', content=corrected, supersedes='memory:' + old)
             work(h)
             current = latest_memory(h)
-            found = call(h, 'finance-search', 'builtin__memory__search', {'query': 'employer options'})
+            found = call(h, 'finance-search', 'builtin__memory_search', {'query': 'employer options'})
             hits = json.loads(content(found)['text'])
             require(any(hit['content'] == corrected for hit in hits), 'finance correction not recalled')
             require(not any(hit['content'] == finance for hit in hits), 'superseded finance fact recalled')
@@ -223,7 +223,7 @@ def run(binary, failure_evidence=None):
             # Fresh authorized provenance must survive content deduplication.
             tea = 'I prefer unsweetened tea'
             def tea_hits(key):
-                found = call(h, key, 'builtin__memory__search', {'query': 'unsweetened tea'})
+                found = call(h, key, 'builtin__memory_search', {'query': 'unsweetened tea'})
                 return [hit for hit in json.loads(content(found)['text'])
                         if hit['source_type'] == 'memory' and hit['content'] == tea]
             manage(h, 'tea-before-unrelated-forget', operation='remember', content=tea)
@@ -281,14 +281,14 @@ def run(binary, failure_evidence=None):
                                             original_message_ids=[s['message_id'] for s in submitted]))
 
             # Real controlled workspace test, executed through ToolExecutor.
-            rules = json.loads(content(call(h, 'rules', 'builtin__workspace__read', {'path': 'AGENTS.md'}))['text'])
-            source = json.loads(content(call(h, 'cli-source', 'builtin__workspace__read', {'path': 'cmd/taskctl/main.go'}))['text'])
+            rules = json.loads(content(call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'}))['text'])
+            source = json.loads(content(call(h, 'cli-source', 'builtin__workspace_read', {'path': 'cmd/taskctl/main.go'}))['text'])
             replacement = source['text'].replace('status := "" // CLI_STATUS_FLAG',
                                                  'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")')
             require(replacement != source['text'], 'fixture correction did not apply')
-            call(h, 'cli-fix', 'builtin__workspace__edit', {'path': 'cmd/taskctl/main.go', 'before_hash': source['hash'],
+            call(h, 'cli-fix', 'builtin__workspace_edit', {'path': 'cmd/taskctl/main.go', 'before_hash': source['hash'],
                                                           'rules_hash': rules['hash'], 'text': replacement}, worker=True)
-            tests = [call(h, 'verified-' + str(i), 'builtin__workspace__test', {}) for i in range(2)]
+            tests = [call(h, 'verified-' + str(i), 'builtin__workspace_test', {}) for i in range(2)]
             require(all(json.loads(content(inv)['text'])['passed'] for inv in tests), 'real workspace verification failed')
             # Isolate catalog cardinality from the earlier small-profile context
             # tests: 128 summaries plus list results need an explicit larger model.
@@ -371,7 +371,7 @@ def run(binary, failure_evidence=None):
                 summary = next((item for item in summaries if item['name'] == skill_name), None)
                 require(summary and summary['description'] == skill_description,
                         'published punctuation metadata did not round-trip through catalog')
-                viewed = call(h, skill_name + '-view', 'builtin__skill__view',
+                viewed = call(h, skill_name + '-view', 'builtin__skill_view',
                               {'name': skill_name, 'version': summary['version']})
                 require(content(viewed)['text'].endswith(proposal['procedure'] + '\n'),
                         'published Skill body changed across restart')

@@ -14,10 +14,10 @@ let source = replaceOnce(PI_PRELUDE, '"use strict";', `"use strict";
   delete globalThis.FinalizationRegistry;
 `);
 source = replaceOnce(source, 'allTools.push(Object.freeze({ name: jsName, description }));',
-  'if (!["builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke"].includes(name)) allTools.push(Object.freeze({ name, description }));');
+  'if (!["builtin__computer_discover", "builtin__computer_bind", "builtin__computer_invoke"].includes(name)) allTools.push(Object.freeze({ name, description }));');
 source = replaceOnce(source, 'const toolsProxy = guard(\n\t\ttools,', `const publicTools = Object.create(null);
   for (const key of Object.keys(tools)) {
-    if (!["builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke"].includes(key)) publicTools[key] = tools[key];
+    if (!["builtin__computer_discover", "builtin__computer_bind", "builtin__computer_invoke"].includes(key)) publicTools[key] = tools[key];
   }
   Object.freeze(publicTools);
   const toolsProxy = guard(
@@ -61,8 +61,8 @@ source = source.slice(0, start) + `
   Object.defineProperty(globalThis, "load", {value: load, enumerable: true});
 
   const invoke = (name, args) => tools[name](args);
-  const cuaDiscover = (method, args) => invoke("builtin__computer__discover", {method, args: args === undefined ? null : args});
-  const cuaInvoke = (token, method, args) => invoke("builtin__computer__invoke", {handle_token: token, method, args});
+  const cuaDiscover = (method, args) => invoke("builtin__computer_discover", {method, args: args === undefined ? null : args});
+  const cuaInvoke = (token, method, args) => invoke("builtin__computer_invoke", {handle_token: token, method, args});
   function surface(value) {
     const token = value.handle_token;
     if (typeof token !== "string") throw new TypeErrorCtor("Invalid Surface binding");
@@ -109,10 +109,10 @@ source = source.slice(0, start) + `
   for (const method of ["getState", "listApps", "listWindows", "listBrowsers", "listTabs"])
     cua[method] = (args) => cuaDiscover(method, args);
   for (const method of ["getApp", "getBrowser", "getTab", "createBrowserTab"])
-    cua[method] = (...args) => invoke("builtin__computer__bind", {method, args}).then(surface);
+    cua[method] = (...args) => invoke("builtin__computer_bind", {method, args}).then(surface);
   Object.defineProperty(globalThis, "cua", {value: Object.freeze(cua), enumerable: true});
-  if (Object.hasOwn(tools, "builtin__agent__run"))
-    Object.defineProperty(globalThis, "agent", {value: Object.freeze({run: (request) => invoke("builtin__agent__run", request)}), enumerable: true});
+  if (Object.hasOwn(tools, "builtin__agent_run"))
+    Object.defineProperty(globalThis, "agent", {value: Object.freeze({run: (request) => invoke("builtin__agent_run", request)}), enumerable: true});
 ` + source.slice(end);
 // Console output remains internal. Only explicit text/image/return is exposed.
 source = replaceOnce(source, 'output("console", args.map(format).join(" "));', 'void args;');

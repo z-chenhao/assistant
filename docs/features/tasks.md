@@ -77,8 +77,8 @@ accepted, not finished. Short synchronous questions remain in Main.
 
 | Canonical tool | Input | Output | Visibility / permission | Recovery |
 | --- | --- | --- | --- | --- |
-| `builtin__task__search` v1 | Optional `query`, `scope`, `status[]`, `limit` | `TaskSummary[]` | Main, `read_only` | `safe`; bounded 64 KiB result |
-| `builtin__task__manage` v1 | Discriminated `create/append/pause/cancel/complete` union | `{taskRef,status,accepted:true}` | Main, `task_control` | `safe`; transactional receipt dedup |
+| `builtin__task_search` v1 | Optional `query`, `scope`, `status[]`, `limit` | `TaskSummary[]` | Main, `read_only` | `safe`; bounded 64 KiB result |
+| `builtin__task_manage` v1 | Discriminated `create/append/pause/cancel/complete` union | `{taskRef,status,accepted:true}` | Main, `task_control` | `safe`; transactional receipt dedup |
 
 The exact schemas and strict validators live in `internal/task/task.go`.
 Unknown fields, nulls, duplicate fields, wrong union arms, invalid limits and

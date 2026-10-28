@@ -26,6 +26,8 @@
 
 ## 如何使用
 
+工具名使用 `builtin__task_search`、`builtin__artifact_manage` 这类完整 snake_case 名称；MCP 使用 `mcp__browser_use__click_button`，保留 server 与工具名内部的单下划线。旧名称不作别名，升级前需完成旧 Main 和未决外部效果核实；具体兼容边界见[命名规范与升级说明](../designs/tools-approvals.md#contract-61-工具命名规范)。
+
 在终端或 Web 查看待审批动作及最终参数，明确批准或拒绝。CLI 使用 `erii approval list` 和 `erii approval approve APPROVAL_ID FROZEN_ARGUMENTS_HASH`。
 
 `erii approval reconcile` 核实未知结果。修改要求后未执行的旧审批会失效；批准 Task 不代表授权全部子动作。

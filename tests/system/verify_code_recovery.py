@@ -46,7 +46,7 @@ const active = await Promise.all(Array.from({length:8}, (_,i)=>agent.run({task:C
 const rest = await Promise.all(Array.from({length:55}, (_,i)=>agent.run({task:"Capabilities: []"})));
 return {count:first.length+active.length+rest.length};
 '''.replace('CHILD', json.dumps(child))
-                plan = json.dumps([{'name': 'builtin__codemode__execute', 'arguments': {'source': source}}])
+                plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': source}}])
                 h.send('recover-' + variant, 'Delegate capabilities: ' + plan)
                 start = time.monotonic()
                 process = h.hold('code_37_completed_8_active', extra_flags=('-test-main-release', str(release)))
@@ -99,7 +99,7 @@ return {count:first.length+active.length+rest.length};
                 audit = Counter(json.loads(line)['generation_id'] for line in audit_path.read_text().splitlines())
                 require(all(audit[g] == 1 for g in done_generations), 'recovery redispatched completed provider calls')
                 final = read(state, "SELECT * FROM code_execution_state")[0]
-                parent = read(state, "SELECT result_json,status FROM tool_invocation WHERE tool_name='builtin__codemode__execute'")[0]
+                parent = read(state, "SELECT result_json,status FROM tool_invocation WHERE tool_name='builtin__codemode_execute'")[0]
                 require(parent['status'] == 'succeeded' and json.loads(json.loads(parent['result_json'])['text']) == [{'type':'return','value':{'count':100}}], 'aggregation changed')
                 require(final['state'] == 'completed' and final['claim_token'] is None, 'terminal lease leaked')
                 require(read(state, 'SELECT descendants FROM run_tree')[0]['descendants'] == 100, 'replay consumed descendant quota')
@@ -107,11 +107,11 @@ return {count:first.length+active.length+rest.length};
                 # Cancellation reaches a live Root/Child tree through Main's
                 # public Task tool; no test directly writes domain stop intent.
                 cancel_source = 'return await agent.run({task:' + json.dumps(child) + '});'
-                cancel_plan = json.dumps([{'name':'builtin__codemode__execute','arguments':{'source':cancel_source}}])
+                cancel_plan = json.dumps([{'name':'builtin__codemode_execute','arguments':{'source':cancel_source}}])
                 h.send('cancel-start', 'Delegate capabilities: ' + cancel_plan)
                 h.command('chat', 'work')
                 task = read(state, "SELECT task_id,task_ref FROM task WHERE status='active'")[0]
-                stops = json.dumps([{'name':'builtin__task__manage','arguments':{'operation':'cancel','taskRef':task['task_ref']}}])
+                stops = json.dumps([{'name':'builtin__task_manage','arguments':{'operation':'cancel','taskRef':task['task_ref']}}])
                 h.send('cancel-control', 'Capabilities: ' + stops)
                 h.command('chat', 'work')
                 cancelled = read(state, "SELECT run_id,status,desired_state FROM run WHERE task_id=?", (task['task_id'],))

@@ -8,7 +8,7 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
-const RunToolName = "builtin__agent__run"
+const RunToolName = "builtin__agent_run"
 const RunToolSchema = `{"type":"object","properties":{"task":{"type":"string","minLength":1,"maxLength":8192},"artifactRefs":{"type":"array","maxItems":127,"items":{"type":"string","minLength":1,"maxLength":256}}},"required":["task"],"additionalProperties":false}`
 
 // AgentRunRequest and AgentResult are the entire model-visible delegation API.
@@ -39,7 +39,7 @@ func ParseAgentRun(args string) (AgentRunRequest, error) {
 func WorkerTools(specs []tool.Spec) []tool.Spec {
 	out := []tool.Spec{}
 	for _, s := range specs {
-		if strings.HasPrefix(s.Name, "builtin__task__") {
+		if strings.HasPrefix(s.Name, "builtin__task_") {
 			continue
 		}
 		switch s.Permission {

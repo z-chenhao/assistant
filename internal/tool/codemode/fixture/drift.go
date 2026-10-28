@@ -38,7 +38,7 @@ func (s *inject) Handle(ctx context.Context, method string, m codemode.Message) 
 		return s.sink.Handle(ctx, method, value)
 	}
 	reply, err := forward(m)
-	if err != nil || method != "host.invoke" || m.ToolName != "builtin__agent__run" {
+	if err != nil || method != "host.invoke" || m.ToolName != "builtin__agent_run" {
 		return reply, err
 	}
 	var a struct {

@@ -13,8 +13,8 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
-const ManageName = "builtin__automation__manage"
-const ObserveName = "builtin__automation__observe"
+const ManageName = "builtin__automation_manage"
+const ObserveName = "builtin__automation_observe"
 const Schema = `{"type":"object","properties":{"operation":{"enum":["create","update","cancel","list"]},"automationRef":{"type":"string"},"version":{"type":"integer","minimum":1},"instruction":{"type":"string","minLength":1,"maxLength":8192},"triggerType":{"enum":["at","cron"]},"triggerSpec":{"type":"string","maxLength":256},"timezone":{"type":"string","maxLength":128},"below":{"type":"integer","minimum":0,"maximum":1000000000000}},"required":["operation"],"additionalProperties":false}`
 const ObserveSchema = `{"type":"object","properties":{"value":{"type":"integer","minimum":0,"maximum":1000000000000}},"required":["value"],"additionalProperties":false}`
 

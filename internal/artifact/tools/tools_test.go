@@ -13,7 +13,7 @@ func TestManageSearchContract(t *testing.T) {
 	if err != nil || len(registry.Describe()) != 2 {
 		t.Fatal(registry, err)
 	}
-	for _, name := range []string{"builtin__artifact__save", "builtin__artifact__read", "builtin__artifact__describe", "builtin__artifact__list", "builtin__artifact__publish"} {
+	for _, name := range []string{"builtin__artifact_save", "builtin__artifact_read", "builtin__artifact_describe", "builtin__artifact_list", "builtin__artifact_publish"} {
 		if _, ok := registry.Resolve(name); ok || Known(name) {
 			t.Fatal("legacy Tool exposed", name)
 		}

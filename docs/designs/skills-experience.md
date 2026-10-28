@@ -59,9 +59,9 @@ M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list
 #### 7.2 Skill 工具
 
 ```text
-builtin__skill__list
-builtin__skill__view
-builtin__skill__manage
+builtin__skill_list
+builtin__skill_view
+builtin__skill_manage
 ```
 
 - Main Agent Loop 和 Worker Agent Loop 可以列出和读取 Skill。
@@ -80,8 +80,8 @@ references/scripts/assets. Names match their directories. Symlinks, malformed
 metadata and oversized catalogs are rejected. Hashes include every catalog file,
 not only the summary. No full body is embedded in the startup description.
 
-`builtin__skill__list({})` returns name, description, scope and content version.
-`builtin__skill__view({name, version, path?})` defaults to `SKILL.md`; relative
+`builtin__skill_list({})` returns name, description, scope and content version.
+`builtin__skill_view({name, version, path?})` defaults to `SKILL.md`; relative
 references must already exist in the catalog. A wrong version or changed file
 returns `NON_DETERMINISTIC_REPLAY`; paths cannot escape the configured root.
 Non-UTF-8 assets use the common binary-result Artifact path, preserving bytes
