@@ -24,9 +24,9 @@
 
 **需求**：开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。
 
-**当前实现**：Web 无此 Tab；已有领域记录与简化 ops trace。
+**当前实现**：Web 侧栏的可折叠 Developer 区域提供 Observability。可按 Main/Root/Child、Run 状态及 UTC 创建时间筛选并翻页；选择 Main 查看原始已提交 Task 行为回执，选择 Task 或 Worker 查看创建来源、分 epoch 的 Root/Child 树及直接 Parent/Root 导航。
 
-**边界与剩余工作**：实现列表、筛选、Main 创建 Task 的关联和 Root/Child 树，保留返回对话或任务的导航。
+**边界**：只读关系元数据和最多 240 字符的 Task 标题，不显示原始指令、工具参数/结果、凭据、模型请求或内部所有权 token。Main 创建 Task 是因果关联，Root 没有 Main parent。历史或自动化入口没有 Main 创建回执时明确说明来源未记录，不推断。每页默认 40、最多 100 条；关系分页可能从一棵树的中间开始，Parent 可直接打开。跨页状态不是冻结快照；按页读取当前已提交状态。返回 Conversation 和 Ongoing work 的链接保留，旧 Task 可能不在 Ongoing work 的近期窗口内。
 
 **验收目标**：真实工作能从入口定位到 Main、Task、Root 和 Child；Root 不被误标为 Main 的 Child。
 
@@ -68,9 +68,14 @@
 
 ## 如何使用
 
-当前可用 `erii ops trace RUN_ID` 读取简化事件；它不提供完整逐轮上下文。Web 尚无 Observability 页面。
+登录现有 Web，展开侧栏 **Developer → Observability**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。
 
-已确认的产品方向是在现有 Web 增加可折叠 Developer 区域，首个 Tab 为 Observability。目标操作为选择执行 → 展开关联 Main/Task/Root/Child → 选择模型轮次 → 查看上下文、工具、响应及相邻轮次差异。
+1. 在 Execution list 中按角色、状态和创建时间查找。时间筛选使用 UTC，起点包含、终点不包含；Apply filters 重置分页与选择，Older executions 读取下一页。
+2. 打开 Main，沿 Task action timeline 查看原始创建、追加或控制回执。时间标记为来源调用的接纳时间，不冒充外部 dispatch 时间。点击 Task 查看执行树。
+3. 打开 Root/Child，核对实际 Parent、Root 和 Task epoch；Parent/Root/创建者链接可相互跳转。More relationships 读取后续节点或回执，刷新页面获取最新状态。
+4. Back to conversation 和 Ongoing work 返回日常工作入口。该页面没有重放、审批、取消或外部发送动作；关闭 JavaScript 仍可使用导航、筛选和分页。
+
+`erii ops trace RUN_ID` 继续提供既有简化事件。完整逐轮 context、Diff、供应商最终请求与调用/用量时间线尚未实现，分别由 F-034/F-035/F-036 维护。
 
 ## 详细操作参考
 

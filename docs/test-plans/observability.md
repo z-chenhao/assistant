@@ -12,14 +12,14 @@
 
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
-| [F-031](../features/observability.md#f-031) | 真实工作能从入口定位到 Main、Task、Root 和 Child；Root 不被误标为 Main 的 Child。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| [F-031](../features/observability.md#f-031) | 真实工作能从入口定位到 Main、Task、Root 和 Child；Root 不被误标为 Main 的 Child。 | 已有真实 Actor/SQLite 与浏览器入口；逐轮内容不是本行完成范围 |
 | [F-034](../features/observability.md#f-034) | UI 与被冻结的 Host 请求逐项一致，工具调用/结果对应正确，来源和省略可追溯，长文本可完整查看。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-035](../features/observability.md#f-035) | HTTP peer 接收的请求与观测记录对应，差异明确标记为脱敏或媒体引用；请求头凭据不可见。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-036](../features/observability.md#f-036) | 受控中断恢复后，UI 不把复用结果显示成新外部调用；未知结果、缺失 usage 和未 dispatch 等待如实展示。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 
 ## 层级与关键路径
 
-本功能新增入口尚未实现。先复用真实 Host/Bridge/store，必要时使用受控模型 HTTP peer 和 disposable 数据；页面读取真实保存的数据，不为 Inspector 新建执行引擎。
+F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider 决定调用，ToolInvocation、Task 和递归 Child 由真实执行链产生；页面读取真实保存的数据，不为 Inspector 新建执行引擎。其他 ID 的内容观测仍待实现。
 
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
@@ -27,7 +27,7 @@
 
 ## 首版具体场景
 
-以下是待实现的验收用例，不表示已有自动化覆盖。使用同一真实执行链产生数据，再通过实际 Web 入口检查。
+下表维护整组功能的验收用例；F-031 的已有入口见下节，其余场景仍待相应 feature 实现，不由关系检查通过推定。
 
 | 场景 | 关联需求 | 输入 / 操作 | 预期断言 | 层级 |
 | --- | --- | --- | --- | --- |
@@ -48,9 +48,12 @@
 
 | 入口 | 已有证据用途 | 本次执行状态 |
 | --- | --- | --- |
-| 暂无该目标入口的专属回归 | 先复用邻近真实执行链，随实现增加必要覆盖 | 尚待实现 |
+| [internal/agent/sqlite/inspection_test.go](../../internal/agent/sqlite/inspection_test.go) | 真实 Main/Task/Root/递归 Child、原始提交因果、选择与分页、相同时间游标、角色/状态/UTC 边界、Agent 隔离、只读并发、schema 29→30 回滚与冻结数据保持 | 执行结果在对应日志维护 |
+| [internal/observability/sqlite/inspection_test.go](../../internal/observability/sqlite/inspection_test.go) | 数据库层拒绝检查器写入，缺失状态文件不能由读操作创建；读取失败不成为 Runtime 启动依赖 | 执行结果在对应日志维护 |
+| [internal/interaction/web/inspection_test.go](../../internal/interaction/web/inspection_test.go) | 认证、无执行 runtime 依赖、参数校验、标题转义、元数据页面、无 POST 动作、脱敏失败 | 执行结果在对应日志维护 |
+| [verify_channels.py](../../tests/system/verify_channels.py) 的 inspection_relationships / [channels_browser.mjs](../../tests/system/channels_browser.mjs) | CLI 设置 → 实际 Web Main 创建 Task 与递归 Child → API 与数据库关系比对 → 浏览器导航/角色状态时间筛选/桌面移动/无 JS → 原始领域计数不变 → SIGKILL 重启不重跑 | 随既有 channels gate 运行，不新增脚本或 gate |
 
-- **F-031 剩余覆盖**：实现列表、筛选、Main 创建 Task 的关联和 Root/Child 树，保留返回对话或任务的导航。
+- **F-031 证明范围**：O-01 导航、O-09 的关系元数据分页、O-10 的认证/只读/转义已有入口。缺少来源记录时明确未知；标题裁切、跨页状态变化和树片段有说明。截图不证明后续逐轮内容或模型质量。
 - **F-034 剩余覆盖**：实现完整有序消息查看、来源关联、压缩省略说明、相邻轮次新增/删除/变化展示。
 - **F-035 剩余覆盖**：在最终发送边界保存受控脱敏记录，标识发送尝试与转换版本；凭据和图片 Base64 不进入普通轨迹。
 - **F-036 剩余覆盖**：聚合模型/工具时间线、状态、已有 Token/耗时；区分 Generation、dispatch attempt 和结果复用。

@@ -179,6 +179,8 @@ def run(binary,evidence):
             report['checks'].append('Live Web: committed replies/approvals/progress update while draft, file, focus, selection, scroll and request identity survive; network/session recovery without reload')
         finally:h.cleanup()
 
+    inspection_relationships(binary,evidence,report)
+
     # Approval recovery uses the same external-effect Fake and persistent Security
     # lifecycle as TUI. Callback races cross two authenticated transports.
     with tempfile.TemporaryDirectory(prefix='erii-channel-approval-') as temp, Sandbox() as platform:
@@ -217,6 +219,60 @@ def run(binary,evidence):
     account_presentation(binary,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def inspection_relationships(binary, evidence, report):
+    """Real Main -> Task -> Root -> recursive Child, read through Web only."""
+    def plan(calls): return 'Capabilities: '+json.dumps(calls)
+    leaf=plan([dict(name='mcp__fixture__echo',arguments=dict(text='Inspection leaf completed.'))])
+    child=plan([dict(name='builtin__agent_run',arguments=dict(task=leaf))])
+    root='Inspection Task <img src=x onerror="unsafe()">\n'+plan([dict(name='builtin__agent_run',arguments=dict(task=child))])
+    with tempfile.TemporaryDirectory(prefix='erii-inspection-') as temp, Sandbox() as platform:
+        h=ChannelHarness(binary,Path(temp),platform,'capabilities')
+        try:
+            h.setup();h.start()
+            h.wait_state(lambda status:status['readiness']=='ready','inspection runtime readiness',lambda _:h.http('/api/status'))
+            h.http('/api/message',dict(source_id='inspect-tree',content=[dict(type='text',text=plan([
+                dict(name='builtin__task_manage',arguments=dict(operation='create',task=root))]))]))
+            h.wait(lambda s:sum(r['worker_position']=='child' for r in s['runs'])==2
+                   and all(r['status'] in ('completed','failed','cancelled') for r in s['runs'])
+                   and all(d['status']=='sent' for d in s['deliveries']), 'completed inspection tree')
+            def facts():
+                with sqlite3.connect(h.root/'data/state.db') as db:
+                    return dict(runs=[dict(zip(('id','role','parent','root'),row)) for row in db.execute(
+                        "SELECT run_id,CASE WHEN kind='main' THEN 'main' ELSE worker_position END,coalesce(parent_run_id,''),coalesce(root_run_id,'') FROM run ORDER BY created_at,run_id")],
+                        task=db.execute('SELECT task_ref FROM task').fetchone()[0],
+                        main=db.execute("SELECT i.run_id FROM task_request q JOIN tool_invocation i USING(invocation_id) WHERE json_extract(i.arguments_json,'$.operation')='create'").fetchone()[0],
+                        counts={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in
+                                ('run','task','tool_invocation','task_request','task_invocation','model_generation','run_trace','event_outbox')})
+            original=facts()
+            h.http('/developer/observability',auth=False,expected=401)
+            h.http('/api/developer/executions',auth=False,expected=401)
+            h.http('/api/developer/executions?limit=101',expected=400)
+            h.http('/api/developer/relationships?run=missing',expected=404)
+            h.http('/api/developer/relationships?task=task:missing',expected=404)
+            ids=[];cursor=''
+            for _ in range(len(original['runs'])+1):
+                page=h.http('/api/developer/executions?'+urlencode(dict(limit=1,cursor=cursor)))
+                ids.extend(r['run_id'] for r in page['items']);cursor=page.get('next','')
+                if not cursor:break
+            require(len(ids)==len(set(ids))==len(original['runs']) and set(ids)=={r['id'] for r in original['runs']},'inspection pagination omitted or duplicated an execution')
+            source=h.http('/api/developer/relationships?'+urlencode(dict(run=original['main'])))
+            require(len(source['tasks'])==1 and source['tasks'][0]['task_ref']==original['task'] and source['tasks'][0]['operation']=='create','Main creation receipt missing')
+            tree=h.http('/api/developer/relationships?'+urlencode(dict(task=original['task'])))
+            actual={r['run_id']:(r['role'],r.get('parent_run_id',''),r.get('root_run_id','')) for r in tree['executions']}
+            require(actual=={r['id']:(r['role'],r['parent'],r['root']) for r in original['runs'] if r['role']!='main'},'inspection tree differs from authoritative Run links')
+            require(tree['creator']['run_id']==original['main'],'Task origin lost')
+            require(all(parent!=original['main'] for _,parent,_ in actual.values()),'Root mislabeled as Main Child')
+            h.env['ERII_INSPECTION_FACTS']=json.dumps(original)
+            h.browser(evidence.parent/'inspection-ui','inspection')
+            require(facts()==original,'opening inspection changed execution or domain records')
+            h.stop(kill=True);h.start()
+            recovered=h.http('/api/developer/relationships?'+urlencode(dict(task=original['task'])))
+            require(recovered==tree and facts()==original,'inspection restart rewrote or reran completed work')
+            report['scenarios']['inspection']=dict(source=source,tree=tree,paginated_ids=ids,read_only=True,restart=True)
+            report['checks'].append('Developer Observability: actual Main/Task/Root/recursive Child, paged metadata, original receipt causality, browser filters/navigation/escaping/mobile, read-only restart')
+        finally:h.cleanup()
 
 
 def dependency_recovery(binary, report):

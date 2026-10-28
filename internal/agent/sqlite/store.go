@@ -20,6 +20,7 @@ import (
 	"github.com/z-chenhao/erii/internal/event"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
+	inspectionsqlite "github.com/z-chenhao/erii/internal/observability/sqlite"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -111,9 +112,13 @@ var toolNamesSQL string
 //go:embed migrations/029_native_execution.sql
 var nativeExecutionSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL}
+//go:embed migrations/030_inspection.sql
+var inspectionSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL}
 
 type Store struct {
+	inspector *inspectionsqlite.Inspector
 	scheduler atomic.Pointer[agent.SchedulerLimits]
 	nextRun   *sql.Stmt
 	activeRun *sql.Stmt
@@ -189,6 +194,10 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 	s.artifacts.Boundary = s.boundary
 	if _, err = s.artifacts.Recover(ctx); err != nil {
 		return nil, errors.Join(err, s.artifacts.Close(), db.Close())
+	}
+	s.inspector, err = inspectionsqlite.Open(path)
+	if err != nil {
+		return nil, errors.Join(err, s.Close())
 	}
 	return s, nil
 }
@@ -312,10 +321,14 @@ func (s *Store) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 }
 
 func (s *Store) Close() error {
-	if s.artifacts != nil {
-		return errors.Join(s.artifacts.Close(), s.db.Close())
+	var inspectionErr error
+	if s.inspector != nil {
+		inspectionErr = s.inspector.Close()
 	}
-	return s.db.Close()
+	if s.artifacts != nil {
+		return errors.Join(inspectionErr, s.artifacts.Close(), s.db.Close())
+	}
+	return errors.Join(inspectionErr, s.db.Close())
 }
 func (s *Store) Artifacts() *artifactsqlite.Store { return s.artifacts }
 

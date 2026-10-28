@@ -72,6 +72,7 @@ type Models interface {
 	AddProfile(context.Context, llm.ProfileInput) (llm.Profile, error)
 }
 type Server struct {
+	Inspector      ExecutionReader
 	Config         Config
 	Core           Core
 	Models         Models
@@ -265,6 +266,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
+	case "/api/developer/executions":
+		s.inspectionAPI(w, r, false)
+	case "/api/developer/relationships":
+		s.inspectionAPI(w, r, true)
 	case "/api/updates":
 		s.updates(w, r)
 	case "/api/conversation":
@@ -319,7 +324,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": d.Name}))
 		_, _ = io.Copy(w, src)
-	case "/", "/settings", "/progress":
+	case "/", "/settings", "/progress", "/developer/observability":
 		s.show(w, r)
 	default:
 		fail(w, 404)
