@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/media"
 )
 
 func TestImagePreviewBoundsAndEnvelopeSelection(t *testing.T) {
@@ -46,7 +47,7 @@ func TestImagePreviewBoundsAndEnvelopeSelection(t *testing.T) {
 		media string
 		data  []byte
 	}{
-		{"image/gif", pixels.Bytes()}, {"image/png", []byte("corrupt")}, {"image/png", make([]byte, llm.MaxInputImageBytes+1)}, {"image/png", oversized},
+		{"image/gif", pixels.Bytes()}, {"image/png", []byte("corrupt")}, {"image/png", make([]byte, media.MaxImageBytes+1)}, {"image/png", oversized},
 	} {
 		if _, err := previewImage(tc.media, tc.data); err != llm.ModelIncompatible {
 			t.Fatal("unsafe image admitted", tc.media, len(tc.data), err)

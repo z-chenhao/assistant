@@ -98,6 +98,21 @@ class Endpoint(BaseHTTPRequestHandler):
                     require(self.server.release_image.wait(15),'image recovery peer was not released')
                 chunk({'content':'USER_IMAGE_PIXELS_RECEIVED' if images else 'USER_IMAGE_REFERENCE_ONLY'})
                 chunk({},'stop')
+            elif self.server.mode == "ocr" and any("OCR_INPUT" in str(m.get("content", "")) for m in body["messages"]):
+                require(images == 0, "text-only OCR unexpectedly sent image pixels to the model")
+                marker = max(i for i, m in enumerate(body["messages"]) if "OCR_INPUT" in str(m.get("content", "")))
+                outputs = [m for m in body["messages"][marker+1:] if m["role"] == "tool"]
+                if not outputs:
+                    chunk({"tool_calls": [{"index": 0, "id": "read-image-text", "type": "function", "function": {
+                        "name": "builtin__image_ocr", "arguments": json.dumps({"artifactRef": self.server.ocr_ref})}}]})
+                    chunk({}, "tool_calls")
+                else:
+                    require("OCR 12345" in str(outputs[-1]["content"]), "actual OCR text did not reach the model")
+                    self.server.received_ocr.set()
+                    if self.server.hold_ocr:
+                        require(self.server.release_ocr.wait(15), "OCR recovery peer was not released")
+                    chunk({"content": "OCR_TEXT_RECEIVED"})
+                    chunk({}, "stop")
             elif self.server.mode == "screenshots" and any(t["function"]["name"] == "builtin__codemode_execute" for t in body.get("tools", [])):
                 self.server.images.append(images)
                 count = sum(m["role"] == "tool" for m in body["messages"])
@@ -207,7 +222,49 @@ def verify(binary, script):
             require(sorted(n for n in names if n.startswith("builtin__artifact_")) == ["builtin__artifact_manage", "builtin__artifact_search"], "production Artifact surface not consolidated")
             require("builtin__text_echo" not in names and "mcp__fixture__echo" not in names, "fixture echo leaked to production")
             require("builtin__memory_search" in names and "builtin__memory_manage" in names, "Memory tools hidden")
+            require("builtin__image_ocr" in names, "default OCR tool hidden")
             report["production_surface"] = surface
+
+            # Real PNG -> scoped source -> offline Tesseract -> Tool result ->
+            # text-only Pi HTTP. Kill after OCR commit, while the model waits.
+            picture = Path(__file__).resolve().parents[2] / "internal/media/ocr/testdata/text.png"
+            saved = subprocess.run([str(binary), "-config", str(config), "artifact", "save", "scan.png", "image/png"],
+                                   input=picture.read_bytes(), capture_output=True, env=env, cwd=root, timeout=20)
+            require(saved.returncode == 0, "OCR source upload failed")
+            server.ocr_ref = json.loads(saved.stdout)["artifact_ref"]
+            server.received_ocr, server.release_ocr = threading.Event(), threading.Event()
+            server.mode, server.hold_ocr = "ocr", True
+            command("chat", "send-parts", "local-ocr", text=json.dumps([
+                {"type": "text", "text": "OCR_INPUT: read the words in this scan."},
+                {"type": "image", "artifact_ref": server.ocr_ref}]))
+            child = subprocess.Popen([str(binary), "-config", str(config), "chat", "work"],
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=root)
+            try:
+                require(server.received_ocr.wait(15), "OCR text never reached actual text-only provider")
+                child.kill(); child.communicate(timeout=10)
+                with closing(sqlite3.connect(root / "data/state.db")) as db:
+                    before = db.execute("SELECT invocation_id,attempt_count,result_json FROM tool_invocation WHERE tool_name='builtin__image_ocr'").fetchall()
+                    pending = db.execute("SELECT generation_id,request_hash,request_json FROM model_generation WHERE status='pending'").fetchall()
+                require(len(before) == 1 and before[0][1] == 1 and pending, "missing committed OCR or held generation")
+                server.hold_ocr = False; server.release_ocr.set()
+                command("chat", "work")
+                with closing(sqlite3.connect(root / "data/state.db")) as db:
+                    after = db.execute("SELECT invocation_id,attempt_count,result_json FROM tool_invocation WHERE tool_name='builtin__image_ocr'").fetchall()
+                    recovered = db.execute("SELECT generation_id,request_hash,request_json FROM model_generation WHERE generation_id=?", (pending[0][0],)).fetchall()
+                    require(after == before and recovered == pending, "restart repeated OCR or changed the frozen model request")
+                    result = json.loads(after[0][2]); preview = json.loads(result["text"])
+                    require(preview["method"] == "ocr" and preview["source_ref"] == server.ocr_ref and "OCR 12345" in preview["text"], "OCR source or transcription lost")
+                    require(preview["document_ref"] in result["artifact_refs"] and len(result["artifact_refs"]) == 2, "full OCR artifact missing")
+                    require(db.execute("SELECT count(*) FROM artifact_publication").fetchone()[0] == 0, "OCR auto-published a file")
+                history = command("chat", "history")
+                require(history[-1]["content"] == [{"type": "text", "text": "OCR_TEXT_RECEIVED"}], "OCR Main did not finish")
+                report["ocr"] = {"preview": preview, "reused_invocation": before[0][0], "reused_generation": pending[0][0]}
+                report["checks"].append("actual offline OCR enters text-only Pi context; SIGKILL reuses committed OCR and frozen generation without publishing")
+            finally:
+                server.release_ocr.set()
+                if child.poll() is None: child.kill()
+                child.communicate(timeout=10)
+
             server.mode = "memory-disabled"
             command("chat", "send", "disabled-memory", text="Remember that I prefer tea and search for tea.")
             command("chat", "work")

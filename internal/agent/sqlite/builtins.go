@@ -38,6 +38,8 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 		return t.executeTaskAdmission(ctx, inv)
 	case tool.ArtifactBuiltin:
 		return t.executeArtifactCall(ctx, inv)
+	case tool.ImageBuiltin:
+		return t.executeImageOCR(ctx, inv)
 	}
 	return tool.Failure("PERMISSION_DENIED"), nil
 }

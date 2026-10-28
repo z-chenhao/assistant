@@ -41,6 +41,9 @@ use system Python 3 and bash, with bubblewrap/user namespaces on Linux or
 Seatbelt on macOS; doctor checks their presence. No Host execution fallback exists.
 On Ubuntu, install `python3 bash bubblewrap` using the system package manager and
 ensure unprivileged user namespaces are available.
+Image OCR additionally uses local Tesseract and supported language data. The
+tool is always discoverable; missing OCR does not block chat. See
+[OCR installation and limits](artifacts-media.md#图片文字识别f-013-增强).
 The source installer needs Go and npm while building. A prebuilt native archive
 needs Node and the execution dependencies above: unpack it and run its `install.sh`. Maintainers produce archives with `sh scripts/package.sh "$PWD/dist"`.
 Until a release is published, use the checkout installer.

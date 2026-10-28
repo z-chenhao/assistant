@@ -12,6 +12,7 @@ import (
 
 	"github.com/z-chenhao/erii/internal/computer/environment"
 	"github.com/z-chenhao/erii/internal/config"
+	"github.com/z-chenhao/erii/internal/media/ocr"
 )
 
 // A source build and an installed bundle share the same relative layout. Use
@@ -74,6 +75,12 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 		check("file/command environment: system Python 3, bash and kernel sandbox", environment.Check())
 	} else {
 		fmt.Fprintln(out, "SKIP local execution: file/command tools use the configured Computer Guest")
+	}
+	imageOCR := ocr.Discover(ctx)
+	if imageOCR.Available() {
+		fmt.Fprintln(out, "OK   image OCR: local Tesseract; languages="+strings.Join(imageOCR.Languages(), ","))
+	} else {
+		fmt.Fprintln(out, "SKIP image OCR: install Tesseract, eng/chi_sim/chi_tra language data and the kernel sandbox; see docs/features/artifacts-media.md")
 	}
 	if failed {
 		return errors.New("installation incomplete; check Node 24.21.0 and execution dependencies (Python 3, bash, bubblewrap on Linux), then rerun ./install.sh (see docs/features/installation.md)")

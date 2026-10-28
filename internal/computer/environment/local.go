@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -30,12 +28,7 @@ func Check() error {
 			return err
 		}
 	}
-	if runtime.GOOS == "darwin" {
-		_, err := os.Stat("/usr/bin/sandbox-exec")
-		return err
-	}
-	_, err := exec.LookPath("bwrap")
-	return err
+	return sandbox.Check()
 }
 
 func (l Local) Execute(ctx context.Context, name, args string) tool.Result {

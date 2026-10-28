@@ -15,6 +15,7 @@ import (
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/media/ocr"
 	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/recall"
 	"github.com/z-chenhao/erii/internal/recall/embedding"
@@ -28,13 +29,15 @@ import (
 )
 
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {
-	registry, err := a.runtimeRegistry(ctx, cfg, fixture, secrets)
+	imageOCR := ocr.Discover(ctx)
+	registry, err := a.runtimeRegistry(ctx, cfg, fixture, secrets, imageOCR)
 	if err != nil {
 		return err
 	}
 	runs := a.store.Runs(a.history, registry)
 	local := environment.Local{Config: cfg.ExecutionConfig()}
 	runs.ConfigureEnvironment(local.Execute)
+	runs.ConfigureImageOCR(imageOCR)
 	if cfg.Computer != nil {
 		provider, e := macosvm.New(*cfg.Computer, macosvm.SSHGuest{Config: cfg.Computer.Guest, Secrets: secrets})
 		if e != nil {
@@ -76,7 +79,7 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 	return nil
 }
 
-func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) (*tool.Registry, error) {
+func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore, imageOCR *ocr.Engine) (*tool.Registry, error) {
 	var err error
 	base := task.Registry()
 	if fixture != "" {
@@ -113,6 +116,7 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 		identity = cfg.Computer
 	}
 	defs = append(defs, environment.Definitions(environment.ResourceHash(identity))...)
+	defs = append(defs, ocr.Definition(imageOCR.ResourceHash()))
 
 	if (fixture == "core" || fixture == "codemode") && cfg.JavaScript != nil {
 		if cfg.Computer != nil {
