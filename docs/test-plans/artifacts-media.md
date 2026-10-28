@@ -40,6 +40,14 @@
 - `tests/system/verify_local_provider.py` 的用户图片场景启动真实事件 broker、Web、Actor 与 Node/Pi。Chromium 实际上传 PNG，HTTP peer 检查收到 JPEG 字节；纯文本模式无图片字节且生成上下文包含限制说明。CLI save/send-parts 后在 HTTP 响应前 SIGKILL，恢复保持 generation id、request hash 和图片内容 hash。现有 screenshot 场景继续证明工具图片选择。
 - 浏览器证据含桌面与移动截图。所有图片为合成运输素材，HTTP peer 只验证协议与字节，不对 OCR、视觉推理或真实模型质量评分；真实账户视觉质量另行 Live/eval。
 
+### F-013 本地 OCR 增强回归
+
+- `internal/media/ocr/engine_test.go` 用测试图片的真实字形像素驱动已安装 Tesseract，在内核沙箱中验证文字和原图词框，检查引擎/语言资源漂移、损坏图片与取消。缺少依赖时组件测试明确 skip；维护中的 CI 安装 Tesseract/英文/简体语言包，系统入口要求真实 OCR 成功。
+- `internal/media/ocr/document_test.go` 验证不合法 TSV、框越界、非有限分数、词数上限及 UTF-8 预览截断。固定图片是确定性软件回归素材，不是模型 golden case，也不证明普遍识别质量。
+- `internal/agent/sqlite/image_ocr_test.go` 经真实 Registry/SQLite/Executor 和 Node Code Mode 验证默认角色边界、授权引用、持久化调用参数不可替换、完整输出与原图关联、preview 上限、不自动发布、错误归一化、跨 claim 重放不再调用 OCR。
+- 既有 `verify_local_provider.py` 从 CLI 上传同一实际 PNG，正常选择纯文本模型，由协议 peer 请求 OCR；读取真实 Tesseract 的 Tool 结果，检查 Pi HTTP 没有图片像素且含识别文字。结果提交后、下一轮模型响应前 SIGKILL，恢复必须保留 invocation/attempt、Artifact 与 generation/hash，不重复识别。沿用已有 gate，不新增脚本或 CI 评测阶段。
+- 软件回归证明支持的格式、处理链路和失败边界。多语种准确率、低分辨率/手写/复杂版面质量、真实 DeepSeek 选择工具与答案效果属于独立 Live/eval；不能由受控 HTTP peer 通过推定。
+
 - **F-014 剩余覆盖**：按实际用户场景明确支持格式，补解析、转写或媒体工具及错误反馈；不以合成文件证明理解质量。
 
 ## 详细测试入口与证明边界

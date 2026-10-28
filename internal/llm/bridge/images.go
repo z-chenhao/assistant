@@ -6,10 +6,10 @@ import (
 	"encoding/base64"
 	"image"
 	"image/jpeg"
-	_ "image/png"
 	"math"
 
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/media"
 )
 
 type imagePayload struct {
@@ -66,19 +66,12 @@ func resolveImages(ctx context.Context, r llm.GenerationRequest) (map[string]ima
 
 // Decode and resize one authorized input; selection, deduplication and envelope
 // budgeting stay with resolveImages. Invalid files fail before provider dispatch.
-func previewImage(media string, data []byte) (imagePayload, error) {
-	if len(data) > llm.MaxInputImageBytes || (media != "image/png" && media != "image/jpeg") {
-		return imagePayload{}, llm.ModelIncompatible
-	}
-
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || cfg.Width < 1 || cfg.Height < 1 || int64(cfg.Width)*int64(cfg.Height) > llm.MaxInputImagePixels {
-		return imagePayload{}, llm.ModelIncompatible
-	}
-	img, _, err := image.Decode(bytes.NewReader(data))
+func previewImage(kind string, data []byte) (imagePayload, error) {
+	img, err := media.DecodeImage(kind, data)
 	if err != nil {
 		return imagePayload{}, llm.ModelIncompatible
 	}
+	cfg := image.Config{Width: img.Bounds().Dx(), Height: img.Bounds().Dy()}
 	size := 640
 	var encoded bytes.Buffer
 	for {

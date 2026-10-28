@@ -8,6 +8,7 @@ import (
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/media"
 )
 
 // Only the accepted generation's explicit selections can resolve pixels. The
@@ -30,23 +31,29 @@ func (r *Runs) resolveGenerationImages(c agent.RunClaim, request *llm.Generation
 		if !selected[ref] {
 			return "", nil, artifact.ErrNotFound
 		}
-		file, descriptor, err := r.openArtifact(ctx, ref, func(tx *sql.Tx) (artifact.Scope, error) {
+		return r.readImage(ctx, ref, func(tx *sql.Tx) (artifact.Scope, error) {
 			if err := fence(ctx, tx, c); err != nil {
 				return artifact.Scope{}, err
 			}
 			return runScope(ctx, tx, c.RunID())
 		})
-		if err != nil {
-			return "", nil, err
-		}
-		defer file.Close()
-		if descriptor.ByteSize > llm.MaxInputImageBytes {
-			return "", nil, artifact.ErrLimit
-		}
-		data, err := io.ReadAll(io.LimitReader(file, llm.MaxInputImageBytes+1))
-		if err == nil && len(data) > llm.MaxInputImageBytes {
-			err = artifact.ErrLimit
-		}
-		return descriptor.MediaType, data, err
 	}
+}
+
+// Visual dispatch and OCR share the scoped, integrity-checked source read.
+// Callers supply their generation or Tool claim; neither accepts Host paths.
+func (r *Runs) readImage(ctx context.Context, ref string, authorize func(*sql.Tx) (artifact.Scope, error)) (string, []byte, error) {
+	file, descriptor, err := r.openArtifact(ctx, ref, authorize)
+	if err != nil {
+		return "", nil, err
+	}
+	defer file.Close()
+	if descriptor.ByteSize > media.MaxImageBytes {
+		return "", nil, artifact.ErrLimit
+	}
+	data, err := io.ReadAll(io.LimitReader(file, media.MaxImageBytes+1))
+	if err == nil && len(data) > media.MaxImageBytes {
+		err = artifact.ErrLimit
+	}
+	return descriptor.MediaType, data, err
 }

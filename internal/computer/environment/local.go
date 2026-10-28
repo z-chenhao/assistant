@@ -7,12 +7,9 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/z-chenhao/erii/internal/computer/sandbox"
 	"github.com/z-chenhao/erii/internal/tool"
@@ -30,12 +27,7 @@ func Check() error {
 			return err
 		}
 	}
-	if runtime.GOOS == "darwin" {
-		_, err := os.Stat("/usr/bin/sandbox-exec")
-		return err
-	}
-	_, err := exec.LookPath("bwrap")
-	return err
+	return sandbox.Check()
 }
 
 func (l Local) Execute(ctx context.Context, name, args string) tool.Result {
@@ -74,16 +66,13 @@ func (l Local) Execute(ctx context.Context, name, args string) tool.Result {
 	paths = append(paths, "/usr/bin", "/bin")
 	cmd.Env = []string{"PATH=" + strings.Join(paths, ":"), "HOME=" + root, "LANG=C.UTF-8"}
 	cmd.Dir, cmd.Stdin = root, bytes.NewReader(request)
-	var output boundedBuffer
-	cmd.Stdout, cmd.Stderr = &output, nil
-	cmd.WaitDelay = time.Second
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
-	if err = cmd.Start(); err != nil {
+	output := sandbox.NewOutput(12 << 20)
+	cmd.Stdout, cmd.Stderr = output, nil
+	started, err := sandbox.Run(cmd, syscall.SIGTERM)
+	if !started {
 		return tool.Failure("PROVIDER_UNAVAILABLE")
 	}
-	defer syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	if err = cmd.Wait(); err != nil || output.overflow {
+	if err != nil || output.Overflow() {
 		// The transport may have executed before it died; never dispatch again.
 		if name != "builtin__read" {
 			return tool.Failure("UNKNOWN_SIDE_EFFECT")
@@ -126,19 +115,4 @@ func Response(raw []byte) tool.Result {
 		}}}
 	}
 	return tool.Result{Text: string(result.Value)}
-}
-
-type boundedBuffer struct {
-	bytes.Buffer
-	overflow bool
-}
-
-func (b *boundedBuffer) Write(p []byte) (int, error) {
-	n := len(p)
-	if n > (12<<20)-b.Len() {
-		p = p[:(12<<20)-b.Len()]
-		b.overflow = true
-	}
-	_, _ = b.Buffer.Write(p)
-	return n, nil
 }

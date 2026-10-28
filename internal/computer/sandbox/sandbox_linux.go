@@ -6,6 +6,8 @@ import (
 	"os/exec"
 )
 
+func Check() error { _, err := exec.LookPath("bwrap"); return err }
+
 func Command(ctx context.Context, executable string, args []string, readRoots []string, writeRoot, workingDir string) (*exec.Cmd, error) {
 	bin, err := exec.LookPath("bwrap")
 	if err != nil {

@@ -9,6 +9,7 @@ F-026 验证四工具在真实隔离环境与统一 ToolExecutor 中的能力，
 | 层级 / 入口 | 验证内容 |
 | --- | --- |
 | [environment 组件](../../internal/computer/environment/local_test.go) | 实际内核沙箱：四工具互通、重复精确编辑、宿主文件和环境变量不可见、链接与越界拒绝、超时、输出上限、二进制 Artifact、无沙箱时不回退 |
+| [共享进程输出](../../internal/computer/sandbox/process_test.go) / [OCR 取消](../../internal/media/ocr/engine_test.go) | io.Copy 与后续写入不能绕过输出上限；真实沙箱启动后取消需等待退出并清理作业；原生工具继续由上行验证 SIGTERM 清理与 unknown 效应行为 |
 | [SQLite 组件](../../internal/agent/sqlite/environment_test.go) | 真实状态库和审批；原生调用复用 Computer、checkpoint 和 execution claim；无 JavaScript 依赖；完成和 unknown 不重发；旧 Workspace 无运行时别名 |
 | [CLI capabilities](../../tests/system/verify_capabilities.py) | 真实 red → Worker 精确修改多个文件 → bash go test → diff → Artifact；连续脏文件编辑/新建/过时哈希；审批拒绝不执行；SIGKILL 后 unknown 不重发；保留 MCP/Skill/角色回归 |
 | [memory maintenance](../../tests/system/verify_memory_maintenance.py) | Reviewer 只采纳真实 bash 的精确测试命令、退出码与完整输出证据；保留独立 Run 与晋升约束 |

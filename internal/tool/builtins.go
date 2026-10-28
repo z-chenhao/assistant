@@ -7,6 +7,7 @@ type BuiltinFamily string
 const (
 	TaskBuiltin         BuiltinFamily = "task"
 	ArtifactBuiltin     BuiltinFamily = "artifact"
+	ImageBuiltin        BuiltinFamily = "image"
 	AutomationBuiltin   BuiltinFamily = "automation"
 	ComputerBuiltin     BuiltinFamily = "computer"
 	CodeBuiltin         BuiltinFamily = "code"
@@ -33,6 +34,7 @@ var builtinCatalog = map[string]builtinPolicy{
 	"builtin__task_manage":        {TaskBuiltin, "task_control", false},
 	"builtin__artifact_search":    {ArtifactBuiltin, "read_only", false},
 	"builtin__artifact_manage":    {ArtifactBuiltin, "artifact_write", false},
+	"builtin__image_ocr":          {ImageBuiltin, "read_only", false},
 	"builtin__automation_manage":  {AutomationBuiltin, "task_control", false},
 	"builtin__automation_observe": {AutomationBuiltin, "automation_observe", false},
 	"builtin__computer_discover":  {ComputerBuiltin, "read_only", true},

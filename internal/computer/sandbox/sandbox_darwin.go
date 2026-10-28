@@ -4,9 +4,12 @@ package sandbox
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"strconv"
 )
+
+func Check() error { _, err := os.Stat("/usr/bin/sandbox-exec"); return err }
 
 func Command(ctx context.Context, executable string, args []string, readRoots []string, writeRoot, workingDir string) (*exec.Cmd, error) {
 	q := strconv.Quote

@@ -30,15 +30,15 @@
 
 <a id="f-013"></a>
 
-### F-013 · 用户图片到模型视觉输入
+### F-013 · 用户图片视觉输入与本地 OCR
 
-**需求**：用户上传图片后，选定视觉模型能实际收到授权图片内容。
+**需求**：用户上传图片后，选定视觉模型能实际收到授权图片内容；纯文本模型也能显式识别图片文字并保留来源。
 
-**当前实现**：Web 上传和 CLI `chat send-parts` 的显式用户图片进入冻结的 ImageRefs 投影；通过视觉 Probe 的选定模型会在实际供应商请求中收到授权缩图。Settings 可显式声明并测试图片输入能力。
+**当前实现**：Web 上传和 CLI `chat send-parts` 的显式用户图片进入冻结的 ImageRefs 投影；通过视觉 Probe 的选定模型会在实际供应商请求中收到授权缩图。Settings 可显式声明并测试图片输入能力。Main/Worker 默认获得 `builtin__image_ocr`，可用本地 Tesseract 提取授权图片中的文字、词框和引擎置信分数，完整结果保存为关联原图的 Artifact。
 
 **边界**：支持 PNG/JPEG，单图最多 8 MiB、约 3355 万像素（32 × 1024²）。工作集最多保留 8 张不同图片，激进上下文重试最多 4 张；省略的像素保留引用与说明。文本模型保留引用并明确说明未看到图片，不读取或发送像素。格式不支持、图片损坏或越界在供应商调用前失败，不把文件名当作图像理解。真实模型的理解质量独立评测。
 
-**验收目标**：通过真实消息入口上传图片，在最终供应商请求中验证图片存在，并验证无权限/不支持模型的行为。
+**验收目标**：通过真实消息入口上传图片，在最终供应商请求中验证图片存在，并验证无权限/不支持模型的行为；纯文本模型通过真实 OCR 工具收到文字，已提交 OCR 结果在重启后复用。
 
 <a id="f-014"></a>
 
@@ -59,6 +59,28 @@ Web 的附件选择器可随文字提交文件。CLI 用 `erii artifact save NAM
 在 Settings 添加模型时，按需勾选 **Enable image input (verified when tested)**，执行 Test connection，通过后再 Select model。Saved models 显示 Image input verified；未启用时显示 Text only。随后随消息上传 PNG/JPEG 即可。CLI 的模型 JSON 输入使用 `capabilities.image_input: true`，图片 ContentPart 必须为 `{"type":"image","artifact_ref":"artifact:..."}`；普通 `file` 不自动加载像素。
 
 新 Run 才启用这条用户图片投影；升级前的活动 Run 沿用其冻结表示。正常停止旧进程后统一升级，不混跑不同投影版本。音视频和复杂文档仍由 F-014 跟踪，文件运输不等于内容理解。
+
+### 图片文字识别（F-013 增强）
+
+上传 PNG/JPEG 后可要求 Agent「识别图片中的文字」。模型通过 `builtin__image_ocr({artifactRef})` 显式调用本地 OCR，Direct Tool 和 Code Mode 使用同一执行路径。视觉模型也可使用此工具；OCR 不改变所选模型，不调用另一家视觉服务。支持英文、简体中文和繁体中文语言包，以返回的 `languages` 为本次实际使用的语言。
+
+先安装运行依赖，再启动 Erii：
+
+```sh
+# Ubuntu / Debian，简体中文和英文
+sudo apt-get install tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim bubblewrap
+# macOS
+brew install tesseract tesseract-lang
+erii doctor
+```
+
+繁体中文在 Debian/Ubuntu 另装 `tesseract-ocr-chi-tra`。自定义语言目录可在启动前设置绝对路径 `TESSDATA_PREFIX`。只使用已安装的 eng/chi_sim/chi_tra；缺少某语言包不会推定能够识别该语言。Doctor 报告依赖与语言包，缺少 OCR 不阻止普通对话，调用会明确失败 `PROVIDER_UNAVAILABLE`。Linux 还需要启用非特权 user namespaces；macOS 使用 Seatbelt。没有无沙箱执行回退。
+
+结果标记 `method: "ocr"`，包含 `source_ref`、原图尺寸、文字、词框与 `document_ref`。坐标以原图左上角为原点，单位为像素；`confidence` 是 0–100 引擎分数，不是正确率概率。模型预览最多 2048 字节文字、16 个词框，完整 JSON 可用 Artifact 工具按范围读取。识别最多保留 4096 个词和 128 KiB 文字，截断会标记 `truncated`；空白图可成功返回空文字。
+
+OCR 能提供截图中的文字证据，不能证明布局、颜色、图表关系或场景理解。处理原图，沿用 8 MiB/32 × 1024² 像素限制；调用总期限为 30 秒。没有自动发布、向用户发送文件或写入长期 Memory。文字会作为普通 Tool 结果进入当前模型上下文，依旧属于不可信的图片内容。
+
+引擎及语言包身份随新 Run 冻结。安装、升级或变更语言目录后重启并建立新 Run；旧冻结调用不会换引擎继续执行。升级前完成 Main 与需保留的旧 Run，Worker Task 可暂停后由新 Main append 接续。已经提交的结果复用原始文字与 Artifact，不重新识别。
 
 ## 详细操作参考
 
