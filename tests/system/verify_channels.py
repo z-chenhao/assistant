@@ -34,6 +34,7 @@ TOKEN = 'sandbox-web-owner-token-at-least-24-bytes'
 
 class ChannelHarness(MainHarness):
     def __init__(self, binary, root, platform, fixture='main'):
+        self.production_events = False
         super().__init__(binary, root, fixture)
         self.config = root / 'config.yaml'
         self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:ERII_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:ERII_FEISHU_VERIFY\n  encrypt_key_ref: env:ERII_FEISHU_ENCRYPT\n  access_token_ref: env:ERII_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
@@ -41,7 +42,6 @@ class ChannelHarness(MainHarness):
                         ERII_FEISHU_ENCRYPT='sandbox-encrypt-key', ERII_FEISHU_ACCESS='sandbox-access-token')
         self.bind = self.command('channel','manage',text=json.dumps(dict(op='bind',channel='feishu',subject='sandbox-tenant:sandbox-app:owner',destination='bound-chat',enabled=True,version=0)))
         self.process = None
-        self.production_events = False
 
     def args(self, *args):
         return [str(self.binary), '-config', str(self.config), '-test-bridge', self.fixture, *(['-test-events'] if self.production_events else []), *(['-test-automation-now',self.now] if hasattr(self,'now') else []), *args]
