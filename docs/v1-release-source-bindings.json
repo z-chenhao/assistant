@@ -1,8 +1,0 @@
-{
-  "version": 1,
-  "ledger_sha256": "05063f1a2f83327baa74ae971bd61f31485e66211ec76309b566ff1c747d4181",
-  "sources": {
-    "docs/technical-design.md": "bbb7e5db3f0bd6aa672e8704e7329d0ecd6d067769c9e49bf3997af5d9268a67",
-    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f"
-  }
-}

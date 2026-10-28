@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "scope": "scripted continuation variant of GC-08; original three turns remain unchanged",
-  "continue": "继续婚礼筹备，宾客仍为128人，桌数与每桌人数尚未确认。",
-  "pause": "暂停婚礼筹备，保留已提交清单和128人。",
-  "resume": "继续婚礼筹备。婚期改为2026-11-08；C2截止改为2026-10-29，C3截止改为2026-11-01，人数和桌数事实沿用已提交清单。",
-  "event_date": "2026-11-08",
-  "deadlines": {"C2": "2026-10-29", "C3": "2026-11-01"}
-}

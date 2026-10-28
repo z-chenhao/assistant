@@ -1,8 +1,0 @@
-{
-  "version": 3,
-  "files": {
-    "evals/fixtures/m1-v2.json": "eb0ffc020b92e945131ded929b92ef2513cf279e7a91462f91f51045e1b5720c",
-    "evals/scoring-v1.json": "6c7cca34d63300c7ec84bd971f89e72daf0c8dd7fadbde240783ab49cf0d4706",
-    "evals/golden-cases.md": "7f420ac86bd296d935ebe0003e2a04d2f0cf4315999aaf31ebac31e929b86f9f"
-  }
-}

@@ -2,7 +2,12 @@
 
 Build the smallest complete change that satisfies the request, prove it with inspectable evidence, and continue through verification without waiting for routine approval.
 
-Start at [README](README.md) for installation and [CONTRIBUTING](CONTRIBUTING.md) for the implementation workflow, risk-based checks, review and cleanup. Use the [feature map](scripts/FEATURES.md) to find maintained verification entry points. These instructions retain product invariants; the baseline defines their full semantics.
+Prioritize user-visible product capability. Standalone verification infrastructure,
+CI tuning, Golden Case expansion and clause-audit work are paused; follow the
+current development priority in CONTRIBUTING. Keep regression checks needed to
+prove a product change.
+
+Start at [Feature Map](docs/feature-map.md) for requirements and status, [README](README.md) for installation and [CONTRIBUTING](docs/features/engineering.md#contributing-contributing-to-erii) for the implementation workflow, risk-based checks, review and cleanup. Use the [testing guide](docs/test-plans/product.md) to find maintained verification entry points. These instructions retain product invariants; the linked designs define their full semantics.
 
 ## 1. Read only the context the task needs
 
@@ -10,12 +15,12 @@ Do not read every design document before every edit. Start with the target code,
 
 | Task | Read |
 |---|---|
-| Architecture, protocol, state, storage, security, replay, or milestone work | Relevant sections of [technical baseline](docs/technical-design.md) |
-| Product behavior, eval fixtures, user-visible claims, or release gates | Relevant cases plus scoring and hard-failure rules in [Golden Cases](evals/golden-cases.md) |
-| Model-visible Tool changes | Baseline Tool, Security, Coding Agent Contract, and Definition of Done sections |
+| Architecture, protocol, state, storage, security, replay, or milestone work | Relevant sections of [feature technical designs and runtime contracts](docs/designs/product-overview.md#contract-0-文档效力与实现规则) |
+| Product behavior, eval fixtures, user-visible claims, or release gates | [Test boundaries and system coverage](docs/test-plans/product.md); external model evaluation belongs to the evaluation project |
+| Model-visible Tool changes | [Tool and approval design](docs/designs/tools-approvals.md), [runtime contracts](docs/designs/runtime-contracts.md), and [acceptance matrix](docs/test-plans/product.md) |
 | Small local refactor or bug fix | Target implementation, callers, tests, and only the specification needed to resolve intent |
 
-The baseline defines intended semantics. Tests and code show current reality. If they disagree, identify the exact conflict. Do not invent a compatibility path or silently choose one side.
+The feature designs define intended semantics. Tests and code show current reality. If they disagree, identify the exact conflict. Do not invent a compatibility path or silently choose one side.
 
 Ask for a decision only when the conflict changes product behavior, a public/model-visible protocol, data compatibility, security, or Durable Replay. Continue safe read-only diagnosis while waiting.
 
@@ -66,11 +71,11 @@ Do not expose Run IDs, usage, traces, status unions, partial results, or JSON-co
 - Freeze ModelSnapshot at Run creation. Profile changes affect only new Runs. A Root tree and its Durable Replay never switch model, endpoint, wire protocol, Tool schema, or compatibility snapshot.
 - Secrets live only in the credential store. Never put credentials in SQLite, YAML, prompts, Artifacts, logs, traces, or errors.
 
-Treat any change to these points as a protocol change. Update the baseline, migration/compatibility plan, and conformance tests together.
+Treat any change to these points as a protocol change. Update the owning feature design, its changelog, migration/compatibility plan, and tests together.
 
 ## 4. Architecture boundaries
 
-Use the project structure defined in the baseline:
+Use the project structure defined in the engineering design:
 
 - `cmd/erii` is the only Go process entry point.
 - `internal/app` is a composition root with no business logic.
@@ -85,6 +90,6 @@ Prefer the smallest coherent implementation. Do not keep old and new paths, temp
 
 ## 5. Delivery and instruction maintenance
 
-Follow [the contribution workflow](CONTRIBUTING.md#working-on-a-change) through verification and final evidence. Preserve user changes, never weaken checks, and ask only for a real decision or permission boundary.
+Follow [the contribution workflow](docs/features/engineering.md#contributing-working-on-a-change) through verification and final evidence. Preserve user changes, never weaken checks, and ask only for a real decision or permission boundary.
 
-Keep this file a router and a list of cross-repository product invariants. Put mechanical controls in code, lint or tests, module guidance in the nearest nested `AGENTS.md`, and general workflow in CONTRIBUTING. Do not edit the auto-managed runtime block below or include it in a product commit.
+Keep this file a router and a list of cross-repository product invariants. Put mechanical controls in code, lint or tests, module guidance in the nearest nested `AGENTS.md`, and general workflow in the engineering feature document. Do not edit the auto-managed runtime block below or include it in a product commit.

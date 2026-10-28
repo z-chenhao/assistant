@@ -1,54 +1,43 @@
-name: Offline CI runtime
-description: Prepare pinned dependencies, isolated public SDK and exact-source binary
+name: Development runtime
+description: Pinned tools and lockfile-installed dependencies shared by software checks
 inputs:
   frontend:
-    description: Install frontend build and TypeScript dependencies (unit/lint only)
-    default: "false"
+    description: Install frontend build and TypeScript dependencies
+    default: 'false'
   browser:
-    description: Install Playwright for Browser contract and UI journeys
-    default: "false"
-  sandbox:
-    description: Install the offline coding sandbox
-    default: "true"
-  temporary-fixtures:
-    description: Use bounded tmpfs for disposable fixtures
-    default: "false"
+    description: Install the pinned browser and system libraries
+    default: 'false'
 runs:
   using: composite
   steps:
-    - name: Use the Ubuntu archive for dependency downloads
-      shell: bash
-      # Azure's mirror repeatedly served browser prerequisites at ~55 kB/s,
-      # consuming 8–9 minutes of the unchanged ten-minute job limit.
-      run: sudo sed -i 's|http://azure\.archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version-file: go.mod
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version-file: .node-version
-        # Hosted npm restore is intentionally absent; native setup has a bounded
-        # cache-miss path and local worktrees reuse their existing npm cache.
-    - name: Install pinned dependencies
+        cache: npm
+        cache-dependency-path: |
+          provider-bridge/package-lock.json
+          runtime/javascript/package-lock.json
+          guest-browser/package-lock.json
+          web/package-lock.json
+    - name: Install locked packages
       shell: bash
+      env:
+        NPM_CONFIG_AUDIT: 'true'
       run: |
         packages=(provider-bridge runtime/javascript)
-        if [ "${{ inputs.browser }}" = true ]; then packages+=(guest-browser); fi
-        if [ "${{ inputs.frontend }}" = true ]; then packages+=(web); fi
-        python3 scripts/setup.py --part packages --packages "${packages[@]}"
-    - name: Provision copied public SDK
-      shell: bash
-      run: exec python3 scripts/ci_step.py --name sdk --phase setup -- python3 scripts/ci_sdk.py prepare --evidence evidence/sdk.json
-    - name: Build this job's exact-source CLI
-      shell: bash
-      run: exec env GOROOT="$ERII_CI_BASE_GOROOT" PATH="$ERII_CI_BASE_GOROOT/bin:$PATH" python3 scripts/ci_step.py --name build --phase build -- make build
-    - name: Prepare isolated coding fixture runtime
-      if: inputs.sandbox == 'true'
+        if [ '${{ inputs.browser }}' = true ]; then packages+=(guest-browser); fi
+        if [ '${{ inputs.frontend }}' = true ]; then packages+=(web); fi
+        python3 scripts/setup.py --part packages --packages "${packages[@]}" --timeout 600
+    - name: Prepare the coding sandbox
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y bubblewrap
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-    - name: Verify fixture storage
+    - name: Install the locked browser
+      if: inputs.browser == 'true'
       shell: bash
-      run: python3 scripts/ci_tmpfs.py ${{ inputs.temporary-fixtures == 'true' && 'setup' || 'disk' }}
+      run: python3 scripts/setup.py --part browser --with-deps --timeout 600 --evidence evidence/setup-browser.json

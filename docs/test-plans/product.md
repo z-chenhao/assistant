@@ -1,0 +1,201 @@
+# 产品测试总方案
+
+[需求主索引](../feature-map.md) · [开发与交付](../features/engineering.md) · [产品架构](../designs/product-overview.md)
+
+本页承载统一的软件测试层级、命令、覆盖、失败处理与评测边界。各功能测试方案补充需求级场景；执行报告仍单独保存。
+
+## 当前执行规则
+
+日常/扩展/发布的检查调度以下方 Testing 和 CI 入口为准。协议验收矩阵描述必须保护的行为，不表示每次文档或局部改动都重新执行完整发布检查。
+
+迁入的早期决策中 make verify 等表述仅保留历史验收范围，当前命令见本页及 Makefile。
+
+## 详细测试入口与证明边界
+
+迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+
+<a id="contract-18-测试故障注入与-definition-of-done"></a>
+
+### 18. 测试、故障注入与 Definition of Done
+
+<a id="contract-181-必须自动化的测试层级"></a>
+
+#### 18.1 必须自动化的测试层级
+
+- 单元测试：所有状态机合法/非法迁移、Capability 派生、Context 裁剪、错误映射、冲突键与重放策略。
+- 契约测试：Model Provider Bridge、OAuth UI 事件、LLM Adapter、Tool Provider、Sidecar RPC、ComputerProvider、ArtifactStore、EventBus 和渠道 Adapter。
+- 集成测试：真实 SQLite + NATS；数据库可以临时目录运行，测试结束不依赖手工清理。
+- 属性/竞态测试：重复事件、乱序完成、并发 append/cancel、Claim 接管、旧 epoch 写入、同 `call_key` 参数漂移。
+- 端到端测试：Fake LLM 驱动完整 TUI → Main → Task → Root → Child → Main → Delivery 链路。
+- 故障注入：在“事务提交前/后、Outbox 发布前/后、Tool 副作用前/后、结果持久化前/后、Sidecar Host Call 前/后”杀进程。
+
+Go 测试必须运行 race detector；Sidecar 必须包含协议 fixture、资源上限、Promise 挂起、未 await、取消和非法 Host Call 测试。所有外部依赖都应有确定性 Fake，不能用线上账号作为 CI 前提。
+
+<a id="contract-182-核心验收矩阵"></a>
+
+#### 18.2 核心验收矩阵
+
+| 主题 | 必须证明 |
+|---|---|
+| 首次启动 | 无 Active Profile 时只能进入 Setup；本地 URL 与 ChatGPT 登录都能创建并激活通过 Probe 的 Profile |
+| 模型快照 | Profile 切换不改变活动 Run；Root/Child 树固定使用同一 ModelSnapshot；Durable Replay 拒绝模型漂移 |
+| 登录刷新 | OAuth state/PKCE、防重复回调、并发单飞刷新、过期重登和 Logout 均不泄露或残留 Secret |
+| Provider 隔离 | Provider Bridge 无 Tool/Computer/数据库权限；Code Mode Sidecar 无模型凭据或任意网络 |
+| 单 Main | 并发消息只注入一个活动 Main Run，用户 Steering 优先于 Worker Follow-up |
+| Task 生命周期 | create/append/pause/cancel/complete 与四状态一致；失败 Run 不产生 `failed` Task |
+| Root/Child | Main 不可直接创建 Child；`agent.run()` 永不创建 Task；Child 只回直接 Parent |
+| 权限 | Child 不获得用户交付、Task 管理、凭据管理或 Parent 没有的能力 |
+| 并发 | 100/1000 项在高上限内透明排队，用户无并发询问风暴 |
+| Durable | 崩溃后固定源码重放，已完成调用零重复，未完成调用重新附着或继续 |
+| 副作用 | `safe/query_before_retry/never` 三种策略分别通过故障注入；不确定结果进入 `unknown` |
+| 取消与暂停 | 取消递归传播；暂停受控落盘；迟到事件因 epoch/fencing 被拒绝 |
+| Approval | 冻结参数跨重启不变；批准仅执行原调用；拒绝不会调用 Provider |
+| Artifact | 大结果不进入消息历史；引用越权、过期、篡改和路径穿越均被拒绝 |
+| Delivery | AssistantMessage 与 DeliveryRequest 原子建立，渠道重试不重复发送 |
+| 安全 | API Key、access/refresh token 不出现在 SQLite、YAML、Artifact、Trace、错误或日志；模型无法读取 CredentialRef 或伪造内部 ID 扩权 |
+
+<a id="contract-183-完成定义"></a>
+
+#### 18.3 完成定义
+
+一个里程碑只有同时满足以下条件才算完成：
+
+1. 代码、migration、配置样例、Fake、测试和最小运维说明均已提交。
+2. 新增模型可见 Tool 有稳定 Schema、权限矩阵、错误码、重放策略和契约测试。
+3. 新增状态有合法迁移表、并发/幂等策略、恢复扫描和故障注入测试。
+4. `go test -race ./...`、Sidecar 测试、静态检查与端到端测试全部通过。
+5. 至少完成一次“运行中 kill -9 → 重启 → 自动恢复”的演示，并保存可审计结果。
+6. 文档与实现没有新的未标注差异；必要偏差在所属技术方案的 Changelog 记录，并更新当前架构/流程后才合并。
+
+<a id="contract-184-软件回归与-agent-评测边界"></a>
+
+#### 18.4 软件回归与 Agent 评测边界
+
+产品仓库维护确定性的单元、集成、端到端和故障恢复测试；CI 是运行这些检查的自动化机制。日常 PR 执行核心软件回归，完整软件回归和 race 检查独立定时或手动执行，发布前按风险补齐相关验证。安全、审批、取消、Durable Replay、工作区保护和数据完整性要求不因调度拆分而降低。
+
+完整 Golden Case 题库、真实模型运行器、评分规则和结果归独立评测项目管理，不再作为每次代码提交的 CI 门禁，也不在产品仓库维护逐段条款哈希审计。评测必须通过普通产品接口，记录产品版本、模型和配置。固定回复或预写 Tool 计划只能证明软件机制，不能证明模型效果。真实账号和 macOS Computer 兼容性仍需显式 Live 验证。
+
+当前执行入口和覆盖范围见 [测试治理](#testing-test-levels) 与 [CI](../designs/engineering.md#ci-continuous-integration-and-delivery)。
+
+<a id="verification-product-verification"></a>
+
+## Product verification
+
+Use the [testing guide](#testing-test-levels) for test levels, ownership and the current
+coverage map. [CI](../designs/engineering.md#ci-continuous-integration-and-delivery) describes which checks run on PRs, weekly runs and
+releases. Actual commands live in Makefile and the system runner.
+
+```sh
+make test lint
+make test-e2e E2E_EVIDENCE=evidence/my-change
+python3 tests/system/runner.py --list --suite full
+python3 tests/system/runner.py --gate tools --gate children --repeat 5 --evidence evidence/focused-change
+make test-full E2E_EVIDENCE=evidence/full-change
+make test-race
+```
+
+Keep failed outputs until diagnosis is complete, use a fresh directory for a
+rerun and preserve the command's exit status. A PID, open port, empty test run
+or valid report shape alone does not prove a user flow. Inspect state and outputs
+through the maintained tests; do not point them at user data.
+
+Fake peers verify software contracts. Real model behavior, actual account login
+and native macOS Computer compatibility require explicit live checks. The full
+Golden benchmark and scoring run outside this repository.
+
+<a id="testing-testing-and-engineering-boundaries"></a>
+
+## Testing and engineering boundaries
+
+Tests protect product behavior. Scripts provide a small set of entry points;
+they are not a separate product roadmap. CI schedules the checks. Delivery builds
+and publishes artifacts under explicit release authorization.
+
+<a id="testing-test-levels"></a>
+
+### Test levels
+
+| Layer | What it proves | Ownership and execution |
+| --- | --- | --- |
+| Unit | Local rules, parsing, validation, state transitions | Go/Node tests beside code; fast focused runs during editing |
+| Component/integration | Real SQLite, adapter contracts, Sidecar RPC, concurrency | Existing Go/Node package tests; PR checks and relevant race checks |
+| System/E2E | Actual UI/CLI → Main/Task/Worker/Tool → durable result, failure and recovery | `tests/system/`; core PR checks, extended weekly/manual checks |
+| Test-support regression | Process cleanup, setup integrity and small shared test helpers | `tests/harness/`; PR checks; no historical CI topology or audit-ledger tests |
+| Agent evaluation | A real model completes an actual user goal, with quality, cost and reliability measured | Independent evaluation repository and explicit low-frequency runs |
+
+A Fake or deterministic HTTP peer is appropriate for checking a protocol or
+recovery contract. A hard-coded answer or scripted Tool plan cannot prove Agent
+quality. Existing Go test packages mix local and integration coverage; that mix
+is stated rather than hidden behind a `test-unit` alias.
+
+<a id="testing-commands"></a>
+
+### Commands
+
+- `make test`: Go, Node, real-browser and retained infrastructure regressions.
+- `make lint`: documentation links, shell syntax, Go checks and TypeScript.
+- `make test-e2e`: core deterministic user flows, once each.
+- `make test-full`: all retained product system flows, once each.
+- `make test-race`: the complete race-instrumented Go inventory with bounded scheduling.
+- `python3 tests/system/runner.py --gate tools --repeat 5 --evidence evidence/tool-stability`: explicit repeated/focused regression when warranted.
+
+Use a built `bin/erii` and a fresh evidence directory for system runs. Every gate
+must complete, produce a fresh report and drain owned processes. Cancellation,
+launcher failure, missing reports or source/binary drift reject success. Local
+loopback peers, disposable databases and pinned runtimes make the checks account-free.
+Test output stays in ignored `evidence/`; credentials and personal data stay out.
+
+<a id="testing-system-coverage"></a>
+
+### System coverage
+
+| Core gate | Product contract |
+| --- | --- |
+| `startup` | Source/native installation, real terminal setup, Tool use, broker and crash/restart |
+| `main` | Single Main, steering, Tool continuation and durable response |
+| `tasks` | Main-to-Task/Worker handoff, pause/append/cancel and recovery |
+| `children` | Recursive delegation, frozen capabilities, parent-only results and approvals |
+| `tools` | Frozen approved actions, invocation persistence and unknown side effects |
+| `code-recovery` | Actual Go/QuickJS interruption, 37 completed/8 waiting calls, no repeated completed work |
+| `local-provider` | Discover/probe/select, transport and image projection with an owned HTTP peer |
+| `account` | Deterministic auth/callback/refresh/logout contracts and secret handling |
+| `channels` | Real Web/browser and channel delivery behavior |
+
+Extended gates cover artifacts, memory, recall, automation, scheduling, spend,
+capacity, operations, Computer, capabilities and additional terminal behavior.
+They protect software mechanics and never assign semantic scores. Full inventory
+and exact commands come from `tests/system/runner.py --list --suite full`.
+
+<a id="testing-agent-evaluation"></a>
+
+### Agent evaluation
+
+The full Golden benchmark, real-model drivers, rubrics, Judge integration and
+large run records belong in a separate evaluation repository. Version those
+assets there. Bind a run to the product commit or binary digest, model/version,
+configuration and evaluation-set version. Keep raw traces and results as run
+artifacts. Do not copy them into this product checkout on every code submission.
+
+This repository retains only synthetic software-test fixtures needed by actual
+regressions. Tool schemas, CLI/API behavior and ordinary user controls are the
+integration surface for external evaluators. Do not give an evaluator a separate
+Agent Loop or privileged production bypass.
+
+The former Golden/audit implementation is recoverable from Git at
+`006ac326e7db279f916f066334bfddd26ac33735`. A verified export was also retained
+outside the checkout during this migration. That export preserves the original
+assets; it is not a newly deployed or independently validated evaluation service.
+
+The product repo makes no Agent-quality or whole-benchmark pass claim. Quality
+thresholds and benchmark governance are owned by the evaluation project. Software
+safety requirements still apply to every product change and release.
+
+<a id="testing-keep-the-boundaries-small"></a>
+
+### Keep the boundaries small
+
+Operational commands belong in `scripts/`, software tests in `tests/`, product
+logic in its owning module. Add a helper only for a real repeated operation;
+extend an existing test for a product regression. Do not recreate the retired
+Multica task hierarchy, per-clause source-hash ledgers, CI sharding/join framework
+or a parallel benchmark platform inside the product repository.

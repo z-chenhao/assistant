@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "files": {
+    "tests/fixtures/m3-artifact-v1.json": "d77794cff66a3b9fe4f38547fe9d3339fd22745471c6ea30d721d17d021cdd31",
+    "tests/fixtures/artifact-v1/visa_front.png": "c85eeb8b11a5efde47635f5ac167dff36b0bf81055c883bd239f4959419d0486",
+    "tests/fixtures/artifact-v1/flight_order.png": "19b66a139434807667098a51b93d374caa81fccea5c5b7bb366169e31a7b6af9"
+  }
+}

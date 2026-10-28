@@ -1,0 +1,36 @@
+name: Extended regression
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 19 * * 0'
+permissions:
+  contents: read
+concurrency:
+  group: extended-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    name: Full deterministic regression and race checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          frontend: 'true'
+          browser: 'true'
+      - name: Extended product flows
+        run: exec python3 tests/system/process_step.py --name full --phase test -- make test-full
+      - name: Race detector
+        if: ${{ !cancelled() }}
+        run: exec python3 tests/system/process_step.py --name race --phase test -- make test-race
+      - name: Retain results, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: extended-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
