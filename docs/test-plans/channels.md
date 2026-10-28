@@ -33,7 +33,7 @@
 | [tests/system/verify_tui.py](../../tests/system/verify_tui.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
 | [tests/system/verify_delivery.py](../../tests/system/verify_delivery.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
 
-- **F-019 剩余覆盖**：接通增量状态/消息读取与前端更新；具体传输方式在实施时确定，保留权威提交边界。
+- **F-019**：通过具名投影与真实浏览器覆盖；不以软件回归证明真实模型质量或外部账户可用性。
 - **F-020 剩余覆盖**：补凭据刷新/失效诊断体验；不确定远端投递目前只能依赖已保存本地回执，可信远端核实能力仍待定义。
 
 ## 详细测试入口与证明边界
@@ -144,3 +144,11 @@ input cannot be lost during progressive enhancement.
 ## 工程基础重构回归
 
 F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failure 后仍服务并执行下一请求；`web/page_test.go` 证明 Settings/Progress 不依赖历史查询；`conversation/sqlite/store_test.go` 验证 205 条记录无重叠/遗漏分页和作用域查询。`tests/system/verify_channels.py` 通过实际 Web 证明缺失依赖不隐藏控制页、修复后恢复 ingress、GET 不修改已稳定业务状态。
+
+## F-019 实时更新验收
+
+- `internal/interaction/web/updates_test.go`：条件 ETag、消息/审批/状态变化、历史游标、HTML 转义、无输入/内部字段、失败无部分响应；条件请求也必须重新认证和检查绑定；Settings/Progress 不查询 Conversation。
+- `tests/system/verify_channels.py` 调用维护中的 `channels_browser.mjs` live 场景：在真实 Actor/SQLite/HTTP/浏览器链路中，输入草稿和选择文件后收到新回复，保留原输入节点、request source ID、光标/选区、焦点和阅读锚点；断网后重连；Task/Worker 产生冻结审批与 busy 状态，拒绝动作不重载、不执行副作用；另一页显示任务取消；会话轮换后保留草稿并显式恢复。
+- 原有 setup/components/approval/移动端/无 JavaScript 场景继续验证渐进增强、受控投影和原表单兼容；整个渠道回归保留签名/身份/去重、未知副作用和重启场景。
+
+不增加 golden case、模型效果分数或独立 CI 编排。完整检查使用既有 `make test lint` 与 channels/core runner；执行结果保留在既有 evidence 报告中。

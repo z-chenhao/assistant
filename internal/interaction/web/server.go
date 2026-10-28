@@ -265,6 +265,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
+	case "/api/updates":
+		s.updates(w, r)
 	case "/api/conversation":
 		before, e := conversationCursor(r)
 		if e != nil {
@@ -343,6 +345,12 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 	case "/approval":
 		if err := s.decideApproval(r); err != nil {
 			return err
+		}
+		if r.Header.Get("Accept") == "application/json" {
+			jsonResult(w, struct {
+				Accepted bool `json:"accepted"`
+			}{true})
+			return nil
 		}
 	case "/model/add":
 		if err := s.addModel(r); err != nil {
