@@ -44,7 +44,7 @@ class ChannelHarness(MainHarness):
         self.process = None
 
     def args(self, *args):
-        return [str(self.binary), '-config', str(self.config), '-test-bridge', self.fixture, *(['-test-events'] if self.production_events else []), *(['-test-automation-now',self.now] if hasattr(self,'now') else []), *args]
+        return [str(self.binary), '-config', str(self.config), '-test-bridge', self.fixture, *(['-test-events'] if getattr(self, 'production_events', False) else []), *(['-test-automation-now',self.now] if hasattr(self,'now') else []), *args]
 
     def start(self, boundary=None):
         args = ('web','serve') if boundary is None else ('-test-main-hold',boundary,'web','serve')
