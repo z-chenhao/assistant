@@ -1,6 +1,8 @@
 package context
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -8,6 +10,28 @@ import (
 
 	"github.com/z-chenhao/erii/internal/llm"
 )
+
+func TestSummaryPromptBytes(t *testing.T) {
+	t.Chdir(t.TempDir())
+	anchors := []llm.Message{{Role: "user", Text: "Keep constraints", Source: &llm.ContextSource{Kind: "task", Protected: true}}}
+	sources := []llm.Message{{Role: "assistant", ToolCalls: []llm.ToolCall{{ID: "call-1", Name: "echo", Arguments: `{}`}}}, {Role: "tool", ToolCallID: "call-1", Text: "confirmed result"}}
+	for _, tc := range []struct {
+		target int
+		hash   string
+	}{{256, "065c8c766ade65111d52f8d837b1fb30cc96ce90a2b522f27b9fb86c545fb4e2"}, {2048, "aede9ab48b578fb5c8c7e0c081a7ff19117c736dbe92b4c9435204dc6b706884"}, {16384, "a974392e75ca470dfc11c9b711131275205fd6af925bc3a90060906afa7af2b8"}} {
+		t.Run(fmt.Sprint(tc.target), func(t *testing.T) {
+			messages, n, err := SummaryRequest(sources, anchors, 10000, tc.target)
+			if err != nil || n != len(sources) {
+				t.Fatal(n, err)
+			}
+			raw, _ := json.Marshal(messages)
+			got := fmt.Sprintf("%x", sha256.Sum256(raw))
+			if got != tc.hash {
+				t.Fatalf("summary request bytes changed: %s", got)
+			}
+		})
+	}
+}
 
 func TestWorkingPreparationPreservesTaskAndUnknownFacts(t *testing.T) {
 	anchor := llm.Message{Role: "user", Text: strings.Repeat("task background ", 150) + "DO_NOT_PUBLISH\nartifact:input", Source: &llm.ContextSource{Kind: "task", Protected: true}}

@@ -1,0 +1,2 @@
+# Embedded prompt text must keep identical bytes across Git checkouts.
+internal/prompt/**/*.md text eol=lf
