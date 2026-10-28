@@ -98,8 +98,7 @@ def verify(binary, bridge):
                     require(t.stop(signal.SIGKILL) == -signal.SIGKILL, "kill evidence missing")
                     transcript = t.transcript()
                 with h.terminal() as t:
-                    t.expect("State: ready")
-                    t.expect("assistant: PROBE_RESULT_OK"); t.expect("You> ")
+                    t.expect_all(["State: ready", "assistant: PROBE_RESULT_OK"]); t.expect("You> ")
                     require(h.state() == state, "reopen duplicated semantic state")
                     t.send("/models"); t.expect("fixture-model ready"); t.expect("You> ")
                     t.send("/setup"); t.expect("Connection [1/2]"); t.send("/cancel")
@@ -250,7 +249,7 @@ def verify(binary, bridge):
                     transcript = t.transcript()
                 aid = h.command("model", "accounts")[0]["connection_id"]
                 with h.terminal() as t:
-                    t.expect("State: ready"); t.expect("assistant: PROBE_RESULT_OK"); t.expect("You> ")
+                    t.expect_all(["State: ready", "assistant: PROBE_RESULT_OK"]); t.expect("You> ")
                     require(h.state() == state, "account restart changed state")
                     t.send("/logout " + aid); t.expect("Account logged out."); t.expect("You> ")
                     t.send("blocked after logout"); t.expect("State: degraded."); t.expect("You> ")
