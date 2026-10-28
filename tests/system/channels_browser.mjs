@@ -59,6 +59,88 @@ try{
   if((await submitted).status()!==303)throw new Error('composer submission was not accepted');
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
  }
+
+ if(phase==='live'){
+  page.setDefaultTimeout(10000);
+  let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++});
+  const send=async(source,text)=>{
+   const response=await context.request.post(url+'/api/message',{data:{source_id:source,content:[{type:'text',text}]}});
+   if(!response.ok())throw new Error('live input not accepted: '+response.status());
+  };
+  const plan=(name,args)=>'Capabilities: '+JSON.stringify([{name,arguments:args}]);
+  const echo=async(key,text)=>send(key,plan('mcp__fixture__echo',{text}));
+  await echo('live-initial','Opening note\n'+'Context line\n'.repeat(55)+'INITIAL_DONE');
+  await page.locator('.message.assistant').filter({hasText:'INITIAL_DONE'}).waitFor();
+  const editor=page.getByLabel('Message Erii',{exact:true});
+  await editor.fill('Keep this unsent draft exactly.');
+  await page.getByLabel('Attach a file').setInputFiles({name:'pending.txt',mimeType:'text/plain',buffer:Buffer.from('Unsent attachment bytes.\n')});
+  await editor.focus();await editor.press('ArrowLeft');
+  const source=await page.locator('input[name="source_id"]').inputValue();
+  const selection=await editor.evaluate(input=>[input.selectionStart,input.selectionEnd]);
+  await page.evaluate(()=>{window.liveEditor=document.querySelector('textarea');window.liveFile=document.querySelector('input[type=file]');scrollTo(0,180)});
+  const anchor=await page.locator('[data-live-key^="message:"]').first().evaluate(node=>({key:node.dataset.liveKey,top:node.getBoundingClientRect().top}));
+  const checkDraft=async(focused=true)=>{
+   if(await editor.inputValue()!=='Keep this unsent draft exactly.'||await page.locator('input[name="source_id"]').inputValue()!==source)throw new Error('live update lost draft or request identity');
+   const kept=await editor.evaluate(input=>({node:input===window.liveEditor,file:document.querySelector('input[type=file]')===window.liveFile,focused:document.activeElement===input,selection:[input.selectionStart,input.selectionEnd]}));
+   if(!kept.node||!kept.file||focused&&!kept.focused||JSON.stringify(kept.selection)!==JSON.stringify(selection))throw new Error('live update replaced input nodes, focus or selection');
+   const file=await page.getByLabel('Attach a file').evaluate(async input=>({name:input.files[0]?.name,text:await input.files[0]?.text()}));
+   if(file.name!=='pending.txt'||file.text!=='Unsent attachment bytes.\n')throw new Error('live update lost attachment');
+  };
+  await echo('live-reply','LIVE_REPLY_WHILE_TYPING');
+  await page.locator('.message.assistant').filter({hasText:'LIVE_REPLY_WHILE_TYPING'}).waitFor();
+  await checkDraft();
+  const top=await page.locator('[data-live-key="'+anchor.key+'"]').evaluate(node=>node.getBoundingClientRect().top);
+  if(Math.abs(top-anchor.top)>2)throw new Error('background update moved reading position');
+  await page.getByRole('button',{name:'New messages'}).waitFor();
+  await page.waitForResponse(response=>response.url().includes('/api/updates?')&&response.status()===304);
+  await checkDraft();
+  // A real network failure retains the DOM and draft, then reads current state.
+  let interrupted=false;
+  await page.route('**/api/updates?**',async route=>{if(!interrupted){interrupted=true;await route.abort()}else await route.continue()});
+  await page.getByRole('status').filter({hasText:'Connection lost'}).waitFor();
+  await checkDraft();
+  await echo('live-reconnect','LIVE_REPLY_AFTER_RECONNECT');
+  await page.locator('.message.assistant').filter({hasText:'LIVE_REPLY_AFTER_RECONNECT'}).waitFor();
+  await page.unroute('**/api/updates?**');
+  await checkDraft();
+  // The approval and progress come from a real Task/Worker and frozen native
+  // write invocation. Rejecting it must not navigate away from this draft.
+  const task=plan('builtin__write',{path:'unapproved.txt',content:'must not be written'});
+  await send('live-task',plan('builtin__task_manage',{operation:'create',task,completionPolicy:'ongoing'}));
+  const approval=page.locator('#conversation-approvals form').first();await approval.waitFor();
+  await page.locator('#workspace-status').filter({hasText:'busy'}).waitFor();
+  await checkDraft();
+  const frozen=await approval.locator('input[name="hash"]').inputValue();
+  const progress=await context.newPage();
+  try{
+   await progress.goto(url+'/progress');await progress.locator('[data-live-key^="task:"]').waitFor();
+   const tasks=await (await context.request.get(url+'/api/progress')).json();const ref=tasks[0].taskRef;
+   await page.bringToFront();
+   const decision=page.waitForResponse(response=>response.url()===url+'/approval'&&response.request().method()==='POST');
+   await approval.getByRole('button',{name:'Decline',exact:true}).click();
+   const acknowledged=await decision;
+   if(acknowledged.status()!==200||!(await acknowledged.json()).accepted)throw new Error('live approval was not acknowledged');
+   if(!acknowledged.request().postData().includes(frozen))throw new Error('approval changed the frozen action hash');
+   await page.waitForFunction(()=>!document.querySelector('#conversation-approvals form'));
+   await checkDraft(false);
+   await send('live-cancel',plan('builtin__task_manage',{operation:'cancel',taskRef:ref}));
+   await progress.bringToFront();
+   await progress.locator('[data-live-key="task:'+ref+'"] .state').filter({hasText:'cancelled'}).waitFor();
+   if(await progress.locator('main').getByRole('button').count())throw new Error('live progress gained management controls');
+  }finally{await progress.close();await page.bringToFront()}
+  // Another authenticated browser rotates the session. The old page must keep
+  // its draft and offer explicit reconnect, without redirecting to login.
+  const other=await browser.newContext();
+  try{await other.request.post(url+'/session',{form:{token:process.env.ERII_WEB_TEST_TOKEN}})}finally{await other.close()}
+  await page.getByRole('status').filter({hasText:'Updates paused'}).waitFor();
+  await checkDraft(false);
+  await context.request.post(url+'/session',{form:{token:process.env.ERII_WEB_TEST_TOKEN}});
+  const resumed=page.waitForResponse(response=>response.url().includes('/api/updates?')&&[200,304].includes(response.status()));
+  await page.getByRole('button',{name:'Retry updates',exact:true}).click();await resumed;
+  await checkDraft(false);
+  if(navigations!==0)throw new Error('live updates navigated the document');
+  await writeFile(evidence+'/live-contract.json',JSON.stringify({draft:true,attachment:true,focus:true,selection:true,scroll:true,conditional:true,reconnect:true,approval:true,progress:true,session:true,navigations},null,2));
+ }
  if(phase==='components'){
   await page.locator('[data-renderer="native"] .answer-table').waitFor();
   if(await page.locator('.answer-table tbody tr').count()!==2)throw new Error('native table lost rows');

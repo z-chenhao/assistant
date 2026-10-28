@@ -165,6 +165,20 @@ def run(binary,evidence):
             h.stop()
         finally:h.cleanup()
 
+    # F-019: keep a real browser draft and attachment across committed replies,
+    # approval decisions, Task status, network loss and session rotation.
+    with tempfile.TemporaryDirectory(prefix='erii-channel-live-') as temp, Sandbox() as platform:
+        h=ChannelHarness(binary,Path(temp),platform,'capabilities')
+        try:
+            h.setup();h.start()
+            h.browser(evidence.parent/'channels-live-ui','live')
+            state=h.rows()
+            require(any(a['status']=='denied' for a in state['approvals']), 'live UI did not persist exact approval rejection')
+            require(not (h.root/'data.computer/unapproved.txt').exists(), 'rejected live action executed')
+            report['scenarios']['live-updates']=state
+            report['checks'].append('Live Web: committed replies/approvals/progress update while draft, file, focus, selection, scroll and request identity survive; network/session recovery without reload')
+        finally:h.cleanup()
+
     # Approval recovery uses the same external-effect Fake and persistent Security
     # lifecycle as TUI. Callback races cross two authenticated transports.
     with tempfile.TemporaryDirectory(prefix='erii-channel-approval-') as temp, Sandbox() as platform:
