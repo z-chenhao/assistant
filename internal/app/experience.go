@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/skill"
 )
@@ -10,5 +11,5 @@ func (a *App) ReviewExperience(ctx context.Context, q skill.ReviewRequest) (map[
 	if a.skillConfig == nil {
 		return nil, agent.ErrNotFound
 	}
-	return a.Runs().ReviewExperience(ctx, *a.skillConfig, q)
+	return a.runtimeRuns().ReviewExperience(ctx, *a.skillConfig, q)
 }

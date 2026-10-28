@@ -23,6 +23,7 @@ import (
 	deliveryterminal "github.com/z-chenhao/erii/internal/delivery/terminal"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
+	"github.com/z-chenhao/erii/internal/interaction"
 	"github.com/z-chenhao/erii/internal/interaction/feishu"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/llm/account"
@@ -34,6 +35,7 @@ import (
 	"github.com/z-chenhao/erii/internal/memory"
 	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
 	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/erii/internal/operations"
 	"github.com/z-chenhao/erii/internal/recall/embedding"
 	"github.com/z-chenhao/erii/internal/skill"
 	"github.com/z-chenhao/erii/internal/task"
@@ -77,7 +79,7 @@ type runtimeCore struct {
 	registry *tool.Registry
 }
 
-func (a *App) Runs() *sqlite.Runs { return a.core.Load().runs }
+func (a *App) runtimeRuns() *sqlite.Runs { return a.core.Load().runs }
 
 // OpenRuntime defers Tool/Computer initialization until the production broker
 // phase. Explicit fixtures still use the very same composition and lifecycle.
@@ -233,7 +235,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	projection.ConfigureScheduler(cfg.Scheduler)
 	a.core.Store(&runtimeCore{runs: projection})
 	if cfg.Memory != nil {
-		a.memoryCurator = &memory.Curator{Process: func(ctx context.Context) error { return a.Runs().CurateMemory(ctx) }, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
+		a.memoryCurator = &memory.Curator{Process: func(ctx context.Context) error { return a.runtimeRuns().CurateMemory(ctx) }, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
 	}
 	var prepareMu sync.Mutex
 	prepared := false
@@ -265,10 +267,10 @@ func SchemaVersions() map[string]int {
 	return map[string]int{"state.db": sqlite.SchemaVersion(), "conversation.db": conversationsqlite.SchemaVersion, "memory.db": memorysqlite.SchemaVersion}
 }
 
-func (a *App) Operations(ctx context.Context) (sqlite.Operations, error) {
+func (a *App) Operations(ctx context.Context) (operations.Report, error) {
 	return a.store.Operations(ctx)
 }
-func (a *App) OperationalTrace(ctx context.Context, id string) (sqlite.RunTrace, error) {
+func (a *App) OperationalTrace(ctx context.Context, id string) (operations.RunTrace, error) {
 	return a.store.OperationalTrace(ctx, id)
 }
 func (a *App) RetryEvent(ctx context.Context, id string, attempts int) error {
@@ -445,23 +447,27 @@ func (a *App) Discover(ctx context.Context, endpoint, authID string) ([]llm.Cata
 	return a.provider.CatalogAt(ctx, connection)
 }
 
-func (a *App) Activity(ctx context.Context) ([]task.Summary, error) { return a.Runs().Activity(ctx) }
+func (a *App) Activity(ctx context.Context) ([]task.Summary, error) {
+	return a.runtimeRuns().Activity(ctx)
+}
 
-func (a *App) Spend(ctx context.Context) ([]sqlite.SpendView, error) { return a.Runs().Spend(ctx) }
+func (a *App) Spend(ctx context.Context) ([]agent.SpendView, error) {
+	return a.runtimeRuns().Spend(ctx)
+}
 
-func (a *App) Approvals(ctx context.Context) ([]sqlite.ApprovalView, error) {
-	return a.Runs().Approvals(ctx)
+func (a *App) Approvals(ctx context.Context) ([]interaction.Approval, error) {
+	return a.runtimeRuns().Approvals(ctx)
 }
 func (a *App) DecideApproval(ctx context.Context, id, hash, decision string) error {
 	d, err := a.store.Diagnostics(ctx)
 	if err != nil {
 		return err
 	}
-	return a.Runs().Decide(ctx, d.AgentID, id, hash, decision)
+	return a.runtimeRuns().Decide(ctx, d.AgentID, id, hash, decision)
 }
-func (a *App) ReconcileTools(ctx context.Context) ([]sqlite.ToolOutcome, error) {
-	if err := a.Runs().ReconcileUnknown(ctx); err != nil {
+func (a *App) ReconcileTools(ctx context.Context) ([]tool.ToolOutcome, error) {
+	if err := a.runtimeRuns().ReconcileUnknown(ctx); err != nil {
 		return nil, err
 	}
-	return a.Runs().ToolOutcomes(ctx)
+	return a.runtimeRuns().ToolOutcomes(ctx)
 }

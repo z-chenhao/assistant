@@ -281,20 +281,8 @@ func (r *Runs) decideSpend(ctx context.Context, tx *sql.Tx, principal, id, hash,
 	return true, runEvent(ctx, tx, owner, "spend_approval.decided", 1)
 }
 
-type SpendView struct {
-	Snapshot       string `json:"snapshot_id,omitempty"`
-	PricingVersion string `json:"pricing_version,omitempty"`
-	Account        string `json:"account"`
-	Currency       string `json:"currency"`
-	State          string `json:"state"`
-	Boundary       int64  `json:"boundary_micros"`
-	Committed      int64  `json:"committed_micros"`
-	MissingUsage   int64  `json:"missing_usage_calls"`
-	UnpricedCalls  int64  `json:"unpriced_calls"`
-}
-
 // Spend is a local human control-plane read. No model-visible tool is added.
-func (r *Runs) Spend(ctx context.Context) ([]SpendView, error) {
+func (r *Runs) Spend(ctx context.Context) ([]agent.SpendView, error) {
 	rows, err := r.host.db.QueryContext(ctx, `WITH snapshots AS (
  SELECT * FROM spend_snapshot UNION ALL
  SELECT DISTINCT u.snapshot_id,u.account_key,'',0,'null' FROM spend_unpriced_usage u WHERE NOT EXISTS(SELECT 1 FROM spend_snapshot f WHERE f.snapshot_id=u.snapshot_id)
@@ -307,9 +295,9 @@ func (r *Runs) Spend(ctx context.Context) ([]SpendView, error) {
 		return nil, agent.ErrStorage
 	}
 	defer rows.Close()
-	out := []SpendView{}
+	out := []agent.SpendView{}
 	for rows.Next() {
-		var v SpendView
+		var v agent.SpendView
 		if rows.Scan(&v.Snapshot, &v.PricingVersion, &v.Account, &v.Currency, &v.State, &v.Boundary, &v.Committed, &v.MissingUsage, &v.UnpricedCalls) != nil {
 			return nil, agent.ErrStorage
 		}
@@ -319,7 +307,7 @@ func (r *Runs) Spend(ctx context.Context) ([]SpendView, error) {
 		return nil, agent.ErrStorage
 	}
 	if len(out) == 0 {
-		out = append(out, SpendView{State: "unpriced_unconfigured"})
+		out = append(out, agent.SpendView{State: "unpriced_unconfigured"})
 	}
 	return out, nil
 }

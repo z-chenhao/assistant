@@ -21,7 +21,7 @@ type computerUseStore struct {
 	version int64
 }
 
-func (s *computerUseStore) Fence(ctx context.Context) error { return (computerStore{s.b}).Fence(ctx) }
+func (s *computerUseStore) Fence(ctx context.Context) error { return s.b.computerStore().Fence(ctx) }
 func (s *computerUseStore) Load(ctx context.Context) (computer.UseState, error) {
 	var state computer.UseState
 	err := s.b.t.runs.write(ctx, func(tx *sql.Tx) error {

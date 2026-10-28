@@ -24,6 +24,10 @@ Web 在依赖准备期间开放，ingress 保持关闭；缺失能力修复后�
 
 页面查询按用途分开：Settings 读取模型/账户/渠道设置，Progress 读取任务摘要，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Erii-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
 
+### Go 实现职责（F-040）
+
+Web POST 分发只选择有名动作处理函数；消息/附件、模型、账户、通知各自维护请求步骤，认证、CSRF 和 Server 生命周期仍为统一入口。
+
 ## 当前流程与目标差异
 
 验证身份 → 规范输入与附件 → 接受并去重 → Actor 执行 → 冻结回复目标 → 适配呈现并发送。Web 现状通过整页刷新看到新记录。
@@ -234,6 +238,7 @@ dynamic component import, remote asset or browser credential input.
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
 | 2026-10-28 | F-039：Web 故障隔离与分页纯查询；交付按 ID 定位。 | 控制面可用于修复运行依赖，避免读请求产生运行副作用或随历史无限增长；API 数组形状保留，超过 100 条需跟随游标。 |
 | 2026-10-28 | 现状建档 | 渠道共享对话、审批与执行，不引入渠道专属 Agent Loop。Web 实时化需保留提交后的权威结果；飞书 unknown 不通过重复发送消除。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 

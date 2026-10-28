@@ -47,11 +47,10 @@ func (r *Runs) toolLimits() ToolLimits {
 	return l
 }
 
-// ApprovalView belongs to the local user control plane, never model context.
+// interaction.Approval belongs to the local user control plane, never model context.
 // The local CLI is authenticated by ownership of the private data directory.
-type ApprovalView = interaction.Approval
 
-func (r *Runs) Approvals(ctx context.Context) ([]ApprovalView, error) {
+func (r *Runs) Approvals(ctx context.Context) ([]interaction.Approval, error) {
 	if err := r.recoverApprovals(ctx); err != nil {
 		return nil, err
 	}
@@ -63,9 +62,9 @@ func (r *Runs) Approvals(ctx context.Context) ([]ApprovalView, error) {
 		return nil, agent.ErrStorage
 	}
 	defer rows.Close()
-	out := []ApprovalView{}
+	out := []interaction.Approval{}
 	for rows.Next() {
-		var v ApprovalView
+		var v interaction.Approval
 		if rows.Scan(&v.ID, &v.Tool, &v.Arguments, &v.Hash, &v.Status, &v.ExpiresAt) != nil {
 			return nil, agent.ErrStorage
 		}
@@ -290,22 +289,16 @@ func (r *Runs) ReconcileUnknown(ctx context.Context) error {
 
 // ToolOutcomes exposes query-only reconciliation observations to the local user.
 // It does not mutate or redeliver historical model/Conversation messages.
-type ToolOutcome struct {
-	Tool      string      `json:"tool"`
-	Arguments string      `json:"arguments"`
-	Status    string      `json:"status"`
-	Result    tool.Result `json:"result"`
-}
 
-func (r *Runs) ToolOutcomes(ctx context.Context) ([]ToolOutcome, error) {
+func (r *Runs) ToolOutcomes(ctx context.Context) ([]tool.ToolOutcome, error) {
 	rows, err := r.host.db.QueryContext(ctx, `SELECT i.tool_name,i.arguments_json,i.status,coalesce(i.result_json,'{}') FROM tool_invocation i JOIN run r USING(run_id) WHERE r.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND (i.status='unknown' OR i.reconciliation_json IS NOT NULL) ORDER BY i.created_at,i.invocation_id`)
 	if err != nil {
 		return nil, agent.ErrStorage
 	}
 	defer rows.Close()
-	out := []ToolOutcome{}
+	out := []tool.ToolOutcome{}
 	for rows.Next() {
-		var v ToolOutcome
+		var v tool.ToolOutcome
 		var result string
 		if err = rows.Scan(&v.Tool, &v.Arguments, &v.Status, &result); err != nil {
 			return nil, agent.ErrStorage

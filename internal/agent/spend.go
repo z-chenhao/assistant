@@ -94,3 +94,15 @@ func (p SpendPolicy) Validate() error {
 	}
 	return nil
 }
+
+type SpendView struct {
+	Snapshot       string `json:"snapshot_id,omitempty"`
+	PricingVersion string `json:"pricing_version,omitempty"`
+	Account        string `json:"account"`
+	Currency       string `json:"currency"`
+	State          string `json:"state"`
+	Boundary       int64  `json:"boundary_micros"`
+	Committed      int64  `json:"committed_micros"`
+	MissingUsage   int64  `json:"missing_usage_calls"`
+	UnpricedCalls  int64  `json:"unpriced_calls"`
+}

@@ -54,3 +54,10 @@ func RecoverResult(ctx context.Context, d Definition, request Request, settle fu
 	}
 	return Evidence{State: evidence.State, Result: result}, nil
 }
+
+type ToolOutcome struct {
+	Tool      string `json:"tool"`
+	Arguments string `json:"arguments"`
+	Status    string `json:"status"`
+	Result    Result `json:"result"`
+}

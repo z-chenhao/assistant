@@ -22,7 +22,7 @@ func (a *App) Deliver(ctx context.Context) error {
 	if a.eventsRequired.Load() && !a.eventsReady.Load() {
 		return nil
 	}
-	if err := a.Runs().Flush(ctx); err != nil {
+	if err := a.runtimeRuns().Flush(ctx); err != nil {
 		return err
 	}
 	d, err := a.store.Diagnostics(ctx)
