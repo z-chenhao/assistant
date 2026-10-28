@@ -411,7 +411,7 @@ Runs use the current assembly while preserving Task epochs and role reductions.
 
 - 内置文案放在 `internal/prompt/system/`、`internal/prompt/capability/`、`internal/prompt/summary/` 的 Markdown 文件中，通过 `go:embed` 编入二进制；`internal/prompt` 只提供文案与摘要目标字节数替换。角色选择、冻结能力判断、顺序、消息边界和动态证据继续由装配代码负责。
 - Markdown 使用 UTF-8，Git 属性固定 LF；载入时仅移除单个文件末尾 LF，保留段落、空格和消息边界。修改这些资产需重新构建，只影响新生成的上下文；旧 Run 与已接受请求仍读取各自冻结记录。资源不依赖启动目录，不增加外部 prompt 配置或热加载入口。
-- `internal/agent/context.go` 是唯一初始装配入口。Main 使用 safety + Main 规则；Root 使用 safety + 精简身份 + Worker 规则；Child 使用 safety + Worker 规则。之后追加执行原则、冻结能力对应的操作指导、作用域项目指令和 Skill 索引。
+- `internal/agent/context.go` 是唯一初始装配入口。Main 使用 safety + Main 规则；Root 使用 safety + 精简身份 + Worker 规则；Child 使用 safety + Worker 规则。之后追加执行原则；新 Root 再追加独立的阶段进度约定（`progress_guidance`），随后是冻结能力对应的操作指导和 Skill 索引。Child 不继承 Root 的进度约定；项目指令通过执行环境按需读取。
 - Skill 索引进入 Capability Snapshot 的 Host prompt metadata；provider Tool schema 仅包含名称、描述与输入 schema。项目 AGENTS.md 通过执行环境的 builtin__read 按需读取，不读取宿主 cwd。恢复旧 Run 时保留已冻结上下文和原工具结果，不用当前文件覆盖它。项目和 Skill 指令不能扩大权限或授予审批。
 - Root 的 Task 正文和显式 Artifact 引用是一个受保护的逻辑输入。Child 只接收显式子任务和引用，以及从 Parent 冻结的共享规则；不复制聊天、Task 历史或 Parent 的工作状态。
 - 新 Main 从 Conversation 载入语义历史，并交接最近 Main 的工作摘要和可见顶层工具回执；私有摘要原文仅通过显式 Run grant 传递。Forget 屏障之前的执行内容不进入这条交接路径。
@@ -421,6 +421,8 @@ Runs use the current assembly while preserving Task epochs and role reductions.
 - `summary_bytes` 是摘要目标；模型结果上限为 `max(4096, summary_bytes × 4)`，最多 64 KiB。被截断、空白、超限或要求调用工具的摘要不能成为工作状态。语义质量不由确定性测试证明。
 
 ## Changelog
+
+2026-10-28：F-005 为新 Root 在执行原则后冻结独立的阶段进度约定，完整工具轮的简短 assistant 文本用于只读进度展示。Child 不继承，旧 Run 不重写；不新增工具、额外模型轮次或上下文格式。接纳与持久化边界见 [后台任务方案](tasks.md)。
 
 2026-10-28：将内置角色、能力指导与摘要指令迁入嵌入式 Markdown 产品资产，便于独立审阅和迭代；保留 Go 中的装配与权限判断。相较运行时加载外部文件，`go:embed` 保持单二进制部署和显式升级；本次完整消息与摘要请求逐字节不变，不引入 schema、配置或冻结请求迁移。
 
