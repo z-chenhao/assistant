@@ -54,9 +54,19 @@ def run(binary):
                 t.expect("You> ")
                 t.send("Delegate: Hold worker Wedding checklist with venue dependencies.")
                 t.expect("Main accepted the work.")
-                # A persisted delta proves the real peer accepted the generation,
-                # beyond Host queue admission.
-                h.wait_state(lambda v: any("Worker waiting for cancellation" in e["event_json"] for e in v["trace"]), "Worker peer accepted generation")
+                # The independent peer audit proves dispatch beyond Host queue
+                # admission. Stream previews intentionally are not durable trace.
+                def worker_accepted(value):
+                    workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
+                    pending = {g['generation_id'] for g in value['generations']
+                               if g['run_id'] in workers and g['status'] == 'pending'}
+                    audit = Path(h.env['ERII_DATA_ROOT']) / 'fake-provider-calls.jsonl'
+                    if not audit.exists():
+                        return False
+                    return any(json.loads(line)['generation_id'] in pending
+                               for line in audit.read_text().splitlines(keepends=True)
+                               if line.endswith('\n'))
+                h.wait_state(worker_accepted, "Worker peer accepted generation")
                 active = state(h)
                 t.send("Complete: Wedding")
                 t.expect("Main accepted the work.")
