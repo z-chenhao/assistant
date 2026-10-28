@@ -70,7 +70,7 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 		check(runtime.name+": pinned dependencies", err)
 	}
 	if failed {
-		return errors.New("installation incomplete; install Node 24.21.0 and rerun ./install.sh (see docs/guides/getting-started.md)")
+		return errors.New("installation incomplete; install Node 24.21.0 and rerun ./install.sh (see docs/features/installation.md)")
 	}
 	fmt.Fprintln(out, "Ready to start. Run erii; connect a local model or sign in with ChatGPT in setup.")
 	return nil

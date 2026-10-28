@@ -1,47 +1,9 @@
-# Documentation
+# Erii 文档
 
-Read the guide for the task at hand. The technical baseline defines intended
-semantics; feature guides describe the implemented paths and their proof limits.
+[Feature Map](feature-map.md) 是唯一需求主入口。所有说明归入功能、技术、测试三类；本页只提供导航。
 
-## Use Erii
-
-- [Install and start](guides/getting-started.md)
-- [Model connections and ChatGPT sign-in](guides/provider-bridge.md)
-- [Terminal setup and conversation](guides/tui-and-evals.md)
-- [Web and Feishu](guides/channels.md)
-- [Tasks and follow-up](guides/tasks.md), [Child Runs](guides/children.md)
-- [Tools and approvals](guides/tools.md), [Code Mode](guides/codemode.md)
-- [Memory maintenance](guides/memory-maintenance.md), [recall](guides/recall.md)
-- [Artifacts](guides/artifacts.md), [delivery](guides/delivery.md)
-- [Automation](guides/automation.md), [capabilities](guides/capabilities.md)
-- [Computer lifecycle](guides/computer.md), [Computer Use](guides/computer-use.md)
-- [Operations, backups and recovery](guides/operations.md)
-
-## Develop and verify
-
-- [Contributing, development commands and layout](../CONTRIBUTING.md)
-- [End-to-end verification](guides/verification.md)
-- [Verification feature map](../scripts/FEATURES.md)
-- [Local-first evidence collection and handoff](guides/evidence.md)
-- [Release evidence decisions and proof limits](guides/release-evidence.md)
-- [Unscripted evaluation entry and support matrix](guides/unscripted-evals.md)
-- [Main loop and recovery](guides/main-loop.md)
-- [Core conformance](guides/core-evals.md), [personal-assistant evaluation](guides/m6-evals.md)
-- [CI operations](ci.md), [Golden Cases](../evals/golden-cases.md)
-- [v1 release audit](v1-release-audit.md), [live evaluation preflight](v1-live-preflight.md)
-- Exact case mechanics: [GC-01 health](gc01-verification.md), [GC-03 finance](gc03-verification.md), [GC-04 travel](gc04-verification.md), [GC-08 wedding](gc08-verification.md), [GC-09 agenda](gc09-verification.md), [GC-10 local life](gc10-verification.md), [GC-11 evaluation](gc11-evaluation.md), [GC-12 invitation](gc12-verification.md), [GC-14 monitoring](gc14-verification.md), [GC-16 research](gc16-verification.md)
-
-## Architecture and historical evidence
-
-- [Technical baseline](technical-design.md)
-- [Architecture decisions](adr/README.md)
-- [Recorded reports](reports/README.md)
-
-New feature instructions belong in `guides/`. Approved architecture decisions
-belong in `adr/`. Dated measurements and compatibility results belong in
-`reports/`; they are historical observations, not current release certification.
-Generated local verification output stays in ignored `evidence/`. Update this
-index and the feature map when changing a user path. `make lint` checks local
-Markdown destinations and heading anchors, including repository AGENTS links, so moves
-cannot silently break navigation. Code examples and runtime-injected policy are
-not repository navigation.
+- [功能说明与用法](feature-map.md#需求索引)
+- [产品架构与流程](designs/product-overview.md)
+- [跨功能运行时契约](designs/runtime-contracts.md)
+- [产品测试方案](test-plans/product.md)
+- [文档结构与维护规则](feature-map.md#文档维护规则)

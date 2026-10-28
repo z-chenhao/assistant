@@ -1,63 +1,48 @@
-.PHONY: setup install run build test test-race lint verify release-audit
+.PHONY: setup install run build test test-go test-node test-browser test-infra test-e2e test-full test-race lint
 
+# Operations live in scripts; software tests live in tests. Model evals are external.
 setup:
 	python3 scripts/setup.py $(SETUP_FLAGS)
 
 install:
 	sh install.sh
 
-.PHONY: audit-baseline-01 audit-baseline-02 audit-baseline-03 audit-baseline-04
-.PHONY: audit-golden-common-01 audit-golden-common-02 audit-golden-common-03
-audit-golden-common-03:
-	python3 scripts/release_audit.py --package-ledger docs/audits/golden-common-03.json --evidence evidence/golden-common-03.json
-
-audit-golden-common-02:
-	python3 scripts/release_audit.py --package-ledger docs/audits/golden-common-02.json --evidence evidence/golden-common-02.json
-
-audit-golden-common-01:
-	python3 scripts/release_audit.py --package-ledger docs/audits/golden-common-01.json --evidence evidence/golden-common-01.json
-
-audit-baseline-01:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-01.json --evidence evidence/baseline-01.json
-
-audit-baseline-02:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-02.json --evidence evidence/baseline-02.json
-
-audit-baseline-03:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-03.json --evidence evidence/baseline-03.json
-
-audit-baseline-04:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-04.json --evidence evidence/baseline-04.json
-
-.PHONY: audit-baseline-05
-audit-baseline-05:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-05.json --evidence evidence/baseline-05.json
-
-.PHONY: audit-baseline-06
-audit-baseline-06:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-06.json --evidence evidence/baseline-06.json
+build:
+	go build -o bin/erii ./cmd/erii
 
 run: build
 	./bin/erii start
 
-build:
-	go build -o bin/erii ./cmd/erii
+# Go tests currently contain both unit and component integration tests.
+# Keep that explicit rather than relabeling the entire package suite as UT.
+test: test-go test-node test-browser test-infra
 
-test:
-	npm run check --prefix web
+test-go:
 	go test ./...
+
+test-node:
+	npm run check --prefix web
 	npm test --prefix provider-bridge
 	npm test --prefix runtime/javascript
-	npm test --prefix guest-browser
-	python3 -m unittest discover -s scripts -p 'test_*.py'
 
-# The full SQLite package repeatedly migrates real schemas under instrumentation.
-# Ubuntu exceeded Go's implicit 10m package budget while its current test was 1s old.
-# Keep per-test/Tool/lease deadlines intact; bound the complete package at 15m.
-# Run Bridge before unrelated compiler/race work, then every remaining package
-# at normal parallelism. The maintained runner audits the complete inventory.
+test-browser:
+	npm test --prefix guest-browser
+
+export PYTHONPATH := $(CURDIR)/tests/system:$(CURDIR)/scripts:$(PYTHONPATH)
+
+test-infra:
+	python3 -m unittest discover -s tests/harness -p 'test_*.py'
+
+E2E_EVIDENCE ?= evidence/e2e
+
+test-e2e: build
+	python3 tests/system/runner.py --suite core --binary bin/erii --evidence "$(E2E_EVIDENCE)"
+
+test-full: build
+	python3 tests/system/runner.py --suite full --binary bin/erii --evidence "$(E2E_EVIDENCE)"
+
 test-race:
-	python3 scripts/ci_race.py
+	python3 tests/system/race.py
 
 lint:
 	python3 scripts/check_docs.py
@@ -69,55 +54,3 @@ lint:
 	npm run lint --prefix runtime/javascript
 	npm run lint --prefix guest-browser
 	npm run lint --prefix web
-
-# Shards own isolated fixtures and disjoint evidence; repetitions stay serial.
-VERIFY_JOBS ?= 2
-VERIFY_EVIDENCE ?= evidence
-VERIFY_SHARD ?=
-
-verify: build
-	python3 scripts/verify_suite.py --binary bin/erii --evidence "$(VERIFY_EVIDENCE)" --jobs "$(VERIFY_JOBS)" $(if $(VERIFY_SHARD),--shard "$(VERIFY_SHARD)")
-
-# A successful inventory is not release acceptance. This returns 2 while the
-# recorded whole-case/audit/model/L2 gaps remain; deterministic CI stays offline.
-# Use a fresh durable fixture root outside the checkout; never contacts GitHub.
-.PHONY: verify-evidence
-verify-evidence:
-	@test -n "$(EVIDENCE_ROOT)" || { echo 'Set EVIDENCE_ROOT to a fresh absolute durable fixture root'; exit 1; }
-	python3 scripts/evidence_harness.py --root "$(EVIDENCE_ROOT)" --sha "$$(git rev-parse HEAD)" --evidence "$(EVIDENCE_ROOT)/report.json"
-
-# Inventory is deliberately inconclusive. It never certifies release.
-.PHONY: release-audit verify-release-decision
-release-audit:
-	python3 scripts/release_audit.py --evidence evidence/release-audit.json --require-complete
-
-verify-release-decision:
-	python3 -m unittest discover -s scripts -p 'test_release_*.py'
-
-.PHONY: audit-baseline-07
-audit-baseline-07:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-07.json --evidence evidence/baseline-07.json
-
-.PHONY: audit-baseline-08
-audit-baseline-08:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-08.json --evidence evidence/baseline-08.json
-
-.PHONY: audit-baseline-09
-audit-baseline-09:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-09.json --evidence evidence/baseline-09.json
-
-.PHONY: audit-baseline-10
-audit-baseline-10:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-10.json --evidence evidence/baseline-10.json
-
-.PHONY: audit-baseline-11
-audit-baseline-11:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-11.json --evidence evidence/baseline-11.json
-
-.PHONY: audit-baseline-12
-audit-baseline-12:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-12.json --evidence evidence/baseline-12.json
-
-.PHONY: audit-baseline-13
-audit-baseline-13:
-	python3 scripts/release_audit.py --package-ledger docs/audits/baseline-13.json --evidence evidence/baseline-13.json

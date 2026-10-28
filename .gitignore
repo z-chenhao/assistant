@@ -7,11 +7,9 @@ __pycache__/
 
 /runtime/javascript/node_modules/
 
-/.ci-go/
-/ci-build.tar.gz
 /guest-browser/node_modules/
 /web/node_modules/
 /dist/
 
-# Multica workspace context and execution records are local, never source.
+# Retired local coordinator records must never be committed.
 /.multica/

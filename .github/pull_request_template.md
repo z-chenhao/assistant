@@ -1,10 +1,9 @@
 ## Behavior
 
-Describe the concrete problem and resulting user behavior. Link the owning issue.
+Describe the concrete problem and resulting user behavior. Link an issue if one exists.
 
 ## Verification
 
-- Affected entries in `scripts/FEATURES.md`:
 - Exact commands run and observed evidence/artifacts:
-- Launch / Doctor / Drive / Evidence / Cleanup result:
+- Relevant unit, integration or system coverage:
 - Residual risk, missing checks or decisions:

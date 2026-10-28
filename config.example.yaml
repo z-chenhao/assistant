@@ -1,6 +1,6 @@
 version: 1
 # Optional durable recall. Install/serve the selected model explicitly.
-# No implicit embedding provider or FTS-only fallback. See docs/guides/recall.md.
+# No implicit embedding provider or FTS-only fallback. See docs/features/memory-context.md.
 # embedding:
 #   provider: openai_compatible
 #   endpoint: http://127.0.0.1:11434/v1
@@ -140,11 +140,11 @@ context:
 #     module: /opt/erii/browser/node_modules/playwright-core/index.mjs
 #     port: 9222
 # Install pinned guest-browser/package-lock.json and erii-transfer.py in the
-# clean Guest. See docs/guides/computer-use.md. No Host browser or personal profile.
+# clean Guest. See docs/features/computer-use.md. No Host browser or personal profile.
 
 # Automation intent is persisted through Main/automation manage, not YAML.
 # Run erii automation work in the foreground under your supervisor.
-# Every intent carries its own IANA timezone; see docs/guides/automation.md.
+# Every intent carries its own IANA timezone; see docs/features/automation.md.
 
 # Optional authenticated Web surface; listener must be literal loopback.
 # web:

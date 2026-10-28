@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 @source "./";
 
 /* ad-agent's neutral component tokens; Erii owns the conversation layout. */

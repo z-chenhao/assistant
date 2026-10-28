@@ -26,9 +26,6 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 		if m.Role == "user" && m.Text == "Review cancellation" {
 			return cancellationReview(request)
 		}
-		if m.Role == "user" && strings.HasPrefix(m.Text, "Classify feedback: ") {
-			return feedbackReply(m.Text, lastMessage.Role == "tool")
-		}
 	}
 	if lastMessage.Origin == "runtime" {
 		return llm.GenerationResult{Text: "Observed Worker update: " + lastMessage.Text}
@@ -92,4 +89,24 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	}
 	p := plan[next]
 	return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "capability:" + strconv.Itoa(next), Name: p.Name, Arguments: string(p.Arguments)}}}
+}
+
+func cancellationReview(req llm.GenerationRequest) llm.GenerationResult {
+	count := 0
+	last := ""
+	for _, m := range req.Messages {
+		if m.Role == "tool" {
+			count++
+			last = m.Text
+		}
+	}
+	paths := []string{"AGENTS.md", "internal/run/service.go"}
+	if count < len(paths) {
+		raw, _ := json.Marshal(map[string]string{"path": paths[count]})
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "review", Name: "builtin__workspace__read", Arguments: string(raw)}}}
+	}
+	if strings.Contains(last, "tree[i].Parent == parent") && !strings.Contains(last, "Cancel(tree,") {
+		return llm.GenerationResult{Text: "BLOCKED: internal/run/service.go Cancel visits only direct children; grandchild accepts a late result. Recurse into descendants and run TestGrandchildCancel."}
+	}
+	return llm.GenerationResult{Text: "Review found no direct-child-only cancellation pattern."}
 }

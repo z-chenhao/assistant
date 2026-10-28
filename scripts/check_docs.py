@@ -116,7 +116,7 @@ def anchors(path):
 
 def documentation_files(root):
     return {path.resolve() for path in [*root.glob('*.md'), *root.glob('docs/**/*.md'),
-                                        root / 'web/README.md', root / 'scripts/FEATURES.md']
+                                        root / 'web/README.md']
             if path.is_file()}
 
 
