@@ -34,9 +34,9 @@
 
 **需求**：用户上传图片后，选定视觉模型能实际收到授权图片内容。
 
-**当前实现**：工具结果/Code Mode 图片有显式 ImageRefs、缩图和 Bridge 传图；用户消息图片目前主要是引用提示。
+**当前实现**：Web 上传和 CLI `chat send-parts` 的显式用户图片进入冻结的 ImageRefs 投影；通过视觉 Probe 的选定模型会在实际供应商请求中收到授权缩图。Settings 可显式声明并测试图片输入能力。
 
-**边界与剩余工作**：接通用户图片与视觉能力设置，保留授权、大小及数量约束。
+**边界**：支持 PNG/JPEG，单图最多 8 MiB、约 3355 万像素（32 × 1024²）。工作集最多保留 8 张不同图片，激进上下文重试最多 4 张；省略的像素保留引用与说明。文本模型保留引用并明确说明未看到图片，不读取或发送像素。格式不支持、图片损坏或越界在供应商调用前失败，不把文件名当作图像理解。真实模型的理解质量独立评测。
 
 **验收目标**：通过真实消息入口上传图片，在最终供应商请求中验证图片存在，并验证无权限/不支持模型的行为。
 
@@ -56,7 +56,9 @@
 
 Web 的附件选择器可随文字提交文件。CLI 用 `erii artifact save NAME MEDIA_TYPE` 从 stdin 保存，随后用 `erii artifact describe REF` 或 `erii artifact open REF` 检查和读取。
 
-请把当前附件能力理解为可靠存储和传递。图片、音视频和复杂文档的自动理解仍受 F-013/F-014 的链路与模型能力限制。
+在 Settings 添加模型时，按需勾选 **Enable image input (verified when tested)**，执行 Test connection，通过后再 Select model。Saved models 显示 Image input verified；未启用时显示 Text only。随后随消息上传 PNG/JPEG 即可。CLI 的模型 JSON 输入使用 `capabilities.image_input: true`，图片 ContentPart 必须为 `{"type":"image","artifact_ref":"artifact:..."}`；普通 `file` 不自动加载像素。
+
+新 Run 才启用这条用户图片投影；升级前的活动 Run 沿用其冻结表示。正常停止旧进程后统一升级，不混跑不同投影版本。音视频和复杂文档仍由 F-014 跟踪，文件运输不等于内容理解。
 
 ## 详细操作参考
 
@@ -112,9 +114,11 @@ metadata remains. Referenced objects cannot be deleted.
 Text uses `{ "type": "text", "text": "..." }`; image/audio/video/file parts use
 `{ "type": "file", "artifact_ref": "..." }` with their semantic type. The Host
 validates and pins each input before accepting it. Large files are uploaded
-through `artifact save`, then passed by reference. The current text Provider
-receives reference hints and can request bounded text reads. Reference transport
-does not establish visual understanding. [M6 fixtures](../test-plans/product.md) exercise
+through `artifact save`, then passed by reference. A verified image-capable profile
+receives explicitly typed user image parts through the scoped pixel envelope on
+new Runs; text-only profiles receive reference
+hints and an explicit no-pixels notice. Other files remain references and can
+request bounded text reads. Transport does not establish model understanding quality. [M6 fixtures](../test-plans/product.md) exercise
 image/source-region and media handling with explicit Fakes; [Computer Use](computer-use.md)
 provides scoped file transfer. Those paths have separate proof limits.
 

@@ -18,7 +18,7 @@ function Composer({sourceID,draft}:{sourceID:string;draft:Draft}) {
     <input type="hidden" name="source_id" value={sourceID}/>
     <label htmlFor="message" className="sr-only">Message Erii</label>
     <Textarea ref={text} defaultValue={draft.text} id="message" name="text" placeholder="Ask anything, or hand something over…" required rows={2} maxLength={16384}/>
-    <div className="composer-actions"><label className="attachment-picker" title="Attach a file"><span aria-hidden="true">＋</span><span className="sr-only">Attach a file</span><input ref={file} type="file" name="file" aria-label="Attach a file"/></label><span className="composer-hint">Your conversation, across every channel</span><Button type="submit" size="icon" className="send-button" aria-label="Send message">↑</Button></div>
+    <div className="composer-actions"><label className="attachment-picker" title="Attach a file"><span aria-hidden="true">＋</span><span className="sr-only">Attach a file</span><input ref={file} type="file" name="file" aria-label="Attach a file"/></label><span className="composer-hint">PNG/JPEG up to 8 MiB · verified vision model required</span><Button type="submit" size="icon" className="send-button" aria-label="Send message">↑</Button></div>
   </form>;
 }
 

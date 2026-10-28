@@ -40,7 +40,7 @@
 
 ## 如何使用
 
-标准安装后运行 `erii`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。
+标准安装后运行 `erii`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。连接视觉模型时显式勾选 **Enable image input (verified when tested)**，通过图片 Probe 后再选择；模型卡显示已验证图片输入或 Text only。图片发送规则见 [F-013](artifacts-media.md#f-013)。
 
 CLI 可运行 `erii model list` 查看配置，使用 `erii model test PROFILE_ID` 测试。ChatGPT 当前完整凭据路径依赖 macOS 与 cgo；Linux 可使用明确配置的本地端点或环境变量 API Key，不能据此宣称 OAuth 已跨平台可用。
 

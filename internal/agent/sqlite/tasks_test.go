@@ -323,14 +323,14 @@ func TestTaskCustomMessageConversionFailsClosed(t *testing.T) {
 	m.Origin = "runtime"
 	m.CreatedAt = &at
 	m.Details = &task.UpdateDetails{TaskRef: "opaque", Kind: "completed"}
-	wire, err := agent.ProviderMessages([]agent.AgentMessage{m})
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{m}, false)
 	if err != nil || len(wire) != 1 || wire[0].Role == "system" || wire[0].Origin != "runtime" || !strings.Contains(wire[0].Text, "untrusted Worker data") {
 		t.Fatal(wire, err)
 	}
 	for _, mutate := range []func(*agent.AgentMessage){func(m *agent.AgentMessage) { m.Origin = "user" }, func(m *agent.AgentMessage) { m.CustomType = "unknown" }, func(m *agent.AgentMessage) { m.Details = nil }, func(m *agent.AgentMessage) { m.CreatedAt = nil }, func(m *agent.AgentMessage) { m.Details = &task.UpdateDetails{Kind: "completed"} }, func(m *agent.AgentMessage) { m.CreatedAt = &time.Time{} }} {
 		bad := m
 		mutate(&bad)
-		if _, err = agent.ProviderMessages([]agent.AgentMessage{bad}); !errors.Is(err, llm.ModelIncompatible) {
+		if _, err = agent.ProviderMessages([]agent.AgentMessage{bad}, false); !errors.Is(err, llm.ModelIncompatible) {
 			t.Fatal("accepted malformed runtime update", err)
 		}
 	}

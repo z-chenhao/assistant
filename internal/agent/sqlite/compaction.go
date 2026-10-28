@@ -18,6 +18,7 @@ func (r *Runs) freezeContext(ctx context.Context, tx *sql.Tx, id string) error {
 	if !p.Valid() {
 		p = contextbuilder.DefaultPolicy()
 	}
+	p.UserImages = true
 	raw, _ := encoded(p)
 	var parent sql.NullString
 	if e := tx.QueryRowContext(ctx, `SELECT parent_run_id FROM run WHERE run_id=?`, id).Scan(&parent); e != nil {

@@ -13,7 +13,7 @@
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
 | [F-012](../features/artifacts-media.md#f-012) | 验证读回字节与哈希、作用域、保留期、并发保存、删除和重启恢复。 | 保护已接通的限定范围；Live/配置另行验证 |
-| [F-013](../features/artifacts-media.md#f-013) | 通过真实消息入口上传图片，在最终供应商请求中验证图片存在，并验证无权限/不支持模型的行为。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| [F-013](../features/artifacts-media.md#f-013) | 通过真实消息入口上传图片，在最终供应商请求中验证图片存在，并验证无权限/不支持模型的行为。 | 实际浏览器/CLI → Artifact → Pi → HTTP，区分视觉与纯文本 |
 | [F-014](../features/artifacts-media.md#f-014) | 逐格式验证可获取的内容、原始文件关联、失败反馈和实际任务输出；质量由独立评测衡量。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 
 ## 层级与关键路径
@@ -26,12 +26,20 @@
 
 ## 已有检查与缺失覆盖
 
-| 入口 | 已有证据用途 | 本次执行状态 |
+| 入口 | 已有证据用途 | 执行记录 |
 | --- | --- | --- |
-| [tests/system/verify_artifacts.py](../../tests/system/verify_artifacts.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
-| [internal/llm/bridge/images_test.go](../../internal/llm/bridge/images_test.go) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
+| [tests/system/verify_artifacts.py](../../tests/system/verify_artifacts.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 结果保存于对应 evidence，不在计划中推定 |
+| [internal/llm/bridge/images_test.go](../../internal/llm/bridge/images_test.go) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 结果保存于对应 evidence，不在计划中推定 |
 
-- **F-013 剩余覆盖**：接通用户图片与视觉能力设置，保留授权、大小及数量约束。
+### F-013 回归路径
+
+- `internal/agent/messages_test.go`：真实 user、runtime、assistant、Tool 图片的选择边界及旧引用模式。
+- `internal/agent/sqlite/images_test.go`：通过 Submit/Steering/Generation 接入实际 SQLite 和图片字节，验证显式 grant、未选择/未授权 ref 拒绝、过期 claim、纯文本回退、旧 policy 恢复的请求字节一致、已完成结果不再读取图片。
+- `internal/llm/bridge/images_test.go`：真实 Pi HTTP 图像 envelope、不落盘像素、去重/图片数量上限、格式/损坏/字节及像素上限、极窄图片的实际 JPEG 尺寸。
+- `internal/interaction/web/model_actions_test.go`：图片选项仅形成显式候选声明；既有模型 Probe 检查继续保护声明与观察证明双条件。
+- `tests/system/verify_local_provider.py` 的用户图片场景启动真实事件 broker、Web、Actor 与 Node/Pi。Chromium 实际上传 PNG，HTTP peer 检查收到 JPEG 字节；纯文本模式无图片字节且生成上下文包含限制说明。CLI save/send-parts 后在 HTTP 响应前 SIGKILL，恢复保持 generation id、request hash 和图片内容 hash。现有 screenshot 场景继续证明工具图片选择。
+- 浏览器证据含桌面与移动截图。所有图片为合成运输素材，HTTP peer 只验证协议与字节，不对 OCR、视觉推理或真实模型质量评分；真实账户视觉质量另行 Live/eval。
+
 - **F-014 剩余覆盖**：按实际用户场景明确支持格式，补解析、转写或媒体工具及错误反馈；不以合成文件证明理解质量。
 
 ## 详细测试入口与证明边界

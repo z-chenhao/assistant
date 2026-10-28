@@ -416,11 +416,14 @@ Runs use the current assembly while preserving Task epochs and role reductions.
 - Root 的 Task 正文和显式 Artifact 引用是一个受保护的逻辑输入。Child 只接收显式子任务和引用，以及从 Parent 冻结的共享规则；不复制聊天、Task 历史或 Parent 的工作状态。
 - 新 Main 从 Conversation 载入语义历史，并交接最近 Main 的工作摘要和可见顶层工具回执；私有摘要原文仅通过显式 Run grant 传递。Forget 屏障之前的执行内容不进入这条交接路径。
 - Task 续跑接收旧 Root 最终业务结果、Root 可见的顶层工具输出和历史指令；最终答复已接受但 report 尚未提交时，仍保留该答复，排除内部压缩摘要。不汇总 Child 的模型响应、内部工具轨迹或 Code Mode 未输出内容。整棵 Task 树中结果未知的效果以 Host 状态保留，不披露 Child 参数。
+- 用户图片投影由冻结 context policy 的 `user_images` 标记控制：新 Run 启用、字段缺失沿用旧引用模式。真实 user 的显式图片与 Tool 选择使用同一有界 ImageRefs 工作集；像素仅在授权 dispatch 时加载，文本模型上下文明确说明未看到图片。
 - 生成前执行消息投影、按轮召回、工作集选择与冻结。工作摘要继续是有来源的 runtime user 消息；模型生成的摘要不写入长期 Memory，也不成为安全策略。
 - 需要总结时，该轮只提供专用总结 system prompt、序列化证据和保留任务事实，不声明 Tools。结果提交后推进同一个 Run 的 step，更新 `working_state`，继续业务推理；已接受结果在故障恢复时复用。
 - `summary_bytes` 是摘要目标；模型结果上限为 `max(4096, summary_bytes × 4)`，最多 64 KiB。被截断、空白、超限或要求调用工具的摘要不能成为工作状态。语义质量不由确定性测试证明。
 
 ## Changelog
+
+2026-10-28：F-013 将消息投影从 Run 类型文件拆至 `agent/messages.go`，用冻结 policy 标记接通用户图片，保留旧 Run 请求表示及 Child 策略继承；不将 base64 写入工作状态、归档或 Conversation。具体图像限制见 [文件方案](artifacts-media.md)。
 
 2026-10-28：F-005 为新 Root 在执行原则后冻结独立的阶段进度约定，完整工具轮的简短 assistant 文本用于只读进度展示。Child 不继承，旧 Run 不重写；不新增工具、额外模型轮次或上下文格式。接纳与持久化边界见 [后台任务方案](tasks.md)。
 
