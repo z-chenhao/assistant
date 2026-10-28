@@ -14,7 +14,7 @@ func automationReply(r llm.GenerationRequest) llm.GenerationResult {
 	worker, followup := false, false
 	for _, m := range r.Messages {
 		worker = worker || strings.Contains(m.Text, "general Worker executing")
-		followup = followup || m.Origin == "runtime"
+		followup = followup || m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update")
 	}
 	call := func(name, args string) llm.GenerationResult {
 		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "fixture-call", Name: name, Arguments: args}}}
@@ -42,7 +42,7 @@ func automationReply(r llm.GenerationRequest) llm.GenerationResult {
 		}
 		return llm.GenerationResult{Text: "Reminder: review your long-term goals."}
 	}
-	if followup {
+	if followup && !hasAppendedUser(r.Messages) {
 		return llm.GenerationResult{Text: "Main: a meaningful Automation update is ready."}
 	}
 	if last.Role == "tool" {

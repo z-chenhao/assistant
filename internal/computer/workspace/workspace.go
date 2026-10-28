@@ -201,7 +201,8 @@ func Definitions(c Config) ([]tool.Definition, error) {
 		return nil, invalid
 	}
 	defer root.Close()
-	if _, err = read(root, "AGENTS.md"); err != nil {
+	rules, err := read(root, "AGENTS.md")
+	if err != nil {
 		return nil, invalid
 	}
 	info, err := root.Lstat(".git")
@@ -227,6 +228,9 @@ func Definitions(c Config) ([]tool.Definition, error) {
 		s.Name = "builtin__workspace__" + name
 		s.InputSchema = schema
 		s.Description = description
+		if name == "read" {
+			s.PromptContext = []tool.PromptContext{{Kind: "project_instructions", Source: "workspace:AGENTS.md:" + rules.Hash, Text: rules.Text}}
+		}
 		return tool.Definition{Spec: s, Execute: fn, ConflictKeys: func(string) []string { return []string{"workspace:" + hash([]byte(c.Root))} }}
 	}
 	open := func() (*os.Root, error) { return os.OpenRoot(c.Root) }

@@ -68,19 +68,28 @@ func (r Result) ModelText() string {
 }
 
 type Spec struct {
-	Internal       bool   `json:"internal,omitempty"` // Host bridge binding; excluded from the model Tool projection.
-	Name           string `json:"name"`
-	Description    string `json:"description,omitempty"`
-	ResourceHash   string `json:"resource_hash,omitempty"`
-	Version        int    `json:"version"`
-	InputSchema    string `json:"input_schema"`
-	ReplayPolicy   string `json:"replay_policy"`
-	Permission     string `json:"permission"`
-	Risk           string `json:"risk,omitempty"`
-	TimeoutMS      int    `json:"timeout_ms,omitempty"`
-	OutputBytes    int    `json:"output_bytes,omitempty"`
-	Provider       string `json:"provider,omitempty"`
-	ConflictPolicy string `json:"conflict_policy,omitempty"`
+	// PromptContext is trusted Host resource metadata, frozen with capability.
+	// It is excluded from the provider Tool declaration by ProviderTools.
+	PromptContext  []PromptContext `json:"prompt_context,omitempty"`
+	Internal       bool            `json:"internal,omitempty"` // Host bridge binding; excluded from the model Tool projection.
+	Name           string          `json:"name"`
+	Description    string          `json:"description,omitempty"`
+	ResourceHash   string          `json:"resource_hash,omitempty"`
+	Version        int             `json:"version"`
+	InputSchema    string          `json:"input_schema"`
+	ReplayPolicy   string          `json:"replay_policy"`
+	Permission     string          `json:"permission"`
+	Risk           string          `json:"risk,omitempty"`
+	TimeoutMS      int             `json:"timeout_ms,omitempty"`
+	OutputBytes    int             `json:"output_bytes,omitempty"`
+	Provider       string          `json:"provider,omitempty"`
+	ConflictPolicy string          `json:"conflict_policy,omitempty"`
+}
+
+type PromptContext struct {
+	Kind   string `json:"kind"`
+	Source string `json:"source"`
+	Text   string `json:"text"`
 }
 
 type Definition struct {
@@ -106,6 +115,7 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 		if _, exists := r.definitions[d.Spec.Name]; exists {
 			return nil, errors.New("duplicate tool definition")
 		}
+		d.Spec = copySpec(d.Spec)
 		r.definitions[d.Spec.Name] = d
 	}
 	return r, nil
@@ -127,6 +137,9 @@ func (r *Registry) Select(specs []Spec) (*Registry, error) {
 	defs := make([]Definition, 0, len(specs))
 	for _, s := range specs {
 		d, ok := r.Resolve(s.Name)
+		// Prompt resources belong to the frozen capability, not live execution
+		// policy. Reopening a Run never substitutes freshly loaded instructions.
+		d.Spec.PromptContext = append([]PromptContext(nil), s.PromptContext...)
 		if !ok || !reflect.DeepEqual(d.Spec, s) {
 			return nil, llm.ModelIncompatible
 		}
@@ -168,14 +181,20 @@ func (r *Registry) Describe() []Spec {
 	// M1 has one Tool. Sorting keeps capability hashing stable as it grows.
 	out := make([]Spec, 0, len(r.definitions))
 	for _, d := range r.definitions {
-		out = append(out, d.Spec)
+		out = append(out, copySpec(d.Spec))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 func (r *Registry) Resolve(name string) (Definition, bool) {
 	d, ok := r.definitions[name]
+	d.Spec = copySpec(d.Spec)
 	return d, ok
+}
+
+func copySpec(s Spec) Spec {
+	s.PromptContext = append([]PromptContext(nil), s.PromptContext...)
+	return s
 }
 
 type Invocation struct {

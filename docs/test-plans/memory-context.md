@@ -32,7 +32,7 @@
 | [tests/system/verify_recall.py](../../tests/system/verify_recall.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
 
 - **F-009 剩余覆盖**：补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
-- **F-011 剩余覆盖**：补面向任务与对话的语义整理；不得改写原文或在旧 Run 中静默变更冻结请求。
+- **F-011 剩余覆盖**：用外部模型评测验证长对话中的目标、约束、决策和待办保留质量；软件测试只证明上下文选择、冻结、隔离与恢复。
 
 ## 详细测试入口与证明边界
 
@@ -104,3 +104,16 @@ full GC-01–07, Computer cases or release-time Live Shadow behavior.
 ## 工程基础重构回归
 
 F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统计 embedding 调用；同查询第二次仅嵌入 query，追加一条只补一条向量；Forget 和换 scope 清除工作索引，持久库无私有向量。既有 scope、敏感明文不落盘、隐私 epoch 和每轮冻结证据回归继续执行。
+
+## 上下文装配与语义压缩回归
+
+[internal/agent/context_test.go](../../internal/agent/context_test.go) 检查角色组合、冻结项目/Skill 来源和显式子任务；[internal/context/working_test.go](../../internal/context/working_test.go) 检查目标与未知事实保留、工具交换边界、媒体与传输预算；[internal/agent/sqlite/context_test.go](../../internal/agent/sqlite/context_test.go) 通过真实存储和共享 Loop 检查：
+
+- Task 续跑排除 Child 私有中间轨迹，保留未知操作状态。
+- Root 最终答复已接受但尚未提交 report 时暂停并续跑，保留该答复；同一边界的内部压缩摘要不作为业务答复交接。
+- 摘要结果已接受但未写 checkpoint 时恢复，按 generation 复用，不重新执行历史工具。
+- 摘要继续使用原 ModelSnapshot、没有 Tools、不流式交付用户；原文通过私有 Artifact 可读取。
+- 同 Task 的 Child 无法读取 Parent 私有摘要原文；新 Main 通过业务接续显式授权读取上一 Main 原文。
+- 项目/Skill prompt 资源复制及冻结，读取当前资源不改写旧 capability。
+
+这些用例不评价真实模型总结质量。现有取消、Forget、审批、Worker 树和 legacy 请求恢复测试继续适用。

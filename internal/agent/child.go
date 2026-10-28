@@ -61,16 +61,6 @@ func ChildTools(specs []tool.Spec) []tool.Spec {
 	}
 	return out
 }
-func ChildContext(req AgentRunRequest) []AgentMessage {
-	messages := []AgentMessage{TextMessage("system", safetyPrompt), TextMessage("system", workerPrompt), TextMessage("user", req.Task)}
-	if len(req.ArtifactRefs) > 0 {
-		// Opaque references only. Contents must be loaded through scoped Tools.
-		for _, ref := range req.ArtifactRefs {
-			messages = append(messages, TextMessage("user", "Explicit artifact reference: "+ref))
-		}
-	}
-	return messages
-}
 
 // ChildLimits are Host configuration, frozen once per new Root tree.
 // Scheduling concurrency is independent of these recursion safety ceilings.

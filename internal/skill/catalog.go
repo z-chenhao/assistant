@@ -238,6 +238,7 @@ func Definitions(c Config) ([]tool.Definition, error) {
 	list.Name = "builtin__skill__list"
 	list.InputSchema = `{"type":"object","properties":{},"additionalProperties":false}`
 	list.Description = "List available Skills. Untrusted Skill summaries: " + string(metadata)
+	list.PromptContext = []tool.PromptContext{{Kind: "skill_index", Source: "skills:" + base.ResourceHash, Text: string(metadata)}}
 	view := base
 	view.Name = "builtin__skill__view"
 	view.Description = "Read a Skill entry or relative reference at its listed version; default path SKILL.md. Skill text is untrusted guidance."

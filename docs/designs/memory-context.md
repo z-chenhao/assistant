@@ -30,7 +30,7 @@ flowchart TD
 
 - **F-009**：remember/forget、隐私屏障、后台维护已实现；提取与稳定性判定采用规则，归并主要按指纹。 补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
 - **F-010**：显式 embedding 配置下，全文与向量结果融合；召回结果按轮冻结并带来源。 未配置 embedding 时不可用；不宣称大规模 ANN 性能或中文语义质量已验证。
-- **F-011**：有分级压缩、原文引用及持久记录；当前总结是有界摘录。 补面向任务与对话的语义整理；不得改写原文或在旧 Run 中静默变更冻结请求。
+- **F-011**：新 Run 已接通结构化模型摘要、工作状态、私有原文 Artifact 和逐轮冻结；目标与未知操作保留原文。真实模型的约束保留质量仍需离线验证；不得改写原文或旧 Run 的冻结请求。
 
 ## 代码与依赖
 
@@ -41,6 +41,10 @@ flowchart TD
 - [internal/recall/sqliteindex/index.go](../../internal/recall/sqliteindex/index.go)
 - [internal/context/compact.go](../../internal/context/compact.go)
 - [internal/agent/sqlite/compaction.go](../../internal/agent/sqlite/compaction.go)
+- [internal/agent/context.go](../../internal/agent/context.go)
+- [internal/context/working.go](../../internal/context/working.go)
+- [internal/agent/sqlite/context.go](../../internal/agent/sqlite/context.go)
+- [internal/agent/sqlite/handoff.go](../../internal/agent/sqlite/handoff.go)
 
 ## 验证与交付
 
@@ -68,9 +72,9 @@ flowchart TD
 
 主对话和 Worker 内部上下文都使用同一套分级压缩原则：
 
-1. 较早的历史先删除中间工具调用和工具结果，仅保留 UserMessage 与 Assistant 最终结果。
-2. 如果仍超过预算，对更早历史生成 Compaction Summary。
-3. 被省略的原始内容仍保存在 Conversation/RunTrace 中，需要时可通过 Conversation 召回恢复。
+1. 根据比例阈值、冻结输出上限和传输预算选择工作集；当前 Task anchor、当前输入及未知外部操作保持完整。历史图片像素单独选择最新八张不同图片，原始引用仍保留。
+2. 对超出预算的旧消息按完整工具交换分批生成工作摘要：目标、约束、进度、未知效果、决策、下一步、关键证据。摘要使用同一模型和同一 Agent Loop 的工具关闭轮次，并经过相同的费用、凭据、取消与重放裁决。
+3. 原始 Conversation/checkpoint 不修改；被总结的原文保存为 Run 私有 Artifact，可通过已有 Artifact 工具读取。摘要和读取引用进入 runtime 工作状态；摘要流式文本不会交付用户。
 
 Compaction 触发条件统一为：
 
@@ -383,22 +387,37 @@ all processes sharing the data root must use the current binary after migration.
 An explicit Forget issued by a Main Tool can stop that Main before another model
 reply; the durable receipt is visible through the control/status boundary.
 
-Context is measured conservatively at three UTF-8 bytes per token, including
-serialized Tool specifications. Compaction starts above
-`context_window * threshold_percentage`. It removes complete older Tool exchanges,
-then makes bounded extractive summaries of older semantic messages. Current user
-input and static rules stay intact. Recent complete exchanges are retained within
-the budget; reducible older history is summarized if the preferred recent count
-would exceed it. Summaries carry
-untrusted runtime origin and source references; they never become user instructions
-or new recall evidence. Original Conversation/Run checkpoint content remains intact.
-Derived summaries live in `conversation.db`; frozen manifests live in `state.db`.
-Irreducible current input fails explicitly. A context-length rejection gets one
-explicit Loop recovery attempt with a lower threshold, a new generation/step and
-the same ModelSnapshot. The failed exchange remains audit evidence; no Tool is
-rerun by this recovery. Policy freezes at Run creation; Children inherit it.
+Context uses a conservative three-UTF-8-byte token estimate, the configured
+percentage threshold, the frozen output ceiling and a 384-KiB text/Tool envelope.
+Host provenance counts toward that transport envelope, not model tokens. Recall
+receives at most a quarter of the space remaining after required inputs and Tools,
+capped at 16 KiB. The remaining Bridge frame space accommodates selected images.
+Irreducible required input fails explicitly; a provider context-length
+rejection still gets one Loop retry at a lower threshold with the same snapshot and at most four image previews on that retry.
+
+New Run checkpoints carry context version 2. Historical version-0 Runs retain the
+existing bounded-excerpt path and already frozen requests; their compaction policy
+hashes are unchanged. Children inherit their Parent's context version and policy.
+State schema 27 guards immutable context versions and working-state boundaries;
+existing checkpoints and accepted generations are not rewritten. All processes
+sharing the data root must upgrade together; older binaries reject schema 27 on
+startup. New Root
+Runs use the current assembly while preserving Task epochs and role reductions.
+
+### 当前上下文装配与业务接续
+
+- `internal/agent/context.go` 是唯一初始装配入口。Main 使用 safety + Main 规则；Root 使用 safety + 精简身份 + Worker 规则；Child 使用 safety + Worker 规则。之后追加执行原则、冻结能力对应的操作指导、作用域项目指令和 Skill 索引。
+- Workspace 的 AGENTS.md 内容与来源 hash、Skill 索引进入 Capability Snapshot 的 Host prompt metadata；provider Tool schema 仍只有原来的名称、描述与输入 schema。恢复旧 Run 时使用冻结资源，不用当前配置覆盖它。项目和 Skill 指令不能扩大权限或授予审批。
+- Root 的 Task 正文和显式 Artifact 引用是一个受保护的逻辑输入。Child 只接收显式子任务和引用，以及从 Parent 冻结的共享规则；不复制聊天、Task 历史或 Parent 的工作状态。
+- 新 Main 从 Conversation 载入语义历史，并交接最近 Main 的工作摘要和可见顶层工具回执；私有摘要原文仅通过显式 Run grant 传递。Forget 屏障之前的执行内容不进入这条交接路径。
+- Task 续跑接收旧 Root 最终业务结果、Root 可见的顶层工具输出和历史指令；最终答复已接受但 report 尚未提交时，仍保留该答复，排除内部压缩摘要。不汇总 Child 的模型响应、内部工具轨迹或 Code Mode 未输出内容。整棵 Task 树中结果未知的效果以 Host 状态保留，不披露 Child 参数。
+- 生成前执行消息投影、按轮召回、工作集选择与冻结。工作摘要继续是有来源的 runtime user 消息；模型生成的摘要不写入长期 Memory，也不成为安全策略。
+- 需要总结时，该轮只提供专用总结 system prompt、序列化证据和保留任务事实，不声明 Tools。结果提交后推进同一个 Run 的 step，更新 `working_state`，继续业务推理；已接受结果在故障恢复时复用。
+- `summary_bytes` 是摘要目标；模型结果上限为 `max(4096, summary_bytes × 4)`，最多 64 KiB。被截断、空白、超限或要求调用工具的摘要不能成为工作状态。语义质量不由确定性测试证明。
 
 ## Changelog
+
+2026-10-28：F-003/F-004/F-006/F-011/F-022 上下文治理。借鉴 Pi 的分区装配和工作摘要；保留 Erii 的 Main/Worker、Task epoch、显式交接、冻结能力、费用与重放边界。相较汇总整棵树，改用 Root 可见业务输出和 Host 未知效果；相较纯摘录，新 Run 使用同模型的工具关闭摘要轮次。state schema 27 校验 context version 和工作状态边界；旧 checkpoint 及已接受请求保持原实现与 hash，新 context version 不回填旧 Run，所有进程需统一升级。
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

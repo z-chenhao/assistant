@@ -477,6 +477,13 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 	for _, m := range filtered {
 		run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.AgentMessage{MessageID: m.MessageID, Type: m.Role, Content: m.Content})
 	}
+	if run.Checkpoint.ContextVersion >= 2 {
+		handoff, e := r.mainHandoff(ctx, c, run)
+		if e != nil {
+			return e
+		}
+		run.Checkpoint.Messages = append(run.Checkpoint.Messages, handoff...)
+	}
 	run.Checkpoint.Messages = append(run.Checkpoint.Messages, runtimeMessages...)
 	run.Checkpoint.ContextReady = true
 	return r.Checkpoint(ctx, c, run.Version, run.Checkpoint)

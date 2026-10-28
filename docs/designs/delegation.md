@@ -56,7 +56,7 @@ Prompt 使用可组合片段，不为三种 Run 维护三份彼此分叉的完�
 - Main 面向用户，对用户关系、意图协调和最终表达负责。
 - Root Worker 面向 Task，保持该 Erii 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
 - Child 面向直接 Parent，是无独立人格的通用执行单元；它不得凭空假设未显式提供的用户背景。
-- Prompt 片段由 Context Builder 按 Run 位置组装；是否暴露 `agent.run()` 由 Tool Exposure/Capability Policy 决定，而不是通过复制或分叉 Agent Loop 实现。
+- Prompt 片段统一由 `internal/agent/context.go` 按 Run 位置和冻结能力组装；是否暴露 `agent.run()` 由 Tool Exposure/Capability Policy 决定，而不是通过复制或分叉 Agent Loop 实现。
 - Main 与 Root 共享同一份 Agent 基础能力配置，包括普通 Tool、CUA、Skill、数据作用域和 Security Policy；Host 再按 Run Role 自动派生能力表面。Main 额外拥有 Task 控制和用户交付能力且默认没有 `agent.run()`；Root 不拥有 Task 控制或用户交付能力，但拥有 `agent.run()`。
 - Root 能力不在 `task_manage(create)` 中指定。Host 创建 Run 时根据当前 Agent 配置与 Run Role 生成带版本的 Capability Snapshot；Run 期间配置变化不影响该 Run，新 Run 使用新版本。
 - Child 默认完整继承直接 Parent Worker 的 Capability Snapshot，并应用 Child 固定禁用项；调用方不在 `agent.run()` 中指定 Tool、Skill 或权限。Child 只能缩小能力，不能扩大能力、提升权限或加载 Parent 不具备的 Skill。
@@ -578,6 +578,8 @@ across SIGKILL. It also proves all unknown configuration/usage states. It is sel
 semantic Golden Case or M5 JavaScript/Durable Replay claim.
 
 ## Changelog
+
+2026-10-28：F-004/F-006 上下文交接只选择旧 Root 业务结果和顶层可见输出，排除 Child 原始模型轨迹和嵌套未输出结果；未知外部效果以不含 Child 参数的 Host 状态保留。Task 正文与附件合并为受保护输入，Child 继承冻结共享规则和 context version。相比全树历史聚合，明确保留显式父子结果边界；Task 生命周期和 AgentResult 协议不变。
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

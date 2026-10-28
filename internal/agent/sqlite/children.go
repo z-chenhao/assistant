@@ -110,7 +110,15 @@ func (r *Runs) StartChildRun(ctx context.Context, tx *sql.Tx, c agent.RunClaim, 
 	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'worker',?,?,?,?,?,?,?)`, capID, config, digest(raw), skill.SetHash(specs), scope, spawn, raw, now, format); err != nil {
 		return tool.Result{}, err
 	}
-	cp, _ := encoded(agent.Checkpoint{ContextReady: true, Phase: "model", Messages: agent.ChildContext(req)})
+	var parentCheckpoint string
+	if err = tx.QueryRowContext(ctx, `SELECT checkpoint_json FROM run WHERE run_id=?`, c.RunID()).Scan(&parentCheckpoint); err != nil {
+		return tool.Result{}, err
+	}
+	var parent agent.Checkpoint
+	if json.Unmarshal([]byte(parentCheckpoint), &parent) != nil {
+		return tool.Result{}, agent.ErrStorage
+	}
+	cp, _ := encoded(agent.Checkpoint{ContextVersion: parent.ContextVersion, ContextReady: true, Phase: "model", Messages: agent.InitialContext(agent.ContextOptions{Position: "child", Tools: specs, Task: req.Task, ArtifactRefs: req.ArtifactRefs, ParentSystem: parent.Messages})})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,task_id,parent_run_id,root_run_id,kind,worker_position,status,task_epoch,depth,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,?,?,?,'worker','child','queued',?,?,?,?,?,0,?,?,1)`, id, agentID, conv, taskID, c.RunID(), rootID, epoch, depth+1, capID, modelID, cp, now, now); err != nil {
 		return tool.Result{}, err
 	}

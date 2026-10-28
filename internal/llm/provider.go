@@ -38,12 +38,21 @@ type ToolCall struct {
 }
 
 type Message struct {
-	ImageRefs  []string   `json:"image_refs,omitempty"`
-	Role       string     `json:"role"`
-	Origin     string     `json:"origin,omitempty"`
-	Text       string     `json:"text"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	Source     *ContextSource `json:"source,omitempty"`
+	ImageRefs  []string       `json:"image_refs,omitempty"`
+	Role       string         `json:"role"`
+	Origin     string         `json:"origin,omitempty"`
+	Text       string         `json:"text"`
+	ToolCallID string         `json:"tool_call_id,omitempty"`
+	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`
+}
+
+// ContextSource is Host provenance retained through context selection and replay.
+// Providers receive the rendered text; this metadata never grants authority.
+type ContextSource struct {
+	Kind      string `json:"kind"`
+	Ref       string `json:"ref,omitempty"`
+	Protected bool   `json:"protected,omitempty"`
 }
 
 type ToolSpec struct {

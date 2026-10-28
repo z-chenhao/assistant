@@ -53,7 +53,7 @@ func isRoot(req llm.GenerationRequest) bool {
 }
 func isFollowup(req llm.GenerationRequest) bool {
 	for _, m := range req.Messages {
-		if m.Origin == "runtime" {
+		if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update") {
 			return true
 		}
 	}

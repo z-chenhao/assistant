@@ -34,7 +34,7 @@ func (r *Runs) recallIdentity(run agent.Run) (string, error) {
 	return "", nil // Pre-M6 frozen capabilities do not gain a new data source.
 }
 
-func (r *Runs) recallMessages(ctx context.Context, c agent.RunClaim, run agent.Run, messages []llm.Message) ([]llm.Message, error) {
+func (r *Runs) recallMessages(ctx context.Context, c agent.RunClaim, run agent.Run, messages []llm.Message, maxBytes int) ([]llm.Message, error) {
 	identity, err := r.recallIdentity(run)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,10 @@ func (r *Runs) recallMessages(ctx context.Context, c agent.RunClaim, run agent.R
 			query = "durable context"
 		}
 		// Bound serialized evidence to a quarter of the remaining model budget.
-		budget := max(0, min(16<<10, int(run.Snapshot.ContextWindow*3)/8))
+		budget := maxBytes
+		if maxBytes < 0 {
+			budget = max(0, min(16<<10, int(run.Snapshot.ContextWindow*3)/8))
+		}
 		lookup, cancel := context.WithTimeout(ctx, 30*time.Second)
 		q, e := r.privacyQuery(lookup, run.AgentID, recall.Query{Query: query})
 		if e != nil {

@@ -23,6 +23,7 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		root = root || strings.Contains(m.Text, "Task anchor:")
 		if m.Role == "user" && input == "" {
 			input = m.Text
+			input, _, _ = strings.Cut(input, "\nExplicit artifact references: ")
 		}
 		for _, c := range m.ToolCalls {
 			prior = c
@@ -72,10 +73,8 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 			return call(agent.RunToolName, agent.AgentRunRequest{Task: "Read child artifact", ArtifactRefs: output.ArtifactRefs}), nil
 		}
 		if !root && input == "Read child artifact" && prior.Name == artifacttools.Manage && strings.Contains(prior.Arguments, `"operation":"read"`) {
-			for _, m := range req.Messages {
-				if strings.HasPrefix(m.Text, "Explicit artifact reference: ") {
-					return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": []string{strings.TrimPrefix(m.Text, "Explicit artifact reference: ")}}), nil
-				}
+			if refs := explicitTaskRefs(req.Messages); len(refs) > 0 {
+				return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": refs}), nil
 			}
 		}
 		if root && strings.Contains(input, "Child artifact") && prior.Name == agent.RunToolName {
@@ -127,10 +126,8 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 	case "Approve child":
 		return call(toolfake.Name, map[string]string{"target": "Alex", "text": "Child frozen action"}), nil
 	case "Read child artifact":
-		for _, m := range req.Messages {
-			if strings.HasPrefix(m.Text, "Explicit artifact reference: ") {
-				return call(artifacttools.Manage, map[string]string{"operation": "read", "artifactRef": strings.TrimPrefix(m.Text, "Explicit artifact reference: ")}), nil
-			}
+		if refs := explicitTaskRefs(req.Messages); len(refs) > 0 {
+			return call(artifacttools.Manage, map[string]string{"operation": "read", "artifactRef": refs[0]}), nil
 		}
 	}
 	return llm.GenerationResult{}, llm.InvalidProviderResponse

@@ -224,8 +224,12 @@ def verify(value):
     for c in value['children']:
         cp = json.loads(c['checkpoint_json'])
         if c['worker_position'] == 'child':
-            base = cp['messages'][:3]
-            require(len(base) == 3 and base[-1]['content'][0]['text'].startswith('Retrieve tea context independently'), 'parent context copied')
+            task_index = next((i for i, m in enumerate(cp['messages']) if m['type'] == 'user'), None)
+            require(task_index is not None, 'Child missing explicit task')
+            base = cp['messages'][:task_index + 1]
+            require(all(m['type'] == 'system' for m in base[:-1])
+                    and base[-1]['source']['kind'] == 'task' and base[-1]['source']['protected']
+                    and base[-1]['content'][0]['text'].startswith('Retrieve tea context independently'), 'parent context copied')
             require(not any('Task anchor:' in json.dumps(m) or 'personal assistant' in json.dumps(m) for m in base), 'Child inherited identity/history')
     for key in ('memory', 'conversation'):
         require(value[key + '_journal'] == 'wal', 'missing WAL')

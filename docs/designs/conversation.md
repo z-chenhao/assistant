@@ -189,7 +189,17 @@ continue. SIGKILL leaves the lease to expire; a newly started `chat work` waits
 and reclaims automatically. No broker is needed for this bounded CLI drain:
 state is authoritative, and Outbox notifications remain available to the relay.
 
+## Prompt 与工作状态装配
+
+初始上下文统一由 [agent/context.go](../../internal/agent/context.go) 根据 Main/Root/Child 位置和冻结 Tool specs 生成。共享安全与证据原则、角色职责、执行状态、能力操作规则及有来源的项目/Skill 资源分区保存；没有把个人助手改成 coding agent，也没有给 Main 增加 Child 创建能力。
+
+Main 的原始 Conversation 仍保存用户语义历史。新 Main 额外交接最近 Main 的工作状态、获准读取的摘要原文和顶层工具回执；未知效果是独立 Host 事实。来源在 [sqlite/handoff.go](../../internal/agent/sqlite/handoff.go) 选择，接受 Forget 前的执行内容被排除。
+
+超预算时共享 Loop 可执行工具关闭的总结轮次。该轮只更新工作状态并推进 step，不进入 reply 阶段、不对用户流式输出、不产生 Worker 最终结果，也不直接进入 Curator。模型、费用、权限、取消和重放继续使用现有链路。协议与兼容说明见 [上下文方案](memory-context.md#当前上下文装配与业务接续)。
+
 ## Changelog
+
+2026-10-28：F-003/F-011 引入统一分区装配与 Main 业务接续，选择同一 Loop 内工具关闭的摘要步骤，避免另建推理运行时。原有 Run 冻结请求保留；新 checkpoint 使用 context version 2。真实模型质量另行验证。
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

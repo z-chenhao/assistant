@@ -80,7 +80,7 @@ def run(binary, scenario_jobs=1):
                 if name == "large-result":
                     h.setup(metadata={"name": "large-output", "provider_kind": "openai_compatible",
                                       "endpoint": "http://127.0.0.1:1/v1", "wire_api": "openai_completions",
-                                      "model_id": "fixture-model", "context_window": 8192, "max_output_tokens": 8192,
+                                      "model_id": "fixture-model", "context_window": 32768, "max_output_tokens": 8192,
                                       "generation_defaults": {}, "compatibility": {"tool_result_format": "openai"},
                                       "capabilities": {"text_input": True}})
                 else:
