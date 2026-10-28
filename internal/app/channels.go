@@ -45,7 +45,7 @@ func (a *App) WebStatus(ctx context.Context) (web.Status, error) {
 func (a *App) ImportChannelArtifact(ctx context.Context, e interaction.InboundEvent, key string, input artifact.Input, src io.Reader) (string, error) {
 	return a.store.ImportChannelArtifact(ctx, e, key, input, src)
 }
-func (a *App) SaveWebProjection(ctx context.Context, m conversation.Message) (json.RawMessage, error) {
+func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.RawMessage, error) {
 	return a.store.WebProjection(ctx, m)
 }
 func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Config) error {
@@ -131,4 +131,12 @@ func (a *App) ChannelPreference(ctx context.Context) (interaction.Preference, er
 }
 func (a *App) PreferChannel(ctx context.Context, channel, binding string, version int64) error {
 	return a.store.PreferChannel(ctx, channel, binding, version)
+}
+
+func (a *App) Conversation(ctx context.Context, before int64) (conversation.Page, error) {
+	d, err := a.store.Diagnostics(ctx)
+	if err != nil {
+		return conversation.Page{}, err
+	}
+	return a.history.Page(ctx, d.AgentID, before)
 }

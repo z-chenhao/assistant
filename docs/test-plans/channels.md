@@ -140,3 +140,7 @@ input cannot be lost during progressive enhancement.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## 工程基础重构回归
+
+F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failure 后仍服务并执行下一请求；`web/page_test.go` 证明 Settings/Progress 不依赖历史查询；`conversation/sqlite/store_test.go` 验证 205 条记录无重叠/遗漏分页和作用域查询。`tests/system/verify_channels.py` 通过实际 Web 证明缺失依赖不隐藏控制页、修复后恢复 ingress、GET 不修改已稳定业务状态。

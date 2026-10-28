@@ -77,7 +77,7 @@ func (r *Runs) recallMessages(ctx context.Context, c agent.RunClaim, run agent.R
 		hits, e := r.recall.Search(lookup, recall.Scope{UserID: artifact.LocalUser, AgentID: run.AgentID}, q, budget)
 		cancel()
 		if e != nil {
-			return nil, agent.ErrStorage
+			return nil, &agent.OperationError{Operation: "context recall", Category: llm.ProviderUnavailable, Cause: e}
 		}
 		raw, err = encoded(hits)
 		if err != nil {

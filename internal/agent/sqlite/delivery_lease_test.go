@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"github.com/z-chenhao/erii/internal/conversation"
 	"sync"
 	"testing"
 	"time"
@@ -131,7 +132,7 @@ func TestDeliverySlowSendAndQueryRetainClaim(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				messages, err := service.History.List(ctx, service.Destination)
+				messages, err := service.History.(conversation.Store).List(ctx, service.Destination)
 				if err != nil {
 					t.Fatal(err)
 				}

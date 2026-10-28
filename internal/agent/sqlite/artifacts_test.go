@@ -316,7 +316,11 @@ func TestArtifactTaskVisibilityConcurrentChildWritersAndPublication(t *testing.T
 	if _, err := s.Artifacts().Open(ctx, main, refs[0]); !errors.Is(err, artifact.ErrNotFound) {
 		t.Fatal("Main received unpublished Child output", err)
 	}
-	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scopes[0], []string{refs[0]}) }); err != nil {
+	publication, err := s.Artifacts().PreparePublication(ctx, scopes[0], []string{refs[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scopes[0], publication) }); err != nil {
 		t.Fatal(err)
 	}
 	if scalar(t, s, `SELECT count(*) FROM artifact_publication`) != 1 {
@@ -427,16 +431,9 @@ func TestArtifactPublicationValidatesSetBeforeMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, refs := range [][]string{{good, bad}, {good, "artifact:" + strings.Repeat("0", 64)}} {
-		if err := s.Transaction(ctx, func(tx *sql.Tx) error {
-			err := s.Artifacts().PublishTx(ctx, tx, scope, refs)
-			if !errors.Is(err, artifact.ErrIntegrity) && !errors.Is(err, artifact.ErrNotFound) {
-				return fmt.Errorf("invalid set accepted: %v", err)
-			}
-			// The Tool layer can turn a validation error into a failed result and
-			// commit, without accidentally retaining a partial output selection.
-			return nil
-		}); err != nil {
-			t.Fatal(err)
+		_, err := s.Artifacts().PreparePublication(ctx, scope, refs)
+		if !errors.Is(err, artifact.ErrIntegrity) && !errors.Is(err, artifact.ErrNotFound) {
+			t.Fatalf("invalid set accepted: %v", err)
 		}
 	}
 	if scalar(t, s, `SELECT count(*) FROM artifact_publication`) != 0 || scalar(t, s, `SELECT count(*) FROM artifact_reference`) != 0 {
@@ -673,11 +670,19 @@ func TestArtifactFinalSelectionFitsConversationEnvelope(t *testing.T) {
 	for i := 0; i < artifact.MaxPublished+1; i++ {
 		refs = append(refs, putArtifact(t, s, scope, ""))
 	}
-	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scope, refs[:artifact.MaxPublished]) }); err != nil {
+	first, err := s.Artifacts().PreparePublication(ctx, scope, refs[:artifact.MaxPublished])
+	if err != nil {
+		t.Fatal(err)
+	}
+	later, err := s.Artifacts().PreparePublication(ctx, scope, refs[artifact.MaxPublished:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scope, first) }); err != nil {
 		t.Fatal(err)
 	}
 	// A later independent publication cannot grow an invalid final envelope.
-	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scope, refs[artifact.MaxPublished:]) }); !errors.Is(err, artifact.ErrLimit) {
+	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return s.Artifacts().PublishTx(ctx, tx, scope, later) }); !errors.Is(err, artifact.ErrLimit) {
 		t.Fatal("aggregate selection grew beyond Conversation", err)
 	}
 	if scalar(t, s, `SELECT count(*) FROM artifact_publication`) != artifact.MaxPublished {

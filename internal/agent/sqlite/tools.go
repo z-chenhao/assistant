@@ -260,8 +260,12 @@ func (t *tools) FinishResult(ctx context.Context, id string, result tool.Result)
 	return out, err
 }
 func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Result, reconcile, reject bool, out *tool.Result) error {
+	prepared := t.runs.stageOutput(outputCtx, id, result)
+	defer prepared.Close()
 	committed := false
+	original := result
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
+		result = original
 		if err := t.fence(ctx, tx); err != nil {
 			return err
 		}
@@ -284,9 +288,9 @@ func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Re
 		result = tool.Normalize(result)
 		var err error
 		if reconcile {
-			result, err = t.runs.storeRecoveryOutput(ctx, outputCtx, tx, t.claim.RunID(), id, result)
+			result, err = t.runs.storeRecoveryOutput(ctx, outputCtx, tx, t.claim.RunID(), id, result, prepared)
 		} else {
-			result, err = t.runs.storeOutput(ctx, outputCtx, tx, t.claim.RunID(), id, result)
+			result, err = t.runs.storeOutput(ctx, outputCtx, tx, t.claim.RunID(), id, result, prepared)
 		}
 		if err != nil {
 			return err

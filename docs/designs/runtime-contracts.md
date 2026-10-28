@@ -157,7 +157,7 @@ SQLite 是权威状态；Outbox 与 JetStream 传递唤醒。每个 claim/epoch 
 - `task_manage(append)`：TaskInstruction + Task 状态/epoch 更新 + 新 Root Run（若需要）+ Steering/`run_ready` Outbox。
 - `agent.run()` admission：CodeCall（若来自 Code Mode）+ Agent ToolInvocation + Child Run + Root 树计数 + `run_ready` Outbox。
 - 任意状态迁移：领域记录 + 对应 EventOutbox；Broker 发布不参与数据库事务。
-- Tool 成功：规范化结果/Artifact 元数据 + ToolInvocation 终态；提交成功后才能发送 `tool_execution_end`。Artifact 二进制先写临时对象、校验哈希并原子发布，再提交元数据；恢复器清理无引用临时对象。
+- Tool 成功：规范化结果/Artifact 元数据 + ToolInvocation 终态；提交成功后才能发送 `tool_execution_end`。Artifact 二进制在事务外写临时对象并校验哈希，文件锁保护活跃 staging；短事务重检配额/授权、原子发布并提交元数据；恢复器跳过活跃锁，清理无引用对象。
 - `conversation.db` 与 `state.db` 不做分布式事务。Main 最终回复使用确定性的 `message_id/delivery_id`、幂等 Append 和可恢复提交顺序：先写 ConversationMessage，再写 DeliveryRequest，二者都成功后才推进 Main Checkpoint；任一步崩溃都由恢复器补齐，渠道发送成功只更新 DeliveryRequest，不重写语义消息。
 
 必须始终成立：

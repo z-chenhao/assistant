@@ -17,7 +17,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/google/uuid"
 	"github.com/z-chenhao/erii/internal/artifact"
 )
 
@@ -180,95 +179,6 @@ func (s *Store) Describe(ctx context.Context, a artifact.Scope, ref string) (d a
 	err = s.transaction(ctx, func(tx *sql.Tx) error { var e error; d, e = s.DescribeTx(ctx, tx, a, ref, false); return e })
 	return
 }
-func (s *Store) Put(ctx context.Context, a artifact.Scope, in artifact.Input, src io.Reader) (ref string, err error) {
-	err = s.transaction(ctx, func(tx *sql.Tx) error { var e error; ref, e = s.PutTx(ctx, tx, a, in, src, ""); return e })
-	return
-}
-
-// PutTx must run inside an immediate state.db transaction. This serializes
-// quota admission and orphan recovery across processes, including live writers.
-// key is a Host-owned invocation key. Never accept it from a model or user.
-func (s *Store) PutTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, in artifact.Input, src io.Reader, key string) (string, error) {
-	if src == nil || !validInput(in) || s.Policy.Validate() != nil {
-		return "", artifact.ErrInvalid
-	}
-	if err := s.scope(ctx, tx, a); err != nil {
-		return "", err
-	}
-	obj := token()
-	tmp := "tmp-" + obj
-	f, err := s.root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return "", artifact.ErrStorage
-	}
-	defer f.Close()
-	defer s.root.Remove(tmp)
-	s.boundary("artifact_temp_created")
-	hash := sha256.New()
-	n, err := io.Copy(io.MultiWriter(f, hash), io.LimitReader(&contextReader{ctx, src}, s.Policy.MaxBytes+1))
-	if err != nil {
-		return "", artifact.ErrStorage
-	}
-	if n > s.Policy.MaxBytes {
-		return "", artifact.ErrLimit
-	}
-	sum := hex.EncodeToString(hash.Sum(nil))
-	if key != "" {
-		var ref, oldHash, name, media, runID string
-		err = tx.QueryRowContext(ctx, `SELECT artifact_ref,content_hash,name,media_type,coalesce(run_id,'') FROM artifact WHERE put_key=?`, key).Scan(&ref, &oldHash, &name, &media, &runID)
-		if err == nil {
-			if oldHash != sum || name != in.Name || media != in.MediaType || runID != a.RunID {
-				return "", artifact.ErrConflict
-			}
-			_, err = s.DescribeTx(ctx, tx, a, ref, true)
-			return ref, err
-		}
-		if err != sql.ErrNoRows {
-			return "", artifact.ErrStorage
-		}
-	}
-	var used int64
-	if tx.QueryRowContext(ctx, `SELECT coalesce(sum(byte_size),0) FROM artifact WHERE owner_user_id=? AND deleted_at IS NULL`, a.UserID).Scan(&used) != nil {
-		return "", artifact.ErrStorage
-	}
-	if n > s.Policy.QuotaBytes-used {
-		return "", artifact.ErrLimit
-	}
-	if f.Chmod(0400) != nil || f.Sync() != nil || f.Close() != nil {
-		return "", artifact.ErrStorage
-	}
-	// Verify the actual written object, not only the source stream.
-	if err = s.verify(tmp, n, sum); err != nil {
-		return "", err
-	}
-	s.boundary("artifact_before_publish")
-	if s.root.Rename(tmp, obj) != nil || s.sync() != nil {
-		return "", artifact.ErrStorage
-	}
-	s.boundary("artifact_after_publish")
-	ref := "artifact:" + token()
-	id := uuid.Must(uuid.NewV7()).String()
-	now := time.Now().UTC()
-	visibility := "agent"
-	if a.TaskID != "" {
-		visibility = "task"
-	} else if a.RunID != "" {
-		visibility = "run"
-	}
-	var putKey any
-	if key != "" {
-		putKey = key
-	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO artifact(artifact_id,artifact_ref,owner_user_id,owner_agent_id,task_id,run_id,media_type,name,byte_size,content_hash,storage_key,visibility,retention_class,created_at,expires_at,put_key) VALUES(?,?,?,?,nullif(?,''),nullif(?,''),?,?,?,?,?,?,'standard',?,?,?)`, id, ref, a.UserID, a.AgentID, a.TaskID, a.RunID, in.MediaType, in.Name, n, sum, obj, visibility, now.UnixMicro(), now.Add(time.Duration(s.Policy.RetentionDays)*24*time.Hour).UnixMicro(), putKey)
-	if err != nil {
-		return "", artifact.ErrStorage
-	}
-	if err = artifactEvent(ctx, tx, ref, "created"); err != nil {
-		return "", err
-	}
-	s.boundary("artifact_after_metadata")
-	return ref, nil
-}
 
 type contextReader struct {
 	ctx context.Context
@@ -323,8 +233,31 @@ func (s *Store) verify(key string, n int64, sum string) error {
 	}
 	return nil
 }
-func (s *Store) OpenTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref string) (io.ReadCloser, error) {
-	d, err := s.DescribeTx(ctx, tx, a, ref, true)
+
+// Opened binds authorization metadata to the exact file descriptor. It cannot
+// be consumed until Verify has checked the complete object outside SQLite.
+type Opened struct {
+	file       *os.File
+	descriptor artifact.Descriptor
+}
+
+func (o *Opened) Descriptor() artifact.Descriptor { return o.descriptor }
+func (o *Opened) Close() error                    { return o.file.Close() }
+func (o *Opened) Verify(ctx context.Context) (io.ReadCloser, error) {
+	hash := sha256.New()
+	n, err := io.Copy(hash, io.LimitReader(&contextReader{ctx, o.file}, o.descriptor.ByteSize+1))
+	if err != nil || n != o.descriptor.ByteSize || hex.EncodeToString(hash.Sum(nil)) != o.descriptor.ContentHash {
+		o.file.Close()
+		return nil, artifact.ErrIntegrity
+	}
+	if _, err = o.file.Seek(0, io.SeekStart); err != nil {
+		o.file.Close()
+		return nil, artifact.ErrStorage
+	}
+	return o.file, nil
+}
+func (s *Store) OpenFileTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref string) (*Opened, error) {
+	descriptor, err := s.DescribeTx(ctx, tx, a, ref, true)
 	if err != nil {
 		return nil, err
 	}
@@ -332,30 +265,28 @@ func (s *Store) OpenTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref st
 	if tx.QueryRowContext(ctx, `SELECT storage_key FROM artifact WHERE artifact_ref=?`, ref).Scan(&key) != nil {
 		return nil, artifact.ErrStorage
 	}
-	// Return the same verified descriptor to avoid a pathname swap after hashing.
-	f, err := s.file(key)
+	file, err := s.file(key)
 	if err != nil {
 		return nil, err
 	}
-	h := sha256.New()
-	n, err := io.Copy(h, io.LimitReader(&contextReader{ctx, f}, d.ByteSize+1))
-	if err != nil || n != d.ByteSize || hex.EncodeToString(h.Sum(nil)) != d.ContentHash {
-		f.Close()
-		return nil, artifact.ErrIntegrity
-	}
-	if _, err = f.Seek(0, io.SeekStart); err != nil {
-		f.Close()
-		return nil, artifact.ErrStorage
-	}
-	return f, nil
+	return &Opened{file: file, descriptor: descriptor}, nil
 }
-func (s *Store) Open(ctx context.Context, a artifact.Scope, ref string) (f io.ReadCloser, err error) {
-	err = s.transaction(ctx, func(tx *sql.Tx) error { var e error; f, e = s.OpenTx(ctx, tx, a, ref); return e })
-	if err != nil && f != nil {
-		f.Close()
+func (s *Store) Open(ctx context.Context, a artifact.Scope, ref string) (io.ReadCloser, error) {
+	var opened *Opened
+	err := s.transaction(ctx, func(tx *sql.Tx) error {
+		var e error
+		opened, e = s.OpenFileTx(ctx, tx, a, ref)
+		return e
+	})
+	if err != nil {
+		if opened != nil {
+			opened.Close()
+		}
+		return nil, err
 	}
-	return
+	return opened.Verify(ctx)
 }
+
 func (s *Store) PinTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref, kind, id string) error {
 	if _, err := s.DescribeTx(ctx, tx, a, ref, true); err != nil {
 		return err
@@ -364,9 +295,13 @@ func (s *Store) PinTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref, ki
 	return err
 }
 
-// PublishTx validates the complete immutable set, including content integrity,
-// before any mutation. Expected validation failures leave the transaction clean.
-func (s *Store) PublishTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, refs []string) error {
+// PublishTx revalidates a preverified complete set before any mutation.
+// Expected validation failures leave the transaction clean.
+func (s *Store) PublishTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, publication *Publication) error {
+	if publication == nil || publication.store != s || publication.scope != a {
+		return artifact.ErrInvalid
+	}
+	refs := publication.refs
 	if a.RunID == "" {
 		return artifact.ErrInvalid
 	}
@@ -401,14 +336,16 @@ func (s *Store) PublishTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref
 		return artifact.ErrLimit
 	}
 	for _, ref := range refs {
-		f, err := s.OpenTx(ctx, tx, a, ref)
+		descriptor, err := s.DescribeTx(ctx, tx, a, ref, true)
 		if err != nil {
 			return err
 		}
-		if f.Close() != nil {
-			return artifact.ErrStorage
+		verified, ok := publication.verified[ref]
+		if !ok || descriptor.ContentHash != verified.ContentHash || descriptor.Version != verified.Version {
+			return artifact.ErrIntegrity
 		}
 	}
+
 	for _, ref := range refs {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_reference VALUES(?,'publication',?) ON CONFLICT DO NOTHING`, ref, a.RunID); err != nil {
 			return err
@@ -514,4 +451,38 @@ func (s *Store) tombstone(ctx context.Context, tx *sql.Tx, ref string, version i
 		return artifact.ErrConflict
 	}
 	return artifactEvent(ctx, tx, ref, "deleted")
+}
+
+// Publication proves that all selected bytes were checked before the write
+// transaction. Commit revalidates scope, liveness and metadata as one set.
+type Publication struct {
+	store    *Store
+	scope    artifact.Scope
+	refs     []string
+	verified map[string]artifact.Descriptor
+}
+
+func (s *Store) PreparePublication(ctx context.Context, scope artifact.Scope, refs []string) (*Publication, error) {
+	if scope.RunID == "" {
+		return nil, artifact.ErrInvalid
+	}
+	if len(refs) > artifact.MaxPublished {
+		return nil, artifact.ErrLimit
+	}
+	publication := &Publication{store: s, scope: scope, refs: append([]string{}, refs...), verified: make(map[string]artifact.Descriptor)}
+	for _, ref := range refs {
+		descriptor, err := s.Describe(ctx, scope, ref)
+		if err != nil {
+			return nil, err
+		}
+		file, err := s.Open(ctx, scope, ref)
+		if err != nil {
+			return nil, err
+		}
+		if err = file.Close(); err != nil {
+			return nil, artifact.ErrStorage
+		}
+		publication.verified[ref] = descriptor
+	}
+	return publication, nil
 }

@@ -232,9 +232,13 @@ func (r *Runs) ReconcileUnknown(ctx context.Context) error {
 			continue
 		}
 		_, err = tool.RecoverResult(ctx, d, tool.Request{Arguments: v.args, IdempotencyKey: v.key}, func(outputCtx context.Context, result tool.Result) (tool.Result, error) {
+			prepared := r.stageOutput(outputCtx, v.id, result)
+			defer prepared.Close()
 			writeCtx := context.WithoutCancel(outputCtx)
 			committed := false
+			original := result
 			err := r.write(writeCtx, func(tx *sql.Tx) error {
+				result = original
 				// The query ran outside the lock. Another reconciler may have won;
 				// never consume or publish another receipt after terminal commit.
 				var status string
@@ -246,7 +250,7 @@ func (r *Runs) ReconcileUnknown(ctx context.Context) error {
 					return nil
 				}
 				var err error
-				result, err = r.storeRecoveryOutput(writeCtx, outputCtx, tx, v.run, v.id, result)
+				result, err = r.storeRecoveryOutput(writeCtx, outputCtx, tx, v.run, v.id, result, prepared)
 				if err != nil || (result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT") {
 					return err
 				}

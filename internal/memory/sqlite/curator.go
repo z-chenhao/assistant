@@ -42,6 +42,7 @@ UPDATE memory_record SET deleted_at=(SELECT max(at) FROM lineage WHERE id=memory
 `
 
 func (s *Store) ConfigureVault(v memory.Vault) error {
+	s.clearWorking()
 	s.vault = v
 	return s.protectExisting(context.Background())
 }
@@ -181,6 +182,13 @@ func (s *Store) Curate(ctx context.Context, eventID string, scope recall.Scope, 
 }
 
 func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
+	if err := s.lockSearch(ctx); err != nil {
+		return nil, err
+	}
+	defer s.unlockSearch()
+	if s.working != nil && s.workingScope != scope {
+		s.clearWorking()
+	}
 	if !q.Valid() || scope.UserID == "" || scope.AgentID == "" {
 		return nil, recall.ErrInvalid
 	}
@@ -204,7 +212,7 @@ func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) 
 	if !ok || !local.Local() {
 		return nil, recall.ErrUnavailable
 	}
-	rows, e := s.db.QueryContext(ctx, `SELECT m.memory_id,m.user_id,m.scope_type,m.scope_id,m.content,m.created_at,m.tier FROM memory_record m LEFT JOIN recall_document d ON d.ref='memory:'||m.memory_id WHERE m.user_id=? AND ((m.scope_type='user' AND m.scope_id=?) OR (m.scope_type='agent' AND m.scope_id=?)) AND m.deleted_at IS NULL AND m.created_at>=? AND m.created_at<=? AND (d.active=1 OR m.content LIKE 'sealed:v1:%') AND NOT EXISTS(SELECT 1 FROM memory_record n WHERE n.supersedes_memory_id=m.memory_id) ORDER BY m.memory_id`, scope.UserID, scope.UserID, scope.AgentID, start, end)
+	rows, e := s.db.QueryContext(ctx, `SELECT m.memory_id,m.user_id,m.scope_type,m.scope_id,m.content,m.created_at,m.tier FROM memory_record m LEFT JOIN recall_document d ON d.ref='memory:'||m.memory_id WHERE m.user_id=? AND ((m.scope_type='user' AND m.scope_id=?) OR (m.scope_type='agent' AND m.scope_id=?)) AND m.deleted_at IS NULL AND (d.active=1 OR m.content LIKE 'sealed:v1:%') AND NOT EXISTS(SELECT 1 FROM memory_record n WHERE n.supersedes_memory_id=m.memory_id) ORDER BY m.memory_id`, scope.UserID, scope.UserID, scope.AgentID)
 	if e != nil {
 		return nil, recall.ErrUnavailable
 	}
@@ -235,30 +243,8 @@ func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) 
 	if e != nil {
 		return nil, recall.ErrUnavailable
 	}
-	// The selected index/embedding protocol is unchanged. Plaintext FTS and
-	// vectors exist only in a private in-memory SQLite working set; temp files
-	// are disabled and requests can go only to the selected loopback provider.
-	working, e := sql.Open("sqlite", ":memory:")
-	if e != nil {
-		return nil, recall.ErrUnavailable
+	if err := s.syncWorking(ctx, scope, docs); err != nil {
+		return nil, err
 	}
-	defer working.Close()
-	working.SetMaxOpenConns(1)
-	if _, e = working.ExecContext(ctx, `PRAGMA temp_store=MEMORY; PRAGMA journal_mode=MEMORY;`+sqliteindex.Schema); e != nil {
-		return nil, recall.ErrUnavailable
-	}
-	tx, e := working.BeginTx(ctx, nil)
-	if e != nil {
-		return nil, recall.ErrUnavailable
-	}
-	defer tx.Rollback()
-	for _, d := range docs {
-		if e = sqliteindex.Insert(ctx, tx, d); e != nil {
-			return nil, recall.ErrUnavailable
-		}
-	}
-	if tx.Commit() != nil {
-		return nil, recall.ErrUnavailable
-	}
-	return sqliteindex.Search(ctx, working, scope, q, s.engine, "memory")
+	return sqliteindex.Search(ctx, s.working, scope, q, s.engine, "memory")
 }

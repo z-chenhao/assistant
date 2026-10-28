@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
-	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/skill"
@@ -192,10 +191,10 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 }
 
 // executeTaskAdmission waits only for rolled-back Task admission. The shared
-// transactional fallback also serves Artifacts; only Task append returns ErrBusy.
+// transaction handles Task control only; append alone returns ErrBusy.
 func (t *tools) executeTaskAdmission(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	for {
-		result, err := t.executeBuiltin(ctx, inv)
+		result, err := t.executeTask(ctx, inv)
 		if !errors.Is(err, agent.ErrBusy) {
 			return result, err
 		}
@@ -216,33 +215,19 @@ func (t *tools) executeTaskAdmission(ctx context.Context, inv tool.Invocation) (
 	}
 }
 
-func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
+func (t *tools) executeTask(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	result := tool.Failure("PERMISSION_DENIED")
 	completion := false
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		completion = false
-		if err := t.fence(ctx, tx); err != nil {
-			return err
-		}
-		// Resolve the accepted record rather than trusting invocation fields supplied
-		// by a caller. Frozen role visibility is enforced again here.
-		var kind, name, args, source string
-		if err := tx.QueryRowContext(ctx, `SELECT r.kind,i.tool_name,i.arguments_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.run_id=? AND i.status='running'`, inv.ID, t.claim.RunID()).Scan(&kind, &name, &args); err != nil {
-			return err
-		}
-
-		var visible int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id, json_each(c.tools_json) j WHERE r.run_id=? AND json_extract(j.value,'$.name')=?`, t.claim.RunID(), name).Scan(&visible); err != nil {
-			return err
-		}
-		if visible != 1 {
+		kind, name, args, err := t.acceptedBuiltin(ctx, tx, inv)
+		if errors.Is(err, tool.ErrApprovalDenied) {
 			return nil
 		}
-		if artifacttools.Known(name) {
-			var e error
-			result, e = t.executeArtifact(ctx, tx, name, args)
-			return e
+		if err != nil {
+			return err
 		}
+		var source string
 		if kind != "main" {
 			return nil
 		}
@@ -352,7 +337,7 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
                       OR EXISTS(SELECT 1 FROM tool_invocation i JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch=? AND i.status IN ('queued','running','waiting','unknown'))`, taskID, epoch, taskID, epoch).Scan(&pending); err != nil {
 						return err
 					}
-					if status != "active" || pending {
+					if !task.CanComplete(task.Status(status), pending) {
 						result = tool.Failure("INVALID_ARGUMENT")
 						return nil
 					}
@@ -370,7 +355,7 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 						receiptStatus = "cancelled"
 					}
 					if status != receiptStatus {
-						if status != "active" && !(status == "paused" && receiptStatus == "cancelled") {
+						if !task.CanStop(task.Status(status), task.Status(receiptStatus)) {
 							result = tool.Failure("INVALID_ARGUMENT")
 							return nil
 						}
@@ -384,24 +369,20 @@ func (t *tools) executeBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 					if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND worker_position='root' AND status IN ('queued','running','waiting')`, taskID).Scan(&active); err != nil {
 						return err
 					}
-					fresh := status != "active" || active == 0
-					if fresh && active > 0 {
+					var liveTree int
+					if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND status IN ('queued','running','waiting')`, taskID).Scan(&liveTree); err != nil {
+						return err
+					}
+					plan, err := task.PlanAppend(task.Status(status), epoch, active, liveTree)
+					if errors.Is(err, task.ErrDraining) {
 						return agent.ErrBusy
 					}
-					if fresh {
-						// A finished Root can still have draining descendants. Keep
-						// their epoch valid until the tree reaches its boundary.
-						var pendingTree int
-						if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND status IN ('queued','running','waiting')`, taskID).Scan(&pendingTree); err != nil {
-							return err
-						}
-						if pendingTree > 0 {
-							return agent.ErrBusy
-						}
+					if err != nil {
+						return err
 					}
-					if fresh {
-						epoch++
-					}
+					fresh := plan.FreshRoot
+					epoch = plan.Epoch
+
 					res, err := tx.ExecContext(ctx, `UPDATE task SET status='active',task_epoch=?,completed_at=NULL,cancelled_at=NULL,updated_at=?,version=version+1 WHERE task_id=? AND version=?`, epoch, now, taskID, version)
 					if err != nil {
 						return err

@@ -248,3 +248,87 @@ func TestCategoryOptOutReplayDoesNotDeleteFreshExplicitEvidence(t *testing.T) {
 		t.Fatal("old allow event undid later opt-out", count, e)
 	}
 }
+
+type countedEmbedding struct {
+	fake.Embedding
+	calls int
+}
+
+func (e *countedEmbedding) Embed(ctx context.Context, text string) ([]float64, error) {
+	e.calls++
+	return e.Embedding.Embed(ctx, text)
+}
+func TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget(t *testing.T) {
+	s := openTest(t)
+	engine := &countedEmbedding{}
+	if err := s.Configure(ctx, engine); err != nil {
+		t.Fatal(err)
+	}
+	secrets := memory.New()
+	if err := secrets.Put(ctx, "key", bytes.Repeat([]byte{3}, 32)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ConfigureVault(mem.Vault{Secrets: secrets, Ref: "key"}); err != nil {
+		t.Fatal(err)
+	}
+	add := func(id, text string) {
+		t.Helper()
+		if err := s.Curate(ctx, id, scope, mem.SourceRef{Type: "conversation", Ref: "conversation:" + id}, time.Unix(101, 0), []string{text}, true, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("first", "I prefer green tea")
+	add("second", "I travel by railway")
+	q := recall.Query{Query: "tea"}
+	if _, err := s.Search(ctx, scope, q); err != nil {
+		t.Fatal(err)
+	}
+	if engine.calls != 3 {
+		t.Fatal("expected two documents and query", engine.calls)
+	}
+	working := s.working
+	if _, err := s.Search(ctx, scope, q); err != nil {
+		t.Fatal(err)
+	}
+	if engine.calls != 4 || s.working != working {
+		t.Fatal("unchanged encrypted corpus rebuilt", engine.calls)
+	}
+	add("third", "I enjoy restful sleep")
+	if _, err := s.Search(ctx, scope, q); err != nil {
+		t.Fatal(err)
+	}
+	if engine.calls != 6 {
+		t.Fatal("unchanged vectors reembedded after append", engine.calls)
+	}
+	if err := s.Forget(ctx, scope, "first-0", time.Unix(110, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if s.working != nil || len(s.indexed) != 0 {
+		t.Fatal("forgotten plaintext retained in working index")
+	}
+	hits, err := s.Search(ctx, scope, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, hit := range hits {
+		if hit.SourceRef == "memory:first-0" {
+			t.Fatal("forgotten fact returned")
+		}
+	}
+	other := recall.Scope{UserID: scope.UserID, AgentID: "other-agent"}
+	if _, err := s.Search(ctx, other, q); err != nil {
+		t.Fatal(err)
+	}
+	if s.working != nil {
+		t.Fatal("plaintext index retained across scope switch")
+	}
+	// The alternate scope may have no encrypted facts and use the disk index.
+	// The next encrypted search must still validate its exact authorized corpus.
+	if _, err := s.Search(ctx, scope, q); err != nil {
+		t.Fatal(err)
+	}
+	var vectors int
+	if err := s.db.QueryRow(`SELECT count(*) FROM recall_document WHERE vector_json IS NOT NULL`).Scan(&vectors); err != nil || vectors != 0 {
+		t.Fatal("encrypted vectors persisted", vectors, err)
+	}
+}

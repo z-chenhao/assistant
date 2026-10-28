@@ -110,6 +110,7 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 		return err
 	}
 	u.print("State: " + d.Readiness)
+	u.readiness = d.Readiness
 	if d.Readiness == agent.SetupRequired {
 		u.report(u.setup(ctx))
 	}
@@ -161,13 +162,15 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 
 type terminal struct {
 	Session
-	lines        <-chan inputEvent
-	out          io.Writer
-	seenMessages map[string]bool
-	work         context.Context
-	workDone     chan error
-	drainAgain   bool
-	updates      chan struct{}
+	lines              <-chan inputEvent
+	out                io.Writer
+	seenMessages       map[string]bool
+	work               context.Context
+	workDone           chan error
+	drainAgain         bool
+	updates            chan struct{}
+	readiness          string
+	nextReadinessCheck time.Time
 }
 
 // Keep accepting input while Main is busy. Actor.Submit routes Steering to the
@@ -214,6 +217,10 @@ func (u *terminal) read(ctx context.Context, prompt string) (string, error) {
 		case <-ctx.Done():
 			return "", ctx.Err()
 		case <-ticker.C:
+			if u.readiness == agent.Degraded && !time.Now().Before(u.nextReadinessCheck) {
+				u.nextReadinessCheck = time.Now().Add(time.Second)
+				u.report(u.refreshReadiness(ctx))
+			}
 			if u.Messages != nil {
 				u.report(u.history(ctx))
 			}
@@ -610,4 +617,22 @@ func (u *terminal) chooseModel(ctx context.Context, catalog []llm.CatalogModel, 
 		}
 		u.print("Choose a listed model by number or ID.")
 	}
+}
+
+// A control surface can open before dependencies finish connecting. Announce
+// recovery and resume accepted work without waiting for a new user command.
+func (u *terminal) refreshReadiness(ctx context.Context) error {
+	diagnostics, err := u.State.Diagnostics(ctx)
+	if err != nil {
+		return err
+	}
+	if diagnostics.Readiness == u.readiness {
+		return nil
+	}
+	u.readiness = diagnostics.Readiness
+	u.print("\nState: " + diagnostics.Readiness)
+	if diagnostics.AgentIngressEnabled {
+		u.startDrain()
+	}
+	return nil
 }

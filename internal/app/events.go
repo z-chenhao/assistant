@@ -110,10 +110,7 @@ func (a *App) WithEvents(ctx context.Context, cfg config.Config, run func(contex
 		a.eventsReady.Store(true)
 		return connection{bus, sub}, nil
 	}
-	current, err := connect()
-	if err != nil && !errors.Is(err, agent.ErrSetup) {
-		return err
-	}
+	var current connection
 	done := make(chan error, 1)
 	go func() {
 		var result error
@@ -149,18 +146,14 @@ func (a *App) WithEvents(ctx context.Context, cfg config.Config, run func(contex
 				var e error
 				current, e = connect()
 				if e != nil {
+					a.telemetry.Logger.Warn("runtime preparation deferred", "code", "RUNTIME_NOT_READY")
 					if ctx.Err() != nil {
 						break
 					}
-					if errors.Is(e, event.ErrUnavailable) || errors.Is(e, agent.ErrSetup) {
-						if !wait() {
-							break
-						}
-						continue
+					if !wait() {
+						break
 					}
-					result = e
-					cancelWork()
-					return
+					continue
 				}
 			}
 			_, e := (event.Publisher{Outbox: outbox, Bus: current.bus}).Flush(ctx, 100)
@@ -203,7 +196,7 @@ func (a *App) WithEvents(ctx context.Context, cfg config.Config, run func(contex
 		}
 	}()
 	a.telemetry.Logger.Info("startup stage", "stage", "surface_open")
-	err = run(workCtx)
+	err := run(workCtx)
 	a.telemetry.Logger.Info("shutdown stage", "stage", "ingress_closed")
 	cancelWork()
 	cancelInfra()

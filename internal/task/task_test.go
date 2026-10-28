@@ -153,3 +153,28 @@ func TestSearchHybridAmbiguityAndStableOrder(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestAppendWaitsForOldTreeAndNeverRevivesRoot(t *testing.T) {
+	for _, status := range []Status{Active, Paused, Completed, Cancelled} {
+		plan, err := PlanAppend(status, 7, 0, 0)
+		if err != nil || !plan.FreshRoot || plan.Epoch != 8 {
+			t.Fatal("continuation did not create new epoch", status, plan, err)
+		}
+		if _, err := PlanAppend(status, 7, 0, 1); err != ErrDraining {
+			t.Fatal("unfinished descendant lost its epoch", status, err)
+		}
+	}
+	plan, err := PlanAppend(Active, 7, 1, 3)
+	if err != nil || plan.FreshRoot || plan.Epoch != 7 {
+		t.Fatal("live Root should receive steering", plan, err)
+	}
+	if _, err := PlanAppend(Paused, 7, 1, 1); err != ErrDraining {
+		t.Fatal("second Root admitted during pause")
+	}
+	if CanComplete(Active, true) || CanComplete(Paused, false) || !CanComplete(Active, false) {
+		t.Fatal("completion skipped pending effects or status")
+	}
+	if !CanStop(Paused, Cancelled) || CanStop(Completed, Paused) || CanStop(Cancelled, Paused) {
+		t.Fatal("invalid stop transition")
+	}
+}

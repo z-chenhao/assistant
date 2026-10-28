@@ -2,12 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/automation"
-	"github.com/z-chenhao/erii/internal/memory"
 	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
 )
 
 // ExecuteBuiltin routes the accepted, persisted Tool name through the shared
@@ -17,23 +15,45 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=?`, inv.ID, t.claim.RunID()).Scan(&name); err != nil {
 		return tool.Result{}, agent.ErrStorage
 	}
-	if name == automation.ManageName || name == automation.ObserveName {
+	family, ok := tool.HostFamily(name)
+	if !ok {
+		return tool.Failure("PERMISSION_DENIED"), nil
+	}
+	switch family {
+	case tool.AutomationBuiltin:
 		return t.executeAutomation(ctx, inv)
-	}
-	if name == codemode.ToolName {
+	case tool.CodeBuiltin:
 		return t.executeCode(ctx, inv)
-	}
-	if name == "builtin__computer__discover" || name == "builtin__computer__bind" || name == "builtin__computer__invoke" {
+	case tool.ComputerBuiltin:
 		return t.executeComputer(ctx, inv)
-	}
-	if name == agent.RunToolName {
+	case tool.AgentBuiltin:
 		return t.AgentToolExecutor(ctx, inv.ID)
-	}
-	if name == memory.ManageName {
+	case tool.MemoryWriteBuiltin:
 		return t.manageMemory(ctx, inv)
-	}
-	if name == "builtin__memory__search" {
+	case tool.MemorySearchBuiltin:
 		return t.searchMemory(ctx, inv)
+	case tool.TaskBuiltin:
+		return t.executeTaskAdmission(ctx, inv)
+	case tool.ArtifactBuiltin:
+		return t.executeArtifactCall(ctx, inv)
 	}
-	return t.executeTaskAdmission(ctx, inv)
+	return tool.Failure("PERMISSION_DENIED"), nil
+}
+
+// acceptedBuiltin resolves only a running, fenced invocation whose capability
+// was frozen for this Run. Shared admission never dispatches an unknown name.
+func (t *tools) acceptedBuiltin(ctx context.Context, tx *sql.Tx, inv tool.Invocation) (kind, name, args string, err error) {
+	if err = t.fence(ctx, tx); err != nil {
+		return
+	}
+	err = tx.QueryRowContext(ctx, `SELECT r.kind,i.tool_name,i.arguments_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.run_id=? AND i.status='running'`, inv.ID, t.claim.RunID()).Scan(&kind, &name, &args)
+	if err != nil {
+		return
+	}
+	var visible int
+	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id, json_each(c.tools_json) j WHERE r.run_id=? AND json_extract(j.value,'$.name')=?`, t.claim.RunID(), name).Scan(&visible)
+	if err == nil && visible != 1 {
+		err = tool.ErrApprovalDenied
+	}
+	return
 }

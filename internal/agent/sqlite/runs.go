@@ -91,19 +91,19 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return agent.ErrStorage
+			return &agent.OperationError{Operation: "state transaction", Category: agent.ErrStorage, Cause: ctx.Err()}
 		case <-timer.C:
 		}
 	}
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{artifact.ErrNotFound, artifact.ErrIntegrity, artifact.ErrInvalid, artifact.ErrLimit, artifact.ErrConflict, interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
 	}
-	return agent.ErrStorage
+	return &agent.OperationError{Operation: "state transaction", Category: agent.ErrStorage, Cause: err}
 }
 func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 	owner, ok := c.(*claim)
@@ -456,15 +456,13 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 	if err != nil {
 		return agent.ErrStorage
 	}
-	history, err := r.history.List(ctx, run.ConversationID)
+	admitted := make([]string, 0, len(ids))
+	for id := range ids {
+		admitted = append(admitted, id)
+	}
+	filtered, err := r.history.GetMany(ctx, run.ConversationID, admitted)
 	if err != nil {
 		return err
-	}
-	filtered := []conversation.Message{}
-	for _, m := range history {
-		if ids[m.MessageID] {
-			filtered = append(filtered, m)
-		}
 	}
 	runtimeMessages := []agent.AgentMessage{}
 	base := []agent.AgentMessage{}

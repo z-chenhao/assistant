@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -200,6 +201,10 @@ func (s *Store) List(ctx context.Context, id string) ([]conversation.Message, er
 	if err != nil {
 		return nil, conversation.ErrStorage
 	}
+	return readMessages(rows, id)
+}
+
+func readMessages(rows *sql.Rows, id string) ([]conversation.Message, error) {
 	defer rows.Close()
 	result := []conversation.Message{}
 	for rows.Next() {
@@ -256,4 +261,74 @@ func (s *Store) BindConversation(ctx context.Context, id string, scope recall.Sc
 		return recall.ErrConflict
 	}
 	return nil
+}
+
+// Get selects one immutable message under both conversation and message IDs.
+func (s *Store) Get(ctx context.Context, id, messageID string) (conversation.Message, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT message_id,sequence,role,content_json,source,coalesce(source_event_id,''),created_at FROM conversation_message WHERE conversation_id=? AND message_id=?`, id, messageID)
+	if err != nil {
+		return conversation.Message{}, conversation.ErrStorage
+	}
+	messages, err := readMessages(rows, id)
+	if err != nil {
+		return conversation.Message{}, err
+	}
+	if len(messages) != 1 {
+		return conversation.Message{}, conversation.ErrConflict
+	}
+	return messages[0], nil
+}
+
+func (s *Store) Page(ctx context.Context, id string, before int64) (conversation.Page, error) {
+	if before < 0 {
+		return conversation.Page{}, conversation.ErrInvalid
+	}
+	const pageQuery = `SELECT message_id,sequence,role,content_json,source,coalesce(source_event_id,''),created_at FROM conversation_message WHERE conversation_id=? AND (?=0 OR sequence<?) ORDER BY sequence DESC LIMIT ?`
+	rows, err := s.db.QueryContext(ctx, pageQuery, id, before, before, conversation.PageSize+1)
+	if err != nil {
+		return conversation.Page{}, conversation.ErrStorage
+	}
+	messages, err := readMessages(rows, id)
+	if err != nil {
+		return conversation.Page{}, err
+	}
+	page := conversation.Page{}
+	if len(messages) > conversation.PageSize {
+		messages = messages[:conversation.PageSize]
+		page.Before = messages[len(messages)-1].Sequence
+	}
+	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
+		messages[left], messages[right] = messages[right], messages[left]
+	}
+	page.Messages = messages
+	return page, nil
+}
+
+// GetMany loads admitted immutable IDs in bounded batches without scanning
+// unrelated history. The result retains sequence order across all batches.
+func (s *Store) GetMany(ctx context.Context, id string, ids []string) ([]conversation.Message, error) {
+	result := make([]conversation.Message, 0, len(ids))
+	for start := 0; start < len(ids); start += 128 {
+		batch := ids[start:min(start+128, len(ids))]
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")
+		args := make([]any, 0, len(batch)+1)
+		args = append(args, id)
+		for _, messageID := range batch {
+			args = append(args, messageID)
+		}
+		rows, err := s.db.QueryContext(ctx, `SELECT message_id,sequence,role,content_json,source,coalesce(source_event_id,''),created_at FROM conversation_message WHERE conversation_id=? AND message_id IN (`+placeholders+`)`, args...)
+		if err != nil {
+			return nil, conversation.ErrStorage
+		}
+		messages, err := readMessages(rows, id)
+		if err != nil {
+			return nil, err
+		}
+		if len(messages) != len(batch) {
+			return nil, conversation.ErrConflict
+		}
+		result = append(result, messages...)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Sequence < result[j].Sequence })
+	return result, nil
 }

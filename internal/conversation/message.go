@@ -72,5 +72,16 @@ type Message struct {
 
 type Store interface {
 	Append(context.Context, []Message) error
+	Get(context.Context, string, string) (Message, error)
+	GetMany(context.Context, string, []string) ([]Message, error)
 	List(context.Context, string) ([]Message, error)
 }
+
+// Page uses an exclusive sequence cursor. Zero requests the latest window.
+// Messages are always returned in ascending conversation order.
+type Page struct {
+	Messages []Message `json:"messages"`
+	Before   int64     `json:"before,omitempty"`
+}
+
+const PageSize = 100

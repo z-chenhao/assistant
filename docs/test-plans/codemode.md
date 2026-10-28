@@ -84,3 +84,7 @@ error, never a raw exception or inherited credential.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## 工程基础重构回归
+
+F-008/F-039：现有真实 Sidecar、挂起/恢复、Child、事件落库失败、旧 owner fencing 和 SIGKILL 重放测试覆盖提取后的协调器；相同 source/runtime/prelude/ToolSpec fingerprint 必须复用既存结果，unknown 外部作用不重新派发。Provider Bridge 既有 Node 协议测试覆盖拆分的上下文转换函数。

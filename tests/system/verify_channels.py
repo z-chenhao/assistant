@@ -194,12 +194,44 @@ def run(binary,evidence):
             report['checks'].append('GC-12 channel/Security fragment; Approval: exact frozen-hash rejection, SIGKILL/restart, concurrent duplicate callbacks; one approved Tool dispatch')
             h.stop()
         finally:h.cleanup()
+    dependency_recovery(binary,report)
     extra_scenarios(binary,report)
     native_components(binary, evidence, report)
     delivery_leases(binary, report)
     account_presentation(binary,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def dependency_recovery(binary, report):
+    with tempfile.TemporaryDirectory(prefix='erii-channel-repair-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.setup()
+            catalog = h.root / 'repaired-skills'
+            with h.config.open('a') as config:
+                config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
+            h.start()
+            require('Model connection' in h.http('/settings'), 'dependency failure hid Settings')
+            require('Your ongoing work' in h.http('/progress'), 'dependency failure hid Progress')
+            require(h.http('/api/status')['readiness'] != 'ready', 'broken runtime admitted work')
+            h.http('/api/message', dict(source_id='blocked', content=[dict(type='text', text='blocked')]), expected=409)
+            catalog.mkdir(mode=0o700)
+            h.wait_state(lambda status: status['readiness'] == 'ready', 'dependency repair reopened ingress', reader=lambda _: h.http('/api/status'))
+            h.http('/api/message', dict(source_id='repaired', content=[dict(type='text', text='Continue after repair.')]))
+            h.wait(lambda state: any(row['status'] == 'sent' for row in state['deliveries']), 'repaired runtime reply')
+            # Repeated UI reads must not create traces, projections or intents.
+            h.wait(lambda state: all(row['status'] in ('completed', 'failed') for row in state['runs']), 'settled reads')
+            before = h.rows()
+            for path in ('/settings', '/progress', '/', '/api/conversation'):
+                h.http(path)
+            after = h.rows()
+            require(before == after, 'GET mutated authoritative state')
+            report['scenarios']['dependency-repair'] = dict(status='passed', state=after)
+            report['checks'].append('Unavailable optional dependency keeps control pages usable; in-process repair opens ingress; GET leaves settled state unchanged')
+            h.stop()
+        finally:
+            h.cleanup()
 
 
 def native_components(binary, evidence, report):

@@ -82,3 +82,7 @@ an installation with active Runs. The authenticated `artifact` CLI is unchanged.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## 工程基础重构回归
+
+F-012/F-039：流阻塞期间另一个 state owner 能扫描回收且不删除活跃 stage；进程被杀后锁自动释放，现有恢复场景回收 orphan；publish 整组预校验与提交时版本/授权重检；继续运行配额并发、Tool deadline、unknown 效应和最终 envelope 上限回归。入口：`internal/agent/sqlite/foundation_test.go`、`artifacts_test.go`、`artifact_recovery_test.go` 与既有 artifacts system gate。

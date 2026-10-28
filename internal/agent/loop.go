@@ -10,12 +10,12 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
-// runFailure proves the terminal failure transaction committed. Provider errors
-// encountered before that boundary remain recoverable infrastructure failures.
-type runFailure struct{ cause error }
+// RunFailure proves that the Run's terminal failure was committed. Interactive
+// surfaces may keep serving; callers can still inspect the provider cause.
+type RunFailure struct{ cause error }
 
-func (e *runFailure) Error() string { return e.cause.Error() }
-func (e *runFailure) Unwrap() error { return e.cause }
+func (e *RunFailure) Error() string { return e.cause.Error() }
+func (e *RunFailure) Unwrap() error { return e.cause }
 
 type LoopOptions struct {
 	Store    RunStore
@@ -74,18 +74,18 @@ func (l agentLoop) run(ctx context.Context) error {
 		}
 		// Accepted Tool calls must drain and adopt terminal Child results even
 		// when monetary authorization is denied at the next model boundary.
-		if (r.SpendStatus == "denied" || r.SpendStatus == "invalidated") && r.Checkpoint.Phase != "tools" {
+		if (r.SpendStatus == "denied" || r.SpendStatus == "invalidated") && r.Checkpoint.Phase != ToolsPhase {
 			return l.fail(r, "SPEND_AUTHORIZATION_DENIED")
 		}
 		var stopped bool
 		switch r.Checkpoint.Phase {
-		case "model":
+		case ModelPhase:
 			stopped, err = l.modelTurn(r)
-		case "tools":
+		case ToolsPhase:
 			stopped, err = l.toolsTurn(r)
-		case "reply":
+		case ReplyPhase:
 			stopped, err = l.replyTurn(r)
-		case "settle":
+		case SettlePhase:
 			stopped, err = l.settleTurn(r)
 		default:
 			return ErrStorage
@@ -176,7 +176,7 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 		}
 		if callErr != nil {
 			// Storage/claim rejection is infrastructure, not a failed model.
-			if callErr == ErrClaimLost || callErr == ErrStorage || callErr == llm.ErrStorage {
+			if errors.Is(callErr, ErrClaimLost) || errors.Is(callErr, ErrStorage) || errors.Is(callErr, llm.ErrStorage) {
 				return false, callErr
 			}
 			// A failed provider response may still report billable usage.
@@ -217,9 +217,9 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 	cp.Messages = append(cp.Messages, AgentMessage{Type: "assistant", Content: parts})
 	cp.Result = result
 	cp.ExchangeID = generation.Request.GenerationID
-	cp.Phase = "reply"
+	cp.Phase = ReplyPhase
 	if len(result.ToolCalls) > 0 {
-		cp.Phase = "tools"
+		cp.Phase = ToolsPhase
 	}
 	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
 		return false, err
@@ -252,7 +252,7 @@ func (l agentLoop) toolsTurn(r Run) (bool, error) {
 		cp.Messages = append(cp.Messages, AgentMessage{Type: "tool_result", ToolCallID: cp.Result.ToolCalls[i].ID, Content: parts})
 	}
 	cp.Step++
-	cp.Phase = "model"
+	cp.Phase = ModelPhase
 	cp.ExchangeID = ""
 	cp.Result = nil
 	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
@@ -272,7 +272,7 @@ func (l agentLoop) replyTurn(r Run) (bool, error) {
 		// A completed generation may have been overtaken by user steering.
 		// Keep it as model context, then inject separate user messages.
 		cp.Step++
-		cp.Phase = "model"
+		cp.Phase = ModelPhase
 		cp.Result = nil
 		cp.ExchangeID = ""
 		if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
@@ -297,7 +297,7 @@ func (l agentLoop) settleTurn(r Run) (bool, error) {
 		l.emit(r, "agent_end", "", "")
 		return true, nil
 	}
-	cp.Phase = "model"
+	cp.Phase = ModelPhase
 	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
 		return false, err
 	}
@@ -315,12 +315,12 @@ func (l agentLoop) fail(r Run, code string) error {
 		return err
 	}
 	if code == "SPEND_AUTHORIZATION_DENIED" {
-		return &runFailure{cause: ErrSpendDenied}
+		return &RunFailure{cause: ErrSpendDenied}
 	}
 	if code == "RESOURCE_LIMIT" {
-		return &runFailure{cause: ErrResourceLimit}
+		return &RunFailure{cause: ErrResourceLimit}
 	}
-	return &runFailure{cause: llm.NormalizeError(code)}
+	return &RunFailure{cause: llm.NormalizeError(code)}
 }
 
 func (l agentLoop) retryContext(run Run) (bool, error) {
@@ -332,6 +332,6 @@ func (l agentLoop) retryContext(run Run) (bool, error) {
 	cp.Step++
 	cp.Result = nil
 	cp.ExchangeID = ""
-	cp.Phase = "model"
+	cp.Phase = ModelPhase
 	return true, l.options.Store.Checkpoint(l.work, l.claim, run.Version, cp)
 }

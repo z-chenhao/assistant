@@ -100,3 +100,7 @@ full GC-01–07, Computer cases or release-time Live Shadow behavior.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## 工程基础重构回归
+
+F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统计 embedding 调用；同查询第二次仅嵌入 query，追加一条只补一条向量；Forget 和换 scope 清除工作索引，持久库无私有向量。既有 scope、敏感明文不落盘、隐私 epoch 和每轮冻结证据回归继续执行。

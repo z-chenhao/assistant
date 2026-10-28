@@ -57,7 +57,7 @@ type Core interface {
 	ChannelPreference(context.Context) (interaction.Preference, error)
 	PreferChannel(context.Context, string, string, int64) error
 	WebStatus(context.Context) (Status, error)
-	History(context.Context) ([]conversation.Message, error)
+	Conversation(context.Context, int64) (conversation.Page, error)
 	Activity(context.Context) ([]task.Summary, error)
 	Approvals(context.Context) ([]interaction.Approval, error)
 	AcceptInbound(context.Context, interaction.InboundEvent) (agent.Receipt, error)
@@ -67,7 +67,7 @@ type Core interface {
 	SaveArtifact(context.Context, artifact.Input, io.Reader) (artifact.Descriptor, error)
 	OpenArtifact(context.Context, string) (io.ReadCloser, error)
 	DescribeArtifact(context.Context, string) (artifact.Descriptor, error)
-	SaveWebProjection(context.Context, conversation.Message) (json.RawMessage, error)
+	WebProjection(context.Context, conversation.Message) (json.RawMessage, error)
 }
 type Models interface {
 	ListProfiles(context.Context) ([]llm.Profile, error)
@@ -268,12 +268,20 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/api/conversation":
-		m, e := s.Core.History(r.Context())
+		before, e := conversationCursor(r)
+		if e != nil {
+			fail(w, 400)
+			return
+		}
+		p, e := s.Core.Conversation(r.Context(), before)
 		if e != nil {
 			fail(w, 503)
 			return
 		}
-		jsonResult(w, m)
+		if p.Before != 0 {
+			w.Header().Set("X-Erii-Before", strconv.FormatInt(p.Before, 10))
+		}
+		jsonResult(w, p.Messages)
 	case "/api/progress":
 		a, e := s.Core.Activity(r.Context())
 		if e != nil {

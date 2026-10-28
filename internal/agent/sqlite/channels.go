@@ -266,16 +266,21 @@ func (s *Store) AgentStatus(ctx context.Context) (string, error) {
 	return "idle", nil
 }
 func (s *Store) WebProjection(ctx context.Context, m conversation.Message) (json.RawMessage, error) {
-	spec := ui.Compose(delivery.Envelope{Message: m})
-	var id string
-	err := s.db.QueryRowContext(ctx, `SELECT delivery_id FROM delivery_request WHERE message_id=?`, m.MessageID).Scan(&id)
+	// A GET never materializes projections or intents. Delivery freezes a
+	// projection under its accepted envelope; undelivered history is composed
+	// in memory until that independent runtime operation commits.
+	var raw, hash string
+	err := s.db.QueryRowContext(ctx, `SELECT p.spec_json,p.envelope_hash FROM delivery_projection p JOIN delivery_request d USING(delivery_id) WHERE d.message_id=?`, m.MessageID).Scan(&raw, &hash)
 	if err == sql.ErrNoRows {
-		return json.Marshal(spec)
+		return json.Marshal(ui.Compose(delivery.Envelope{Message: m}))
 	}
 	if err != nil {
 		return nil, delivery.ErrStorage
 	}
-	return s.SaveProjection(ctx, id, ui.Hash(m), ui.Version, spec)
+	if hash != ui.Hash(m) {
+		return nil, delivery.ErrConflict
+	}
+	return json.RawMessage(raw), nil
 }
 func (s *Store) ImportChannelArtifact(ctx context.Context, e interaction.InboundEvent, key string, input artifact.Input, src io.Reader) (string, error) {
 	if key == "" || len(key) > 256 {

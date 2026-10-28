@@ -14,6 +14,36 @@ flowchart TD
     S --> R["显式原生打包 / 草稿发布"]
 ```
 
+### 运行时边界（F-039）
+
+```mermaid
+flowchart TD
+    UI["Web / TUI / CLI"] --> Q["只读查询：分页、按 ID、内存投影"]
+    UI --> A["单一 Actor / Agent Loop"]
+    BOOT["后台依赖准备与重试"] --> READY["成功后发布能力与开放 ingress"]
+    READY --> A
+    A --> T["统一 Tool Executor / 受信 builtin 目录"]
+    T --> TASK["Task 生命周期判断"]
+    T --> CODE["CodeMode VM / 重启 / 重放协调"]
+    CODE --> T
+    T --> SQL["SQLite：claim / fencing / 原子提交"]
+    A --> SQL
+    SQL --> OUT["持久化结果与 Outbox"]
+    STAGE["Artifact 流 / 哈希：事务外，文件锁"] --> SQL
+    A --> PREVIEW["临时流式预览"]
+    A --> TRACE["有界生命周期轨迹 / 写失败诊断"]
+```
+
+- `agent.RunFailure` 仅表示终态失败已提交，Web 可继续处理新请求；基础设施错误不能冒充该类型。CLI 可用 `errors.Is` 检查模型 cause。
+- `app.WithEvents` 先交给 UI 生命周期，再在可取消的后台连接循环准备 broker/能力/恢复扫描。入口在准备成功前关闭；失败保留脱敏日志并重试。能力准备仅缓存成功，不为重试生成第二条执行管线。
+- `task/transitions.go` 计算继续/停止/完成约束，适配器在同一事务读取权威事实、应用 CAS 并创建或 steering Root。`tool/codemode/execution.go` 定义其消费的持久边界并拥有 VM 重建循环；`agent/sqlite` 实现 SQL、claim 和调用接纳。
+- `tool/builtins.go` 是 Host 名称、权限、内部可见性和分发家族的唯一目录。外部 provider 不能注册任意 Host 工具。冻结 ToolSpec 与角色裁减规则保持原有字节和语义。
+- `agent.OperationError` 保留 operation、分类和可解包 cause；对外 Error 文本不拼接原始错误内容。召回服务不可用与状态库故障分开分类。
+- `message_update` 是进程内预览，无持久序号/重放保证；完整 GenerationResult、Tool 结果、checkpoint 和业务事件仍由原有事务保存。生命周期 trace 有单次写入期限，写失败报告 `TRACE_UNAVAILABLE`。这不替代 F-031/F-034/F-035/F-036 的观测产品。
+- 内部 Phase/Role/RunStatus 使用命名类型，序列化字符串不变。Provider Bridge 的图片、assistant/tool 消息转换拆成有名函数；不修改 QuickJS prelude/runtime 指纹。
+
+迁移：不增加 schema 版本，不重写历史数据或已冻结请求。Artifact staging 文件名继续沿用生成的平面 key；文件锁需要支持 advisory flock 的本地文件系统，存储根的 OS 账户仍为信任边界。升级须先停止旧版本进程，再启动新版本；旧回收器不识别新 staging 锁，禁止混跑旧、新二进制操作同一 data root。
+
 ## 当前流程
 
 用户问题 → 登记需求 → 检查代码与相关约束 → 实现与成比例验证 → 更新功能/设计/测试及状态 → 审查交付。F-038 不授予发布授权。
@@ -199,4 +229,8 @@ They are not PR prerequisites. See [evaluation boundaries](../test-plans/product
 
 | 日期 | 决策 | 理由与影响 |
 | --- | --- | --- |
+| 2026-10-28 | F-039：终态 Run 失败与基础设施错误分开；UI 先开放，依赖准备只缓存成功。 | 保留控制面以修复故障；不使用跳过失效能力的降级注册，避免静默更改冻结能力。 |
+| 2026-10-28 | F-039：Task 规则、CodeMode 协调从 SQLite 适配器移回所属模块；统一 Host 目录与显式 Artifact 分发。 | 保持一个事务权威和一条工具管线，避免以通用 service/ports 层替代现有领域。 |
+| 2026-10-28 | F-039：流式预览不逐片落库，生命周期 trace 保留有界写入与诊断。 | 避免每个 token 竞争权威 writer；完整请求/结果仍持久，丢失的临时预览不能作为执行失败或重试依据。 |
+| 2026-10-28 | F-039：命名状态类型、Bridge 转换函数和分类错误。 | 保持线协议、快照与数据库兼容；只解包内部 cause，避免日志/界面泄露私人内容。 |
 | 2026-10-28 | 把贡献流程、工程组织与 CI 说明归入同一功能及方案。 | 不维护额外 CONTRIBUTING/CI 正文；保留软件测试与独立模型评测边界。 |

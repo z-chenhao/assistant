@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"errors"
+	"github.com/z-chenhao/erii/internal/agent"
 	"net"
 	"time"
 )
@@ -23,7 +25,12 @@ func Run(ctx context.Context, s *Server, l net.Listener, drain, deliver func(con
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
 		for {
-			if err := action(ctx); err != nil {
+			err := action(ctx)
+			var failure *agent.RunFailure
+			if ingress && errors.As(err, &failure) {
+				err = nil // The failed Run is terminal; subsequent requests remain usable.
+			}
+			if err != nil {
 				if ctx.Err() != nil {
 					done <- nil
 				} else {

@@ -80,32 +80,74 @@ function transport(connection, signal, state) {
 }
 
 const zeroUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input:0, output:0, cacheRead:0, cacheWrite:0, total:0 } });
-function context(r, model) {
+function imageContent(request, message) {
+  return (message.image_refs ?? []).flatMap(ref => {
+    const image = request.images?.[ref];
+    if (!image) return [];
+    if (image.media_type !== 'image/jpeg' || typeof image.data !== 'string' || image.data.length > 65536) {
+      fail('INVALID_PROVIDER_RESPONSE');
+    }
+    return [
+      { type: 'text', text: `Image original coordinate size: ${image.original_width} x ${image.original_height}; preview: ${image.preview_width} x ${image.preview_height}. Use original coordinates for screenshot actions.` },
+      { type: 'image', data: image.data, mimeType: image.media_type }
+    ];
+  });
+}
+
+function assistantContent(message, model) {
+  const text = message.text ? [{ type: 'text', text: message.text }] : [];
+  const toolCalls = (message.tool_calls ?? []).map(call => ({
+    type: 'toolCall', id: call.id, name: call.name, arguments: JSON.parse(call.arguments),
+    ...(model.provider === 'openai' ? { namespace: 'erii' } : {})
+  }));
+  return {
+    role: 'assistant', content: [...text, ...toolCalls], api: model.api,
+    provider: model.provider, model: model.id, usage: zeroUsage(),
+    stopReason: message.tool_calls?.length ? 'toolUse' : 'stop', timestamp: 0
+  };
+}
+
+// Restore the SDK conversation from Host messages. Tool namespaces are fixed;
+// the provider receives no Host policy or replay metadata in tool arguments.
+function context(request, model) {
   const messages = [];
-  const systems=[];
- const images=m=>(m.image_refs??[]).flatMap(ref=>{const v=r.images?.[ref];if(!v)return [];if(v.media_type!=='image/jpeg'||typeof v.data!=='string'||v.data.length>65536)fail('INVALID_PROVIDER_RESPONSE');return [{type:'text',text:`Image original coordinate size: ${v.original_width} x ${v.original_height}; preview: ${v.preview_width} x ${v.preview_height}. Use original coordinates for screenshot actions.`},{type:'image',data:v.data,mimeType:v.media_type}];});
-  let calls=new Map();
-  for (const m of r.messages) {
-    if (m.role === 'system') {
-      if(messages.length) fail('INVALID_PROVIDER_RESPONSE');
-      systems.push(m.text);
+  const systems = [];
+  let calls = new Map();
+  for (const message of request.messages) {
+    switch (message.role) {
+      case 'system':
+        if (messages.length) fail('INVALID_PROVIDER_RESPONSE');
+        systems.push(message.text);
+        break;
+      case 'user': {
+        const images = imageContent(request, message);
+        messages.push({ role: 'user', content: images.length ? [{ type: 'text', text: message.text }, ...images] : message.text, timestamp: 0 });
+        break;
+      }
+      case 'assistant':
+        calls = new Map((message.tool_calls ?? []).map(call => [call.id, call]));
+        if (calls.size !== (message.tool_calls ?? []).length) fail('INVALID_PROVIDER_RESPONSE');
+        messages.push(assistantContent(message, model));
+        break;
+      case 'tool': {
+        const call = calls.get(message.tool_call_id);
+        if (!call) fail('INVALID_PROVIDER_RESPONSE');
+        messages.push({
+          role: 'toolResult', toolCallId: message.tool_call_id, toolName: call.name,
+          content: [{ type: 'text', text: message.text }, ...imageContent(request, message)],
+          isError: false, timestamp: 0
+        });
+        calls.delete(message.tool_call_id);
+        break;
+      }
+      default:
+        fail('INVALID_PROVIDER_RESPONSE');
     }
-    else if (m.role === 'user') messages.push({ role:'user', content:images(m).length ? [{type:'text',text:m.text},...images(m)] : m.text, timestamp:0 });
-    // Account tools are always declared under the fixed erii namespace. Restore
-    // it on replay without adding provider metadata to the Host ToolCall schema.
-    else if (m.role === 'assistant') {
-      calls=new Map((m.tool_calls ?? []).map(t=>[t.id,t]));
-      if(calls.size!==(m.tool_calls ?? []).length) fail('INVALID_PROVIDER_RESPONSE');
-      messages.push({ role:'assistant', content:[...(m.text ? [{type:'text',text:m.text}] : []), ...(m.tool_calls ?? []).map(t => ({type:'toolCall',id:t.id,name:t.name,arguments:JSON.parse(t.arguments),...(model.provider==='openai'?{namespace:'erii'}:{})}))], api:model.api, provider:model.provider, model:model.id, usage:zeroUsage(), stopReason:m.tool_calls?.length ? 'toolUse':'stop', timestamp:0 });
-    }
-    else if (m.role === 'tool') {
-      const call = calls.get(m.tool_call_id);
-      if (!call) fail('INVALID_PROVIDER_RESPONSE');
-      messages.push({ role:'toolResult', toolCallId:m.tool_call_id, toolName:call.name, content:[{type:'text',text:m.text},...images(m)], isError:false, timestamp:0 });
-      calls.delete(m.tool_call_id);
-    } else fail('INVALID_PROVIDER_RESPONSE');
   }
-  return { systemPrompt:systems.join('\n\n'), messages, tools:(r.tools ?? []).map(t => ({name:t.name,description:t.description ?? '',parameters:JSON.parse(t.input_schema)})) };
+  return {
+    systemPrompt: systems.join('\n\n'), messages,
+    tools: (request.tools ?? []).map(tool => ({ name: tool.name, description: tool.description ?? '', parameters: JSON.parse(tool.input_schema) }))
+  };
 }
 
 async function generate(r, job, send) {

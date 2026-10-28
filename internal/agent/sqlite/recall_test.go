@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -141,7 +142,7 @@ func TestRecallFailureLeavesNoFrozenTurnOrModelCall(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = r.Generation(ctx, c, run); e != agent.ErrStorage {
+	if _, e = r.Generation(ctx, c, run); !errors.Is(e, llm.ProviderUnavailable) {
 		t.Fatal(e)
 	}
 	if scalar(t, s, `SELECT count(*) FROM run_recall`) != 0 || scalar(t, s, `SELECT count(*) FROM model_generation`) != 0 {

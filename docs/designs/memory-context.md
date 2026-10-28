@@ -18,6 +18,12 @@ flowchart TD
     K --> G["冻结 Generation"]
 ```
 
+### 加密召回的工作索引（F-039）
+
+每个 Memory Store 最多保留一个授权作用域的内存 SQLite 工作索引，禁用落盘 temp。每次查询按当前可访问记录增量同步；未变化文档复用向量，只对新增/变化文档生成 embedding。切换作用域、Forget、重新配置 vault 或关闭 Store 清除工作索引。搜索串行使用该工作集，等待可由 context 取消；隐私修改与搜索互斥。持久库不保存解密内容或这些向量，选定 embedding 仍须为 loopback。
+
+召回不可用保留其独立错误分类并阻止未冻结的请求派发，不伪装为 state.db 错误。原有逐轮证据冻结、隐私 epoch 和 provider 一致性检查继续生效。
+
 ## 当前流程与目标差异
 
 观察或显式记忆请求 → 保存事件 → Curator 提取归并 → 后续轮次召回 → 压缩 → 冻结模型请求。Forget 先建立隐私屏障，再异步维护记录。
@@ -357,8 +363,9 @@ derived FTS is rebuilt and old database/WAL pages are cleaned. A persisted clean
 marker resumes cleanup after a crash. Original Conversation and frozen Run audit
 records retain their existing private-file storage policy; this is not full disk
 encryption. Back up all three databases together with the credential-store key.
-Private working sets are rebuilt per search; this prioritizes confidentiality and
-protocol consistency over an unmeasured performance claim.
+The private working index is reused within one authorized scope and reconciled
+incrementally. Scope switches, Forget, vault reconfiguration and Close discard
+it. Unchanged records retain their vectors; no private vectors are persisted.
 
 Forget follows [ADR 003](#decision-003-forget-revokes-unfinished-context). It
 revokes unfinished context at acceptance, before asynchronous tombstones apply.
@@ -401,6 +408,7 @@ rerun by this recovery. Policy freezes at Run creation; Children inherit it.
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-039：同作用域复用仅在内存的索引，增量补充向量并在隐私边界清除。 | 相较逐次重建减少重复本地模型调用；内存中明文寿命延长到作用域切换/Forget/关闭，仍不落盘，进程内隐私互斥。 |
 | 2026-10-28 | 现状建档 | 沿用分库、证据来源和冻结召回；语义能力不足需单独补齐，不把摘录当成完整语义摘要。Forget 保留原始审计，但阻止旧上下文继续执行。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [003-memory-forget-revokes-unfinished-context.md](#decision-003-forget-revokes-unfinished-context) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

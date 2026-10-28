@@ -111,34 +111,14 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 	return r, nil
 }
 func validDefinition(d Definition) bool {
-	if d.Spec.Internal && (!d.Host || (d.Spec.Name != "builtin__computer__discover" && d.Spec.Name != "builtin__computer__bind" && d.Spec.Name != "builtin__computer__invoke")) {
+	if d.Host {
+		policy, ok := builtinCatalog[d.Spec.Name]
+		return ok && d.Execute == nil && d.Invoke == nil && d.Spec.Permission == policy.permission && (!d.Spec.Internal || policy.internal)
+	}
+	if d.Spec.Internal {
 		return false
 	}
-	if d.Host {
-		if d.Spec.Name == "builtin__automation__manage" {
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "task_control"
-		}
-		if d.Spec.Name == "builtin__automation__observe" {
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "automation_observe"
-		}
-		switch d.Spec.Name {
-		case "builtin__computer__discover", "builtin__computer__bind", "builtin__computer__invoke":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
-		case "builtin__codemode__execute":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
-		case "builtin__memory__manage":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "memory_control"
-		case "builtin__memory__search":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
-		case "builtin__agent__run":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "spawn_agents"
-		case "builtin__artifact__manage":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "artifact_write"
-		case "builtin__artifact__search":
-			return d.Execute == nil && d.Invoke == nil && d.Spec.Permission == "read_only"
-		}
-		return d.Execute == nil && ((d.Spec.Name == "builtin__task__search" && d.Spec.Permission == "read_only") || (d.Spec.Name == "builtin__task__manage" && d.Spec.Permission == "task_control"))
-	}
+
 	return (d.Execute != nil && d.Invoke == nil && d.Spec.Permission == "read_only") || (d.Invoke != nil && d.Spec.Permission == "external_effect")
 }
 

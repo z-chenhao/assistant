@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"golang.org/x/sys/unix"
 	"os"
 	"strings"
 	"time"
@@ -21,7 +23,8 @@ func artifactEvent(ctx context.Context, tx *sql.Tx, ref, kind string) error {
 }
 
 // Recover removes only uncommitted objects and bytes behind tombstones. A DB
-// write lock excludes live writers across processes; os.Root confines unlink.
+// write lock serializes metadata. File locks protect live staged objects while
+// streaming outside SQLite, including in another process; os.Root confines unlink.
 func (s *Store) Recover(ctx context.Context) (artifact.CleanupReport, error) {
 	report := artifact.CleanupReport{Artifacts: []string{}}
 	err := s.transaction(ctx, func(tx *sql.Tx) error {
@@ -66,10 +69,27 @@ func (s *Store) orphans(ctx context.Context, tx *sql.Tx, dry bool) (int, error) 
 		if count > 0 {
 			continue
 		}
-		n++
-		if !dry && s.root.Remove(name) != nil {
+		file, err := s.file(name)
+		if err != nil {
+			return n, err
+		}
+		err = unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		if errors.Is(err, unix.EWOULDBLOCK) || errors.Is(err, unix.EAGAIN) {
+			file.Close()
+			continue
+		}
+		if err != nil {
+			file.Close()
 			return n, artifact.ErrStorage
 		}
+		if !dry {
+			err = s.root.Remove(name)
+		}
+		file.Close()
+		if err != nil {
+			return n, artifact.ErrStorage
+		}
+		n++
 	}
 	if !dry && n > 0 {
 		err = s.sync()
