@@ -182,13 +182,6 @@ func (s *Store) Curate(ctx context.Context, eventID string, scope recall.Scope, 
 }
 
 func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
-	if err := s.lockSearch(ctx); err != nil {
-		return nil, err
-	}
-	defer s.unlockSearch()
-	if s.working != nil && s.workingScope != scope {
-		s.clearWorking()
-	}
 	if !q.Valid() || scope.UserID == "" || scope.AgentID == "" {
 		return nil, recall.ErrInvalid
 	}
@@ -206,8 +199,27 @@ func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) 
 		return nil, recall.ErrUnavailable
 	}
 	if sealed == 0 {
+		if err := s.lockSearch(ctx); err != nil {
+			return nil, err
+		}
+		if s.workingScope != scope {
+			s.clearWorking()
+		}
+		s.unlockSearch()
 		return sqliteindex.Search(ctx, s.db, scope, q, s.engine, "memory")
 	}
+	working, err := s.encryptedIndex(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	return sqliteindex.Search(ctx, working, scope, q, s.engine, "memory")
+}
+
+func (s *Store) encryptedIndex(ctx context.Context, scope recall.Scope) (*sql.DB, error) {
+	if err := s.lockSearch(ctx); err != nil {
+		return nil, err
+	}
+	defer s.unlockSearch()
 	local, ok := s.engine.(interface{ Local() bool })
 	if !ok || !local.Local() {
 		return nil, recall.ErrUnavailable
@@ -246,5 +258,8 @@ func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) 
 	if err := s.syncWorking(ctx, scope, docs); err != nil {
 		return nil, err
 	}
-	return sqliteindex.Search(ctx, s.working, scope, q, s.engine, "memory")
+	if err := sqliteindex.Bind(ctx, s.working, s.engine); err != nil {
+		return nil, err
+	}
+	return s.working, nil
 }

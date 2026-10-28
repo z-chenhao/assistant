@@ -332,3 +332,57 @@ func TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget(t *testing.T) 
 		t.Fatal("encrypted vectors persisted", vectors, err)
 	}
 }
+
+type blockingQueryEmbedding struct {
+	fake.Embedding
+	entered, release chan struct{}
+}
+
+func (e blockingQueryEmbedding) Embed(ctx context.Context, text string) ([]float64, error) {
+	if text == "blocked query" {
+		close(e.entered)
+		select {
+		case <-e.release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return e.Embedding.Embed(ctx, text)
+}
+func TestEncryptedEmbeddingDoesNotBlockOtherRunsOrForget(t *testing.T) {
+	s := openTest(t)
+	engine := blockingQueryEmbedding{entered: make(chan struct{}), release: make(chan struct{})}
+	if err := s.Configure(ctx, engine); err != nil {
+		t.Fatal(err)
+	}
+	secrets := memory.New()
+	secrets.Put(ctx, "key", bytes.Repeat([]byte{8}, 32))
+	if err := s.ConfigureVault(mem.Vault{Secrets: secrets, Ref: "key"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Curate(ctx, "private", scope, mem.SourceRef{Type: "conversation", Ref: "source"}, time.Unix(101, 0), []string{"I prefer tea"}, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Search(ctx, scope, recall.Query{Query: "tea"}); err != nil {
+		t.Fatal(err)
+	}
+	work, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { _, err := s.Search(work, scope, recall.Query{Query: "blocked query"}); done <- err }()
+	select {
+	case <-engine.entered:
+	case <-work.Done():
+		t.Fatal("query did not start")
+	}
+	if _, err := s.Search(work, scope, recall.Query{Query: "railway"}); err != nil {
+		t.Fatal("one query blocked another Run", err)
+	}
+	if err := s.Forget(work, scope, "private-0", time.Unix(110, 0)); err != nil {
+		t.Fatal("embedding held privacy mutation", err)
+	}
+	close(engine.release)
+	if err := <-done; err == nil {
+		t.Fatal("closed pre-Forget working view returned private results")
+	}
+}
