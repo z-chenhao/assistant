@@ -2,15 +2,16 @@ package app
 
 import (
 	"context"
+
 	"github.com/z-chenhao/erii/internal/memory"
 )
 
 func (a *App) ManageMemory(ctx context.Context, key string, m memory.Mutation) (map[string]any, error) {
-	return a.Runs().ManageMemory(ctx, key, m)
+	return a.runtimeRuns().ManageMemory(ctx, key, m)
 }
-func (a *App) CurateMemory(ctx context.Context) error { return a.Runs().CurateMemory(ctx) }
+func (a *App) CurateMemory(ctx context.Context) error { return a.runtimeRuns().CurateMemory(ctx) }
 func (a *App) MemoryStatus(ctx context.Context) ([]map[string]any, error) {
-	return a.Runs().MemoryStatus(ctx)
+	return a.runtimeRuns().MemoryStatus(ctx)
 }
 
 func (a *App) StartMemory(ctx context.Context) {

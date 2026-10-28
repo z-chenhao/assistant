@@ -17,6 +17,10 @@ flowchart TD
     P --> U["usage 接受与结算"]
 ```
 
+### Go 实现职责（F-040）
+
+报表类型由 `internal/operations` 持有，`internal/operations/sqlite` 提供只读查询；App 与 CLI 不依赖 agent/sqlite 中的报表实现类型。
+
 ## 当前流程与目标差异
 
 诊断读取 → 定位问题；备份关闭/锁定工作集 → 加密归档 → 隔离验证恢复 → 显式切换。费用先预留再 dispatch，结果接受时结算。
@@ -46,6 +50,7 @@ flowchart TD
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
 | 2026-10-28 | 现状建档 | 保持运维诊断与用户对话分离；凭据独立备份管理。费用授权与 Tool 审批分别处理。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [002-account-monetary-authorization.md](#decision-002-account-monetary-authorization) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

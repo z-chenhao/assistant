@@ -73,5 +73,5 @@ func (a *App) SubmitParts(ctx context.Context, key string, parts []conversation.
 	if key == "" || len(key) > 256 {
 		return agent.Receipt{}, conversation.ErrInvalid
 	}
-	return a.Runs().Submit(ctx, key, parts)
+	return a.runtimeRuns().Submit(ctx, key, parts)
 }

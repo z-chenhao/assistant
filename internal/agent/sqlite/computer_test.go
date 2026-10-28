@@ -130,7 +130,7 @@ func TestComputerIdentityRecoveryArbitrationAndFencing(t *testing.T) {
 	if first.ComputerID != second.ComputerID || second.Epoch != first.Epoch+1 || first.NativeName == second.NativeName || provider.restores != 1 {
 		t.Fatal(first, second, provider)
 	}
-	if err := (computerStore{bridges[0]}).Fence(ctx); !errors.Is(err, computer.ErrStale) {
+	if err := bridges[0].computerStore().Fence(ctx); !errors.Is(err, computer.ErrStale) {
 		t.Fatal("late old instance accepted", err)
 	}
 	if _, err := bridges[0].computer().Ensure(ctx); !errors.Is(err, computer.ErrStale) {
@@ -152,7 +152,7 @@ func TestComputerIdentityRecoveryArbitrationAndFencing(t *testing.T) {
 	if third.ComputerID != first.ComputerID || third.Epoch != 3 || provider.checkpoints != 2 || provider.restores != 2 {
 		t.Fatal(third, provider)
 	}
-	if err := (computerStore{bridges[1]}).Fence(ctx); !errors.Is(err, agent.ErrClaimLost) {
+	if err := bridges[1].computerStore().Fence(ctx); !errors.Is(err, agent.ErrClaimLost) {
 		t.Fatal("old Host result accepted", err)
 	}
 	if err := recovered.computer().Idle(ctx); err != nil {
@@ -190,7 +190,7 @@ func TestComputerIdleRecoveryRetainsFrozenCheckpoint(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			oldStore := computerStore{bridges[0]}
+			oldStore := bridges[0].computerStore()
 			frozen, err := oldStore.Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
 			if err != nil {
 				t.Fatal(err)
@@ -218,7 +218,7 @@ func TestComputerIdleRecoveryRetainsFrozenCheckpoint(t *testing.T) {
 			if err := recovered.claim(ctx, invs[0]); err != nil {
 				t.Fatal(err)
 			}
-			resumed, err := (computerStore{recovered}).Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
+			resumed, err := recovered.computerStore().Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -290,7 +290,7 @@ func TestComputerAbandonedIdleRetainsFrozenCleanup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			oldStore := computerStore{bridges[0]}
+			oldStore := bridges[0].computerStore()
 			frozen, err := oldStore.Begin(ctx, "idle", r.computerCompatibility, r.computerManifest)
 			if err != nil {
 				t.Fatal(err)
@@ -316,7 +316,7 @@ func TestComputerAbandonedIdleRetainsFrozenCleanup(t *testing.T) {
 			if _, err := s.db.Exec(`UPDATE tool_invocation SET status='cancelled',version=version+1 WHERE invocation_id=?`, invs[0].ID); err != nil {
 				t.Fatal(err)
 			}
-			plan, err := (computerStore{bridges[1]}).Begin(ctx, "ensure", r.computerCompatibility, r.computerManifest)
+			plan, err := bridges[1].computerStore().Begin(ctx, "ensure", r.computerCompatibility, r.computerManifest)
 			if err != nil || plan.Cleanup == nil {
 				t.Fatal("new invocation lost accepted idle cleanup", plan, err)
 			}

@@ -17,6 +17,10 @@ flowchart TD
     T --> V["Activity / 只读进度页"]
 ```
 
+### Go 实现职责（F-040）
+
+Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Task 操作移到 task_changes.go；这些 helper 加入同一个事务，不独立提交。
+
 ## 当前流程与目标差异
 
 创建 Task → Root 执行 → 追加可在稳定边界 Steering；暂停/取消关闭旧 epoch → 继续建立新 Root → 结果交给 Main。once 成功结束 Task；ongoing 本轮完成后仍可保持 active。
@@ -486,6 +490,7 @@ independently of the retained anchors, so all 50 rows fit the Tool result limit.
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
 | 2026-10-28 | 现状建档 | 沿用 once/ongoing 的显式完成策略及独立进度投影。补进度时不能用低层工具日志机械生成摘要，也不能恢复已结束的旧 Run。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [006-explicit-task-completion-policy.md](#decision-006-006--explicit-task-completion-policy) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

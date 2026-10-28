@@ -277,132 +277,19 @@ func (t *tools) executeTask(ctx context.Context, inv tool.Invocation) (tool.Resu
 			epoch := int64(1)
 			now := time.Now().UnixMicro()
 			refs, _ := encoded(request.ArtifactRefs)
+			change := taskChange{source: source, request: request, scope: scope, agentID: agentID, conversationID: conv, reference: ref, id: taskID, receiptStatus: receiptStatus, epoch: epoch, at: now, artifactsJSON: refs}
 			if request.Operation == "create" {
-				taskID, ref = newID(), "task:"+newID()
-				policy := request.CompletionPolicy
-				if policy == "" {
-					policy = "once"
-				}
-				if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1,?)`, taskID, ref, agentID, conv, task.Title(request.Task), request.Task, refs, now, now, policy); err != nil {
-					return err
-				}
-				for _, ref := range request.ArtifactRefs {
-					if err = t.runs.host.Artifacts().PinTx(ctx, tx, scope, ref, "task", taskID); err != nil {
-						return err
-					}
-				}
-				if err = t.runs.createRoot(ctx, tx, taskID); err != nil {
+				if err = t.createManagedTask(ctx, tx, &change); err != nil {
 					return err
 				}
 			} else {
-				var status string
-				var version int64
-				if err = tx.QueryRowContext(ctx, `SELECT task_id,status,task_epoch,version FROM task WHERE task_ref=? AND agent_id=? AND conversation_id=?`, ref, agentID, conv).Scan(&taskID, &status, &epoch, &version); err == sql.ErrNoRows {
-					result = tool.Failure("NOT_FOUND")
-					return nil
-				} else if err != nil {
+				result, err = t.changeManagedTask(ctx, tx, &change)
+				if err != nil || result.Error != nil {
 					return err
 				}
-				if request.Operation == "append" {
-					var revoked bool
-					if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task t JOIN memory_privacy p USING(agent_id) WHERE t.task_id=? AND t.created_at<=p.updated_at)`, taskID).Scan(&revoked); err != nil {
-						return err
-					}
-					if revoked {
-						result = tool.Failure("PERMISSION_DENIED")
-						return nil
-					}
-				}
-				if request.Operation == "complete" {
-					// Complete is a control action, not a stop/drain request.
-					// Include orphaned invocations on terminal Runs: an unknown
-					// external outcome must never become a completion claim.
-					var pending bool
-					if err = tx.QueryRowContext(ctx, `SELECT
-                      EXISTS(SELECT 1 FROM run WHERE task_id=? AND task_epoch=? AND status IN ('queued','running','waiting'))
-                      OR EXISTS(SELECT 1 FROM tool_invocation i JOIN run r USING(run_id) WHERE r.task_id=? AND r.task_epoch=? AND i.status IN ('queued','running','waiting','unknown'))`, taskID, epoch, taskID, epoch).Scan(&pending); err != nil {
-						return err
-					}
-					if !task.CanComplete(task.Status(status), pending) {
-						result = tool.Failure("INVALID_ARGUMENT")
-						return nil
-					}
-					res, err := tx.ExecContext(ctx, `UPDATE task SET status='completed',completed_at=?,updated_at=?,version=version+1 WHERE task_id=? AND status='active' AND task_epoch=? AND version=?`, now, now, taskID, epoch, version)
-					if err != nil {
-						return err
-					}
-					if n, _ := res.RowsAffected(); n != 1 {
-						return agent.ErrConflict
-					}
-					receiptStatus = "completed"
-				} else if request.Operation == "pause" || request.Operation == "cancel" {
-					receiptStatus = "paused"
-					if request.Operation == "cancel" {
-						receiptStatus = "cancelled"
-					}
-					if status != receiptStatus {
-						if !task.CanStop(task.Status(status), task.Status(receiptStatus)) {
-							result = tool.Failure("INVALID_ARGUMENT")
-							return nil
-						}
-						if err = t.runs.stopTask(ctx, tx, taskID, receiptStatus, epoch, version); err != nil {
-							return err
-						}
-						epoch++
-					}
-				} else {
-					var active int
-					if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND worker_position='root' AND status IN ('queued','running','waiting')`, taskID).Scan(&active); err != nil {
-						return err
-					}
-					var liveTree int
-					if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM run WHERE task_id=? AND status IN ('queued','running','waiting')`, taskID).Scan(&liveTree); err != nil {
-						return err
-					}
-					plan, err := task.PlanAppend(task.Status(status), epoch, active, liveTree)
-					if errors.Is(err, task.ErrDraining) {
-						return agent.ErrBusy
-					}
-					if err != nil {
-						return err
-					}
-					fresh := plan.FreshRoot
-					epoch = plan.Epoch
-
-					res, err := tx.ExecContext(ctx, `UPDATE task SET status='active',task_epoch=?,completed_at=NULL,cancelled_at=NULL,updated_at=?,version=version+1 WHERE task_id=? AND version=?`, epoch, now, taskID, version)
-					if err != nil {
-						return err
-					}
-					n, _ := res.RowsAffected()
-					if n != 1 {
-						return agent.ErrConflict
-					}
-					for _, ref := range request.ArtifactRefs {
-						if err = t.runs.host.Artifacts().PinTx(ctx, tx, scope, ref, "task", taskID); err != nil {
-							return err
-						}
-					}
-					if _, err = tx.ExecContext(ctx, `INSERT INTO task_instruction(instruction_id,task_id,task_epoch,source_message_id,instruction,artifact_refs,created_at) VALUES(?,?,?,?,?,?,?)`, newID(), taskID, epoch, source, request.Instruction, refs, now); err != nil {
-						return err
-					}
-					if fresh {
-						if err = t.runs.createRoot(ctx, tx, taskID); err != nil {
-							return err
-						}
-					} else {
-						var rootID string
-						if err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE task_id=? AND worker_position='root' AND status IN ('queued','running','waiting')`, taskID).Scan(&rootID); err != nil {
-							return err
-						}
-						if err = invalidateApprovals(ctx, tx, rootID); err != nil {
-							return err
-						}
-						if err = runEvent(ctx, tx, taskID, "task.steering", epoch); err != nil {
-							return err
-						}
-					}
-				}
 			}
+			ref, taskID, receiptStatus, epoch = change.reference, change.id, change.receiptStatus, change.epoch
+
 			receipt, _ = encoded(task.Receipt{TaskRef: ref, Status: receiptStatus, Accepted: true})
 			if _, err = tx.ExecContext(ctx, `INSERT INTO task_request VALUES(?,?,?,?)`, source, hash, receipt, inv.ID); err != nil {
 				return err

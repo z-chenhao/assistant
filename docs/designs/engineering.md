@@ -44,6 +44,40 @@ flowchart TD
 
 迁移：不增加 schema 版本，不重写历史数据或已冻结请求。Artifact staging 文件名继续沿用生成的平面 key；文件锁需要支持 advisory flock 的本地文件系统，存储根的 OS 账户仍为信任边界。升级须先停止旧版本进程，再启动新版本；旧回收器不识别新 staging 锁，禁止混跑旧、新二进制操作同一 data root。
 
+### Go 工程审查与模块边界（F-040）
+
+以下是以合并后的 PR #95 为基线的审查结果，优先级针对工程维护成本。函数长度只作为定位线索，判断依据是职责混合、依赖方向与状态流的可理解性。
+
+| 优先级 / 发现 | 具体问题与影响 | 本轮处理 |
+| --- | --- | --- |
+| P2 · 领域持久化依赖反向集中 | `agent/sqlite/computer.go` 把 Computer 生命周期 SQL 与私有 `codeBridge` 绑定，增加 Computer 变化牵动 Agent 适配器的范围。 | `computer/sqlite` 持有生命周期和 status；Run 适配器只绑定同一事务内的 claim 检查与事件写入。 |
+| P2 · 只读查询与接口类型泄漏 | 运维报表与 DTO、额度 DTO、审批别名、ToolOutcome 位于 SQLite 包，App 的对外方法把实现包变成调用方的依赖。 | `operations` 定义报表、`operations/sqlite` 查询；其余 DTO 归 `agent`、`interaction`、`tool`，删除无意义的审批类型别名。 |
+| P2 · CLI 入口职责混合 | `cmd/erii.run` 约 380 行，混合语法判断、模型输入、配置、离线备份、初始化、测试屏障和分发；大量并行布尔变量掩盖互斥命令。 | 用单一语法表选择命令种类；按 options、command、model_input、operations、test_options、dispatch 分阶段；`run` 只保留进程生命周期组装。 |
+| P2 · Web 操作分发承载业务动作 | 约 200 行 POST 方法混合 JSON/form/multipart、模型选择与账户 goroutine 状态，审查权限/关闭行为时难以追踪。 | 单一认证/CSRF 边界保持不变，路由调用有名的消息、附件、模型、账户与通知处理函数。 |
+| P2 · Task 事务闭包包含多种职责 | 约 235 行 executeTask 混合 frozen-call 验证、两层 replay receipt、创建和已有 Task 状态变化，依赖大量捕获变量。 | 接纳与 replay 留在 executeTask，具体创建/控制在命名事务内 helper；`taskChange` 明确保存当前行、请求与变更状态。 |
+| P2 · 注册与实例组装混在一起 | `app.prepareRuntime` 一边发现/校验能力，一边配置 provider、Runs 与测试注入，阅读失败路径要跨越整个函数。 | builtinDefinitions、runtimeRegistry、prepareRuntime 分别建立能力、校验 registry、组装实例；成功后一次发布。 |
+| P3 · 不必要的具体类型出口 | App 的公共 Runs 方法允许调用者直接依赖 SQLite 执行实现，当前项目没有这样的外部消费者。 | 改为包内 runtimeRuns；外部使用 Actor 或所属控制接口。 |
+
+```mermaid
+flowchart TD
+    CLI["cmd/erii：语法 → 输入 → 生命周期 → 分发"] --> APP["app：组合根 / 领域类型接口"]
+    WEB["web：认证与 CSRF → 有名的动作处理"] --> APP
+    APP --> OPS["operations 报表类型"]
+    OPSQ["operations/sqlite：只读查询"] --> OPS
+    APP --> RUN["agent/sqlite：Run / Tool 权威事务"]
+    RUN --> HOST["绑定 Code claim 的 ExecutionHost"]
+    COMP["computer/sqlite：生命周期 SQL"] --> HOST
+    HOST --> TX["同一 state.db 事务：fence + 元数据 + 事件"]
+    RUN --> TX
+    APP --> DOMAIN["agent / tool / interaction 的结果类型"]
+```
+
+依赖约束：`computer/sqlite` 不导入 `agent/sqlite` 或 `app`，不接触 provider；`operations/sqlite` 不执行 Runtime 工作，只读取所需快照。Consumer interface 在 Computer 适配器定义，由 Agent 适配器实现绑定。`ExecutionHost.Write` 必须在执行 change 前、同一事务内验证 Code claim，事件必须加入该事务；不能用一个无 fence 的普通 DB callback 代替。
+
+Computer 的 Begin 拆为已接纳计划读取、当前实例决策和原子计划写入；Task helper 不调用 BeginTx/Commit，继续与 receipt/epoch/Root 一次提交。JSON canonical encoding、冻结请求、SQL/schema 与模型可见工具定义不变，内部类型改名不改变序列化。
+
+保留的边界：Run、Tool、Task 的多表变更仍集中在权威事务适配器，不能为了减少文件长度而独立提交。`agent/sqlite` 因此仍不是一个很小的包；这部分是事务一致性边界，不宣称本轮已把全部 SQL 移出。Provider 协议、沙箱与系统验证脚本不因 Go 拆包而重设计。本轮未建立通用 service/repository/ports 框架。
+
 ## 当前流程
 
 用户问题 → 登记需求 → 检查代码与相关约束 → 实现与成比例验证 → 更新功能/设计/测试及状态 → 审查交付。F-038 不授予发布授权。
@@ -229,6 +263,8 @@ They are not PR prerequisites. See [evaluation boundaries](../test-plans/product
 
 | 日期 | 决策 | 理由与影响 |
 | --- | --- | --- |
+| 2026-10-28 | F-040：Computer 与运维查询归所属模块，App 返回领域类型并隐藏具体执行访问器。 | 选择明确领域子包而非通用 repository 层；通过绑定 claim 的 Host 保留原子事务，不改变存储协议。 |
+| 2026-10-28 | F-040：CLI 使用统一语法表和分阶段处理；Web 动作、Task 变更、能力注册分职责。 | 相较仅按行数切文件，命名函数对应可审查步骤；复用原入口和回归，保持原有参数、权限、关闭与 replay 行为。 |
 | 2026-10-28 | F-039：终态 Run 失败与基础设施错误分开；UI 先开放，依赖准备只缓存成功。 | 保留控制面以修复故障；不使用跳过失效能力的降级注册，避免静默更改冻结能力。 |
 | 2026-10-28 | F-039：Task 规则、CodeMode 协调从 SQLite 适配器移回所属模块；统一 Host 目录与显式 Artifact 分发。 | 保持一个事务权威和一条工具管线，避免以通用 service/ports 层替代现有领域。 |
 | 2026-10-28 | F-039：流式预览不逐片落库，生命周期 trace 保留有界写入与诊断。 | 避免每个 token 竞争权威 writer；完整请求/结果仍持久，丢失的临时预览不能作为执行失败或重试依据。 |

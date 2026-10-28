@@ -3,14 +3,12 @@
 package web
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/z-chenhao/erii/internal/delivery/ui"
 	"io"
 	"mime"
 	"net"
@@ -326,192 +324,46 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
-	if r.URL.Path == "/api/message" {
-		var input struct {
-			SourceID string                     `json:"source_id"`
-			Content  []conversation.ContentPart `json:"content"`
-		}
-		d := json.NewDecoder(r.Body)
-		d.DisallowUnknownFields()
-		if d.Decode(&input) != nil {
-			fail(w, 400)
-			return nil
-		}
-		receipt, e := s.Core.AcceptInbound(r.Context(), interaction.InboundEvent{Channel: "web", Subject: Subject, Destination: Destination, EventID: input.SourceID, SourceID: input.SourceID, Content: input.Content})
-		if e != nil {
-			return e
-		}
-		if s.Wake != nil {
-			s.Wake()
-		}
-		jsonResult(w, map[string]any{"accepted": true, "message_id": receipt.MessageID})
-		return nil
+	switch r.URL.Path {
+	case "/api/message":
+		return s.acceptJSONMessage(w, r)
 	}
-	if r.URL.Path == "/message" {
-		if err := r.ParseMultipartForm(1 << 20); err != nil {
-			return err
-		}
-		defer r.MultipartForm.RemoveAll()
-		key := r.FormValue("source_id")
-		e := interaction.InboundEvent{Channel: "web", Subject: Subject, Destination: Destination, EventID: key, SourceID: key, Content: conversation.Text(r.FormValue("text"))}
-		if err := e.Validate(); err != nil {
-			return err
-		}
-		file, header, err := r.FormFile("file")
-		if err == nil {
-			defer file.Close()
-			data, err := io.ReadAll(io.LimitReader(file, (30<<20)+1))
-			if err != nil || len(data) > 30<<20 {
-				return artifact.ErrLimit
-			}
-			input := artifact.Input{Name: header.Filename, MediaType: header.Header.Get("Content-Type")}
-			ref, err := s.Core.ImportChannelArtifact(r.Context(), e, ui.Hash([]any{input.Name, input.MediaType, ui.Hash(data)}), input, bytes.NewReader(data))
-			if err != nil {
-				return err
-			}
-			e.Content = append(e.Content, conversation.ContentPart{Type: artifact.ContentType(input.MediaType), ArtifactRef: ref})
-		} else if err != http.ErrMissingFile {
-			return err
-		}
-		if _, err = s.Core.AcceptInbound(r.Context(), e); err != nil {
-			return err
-		}
-		if s.Wake != nil {
-			s.Wake()
-		}
-		http.Redirect(w, r, "/", 303)
-		return nil
+	switch r.URL.Path {
+	case "/message":
+		return s.acceptFormMessage(w, r)
 	}
-	if r.URL.Path == "/upload" {
-		if e := r.ParseMultipartForm(1 << 20); e != nil {
-			return e
-		}
-		defer r.MultipartForm.RemoveAll()
-		file, h, e := r.FormFile("file")
-		if e != nil {
-			return e
-		}
-		defer file.Close()
-		d, e := s.Core.SaveArtifact(r.Context(), artifact.Input{Name: h.Filename, MediaType: h.Header.Get("Content-Type")}, file)
-		if e != nil {
-			return e
-		}
-		jsonResult(w, d)
-		return nil
+	switch r.URL.Path {
+	case "/upload":
+		return s.uploadArtifact(w, r)
 	}
 	if e := r.ParseForm(); e != nil {
 		return e
 	}
 	switch r.URL.Path {
 	case "/approval":
-		key := r.FormValue("source_id")
-		if key == "" {
-			key = "approval:" + r.FormValue("approval_id") + ":" + r.FormValue("decision")
-		}
-		text := r.FormValue("approval_id") + ":" + r.FormValue("hash") + ":" + r.FormValue("decision")
-		event := interaction.InboundEvent{Channel: "web", Subject: Subject, Destination: Destination, EventID: key, SourceID: key, Content: conversation.Text(text)}
-		if e := s.Core.DecideInbound(r.Context(), event, r.FormValue("approval_id"), r.FormValue("hash"), r.FormValue("decision")); e != nil {
-			return e
-		}
-		if s.Wake != nil {
-			s.Wake()
+		if err := s.decideApproval(r); err != nil {
+			return err
 		}
 	case "/model/add":
-		input := llm.ProfileInput{Name: r.FormValue("model"), Endpoint: r.FormValue("endpoint"), ModelID: r.FormValue("model"), ProviderKind: "openai_compatible", WireAPI: "openai_completions", ContextWindow: 8192, MaxOutputTokens: 1024, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true}}
-		if r.FormValue("account") != "" {
-			input.AuthConnectionID = r.FormValue("account")
-			input.ProviderKind = "openai_account"
-			input.WireAPI = "openai_responses"
-			input.Endpoint = ""
-			if s.AccountCatalog == nil {
-				return llm.ErrNoBridge
-			}
-			catalog, err := s.AccountCatalog(r.Context(), input.AuthConnectionID)
-			if err != nil {
-				return err
-			}
-			found := false
-			for _, m := range catalog {
-				if m.ModelID == input.ModelID {
-					input.ContextWindow = m.ContextWindow
-					input.MaxOutputTokens = min(m.MaxOutputTokens, m.ContextWindow)
-					found = true
-				}
-			}
-			if !found {
-				return llm.ModelIncompatible
-			}
-		}
-		if _, e := s.Models.AddProfile(r.Context(), input); e != nil {
-			return e
+		if err := s.addModel(r); err != nil {
+			return err
 		}
 	case "/model/test":
 		if _, e := s.Control.Test(r.Context(), r.FormValue("profile")); e != nil {
 			return e
 		}
 	case "/model/select":
-		if r.FormValue("consent") != "yes" {
-			return llm.ErrConflict
-		}
-		pv, e := strconv.ParseInt(r.FormValue("profile_version"), 10, 64)
-		if e != nil {
-			return e
-		}
-		cv, e := strconv.ParseInt(r.FormValue("config_version"), 10, 64)
-		if e != nil {
-			return e
-		}
-		if e = s.Control.Select(r.Context(), r.FormValue("profile"), pv, cv); e != nil {
-			return e
-		}
-		if e = s.Core.WaitForRuntime(r.Context()); e != nil {
-			return e
+		if err := s.selectModel(r); err != nil {
+			return err
 		}
 	case "/notification":
-		version, e := strconv.ParseInt(r.FormValue("version"), 10, 64)
-		if e != nil {
-			return e
-		}
-		channel, binding, ok := strings.Cut(r.FormValue("target"), ":")
-		if !ok {
-			return interaction.ErrUnauthorized
-		}
-		if e = s.Core.PreferChannel(r.Context(), channel, binding, version); e != nil {
-			return e
+		if err := s.preferNotification(r); err != nil {
+			return err
 		}
 	case "/auth/login":
-		s.mu.Lock()
-		if s.auth.Status == "pending" {
-			s.mu.Unlock()
-			return llm.ErrConflict
+		if err := s.startLogin(r); err != nil {
+			return err
 		}
-		lifetime := s.lifetime
-		if lifetime == nil {
-			lifetime = context.Background()
-		}
-		ctx, cancel := context.WithCancel(lifetime)
-		s.authCancel = cancel
-		s.auth = llm.AuthState{Status: "pending", Events: []llm.AuthEvent{}}
-		s.accountID = ""
-		done := make(chan struct{})
-		s.authDone = done
-		s.mu.Unlock()
-		accountID := r.FormValue("account")
-		go func() {
-			defer close(done)
-			a, e := s.Accounts.Login(ctx, accountID, func(event llm.AuthEvent) {
-				s.mu.Lock()
-				defer s.mu.Unlock()
-				s.auth.Events = append(s.auth.Events, event)
-			})
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			s.auth.Status = "connected"
-			if e != nil {
-				s.auth.Status = "reauth_required"
-			}
-			s.accountID = a.ConnectionID
-		}()
 	case "/auth/logout":
 		if _, err := s.Accounts.Logout(r.Context(), r.FormValue("account")); err != nil {
 			return err
