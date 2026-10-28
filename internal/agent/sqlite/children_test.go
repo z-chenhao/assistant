@@ -335,6 +335,10 @@ func TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases(t *testing.T) 
 	if scalar(t, s, `SELECT count(*) FROM approval WHERE status='pending'`) != 2 || scalar(t, s, `SELECT count(*) FROM run_claim WHERE token IS NOT NULL`) != 0 {
 		t.Fatal("approval inherited or live lease retained")
 	}
+	activity, err := r.Activity(ctx)
+	if err != nil || len(activity) != 1 || !strings.HasPrefix(activity[0].ProgressSummary, "Waiting for approval.") || !strings.Contains(activity[0].ProgressSummary, "waiting 1") {
+		t.Fatal("approval wait missing from Task progress", activity, err)
+	}
 	var rootApproval, hash string
 	if err := s.db.QueryRow(`SELECT a.approval_id,a.frozen_arguments_hash FROM approval a JOIN tool_invocation i USING(invocation_id) JOIN run r USING(run_id) WHERE r.worker_position='root'`).Scan(&rootApproval, &hash); err != nil {
 		t.Fatal(err)
@@ -347,6 +351,10 @@ func TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases(t *testing.T) 
 	}
 	if scalar(t, s, `SELECT count(*) FROM approval WHERE status='pending'`) != 1 || scalar(t, s, `SELECT count(*) FROM tool_invocation i JOIN run r USING(run_id) WHERE r.worker_position='child' AND i.status='waiting' AND i.wait_reason='approval'`) != 1 {
 		t.Fatal("Parent approval authorized Child")
+	}
+	activity, err = r.Activity(ctx)
+	if err != nil || len(activity) != 1 || !strings.HasPrefix(activity[0].ProgressSummary, "Waiting for approval.") {
+		t.Fatal("Child approval hidden by Parent resource wait", activity, err)
 	}
 	views, err := r.Approvals(ctx)
 	if err != nil {

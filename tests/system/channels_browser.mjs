@@ -105,7 +105,10 @@ try{
   await checkDraft();
   // The approval and progress come from a real Task/Worker and frozen native
   // write invocation. Rejecting it must not navigate away from this draft.
-  const task=plan('builtin__write',{path:'unapproved.txt',content:'must not be written'});
+  const task='Capabilities: '+JSON.stringify([
+   {name:'builtin__write',arguments:{path:'unapproved.txt',content:'must not be written'},progress:'Compared the available options; preparing the draft.'},
+   {name:'mcp__fixture__echo',arguments:{text:'Ready to return the reviewed options.'},progress:'Draft save declined; preparing the reviewed options.'},
+  ]);
   await send('live-task',plan('builtin__task_manage',{operation:'create',task,completionPolicy:'ongoing'}));
   const approval=page.locator('#conversation-approvals form').first();await approval.waitFor();
   await page.locator('#workspace-status').filter({hasText:'busy'}).waitFor();
@@ -115,6 +118,8 @@ try{
   try{
    await progress.goto(url+'/progress');await progress.locator('[data-live-key^="task:"]').waitFor();
    const tasks=await (await context.request.get(url+'/api/progress')).json();const ref=tasks[0].taskRef;
+   const ongoing=progress.locator('[data-live-key="task:'+ref+'"]');
+   await ongoing.filter({hasText:'Waiting for approval. Last update: Compared the available options; preparing the draft.'}).waitFor();
    await page.bringToFront();
    const decision=page.waitForResponse(response=>response.url()===url+'/approval'&&response.request().method()==='POST');
    await approval.getByRole('button',{name:'Decline',exact:true}).click();
@@ -123,6 +128,9 @@ try{
    if(!acknowledged.request().postData().includes(frozen))throw new Error('approval changed the frozen action hash');
    await page.waitForFunction(()=>!document.querySelector('#conversation-approvals form'));
    await checkDraft(false);
+   await progress.bringToFront();
+   await ongoing.filter({hasText:'This round is complete; the work remains open. Last update: Draft save declined; preparing the reviewed options.'}).waitFor();
+   if((await ongoing.innerText()).includes('must not be written'))throw new Error('raw tool arguments became stage progress');
    await send('live-cancel',plan('builtin__task_manage',{operation:'cancel',taskRef:ref}));
    await progress.bringToFront();
    await progress.locator('[data-live-key="task:'+ref+'"] .state').filter({hasText:'cancelled'}).waitFor();
@@ -139,7 +147,7 @@ try{
   await page.getByRole('button',{name:'Retry updates',exact:true}).click();await resumed;
   await checkDraft(false);
   if(navigations!==0)throw new Error('live updates navigated the document');
-  await writeFile(evidence+'/live-contract.json',JSON.stringify({draft:true,attachment:true,focus:true,selection:true,scroll:true,conditional:true,reconnect:true,approval:true,progress:true,session:true,navigations},null,2));
+  await writeFile(evidence+'/live-contract.json',JSON.stringify({draft:true,attachment:true,focus:true,selection:true,scroll:true,conditional:true,reconnect:true,approval:true,progress:true,semanticStages:true,session:true,navigations},null,2));
  }
  if(phase==='components'){
   await page.locator('[data-renderer="native"] .answer-table').waitFor();

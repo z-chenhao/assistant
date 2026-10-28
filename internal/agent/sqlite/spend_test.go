@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -321,6 +322,10 @@ func TestSpendChildrenCoalesceAtRootAcrossProcesses(t *testing.T) {
 	}
 	if scalar(t, s, `SELECT count(*) FROM spend_reservation`) != 1 {
 		t.Fatal("blocked Children reserved spend")
+	}
+	activity, err := r.Activity(ctx)
+	if err != nil || len(activity) != 1 || !strings.HasPrefix(activity[0].ProgressSummary, "Waiting for approval.") {
+		t.Fatal("monetary consent missing from Task progress", activity, err)
 	}
 	views, err := r2.Approvals(ctx)
 	if err != nil {

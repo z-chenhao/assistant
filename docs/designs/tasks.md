@@ -13,9 +13,19 @@ flowchart TD
     M["Main"] --> T["Task / 指令 / epoch"]
     T --> R["Root Run"]
     R --> P["Reporter → Main"]
-    R -.-> G["阶段进度写入：尚未接通"]
+    R --> G["Root 阶段摘要 + checkpoint 原子提交"]
+    G --> V
     T --> V["Activity / 只读进度页"]
 ```
+
+### 阶段进度接入（F-005）
+
+- 新 Root 的独立 `progress_guidance` system 片段约定：阶段变化时，在带工具调用的 assistant 文本中写一句不超过 512 UTF-8 字节的进度，描述已确认进展与下一阶段，不写推理、原始调用或私有数据。普通 Worker 规则不改，Child 不继承该片段。
+- 共享 Agent Loop 不新增分支、接口或工具。`Runs.Checkpoint` 在现有事务中先 fence 与 CAS 保存 checkpoint，再由 `progress.go` 接纳 Root 阶段文本并写 `task.progress_summary`；两者一起提交或回滚。重启复用已接受的 generation，摘要失败不会留下已推进的 checkpoint 或提前执行工具。
+- 接纳仅限 `tools` phase、完整且未截断的工具调用响应，并要求 Root 冻结的 system 上下文包含进度约定。空白、过长、含控制字符或非法 UTF-8 文本不替换上一条；归一化段落空白后保存。重复摘要不递增 Task version、不改变其更新时间。最终结果、压缩和 Child 文本不进入此路径。
+- `activity.go` 使用同一次只读查询聚合当前 Task epoch 的 Root 状态、等待原因和 Child 数量，并保留 `Last update`。等待审批包含 Child 审批及 Root 的费用授权；未知外部结果显示未确认，失败 Run 保持 Task 开放，ongoing 一轮结束与 Task 完成分开。界面不暴露 Run ID、Child 任务正文或工具参数。
+- 摘要是非授权的模型展示文本，沿现有 HTML 转义展示。它不创建 TaskUpdate、Inbox、Outbox、通知或额外推理；正常 checkpoint 仍保留原有运行时事件。`task_search` 继续返回已保存摘要，不能把展示文本当作已完成或副作用成功的证据。
+- 无数据迁移、工具 schema 或 Bridge 格式变化。新 Root 使用新提示；旧 Run 的冻结请求和提示不重写，无进度约定时不把其历史 assistant 文本改作可见进度。继续工作保留旧摘要作为已标明来源的 Task context，新状态单独计算。
 
 ### Go 实现职责（F-040）
 
@@ -26,19 +36,21 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 创建 Task → Root 执行 → 追加可在稳定边界 Steering；暂停/取消关闭旧 epoch → 继续建立新 Root → 结果交给 Main。once 成功结束 Task；ongoing 本轮完成后仍可保持 active。
 
 - **F-004**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通。 Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。
-- **F-005**：有 Progress 存储方法、Activity 聚合及进度页；静态调用搜索未发现生产路径写入 Progress()。 接通受信任的阶段进度生产者；保留独立于主动通知的只读投影。
+- **F-005**：Root 的非最终 assistant 文本在完整响应提交后的工具阶段边界写入进度；Activity 将最近摘要与当前执行事实、Child 数量组合，Web 和 TUI 复用同一投影。普通进度独立于主动通知与 Main 调度。
 
 ## 代码与依赖
 
 - [internal/task/task.go](../../internal/task/task.go)
 - [internal/agent/sqlite/tasks.go](../../internal/agent/sqlite/tasks.go)
 - [internal/agent/sqlite/task_control.go](../../internal/agent/sqlite/task_control.go)
-- [internal/agent/sqlite/progress.go](../../internal/agent/sqlite/progress.go)
+- [internal/agent/sqlite/progress.go](../../internal/agent/sqlite/progress.go)：阶段摘要接纳与事务内持久化
+- [internal/agent/sqlite/activity.go](../../internal/agent/sqlite/activity.go)：只读执行状态、摘要与 Child 数量投影
+- [internal/prompt/system/progress.md](../../internal/prompt/system/progress.md)：仅 Root 的阶段进度约定
 - [internal/agent/sqlite/reporter.go](../../internal/agent/sqlite/reporter.go)
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/tasks.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/tasks.md) 维护。确定性组件与系统检查分别证明生产写入、只读展示和恢复边界；它们不证明真实模型生成摘要的质量。
 
 ## 协议、实现与配置约束
 
@@ -490,6 +502,7 @@ independently of the retained anchors, so all 50 rows fit the Tool result limit.
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-005：阶段摘要生产与职责拆分 | 复用 Root 工具轮的显式 assistant 进度句，与 checkpoint 原子持久化；进度写入和只读 Activity 分文件。 | 比较新增 progress 工具、额外总结模型调用和工具日志拼接后，采用无新工具/无额外推理的语义更新；保护旧冻结 Run、Child 隔离和通知边界，无 schema 迁移。 | F-005 |
 | 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
 | 2026-10-28 | 现状建档 | 沿用 once/ongoing 的显式完成策略及独立进度投影。补进度时不能用低层工具日志机械生成摘要，也不能恢复已结束的旧 Run。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [006-explicit-task-completion-policy.md](#decision-006-006--explicit-task-completion-policy) |
 

@@ -53,6 +53,7 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 	var plan []struct {
 		Name      string          `json:"name"`
 		Arguments json.RawMessage `json:"arguments"`
+		Progress  string          `json:"progress,omitempty"`
 	}
 	found := false
 	// A Task title may repeat a truncated plan, and JavaScript may itself
@@ -95,7 +96,7 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 		return llm.GenerationResult{Text: "Observed Tool result: " + last}
 	}
 	p := plan[next]
-	return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "capability:" + strconv.Itoa(next), Name: p.Name, Arguments: string(p.Arguments)}}}
+	return llm.GenerationResult{Text: p.Progress, ToolCalls: []llm.ToolCall{{ID: "capability:" + strconv.Itoa(next), Name: p.Name, Arguments: string(p.Arguments)}}}
 }
 
 func cancellationReview(req llm.GenerationRequest) llm.GenerationResult {
