@@ -316,7 +316,7 @@ func TestSchedulerActivityCountsDoNotNotify(t *testing.T) {
 	}
 	before := scalar(t, s, `SELECT count(*) FROM event_outbox`)
 	items, err := r.Activity(ctx)
-	if err != nil || len(items) != 1 || !strings.Contains(items[0].ProgressSummary, "queued 2, running 0, succeeded 0, failed 0, waiting 0") {
+	if err != nil || len(items) != 1 || !strings.Contains(items[0].ProgressSummary, "queued 2, running 0, succeeded 0, failed 0, waiting 0 (0/2 finished)") {
 		t.Fatal(items, err)
 	}
 	if scalar(t, s, `SELECT count(*) FROM event_outbox`) != before || scalar(t, s, `SELECT count(*) FROM task_update`) != 0 {

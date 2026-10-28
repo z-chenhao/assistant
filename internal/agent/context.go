@@ -59,6 +59,9 @@ func InitialContext(o ContextOptions) []AgentMessage {
 		panic("invalid context position")
 	}
 	out = append(out, systemPart("execution", execution))
+	if o.Position == "root" {
+		out = append(out, systemPart("progress_guidance", prompt.Progress()))
+	}
 	seen := map[string]bool{}
 	rules := []string{}
 	for _, s := range o.Tools {

@@ -228,6 +228,28 @@ def run(binary):
         report["failure"] = scenario("failure", failure)
         report["checks"].append("Failed Root persists one failed update; Task stays active and Main receives it")
 
+        for boundary in ("before_progress_commit", "after_progress_commit"):
+            def progress_crash(h):
+                h.send("progress", "Delegate: Compare sources and prepare the recommendation.")
+                child = h.hold(boundary)
+                child.kill(); child.communicate(timeout=10)
+                before = state(h)
+                summary = "Requirements reviewed; checking the supporting evidence."
+                expected = summary if boundary.startswith("after_") else ""
+                require(before["tasks"][0]["progress_summary"] == expected, "progress/checkpoint boundary not atomic")
+                require(not before["updates"] and not before["inbox"], "ordinary progress woke Main")
+                h.command("chat", "work")
+                after = state(h); check(after)
+                require(after["tasks"][0]["progress_summary"] == summary, "recovery lost semantic progress")
+                prior = {g["generation_id"]: g for g in before["generations"] if g["status"] == "completed"}
+                require(all(g["attempt_count"] == prior[g["generation_id"]]["attempt_count"] and g["request_hash"] == prior[g["generation_id"]]["request_hash"]
+                            for g in after["generations"] if g["generation_id"] in prior), "progress recovery regenerated a completed turn")
+                require(sum(r["kind"] == "main" for r in after["runs"]) == 2, "progress triggered an extra Main run")
+                h.command("chat", "work"); require(state(h) == after, "progress recovery churned terminal state")
+                return {"boundary": boundary, "before_kill": before, "recovered": after}
+            report["crashes"].append(scenario(boundary, progress_crash))
+        report["checks"].append("F-005: Root stage prose commits atomically with its checkpoint; SIGKILL before/after preserves progress, reuses accepted model turns and creates no extra Main work")
+
         for boundary in ("before_task_commit", "after_task_commit", "before_result_commit", "after_result_commit",
                          "before_report_commit", "after_report_commit", "before_followup_commit", "after_followup_commit"):
             def crash(h):

@@ -13,7 +13,7 @@
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
 | [F-004](../features/tasks.md#f-004) | 验证状态转换、同 Task 单活动 Root、取消传播、旧 owner fencing 与结果回传。 | 保护已接通的限定范围；Live/配置另行验证 |
-| [F-005](../features/tasks.md#f-005) | 真实长任务产生阶段摘要，UI 能读到更新；普通进度不触发 Main 推理或通知。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| [F-005](../features/tasks.md#f-005) | 真实长任务产生阶段摘要，UI 能读到更新；普通进度不触发 Main 推理或通知。 | 通过实际 Root 循环、真实浏览器和 checkpoint 前后杀进程证明闭环；模型质量单独评测 |
 
 ## 层级与关键路径
 
@@ -25,12 +25,18 @@
 
 ## 已有检查与缺失覆盖
 
-| 入口 | 已有证据用途 | 本次执行状态 |
+| 入口 | 已有证据用途 | 执行记录 |
 | --- | --- | --- |
-| [tests/system/verify_tasks.py](../../tests/system/verify_tasks.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
-| [tests/system/verify_task_control.py](../../tests/system/verify_task_control.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
+| [tests/system/verify_tasks.py](../../tests/system/verify_tasks.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本轮及后续结果存于对应 evidence |
+| [tests/system/verify_task_control.py](../../tests/system/verify_task_control.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本轮及后续结果存于对应 evidence |
 
-- **F-005 剩余覆盖**：接通受信任的阶段进度生产者；保留独立于主动通知的只读投影。
+### F-005 验收路径
+
+- `internal/agent/sqlite/progress_test.go`：通过实际 Root 工具轮产生多阶段摘要，重复文本幂等，最终结果/Main/Child/旧冻结上下文不泄漏；空白、UTF-8 字节上限与截断响应保留上一条。注入 Task 写入失败验证 checkpoint 回滚，换 owner 恢复后复用已保存 generation，旧 claim 拒绝写入。
+- 现有 Child 审批和费用授权组件检查验证 Activity 不把等待授权错误显示为工作完成；既有 Task control 检查继续覆盖 pause/cancel 的 epoch fencing。
+- `verify_tasks.py`：实际 CLI/Actor 在进度事务提交前后 SIGKILL，恢复后保留摘要，完成的模型调用不重发；只生成原有最终 Root update 和 Main follow-up。现有 PTY `/status` 仍从同一 Activity 投影读取。
+- `verify_channels.py` 的真实 Chromium live 场景：Root 先写一条摘要并等待冻结审批，进度页可见；拒绝后进入下一阶段并结束 ongoing 的本轮，摘要和阶段自动更新；随后取消，页面不增加任务控制按钮，Conversation 草稿及附件保留。
+- 上述使用显式脚本模型检查软件协议。真实模型是否在适当阶段稳定生成有用摘要属于外部 Agent eval，本轮不声称通过该质量验收。
 
 ## 详细测试入口与证明边界
 

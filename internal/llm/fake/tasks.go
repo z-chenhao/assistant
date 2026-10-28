@@ -45,9 +45,11 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: "Worker result: " + last.Text}, nil
 		}
-		return call("mcp__fixture__echo", struct {
+		result := call("mcp__fixture__echo", struct {
 			Text string `json:"text"`
-		}{last.Text}), nil
+		}{last.Text})
+		result.Text = "Requirements reviewed; checking the supporting evidence."
+		return result, nil
 	}
 	if followup && !hasAppendedUser(r.Messages) {
 		return llm.GenerationResult{Text: "Main follow-up: the delegated work has returned."}, nil

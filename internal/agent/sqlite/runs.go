@@ -592,7 +592,19 @@ func (r *Runs) Checkpoint(ctx context.Context, c agent.RunClaim, version int64, 
 			return err
 		}
 	}
-	return r.write(ctx, func(tx *sql.Tx) error { return checkpoint(ctx, tx, c, version, cp) })
+	progress := false
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		if err := checkpoint(ctx, tx, c, version, cp); err != nil {
+			return err
+		}
+		var err error
+		progress, err = r.checkpointProgress(ctx, tx, c, cp)
+		return err
+	})
+	if err == nil && progress {
+		r.host.boundary("after_progress_commit")
+	}
+	return err
 }
 
 func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, status, reason string) (bool, error) {

@@ -24,6 +24,9 @@ var worker string
 //go:embed system/execution.md
 var execution string
 
+//go:embed system/progress.md
+var progress string
+
 //go:embed capability/environment.md
 var environment string
 
@@ -59,6 +62,7 @@ func Safety() string        { return text(safety) }
 func Main() string          { return text(main) }
 func Identity() string      { return text(identity) }
 func Worker() string        { return text(worker) }
+func Progress() string      { return text(progress) }
 func Execution() string     { return text(execution) }
 func Environment() string   { return text(environment) }
 func CodeMode() string      { return text(codeMode) }

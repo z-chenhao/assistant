@@ -26,7 +26,7 @@ func TestContextPromptBytes(t *testing.T) {
 		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:frozen", Text: "research"}}},
 		{Name: "builtin__computer_observe", Internal: true},
 	}
-	for _, tc := range []struct{ position, hash string }{{"main", "ab5db88fcaa9ba1d03f1b31814c58e4622266dd62121512dc5b9b0a5991317d2"}, {"root", "4fa6562963293c062a48df47e5bf1b4eb36fb4e59eb19ab7045cadc9a716fdce"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
+	for _, tc := range []struct{ position, hash string }{{"main", "ab5db88fcaa9ba1d03f1b31814c58e4622266dd62121512dc5b9b0a5991317d2"}, {"root", "b3786b42ca99f39462664da578d0e2c27e6628172c56afdc7cd2c7f4fbbd6e1a"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
 		t.Run(tc.position, func(t *testing.T) {
 			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}))
 			if err != nil {
@@ -55,7 +55,7 @@ func TestContextRolesAndFrozenResources(t *testing.T) {
 	root[0].Content[0].Text = "frozen parent safety"
 	child := InitialContext(ContextOptions{Position: "child", Tools: specs, Task: "explicit subtask", ParentSystem: append(root, TextMessage("user", "PARENT_PRIVATE"))})
 	raw, _ := json.Marshal(child)
-	if !strings.Contains(string(raw), "frozen parent safety") || strings.Contains(string(raw), "PARENT_PRIVATE") || strings.Contains(string(raw), prompt.Identity()) {
+	if !strings.Contains(string(raw), "frozen parent safety") || strings.Contains(string(raw), "PARENT_PRIVATE") || strings.Contains(string(raw), prompt.Identity()) || strings.Contains(string(raw), prompt.Progress()) {
 		t.Fatal("child scope or frozen rules drift", string(raw))
 	}
 	for _, needle := range []string{"skill_index", "frozen", "Delegation:"} {
