@@ -52,11 +52,11 @@ overlap with Erii data, Skills and provider directories.
 
 | Tool | Behavior | Permission / replay |
 | --- | --- | --- |
-| `builtin__workspace__read` | Relative regular file, text and SHA-256 | read_only / safe |
-| `builtin__workspace__search` | Bounded literal search or file listing | read_only / safe |
-| `builtin__workspace__git` | Fixed status/diff commands only | read_only / safe |
-| `builtin__workspace__test` | Fixed `go test -race ./...` in an isolated disposable copy | read_only / safe |
-| `builtin__workspace__edit` | One existing clean tracked file; matching `before_hash` and AGENTS.md `rules_hash` | external_effect / high / never |
+| `builtin__workspace_read` | Relative regular file, text and SHA-256 | read_only / safe |
+| `builtin__workspace_search` | Bounded literal search or file listing | read_only / safe |
+| `builtin__workspace_git` | Fixed status/diff commands only | read_only / safe |
+| `builtin__workspace_test` | Fixed `go test -race ./...` in an isolated disposable copy | read_only / safe |
+| `builtin__workspace_edit` | One existing clean tracked file; matching `before_hash` and AGENTS.md `rules_hash` | external_effect / high / never |
 
 `audit` mode omits edit entirely, including from Worker discovery. `edit` mode
 requires an exact approval and rejects protected paths, AGENTS.md, dirty/staged

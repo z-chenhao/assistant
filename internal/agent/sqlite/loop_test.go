@@ -376,7 +376,7 @@ func TestLoopToolRejectionPersistsAndDoesNotExposeHostData(t *testing.T) {
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: last.Text}, nil
 		}
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "mcp__fixture__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent__run", Arguments: `{"task":"forbidden"}`}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "mcp__fixture__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent_run", Arguments: `{"task":"forbidden"}`}}}, nil
 	}
 	mustSubmit(t, a, "one", "try invalid calls")
 	mustDrain(t, a)

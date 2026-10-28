@@ -602,7 +602,7 @@ func TestToolWorkerUnknownReturnsUnknownUpdateAndKeepsTaskActive(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "Delegated"}, nil
 		}
-		return calls("builtin__task__manage", `{"operation":"create","task":"Reserve R1 after confirmation"}`), nil
+		return calls("builtin__task_manage", `{"operation":"create","task":"Reserve R1 after confirmation"}`), nil
 	}
 	mustSubmit(t, a, "delegate", "delegate reservation")
 	mustDrain(t, a)
@@ -687,7 +687,7 @@ func TestToolWorkerRecoveryUnusableEvidencePersistsUnknown(t *testing.T) {
 				if req.Messages[len(req.Messages)-1].Role == "tool" {
 					return llm.GenerationResult{Text: "Delegated"}, nil
 				}
-				return calls("builtin__task__manage", `{"operation":"create","task":"Reserve R1 after confirmation"}`), nil
+				return calls("builtin__task_manage", `{"operation":"create","task":"Reserve R1 after confirmation"}`), nil
 			}
 			mustSubmit(t, a, "delegate", "delegate reservation")
 			mustDrain(t, a)
@@ -755,12 +755,12 @@ func TestToolHiddenFromWorkerIsNotResolvedOrValidated(t *testing.T) {
 				sawHiddenResult = true
 				return llm.GenerationResult{Text: "Tool unavailable"}, nil
 			}
-			return calls("builtin__task__manage", `{"forged":"invalid arguments for a hidden Tool"}`), nil
+			return calls("builtin__task_manage", `{"forged":"invalid arguments for a hidden Tool"}`), nil
 		}
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: "Delegated"}, nil
 		}
-		return calls("builtin__task__manage", `{"operation":"create","task":"Attempt an unavailable Tool without gaining Task control"}`), nil
+		return calls("builtin__task_manage", `{"operation":"create","task":"Attempt an unavailable Tool without gaining Task control"}`), nil
 	}
 	mustSubmit(t, a, "hidden-tool", "delegate work")
 	mustDrain(t, a)

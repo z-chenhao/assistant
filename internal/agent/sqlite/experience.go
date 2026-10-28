@@ -112,7 +112,7 @@ func (r *Runs) ReviewExperience(ctx context.Context, c skill.Config, q skill.Rev
 				return agent.ErrConflict
 			}
 			var runID, raw string
-			if e := tx.QueryRowContext(ctx, `SELECT i.run_id,i.result_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.tool_name='builtin__workspace__test' AND i.status='succeeded' AND r.agent_id=? AND r.status='completed'`, strings.TrimPrefix(q.VerificationRef, "invocation:"), owner).Scan(&runID, &raw); e != nil {
+			if e := tx.QueryRowContext(ctx, `SELECT i.run_id,i.result_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.tool_name='builtin__workspace_test' AND i.status='succeeded' AND r.agent_id=? AND r.status='completed'`, strings.TrimPrefix(q.VerificationRef, "invocation:"), owner).Scan(&runID, &raw); e != nil {
 				return e
 			}
 			var value tool.Result

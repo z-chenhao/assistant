@@ -107,7 +107,7 @@ F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统
 
 ## 上下文装配与语义压缩回归
 
-`TestContextPromptBytes` 与 `TestSummaryPromptBytes` 对照文案迁移前的完整模型消息 hash，覆盖 Main/Root/Child、全部能力指导、冻结项目/Skill 资源、显式 Artifact 输入及三种摘要目标大小；从空临时目录调用，验证内置文案不依赖运行目录。这是确定性的消息兼容回归，预期 hash 仅在明确调整模型输入时更新，不评价模型效果。
+`TestContextPromptBytes` 与 `TestSummaryPromptBytes` 对照当前约定的完整模型消息 hash，覆盖 Main/Root/Child、全部能力指导、冻结项目/Skill 资源、显式 Artifact 输入及三种摘要目标大小；从空临时目录调用，验证内置文案不依赖运行目录。这是确定性的消息兼容回归，预期 hash 仅在明确调整模型输入时更新，不评价模型效果。
 
 [internal/agent/context_test.go](../../internal/agent/context_test.go) 检查角色组合、冻结项目/Skill 来源和显式子任务；[internal/context/working_test.go](../../internal/context/working_test.go) 检查目标与未知事实保留、工具交换边界、媒体与传输预算；[internal/agent/sqlite/context_test.go](../../internal/agent/sqlite/context_test.go) 通过真实存储和共享 Loop 检查：
 

@@ -10,7 +10,7 @@ import (
 	"github.com/z-chenhao/erii/internal/tool"
 )
 
-const ManageName = "builtin__memory__manage"
+const ManageName = "builtin__memory_manage"
 const ManageSchema = `{"type":"object","properties":{"operation":{"type":"string","enum":["remember","forget"]},"content":{"type":"string","minLength":1,"maxLength":4096},"memory_ref":{"type":"string","minLength":1,"maxLength":256},"category":{"type":"string","enum":["health","finance","identity","relationships","goals","learning","preferences","facts","all"]},"supersedes":{"type":"string","minLength":1,"maxLength":256}},"required":["operation"],"additionalProperties":false}`
 
 type Config struct {

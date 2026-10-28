@@ -33,6 +33,8 @@
 
 ## 详细测试入口与证明边界
 
+工具命名回归：`TestNamespacePreservesSingleUnderscoresAndSourceBoundaries` 验证 builtin 的工具名前缀和 MCP server 的精确匹配；`TestMCPWireNameKeepsServerAndToolUnderscores` 通过真实 MCP stdio 发现 `mcp__browser_use__click_button`，并拒绝含结构分界符的 server/tool 名。`TestLegacyBuiltinSnapshotIsRejectedWithoutAliasesOrMutation` 验证旧名不成为别名、冻结快照不被改写且失败为 `MODEL_INCOMPATIBLE`。Child 与 Code Mode 的 SQLite/CLI 回归继续验证新名下的权限隔离、终态和恢复。
+
 迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="tools-deterministic-evidence"></a>

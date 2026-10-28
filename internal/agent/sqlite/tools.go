@@ -71,7 +71,7 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 			}
 		} else {
 			var valid bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tool_invocation i JOIN code_execution c ON c.execution_id=i.invocation_id WHERE i.invocation_id=? AND i.run_id=? AND i.provider_exchange_id=? AND i.tool_name='builtin__codemode__execute' AND i.status='running')`, parent, t.claim.RunID(), exchange).Scan(&valid); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tool_invocation i JOIN code_execution c ON c.execution_id=i.invocation_id WHERE i.invocation_id=? AND i.run_id=? AND i.provider_exchange_id=? AND i.tool_name='builtin__codemode_execute' AND i.status='running')`, parent, t.claim.RunID(), exchange).Scan(&valid); err != nil {
 				return err
 			}
 			if !valid {
@@ -427,7 +427,7 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 			inv.Status = "queued" // Persisted retry intent proves no effect took place.
 			return nil
 		}
-		if inv.Status == "waiting" && inv.WaitReason == "external_event" && inv.Call.Name == "builtin__codemode__execute" {
+		if inv.Status == "waiting" && inv.WaitReason == "external_event" && inv.Call.Name == "builtin__codemode_execute" {
 			inv.Status = "queued"
 			return nil
 		}

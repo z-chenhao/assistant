@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -40,11 +41,11 @@ type Config struct {
 }
 
 func (c Config) Validate() error {
-	if !identifier.MatchString(c.Name) || !filepath.IsAbs(c.Command) || !filepath.IsAbs(c.Directory) || len(c.Tools) == 0 || len(c.Tools) > 128 || len(c.Args) > 32 {
+	if !identifier.MatchString(c.Name) || strings.Contains(c.Name, "__") || !filepath.IsAbs(c.Command) || !filepath.IsAbs(c.Directory) || len(c.Tools) == 0 || len(c.Tools) > 128 || len(c.Args) > 32 {
 		return invalid
 	}
 	for name, permission := range c.Tools {
-		if !identifier.MatchString(name) || (permission != "read_only" && permission != "external_effect") {
+		if !identifier.MatchString(name) || strings.Contains(name, "__") || (permission != "read_only" && permission != "external_effect") {
 			return invalid
 		}
 	}

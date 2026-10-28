@@ -83,13 +83,13 @@ cua.*        Computer、App、Browser、Tab
 agent.*      Child Agent Run
 ```
 
-- Canonical Tool 名称是 `builtin__agent__run`；拥有 `can_spawn_agents` 的 Worker 模型执行单次委派时可以直接调用它，进入 Code Mode 后则通过更自然的 `agent.run()` Facade 调用。两者引用同一个 ToolSpec、ToolInvocation 状态机和 `AgentToolExecutor`，不是两套实现。
-- Root/Child Worker 在 Capability Policy 允许时看到 `agent.*`，不需要先选择 `builtin__workflow__start`，也不存在另一套 Workflow DSL。Main 默认不暴露 `builtin__agent__run` 或 `agent.*`，它通过创建 Task 启动 Root Worker。
+- Canonical Tool 名称是 `builtin__agent_run`；拥有 `can_spawn_agents` 的 Worker 模型执行单次委派时可以直接调用它，进入 Code Mode 后则通过更自然的 `agent.run()` Facade 调用。两者引用同一个 ToolSpec、ToolInvocation 状态机和 `AgentToolExecutor`，不是两套实现。
+- Root/Child Worker 在 Capability Policy 允许时看到 `agent.*`，不需要先选择 `builtin__workflow_start`，也不存在另一套 Workflow DSL。Main 默认不暴露 `builtin__agent_run` 或 `agent.*`，它通过创建 Task 启动 Root Worker。
 - “可见”不等于“有权执行”。Host Bridge 根据当前 Run 的 `can_spawn_agents`、最大深度、高安全配额、工具范围和数据作用域进行强制校验；不能依赖 Prompt 约束。
 - Root Worker 与具备委派能力的 Child Worker 使用相同 JavaScript API。Child Run 可以继续调用 `agent.run()` 形成 Run 树；宿主统一限制最大深度、后代总数、调用次数和并发。是否向某类 Run 暴露该命名空间由 Tool Exposure/Capability Policy 决定。
 - Worker 的普通能力来源于统一 Agent 配置，而不是 Task 或 `agent.run()` 参数。Root 使用 Agent 配置的 Worker Role View；Child 继承 Parent Worker 的带版本 Capability Snapshot，并再次经过深度、高安全配额、Computer 资源锁和固定禁用项校验。
 - 不提供 `workflow.*`、`WorkflowDefinition`、`WorkflowRun`、`WorkflowStep` 或单独的 Workflow Scheduler。
-- 顶层入口保持一个：`builtin__codemode__execute`。暂停、取消、恢复和后台执行沿用 Run/Continuation 的通用协议。
+- 顶层入口保持一个：`builtin__codemode_execute`。暂停、取消、恢复和后台执行沿用 Run/Continuation 的通用协议。
 
 <a id="contract-662-javascript-api"></a>
 
@@ -113,7 +113,7 @@ declare const agent: {
 };
 ```
 
-MVP 对有权委派的 Worker 只保留 `agent.run()`；Canonical Direct Tool 是 `builtin__agent__run`。不提供 `capabilities/spawn/get/cancel/send/broadcast` 等第二套能力发现、资源监控、生命周期或通信 API。
+MVP 对有权委派的 Worker 只保留 `agent.run()`；Canonical Direct Tool 是 `builtin__agent_run`。不提供 `capabilities/spawn/get/cancel/send/broadcast` 等第二套能力发现、资源监控、生命周期或通信 API。
 
 模型不查询预算余额、当前并发槽位或剩余后代数量。调用是否可接受由 Host 在 `agent.run()` admission 时原子判断：并发不足时透明排队，达到极高的深度、后代数或调用次数安全上限时以统一 `RESOURCE_LIMIT` Host Tool Error reject。带版本的 Capability Snapshot 仍作为宿主内部数据，用于 Child 权限继承、Tool/Skill 集合冻结、Durable Replay 一致性校验和防止扩权，但不暴露给模型或 JavaScript。
 
@@ -144,7 +144,7 @@ const results = await Promise.allSettled(
   }))
 );
 
-const resultSet = await tools.builtin__artifact__manage({
+const resultSet = await tools.builtin__artifact_manage({
   operation: "save",
   text: JSON.stringify(results),
   mediaType: "application/json",
@@ -187,9 +187,9 @@ return agent.run({
 
 ```text
 Worker Agent Loop
-  → builtin__codemode__execute
+  → builtin__codemode_execute
   → JavaScript Runtime
-  → host.invoke(toolName="builtin__agent__run")
+  → host.invoke(toolName="builtin__agent_run")
   → ToolExecutor
   → AgentToolExecutor.StartChildRun
   → Child Run
@@ -200,7 +200,7 @@ Worker Agent Loop
 - Node Sidecar 不直接调用模型，也不实现第二套 Agent Loop；它只把 `agent.run()` 转成带 `execution_id/call_id/nested_call_key` 的普通 Tool Host Call，其中 `nested_call_key` 由受信 Runtime 生成，不接受模型或脚本传入。
 - Go 在同一事务中创建 CodeCall、ToolInvocation、Child Run 和 `run_ready` Outbox 事件，然后才向 Sidecar 确认调用已经登记；该调用永远不会隐式创建 Task。
 - `AgentToolExecutor` 负责把 Tool 参数转换为 Child Run 输入，并在 Child Run 终态后把最终业务结果规范化为 ToolResult；Child 生命周期、用量和轨迹仍由 Agent 模块管理。
-- 唤起 Child Run 本身不创建第二个 JavaScript Code Cell；Child 先进入正常 Agent Loop，只有当它自行调用 `builtin__codemode__execute` 时才创建属于该 Child Run 的 Code Cell。
+- 唤起 Child Run 本身不创建第二个 JavaScript Code Cell；Child 先进入正常 Agent Loop，只有当它自行调用 `builtin__codemode_execute` 时才创建属于该 Child Run 的 Code Cell。
 - Child Run 使用现有 Worker Agent Loop，只接收显式 `task`、重点 `artifactRefs`、通用 Worker 规则、Task-scoped Artifact 可见范围和数据作用域；它继承 Parent 的工作面 Capability Snapshot，但不继承 Parent 的 Agent Identity、模型上下文、可变状态、控制面权力或具体 ToolInvocation Approval。Child 可以通过只读检索工具独立召回持久化 Memory 与 Conversation，这不构成 Parent 上下文继承。
 - Child 正常结束时只把 `{ text, artifactRefs }` 交还给直接 Parent；调用失败沿用统一 Host Tool Error。Run ID、用量和轨迹留在宿主内部，也不存在 Child 之间的直接消息通道。
 - Child Run 完成、失败、等待审批或进入不确定副作用状态时更新 Agent ToolInvocation 和 CodeCall，并通过事件唤醒父 Code Mode ToolInvocation；不轮询模型。
@@ -211,7 +211,7 @@ Worker Agent Loop
 
 ##### 6.6.4 Code Mode ToolInvocation 的内部恢复状态
 
-`CodeExecutionState` 不是独立领域对象，而是 `builtin__codemode__execute` ToolInvocation 的内部可恢复状态。它可以使用独立表实现租约和重放，但不拥有面向 Agent 或用户的 API、调度器和生命周期。是否在脚本中调用 Agent 不改变这一模型：
+`CodeExecutionState` 不是独立领域对象，而是 `builtin__codemode_execute` ToolInvocation 的内部可恢复状态。它可以使用独立表实现租约和重放，但不拥有面向 Agent 或用户的 API、调度器和生命周期。是否在脚本中调用 Agent 不改变这一模型：
 
 ```typescript
 interface CodeExecutionState {
@@ -282,7 +282,7 @@ interface CodeCallRecord {
 
 ##### 6.6.6 安全、配额与上下文
 
-- `agent.*` 是统一 Code Mode Runtime 支持的一等 Host Namespace，但只向 Capability Policy 允许的 Worker Run 暴露；Main 默认不暴露。ToolExecutor 仍必须验证当前 Run 是否拥有 `can_spawn_agents`，伪造 `builtin__agent__run`、提高深度或扩大工具集合都会被拒绝。
+- `agent.*` 是统一 Code Mode Runtime 支持的一等 Host Namespace，但只向 Capability Policy 允许的 Worker Run 暴露；Main 默认不暴露。ToolExecutor 仍必须验证当前 Run 是否拥有 `can_spawn_agents`，伪造 `builtin__agent_run`、提高深度或扩大工具集合都会被拒绝。
 - Root Worker 是整棵后代 Run 树的预算控制与记账边界，但“控制预算”表示宿主调度、累计用量和防止失控，不表示为正常任务预先分配一笔容易耗尽的小额度。新 Root 获得新的树级执行保护计数器；Task、用户和账户级 Token、费用及调用用量跨 Root 累计。
 - 一期采用高安全上限：Child 并发建议默认 `16`、部署级硬上限 `32`；Run 树深度建议默认 `8`、硬上限 `16`；累计后代 Run 建议默认 `4096`、硬上限 `10000`；单个 Worker Agent Loop 建议默认 `256` turns、硬上限 `512`；Root 树 Tool 调用建议默认 `10000`、硬上限 `50000`；单个 Code Mode ToolInvocation 的 Host Call 建议默认 `10000`、硬上限 `50000`。这些数字是可配置的初始容量基线，后续只依据容量测试和真实任务分布调整，不进入模型协议。
 - 超过并发额度只进入公平队列，不返回预算不足。深度、后代数、Loop turns 和调用次数上限只作为递归爆炸、无限循环及异常资源放大的安全熔断，正常的 100 条或 1000 条批处理不应触发。
@@ -386,7 +386,7 @@ runtime/javascript/
 
 ## Direct Child delegation
 
-ERII-17 adds `builtin__agent__run` v1 to new Worker capabilities. A Root or
+ERII-17 adds `builtin__agent_run` v1 to new Worker capabilities. A Root or
 Child can delegate explicit work to one general Worker. Main continues to use
 Task tools. Every Child executes the same `RunAgentLoop` kernel.
 
@@ -597,6 +597,6 @@ semantic Golden Case or M5 JavaScript/Durable Replay claim.
 
 以下是早期阶段记录，保留当时边界，不描述当前完成状态；当前需求状态以 Feature Map 为准。
 
-ERII-17 Direct Tool 实现说明：`builtin__agent__run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/designs/delegation.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
+ERII-17 Direct Tool 实现说明：`builtin__agent_run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/designs/delegation.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
 
 ERII-18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/designs/delegation.md`。

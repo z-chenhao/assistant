@@ -148,31 +148,31 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         def coding(h):
             repo = h.root / 'repo'
             original = tree(repo)
-            rules = call(h, 'rules', 'builtin__workspace__read', {'path': 'AGENTS.md'})
+            rules = call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'})
             document = json.loads(content(rules)['text'])
-            before = call(h, 'red', 'builtin__workspace__test', {})
+            before = call(h, 'red', 'builtin__workspace_test', {})
             observed = json.loads(content(before)['text'])
             require(not observed['passed'] and 'flag provided but not defined' in observed['output'],
                     'fixture did not reproduce missing --status')
             path = 'cmd/taskctl/main.go'
-            source = json.loads(content(call(h, 'source', 'builtin__workspace__read', {'path': path}))['text'])
+            source = json.loads(content(call(h, 'source', 'builtin__workspace_read', {'path': path}))['text'])
             replacement = source['text'].replace('status := "" // CLI_STATUS_FLAG',
                                                 'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")')
             require(replacement != source['text'], 'fixture patch did not match')
-            edited = call(h, 'edit', 'builtin__workspace__edit',
+            edited = call(h, 'edit', 'builtin__workspace_edit',
                           {'path': path, 'before_hash': source['hash'], 'rules_hash': document['hash'], 'text': replacement}, worker=True)
             require(not content(edited).get('error'), 'approved Worker edit failed')
             require((repo / path).read_text() == replacement, 'edit did not reach actual workspace file')
             test_path = 'cmd/taskctl/main_test.go'
-            test_source = json.loads(content(call(h, 'test-source', 'builtin__workspace__read', {'path': test_path}))['text'])
+            test_source = json.loads(content(call(h, 'test-source', 'builtin__workspace_read', {'path': test_path}))['text'])
             tests = test_source['text'] + '\nfunc TestSearchActiveCompatibility(t *testing.T) {\n var out bytes.Buffer\n if err := run([]string{"--status", "active"}, &out); err != nil { t.Fatal(err) }\n if out.String() != "[{\\\"Title\\\":\\\"Build\\\",\\\"Status\\\":\\\"active\\\"}]\\n" { t.Fatal(out.String()) }\n}\n'
-            test_edit = call(h, 'test-edit', 'builtin__workspace__edit', {'path': test_path, 'before_hash': test_source['hash'], 'rules_hash': document['hash'], 'text': tests}, worker=True)
+            test_edit = call(h, 'test-edit', 'builtin__workspace_edit', {'path': test_path, 'before_hash': test_source['hash'], 'rules_hash': document['hash'], 'text': tests}, worker=True)
             require(not content(test_edit).get('error'), 'test edit failed')
-            tested = call(h, 'green', 'builtin__workspace__test', {})
+            tested = call(h, 'green', 'builtin__workspace_test', {})
             require(json.loads(content(tested)['text'])['passed'], 'real sandbox tests did not pass: ' + content(tested)['text'])
-            diff = content(call(h, 'diff', 'builtin__workspace__git', {'operation': 'diff'}))['text']
+            diff = content(call(h, 'diff', 'builtin__workspace_git', {'operation': 'diff'}))['text']
             require('flags.StringVar' in diff, 'Git diff omitted real edit')
-            protected = content(call(h, 'protected', 'builtin__workspace__edit',
+            protected = content(call(h, 'protected', 'builtin__workspace_edit',
                                 {'path': 'docs/notes.md', 'before_hash': digest(repo / 'docs/notes.md'),
                                  'rules_hash': document['hash'], 'text': 'overwrite'}))
             require(protected['error']['code'] == 'PERMISSION_DENIED', 'protected dirty file edited')
@@ -190,7 +190,7 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             # Exercise unprotected files through approved Worker calls. Git's
             # hidden-index flags must never turn user bytes into editable input.
             repo = h.root / 'repo'
-            rules = json.loads(content(call(h, 'rules', 'builtin__workspace__read', {'path': 'AGENTS.md'}))['text'])
+            rules = json.loads(content(call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'}))['text'])
             observations = []
             paths = ['cmd/taskctl/main.go', 'internal/retry/executor.go', 'internal/task/search.go']
             for flag, path in zip([None, '--assume-unchanged', '--skip-worktree'], paths):
@@ -201,8 +201,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                 source = repo / path
                 source.write_text(source.read_text() + '\n// USER_UNCOMMITTED_CHANGE\n')
                 before = tree(repo)
-                observed = json.loads(content(call(h, 'read-' + path, 'builtin__workspace__read', {'path': path}))['text'])
-                invocation = call(h, 'edit-' + path, 'builtin__workspace__edit',
+                observed = json.loads(content(call(h, 'read-' + path, 'builtin__workspace_read', {'path': path}))['text'])
+                invocation = call(h, 'edit-' + path, 'builtin__workspace_edit',
                                   {'path': path, 'before_hash': observed['hash'], 'rules_hash': rules['hash'],
                                    'text': '// AGENT_REPLACEMENT\n'}, worker=True)
                 require(invocation['status'] == 'failed' and content(invocation)['error']['code'] == 'PERMISSION_DENIED',
@@ -217,12 +217,12 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         def audit(h):
             repo = h.root / 'repo'
             before = tree(repo)
-            call(h, 'audit-rules', 'builtin__workspace__read', {'path': 'AGENTS.md'})
-            searched = content(call(h, 'search', 'builtin__workspace__search', {'query': 'provider.Execute'}, worker=True))
+            call(h, 'audit-rules', 'builtin__workspace_read', {'path': 'AGENTS.md'})
+            searched = content(call(h, 'search', 'builtin__workspace_search', {'query': 'provider.Execute'}, worker=True))
             require('internal/retry/executor.go' in searched['text'], 'audit search missed actual source')
-            read = content(call(h, 'read', 'builtin__workspace__read', {'path': 'internal/retry/executor.go'}))
+            read = content(call(h, 'read', 'builtin__workspace_read', {'path': 'internal/retry/executor.go'}))
             require('provider.Execute()' in read['text'] and 'ledger.Lookup()' in read['text'] and read['text'].index('provider.Execute()') < read['text'].index('ledger.Lookup()'), 'audit lacks call-order evidence')
-            forbidden = content(call(h, 'forged-edit', 'builtin__workspace__edit', {}, worker=True))
+            forbidden = content(call(h, 'forged-edit', 'builtin__workspace_edit', {}, worker=True))
             require(forbidden['error']['code'] == 'NOT_FOUND', 'audit edit capability leaked')
             require(tree(repo) == before, 'audit changed workspace bytes or Git state')
             return {'name': 'audit_read_search_no_writes', 'tree_hashes': before, 'finding': {'file': 'internal/retry/executor.go', 'symbols': ['retry.Execute', 'Provider.Execute', 'Ledger.Lookup'], 'trigger': 'retry after a previously completed call', 'impact': 'Provider runs before the completed Ledger result is checked, so a retry can repeat an effect', 'basis': 'observed source order; no claim of a production failure'}, 'state': h.state()}
@@ -230,20 +230,20 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
 
 
         def discovery(h):
-            listed = content(call(h, 'skills', 'builtin__skill__list', {}, worker=True))
+            listed = content(call(h, 'skills', 'builtin__skill_list', {}, worker=True))
             summaries = json.loads(listed['text'])
             require(len(summaries) == 1 and 'PRIVATE_BODY_MARKER' not in listed['text'], 'Skill list exposed body')
-            viewed = content(call(h, 'view', 'builtin__skill__view', {'name': 'review', 'version': summaries[0]['version']}))
+            viewed = content(call(h, 'view', 'builtin__skill_view', {'name': 'review', 'version': summaries[0]['version']}))
             require('PRIVATE_BODY_MARKER' in viewed['text'], 'Skill view missing actual body')
-            asset = content(call(h, 'asset', 'builtin__skill__view',
+            asset = content(call(h, 'asset', 'builtin__skill_view',
                                  {'name': 'review', 'version': summaries[0]['version'], 'path': 'assets/opaque.bin'}))
             opened = fixture_run(h.args('artifact', 'open', asset['artifact_refs'][0]), capture_output=True,
                                     env=h.env, cwd=h.root, timeout=20)
             require(opened.returncode == 0 and opened.stdout == b'\x00\xffSKILL_ASSET',
                     'binary Skill asset was corrupted or bypassed ArtifactStore')
-            denied = content(call(h, 'manage', 'builtin__skill__manage', {}, worker=True))
+            denied = content(call(h, 'manage', 'builtin__skill_manage', {}, worker=True))
             require(denied['error']['code'] == 'NOT_FOUND', 'ordinary Worker got Skill management')
-            denied = content(call(h, 'task-control', 'builtin__task__manage', {'operation': 'cancel', 'taskRef': 'forged'}, worker=True))
+            denied = content(call(h, 'task-control', 'builtin__task_manage', {'operation': 'cancel', 'taskRef': 'forged'}, worker=True))
             require(denied['error']['code'] == 'NOT_FOUND', 'Worker gained Task control')
             read = content(call(h, 'mcp-read', 'mcp__fixture__read', {'text': 'structured fixture response'}, worker=True))
             require(read['text'] == 'structured fixture response', 'stdio response lost')
@@ -293,11 +293,11 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
 
         def crash(h):
             repo = h.root / 'repo'
-            rules = json.loads(content(call(h, 'rules', 'builtin__workspace__read', {'path': 'AGENTS.md'}))['text'])
+            rules = json.loads(content(call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'}))['text'])
             path = 'cmd/taskctl/main.go'
-            source = json.loads(content(call(h, 'source', 'builtin__workspace__read', {'path': path}))['text'])
+            source = json.loads(content(call(h, 'source', 'builtin__workspace_read', {'path': path}))['text'])
             replacement = source['text'] + '\n// accepted edit\n'
-            plan = [{'name': 'builtin__workspace__edit', 'arguments': {'path': path, 'before_hash': source['hash'],
+            plan = [{'name': 'builtin__workspace_edit', 'arguments': {'path': path, 'before_hash': source['hash'],
                      'rules_hash': rules['hash'], 'text': replacement}}]
             h.send('crash-edit', 'Capabilities: ' + json.dumps(plan))
             h.command('chat', 'work')
@@ -309,7 +309,7 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             require((repo / path).read_text() == replacement, 'crash not after actual edit')
             h.command('chat', 'work')
             value = h.state()
-            inv = [t for t in value['tools'] if t['tool_name'] == 'builtin__workspace__edit'][0]
+            inv = [t for t in value['tools'] if t['tool_name'] == 'builtin__workspace_edit'][0]
             require(inv['status'] == 'unknown' and inv['attempt_count'] == 1 and (repo / path).read_text() == replacement,
                     'crashed edit retried or falsely completed')
             return {'name': 'edit_after_effect_before_result_commit', 'signal': 'SIGKILL', 'state': value}

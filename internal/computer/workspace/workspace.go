@@ -225,7 +225,7 @@ func Definitions(c Config) ([]tool.Definition, error) {
 	base := tool.Spec{Version: 1, ResourceHash: hash(identity), ReplayPolicy: "safe", Permission: "read_only", Provider: "workspace:" + hash([]byte(c.Root)), Risk: "low", TimeoutMS: 300000, OutputBytes: 65536, ConflictPolicy: "workspace-v1"}
 	makeDef := func(name, schema, description string, fn func(context.Context, string) tool.Result) tool.Definition {
 		s := base
-		s.Name = "builtin__workspace__" + name
+		s.Name = "builtin__workspace_" + name
 		s.InputSchema = schema
 		s.Description = description
 		if name == "read" {

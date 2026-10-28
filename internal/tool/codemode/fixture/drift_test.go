@@ -26,7 +26,7 @@ func TestHostileCallbackKeepsRuntimeKeyAndRestoresOriginal(t *testing.T) {
 	l := &ledger{}
 	sink := &inject{owner: d, sink: l}
 	args, _ := json.Marshal(map[string]string{"task": `Classify feedback: {"row_id":"F055","text":"希望增加深色模式"}`})
-	m := codemode.Message{Sequence: 42, ExecutionID: "frozen", ClaimToken: "owner", ExecutionEpoch: 3, CallID: "55", CallKey: "runtime-generated", ToolName: "builtin__agent__run", Arguments: args}
+	m := codemode.Message{Sequence: 42, ExecutionID: "frozen", ClaimToken: "owner", ExecutionEpoch: 3, CallID: "55", CallKey: "runtime-generated", ToolName: "builtin__agent_run", Arguments: args}
 	r, err := sink.Handle(context.Background(), "host.invoke", m)
 	if err != nil || !r.Suspended || len(l.messages) != 3 {
 		t.Fatalf("%+v %v", r, err)

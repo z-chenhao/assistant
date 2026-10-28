@@ -49,7 +49,7 @@ func ProviderTools(specs []tool.Spec) []llm.ToolSpec {
 			continue
 		}
 		description := spec.Description
-		if spec.Name == "builtin__skill__list" && len(spec.PromptContext) > 0 {
+		if spec.Name == "builtin__skill_list" && len(spec.PromptContext) > 0 {
 			description = "List available Skills and their frozen versions. Read a matching Skill with skill view before applying its scoped guidance."
 		}
 		out = append(out, llm.ToolSpec{Name: spec.Name, Description: description, InputSchema: spec.InputSchema})

@@ -63,7 +63,7 @@ func InitialContext(o ContextOptions) []AgentMessage {
 	rules := []string{}
 	for _, s := range o.Tools {
 		if s.Internal {
-			if strings.HasPrefix(s.Name, "builtin__computer__") && !seen["computer"] {
+			if strings.HasPrefix(s.Name, "builtin__computer_") && !seen["computer"] {
 				rules = append(rules, "- "+prompt.Computer())
 				seen["computer"] = true
 			}
@@ -71,17 +71,17 @@ func InitialContext(o ContextOptions) []AgentMessage {
 		}
 		var rule string
 		switch {
-		case strings.HasPrefix(s.Name, "builtin__workspace__"):
+		case strings.HasPrefix(s.Name, "builtin__workspace_"):
 			rule = prompt.Workspace()
-		case s.Name == "builtin__codemode__execute":
+		case s.Name == "builtin__codemode_execute":
 			rule = prompt.CodeMode()
 		case s.Name == RunToolName:
 			rule = prompt.Delegation()
-		case s.Name == "builtin__artifact__manage":
+		case s.Name == "builtin__artifact_manage":
 			rule = prompt.Artifacts()
-		case s.Name == "builtin__memory__search":
+		case s.Name == "builtin__memory_search":
 			rule = prompt.Memory()
-		case s.Name == "builtin__skill__view":
+		case s.Name == "builtin__skill_view":
 			rule = prompt.Skills()
 		}
 		if rule != "" && !seen[rule] {
@@ -95,7 +95,7 @@ func InitialContext(o ContextOptions) []AgentMessage {
 	for _, s := range o.Tools {
 		for _, p := range s.PromptContext {
 			// Only these local Host adapters may contribute resource sections.
-			if !(p.Kind == "project_instructions" && s.Name == "builtin__workspace__read" || p.Kind == "skill_index" && s.Name == "builtin__skill__list") {
+			if !(p.Kind == "project_instructions" && s.Name == "builtin__workspace_read" || p.Kind == "skill_index" && s.Name == "builtin__skill_list") {
 				continue
 			}
 			raw, _ := json.Marshal(p)

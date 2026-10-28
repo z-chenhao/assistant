@@ -65,7 +65,7 @@ Intelligent UI 采用 Delivery 层的声明式组件协议 `UISpec`：
 - `UISpec` 带 `schema_version`；未知组件或渲染失败时 fail-soft，降级为语义文本，不阻塞消息投递。
 - 一期不允许模型生成或执行任意 HTML、JavaScript、React 代码。
 - Main Agent Loop 输出渠道无关的语义结果；Delivery Composer 根据语义内容、结构化数据和渠道能力生成 `UISpec`，Agent 不需要感知具体渠道。
-- 后续如需更自由的生成式界面，可增加 `builtin__ui__compose`，产出经过 Schema 校验和安全检查的 `UIArtifact`。
+- 后续如需更自由的生成式界面，可增加 `builtin__ui_compose`，产出经过 Schema 校验和安全检查的 `UIArtifact`。
 
 Web/飞书身份绑定、回调规范化、UISpec v1 渲染、冻结路由与不确定投递恢复的实现及操作说明见 [渠道与交付](../features/channels.md)。
 

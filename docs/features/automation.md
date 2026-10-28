@@ -157,7 +157,7 @@ A create/update may include `below`, a nonnegative integer threshold (maximum
 10^12, same unit as observations). The instruction specifies the real data source
 and business units. This is not a price-fetching service: the Root uses its
 existing scoped Tools to obtain evidence, then calls
-`builtin__automation__observe({"value":1750})`. The Host binds the call to that
+`builtin__automation_observe({"value":1750})`. The Host binds the call to that
 Root's persisted fire; the model cannot choose identities, dates or replay keys.
 Only the linked Root may write an observation. Main and other Roots/Children
 cannot update that state. Claims and schedule versions fence late writes.

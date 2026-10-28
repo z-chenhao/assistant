@@ -22,6 +22,9 @@ type rewrite struct {
 
 func (w rewrite) Write(b []byte) (int, error) {
 	text := string(b)
+	if w.mode == "underscores" {
+		text = strings.ReplaceAll(text, `"name":"read"`, `"name":"click_button"`)
+	}
 	if w.mode == "malformed" {
 		text = strings.ReplaceAll(text, `"maxLength":4096`, `"unsupported":4096`)
 	}
@@ -79,6 +82,27 @@ func config(t *testing.T) Config {
 	}
 	root := t.TempDir()
 	return Config{Name: "fixture", Command: bin, Directory: root, Args: []string{"-test.run=^TestMCPPeer$", "--", "mcp-fixture", root}, Tools: map[string]string{"read": "read_only", "send": "external_effect"}}
+}
+
+func TestMCPWireNameKeepsServerAndToolUnderscores(t *testing.T) {
+	c := config(t)
+	c.Name = "browser_use"
+	c.Tools = map[string]string{"click_button": "read_only"}
+	if err := os.WriteFile(filepath.Join(c.Args[len(c.Args)-1], "mode"), []byte("underscores"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	defs, err := Definitions(context.Background(), c)
+	if err != nil || len(defs) != 1 || defs[0].Spec.Name != "mcp__browser_use__click_button" {
+		t.Fatal("MCP name was split or flattened", defs, err)
+	}
+	for _, invalid := range []Config{
+		{Name: "browser__use", Command: c.Command, Directory: c.Directory, Tools: c.Tools},
+		{Name: c.Name, Command: c.Command, Directory: c.Directory, Tools: map[string]string{"click__button": "read_only"}},
+	} {
+		if invalid.Validate() == nil {
+			t.Fatal("ambiguous double-underscore identifier accepted", invalid.Name)
+		}
+	}
 }
 func TestDiscoveryFreezesHostPolicyAndNormalizesErrors(t *testing.T) {
 	t.Setenv("ERII_TEST_SECRET", "secret")

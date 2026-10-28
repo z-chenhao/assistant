@@ -125,7 +125,7 @@ func CallPolicy(name, raw string, p tool.Policy) tool.Policy {
 	c, _, err := decodeCall(raw)
 	p.Replay = "never"
 	p.Risk = "high"
-	if err == nil && (name == "builtin__computer__discover" && c.Method != "launchApp" && c.Method != "importArtifact" && c.Method != "exportArtifact" || name == "builtin__computer__bind" && c.Method != "createBrowserTab" || name == "builtin__computer__invoke" && readMethod(c.Method)) {
+	if err == nil && (name == "builtin__computer_discover" && c.Method != "launchApp" && c.Method != "importArtifact" && c.Method != "exportArtifact" || name == "builtin__computer_bind" && c.Method != "createBrowserTab" || name == "builtin__computer_invoke" && readMethod(c.Method)) {
 		p.Replay = "safe"
 		p.Risk = "low"
 	}
@@ -187,11 +187,11 @@ func (r UseRuntime) Call(ctx context.Context, name, raw string) (tool.Result, er
 		state.Files = map[string]bool{}
 	}
 	switch name {
-	case "builtin__computer__discover":
+	case "builtin__computer_discover":
 		return r.discover(ctx, &state, c, a)
-	case "builtin__computer__bind":
+	case "builtin__computer_bind":
 		return r.bind(ctx, &state, c, a)
-	case "builtin__computer__invoke":
+	case "builtin__computer_invoke":
 		h := state.Handles[c.Token]
 		if h == nil || h.Instance != r.Instance || h.Lease != r.Lease {
 			return tool.Failure("STALE_SURFACE_HANDLE"), nil

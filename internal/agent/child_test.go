@@ -26,8 +26,8 @@ func TestAgentRunSchemaHasOnlyTaskAndArtifactRefs(t *testing.T) {
 }
 func TestChildFixedReductionDoesNotAddCapabilities(t *testing.T) {
 	in := []tool.Spec{
-		{Name: "builtin__task__search", Permission: "read_only"},
-		{Name: "builtin__task__manage", Permission: "task_control"},
+		{Name: "builtin__task_search", Permission: "read_only"},
+		{Name: "builtin__task_manage", Permission: "task_control"},
 		{Name: "credential", Permission: "credential_control"},
 		{Name: "memory", Permission: "memory_write"},
 		{Name: "delivery", Permission: "user_delivery"},

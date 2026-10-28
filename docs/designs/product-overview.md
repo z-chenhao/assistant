@@ -269,7 +269,7 @@ M3 的 MCP 与 Coding 验证使用真实 stdio 协议和受控磁盘 fixture：�
 
 #### M4：Child Run 与 `agent.run()`
 
-- 实现 `builtin__agent__run`、AgentToolExecutor、Parent/Child Run 树、高安全上限与公平队列。
+- 实现 `builtin__agent_run`、AgentToolExecutor、Parent/Child Run 树、高安全上限与公平队列。
 - 先验证 Direct Tool 形式，再接入 Code Mode Facade；二者必须复用同一个 ToolSpec 和 Executor。
 
 完成条件：100 项任务产生 1 Task、1 Root、100 Child；最大实际并发不超过配置；Child 可继续委派且不能扩权。

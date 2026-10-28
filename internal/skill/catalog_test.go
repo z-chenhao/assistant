@@ -35,9 +35,9 @@ func TestProgressiveCatalogScopeVersionsAndNoManagement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, _ := r.Resolve("builtin__skill__list")
-	view, _ := r.Resolve("builtin__skill__view")
-	if _, ok := r.Resolve("builtin__skill__manage"); ok {
+	list, _ := r.Resolve("builtin__skill_list")
+	view, _ := r.Resolve("builtin__skill_view")
+	if _, ok := r.Resolve("builtin__skill_manage"); ok {
 		t.Fatal("management exposed")
 	}
 	if strings.Contains(list.Spec.Description, "BODY_ONLY_MARKER") {

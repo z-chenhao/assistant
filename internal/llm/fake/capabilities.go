@@ -48,7 +48,7 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 			return llm.GenerationResult{Text: "Observed Task result: " + lastMessage.Text}
 		}
 		raw, _ := json.Marshal(map[string]string{"operation": "create", "task": "Capabilities fixture\nCapabilities: " + strings.TrimPrefix(source, "Delegate capabilities: ")})
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "delegate", Name: "builtin__task__manage", Arguments: string(raw)}}}
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "delegate", Name: "builtin__task_manage", Arguments: string(raw)}}}
 	}
 	var plan []struct {
 		Name      string          `json:"name"`
@@ -110,7 +110,7 @@ func cancellationReview(req llm.GenerationRequest) llm.GenerationResult {
 	paths := []string{"AGENTS.md", "internal/run/service.go"}
 	if count < len(paths) {
 		raw, _ := json.Marshal(map[string]string{"path": paths[count]})
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "review", Name: "builtin__workspace__read", Arguments: string(raw)}}}
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "review", Name: "builtin__workspace_read", Arguments: string(raw)}}}
 	}
 	if strings.Contains(last, "tree[i].Parent == parent") && !strings.Contains(last, "Cancel(tree,") {
 		return llm.GenerationResult{Text: "BLOCKED: internal/run/service.go Cancel visits only direct children; grandchild accepts a late result. Recurse into descendants and run TestGrandchildCancel."}

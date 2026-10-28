@@ -75,7 +75,7 @@ Setup Wizard 可以安全取消；取消后应用的 `AppReadiness` 保持 `setu
 
 `AppReadiness = setup_required | ready | degraded`：`ready` 才开放 Agent Ingress；Active Profile 后续失效时进入 `degraded`，允许查看历史、修复连接和切换 Profile，但不接受新的 Agent 工作。
 
-初次设置完成后，`model list/add/login/logout/select/test` 可以作为 TUI 命令或 Settings API 存在，但不是 `builtin__model__*` Agent Tool。模型不能自行切换到更贵、不同隐私边界或不同账号的 Provider。
+初次设置完成后，`model list/add/login/logout/select/test` 可以作为 TUI 命令或 Settings API 存在，但不是 `builtin__model_*` Agent Tool。模型不能自行切换到更贵、不同隐私边界或不同账号的 Provider。
 
 <a id="contract-52-统一-modelprofile"></a>
 

@@ -51,7 +51,7 @@ func (s Spec) Policy() Policy {
 		}
 		if p.OutputBytes == 0 {
 			p.OutputBytes = 16384
-			if s.Name == "builtin__task__search" {
+			if s.Name == "builtin__task_search" {
 				p.OutputBytes = 65536
 			}
 		}

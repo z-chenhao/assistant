@@ -18,7 +18,7 @@ import (
 func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 	ctx := context.Background()
 	s, r, _, a, p := loopFixture(t)
-	spec := tool.Spec{Name: "builtin__workspace__test", Version: 1, Permission: "read_only", ReplayPolicy: "safe", InputSchema: `{"type":"object","properties":{},"additionalProperties":false}`}
+	spec := tool.Spec{Name: "builtin__workspace_test", Version: 1, Permission: "read_only", ReplayPolicy: "safe", InputSchema: `{"type":"object","properties":{},"additionalProperties":false}`}
 	registry, e := tool.NewRegistry([]tool.Definition{{Spec: spec, Execute: func(context.Context, string) tool.Result {
 		return tool.Result{Text: `{"passed":true,"command":"go test -race ./...","truncated":false}`}
 	}}})

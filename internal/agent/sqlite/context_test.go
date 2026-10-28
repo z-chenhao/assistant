@@ -42,7 +42,7 @@ func TestContinuationExcludesChildPrivateTrace(t *testing.T) {
 			if last.Role == "tool" {
 				return llm.GenerationResult{Text: "root aggregate public final only"}, nil
 			}
-			return calls("builtin__agent__run", `{"task":"child explicit task"}`), nil
+			return calls("builtin__agent_run", `{"task":"child explicit task"}`), nil
 		}
 		if last.Role == "tool" || isFollowup(req) {
 			return llm.GenerationResult{Text: "Main acknowledgement"}, nil

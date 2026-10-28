@@ -21,14 +21,18 @@ func Describe(s tool.Spec) ToolDescription {
 	_ = json.Unmarshal([]byte(s.InputSchema), &input)
 	name, _ := json.Marshal(s.Name)
 	output := "unknown"
-	if s.Name == "builtin__agent__run" {
+	if s.Name == "builtin__agent_run" {
 		output = "{ readonly text: string; readonly artifactRefs: readonly string[] }"
 	}
 	return ToolDescription{Name: s.Name, Description: s.Description, InputSchema: s.InputSchema, Declaration: "tools[" + string(name) + "](args: " + typeScript(input) + "): Promise<" + output + ">", Instructions: s.Description}
 }
 func NamespaceMatches(toolName, namespace string) bool {
+	if name, ok := strings.CutPrefix(toolName, "builtin__"); ok {
+		namespace = strings.TrimPrefix(namespace, "builtin__")
+		return namespace != "" && !strings.Contains(namespace, "__") && !strings.Contains(name, "__") && strings.HasPrefix(name, namespace+"_")
+	}
 	parts := strings.Split(toolName, "__")
-	return len(parts) >= 3 && (namespace == parts[1] || namespace == parts[0]+"__"+parts[1])
+	return len(parts) == 3 && parts[0] == "mcp" && parts[1] != "" && parts[2] != "" && (namespace == parts[1] || namespace == "mcp__"+parts[1])
 }
 
 // Types describe shape; complete validation constraints remain in InputSchema.
@@ -101,5 +105,5 @@ func typeScript(value any) string {
 
 // Computer bridge helpers return ephemeral lease tokens, never public Tool data.
 func ComputerBridge(name string) bool {
-	return name == "builtin__computer__discover" || name == "builtin__computer__bind" || name == "builtin__computer__invoke"
+	return name == "builtin__computer_discover" || name == "builtin__computer_bind" || name == "builtin__computer_invoke"
 }

@@ -13,7 +13,7 @@ import (
 
 // Experience management belongs to the trusted Reviewer control path. Ordinary
 // Main/Worker capabilities still contain only list/view, never this operation.
-const ManageName = "builtin__skill__manage"
+const ManageName = "builtin__skill_manage"
 
 type ReviewRequest struct {
 	Operation       string   `json:"operation"`
