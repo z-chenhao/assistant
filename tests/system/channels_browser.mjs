@@ -60,6 +60,18 @@ try{
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
  }
 
+ if(phase==='image'){
+  await page.getByRole('link',{name:'Settings',exact:false}).click();
+  const capability=process.env.ERII_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
+  await page.getByText(capability,{exact:false}).waitFor();
+  if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).first().isChecked())throw new Error('vision declaration enabled implicitly');
+  await page.getByRole('link',{name:'Conversation',exact:false}).click();
+  await page.getByLabel('Message Erii',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
+  await page.getByLabel('Attach a file').setInputFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.ERII_TEST_PICTURE,'base64')});
+  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  const expected=process.env.ERII_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
+  await page.locator('.message.assistant').filter({hasText:expected}).waitFor();
+ }
  if(phase==='live'){
   page.setDefaultTimeout(10000);
   let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++});

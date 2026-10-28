@@ -56,7 +56,7 @@ func Prepare(in []llm.Message, budget Budget, p Policy, aggressive bool) (Prepar
 	// Pixels have an independent budget. Keep the newest explicitly selected
 	// images; old Artifact references remain in each message's text.
 	seen := map[string]bool{}
-	imageLimit := 8
+	imageLimit := llm.MaxInputImages
 	if aggressive {
 		imageLimit = 4
 	}

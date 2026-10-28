@@ -6,7 +6,7 @@
 
 ## 当前架构
 
-文件字节位于 Artifact store，引用与权限由 Host 解析。Conversation 保留语义引用；支持的工具图片在 dispatch 时由 Host 解码，再送入冻结 Provider envelope。
+文件字节位于 Artifact store，引用与权限由 Host 解析。Conversation 保留语义引用；支持的用户图片与显式选择的工具图片在 dispatch 时由 Host 解码，再送入冻结 Provider envelope。
 
 ```mermaid
 flowchart TD
@@ -14,9 +14,20 @@ flowchart TD
     A --> C["Conversation / Task 引用"]
     C --> M["模型引用提示"]
     A --> I["授权图片解析"]
-    I --> B["Bridge 图片输入：工具结果已接通"]
-    C -.-> P["用户多模态解析：待补齐"]
+    I --> B["Bridge → 冻结视觉模型的图片输入"]
+    C -.-> P["音视频 / 文档解析：待补齐"]
 ```
+
+### 用户图片输入与职责边界（F-013）
+
+1. Web 根据附件 MIME 产生 image ContentPart；CLI 通过显式 `type:image` 引用。现有入站接纳验证并 pin 可访问 Artifact，Conversation 与 checkpoint 仅保存语义引用。
+2. `agent/messages.go` 统一角色、内容与媒体引用投影。只有真实 user 图片和原有显式 Tool 图片可选择像素；runtime 证据、assistant 附件和 Task 更新不自动变成图片输入。Root/Child 的正文与 Artifact refs 仍保持显式委派边界，不借此复制 Main 图片上下文。
+3. 新建 Run 的 `run_context_policy` 冻结 `user_images:true`；Child 复制 Parent 的原始策略。字段缺失表示旧用户引用模式，旧请求和压缩缓存的输入/策略 hash 不重写。该标记属于 Host 的投影版本约定，不是 YAML 配置或新模型能力。schema 29 与 Bridge 格式保持不变，升级时统一停止旧进程，禁止不同投影实现混跑。
+4. `agent/sqlite/images.go` 只给未完成、已接纳的视觉 generation 安装临时 resolver。resolver 限定该请求选择的 refs，再通过既有 Artifact 权限、完整性验证及 claim/隐私二次 fence 读取；未选择和未授权引用均拒绝。已完成 generation 直接复用结果，不重新读图；文本模型不安装 resolver。
+5. `llm/bridge/images.go` 将请求选择/去重/总量预算与单图解码/预览生成分开。PNG/JPEG 上限为 8 MiB、约 3355 万像素（32 × 1024²），每图最长边 640（极窄图仍至少 1 像素），JPEG 预览最多 48 KiB；工作集最多 8 张，激进重试 4 张，总 base64 预算 512 KiB，复用 1 MiB RPC 上限。输入图片上限由 `llm/images.go` 统一定义。
+6. 图片字节仅存在于临时 provider envelope，observer、SQLite generation、Conversation 和摘要档案均不写 base64。格式、大小、损坏与权限失败在供应商调用前拒绝。语义摘要不隐式获得图片；文本模型的 working set 明确说明像素不可用。
+
+Settings 的图片复选框只是候选声明；既有 Host 蓝色方块 Probe 经同一图像 envelope 验证成功后才可选择模型。Saved models 区分未验证请求、已验证图片输入和纯文本。更新模型只影响新 Run，现有模型快照保持冻结。
 
 ### 短事务与文件所有权（F-039）
 
@@ -39,7 +50,7 @@ sequenceDiagram
 上传或保存 → 绑定授权引用 → Agent 读取/处理 → 显式 publish → Main 选择最终附件 → 渠道交付。媒体内容理解需另经支持的解析或视觉路径。
 
 - **F-012**：Artifact 存储、哈希校验、发布选择、Task 引用与渠道文件入口已实现。 保存文件不等于理解内容；发布仅选择当前 Run 最终输出，不授予外部发送权限。
-- **F-013**：工具结果/Code Mode 图片有显式 ImageRefs、缩图和 Bridge 传图；用户消息图片目前主要是引用提示。 接通用户图片与视觉能力设置，保留授权、大小及数量约束。
+- **F-013**：新 Run 将显式用户图片投影为 ImageRefs。Host 在 dispatch 时以当前 claim/隐私 fence 和 Run grant 读取、验证及缩图，通过既有 Bridge 送给冻结的视觉模型；文本模型保留引用并显式说明无像素。
 - **F-014**：附件运输与保存已有；消息投影主要提供引用，未形成统一解析/转写链路。 按实际用户场景明确支持格式，补解析、转写或媒体工具及错误反馈；不以合成文件证明理解质量。
 
 ## 代码与依赖
@@ -47,13 +58,15 @@ sequenceDiagram
 - [internal/artifact/tools/tools.go](../../internal/artifact/tools/tools.go)
 - [internal/agent/sqlite/artifacts.go](../../internal/agent/sqlite/artifacts.go)
 - [internal/app/artifacts.go](../../internal/app/artifacts.go)
-- [internal/agent/run.go](../../internal/agent/run.go)
+- [internal/agent/messages.go](../../internal/agent/messages.go)
+- [internal/agent/sqlite/images.go](../../internal/agent/sqlite/images.go)
+- [internal/llm/images.go](../../internal/llm/images.go)
 - [internal/llm/bridge/images.go](../../internal/llm/bridge/images.go)
 - [internal/agent/sqlite/codemode.go](../../internal/agent/sqlite/codemode.go)
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/artifacts-media.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/artifacts-media.md) 维护。软件证据验证真实入口、最终供应商 HTTP 请求与恢复，不代表真实模型视觉质量或真实账户验收。
 
 ## 协议、实现与配置约束
 
@@ -162,6 +175,7 @@ transaction before storage can be reclaimed. After Task protection ends, effecti
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-013：用户图片进入视觉输入 | 从 Run 类型/生成存储文件拆出统一消息投影与授权图像 resolver，缩图过程分职责；复用既有 Probe 与 Bridge。 | 采用冻结 context policy 标记保留旧引用表示，不改已有请求或扩大 Child 权限；相比把 base64 放入历史或增加专用看图工具，保持引用持久化和统一执行路径。无需 schema 迁移，升级进程统一版本。 | F-013 |
 | 2026-10-28 | F-039：流读取/校验移出 SQLite，保留短事务配额及结果接纳；活跃对象由文件锁保护。 | 避免长流阻塞 lease 和结果接纳；增加文件所有权协议，需停止旧版本后升级，禁止不同回收协议混跑。 |
 | 2026-10-28 | 现状建档 | 保留引用式持久化，避免把 Base64 写入对话与恢复记录；用户输入与工具图片分开追踪，不能用运输证据代替模型理解。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 

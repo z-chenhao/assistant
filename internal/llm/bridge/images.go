@@ -35,48 +35,22 @@ func resolveImages(ctx context.Context, r llm.GenerationRequest) (map[string]ima
 			if _, ok := out[ref]; ok {
 				continue
 			}
-			if len(out) >= 8 || r.ResolveImage == nil {
+			if len(out) >= llm.MaxInputImages || r.ResolveImage == nil {
 				return nil, llm.ModelIncompatible
+			}
+			if ctx.Err() != nil {
+				return nil, llm.GenerationCancelled
 			}
 			media, data, err := r.ResolveImage(ctx, ref)
-			if err != nil || len(data) > 8<<20 || (media != "image/png" && media != "image/jpeg") {
-				return nil, llm.ModelIncompatible
-			}
-			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-			if err != nil || cfg.Width < 1 || cfg.Height < 1 || int64(cfg.Width)*int64(cfg.Height) > 32<<20 {
-				return nil, llm.ModelIncompatible
-			}
-			img, _, err := image.Decode(bytes.NewReader(data))
 			if err != nil {
 				return nil, llm.ModelIncompatible
 			}
-			size := 640
-			var encoded bytes.Buffer
-			for {
-				scale := math.Min(1, float64(size)/float64(max(cfg.Width, cfg.Height)))
-				w, h := int(float64(cfg.Width)*scale), int(float64(cfg.Height)*scale)
-				if w < 1 || h < 1 {
-					return nil, llm.ModelIncompatible
-				}
-				small := image.NewRGBA(image.Rect(0, 0, w, h))
-				for y := 0; y < h; y++ {
-					for x := 0; x < w; x++ {
-						small.Set(x, y, img.At(img.Bounds().Min.X+int(float64(x)/scale), img.Bounds().Min.Y+int(float64(y)/scale)))
-					}
-				}
-				encoded.Reset()
-				if jpeg.Encode(&encoded, small, &jpeg.Options{Quality: 60}) != nil {
-					return nil, llm.ModelIncompatible
-				}
-				if encoded.Len() <= 48<<10 {
-					break
-				}
-				size /= 2
-				if size < 80 {
-					return nil, llm.ModelIncompatible
-				}
+			payload, err := previewImage(media, data)
+			if err != nil {
+				return nil, err
 			}
-			encoded64 := base64.StdEncoding.EncodeToString(encoded.Bytes())
+
+			encoded64 := payload.Data
 			total += len(encoded64)
 			if total > 512<<10 {
 				return nil, llm.ModelIncompatible
@@ -84,8 +58,50 @@ func resolveImages(ctx context.Context, r llm.GenerationRequest) (map[string]ima
 			if out == nil {
 				out = map[string]imagePayload{}
 			}
-			out[ref] = imagePayload{Data: encoded64, MediaType: "image/jpeg", OriginalWidth: cfg.Width, OriginalHeight: cfg.Height, PreviewWidth: int(float64(cfg.Width) * math.Min(1, float64(size)/float64(max(cfg.Width, cfg.Height)))), PreviewHeight: int(float64(cfg.Height) * math.Min(1, float64(size)/float64(max(cfg.Width, cfg.Height))))}
+			out[ref] = payload
 		}
 	}
 	return out, nil
+}
+
+// Decode and resize one authorized input; selection, deduplication and envelope
+// budgeting stay with resolveImages. Invalid files fail before provider dispatch.
+func previewImage(media string, data []byte) (imagePayload, error) {
+	if len(data) > llm.MaxInputImageBytes || (media != "image/png" && media != "image/jpeg") {
+		return imagePayload{}, llm.ModelIncompatible
+	}
+
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || cfg.Width < 1 || cfg.Height < 1 || int64(cfg.Width)*int64(cfg.Height) > llm.MaxInputImagePixels {
+		return imagePayload{}, llm.ModelIncompatible
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return imagePayload{}, llm.ModelIncompatible
+	}
+	size := 640
+	var encoded bytes.Buffer
+	for {
+		scale := math.Min(1, float64(size)/float64(max(cfg.Width, cfg.Height)))
+		w, h := max(1, int(float64(cfg.Width)*scale)), max(1, int(float64(cfg.Height)*scale))
+		small := image.NewRGBA(image.Rect(0, 0, w, h))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				small.Set(x, y, img.At(img.Bounds().Min.X+int(float64(x)/scale), img.Bounds().Min.Y+int(float64(y)/scale)))
+			}
+		}
+		encoded.Reset()
+		if jpeg.Encode(&encoded, small, &jpeg.Options{Quality: 60}) != nil {
+			return imagePayload{}, llm.ModelIncompatible
+		}
+		if encoded.Len() <= 48<<10 {
+			break
+		}
+		size /= 2
+		if size < 80 {
+			return imagePayload{}, llm.ModelIncompatible
+		}
+	}
+	scale := math.Min(1, float64(size)/float64(max(cfg.Width, cfg.Height)))
+	return imagePayload{Data: base64.StdEncoding.EncodeToString(encoded.Bytes()), MediaType: "image/jpeg", OriginalWidth: cfg.Width, OriginalHeight: cfg.Height, PreviewWidth: max(1, int(float64(cfg.Width)*scale)), PreviewHeight: max(1, int(float64(cfg.Height)*scale))}, nil
 }

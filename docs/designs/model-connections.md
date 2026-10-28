@@ -351,8 +351,8 @@ format: valid v3 candidates above these limits still migrate, list and read back
 unchanged, alongside all other candidates. They cannot be probed or selected
 until replaced or edited within limits. No profile is silently clamped.
 When `image_input:true` is declared, Probe additionally sends a Host-owned blue
-square through the same image resolver/Pi envelope used by screenshot output and
-requires the correct color response. Rejection or an incorrect reply prevents
+square through the same image resolver/Pi envelope used by user uploads and
+explicitly selected screenshot output, and requires the correct color response. Rejection or an incorrect reply prevents
 activation; a failed retest revokes existing readiness. Declare `image_input:false`
 for a text-only profile. Activation retains observed text/tool/streaming capabilities,
 declared and verified image input, and conservative compatibility. Old Probe
@@ -379,6 +379,8 @@ Generate/Continue calls against actual Node/HTTP, dispatch ordering, failed clea
 and the full 30-second trickling-body deadline (not a shortened test-only timer).
 
 ## Changelog
+
+2026-10-28：F-013 在 Web 本地/账户模型候选中增加显式图片输入声明，并展示已验证/未验证/纯文本状态；沿用既有行为 Probe 和冻结 ModelSnapshot，不基于勾选或 catalog 直接启用视觉。
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

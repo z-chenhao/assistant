@@ -58,7 +58,17 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		Draft     bool     `json:"draft"`
 	}
 	user, _, _ = strings.Cut(user, "\nExplicit artifact references: ")
-	_ = json.Unmarshal([]byte(strings.SplitN(user, "\nArtifact reference", 2)[0]), &request)
+	// Decode the plan, not the Host's human-readable media hint suffix.
+	_ = json.NewDecoder(strings.NewReader(user)).Decode(&request)
+	if request.Operation == "read" {
+		for _, message := range r.Messages {
+			for _, id := range contextReceipts(message) {
+				if id == "artifact-fixture" {
+					return llm.GenerationResult{Text: "Artifact operation observed: completed receipt retained in working context."}
+				}
+			}
+		}
+	}
 	if last.Role == "tool" {
 		if (prior.Name == artifacttools.Manage && strings.Contains(prior.Arguments, `"operation":"save"`) || prior.Name == "mcp__fixture__binary" || prior.Name == "mcp__fixture__large") && !request.Draft {
 			var result struct {

@@ -19,8 +19,8 @@ type workingPreparation struct {
 	Compaction *agent.Compaction `json:"compaction,omitempty"`
 }
 
-func (r *Runs) workingMessages(run agent.Run) ([]llm.Message, map[string]int, error) {
-	all, e := agent.ProviderMessages(run.Checkpoint.Messages)
+func (r *Runs) workingMessages(run agent.Run, userImages bool) ([]llm.Message, map[string]int, error) {
+	all, e := agent.ProviderMessages(run.Checkpoint.Messages, userImages)
 	if e != nil {
 		return nil, nil, e
 	}
@@ -38,6 +38,9 @@ func (r *Runs) workingMessages(run agent.Run) ([]llm.Message, map[string]int, er
 		return nil, nil, agent.ErrStorage
 	}
 	for i, m := range all {
+		if userImages && !run.Snapshot.Capabilities.ImageInput && m.Role == "user" && len(m.ImageRefs) > 0 {
+			m.Text += "\nImage pixels are unavailable: the selected model has no verified image input. Use the references only; do not claim to have viewed the images."
+		}
 		ref := "trace:" + digest(fmt.Sprintf("%s:%d", run.ID, i))
 		if id := run.Checkpoint.Messages[i].MessageID; id != "" && run.Kind == "main" && run.Checkpoint.Messages[i].Type != "custom" {
 			ref = "conversation:" + id
@@ -76,7 +79,7 @@ func workingStateMessage(s *agent.WorkingState) llm.Message {
 		Summary string `json:"summary"`
 		History string `json:"history_artifact"`
 	}{s.Text, s.ArchiveRef})
-	out, _ := agent.ProviderMessages([]agent.AgentMessage{m})
+	out, _ := agent.ProviderMessages([]agent.AgentMessage{m}, false)
 	return out[0]
 }
 
@@ -84,17 +87,17 @@ func workingStateMessage(s *agent.WorkingState) llm.Message {
 // working sets before model admission. They use the same fenced generation,
 // spend, auth, cancellation and replay pipeline.
 func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run agent.Run) (workingPreparation, error) {
-	in, positions, e := r.workingMessages(run)
-	if e != nil {
-		return workingPreparation{}, e
-	}
 	p := contextbuilder.Policy{}
 	var policy string
-	if e = r.host.db.QueryRowContext(ctx, `SELECT policy_json FROM run_context_policy WHERE run_id=?`, run.ID).Scan(&policy); e != nil {
+	if e := r.host.db.QueryRowContext(ctx, `SELECT policy_json FROM run_context_policy WHERE run_id=?`, run.ID).Scan(&policy); e != nil {
 		return workingPreparation{}, agent.ErrStorage
 	}
 	if json.Unmarshal([]byte(policy), &p) != nil || !p.Valid() {
 		return workingPreparation{}, llm.ModelIncompatible
+	}
+	in, positions, e := r.workingMessages(run, p.UserImages)
+	if e != nil {
+		return workingPreparation{}, e
 	}
 	tools := contextbuilder.Size(agent.ProviderTools(run.Tools))
 	budget := contextbuilder.BudgetFor(run.Snapshot.ContextWindow, run.Snapshot.MaxOutputTokens, tools, p, run.Checkpoint.ContextRetries > 0)

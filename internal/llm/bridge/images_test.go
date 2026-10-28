@@ -3,8 +3,11 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/png"
@@ -17,6 +20,55 @@ import (
 
 	"github.com/z-chenhao/erii/internal/llm"
 )
+
+func TestImagePreviewBoundsAndEnvelopeSelection(t *testing.T) {
+	var pixels bytes.Buffer
+	if err := png.Encode(&pixels, image.NewRGBA(image.Rect(0, 0, 2000, 1))); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := previewImage("image/png", pixels.Bytes())
+	if err != nil || payload.PreviewWidth != 640 || payload.PreviewHeight != 1 || payload.OriginalWidth != 2000 {
+		t.Fatal(payload, err)
+	}
+	jpeg, err := base64.StdEncoding.DecodeString(payload.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(jpeg))
+	if err != nil || cfg.Width != payload.PreviewWidth || cfg.Height != payload.PreviewHeight {
+		t.Fatal(cfg, err)
+	}
+	oversized := append([]byte(nil), pixels.Bytes()...)
+	binary.BigEndian.PutUint32(oversized[16:20], 65536)
+	binary.BigEndian.PutUint32(oversized[20:24], 65536)
+	binary.BigEndian.PutUint32(oversized[29:33], crc32.ChecksumIEEE(oversized[12:29]))
+	for _, tc := range []struct {
+		media string
+		data  []byte
+	}{
+		{"image/gif", pixels.Bytes()}, {"image/png", []byte("corrupt")}, {"image/png", make([]byte, llm.MaxInputImageBytes+1)}, {"image/png", oversized},
+	} {
+		if _, err := previewImage(tc.media, tc.data); err != llm.ModelIncompatible {
+			t.Fatal("unsafe image admitted", tc.media, len(tc.data), err)
+		}
+	}
+	reads := 0
+	r := llm.GenerationRequest{Snapshot: llm.Snapshot{Capabilities: llm.Capabilities{ImageInput: true}}, ResolveImage: func(context.Context, string) (string, []byte, error) {
+		reads++
+		return "image/png", pixels.Bytes(), nil
+	}, Messages: []llm.Message{{Role: "user", ImageRefs: []string{"same", "same"}}}}
+	images, err := resolveImages(context.Background(), r)
+	if err != nil || len(images) != 1 || reads != 1 {
+		t.Fatal("duplicate pixel reads", images, reads, err)
+	}
+	r.Messages[0].ImageRefs = nil
+	for i := 0; i <= llm.MaxInputImages; i++ {
+		r.Messages[0].ImageRefs = append(r.Messages[0].ImageRefs, fmt.Sprint(i))
+	}
+	if _, err := resolveImages(context.Background(), r); err != llm.ModelIncompatible {
+		t.Fatal("unbounded images", err)
+	}
+}
 
 func TestExplicitScopedImageIsSentToActualPiAndNeverObserver(t *testing.T) {
 	ctx := context.Background()

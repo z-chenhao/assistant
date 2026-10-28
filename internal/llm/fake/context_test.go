@@ -17,7 +17,7 @@ func TestToolFreeSummaryRetainsFixtureReceiptProgress(t *testing.T) {
 	state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 		Summary string `json:"summary"`
 	}{summary.Text})
-	wire, e := agent.ProviderMessages([]agent.AgentMessage{state})
+	wire, e := agent.ProviderMessages([]agent.AgentMessage{state}, false)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -25,5 +25,25 @@ func TestToolFreeSummaryRetainsFixtureReceiptProgress(t *testing.T) {
 	next := capabilitiesReply(request)
 	if len(next.ToolCalls) != 1 || next.ToolCalls[0].ID != "capability:1" {
 		t.Fatal("summary replay repeated a completed fixture operation", next)
+	}
+}
+
+func TestArtifactReadKeepsCompletedReceiptAcrossSummary(t *testing.T) {
+	messages, _, err := contextbuilder.SummaryRequest([]llm.Message{{Role: "tool", ToolCallID: "artifact-fixture", Text: "Actual read result"}}, nil, 6000, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary := contextReply(llm.GenerationRequest{Messages: messages})
+	state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
+		Summary string `json:"summary"`
+	}{summary.Text})
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := llm.GenerationRequest{Messages: append([]llm.Message{{Role: "user", Text: `{"operation":"read","artifactRef":"artifact:input"}`}}, wire...)}
+	result := artifactsReply(request)
+	if len(result.ToolCalls) != 0 || result.Text == "" {
+		t.Fatal("compaction repeated the completed read", result)
 	}
 }

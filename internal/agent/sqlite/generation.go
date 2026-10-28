@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"io"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
@@ -35,7 +34,7 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		}
 		messages, compaction = prepared.Messages, prepared.Compaction
 	} else {
-		messages, err = agent.ProviderMessages(run.Checkpoint.Messages)
+		messages, err = agent.ProviderMessages(run.Checkpoint.Messages, false)
 		if err == nil {
 			messages, err = r.recallMessages(ctx, c, run, messages, -1)
 		}
@@ -122,26 +121,7 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		return nil
 	})
 	if err == nil && gen.Result == nil && gen.ErrorCode == "" && !gen.Waiting && !gen.Denied {
-		hasImages := false
-		for _, message := range gen.Request.Messages {
-			hasImages = hasImages || len(message.ImageRefs) > 0
-		}
-		if hasImages && gen.Request.Snapshot.Capabilities.ImageInput {
-			gen.Request.ResolveImage = func(imageCtx context.Context, ref string) (string, []byte, error) {
-				file, descriptor, err := r.openArtifact(imageCtx, ref, func(tx *sql.Tx) (artifact.Scope, error) {
-					if err := fence(imageCtx, tx, c); err != nil {
-						return artifact.Scope{}, err
-					}
-					return runScope(imageCtx, tx, run.ID)
-				})
-				if err != nil {
-					return "", nil, err
-				}
-				defer file.Close()
-				data, err := io.ReadAll(io.LimitReader(file, (8<<20)+1))
-				return descriptor.MediaType, data, err
-			}
-		}
+		r.resolveGenerationImages(c, &gen.Request)
 		if run.Kind == "worker" {
 			r.host.boundary("before_worker_generation")
 		}

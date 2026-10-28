@@ -4,6 +4,10 @@
 Launch/doctor/drive/evidence/cleanup are one foreground, disposable operation.
 """
 import argparse
+import base64
+import hashlib
+import struct
+import zlib
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -79,6 +83,21 @@ class Endpoint(BaseHTTPRequestHandler):
             elif "dominant color of this image" in text:
                 chunk({"content": "blue" if images == 1 and self.server.mode != "reject-images" else "unseen"})
                 chunk({}, "stop")
+            elif self.server.mode == "user-images" and "USER_IMAGE_INPUT" in text:
+                payloads = [p['image_url']['url'] for m in body['messages'] if isinstance(m.get('content'),list)
+                            for p in m['content'] if p.get('type') == 'image_url']
+                hashes = []
+                for value in payloads:
+                    require(value.startswith('data:image/jpeg;base64,'),'user image did not enter the provider envelope')
+                    data = base64.b64decode(value.split(',',1)[1],validate=True)
+                    require(data.startswith(b'\xff\xd8\xff') and len(data)>100,'provider did not receive actual JPEG bytes')
+                    hashes.append(hashlib.sha256(data).hexdigest())
+                self.server.images.append(hashes)
+                if self.server.hold_images:
+                    self.server.received_image.set()
+                    require(self.server.release_image.wait(15),'image recovery peer was not released')
+                chunk({'content':'USER_IMAGE_PIXELS_RECEIVED' if images else 'USER_IMAGE_REFERENCE_ONLY'})
+                chunk({},'stop')
             elif self.server.mode == "screenshots" and any(t["function"]["name"] == "builtin__codemode_execute" for t in body.get("tools", [])):
                 self.server.images.append(images)
                 count = sum(m["role"] == "tool" for m in body["messages"])
@@ -318,6 +337,76 @@ def verify_screenshot_projection(binary, script):
     return report
 
 
+def verify_user_images(binary, script, evidence):
+    """Actual Web/CLI inputs -> scoped Artifact -> frozen request -> Pi HTTP."""
+    from verify_channels import ChannelHarness, Sandbox
+    from event_broker import Broker
+    report = {'checks': [], 'scenarios': {}}
+    def png_chunk(kind, data):
+        return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+    picture = b'\x89PNG\r\n\x1a\n'+png_chunk(b'IHDR',struct.pack('>IIBBBBB',2,2,8,2,0,0,0))
+    picture += png_chunk(b'IDAT',zlib.compress((b'\0'+b'\xff\0\0'*2)*2))+png_chunk(b'IEND',b'')
+    server = ThreadingHTTPServer(('127.0.0.1',0),Endpoint)
+    server.daemon_threads = True
+    server.requests,server.images,server.mode,server.hold_images = [],[],'user-images',False
+    server.received_image,server.release_image = threading.Event(),threading.Event()
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        for mode in ('vision','text','recovery'):
+            with tempfile.TemporaryDirectory(prefix='erii-user-image-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+                h=ChannelHarness(binary,Path(temp),platform)
+                try:
+                    h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(script))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
+                    h.args=lambda *a:[str(binary),'-config',str(h.config),*a]
+                    metadata={'name':'User images','provider_kind':'openai_compatible','endpoint':f'http://127.0.0.1:{server.server_port}/v1',
+                              'wire_api':'openai_completions','model_id':'fixture-model','context_window':65536,'max_output_tokens':4096,
+                              'compatibility':{'tool_result_format':'openai'},'capabilities':{'text_input':True,'image_input':mode!='text'}}
+                    h.setup(metadata=metadata)
+                    start=len(server.images)
+                    if mode!='recovery':
+                        h.env['ERII_TEST_PICTURE']=base64.b64encode(picture).decode()
+                        h.env['ERII_TEST_VISION']='yes' if mode=='vision' else 'no'
+                        h.start()
+                        h.wait_state(lambda status:status['readiness']=='ready','image runtime readiness',lambda _:h.http('/api/status'))
+                        h.browser(evidence.parent/('user-image-'+mode),'image');h.stop()
+                    else:
+                        run=h.processes.run if h.processes is not None else subprocess.run
+                        saved=run(h.args('artifact','save','user-picture.png','image/png'),input=picture,capture_output=True,env=h.env,cwd=h.root,timeout=20)
+                        require(saved.returncode==0,'CLI image save failed')
+                        ref=json.loads(saved.stdout)['artifact_ref']
+                        h.command('chat','send-parts','user-image-recovery',text=json.dumps([{'type':'text','text':'USER_IMAGE_INPUT: inspect this upload.'},{'type':'image','artifact_ref':ref}]))
+                        server.hold_images=True
+                        start_process=h.processes.start if h.processes is not None else subprocess.Popen
+                        child=start_process(h.args('chat','work'),stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=h.env,cwd=h.root)
+                        h.children.append(child)
+                        require(server.received_image.wait(15),'CLI image never reached actual provider')
+                        child.kill();child.communicate(timeout=10)
+                        with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+                            frozen=db.execute('SELECT generation_id,request_hash,request_json FROM model_generation').fetchone()
+                        server.hold_images=False;server.release_image.set()
+                        h.command('chat','work')
+                        with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+                            recovered=db.execute('SELECT generation_id,request_hash,request_json FROM model_generation').fetchone()
+                        require(recovered==frozen,'image recovery changed the accepted generation or hash')
+                    with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+                        requests=[json.loads(r[0]) for r in db.execute('SELECT request_json FROM model_generation ORDER BY created_at')]
+                        require(requests and all(sum(len(m.get('image_refs',[])) for m in r['messages'])==1 for r in requests),'user input image reference missing')
+                        require('base64' not in json.dumps(requests),'pixels entered durable request')
+                        if mode=='text':require('Image pixels are unavailable:' in json.dumps(requests),'text-only fallback was not explicit')
+                    captured=server.images[start:]
+                    require(captured and all(len(p)==(0 if mode=='text' else 1) for p in captured),'wrong actual provider pixel selection')
+                    if mode=='recovery':require(len(captured)==2 and captured[0]==captured[1],'recovery changed selected pixels')
+                    report['scenarios'][mode]={'provider_image_hashes':captured,'requests':requests}
+                finally:
+                    server.hold_images=False;server.release_image.set();h.cleanup()
+        report['checks']=['Authenticated browser uploads reach actual Pi HTTP with scoped pixels; text-only profiles send no pixels and state the limitation',
+                          'CLI save/send-parts followed by SIGKILL reuses the frozen generation id, hash and selected image bytes']
+    finally:
+        server.release_image.set();server.shutdown();server.server_close();thread.join(timeout=3)
+    report['cleanup']=True
+    return report
+
+
 def verify_live_probe(binary, script, endpoint, model, context_tokens, output_tokens):
     """Opt-in local Live Shadow. Never selects a profile or opens user state."""
     from urllib.parse import urlsplit
@@ -377,6 +466,7 @@ if __name__ == "__main__":
     else:
         result = verify(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve())
         result['screenshot_projection'] = verify_screenshot_projection(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve())
+        result['user_images'] = verify_user_images(Path(args.binary).resolve(), Path('provider-bridge/bridge.mjs').resolve(),Path(args.evidence))
     Path(args.evidence).parent.mkdir(parents=True, exist_ok=True)
     Path(args.evidence).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"checks": len(result.get("checks", [])), "usage_rows": len(result["usage"]), "cleanup": result["cleanup"]}))
