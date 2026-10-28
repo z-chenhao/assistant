@@ -106,30 +106,18 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		}
 		if hasImages && gen.Request.Snapshot.Capabilities.ImageInput {
 			gen.Request.ResolveImage = func(imageCtx context.Context, ref string) (string, []byte, error) {
-				var media string
-				var data []byte
-				err := r.write(imageCtx, func(tx *sql.Tx) error {
+				file, descriptor, err := r.openArtifact(imageCtx, ref, func(tx *sql.Tx) (artifact.Scope, error) {
 					if err := fence(imageCtx, tx, c); err != nil {
-						return err
+						return artifact.Scope{}, err
 					}
-					scope, err := runScope(imageCtx, tx, run.ID)
-					if err != nil {
-						return err
-					}
-					d, err := r.host.Artifacts().DescribeTx(imageCtx, tx, scope, ref, true)
-					if err != nil {
-						return err
-					}
-					media = d.MediaType
-					f, err := r.host.Artifacts().OpenTx(imageCtx, tx, scope, ref)
-					if err != nil {
-						return err
-					}
-					defer f.Close()
-					data, err = io.ReadAll(io.LimitReader(f, (8<<20)+1))
-					return err
+					return runScope(imageCtx, tx, run.ID)
 				})
-				return media, data, err
+				if err != nil {
+					return "", nil, err
+				}
+				defer file.Close()
+				data, err := io.ReadAll(io.LimitReader(file, (8<<20)+1))
+				return descriptor.MediaType, data, err
 			}
 		}
 		if run.Kind == "worker" {

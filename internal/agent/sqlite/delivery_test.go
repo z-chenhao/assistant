@@ -94,14 +94,14 @@ func TestDeliveryTransportRecoveryAndRetainedHistory(t *testing.T) {
 			if mode == "unavailable" && rows[0].AttemptCount != 2 {
 				t.Fatal("unbounded retries", rows)
 			}
-			before, err := service.History.List(ctx, service.Destination)
+			before, err := service.History.(conversation.Store).List(ctx, service.Destination)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if err := service.Drain(ctx); err != nil {
 				t.Fatal(err)
 			}
-			after, _ := service.History.List(ctx, service.Destination)
+			after, _ := service.History.(conversation.Store).List(ctx, service.Destination)
 			if len(before) != 2 || len(after) != 2 || before[1].MessageID != after[1].MessageID {
 				t.Fatal("send rewrote semantic history")
 			}
@@ -130,7 +130,7 @@ func TestDeliveryClaimFencesLateAckAndQueriesAcceptedSend(t *testing.T) {
 	if _, err = s.Deliveries().Claim(ctx, "tui", service.Destination, nil, now, time.Second); !errors.Is(err, delivery.ErrEmpty) {
 		t.Fatal("duplicate owner", err)
 	}
-	messages, _ := service.History.List(ctx, service.Destination)
+	messages, _ := service.History.(conversation.Store).List(ctx, service.Destination)
 	e, err := delivery.Compose(c.Request, messages[1])
 	if err != nil {
 		t.Fatal(err)
@@ -355,7 +355,7 @@ INSERT INTO delivery_request VALUES('d1','m1','local_cli','prior','pending','d1'
 func TestDeliveryComposeRejectsWrongSemanticSource(t *testing.T) {
 	_, service, _ := terminalFixture(t)
 	ctx := context.Background()
-	messages, _ := service.History.List(ctx, service.Destination)
+	messages, _ := service.History.(conversation.Store).List(ctx, service.Destination)
 	r := delivery.Request{DeliveryID: "d", MessageID: messages[0].MessageID, ConversationID: service.Destination, Channel: "tui", DestinationRef: service.Destination, Intent: "approval", IdempotencyKey: "d", CreatedAt: 1}
 	if _, err := delivery.Compose(r, messages[0]); err == nil {
 		t.Fatal("user message sent as assistant")
@@ -466,7 +466,7 @@ func TestDeliveryMainFailureAndNeedsInputNotices(t *testing.T) {
 func TestTerminalProjectionHidesUnsentAndRetainsPriorSentHistory(t *testing.T) {
 	s, service, adapter := terminalFixture(t)
 	ctx := context.Background()
-	messages, _ := service.History.List(ctx, service.Destination)
+	messages, _ := service.History.(conversation.Store).List(ctx, service.Destination)
 	projected, err := adapter.History(ctx, service.Destination, messages, deliveryRows(t, s))
 	if err != nil || len(projected) != 1 || projected[0].Role != "user" {
 		t.Fatal("unaccepted output visible", projected, err)

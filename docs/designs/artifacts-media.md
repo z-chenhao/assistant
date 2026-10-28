@@ -18,6 +18,22 @@ flowchart TD
     C -.-> P["用户多模态解析：待补齐"]
 ```
 
+### 短事务与文件所有权（F-039）
+
+```mermaid
+sequenceDiagram
+    participant E as Executor
+    participant F as Artifact 文件
+    participant D as state.db
+    E->>D: 短事务创建并锁定临时文件
+    E->>F: 事务外读取、哈希、sync、校验
+    E->>D: 短事务重检 scope/fence/配额
+    E->>F: rename + 目录 sync
+    E->>D: 元数据、pins、Tool 终态一起提交
+```
+
+临时对象保持进程所有的文件锁；回收器在元数据事务内以非阻塞 flock 跳过活跃文件。进程死亡自动释放锁，未提交对象由现有回收扫描删除。读取绑定同一 fd，在事务外验证完整性；Run/Computer 使用前再次检查 owner/隐私 fence。显式 publish 的整组内容先在事务外校验，短事务重检每项授权、存活和版本，再一起写最终选择。配额仍由单一即时事务接纳。
+
 ## 当前流程与目标差异
 
 上传或保存 → 绑定授权引用 → Agent 读取/处理 → 显式 publish → Main 选择最终附件 → 渠道交付。媒体内容理解需另经支持的解析或视觉路径。
@@ -115,17 +131,14 @@ Changing content creates a new ref; no overwrite operation exists.
 Defaults: 30 days, 1 GiB per local user, 64 MiB per object, 100 expiry candidates
 per cleanup batch. `artifact` configuration sets positive bounds; quota must
 cover max object size. Quota counts all live metadata, including expired objects
-until deletion. The immediate state.db write transaction serializes quota,
-object writes and orphan recovery across processes. This favors correctness
-and bounded local storage over throughput; one large upload holds the write
-lock, and lock contention can return a storage failure rather than retrying an
-unreadable input stream.
-
-The Store writes a fresh exclusive temporary file, hashes and syncs it, verifies
-the written bytes, atomically renames and syncs the directory, then inserts
-metadata. A process death before metadata commit leaves an orphan; startup
-removes unreferenced temp/final objects under the same write lock, so a live
-writer cannot be collected. A committed Tool result is reused after restart.
+until deletion. Streaming, syncing and full integrity verification happen outside
+state.db transactions. Short immediate transactions serialize quota admission,
+metadata publication and recovery scans. Staged files keep an exclusive file
+lock until metadata commits or the owner closes; orphan recovery skips locked
+files across processes. A crash releases the lock, permitting orphan cleanup.
+Rename and directory sync precede atomic metadata/Tool result commit. A committed
+Tool result is reused after restart. Existing data needs no schema migration;
+stop older binaries before upgrading because their recovery ignores file locks.
 Filesystem access uses `os.Root`, generated flat keys, regular-file checks and
 no caller-controlled paths. A symlink as the Artifact root fails startup;
 symlink objects and path escapes fail closed. The configured data root and OS
@@ -149,6 +162,7 @@ transaction before storage can be reclaimed. After Task protection ends, effecti
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-039：流读取/校验移出 SQLite，保留短事务配额及结果接纳；活跃对象由文件锁保护。 | 避免长流阻塞 lease 和结果接纳；增加文件所有权协议，需停止旧版本后升级，禁止不同回收协议混跑。 |
 | 2026-10-28 | 现状建档 | 保留引用式持久化，避免把 Base64 写入对话与恢复记录；用户输入与工具图片分开追踪，不能用运输证据代替模型理解。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

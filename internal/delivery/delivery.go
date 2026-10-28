@@ -105,7 +105,7 @@ type Store interface {
 	Settle(context.Context, Claim, Observation, time.Time, time.Time) error
 }
 type History interface {
-	List(context.Context, string) ([]conversation.Message, error)
+	Get(context.Context, string, string) (conversation.Message, error)
 }
 
 type Policy struct {
@@ -203,16 +203,9 @@ func (s Service) deliverClaim(ctx context.Context, c Claim) error {
 }
 
 func (s Service) deliver(ctx context.Context, c Claim) error {
-	messages, err := s.History.List(ctx, c.Request.ConversationID)
+	message, err := s.History.Get(ctx, c.Request.ConversationID, c.Request.MessageID)
 	if err != nil {
 		return err
-	}
-	var message conversation.Message
-	for _, m := range messages {
-		if m.MessageID == c.Request.MessageID {
-			message = m
-			break
-		}
 	}
 	e, err := Compose(c.Request, message)
 	if err != nil {

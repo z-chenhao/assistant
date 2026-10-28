@@ -17,6 +17,10 @@ flowchart TD
     E <--> S["固定源 / Store / replay 记录"]
 ```
 
+### 执行协调边界（F-039）
+
+`internal/tool/codemode/execution.go` 拥有 VM 尝试、最多三次 transport 重建、已存 outcome 复用、嵌套调用 drain 与挂起协调。消费方定义 `ExecutionHost`，SQLite 的 `codeBridge` 提供 claim/fence、读取/记录 outcome、原子事件接纳、release 和 Computer idle。所有工具仍进入原 Tool Executor；VM 不接触数据库或模型凭据。shutdown watcher 在返回前 join。指纹、source、call key、既存 schema 与重放结果保持不变。
+
 ## 当前流程与目标差异
 
 接受固定 source → 启动隔离 VM → 嵌套调用和 Store 观察持久化 → 等待可释放 VM → 重启按同一源重放并复用结果 → 显式输出。
@@ -385,6 +389,7 @@ and prove the disposed VM is not retained.
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-039：VM 重建/挂起协调移入 CodeMode，SQLite 继续负责权威事实与事务。 | 替代把所有编排放进数据库适配器；不引入第二 scheduler、执行管线或运行时 wire 版本。 |
 | 2026-10-28 | 现状建档 | 使用标准 JavaScript 表达顺序与并发；固定源与冻结能力恢复，不增加 Workflow DSL 或第二套执行引擎。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

@@ -12,6 +12,7 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	artifactsqlite "github.com/z-chenhao/erii/internal/artifact/sqlite"
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/tool"
 )
@@ -82,45 +83,7 @@ func (t *tools) executeArtifact(ctx context.Context, tx *sql.Tx, name, args stri
 		}
 		raw, e := encoded(list)
 		return tool.Result{Text: raw}, e
-	case "read":
-		d, e := store.DescribeTx(ctx, tx, a, v.Ref, true)
-		if e != nil {
-			return artifactFailure(e), nil
-		}
-		// Binary media are passed by ref; never base64-encode them into history.
-		media, _, _ := mime.ParseMediaType(d.MediaType)
-		if !strings.HasPrefix(media, "text/") && media != "application/json" && !strings.HasSuffix(media, "+json") {
-			return tool.Result{Text: "Binary content; use the artifact reference.", ArtifactRefs: []string{v.Ref}}, nil
-		}
-		f, e := store.OpenTx(ctx, tx, a, v.Ref)
-		if e != nil {
-			return artifactFailure(e), nil
-		}
-		defer f.Close()
-		if v.Limit == 0 {
-			v.Limit = 4096
-		}
-		if v.Limit < 1 || v.Limit > 4096 || v.Offset < 0 || v.Offset > d.ByteSize {
-			return tool.Failure("INVALID_ARGUMENT"), nil
-		}
-		if _, e = io.CopyN(io.Discard, f, v.Offset); e != nil {
-			return artifactFailure(e), nil
-		}
-		b, e := io.ReadAll(io.LimitReader(f, int64(v.Limit)))
-		if e != nil {
-			return artifactFailure(e), nil
-		}
-		// Byte ranges may cut a Unicode character. Reject that range explicitly.
-		if !utf8.Valid(b) {
-			return tool.Failure("INVALID_ARGUMENT"), nil
-		}
-		raw, e := encoded(struct {
-			Text   string `json:"text"`
-			Offset int64  `json:"offset"`
-			Bytes  int    `json:"bytes"`
-			Total  int64  `json:"total_bytes"`
-		}{string(b), v.Offset, len(b), d.ByteSize})
-		return tool.Result{Text: raw}, e
+
 	}
 	return tool.Failure("NOT_FOUND"), nil
 }
@@ -147,22 +110,7 @@ func artifactChange(ctx, outputCtx context.Context, tx *sql.Tx, change func() er
 	return err
 }
 
-type artifactResultReader struct {
-	ctx context.Context
-	src io.Reader
-}
-
-func (r artifactResultReader) Read(p []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
-	}
-	n, err := r.src.Read(p)
-	if cause := r.ctx.Err(); cause != nil {
-		return 0, cause
-	}
-	return n, err
-}
-func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result) (tool.Result, error) {
+func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result, prepared preparedOutput) (tool.Result, error) {
 	a, err := runScope(ctx, tx, runID)
 	if err != nil {
 		return tool.Result{}, err
@@ -239,10 +187,13 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 			if output == nil {
 				output = &tool.BinaryOutput{Name: "tool-output.txt", MediaType: "text/plain", Reader: strings.NewReader(result.Text)}
 			}
-			if output.Reader == nil {
+			if prepared.err != nil {
+				return prepared.err
+			}
+			if prepared.staged == nil {
 				return artifact.ErrInvalid
 			}
-			ref, e := store.PutTx(ctx, tx, a, artifact.Input{Name: output.Name, MediaType: output.MediaType}, artifactResultReader{outputCtx, output.Reader}, "tool:"+id)
+			ref, e := store.CommitTx(ctx, tx, a, prepared.staged, "tool:"+id)
 			if e != nil {
 				return e
 			}
@@ -262,7 +213,10 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 			}
 		}
 		if result.PublishRefs != nil {
-			if err := store.PublishTx(outputCtx, tx, a, result.PublishRefs); err != nil {
+			if prepared.err != nil {
+				return prepared.err
+			}
+			if err := store.PublishTx(outputCtx, tx, a, prepared.publication); err != nil {
 				return err
 			}
 			result.ArtifactRefs = append(result.ArtifactRefs, result.PublishRefs...)
@@ -292,11 +246,11 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 
 // Receipt storage failures cannot establish that an external effect failed.
 // storeOutput rolls back normalization before returning an expected failure.
-func (r *Runs) storeRecoveryOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result) (tool.Result, error) {
+func (r *Runs) storeRecoveryOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id string, result tool.Result, prepared preparedOutput) (tool.Result, error) {
 	if outputCtx.Err() != nil {
 		return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
 	}
-	out, err := r.storeOutput(ctx, outputCtx, tx, runID, id, result)
+	out, err := r.storeOutput(ctx, outputCtx, tx, runID, id, result, prepared)
 	if err == nil && result.Error == nil && out.Error != nil {
 		return tool.Failure("UNKNOWN_SIDE_EFFECT"), nil
 	}
@@ -330,4 +284,193 @@ func imageRefsIncluded(images, refs []string) bool {
 		}
 	}
 	return true
+}
+
+// stageOutput performs provider I/O outside state.db. The terminal transaction
+// repeats policy, owner, result and reference validation before publication.
+type preparedOutput struct {
+	staged      *artifactsqlite.Staged
+	publication *artifactsqlite.Publication
+	err         error
+}
+
+func (p preparedOutput) Close() {
+	if p.staged != nil {
+		p.staged.Close()
+	}
+}
+func (r *Runs) stageOutput(ctx context.Context, id string, result tool.Result) preparedOutput {
+	var prepared preparedOutput
+	prepared.staged, prepared.err = r.stageBinaryOutput(ctx, id, result)
+	if prepared.err != nil || result.PublishRefs == nil {
+		return prepared
+	}
+	var scope artifact.Scope
+	var runID string
+	prepared.err = r.host.db.QueryRowContext(ctx, `SELECT run_id FROM tool_invocation WHERE invocation_id=?`, id).Scan(&runID)
+	if prepared.err != nil {
+		return prepared
+	}
+	prepared.err = r.write(ctx, func(tx *sql.Tx) error { var err error; scope, err = runScope(ctx, tx, runID); return err })
+	if prepared.err == nil {
+		prepared.publication, prepared.err = r.host.Artifacts().PreparePublication(ctx, scope, result.PublishRefs)
+	}
+	return prepared
+}
+func (r *Runs) stageBinaryOutput(ctx context.Context, id string, result tool.Result) (*artifactsqlite.Staged, error) {
+	if result.Error != nil {
+		return nil, nil
+	}
+	var raw, name string
+	if err := r.host.db.QueryRowContext(ctx, `SELECT policy_json,tool_name FROM tool_invocation WHERE invocation_id=?`, id).Scan(&raw, &name); err != nil {
+		return nil, err
+	}
+	var policy tool.Policy
+	if json.Unmarshal([]byte(raw), &policy) != nil {
+		return nil, artifact.ErrStorage
+	}
+	if policy.OutputBytes == 0 {
+		policy.OutputBytes = 16384
+	}
+	text := result.Text
+	if name == agent.RunToolName {
+		var value agent.AgentResult
+		if json.Unmarshal([]byte(text), &value) != nil {
+			return nil, nil
+		}
+		text = value.Text
+		policy.OutputBytes = 16384
+	}
+	output := result.Output
+	if output == nil && len(text) > policy.OutputBytes {
+		output = &tool.BinaryOutput{Name: "tool-output.txt", MediaType: "text/plain", Reader: strings.NewReader(text)}
+	}
+	if output == nil {
+		return nil, nil
+	}
+	return r.host.Artifacts().Stage(ctx, artifact.Input{Name: output.Name, MediaType: output.MediaType}, output.Reader)
+}
+
+func (t *tools) executeArtifactCall(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
+	result := tool.Failure("PERMISSION_DENIED")
+	var readArgs string
+	err := t.runs.write(ctx, func(tx *sql.Tx) error {
+		_, name, args, err := t.acceptedBuiltin(ctx, tx, inv)
+		if errors.Is(err, tool.ErrApprovalDenied) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if !artifacttools.Known(name) {
+			return nil
+		}
+		var request struct {
+			Operation string `json:"operation"`
+		}
+		if name == artifacttools.Manage && json.Unmarshal([]byte(args), &request) == nil && request.Operation == "read" {
+			readArgs = args
+			return nil
+		}
+		result, err = t.executeArtifact(ctx, tx, name, args)
+		return err
+	})
+	if err == nil && readArgs != "" {
+		return t.readArtifact(ctx, readArgs)
+	}
+	return result, err
+}
+
+type artifactReadRequest struct {
+	Ref    string `json:"artifactRef"`
+	Offset int64  `json:"offset"`
+	Limit  int    `json:"limit"`
+}
+
+func (t *tools) readArtifact(ctx context.Context, args string) (tool.Result, error) {
+	var v artifactReadRequest
+	if json.Unmarshal([]byte(args), &v) != nil {
+		return tool.Failure("INVALID_ARGUMENT"), nil
+	}
+
+	f, d, e := t.runs.openArtifact(ctx, v.Ref, func(tx *sql.Tx) (artifact.Scope, error) {
+		if err := t.fence(ctx, tx); err != nil {
+			return artifact.Scope{}, err
+		}
+		return runScope(ctx, tx, t.claim.RunID())
+	})
+	if e != nil {
+		if errors.Is(e, agent.ErrClaimLost) || errors.Is(e, agent.ErrStorage) {
+			return tool.Result{}, e
+		}
+		return artifactFailure(e), nil
+	}
+	defer f.Close()
+	// Binary media are passed by ref; never base64-encode them into history.
+	media, _, _ := mime.ParseMediaType(d.MediaType)
+	if !strings.HasPrefix(media, "text/") && media != "application/json" && !strings.HasSuffix(media, "+json") {
+		return tool.Result{Text: "Binary content; use the artifact reference.", ArtifactRefs: []string{v.Ref}}, nil
+	}
+
+	if v.Limit == 0 {
+		v.Limit = 4096
+	}
+	if v.Limit < 1 || v.Limit > 4096 || v.Offset < 0 || v.Offset > d.ByteSize {
+		return tool.Failure("INVALID_ARGUMENT"), nil
+	}
+	if _, e = io.CopyN(io.Discard, f, v.Offset); e != nil {
+		return artifactFailure(e), nil
+	}
+	b, e := io.ReadAll(io.LimitReader(f, int64(v.Limit)))
+	if e != nil {
+		return artifactFailure(e), nil
+	}
+	// Byte ranges may cut a Unicode character. Reject that range explicitly.
+	if !utf8.Valid(b) {
+		return tool.Failure("INVALID_ARGUMENT"), nil
+	}
+	raw, e := encoded(struct {
+		Text   string `json:"text"`
+		Offset int64  `json:"offset"`
+		Bytes  int    `json:"bytes"`
+		Total  int64  `json:"total_bytes"`
+	}{string(b), v.Offset, len(b), d.ByteSize})
+	return tool.Result{Text: raw}, e
+}
+
+func (r *Runs) openArtifact(ctx context.Context, ref string, authorize func(*sql.Tx) (artifact.Scope, error)) (io.ReadCloser, artifact.Descriptor, error) {
+	var opened *artifactsqlite.Opened
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		scope, err := authorize(tx)
+		if err != nil {
+			return err
+		}
+		opened, err = r.host.Artifacts().OpenFileTx(ctx, tx, scope, ref)
+		return err
+	})
+	if err != nil {
+		if opened != nil {
+			opened.Close()
+		}
+		return nil, artifact.Descriptor{}, err
+	}
+	reader, err := opened.Verify(ctx)
+	if err != nil {
+		return nil, artifact.Descriptor{}, err
+	}
+	// A privacy/stop epoch can change while hashing. Revalidate before any
+	// bytes reach a runtime or provider; returning the same fd avoids TOCTOU.
+	err = r.write(ctx, func(tx *sql.Tx) error {
+		scope, err := authorize(tx)
+		if err != nil {
+			return err
+		}
+		_, err = r.host.Artifacts().DescribeTx(ctx, tx, scope, ref, true)
+		return err
+	})
+	if err != nil {
+		reader.Close()
+		return nil, artifact.Descriptor{}, err
+	}
+	return reader, opened.Descriptor(), nil
 }

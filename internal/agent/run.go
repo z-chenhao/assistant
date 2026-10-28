@@ -122,7 +122,7 @@ type Checkpoint struct {
 	Messages       []AgentMessage        `json:"messages"`
 	InputSequence  int64                 `json:"input_sequence"`
 	Step           int64                 `json:"step"`
-	Phase          string                `json:"phase"` // model, tools, reply
+	Phase          Phase                 `json:"phase"`
 	ExchangeID     string                `json:"exchange_id,omitempty"`
 	Result         *llm.GenerationResult `json:"result,omitempty"`
 }
@@ -131,8 +131,8 @@ type Run struct {
 	ID             string       `json:"run_id"`
 	AgentID        string       `json:"agent_id"`
 	ConversationID string       `json:"conversation_id"`
-	Kind           string       `json:"kind"`
-	Status         string       `json:"status"`
+	Kind           Role         `json:"kind"`
+	Status         RunStatus    `json:"status"`
 	WaitReason     string       `json:"wait_reason,omitempty"`
 	Version        int64        `json:"version"`
 	Snapshot       llm.Snapshot `json:"model_snapshot"`
@@ -193,3 +193,31 @@ const workerPrompt = "You are a general Worker executing a delegated Task. Work 
 func RootContext(title, brief string) []AgentMessage {
 	return []AgentMessage{TextMessage("system", safetyPrompt), TextMessage("system", "You are Erii. Follow stable safety and evidence principles."), TextMessage("system", workerPrompt), TextMessage("user", "Task anchor: "+title+"\n"+brief)}
 }
+
+// These types model persisted runtime states. Their wire strings are frozen.
+type Phase string
+
+const (
+	ModelPhase  Phase = "model"
+	ToolsPhase  Phase = "tools"
+	ReplyPhase  Phase = "reply"
+	SettlePhase Phase = "settle"
+)
+
+type Role string
+
+const (
+	MainRole   Role = "main"
+	WorkerRole Role = "worker"
+)
+
+type RunStatus string
+
+const (
+	QueuedRun    RunStatus = "queued"
+	RunningRun   RunStatus = "running"
+	WaitingRun   RunStatus = "waiting"
+	CompletedRun RunStatus = "completed"
+	FailedRun    RunStatus = "failed"
+	CancelledRun RunStatus = "cancelled"
+)

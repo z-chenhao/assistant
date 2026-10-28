@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/computer"
 	"github.com/z-chenhao/erii/internal/tool"
 )
@@ -108,19 +109,13 @@ func (s *computerUseStore) Save(ctx context.Context, state computer.UseState) er
 }
 
 func (s *computerUseStore) OpenArtifact(ctx context.Context, ref string) (io.ReadCloser, error) {
-	var f io.ReadCloser
-	err := s.b.t.runs.write(ctx, func(tx *sql.Tx) error {
+	file, _, err := s.b.t.runs.openArtifact(ctx, ref, func(tx *sql.Tx) (artifact.Scope, error) {
 		if err := s.b.fence(ctx, tx); err != nil {
-			return err
+			return artifact.Scope{}, err
 		}
-		scope, err := runScope(ctx, tx, s.b.t.claim.RunID())
-		if err != nil {
-			return err
-		}
-		f, err = s.b.t.runs.host.Artifacts().OpenTx(ctx, tx, scope, ref)
-		return err
+		return runScope(ctx, tx, s.b.t.claim.RunID())
 	})
-	return f, err
+	return file, err
 }
 func (t *tools) executeComputerUse(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	b := t.codeOwner

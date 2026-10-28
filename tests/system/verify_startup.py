@@ -112,8 +112,7 @@ def verify_install():
                 require(terminal.stop(signal.SIGKILL) == -signal.SIGKILL, 'missing crash evidence')
                 report['first_launch'] = terminal.transcript()
             with Terminal(h.args(), h.env, folder) as terminal:
-                terminal.expect('State: ready')
-                terminal.expect('assistant: PROBE_RESULT_OK')
+                terminal.expect_all(['State: ready', 'assistant: PROBE_RESULT_OK'])
                 terminal.expect('You> ')
                 require(h.state() == before, 'restart duplicated or changed completed state')
                 require(terminal.stop() == 0, 'foreground cleanup failed')

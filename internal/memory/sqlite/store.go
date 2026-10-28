@@ -19,9 +19,13 @@ import (
 )
 
 type Store struct {
-	db     *sql.DB
-	engine recall.Embedding
-	vault  memory.Vault
+	db           *sql.DB
+	engine       recall.Embedding
+	vault        memory.Vault
+	searchGate   chan struct{}
+	working      *sql.DB // Plaintext exists only in process memory.
+	workingScope recall.Scope
+	indexed      map[string]sqliteindex.Document
 }
 
 const SchemaVersion = 2
@@ -64,7 +68,7 @@ func Open(ctx context.Context, root string) (*Store, error) {
 		return nil, recall.ErrUnavailable
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
+	s := &Store{db: db, searchGate: make(chan struct{}, 1)}
 	if err = s.migrate(ctx); err != nil {
 		db.Close()
 		return nil, err
@@ -103,7 +107,12 @@ func (s *Store) Configure(ctx context.Context, e recall.Embedding) error {
 	s.engine = e
 	return nil
 }
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	s.searchGate <- struct{}{}
+	defer func() { <-s.searchGate }()
+	s.clearWorking()
+	return s.db.Close()
+}
 func (s *Store) Search(ctx context.Context, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
 	return s.search(ctx, scope, q)
 }
@@ -206,6 +215,12 @@ func (s *Store) apply(ctx context.Context, tx *sql.Tx, r memory.Record) error {
 	return nil
 }
 func (s *Store) Forget(ctx context.Context, scope recall.Scope, id string, at time.Time) error {
+	if err := s.lockSearch(ctx); err != nil {
+		return err
+	}
+	defer s.unlockSearch()
+	// Clear plaintext before processing a privacy mutation, including retries.
+	s.clearWorking()
 	if scope.UserID == "" || scope.AgentID == "" || at.IsZero() {
 		return recall.ErrInvalid
 	}

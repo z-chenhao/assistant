@@ -33,11 +33,12 @@ type ActorStore interface {
 // Actor coordinates ownership and lifecycle. All reasoning remains in loop.go.
 // Database uniqueness, rather than this object's lifetime, enforces one Main.
 type Actor struct {
-	Store    ActorStore
-	Provider llm.LLMProvider
-	Registry *tool.Registry
-	Ready    func(context.Context) bool
-	Sink     EventSink
+	Store      ActorStore
+	Provider   llm.LLMProvider
+	Registry   *tool.Registry
+	Ready      func(context.Context) bool
+	Sink       EventSink
+	TraceError func(error) // Sanitized diagnostics; trace loss never reruns work.
 }
 
 func (a Actor) Submit(ctx context.Context, key, text string) (Receipt, error) {
@@ -91,12 +92,12 @@ func (a Actor) Drain(ctx context.Context) error {
 						}
 						// A Root's business failure is durably reported to Main. Infrastructure
 						// failures still stop this drain after all owned work has been joined.
-						var failed *runFailure
+						var failed *RunFailure
 						if errors.As(err, &failed) {
 							if run.Kind == "worker" {
 								err = nil
 							} else {
-								err = failed.cause
+								err = failed
 							}
 						}
 						done <- completed{id, err}
@@ -166,8 +167,24 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 		}
 	}()
 	emit := func(e Event) {
-		event, err := a.Store.Trace(context.WithoutCancel(work), claim, e)
-		if err == nil && a.Sink != nil {
+		if e.Kind == "message_update" {
+			// Preview chunks are ephemeral. The accepted GenerationResult and
+			// checkpoint retain the complete text under the ordinary fence.
+			if a.Sink != nil {
+				a.Sink(e)
+			}
+			return
+		}
+		traceCtx, cancel := context.WithTimeout(context.WithoutCancel(work), time.Second)
+		event, err := a.Store.Trace(traceCtx, claim, e)
+		cancel()
+		if err != nil {
+			if a.TraceError != nil {
+				a.TraceError(err)
+			}
+			return
+		}
+		if a.Sink != nil {
 			a.Sink(event)
 		}
 	}

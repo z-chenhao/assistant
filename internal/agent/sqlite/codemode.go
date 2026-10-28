@@ -100,130 +100,68 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (result to
 		}
 	}
 	b.req.Tools = inner
-	crashes := 0
-	for {
-		observed, err := b.wake(ctx)
-		if err != nil {
-			return tool.Result{}, err
-		}
-		var outcome codemode.Outcome
-		var saved string
-		err = t.runs.host.db.QueryRowContext(ctx, `SELECT outcome_json FROM code_outcome WHERE execution_id=?`, inv.ID).Scan(&saved)
-		if err == nil {
-			if json.Unmarshal([]byte(saved), &outcome) != nil {
-				return tool.Result{}, agent.ErrStorage
-			}
-		} else if err == sql.ErrNoRows {
-			b.attempt = newID()
-			err = t.runs.write(ctx, func(tx *sql.Tx) error {
-				if err := b.fence(ctx, tx); err != nil {
-					return err
-				}
-				_, err := tx.ExecContext(ctx, `UPDATE code_execution_state SET replay_starts=replay_starts+1,version=version+1 WHERE execution_id=?`, inv.ID)
-				return err
-			})
-			if err != nil {
-				return tool.Result{}, err
-			}
-			vmCtx, stopVM := context.WithCancel(ctx)
-			joined := make(chan struct{})
-			go func() {
-				select {
-				case <-tool.ShutdownSignal(ctx):
-					stopVM()
-				case <-joined:
-				}
-			}()
-			outcome, err = t.runs.javascript.Start(vmCtx, b.req, b)
-			close(joined)
-			stopVM()
-			select {
-			case <-tool.ShutdownSignal(ctx):
-				return tool.Result{}, context.Canceled
-			default:
-			}
-		}
-		if err != nil {
-			if errors.Is(err, codemode.ErrEventCommit) {
-				return tool.Failure("PROVIDER_UNAVAILABLE"), nil
-			}
-			if ctx.Err() != nil {
-				return tool.Result{}, ctx.Err()
-			}
-			// Transport death is infrastructure. Rebuild the VM from immutable source;
-			// never turn a lost peer into a new logical nested call.
-			crashes++
-			if crashes <= 3 {
-				continue
-			}
-			return tool.Result{}, agent.ErrStorage
-		}
-		if outcome.Kind == "completed" || outcome.Kind == "failed" {
-			raw, _ := encoded(outcome)
-			err = t.runs.write(ctx, func(tx *sql.Tx) error {
-				if err := b.fence(ctx, tx); err != nil {
-					return err
-				}
-				_, err := tx.ExecContext(ctx, `INSERT INTO code_outcome VALUES(?,?,?) ON CONFLICT DO NOTHING`, inv.ID, raw, time.Now().UnixMicro())
-				return err
-			})
-			if err != nil {
-				return tool.Result{}, err
-			}
-		}
-		// All nonterminal Host calls are admitted before VM disposal. Execute them
-		// through the ordinary pipeline with no retained JavaScript heap.
-		err = b.drain(ctx)
-		if err != nil && !errors.Is(err, tool.ErrSuspended) {
-			return tool.Result{}, err
-		}
-		if errors.Is(err, tool.ErrSuspended) {
-			t.runs.host.boundary("before_code_release")
-			idle, e := b.release(ctx, observed)
-			if e != nil {
-				return tool.Result{}, e
-			}
-			if !idle {
-				continue
-			}
-			return tool.Result{}, tool.ErrSuspended
-		}
-		if t.runs.computerProvider != nil && outcome.Kind != "suspended" {
-			if err := b.computer().Idle(ctx); err != nil {
-				if errors.Is(err, agent.ErrClaimLost) || errors.Is(err, agent.ErrStorage) {
-					return tool.Result{}, err
-				}
-				return computerFailure(err), nil
-			}
-		}
-		switch outcome.Kind {
-		case "suspended":
-			continue
-		case "cancelled":
-			return tool.Failure("CANCELLED"), nil
-		case "failed":
-			if outcome.Error != nil {
-				return tool.Normalize(tool.Result{Error: outcome.Error}), nil
-			}
-			return tool.Failure("INVALID_ARGUMENT"), nil
-		case "completed":
-			value, _ := json.Marshal(outcome.Output)
-			result := tool.Result{Text: string(value)}
-			for _, raw := range outcome.Output {
-				var item struct {
-					Type     string
-					Data     string
-					MimeType string
-				}
-				if json.Unmarshal(raw, &item) == nil && item.Type == "image" && item.MimeType == "application/x-erii-artifact" {
-					result.ImageRefs = append(result.ImageRefs, item.Data)
-					result.ArtifactRefs = append(result.ArtifactRefs, item.Data)
-				}
-			}
-			return result, nil
-		}
-		return tool.Failure("PROVIDER_UNAVAILABLE"), nil
+	result, executionErr = codemode.Run(ctx, t.runs.javascript, b.req, b)
+	if errors.Is(executionErr, codemode.ErrTransport) {
+		executionErr = &agent.OperationError{Operation: "javascript runtime", Category: agent.ErrStorage, Cause: executionErr}
 	}
+	return result, executionErr
+}
+
+func (b *codeBridge) Wake(ctx context.Context) (int64, error) { return b.wake(ctx) }
+func (b *codeBridge) Drain(ctx context.Context) error         { return b.drain(ctx) }
+func (b *codeBridge) Release(ctx context.Context, observed int64) (bool, error) {
+	b.t.runs.host.boundary("before_code_release")
+	return b.release(ctx, observed)
+}
+func (b *codeBridge) LoadOutcome(ctx context.Context) (codemode.Outcome, bool, error) {
+	var raw string
+	var outcome codemode.Outcome
+	err := b.t.runs.host.db.QueryRowContext(ctx, `SELECT outcome_json FROM code_outcome WHERE execution_id=?`, b.req.ExecutionID).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return outcome, false, nil
+	}
+	if err != nil {
+		return outcome, false, &agent.OperationError{Operation: "code outcome read", Category: agent.ErrStorage, Cause: err}
+	}
+	if json.Unmarshal([]byte(raw), &outcome) != nil {
+		return outcome, false, agent.ErrStorage
+	}
+	return outcome, true, nil
+}
+func (b *codeBridge) BeginAttempt(ctx context.Context) error {
+	b.attempt = newID()
+	return b.t.runs.write(ctx, func(tx *sql.Tx) error {
+		if err := b.fence(ctx, tx); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE code_execution_state SET replay_starts=replay_starts+1,version=version+1 WHERE execution_id=?`, b.req.ExecutionID)
+		return err
+	})
+}
+func (b *codeBridge) SaveOutcome(ctx context.Context, outcome codemode.Outcome) error {
+	raw, err := encoded(outcome)
+	if err != nil {
+		return err
+	}
+	return b.t.runs.write(ctx, func(tx *sql.Tx) error {
+		if err := b.fence(ctx, tx); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO code_outcome VALUES(?,?,?) ON CONFLICT DO NOTHING`, b.req.ExecutionID, raw, time.Now().UnixMicro())
+		return err
+	})
+}
+func (b *codeBridge) Idle(ctx context.Context) (tool.Result, error) {
+	if b.t.runs.computerProvider == nil {
+		return tool.Result{}, nil
+	}
+	if err := b.computer().Idle(ctx); err != nil {
+		if errors.Is(err, agent.ErrClaimLost) || errors.Is(err, agent.ErrStorage) {
+			return tool.Result{}, err
+		}
+		return computerFailure(err), nil
+	}
+	return tool.Result{}, nil
 }
 
 func (b *codeBridge) drain(ctx context.Context) error {

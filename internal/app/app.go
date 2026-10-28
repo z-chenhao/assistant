@@ -235,13 +235,19 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	if cfg.Memory != nil {
 		a.memoryCurator = &memory.Curator{Process: func(ctx context.Context) error { return a.Runs().CurateMemory(ctx) }, Deferred: func() { a.telemetry.Logger.Warn("memory maintenance deferred", "code", "MEMORY_UNAVAILABLE") }}
 	}
-	var once sync.Once
-	var coreError error
+	var prepareMu sync.Mutex
+	prepared := false
 	a.prepareCore = func(ctx context.Context) error {
-		once.Do(func() {
-			coreError = a.prepareRuntime(ctx, cfg, fixture, secrets)
-		})
-		return coreError
+		prepareMu.Lock()
+		defer prepareMu.Unlock()
+		if prepared {
+			return nil
+		}
+		if err := a.prepareRuntime(ctx, cfg, fixture, secrets); err != nil {
+			return err
+		}
+		prepared = true
+		return nil
 	}
 	if deferred {
 		a.eventsRequired.Store(true)
@@ -362,21 +368,19 @@ func (a *App) Actor(sink agent.EventSink) agent.Actor {
 	if a.provider != nil && core.registry != nil && (!a.eventsRequired.Load() || a.eventsReady.Load()) {
 		provider = core.runs.GuardProvider(a.provider)
 	}
-	return agent.Actor{Store: core.runs, Provider: provider, Registry: core.registry, Sink: sink, Ready: func(ctx context.Context) bool {
-		if core.registry == nil || a.core.Load() != core {
-			return false
-		}
-		if a.eventsRequired.Load() && !a.eventsReady.Load() {
-			return false
-		}
-		d, err := a.Diagnostics(ctx)
-		return err == nil && d.AgentIngressEnabled
-	}}
+	return agent.Actor{Store: core.runs, Provider: provider, Registry: core.registry, Sink: sink,
+		TraceError: func(error) { a.telemetry.Logger.Warn("run trace unavailable", "code", "TRACE_UNAVAILABLE") }, Ready: func(ctx context.Context) bool {
+			if core.registry == nil || a.core.Load() != core {
+				return false
+			}
+			if a.eventsRequired.Load() && !a.eventsReady.Load() {
+				return false
+			}
+			d, err := a.Diagnostics(ctx)
+			return err == nil && d.AgentIngressEnabled
+		}}
 }
 func (a *App) History(ctx context.Context) ([]conversation.Message, error) {
-	if err := a.Runs().Flush(ctx); err != nil {
-		return nil, err
-	}
 	d, err := a.store.Diagnostics(ctx)
 	if err != nil {
 		return nil, err

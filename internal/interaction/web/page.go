@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"strconv"
 
 	"github.com/z-chenhao/erii/internal/delivery/ui"
 	"github.com/z-chenhao/erii/internal/interaction"
@@ -30,6 +31,7 @@ type page struct {
 	Login      bool
 	Tab        string
 	Status     Status
+	Before     int64
 	Messages   []shownMessage
 	Activity   []task.Summary
 	Approvals  []shownProjection
@@ -48,65 +50,77 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503)
 		return
 	}
-	if s.Accounts != nil {
-		p.Accounts, err = s.Accounts.Store.Accounts(ctx)
-		if err != nil {
-			fail(w, 503)
-			return
-		}
-	}
-	p.Bindings, err = s.Core.ChannelBindings(ctx)
-	if err != nil {
-		fail(w, 503)
-		return
-	}
-	p.Preference, err = s.Core.ChannelPreference(ctx)
-	if err != nil {
-		fail(w, 503)
-		return
-	}
-	p.Profiles, err = s.Models.ListProfiles(ctx)
-	if err != nil {
-		fail(w, 503)
-		return
-	}
-	p.Activity, err = s.Core.Activity(ctx)
-	if err != nil {
-		fail(w, 503)
-		return
-	}
-	approvals, err := s.Core.Approvals(ctx)
-	if err != nil {
-		fail(w, 503)
-		return
-	}
-	for _, a := range approvals {
-		if a.Status == "pending" {
-			spec := ui.Spec{SchemaVersion: ui.Version, Fallback: a.Arguments, Components: []ui.Component{{Type: "confirmation", Text: a.Tool + "\n" + a.Arguments, ApprovalID: a.ID, Hash: a.Hash}}}
-			raw, _ := json.Marshal(spec)
-			p.Approvals = append(p.Approvals, shownProjection{HTML: ui.HTML(raw, spec.Fallback), Spec: string(raw), Fallback: spec.Fallback})
-		}
-	}
-	messages, err := s.Core.History(ctx)
-	if err != nil {
-		fail(w, 503)
-		return
-	}
-	for _, m := range messages {
-		fallback := ""
-		for _, c := range m.Content {
-			if c.Type == "text" {
-				fallback += c.Text + "\n"
-			} else if c.ArtifactRef != "" {
-				fallback += c.Type + ": " + c.ArtifactRef + "\n"
+	if p.Tab == "/settings" {
+		if s.Accounts != nil {
+			p.Accounts, err = s.Accounts.Store.Accounts(ctx)
+			if err != nil {
+				fail(w, 503)
+				return
 			}
 		}
-		raw, err := s.Core.SaveWebProjection(ctx, m)
+		p.Bindings, err = s.Core.ChannelBindings(ctx)
 		if err != nil {
 			fail(w, 503)
 			return
 		}
-		p.Messages = append(p.Messages, shownMessage{Role: m.Role, Sequence: m.Sequence, Projection: shownProjection{HTML: ui.HTML(raw, fallback), Spec: string(raw), Fallback: fallback}})
+		p.Preference, err = s.Core.ChannelPreference(ctx)
+		if err != nil {
+			fail(w, 503)
+			return
+		}
+		p.Profiles, err = s.Models.ListProfiles(ctx)
+		if err != nil {
+			fail(w, 503)
+			return
+		}
+	}
+	if p.Tab == "/progress" {
+		p.Activity, err = s.Core.Activity(ctx)
+		if err != nil {
+			fail(w, 503)
+			return
+		}
+	}
+	if p.Tab == "/" {
+		approvals, err := s.Core.Approvals(ctx)
+		if err != nil {
+			fail(w, 503)
+			return
+		}
+		for _, a := range approvals {
+			if a.Status == "pending" {
+				spec := ui.Spec{SchemaVersion: ui.Version, Fallback: a.Arguments, Components: []ui.Component{{Type: "confirmation", Text: a.Tool + "\n" + a.Arguments, ApprovalID: a.ID, Hash: a.Hash}}}
+				raw, _ := json.Marshal(spec)
+				p.Approvals = append(p.Approvals, shownProjection{HTML: ui.HTML(raw, spec.Fallback), Spec: string(raw), Fallback: spec.Fallback})
+			}
+		}
+		before, err := conversationCursor(r)
+		if err != nil {
+			fail(w, 400)
+			return
+		}
+		messages, err := s.Core.Conversation(ctx, before)
+		p.Before = messages.Before
+		if err != nil {
+			fail(w, 503)
+			return
+		}
+		for _, m := range messages.Messages {
+			fallback := ""
+			for _, c := range m.Content {
+				if c.Type == "text" {
+					fallback += c.Text + "\n"
+				} else if c.ArtifactRef != "" {
+					fallback += c.Type + ": " + c.ArtifactRef + "\n"
+				}
+			}
+			raw, err := s.Core.WebProjection(ctx, m)
+			if err != nil {
+				fail(w, 503)
+				return
+			}
+			p.Messages = append(p.Messages, shownMessage{Role: m.Role, Sequence: m.Sequence, Projection: shownProjection{HTML: ui.HTML(raw, fallback), Spec: string(raw), Fallback: fallback}})
+		}
 	}
 	key := make([]byte, 16)
 	if _, err = rand.Read(key); err != nil {
@@ -138,5 +152,17 @@ var layout = template.Must(template.New("page").Funcs(template.FuncMap{"authURL"
 <div class="panel"><h2>Notifications</h2><p>Current channel: {{.Preference.Channel}}. Automatic prefers Feishu when bound. Ordinary progress stays on the progress page.</p><form method="post" action="/notification"><input name="version" type="hidden" value="{{.Preference.Version}}"><label>Send future notifications to<select name="target"><option value="auto:">Automatic</option><option value="tui:">Terminal</option>{{range .Bindings}}{{if .Enabled}}<option value="{{.Channel}}:{{.ID}}">{{.Channel}} · {{.Destination}}</option>{{end}}{{end}}</select></label><button>Save notification channel</button></form></div><h2>Saved models</h2>{{range .Profiles}}<div class="panel"><h3>{{.ModelID}}</h3><p>{{.ProviderKind}} · {{.Status}}</p><form method="post" action="/model/test"><input name="profile" type="hidden" value="{{.ProfileID}}"><button class="secondary">Test connection</button></form><form method="post" action="/model/select"><input name="profile" type="hidden" value="{{.ProfileID}}"><input name="profile_version" type="hidden" value="{{.Version}}"><input name="config_version" type="hidden" value="{{$.Status.ConfigVersion}}"><label class="check"><input name="consent" type="checkbox" value="yes" required>Use this provider for new work</label><button>Select model</button></form></div>{{else}}<p>No models connected yet.</p>{{end}}<p><a href="/licenses.txt">Open source notices</a></p></section>
 {{else if eq .Tab "/progress"}}<section class="settings"><p class="eyebrow">A LITTLE PEACE OF MIND</p><h1>Your ongoing work</h1><p>Progress updates appear here as work moves forward. Continue, pause or cancel work in conversation.</p>{{range .Activity}}<article class="panel"><h2>{{.Title}}</h2><p class="state">{{.Status}}</p><p>{{.ProgressSummary}}</p></article>{{else}}<div class="empty"><h2>All clear for now.</h2><p>When you hand something over, you can follow it here.</p></div>{{end}}</section>
 {{else}}<section class="thread">{{if eq .Status.Readiness "setup_required"}}<div class="panel"><h2>Let's connect your model.</h2><p>Choose how Erii should help you think and get things done.</p><a class="button" href="/settings">Set up Erii →</a></div>{{end}}
-{{range .Messages}}<article class="message {{.Role}}"><div class="message-label">{{if eq .Role "user"}}You{{else}}<img class="avatar" src="/brand/eri-icon-192.png" alt="Erii default agent avatar" width="28" height="28">Erii{{end}}</div><div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div></article>{{else}}<div class="welcome"><img class="welcome-avatar" src="/brand/eri-icon-192.png" alt="Erii default agent avatar" width="72" height="72"><p class="eyebrow">A LITTLE ROOM TO THINK</p><h1>What's on your mind?</h1><p>Plan something, work through an idea,<br>or hand over the next thing on your list.</p></div>{{end}}
+{{if .Before}}<a href="/?before={{.Before}}">Earlier messages</a>{{end}}{{range .Messages}}<article class="message {{.Role}}"><div class="message-label">{{if eq .Role "user"}}You{{else}}<img class="avatar" src="/brand/eri-icon-192.png" alt="Erii default agent avatar" width="28" height="28">Erii{{end}}</div><div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div></article>{{else}}<div class="welcome"><img class="welcome-avatar" src="/brand/eri-icon-192.png" alt="Erii default agent avatar" width="72" height="72"><p class="eyebrow">A LITTLE ROOM TO THINK</p><h1>What's on your mind?</h1><p>Plan something, work through an idea,<br>or hand over the next thing on your list.</p></div>{{end}}
 {{range .Approvals}}<div data-ui-spec="{{.Spec}}" data-ui-fallback="{{.Fallback}}">{{.HTML}}</div>{{end}}</section><footer><div id="composer-root" data-source-id="{{.SourceID}}"><form class="composer" action="/message" method="post" enctype="multipart/form-data"><input type="hidden" name="source_id" value="{{.SourceID}}"><label for="message" class="sr-only">Message Erii</label><textarea id="message" name="text" placeholder="Tell Erii what you need…" required rows="2" maxlength="16384"></textarea><label class="attachment-picker">Attach a file<input type="file" name="file" aria-label="Attach a file"></label><div><small>Shared with your TUI and bound Feishu conversation</small><button aria-label="Send message">Send ↑</button></div></form></div><p class="footnote">Erii asks for approval before sensitive external actions.</p></footer>{{end}}</main>{{end}}</body></html>`))
+
+func conversationCursor(r *http.Request) (int64, error) {
+	value := r.URL.Query().Get("before")
+	if value == "" {
+		return 0, nil
+	}
+	before, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || before <= 0 {
+		return 0, strconv.ErrSyntax
+	}
+	return before, nil
+}

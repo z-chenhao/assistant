@@ -124,3 +124,52 @@ func TestConversationFutureSchemaAndTraceContentRejected(t *testing.T) {
 		t.Fatal("future schema modified")
 	}
 }
+
+func TestConversationPagesUseStableExclusiveCursorsAndScopedGet(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for i := 0; i < 205; i++ {
+		m := conversation.Message{MessageID: fmt.Sprintf("m-%03d", i), ConversationID: "one", Role: "user", Content: conversation.Text("retained history"), Source: "cli", SourceEventID: fmt.Sprint(i), CreatedAt: time.UnixMicro(int64(i + 1))}
+		if err := s.Append(ctx, []conversation.Message{m}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cursor := int64(0)
+	seen := map[string]bool{}
+	sizes := []int{}
+	for {
+		page, err := s.Page(ctx, "one", cursor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sizes = append(sizes, len(page.Messages))
+		last := int64(0)
+		for _, m := range page.Messages {
+			if seen[m.MessageID] || m.Sequence <= last {
+				t.Fatal("duplicate or unordered page", m)
+			}
+			seen[m.MessageID] = true
+			last = m.Sequence
+		}
+		if page.Before == 0 {
+			break
+		}
+		cursor = page.Before
+	}
+	if !reflect.DeepEqual(sizes, []int{100, 100, 5}) || len(seen) != 205 {
+		t.Fatal("unbounded or incomplete history", sizes, len(seen))
+	}
+	if _, err := s.Get(ctx, "other", "m-000"); !errors.Is(err, conversation.ErrConflict) {
+		t.Fatal("cross-conversation lookup", err)
+	}
+	if message, err := s.Get(ctx, "one", "m-000"); err != nil || message.Sequence != 1 {
+		t.Fatal(message, err)
+	}
+	if _, err := s.Page(ctx, "one", -1); !errors.Is(err, conversation.ErrInvalid) {
+		t.Fatal("bad cursor accepted")
+	}
+}

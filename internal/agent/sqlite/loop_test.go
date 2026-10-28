@@ -468,7 +468,7 @@ func TestLoopModelFailureIsTerminalObservableAndNotRetried(t *testing.T) {
 		return llm.GenerationResult{}, llm.ProviderUnavailable
 	}
 	mustSubmit(t, a, "one", "hello")
-	if err := a.Drain(context.Background()); err != llm.ProviderUnavailable {
+	if err := a.Drain(context.Background()); !errors.Is(err, llm.ProviderUnavailable) {
 		t.Fatal("model failure not observable", err)
 	}
 	if scalar(t, s, `SELECT count(*) FROM run WHERE status='failed' AND error_code='PROVIDER_UNAVAILABLE'`) != 1 {
