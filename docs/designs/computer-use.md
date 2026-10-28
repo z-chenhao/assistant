@@ -17,6 +17,10 @@ flowchart TD
     L --> B["Guest Browser / Playwright"]
 ```
 
+### Go 实现职责（F-040）
+
+Computer 生命周期持久化位于 `internal/computer/sqlite`。Agent 仅提供绑定当前 Code claim 的 ExecutionHost；状态变化和事件仍与原 Host transaction 一起提交。
+
 ## 当前流程与目标差异
 
 配置并验证基础环境 → 获取逻辑 Computer → 恢复实例 → 发现和观察 → 审批后动作 → 再观察 → 排空调用并 checkpoint/dispose。
@@ -582,6 +586,7 @@ standard Tool errors, without raw paths, SSH diagnostics or credentials.
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
 | 2026-10-28 | 现状建档 | 保持宿主与 Guest 隔离、观察引用随状态失效、桌面互斥与统一副作用恢复；Fake 测试不能代替真实 macOS 兼容性证据。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

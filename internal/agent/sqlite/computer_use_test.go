@@ -76,7 +76,7 @@ func TestComputerApprovalControlledLeaseResumeAndUnknownNeverDispatchesAgain(t *
 			if err = next.claim(ctx, parents[0]); err != nil {
 				t.Fatal(err)
 			}
-			if err = (computerStore{b}).Fence(ctx); !errors.Is(err, agent.ErrClaimLost) {
+			if err = b.computerStore().Fence(ctx); !errors.Is(err, agent.ErrClaimLost) {
 				t.Fatal("old lease owner survived", err)
 			}
 			result, err = executor(&next).Execute(ctx, next.exchange, action)

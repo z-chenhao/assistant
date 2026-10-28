@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
+
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/event"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	"github.com/z-chenhao/erii/internal/tool/codemode"
-	"time"
 )
 
 // WaitForRuntime is the interactive selection boundary, not a model API.
@@ -101,7 +102,7 @@ func (a *App) WithEvents(ctx context.Context, cfg config.Config, run func(contex
 			return fail(e)
 		}
 		a.telemetry.Logger.Info("startup stage", "stage", "outboxes_started")
-		if e = a.Runs().Recover(ctx); e != nil {
+		if e = a.runtimeRuns().Recover(ctx); e != nil {
 			return fail(e)
 		}
 		a.StartMemory(workCtx)
