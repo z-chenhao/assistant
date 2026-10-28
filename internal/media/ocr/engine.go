@@ -168,17 +168,19 @@ func (e *Engine) verify(ctx context.Context) error {
 }
 
 type limitedBuffer struct {
-	bytes.Buffer
+	buffer   bytes.Buffer
 	limit    int
 	overflow bool
 }
 
+func (b *limitedBuffer) Bytes() []byte { return b.buffer.Bytes() }
+
 func (b *limitedBuffer) Write(p []byte) (int, error) {
 	n := len(p)
-	if len(p) > b.limit-b.Len() {
-		p = p[:max(0, b.limit-b.Len())]
+	if len(p) > b.limit-b.buffer.Len() {
+		p = p[:max(0, b.limit-b.buffer.Len())]
 		b.overflow = true
 	}
-	_, err := b.Buffer.Write(p)
+	_, err := b.buffer.Write(p)
 	return n, err
 }
