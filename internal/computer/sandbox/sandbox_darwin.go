@@ -1,5 +1,5 @@
-// Package sandbox owns the interim M3 process boundary. All scopes and commands
-// come from the Host; models cannot select commands, environments or mounts.
+// Package sandbox owns the kernel process boundary. The Host supplies scopes
+// and mounts; admitted bash commands may come from the model after approval.
 package sandbox
 
 import (

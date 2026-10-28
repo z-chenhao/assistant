@@ -76,6 +76,7 @@ def prepare(binary, root, mode='edit'):
         fixture_run(['git', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', *args], cwd=repo, check=True, capture_output=True,
                        env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent',
                             'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'})
+    repo.chmod(0o700)
     (repo / 'docs/notes.md').write_text('USER_UNCOMMITTED_SENTINEL\n')
     hook = repo / '.git/hooks/pre-commit'
     hook.write_text('#!/bin/sh\necho must-not-run > hook-ran\nexit 1\n')
@@ -93,8 +94,8 @@ def prepare(binary, root, mode='edit'):
               '\n    args: ["-test-mcp-server", ' + json.dumps(str(root / 'provider')) + ']\n' +
               '    tools: {read: read_only, send: external_effect}\n' +
               'skills:\n  root: ' + json.dumps(str(root / 'skills')) + '\n  scope: workspace\n' +
-              'workspace:\n  root: ' + json.dumps(str(repo)) + '\n  mode: ' + mode +
-              '\n  protected: [docs/notes.md]\n')
+              'execution:\n  root: ' + json.dumps(str(repo)) + '\n  toolchain_roots: [' +
+              json.dumps(str(Path(shutil.which('go')).resolve().parent.parent)) + ']\n')
     (root / 'config.yaml').write_text(config)
     h = CapabilityHarness(binary, root, fixture='capabilities')
     if os.environ.get('ERII_CAPABILITY_DIAGNOSTICS'):
@@ -124,7 +125,7 @@ def content(invocation):
 
 
 def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
-    report = {'version': 1, 'scope': 'M3 MCP/Skill/coding contracts; read/search/edit boundaries and controlled workspace isolation',
+    report = {'version': 1, 'scope': 'MCP/Skill and native file/command contracts; approvals, isolated persistent execution, CAS and unknown effects',
               'checks': [], 'crashes': [], 'cleanup': False, 'scenario_jobs': scenario_jobs}
     with tempfile.TemporaryDirectory(prefix='erii-capabilities-') as temp:
         root = Path(temp)
@@ -148,86 +149,72 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         def coding(h):
             repo = h.root / 'repo'
             original = tree(repo)
-            rules = call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'})
-            document = json.loads(content(rules)['text'])
-            before = call(h, 'red', 'builtin__workspace_test', {})
+            call(h, 'rules', 'builtin__read', {'path': 'AGENTS.md'})
+            before = call(h, 'red', 'builtin__bash', {'command': 'go test -race ./...', 'timeout': 120})
             observed = json.loads(content(before)['text'])
-            require(not observed['passed'] and 'flag provided but not defined' in observed['output'],
-                    'fixture did not reproduce missing --status')
+            require(observed['exit_code'] != 0 and 'flag provided but not defined' in observed['output'], 'fixture did not reproduce missing --status: ' + str(observed))
             path = 'cmd/taskctl/main.go'
-            source = json.loads(content(call(h, 'source', 'builtin__workspace_read', {'path': path}))['text'])
+            source = json.loads(content(call(h, 'source', 'builtin__read', {'path': path}))['text'])
             replacement = source['text'].replace('status := "" // CLI_STATUS_FLAG',
                                                 'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")')
-            require(replacement != source['text'], 'fixture patch did not match')
-            edited = call(h, 'edit', 'builtin__workspace_edit',
-                          {'path': path, 'before_hash': source['hash'], 'rules_hash': document['hash'], 'text': replacement}, worker=True)
-            require(not content(edited).get('error'), 'approved Worker edit failed')
-            require((repo / path).read_text() == replacement, 'edit did not reach actual workspace file')
+            edited = call(h, 'edit', 'builtin__edit',
+                          {'path': path, 'before_hash': source['hash'], 'old_text': 'status := "" // CLI_STATUS_FLAG', 'new_text': 'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")'}, worker=True)
+            require(not content(edited).get('error') and (repo / path).read_text() == replacement, 'approved Worker edit failed')
             test_path = 'cmd/taskctl/main_test.go'
-            test_source = json.loads(content(call(h, 'test-source', 'builtin__workspace_read', {'path': test_path}))['text'])
-            tests = test_source['text'] + '\nfunc TestSearchActiveCompatibility(t *testing.T) {\n var out bytes.Buffer\n if err := run([]string{"--status", "active"}, &out); err != nil { t.Fatal(err) }\n if out.String() != "[{\\\"Title\\\":\\\"Build\\\",\\\"Status\\\":\\\"active\\\"}]\\n" { t.Fatal(out.String()) }\n}\n'
-            test_edit = call(h, 'test-edit', 'builtin__workspace_edit', {'path': test_path, 'before_hash': test_source['hash'], 'rules_hash': document['hash'], 'text': tests}, worker=True)
-            require(not content(test_edit).get('error'), 'test edit failed')
-            tested = call(h, 'green', 'builtin__workspace_test', {})
-            require(json.loads(content(tested)['text'])['passed'], 'real sandbox tests did not pass: ' + content(tested)['text'])
-            diff = content(call(h, 'diff', 'builtin__workspace_git', {'operation': 'diff'}))['text']
-            require('flags.StringVar' in diff, 'Git diff omitted real edit')
-            protected = content(call(h, 'protected', 'builtin__workspace_edit',
-                                {'path': 'docs/notes.md', 'before_hash': digest(repo / 'docs/notes.md'),
-                                 'rules_hash': document['hash'], 'text': 'overwrite'}))
-            require(protected['error']['code'] == 'PERMISSION_DENIED', 'protected dirty file edited')
+            source_test = json.loads(content(call(h, 'test-source', 'builtin__read', {'path': test_path}))['text'])
+            edited_test = call(h, 'test-edit', 'builtin__edit', {'path': test_path, 'before_hash': source_test['hash'],
+                               'old_text': 'package main', 'new_text': 'package main\n// verification retains existing tests'}, worker=True)
+            require(not content(edited_test).get('error'), 'multi-file edit failed')
+            tested = call(h, 'green', 'builtin__bash', {'command': 'go test -race ./...', 'timeout': 120})
+            passed = json.loads(content(tested)['text'])
+            require(passed['exit_code'] == 0 and not passed['timed_out'], 'real sandbox tests failed: ' + str(passed))
+            # Git is a regular approved command; explicit no-refresh/index scope
+            # avoids treating index maintenance as a source-file modification.
+            diff = json.loads(content(call(h, 'diff', 'builtin__bash', {'command': 'git --no-optional-locks diff --no-ext-diff'}))['text'])
+            require('flags.StringVar' in diff['output'], 'Git diff omitted edit')
+            published = content(call(h, 'deliver', 'builtin__read', {'path': path, 'as_artifact': True}))
+            artifact = fixture_run(h.args('artifact', 'open', published['artifact_refs'][0]), capture_output=True, env=h.env, cwd=h.root, timeout=20)
+            require(artifact.returncode == 0 and artifact.stdout == replacement.encode(), 'native read did not retain file as Artifact')
             final = tree(repo)
             changed = [p for p in original if original[p] != final.get(p)]
-            require(sorted(changed) == sorted([path, test_path]), f'unrelated coding changes: {changed}')
-            require(not (repo / 'hook-ran').exists() and original['.git/hooks/pre-commit'] == final['.git/hooks/pre-commit'],
-                    'hook changed or executed')
-            return {'name': 'real_red_edit_green_with_Worker_approval', 'changed': changed,
-                    'before': observed, 'after': json.loads(content(tested)['text']),
-                    'sentinel_hash': digest(repo / 'docs/notes.md'), 'hook_hash': digest(repo / '.git/hooks/pre-commit'), 'state': h.state()}
+            require(sorted(changed) == sorted([path, test_path]), 'unrelated source changes: ' + str(changed))
+            require(not (repo / 'hook-ran').exists(), 'reading diff executed hook')
+            return {'name': 'real_red_edit_green_with_Worker_approval', 'changed': changed, 'before': observed, 'after': passed, 'state': h.state()}
         scenario('coding', coding)
 
         def dirty_index(h):
-            # Exercise unprotected files through approved Worker calls. Git's
-            # hidden-index flags must never turn user bytes into editable input.
             repo = h.root / 'repo'
-            rules = json.loads(content(call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'}))['text'])
-            observations = []
-            paths = ['cmd/taskctl/main.go', 'internal/retry/executor.go', 'internal/task/search.go']
-            for flag, path in zip([None, '--assume-unchanged', '--skip-worktree'], paths):
-                if flag:
-                    fixture_run(['git', 'update-index', flag, '--', path], cwd=repo, check=True,
-                                   capture_output=True, env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent',
-                                                            'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'})
-                source = repo / path
-                source.write_text(source.read_text() + '\n// USER_UNCOMMITTED_CHANGE\n')
-                before = tree(repo)
-                observed = json.loads(content(call(h, 'read-' + path, 'builtin__workspace_read', {'path': path}))['text'])
-                invocation = call(h, 'edit-' + path, 'builtin__workspace_edit',
-                                  {'path': path, 'before_hash': observed['hash'], 'rules_hash': rules['hash'],
-                                   'text': '// AGENT_REPLACEMENT\n'}, worker=True)
-                require(invocation['status'] == 'failed' and content(invocation)['error']['code'] == 'PERMISSION_DENIED',
-                        f'{flag or "ordinary dirty"}: approved Worker overwrote user content')
-                require(tree(repo) == before, f'{flag or "ordinary dirty"}: workspace/index/hooks changed')
-                observations.append({'flag': flag, 'path': path, 'content_preserved': digest(source) == before[path],
-                                     'index_unchanged': digest(repo / '.git/index') == before['.git/index'],
-                                     'invocation': invocation})
-            return {'name': 'approved_Worker_dirty_index_flags_refused', 'cases': observations, 'state': h.state()}
+            path = 'docs/notes.md'
+            source = json.loads(content(call(h, 'read-dirty', 'builtin__read', {'path': path}))['text'])
+            first = call(h, 'first-edit', 'builtin__edit', {'path': path, 'before_hash': source['hash'],
+                         'old_text': 'SENTINEL', 'new_text': 'SENTINEL + FIRST'}, worker=True)
+            require(not content(first).get('error'), 'dirty-file edit rejected')
+            current = json.loads(content(call(h, 'read-first', 'builtin__read', {'path': path}))['text'])
+            second = call(h, 'second-edit', 'builtin__edit', {'path': path, 'before_hash': current['hash'],
+                          'old_text': 'FIRST', 'new_text': 'SECOND'}, worker=True)
+            require(not content(second).get('error') and (repo / path).read_text() == 'USER_UNCOMMITTED_SENTINEL + SECOND\n', 'continuous edits lost user content')
+            stale = call(h, 'stale-edit', 'builtin__edit', {'path': path, 'before_hash': source['hash'],
+                         'old_text': 'SECOND', 'new_text': 'OVERWRITE'}, worker=True)
+            require(content(stale)['error']['code'] == 'PERMISSION_DENIED', 'stale preimage overwrote changes')
+            created = call(h, 'create', 'builtin__write', {'path': 'output/result.txt', 'content': 'created'}, worker=True)
+            require(not content(created).get('error'), 'file creation failed')
+            denied = call(h, 'overwrite', 'builtin__write', {'path': 'output/result.txt', 'content': 'blind'})
+            require(content(denied)['error']['code'] == 'PERMISSION_DENIED', 'blind overwrite allowed')
+            return {'name': 'continuous_dirty_edits_create_and_stale_hash_refusal', 'state': h.state()}
         scenario('dirty-index', dirty_index)
 
         def audit(h):
             repo = h.root / 'repo'
             before = tree(repo)
-            call(h, 'audit-rules', 'builtin__workspace_read', {'path': 'AGENTS.md'})
-            searched = content(call(h, 'search', 'builtin__workspace_search', {'query': 'provider.Execute'}, worker=True))
-            require('internal/retry/executor.go' in searched['text'], 'audit search missed actual source')
-            read = content(call(h, 'read', 'builtin__workspace_read', {'path': 'internal/retry/executor.go'}))
-            require('provider.Execute()' in read['text'] and 'ledger.Lookup()' in read['text'] and read['text'].index('provider.Execute()') < read['text'].index('ledger.Lookup()'), 'audit lacks call-order evidence')
-            forbidden = content(call(h, 'forged-edit', 'builtin__workspace_edit', {}, worker=True))
-            require(forbidden['error']['code'] == 'NOT_FOUND', 'audit edit capability leaked')
-            require(tree(repo) == before, 'audit changed workspace bytes or Git state')
-            return {'name': 'audit_read_search_no_writes', 'tree_hashes': before, 'finding': {'file': 'internal/retry/executor.go', 'symbols': ['retry.Execute', 'Provider.Execute', 'Ledger.Lookup'], 'trigger': 'retry after a previously completed call', 'impact': 'Provider runs before the completed Ledger result is checked, so a retry can repeat an effect', 'basis': 'observed source order; no claim of a production failure'}, 'state': h.state()}
-        scenario('audit', audit, mode='audit')
-
+            read = content(call(h, 'read', 'builtin__read', {'path': 'internal/retry/executor.go'}))
+            text = json.loads(read['text'])['text']
+            require('provider.Execute()' in text and 'ledger.Lookup()' in text, 'read lacks call-order evidence')
+            denied = call(h, 'denied-command', 'builtin__bash', {'command': 'touch forbidden'}, approve=False)
+            require(content(denied)['error']['code'] == 'APPROVAL_DENIED' and tree(repo) == before, 'unapproved bash modified workspace')
+            traversal = content(call(h, 'traversal', 'builtin__read', {'path': '../config.yaml'}))
+            require(traversal['error']['code'] == 'PERMISSION_DENIED', 'file traversal escaped workspace')
+            return {'name': 'reads_automatic_mutations_require_exact_approval', 'state': h.state()}
+        scenario('audit', audit)
 
         def discovery(h):
             listed = content(call(h, 'skills', 'builtin__skill_list', {}, worker=True))
@@ -293,12 +280,11 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
 
         def crash(h):
             repo = h.root / 'repo'
-            rules = json.loads(content(call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'}))['text'])
             path = 'cmd/taskctl/main.go'
-            source = json.loads(content(call(h, 'source', 'builtin__workspace_read', {'path': path}))['text'])
-            replacement = source['text'] + '\n// accepted edit\n'
-            plan = [{'name': 'builtin__workspace_edit', 'arguments': {'path': path, 'before_hash': source['hash'],
-                     'rules_hash': rules['hash'], 'text': replacement}}]
+            source = json.loads(content(call(h, 'source', 'builtin__read', {'path': path}))['text'])
+            replacement = source['text'].replace('package main', 'package main\n// accepted edit', 1)
+            plan = [{'name': 'builtin__edit', 'arguments': {'path': path, 'before_hash': source['hash'],
+                     'old_text': 'package main', 'new_text': 'package main\n// accepted edit'}}]
             h.send('crash-edit', 'Capabilities: ' + json.dumps(plan))
             h.command('chat', 'work')
             a = [a for a in h.command('approval', 'list') if a['status'] == 'pending'][0]
@@ -309,7 +295,7 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             require((repo / path).read_text() == replacement, 'crash not after actual edit')
             h.command('chat', 'work')
             value = h.state()
-            inv = [t for t in value['tools'] if t['tool_name'] == 'builtin__workspace_edit'][0]
+            inv = [t for t in value['tools'] if t['tool_name'] == 'builtin__edit'][0]
             require(inv['status'] == 'unknown' and inv['attempt_count'] == 1 and (repo / path).read_text() == replacement,
                     'crashed edit retried or falsely completed')
             return {'name': 'edit_after_effect_before_result_commit', 'signal': 'SIGKILL', 'state': value}
@@ -318,8 +304,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             report[kind].append(result)
         if not selected:
             expected = {'real_red_edit_green_with_Worker_approval',
-                        'approved_Worker_dirty_index_flags_refused',
-                        'audit_read_search_no_writes',
+                        'continuous_dirty_edits_create_and_stale_hash_refusal',
+                        'reads_automatic_mutations_require_exact_approval',
                         'MCP_transport_Skill_scope_role_denial_unknown',
                         'malformed_stdio_effect_replies_stay_unknown'}
             require(len(report['checks']) == len(expected) and

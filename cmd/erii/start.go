@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/z-chenhao/erii/internal/computer/environment"
 	"github.com/z-chenhao/erii/internal/config"
 )
 
@@ -69,8 +70,13 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 		_, err = os.Stat(filepath.Join(filepath.Dir(runtime.script), runtime.dependency))
 		check(runtime.name+": pinned dependencies", err)
 	}
+	if cfg.Computer == nil {
+		check("file/command environment: system Python 3, bash and kernel sandbox", environment.Check())
+	} else {
+		fmt.Fprintln(out, "SKIP local execution: file/command tools use the configured Computer Guest")
+	}
 	if failed {
-		return errors.New("installation incomplete; install Node 24.21.0 and rerun ./install.sh (see docs/features/installation.md)")
+		return errors.New("installation incomplete; check Node 24.21.0 and execution dependencies (Python 3, bash, bubblewrap on Linux), then rerun ./install.sh (see docs/features/installation.md)")
 	}
 	fmt.Fprintln(out, "Ready to start. Run erii; connect a local model or sign in with ChatGPT in setup.")
 	return nil

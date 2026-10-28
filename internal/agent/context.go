@@ -71,8 +71,8 @@ func InitialContext(o ContextOptions) []AgentMessage {
 		}
 		var rule string
 		switch {
-		case strings.HasPrefix(s.Name, "builtin__workspace_"):
-			rule = prompt.Workspace()
+		case s.Name == "builtin__read" || s.Name == "builtin__bash" || s.Name == "builtin__edit" || s.Name == "builtin__write":
+			rule = prompt.Environment()
 		case s.Name == "builtin__codemode_execute":
 			rule = prompt.CodeMode()
 		case s.Name == RunToolName:
@@ -95,7 +95,7 @@ func InitialContext(o ContextOptions) []AgentMessage {
 	for _, s := range o.Tools {
 		for _, p := range s.PromptContext {
 			// Only these local Host adapters may contribute resource sections.
-			if !(p.Kind == "project_instructions" && s.Name == "builtin__workspace_read" || p.Kind == "skill_index" && s.Name == "builtin__skill_list") {
+			if !(p.Kind == "skill_index" && s.Name == "builtin__skill_list") {
 				continue
 			}
 			raw, _ := json.Marshal(p)

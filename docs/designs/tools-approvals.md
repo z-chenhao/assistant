@@ -304,3 +304,5 @@ unconfigured Memory without mutation. Maintained CLI harnesses inspect actual
 production HTTP projection, nested Code Mode calls, real CUA/Child behavior,
 Artifact kill/restart recovery, configured Memory and channel delivery. See the
 ERII-192 entries in [testing guide](../test-plans/product.md) for commands and evidence ownership.
+
+2026-10-28：默认 read/bash/edit/write 属于统一 Host 工具目录。只有受信任 environment builtin 可以采用 external_effect / high / never 的 Host 执行；任意外部 Provider 不能借此跳过审批。原生与 Code Mode 的具体动作仍各自批准，未知效果不重发。旧 Workspace 无别名，schema 29 不重写旧请求；[迁移与环境边界](coding.md#默认设置与迁移)。

@@ -281,15 +281,15 @@ def run(binary, failure_evidence=None):
                                             original_message_ids=[s['message_id'] for s in submitted]))
 
             # Real controlled workspace test, executed through ToolExecutor.
-            rules = json.loads(content(call(h, 'rules', 'builtin__workspace_read', {'path': 'AGENTS.md'}))['text'])
-            source = json.loads(content(call(h, 'cli-source', 'builtin__workspace_read', {'path': 'cmd/taskctl/main.go'}))['text'])
+            rules = json.loads(content(call(h, 'rules', 'builtin__read', {'path': 'AGENTS.md'}))['text'])
+            source = json.loads(content(call(h, 'cli-source', 'builtin__read', {'path': 'cmd/taskctl/main.go'}))['text'])
             replacement = source['text'].replace('status := "" // CLI_STATUS_FLAG',
                                                  'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")')
             require(replacement != source['text'], 'fixture correction did not apply')
-            call(h, 'cli-fix', 'builtin__workspace_edit', {'path': 'cmd/taskctl/main.go', 'before_hash': source['hash'],
-                                                          'rules_hash': rules['hash'], 'text': replacement}, worker=True)
-            tests = [call(h, 'verified-' + str(i), 'builtin__workspace_test', {}) for i in range(2)]
-            require(all(json.loads(content(inv)['text'])['passed'] for inv in tests), 'real workspace verification failed')
+            call(h, 'cli-fix', 'builtin__edit', {'path': 'cmd/taskctl/main.go', 'before_hash': source['hash'],
+                                                          'old_text': 'status := "" // CLI_STATUS_FLAG', 'new_text': 'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")'}, worker=True)
+            tests = [call(h, 'verified-' + str(i), 'builtin__bash', {'command': 'go test -race ./...', 'timeout': 120}) for i in range(2)]
+            require(all(json.loads(content(inv)['text'])['exit_code'] == 0 for inv in tests), 'real workspace verification failed')
             # Isolate catalog cardinality from the earlier small-profile context
             # tests: 128 summaries plus list results need an explicit larger model.
             catalog_profile = h.setup(metadata=dict(name='catalog capacity fixture', provider_kind='openai_compatible',

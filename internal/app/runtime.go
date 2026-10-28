@@ -10,9 +10,9 @@ import (
 	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
 	"github.com/z-chenhao/erii/internal/automation"
 	"github.com/z-chenhao/erii/internal/computer"
+	"github.com/z-chenhao/erii/internal/computer/environment"
 	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
-	"github.com/z-chenhao/erii/internal/computer/workspace"
 	"github.com/z-chenhao/erii/internal/config"
 	"github.com/z-chenhao/erii/internal/llm"
 	"github.com/z-chenhao/erii/internal/memory"
@@ -33,6 +33,8 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 		return err
 	}
 	runs := a.store.Runs(a.history, registry)
+	local := environment.Local{Config: cfg.ExecutionConfig()}
+	runs.ConfigureEnvironment(local.Execute)
 	if cfg.Computer != nil {
 		provider, e := macosvm.New(*cfg.Computer, macosvm.SSHGuest{Config: cfg.Computer.Guest, Secrets: secrets})
 		if e != nil {
@@ -103,13 +105,15 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 		}
 		defs = append(defs, more...)
 	}
-	if cfg.Workspace != nil {
-		more, e := workspace.Definitions(*cfg.Workspace)
-		if e != nil {
-			return nil, e
-		}
-		defs = append(defs, more...)
+	if cfg.Skills == nil {
+		defs = append(defs, skill.EmptyDefinitions()...)
 	}
+	identity := any(cfg.ExecutionConfig())
+	if cfg.Computer != nil {
+		identity = cfg.Computer
+	}
+	defs = append(defs, environment.Definitions(environment.ResourceHash(identity))...)
+
 	if (fixture == "core" || fixture == "codemode") && cfg.JavaScript != nil {
 		if cfg.Computer != nil {
 			return nil, computer.ErrInvalid

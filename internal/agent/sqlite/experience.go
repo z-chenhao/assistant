@@ -112,16 +112,17 @@ func (r *Runs) ReviewExperience(ctx context.Context, c skill.Config, q skill.Rev
 				return agent.ErrConflict
 			}
 			var runID, raw string
-			if e := tx.QueryRowContext(ctx, `SELECT i.run_id,i.result_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.tool_name='builtin__workspace_test' AND i.status='succeeded' AND r.agent_id=? AND r.status='completed'`, strings.TrimPrefix(q.VerificationRef, "invocation:"), owner).Scan(&runID, &raw); e != nil {
+			if e := tx.QueryRowContext(ctx, `SELECT i.run_id,i.result_json FROM tool_invocation i JOIN run r USING(run_id) WHERE i.invocation_id=? AND i.tool_name='builtin__bash' AND json_extract(i.arguments_json,'$.command')='go test -race ./...' AND i.status='succeeded' AND r.agent_id=? AND r.status='completed'`, strings.TrimPrefix(q.VerificationRef, "invocation:"), owner).Scan(&runID, &raw); e != nil {
 				return e
 			}
 			var value tool.Result
 			var proof struct {
-				Passed    bool   `json:"passed"`
+				ExitCode  *int   `json:"exit_code"`
+				TimedOut  *bool  `json:"timed_out"`
 				Command   string `json:"command"`
-				Truncated bool   `json:"truncated"`
+				Truncated *bool  `json:"truncated"`
 			}
-			if json.Unmarshal([]byte(raw), &value) != nil || value.Error != nil || json.Unmarshal([]byte(value.Text), &proof) != nil || !proof.Passed || proof.Truncated || proof.Command != "go test -race ./..." {
+			if json.Unmarshal([]byte(raw), &value) != nil || value.Error != nil || json.Unmarshal([]byte(value.Text), &proof) != nil || proof.ExitCode == nil || *proof.ExitCode != 0 || proof.TimedOut == nil || *proof.TimedOut || proof.Truncated == nil || *proof.Truncated || proof.Command != "go test -race ./..." {
 				return agent.ErrConflict
 			}
 			if _, e := tx.ExecContext(ctx, `INSERT OR IGNORE INTO skill_verification VALUES(?,?,?,?,?)`, id, strings.TrimPrefix(q.VerificationRef, "invocation:"), runID, hash, time.Now().UnixMicro()); e != nil {

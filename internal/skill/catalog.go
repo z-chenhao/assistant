@@ -301,3 +301,11 @@ func SetHash(specs []tool.Spec) string {
 	b, _ := json.Marshal(values)
 	return sum(b)
 }
+
+// EmptyDefinitions keeps discovery available without requiring catalog YAML.
+func EmptyDefinitions() []tool.Definition {
+	return []tool.Definition{
+		{Spec: tool.Spec{Name: "builtin__skill_list", Version: 1, Description: "List available Skills; this installation has an empty catalog.", InputSchema: `{"type":"object","properties":{},"additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", ResourceHash: sum([]byte("empty-catalog-v1"))}, Execute: func(context.Context, string) tool.Result { return tool.Result{Text: "[]"} }},
+		{Spec: tool.Spec{Name: "builtin__skill_view", Version: 1, Description: "Read a versioned Skill. The catalog is currently empty.", InputSchema: `{"type":"object","properties":{"name":{"type":"string"},"version":{"type":"string"},"path":{"type":"string"}},"required":["name","version"],"additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", ResourceHash: sum([]byte("empty-catalog-v1"))}, Execute: func(context.Context, string) tool.Result { return tool.Failure("NOT_FOUND") }},
+	}
+}

@@ -17,7 +17,7 @@ import (
 func TestContextPromptBytes(t *testing.T) {
 	t.Chdir(t.TempDir())
 	specs := []tool.Spec{
-		{Name: "builtin__workspace_read", PromptContext: []tool.PromptContext{{Kind: "project_instructions", Source: "workspace:AGENTS.md:frozen", Text: "Keep project rules."}}},
+		{Name: "builtin__read", PromptContext: []tool.PromptContext{{Kind: "project_instructions", Source: "workspace:AGENTS.md:frozen", Text: "Keep project rules."}}},
 		{Name: "builtin__codemode_execute"},
 		{Name: RunToolName},
 		{Name: "builtin__artifact_manage"},
@@ -26,7 +26,7 @@ func TestContextPromptBytes(t *testing.T) {
 		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:frozen", Text: "research"}}},
 		{Name: "builtin__computer_observe", Internal: true},
 	}
-	for _, tc := range []struct{ position, hash string }{{"main", "b251eae3d876e715a9ec6e78ba41e994772123d3972d5268edde320e0b53cf9f"}, {"root", "99b25c813061af61fe3fc16e4808988784b67a794726c76bd650dd03691f27ca"}, {"child", "20fb3a61f78f7648f4fb6f9a569add725b734cf4bbede268e0ad8250884c4430"}} {
+	for _, tc := range []struct{ position, hash string }{{"main", "ab5db88fcaa9ba1d03f1b31814c58e4622266dd62121512dc5b9b0a5991317d2"}, {"root", "4fa6562963293c062a48df47e5bf1b4eb36fb4e59eb19ab7045cadc9a716fdce"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
 		t.Run(tc.position, func(t *testing.T) {
 			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}))
 			if err != nil {
@@ -43,7 +43,7 @@ func TestContextPromptBytes(t *testing.T) {
 
 func TestContextRolesAndFrozenResources(t *testing.T) {
 	specs := []tool.Spec{
-		{Name: "builtin__workspace_read", PromptContext: []tool.PromptContext{{Kind: "project_instructions", Source: "workspace:AGENTS.md:hash", Text: "preserve user files"}}},
+		{Name: "builtin__read", PromptContext: []tool.PromptContext{{Kind: "project_instructions", Source: "workspace:AGENTS.md:hash", Text: "preserve user files"}}},
 		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:version", Text: `[{"name":"research","version":"frozen"}]`}}},
 		{Name: RunToolName},
 	}
@@ -58,14 +58,14 @@ func TestContextRolesAndFrozenResources(t *testing.T) {
 	if !strings.Contains(string(raw), "frozen parent safety") || strings.Contains(string(raw), "PARENT_PRIVATE") || strings.Contains(string(raw), prompt.Identity()) {
 		t.Fatal("child scope or frozen rules drift", string(raw))
 	}
-	for _, needle := range []string{"project_instructions", "workspace:AGENTS.md:hash", "skill_index", "frozen", "Delegation:"} {
+	for _, needle := range []string{"skill_index", "frozen", "Delegation:"} {
 		if !strings.Contains(string(raw), needle) {
 			t.Fatal("missing scoped guidance", needle)
 		}
 	}
 	main := InitialContext(ContextOptions{Position: "main", Tools: []tool.Spec{{Name: "builtin__memory_search"}}})
 	b, _ := json.Marshal(main)
-	if strings.Contains(string(b), "Delegation:") || strings.Contains(string(b), "Workspace:") {
+	if strings.Contains(string(b), "Delegation:") || strings.Contains(string(b), "Execution environment:") {
 		t.Fatal("guidance for absent capability")
 	}
 	if len(ProviderTools(specs)) != 3 || strings.Contains(ProviderTools(specs)[0].Description, "preserve user files") {

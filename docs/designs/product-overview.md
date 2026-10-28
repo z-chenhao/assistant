@@ -21,7 +21,7 @@ flowchart TD
     L <--> B["Node Provider Bridge → 选定模型"]
     L --> T["统一 ToolExecutor / Security / Approval"]
     T <--> J["配置型 JavaScript / QuickJS"]
-    T --> X["配置型 MCP / Workspace / macOS Computer"]
+    T --> X["默认文件与命令 / MCP / macOS Computer"]
     L --> S["SQLite：Task / Run / Generation / Invocation"]
     T --> F["Artifact 字节与授权引用"]
     L --> D["语义回复 / DeliveryRequest / Outbox"]

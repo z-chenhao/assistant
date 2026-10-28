@@ -46,7 +46,7 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Computer != nil || cfg.Version != 1 || !filepath.IsAbs(cfg.App.DataRoot) || cfg.App.LogLevel != "info" {
+	if cfg.Computer != nil || cfg.Execution == nil || cfg.Execution.Root != cfg.App.DataRoot+".computer" || cfg.Version != 1 || !filepath.IsAbs(cfg.App.DataRoot) || cfg.App.LogLevel != "info" {
 		t.Fatalf("defaults: %+v", cfg)
 	}
 	dir := t.TempDir()
@@ -111,9 +111,11 @@ func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 		"child-calls-zero":             "version: 1\nchildren: {max_tool_calls: 0}",
 		"mcp-overlapping-providers":    "version: 1\nmcp:\n  - name: first\n    command: /usr/bin/python3\n    directory: /provider\n    tools: {read: read_only}\n  - name: second\n    command: /usr/bin/python3\n    directory: /provider/child\n    tools: {read: read_only}",
 		"mcp-root-scope":               "version: 1\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /\n    tools: {read: read_only}",
-		"workspace-overlaps-data":      "version: 1\napp:\n  data_root: /scope/data\nworkspace:\n  root: /scope\n  mode: edit",
-		"workspace-overlaps-skills":    "version: 1\nskills:\n  root: /scope/skills\n  scope: agent\nworkspace:\n  root: /scope\n  mode: edit",
-		"workspace-invalid-mode":       "version: 1\nworkspace:\n  root: /coding\n  mode: unrestricted",
+		"execution-overlaps-data":      "version: 1\napp:\n  data_root: /scope/data\nexecution:\n  root: /scope",
+		"execution-overlaps-skills":    "version: 1\nskills:\n  root: /scope/skills\n  scope: agent\nexecution:\n  root: /scope",
+		"legacy-workspace-rejected":    "version: 1\nworkspace:\n  root: /coding\n  mode: edit",
+		"execution-relative":           "version: 1\nexecution: {root: relative}",
+		"execution-toolchain-overlap":  "version: 1\napp: {data_root: /scope/data}\nexecution: {root: /work, toolchain_roots: [/scope]}",
 		"skill-invalid-scope":          "version: 1\nskills:\n  root: /skills\n  scope: all",
 		"mcp-overlaps-data":            "version: 1\napp:\n  data_root: /scope/data\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /scope\n    tools: {read: read_only}",
 		"mcp-invalid-permission":       "version: 1\nmcp:\n  - name: fixture\n    command: /usr/bin/python3\n    directory: /scope\n    tools: {send: read_only_unrestricted}",

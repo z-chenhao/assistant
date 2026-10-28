@@ -86,7 +86,14 @@ func validPolicy(d Definition) bool {
 		return false
 	}
 	if d.Spec.Permission == "external_effect" {
-		return p.Risk == "high" && p.Replay != "safe" && d.Invoke != nil && d.Execute == nil && !d.Host
+		if p.Risk != "high" || p.Replay == "safe" || d.Execute != nil {
+			return false
+		}
+		if d.Host {
+			family, trusted := HostFamily(d.Spec.Name)
+			return trusted && family == EnvironmentBuiltin && p.Replay == "never" && d.Invoke == nil
+		}
+		return d.Invoke != nil
 	}
 	return true
 }
