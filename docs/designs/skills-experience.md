@@ -22,7 +22,7 @@ flowchart TD
 读取已有 Skill 按需执行；当前经验流程由 CLI propose → verify → promote → 新 Run 读取新版本。目标是由可信事件驱动候选处理，保留审核边界。
 
 - **F-022**：受控目录 list/view 与全目录指纹冻结已实现。 普通 Main/Worker 不管理目录；变化不热替换旧 Run 的冻结 Skill。
-- **F-023**：可信 Reviewer 有 propose/verify/promote/reject/retire；目前由 CLI 显式驱动，缺自动触发与编排。 接入纠正/结果事件与可信 Reviewer；当前验证证据限于 workspace test，需明确其他方法的证据标准。
+- **F-023**：可信 Reviewer 有 propose/verify/promote/reject/retire；目前由 CLI 显式驱动，缺自动触发与编排。 接入纠正/结果事件与可信 Reviewer；当前验证证据限于经审批的 bash 精确测试命令，需明确其他方法的证据标准。
 
 ## 代码与依赖
 

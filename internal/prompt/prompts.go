@@ -24,8 +24,8 @@ var worker string
 //go:embed system/execution.md
 var execution string
 
-//go:embed capability/workspace.md
-var workspace string
+//go:embed capability/environment.md
+var environment string
 
 //go:embed capability/codemode.md
 var codeMode string
@@ -60,7 +60,7 @@ func Main() string          { return text(main) }
 func Identity() string      { return text(identity) }
 func Worker() string        { return text(worker) }
 func Execution() string     { return text(execution) }
-func Workspace() string     { return text(workspace) }
+func Environment() string   { return text(environment) }
 func CodeMode() string      { return text(codeMode) }
 func Delegation() string    { return text(delegation) }
 func Artifacts() string     { return text(artifacts) }

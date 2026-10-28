@@ -105,6 +105,9 @@ def verify_install():
                 local_setup(terminal, f'http://127.0.0.1:{server.server_port}/v1')
                 terminal.send('One-command startup verification')
                 terminal.expect('assistant: PROBE_RESULT_OK')
+                # History updates can redraw the prompt before Actor.Drain
+                # commits the terminal Run state; wait for its public signal.
+                terminal.expect('Erii: idle')
                 terminal.expect('You> ')
                 before = h.state()
                 assert_final(before, 1)

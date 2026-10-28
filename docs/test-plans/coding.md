@@ -1,37 +1,22 @@
-# 受控代码工作与开发交付：测试方案
+# 文件、命令与代码工作：测试方案
 
 [功能与验收目标](../features/coding.md) · [技术方案](../designs/coding.md) · [主索引](../feature-map.md) · [统一测试入口](product.md)
 
 ## 范围与证据
 
-本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导本次已通过或真实模型效果已达标。
+F-026 验证四工具在真实隔离环境与统一 ToolExecutor 中的能力，不以 Fake 模型结果宣称模型开发质量。本页列维护中的验证；实际结果以本轮执行报告为准。
 
-以功能文档中的需求为验收源；配置依赖、待实现分支、平台限制和未验证项单独报告。具体命令及 core/extended 编排以 [Testing](product.md) 和 [runner](../../tests/system/runner.py) 为准。
+| 层级 / 入口 | 验证内容 |
+| --- | --- |
+| [environment 组件](../../internal/computer/environment/local_test.go) | 实际内核沙箱：四工具互通、重复精确编辑、宿主文件和环境变量不可见、链接与越界拒绝、超时、输出上限、二进制 Artifact、无沙箱时不回退 |
+| [SQLite 组件](../../internal/agent/sqlite/environment_test.go) | 真实状态库和审批；原生调用复用 Computer、checkpoint 和 execution claim；无 JavaScript 依赖；完成和 unknown 不重发；旧 Workspace 无运行时别名 |
+| [CLI capabilities](../../tests/system/verify_capabilities.py) | 真实 red → Worker 精确修改多个文件 → bash go test → diff → Artifact；连续脏文件编辑/新建/过时哈希；审批拒绝不执行；SIGKILL 后 unknown 不重发；保留 MCP/Skill/角色回归 |
+| [memory maintenance](../../tests/system/verify_memory_maintenance.py) | Reviewer 只采纳真实 bash 的精确测试命令、退出码与完整输出证据；保留独立 Run 与晋升约束 |
 
-## 需求场景矩阵
+## 仍需独立验证
 
-| 需求 | 需要验证的可观察行为 | 当前重点 |
-| --- | --- | --- |
-| [F-026](../features/coding.md#f-026) | 在一次多文件真实修改中完成理解、修改、测试和 diff 交付，同时保留用户变更和审批边界。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
-
-## 层级与关键路径
-
-覆盖 AGENTS/preimage 哈希、用户脏文件保护、受保护路径、测试隔离与修改后结果未知。扩展开发链路后，用真实多文件更改验证交付，禁止绕过现有限制让测试通过。
-
-- 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
-- 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
-- Live/质量：涉及真实账户、Guest 平台或语义质量时单独记录环境与证据；不适用项说明理由，不用软件回归代替。
-
-## 已有检查与缺失覆盖
-
-| 入口 | 已有证据用途 | 本次执行状态 |
-| --- | --- | --- |
-| [tests/system/verify_capabilities.py](../../tests/system/verify_capabilities.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
-
-- **F-026 剩余覆盖**：缺少通用新建/删除、连续修改脏文件和提交交付链路；是否开放任意命令需单独决策。
+macOS Seatbelt、本轮新增的真实 Lume/SSH Guest 命令与桌面文件互通，必须在对应平台做 Live 检查；Linux 软件回归和协议 Fake 不能代替。真实模型质量、联网依赖、真实仓库导入与远端交付按实际接入单独验收。
 
 ## 执行与完成判定
 
-使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
-
-需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+沿用既有 make test/lint、system runner 与证据目录；不另建脚本框架或 golden case。状态、审批、冻结协议或取消变化需要相关 race/恢复检查。F-026 的通用开发交付目标仍保持部分完成。

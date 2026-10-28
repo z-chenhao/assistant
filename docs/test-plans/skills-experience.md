@@ -30,7 +30,7 @@
 | [tests/system/verify_capabilities.py](../../tests/system/verify_capabilities.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
 | [tests/system/verify_memory_maintenance.py](../../tests/system/verify_memory_maintenance.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
 
-- **F-023 剩余覆盖**：接入纠正/结果事件与可信 Reviewer；当前验证证据限于 workspace test，需明确其他方法的证据标准。
+- **F-023 剩余覆盖**：接入纠正/结果事件与可信 Reviewer；当前验证证据限于经审批的 bash 精确测试命令，需明确其他方法的证据标准。
 
 ## 执行与完成判定
 

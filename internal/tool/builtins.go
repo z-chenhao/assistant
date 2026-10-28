@@ -10,6 +10,7 @@ const (
 	AutomationBuiltin   BuiltinFamily = "automation"
 	ComputerBuiltin     BuiltinFamily = "computer"
 	CodeBuiltin         BuiltinFamily = "code"
+	EnvironmentBuiltin  BuiltinFamily = "environment"
 	AgentBuiltin        BuiltinFamily = "agent"
 	MemoryWriteBuiltin  BuiltinFamily = "memory_write"
 	MemorySearchBuiltin BuiltinFamily = "memory_search"
@@ -24,6 +25,10 @@ type builtinPolicy struct {
 // This is the single trusted name/policy catalog used for validation and Host
 // dispatch. A provider cannot register an arbitrary Host name or permission.
 var builtinCatalog = map[string]builtinPolicy{
+	"builtin__read":               {EnvironmentBuiltin, "read_only", false},
+	"builtin__bash":               {EnvironmentBuiltin, "external_effect", false},
+	"builtin__edit":               {EnvironmentBuiltin, "external_effect", false},
+	"builtin__write":              {EnvironmentBuiltin, "external_effect", false},
 	"builtin__task_search":        {TaskBuiltin, "read_only", false},
 	"builtin__task_manage":        {TaskBuiltin, "task_control", false},
 	"builtin__artifact_search":    {ArtifactBuiltin, "read_only", false},

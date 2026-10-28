@@ -18,9 +18,9 @@ import (
 func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 	ctx := context.Background()
 	s, r, _, a, p := loopFixture(t)
-	spec := tool.Spec{Name: "builtin__workspace_test", Version: 1, Permission: "read_only", ReplayPolicy: "safe", InputSchema: `{"type":"object","properties":{},"additionalProperties":false}`}
-	registry, e := tool.NewRegistry([]tool.Definition{{Spec: spec, Execute: func(context.Context, string) tool.Result {
-		return tool.Result{Text: `{"passed":true,"command":"go test -race ./...","truncated":false}`}
+	spec := tool.Spec{Name: "builtin__bash", Version: 1, Permission: "external_effect", Risk: "high", ReplayPolicy: "never", TimeoutMS: 10000, OutputBytes: 16384, Provider: "fixture", ConflictPolicy: "none", InputSchema: `{"type":"object","properties":{"command":{"type":"string"}},"required":["command"],"additionalProperties":false}`}
+	registry, e := tool.NewRegistry([]tool.Definition{{Spec: spec, Invoke: func(context.Context, tool.Request) tool.Outcome {
+		return tool.Outcome{Result: tool.Result{Text: `{"exit_code":0,"timed_out":false,"command":"go test -race ./...","truncated":false}`}}
 	}}})
 	if e != nil {
 		t.Fatal(e)
@@ -30,11 +30,29 @@ func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "Verified correction"}, nil
 		}
-		return calls(spec.Name, `{}`), nil
+		return calls(spec.Name, `{"command":"go test -race ./..."}`), nil
 	}
 	one := mustSubmit(t, a, "experience-1", "Verify the corrected method")
 	mustDrain(t, a)
+	approvePolicy(t, s, r)
+	mustDrain(t, a)
 	two := mustSubmit(t, a, "experience-2", "Independently repeat the corrected method")
+	mustDrain(t, a)
+	views, err := r.Approvals(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.Diagnostics(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range views {
+		if v.Status == "pending" {
+			if err := r.Decide(ctx, d.AgentID, v.ID, v.Hash, "approved"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	mustDrain(t, a)
 	c := skill.Config{Root: t.TempDir(), Scope: "agent"}
 	q := skill.ReviewRequest{Operation: "propose", Name: "verified---tests", Description: "Review code --- safely.", Procedure: "1. Read AGENTS.md and reproduce the failure.\n2. Make the smallest correction.\n3. Run go test -race ./... and inspect the result.", Reason: "success", SourceRefs: []string{"run:" + one.RunID}}

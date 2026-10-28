@@ -31,6 +31,7 @@ import (
 )
 
 type Runs struct {
+	environmentExecute    func(context.Context, string, string) tool.Result
 	automationClock       func() time.Time
 	computerProvider      computer.Provider
 	computerCompatibility computer.Compatibility

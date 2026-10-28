@@ -34,7 +34,7 @@ Agent 可发现可用方法，再按需读取正文和资源。
 
 **当前实现**：可信 Reviewer 有 propose/verify/promote/reject/retire；目前由 CLI 显式驱动，缺自动触发与编排。
 
-**边界与剩余工作**：接入纠正/结果事件与可信 Reviewer；当前验证证据限于 workspace test，需明确其他方法的证据标准。
+**边界与剩余工作**：接入纠正/结果事件与可信 Reviewer；当前验证证据限于经审批的 bash 精确测试命令，需明确其他方法的证据标准。
 
 **验收目标**：从真实纠正或执行结果自动形成候选、按证据验证并可再次调用；普通 Worker 仍不能随意改 Skill。
 
@@ -60,8 +60,8 @@ Worker Skill capabilities remain list/view. `skill manage` reads a JSON operatio
 `recovered_failure`, `success`) and accessible `source_refs`.
 
 Verification supplies a `candidate_ref`, current `version` and `verification_ref`
-(`invocation:REF`). It must resolve to a successful real workspace test invocation
-in a completed authorized Run, reporting an untruncated passing `go test -race ./...`.
+(`invocation:REF`). It must resolve to a successful real builtin__bash invocation with the exact accepted command
+in a completed authorized Run, reporting exit_code=0, timed_out=false and untruncated output for `go test -race ./...`.
 Ordinary success requires two independent Runs; correction/recovered-failure
 candidates require one. Correction candidates require an original user source;
 recovered-failure candidates require a failed Run source. Later independent

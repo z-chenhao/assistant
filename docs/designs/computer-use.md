@@ -6,7 +6,7 @@
 
 ## 当前架构
 
-逻辑 Computer 身份持久化，实例 epoch 随恢复变化；DesktopLease 约束冲突。Code Mode 的私有桥经统一工具执行器访问 Lume/SSH Guest。
+逻辑 Computer 身份持久化，实例 epoch 随恢复变化；DesktopLease 约束冲突。Code Mode 的私有桥与默认 read/bash/edit/write 经统一工具执行器访问同一个 Lume/SSH Guest；原生工具也能直接调用。
 
 ```mermaid
 flowchart TD
@@ -507,8 +507,7 @@ Computer configuration defaults to absent.
 
 Migration 021 adds the logical Computer and frozen operation ledger to the
 existing `state.db`. State/version changes and their Outbox events commit with
-the Run and Code execution fences. The Computer has one exclusive Code execution
-owner. Concurrent users receive a resource refusal; unrelated cells cannot
+the Run and Code execution fences. The Computer has one exclusive accepted execution owner (Code cell or native file/command invocation). Concurrent users receive a resource refusal; unrelated cells cannot
 reclaim that owner's instance. Pending accepted calls retain ownership until
 they drain or a later fenced owner recovers them.
 
@@ -590,3 +589,5 @@ standard Tool errors, without raw paths, SSH diagnostics or credentials.
 | 2026-10-28 | 现状建档 | 保持宿主与 Guest 隔离、观察引用随状态失效、桌面互斥与统一副作用恢复；Fake 测试不能代替真实 macOS 兼容性证据。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
+
+2026-10-28：F-026 原生文件/命令工具复用 Computer 生命周期与 execution claim，不需要生成 JavaScript。直接调用结束前 checkpoint/dispose，嵌套调用随 cell 排空；四工具与桌面浏览器共享 Guest。schema 29 扩展原生终态清理，不重写冻结请求；详见[执行环境方案](coding.md)。

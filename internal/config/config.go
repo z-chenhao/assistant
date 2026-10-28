@@ -13,8 +13,8 @@ import (
 
 	"github.com/z-chenhao/erii/internal/agent"
 	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/erii/internal/computer/environment"
 	"github.com/z-chenhao/erii/internal/computer/macosvm"
-	"github.com/z-chenhao/erii/internal/computer/workspace"
 	contextbuilder "github.com/z-chenhao/erii/internal/context"
 	"github.com/z-chenhao/erii/internal/delivery"
 	eventnats "github.com/z-chenhao/erii/internal/event/nats"
@@ -40,7 +40,7 @@ type Config struct {
 	Children   agent.ChildLimits     `yaml:"children"`
 	MCP        []mcp.Config          `yaml:"mcp"`
 	Skills     *skill.Config         `yaml:"skills"`
-	Workspace  *workspace.Config     `yaml:"workspace"`
+	Execution  *environment.Config   `yaml:"execution"`
 	Delivery   delivery.Policy       `yaml:"delivery"`
 	Version    int                   `yaml:"version"`
 	Artifact   artifact.Policy       `yaml:"artifact"`
@@ -202,13 +202,19 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("invalid bounded diagnostic log policy")
 	}
 	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
-	if cfg.Computer != nil && (overlaps(cfg.Computer.Root, cfg.App.DataRoot) || cfg.Workspace != nil && overlaps(cfg.Computer.Root, cfg.Workspace.Root) || cfg.Skills != nil && overlaps(cfg.Computer.Root, cfg.Skills.Root)) {
+	if cfg.Execution == nil && cfg.Computer == nil {
+		cfg.Execution = &environment.Config{Root: cfg.App.DataRoot + ".computer"}
+	}
+	if cfg.Execution != nil && cfg.Computer != nil {
+		return Config{}, errors.New("execution and computer are alternative backends; core file/command tools use the configured Computer")
+	}
+	if cfg.Computer != nil && (overlaps(cfg.Computer.Root, cfg.App.DataRoot) || cfg.Execution != nil && overlaps(cfg.Computer.Root, cfg.Execution.Root) || cfg.Skills != nil && overlaps(cfg.Computer.Root, cfg.Skills.Root)) {
 		return Config{}, errors.New("computer storage must be separate from application data, workspace and Skills")
 	}
 	seenServers := map[string]bool{}
 	providerDirectories := []string{}
 	for _, server := range cfg.MCP {
-		if server.Validate() != nil || seenServers[server.Name] || overlaps(server.Directory, cfg.App.DataRoot) || (cfg.Skills != nil && overlaps(server.Directory, cfg.Skills.Root)) || (cfg.Workspace != nil && overlaps(server.Directory, cfg.Workspace.Root)) || (cfg.Computer != nil && overlaps(server.Directory, cfg.Computer.Root)) {
+		if server.Validate() != nil || seenServers[server.Name] || overlaps(server.Directory, cfg.App.DataRoot) || (cfg.Skills != nil && overlaps(server.Directory, cfg.Skills.Root)) || (cfg.Execution != nil && overlaps(server.Directory, cfg.Execution.Root)) || (cfg.Computer != nil && overlaps(server.Directory, cfg.Computer.Root)) {
 			return Config{}, errors.New("invalid or duplicate MCP configuration")
 		}
 		for _, directory := range providerDirectories {
@@ -222,22 +228,34 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	if cfg.Skills != nil && cfg.Skills.Validate() != nil {
 		return Config{}, errors.New("invalid Skills configuration")
 	}
-	if cfg.Workspace != nil {
-		if cfg.Workspace.Validate() != nil || overlaps(cfg.Workspace.Root, cfg.App.DataRoot) {
-			return Config{}, errors.New("workspace must be separate from application data")
+	if cfg.Execution != nil {
+		for _, root := range cfg.Execution.ToolchainRoots {
+			if overlaps(root, cfg.Execution.Root) {
+				return Config{}, errors.New("execution workspace must be separate from read-only toolchains")
+			}
 		}
-		if cfg.JavaScript != nil && (overlaps(cfg.Workspace.Root, cfg.JavaScript.Script) || overlaps(cfg.Workspace.Root, cfg.JavaScript.Command)) {
-			return Config{}, errors.New("workspace cannot contain trusted JavaScript runtime")
+		roots := append([]string{cfg.Execution.Root}, cfg.Execution.ToolchainRoots...)
+		if cfg.Execution.Validate() != nil {
+			return Config{}, errors.New("invalid execution workspace")
 		}
-		if cfg.Skills != nil && overlaps(cfg.Workspace.Root, cfg.Skills.Root) {
-			return Config{}, errors.New("workspace cannot contain or overlap Skills")
-		}
-		for _, server := range cfg.MCP {
-			if overlaps(cfg.Workspace.Root, server.Command) {
-				return Config{}, errors.New("workspace cannot contain trusted MCP executable")
+		for _, root := range roots {
+			if overlaps(root, cfg.App.DataRoot) || cfg.Skills != nil && overlaps(root, cfg.Skills.Root) {
+				return Config{}, errors.New("execution scope must be separate from application data and Skills")
+			}
+			if cfg.JavaScript != nil && (overlaps(cfg.Execution.Root, cfg.JavaScript.Script) || overlaps(cfg.Execution.Root, cfg.JavaScript.Command)) {
+				return Config{}, errors.New("execution workspace cannot contain trusted runtime")
+			}
+			if cfg.LLM.ProviderBridgeScript != "" && overlaps(cfg.Execution.Root, cfg.LLM.ProviderBridgeScript) {
+				return Config{}, errors.New("execution workspace cannot contain model bridge")
+			}
+			for _, server := range cfg.MCP {
+				if overlaps(root, server.Directory) || overlaps(cfg.Execution.Root, server.Command) {
+					return Config{}, errors.New("execution scope cannot overlap MCP provider")
+				}
 			}
 		}
 	}
+
 	switch cfg.App.LogLevel {
 	case "debug", "info", "warn", "error":
 	default:
@@ -279,4 +297,12 @@ func (c Config) LogLevel() slog.Level {
 	// Load validates the value before this conversion.
 	_ = level.UnmarshalText([]byte(c.App.LogLevel))
 	return level
+}
+
+// ExecutionConfig supplies the product default even for programmatic callers.
+func (c Config) ExecutionConfig() environment.Config {
+	if c.Execution != nil {
+		return *c.Execution
+	}
+	return environment.Config{Root: c.App.DataRoot + ".computer"}
 }

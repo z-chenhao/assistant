@@ -57,6 +57,9 @@ func (g SSHGuest) command(ctx context.Context, ip, command string, sudo bool) (s
 	return g.commandInput(ctx, ip, command, sudo, nil)
 }
 func (g SSHGuest) commandInput(ctx context.Context, ip, command string, sudo bool, input io.Reader) (string, error) {
+	return g.commandInputFor(ctx, ip, command, sudo, input, 30*time.Second)
+}
+func (g SSHGuest) commandInputFor(ctx context.Context, ip, command string, sudo bool, input io.Reader, limit time.Duration) (string, error) {
 	address := net.ParseIP(ip)
 	if g.Config.Validate() != nil || g.Secrets == nil || address == nil || !address.IsPrivate() && !address.IsLoopback() {
 		return "", computer.ErrInvalid
@@ -78,7 +81,7 @@ func (g SSHGuest) commandInput(ctx context.Context, ip, command string, sudo boo
 		return "", computer.ErrUnavailable
 	}
 	defer connection.Close()
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(limit)
 	if end, ok := ctx.Deadline(); ok && end.Before(deadline) {
 		deadline = end
 	}

@@ -1,0 +1,1 @@
+Execution environment: files and bash share one isolated persistent workspace. Read applicable AGENTS.md and preserve user changes. Use bash for search, Git and tests; read/edit/write for files. Check exit_code, timed_out and truncated. Read with as_artifact:true then publish for delivery. Never access private Host state.

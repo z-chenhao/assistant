@@ -24,6 +24,8 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 		return t.executeAutomation(ctx, inv)
 	case tool.CodeBuiltin:
 		return t.executeCode(ctx, inv)
+	case tool.EnvironmentBuiltin:
+		return t.executeEnvironment(ctx, inv)
 	case tool.ComputerBuiltin:
 		return t.executeComputer(ctx, inv)
 	case tool.AgentBuiltin:

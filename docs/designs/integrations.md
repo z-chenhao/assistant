@@ -42,8 +42,9 @@ flowchart TD
 
 ## MCP, Skills and controlled coding
 
-These optional adapters enter the existing registry and ToolExecutor. Main and
-Root receive the same configured work surface; Root still lacks Task control and
+External MCP and curated Skill content enter the existing registry and ToolExecutor.
+File/command tools and empty Skill discovery are built in by default (see [execution](coding.md)). Main and
+Root receive the same frozen work surface; Root still lacks Task control and
 user delivery. Neither role receives Skill management. No second discovery API,
 execution loop, approval pipeline or model credential channel is introduced.
 
