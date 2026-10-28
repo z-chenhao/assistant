@@ -23,7 +23,10 @@ def run(binary):
         h = ArtifactHarness(binary, root, fixture='approval')
         h.env.update(ERII_BACKUP_KEY='B'*32, ERII_MEMORY_KEY='M'*32,
                      ERII_AUTH_FIXTURE='PRIVATE_CREDENTIAL_SENTINEL_29')
-        (root / 'tool-config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:ERII_MEMORY_KEY\n')
+        # Restore changes data_root, not the frozen execution environment.
+        # Workspace files/configuration are intentionally outside the archive.
+        workspace = root / 'execution'
+        (root / 'tool-config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:ERII_MEMORY_KEY\nexecution:\n  root: ' + json.dumps(str(workspace)) + '\n')
         try:
             h.setup()
             auth = h.command('model', 'login', 'ERII_AUTH_FIXTURE')
