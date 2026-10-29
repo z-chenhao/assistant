@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func (s *Store) RecordProbe(ctx context.Context, p llm.Profile, r llm.ProbeRecord) error {

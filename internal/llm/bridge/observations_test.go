@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func TestDispatchEvidenceIsOptionalBoundedAndCannotRejectGeneration(t *testing.T) {

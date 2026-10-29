@@ -8,10 +8,10 @@ import (
 	"fmt"
 	nat "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	agentsqlite "github.com/z-chenhao/erii/internal/agent/sqlite"
-	"github.com/z-chenhao/erii/internal/event"
-	eventnats "github.com/z-chenhao/erii/internal/event/nats"
-	"github.com/z-chenhao/erii/internal/event/testbroker"
+	agentsqlite "github.com/z-chenhao/collie/internal/agent/sqlite"
+	"github.com/z-chenhao/collie/internal/event"
+	eventnats "github.com/z-chenhao/collie/internal/event/nats"
+	"github.com/z-chenhao/collie/internal/event/testbroker"
 	"io"
 	"os"
 	"os/exec"
@@ -25,7 +25,7 @@ import (
 // TestBrokerFixture is a test-only, owned JetStream peer for Python surfaces.
 // Its stdin lifetime and JSON handshake are consumed by event_broker.py.
 func TestBrokerFixture(t *testing.T) {
-	if os.Getenv("ERII_BROKER_FIXTURE") != "1" {
+	if os.Getenv("COLLIE_BROKER_FIXTURE") != "1" {
 		t.Skip("owned fixture only")
 	}
 	// Interactive scenarios share this peer but own separate Stream prefixes.
@@ -190,7 +190,7 @@ func TestUnboundedBrokerUpgradePreservesRetainedEvents(t *testing.T) {
 // This is part of make verify's maintained real-binary/NATS gate. No online
 // account or test-only execution loop is involved.
 func TestProductionLifecycleCLI(t *testing.T) {
-	binary := os.Getenv("ERII_TEST_BINARY")
+	binary := os.Getenv("COLLIE_TEST_BINARY")
 	if binary == "" {
 		t.Skip("real binary supplied by make verify")
 	}
@@ -203,14 +203,14 @@ func TestProductionLifecycleCLI(t *testing.T) {
 	checkErr(t, e)
 	script, e := filepath.Abs("../../../runtime/javascript/src/sidecar.mjs")
 	checkErr(t, e)
-	checkErr(t, os.WriteFile(cfg, []byte(fmt.Sprintf("version: 1\napp:\n  data_root: %q\nnats:\n  url: %q\n  stream_prefix: test\n  timeout: 100ms\n  retry_interval: 10ms\n  ack_wait: 20ms\n  poison_attempts: 2\nmemory:\n  encryption_key_ref: env:ERII_LIFECYCLE_MEMORY\njavascript:\n  command: %q\n  script: %q\n", data, broker.URL(), node, script)), 0600))
+	checkErr(t, os.WriteFile(cfg, []byte(fmt.Sprintf("version: 1\napp:\n  data_root: %q\nnats:\n  url: %q\n  stream_prefix: test\n  timeout: 100ms\n  retry_interval: 10ms\n  ack_wait: 20ms\n  poison_attempts: 2\nmemory:\n  encryption_key_ref: env:COLLIE_LIFECYCLE_MEMORY\njavascript:\n  command: %q\n  script: %q\n", data, broker.URL(), node, script)), 0600))
 	env := []string{}
 	for _, v := range os.Environ() {
-		if !strings.HasPrefix(v, "ERII_") {
+		if !strings.HasPrefix(v, "COLLIE_") {
 			env = append(env, v)
 		}
 	}
-	env = append(env, "ERII_LIFECYCLE_MEMORY=MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+	env = append(env, "COLLIE_LIFECYCLE_MEMORY=MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
 	args := []string{"-config", cfg, "-test-bridge", "main"}
 	command := func(arguments ...string) map[string]any {
 		t.Helper()
@@ -322,7 +322,7 @@ func TestProductionLifecycleCLI(t *testing.T) {
 		}
 		position = found
 	}
-	if path := os.Getenv("ERII_EVENT_EVIDENCE"); path != "" {
+	if path := os.Getenv("COLLIE_EVENT_EVIDENCE"); path != "" {
 		body, _ := json.MarshalIndent(map[string]any{"passed": true, "stages": stages, "checks": []string{"Setup remains available before broker/Tool initialization", "real CLI/provider Fake + NATS + Sidecar handshake", "authoritative startup recovery", "broker outage/reconnect retains active work", "Inbox deduplication", "SIGTERM joins and releases claims without Task cancellation"}}, "", "  ")
 		checkErr(t, os.WriteFile(filepath.Join(filepath.Dir(path), "production-lifecycle.json"), append(body, '\n'), 0600))
 	}

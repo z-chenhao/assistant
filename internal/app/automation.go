@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/automation"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/automation"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func (a *App) ManageAutomation(ctx context.Context, key string, q automation.Request) (tool.Result, error) {

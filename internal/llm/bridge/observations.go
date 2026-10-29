@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 // SetDispatchObserver installs a nonblocking Host diagnostic sink. It cannot

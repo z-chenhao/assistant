@@ -22,7 +22,7 @@ class ToolHarness(MainHarness):
 
 def state(h):
     value = h.state()
-    root = Path(h.env['ERII_DATA_ROOT'])
+    root = Path(h.env['COLLIE_DATA_ROOT'])
     with sqlite3.connect(root / 'state.db') as db:
         db.row_factory = sqlite3.Row
         for name, query in {
@@ -43,7 +43,7 @@ def state(h):
 
 
 def pending(h, text=None):
-    h.send('effect', json.dumps(text or {'target': 'alex.chen@example.test', 'text': '2026-10-20 11:00 Erii review'}))
+    h.send('effect', json.dumps(text or {'target': 'alex.chen@example.test', 'text': '2026-10-20 11:00 Collie review'}))
     h.command('chat', 'work')
     approval = h.command('approval', 'list')[-1]
     value = state(h)
@@ -61,7 +61,7 @@ def decide(h, approval, decision='approve'):
 def run(binary, scenario_jobs=1):
     report = {'version': 1, 'scope': 'SC-06/07 and GC-11/12/13 Tool approval/recovery fragments; full product cases remain due with their integrations',
               'checks': [], 'crashes': [], 'scenario_jobs': scenario_jobs}
-    with tempfile.TemporaryDirectory(prefix='erii-tools-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-tools-') as temp:
         root = Path(temp)
 
         def scenario(name, action, fixture='approval'):
@@ -175,7 +175,7 @@ def run(binary, scenario_jobs=1):
             require(inv['status'] == 'running' and len(before['effects']) == 1, 'missing incomplete committed effect')
             key = inv['idempotency_key']
             receipt = before['effects'][0]['result']
-            ledger = Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db'
+            ledger = Path(h.env['COLLIE_DATA_ROOT']) / 'effect-ledger.db'
             # Inject unusable external evidence without changing the frozen
             # ToolSpec, arguments, key or domain state. Restore it for reconciliation.
             with sqlite3.connect(ledger) as db:
@@ -289,7 +289,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
+    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("COLLIE_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
     report = run(args.binary.resolve(), args.scenario_jobs)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)

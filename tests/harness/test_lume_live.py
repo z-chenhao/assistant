@@ -202,7 +202,7 @@ class LumeLiveTests(unittest.TestCase):
             self.assertFalse((live.root / 'evidence/crash.json').exists())
 
     def test_fixture_upload_refuses_a_host_file_alias_before_ssh(self):
-        with tempfile.TemporaryDirectory(prefix='erii24-upload-', dir=Path.home()) as directory:
+        with tempfile.TemporaryDirectory(prefix='collie24-upload-', dir=Path.home()) as directory:
             outer = Path(directory)
             root = outer / 'test-root'
             root.mkdir()
@@ -271,7 +271,7 @@ class LumeLiveTests(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write(body)
 
-        with tempfile.TemporaryDirectory(prefix='erii24-download-', dir=Path.home()) as directory:
+        with tempfile.TemporaryDirectory(prefix='collie24-download-', dir=Path.home()) as directory:
             root = Path(directory)
             self.initialize(root)
             live = Live(root)
@@ -312,7 +312,7 @@ class LumeLiveTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform == 'darwin', 'macOS Seatbelt is a live-host boundary')
     def test_seatbelt_denies_owned_host_probe_outside_test_store(self):
         # Both files are disposable fixtures; this never probes a personal file.
-        with tempfile.TemporaryDirectory(prefix='erii24-boundary-', dir=Path.home()) as directory:
+        with tempfile.TemporaryDirectory(prefix='collie24-boundary-', dir=Path.home()) as directory:
             outer = Path(directory)
             root = outer / 'test-root'
             root.mkdir()

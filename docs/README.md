@@ -1,4 +1,4 @@
-# Erii 文档
+# Collie 文档
 
 [Feature Map](feature-map.md) 是唯一需求主入口。所有说明归入功能、技术、测试三类；本页只提供导航。
 

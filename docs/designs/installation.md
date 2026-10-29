@@ -4,7 +4,7 @@
 
 ## 当前架构
 
-唯一 Go 入口是 cmd/erii；安装器管理版本化应用和启动器，用户数据独立保存。默认终端启动拥有本地 JetStream broker，显式配置保留外部 broker 路径。
+唯一 Go 入口是 cmd/collie；安装器管理版本化应用和启动器，用户数据独立保存。默认终端启动拥有本地 JetStream broker，显式配置保留外部 broker 路径。
 
 ```mermaid
 flowchart TD
@@ -31,18 +31,18 @@ flowchart TD
 
 以下正文保留原决定、理由、兼容影响和当时证明范围，不作为当前完成声明。原记录中旧目录布局与旧验证命令属于历史上下文；现行入口以功能说明、当前架构及产品测试方案为准。
 
-<a id="decision-004-004--erii-installation-and-repository-layout"></a>
+<a id="decision-004-004--collie-installation-and-repository-layout"></a>
 
-## 004 — Erii installation and repository layout
+## 004 — Collie installation and repository layout
 
-Status: implemented by ERII-183 and merged in [PR #33](https://github.com/z-chenhao/erii/pull/33).
+Status: implemented by retired task #183 and merged in [PR #33](https://github.com/z-chenhao/collie/pull/33).
 This record retains the installation/layout decision and its validation scope.
 
 <a id="decision-004-decision-summary"></a>
 
 ### Decision summary
 
-Use `cmd/erii` as the only Go process entry point and `erii` as the executable.
+Use `cmd/collie` as the only Go process entry point and `collie` as the executable.
 Keep frontend source in `web/`, with generated assets embedded in the existing
 Go HTTP adapter. Add source/native-package installation and a foreground desktop
 startup that owns its local broker. This is deployment and source organization;
@@ -56,7 +56,7 @@ The old README described implemented Tasks as future work and required several
 manual npm/configuration/broker steps. Frontend tooling lived inside the Go
 adapter. The shared loop's model phase obscured its four durable lifecycle phases.
 Existing real SQLite, Pi/QuickJS and CLI harnesses already verify those boundaries.
-The owner explicitly requested the executable/directory rename to match Erii.
+The owner explicitly requested the executable/directory rename to match Collie.
 
 <a id="decision-004-invariants-and-policy"></a>
 
@@ -66,14 +66,14 @@ SQLite remains authoritative; JetStream provides wakeups. Main and Worker share
 one loop. First launch requires explicit profile probing and selection. Snapshots,
 call keys, approvals, unknown effects, fencing and cancellation retain their
 semantics. The managed loopback broker is desktop deployment policy, not an
-additional queue implementation. An explicit config or `ERII_NATS_URL` keeps the
+additional queue implementation. An explicit config or `COLLIE_NATS_URL` keeps the
 existing external-broker path.
 
 <a id="decision-004-openness-decision"></a>
 
 ### Openness decision
 
-The public user surface is the installed `erii` command and feature guides.
+The public user surface is the installed `collie` command and feature guides.
 `internal/startup` privately owns the local broker lifecycle, locks and storage.
 The loop's private phase handlers expose no new extension API. Frontend source is
 inspectable and independently buildable but uses the existing Host HTTP contract;
@@ -148,4 +148,4 @@ cover the loop refactor. Every original required CI gate stays required.
 - [GitHub native runner labels](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
 These references inform readability and install/launch ergonomics. They do not
-grant permission to reuse credentials or change Erii's runtime semantics.
+grant permission to reuse credentials or change Collie's runtime semantics.

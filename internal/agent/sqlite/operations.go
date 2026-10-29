@@ -3,8 +3,8 @@ package sqlite
 import (
 	"context"
 
-	"github.com/z-chenhao/erii/internal/operations"
-	operationssqlite "github.com/z-chenhao/erii/internal/operations/sqlite"
+	"github.com/z-chenhao/collie/internal/operations"
+	operationssqlite "github.com/z-chenhao/collie/internal/operations/sqlite"
 )
 
 func (s *Store) Operations(ctx context.Context) (operations.Report, error) {

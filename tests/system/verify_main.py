@@ -29,8 +29,8 @@ class MainHarness:
     def __init__(self, binary, root, fixture="main"):
         self.binary = binary
         self.root = root
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
-        self.env["ERII_DATA_ROOT"] = str(root / "data")
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith("COLLIE_")}
+        self.env["COLLIE_DATA_ROOT"] = str(root / "data")
         self.children = []
         self.fixture = fixture
         self.processes = current()
@@ -192,7 +192,7 @@ class MainHarness:
 
     def state(self):
         result = {}
-        with sqlite3.connect(Path(self.env["ERII_DATA_ROOT"]) / "state.db") as db:
+        with sqlite3.connect(Path(self.env["COLLIE_DATA_ROOT"]) / "state.db") as db:
             db.row_factory = sqlite3.Row
             for name, query in {
                 "runs": "SELECT run_id,kind,task_id,parent_run_id,root_run_id,task_epoch,depth,status,desired_state,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
@@ -222,7 +222,7 @@ class MainHarness:
 
     def failure_state(self):
         """Bounded read-only evidence from disposable fixtures; no claim tokens."""
-        path = Path(self.env['ERII_DATA_ROOT']) / 'state.db'
+        path = Path(self.env['COLLIE_DATA_ROOT']) / 'state.db'
         if not path.exists():
             return {'database': 'not created'}
         with sqlite3.connect(path) as db:
@@ -259,7 +259,7 @@ def assert_final(state, users, replies=1):
 def run(binary):
     report = {"version": 1, "scope": "M1 Main slice; no M3 Security or M5 JavaScript replay claim",
               "checks": [], "crashes": []}
-    with tempfile.TemporaryDirectory(prefix="erii-main-") as temp:
+    with tempfile.TemporaryDirectory(prefix="collie-main-") as temp:
         root = Path(temp)
 
         def scenario(name, action):
@@ -310,7 +310,7 @@ def run(binary):
                     h.send("late", "late crash steering")
                 frozen = None
                 if boundary == "after_compaction_commit":
-                    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+                    with sqlite3.connect(Path(h.env["COLLIE_DATA_ROOT"]) / "state.db") as db:
                         frozen = db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone()
                         require(frozen is not None and db.execute("SELECT count(*) FROM model_generation").fetchone()[0] == 0,
                                 "kill did not separate compaction and generation admission")
@@ -330,7 +330,7 @@ def run(binary):
                     if t["invocation_id"] in accepted_tools:
                         require(t == accepted_tools[t["invocation_id"]], "completed Tool replayed")
                 if frozen is not None:
-                    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+                    with sqlite3.connect(Path(h.env["COLLIE_DATA_ROOT"]) / "state.db") as db:
                         require(db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone() == frozen,
                                 "steering changed the frozen pre-admission context")
                 return {"boundary": boundary, "signal": "SIGKILL", "before": before, "after": after}
@@ -345,7 +345,7 @@ def run(binary):
             new_profile = h.setup("second-model")
             child.send_signal(signal.SIGTERM)
             child.communicate(timeout=15)
-            with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+            with sqlite3.connect(Path(h.env["COLLIE_DATA_ROOT"]) / "state.db") as db:
                 require(db.execute("SELECT status FROM run").fetchone()[0] == "running", "shutdown cancelled/lost business work")
             h.command("chat", "work")
             state = h.state()

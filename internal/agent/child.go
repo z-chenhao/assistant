@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/task"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 const RunToolName = "builtin__agent_run"

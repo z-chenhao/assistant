@@ -9,7 +9,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/z-chenhao/erii/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer"
 )
 
 // Driver is an explicit deterministic adapter Fake. It never substitutes for a

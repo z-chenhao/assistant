@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 const SearchName = "builtin__task_search"

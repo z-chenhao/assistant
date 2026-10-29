@@ -2,7 +2,7 @@ package web
 
 import (
 	"fmt"
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 	"net/http"
 	"net/url"
 	"strconv"

@@ -19,7 +19,7 @@ class FailureEvidenceTests(unittest.TestCase):
         with patch.object(driver, 'prepare', side_effect=error), patch.object(driver, 'Embeddings', return_value=embeddings), \
                 redirect_stderr(log):
             with self.assertRaises(RuntimeError) as raised:
-                driver.run(Path('/unused/erii'), output)
+                driver.run(Path('/unused/collie'), output)
         self.assertIs(raised.exception, error)
         self.assertIn('OSError', log.getvalue())
         self.assertNotIn('private path', log.getvalue())
@@ -38,7 +38,7 @@ class FailureEvidenceTests(unittest.TestCase):
             with patch.object(driver, 'prepare', return_value=h), patch.object(driver, 'Embeddings', return_value=embeddings), \
                     patch.object(driver, 'readback', return_value=dict(state=dict(compaction=[]))):
                 with self.assertRaises(RuntimeError) as raised:
-                    driver.run(Path('/unused/erii'), output)
+                    driver.run(Path('/unused/collie'), output)
             self.assertIs(raised.exception, error)
             receipt = json.loads(output.read_text())
             self.assertIs(receipt['passed'], False)
@@ -59,7 +59,7 @@ class FailureEvidenceTests(unittest.TestCase):
             with patch.object(driver, 'prepare', return_value=h), patch.object(driver, 'Embeddings', return_value=embeddings), \
                     patch.object(driver, 'readback', side_effect=OSError('unreadable')):
                 with self.assertRaises(RuntimeError) as raised:
-                    driver.run(Path('/unused/erii'), output)
+                    driver.run(Path('/unused/collie'), output)
             self.assertIs(raised.exception, error)
             receipt = json.loads(output.read_text())
             self.assertEqual(receipt['runtime'], dict(capture_error_type='ValueError'))

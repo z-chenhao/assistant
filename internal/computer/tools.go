@@ -1,6 +1,6 @@
 package computer
 
-import "github.com/z-chenhao/erii/internal/tool"
+import "github.com/z-chenhao/collie/internal/tool"
 
 // Definitions keeps the established private cua bridge. Lifecycle policy is
 // Host-owned; no ensure/stop/restore operation is exposed as a model parameter.

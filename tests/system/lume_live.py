@@ -32,10 +32,10 @@ import urllib.request
 from file_digest import sha256_file
 
 ISSUE = '01a14029-4eab-7782-afba-3980c6c98a7c'
-VM = 'erii24-base'
+VM = 'collie24-base'
 LUME_VERSION = '0.6.1'
 TESTED_IMAGE = 'macos-tahoe-cua:26.5.2'
-MARKER = 'erii24-owned.json'
+MARKER = 'collie24-owned.json'
 IPSW_NAME = 'UniversalMac_27.0.1_26A434_Restore.ipsw'
 IPSW_URL = ('https://updates.cdn-apple.com/2026FallFCS/'
             '59241290-5d51-4ca8-9df4-31624b9a4eac/' + IPSW_NAME)
@@ -95,7 +95,7 @@ class Live:
         require(profile in {'acceptance', 'product'}, 'invalid owned test profile')
         if profile == 'product':
             product = root / 'product'
-            require(not product.is_symlink() and json.loads((product / 'erii-computer.json').read_text()) == {'version': 1},
+            require(not product.is_symlink() and json.loads((product / 'collie-computer.json').read_text()) == {'version': 1},
                     'production lifecycle test store must be sealed first')
             self.store = product / 'vms'
             config = root / 'product-config'
@@ -103,13 +103,13 @@ class Live:
                     'invalid isolated production lifecycle store')
             self.env['XDG_CONFIG_HOME'] = str(config)
             if vm != VM:
-                require(re.fullmatch(r'erii-[0-9a-f-]{36}-[1-9][0-9]*', vm), 'invalid Host instance name')
+                require(re.fullmatch(r'collie-[0-9a-f-]{36}-[1-9][0-9]*', vm), 'invalid Host instance name')
                 directory = self.store / vm
                 require(directory.is_dir() and not directory.is_symlink(), 'Host instance missing')
-                owner = directory / 'erii-instance.json'
+                owner = directory / 'collie-instance.json'
                 require(owner.is_file() and not owner.is_symlink(), 'Host instance ownership missing')
                 identity = json.loads(owner.read_text())
-                require(identity['native_name'] == vm and vm == f"erii-{identity['computer_id']}-{identity['instance_epoch']}",
+                require(identity['native_name'] == vm and vm == f"collie-{identity['computer_id']}-{identity['instance_epoch']}",
                         'Host instance ownership mismatch')
         else:
             require(vm == VM, 'acceptance profile owns exactly its assigned VM')
@@ -177,8 +177,8 @@ class Live:
         # Refuse an accidentally selected server with a different VM store.
         with opener.open(url + 'config', timeout=min(5, timeout)) as response:
             config = json.load(response)
-        require(isinstance(config, dict) and config.get('defaultLocationName') == 'erii24'
-                and config.get('vmLocations') == [{'name': 'erii24', 'path': str(self.store)}],
+        require(isinstance(config, dict) and config.get('defaultLocationName') == 'collie24'
+                and config.get('vmLocations') == [{'name': 'collie24', 'path': str(self.store)}],
                 'server does not exclusively own the test store')
         payload = None if body is None else json.dumps(body).encode()
         request = urllib.request.Request(url + path, data=payload, method=method,
@@ -298,8 +298,8 @@ class Live:
             output.setparams((1, 2, 24000, 0, 'NONE', 'not compressed'))
             output.writeframes(samples)
         (directory / 'subtitles.srt').write_text(
-            '1\n00:00:00,200 --> 00:00:02,800\nERII-24 alpha\n\n'
-            '2\n00:00:03,200 --> 00:00:05,800\nERII-24 beta\n')
+            '1\n00:00:00,200 --> 00:00:02,800\nCOLLIE-24 alpha\n\n'
+            '2\n00:00:03,200 --> 00:00:05,800\nCOLLIE-24 beta\n')
         report = {name: {'bytes': (directory / name).stat().st_size,
                          'sha256': hashlib.sha256((directory / name).read_bytes()).hexdigest()} for name in names}
         (self.root / 'evidence/fixtures.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -562,7 +562,7 @@ class Live:
         target = self.root / 'evidence' / filename
         require(target.parent == self.root / 'evidence' and not target.is_symlink(),
                 'get requires a filename in owned evidence')
-        source = shlex.quote('/Users/lume/erii24-fixtures/' + filename)
+        source = shlex.quote('/Users/lume/collie24-fixtures/' + filename)
         size = int(self.guest(f'stat -f %z {source}').strip())
         require(0 <= size <= 8 * 1024 * 1024, 'Guest evidence exceeds the transfer limit')
         payload = base64.b64decode(''.join(self.guest(f'base64 -i {source}').split()), validate=True)
@@ -574,9 +574,9 @@ class Live:
 
     def put_fixture(self, filename):
         payload = self.fixture_bytes(filename)
-        target = shlex.quote('/Users/lume/erii24-fixtures/' + filename)
-        temporary = shlex.quote('/Users/lume/erii24-fixtures/' + filename + '.b64')
-        self.guest(f'mkdir -p /Users/lume/erii24-fixtures && : > {temporary}')
+        target = shlex.quote('/Users/lume/collie24-fixtures/' + filename)
+        temporary = shlex.quote('/Users/lume/collie24-fixtures/' + filename + '.b64')
+        self.guest(f'mkdir -p /Users/lume/collie24-fixtures && : > {temporary}')
         encoded = base64.b64encode(payload).decode('ascii')
         for start in range(0, len(encoded), 32768):
             self.guest(f"printf '%s' '{encoded[start:start + 32768]}' >> {temporary}")

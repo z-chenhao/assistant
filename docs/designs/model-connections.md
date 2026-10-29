@@ -26,7 +26,7 @@ flowchart TD
 
 ## 代码与依赖
 
-- [cmd/erii/models.go](../../cmd/erii/models.go)
+- [cmd/collie/models.go](../../cmd/collie/models.go)
 - [internal/llm/control.go](../../internal/llm/control.go)
 - [internal/llm/account/manager.go](../../internal/llm/account/manager.go)
 - [internal/llm/secret/unsupported.go](../../internal/llm/secret/unsupported.go)
@@ -162,13 +162,13 @@ model_id: Qwen3.8-27B-Splash
 auth_connection_id: null
 ```
 
-- `endpoint` 支持用户明确配置的 `http/https` URL，默认建议 `http://127.0.0.1:8000/v1`；`localhost` 从 Erii Go 主进程所在网络命名空间解析，不指向 Computer macOS Guest。
+- `endpoint` 支持用户明确配置的 `http/https` URL，默认建议 `http://127.0.0.1:8000/v1`；`localhost` 从 Collie Go 主进程所在网络命名空间解析，不指向 Computer macOS Guest。
 - API Key 可为空；需要认证时创建 `AuthConnection{auth_kind: api_key}` 并只把值保存到 SecretStore。不得为了满足 SDK 校验向网络发送伪造 Key；若上游要求任意 Bearer 值，可由用户显式配置。
 - 模型目录通过 `GET /models` 最佳努力发现；端点不支持目录时允许手动输入 `model_id`，但仍必须通过实际推理 Probe。
 - Compatibility 不能仅因服务声称“OpenAI compatible”就推断。至少显式记录 `developer_role`、`reasoning_effort`、`parallel_tool_calls`、`stream_usage` 和 Tool Result 格式；未知项通过 Probe 或保守默认确定。
 - MVP 必须支持常见 Qwen/vLLM/SGLang/LM Studio 风格 Chat Completions；Responses API 只有在实际端点通过契约测试后才启用。
 - 可选 `temperature/top_p` 只在模型声明支持时发送；未设置时使用 Provider 默认值。Reasoning 模型拒绝的采样参数不得强行注入。
-- Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Erii 主模型。
+- Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Collie 主模型。
 - 声明 `image_input:true` 时，Host 通过现有图像 resolver 与 Provider envelope 发送合成蓝色方块并验证颜色响应，成功后才保留并冻结图像输入能力。旧 Probe 中缺失图像证明不授予该能力；文本 Profile 的验证与引用回退不变。失败的图像重测同样撤销 readiness。
 - URL、Header、响应 Body 和模型输出都按不可信外部输入处理；禁止跨 Origin 自动携带 Authorization，禁止把凭据或完整 Provider 响应写入日志。
 
@@ -178,7 +178,7 @@ auth_connection_id: null
 
 第二条路径采用 Pi 当前 OpenAI Provider 的 “Sign in with ChatGPT” 语义，而不是 legacy `openai-codex` Provider：
 
-- Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不作为当前 M1/ERII-8 里程碑阻塞条件，不得记为已交付或已测试（2026-10-16 用户批准方案 A，见 [ADR 001](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow)）。
+- Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不作为当前 M1/retired task #8 里程碑阻塞条件，不得记为已交付或已测试（2026-10-16 用户批准方案 A，见 [ADR 001](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow)）。
 - 登录完成后创建 `AuthConnection{provider: openai, auth_kind: chatgpt_oauth}`，刷新凭据进入 SecretStore；`state.db` 只保存 credential ref、账号/Workspace 的脱敏显示信息、过期状态和版本。
 - `AuthConnection.status = connected | refreshing | reauth_required | logged_out`。状态迁移由 Auth 层持久化；模型和 Run 只引用 Connection ID，不能读取 CredentialRef。
 - Access token 到期前由 Provider Auth 层自动刷新；同一 Credential 使用单飞锁，避免多个并发 Run 同时刷新。刷新失败或服务返回确定的授权失效时，连接进入 `reauth_required`，停止接收新 Run 并提示用户重新登录。
@@ -188,7 +188,7 @@ auth_connection_id: null
 - Logout 删除 SecretStore 中的 refresh/access token、清理 Provider Session/Prompt Cache，并将关联 Profile 置为 `reauth_required`；不删除历史 Run、Conversation 或用量记录。
 - Host 在请求解析时捕获账号 epoch，最终接受结果时在 usage 写事务内重验该 epoch 与账号状态；该事务与其他 Host 的鉴权状态写入串行化。若 auth loss/logout 已先提交，旧结果记录 `AUTH_REQUIRED`，不得返回成功文本或发布 completed 事件；同一身份的成功刷新不改变 epoch。该 fence 不进入 ModelSnapshot、模型上下文或 Bridge RPC。
 - Generate/Continue 的注册保留到 Host 最终接受完成。Cancel/Dispose 的确认与 usage 提交使用同一注册级接受锁；确认先完成时，未接受的结果记录 `GENERATION_CANCELLED`，不返回成功或发布 completed。usage 提交先完成时，后来的取消不改变已接受的结果；鉴权事务拒绝仍返回 `AUTH_REQUIRED`。接受锁只保护实际 usage 写入/提交，不包围 observer 等待、RPC 或 sink 回调；SQLite writer admission 在获取接受锁之前完成。接受控制仅存在于 Go Host 内存，不改变 RPC、ModelSnapshot 或存储格式。
-- 不读取或修改用户现有 `~/.codex/auth.json`，不调用 `codex login` 后复制凭据，也不让多个产品争用同一凭据文件。Erii 拥有独立的 AuthConnection 生命周期。
+- 不读取或修改用户现有 `~/.codex/auth.json`，不调用 `codex login` 后复制凭据，也不让多个产品争用同一凭据文件。Collie 拥有独立的 AuthConnection 生命周期。
 
 <a id="contract-55-provider-bridge-与安全边界"></a>
 
@@ -215,7 +215,7 @@ MVP 使用独立的 Model Provider Bridge 复用 Pi AI 的 Provider、OAuth、�
 #### 5.6 切换、故障与隐私语义
 
 - 系统不在本地 Qwen 与 OpenAI 账号模型之间自动 fallback。切换 Provider 会改变费用、隐私和能力边界，必须由用户控制面显式选择。
-- Erii 不负责启动、下载或升级本地 Qwen/vLLM 进程；它只保存连接并报告可操作的健康诊断。端点恢复后可以重新 Test 并恢复同一 Profile。
+- Collie 不负责启动、下载或升级本地 Qwen/vLLM 进程；它只保存连接并报告可操作的健康诊断。端点恢复后可以重新 Test 并恢复同一 Profile。
 - Active Profile 暂时不可用时，新 Run 进入可恢复等待或返回设置级错误；后台已有 Task 不自动换模型。用户选择新 Profile 后，由 Main 决定对受影响工作创建新 Run。
 - Root 的后代树始终继承 Root ModelSnapshot；同一 Durable Replay 不允许换 model ID、endpoint、Wire API、兼容性或 Tool Schema。需要换模型时创建新业务 Run。
 - 本地模型请求只发送到配置的 endpoint；OpenAI Account 请求只发送到 Provider 固定的受信端点。模型连接的隐私说明在激活前展示一次，并可在设置中查看。
@@ -237,7 +237,7 @@ The Go Host runs a separate Node stdio Bridge using exact dependency
 `@earendil-works/pi-ai@1.3.0` (MIT), with a checked-in transitive lockfile.
 Pi's Chat Completions and Responses adapters are imported. Installation downloads the Pi
 SDK dependency tree; it adds no hosted service or account cost. Its SDK still
-brings other provider packages transitively, although Erii does not enable them.
+brings other provider packages transitively, although Collie does not enable them.
 Current OpenAI account OAuth is also implemented; see the account lifecycle below.
 The [Main CLI](../features/conversation.md) uses the same Bridge for frozen Run requests,
 Direct Tool continuation and Conversation recovery. Main and Worker use the
@@ -402,7 +402,7 @@ and the full 30-second trickling-body deadline (not a shortened test-only timer)
 
 ## ADR 001: Current OpenAI account authentication and deferred device flow
 
-Status: accepted by 朱晨浩 on 2026-10-16 in ERII-8, comment
+Status: accepted by 朱晨浩 on 2026-10-16 in retired task #8, comment
 `01a1431f-37d1-7369-9c29-fba77578c4a5` (方案 A). Implementation remains subject
 to independent review and human merge.
 
@@ -519,4 +519,4 @@ times in `make verify`. No online account is needed in CI.
 
 Unexecuted real login/Keychain/provider Live Shadow is **inconclusive**. Device
 Authorization is **deferred**, not passed. Main/Conversation Golden Cases belong
-to ERII-9/10; this slice does not establish full M1 or release completion.
+to retired task #9/10; this slice does not establish full M1 or release completion.

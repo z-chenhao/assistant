@@ -8,7 +8,7 @@ import {waitForDevToolsPort} from './readiness.mjs';
 
 for (const initial of [null,'','321','0\n','invalid\n','65536\n']) {
  test(`CDP readiness waits for a valid published port after ${JSON.stringify(initial)}`,async()=>{
-  const root=await mkdtemp(join(tmpdir(),'erii-cdp-'));
+  const root=await mkdtemp(join(tmpdir(),'collie-cdp-'));
   let publication;
   try {
    if (initial!==null) await writeFile(join(root,'DevToolsActivePort'),initial);
@@ -23,7 +23,7 @@ for (const initial of [null,'','321','0\n','invalid\n','65536\n']) {
 }
 
 test('CDP readiness fails by its deadline and propagates filesystem errors',async()=>{
- const root=await mkdtemp(join(tmpdir(),'erii-cdp-'));
+ const root=await mkdtemp(join(tmpdir(),'collie-cdp-'));
  try {
   await assert.rejects(waitForDevToolsPort(root,50),/doctor: Chromium CDP port not ready/);
   await mkdir(join(root,'DevToolsActivePort'));

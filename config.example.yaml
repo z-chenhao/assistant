@@ -24,8 +24,8 @@ version: 1
 #   toolchain_roots: [/absolute/read-only/compiler-install]
 
 app:
-  # Must be absolute. ERII_DATA_ROOT can override this for deployment.
-  data_root: /tmp/erii-local
+  # Must be absolute. COLLIE_DATA_ROOT can override this for deployment.
+  data_root: /tmp/collie-local
   log_level: info
   log_max_bytes: 16777216
   log_backups: 2
@@ -34,12 +34,12 @@ app:
 nats:
   url: nats://127.0.0.1:4222
   # Use a dedicated prefix per data root on a shared broker. Never embed credentials.
-  stream_prefix: erii
+  stream_prefix: collie
   timeout: 2s
   ack_wait: 30s
   retry_interval: 1s
   # Remote brokers require tls:// and a token reference in SecretStore.
-  # token_ref: env:ERII_NATS_TOKEN
+  # token_ref: env:COLLIE_NATS_TOKEN
   max_age: 168h
   max_bytes: 1073741824
   max_messages: 1000000
@@ -90,7 +90,7 @@ tasks:
 # Optional real local-model Bridge. Install pinned dependencies first; use an absolute path.
 # llm:
 #   provider_bridge_command: node
-#   provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
+#   provider_bridge_script: /absolute/path/to/collie/provider-bridge/bridge.mjs
 #   provider_bridge_version: pi-ai-1.3.0-v1
 
 # Host limits apply across CLI processes sharing this data root. Waiting calls
@@ -122,13 +122,13 @@ delivery:
 # Pin Node 24.21.0; both paths must be absolute and outside an editable workspace.
 # javascript:
 #   command: /absolute/path/to/node
-#   script: /absolute/path/to/erii/runtime/javascript/src/sidecar.mjs
+#   script: /absolute/path/to/collie/runtime/javascript/src/sidecar.mjs
 
 # Optional background Memory maintenance. The reference resolves to an existing
 # 32-byte key in SecretStore; never put key bytes in YAML. No per-record prompts.
 # When embedding is enabled with maintenance, its endpoint must be literal loopback.
 # memory:
-#   encryption_key_ref: env:ERII_MEMORY_KEY
+#   encryption_key_ref: env:COLLIE_MEMORY_KEY
 
 # Frozen per Run; Children inherit the Parent policy. Provisional defaults.
 context:
@@ -138,25 +138,25 @@ context:
 
 # Optional managed Guest Chromium (inside the existing computer: block):
 #   browser:
-#     node: /opt/erii/node/bin/node
-#     module: /opt/erii/browser/node_modules/playwright-core/index.mjs
+#     node: /opt/collie/node/bin/node
+#     module: /opt/collie/browser/node_modules/playwright-core/index.mjs
 #     port: 9222
-# Install pinned guest-browser/package-lock.json and erii-transfer.py in the
+# Install pinned guest-browser/package-lock.json and collie-transfer.py in the
 # clean Guest. See docs/features/computer-use.md. No Host browser or personal profile.
 
 # Automation intent is persisted through Main/automation manage, not YAML.
-# Run erii automation work in the foreground under your supervisor.
+# Run collie automation work in the foreground under your supervisor.
 # Every intent carries its own IANA timezone; see docs/features/automation.md.
 
 # Optional authenticated Web surface; listener must be literal loopback.
 # web:
 #   listen: 127.0.0.1:8787
-#   token_ref: env:ERII_WEB_TOKEN
+#   token_ref: env:COLLIE_WEB_TOKEN
 # Optional Feishu p2p channel. Enroll the exact owner/chat through channel manage.
 # All credentials resolve through SecretStore; never put token values here.
 # feishu:
 #   app_id: your-app-id
 #   tenant_key: your-tenant-key
-#   verification_token_ref: env:ERII_FEISHU_VERIFICATION_TOKEN
-#   encrypt_key_ref: env:ERII_FEISHU_ENCRYPT_KEY
-#   access_token_ref: env:ERII_FEISHU_ACCESS_TOKEN
+#   verification_token_ref: env:COLLIE_FEISHU_VERIFICATION_TOKEN
+#   encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT_KEY
+#   access_token_ref: env:COLLIE_FEISHU_ACCESS_TOKEN

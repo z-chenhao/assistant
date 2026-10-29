@@ -17,7 +17,7 @@ import (
 
 	nat "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/z-chenhao/erii/internal/event"
+	"github.com/z-chenhao/collie/internal/event"
 )
 
 type Options struct {
@@ -164,7 +164,7 @@ func open(ctx context.Context, options Options, secrets SecretStore, upgrade boo
 			old := info.Config
 			if len(old.Subjects) != 1 || old.Subjects[0] != b.subjects+".>" || old.Storage != jetstream.FileStorage || old.Retention != jetstream.LimitsPolicy || old.Discard != jetstream.DiscardNew || old.MaxConsumers > 0 || old.Sealed || old.Mirror != nil || len(old.Sources) > 0 {
 				conn.Close()
-				return nil, errors.New("broker stream is not an owned Erii v1 stream")
+				return nil, errors.New("broker stream is not an owned Collie v1 stream")
 			}
 			old.MaxAge = options.MaxAge
 			old.MaxBytes = options.MaxBytes

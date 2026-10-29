@@ -50,7 +50,7 @@ func TestConcurrentCatalogPublicationAtLastSlot(t *testing.T) {
 }
 
 func TestCatalogWriterProcess(t *testing.T) {
-	root := os.Getenv("ERII_SKILL_CRASH_ROOT")
+	root := os.Getenv("COLLIE_SKILL_CRASH_ROOT")
 	if root == "" {
 		return
 	}
@@ -59,10 +59,10 @@ func TestCatalogWriterProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close()
-	if err := r.Mkdir(".erii-pending-crash", 0700); err != nil {
+	if err := r.Mkdir(".collie-pending-crash", 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.WriteFile(".erii-pending-crash/SKILL.md", []byte("partial write"), 0600); err != nil {
+	if err := r.WriteFile(".collie-pending-crash/SKILL.md", []byte("partial write"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println("locked")
@@ -75,7 +75,7 @@ func TestCatalogWriterCrashReleasesAdmission(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestCatalogWriterProcess$")
-	cmd.Env = append(os.Environ(), "ERII_SKILL_CRASH_ROOT="+c.Root)
+	cmd.Env = append(os.Environ(), "COLLIE_SKILL_CRASH_ROOT="+c.Root)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +127,7 @@ func TestCatalogCapacityAdmissionAndRecovery(t *testing.T) {
 	if err := Retire(c, "last", "last-slot", description, procedure); err != nil {
 		t.Fatal(err)
 	}
-	staging := filepath.Join(c.Root, ".erii-pending-next")
+	staging := filepath.Join(c.Root, ".collie-pending-next")
 	if err := os.Mkdir(staging, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestCatalogCapacityAdmissionAndRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"last", "next"} {
-		if _, err := os.ReadFile(filepath.Join(c.Root, ".erii-retired-"+id, "SKILL.md")); err != nil {
+		if _, err := os.ReadFile(filepath.Join(c.Root, ".collie-retired-"+id, "SKILL.md")); err != nil {
 			t.Fatal("audit history lost", err)
 		}
 	}
@@ -157,7 +157,7 @@ func TestCatalogBoundsActiveEntriesWithoutLoadingHistory(t *testing.T) {
 	c := Config{Root: t.TempDir(), Scope: "agent"}
 	fillCatalog(t, c, 128)
 	for i := 0; i < 260; i++ {
-		for _, prefix := range []string{".erii-retired-", ".erii-pending-"} {
+		for _, prefix := range []string{".collie-retired-", ".collie-pending-"} {
 			path := filepath.Join(c.Root, fmt.Sprintf("%s%d", prefix, i))
 			if err := os.Mkdir(path, 0700); err != nil {
 				t.Fatal(err)
@@ -188,7 +188,7 @@ func TestPublicationChecksCatalogAndRecoverableStage(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else {
-				stage := filepath.Join(c.Root, ".erii-pending-candidate")
+				stage := filepath.Join(c.Root, ".collie-pending-candidate")
 				if err := os.Mkdir(stage, 0700); err != nil {
 					t.Fatal(err)
 				}

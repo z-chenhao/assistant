@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/tool"
-	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
+	"github.com/z-chenhao/collie/internal/agent"
+	artifacttools "github.com/z-chenhao/collie/internal/artifact/tools"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/tool"
+	toolfake "github.com/z-chenhao/collie/internal/tool/fake"
 )
 
 // childrenReply drives the production Direct Tool path. It supplies protocol

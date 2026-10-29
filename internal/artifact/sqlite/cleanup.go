@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/event"
-	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/event"
+	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
 )
 
 func artifactEvent(ctx context.Context, tx *sql.Tx, ref, kind string) error {
-	e, err := event.New("/erii/artifacts", "ai.erii.artifact."+kind+".v1", ref, map[string]string{"artifact_ref": ref})
+	e, err := event.New("/collie/artifacts", "ai.collie.artifact."+kind+".v1", ref, map[string]string{"artifact_ref": ref})
 	if err != nil {
 		return err
 	}

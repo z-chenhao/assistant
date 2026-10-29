@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/account"
-	"github.com/z-chenhao/erii/internal/llm/bridge"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/account"
+	"github.com/z-chenhao/collie/internal/llm/bridge"
 )
 
 // Pause after the observer's Guard, before the real usage transaction. A second

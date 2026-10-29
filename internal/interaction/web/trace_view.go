@@ -3,7 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 	"strings"
 	"time"
 )

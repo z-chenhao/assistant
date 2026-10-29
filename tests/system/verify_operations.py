@@ -18,22 +18,22 @@ from verify_scheduling import setup as batch_setup, state as batch_state, concur
 def run(binary):
     report = dict(version=1, scope='M7 operations contracts; no semantic score or exactly-once external-effect claim',
                   checks=[], passed=False)
-    with tempfile.TemporaryDirectory(prefix='erii-operations-') as folder:
+    with tempfile.TemporaryDirectory(prefix='collie-operations-') as folder:
         root = Path(folder)
         h = ArtifactHarness(binary, root, fixture='approval')
-        h.env.update(ERII_BACKUP_KEY='B'*32, ERII_MEMORY_KEY='M'*32,
-                     ERII_AUTH_FIXTURE='PRIVATE_CREDENTIAL_SENTINEL_29')
+        h.env.update(COLLIE_BACKUP_KEY='B'*32, COLLIE_MEMORY_KEY='M'*32,
+                     COLLIE_AUTH_FIXTURE='PRIVATE_CREDENTIAL_SENTINEL_29')
         # Restore changes data_root, not the frozen execution environment.
         # Workspace files/configuration are intentionally outside the archive.
         workspace = root / 'execution'
-        (root / 'tool-config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:ERII_MEMORY_KEY\nexecution:\n  root: ' + json.dumps(str(workspace)) + '\n')
+        (root / 'tool-config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:COLLIE_MEMORY_KEY\nexecution:\n  root: ' + json.dumps(str(workspace)) + '\n')
         try:
             h.setup()
-            auth = h.command('model', 'login', 'ERII_AUTH_FIXTURE')
+            auth = h.command('model', 'login', 'COLLIE_AUTH_FIXTURE')
             require('credential_ref' not in auth, 'credential ref exposed on public login response')
-            with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+            with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
                 credential_before = db.execute('SELECT credential_ref FROM auth_connection WHERE connection_id=?', (auth['connection_id'],)).fetchone()[0]
-            require(credential_before == 'env:ERII_AUTH_FIXTURE', 'credential ref did not use SecretStore')
+            require(credential_before == 'env:COLLIE_AUTH_FIXTURE', 'credential ref did not use SecretStore')
             saved = h.save('operations.txt', 'text/plain', b'PRIVATE_ARTIFACT_29\n')
             ref = saved['artifact_ref']
             manage(h, 'durable-memory', operation='remember', content='PRIVATE_MEMORY_29 I prefer tea')
@@ -50,22 +50,22 @@ def run(binary):
             bug = h.command('ops', 'report')
             encoded = json.dumps([bug, trace])
             require(not any(v in encoded for v in ('alex.chen', 'PRIVATE_', 'credential_ref', 'arguments_json', 'content_json', 'endpoint')), 'bug report exposed domain/private data')
-            archive = root / 'backup.erii'
+            archive = root / 'backup.collie'
             # A real held process proves offline exclusion; kill releases the
             # kernel lock, then an archive can be made without stale owners.
             held = h.hold('before_next_scan')
-            result = h.raw('ops', 'backup', str(archive), 'env:ERII_BACKUP_KEY', ok=False)
+            result = h.raw('ops', 'backup', str(archive), 'env:COLLIE_BACKUP_KEY', ok=False)
             require(result.returncode != 0 and b'data root is in use' in result.stderr and not archive.exists(), 'backup copied an active instance')
             held.kill()
             held.communicate(timeout=10)
             memory = readback(h)['memory']  # Freeze the actual backup boundary, after Curator joined.
-            manifest = h.command('ops', 'backup', str(archive), 'env:ERII_BACKUP_KEY')
+            manifest = h.command('ops', 'backup', str(archive), 'env:COLLIE_BACKUP_KEY')
             raw = archive.read_bytes()
             require(not any(v in raw for v in (b'SQLite format', b'PRIVATE_', b'B'*32, b'M'*32)), 'unencrypted archive material')
-            require(h.command('ops', 'backup', str(archive), 'env:ERII_BACKUP_KEY', ok=False).returncode != 0, 'existing backup overwritten')
+            require(h.command('ops', 'backup', str(archive), 'env:COLLIE_BACKUP_KEY', ok=False).returncode != 0, 'existing backup overwritten')
             target = root / 'restored'
-            h.env['ERII_DATA_ROOT'] = str(target)
-            restored = h.command('ops', 'restore', str(archive), 'env:ERII_BACKUP_KEY')
+            h.env['COLLIE_DATA_ROOT'] = str(target)
+            restored = h.command('ops', 'restore', str(archive), 'env:COLLIE_BACKUP_KEY')
             require(restored == manifest, 'restore manifest changed')
             require(h.command('chat', 'work', ok=False).returncode != 0, 'restored identity dispatched before cutover')
             for entry in manifest['files']:
@@ -91,7 +91,7 @@ def run(binary):
             for path in target.rglob('*'):
                 if path.is_file():
                     content = path.read_bytes()
-                    require(not any(value.encode() in content for value in (h.env['ERII_BACKUP_KEY'], h.env['ERII_MEMORY_KEY'], h.env['ERII_AUTH_FIXTURE'])), 'Secret leaked into restored data/logs')
+                    require(not any(value.encode() in content for value in (h.env['COLLIE_BACKUP_KEY'], h.env['COLLIE_MEMORY_KEY'], h.env['COLLIE_AUTH_FIXTURE'])), 'Secret leaked into restored data/logs')
             report['checks'] = ['CLI/SecretStore setup Doctor', 'operator-only health and correlated content-free trace/report',
                                 'SIGKILL releases shared lock; live backup refused',
                                 'encrypted consistent state/conversation/memory/Artifact archive',
@@ -107,7 +107,7 @@ def run(binary):
 
 def capacity(binary):
     """Three default-limit 1000-Child batches reuse one durable state root."""
-    with tempfile.TemporaryDirectory(prefix='erii-capacity-') as folder:
+    with tempfile.TemporaryDirectory(prefix='collie-capacity-') as folder:
         h = ArtifactHarness(binary, Path(folder), fixture='children')
         try:
             batch_setup(h)

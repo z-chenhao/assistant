@@ -10,11 +10,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	artifactsqlite "github.com/z-chenhao/erii/internal/artifact/sqlite"
-	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	artifactsqlite "github.com/z-chenhao/collie/internal/artifact/sqlite"
+	artifacttools "github.com/z-chenhao/collie/internal/artifact/tools"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func runScope(ctx context.Context, tx *sql.Tx, id string) (artifact.Scope, error) {

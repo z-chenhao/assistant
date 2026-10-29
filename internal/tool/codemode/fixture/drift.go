@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/z-chenhao/erii/internal/tool/codemode"
+	"github.com/z-chenhao/collie/internal/tool/codemode"
 )
 
 type Drift struct {

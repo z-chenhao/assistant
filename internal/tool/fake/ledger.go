@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 	_ "modernc.org/sqlite"
 )
 

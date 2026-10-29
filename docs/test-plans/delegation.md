@@ -41,7 +41,7 @@
 
 ```sh
 make build
-python3 tests/system/verify_children.py --binary bin/erii --evidence evidence/children.json
+python3 tests/system/verify_children.py --binary bin/collie --evidence evidence/children.json
 ```
 
 The maintained harness owns Launch (isolated data root and explicit Fake), Doctor

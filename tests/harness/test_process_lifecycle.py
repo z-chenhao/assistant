@@ -79,7 +79,7 @@ class ProcessLifecycleTests(unittest.TestCase):
                 stopped.set()
             thread = threading.Thread(target=interrupt)
             thread.start()
-            env = dict(os.environ, ERII_TEST_METRICS_DIR=str(root / 'profile'))
+            env = dict(os.environ, COLLIE_TEST_METRICS_DIR=str(root / 'profile'))
             try:
                 code = suite.run_command([sys.executable, 'tests/system/entrypoint.py', str(script)],
                                          env, root / 'log', stopped)
@@ -122,7 +122,7 @@ class ProcessLifecycleTests(unittest.TestCase):
             started = time.monotonic()
             try:
                 code = suite.run_command([sys.executable, 'tests/system/entrypoint.py', str(fixture)],
-                                         dict(os.environ, ERII_TEST_METRICS_DIR=str(root / 'profile')),
+                                         dict(os.environ, COLLIE_TEST_METRICS_DIR=str(root / 'profile')),
                                          root / 'log', stopped, metrics)
                 self.assertNotEqual(code, 0)
                 self.assertFalse(state.exists())

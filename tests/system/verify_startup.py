@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install a native release; drive bare erii through the maintained real PTY.
+"""Install a native release; drive bare collie through the maintained real PTY.
 
 Launch/Doctor/Drive/Evidence/Cleanup includes actual Pi/QuickJS dependencies,
 local JetStream, explicit model setup, Tool execution and SIGKILL/restart.
@@ -31,7 +31,7 @@ class StartupHarness(MainHarness):
 
 
 def install_environment(root):
-    env = {k: v for k, v in os.environ.items() if not k.startswith('ERII_')}
+    env = {k: v for k, v in os.environ.items() if not k.startswith('COLLIE_')}
     # npm enables Node's compile cache. Keep that cache and every subprocess
     # scratch file under this fixture, never beside it in the CI tmpfs root.
     temporary = root / 'temporary'
@@ -40,7 +40,7 @@ def install_environment(root):
                npm_config_offline='true')
     # CI's copied public SDK is immutable. Product builds use its original
     # Host SDK, as in ci-inputs; do not populate the fixture SDK's archives.
-    base_sdk = os.environ.get('ERII_CI_BASE_GOROOT')
+    base_sdk = os.environ.get('COLLIE_CI_BASE_GOROOT')
     if base_sdk:
         env['GOROOT'] = base_sdk
         env['PATH'] = str(Path(base_sdk) / 'bin') + os.pathsep + env['PATH']
@@ -49,7 +49,7 @@ def install_environment(root):
 
 def verify_install():
     report = dict(version=1, checks=[], live_model='not_run')
-    with tempfile.TemporaryDirectory(prefix='erii-start-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='collie-start-') as tmp:
         root = Path(tmp)
         env = install_environment(root)
         def run(*args):
@@ -65,10 +65,10 @@ def verify_install():
                 'native package checksum does not match archive')
         with tarfile.open(archive) as bundle:
             bundle.extractall(root / 'unpacked', filter='data')
-        installer = root / 'unpacked/erii/install.sh'
+        installer = root / 'unpacked/collie/install.sh'
         prefix = root / 'prefix with spaces'
         install_log = run('sh', str(installer), '--prefix', str(prefix))
-        binary = prefix / 'bin/erii'
+        binary = prefix / 'bin/collie'
         folder = root / 'workspace'
         folder.mkdir()
         h = StartupHarness(binary, folder)
@@ -84,7 +84,7 @@ def verify_install():
         # Refuse an unrelated executable before changing any installation.
         protected = root / 'protected'
         (protected / 'bin').mkdir(parents=True)
-        sentinel = protected / 'bin/erii'
+        sentinel = protected / 'bin/collie'
         sentinel.write_text('user executable')
         rejected = owned_run(['sh', str(installer), '--prefix', str(protected)],
                                   cwd=folder, env=env, capture_output=True, text=True, timeout=10)
@@ -98,7 +98,7 @@ def verify_install():
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
         try:
-            # Bare erii, no YAML, no preselected model, no external broker.
+            # Bare collie, no YAML, no preselected model, no external broker.
             with Terminal(h.args(), h.env, folder) as terminal:
                 terminal.expect('State: setup_required')
                 require(h.command('status')['readiness'] == 'setup_required', 'startup selected an implicit model')
@@ -107,7 +107,7 @@ def verify_install():
                 terminal.expect('assistant: PROBE_RESULT_OK')
                 # History updates can redraw the prompt before Actor.Drain
                 # commits the terminal Run state; wait for its public signal.
-                terminal.expect('Erii: idle')
+                terminal.expect('Collie: idle')
                 terminal.expect('You> ')
                 before = h.state()
                 assert_final(before, 1)

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/task"
 	_ "modernc.org/sqlite"
 )
 

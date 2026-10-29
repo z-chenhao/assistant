@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/computer"
-	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
+	"github.com/z-chenhao/collie/internal/computer"
+	computerfake "github.com/z-chenhao/collie/internal/computer/fake"
 )
 
 // shellWords decodes the adapter's quoted argv without executing any command.

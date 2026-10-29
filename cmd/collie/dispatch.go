@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/config"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/app"
+	"github.com/z-chenhao/collie/internal/config"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func dispatchCommand(ctx context.Context, application *app.App, cfg config.Config, command command, options commandOptions, input llm.ProfileInput, in io.Reader, out, errOut io.Writer) error {

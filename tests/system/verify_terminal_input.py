@@ -26,7 +26,7 @@ def verify(binary):
                ("ascii-overflow", "x" * 16385, False),
                ("utf8-overflow", "困" * 5461 + "xy", False),
                ("large-overflow", "困" * 22000, False)]
-    with tempfile.TemporaryDirectory(prefix="erii-terminal-input-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="collie-terminal-input-") as tmp:
         root = Path(tmp)
         for name, text, echo in samples:
             folder = root / name

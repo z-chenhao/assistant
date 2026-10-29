@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/interaction"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/interaction"
 )
 
 type Core interface {

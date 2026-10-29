@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func (s *Store) DeviceID(ctx context.Context) (string, error) {

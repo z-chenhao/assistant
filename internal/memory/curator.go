@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 const ManageName = "builtin__memory_manage"

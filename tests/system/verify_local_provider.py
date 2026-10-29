@@ -184,12 +184,12 @@ def verify(binary, script):
     thread.start()
     report = {"bridge": "pi-ai-1.3.0-v1", "checks": []}
     try:
-        with tempfile.TemporaryDirectory(prefix="erii-local-") as directory:
+        with tempfile.TemporaryDirectory(prefix="collie-local-") as directory:
             root = Path(directory)
             endpoint = f"http://127.0.0.1:{server.server_port}/v1"
-            env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
-            env["ERII_DATA_ROOT"] = str(root / "data")
-            env["ERII_FIXTURE_KEY"] = "SYNTHETIC_LOCAL_KEY_NEVER_PERSIST"
+            env = {k: v for k, v in os.environ.items() if not k.startswith("COLLIE_")}
+            env["COLLIE_DATA_ROOT"] = str(root / "data")
+            env["COLLIE_FIXTURE_KEY"] = "SYNTHETIC_LOCAL_KEY_NEVER_PERSIST"
             config = root / "config.yaml"
             config.write_text("version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: " + json.dumps(str(script)) + "\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
 
@@ -311,13 +311,13 @@ def verify(binary, script):
             report["checks"].append("manual ID independent of catalog")
 
             server.mode = "success"
-            auth = command("model", "login", "ERII_FIXTURE_KEY")
+            auth = command("model", "login", "COLLIE_FIXTURE_KEY")
             keyed = command("model", "add", endpoint, "fixture-model", auth["connection_id"])["profile_id"]
             start = len(server.requests)
             command("model", "catalog", keyed)
             command("model", "test", keyed)
-            require(all(r["auth"] == "Bearer " + env["ERII_FIXTURE_KEY"] for r in server.requests[start:]), "key missing/wrong")
-            del env["ERII_FIXTURE_KEY"]
+            require(all(r["auth"] == "Bearer " + env["COLLIE_FIXTURE_KEY"] for r in server.requests[start:]), "key missing/wrong")
+            del env["COLLIE_FIXTURE_KEY"]
             require("AUTH_REQUIRED" in command("model", "test", keyed, ok=False), "missing key not rejected")
             report["checks"] += ["explicit environment credential", "missing credential rejection"]
 
@@ -361,7 +361,7 @@ def verify_screenshot_projection(binary, script):
     try:
         for enabled in (True, False):
             server.images.clear()
-            with tempfile.TemporaryDirectory(prefix="erii-image-profile-") as temporary:
+            with tempfile.TemporaryDirectory(prefix="collie-image-profile-") as temporary:
                 with launch(binary, Path(temporary).resolve()) as h:
                     config = json.loads((h.root / "config.yaml").read_text())
                     config["llm"] = {"provider_bridge_command": "node", "provider_bridge_script": str(script), "provider_bridge_version": "pi-ai-1.3.0-v1"}
@@ -371,7 +371,7 @@ def verify_screenshot_projection(binary, script):
                     profile = h.setup(metadata=metadata)
                     h.send("screenshot-profile", "Observe two screenshots; explicitly select only the second image.")
                     h.command("chat", "work")
-                    with closing(sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db")) as db:
+                    with closing(sqlite3.connect(Path(h.env["COLLIE_DATA_ROOT"]) / "state.db")) as db:
                         requests = [json.loads(r[0]) for r in db.execute("SELECT request_json FROM model_generation ORDER BY created_at")]
                         require(len(requests) == 3, "screenshot Run exchanges")
                         require(all(r["model_snapshot"]["capabilities"]["image_input"] == enabled for r in requests), "normally selected image capability lost or gained")
@@ -410,7 +410,7 @@ def verify_user_images(binary, script, evidence):
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     try:
         for mode in ('vision','text','recovery'):
-            with tempfile.TemporaryDirectory(prefix='erii-user-image-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+            with tempfile.TemporaryDirectory(prefix='collie-user-image-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
                 h=ChannelHarness(binary,Path(temp),platform)
                 try:
                     h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(script))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
@@ -421,8 +421,8 @@ def verify_user_images(binary, script, evidence):
                     h.setup(metadata=metadata)
                     start=len(server.images)
                     if mode!='recovery':
-                        h.env['ERII_TEST_PICTURE']=base64.b64encode(picture).decode()
-                        h.env['ERII_TEST_VISION']='yes' if mode=='vision' else 'no'
+                        h.env['COLLIE_TEST_PICTURE']=base64.b64encode(picture).decode()
+                        h.env['COLLIE_TEST_VISION']='yes' if mode=='vision' else 'no'
                         h.start()
                         h.wait_state(lambda status:status['readiness']=='ready','image runtime readiness',lambda _:h.http('/api/status'))
                         h.browser(evidence.parent/('user-image-'+mode),'image');h.stop()
@@ -470,10 +470,10 @@ def verify_live_probe(binary, script, endpoint, model, context_tokens, output_to
     url = urlsplit(endpoint)
     require(url.scheme in ("http", "https") and url.hostname in ("127.0.0.1", "localhost", "::1")
             and not (url.username or url.password or url.query or url.fragment), "live probe requires a local endpoint without credentials")
-    with tempfile.TemporaryDirectory(prefix="erii-live-probe-") as directory:
+    with tempfile.TemporaryDirectory(prefix="collie-live-probe-") as directory:
         root = Path(directory)
-        env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
-        env["ERII_DATA_ROOT"] = str(root / "data")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("COLLIE_")}
+        env["COLLIE_DATA_ROOT"] = str(root / "data")
         config = root / "config.yaml"
         config.write_text("version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: " + json.dumps(str(script)) + "\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
 
@@ -507,7 +507,7 @@ def verify_live_probe(binary, script, endpoint, model, context_tokens, output_to
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--binary", default="bin/erii")
+    parser.add_argument("--binary", default="bin/collie")
     parser.add_argument("--evidence", default="evidence/local-provider.json")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--live-endpoint', help='opt-in local Live Shadow; isolated Probe only')

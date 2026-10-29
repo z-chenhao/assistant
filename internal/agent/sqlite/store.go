@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/agent"
-	artifactsqlite "github.com/z-chenhao/erii/internal/artifact/sqlite"
-	"github.com/z-chenhao/erii/internal/event"
-	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
-	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
-	inspectionsqlite "github.com/z-chenhao/erii/internal/observability/sqlite"
-	tasksqlite "github.com/z-chenhao/erii/internal/task/sqlite"
+	"github.com/z-chenhao/collie/internal/agent"
+	artifactsqlite "github.com/z-chenhao/collie/internal/artifact/sqlite"
+	"github.com/z-chenhao/collie/internal/event"
+	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	llmsqlite "github.com/z-chenhao/collie/internal/llm/sqlite"
+	inspectionsqlite "github.com/z-chenhao/collie/internal/observability/sqlite"
+	tasksqlite "github.com/z-chenhao/collie/internal/task/sqlite"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -304,7 +304,7 @@ func (s *Store) bootstrap(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("initialize agent configuration: %w", err)
 		}
-		e, err := event.New("/erii/agents/"+id.String(), "ai.erii.agent.initialized.v1", id.String(), map[string]any{"agent_id": id.String(), "config_version": 1})
+		e, err := event.New("/collie/agents/"+id.String(), "ai.collie.agent.initialized.v1", id.String(), map[string]any{"agent_id": id.String(), "config_version": 1})
 		if err != nil {
 			return err
 		}

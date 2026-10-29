@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/recall/embedding"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall/embedding"
 )
 
 const Schema = `CREATE TABLE recall_document (

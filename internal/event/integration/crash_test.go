@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	agentsqlite "github.com/z-chenhao/erii/internal/agent/sqlite"
-	"github.com/z-chenhao/erii/internal/event"
-	eventnats "github.com/z-chenhao/erii/internal/event/nats"
-	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
-	"github.com/z-chenhao/erii/internal/event/testbroker"
+	agentsqlite "github.com/z-chenhao/collie/internal/agent/sqlite"
+	"github.com/z-chenhao/collie/internal/event"
+	eventnats "github.com/z-chenhao/collie/internal/event/nats"
+	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	"github.com/z-chenhao/collie/internal/event/testbroker"
 )
 
 func checkErr(t *testing.T, err error) {
@@ -41,15 +41,15 @@ func domainEffect(ctx context.Context, tx *sql.Tx, _ event.CloudEvent) error {
 // The child test process stops at an observable boundary. The parent kills this
 // exact process with SIGKILL; none of its deferred cleanup runs.
 func TestCrashWorker(t *testing.T) {
-	phase := os.Getenv("ERII_CRASH_PHASE")
+	phase := os.Getenv("COLLIE_CRASH_PHASE")
 	if phase == "" {
 		return
 	}
 	ctx := context.Background()
-	s, err := agentsqlite.Open(ctx, os.Getenv("ERII_CRASH_ROOT"))
+	s, err := agentsqlite.Open(ctx, os.Getenv("COLLIE_CRASH_ROOT"))
 	checkErr(t, err)
 	defer s.Close()
-	checkpoint := func() { fmt.Println("ERII_CHECKPOINT"); select {} }
+	checkpoint := func() { fmt.Println("COLLIE_CHECKPOINT"); select {} }
 	if phase == "before-domain-commit" || phase == "after-domain-commit" {
 		err := s.Transaction(ctx, func(tx *sql.Tx) error {
 			if err := domainEffect(ctx, tx, event.CloudEvent{}); err != nil {
@@ -67,7 +67,7 @@ func TestCrashWorker(t *testing.T) {
 		checkpoint()
 		return
 	}
-	bus, err := eventnats.Open(ctx, options(os.Getenv("ERII_CRASH_URL")))
+	bus, err := eventnats.Open(ctx, options(os.Getenv("COLLIE_CRASH_URL")))
 	checkErr(t, err)
 	defer bus.Close()
 	if phase == "before-publish" || phase == "after-publish-before-mark" {
@@ -135,7 +135,7 @@ func killAtCheckpoint(t *testing.T, phase, root, url string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestCrashWorker$", "-test.timeout=12s")
-	cmd.Env = append(os.Environ(), "ERII_CRASH_PHASE="+phase, "ERII_CRASH_ROOT="+root, "ERII_CRASH_URL="+url)
+	cmd.Env = append(os.Environ(), "COLLIE_CRASH_PHASE="+phase, "COLLIE_CRASH_ROOT="+root, "COLLIE_CRASH_URL="+url)
 	stdout, err := cmd.StdoutPipe()
 	checkErr(t, err)
 	var stderr strings.Builder
@@ -152,7 +152,7 @@ func killAtCheckpoint(t *testing.T, phase, root, url string) {
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			if scanner.Text() == "ERII_CHECKPOINT" {
+			if scanner.Text() == "COLLIE_CHECKPOINT" {
 				ready <- true
 				return
 			}
@@ -274,7 +274,7 @@ func TestProcessCrashBoundaries(t *testing.T) {
 			t.Log(string(raw))
 		})
 	}
-	if path := os.Getenv("ERII_EVENT_EVIDENCE"); path != "" && !t.Failed() {
+	if path := os.Getenv("COLLIE_EVENT_EVIDENCE"); path != "" && !t.Failed() {
 		raw, err := json.MarshalIndent(map[string]any{"result": "passed", "fault_boundaries": evidence}, "", "  ")
 		checkErr(t, err)
 		checkErr(t, os.MkdirAll(filepath.Dir(path), 0700))

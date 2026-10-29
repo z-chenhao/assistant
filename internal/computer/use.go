@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 // Driver is private to ComputerUseRuntime. Native IDs never cross the facade.

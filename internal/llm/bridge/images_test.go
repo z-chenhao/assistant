@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/media"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/media"
 )
 
 func TestImagePreviewBoundsAndEnvelopeSelection(t *testing.T) {

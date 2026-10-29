@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 // TestSocket is explicit CI injection into an owned, in-memory Unix-socket

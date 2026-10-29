@@ -31,7 +31,7 @@ class TUIHarness(MainHarness):
         super().__init__(binary, root)
         self.config, self.secrets = config, secrets
         if broker is not None:
-            self.env.update(ERII_NATS_URL=broker.url, ERII_NATS_STREAM_PREFIX='tui_'+root.name)
+            self.env.update(COLLIE_NATS_URL=broker.url, COLLIE_NATS_STREAM_PREFIX='tui_'+root.name)
 
     def args(self, *args):
         flags = [str(self.binary), "-config", str(self.config)]
@@ -178,8 +178,8 @@ def verify(binary, bridge):
         with Terminal(h.args("-test-main-hold", "after_generation_commit", "tui"), h.env, h.root) as t:
             t.expect("You> "); t.send("original terminal work")
             t.expect('"boundary":"after_generation_commit"')
-            t.send("terminal steering one"); t.expect("Erii: busy"); t.expect("You> ")
-            t.send("terminal steering two"); t.expect("Erii: busy"); t.expect("You> ")
+            t.send("terminal steering one"); t.expect("Collie: busy"); t.expect("You> ")
+            t.send("terminal steering two"); t.expect("Collie: busy"); t.expect("You> ")
             before = h.state()
             require(len(before["runs"]) == 1 and len(before["inputs"]) == 3, "busy terminal failed to route Steering to current Main")
             new = h.setup("new-model")

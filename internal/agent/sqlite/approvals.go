@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/interaction"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 type ToolLimits struct{ Global, Agent, Run, Provider, Tool int }

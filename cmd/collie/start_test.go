@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/config"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/config"
 )
 
 func TestStartRejectsRedirectedInputBeforeCreatingState(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "data")
-	t.Setenv("ERII_DATA_ROOT", root)
+	t.Setenv("COLLIE_DATA_ROOT", root)
 	var out bytes.Buffer
 	err := run(context.Background(), []string{"start"}, strings.NewReader(""), &out, &out)
 	if err == nil || !strings.Contains(err.Error(), "interactive terminal") {
@@ -75,7 +75,7 @@ func TestDoctorRespectsDisabledOptionalRuntimes(t *testing.T) {
 }
 
 func TestUnconfiguredDrainDoesNotInferAnInstalledProvider(t *testing.T) {
-	t.Setenv("ERII_DATA_ROOT", t.TempDir())
+	t.Setenv("COLLIE_DATA_ROOT", t.TempDir())
 	var out bytes.Buffer
 	err := run(context.Background(), []string{"chat", "work"}, strings.NewReader(""), &out, &out)
 	if !errors.Is(err, agent.ErrSetup) || out.Len() != 0 {

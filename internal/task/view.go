@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/collie/internal/conversation"
 )
 
 var ErrNotFound = errors.New("task not found")

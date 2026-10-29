@@ -8,11 +8,11 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
-	"github.com/z-chenhao/erii/internal/event"
-	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/collie/internal/event"
+	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 type Adapter struct{ db *sql.DB }
@@ -68,7 +68,7 @@ func (a *Adapter) Send(ctx context.Context, e delivery.Envelope) delivery.Observ
 		tx.Rollback()
 		return a.Query(ctx, e)
 	}
-	accepted, err := event.New("/erii/delivery", "ai.erii.delivery.accepted.v1", e.Request.DeliveryID, struct {
+	accepted, err := event.New("/collie/delivery", "ai.collie.delivery.accepted.v1", e.Request.DeliveryID, struct {
 		ID string `json:"delivery_id"`
 	}{e.Request.DeliveryID})
 	if err == nil {

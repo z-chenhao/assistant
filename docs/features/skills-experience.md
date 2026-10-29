@@ -40,7 +40,7 @@ Agent 可发现可用方法，再按需读取正文和资源。
 
 ## 如何使用
 
-配置受控 Skills 目录后，Agent 按需 list/view 使用已有方法。操作员可经 `erii skill manage` 从 stdin 提交 Reviewer 请求。
+配置受控 Skills 目录后，Agent 按需 list/view 使用已有方法。操作员可经 `collie skill manage` 从 stdin 提交 Reviewer 请求。
 
 当前不会仅因一次任务成功就自动形成可复用 Skill；F-023 的触发、证据和晋升编排尚未闭环。
 

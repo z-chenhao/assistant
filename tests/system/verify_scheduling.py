@@ -18,7 +18,7 @@ from verify_main import require
 
 def state(h):
     value = child_state(h)
-    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+    with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
         db.row_factory = sqlite3.Row
         for name, query in {
             'scheduler': 'SELECT * FROM scheduler_tree ORDER BY root_run_id',
@@ -26,7 +26,7 @@ def state(h):
             'tree_usage': 'SELECT * FROM run_tree_usage ORDER BY root_run_id',
             'task_usage': 'SELECT * FROM task_usage ORDER BY task_id',
             'account_usage': 'SELECT * FROM account_usage ORDER BY provider_key',
-            'run_events': "SELECT type,subject,occurred_at,event_id,payload_json FROM event_outbox WHERE type IN ('ai.erii.run.claimed.v1','ai.erii.run.released.v1','ai.erii.run.waiting.v1','ai.erii.run.completed.v1','ai.erii.run.failed.v1','ai.erii.run.cancelled.v1') ORDER BY occurred_at,event_id",
+            'run_events': "SELECT type,subject,occurred_at,event_id,payload_json FROM event_outbox WHERE type IN ('ai.collie.run.claimed.v1','ai.collie.run.released.v1','ai.collie.run.waiting.v1','ai.collie.run.completed.v1','ai.collie.run.failed.v1','ai.collie.run.cancelled.v1') ORDER BY occurred_at,event_id",
         }.items():
             value[name] = [dict(row) for row in db.execute(query)]
     return value
@@ -40,7 +40,7 @@ def concurrency(value, limit=16):
         node = nodes[event['subject']]
         if node['kind'] != 'worker':
             continue
-        if event['type'] == 'ai.erii.run.claimed.v1':
+        if event['type'] == 'ai.collie.run.claimed.v1':
             require(node['run_id'] not in live, 'duplicate live lease')
             live.add(node['run_id'])
         else:
@@ -64,7 +64,7 @@ def setup(h):
 
 def run(binary, evidence=None):
     report = {'version': 1, 'scope': 'M4 Direct Tool scheduling fragments GC-16/17/18/20; semantic scores, JavaScript, CodeCall replay and Computer binding are not_applicable', 'checks': []}
-    with tempfile.TemporaryDirectory(prefix='erii-scheduling-') as folder:
+    with tempfile.TemporaryDirectory(prefix='collie-scheduling-') as folder:
         root = Path(folder)
 
         def scenario(name, action):
@@ -97,7 +97,7 @@ def run(binary, evidence=None):
                 t.expect('You> ')
                 t.send('Delegate: Batch 100')
                 t.expect('Main follow-up:', timeout=30)
-                t.expect('Erii: idle')
+                t.expect('Collie: idle')
                 t.send('/status')
                 t.expect('Children: queued 0, running 0, succeeded 98, failed 2, waiting 0')
                 require(t.stop() == 0, 'batch PTY cleanup')

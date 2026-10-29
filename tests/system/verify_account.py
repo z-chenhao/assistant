@@ -71,7 +71,7 @@ def verify(binary, bridge):
             thread.start()
             try:
                 cfg = account_config(root, bridge, endpoint)
-                env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
+                env = {k: v for k, v in os.environ.items() if not k.startswith("COLLIE_")}
                 args = [str(binary), "-config", str(cfg), "-test-secret-store", str(socket)]
                 ordinary_output = []
 

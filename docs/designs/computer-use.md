@@ -82,12 +82,12 @@ Computer 生命周期持久化位于 `internal/computer/sqlite`。Agent 仅提�
 - 用户不感知 Instance 的启动、暂停、迁移或恢复状态。
 - 用户只看到 Agent 空闲/忙碌和持续进行中的工作。
 
-ERII-24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生命周期策略：
+retired task #24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生命周期策略：
 首次 `cua.getState()` 获取逻辑 Computer，已接受嵌套调用全部结束后优雅关机、
 提交 Durable Checkpoint、销毁 Instance。Computer 元数据、冻结操作和 Outbox
 同处 `state.db`，使用 Run/Code claim 与 instance epoch fencing。Guest 的签名、
 权限、登录及 Driver 连接和三文件原子恢复由 `computer/macosvm` 负责。
-ERII-25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
+retired task #25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
 DesktopLease、Observation 和受控文件传输；来源局部失败进入 Inventory errors。
 受控审批/资源暂停保留物理 Lease，活动 claim 崩溃仍重建 Instance 并拒绝旧 Handle。
 配置、恢复和故障处理见 [Computer 运维](#) 与 [Computer Use](../features/computer-use.md)。
@@ -278,7 +278,7 @@ interface Tab extends Surface {
 
 - App 与 Tab 复用相同观察和指针操作协议；输入方法单独定义，因为 Browser 可能需要先聚焦具体元素，而原生 App 通常对当前焦点输入。
 - 导航、关闭等方法为可选能力；Provider 不支持时不伪造实现，而是在 `documentation()` 与 Capability Inventory 中明确缺失。
-- 不复制 Codex 的 `markDeliverable/markHandoff` 到 CUA 核心协议。Erii 的长期 Tab 生命周期属于 Run/Computer 的资源保留策略，而不是 UI Driver 方法。
+- 不复制 Codex 的 `markDeliverable/markHandoff` 到 CUA 核心协议。Collie 的长期 Tab 生命周期属于 Run/Computer 的资源保留策略，而不是 UI Driver 方法。
 - Agent 创建的临时 Tab 默认属于当前 Run Lease；需要跨 Run 保留时，由上层 Resource Policy 持久化稳定 Tab Reference，不能依赖 JavaScript Handle。
 
 <a id="contract-964-等待模型"></a>
@@ -297,7 +297,7 @@ waitForChange(options?: {
 
 - Runtime 负责等待 Driver 事件或执行有界轮询，模型不指定 `poll_interval`，也不能用 Sleep 制造大量空转。
 - 成功时返回变化后的最新 AX Observation；超时返回结构化 `WAIT_TIMEOUT`，并携带最后一次 Observation 摘要。
-  ERII-25 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
+  retired task #25 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
 - 模型在拿到新 Observation 后自行判断文本、元素或窗口条件；Browser 的 DOM Locator、URL 和导航同步由 `playwright` Capability 提供。
 - 只有实际场景证明 `waitForChange()` 往返成本不可接受时，才增加声明式语义条件，避免一期维护复杂且 Provider 难以一致实现的等待 DSL。
 
@@ -456,7 +456,7 @@ const artifact = await cua.files.exportArtifact({path: file.path});
 return artifact;
 ```
 
-The fixed Guest Transfer Root is `/Users/<configured-guest-user>/EriiTransfer`.
+The fixed Guest Transfer Root is `/Users/<configured-guest-user>/CollieTransfer`.
 Only registered `imports/<name>` and `downloads/<name>` refs are accepted. No
 Host path, arbitrary URL, external Guest path or script-provided ID authorizes
 access. ArtifactStore enforces the current Agent/Task/Run scope. Imports,
@@ -477,7 +477,7 @@ scoped registration.
 
 ## Durable logical Computer
 
-ERII-24 adds the Lume lifecycle behind the existing Code Mode ToolExecutor and
+retired task #24 adds the Lume lifecycle behind the existing Code Mode ToolExecutor and
 Security boundary. `cua.getState()` lazily obtains the configured logical
 Computer. Its ID persists in `state.db`; replacement instances get increasing
 epochs. The accepted Code Mode invocation owns its lifecycle plan and cleanup.
@@ -494,7 +494,7 @@ even after supersession. The cancelled Task, Run and Code execution stay termina
 only Computer lifecycle progress is reconciled. No schema or frozen-request
 format changes; unknown effects still fail closed.
 
-ERII-25 adds live inventory, leased App/Window/Tab bindings, AX and screenshot
+retired task #25 adds live inventory, leased App/Window/Tab bindings, AX and screenshot
 revisions, input, bounded waits, scoped Artifact transfers and the delayed
 Playwright Capability. See [Computer Use](../features/computer-use.md) for the facade,
 conservative action approvals, Guest browser provisioning and verification.

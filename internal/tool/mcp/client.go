@@ -19,8 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer/sandbox"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/computer/sandbox"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 const protocol = "2025-03-26"
@@ -66,7 +66,7 @@ type session struct {
 }
 
 func start(ctx context.Context, c Config) (*session, error) {
-	dir, err := os.MkdirTemp(c.Directory, ".erii-mcp-")
+	dir, err := os.MkdirTemp(c.Directory, ".collie-mcp-")
 	if err != nil {
 		return nil, invalid
 	}
@@ -108,7 +108,7 @@ func start(ctx context.Context, c Config) (*session, error) {
 			Tools *json.RawMessage `json:"tools"`
 		} `json:"capabilities"`
 	}
-	if s.call("initialize", map[string]any{"protocolVersion": protocol, "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "erii", "version": "1"}}, &init) != nil || init.Protocol != protocol || init.Capabilities.Tools == nil {
+	if s.call("initialize", map[string]any{"protocolVersion": protocol, "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "collie", "version": "1"}}, &init) != nil || init.Protocol != protocol || init.Capabilities.Tools == nil {
 		s.close()
 		return nil, invalid
 	}

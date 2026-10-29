@@ -1,4 +1,4 @@
-# Erii — Repository Instructions
+# Collie — Repository Instructions
 
 Build the smallest complete change that satisfies the request, prove it with inspectable evidence, and continue through verification without waiting for routine approval.
 
@@ -7,7 +7,7 @@ CI tuning, Golden Case expansion and clause-audit work are paused; follow the
 current development priority in CONTRIBUTING. Keep regression checks needed to
 prove a product change.
 
-Start at [Feature Map](docs/feature-map.md) for requirements and status, [README](README.md) for installation and [CONTRIBUTING](docs/features/engineering.md#contributing-contributing-to-erii) for the implementation workflow, risk-based checks, review and cleanup. Use the [testing guide](docs/test-plans/product.md) to find maintained verification entry points. These instructions retain product invariants; the linked designs define their full semantics.
+Start at [Feature Map](docs/feature-map.md) for requirements and status, [README](README.md) for installation and [CONTRIBUTING](docs/features/engineering.md#contributing-contributing-to-collie) for the implementation workflow, risk-based checks, review and cleanup. Use the [testing guide](docs/test-plans/product.md) to find maintained verification entry points. These instructions retain product invariants; the linked designs define their full semantics.
 
 ## 1. Read only the context the task needs
 
@@ -77,7 +77,7 @@ Treat any change to these points as a protocol change. Update the owning feature
 
 Use the project structure defined in the engineering design:
 
-- `cmd/erii` is the only Go process entry point.
+- `cmd/collie` is the only Go process entry point.
 - `internal/app` is a composition root with no business logic.
 - Define an interface in the module that uses it. Put implementations in named subpackages such as `memory/sqlite` or `event/nats`.
 - Do not create generic `ports`, `adapters`, `controller`, `service`, or `repository` hierarchies.

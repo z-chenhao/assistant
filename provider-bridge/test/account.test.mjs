@@ -68,7 +68,7 @@ test('malformed catalog is a protocol error rather than authorization loss',asyn
   }
 });
 
-test('account Pi continuation replays the fixed erii namespace on the wire',{timeout:10000},async t=>{
+test('account Pi continuation replays the fixed collie namespace on the wire',{timeout:10000},async t=>{
   const f=await fixture(t);const credential=await f.complete(await f.start());
   const network=globalThis.fetch;
   let captured;
@@ -105,8 +105,8 @@ test('account Pi continuation replays the fixed erii namespace on the wire',{tim
     r.generation_id='second';r.connection=connection();r.messages.push({role:'assistant',tool_calls:[call]},{role:'tool',tool_call_id:call.id,text:'PROBE_RESULT_OK'});
     await run('generation.continue',r);
     const wireCall=captured.input.find(i=>i.type==='function_call');
-    assert.equal(captured.tools[0].name,'erii');
-    assert.equal(wireCall.namespace,'erii');
+    assert.equal(captured.tools[0].name,'collie');
+    assert.equal(wireCall.namespace,'collie');
     assert.equal(wireCall.name,call.name);assert.equal(wireCall.arguments,call.arguments);
     assert.equal(captured.input.find(i=>i.type==='function_call_output').call_id,wireCall.call_id);
     assert.equal(f.peer.stats.request_valid,true);

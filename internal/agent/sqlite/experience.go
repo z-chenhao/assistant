@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/skill"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/skill"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 // ReviewExperience is a trusted local Reviewer operation, never an ordinary

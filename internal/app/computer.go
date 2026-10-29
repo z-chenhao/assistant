@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/z-chenhao/erii/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer"
 )
 
 // ComputerStatus is a read-only operator diagnostic. Lifecycle decisions remain

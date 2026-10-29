@@ -63,7 +63,7 @@ launches approved Worker effects, kills after the effect or terminal unknown
 commit, reconciles through the CLI, verifies bytes/hash and caller readback,
 replays without a second effect, and removes all disposable state.
 
-`python3 tests/system/verify_artifacts.py --binary bin/erii --evidence
+`python3 tests/system/verify_artifacts.py --binary bin/collie --evidence
 evidence/artifacts.json` owns Launch/Doctor/Drive/Evidence/Cleanup, using the
 explicit `artifacts` model and binary/large-output Tool Fakes. It drives actual
 CLI save/open/delete, large input refs, Task output publication, eight concurrent
@@ -90,7 +90,7 @@ paths. Search filters before counting accessible matches, so older matches are
 not hidden behind 50 unrelated files.
 
 The five old Direct Tool names are removed. See
-[ERII-192 compatibility](../designs/tools-approvals.md#decision-005-005--consolidated-model-visible-tools) before upgrading
+[retired task #192 compatibility](../designs/tools-approvals.md#decision-005-005--consolidated-model-visible-tools) before upgrading
 an installation with active Runs. The authenticated `artifact` CLI is unchanged.
 
 ## 执行与完成判定

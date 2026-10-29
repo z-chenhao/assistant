@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	eventnats "github.com/z-chenhao/erii/internal/event/nats"
-	"github.com/z-chenhao/erii/internal/maintenance"
+	eventnats "github.com/z-chenhao/collie/internal/event/nats"
+	"github.com/z-chenhao/collie/internal/maintenance"
 )
 
 func TestLocalBrokerRestartOwnershipAndMaintenance(t *testing.T) {

@@ -20,9 +20,9 @@
 
 迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
-<a id="getting-started-install-and-start-erii"></a>
+<a id="getting-started-install-and-start-collie"></a>
 
-## Install and start Erii
+## Install and start Collie
 
 <a id="getting-started-install"></a>
 
@@ -32,7 +32,7 @@ From the repository checkout, install Go 1.26.2+ and Node.js 24.21.0, then run:
 
 ```sh
 ./install.sh
-~/.local/bin/erii
+~/.local/bin/collie
 ```
 
 No browser download, YAML editing, broker installation or frontend build
@@ -48,8 +48,8 @@ The source installer needs Go and npm while building. A prebuilt native archive
 needs Node and the execution dependencies above: unpack it and run its `install.sh`. Maintainers produce archives with `sh scripts/package.sh "$PWD/dist"`.
 Until a release is published, use the checkout installer.
 
-The installer creates a versioned runtime in `~/.local/lib/erii/releases/`, a
-`current` symlink, and the `~/.local/bin/erii` launcher. It checks the new runtime
+The installer creates a versioned runtime in `~/.local/lib/collie/releases/`, a
+`current` symlink, and the `~/.local/bin/collie` launcher. It checks the new runtime
 before switching the launcher. It refuses to overwrite unrelated executables or
 unmanaged installation directories. It never edits your shell profile.
 
@@ -57,22 +57,22 @@ For another installation location:
 
 ```sh
 ./install.sh --prefix /absolute/installation-prefix
-/absolute/installation-prefix/bin/erii
+/absolute/installation-prefix/bin/collie
 ```
 
 Add the prefix's `bin` directory to your shell's `PATH` if you want the short
-`erii` command. Rerun the installer to upgrade. Prior runtime releases stay in
-`lib/erii/releases/`; remove old releases only after stopping Erii and confirming
+`collie` command. Rerun the installer to upgrade. Prior runtime releases stay in
+`lib/collie/releases/`; remove old releases only after stopping Collie and confirming
 they are not the `current` target. User data is separate and survives reinstall.
 
 <a id="getting-started-connect-a-model-and-chat"></a>
 
 ### Connect a model and chat
 
-Bare `erii` opens guided setup on a terminal. Choose a local OpenAI-compatible
+Bare `collie` opens guided setup on a terminal. Choose a local OpenAI-compatible
 endpoint or Sign in with ChatGPT. Follow the prompts to discover or enter a model,
 probe its capabilities, and explicitly confirm selection. Without a selected
-model, Erii stays `setup_required` and accepts no Agent work.
+model, Collie stays `setup_required` and accepts no Agent work.
 
 After selection, type your message. `/models` lists profiles, `/setup` repairs a
 connection, and `/quit` or Ctrl-C closes the foreground application. Within a
@@ -90,14 +90,14 @@ for authentication requirements and model privacy details.
 ### Diagnose
 
 ```sh
-erii doctor
-erii status
+collie doctor
+collie status
 ```
 
 `doctor` checks the Node version and installed runtime/dependency files without
 opening user databases or contacting a provider. `status` opens the control plane
 and reports persisted model readiness. It can initialize or migrate state.
-`erii start` is the explicit form of terminal startup and requires a terminal.
+`collie start` is the explicit form of terminal startup and requires a terminal.
 With redirected input, use an explicit control command such as `status`.
 
 Default startup manages an embedded JetStream server on a random **loopback-only**
@@ -110,14 +110,14 @@ broker; restarting after a crash reopens the same durable stores.
 
 ### Advanced deployment
 
-The default data directory is `~/.local/share/erii`. Override it explicitly with
-`ERII_DATA_ROOT=/absolute/path erii`. Do not use a temporary directory for real work.
+The default data directory is `~/.local/share/collie`. Override it explicitly with
+`COLLIE_DATA_ROOT=/absolute/path collie`. Do not use a temporary directory for real work.
 
-An explicit config file or `ERII_NATS_URL` opts into your configured external
+An explicit config file or `COLLIE_NATS_URL` opts into your configured external
 broker instead of the managed local broker:
 
 ```sh
-erii -config /absolute/erii.yaml start
+collie -config /absolute/collie.yaml start
 ```
 
 With a config file, only its configured model bridge and optional runtimes are
@@ -129,10 +129,10 @@ for ordinary conversation or supply `-config` for scripted execution.
 
 Copy only the needed sections from [config.example.yaml](../../config.example.yaml).
 The example's `/tmp` data root is for disposable development. Flags precede commands.
-The browser surface remains `erii -config /absolute/erii.yaml web serve`; it needs
+The browser surface remains `collie -config /absolute/collie.yaml web serve`; it needs
 its existing loopback listener, SecretStore token reference and broker configuration.
 See [channels](channels.md) and [operations](operations.md).
 
-The underlying Go entry point is `cmd/erii`; local builds produce `bin/erii`.
+The underlying Go entry point is `cmd/collie`; local builds produce `bin/collie`.
 The previous `personal-agent` command/path is replaced; existing databases and
 model snapshots do not require a migration for this executable rename.

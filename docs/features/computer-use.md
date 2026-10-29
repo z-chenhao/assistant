@@ -85,7 +85,7 @@ Install Node 24.21.0 and this repository's `guest-browser/package-lock.json` in 
 clean Guest. Run `npm ci --ignore-scripts` there. The pinned Playwright Core
 1.64.1 dependency uses Apache-2.0 and adds no Go dependency or Host runtime.
 Place `internal/computer/macosvm/transfer.py` beside Playwright Core's `index.mjs`
-as `erii-transfer.py`. Provision one isolated Chromium profile with CDP listening
+as `collie-transfer.py`. Provision one isolated Chromium profile with CDP listening
 only on Guest loopback. The adapter binds that existing browser; discovery does
 not launch it or attach to a Host user's browser. Add trusted configuration:
 
@@ -93,8 +93,8 @@ not launch it or attach to a Host user's browser. Add trusted configuration:
 computer:
   # existing durable Lume/Guest configuration ...
   browser:
-    node: /opt/erii/node/bin/node
-    module: /opt/erii/browser/node_modules/playwright-core/index.mjs
+    node: /opt/collie/node/bin/node
+    module: /opt/collie/browser/node_modules/playwright-core/index.mjs
     port: 9222
 ```
 
@@ -121,12 +121,12 @@ location, disable telemetry/caching, and keep `vmLocations` last in the pinned
 Lume YAML parser:
 
 ```yaml
-defaultLocationName: "erii"
+defaultLocationName: "collie"
 cacheDirectory: "/ABSOLUTE/OWNED/cache"
 cachingEnabled: false
 telemetryEnabled: false
 vmLocations:
-  - name: "erii"
+  - name: "collie"
     path: "/ABSOLUTE/OWNED/computer/vms"
 ```
 
@@ -181,8 +181,8 @@ The public seed's test login is suitable only for the isolated L2 fixture.
 Prepare the base before opening the configured application:
 
 ```sh
-bin/erii -config /ABSOLUTE/OWNED/erii.yaml computer prepare-base /ABSOLUTE/OWNED/clean-stopped-vm
-bin/erii -config /ABSOLUTE/OWNED/erii.yaml computer status
+bin/collie -config /ABSOLUTE/OWNED/collie.yaml computer prepare-base /ABSOLUTE/OWNED/clean-stopped-vm
+bin/collie -config /ABSOLUTE/OWNED/collie.yaml computer status
 ```
 
 `prepare-base` copies only `disk.img`, `nvram.bin` and `config.json`, holds the

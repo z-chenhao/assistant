@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	agentsqlite "github.com/z-chenhao/erii/internal/agent/sqlite"
+	agentsqlite "github.com/z-chenhao/collie/internal/agent/sqlite"
 	"testing"
 	"time"
 
 	nat "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/z-chenhao/erii/internal/event"
-	"github.com/z-chenhao/erii/internal/event/fake"
-	eventnats "github.com/z-chenhao/erii/internal/event/nats"
-	"github.com/z-chenhao/erii/internal/event/testbroker"
+	"github.com/z-chenhao/collie/internal/event"
+	"github.com/z-chenhao/collie/internal/event/fake"
+	eventnats "github.com/z-chenhao/collie/internal/event/nats"
+	"github.com/z-chenhao/collie/internal/event/testbroker"
 )
 
 func options(url string) eventnats.Options {
@@ -30,7 +30,7 @@ func connect(t *testing.T, b *testbroker.Broker) *eventnats.Bus {
 }
 func testEvent(t *testing.T) event.CloudEvent {
 	t.Helper()
-	e, err := event.New("/erii/test", "ai.erii.test.v1", "aggregate/with . * >", map[string]int{"version": 2})
+	e, err := event.New("/collie/test", "ai.collie.test.v1", "aggregate/with . * >", map[string]int{"version": 2})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 )
 
 func contentChunk(body []byte, offset, length int) (string, *int, error) {

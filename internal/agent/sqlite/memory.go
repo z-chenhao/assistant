@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/memory"
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/memory"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 type MemoryWriter interface {

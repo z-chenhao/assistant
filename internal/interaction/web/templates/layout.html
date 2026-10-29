@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Erii · {{if .Title}}{{.Title}}{{else}}Workspace{{end}}</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Collie · {{if .Title}}{{.Title}}{{else}}Workspace{{end}}</title><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
 <body>
 {{if .Login}}
 <main class="login">
- <a class="brand" href="/"><img src="/brand/eri-icon-192.png" alt="Erii character logo" width="40" height="40">Erii</a>
+ <a class="brand" href="/"><img src="/brand/collie.png" alt="Collie logo" width="40" height="40">Collie</a>
  <h1>Open your workspace</h1><p>Enter the access token for this installation.</p>
  {{if .Error}}<p class="feedback error" role="alert">{{.Error}}</p>{{end}}
  <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label>Workspace access token<input type="password" name="token" required autocomplete="off" autofocus></label><button>Open workspace →</button></form>
@@ -11,10 +11,10 @@
 </main>
 {{else}}
 <aside class="app-sidebar">
- <a class="brand" href="/"><img src="/brand/eri-icon-192.png" alt="Erii character logo" width="40" height="40"><span>Erii</span></a>
- <nav aria-label="Workspace"><a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>Conversation</a><a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>Tasks</a><a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>Settings</a></nav>
- <nav class="developer-nav" aria-label="Developer"><a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>Developer <span>Traces</span></a></nav>
-</aside>
+ <a class="brand" href="/"><img src="/brand/collie.png" alt="Collie logo" width="40" height="40"><span>collie<span class="brand-period">.</span></span></a>
+ <nav aria-label="Workspace"><a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>Conversation</span></a><a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>Tasks</span></a><a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>Settings</span></a></nav>
+ <nav class="developer-nav" aria-label="Developer"><a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>Developer</span></a></nav>
+<p class="sidebar-note">A task out.<br>A little more life back.</p></aside>
 <main class="workspace-main" data-live-view="{{.Live}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}">
  <header class="workspace-topbar"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Workspace</a><span>/</span>{{if eq .Tab "/settings"}}<a href="/settings/models">Settings</a><span>/</span>{{end}}{{if eq .View "task"}}<a href="/tasks">Tasks</a><span>/</span>{{end}}{{if eq .View "trace"}}<a href="{{traceListURL .Trace}}">Traces</a><span>/</span>{{end}}<span>{{.Title}}</span></nav><div id="workspace-status">{{template "status" .}}</div></header>
  <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>

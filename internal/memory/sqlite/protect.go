@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/memory"
-	"github.com/z-chenhao/erii/internal/recall"
+	"github.com/z-chenhao/collie/internal/memory"
+	"github.com/z-chenhao/collie/internal/recall"
 )
 
 // Representation migration: domain identity/provenance never change. Rewrite

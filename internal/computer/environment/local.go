@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/z-chenhao/erii/internal/computer/sandbox"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/computer/sandbox"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 // Local is a persistent private workspace inside the platform kernel sandbox.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 )
 
 // Compare the complete inspection projection with the actual admitted records,

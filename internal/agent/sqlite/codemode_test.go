@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool/codemode"
 )
 
 func realCodeRuntime(t *testing.T) *codemode.Sidecar {

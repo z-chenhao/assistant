@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 
-export const VERSION = 'erii-js-v2';
-const PRELUDE = 'erii-prelude-v3';
+export const VERSION = 'collie-js-v2';
+const PRELUDE = 'collie-prelude-v3';
 const MAX_MESSAGE = 1048576;
 const executions = new Map();
 const replies = new Map();

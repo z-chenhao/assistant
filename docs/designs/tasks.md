@@ -186,7 +186,7 @@ builtin__task_manage
 - 两者复用统一的 `ToolSpec → ToolInvocation → ToolExecutor` 管线；Task Tool 是 Main 的控制面能力，Root/Child Worker 默认不可见。
 - `task_search` 返回内部 `TaskRef`、标题、目标摘要、状态、最近进度和更新时间，不返回 Root Run ID、Run 树或内部轨迹。唯一高置信匹配可继续；多个合理候选必须由 Main 向用户澄清。
 - `task_manage(create)` 原子创建 Task、保存 Task Anchor、创建首个 Root Worker Run 并发布 `run_ready`；它只返回接收凭证，不等待任务完成。
-- `task_manage(create).completionPolicy` 只允许 `once|ongoing`，省略等同 `once`；仅 create 接受此字段。普通 Root 成功不结束 ongoing Task，也不自动调度下一轮；后续 append 沿用同一策略并按既有规则创建新 Root。策略创建后不可改写。ERII-225 的批准、升级边界与显式完成合同见 `docs/designs/tasks.md`。
+- `task_manage(create).completionPolicy` 只允许 `once|ongoing`，省略等同 `once`；仅 create 接受此字段。普通 Root 成功不结束 ongoing Task，也不自动调度下一轮；后续 append 沿用同一策略并按既有规则创建新 Root。策略创建后不可改写。retired task #225 的批准、升级边界与显式完成合同见 `docs/designs/tasks.md`。
 - `task_manage(complete)` 仅接受 `active` Task，且当前 epoch 没有非终态 Root/Child Run，也没有 queued/running/waiting/unknown ToolInvocation。存在未完成工作或未确认副作用、或 Task 为 paused/completed/cancelled 时返回不可重试的 `INVALID_ARGUMENT`，不取消、不排空、不等待。Host 在同一事务内校验 Main owner、Task version/epoch，保存 `completed`、`completed_at` 和普通幂等 receipt；不递增 epoch、不修改 completion policy、不生成 Worker TaskUpdate 或 Main Follow-up。重复来源/调用复用原 receipt；新的 complete 来源不能再次完成 completed Task。后续 append 沿既有规则重新激活并创建新 Root。
 - `task_manage(append)` 追加持久化 `TaskInstruction`，不覆盖原 Task Anchor。Task 为 `active` 且存在活动 Root 时，在稳定边界向该 Root 注入指令；Task 不是 `active`，或没有活动 Root 时，Host 将其置为 `active`、递增 `task_epoch` 并创建新的 Root Worker Run。
 - `append` 同时承担“追加要求”和“重新激活”语义。用户只说“继续”“接着做”或“恢复这个工作”时，Main 也可以把该自然语言原样保存为 `TaskInstruction`；这条明确的用户指令就是重新激活的授权，不需要再构造 `resume` 操作。
@@ -529,9 +529,9 @@ independently of the retained anchors, so all 50 rows fit the Tool result limit.
 
 ## 006 — Explicit Task completion policy
 
-Status: create policy accepted by the authenticated owner in ERII-225, comment
-`01a16954-32dd-7a14-a571-cd8ba4d33ed3`. ERII-226 implements this finite contract.
-Explicit completion accepted by the same owner on ERII-226, comment
+Status: create policy accepted by the authenticated owner in retired task #225, comment
+`01a16954-32dd-7a14-a571-cd8ba4d33ed3`. retired task #226 implements this finite contract.
+Explicit completion accepted by the same owner on retired task #226, comment
 `01a16b9e-d2ab-7398-b474-cd47164d4022`; it resolves the interface conflict.
 
 <a id="decision-006-decision-and-boundary"></a>

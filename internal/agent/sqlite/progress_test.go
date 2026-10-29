@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 func TestRootLoopPublishesStageUpdatesWithoutMainWork(t *testing.T) {

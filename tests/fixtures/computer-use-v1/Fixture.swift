@@ -9,7 +9,7 @@ final class Fixture: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     var clicks = 0
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 500, height: 260), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Erii CUA Fixture"
+        window.title = "Collie CUA Fixture"
         window.isReleasedWhenClosed = false
         let view = window.contentView!
         input.frame = NSRect(x: 30, y: 190, width: 420, height: 28)

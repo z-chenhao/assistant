@@ -2,8 +2,8 @@ package sqlite
 
 import (
 	"context"
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 type guardedProvider struct {

@@ -38,7 +38,7 @@ async function navigation(page) {
 // Transfer helpers are installed from this repository alongside the pinned
 // Guest Playwright module. Python owns the same openat/O_NOFOLLOW path checks.
 function transfer(operation, path, data) {
-  const helper = fs.readFileSync(new URL('./erii-transfer.py', pathToFileURL(request.module)), 'utf8');
+  const helper = fs.readFileSync(new URL('./collie-transfer.py', pathToFileURL(request.module)), 'utf8');
   const p = spawnSync('/usr/bin/python3', ['-c', helper], { input:JSON.stringify({ root, path, operation, overwrite: false, data: data?.toString('base64') ?? '' }), encoding: 'utf8', maxBuffer: 12 << 20, timeout: 10000 });
   let result; try { result = JSON.parse(p.stdout); } catch { fail('PERMISSION_DENIED'); }
   if (p.status !== 0 || result.error) fail('PERMISSION_DENIED');

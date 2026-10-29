@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
-	"github.com/z-chenhao/erii/internal/observability"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	conversationsqlite "github.com/z-chenhao/collie/internal/conversation/sqlite"
+	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 // Existing populated-version fixtures reconstruct their old schema before

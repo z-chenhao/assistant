@@ -41,7 +41,7 @@
 
 ```sh
 make build
-python3 tests/system/verify_automation.py --binary bin/erii --evidence evidence/automation.json
+python3 tests/system/verify_automation.py --binary bin/collie --evidence evidence/automation.json
 go test -race ./internal/automation ./internal/agent/sqlite -run 'TestAutomation|TestCalendar|TestRejectMalformed' -count=5
 ```
 

@@ -1,6 +1,6 @@
 # Developer Observability 执行检查器
 
-在 Erii Web 检查完整执行关系、逐轮模型上下文和工具轨迹。
+在 Collie Web 检查完整执行关系、逐轮模型上下文和工具轨迹。
 
 [需求主索引](../feature-map.md) · [技术方案](../designs/observability.md) · [测试方案](../test-plans/observability.md)
 
@@ -78,7 +78,7 @@
 
 旧 `/developer/context` 与带 `?run=` 的书签自动转向规范 Trace 详情，保留 step、section、item、format 与正文偏移；原 API 不变。
 
-这是安装所有者授权下的敏感诊断。原有冻结 context 与新增脱敏最终请求均保留在本地 state.db，沿用其保留及加密备份边界；页面/API no-store，不新增公开访问、导出或第三方发送。观测故障不决定执行或重放。旧元数据 API、CLI `erii ops trace RUN_ID` 保留。
+这是安装所有者授权下的敏感诊断。原有冻结 context 与新增脱敏最终请求均保留在本地 state.db，沿用其保留及加密备份边界；页面/API no-store，不新增公开访问、导出或第三方发送。观测故障不决定执行或重放。旧元数据 API、CLI `collie ops trace RUN_ID` 保留。
 
 当前对齐 Langfuse 的 Session/Trace/Observation 数据与浏览体验；不依赖 Langfuse 服务，未接入 OTel 导出、Prompt Management、Dataset/Evals、聚合 Agent Graph 或全文搜索。Prompt 继续由项目文件/Git 管理，模型效果评测继续离线维护。
 

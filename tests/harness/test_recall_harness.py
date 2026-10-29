@@ -119,14 +119,14 @@ wait
             secret = 'SYNTHETIC_PRIVATE_CONTENT'
             with closing(sqlite3.connect(root / 'memory.db')) as db, db:
                 db.execute('CREATE TABLE recall_document(active,vector_json,content,user_id,agent_id)')
-                db.execute("INSERT INTO recall_document VALUES(1,NULL,?,'local','erii')", (secret,))
+                db.execute("INSERT INTO recall_document VALUES(1,NULL,?,'local','collie')", (secret,))
                 db.execute("INSERT INTO recall_document VALUES(1,NULL,?,'foreign','other')", (secret,))
             with closing(sqlite3.connect(root / 'state.db')) as db, db:
                 db.execute('CREATE TABLE run(kind,status,error_code,prompt,agent_id)')
-                db.execute('INSERT INTO run VALUES(?,?,NULL,?,?)', ('worker', 'running', secret, 'erii'))
+                db.execute('INSERT INTO run VALUES(?,?,NULL,?,?)', ('worker', 'running', secret, 'collie'))
                 db.execute('CREATE TABLE run_recall(hits_json)')
             before = {p: p.read_bytes() for p in root.iterdir()}
-            h = SimpleNamespace(env={'ERII_DATA_ROOT': str(root)})
+            h = SimpleNamespace(env={'COLLIE_DATA_ROOT': str(root)})
             embeddings = SimpleNamespace(requests=[{'input': secret}], fail=False)
             evidence = recall.failure_state(h, embeddings, 'ordinary', 'drain')
             self.assertEqual(evidence['databases']['memory']['index_groups'], [(1, 1, 2)])

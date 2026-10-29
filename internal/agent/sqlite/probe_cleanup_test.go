@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/bridge"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/bridge"
 )
 
 // This real subprocess passes stream/tool/continuation checks, then stops

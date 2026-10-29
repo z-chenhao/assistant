@@ -1,7 +1,7 @@
 import { PRELUDE_SOURCE as PI_PRELUDE } from './vendor/prelude.mjs';
 
 // The pinned upstream prelude supplies Promise jobs, serialization, output
-// bounds and intrinsic lockdown. Erii changes only its public Host contract.
+// bounds and intrinsic lockdown. Collie changes only its public Host contract.
 function replaceOnce(source, before, after) {
   if (source.split(before).length !== 2) throw new Error('incompatible pinned Pi prelude');
   return source.replace(before, after);
@@ -120,7 +120,7 @@ source = replaceOnce(source, 'output("console", args.map(format).join(" "));', '
 
 source = replaceOnce(source, 'function image(value) {', `function image(value) {
     if (value && typeof value === "object" && typeof value.artifactRef === "string") {
-      output("image", value.artifactRef, "application/x-erii-artifact");
+      output("image", value.artifactRef, "application/x-collie-artifact");
       return;
     }`);
 

@@ -63,7 +63,7 @@ flowchart TD
 
 ## Account monetary authorization
 
-Accepted for ERII-18 on 2026-10-17 by the project owner. Baseline §6.6.6 is
+Accepted for retired task #18 on 2026-10-17 by the project owner. Baseline §6.6.6 is
 normative. This resolves the previously unspecified price/limit policy.
 
 Use an explicitly configured account monetary boundary and provider/model price

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func TestSummaryPromptBytes(t *testing.T) {
@@ -18,7 +18,7 @@ func TestSummaryPromptBytes(t *testing.T) {
 	for _, tc := range []struct {
 		target int
 		hash   string
-	}{{256, "065c8c766ade65111d52f8d837b1fb30cc96ce90a2b522f27b9fb86c545fb4e2"}, {2048, "aede9ab48b578fb5c8c7e0c081a7ff19117c736dbe92b4c9435204dc6b706884"}, {16384, "a974392e75ca470dfc11c9b711131275205fd6af925bc3a90060906afa7af2b8"}} {
+	}{{256, "40c8bfb2b90bb7465de0feddcb4901dd6b53fdba0bfe3f361d43b59fad9d6dac"}, {2048, "83c13b0fd401fdff570f3809f907f35b201c0f5d3a8a6724451815a57f92df02"}, {16384, "ed1bc55c4a2a031bac53a6678e99c3e0e67a1abf149958f661af3a540f83cc45"}} {
 		t.Run(fmt.Sprint(tc.target), func(t *testing.T) {
 			messages, n, err := SummaryRequest(sources, anchors, 10000, tc.target)
 			if err != nil || n != len(sources) {

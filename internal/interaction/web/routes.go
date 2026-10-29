@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if p.Before != 0 {
-			w.Header().Set("X-Erii-Before", strconv.FormatInt(p.Before, 10))
+			w.Header().Set("X-Collie-Before", strconv.FormatInt(p.Before, 10))
 		}
 		jsonResult(w, p.Messages)
 	case "/api/progress":

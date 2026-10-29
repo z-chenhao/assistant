@@ -11,19 +11,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/computer/environment"
-	"github.com/z-chenhao/erii/internal/computer/macosvm"
-	contextbuilder "github.com/z-chenhao/erii/internal/context"
-	"github.com/z-chenhao/erii/internal/delivery"
-	eventnats "github.com/z-chenhao/erii/internal/event/nats"
-	"github.com/z-chenhao/erii/internal/interaction/feishu"
-	"github.com/z-chenhao/erii/internal/interaction/web"
-	"github.com/z-chenhao/erii/internal/memory"
-	"github.com/z-chenhao/erii/internal/recall/embedding"
-	"github.com/z-chenhao/erii/internal/skill"
-	"github.com/z-chenhao/erii/internal/tool/mcp"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/computer/environment"
+	"github.com/z-chenhao/collie/internal/computer/macosvm"
+	contextbuilder "github.com/z-chenhao/collie/internal/context"
+	"github.com/z-chenhao/collie/internal/delivery"
+	eventnats "github.com/z-chenhao/collie/internal/event/nats"
+	"github.com/z-chenhao/collie/internal/interaction/feishu"
+	"github.com/z-chenhao/collie/internal/interaction/web"
+	"github.com/z-chenhao/collie/internal/memory"
+	"github.com/z-chenhao/collie/internal/recall/embedding"
+	"github.com/z-chenhao/collie/internal/skill"
+	"github.com/z-chenhao/collie/internal/tool/mcp"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -99,8 +99,8 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		Artifact:  artifact.DefaultPolicy(),
 		Tools:     ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
 		Tasks:     Tasks{RecentDays: 30, RecentLimit: 200},
-		App:       App{DataRoot: filepath.Join(home, ".local", "share", "erii"), LogLevel: "info", LogMaxBytes: 16 << 20, LogBackups: 2},
-		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "erii", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
+		App:       App{DataRoot: filepath.Join(home, ".local", "share", "collie"), LogLevel: "info", LogMaxBytes: 16 << 20, LogBackups: 2},
+		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "collie", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
 	if path != "" {
 		f, err := os.Open(path)
@@ -120,16 +120,16 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 			return Config{}, errors.New("configuration must contain exactly one YAML document")
 		}
 	}
-	if value, ok := lookupEnv("ERII_DATA_ROOT"); ok {
+	if value, ok := lookupEnv("COLLIE_DATA_ROOT"); ok {
 		cfg.App.DataRoot = value
 	}
-	if value, ok := lookupEnv("ERII_LOG_LEVEL"); ok {
+	if value, ok := lookupEnv("COLLIE_LOG_LEVEL"); ok {
 		cfg.App.LogLevel = value
 	}
-	if value, ok := lookupEnv("ERII_NATS_URL"); ok {
+	if value, ok := lookupEnv("COLLIE_NATS_URL"); ok {
 		cfg.NATS.URL = value
 	}
-	if value, ok := lookupEnv("ERII_NATS_STREAM_PREFIX"); ok {
+	if value, ok := lookupEnv("COLLIE_NATS_STREAM_PREFIX"); ok {
 		cfg.NATS.StreamPrefix = value
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {

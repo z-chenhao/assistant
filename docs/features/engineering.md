@@ -32,7 +32,7 @@
 
 本批次不新增模型可见协议、不切换旧 Run 的冻结快照，也不宣称实现完整 Observability 产品。内存索引仍采用精确向量检索，Main 初始化仍按既有冻结历史边界恢复上下文；这不是大规模 ANN 或新的上下文裁剪策略。
 
-使用方式：正常启动 Web；依赖不可用时可继续进入 Settings/Progress，修复配置对应的本地依赖后等待运行时恢复。会话页面通过 Earlier messages 查看上一页；`GET /api/conversation?before=<sequence>` 返回至多 100 条消息，有更早数据时响应头 `X-Erii-Before` 提供下一页游标。CLI 显式历史保持完整保留记录。
+使用方式：正常启动 Web；依赖不可用时可继续进入 Settings/Progress，修复配置对应的本地依赖后等待运行时恢复。会话页面通过 Earlier messages 查看上一页；`GET /api/conversation?before=<sequence>` 返回至多 100 条消息，有更早数据时响应头 `X-Collie-Before` 提供下一页游标。CLI 显式历史保持完整保留记录。
 
 
 <a id="f-040"></a>
@@ -71,9 +71,9 @@ output directory when rerunning; retain a failed run when diagnosing it. Use
 `python3 tests/system/runner.py --list --suite full` to inspect the runnable
 software inventory. Results are ignored local outputs, not committed audit ledgers.
 
-<a id="contributing-contributing-to-erii"></a>
+<a id="contributing-contributing-to-collie"></a>
 
-## Contributing to Erii
+## Contributing to Collie
 
 Start with [AGENTS.md](../../AGENTS.md), the code being changed and its nearby tests.
 Use the [testing guide](../test-plans/product.md) for test ownership and commands, and the
@@ -110,7 +110,7 @@ Case expansion and clause-audit work are paused unless explicitly requested by
 the owner. Do not create a new script when an existing test or command can prove
 the behavior. An explicitly requested engineering-governance change is in scope.
 
-Multica is retired. Old ERII tasks and historical coordination notes do not
+Multica is retired. Old COLLIE tasks and historical coordination notes do not
 authorize new work. Link an issue if one exists; a branch or PR does not require
 an issue identifier. Do not recreate the old task hierarchy in another system.
 
@@ -170,7 +170,7 @@ on a weekly schedule or manual request. See [CI](../designs/engineering.md#ci-co
 
 ### Runtime and delivery
 
-`ERII_DATA_ROOT` selects an explicit data directory. Tests use disposable roots;
+`COLLIE_DATA_ROOT` selects an explicit data directory. Tests use disposable roots;
 never use a personal application root as a fixture. `doctor` is read-only;
 `status` can initialize or migrate state. Credentials belong in SecretStore,
 never YAML, source, test outputs or logs. No command selects a paid/default/Fake

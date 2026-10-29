@@ -20,7 +20,7 @@ for (const protocol of ['http', 'https']) {
         return emit.call(this, event, ...items);
       };
     });
-    req.on('close', () => fs.appendFileSync(process.env.ERII_SETUP_NETWORK_LOG,
+    req.on('close', () => fs.appendFileSync(process.env.COLLIE_SETUP_NETWORK_LOG,
       JSON.stringify({pid: process.pid, protocol, host: req.host, kind, status,
         object_sha256: object, response_body_bytes: bytes}) + '\n'));
     return req;

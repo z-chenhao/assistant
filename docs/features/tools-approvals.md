@@ -28,9 +28,9 @@
 
 工具名使用 `builtin__task_search`、`builtin__artifact_manage` 这类完整 snake_case 名称；MCP 使用 `mcp__browser_use__click_button`，保留 server 与工具名内部的单下划线。旧名称不作别名，升级前需完成旧 Main 和未决外部效果核实；具体兼容边界见[命名规范与升级说明](../designs/tools-approvals.md#contract-61-工具命名规范)。
 
-在终端或 Web 查看待审批动作及最终参数，明确批准或拒绝。CLI 使用 `erii approval list` 和 `erii approval approve APPROVAL_ID FROZEN_ARGUMENTS_HASH`。
+在终端或 Web 查看待审批动作及最终参数，明确批准或拒绝。CLI 使用 `collie approval list` 和 `collie approval approve APPROVAL_ID FROZEN_ARGUMENTS_HASH`。
 
-`erii approval reconcile` 核实未知结果。修改要求后未执行的旧审批会失效；批准 Task 不代表授权全部子动作。
+`collie approval reconcile` 核实未知结果。修改要求后未执行的旧审批会失效；批准 Task 不代表授权全部子动作。
 
 ## 详细操作参考
 
@@ -56,11 +56,11 @@ the same pipeline. No implicit Fake is enabled.
 frozen hash, status and expiry. To decide the displayed action:
 
 ```sh
-erii approval list
-erii approval approve APPROVAL_ID FROZEN_ARGUMENTS_HASH
-# Or: erii approval deny APPROVAL_ID FROZEN_ARGUMENTS_HASH
-erii chat work
-erii approval reconcile
+collie approval list
+collie approval approve APPROVAL_ID FROZEN_ARGUMENTS_HASH
+# Or: collie approval deny APPROVAL_ID FROZEN_ARGUMENTS_HASH
+collie chat work
+collie approval reconcile
 ```
 
 These are local user control commands. The principal comes from the private data

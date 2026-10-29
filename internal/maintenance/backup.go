@@ -231,7 +231,7 @@ func Backup(ctx context.Context, root, target string, key []byte, max map[string
 	if e != nil {
 		return empty, e
 	}
-	f, e := os.CreateTemp(filepath.Dir(target), ".erii-backup-*")
+	f, e := os.CreateTemp(filepath.Dir(target), ".collie-backup-*")
 	if e != nil {
 		return empty, ErrInvalid
 	}
@@ -319,7 +319,7 @@ func Restore(ctx context.Context, source, root string, key []byte, max map[strin
 	if e != nil {
 		return empty, e
 	}
-	tmp, e := os.MkdirTemp(filepath.Dir(root), ".erii-restore-*")
+	tmp, e := os.MkdirTemp(filepath.Dir(root), ".collie-restore-*")
 	if e != nil {
 		return empty, ErrInvalid
 	}

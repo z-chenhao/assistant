@@ -112,7 +112,7 @@ def file_operation(root, method, a):
             raise ValueError()
         # One serialized environment owner; directory-relative operations reject
         # symlinks. Bash runs are collected before another tool is dispatched.
-        temporary = '.erii-write-' + os.urandom(16).hex()
+        temporary = '.collie-write-' + os.urandom(16).hex()
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=directory)
         with os.fdopen(fd, 'wb') as f:
             f.write(replacement)

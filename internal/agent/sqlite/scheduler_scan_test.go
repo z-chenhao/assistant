@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/collie/internal/agent"
 )
 
 // This bounded counterfactual keeps the database, rows, SQL, arguments and

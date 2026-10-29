@@ -8,10 +8,10 @@ install:
 	sh install.sh
 
 build:
-	go build -o bin/erii ./cmd/erii
+	go build -o bin/collie ./cmd/collie
 
 run: build
-	./bin/erii start
+	./bin/collie start
 
 # Go tests currently contain both unit and component integration tests.
 # Keep that explicit rather than relabeling the entire package suite as UT.
@@ -36,10 +36,10 @@ test-infra:
 E2E_EVIDENCE ?= evidence/e2e
 
 test-e2e: build
-	python3 tests/system/runner.py --suite core --binary bin/erii --evidence "$(E2E_EVIDENCE)"
+	python3 tests/system/runner.py --suite core --binary bin/collie --evidence "$(E2E_EVIDENCE)"
 
 test-full: build
-	python3 tests/system/runner.py --suite full --binary bin/erii --evidence "$(E2E_EVIDENCE)"
+	python3 tests/system/runner.py --suite full --binary bin/collie --evidence "$(E2E_EVIDENCE)"
 
 test-race:
 	python3 tests/system/race.py

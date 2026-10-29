@@ -13,10 +13,10 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 // These private-to-the-repository seams are consumed by this adapter; app wires
@@ -104,7 +104,7 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 			<-u.workDone
 		}
 	}()
-	u.print("Erii — /setup /models /test ID /select ID /login [ACCOUNT_ID] /logout ACCOUNT_ID /history /status /approve ID HASH /deny ID HASH /quit")
+	u.print("Collie — /setup /models /test ID /select ID /login [ACCOUNT_ID] /logout ACCOUNT_ID /history /status /approve ID HASH /deny ID HASH /quit")
 	d, err := s.State.Diagnostics(ctx)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (s Session) Run(ctx context.Context, input io.ReadCloser, out io.Writer) (r
 		}
 		_, err = s.actor().Submit(ctx, uuid.Must(uuid.NewV7()).String(), line)
 		if err == nil {
-			u.print("Erii: busy")
+			u.print("Collie: busy")
 			u.startDrain()
 		}
 		u.report(err)
@@ -235,7 +235,7 @@ func (u *terminal) read(ctx context.Context, prompt string) (string, error) {
 				u.drainAgain = false
 				u.startDrain()
 			} else {
-				u.print("Erii: idle")
+				u.print("Collie: idle")
 			}
 			fmt.Fprint(u.out, prompt)
 		case event, ok := <-u.lines:
@@ -433,7 +433,7 @@ func (u *terminal) selectModel(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	u.print("Privacy: requests and Tool schemas go to the selected provider or local endpoint. localhost is the Go Host. Credentials stay in SecretStore. Erii never switches providers automatically.")
+	u.print("Privacy: requests and Tool schemas go to the selected provider or local endpoint. localhost is the Go Host. Credentials stay in SecretStore. Collie never switches providers automatically.")
 	answer, err := u.ask(ctx, "Activate "+plain(p.ModelID)+" via "+p.ProviderKind+"? Type yes")
 	if err != nil {
 		return err

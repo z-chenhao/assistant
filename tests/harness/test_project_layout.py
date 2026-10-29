@@ -259,7 +259,7 @@ class ProjectLayoutTests(unittest.TestCase):
         runtime = json.loads((ROOT / 'runtime/javascript/package.json').read_text())
         self.assertEqual(runtime['engines']['node'], version)
         self.assertIn('v' + version, (ROOT / 'install.sh').read_text())
-        self.assertIn('v' + version, (ROOT / 'cmd/erii/start.go').read_text())
+        self.assertIn('v' + version, (ROOT / 'cmd/collie/start.go').read_text())
         self.assertIn('node-version-file: .node-version', (ROOT / '.github/actions/ci-inputs/action.yml').read_text())
         for path in ('Makefile', '.github/actions/ci-inputs/action.yml', 'web/build.mjs'):
             self.assertNotIn('internal/interaction/web/client', (ROOT / path).read_text())

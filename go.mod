@@ -1,4 +1,4 @@
-module github.com/z-chenhao/erii
+module github.com/z-chenhao/collie
 
 go 1.26.2
 

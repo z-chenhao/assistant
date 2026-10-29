@@ -19,7 +19,7 @@ F-039：`internal/agent/sqlite/foundation_test.go` 验证流暂停时状态查�
 | 范围 | 必须保持的行为 / 已有入口 |
 | --- | --- |
 | 包和接口边界 | `go test ./...` / `go vet ./...` 验证调用方编译；Computer 新适配器实现 LifecycleStore；App 不暴露 SQLite DTO 和执行访问器。 |
-| CLI 语法与生命周期 | `cmd/erii/command_test.go` 独立列出合法/非法形式，非法命令在创建状态前拒绝；已有 metadata/control/barrier 用例；startup/main/account/operations system 场景驱动实际 CLI。 |
+| CLI 语法与生命周期 | `cmd/collie/command_test.go` 独立列出合法/非法形式，非法命令在创建状态前拒绝；已有 metadata/control/barrier 用例；startup/main/account/operations system 场景驱动实际 CLI。 |
 | Computer 事务 | `agent/sqlite/computer_test.go`、`computer_use_test.go` 通过新适配器验证过期 Code owner、重复计划、恢复/取消、checkpoint 与 fenced event；该跨模块集成测试留在事务权威处。 |
 | 运维只读报表 | `agent/sqlite/operations_test.go` 验证真实状态库的计数、trace 和脱敏字段；operations system gate 验证实际 CLI。 |
 | Task 接纳与执行 | 既有 tasks/task_control/task_completion 测试验证 receipt 重用、epoch、continue 新 Root、暂停/取消与失败 rollback；拆 helper 不新增事务。 |

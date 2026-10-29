@@ -15,9 +15,9 @@ const source=await readFile(new URL('../internal/computer/macosvm/browser.mjs',i
 const packageRoot=resolve(here,'node_modules/playwright-core');
 
 test('real Chromium: inventory, locator, input, navigation expiry, download and scoped chooser', {timeout:60000}, async()=>{
- const root=await realpath(await mkdtemp(join(tmpdir(),'erii-browser-')));
+ const root=await realpath(await mkdtemp(join(tmpdir(),'collie-browser-')));
  const module=join(root,'playwright/index.mjs');
- const transfer=join(root,'playwright/erii-transfer.py');
+ const transfer=join(root,'playwright/collie-transfer.py');
  const server=createServer((req,res)=>{
   if(req.url==='/download'){res.writeHead(200,{'Content-Disposition':'attachment; filename=fixture.txt','Content-Type':'text/plain'});res.end('fixture download'+'x'.repeat(300000));return;}
   res.end('<title>Fixture</title><input id="field" aria-label="Fixture text"><button id="button" onclick="document.querySelector(\'#status\').textContent=\'clicked:\'+event.detail" oncontextmenu="document.querySelector(\'#status\').textContent=\'context\';return false">Click</button><div id="status">ready</div><a id="download" href="/download">Download</a><button id="upload" onclick="document.querySelector(\'#file\').click()">Upload</button><input type="file" id="file" onchange="document.querySelector(\'#status\').textContent=this.files[0].name">');
@@ -34,7 +34,7 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   browserContext=await chromium.launchPersistentContext(join(root,'profile'),{headless:true,args:['--remote-debugging-address=127.0.0.1','--remote-debugging-port=0']});
   const port=await waitForDevToolsPort(join(root,'profile'));
   const call=async(method,args={},onLog)=>{
-    const child=exec(process.execPath,['--input-type=module','-e',source,JSON.stringify({module,port,root:join(root,'EriiTransfer'),method,args})],{timeout:15000,maxBuffer:12<<20,env:{...process.env,...(onLog?{DEBUG:'pw:api'}:{})}});
+    const child=exec(process.execPath,['--input-type=module','-e',source,JSON.stringify({module,port,root:join(root,'CollieTransfer'),method,args})],{timeout:15000,maxBuffer:12<<20,env:{...process.env,...(onLog?{DEBUG:'pw:api'}:{})}});
     if(onLog)child.child.stderr.on('data',onLog);
     return JSON.parse((await child).stdout);
   };
@@ -58,7 +58,7 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   await call('click',{tabId,x:box.x+box.width/2,y:box.y+box.height/2,geometry:buttonView.geometry,options:{button:'right'}});
   assert.equal((await call('playwright.textContent',{tabId,selector:'#status'})).value,'context');
   assert.equal((await call('playwright.download',{tabId,selector:'#download',path:'downloads/fixture'})).effect,'dispatched');
-  assert.equal(await readFile(join(root,'EriiTransfer/downloads/fixture'),'utf8'),'fixture download'+'x'.repeat(300000));
+  assert.equal(await readFile(join(root,'CollieTransfer/downloads/fixture'),'utf8'),'fixture download'+'x'.repeat(300000));
   assert.equal((await call('playwright.upload',{tabId,selector:'#upload',path:'downloads/fixture'})).effect,'dispatched');
   assert.equal((await call('playwright.textContent',{tabId,selector:'#status'})).value,'fixture');
   const observed=await call('observe',{tabId});
@@ -112,7 +112,7 @@ test('real Chromium: inventory, locator, input, navigation expiry, download and 
   await call('reload',{tabId});
   assert.equal((await call('playwright.count',{tabId,selector:'#field',expectedNavigation:navigation})).error,'STALE_SURFACE_HANDLE');
   assert.equal((await call('playwright.count',{tabId,selector:'#field >> internal:control=enter-frame'})).error,'INVALID_ARGUMENT');
-  await symlink('/etc/passwd',join(root,'EriiTransfer/downloads/escape'));
+  await symlink('/etc/passwd',join(root,'CollieTransfer/downloads/escape'));
   assert.equal((await call('playwright.upload',{tabId,selector:'#upload',path:'downloads/escape'})).error,'PERMISSION_DENIED');
  }finally{
   if(browserContext)await browserContext.close();

@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,7 +63,7 @@ createInterface({input:process.stdin}).on('line',line=>{
  if(m.method==='runtime.initialize')send({id:m.id,result:m.params});
  if(m.method==='execution.start'){
   request=m.params;
-  const event={protocolVersion:'1',runtimeId:'erii-js-v2',executionId:request.executionId,parentInvocationId:request.parentInvocationId,runId:request.runId,claimToken:request.claimToken,executionEpoch:request.executionEpoch,sequence:1,occurredAt:'2026-10-17T00:00:00Z',kind:'execution_completed',outcome:{kind:'completed',output:[],pendingCallIds:[]}};
+  const event={protocolVersion:'1',runtimeId:'collie-js-v2',executionId:request.executionId,parentInvocationId:request.parentInvocationId,runId:request.runId,claimToken:request.claimToken,executionEpoch:request.executionEpoch,sequence:1,occurredAt:'2026-10-17T00:00:00Z',kind:'execution_completed',outcome:{kind:'completed',output:[],pendingCallIds:[]}};
   if(MODE==='completion-without-event'){send({id:'start',result:event.outcome});return;}
   if(MODE==='forged-run') event.runId='forged';
   if(MODE==='event-gap') event.sequence=2;

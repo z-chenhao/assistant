@@ -44,8 +44,8 @@ class Harness:
         self.binary = binary
         self.root = root
         self.data_root = root / "data with # and ?"
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith("ERII_")}
-        self.env["ERII_DATA_ROOT"] = str(self.data_root)
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith("COLLIE_")}
+        self.env["COLLIE_DATA_ROOT"] = str(self.data_root)
         self.config = root / "config.yaml"
         self.yaml_root = root / "unused-config-root"
         self.config.write_text(f"version: 1\napp:\n  data_root: {json.dumps(str(self.yaml_root))}\n  log_level: info\n", encoding="utf-8")
@@ -174,7 +174,7 @@ def verify_models(harness):
 
 def verify_provider(binary):
     """Exercise explicit Bridge injection through real CLI processes and SQL."""
-    with tempfile.TemporaryDirectory(prefix="erii-provider-") as temp:
+    with tempfile.TemporaryDirectory(prefix="collie-provider-") as temp:
         harness = Harness(binary, Path(temp))
         try:
             harness.doctor()
@@ -237,7 +237,7 @@ def verify_provider(binary):
                 require(row[0] == "ready" and row[1] > 10**15 and row[2] == 2, "profile activation not stored")
                 config = db.execute("SELECT active_model_profile_id,setup_status,config_version FROM agent_config").fetchone()
                 require(config == (profile_id, "ready", 2), "AgentConfig disagrees with profile")
-                events = db.execute("SELECT type FROM event_outbox WHERE type IN ('ai.erii.model_profile.activated.v1','ai.erii.agent.model_selected.v1') ORDER BY type").fetchall()
+                events = db.execute("SELECT type FROM event_outbox WHERE type IN ('ai.collie.model_profile.activated.v1','ai.collie.agent.model_selected.v1') ORDER BY type").fetchall()
                 require(len(events) == 2, "activation event pair missing")
             committed = snapshot(harness.data_root)
             require(harness.launch("-test-bridge", "success", readiness="ready") == ready, "ready launch changed state")
@@ -274,7 +274,7 @@ def verify_provider(binary):
 
 
 def verify(binary):
-    with tempfile.TemporaryDirectory(prefix="erii-verify-") as temp:
+    with tempfile.TemporaryDirectory(prefix="collie-verify-") as temp:
         harness = Harness(binary, Path(temp))
         checks = []
         try:

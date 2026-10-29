@@ -21,9 +21,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/z-chenhao/erii/internal/computer"
-	computerfake "github.com/z-chenhao/erii/internal/computer/fake"
-	"github.com/z-chenhao/erii/internal/computer/macosvm"
+	"github.com/z-chenhao/collie/internal/computer"
+	computerfake "github.com/z-chenhao/collie/internal/computer/fake"
+	"github.com/z-chenhao/collie/internal/computer/macosvm"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sys/unix"
 )
@@ -75,15 +75,15 @@ func New(root string) (*Server, error) {
 		s.HTTP.Close()
 		return nil, err
 	}
-	seed := sha256.Sum256([]byte("ERII explicit offline Guest host key fixture, never a real credential"))
+	seed := sha256.Sum256([]byte("COLLIE explicit offline Guest host key fixture, never a real credential"))
 	signer, err := ssh.NewSignerFromKey(ed25519.NewKeyFromSeed(seed[:]))
 	if err != nil {
 		s.Close()
 		return nil, err
 	}
 	port, _ := strconv.Atoi(strings.Split(s.listener.Addr().String(), ":")[1])
-	s.Config = macosvm.Config{Root: root, Endpoint: s.HTTP.URL, Compatibility: computer.Compatibility{ProviderVersion: "0.6.1", GuestBuild: "25F84", DriverVersion: "0.36.0", DriverSHA256: strings.Repeat("a", 64), DriverTeam: "YCK386LBJ7", DriverBundle: "com.trycua.driver", Architecture: "arm64"}, Manifest: computer.RestorationManifest{Version: 1}, Guest: macosvm.SSHConfig{User: "lume", Port: port, PasswordRef: "env:ERII_COMPUTER_FIXTURE_PASSWORD", HostKeySHA256: ssh.FingerprintSHA256(signer.PublicKey())}}
-	s.Config.Browser = &macosvm.BrowserConfig{Node: "/opt/erii/node", Module: "/opt/erii/playwright/index.mjs", Port: 9222}
+	s.Config = macosvm.Config{Root: root, Endpoint: s.HTTP.URL, Compatibility: computer.Compatibility{ProviderVersion: "0.6.1", GuestBuild: "25F84", DriverVersion: "0.36.0", DriverSHA256: strings.Repeat("a", 64), DriverTeam: "YCK386LBJ7", DriverBundle: "com.trycua.driver", Architecture: "arm64"}, Manifest: computer.RestorationManifest{Version: 1}, Guest: macosvm.SSHConfig{User: "lume", Port: port, PasswordRef: "env:COLLIE_COMPUTER_FIXTURE_PASSWORD", HostKeySHA256: ssh.FingerprintSHA256(signer.PublicKey())}}
+	s.Config.Browser = &macosvm.BrowserConfig{Node: "/opt/collie/node", Module: "/opt/collie/playwright/index.mjs", Port: 9222}
 	config := &ssh.ServerConfig{PasswordCallback: func(meta ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 		if meta.User() != "lume" || string(password) != "fixture-only" {
 			return nil, errors.New("fixture authentication rejected")
@@ -240,7 +240,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			Source  string `json:"sourceLocation"`
 			Dest    string `json:"destLocation"`
 		}
-		if json.NewDecoder(r.Body).Decode(&input) != nil || input.Name != "base" || !strings.HasPrefix(input.NewName, "erii-") || strings.ContainsAny(input.NewName, "/\\.") || input.Source != root || input.Dest != filepath.Join(root, "vms") {
+		if json.NewDecoder(r.Body).Decode(&input) != nil || input.Name != "base" || !strings.HasPrefix(input.NewName, "collie-") || strings.ContainsAny(input.NewName, "/\\.") || input.Source != root || input.Dest != filepath.Join(root, "vms") {
 			http.Error(w, "unsafe clone", 400)
 			return
 		}
@@ -313,7 +313,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/lume/vms/"), "/")
-	if len(parts) == 0 || strings.ContainsAny(parts[0], ".\\") || !strings.HasPrefix(parts[0], "erii-") {
+	if len(parts) == 0 || strings.ContainsAny(parts[0], ".\\") || !strings.HasPrefix(parts[0], "collie-") {
 		http.Error(w, "invalid fixture VM", 400)
 		return
 	}

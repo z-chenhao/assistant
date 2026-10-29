@@ -40,9 +40,9 @@
 
 ## 如何使用
 
-运行 `erii doctor` 检查安装；`erii status` 查看模型就绪；`erii ops health` 查看运行健康；`erii spend status` 查看费用状态。
+运行 `collie doctor` 检查安装；`collie status` 查看模型就绪；`collie ops health` 查看运行健康；`collie spend status` 查看费用状态。
 
-备份恢复按现有指南提供 32 字节密钥的 SecretStore 引用，先恢复到隔离数据根。现有 `erii ops trace RUN_ID` 只提供简化轨迹；完整可视化由 F-031 跟踪。
+备份恢复按现有指南提供 32 字节密钥的 SecretStore 引用，先恢复到隔离数据根。现有 `collie ops trace RUN_ID` 只提供简化轨迹；完整可视化由 F-031 跟踪。
 
 ## 详细操作参考
 
@@ -67,7 +67,7 @@ its recovery point.
 
 ### Run and diagnose
 
-`erii -config CONFIG web serve`, `tui`, and `automation work` own the
+`collie -config CONFIG web serve`, `tui`, and `automation work` own the
 foreground production lifecycle. Setup remains available without a usable
 profile. The broker and durable consumer initialize before the Tool Registry,
 ComputerProvider and Sidecar handshake. The existing Outbox/Inbox and recovery
@@ -98,10 +98,10 @@ Only `-test-bridge` selects a Fake; `-test-events` additionally drives the real
 NATS lifecycle in isolated CI.
 
 ```sh
-erii -config CONFIG ops health
-erii -config CONFIG ops broker
-erii -config CONFIG ops trace RUN_ID
-erii -config CONFIG ops report > bug-report.json
+collie -config CONFIG ops health
+collie -config CONFIG ops broker
+collie -config CONFIG ops trace RUN_ID
+collie -config CONFIG ops report > bug-report.json
 ```
 
 `health` contains counts of live/expired claims, pending Code wakes, conversation
@@ -162,7 +162,7 @@ operator remediation; it does not authorize dropping records or replaying effect
 
 ```sh
 # Requeue a valid internal wakeup using its displayed attempt count as a fence.
-erii -config CONFIG ops retry-event EVENT_ID ATTEMPTS
+collie -config CONFIG ops retry-event EVENT_ID ATTEMPTS
 ```
 
 This operation cannot retry a Tool or channel side effect and refuses malformed
@@ -171,10 +171,10 @@ operation using the displayed stream sequence, not a user channel. Diagnose the
 handler first; authoritative recovery scans continue independently.
 
 Existing unbounded v1 Streams fail validation instead of silently acquiring new
-retention policy. Stop Erii processes, back up state, and explicitly run:
+retention policy. Stop Collie processes, back up state, and explicitly run:
 
 ```sh
-erii -config CONFIG ops upgrade-broker
+collie -config CONFIG ops upgrade-broker
 ```
 
 The command verifies the owned subject/storage/retention contract and refuses
@@ -188,7 +188,7 @@ and serving commands validate policy; they never silently alter existing bounds.
 ### Cold encrypted backup and isolated restore
 
 Stop **every** process using the data root, including temporary CLI commands and
-external database writers. Every Erii process holds a shared OS lock. Backup
+external database writers. Every Collie process holds a shared OS lock. Backup
 requires the exclusive lock and refuses a live instance; process death releases
 the lock. Do not copy live WAL files. The backup verifies all three databases,
 checkpoints their WALs, checks foreign keys and live Artifact hashes, then streams
@@ -206,11 +206,11 @@ schemas, sizes and SHA-256 hashes. Its CLI response is local operational data,
 not the shareable bug report.
 
 ```sh
-erii -config SOURCE_CONFIG ops backup /private/backups/erii.erii KEY_REF
-erii -config ISOLATED_CONFIG ops restore /private/backups/erii.erii KEY_REF
+collie -config SOURCE_CONFIG ops backup /private/backups/collie.collie KEY_REF
+collie -config ISOLATED_CONFIG ops restore /private/backups/collie.collie KEY_REF
 # Inspect/retire the source and reconcile post-backup external outcomes first.
-erii -config ISOLATED_CONFIG ops activate source-retired-and-outcomes-reconciled
-erii -config ISOLATED_CONFIG status
+collie -config ISOLATED_CONFIG ops activate source-retired-and-outcomes-reconciled
+collie -config ISOLATED_CONFIG status
 ```
 
 The archive includes `state.db`, `conversation.db`, `memory.db` and immutable

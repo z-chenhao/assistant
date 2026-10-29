@@ -14,7 +14,7 @@ from verify_main import MainHarness, require
 
 def state(h):
     value = h.state()
-    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+    with sqlite3.connect(Path(h.env["COLLIE_DATA_ROOT"]) / "state.db") as db:
         db.row_factory = sqlite3.Row
         for key, query in {
             "tasks": "SELECT * FROM task ORDER BY created_at,task_id",
@@ -67,7 +67,7 @@ def check(value, tasks=1, roots=1, updates=1):
 
 def run(binary):
     report = {"version": 1, "scope": "Task/Root/Reporter implementation; controlled stop evidence is in task-control reports; Child, Artifact and delivery evidence is maintained in their dedicated harnesses", "checks": [], "crashes": []}
-    with tempfile.TemporaryDirectory(prefix="erii-tasks-") as directory:
+    with tempfile.TemporaryDirectory(prefix="collie-tasks-") as directory:
         root = Path(directory)
 
         def scenario(name, action):
@@ -84,9 +84,9 @@ def run(binary):
             with Terminal(h.args("tui"), h.env, h.root) as t:
                 t.expect("State: ready"); t.expect("You> ")
                 t.send("Delegate: Wedding checklist with venue dependencies.")
-                t.expect("Main follow-up:"); t.expect("Erii: idle")
+                t.expect("Main follow-up:"); t.expect("Collie: idle")
                 t.send("Continue: Wedding | Use the new date.")
-                t.expect("Main follow-up:"); t.expect("Erii: idle")
+                t.expect("Main follow-up:"); t.expect("Collie: idle")
                 t.send("/status"); t.expect("completed")
                 require(t.stop() == 0, "terminal did not stop cleanly")
                 transcript = t.transcript()

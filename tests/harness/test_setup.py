@@ -66,7 +66,7 @@ class SetupTests(unittest.TestCase):
                         npm_config_userconfig=str(self.base / 'user.npmrc'), npm_config_globalconfig=str(self.base / 'global.npmrc'),
                         npm_config_registry=f'http://127.0.0.1:{self.server.server_port}')
         # CI may itself be offline; each fixture explicitly tests its own mode.
-        self.env.pop('ERII_SETUP_NETWORK_LOG', None)
+        self.env.pop('COLLIE_SETUP_NETWORK_LOG', None)
         self.env.pop('NODE_OPTIONS', None)
         self.root = self.tree('first')
 
@@ -215,7 +215,7 @@ class SetupTests(unittest.TestCase):
     def test_http_probe_counts_body_bytes_without_changing_streams_or_logging_queries(self):
         log = self.base / 'network.jsonl'
         env = dict(self.env, NODE_OPTIONS='--require=' + str(installer.ROOT / 'scripts/setup_network.cjs'),
-                   ERII_SETUP_NETWORK_LOG=str(log))
+                   COLLIE_SETUP_NETWORK_LOG=str(log))
         script = (f'require("http").get("http://127.0.0.1:{self.server.server_port}/fixture-1.0.0.tgz", '
                   'res=>res.resume())')
         installer.run(['node', '-e', script], self.root, env, 10)

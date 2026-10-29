@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 )
 
 const traceFields = executionColumns + `,r.conversation_id,coalesce(substr(t.title,1,160),'Main conversation'),m.model_id,

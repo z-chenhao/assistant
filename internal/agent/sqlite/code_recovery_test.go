@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
-	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool/codemode"
+	toolfake "github.com/z-chenhao/collie/internal/tool/fake"
 )
 
 func codeClaimFixture(t *testing.T) (*Store, *Runs, *codeBridge, tool.Invocation) {

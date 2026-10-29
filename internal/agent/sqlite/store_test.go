@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/agent"
+	"github.com/z-chenhao/collie/internal/agent"
 )
 
 func TestFreshAndRepeatedStartupPreserveConfiguration(t *testing.T) {

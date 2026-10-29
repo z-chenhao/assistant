@@ -36,7 +36,7 @@ def continued(before, after):
 
 def run(binary):
     report = {"version": 1, "scope": "M2 SC-04/05; synthetic tree/unknown contracts in Go; M3 external effects, M4 Child admission, M5 Durable Replay and semantic scores remain not_applicable", "checks": [], "crashes": []}
-    with tempfile.TemporaryDirectory(prefix="erii-task-control-") as directory:
+    with tempfile.TemporaryDirectory(prefix="collie-task-control-") as directory:
         root = Path(directory)
 
         def scenario(name, drive):
@@ -60,7 +60,7 @@ def run(binary):
                     workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
                     pending = {g['generation_id'] for g in value['generations']
                                if g['run_id'] in workers and g['status'] == 'pending'}
-                    audit = Path(h.env['ERII_DATA_ROOT']) / 'fake-provider-calls.jsonl'
+                    audit = Path(h.env['COLLIE_DATA_ROOT']) / 'fake-provider-calls.jsonl'
                     if not audit.exists():
                         return False
                     return any(json.loads(line)['generation_id'] in pending
@@ -76,11 +76,11 @@ def run(binary):
                             and json.loads(i["result_json"]).get("error", {}).get("code") == "INVALID_ARGUMENT"
                             for i in rejected["tools"] if i["result_json"]), "live completion did not fail closed")
                 t.send(operation + ": Wedding")
-                t.expect("Main accepted the work."); t.expect("Erii: idle")
+                t.expect("Main accepted the work."); t.expect("Collie: idle")
                 before = state(h)
                 stopped(before, "paused" if operation == "Pause" else "cancelled", "task_paused" if operation == "Pause" else "task_cancelled")
                 t.send("Continue: Wedding | Continue with the new date.")
-                t.expect("Main follow-up:"); t.expect("Erii: idle")
+                t.expect("Main follow-up:"); t.expect("Collie: idle")
                 after = state(h); continued(before, after)
                 t.send("/status"); t.expect("completed")
                 require(t.stop() == 0, "PTY did not exit cleanly")

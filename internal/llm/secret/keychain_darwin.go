@@ -6,21 +6,21 @@ package secret
 #cgo LDFLAGS: -framework Security -framework CoreFoundation
 #include <Security/Security.h>
 #include <stdlib.h>
-static CFMutableDictionaryRef erii_query(const char *ref) {
+static CFMutableDictionaryRef collie_query(const char *ref) {
  CFMutableDictionaryRef q=CFDictionaryCreateMutable(NULL,0,&kCFTypeDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks);
  CFStringRef account=CFStringCreateWithCString(NULL,ref,kCFStringEncodingUTF8);
  CFDictionarySetValue(q,kSecClass,kSecClassGenericPassword);
- CFDictionarySetValue(q,kSecAttrService,CFSTR("erii"));
+ CFDictionarySetValue(q,kSecAttrService,CFSTR("collie"));
  CFDictionarySetValue(q,kSecAttrAccount,account); CFRelease(account);
  return q;
 }
-static OSStatus erii_get(const char *ref, CFDataRef *data) {
- CFMutableDictionaryRef q=erii_query(ref);
+static OSStatus collie_get(const char *ref, CFDataRef *data) {
+ CFMutableDictionaryRef q=collie_query(ref);
  CFDictionarySetValue(q,kSecReturnData,kCFBooleanTrue);
  OSStatus status=SecItemCopyMatching(q,(CFTypeRef*)data); CFRelease(q); return status;
 }
-static OSStatus erii_put(const char *ref, const void *bytes, CFIndex length) {
- CFMutableDictionaryRef q=erii_query(ref);
+static OSStatus collie_put(const char *ref, const void *bytes, CFIndex length) {
+ CFMutableDictionaryRef q=collie_query(ref);
  CFDataRef data=CFDataCreate(NULL,bytes,length);
  const void *keys[]={kSecValueData}; const void *values[]={data};
  CFDictionaryRef changes=CFDictionaryCreate(NULL,keys,values,1,&kCFTypeDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks);
@@ -28,8 +28,8 @@ static OSStatus erii_put(const char *ref, const void *bytes, CFIndex length) {
  if(status==errSecItemNotFound) { CFDictionarySetValue(q,kSecValueData,data); status=SecItemAdd(q,NULL); }
  CFRelease(changes); CFRelease(data); CFRelease(q); return status;
 }
-static OSStatus erii_remove(const char *ref) {
- CFMutableDictionaryRef q=erii_query(ref);
+static OSStatus collie_remove(const char *ref) {
+ CFMutableDictionaryRef q=collie_query(ref);
  OSStatus status=SecItemDelete(q); CFRelease(q);
  return status==errSecItemNotFound ? errSecSuccess : status;
 }
@@ -39,7 +39,7 @@ import (
 	"context"
 	"unsafe"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func get(ctx context.Context, ref string) ([]byte, error) {
@@ -49,7 +49,7 @@ func get(ctx context.Context, ref string) ([]byte, error) {
 	key := C.CString(ref)
 	defer C.free(unsafe.Pointer(key))
 	var data C.CFDataRef
-	if C.erii_get(key, &data) != C.errSecSuccess {
+	if C.collie_get(key, &data) != C.errSecSuccess {
 		return nil, llm.ErrSecretStore
 	}
 	defer C.CFRelease(C.CFTypeRef(data))
@@ -61,7 +61,7 @@ func put(ctx context.Context, ref string, value []byte) error {
 	}
 	key := C.CString(ref)
 	defer C.free(unsafe.Pointer(key))
-	if C.erii_put(key, unsafe.Pointer(&value[0]), C.CFIndex(len(value))) != C.errSecSuccess {
+	if C.collie_put(key, unsafe.Pointer(&value[0]), C.CFIndex(len(value))) != C.errSecSuccess {
 		return llm.ErrSecretStore
 	}
 	return nil
@@ -72,7 +72,7 @@ func remove(ctx context.Context, ref string) error {
 	}
 	key := C.CString(ref)
 	defer C.free(unsafe.Pointer(key))
-	if C.erii_remove(key) != C.errSecSuccess {
+	if C.collie_remove(key) != C.errSecSuccess {
 		return llm.ErrSecretStore
 	}
 	return nil

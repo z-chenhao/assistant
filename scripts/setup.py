@@ -146,7 +146,7 @@ def main(argv=None):
             network = args.evidence.with_suffix('.network.jsonl')
             if args.measure_network:
                 network.write_text('')
-                env['ERII_SETUP_NETWORK_LOG'] = str(network)
+                env['COLLIE_SETUP_NETWORK_LOG'] = str(network)
                 env['NODE_OPTIONS'] = (env.get('NODE_OPTIONS', '') + ' --require=' +
                                        json.dumps(str(ROOT / 'scripts/setup_network.cjs'))).strip()
             try:

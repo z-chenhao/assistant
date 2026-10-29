@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
-	deliveryfake "github.com/z-chenhao/erii/internal/delivery/fake"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery"
+	deliveryfake "github.com/z-chenhao/collie/internal/delivery/fake"
 )
 
 // SetTestDelivery is explicit process-local failure injection. The Fake wraps

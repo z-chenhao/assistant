@@ -1,15 +1,10 @@
-# Eri visual identity
+# Collie artwork
 
-`source/eri-portrait-original.jpg` is original Eri brand artwork supplied by the creator on 2026-07-19. It is not official artwork from the work that inspired Eri and does not imply authorization or endorsement by its rights holders. The creator authorized its use as an Eri-owned project asset under Apache-2.0.
+The Collie border collie holding a tennis ball was generated for this project
+with OpenAI image generation on 2026-10-29 and selected by the project owner.
+The supplied PNG is used unchanged for the welcome illustration, brand mark,
+agent avatar and favicon. Browser CSS controls its displayed size.
 
-Transparent PNG files are generated deterministically from the original JPEG without generative-model repainting. The process removes only the outer white area connected to the canvas edge and preserves the face, clothing, flowers, and star-shaped negative space inside the ring:
-
-```bash
-go run ./scripts/brand-assets
-```
-
-- `eri-mark.png`: 1024 px transparent primary mark.
-- `eri-icon-512.png` and `eri-icon-192.png`: Web App and desktop-entry icons.
-- `eri-favicon-32.png`: browser favicon.
-
-The script also writes the runtime sizes required by the embedded Conversation Workspace and System Observatory assets.
+Typography: Bricolage Grotesque and DM Sans, distributed unchanged under their
+included SIL Open Font License notices. Font sources: google/fonts, ofl/
+bricolagegrotesque and ofl/dmsans. No font service or image CDN is contacted.

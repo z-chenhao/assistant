@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/memory"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/memory"
 )
 
 type probeFixture struct {
@@ -102,7 +102,7 @@ func TestAtomicActivationRollbackAndFencing(t *testing.T) {
 		t.Fatal(err)
 	}
 	count := countRows(t, s, "event_outbox")
-	if _, err := s.db.Exec(`CREATE TRIGGER fail_selection BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.agent.model_selected.v1' BEGIN SELECT RAISE(ABORT,'fault'); END`); err != nil {
+	if _, err := s.db.Exec(`CREATE TRIGGER fail_selection BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.agent.model_selected.v1' BEGIN SELECT RAISE(ABORT,'fault'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Select(ctx, p.ProfileID, 1, 1); !errors.Is(err, llm.ErrStorage) {

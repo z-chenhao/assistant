@@ -28,7 +28,7 @@ class ObserverTests(unittest.TestCase):
             return conn
 
         class Harness:
-            env = {'ERII_DATA_ROOT': '/disposable-fixture'}
+            env = {'COLLIE_DATA_ROOT': '/disposable-fixture'}
 
         with patch.object(maintenance.sqlite3, 'connect', connect):
             with self.assertRaisesRegex(RuntimeError, 'injected read failure'):

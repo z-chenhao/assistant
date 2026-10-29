@@ -5,8 +5,8 @@ import (
 	"math"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/recall/embedding"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall/embedding"
 )
 
 // documentVector keeps one derived vector and the original source reference.

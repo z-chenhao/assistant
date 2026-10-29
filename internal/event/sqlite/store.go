@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/event"
+	"github.com/z-chenhao/collie/internal/event"
 )
 
 type Store struct {

@@ -44,7 +44,7 @@
 
 ```sh
 make build
-python3 tests/system/verify_recall.py --binary bin/erii --evidence evidence/recall.json
+python3 tests/system/verify_recall.py --binary bin/collie --evidence evidence/recall.json
 go test -race ./internal/recall/... ./internal/memory/... ./internal/conversation/...
 go test -race ./internal/agent/sqlite -run TestRecall
 ```
@@ -84,7 +84,7 @@ References: [SQLite FTS5](https://www.sqlite.org/fts5.html),
 
 ```sh
 make build
-python3 tests/system/verify_memory_maintenance.py --binary bin/erii --evidence evidence/memory-maintenance.json
+python3 tests/system/verify_memory_maintenance.py --binary bin/collie --evidence evidence/memory-maintenance.json
 go test -race ./internal/context ./internal/memory/... ./internal/conversation/...
 go test -race ./internal/agent/sqlite -run 'TestForget|TestContextLength|TestExperience'
 ```

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/interaction"
+	"github.com/z-chenhao/collie/internal/interaction"
 )
 
 func (s *Server) preferNotification(r *http.Request) error {

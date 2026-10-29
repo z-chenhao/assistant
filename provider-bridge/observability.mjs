@@ -23,7 +23,7 @@ export function wireObserver(request,send){
  return (phase,attempt,body,status=0,error='')=>{
   // Diagnostics are bounded and never alter transport success/failure.
   try{
-   const event={generation_id:request.generation_id,attempt,phase,at:Date.now()*1000,format:'erii-wire-v1/pi-ai-1.3.0',http_status:status,error_code:error};
+   const event={generation_id:request.generation_id,attempt,phase,at:Date.now()*1000,format:'collie-wire-v1/pi-ai-1.3.0',http_status:status,error_code:error};
    if(phase==='started'){
     const clean=redact(JSON.parse(body));
     const encoded=JSON.stringify(clean);

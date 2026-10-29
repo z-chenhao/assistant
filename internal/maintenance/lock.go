@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-var ErrBusy = errors.New("data root is in use; stop every Erii process before maintenance")
+var ErrBusy = errors.New("data root is in use; stop every Collie process before maintenance")
 var ErrInvalid = errors.New("invalid, incompatible or unauthenticated backup")
 
 // Every application process holds a shared lock. Offline backup/upgrade takes

@@ -2,9 +2,9 @@ package web
 
 import (
 	"context"
-	"github.com/z-chenhao/erii/internal/interaction"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/task"
 	"net/http/httptest"
 	"testing"
 )

@@ -40,9 +40,9 @@
 
 ## 如何使用
 
-标准安装后运行 `erii`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。连接视觉模型时显式勾选 **Enable image input (verified when tested)**，通过图片 Probe 后再选择；模型卡显示已验证图片输入或 Text only。图片发送规则见 [F-013](artifacts-media.md#f-013)。
+标准安装后运行 `collie`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。连接视觉模型时显式勾选 **Enable image input (verified when tested)**，通过图片 Probe 后再选择；模型卡显示已验证图片输入或 Text only。图片发送规则见 [F-013](artifacts-media.md#f-013)。
 
-CLI 可运行 `erii model list` 查看配置，使用 `erii model test PROFILE_ID` 测试。ChatGPT 当前完整凭据路径依赖 macOS 与 cgo；Linux 可使用明确配置的本地端点或环境变量 API Key，不能据此宣称 OAuth 已跨平台可用。
+CLI 可运行 `collie model list` 查看配置，使用 `collie model test PROFILE_ID` 测试。ChatGPT 当前完整凭据路径依赖 macOS 与 cgo；Linux 可使用明确配置的本地端点或环境变量 API Key，不能据此宣称 OAuth 已跨平台可用。
 
 ## 详细操作参考
 
@@ -58,19 +58,19 @@ CLI 可运行 `erii model list` 查看配置，使用 `erii model test PROFILE_I
 ### ChatGPT account lifecycle
 
 Use the same explicit Bridge configuration shown below. On macOS with cgo,
-OAuth credentials use Erii's own Keychain service. Other platforms fail closed
+OAuth credentials use Collie's own Keychain service. Other platforms fail closed
 without a writable OS SecretStore; environment API keys cannot authenticate this
 entry point. No Codex credential file is read or written.
 
 ```sh
-bin/erii -config local.yaml model login-chatgpt
-bin/erii -config local.yaml model accounts
-bin/erii -config local.yaml model account-catalog ACCOUNT_ID
-bin/erii -config local.yaml model account-add ACCOUNT_ID RETURNED_MODEL_ID
-bin/erii -config local.yaml model test PROFILE_ID
-bin/erii -config local.yaml model select PROFILE_ID PROFILE_VERSION CONFIG_VERSION
-bin/erii -config local.yaml model refresh ACCOUNT_ID
-bin/erii -config local.yaml model logout ACCOUNT_ID
+bin/collie -config local.yaml model login-chatgpt
+bin/collie -config local.yaml model accounts
+bin/collie -config local.yaml model account-catalog ACCOUNT_ID
+bin/collie -config local.yaml model account-add ACCOUNT_ID RETURNED_MODEL_ID
+bin/collie -config local.yaml model test PROFILE_ID
+bin/collie -config local.yaml model select PROFILE_ID PROFILE_VERSION CONFIG_VERSION
+bin/collie -config local.yaml model refresh ACCOUNT_ID
+bin/collie -config local.yaml model logout ACCOUNT_ID
 ```
 
 `login-chatgpt` prints a private `open_url` JSON event. Open that URL in your
@@ -140,7 +140,7 @@ observations, not tokens or authorization URLs.
 real Go → Node → Pi completion path, pauses before usage persistence, then mutates
 auth through a second Host/DB handle. It covers logout, reauthorization, auth loss,
 same-identity refresh and storage failure. Node contracts also capture the actual
-Tool continuation wire and require the fixed `erii` namespace on replay.
+Tool continuation wire and require the fixed `collie` namespace on replay.
 
 `go test -race ./internal/agent/sqlite -run TestAccountCancellationAtFinalAcceptance -v`
 checks Generate and Continue with Cancel, Dispose and caller-context cancellation
@@ -173,20 +173,20 @@ Add this explicit configuration, using the absolute repository path:
 version: 1
 llm:
   provider_bridge_command: node
-  provider_bridge_script: /absolute/path/to/erii/provider-bridge/bridge.mjs
+  provider_bridge_script: /absolute/path/to/collie/provider-bridge/bridge.mjs
   provider_bridge_version: pi-ai-1.3.0-v1
 ```
 
-Use an isolated `ERII_DATA_ROOT` while evaluating the CLI. The Bridge is optional;
+Use an isolated `COLLIE_DATA_ROOT` while evaluating the CLI. The Bridge is optional;
 unconfigured startup still provides setup/diagnostics without a provider.
 
 ```sh
-bin/erii -config local.yaml model discover http://127.0.0.1:8000/v1
-bin/erii -config local.yaml model add http://127.0.0.1:8000/v1 MODEL_ID
-bin/erii -config local.yaml model catalog PROFILE_ID
-bin/erii -config local.yaml model test PROFILE_ID
-bin/erii -config local.yaml model select PROFILE_ID 1 1
-bin/erii -config local.yaml status
+bin/collie -config local.yaml model discover http://127.0.0.1:8000/v1
+bin/collie -config local.yaml model add http://127.0.0.1:8000/v1 MODEL_ID
+bin/collie -config local.yaml model catalog PROFILE_ID
+bin/collie -config local.yaml model test PROFILE_ID
+bin/collie -config local.yaml model select PROFILE_ID 1 1
+bin/collie -config local.yaml status
 ```
 
 `add URL MODEL_ID [AUTH_ID]` creates an unverified candidate with conservative
@@ -265,16 +265,16 @@ ownership fencing; see [Main recovery](../designs/conversation.md#main-loop-owne
 
 ### Reproduce the CLI path
 
-Use an isolated absolute `ERII_DATA_ROOT`. Run `make build`, then provide metadata
+Use an isolated absolute `COLLIE_DATA_ROOT`. Run `make build`, then provide metadata
 through `model add` as documented in [local model setup](#provider-bridge-connect-a-local-model). Copy its `profile_id`.
 Profiles are unverified candidates, and metadata cannot activate one.
 
 ```sh
-bin/erii -test-bridge success model catalog
-bin/erii -test-bridge success model test PROFILE_ID
-bin/erii -test-bridge success model select PROFILE_ID 1 1
-bin/erii -test-bridge success status
-bin/erii status
+bin/collie -test-bridge success model catalog
+bin/collie -test-bridge success model test PROFILE_ID
+bin/collie -test-bridge success model select PROFILE_ID 1 1
+bin/collie -test-bridge success status
+bin/collie status
 ```
 
 `select` requires the expected profile version and Agent config version, visible

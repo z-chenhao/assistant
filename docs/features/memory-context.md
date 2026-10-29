@@ -56,7 +56,7 @@
 
 在配置中提供 `memory.encryption_key_ref` 开启记忆维护，提供显式 embedding 配置开启搜索与自动召回。加密 Memory 当前要求本地 loopback embedding 端点。
 
-用户可说“记住这个偏好”“之前的信息改为……”或“忘记这类信息”。CLI `erii memory status` 查看维护状态；`erii memory manage REQUEST_KEY` 接受 JSON 控制请求。压缩自动发生；需要语义摘要时会调用当前 Run 已冻结的模型，并计入原有用量和费用授权。没有额外默认模型。
+用户可说“记住这个偏好”“之前的信息改为……”或“忘记这类信息”。CLI `collie memory status` 查看维护状态；`collie memory manage REQUEST_KEY` 接受 JSON 控制请求。压缩自动发生；需要语义摘要时会调用当前 Run 已冻结的模型，并计入原有用量和费用授权。没有额外默认模型。
 
 ## 详细操作参考
 
@@ -106,7 +106,7 @@ There is no implicit credential backend or per-record approval.
 
 ```yaml
 memory:
-  encryption_key_ref: env:ERII_MEMORY_KEY
+  encryption_key_ref: env:COLLIE_MEMORY_KEY
 context:
   threshold_percentage: 0.75
   recent_messages: 6
@@ -133,9 +133,9 @@ Curator source observations. The authenticated local equivalent is:
 
 ```sh
 # Each command reads one JSON object on stdin. Reuse REQUEST_KEY to recover a receipt.
-bin/erii -config config.yaml memory manage REQUEST_KEY
-bin/erii -config config.yaml memory work
-bin/erii -config config.yaml memory status
+bin/collie -config config.yaml memory manage REQUEST_KEY
+bin/collie -config config.yaml memory work
+bin/collie -config config.yaml memory status
 ```
 
 Remember input: `{"operation":"remember","content":"I prefer unsweetened tea"}`.

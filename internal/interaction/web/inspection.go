@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 )
 
 // ExecutionReader is separate from the conversation/action Core. Inspection

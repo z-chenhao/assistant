@@ -21,7 +21,7 @@ FIXTURE = json.loads((Path(__file__).resolve().parents[2] / 'tests/fixtures/m4-s
 
 def state(h):
     value = child_state(h)
-    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+    with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
         db.row_factory = sqlite3.Row
         for table in ('spend_snapshot', 'spend_reservation', 'spend_approval'):
             value[table] = [dict(row) for row in db.execute('SELECT * FROM ' + table + ' ORDER BY 1')]
@@ -77,7 +77,7 @@ def finish_main(h):
 def run(binary):
     report = {'version': 1, 'scope': FIXTURE['scope'], 'checks': [],
               'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
-    with tempfile.TemporaryDirectory(prefix='erii-spend-') as folder:
+    with tempfile.TemporaryDirectory(prefix='collie-spend-') as folder:
         root = Path(folder)
 
         def scenario(name, action):

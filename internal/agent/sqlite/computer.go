@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/computer"
-	computersqlite "github.com/z-chenhao/erii/internal/computer/sqlite"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/computer"
+	computersqlite "github.com/z-chenhao/collie/internal/computer/sqlite"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func (r *Runs) ConfigureComputer(provider computer.Provider, compatibility computer.Compatibility, manifest computer.RestorationManifest) {

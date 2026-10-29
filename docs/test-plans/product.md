@@ -139,7 +139,7 @@ is stated rather than hidden behind a `test-unit` alias.
 - `make test-race`: the complete race-instrumented Go inventory with bounded scheduling.
 - `python3 tests/system/runner.py --gate tools --repeat 5 --evidence evidence/tool-stability`: explicit repeated/focused regression when warranted.
 
-Use a built `bin/erii` and a fresh evidence directory for system runs. Every gate
+Use a built `bin/collie` and a fresh evidence directory for system runs. Every gate
 must complete, produce a fresh report and drain owned processes. Cancellation,
 launcher failure, missing reports or source/binary drift reject success. Local
 loopback peers, disposable databases and pinned runtimes make the checks account-free.

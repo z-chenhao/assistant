@@ -11,7 +11,7 @@ import (
 
 func TestCommandGrammarRejectsBeforeOpeningApplicationState(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "untouched")
-	t.Setenv("ERII_DATA_ROOT", root)
+	t.Setenv("COLLIE_DATA_ROOT", root)
 	for _, args := range [][]string{
 		{"model", "select", "profile", "1"},
 		{"model", "list", "unexpected"},

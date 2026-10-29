@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"github.com/z-chenhao/erii/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer"
 )
 
 func nativeConfig(dir string) (map[string]any, error) {
@@ -129,7 +129,7 @@ func (p *Provider) cloneBase(ctx context.Context, r computer.Request) error {
 	if err := r.Fence(ctx); err != nil {
 		return err
 	}
-	if err := writeJSON(filepath.Join(dir, "erii-instance.json"), r.Instance); err != nil {
+	if err := writeJSON(filepath.Join(dir, "collie-instance.json"), r.Instance); err != nil {
 		return err
 	}
 	if err := syncDir(dir); err != nil {

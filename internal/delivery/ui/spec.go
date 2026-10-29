@@ -10,8 +10,8 @@ import (
 	"html/template"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/delivery"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 const Version = 1

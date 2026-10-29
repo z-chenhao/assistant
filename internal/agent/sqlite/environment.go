@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/computer/environment"
-	"github.com/z-chenhao/erii/internal/tool"
-	"github.com/z-chenhao/erii/internal/tool/codemode"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/computer/environment"
+	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool/codemode"
 )
 
 func (r *Runs) ConfigureEnvironment(execute func(context.Context, string, string) tool.Result) {
@@ -35,7 +35,7 @@ func (t *tools) executeEnvironment(ctx context.Context, inv tool.Invocation) (re
 		// Reuse the existing durable execution claim/lifecycle ledger for native
 		// code and file calls too. There is no generated JavaScript, nested Tool
 		// call, second approval, or second invocation lifecycle.
-		b = &codeBridge{t: t, req: codemode.ExecutionRequest{ExecutionID: inv.ID, ParentInvocationID: inv.ID, RunID: t.claim.RunID(), Source: inv.Call.Name + ":" + inv.Call.Arguments, SourceHash: digest(inv.Call.Name + ":" + inv.Call.Arguments), RuntimeVersion: "erii-native-v1", PreludeVersion: "none"}}
+		b = &codeBridge{t: t, req: codemode.ExecutionRequest{ExecutionID: inv.ID, ParentInvocationID: inv.ID, RunID: t.claim.RunID(), Source: inv.Call.Name + ":" + inv.Call.Arguments, SourceHash: digest(inv.Call.Name + ":" + inv.Call.Arguments), RuntimeVersion: "collie-native-v1", PreludeVersion: "none"}}
 		if err := b.claim(ctx, inv); err != nil {
 			return tool.Result{}, err
 		}

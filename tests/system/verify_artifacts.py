@@ -38,11 +38,11 @@ class ArtifactHarness(ToolHarness):
 
     def state(self):
         value = super().state()
-        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
+        with sqlite3.connect(Path(self.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
             db.row_factory = sqlite3.Row
             for table in ('artifact', 'artifact_reference', 'artifact_publication', 'task_update', 'task'):
                 value[table] = [dict(r) for r in db.execute('SELECT * FROM ' + table)]
-        value['objects'] = sorted(p.name for p in (Path(self.env['ERII_DATA_ROOT']) / 'artifacts').iterdir())
+        value['objects'] = sorted(p.name for p in (Path(self.env['COLLIE_DATA_ROOT']) / 'artifacts').iterdir())
         return value
 
 
@@ -118,7 +118,7 @@ def recover_receipt(h, path):
 
 def run_recovery(binary, scenario_jobs=1):
     report = {'version': 1, 'scope': 'binary Query recovery', 'checks': []}
-    with tempfile.TemporaryDirectory(prefix='erii-artifact-recovery-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-artifact-recovery-') as temp:
         def recover(path):
             folder = Path(temp) / path
             folder.mkdir()
@@ -142,7 +142,7 @@ def run(binary, scenario_jobs=1):
     # Existing fixtures and their normative facts remain byte-for-byte locked.
     report = {'version': 1, 'scope': 'Artifact transport, publication, access and recovery',
               'checks': [], 'crashes': [], 'fixture_lock': lock}
-    with tempfile.TemporaryDirectory(prefix='erii-artifacts-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-artifacts-') as temp:
         root = Path(temp)
 
         def scenario(name, action):
@@ -236,7 +236,7 @@ def run(binary, scenario_jobs=1):
             with Terminal(h.args('tui'), h.env, h.root) as terminal:
                 terminal.expect('State: ready')
                 terminal.expect('assistant attachment: artifact:')
-                terminal.expect('Erii: idle')
+                terminal.expect('Collie: idle')
                 require(terminal.stop() == 0, 'Artifact TUI did not stop cleanly')
                 transcript = terminal.transcript()
             value = h.state()
@@ -289,7 +289,7 @@ def run(binary, scenario_jobs=1):
                 h.send('crash', json.dumps({'name': 'crash.md', 'mediaType': 'text/markdown', 'text': 'durable bytes'}))
                 child = h.hold(boundary)
                 child.send_signal(signal.SIGKILL); child.communicate(timeout=10)
-                data_root = Path(h.env['ERII_DATA_ROOT'])
+                data_root = Path(h.env['COLLIE_DATA_ROOT'])
                 # Avoid App startup recovery while observing the crash residue.
                 with sqlite3.connect(data_root / 'state.db') as db:
                     before_rows = db.execute('SELECT artifact_ref FROM artifact').fetchall()
@@ -321,7 +321,7 @@ if __name__ == '__main__':
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--recovery-only', action='store_true', help='drive both binary Query receipt recovery paths')
-    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
+    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("COLLIE_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args(); args.evidence.unlink(missing_ok=True)
     report = run_recovery(args.binary.resolve(), args.scenario_jobs) if args.recovery_only else run(args.binary.resolve(), args.scenario_jobs)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)

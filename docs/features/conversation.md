@@ -26,7 +26,7 @@
 
 ## 如何使用
 
-启动 `erii` 后直接输入需求。命令行可将文本经 stdin 交给 `erii chat send REQUEST_KEY`，再由 `erii chat work` 推进；`erii chat history` 读取语义对话。
+启动 `collie` 后直接输入需求。命令行可将文本经 stdin 交给 `collie chat send REQUEST_KEY`，再由 `collie chat work` 推进；`collie chat history` 读取语义对话。
 
 用户通过自然语言追加背景或纠正要求。耗时或需要独立 Worker 的工作由 Main 显式建立 Task，参见任务功能。
 
@@ -43,7 +43,7 @@
 
 ### 1. 产品定位
 
-Erii 是一个通用私人助理，目标能力对标 Muse、dots、Manus Cue、Grok Bot、Hermes Agent，并参考 Pi 1.2.0 的 Agent Harness 设计。
+Collie 是一个通用私人助理，目标能力对标 Muse、dots、Manus Cue、Grok Bot、Hermes Agent，并参考 Pi 1.2.0 的 Agent Harness 设计。
 
 <a id="contract-11-当前阶段"></a>
 
@@ -84,9 +84,9 @@ or ChatGPT account profile using [the provider commands](model-connections.md).
 Then use the same configured data root for all commands:
 
 ```sh
-printf '%s' 'Hello Erii' | bin/erii -config local.yaml chat send greeting-1
-bin/erii -config local.yaml chat work
-bin/erii -config local.yaml chat history
+printf '%s' 'Hello Collie' | bin/collie -config local.yaml chat send greeting-1
+bin/collie -config local.yaml chat work
+bin/collie -config local.yaml chat history
 ```
 
 `chat send [REQUEST_KEY]` reads up to 16 KiB of text from stdin. It returns a

@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/computer"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func Definitions() []tool.Definition {

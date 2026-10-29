@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/collie/internal/artifact"
 	"golang.org/x/sys/unix"
 	"io"
 	"os"
