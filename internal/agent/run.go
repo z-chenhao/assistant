@@ -94,16 +94,17 @@ type Generation struct {
 	ErrorCode  string
 }
 type Event struct {
-	RunKind    string    `json:"run_kind"`
-	TaskID     string    `json:"task_id,omitempty"`
-	Kind       string    `json:"kind"`
-	RunID      string    `json:"run_id"`
-	AgentID    string    `json:"agent_id"`
-	Step       int64     `json:"step_index"`
-	Sequence   int64     `json:"sequence"`
-	OccurredAt time.Time `json:"occurred_at"`
-	Text       string    `json:"text,omitempty"`
-	ToolCallID string    `json:"tool_call_id,omitempty"`
+	InvocationID string    `json:"invocation_id,omitempty"`
+	RunKind      string    `json:"run_kind"`
+	TaskID       string    `json:"task_id,omitempty"`
+	Kind         string    `json:"kind"`
+	RunID        string    `json:"run_id"`
+	AgentID      string    `json:"agent_id"`
+	Step         int64     `json:"step_index"`
+	Sequence     int64     `json:"sequence"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	Text         string    `json:"text,omitempty"`
+	ToolCallID   string    `json:"tool_call_id,omitempty"`
 }
 type EventSink func(Event)
 

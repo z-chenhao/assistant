@@ -27,7 +27,7 @@ type shownProjection struct {
 	Fallback string
 }
 type page struct {
-	Inspection *inspectionView
+	Trace      *traceView
 	Context    *contextView
 	Accounts   []llm.AuthConnection
 	Bindings   []interaction.Binding
@@ -98,15 +98,16 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if p.Tab == "/developer/observability" {
-		p.Inspection, err = inspectionQuery(r)
+		p.Trace, err = traceQuery(r)
 		if err == nil {
-			err = s.inspect(ctx, p.Inspection, false)
+			err = s.loadTrace(ctx, p.Trace)
 		}
 		if err != nil {
 			inspectionFailure(w, err)
 			return
 		}
 	}
+
 	if p.Tab == "/" {
 		p.Cursor, err = conversationCursor(r)
 		if err != nil {

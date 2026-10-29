@@ -1,4 +1,5 @@
 @import "tailwindcss" source(none);
+@import "./observability.css";
 @source "./";
 
 /* ad-agent's neutral component tokens; Erii owns the conversation layout. */

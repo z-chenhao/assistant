@@ -60,16 +60,52 @@ try{
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
  }
 
+ if(phase==='native-trace'){
+  const facts=JSON.parse(process.env.ERII_NATIVE_TRACE_FACTS);
+  await page.getByText('Developer',{exact:true}).click();
+  await page.getByRole('link',{name:'Observability',exact:true}).click();
+  await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
+  await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
+  await page.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();
+  const gen=page.locator('.obs-tree [data-observation-id="generation:'+facts.generation+'"] a').first();
+  await gen.click();
+  await page.locator('.obs-selected-name').filter({hasText:'Generate response'}).waitFor();
+  await page.locator('.obs-message.role-system summary').first().click();
+  if(!await page.locator('.obs-message.role-system .obs-message-text').first().innerText().then(text=>text.length>40))throw new Error('system prompt missing from trace detail');
+  await page.screenshot({path:evidence+'/trace-prompt.png',fullPage:true});
+  await page.locator('.obs-message.role-system summary').first().click();
+  await page.screenshot({path:evidence+'/trace-overview.png',fullPage:true});
+  await page.locator('#observability-workbench').screenshot({path:evidence+'/trace-workbench.png'});
+  const treeScroll=await page.locator('.obs-tree-pane').evaluate(node=>{node.scrollTop=60;return node.scrollTop});
+  await page.getByRole('link',{name:'wire',exact:true}).click();
+  await page.getByRole('heading',{name:'Final provider request',exact:true}).waitFor();
+  if(await page.locator('.obs-tree-pane').evaluate(node=>node.scrollTop)!==treeScroll)throw new Error('node selection lost tree position');
+  if(!await page.locator('.wire-body').innerText().then(text=>text.includes('"messages"')&&text.includes('"attempt"')))throw new Error('final request view missing');
+  await page.screenshot({path:evidence+'/trace-wire.png',fullPage:true});
+  await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'overview'}).waitFor();
+  await page.goto(url+'/developer/observability?run='+encodeURIComponent(facts.root));
+  await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
+  await page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first().click();
+  await page.locator('.obs-selected-name').filter({hasText:'Generate response'}).waitFor();
+  await page.screenshot({path:evidence+'/trace-worker.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('mobile trace overflowed viewport');
+  await page.screenshot({path:evidence+'/trace-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:980});
+  const plain=await browser.newContext({javaScriptEnabled:false});
+  try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());await fallback.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();if(!await fallback.locator('.obs-tree .observation-node').count())throw new Error('trace requires JavaScript')}finally{await plain.close()}
+ }
  if(phase==='inspection'){
   const facts=JSON.parse(process.env.ERII_INSPECTION_FACTS);
   const main=facts.main,root=facts.runs.find(r=>r.role==='root'),child=facts.runs.find(r=>r.role==='child'&&r.parent!==root.id);
   await page.getByText('Developer',{exact:true}).click();
   await page.getByRole('link',{name:'Observability',exact:true}).click();
-  await page.getByRole('heading',{name:'Execution relationships',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
   const row=page.locator('[data-execution-id="'+main+'"]');
   await row.getByRole('link',{name:'Main',exact:true}).click();
   await page.locator('.task-timeline .inspect-task').click();
-  await page.locator('.execution-tree .run-node').first().waitFor();
+  await page.locator('.obs-epoch-links a').first().click();
+  await page.locator('.obs-tree .run-node').first().waitFor();
   if(await page.locator('.run-node[data-role="root"]').count()!==1||await page.locator('.run-node[data-role="child"]').count()!==2)throw new Error('inspector lost Root/Child tree');
   if(await page.locator('.run-node[data-role="root"]').getAttribute('data-parent-run')!=='')throw new Error('Main was made the Root parent');
   for(const expected of facts.runs.filter(r=>r.role!=='main')){
@@ -77,15 +113,15 @@ try{
    if(await node.getAttribute('data-parent-run')!==expected.parent||await node.getAttribute('data-root-run')!==expected.root)throw new Error('rendered ancestry differs from stored relationships');
   }
   if(await page.locator('.task-context img').count()||!await page.locator('.task-context').innerText().then(text=>text.includes('<img src=x')))throw new Error('Task title was interpreted as HTML');
-  await page.locator('.run-node[data-run-id="'+child.id+'"] .tree-heading a').click();
+  await page.locator('.run-node[data-run-id="'+child.id+'"] a.tree-heading').click();
   if(!await page.locator('.parent-run').innerText().then(text=>text.includes(child.parent)))throw new Error('selected Child lost parent navigation');
   await page.locator('.parent-run').click();
   await page.locator('.creator-run').click();
-  if(await page.locator('.run-node').count())throw new Error('Main page presented Task Roots as its Child Runs');
-  await page.getByLabel('Role',{exact:true}).selectOption('child');
+  if(await page.locator('.run-node[data-role="root"],.run-node[data-role="child"]').count())throw new Error('Main page presented Task Roots as its Child Runs');
+  await page.getByLabel('Role',{exact:true}).selectOption('root');
   await page.getByLabel('Status',{exact:true}).selectOption('completed');
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
-  if(await page.locator('[data-execution-id]').count()!==2||await page.locator('[data-execution-id]:not([data-role="child"])').count())throw new Error('execution filters ignored');
+  if(await page.locator('[data-execution-id]').count()!==1||await page.locator('[data-execution-id]:not([data-role="root"])').count())throw new Error('execution filters ignored');
   await page.getByLabel('Created before (UTC)').fill('2000-01-01T00:00');
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
   await page.getByText('No executions match these filters.',{exact:true}).waitFor();

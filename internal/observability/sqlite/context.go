@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"unicode/utf8"
 
 	"github.com/z-chenhao/erii/internal/observability"
 )
@@ -144,28 +143,9 @@ func (s Inspector) Context(ctx context.Context, q observability.ContextQuery) (o
 	if err != nil {
 		return out, err
 	}
-	if q.Offset > out.Length {
-		return out, observability.ErrNotFound
-	}
-	if len(body) > 0 && !utf8.RuneStart(body[0]) {
-		return out, observability.ErrInvalid
-	}
-	if q.Offset+len(body) < out.Length {
-		original := len(body)
-		for len(body) > 0 && !utf8.Valid(body) {
-			if original-len(body) == utf8.UTFMax-1 {
-				return out, errors.New("invalid frozen text")
-			}
-			body = body[:len(body)-1]
-		}
-	}
-	if !utf8.Valid(body) {
-		return out, errors.New("invalid frozen text")
-	}
-	out.Content = string(body)
-	if q.Offset+len(body) < out.Length {
-		next := q.Offset + len(body)
-		out.NextOffset = &next
+	out.Content, out.NextOffset, err = contentChunk(body, q.Offset, out.Length)
+	if err != nil {
+		return out, err
 	}
 	return out, nil
 }

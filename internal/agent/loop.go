@@ -141,6 +141,7 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 		if err := l.options.Store.Wait(l.work, l.claim, r.Version, "resource"); err != nil {
 			return false, err
 		}
+		l.emit(r, "agent_wait", "resource", "")
 		return true, nil
 	}
 	if generation.Denied {
@@ -158,6 +159,9 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 		return false, l.fail(r, generation.ErrorCode)
 	}
 	result := generation.Result
+	if result != nil {
+		l.emit(r, "generation_reused", "", "")
+	}
 	if result == nil {
 		visible := generation.Compaction == nil
 		if visible {
@@ -194,6 +198,7 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 				if err := l.options.Store.Wait(l.work, l.claim, latest.Version, "resource"); err != nil {
 					return false, err
 				}
+				l.emit(r, "agent_wait", "resource", "")
 				return true, nil
 			}
 			if latest.SpendStatus == "denied" || latest.SpendStatus == "invalidated" {
@@ -254,6 +259,7 @@ func (l agentLoop) toolsTurn(r Run) (bool, error) {
 		if err = l.options.Store.Wait(l.work, l.claim, r.Version, reason); err != nil {
 			return false, err
 		}
+		l.emit(r, "agent_wait", reason, "")
 		return true, nil
 	}
 	if err != nil {

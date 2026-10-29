@@ -8,7 +8,7 @@
 
 F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让纯文本模型可显式读取图片文字；F-005 和 F-019 继续提供阶段进度与已提交结果更新。软件回归与模型语义质量的证明范围分别见对应测试方案。
 
-F-031 提供 Developer → Observability 执行检查入口：按角色、状态和 UTC 时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；供应商最终请求与调用/用量时间线仍由 F-035/F-036 跟踪。
+F-031 提供 Developer → Observability 执行检查入口：按角色、状态和 UTC 时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；F-035/F-036 进一步统一为 Langfuse 式 Session/Trace/Observation 检查，支持真实 HTTP 尝试、恢复复用、输入输出、时间线和已有用量/费用。
 
 ## 状态定义
 
@@ -21,7 +21,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 
 完成状态只属于本行需求，不自动扩展为整个模块、全部平台或所有业务场景完成。配置依赖、刻意限制、待实现内容和未验证项应分别说明。
 
-当前共 40 项需求：26 项已完成、8 项部分完成、4 项未实现、2 项待定义。此汇总随下表一起维护。
+当前共 40 项需求：28 项已完成、8 项部分完成、2 项未实现、2 项待定义。此汇总随下表一起维护。
 
 ## 需求索引
 
@@ -59,8 +59,8 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 用户能在设置中看见记忆、embedding、MCP、Skills、隔离执行环境及 Computer 是否已连接，并完成配置验证。 | 否 · 未实现 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
-| [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 否 · 未实现 |
-| [F-036](features/observability.md#f-036) | 调用、等待、恢复与用量时间线 | 开发者能看出何时执行、等待审批或 Child、失败、重新尝试、重放或复用结果，并查看已有用量。 | 否 · 未实现 |
+| [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |
+| [F-036](features/observability.md#f-036) | 调用、等待、恢复与用量时间线 | 开发者能看出何时执行、等待审批或 Child、失败、重新尝试、重放或复用结果，并查看已有用量。 | 是 · 已完成 |
 | [F-032](features/evals.md#f-032) | Web Evals 入口 | 后续可从 Developer 查看评测结果，并关联对应执行。 | 否 · 待定义 |
 | [F-033](features/database.md#f-033) | Web Database 检查入口 | 后续可检查执行、对话、记忆和文件元数据，理解数据关系。 | 否 · 待定义 |
 | [F-037](features/installation.md#f-037) | 安装、首次启动与显式部署 | 安装、检查、前台启动及自定义部署，并保持持久数据。 | 是 · 已完成 |

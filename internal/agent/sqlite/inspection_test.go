@@ -19,7 +19,7 @@ import (
 
 // Existing populated-version fixtures reconstruct their old schema before
 // reopening. Remove these new, empty indexes along with the later tables.
-const removeInspectionFixtureSchema = `DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
+const removeInspectionFixtureSchema = `DROP TABLE IF EXISTS dispatch_observation; DROP INDEX IF EXISTS run_observation_root; DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
 
 func TestInspectionUsesRealMainTaskRootChildCausality(t *testing.T) {
 	ctx := context.Background()
@@ -232,7 +232,7 @@ func TestInspectionIndexUpgradeRollbackAndFrozenData(t *testing.T) {
 	if err = db.QueryRow(`SELECT checkpoint_json FROM run WHERE run_id=?`, receipt.RunID).Scan(&kept); err != nil || kept != checkpoint {
 		t.Fatal("queued Run changed", err)
 	}
-	if scalar(t, s, "PRAGMA user_version") != 30 || scalar(t, s, `SELECT count(*) FROM sqlite_schema WHERE name LIKE 'run_inspection_%'`) != 3 {
+	if scalar(t, s, "PRAGMA user_version") != SchemaVersion() || scalar(t, s, `SELECT count(*) FROM sqlite_schema WHERE name LIKE 'run_inspection_%'`) != 3 {
 		t.Fatal("inspection indexes missing")
 	}
 }

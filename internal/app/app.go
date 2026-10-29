@@ -220,6 +220,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 			a.control.BridgeIdentity = cfg.LLM.ProviderBridgeVersion
 		}
 	}
+	if a.provider != nil {
+		a.provider.SetDispatchObserver(store.DispatchRecorder().Record)
+	}
 	if fixture == "" {
 		if a.provider != nil {
 			a.accounts.Provider = a.provider
