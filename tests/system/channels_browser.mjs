@@ -23,14 +23,22 @@ try{
   if(!await image.evaluate(img=>img.complete&&img.naturalWidth===192))throw new Error('Eri artwork failed to load');
  }
  if(phase==='setup'){
-  await page.getByRole('link',{name:'Settings',exact:false}).click();
+  if(!await page.getByRole('button',{name:'Send message',exact:true}).isDisabled())throw Error('unconfigured composer can send');
+  if(await page.locator('.welcome').count())throw Error('setup competes with the normal welcome');
+  await page.getByRole('link',{name:'Set up Erii',exact:false}).click();
+  await page.getByRole('link',{name:'Connect a model',exact:true}).click();
+  await page.getByRole('link',{name:'Local or compatible API',exact:false}).click();
+  if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
   await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
-  await page.locator('input[name="model"]').first().fill('fixture-model');
+  await page.locator('input[name="model"]').fill('fixture-model');
   await page.getByRole('button',{name:'Add connection',exact:true}).click();
-  await page.getByRole('link',{name:'Settings',exact:false}).click();
+  if(!new URL(page.url()).pathname.startsWith('/settings/models/'))throw Error('add left model setup');
   await page.getByRole('button',{name:'Test connection',exact:true}).click();
-  await page.getByRole('link',{name:'Settings',exact:false}).click();
+  if(!new URL(page.url()).pathname.startsWith('/settings/models/'))throw Error('test left model setup');
   await page.getByRole('checkbox',{name:'Use this provider for new work'}).check();
+  await page.getByRole('button',{name:'Select model',exact:true}).click();
+  await page.getByRole('heading',{name:'Ready for new work',exact:true}).waitFor();
+  await page.screenshot({path:evidence+'/model-ready.png',fullPage:true});
   // Deterministically type into usable server HTML before the local bundle is
   // released. Progressive enhancement must preserve this draft and its file.
   let release;
@@ -38,7 +46,7 @@ try{
   let requested;
   const loading=new Promise(resolve=>{requested=resolve});
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
-  const selecting=page.getByRole('button',{name:'Select model',exact:true}).click();
+  const selecting=page.getByRole('link',{name:'Start a conversation',exact:false}).click();
   await loading;
   await page.getByLabel('Message Erii').fill('Plan my day: finish the release risk note before noon.');
   await page.getByLabel('Attach a file').setInputFiles({name:'web-note.txt',mimeType:'text/plain',buffer:Buffer.from('Web owner attachment fixture.\n')});
@@ -56,34 +64,47 @@ try{
   if(file?.name!=='web-note.txt'||file?.text!=='Web owner attachment fixture.\n')throw new Error('frontend enhancement lost early attachment');
   const submitted=page.waitForResponse(r=>r.url()===url+'/message'&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Send message',exact:true}).click();
-  if((await submitted).status()!==303)throw new Error('composer submission was not accepted');
+  if((await submitted).status()!==200)throw new Error('composer submission was not accepted');
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
+  const native=await browser.newContext({javaScriptEnabled:false});
+  try{
+   await native.addCookies(await context.cookies());const settings=await native.newPage();
+   await settings.goto(url+'/settings/notifications');await settings.locator('select[name=target]').selectOption('tui:');
+   await settings.getByRole('button',{name:'Save notification channel',exact:true}).click();
+   if(new URL(settings.url()).pathname!=='/settings/notifications'||await settings.locator('select[name=target]').inputValue()!=='tui:')throw Error('saving notifications lost its route or selected value');
+   await settings.reload();if(await settings.locator('select[name=target]').inputValue()!=='tui:')throw Error('notification preference did not persist');
+   await settings.screenshot({path:evidence+'/notifications.png',fullPage:true});
+   await settings.locator('select[name=target]').selectOption('auto:');await settings.getByRole('button',{name:'Save notification channel',exact:true}).click();
+   await settings.goto(url+'/settings/models');await settings.getByRole('region',{name:'Current model',exact:true}).waitFor();
+   await settings.screenshot({path:evidence+'/models.png',fullPage:true});
+   await settings.getByRole('link',{name:'Connect a model',exact:true}).click();await settings.screenshot({path:evidence+'/model-sources.png',fullPage:true});
+  }finally{await native.close()}
  }
 
  if(phase==='native-trace'){
   const facts=JSON.parse(process.env.ERII_NATIVE_TRACE_FACTS);
-  await page.getByText('Developer',{exact:true}).click();
-  await page.getByRole('link',{name:'Observability',exact:true}).click();
+  await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
   await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
   await page.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();
   const gen=page.locator('.obs-tree [data-observation-id="generation:'+facts.generation+'"] a').first();
   await gen.click();
   await page.locator('.obs-selected-name').filter({hasText:'Generate response'}).waitFor();
-  await page.locator('.obs-message.role-system summary').first().click();
-  if(!await page.locator('.obs-message.role-system .obs-message-text').first().innerText().then(text=>text.length>40))throw new Error('system prompt missing from trace detail');
+  await page.getByRole('link',{name:'Context',exact:true}).click();
+  if(!await page.locator('.frozen-content').innerText().then(text=>text.length>40))throw Error('system prompt missing from unified context');
   await page.screenshot({path:evidence+'/trace-prompt.png',fullPage:true});
-  await page.locator('.obs-message.role-system summary').first().click();
+  await page.getByRole('link',{name:'Overview',exact:true}).click();
   await page.screenshot({path:evidence+'/trace-overview.png',fullPage:true});
   await page.locator('#observability-workbench').screenshot({path:evidence+'/trace-workbench.png'});
   const treeScroll=await page.locator('.obs-tree-pane').evaluate(node=>{node.scrollTop=60;return node.scrollTop});
-  await page.getByRole('link',{name:'wire',exact:true}).click();
+  await page.getByRole('link',{name:'Requests',exact:true}).click();
   await page.getByRole('heading',{name:'Final provider request',exact:true}).waitFor();
   if(await page.locator('.obs-tree-pane').evaluate(node=>node.scrollTop)!==treeScroll)throw new Error('node selection lost tree position');
   if(!await page.locator('.wire-body').innerText().then(text=>text.includes('"messages"')&&text.includes('"attempt"')))throw new Error('final request view missing');
   await page.screenshot({path:evidence+'/trace-wire.png',fullPage:true});
-  await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'overview'}).waitFor();
+  await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'Overview'}).waitFor();
   await page.goto(url+'/developer/observability?run='+encodeURIComponent(facts.root));
+  await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
   await page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first().click();
   await page.locator('.obs-selected-name').filter({hasText:'Generate response'}).waitFor();
@@ -94,17 +115,24 @@ try{
   await page.setViewportSize({width:1400,height:980});
   const plain=await browser.newContext({javaScriptEnabled:false});
   try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());await fallback.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();if(!await fallback.locator('.obs-tree .observation-node').count())throw new Error('trace requires JavaScript')}finally{await plain.close()}
+  await page.locator('.app-sidebar').getByRole('link',{name:'Tasks',exact:true}).click();
+  await page.getByRole('link',{name:'All tasks',exact:true}).click();
+  await page.locator('.task-row').first().click();
+  await page.getByRole('heading',{name:'Goal',exact:true}).waitFor();
+  if(!await page.locator('#task-messages').innerText().then(text=>text.includes('Main Task follow-up through Pi.')))throw Error('completed task did not show Main delivery');
+  await page.screenshot({path:evidence+'/task-result.png',fullPage:true});
+
  }
  if(phase==='inspection'){
   const facts=JSON.parse(process.env.ERII_INSPECTION_FACTS);
   const main=facts.main,root=facts.runs.find(r=>r.role==='root'),child=facts.runs.find(r=>r.role==='child'&&r.parent!==root.id);
-  await page.getByText('Developer',{exact:true}).click();
-  await page.getByRole('link',{name:'Observability',exact:true}).click();
+  await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
   const row=page.locator('[data-execution-id="'+main+'"]');
   await row.getByRole('link',{name:'Main',exact:true}).click();
+  await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.locator('.task-timeline .inspect-task').click();
-  await page.locator('.obs-epoch-links a').first().click();
+  await page.locator('.obs-task-epochs .object-row').first().click();
   await page.locator('.obs-tree .run-node').first().waitFor();
   if(await page.locator('.run-node[data-role="root"]').count()!==1||await page.locator('.run-node[data-role="child"]').count()!==2)throw new Error('inspector lost Root/Child tree');
   if(await page.locator('.run-node[data-role="root"]').getAttribute('data-parent-run')!=='')throw new Error('Main was made the Root parent');
@@ -112,21 +140,26 @@ try{
    const node=page.locator('.run-node[data-run-id="'+expected.id+'"]');
    if(await node.getAttribute('data-parent-run')!==expected.parent||await node.getAttribute('data-root-run')!==expected.root)throw new Error('rendered ancestry differs from stored relationships');
   }
-  if(await page.locator('.task-context img').count()||!await page.locator('.task-context').innerText().then(text=>text.includes('<img src=x')))throw new Error('Task title was interpreted as HTML');
+  if(await page.locator('.obs-task-link img').count()||!await page.locator('.obs-task-link').innerText().then(text=>text.includes('<img src=x')))throw new Error('Task title was interpreted as HTML');
   await page.locator('.run-node[data-run-id="'+child.id+'"] a.tree-heading').click();
+  await page.getByText('Saved metadata & timing',{exact:true}).click();
   if(!await page.locator('.parent-run').innerText().then(text=>text.includes(child.parent)))throw new Error('selected Child lost parent navigation');
   await page.locator('.parent-run').click();
+  await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.locator('.creator-run').click();
   if(await page.locator('.run-node[data-role="root"],.run-node[data-role="child"]').count())throw new Error('Main page presented Task Roots as its Child Runs');
+  await page.getByRole('link',{name:'Traces',exact:true}).first().click();
   await page.getByLabel('Role',{exact:true}).selectOption('root');
   await page.getByLabel('Status',{exact:true}).selectOption('completed');
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
   if(await page.locator('[data-execution-id]').count()!==1||await page.locator('[data-execution-id]:not([data-role="root"])').count())throw new Error('execution filters ignored');
+  await page.getByText('Created time',{exact:true}).click();
   await page.getByLabel('Created before (UTC)').fill('2000-01-01T00:00');
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
-  await page.getByText('No executions match these filters.',{exact:true}).waitFor();
+  await page.getByRole('heading',{name:'No matching executions',exact:true}).waitFor();
   await page.getByRole('link',{name:'Reset',exact:true}).click();
   await page.locator('[data-execution-id="'+root.id+'"] td').first().getByRole('link').click();
+  await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
   await page.screenshot({path:evidence+'/inspection-tree.png',fullPage:true});
   const compact=await context.newPage();
@@ -137,13 +170,15 @@ try{
   }finally{await compact.close()}
   const plain=await browser.newContext({javaScriptEnabled:false});
   try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());if(await fallback.locator('.run-node').count()!==3)throw new Error('inspector requires JavaScript')}finally{await plain.close()}
-  await page.getByRole('link',{name:'Inspect frozen context',exact:false}).click();
-  await page.getByRole('heading',{name:'Frozen context',exact:true}).waitFor();
-  await page.locator('.round-link').last().click();
-  await page.getByRole('heading',{name:'Adjacent round diff',exact:true}).waitFor();
-  if(!await page.locator('.context-diff [data-change="added"]').count())throw new Error('tool continuation additions missing from diff');
+  await page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first().click();
+  await page.getByRole('link',{name:'Compare',exact:true}).click();
+  await page.getByRole('heading',{name:'Adjacent input diff',exact:true}).waitFor();
+  if(!await page.locator('.context-diff [data-change="added"]').count())throw Error('tool continuation additions missing from diff');
+  await page.getByRole('link',{name:'Context',exact:true}).click();
+  await page.getByRole('heading',{name:'Full frozen context',exact:true}).waitFor();
   const system=page.locator('.context-item-link').filter({hasText:'system'}).first();await system.click();
-  const frozen=await (await context.request.get(page.url().replace('/developer/context?','/api/developer/context?'))).json();
+  const meta=await page.locator('.context-reader').evaluate(node=>({...node.dataset}));
+  const frozen=await (await context.request.get(url+'/api/developer/context?'+new URLSearchParams({run:meta.contextRun,step:meta.contextStep,section:meta.contextSection,item:meta.contextItem,offset:meta.contextOffset}))).json();
   if(!frozen.content||await page.locator('.frozen-content').textContent()!==frozen.content)throw new Error('system prompt differs from frozen Host content');
   await page.getByRole('link',{name:'Complete stored item (JSON)',exact:true}).click();
   if(!(await page.locator('.frozen-content').innerText()).includes('"role":"system"'))throw new Error('stored message JSON unavailable');
@@ -156,7 +191,7 @@ try{
   if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('stage')))throw new Error('saved compaction provenance unavailable');
   const long=facts.long_context;
   await page.goto(url+'/developer/observability?run='+encodeURIComponent(long.run));
-  await page.getByRole('link',{name:'Inspect frozen context',exact:false}).click();
+  await page.goto(url+'/developer/observability/'+encodeURIComponent(long.run)+'?tab=context&ctx=1&step='+long.step);
   await page.getByRole('link',{name:'Step '+long.step,exact:true}).click();
   await page.locator('.context-item-link').filter({hasText:'['+long.item+']'}).click();
   let full='';
@@ -177,17 +212,17 @@ try{
   try{await nojs.addCookies(await context.cookies());const fallback=await nojs.newPage();await fallback.goto(page.url());if(!await fallback.locator('.frozen-content').innerText().then(text=>text.includes('LONG_CONTEXT_END')))throw new Error('context requires JavaScript')}finally{await nojs.close()}
  }
  if(phase==='image'){
-  await page.getByRole('link',{name:'Settings',exact:false}).click();
+  await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
+  await page.getByRole('link',{name:'Manage model',exact:false}).click();
   const capability=process.env.ERII_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
   await page.getByText(capability,{exact:false}).waitFor();
-  if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).first().isChecked())throw new Error('vision declaration enabled implicitly');
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
   let release,requested;
   const bundle=new Promise(resolve=>{release=resolve});
   const loading=new Promise(resolve=>{requested=resolve});
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
-  const navigation=page.getByRole('link',{name:'Conversation',exact:false}).click();
+  const navigation=page.locator('.app-sidebar').getByRole('link',{name:'Conversation',exact:true}).click();
   await loading;
   await page.getByLabel('Message Erii',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
   const [picker]=await Promise.all([page.waitForEvent('filechooser'),page.getByLabel('Attach a file').click()]);
@@ -225,6 +260,12 @@ try{
    const file=await page.getByLabel('Attach a file').evaluate(async input=>({name:input.files[0]?.name,text:await input.files[0]?.text()}));
    if(file.name!=='pending.txt'||file.text!=='Unsent attachment bytes.\n')throw new Error('live update lost attachment');
   };
+  let attemptedSends=0;
+  await page.route('**/message',async route=>{attemptedSends++;await route.abort('failed')});
+  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  await page.locator('#composer-feedback').filter({hasText:'Send was not confirmed'}).waitFor();
+  await checkDraft(false);if(attemptedSends!==1)throw Error('failed send was automatically repeated');
+  await page.unroute('**/message');await editor.focus();await editor.evaluate((input,range)=>input.setSelectionRange(...range),selection);
   await echo('live-reply','LIVE_REPLY_WHILE_TYPING');
   await page.locator('.message.assistant').filter({hasText:'LIVE_REPLY_WHILE_TYPING'}).waitFor();
   await checkDraft();
@@ -244,36 +285,52 @@ try{
   await checkDraft();
   // The approval and progress come from a real Task/Worker and frozen native
   // write invocation. Rejecting it must not navigate away from this draft.
-  const task='Capabilities: '+JSON.stringify([
+  const task='Compare release options, identify the tradeoffs, and prepare a concise recommendation for the owner.\nCapabilities: '+JSON.stringify([
    {name:'builtin__write',arguments:{path:'unapproved.txt',content:'must not be written'},progress:'Compared the available options; preparing the draft.'},
    {name:'mcp__fixture__echo',arguments:{text:'Ready to return the reviewed options.'},progress:'Draft save declined; preparing the reviewed options.'},
   ]);
   await send('live-task',plan('builtin__task_manage',{operation:'create',task,completionPolicy:'ongoing'}));
-  const approval=page.locator('#conversation-approvals form').first();await approval.waitFor();
-  await page.locator('#workspace-status').filter({hasText:'busy'}).waitFor();
+  const approval=page.locator('.approval form').first();await approval.waitFor();
+  await page.locator('#workspace-status').filter({hasText:'Working'}).waitFor();
   await checkDraft();
   const frozen=await approval.locator('input[name="hash"]').inputValue();
   const progress=await context.newPage();
   try{
-   await progress.goto(url+'/progress');await progress.locator('[data-live-key^="task:"]').waitFor();
+   await progress.goto(url+'/tasks?view=all');await progress.locator('[data-live-key^="task:"]').waitFor();
    const tasks=await (await context.request.get(url+'/api/progress')).json();const ref=tasks[0].taskRef;
    const ongoing=progress.locator('[data-live-key="task:'+ref+'"]');
-   await ongoing.filter({hasText:'Waiting for approval. Last update: Compared the available options; preparing the draft.'}).waitFor();
+   await ongoing.filter({hasText:'Waiting for your approval'}).waitFor();
+   const detail=await context.newPage();
+   try{
+    await detail.goto(url+'/tasks/'+encodeURIComponent(ref));
+    await detail.getByRole('heading',{name:'Goal',exact:true}).waitFor();
+    if(await detail.locator('.approval form input[name=hash]').inputValue()!==frozen)throw Error('task detail displayed another approval');
+    const communication=await context.newPage();try{
+     await communication.goto(await detail.getByRole('link',{name:'Continue this task',exact:false}).getAttribute('href').then(path=>url+path));
+     if(await communication.locator('input[name=task_ref]').inputValue()!==ref)throw Error('continuation lost task context');
+     await communication.getByLabel('Message Erii',{exact:true}).fill('Keep this task draft.');
+     await communication.getByRole('button',{name:'Clear task context',exact:true}).click();
+     if(await communication.getByLabel('Message Erii',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
+    }finally{await communication.close()}
+    await detail.screenshot({path:evidence+'/task-detail.png',fullPage:true});
+    await detail.setViewportSize({width:390,height:844});if(await detail.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile task detail overflow');
+    await detail.screenshot({path:evidence+'/task-detail-mobile.png',fullPage:true});
+   }finally{await detail.close()}
    await page.bringToFront();
    const decision=page.waitForResponse(response=>response.url()===url+'/approval'&&response.request().method()==='POST');
    await approval.getByRole('button',{name:'Decline',exact:true}).click();
    const acknowledged=await decision;
    if(acknowledged.status()!==200||!(await acknowledged.json()).accepted)throw new Error('live approval was not acknowledged');
    if(!acknowledged.request().postData().includes(frozen))throw new Error('approval changed the frozen action hash');
-   await page.waitForFunction(()=>!document.querySelector('#conversation-approvals form'));
+   await page.waitForFunction(()=>!document.querySelector('.approval form'));
    await checkDraft(false);
    await progress.bringToFront();
-   await ongoing.filter({hasText:'This round is complete; the work remains open. Last update: Draft save declined; preparing the reviewed options.'}).waitFor();
+   await ongoing.filter({hasText:'This round is complete; the task remains open'}).waitFor();
    if((await ongoing.innerText()).includes('must not be written'))throw new Error('raw tool arguments became stage progress');
    await send('live-cancel',plan('builtin__task_manage',{operation:'cancel',taskRef:ref}));
    await progress.bringToFront();
    await progress.locator('[data-live-key="task:'+ref+'"] .state').filter({hasText:'cancelled'}).waitFor();
-   if(await progress.locator('main').getByRole('button').count())throw new Error('live progress gained management controls');
+   if(await progress.locator('form[action="/task/manage"]').count())throw Error('task browsing gained a second control plane');
   }finally{await progress.close();await page.bringToFront()}
   // Another authenticated browser rotates the session. The old page must keep
   // its draft and offer explicit reconnect, without redirecting to login.
@@ -299,7 +356,7 @@ try{
   if((await page.locator('body').innerText()).includes('Untrusted projection fallback'))throw new Error('projection replaced authoritative semantic fallback');
  }
  if(phase==='approval'){
-  await page.locator('[data-renderer="native"] .approval').waitFor();
+  await page.locator('.approval').waitFor();
   const form=page.locator('.approval form').first();
   if(!await form.locator('input[name="approval_id"]').inputValue()||!(/^[a-f0-9]{64}$/.test(await form.locator('input[name="hash"]').inputValue())))throw new Error('native approval lost frozen identity');
  }
@@ -334,8 +391,8 @@ try{
    await fallback.screenshot({path:evidence+'/'+phase+'-no-script.png',fullPage:true});
   }finally{await plain.close()}
  }
- await page.locator('aside').getByRole('link',{name:'Ongoing work',exact:false}).click();
- if(await page.locator('main').getByRole('button').count())throw new Error('progress became a management surface');
+ await page.locator('aside').getByRole('link',{name:'Tasks',exact:false}).click();
+ if(await page.locator('form[action="/task/manage"]').count())throw Error('task browsing gained a second control plane');
  await page.screenshot({path:evidence+'/'+phase+'-progress.png',fullPage:true});
  if(remote.length)throw new Error('UI contacted an external service: '+remote.join(', '));
  if(errors.length)throw new Error(errors.join(';'));

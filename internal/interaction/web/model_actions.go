@@ -7,7 +7,7 @@ import (
 	"github.com/z-chenhao/erii/internal/llm"
 )
 
-func (s *Server) addModel(r *http.Request) error {
+func (s *Server) addModel(r *http.Request) (llm.Profile, error) {
 	input := llm.ProfileInput{Name: r.FormValue("model"), Endpoint: r.FormValue("endpoint"), ModelID: r.FormValue("model"), ProviderKind: "openai_compatible", WireAPI: "openai_completions", ContextWindow: 8192, MaxOutputTokens: 1024, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true, ImageInput: r.FormValue("image_input") == "yes"}}
 	if r.FormValue("account") != "" {
 		input.AuthConnectionID = r.FormValue("account")
@@ -15,11 +15,11 @@ func (s *Server) addModel(r *http.Request) error {
 		input.WireAPI = "openai_responses"
 		input.Endpoint = ""
 		if s.AccountCatalog == nil {
-			return llm.ErrNoBridge
+			return llm.Profile{}, llm.ErrNoBridge
 		}
 		catalog, err := s.AccountCatalog(r.Context(), input.AuthConnectionID)
 		if err != nil {
-			return err
+			return llm.Profile{}, err
 		}
 		found := false
 		for _, m := range catalog {
@@ -30,14 +30,13 @@ func (s *Server) addModel(r *http.Request) error {
 			}
 		}
 		if !found {
-			return llm.ModelIncompatible
+			return llm.Profile{}, llm.ModelIncompatible
 		}
 	}
-	if _, e := s.Models.AddProfile(r.Context(), input); e != nil {
-		return e
+	if name := r.FormValue("name"); name != "" {
+		input.Name = name
 	}
-
-	return nil
+	return s.Models.AddProfile(r.Context(), input)
 }
 func (s *Server) selectModel(r *http.Request) error {
 	if r.FormValue("consent") != "yes" {

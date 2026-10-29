@@ -1,0 +1,20 @@
+{{define "task-page"}}
+<section class="workspace-page task-page"><a class="back-link" href="/tasks">← Tasks</a>
+ <div id="task-header">{{template "task-header" .}}</div>
+ <div class="task-detail-grid"><div>
+  <div id="task-decisions">{{template "task-decisions" .}}</div>
+  {{with .Tasks.Detail}}<section class="panel"><h2>Goal</h2><div class="semantic">{{.GoalSummary}}</div>{{if $.Tasks.Artifacts}}<div class="attachment-list">{{range $.Tasks.Artifacts}}<a class="attachment-link" href="/artifact?ref={{.Ref}}">↓ {{.Name}}</a>{{end}}</div>{{end}}</section>{{end}}
+  <div id="task-progress">{{template "task-progress" .}}</div>
+  <section class="panel"><h2>Related updates from Erii</h2><div id="task-messages">{{template "task-messages" .}}</div></section>
+ </div><div class="task-side">
+  {{with .Tasks.Detail}}<section class="panel"><h2>Continue with Erii</h2><p>Add context, ask for a change, or ask Erii to pause or cancel this task.</p><a class="button {{if $.Tasks.Approvals}}secondary{{end}}" href="/?task={{.TaskRef}}">Continue this task →</a>{{if .SourceSequence}}<p><a href="{{conversationURL .SourceSequence}}">View original request</a></p>{{end}}</section>{{end}}
+  <details class="panel task-history"><summary>Request &amp; milestone history</summary><div id="task-milestones">{{template "task-milestones" .}}</div></details>
+  {{with .Tasks.Detail}}<details class="technical-details"><summary>Technical details</summary><p>Task reference: <code>{{.TaskRef}}</code> · epoch {{.Epoch}}</p><a href="/developer/observability?task={{.TaskRef}}">Inspect execution epochs →</a></details>{{end}}
+ </div></div>
+</section>
+{{end}}
+{{define "task-header"}}{{with .Tasks.Detail}}<div class="page-heading" data-live-key="heading"><div><h1>{{.Title}}</h1><p>{{.Stage}}</p></div><span class="status-pill state" data-status="{{.Status}}">{{.Status}}</span></div>{{end}}{{end}}
+{{define "task-decisions"}}{{if .Tasks.Approvals}}<h2 data-live-key="heading">Your decision is needed</h2>{{range .Tasks.Approvals}}<div data-live-key="approval:{{.ID}}">{{template "approval-card" .}}</div>{{end}}{{end}}{{end}}
+{{define "task-progress"}}{{with .Tasks.Detail}}{{if or .ProgressSummary .Progress.Children}}<section class="panel" data-live-key="progress"><h2>Latest progress</h2>{{if .ProgressSummary}}<p>{{.ProgressSummary}}</p>{{end}}{{with .Progress}}{{if .Children}}<h3>Delegated work · {{.Children}} total</h3><dl class="facts"><div><dt>Completed / failed</dt><dd>{{.Succeeded}} / {{.Failed}}</dd></div><div><dt>Running / queued / waiting</dt><dd>{{.Running}} / {{.Queued}} / {{.Waiting}}</dd></div></dl>{{end}}{{end}}<time datetime="{{.UpdatedAt}}">Updated {{humanTime .UpdatedAt}}</time></section>{{end}}{{end}}{{end}}
+{{define "task-messages"}}{{range .Tasks.Messages}}<div class="task-delivery" data-live-key="message:{{.Sequence}}"><div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div><a class="text-link" href="{{conversationURL .Sequence}}">Open in conversation →</a></div>{{else}}<p class="muted" data-live-key="empty">Erii has not delivered a related update yet. Worker activity is summarized above.</p>{{end}}{{end}}
+{{define "task-milestones"}}{{with .Tasks.Detail}}<ol>{{range .History}}<li data-live-key="milestone:{{.ID}}"><strong>{{historyLabel .Kind}}</strong><time datetime="{{.At}}">{{humanTime .At}}</time>{{if .Text}}<div class="semantic">{{.Text}}</div>{{end}}</li>{{else}}<li>No recorded milestones yet.</li>{{end}}</ol>{{if .HistoryNext}}<a href="{{taskURL .TaskRef}}?history={{.HistoryNext}}">Older milestones →</a>{{end}}{{end}}{{end}}

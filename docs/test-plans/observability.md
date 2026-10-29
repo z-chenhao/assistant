@@ -50,16 +50,16 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 | --- | --- | --- |
 | [internal/agent/sqlite/inspection_test.go](../../internal/agent/sqlite/inspection_test.go) | 真实 Main/Task/Root/递归 Child、原始提交因果、选择与分页、相同时间游标、角色/状态/UTC 边界、Agent 隔离、只读并发、schema 29→30 回滚与冻结数据保持 | 执行结果在对应日志维护 |
 | [internal/observability/sqlite/inspection_test.go](../../internal/observability/sqlite/inspection_test.go) | 数据库层拒绝检查器写入，缺失状态文件不能由读操作创建；读取失败不成为 Runtime 启动依赖 | 执行结果在对应日志维护 |
-| [internal/interaction/web/inspection_test.go](../../internal/interaction/web/inspection_test.go) | 认证、无执行 runtime 依赖、参数校验、标题转义、元数据页面、无 POST 动作、脱敏失败 | 执行结果在对应日志维护 |
+| [internal/interaction/web/inspection_test.go](../../internal/interaction/web/inspection_test.go) | 认证、无执行 runtime 依赖、参数校验、标题转义、规范页面/旧链接跳转、无 POST 动作、脱敏失败 | 执行结果在对应日志维护 |
 | [verify_channels.py](../../tests/system/verify_channels.py) 的 inspection_relationships / [channels_browser.mjs](../../tests/system/channels_browser.mjs) | CLI 设置 → 实际 Web Main 创建 Task 与递归 Child → API 与数据库关系比对 → 浏览器导航/角色状态时间筛选/桌面移动/无 JS → 逐轮内容与实际冻结 JSON 比对、Diff 和长 Unicode 正文续读 → 原始领域计数和冻结哈希不变 → SIGKILL 重启不重跑 | 随既有 channels gate 运行，不新增脚本或 gate |
 | [context_inspection_test.go](../../internal/agent/sqlite/context_inspection_test.go) / [context_test.go](../../internal/agent/sqlite/context_test.go) | 真实 Main/Root/递归 Child、语义摘要恢复各轮的完整 messages/tools/response 与冻结记录逐项一致；原请求/效果与归档隐私不变 | 执行结果在对应日志维护 |
 | [observability/sqlite/context_test.go](../../internal/observability/sqlite/context_test.go) | 长中文/emoji/NUL、8192 字节续读、40 项分页、来源隔离、重复键 Diff、增加/移除/改变/移动、未知响应与压缩/召回原记录、独立并发读取 | 执行结果在对应日志维护 |
 | [web/context_test.go](../../internal/interaction/web/context_test.go) | 同一授权边界、参数/偏移校验、完整模板含 step 0 的前后链接、安全转义、无 POST、no-store 与 CSP | 执行结果在对应日志维护 |
 | [traces_test.go](../../internal/agent/sqlite/traces_test.go) | 真实 Main/Root/递归 Child 的统一查询、输入输出、角色与 Agent/trace 隔离、缺失网络证据不猜测、同时间 100 节点分页及跨 trace 游标拒绝 | 执行结果在对应日志维护 |
-| [web/traces_test.go](../../internal/interaction/web/traces_test.go) | 三栏完整模板、授权/绑定、参数验证、转义、真实 parent 分支、页外 parent 与几何上限 | 执行结果在对应日志维护 |
+| [web/traces_test.go](../../internal/interaction/web/traces_test.go) | 树/时间线与详情模板、授权/绑定、参数验证、转义、真实 parent 分支、页外 parent 与几何上限 | 执行结果在对应日志维护 |
 | [bridge/observations_test.go](../../internal/llm/bridge/observations_test.go) / [images_test.go](../../internal/llm/bridge/images_test.go) | 可选诊断不改变 generation.event 序号；跨 registration 丢弃、上限、凭据、异常 sink；实际 Pi 收到图片而观测仅含安全引用/hash | 执行结果在对应日志维护 |
 | [Node capture tests](../../provider-bridge/test/observability.test.mjs) | Node 侧 opt-in、凭据/像素替换、尺寸/hash、超限标记与 callback 故障隔离 | 执行结果在对应日志维护 |
-| [verify_channels.py](../../tests/system/verify_channels.py) 的 native_trace_inspection | 生产 Bridge + 独立 HTTP peer；实际重试、最终 JSON 比对、usage/cost 缺失、完成后重启不重发；桌面/移动/无 JS、同页滚动/history、只读账本 | 随现有 channels gate 运行，截图为受控 peer 下的真实产品页面 |
+| [verify_channels.py](../../tests/system/verify_channels.py) 的 native_trace_inspection | 生产 Bridge + 独立 HTTP peer；实际重试、最终 JSON 比对、usage/cost 缺失、完成后重启不重发；桌面/移动/无 JS、详情滚动/history、只读账本 | 随现有 channels gate 运行，截图为受控 peer 下的真实产品页面 |
 
 - **F-031 证明范围**：O-01 导航、O-09 的关系元数据分页、O-10 的认证/只读/转义已有入口。缺少来源记录时明确未知；标题裁切、跨页状态变化和树片段有说明。截图不证明模型质量。
 - **F-034 证明范围**：O-02/03/04/09/10 由实际冻结记录比对、语义压缩/恢复检查、SQL 边界测试和真实浏览器共同覆盖。完整内容是保存的 Host 请求和已接纳结果；旧来源缺失明确未知，压缩归档仅显示引用，不授予新 Artifact 访问。
@@ -73,3 +73,7 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
 
 HTTP 诊断写入以真实 SQLite 锁验证：60ms 的短业务写锁释放后保存记录；持续锁定时在预算内放弃，调用方不等待诊断锁。`go test -race ./internal/observability/sqlite -run TestRecorder` 覆盖两条边界。原 native Pi/HTTP 回归保留完整 attempts/headers 数量断言，失败输出已接收请求数、诊断阶段和 generation 状态计数。
+
+## 页面重构验收
+
+真实 channels 浏览器 action 从列表进入独立 Trace 详情，验证树/时间线对齐导航、节点类型 Tab、折叠 metadata、完整 Context/JSON/来源与相邻 Compare 前后内容，返回列表和旧 deep link 保留参数；长 UTF-8 正文、桌面/移动端、无 JavaScript 与原 API 的读取边界继续覆盖。`TestTraceDetailDoesNotDependOnGlobalList` 明确让全局列表失败而详情成功，防止拆页后仍耦合列表查询。沿用同一 SQLite/HTTP peer 证据，不引入第二套执行或评测系统。

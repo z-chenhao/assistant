@@ -1,0 +1,49 @@
+package web
+
+import (
+	"encoding/json"
+	"sort"
+	"strings"
+
+	"github.com/z-chenhao/erii/internal/interaction"
+)
+
+type approvalField struct{ Name, Value string }
+type approvalView struct {
+	ID, Hash, Status, Tool, Title, Raw, ReturnTo string
+	Fields                                       []approvalField
+	Pending                                      bool
+}
+
+func approvalFor(a interaction.Approval) approvalView {
+	v := approvalView{ID: a.ID, Hash: a.Hash, Status: a.Status, Tool: a.Tool, Raw: a.Arguments, Title: "Review this action", Pending: a.Status == "pending"}
+	if a.Tool == "account_spend" {
+		v.Title = "Review model spending"
+	} else if a.Tool == "builtin__write" || a.Tool == "builtin__edit" {
+		v.Title = "Review a file change"
+	} else if a.Tool == "builtin__bash" {
+		v.Title = "Review a terminal command"
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal([]byte(a.Arguments), &fields) != nil {
+		v.Fields = []approvalField{{Name: "Action", Value: a.Arguments}}
+		return v
+	}
+	keys := []string{}
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if a.Tool == "account_spend" && (k == "batch_run_id" || k == "model_snapshot_id" || k == "task_epoch") {
+			continue
+		}
+		value := string(fields[k])
+		var str string
+		if json.Unmarshal(fields[k], &str) == nil {
+			value = str
+		}
+		v.Fields = append(v.Fields, approvalField{Name: strings.ReplaceAll(k, "_", " "), Value: value})
+	}
+	return v
+}

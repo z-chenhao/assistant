@@ -1,0 +1,9 @@
+{{define "approval-card"}}
+<section class="approval panel" id="approval-{{.ID}}" data-approval="{{.ID}}">
+ <div class="row-heading"><h2>{{.Title}}</h2><span class="status-pill" data-status="{{.Status}}">{{.Status}}</span></div>
+ <p class="approval-action">{{toolLabel .Tool}}</p>
+ <dl class="approval-fields">{{range .Fields}}<div><dt>{{.Name}}</dt><dd>{{.Value}}</dd></div>{{end}}</dl>
+ <details class="technical-details"><summary>Exact action details</summary><p><code>{{.Tool}}</code></p><pre>{{.Raw}}</pre></details>
+ {{if .Pending}}<p class="field-help">Your decision applies to this exact action.</p><form action="/approval" method="post"><input type="hidden" name="return_to" value="{{.ReturnTo}}"><input type="hidden" name="approval_id" value="{{.ID}}"><input type="hidden" name="hash" value="{{.Hash}}"><button name="decision" value="approved">Approve</button><button class="secondary" name="decision" value="denied">Decline</button></form>{{else}}<p class="field-help">This decision is {{.Status}}. It is not confirmation that the external action completed.</p>{{end}}
+</section>
+{{end}}

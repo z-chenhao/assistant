@@ -19,6 +19,7 @@ type TraceReader interface {
 }
 
 type traceView struct {
+	MetadataOpen                       bool
 	Query                              observability.TraceQuery
 	Run, Task, Node, After, Tab, Field string
 	Offset                             int
@@ -28,11 +29,12 @@ type traceView struct {
 	Rows                               []traceRow
 	Input, Output, Wire                observability.Body
 	Messages                           []observability.ChatPreview
-	Preparation                        *observability.FrozenContext
-	Schemas                            *observability.FrozenContext
 	ModelOutput                        *llm.GenerationResult
 	Diff                               *observability.ContextDiff
 	Relations                          *observability.Relationships
+	FullContext                        *contextView
+	Compare                            string
+	Tabs                               []string
 }
 type traceRow struct {
 	observability.Observation
@@ -48,8 +50,8 @@ func (s *Server) loadTrace(ctx context.Context, v *traceView) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	var err error
-	v.List, err = s.Traces.Traces(ctx, v.Query)
-	if err != nil {
+	if v.Run == "" && v.Task == "" {
+		v.List, err = s.Traces.Traces(ctx, v.Query)
 		return err
 	}
 	if v.Task != "" || v.Run != "" {
@@ -65,6 +67,26 @@ func (s *Server) loadTrace(ctx context.Context, v *traceView) error {
 	if v.Run == "" {
 		return nil
 	}
+	if v.FullContext != nil {
+		if s.Contexts == nil {
+			return errors.New("context inspection unavailable")
+		}
+		if v.FullContext.Query.Step < 0 {
+			rounds, e := s.Contexts.Rounds(ctx, observability.RoundQuery{RunID: v.FullContext.Query.RunID, After: v.FullContext.RoundAfter})
+			if e != nil {
+				return e
+			}
+			if len(rounds.Items) > 0 {
+				v.FullContext.Query.Step = rounds.Items[0].Step
+			}
+		}
+		if err = s.loadContext(ctx, v.FullContext, ""); err != nil {
+			return err
+		}
+		if v.FullContext.Frozen != nil {
+			v.Node = "generation:" + v.FullContext.Frozen.Round.ID
+		}
+	}
 	query := observability.ObservationQuery{RunID: v.Run, Selected: v.Node, Cursor: v.After}
 	tree, err := s.Traces.Observations(ctx, query)
 	if err != nil {
@@ -74,6 +96,36 @@ func (s *Server) loadTrace(ctx context.Context, v *traceView) error {
 	v.Node = tree.Selected.ID
 	query.Selected = v.Node
 	v.Rows = traceRows(tree)
+	v.Tabs = observationTabs(tree.Selected)
+	if tree.Selected.Type == "generation" && s.Contexts != nil && tree.Selected.Step != nil {
+		rounds, e := s.Contexts.Rounds(ctx, observability.RoundQuery{RunID: tree.Selected.RunID, After: -1})
+		if e != nil {
+			return e
+		}
+		if len(rounds.Items) == 0 || rounds.Items[0].Step >= *tree.Selected.Step {
+			v.Tabs = []string{"overview", "context", "wire"}
+		}
+	}
+	if v.Tab == "metadata" {
+		v.MetadataOpen = true
+		v.Tab = "overview"
+	}
+	valid := false
+	for _, tab := range v.Tabs {
+		if tab == v.Tab {
+			valid = true
+		}
+	}
+	if !valid && v.Tab != "metadata" {
+		v.Tab = "overview"
+	}
+	if v.Tab == "context" && tree.Selected.Type == "generation" {
+		if v.FullContext == nil {
+			v.FullContext = &contextView{Query: observability.ContextQuery{RunID: tree.Selected.RunID, Step: *tree.Selected.Step, Section: "messages"}, RoundAfter: -1}
+			return s.loadContext(ctx, v.FullContext, "")
+		}
+		return nil
+	}
 	read := func(field string) (observability.Body, error) {
 		offset := 0
 		if field == v.Field {
@@ -93,22 +145,11 @@ func (s *Server) loadTrace(ctx context.Context, v *traceView) error {
 			if s.Contexts == nil {
 				return errors.New("context unavailable")
 			}
-			diff, e := s.Contexts.ContextDiff(ctx, observability.DiffQuery{RunID: tree.Selected.RunID, Step: *tree.Selected.Step, Section: "messages", After: v.DiffAfter})
+			diff, e := s.Contexts.ContextDiff(ctx, observability.DiffQuery{RunID: tree.Selected.RunID, Step: *tree.Selected.Step, Section: v.Compare, After: v.DiffAfter})
 			v.Diff = &diff
 			return e
 		}
-		if v.Tab == "context" && s.Contexts != nil {
-			prep, e := s.Contexts.Context(ctx, observability.ContextQuery{RunID: tree.Selected.RunID, Step: *tree.Selected.Step, Section: "provenance"})
-			if e != nil {
-				return e
-			}
-			v.Preparation = &prep
-			schemas, e := s.Contexts.Context(ctx, observability.ContextQuery{RunID: tree.Selected.RunID, Step: *tree.Selected.Step, Section: "tools", JSON: true})
-			if e != nil {
-				return e
-			}
-			v.Schemas = &schemas
-		}
+
 		v.Messages, err = s.Traces.ChatPreview(ctx, query)
 		if err != nil {
 			return err

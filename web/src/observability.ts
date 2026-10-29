@@ -25,9 +25,9 @@ export function enhanceObservability() {
   const anchor=(event.target as Element|null)?.closest<HTMLAnchorElement>('a.obs-select');
   if(!anchor||anchor.target||anchor.download)return;
   const url=new URL(anchor.href);
-  if(url.origin!==location.origin||url.pathname!=='/developer/observability')return;
+  if(url.origin!==location.origin||!url.pathname.startsWith('/developer/observability/'))return;
   event.preventDefault();void select(url,true);
  });
- window.addEventListener('popstate',()=>{if(location.pathname==='/developer/observability')void select(new URL(location.href),false);});
+ window.addEventListener('popstate',()=>{if(location.pathname.startsWith('/developer/observability/'))void select(new URL(location.href),false);});
  window.addEventListener('pagehide',()=>pending?.abort());
 }

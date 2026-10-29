@@ -119,7 +119,7 @@ def run(binary,evidence):
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.start()
-            require('Welcome to Erii' in h.http('/',auth=False),'login page missing')
+            require('Open your workspace' in h.http('/',auth=False),'login page missing')
             h.http('/api/conversation',auth=False,expected=401)
             h.http('/api/message',dict(source_id='x',content=[dict(type='text',text='x')]),headers={'Origin':'http://evil.example'},expected=403)
             h.http('/api/progress',data=b'x',method='POST',expected=404)
@@ -414,8 +414,8 @@ def dependency_recovery(binary, report):
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
             h.start()
-            require('Model connection' in h.http('/settings'), 'dependency failure hid Settings')
-            require('Your ongoing work' in h.http('/progress'), 'dependency failure hid Progress')
+            require('<h1>Models</h1>' in h.http('/settings/models'), 'dependency failure hid Settings')
+            require('<h1>Tasks</h1>' in h.http('/tasks'), 'dependency failure hid Progress')
             require(h.http('/api/status')['readiness'] != 'ready', 'broken runtime admitted work')
             h.http('/api/message', dict(source_id='blocked', content=[dict(type='text', text='blocked')]), expected=409)
             catalog.mkdir(mode=0o700)
@@ -706,7 +706,7 @@ def account_presentation(binary,report):
                 h.http('/model/select',urlencode(dict(profile=profile['profile_id'],profile_version=profile['version'],config_version=1,consent='yes')).encode(),headers=form)
                 require(h.http('/api/status')['readiness']=='ready','Web account profile unavailable')
                 h.stop();h.start()
-                require('Account ' in h.http('/settings'),'restart hid connected account')
+                require('ChatGPT account' in h.http('/settings/models/new?provider=chatgpt'),'restart hid connected account')
                 h.http('/auth/logout',urlencode(dict(account=aid)).encode(),headers=form)
                 require(h.command('model','accounts')[0]['status']=='logged_out','Web logout missed existing lifecycle')
                 with server.lock:

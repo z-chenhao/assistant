@@ -1,34 +1,15 @@
-{{define "context-page"}}
-<section class="inspection context-inspector">
-<p class="eyebrow">DEVELOPER · SENSITIVE CONTEXT · READ ONLY</p><h1>Frozen context</h1>
-<p class="inspection-intro">Inspect the Host input saved for each model round. It contains private conversation and tool content. This is before Bridge/provider conversion; image references do not contain pixels. Reading never sends, retries or changes work.</p>
-{{with .Context}}
-<p><a href="/developer/observability?run={{.Query.RunID}}">← Execution relationships</a> · <a href="/">Conversation</a></p><code class="execution-id">{{.Query.RunID}}</code>
-<section class="panel" aria-label="Model rounds"><h2>Model rounds</h2><ol class="round-list">
-{{range .Rounds.Items}}<li><a class="round-link" href="{{contextLink $.Context "step" .Step}}">Step {{.Step}}</a> · {{.Status}} · <time>{{.CreatedAt}}</time>{{if .Error}} · {{.Error}}{{end}}</li>{{else}}<li>No model rounds on this page. Work may not have reached model admission.</li>{{end}}
-</ol>{{if .Rounds.Next}}<a href="{{contextLink . "round_after" .Rounds.Next}}">More rounds →</a>{{end}}</section>
-{{with .Frozen}}
-<section class="panel" aria-label="Frozen round"><h2>Step {{.Round.Step}} · {{.Round.Status}}</h2><p><code>{{.Round.ID}}</code>{{if .Round.Error}} · {{.Round.Error}}{{end}}</p><p class="inspection-note">Frozen request hash <code class="execution-id">{{.RequestHash}}</code>. Status is saved generation state, not a count of external dispatch attempts.</p>
-<nav class="context-tabs" aria-label="Context sections">{{range $name := contextSections}}<a href="{{contextLink $.Context $name 0}}" {{if eq $.Context.Query.Section $name}}aria-current="page"{{end}}>{{ $name }}</a>{{end}}</nav>
-<h3>{{$.Context.Query.Section}}</h3>
-{{if eq $.Context.Query.Section "provenance"}}<p class="inspection-note">Saved compaction stage, omitted source/image references and history Artifact reference, where recorded. This does not invent missing sources or grant access to an archive.</p>{{end}}
-{{if eq $.Context.Query.Section "recall"}}<p class="inspection-note">Frozen retrieval hits, with their original source references. These are untrusted evidence; a saved hit may have been omitted from this request by context selection.</p>{{end}}
-<ol class="context-items" aria-label="Ordered section items">{{range .Items}}<li><a class="context-item-link" href="{{contextLink $.Context "item" .Index}}">[{{.Index}}] {{.Label}}</a>{{if .SourceRef}} · source <code>{{.SourceRef}}</code>{{end}}{{if .SourceKind}} · {{.SourceKind}}{{end}}{{if .ToolCallID}} · call <code>{{.ToolCallID}}</code>{{end}}</li>{{else}}<li>No saved items in this section. A missing response or provenance is unknown, not an empty successful result.</li>{{end}}</ol>
-{{if .Next}}<a href="{{contextLink $.Context "after" .Next}}">More section items →</a>{{end}}
-{{with .Selected}}<article class="context-content" data-context-index="{{.Index}}"><h3>[{{.Index}}] {{.Label}}</h3>
-{{if .SourceRef}}<p>Recorded source: <code>{{.SourceRef}}</code>{{if .SourceKind}} · {{.SourceKind}}{{end}}</p>{{else}}<p class="inspection-note">No source reference recorded. The origin is not inferred.</p>{{end}}
-{{if or (eq $.Context.Query.Section "messages") (eq $.Context.Query.Section "response")}}<p><a href="{{contextLink $.Context "text" 0}}">Readable text</a> · <a href="{{contextLink $.Context "json" 0}}">Complete stored item (JSON)</a></p><p class="inspection-note">Stored JSON also includes tool call IDs, arguments, results, image refs and provenance when present. Readable text alone may be empty for a tool-calling response. The stored response JSON preserves the clipped flag; a clipped provider response is not a complete upstream answer.</p>{{end}}
-<p class="context-range">UTF-8 bytes {{$.Context.Query.Offset}}–{{partEnd $.Context}} of {{$.Context.Frozen.Length}}{{if $.Context.Frozen.NextOffset}} · continued below{{end}}</p>
-<pre class="frozen-content">{{$.Context.Frozen.Content}}</pre>
-{{if $.Context.Frozen.NextOffset}}<a class="context-continue" href="{{contextLink $.Context "offset" $.Context.Frozen.NextOffset}}">Continue full content →</a>{{end}}
-{{if $.Context.Query.Offset}}<p><a href="{{contextLink $.Context "offset" 0}}">Start of content</a></p>{{end}}</article>{{end}}
-</section>
-{{end}}
-{{with .Diff}}<section class="panel" aria-label="Adjacent round diff"><h2>Adjacent round diff</h2>
-{{if .Previous}}<p>Step {{.Previous}} → {{$.Context.Query.Step}} · {{$.Context.Query.Section}}</p><p class="inspection-note">Messages align by saved source ref or tool call ID; legacy records without refs align by position. Tools align by name. Duplicate keys use occurrence order. Moved items retain their real indexes. Open either side for complete content; no semantic similarity is inferred.</p>
-<ol class="context-diff">{{range .Items}}<li data-change="{{.Kind}}"><strong>{{.Kind}}</strong> · {{.Label}} · {{if ne .Before nil}}<a href="{{diffLink $.Context $.Context.Diff.Previous .Before}}">Before [{{.Before}}]</a>{{end}}{{if ne .After nil}} <a href="{{diffLink $.Context $.Context.Query.Step .After}}">After [{{.After}}]</a>{{end}}</li>{{else}}<li>No differences on this page.</li>{{end}}</ol>
-{{if .Next}}<a href="{{contextLink $.Context "diff_after" .Next}}">More changes →</a>{{end}}
-{{else}}<p>This is the first saved model round; there is no earlier round to compare.</p>{{end}}</section>{{end}}
-{{end}}
-</section>
+{{define "context-reader"}}
+<div class="context-reader" data-context-run="{{.Query.RunID}}" data-context-step="{{.Query.Step}}" data-context-section="{{.Query.Section}}" data-context-item="{{.Query.Item}}" data-context-offset="{{.Query.Offset}}">
+ <div class="context-heading"><h3>Full frozen context</h3><span class="status-pill">Read only</span></div>
+ <nav class="round-links" aria-label="Model rounds">{{range .Rounds.Items}}<a href="{{contextLink $ "step" .Step}}" {{if eq $.Query.Step .Step}}aria-current="page"{{end}}>Step {{.Step}}</a>{{end}}</nav>{{if .Rounds.Next}}<a href="{{contextLink . "round_after" .Rounds.Next}}">More rounds →</a>{{end}}
+ {{with .Frozen}}
+ <nav class="context-tabs section-tabs compact" aria-label="Context sections">{{range $name:=contextSections}}<a href="{{contextLink $ $name 0}}" {{if eq $.Query.Section $name}}aria-current="page"{{end}}>{{$name}}</a>{{end}}</nav>
+ <details class="context-index" open><summary>{{$.Query.Section}} · choose an item</summary><ol class="context-items">{{range .Items}}<li><a class="context-item-link" href="{{contextLink $ "item" .Index}}" {{if eq $.Query.Item .Index}}aria-current="page"{{end}}>[{{.Index}}] {{.Label}}</a></li>{{else}}<li>No saved items in this section.</li>{{end}}</ol>{{if .Next}}<a href="{{contextLink $ "after" .Next}}">More section items →</a>{{end}}</details>
+ {{with .Selected}}<article class="context-content" data-context-index="{{.Index}}"><div class="row-heading"><h3>[{{.Index}}] {{.Label}}</h3>{{if or (eq $.Query.Section "messages") (eq $.Query.Section "response")}}<nav class="content-format" aria-label="Content format"><a href="{{contextLink $ "text" 0}}" {{if not $.Query.JSON}}aria-current="page"{{end}}>Readable text</a><a href="{{contextLink $ "json" 0}}" {{if $.Query.JSON}}aria-current="page"{{end}}>Complete stored item (JSON)</a></nav>{{end}}</div>
+ <pre class="frozen-content">{{$.Frozen.Content}}</pre>
+ <div class="context-range">UTF-8 bytes {{$.Query.Offset}}–{{partEnd $}} of {{$.Frozen.Length}}{{if $.Frozen.NextOffset}} · <a class="context-continue" href="{{contextLink $ "offset" $.Frozen.NextOffset}}">Continue full content →</a>{{end}}{{if $.Query.Offset}} · <a href="{{contextLink $ "offset" 0}}">Start of content</a>{{end}}</div>
+ <details class="technical-details"><summary>Source &amp; frozen request</summary><p>Recorded source: {{if .SourceRef}}<code>{{.SourceRef}}</code> · {{.SourceKind}}{{else}}not recorded{{end}}{{if .ToolCallID}} · call {{.ToolCallID}}{{end}}</p><p>Frozen request hash <code>{{$.Frozen.RequestHash}}</code></p><p>Host input before provider conversion. Source references do not grant access to an archive. A missing response or provenance remains unknown.</p></details>
+ </article>{{end}}
+ {{else}}<p class="obs-empty">No model round has been saved for this execution.</p>{{end}}
+</div>
 {{end}}

@@ -2,7 +2,7 @@
 
 [功能与需求](../features/tasks.md) · [测试方案](../test-plans/tasks.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+最近核对：2026-10-29。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -23,9 +23,19 @@ flowchart TD
 - 新 Root 的独立 `progress_guidance` system 片段约定：阶段变化时，在带工具调用的 assistant 文本中写一句不超过 512 UTF-8 字节的进度，描述已确认进展与下一阶段，不写推理、原始调用或私有数据。普通 Worker 规则不改，Child 不继承该片段。
 - 共享 Agent Loop 不新增分支、接口或工具。`Runs.Checkpoint` 在现有事务中先 fence 与 CAS 保存 checkpoint，再由 `progress.go` 接纳 Root 阶段文本并写 `task.progress_summary`；两者一起提交或回滚。重启复用已接受的 generation，摘要失败不会留下已推进的 checkpoint 或提前执行工具。
 - 接纳仅限 `tools` phase、完整且未截断的工具调用响应，并要求 Root 冻结的 system 上下文包含进度约定。空白、过长、含控制字符或非法 UTF-8 文本不替换上一条；归一化段落空白后保存。重复摘要不递增 Task version、不改变其更新时间。最终结果、压缩和 Child 文本不进入此路径。
-- `activity.go` 使用同一次只读查询聚合当前 Task epoch 的 Root 状态、等待原因和 Child 数量，并保留 `Last update`。等待审批包含 Child 审批及 Root 的费用授权；未知外部结果显示未确认，失败 Run 保持 Task 开放，ongoing 一轮结束与 Task 完成分开。界面不暴露 Run ID、Child 任务正文或工具参数。
+- `task/sqlite.Reader` 使用同一次只读查询聚合当前 Task epoch 的 Root 状态、等待原因和 Child 数量，并保留 `Last update`。等待审批包含 Child 审批及 Root 的费用授权；未知外部结果显示未确认，失败 Run 保持 Task 开放，ongoing 一轮结束与 Task 完成分开。界面不暴露 Run ID、Child 任务正文或工具参数。
 - 摘要是非授权的模型展示文本，沿现有 HTML 转义展示。它不创建 TaskUpdate、Inbox、Outbox、通知或额外推理；正常 checkpoint 仍保留原有运行时事件。`task_search` 继续返回已保存摘要，不能把展示文本当作已完成或副作用成功的证据。
 - 无数据迁移、工具 schema 或 Bridge 格式变化。新 Root 使用新提示；旧 Run 的冻结请求和提示不重写，无进度约定时不把其历史 assistant 文本改作可见进度。继续工作保留旧摘要作为已标明来源的 Task context，新状态单独计算。
+
+### 任务工作台只读边界（F-005/F-018）
+
+`internal/task/view.go` 拥有用户工作台查询、进度/注意状态和详情 DTO；`internal/task/sqlite` 实现独立惰性只读池（mode=ro/query_only，最多两个连接，busy_timeout 500ms），由现有 Store 同生命周期关闭。`agent/sqlite.Activity` 委派它，TUI 与原 `/api/progress` 保持最多 20 条及原有摘要格式；新 Web 列表默认 25 条、上限 50，以不可变 created_at/task_ref 降序稳定分页，游标绑定筛选/搜索。Web 查询总期限 3 秒，不占用运行时写连接、不推进事件。
+
+所有读取按 agent_config 当前 Agent 归属；同一 CTE 只聚合 Task 当前 epoch。Open/Needs me/Finished/All 是查询视图，Task 仍只有 active/paused/completed/cancelled。阶段与 attention 由当前 Root/Child/等待/unknown 事实推导；摘要只保留已提交值。
+
+详情读取完整 anchor goal 和可访问 ArtifactRef，指令/里程碑每页 20 项。用户交付只由 task_update → main_inbox → main_reply → conversation_intent 精确关联，最多最近 10 条；原始 Root/Child result 不进入页面，完整用户历史仍在 Conversation。原始请求按 task_request 回执的 taskRef/source_message_id 定位。审批只按该任务 Run 归属收集 ID，再由现有授权投影/决定校验精确 frozen action。
+
+没有新持久化模型、迁移、Task 状态、模型工具或控制入口。页面继续沟通通过普通 Main 用户输入，不直接改变 Task。
 
 ### Go 实现职责（F-040）
 
@@ -44,7 +54,7 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 - [internal/agent/sqlite/tasks.go](../../internal/agent/sqlite/tasks.go)
 - [internal/agent/sqlite/task_control.go](../../internal/agent/sqlite/task_control.go)
 - [internal/agent/sqlite/progress.go](../../internal/agent/sqlite/progress.go)：阶段摘要接纳与事务内持久化
-- [internal/agent/sqlite/activity.go](../../internal/agent/sqlite/activity.go)：只读执行状态、摘要与 Child 数量投影
+- [internal/task/sqlite/reader.go](../../internal/task/sqlite/reader.go)：任务列表、当前执行/Child 聚合与旧 Activity 投影
 - [internal/prompt/system/progress.md](../../internal/prompt/system/progress.md)：仅 Root 的阶段进度约定
 - [internal/agent/sqlite/reporter.go](../../internal/agent/sqlite/reporter.go)
 
@@ -493,6 +503,9 @@ uses only the calling Agent/Conversation scope. Returned summaries are bounded
 independently of the retained anchors, so all 50 rows fit the Tool result limit.
 
 ## Changelog
+
+2026-10-29：F-005/F-018 新增任务列表/详情，比较扩展原 20 条 Activity 与独立用户查询模块后，选择 task/sqlite 只读池并让 Activity 复用事实/阶段。稳定分页避免实时活动更新时间造成跨页遗漏；详情只关联 Main 用户交付，避免暴露 Worker 结果或新控制管线。schema、Task 生命周期与冻结执行不变。
+
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

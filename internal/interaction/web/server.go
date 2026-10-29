@@ -10,11 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"mime"
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -45,9 +43,10 @@ const Subject = "browser"
 const Destination = "local"
 
 type Status struct {
-	Readiness     string `json:"readiness"`
-	Status        string `json:"status"`
-	ConfigVersion int64  `json:"config_version"`
+	Readiness            string  `json:"readiness"`
+	Status               string  `json:"status"`
+	ConfigVersion        int64   `json:"config_version"`
+	ActiveModelProfileID *string `json:"active_model_profile_id,omitempty"`
 }
 type Core interface {
 	WaitForRuntime(context.Context) error
@@ -57,7 +56,7 @@ type Core interface {
 	WebStatus(context.Context) (Status, error)
 	Conversation(context.Context, int64) (conversation.Page, error)
 	Activity(context.Context) ([]task.Summary, error)
-	Approvals(context.Context) ([]interaction.Approval, error)
+	WebApprovals(context.Context) ([]interaction.Approval, error)
 	AcceptInbound(context.Context, interaction.InboundEvent) (agent.Receipt, error)
 	DecideInbound(context.Context, interaction.InboundEvent, string, string, string) error
 	CheckChannel(context.Context, string, string, string) error
@@ -75,6 +74,7 @@ type Server struct {
 	Inspector      ExecutionReader
 	Contexts       ContextReader
 	Traces         TraceReader
+	Tasks          TaskReader
 	Config         Config
 	Core           Core
 	Models         Models
@@ -225,7 +225,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		token, e := s.Secrets.Get(r.Context(), s.Config.TokenRef)
 		if e != nil || len(token) < 24 || subtle.ConstantTimeCompare(token, []byte(r.FormValue("token"))) != 1 {
-			fail(w, 401)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(401)
+			s.render(w, page{Login: true, Error: "That workspace token was not accepted.", Next: safePageReturn(r.FormValue("next"))})
 			return
 		}
 		for i := range token {
@@ -242,12 +244,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.sessionExpires = time.Now().Add(time.Hour)
 		s.mu.Unlock()
 		http.SetCookie(w, &http.Cookie{Name: "erii_session", Value: session, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/", MaxAge: 3600})
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, safePageReturn(r.FormValue("next")), 303)
 		return
 	}
 	if !s.authorized(r) {
-		if r.URL.Path == "/" && r.Method == "GET" {
-			s.render(w, page{Login: true})
+		_, view, _ := pageRoute(r.URL.Path)
+		if view != "" && r.Method == "GET" {
+			if r.URL.Path != "/" {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(401)
+			}
+			s.render(w, page{Login: true, Next: safePageReturn(r.URL.RequestURI())})
 			return
 		}
 		fail(w, 401)
@@ -262,152 +269,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if e := s.post(w, r); e != nil {
-		fail(w, 409)
+		s.postFailure(w, r, e)
 		return
 	}
-}
-func (s *Server) get(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path {
-	case "/api/developer/traces":
-		s.traceAPI(w, r, "traces")
-	case "/api/developer/observations":
-		s.traceAPI(w, r, "observations")
-	case "/api/developer/observation-body":
-		s.traceAPI(w, r, "body")
-	case "/api/developer/rounds":
-		s.contextAPI(w, r, "rounds")
-	case "/api/developer/context":
-		s.contextAPI(w, r, "context")
-	case "/api/developer/context-diff":
-		s.contextAPI(w, r, "diff")
-	case "/api/developer/executions":
-		s.inspectionAPI(w, r, false)
-	case "/api/developer/relationships":
-		s.inspectionAPI(w, r, true)
-	case "/api/updates":
-		s.updates(w, r)
-	case "/api/conversation":
-		before, e := conversationCursor(r)
-		if e != nil {
-			fail(w, 400)
-			return
-		}
-		p, e := s.Core.Conversation(r.Context(), before)
-		if e != nil {
-			fail(w, 503)
-			return
-		}
-		if p.Before != 0 {
-			w.Header().Set("X-Erii-Before", strconv.FormatInt(p.Before, 10))
-		}
-		jsonResult(w, p.Messages)
-	case "/api/progress":
-		a, e := s.Core.Activity(r.Context())
-		if e != nil {
-			fail(w, 503)
-			return
-		}
-		jsonResult(w, a)
-	case "/api/status":
-		a, e := s.Core.WebStatus(r.Context())
-		if e != nil {
-			fail(w, 503)
-			return
-		}
-		jsonResult(w, a)
-	case "/api/auth":
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		jsonResult(w, struct {
-			llm.AuthState
-			AccountID string `json:"account_id,omitempty"`
-		}{s.auth, s.accountID})
-	case "/artifact":
-		ref := r.URL.Query().Get("ref")
-		d, e := s.Core.DescribeArtifact(r.Context(), ref)
-		if e != nil {
-			fail(w, 404)
-			return
-		}
-		src, e := s.Core.OpenArtifact(r.Context(), ref)
-		if e != nil {
-			fail(w, 404)
-			return
-		}
-		defer src.Close()
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": d.Name}))
-		_, _ = io.Copy(w, src)
-	case "/", "/settings", "/progress", "/developer/observability", "/developer/context":
-		s.show(w, r)
-	default:
-		fail(w, 404)
-	}
-}
-func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
-	switch r.URL.Path {
-	case "/api/message":
-		return s.acceptJSONMessage(w, r)
-	}
-	switch r.URL.Path {
-	case "/message":
-		return s.acceptFormMessage(w, r)
-	}
-	switch r.URL.Path {
-	case "/upload":
-		return s.uploadArtifact(w, r)
-	}
-	if e := r.ParseForm(); e != nil {
-		return e
-	}
-	switch r.URL.Path {
-	case "/approval":
-		if err := s.decideApproval(r); err != nil {
-			return err
-		}
-		if r.Header.Get("Accept") == "application/json" {
-			jsonResult(w, struct {
-				Accepted bool `json:"accepted"`
-			}{true})
-			return nil
-		}
-	case "/model/add":
-		if err := s.addModel(r); err != nil {
-			return err
-		}
-	case "/model/test":
-		if _, e := s.Control.Test(r.Context(), r.FormValue("profile")); e != nil {
-			return e
-		}
-	case "/model/select":
-		if err := s.selectModel(r); err != nil {
-			return err
-		}
-	case "/notification":
-		if err := s.preferNotification(r); err != nil {
-			return err
-		}
-	case "/auth/login":
-		if err := s.startLogin(r); err != nil {
-			return err
-		}
-	case "/auth/logout":
-		if _, err := s.Accounts.Logout(r.Context(), r.FormValue("account")); err != nil {
-			return err
-		}
-	case "/auth/cancel":
-		s.mu.Lock()
-		cancel := s.authCancel
-		s.mu.Unlock()
-		if cancel != nil {
-			cancel()
-		}
-	default:
-		fail(w, 404)
-		return nil
-	}
-	http.Redirect(w, r, "/", 303)
-	return nil
 }
 
 // AuthURL restricts clickable authentication links to the existing provider's

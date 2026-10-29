@@ -4,196 +4,142 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"html/template"
 	"net/http"
 	"strconv"
 
-	"github.com/z-chenhao/erii/internal/delivery/ui"
 	"github.com/z-chenhao/erii/internal/interaction"
 	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/task"
 )
 
 type shownMessage struct {
 	Role       string
 	Sequence   int64
 	Projection shownProjection
+	Approval   *approvalView
 }
 type shownProjection struct {
-	Key      string
-	HTML     template.HTML
-	Spec     string
-	Fallback string
+	Key            string
+	HTML           template.HTML
+	Spec, Fallback string
 }
 type page struct {
-	Trace      *traceView
-	Context    *contextView
-	Accounts   []llm.AuthConnection
-	Bindings   []interaction.Binding
-	Preference interaction.Preference
-	Login      bool
-	Tab        string
-	Status     Status
-	Cursor     int64
-	Latest     int64
-	Before     int64
-	Messages   []shownMessage
-	Activity   []task.Summary
-	Approvals  []shownProjection
-	Profiles   []llm.Profile
-	SourceID   string
-	Auth       llm.AuthState
-	AccountID  string
+	Trace                                             *traceView
+	Tasks                                             *taskView
+	Settings                                          *settingsView
+	Accounts                                          []llm.AuthConnection
+	Bindings                                          []interaction.Binding
+	Preference                                        interaction.Preference
+	Login                                             bool
+	Tab, View, Title, Path, Next, Error, Notice, Live string
+	Status                                            Status
+	Cursor, Latest, Before                            int64
+	Messages                                          []shownMessage
+	Approvals                                         []approvalView
+	Profiles                                          []llm.Profile
+	SourceID                                          string
+	Auth                                              llm.AuthState
+	AccountID                                         string
+	Draft                                             string
+	DraftTask                                         *taskContext
 }
+type taskContext struct{ Ref, Title string }
 
-func (s *Server) show(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	p := page{Tab: r.URL.Path}
+func sourceID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
+}
+func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
+	tab, view, title := pageRoute(r.URL.Path)
+	p := page{Tab: tab, View: view, Title: title, Path: r.URL.Path, SourceID: sourceID(), Notice: notice(r.URL.Query().Get("notice"))}
+	if view == "" {
+		return p, errPageNotFound
+	}
+	if view == "conversation" {
+		p.Live = "/"
+	}
+	if view == "tasks" || view == "task" || view == "settings" {
+		p.Live = r.URL.Path
+	}
 	var err error
 	p.Status, err = s.Core.WebStatus(ctx)
 	if err != nil {
-		fail(w, 503)
-		return
+		return p, err
 	}
-	if p.Tab == "/settings" {
-		if s.Accounts != nil {
-			p.Accounts, err = s.Accounts.Store.Accounts(ctx)
-			if err != nil {
-				fail(w, 503)
-				return
-			}
-		}
-		p.Bindings, err = s.Core.ChannelBindings(ctx)
-		if err != nil {
-			fail(w, 503)
-			return
-		}
-		p.Preference, err = s.Core.ChannelPreference(ctx)
-		if err != nil {
-			fail(w, 503)
-			return
-		}
-		p.Profiles, err = s.Models.ListProfiles(ctx)
-		if err != nil {
-			fail(w, 503)
-			return
-		}
-	}
-	if p.Tab == "/progress" {
-		p.Activity, err = s.Core.Activity(ctx)
-		if err != nil {
-			fail(w, 503)
-			return
-		}
-	}
-	if p.Tab == "/developer/context" {
-		p.Context, err = contextQuery(r)
-		if err == nil {
-			err = s.loadContext(ctx, p.Context, "")
-		}
-		if err != nil {
-			inspectionFailure(w, err)
-			return
-		}
-	}
-	if p.Tab == "/developer/observability" {
-		p.Trace, err = traceQuery(r)
-		if err == nil {
-			err = s.loadTrace(ctx, p.Trace)
-		}
-		if err != nil {
-			inspectionFailure(w, err)
-			return
-		}
-	}
-
-	if p.Tab == "/" {
-		p.Cursor, err = conversationCursor(r)
-		if err != nil {
-			fail(w, 400)
-			return
-		}
-		if err = s.loadConversation(ctx, &p); err != nil {
-			fail(w, 503)
-			return
-		}
-	}
-
-	key := make([]byte, 16)
-	if _, err = rand.Read(key); err != nil {
-		fail(w, 500)
-		return
-	}
-	p.SourceID = hex.EncodeToString(key)
 	s.mu.Lock()
 	p.Auth = s.auth
 	p.AccountID = s.accountID
 	s.mu.Unlock()
+	switch p.View {
+	case "settings":
+		err = s.loadSettings(ctx, r, &p)
+	case "tasks", "task":
+		err = s.loadTasks(ctx, r, &p)
+	case "traces", "trace":
+		p.Trace, err = tracePageQuery(r)
+		if err == nil {
+			err = s.loadTrace(ctx, p.Trace)
+		}
+		if p.Trace != nil && p.Trace.Run != "" {
+			p.View = "trace"
+		}
+	case "conversation":
+		p.Cursor, err = conversationCursor(r)
+		if err != nil {
+			return p, err
+		}
+		if ref := r.URL.Query().Get("task"); ref != "" {
+			if s.Tasks == nil {
+				return p, errPageNotFound
+			}
+			d, e := s.Tasks.Detail(ctx, ref, "")
+			if e != nil {
+				return p, e
+			}
+			p.DraftTask = &taskContext{Ref: d.TaskRef, Title: d.Title}
+		}
+		err = s.loadConversation(ctx, &p)
+	}
+	return p, err
+}
+func (s *Server) show(w http.ResponseWriter, r *http.Request) {
+	p, err := s.page(r.Context(), r)
+	if err != nil {
+		s.pageError(w, r, err)
+		return
+	}
 	s.render(w, p)
 }
 func (s *Server) render(w http.ResponseWriter, p page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := layout.Execute(w, p); err != nil {
-		return
-	}
+	_ = layout.Execute(w, p)
 }
-
 func conversationCursor(r *http.Request) (int64, error) {
-	value := r.URL.Query().Get("before")
-	if value == "" {
+	raw := r.URL.Query().Get("before")
+	if raw == "" {
 		return 0, nil
 	}
-	before, err := strconv.ParseInt(value, 10, 64)
+	before, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || before <= 0 {
 		return 0, strconv.ErrSyntax
 	}
 	return before, nil
 }
-
-func (s *Server) loadConversation(ctx context.Context, p *page) error {
-	approvals, err := s.Core.Approvals(ctx)
-	if err != nil {
-		return err
+func notice(code string) string {
+	switch code {
+	case "added":
+		return "Model saved. Verify the connection before using it."
+	case "tested":
+		return "Connection verified. You can now use this model for new work."
+	case "active":
+		return "Model selected for new work."
+	case "saved":
+		return "Notification preference saved."
+	case "signed-out":
+		return "Provider account signed out."
 	}
-	for _, a := range approvals {
-		if a.Status == "pending" {
-			spec := ui.Spec{SchemaVersion: ui.Version, Fallback: a.Arguments, Components: []ui.Component{{Type: "confirmation", Text: a.Tool + "\n" + a.Arguments, ApprovalID: a.ID, Hash: a.Hash}}}
-			raw, _ := json.Marshal(spec)
-			p.Approvals = append(p.Approvals, shownProjection{Key: a.ID, HTML: ui.HTML(raw, spec.Fallback), Spec: string(raw), Fallback: spec.Fallback})
-		}
-	}
-	messages, err := s.Core.Conversation(ctx, p.Cursor)
-	p.Before = messages.Before
-	if err != nil {
-		return err
-	}
-	for _, m := range messages.Messages {
-		fallback := ""
-		for _, c := range m.Content {
-			if c.Type == "text" {
-				fallback += c.Text + "\n"
-			} else if c.ArtifactRef != "" {
-				fallback += c.Type + ": " + c.ArtifactRef + "\n"
-			}
-		}
-		raw, err := s.Core.WebProjection(ctx, m)
-		if err != nil {
-			return err
-		}
-		p.Messages = append(p.Messages, shownMessage{Role: m.Role, Sequence: m.Sequence, Projection: shownProjection{HTML: ui.HTML(raw, fallback), Spec: string(raw), Fallback: fallback}})
-	}
-	for _, m := range p.Messages {
-		p.Latest = max(p.Latest, m.Sequence)
-	}
-	if p.Cursor != 0 {
-		latest, err := s.Core.Conversation(ctx, 0)
-		if err != nil {
-			return err
-		}
-		for _, m := range latest.Messages {
-			p.Latest = max(p.Latest, m.Sequence)
-		}
-	}
-	return nil
+	return ""
 }

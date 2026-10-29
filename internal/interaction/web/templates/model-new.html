@@ -1,0 +1,20 @@
+{{define "model-new"}}
+<div class="page-heading"><div><a class="back-link" href="/settings/models">← Models</a><h1>Connect a model</h1><p>Connect → verify → choose for new work.</p></div></div>
+{{if not .Settings.Provider}}
+<div class="choice-grid"><a class="panel choice-card" href="/settings/models/new?provider=compatible"><span class="choice-icon" aria-hidden="true">{ }</span><h2>Local or compatible API</h2><p>Use your own OpenAI-compatible endpoint and model.</p><span class="text-link">Configure endpoint →</span></a><a class="panel choice-card" href="/settings/models/new?provider=chatgpt"><span class="choice-icon" aria-hidden="true">◎</span><h2>ChatGPT account</h2><p>Sign in, then choose a model available to your account.</p><span class="text-link">Connect account →</span></a></div>
+{{else if eq .Settings.Provider "compatible"}}
+<section class="panel form-panel"><h2>Local / OpenAI-compatible</h2><form action="/model/add" method="post"><label>Display name <span class="muted">optional</span><input name="name" value="{{.Settings.Name}}" placeholder="My local model"></label><label>Endpoint URL<input type="url" name="endpoint" value="{{.Settings.Endpoint}}" required></label><label>Model ID<input name="model" value="{{.Settings.Model}}" required></label><label class="check"><input type="checkbox" name="image_input" value="yes" {{if .Settings.ImageInput}}checked{{end}}> Enable image input (verified when tested)</label><p class="field-help">Declare vision only when supported. Image text can use local OCR when that tool is available.</p><button>Add connection</button></form></section>
+{{else}}
+<section class="panel form-panel"><h2>ChatGPT account</h2>
+ {{if .Accounts}}<div class="account-choices">{{range .Accounts}}<a class="account-choice" href="/settings/models/new?provider=chatgpt&amp;account={{.ConnectionID}}"><strong>{{.AccountLabel}}</strong><span>{{.Status}}</span></a>{{end}}</div>{{end}}
+ {{if .Settings.Account}}{{with .Settings.Account}}<p>Selected account: <strong>{{.AccountLabel}}</strong></p>{{end}}{{else}}<p>Sign in to see the models available to your account.</p>{{end}}
+ <div id="signin-status">{{template "signin" .}}</div>
+ {{if ne .Auth.Status "pending"}}{{if .Settings.Account}}{{if eq .Settings.Account.Status "connected"}}<form method="post" action="/auth/login"><button class="secondary">Connect another account ↗</button></form>{{end}}{{else}}<form method="post" action="/auth/login"><button>Sign in with ChatGPT ↗</button></form>{{end}}{{end}}
+ {{with .Settings.Account}}{{if eq .Status "connected"}}
+  {{if $.Settings.CatalogError}}<div class="feedback warning">The account model list is unavailable. <a href="/settings/models/new?provider=chatgpt&amp;account={{.ConnectionID}}">Try loading it again</a>.</div>
+  {{else if $.Settings.Catalog}}<form method="post" action="/model/add"><input type="hidden" name="account" value="{{.ConnectionID}}"><label>Model ID<select name="model" required>{{range $.Settings.Catalog}}<option value="{{.ModelID}}">{{.ModelID}}</option>{{end}}</select></label><label class="check"><input type="checkbox" name="image_input" value="yes" {{if $.Settings.ImageInput}}checked{{end}}> Enable image input (verified when tested)</label><button>Add account model</button></form>
+  {{else}}<p class="muted">No compatible models were returned for this account.</p>{{end}}
+ {{else}}<form method="post" action="/auth/login"><input type="hidden" name="account" value="{{.ConnectionID}}"><button>Reconnect account</button></form>{{end}}{{end}}
+</section>
+{{end}}
+{{end}}

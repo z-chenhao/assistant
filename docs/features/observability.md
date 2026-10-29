@@ -24,7 +24,7 @@
 
 **需求**：开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。
 
-**当前实现**：Web Developer → Observability 提供 Trace 列表，按 Main / Root、状态和 UTC 时间筛选；Conversation 作为 Session 关联 Main 与后台工作。选中 Trace 后在同页查看 observation 树、时间线和节点详情，支持键盘/原生链接、浏览器前后退与刷新。Main 的 Task 创建/管理回执作为跨 trace 因果链接；Task 页面列出各 epoch 的 Root，Child 在实际 Parent Worker 的 trace 内展示。
+**当前实现**：Web Developer → Observability 提供 Trace 列表，按 Main / Root、状态和 UTC 时间筛选；Conversation 作为 Session 关联 Main 与后台工作。选中 Trace 后进入独立详情，在同一导航区查看对齐的 observation 树/时间线，右侧检查节点详情，支持键盘/原生链接、浏览器前后退与刷新。Main 的 Task 创建/管理回执作为跨 trace 因果链接；Trace 详情的 Task execution 选择器列出各 epoch 的 Root，Child 在实际 Parent Worker 的 trace 内展示。
 
 **边界**：一个 Main Run 或一个 Task epoch 的 Root 执行树是一条 trace；Root 没有 Main parent。每页最多 100 个 observation，分页缺席的 parent 明确标记并可打开；不同分页看到当前提交状态。只读且沿用现有所有者授权。输入/输出与 Task 标题在列表中使用有界预览，节点详情和冻结上下文有完整读取入口；旧元数据 API 仍保持原含义。
 
@@ -36,7 +36,7 @@
 
 **需求**：展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。
 
-**当前实现**：在执行详情点击 Inspect frozen context，按 step 顺序打开已接纳的模型轮次，查看有序 system/user/assistant/tool 消息、工具 Schema、模型响应、压缩来源/省略记录与冻结召回。消息有可读正文和完整存储 JSON 两种视图；JSON 保留工具调用 ID、参数、结果、图片引用及原始来源。相邻轮次可查看新增、移除、变化与移动项，并打开前后完整内容。
+**当前实现**：在 Generation 的 Context Tab 内按 step 顺序打开已接纳的模型轮次，查看有序 system/user/assistant/tool 消息、工具 Schema、模型响应、压缩来源/省略记录与冻结召回。消息有可读正文和完整存储 JSON 两种视图；JSON 保留工具调用 ID、参数、结果、图片引用及原始来源。相邻轮次可查看新增、移除、变化与移动项，并打开前后完整内容。
 
 **边界**：读取 Host 冻结记录，不重新组装 context，不冒充 Bridge/SDK 最终请求。来源 kind/ref、召回 hit、summary_request/working_set、省略引用和 history_artifact 按已存记录呈现；旧记录没有细粒度来源时明确未知，不解析文本猜测来源或自动开放私有压缩归档。Diff 按保存的 source ref / tool call ID 对齐，旧消息按位置、工具按名称、重复键按出现顺序；比较存储项，不做语义相似度匹配。每页最多 40 条，正文每段最多 8192 UTF-8 字节，链接可读完全部正文与 JSON；不静默截断。待完成或失败 generation 不伪造响应，已保存的 clipped 标记在响应 JSON 中保留。
 
@@ -48,7 +48,7 @@
 
 **需求**：开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。
 
-**当前实现**：新版本生产 Bridge 在 SDK 完成 system 合并、工具转换及图片投影后，在实际 HTTP fetch 边界记录独立 attempt。选中 Generation 或 Provider HTTP 节点，打开 **Wire** 查看脱敏最终请求、格式版本、UTC 时间与脱敏正文 hash。HTTP 重试各有独立 attempt，不把 generation 恢复接纳计数当网络次数。
+**当前实现**：新版本生产 Bridge 在 SDK 完成 system 合并、工具转换及图片投影后，在实际 HTTP fetch 边界记录独立 attempt。选中 Generation 或 Provider HTTP 节点，打开 **Requests** 查看脱敏最终请求、格式版本、UTC 时间与脱敏正文 hash。HTTP 重试各有独立 attempt，不把 generation 恢复接纳计数当网络次数。
 
 **边界**：不保存请求头、connection、API key 或 access token；Node 与 Host 都移除已知凭据。图片像素替换为 Artifact 引用（已知时）、预览 JPEG hash、原图/预览尺寸，不保存 Base64。脱敏正文最多 256 KiB，超限保留 hash 与明确省略原因；详情按 8192 字节续读。capture 为 best-effort，旧 Bridge/历史记录、队列溢出、数据库故障或强制退出可留空；缺失不能证明没有发送。开始事件表示 fetch 尝试，响应头事件不代表模型成功或服务端业务接受；原始 SSE 响应正文不另存。
 
@@ -68,13 +68,15 @@
 
 ## 如何使用
 
-登录现有 Web，展开侧栏 **Developer → Observability**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。
+登录现有 Web，点击侧栏 **Developer · Traces**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。
 
 1. 按角色、状态和 UTC 创建时间筛选 Trace；起点包含、终点不包含。点击 Session 查看同一 Conversation 的相关 Trace。
-2. 点击 Main 或 Root，查看三栏：**Trace tree → Timeline → Observation details**。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
-3. 选择 Generation，展开 system/user/assistant/tool 消息与响应；Context 查看准备/来源和工具列表，Diff 比较相邻冻结输入，Wire 查看最终 HTTP 请求，Metadata 查看保存的观测字段。**Inspect frozen context** 继续提供完整 messages / tools / response / provenance / recall，支持长正文连续读取。
+2. 点击 Main 或 Root，进入独立 `/developer/observability/{run}` 详情。左侧 **Trace tree** 的每个节点与时间线条对齐，右侧为 **Observation details**；返回 Traces 保留列表条件。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
+3. Generation 的 Overview 展示有界消息和响应；**Context** 是完整 messages / tools / response / provenance / recall 的唯一阅读器，支持 JSON、来源与长正文连续读取；**Requests** 查看最终 HTTP 请求；存在前一轮时才显示 **Compare**。技术字段收进 **Technical metadata** 折叠区。HTTP 节点只提供 Overview / Requests；其他类型只显示适用内容。
 4. 选择 Tool、Retriever、等待或 HTTP 节点，核对各自保存的数据和时间语义。API/Page 不提供重试、重放、审批或取消动作；无 JavaScript 时原生导航、筛选和分页仍然可用。
-5. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Ongoing work 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
+5. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Tasks 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
+
+旧 `/developer/context` 与带 `?run=` 的书签自动转向规范 Trace 详情，保留 step、section、item、format 与正文偏移；原 API 不变。
 
 这是安装所有者授权下的敏感诊断。原有冻结 context 与新增脱敏最终请求均保留在本地 state.db，沿用其保留及加密备份边界；页面/API no-store，不新增公开访问、导出或第三方发送。观测故障不决定执行或重放。旧元数据 API、CLI `erii ops trace RUN_ID` 保留。
 

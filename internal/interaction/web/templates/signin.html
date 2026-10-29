@@ -1,0 +1,5 @@
+{{define "signin"}}
+{{if eq .Auth.Status "pending"}}<div class="signin-progress" role="status"><strong>Waiting for sign-in</strong><p>Complete the provider's sign-in flow, then return here.</p>{{range .Auth.Events}}{{if .URL}}<p><a class="button secondary" href="{{authURL .URL}}" target="_blank" rel="noreferrer">Continue sign-in in your browser ↗</a></p>{{end}}{{if .DeviceCode}}<p>Device code: <code>{{.DeviceCode}}</code></p>{{end}}{{end}}<form method="post" action="/auth/cancel">{{if .Settings}}{{if .Settings.Profile}}<input type="hidden" name="profile" value="{{.Settings.Profile.ProfileID}}">{{end}}{{end}}<button class="secondary">Cancel sign-in</button></form></div>
+{{else if eq .Auth.Status "connected"}}<div class="feedback success"><p>Account connected.</p><a href="/settings/models/new?provider=chatgpt&amp;account={{.AccountID}}">Choose an account model →</a></div>
+{{else if eq .Auth.Status "reauth_required"}}<p class="feedback warning">Sign-in was not completed. Reconnect when you are ready.</p>{{end}}
+{{end}}

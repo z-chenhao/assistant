@@ -1,13 +1,14 @@
 import {z} from 'zod';
 import {enhanceProjections,releaseProjections} from './projections';
 
-const snapshot=z.object({view:z.enum(['/','/progress','/settings']),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
-const regions={
- '/':['workspace-status','conversation-messages','conversation-approvals'],
- '/progress':['workspace-status','ongoing-work'],
- '/settings':['workspace-status','signin-status'],
-} as const;
-type View=keyof typeof regions;
+const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
+function viewRegions(view:string):string[]|null {
+ if(view==='/')return ['workspace-status','conversation-messages','conversation-approvals'];
+ if(view==='/tasks')return ['workspace-status','ongoing-work'];
+ if(view.startsWith('/tasks/'))return ['workspace-status','task-header','task-progress','task-decisions','task-messages','task-milestones'];
+ if(view.startsWith('/settings/'))return ['workspace-status','signin-status'];
+ return null;
+}
 
 // Cache Host markup, not React's enhanced DOM. Stable keyed islands retain
 // their component state, focus and nodes when unrelated content changes.
@@ -54,9 +55,9 @@ function scrollToLatest(){window.scrollTo({top:document.documentElement.scrollHe
 
 export function startLiveUpdates(){
  const main=document.querySelector<HTMLElement>('main[data-live-view]');
- if(!main||!Object.hasOwn(regions,main.dataset.liveView??''))return null;
- const view=main.dataset.liveView as View;
- const patch=regionPatcher(regions[view]);
+ if(!main)return null;
+ const view=main.dataset.liveView??'';const regionSet=viewRegions(view);if(!regionSet)return null;const regions:readonly string[]=regionSet;
+ const patch=regionPatcher(regions);
  const feedback=document.getElementById('live-update-status');
  const jump=document.querySelector<HTMLButtonElement>('#new-messages');
  let before=Number(main.dataset.liveBefore??0),latest=Number(main.dataset.liveLatest??0);
@@ -82,6 +83,7 @@ export function startLiveUpdates(){
   const timeout=setTimeout(()=>controller.abort(),10000);
   try{
    const query=new URLSearchParams({view});if(before)query.set('before',String(before));
+   if(view==='/tasks'||view.startsWith('/tasks/')){const pageQuery=new URLSearchParams(location.search);for(const key of ['q','cursor','history']){const value=pageQuery.get(key);if(value)query.set(key,value)}const taskView=pageQuery.get('view');if(taskView)query.set('task_view',taskView)}
    const response=await fetch('/api/updates?'+query,{credentials:'same-origin',cache:'no-store',signal:controller.signal,headers:etag?{'If-None-Match':etag}:{}});
    if(current!==generation)return;
    if(response.status===401||response.status===403){accessLost();return}
@@ -89,7 +91,7 @@ export function startLiveUpdates(){
    if(!response.ok)throw new Error('updates unavailable');
    const value=snapshot.parse(await response.json());
    if(current!==generation)return;
-   if(value.view!==view||value.before!==before||regions[view].some(id=>typeof value.regions[id]!=='string'))throw new Error('invalid view');
+   if(value.view!==view||value.before!==before||regions.some(id=>typeof value.regions[id]!=='string'))throw new Error('invalid view');
    const bottom=atBottom(),anchor=viewportAnchor();
    let deferMessages=before!==0;
    if(view==='/'&&!bottom&&!follow&&anchor?.node.dataset.liveKey?.startsWith('message:')){
@@ -98,7 +100,11 @@ export function startLiveUpdates(){
     // that history until the user explicitly jumps to the new messages.
     if(!Array.from(parsed.content.querySelectorAll<HTMLElement>('[data-live-key]')).some(node=>node.dataset.liveKey===anchor.node.dataset.liveKey))deferMessages=true;
    }
-   for(const id of regions[view]){if(id!=='conversation-messages'||!deferMessages||follow)patch(id,value.regions[id])}
+   for(const id of regions){if(id!=='conversation-messages'||!deferMessages||follow)patch(id,value.regions[id])}
+   const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
+   const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;
+   if(send&&form&&!form.dataset.submitting&&readiness){send.disabled=readiness!=='true';const hint=document.querySelector<HTMLElement>('#composer-feedback');if(hint?.dataset.modelNeeded&&readiness==='true'){hint.textContent='';delete hint.dataset.modelNeeded}}
+
    if(view==='/'&&(follow||bottom&&before===0))finishFollow();
    else{
     if(anchor?.node.isConnected)window.scrollBy(0,anchor.node.getBoundingClientRect().top-anchor.top);

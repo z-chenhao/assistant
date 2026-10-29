@@ -111,3 +111,14 @@ func observationIcon(kind string) string {
 func observationParent(id string) string { return strings.TrimPrefix(id, "agent:") }
 func money(m int64) string               { return fmt.Sprintf("%.6f", float64(m)/1e6) }
 func viewJSON(v any) string              { body, _ := json.MarshalIndent(v, "", "  "); return string(body) }
+
+// Tabs are meaningful views of the selected node, never empty destinations.
+func observationTabs(o observability.Observation) []string {
+	if o.Type == "generation" {
+		return []string{"overview", "context", "wire", "diff"}
+	}
+	if o.Name == "Provider HTTP" {
+		return []string{"overview", "wire"}
+	}
+	return []string{"overview"}
+}

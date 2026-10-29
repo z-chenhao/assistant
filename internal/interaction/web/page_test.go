@@ -28,12 +28,13 @@ type progressCore struct{ Core }
 func (progressCore) WebStatus(context.Context) (Status, error)        { return Status{Status: "idle"}, nil }
 func (progressCore) Activity(context.Context) ([]task.Summary, error) { return nil, nil }
 func TestSettingsAndProgressDoNotQueryConversation(t *testing.T) {
-	for _, path := range []string{"/settings", "/progress"} {
+	for _, path := range []string{"/settings/models", "/tasks"} {
 		t.Run(path, func(t *testing.T) {
 			server := &Server{Core: settingsCore{}, Models: settingsModels{}}
-			if path == "/progress" {
+			if path == "/tasks" {
 				server.Core = progressCore{}
 				server.Models = nil
+				server.Tasks = workspaceReader{}
 			}
 			response := httptest.NewRecorder()
 			server.show(response, httptest.NewRequest("GET", path, nil))

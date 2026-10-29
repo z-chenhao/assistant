@@ -46,14 +46,17 @@ func TestInspectionRoutesAuthenticationReadOnlyBoundedAndEscaped(t *testing.T) {
 	if w := request("GET", "/api/developer/executions?limit=1&role=child&status=completed&since=2026-10-28T01:00:00%2B08:00", true); w.Code != 200 || len(reader.queries) != 1 || reader.queries[0].Since.Format("2006-01-02T15:04:05Z07:00") != "2026-10-27T17:00:00Z" {
 		t.Fatal(w.Code, w.Body.String(), reader.queries)
 	}
-	w := request("GET", "/developer/observability?run=root-public", true)
+	w := request("GET", "/developer/observability/root-public", true)
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	for _, text := range []string{"Developer", "Traces", "Task root · no parent Worker", "Created by", "Main", "&lt;img src=x", "Trace tree", "Older executions"} {
+	for _, text := range []string{"Developer", "Traces", "Task root · no parent Worker", "&lt;img src=x", "Trace tree"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing inspector behavior", text)
 		}
+	}
+	if strings.Contains(w.Body.String(), `class="obs-trace-list"`) {
+		t.Fatal("detail reloaded the execution list")
 	}
 	if strings.Contains(w.Body.String(), `<img src=x`) || strings.Contains(w.Body.String(), `id="composer-root"`) {
 		t.Fatal("unsafe title or conversation dependency in inspector")

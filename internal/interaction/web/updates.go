@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/z-chenhao/erii/internal/llm"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 // updates is a view of committed product data, not an event log or a second
@@ -14,17 +17,24 @@ import (
 func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 	p := page{Tab: r.URL.Query().Get("view")}
 	fragments := map[string]string{"workspace-status": "status"}
-	switch p.Tab {
-	case "/":
+	switch {
+	case p.Tab == "/":
 		fragments["conversation-messages"], fragments["conversation-approvals"] = "conversation", "approvals"
-	case "/progress":
-		fragments["ongoing-work"] = "progress"
-	case "/settings":
+	case p.Tab == "/tasks":
+		fragments["ongoing-work"] = "tasks-list"
+	case strings.HasPrefix(p.Tab, "/tasks/"):
+		fragments["task-header"] = "task-header"
+		fragments["task-progress"] = "task-progress"
+		fragments["task-decisions"] = "task-decisions"
+		fragments["task-messages"] = "task-messages"
+		fragments["task-milestones"] = "task-milestones"
+	case strings.HasPrefix(p.Tab, "/settings/"):
 		fragments["signin-status"] = "signin"
 	default:
 		fail(w, 400)
 		return
 	}
+
 	var err error
 	if p.Cursor, err = conversationCursor(r); err != nil || p.Cursor != 0 && p.Tab != "/" {
 		fail(w, 400)
@@ -34,16 +44,36 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503)
 		return
 	}
-	switch p.Tab {
-	case "/":
+	switch {
+	case p.Tab == "/":
 		err = s.loadConversation(r.Context(), &p)
-	case "/progress":
-		p.Activity, err = s.Core.Activity(r.Context())
-	case "/settings":
+	case p.Tab == "/tasks" || strings.HasPrefix(p.Tab, "/tasks/"):
+		copy := r.Clone(r.Context())
+		u := *r.URL
+		u.Path = p.Tab
+		q := url.Values{}
+		for _, key := range []string{"q", "cursor", "history"} {
+			if value := r.URL.Query().Get(key); value != "" {
+				q.Set(key, value)
+			}
+		}
+		if value := r.URL.Query().Get("task_view"); value != "" {
+			q.Set("view", value)
+		}
+		u.RawQuery = q.Encode()
+		copy.URL = &u
+		err = s.loadTasks(r.Context(), copy, &p)
+	default:
 		s.mu.Lock()
 		p.Auth = s.auth
+		p.AccountID = s.accountID
 		s.mu.Unlock()
+		p.Settings = &settingsView{}
+		if strings.HasPrefix(p.Tab, "/settings/models/") && p.Tab != "/settings/models/new" {
+			p.Settings.Profile = &llm.Profile{ProfileID: strings.TrimPrefix(p.Tab, "/settings/models/")}
+		}
 	}
+
 	if err != nil {
 		fail(w, 503)
 		return
