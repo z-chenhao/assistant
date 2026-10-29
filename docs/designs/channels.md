@@ -36,7 +36,7 @@ Web POST 分发只选择有名动作处理函数；消息/附件、模型、账�
 
 浏览器每秒读取一次，单一调度链与请求取消防止过时响应覆盖新视图；单次 10 秒 deadline，网络失败最多退避到 30 秒。隐藏/离开页面时取消读取，返回时立即刷新。401/403 停止轮询并保留当前页面，另页登录和显式重试不会重建输入节点。设置表单不参与后台替换，避免覆盖用户填写或悄悄更换模型。
 
-前端职责拆分为：`main.tsx` 仅启动；`composer.tsx` 负责输入与早期草稿交接；`projections.tsx` 负责受控 UISpec 和 React root 生命周期；`live-updates.ts` 负责读取、区域协调、阅读位置与连接状态。按稳定消息 sequence/TaskRef/审批 ID 复用不变的组件节点，只释放被移除的 React root。文件选择器不序列化到网络或本地存储，也不随刷新重挂载。读者锚点移出最新 100 条窗口时保留当前内容，用户点击新消息提示后才切换。
+前端职责拆分为：`main.tsx` 仅启动；`composer.ts` 只为原生输入区应用共享控件样式，不替换 DOM；`projections.tsx` 负责受控 UISpec 和 React root 生命周期；`live-updates.ts` 负责读取、区域协调、阅读位置与连接状态。按稳定消息 sequence/TaskRef/审批 ID 复用不变的组件节点，只释放被移除的 React root。文件选择器不序列化到网络或本地存储，也不随刷新重挂载。读者锚点移出最新 100 条窗口时保留当前内容，用户点击新消息提示后才切换。
 
 审批仍使用 `POST /approval`；渐进增强请求通过 `Accept: application/json` 获取接受回执，原 HTML 表单继续使用 303。前端只提交用户所点表单的 ID、原冻结哈希和决定，每次交互发送一次。确认丢失或旧审批失效时读取当前投影，不自动重发决定、不把旧同意转给新审批，也不把回执当成外部动作完成。
 
@@ -94,13 +94,14 @@ outbound file retains its name and exact bytes. Missing/oversized resources fail
 closed rather than exposing a host path or silently sending the wrong attachment.
 
 The Web shell uses the requested ChatGPT-style neutral layout, locally bundled
-ad-agent Button/Card/Textarea components, OpenIntelligentUI's native DataTable,
+ad-agent Button/Card components and shared native-control styles, OpenIntelligentUI's native DataTable,
 and the original Eri character logo/default agent avatar. The React layer only
-enhances fixed UISpec v1 components and existing forms; it does not add a second
+enhances fixed UISpec v1 components; it does not add a second
 Agent or model connection. Server rendering remains the semantic fallback.
-The composer preserves text, selected files, focus/selection and the source ID
-when the local bundle takes over an already usable server form. A delayed-bundle
-browser regression enters real input before that handoff and then submits once.
+The composer keeps its server-rendered form and input nodes throughout enhancement.
+Shared control styles apply without replacing text, focus, source identity, selected
+files or an open native picker. Delayed-bundle browser regressions cover both a
+selected attachment and a picker whose selection finishes after the bundle loads.
 No frontend asset requires an external request. Source revisions, local changes,
 MIT/Apache-2.0 notices, build and verification commands are recorded in
 `web/README.md`; bundled notices are at `/licenses.txt`.
@@ -219,7 +220,7 @@ the existing forms and semantic fallback remain usable without JavaScript.
 
 | Source | Revision | Reused code or asset | Local changes |
 | --- | --- | --- | --- |
-| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card,textarea}.tsx`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Erii supplies layout, routes and content |
+| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Erii supplies layout, routes and content |
 | [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | `apps/app/src/components/generative-ui/table-catalog.tsx` native `DataTable` and Zod props | Remove the CopilotKit catalog registration/import; retain validation and accessible table; map the existing UISpec table through a private adapter |
 | [eri](https://github.com/z-chenhao/eri) | `f4dcf11f29d17a2be517acb2a50dad08318edc40` | `assets/brand/eri-icon-192.png`, `eri-favicon-32.png` | Original bytes; the same character is the logo and default agent avatar |
 
@@ -243,6 +244,8 @@ replacement fallback supplied inside a projection. There is no HTML evaluator,
 dynamic component import, remote asset or browser credential input.
 
 ## Changelog
+
+2026-10-29：输入区保留原生表单与文件选择器 DOM，只复用共享控件样式；修复脚本加载期间打开文件选择器后附件丢失的问题。真实浏览器延迟 bundle 后跨加载完成图片选择并核对实际 Pi HTTP pixels。
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

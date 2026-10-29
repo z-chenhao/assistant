@@ -59,6 +59,7 @@ type Client struct {
 	next             atomic.Uint64
 	resolver         Resolver
 	observer         Observer
+	dispatchObserver func(llm.GenerationRequest, llm.Dispatch)
 }
 
 type initialization struct {
@@ -212,6 +213,15 @@ func (p *process) read(out io.Reader) {
 				select {
 				case ch <- f:
 				default:
+				}
+			}
+		} else if f.ID == 0 && f.Method == "generation.observation" {
+			var header struct {
+				GenerationID string `json:"generation_id"`
+			}
+			if json.Unmarshal(f.Params, &header) == nil {
+				if stream := p.events[header.GenerationID]; stream != nil {
+					stream.observe(f.Params)
 				}
 			}
 		} else if f.ID == 0 && f.Method == "generation.event" {
@@ -455,14 +465,19 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 			sink(*completed)
 		}
 	}()
+	c.mu.Lock()
+	capture := c.dispatchObserver
+	c.mu.Unlock()
+	observe := capture != nil && r.OwnerToken != ""
 	images, imageErr := resolveImages(ctx, r)
 	if imageErr != nil {
 		return llm.GenerationResult{}, imageErr
 	}
 	var params any = struct {
 		llm.GenerationRequest
-		Images map[string]imagePayload `json:"images,omitempty"`
-	}{r, images}
+		Images  map[string]imagePayload `json:"images,omitempty"`
+		Observe bool                    `json:"observe,omitempty"`
+	}{r, images, observe}
 	if c.resolver != nil {
 		resolved, resolveErr := c.resolver(ctx, r.Snapshot)
 		if resolveErr != nil {
@@ -473,7 +488,8 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 			llm.GenerationRequest
 			Connection Connection              `json:"connection"`
 			Images     map[string]imagePayload `json:"images,omitempty"`
-		}{r, connection, images}
+			Observe    bool                    `json:"observe,omitempty"`
+		}{r, connection, images, observe}
 	}
 	if ctx.Err() != nil {
 		return llm.GenerationResult{}, llm.GenerationCancelled
@@ -489,6 +505,10 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, err
 	}
 	stream = newEventStream(r.GenerationID, r.Snapshot.MaxOutputTokens)
+	if observe {
+		stream.capture = func(d llm.Dispatch) { capture(r, d) }
+		stream.wireSecrets = []string{connection.APIKey, connection.AccessToken}
+	}
 	if r.OutputLimitBytes > 0 && r.OutputLimitBytes < stream.remaining {
 		stream.remaining = r.OutputLimitBytes
 	}

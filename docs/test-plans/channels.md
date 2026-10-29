@@ -132,8 +132,10 @@ action also drives model setup, file upload and actual message submission.
 It deliberately holds the local JavaScript bundle while entering a draft and
 selecting an attachment through the usable server form, then releases it and
 checks text, file bytes, focus, selection and source identity before submitting.
-The composer snapshots and synchronously mounts in one browser task so early
-input cannot be lost during progressive enhancement.
+The composer retains the native form and input nodes and only applies shared
+control styles. The existing image scenario also holds the bundle while opening
+a native picker, completes selection after enhancement, then verifies scoped
+pixels at the actual Pi HTTP peer; text-only and recovery checks still apply.
 
 ## 执行与完成判定
 

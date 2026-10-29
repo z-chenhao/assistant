@@ -71,7 +71,7 @@ func TestImagePreviewBoundsAndEnvelopeSelection(t *testing.T) {
 	}
 }
 
-func TestExplicitScopedImageIsSentToActualPiAndNeverObserver(t *testing.T) {
+func TestExplicitScopedImageIsSentToActualPiAndSanitizedObservation(t *testing.T) {
 	ctx := context.Background()
 	var pngBytes bytes.Buffer
 	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
@@ -103,8 +103,10 @@ func TestExplicitScopedImageIsSentToActualPiAndNeverObserver(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	captured := make(chan llm.Dispatch, 16)
+	client.SetDispatchObserver(func(_ llm.GenerationRequest, d llm.Dispatch) { captured <- d })
 	hash, _ := llm.EndpointHash(endpoint)
-	req := llm.GenerationRequest{GenerationID: "image", RunID: "run", SessionID: "run", Snapshot: llm.Snapshot{SnapshotID: "s", ProviderKind: "openai_compatible", WireAPI: "openai_completions", EndpointHash: hash, ModelID: "fixture-model", ContextWindow: 8192, MaxOutputTokens: 1024, Capabilities: llm.Capabilities{ImageInput: true}, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}}, Messages: []llm.Message{{Role: "user", Text: "selected image", ImageRefs: []string{"artifact:allowed"}}}, ResolveImage: func(_ context.Context, ref string) (string, []byte, error) {
+	req := llm.GenerationRequest{OwnerToken: "host-observation-test", GenerationID: "image", RunID: "run", SessionID: "run", Snapshot: llm.Snapshot{SnapshotID: "s", ProviderKind: "openai_compatible", WireAPI: "openai_completions", EndpointHash: hash, ModelID: "fixture-model", ContextWindow: 8192, MaxOutputTokens: 1024, Capabilities: llm.Capabilities{ImageInput: true}, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}}, Messages: []llm.Message{{Role: "user", Text: "selected image", ImageRefs: []string{"artifact:allowed"}}}, ResolveImage: func(_ context.Context, ref string) (string, []byte, error) {
 		if ref != "artifact:allowed" {
 			t.Fatal("unselected read", ref)
 		}
@@ -113,6 +115,16 @@ func TestExplicitScopedImageIsSentToActualPiAndNeverObserver(t *testing.T) {
 	result, err := client.Generate(ctx, req, nil)
 	if err != nil || result.Text != "seen" {
 		t.Fatal(result, err)
+	}
+	var wire []byte
+	for len(captured) > 0 {
+		d := <-captured
+		if d.Phase == "started" {
+			wire = d.Body
+		}
+	}
+	if !bytes.Contains(wire, []byte("artifact:allowed")) || !bytes.Contains(wire, []byte("sha256")) || bytes.Contains(wire, []byte("base64")) || bytes.Contains(wire, []byte("data:image")) {
+		t.Fatal("image observation not safely correlated", string(wire))
 	}
 	req.Snapshot.Capabilities.ImageInput = false
 	req.ResolveImage = func(context.Context, string) (string, []byte, error) {

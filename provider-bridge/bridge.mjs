@@ -1,4 +1,5 @@
 // Private protocol v1. Only this module imports Pi; no domain, Tool, or Computer access.
+import {wireObserver,dispatchID} from './observability.mjs';
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript';
 import { stream } from '@earendil-works/pi-ai/api/openai-completions';
 import { AccountAuth, accountCatalog, API } from './account.mjs';
@@ -25,7 +26,7 @@ function endpoint(value) {
 
 // Pi's SDK requires a nonempty constructor key. The transport owns Authorization:
 // the SDK-only placeholder is always removed before any network request.
-function transport(connection, signal, state) {
+function transport(connection, signal, state, observe=()=>{}) {
   const base = endpoint(connection.endpoint);
   return async (input, init = {}) => {
     const u = new URL(typeof input === 'string' ? input : input.url ?? input.toString());
@@ -36,10 +37,15 @@ function transport(connection, signal, state) {
     if (connection.api_key) headers.set('authorization', `Bearer ${connection.api_key}`);
     for (let attempt = 0; attempt < 3; attempt++) {
       let response;
+      const attemptID=dispatchID();
+      const requestSignal=init.signal ? AbortSignal.any([signal,init.signal]) : signal;
+      if(requestSignal.aborted)fail('GENERATION_CANCELLED');
       try {
-        const requestSignal=init.signal ? AbortSignal.any([signal,init.signal]) : signal;
+        observe('started',attemptID,init.body);
         response = await fetch(u, { ...init, headers, signal:requestSignal, redirect: 'manual' });
+        observe('headers',attemptID,null,response.status);
       } catch (error) {
+        observe('error',attemptID,null,0,signal.aborted?'GENERATION_CANCELLED':'PROVIDER_UNAVAILABLE');
         if (signal.aborted) fail('GENERATION_CANCELLED');
         if (attempt < 2 && ['ECONNRESET','ECONNREFUSED','EPIPE','ETIMEDOUT','EAI_AGAIN','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET'].includes(error.cause?.code)) { await delay(50 * 2 ** attempt, undefined, { signal }); continue; }
         state.code = 'PROVIDER_UNAVAILABLE'; fail(state.code);
@@ -170,7 +176,7 @@ async function generate(r, job, send) {
     const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'erii-local',baseUrl:r.connection.endpoint,reasoning:false,input:s.capabilities?.image_input?['text','image']:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
     // Optional compatibility and sampling stay conservative until individually probed.
     if(isAccount) {model.api='openai-responses';model.provider='openai';model.baseUrl=API;model.compat={supportsDeveloperRole:false,supportsStrictMode:false,supportsMaxOutputTokens:false};}
-    const guardedFetch=transport(r.connection,job.controller.signal,state);
+    const guardedFetch=transport(r.connection,job.controller.signal,state,wireObserver(r,send));
     const fetcher=isAccount ? async(input,init)=>{
       const body=JSON.parse(init.body);
       if(body.tools?.length) body.tools=[{type:'namespace',name:'erii',description:'Erii tools',tools:body.tools}];

@@ -115,16 +115,20 @@ var nativeExecutionSQL string
 //go:embed migrations/030_inspection.sql
 var inspectionSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL}
+//go:embed migrations/031_dispatch_observations.sql
+var dispatchObservationsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL}
 
 type Store struct {
-	inspector *inspectionsqlite.Inspector
-	scheduler atomic.Pointer[agent.SchedulerLimits]
-	nextRun   *sql.Stmt
-	activeRun *sql.Stmt
-	db        *sql.DB
-	path      string
-	artifacts *artifactsqlite.Store
+	inspector  *inspectionsqlite.Inspector
+	dispatches *inspectionsqlite.Recorder
+	scheduler  atomic.Pointer[agent.SchedulerLimits]
+	nextRun    *sql.Stmt
+	activeRun  *sql.Stmt
+	db         *sql.DB
+	path       string
+	artifacts  *artifactsqlite.Store
 	// MainBoundary is explicit fault injection; production composition leaves it nil.
 	MainBoundary func(string)
 }
@@ -199,6 +203,7 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 	if err != nil {
 		return nil, errors.Join(err, s.Close())
 	}
+	s.dispatches = inspectionsqlite.NewRecorder(path)
 	return s, nil
 }
 
@@ -321,6 +326,9 @@ func (s *Store) Diagnostics(ctx context.Context) (agent.Diagnostics, error) {
 }
 
 func (s *Store) Close() error {
+	if s.dispatches != nil {
+		_ = s.dispatches.Close()
+	}
 	var inspectionErr error
 	if s.inspector != nil {
 		inspectionErr = s.inspector.Close()

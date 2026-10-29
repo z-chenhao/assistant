@@ -1,3 +1,4 @@
+import {enhanceObservability} from './observability';
 import {enhanceComposer} from './composer';
 import {enhanceProjections} from './projections';
 import {startLiveUpdates} from './live-updates';
@@ -8,3 +9,5 @@ const live=startLiveUpdates();
 enhanceProjections();
 enhanceComposer();
 live?.start();
+
+enhanceObservability();

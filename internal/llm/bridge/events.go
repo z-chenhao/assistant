@@ -24,6 +24,9 @@ type eventDelivery struct {
 // goroutine. The mailbox holds every allowed distinct event plus one rejection,
 // so a slow sink never blocks the shared RPC reader.
 type eventStream struct {
+	capture      func(llm.Dispatch)
+	wireSecrets  []string
+	observed     int
 	events       chan eventDelivery
 	id           string
 	sessionID    string

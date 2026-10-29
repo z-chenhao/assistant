@@ -1,92 +1,86 @@
-# Developer Observability 执行检查器：技术方案
+# Developer Observability：技术方案
 
 [功能与需求](../features/observability.md) · [测试方案](../test-plans/observability.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-29。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+最近核对：2026-10-29。当前实现对齐 Langfuse 的观测概念与浏览体验；视觉沿用 Erii 的共享主题、控件和间距，只有状态使用语义颜色。运行状态、冻结请求和重放仍由 Erii 持有。参考 [Core concepts](https://langfuse.com/docs/observability/data-model)、[Observation types](https://langfuse.com/docs/observability/features/observation-types) 与 [Good traces](https://langfuse.com/docs/observability/best-practices)。跨功能语义服从 [运行时契约](runtime-contracts.md)。
 
 ## 当前架构
 
-Host 保存冻结模型交换、工具与恢复数据；Bridge 继续转换 system、工具命名空间和图片。F-031 已通过独立只读查询接通 Web 执行列表和因果关系检查；CLI trace 和本地日志保留。F-034 接通冻结 context、来源与 Diff；最终请求观测和调用/用量时间线仍待实现。
-
 ```mermaid
-flowchart TD
-    H["Host：召回 / 压缩"] --> G["model_generation：冻结请求与结果"]
-    G --> B["Provider Bridge / SDK 转换"]
-    B --> P["供应商请求"]
-    T["run_trace / tool_invocation / usage"] --> O["ops trace：简化投影"]
-    R["Run / Task / 原始 Task 回执"] --> Q["独立只读连接与有界关系查询"]
-    Q --> X["Web Developer / Observability：F-031"]
-    G --> F["逐轮上下文 / 来源 / Diff：F-034"]
-    F --> X
+flowchart LR
+    A[Agent / Tools / Replay] --> S[权威 state.db]
+    B[Bridge 最终 HTTP 边界] --> C[脱敏、限额、可丢弃邮箱]
+    C --> D[独立短写连接 / dispatch_observation]
+    S --> Q[独立只读查询池]
+    D --> Q
+    Q --> W[Web: Trace tree / Timeline / Detail]
 ```
 
-## 当前流程与目标差异
+- **Session**：Conversation ID，关联多次 Main 执行与后台 Task epoch。
+- **Trace**：一次 Main Run 或一个 Root epoch 的执行树。Child 仍属于其 Root trace；Main 创建 Task 的原始回执建立跨 trace 因果关联，不把 Root 显示成 Main 的 Child。
+- **Observation**：Agent、Generation、Tool、Retriever、上下文准备、审批等待、工具执行片段、HTTP attempt 和事件。投影读取实际 parent / invocation ID，不从自然语言或时间顺序猜测关系。
 
-当前：每轮组装上下文 → 保存冻结请求 → Bridge 转换 → 发送 → 保存结果/usage。最新目标：只读聚合这些记录 → 关联执行与尝试 → 在 Web 检查；发送边界补记录脱敏后的最终请求。
+状态数据库是业务权威。除新增独立的可丢失 dispatch 证据外，页面直接投影已有记录，不建设第二个调度/重放引擎。
 
-- **F-031**：已实现列表、角色/状态/UTC 时间筛选、稳定 keyset 分页、原始 Main→Task 回执关联和真实 Root/Child 树；保留返回对话/任务的导航。仅提供关系元数据，不将后续 context/dispatch 功能列为已完成。
-- **F-034**：已从 model_generation、context_compaction、run_recall 提供逐轮只读检查、完整有序消息、工具/响应、已记录来源与省略记录，以及相邻输入 Diff。
-- **F-035**：Bridge 会合并 system、转换工具并加入图片；当前缺完整发送边界观测记录。 在最终发送边界保存受控脱敏记录，标识发送尝试与转换版本；凭据和图片 Base64 不进入普通轨迹。
-- **F-036**：调用、trace、generation 与 usage 数据已有，CLI 只提供有限投影。 聚合模型/工具时间线、状态、已有 Token/耗时；区分 Generation、dispatch attempt 和结果复用。
+## 查询与模块边界
 
-## F-031 当前实现与模块边界
+- `observability/trace.go` 定义查询与投影；`observability/sqlite/traces.go` 负责 Trace/Session、指标与有界 observation 页，`observation_sources.go` 明确各权威表的统一字段，`trace_detail.go` 只读取所选节点的允许正文。
+- 复用原独立只读池：`mode=ro`、`query_only(1)`、最多 2 个连接；按当前 Agent 限定 trace 和每次详情读取。Main/Root 列表默认 40、最多 100，按不可变创建时间和 ID keyset 分页；observation 每页最多 100，游标绑定 Root trace。缺席的 parent 显示为页外片段，所选节点可独立读取。
+- 详情不返回完整 model_snapshot、配置、所有权 token 或 connection。`content.go` 是冻结 context、Tool 和 Wire 正文共用的 UTF-8 字节分段实现；每段最多 8192 字节，支持 NUL、中文和 emoji，完整内容通过续读读取，拒绝非法偏移。
+- Web 依赖自己的 `TraceReader`、`ContextReader`、`ExecutionReader` 小接口；App 只绑定同一检查器。查询状态、服务端视图计算、正文模板、渐进导航和样式各自归属功能文件，不扩充 Conversation Core。旧重复关系页被新详情页替换；既有 `/api/developer/executions` 与 `/relationships` 元数据接口语义保留。
+- 新 GET API：`/api/developer/traces`、`/api/developer/observations`、`/api/developer/observation-body`。页面与 API 总期限 3 秒；非法查询 400，缺失/越界节点 404，读故障 503 且不泄露底层错误。沿用 loopback、binding、token/session、CSP、no-store；正文普通转义，SVG 使用数值属性，不注入动态内联脚本/样式。
+- 同页读取之间可看到不同的已提交状态；不承诺整次浏览或跨页数据库快照。刷新获取最新状态。原生链接无 JS 可用；渐进导航仅替换 workbench，保存树/时间线滚动位置与 URL/history，不轮询、不调度工作。
 
-- `observability/inspection.go` 定义执行、Task 节点、回执关系和查询边界。`observability/sqlite` 持有 SELECT 和 keyset 游标；Web 消费自己的 `ExecutionReader` 小接口，不扩充 Conversation/action Core，也不取得领域数据库句柄。App 只绑定依赖。
-- 状态库仍使用原有单写连接。Store 另持有检查器的惰性只读池（最多 2 个连接），查询同一 state.db，DSN 使用 `mode=ro` 与 `query_only(1)`；开启检查页时才建立物理连接。关系查询使用短只读快照，API/Page 总期限 3 秒。观察读取失败只使该页面返回不可用，不调度 Agent、不修改状态、不占用 Runtime 的写连接。Store.Close 同时关闭检查器。
-- 执行列表按 `(created_at, run_id)` 倒序，支持 Main/Root/Child、状态和创建时间 `[since, until)`；Task 树与 Main 的回执按创建/接纳时间正序。每页默认 40、最多 100，读取多一行决定是否还有后续页，不执行全表 COUNT 或一次加载整个任务树。游标绑定列表/指定 Main/指定 Task，分页排序字段不可变；每页看到当前提交状态，不承诺跨页一致性快照。
-- Main→Task 关联读取 `task_request` 的原始提交回执，再关联来源 ToolInvocation 和 Task。`task_invocation` 中复用的回执不作为新的创建关系。Task 的创建者只取原始 create 回执；缺失时保持未知。接纳时间与实际 dispatch/完成时间分开，不推测 F-036 数据。
-- Root/Child 与深度、Root ID、Task epoch 直接读取 Run 记录，Root 的 Parent 为空；页面不把 Main 当作 Root 的父 Run。同一页按真实 Parent 分支排列，避免并行兄弟与晚创建孙节点的时间顺序造成错误缩进。分页中缺席的 Parent 明确标记为页外并保留直接链接，选中 Worker 自身的 Parent/Root 不随当前树页裁掉。Task 标题最多 240 字符，裁切有标记；不读取/返回 checkpoint、prompt、工具正文、模型配置或凭据。绑定当前 Agent，未知和其他 Agent 的选择均返回 404。
-- Web 复用现有 token/session、loopback、binding、CSP 和 no-store 边界；新 GET API 为 `/api/developer/executions`（role/status/since/until/cursor/limit）及 `/api/developer/relationships`（run 或 task、relations_after、limit）。非法过滤器/游标返回 400，缺失资源 404，读故障 503，不泄露底层错误。POST 没有观察动作入口。公开绑定的标题和 ID 使用普通模板转义。
-- 公共布局和 Conversation、Settings、Progress、Observability 分别放入 Web 的嵌入 HTML 模板，保持现有 React islands、草稿和实时更新边界。F-031 使用完整服务端 HTML，无 JavaScript 也可用；不增加轮询/前端状态管理或通用插件框架。
+## 时间、用量与恢复
 
-迁移：state schema 30 只新增执行列表/状态/Task 排序与回执关联索引，不重写记录、模型/能力快照、请求、审批或恢复键。原有已接纳执行继续使用原冻结内容。升级前停止旧进程，统一使用支持 schema 30 的二进制。
+| 节点/指标 | 语义 |
+| --- | --- |
+| Agent / Tool lifecycle | 接纳到终态的 wall time，可能包含排队和等待 |
+| Generation | 冻结接纳到保存结果；不是一次 HTTP dispatch |
+| Provider HTTP | 发送尝试到收到响应头；不冒充完整推理/stream 耗时 |
+| Provider operation | 既有 usage ledger 的 latency_ms，包含 provider 准备和流式读取 |
+| Approval / spend wait | 实际授权创建到决定；未决定时结束未知 |
+| Execute tool | 新事件中的 invocation ID 关联的 start/end 片段；缺事件不推断 |
+| Retriever / context | 已保存时间点；历史记录没有开始时间时不给虚构耗时 |
+| Result reuse | 从已接纳结果继续的事件；不新增 generation、usage 或外部调用 |
 
-## F-034 当前实现与模块边界
+Agent Loop 在实际复用结果和成功提交等待后发出 best-effort 事件；Tool 事件保留真实 invocation ID。旧记录没有该字段时不以跨 generation 可重复的 provider call ID 配对。事件缺失只保留未知，不改变权威执行。
 
-- `observability/context.go` 持有轮次、内容分段、Diff 及校验类型。`observability/sqlite/context.go` 在原只读池中聚合已接纳的 generation、对应压缩与召回，不导入 Agent、当前 checkpoint 或运行配置。Web 消费独立 `ContextReader`，使用自己的 `context.go` 与 `templates/context.html`；App 只绑定同一检查器。既有关系查询和 Conversation Core 不扩充内容访问职责。
-- 轮次按不可变 step_index 正序 keyset 分页，每页 40；选择轮次后，在短只读快照中查询元数据和当前 section。消息/工具/召回按原数组索引分页，响应与 provenance 作为各自单项；缺失或失败响应明确未知。未到模型接纳的准备阶段不伪造 generation。无 schema 或冻结格式变化，schema 继续为 30，老请求/审批/恢复键原样保留。
-- SQL 只投影 messages、tools、已完成 result_json、provenance_json 与 hits_json，不将整个 request_json 或 model_snapshot 返回 Web。每次最多返回 40 项元数据和 8192 字节正文。使用 BLOB 字节切片保留嵌入 NUL，再收齐 UTF-8 边界；续读游标单调前进，JSON 与可读 text 各自有完整入口。切换轮次/section/item 时清除依赖的内容偏移，避免新选择沿用旧裁切位置。UI 不需要 JavaScript。
-- 相邻轮次是同一 Run 中严格更早的最大 step；step 可不连续。只比较冻结 messages/tools。消息以非空 source.ref、其次 tool_call_id、最后原位置为键，工具以名称为键；重复键加出现序号。SQL 对已有项做精确比较，返回 added/removed/changed/moved、前后索引，分页 40 项；完整内容通过原轮次读取，不复制大段前后正文。不根据自然语言猜测身份或相似性。
-- 来源按冻结 ContextSource、原工具调用 ID、召回 hit 与 compaction provenance 展示；压缩摘要、history_artifact、source_refs、omitted_images 保留原字段。已有引用可定位历史记录，缺失的细粒度归因保持未知。检查器不解析不可信正文来推导权威关系，不解密/检索当前 Memory，不读取或授予 Run-only Artifact 字节。原始输入可继续在历史轮次核对。
-- 入口 `/developer/context?run=...` 从执行详情导航；GET API 为 `/api/developer/rounds`、`/api/developer/context`、`/api/developer/context-diff`。按当前 Agent 绑定 Run；不存在、其他 Agent 或不存在的 step/item 返回 404，非法查询 400，读取失败 503 且不泄露底层错误。每个页面/API 总期限 3 秒，保持最多 2 个独立只读连接，不阻塞单写连接或参与调度。
-- 隐私/保留：这是同一工作区所有者授权下的敏感正文检查，复用 loopback、binding、token/session、CSP 与 no-store。消息普通转义，不执行 HTML，不读取凭据引用、所有权 token 或媒体 Base64。直接读取既有权威记录，不新增副本、缓存、导出或保留机制；已有数据保留、删除与备份语义不变。未来外部导出或多用户访问需另行设计。
+指标仅汇总唯一 model_generation 关联的 provider_usage 与 spend_reservation；HTTP 重试和 reuse 不倍增。部分 usage 标明已知记录数，费用直接读取已结算账本、按币种分开；不使用当前价格推算历史，不将缺失 usage、价格或 duration 补零。
 
-## 后续待实现方案
+## F-034 冻结上下文
 
-下图区分已实现的关系/context 检查与尚待实现的发送边界、dispatch/usage；当前不把 generation 状态解释为外部发送次数。
+逐轮内容继续由 `model_generation`、`context_compaction` 和 `run_recall` 提供，读取 Host 冻结输入、原始 Schema 与接受结果，不从当前 checkpoint/Memory 重建。Generation 详情默认按角色展示有界预览；完整消息、来源、Schema、压缩记录和旧/新内容由冻结上下文页与 Diff 入口读取。
 
-```mermaid
-flowchart TD
-    S["已有执行关系"] --> Q["只读关系查询：已实现"]
-    G["逐轮上下文 / 来源 / Diff：已实现"] --> Q
-    B["Bridge 最终发送边界"] --> W["脱敏请求观测：待实现"]
-    W --> Q
-    Q --> U["Developer / Observability：关系入口已实现"]
-    U -.-> V["最终请求 / dispatch / usage：待实现"]
-```
+相邻输入比较同一 Run 的前一个已存 step，step 不要求连续。消息按 source.ref / tool_call_id / 旧位置，工具按名称，重复键按出现序号对齐，精确区分 added/removed/changed/moved，不做语义猜测。原始归档只显示引用，不因观测授予 Run-only Artifact 访问。
 
-Main 创建 Task 是因果关联，不把 Root 伪装成 Main 的 Child Run。Generation 与实际 dispatch attempt 分开；已保存结果的复用、未发送等待、取消和恢复都要标明。
+## F-035 最终 HTTP 证据
 
-Host 请求、Bridge/SDK 转换结果和脱敏供应商请求必须分层展示；图片用授权引用、尺寸和哈希描述，不把 Base64 或凭据写入普通轨迹。请求正文的隐私访问、保留与导出策略在实现前明确，观测故障不能破坏权威执行。
+- `provider-bridge/observability.mjs` 独立拥有脱敏与限额；`bridge.mjs` 在最终 SDK fetch 前和 headers/error 后通知。Account 路径也在 namespace 转换之后采集。每次重试独立 attempt ID，携带 generation ID、UTC 微秒时间、capture/SDK 格式版本、脱敏正文 hash 和状态。
+- `generation.observation` 是私有 RPC 的可选、独立诊断通知。只有 Host 在冻结请求外设置 observe 时才发送；不占用 generation.event 序号，不进入请求哈希或 Capability/ModelSnapshot。旧 peer 不产生证据时明确未知；probe 不持久化为业务 observation。
+- 不采集请求头/connection；Node 和 Host 都移除已知凭据。图片替换为已知 Artifact 引用、预览 JPEG hash 与原图/预览尺寸；不是原图像素 hash。正文最多 256 KiB，超限保留 hash/原因，不能当逐字原包或用于重放。模型输出仍来自既有已接受结果，不复制原始 SSE 流。
+- Host `bridge/observations.go` 校验 registration、字段与上限，诊断错误/回调 panic 不拒绝 generation。`observability/sqlite/recorder.go` 使用 32 条非阻塞邮箱与独立单写连接，busy_timeout 25ms、单条总写期限 100ms；只在该预算内重试本地幂等 INSERT 的 SQLITE_BUSY/LOCKED，其他失败或超时/拥塞可丢弃。Provider 无数据库访问；Web 不取得写连接。App 关闭 provider 后再排空 recorder，强制退出允许留空；已终结的 generation/Run 缺少 HTTP 结束证据时显示 unknown，不冒充仍在请求或补造结束时间。
+- capture 的 started 仅证明 fetch 尝试，headers 仅证明响应头被收到；取消、网络错误、丢失事件与终态不确定性各自保留。generation.attempt_count 不能被解释为 HTTP 次数，工具 Host execution starts 也不等于实际网络次数。
 
-F-031 交付列表和执行关系，F-034 交付逐轮消息、Tool Schema/响应与来源/Diff；后续按 F-035/F-036 交付最终发送请求、发送尝试与已有用量。实时订阅、内容搜索、外部导出仍未实施，不预设 API。
+## 存储、兼容与隐私
 
-## 代码与依赖
+state schema **31** 新增 `dispatch_observation` 与 Root 查询索引；旧权威记录、冻结内容、请求 hash、审批和恢复键不重写。旧已接受结果恢复不产生新的发送记录；旧 Run 的新发送只附加可选诊断。升级前停止旧进程，统一使用支持 schema 31 的二进制。
 
-- [internal/agent/sqlite/operations.go](../../internal/agent/sqlite/operations.go)
-- [internal/agent/sqlite/generation.go](../../internal/agent/sqlite/generation.go)
-- [internal/agent/sqlite/schema.sql](../../internal/agent/sqlite/schema.sql)
-- [internal/llm/sqlite/local.go](../../internal/llm/sqlite/local.go)
-- [provider-bridge/bridge.mjs](../../provider-bridge/bridge.mjs)
-- [internal/interaction/web/server.go](../../internal/interaction/web/server.go)
-- [internal/observability/inspection.go](../../internal/observability/inspection.go)
-- [internal/observability/sqlite/inspection.go](../../internal/observability/sqlite/inspection.go)
-- [internal/interaction/web/inspection.go](../../internal/interaction/web/inspection.go)
-- [internal/interaction/web/templates/observability.html](../../internal/interaction/web/templates/observability.html)
+敏感冻结输入和脱敏最终请求由同一安装所有者授权查看，保留在本地 state.db 并沿用其保留/加密备份边界。capture 不是业务权威或 exactly-once 证明；未知观测不阻塞业务恢复。没有第三方传输、公开分享、外部导出或观测驱动的执行操作。
 
-## 验证与交付
+未实施：Langfuse 服务/OTel exporter、远程 Prompt Management、Dataset/Evals、聚合 Agent Graph、全文搜索和自动轮询。Prompt 继续由文件/Git 管理，模型质量评测继续离线维护。
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/observability.md) 维护。F-031/F-034 的软件证据覆盖真实执行、冻结输入/结果、压缩与浏览器只读链路，不代表最终 wire 观测或真实模型质量。
+## 验证与代码
+
+- [统一数据模型](../../internal/observability/trace.go)
+- [只读投影](../../internal/observability/sqlite/traces.go)
+- [可丢失采集器](../../internal/observability/sqlite/recorder.go)
+- [最终请求脱敏](../../provider-bridge/observability.mjs)
+- [Web 读取边界](../../internal/interaction/web/traces.go)
+- [Trace 模板](../../internal/interaction/web/templates/traces.html)
+- [正文读取](../../internal/observability/sqlite/content.go)
+
+需求级证据与限制统一见 [测试方案](../test-plans/observability.md)，运行命令沿用现有 make/runner，不新建 CI gate 或模型评测框架。
 
 ## 协议、实现与配置约束
 
@@ -124,6 +118,7 @@ F-031 交付列表和执行关系，F-034 交付逐轮消息、Tool Schema/响�
 
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
+| 2026-10-29 | F-035/F-036：Langfuse 式观测 | 统一 Session/Trace/Observation、树/时间线/节点输入输出，保留 Main→Task 因果与 Root/Child 语义。最终 SDK fetch 独立捕捉脱敏 HTTP attempts；复用事件与账本分开。 | schema 31 只加诊断表/索引，不改冻结协议。独立可丢失邮箱与短写隔离故障；新请求体与原冻结 context 使用同一所有者/本地备份边界，无第三方导出。抽出共享正文分页、功能视图和样式，替换旧重复页面。 | F-031/F-034/F-035/F-036 |
 | 2026-10-29 | F-034：冻结上下文、来源与 Diff | 沿用权威冻结记录与独立只读池，新增聚合查询和 feature 自有页面；选择存储投影而非从当前 checkpoint 重建，避免历史与重放漂移。 | 无 schema/协议迁移；40 项分页与 8192 字节连续 UTF-8 切片保留长文本，来源缺失如实说明。Diff 比较已存输入、重复键按出现顺序；同一所有者敏感内容访问，不增加导出/副本/归档授权。F-035/036 保持未实现。 | F-034 |
 | 2026-10-28 | F-031：执行关系检查 | 用已有权威 Run/Task/原始回执建立有界只读投影，接通现有 Web 的 Developer 导航。与共享写连接方案比较，选择独立惰性只读池，避免观察阻塞 Runtime；按 feature 拆开内嵌页面模板。 | schema 30 仅加索引，冻结数据不改；Root/Child 与 Main→Task 因果边区分。无观察调度引擎、内容导出或新 CI/eval 平台，F-034/035/036 保持未实现。 | F-031 |
 | 2026-10-28 | 现状建档 / 未来方向 | 2026-10-28 已确认集成现有 Web，采用 Developer → Observability；首先利用已有权威记录。独立第三方平台不是首版依赖，观测不参与调度或重放。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |

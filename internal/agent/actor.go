@@ -198,7 +198,7 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 			registry, err = a.Registry.Select(run.Tools)
 			if err == nil {
 				executor := tool.Executor{Registry: registry, Store: a.Store.ToolStore(claim), Concurrency: 4, Sink: func(e tool.Event) {
-					emit(Event{Kind: e.Kind, RunID: id, OccurredAt: time.Now().UTC(), ToolCallID: e.Call.ID})
+					emit(Event{Kind: e.Kind, InvocationID: e.InvocationID, RunID: id, OccurredAt: time.Now().UTC(), ToolCallID: e.Call.ID})
 				}}
 				err = RunAgentLoop(work, claim, LoopOptions{Store: a.Store, Provider: a.Provider, Tools: executor, Sink: emit, Execution: execution})
 			}

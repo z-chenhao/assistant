@@ -217,8 +217,74 @@ def run(binary,evidence):
     native_components(binary, evidence, report)
     delivery_leases(binary, report)
     account_presentation(binary,report)
+    native_trace_inspection(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def native_trace_inspection(binary,evidence,report):
+    """Actual Pi/HTTP retries, durable result reuse, and the tracing UI."""
+    from http.server import ThreadingHTTPServer
+    from verify_local_provider import Endpoint
+    class TraceEndpoint(Endpoint):
+        def do_POST(self):
+            time.sleep(.04)
+            if getattr(self.server,'reject_next',False):
+                self.server.reject_next=False
+                body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                self.server.requests.append(dict(method='POST',auth=self.headers.get('Authorization'),session=self.headers.get('session_id'),body=body))
+                self.send_response(503);self.send_header('Content-Length','0');self.end_headers();return
+            return super().do_POST()
+    with tempfile.TemporaryDirectory(prefix='erii-native-traces-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+        server=ThreadingHTTPServer(('127.0.0.1',0),TraceEndpoint);server.daemon_threads=True
+        server.requests=[];server.mode='success'
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        h=ChannelHarness(binary,Path(temp),platform,'')
+        try:
+            h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(ROOT/'provider-bridge/bridge.mjs'))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
+            h.env['ERII_TRACE_KEY']='SYNTHETIC_TRACE_CREDENTIAL_NEVER_STORE'
+            auth=h.command('model','login','ERII_TRACE_KEY')
+            h.setup(metadata=dict(name='Trace HTTP fixture',provider_kind='openai_compatible',endpoint=f'http://127.0.0.1:{server.server_port}/v1',wire_api='openai_completions',model_id='fixture-model',context_window=65536,max_output_tokens=4096,generation_defaults={},compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True),auth_connection_id=auth['connection_id']))
+            server.mode='tasks';server.reject_next=True
+            h.start()
+            h.wait_state(lambda status:status['readiness']=='ready','native trace runtime readiness',lambda _:h.http('/api/status'))
+            h.http('/api/message',dict(source_id='native-trace',content=[dict(type='text',text='Compare the available evidence and prepare an independent report. Keep the original sources and return a concise summary.')]))
+            h.wait(lambda state:any(r['worker_position']=='root' for r in state['runs']) and all(r['status'] in ('completed','failed','cancelled') for r in state['runs']) and all(d['status']=='sent' for d in state['deliveries']),'native trace completion')
+            capture_state={}
+            def captured(_):
+                with sqlite3.connect(h.root/'data/state.db') as db:
+                    runs={r[0] for r in db.execute('SELECT run_id FROM run')}
+                    physical=[r for r in server.requests if r.get('session') in runs and r['method']=='POST']
+                    capture_state.update(physical=len(physical),phases=db.execute('SELECT phase,count(*) FROM dispatch_observation GROUP BY phase').fetchall(),generations=db.execute('SELECT status,count(*) FROM model_generation GROUP BY status').fetchall())
+                    return db.execute("SELECT count(*) FROM dispatch_observation WHERE phase='headers'").fetchone()[0]==len(physical)
+            try:
+                h.wait_state(captured,'all terminal HTTP observations persisted',timeout=10)
+            except RuntimeError as error:
+                raise RuntimeError(str(error)+'; '+json.dumps(capture_state)) from error
+            with sqlite3.connect(h.root/'data/state.db') as db:
+                generation,main=db.execute('SELECT generation_id,run_id FROM model_generation ORDER BY created_at LIMIT 1').fetchone()
+                before=[r['body'] for r in server.requests if r.get('session')==main and r['method']=='POST'][:2]
+                require(len(before)==2 and before[0]==before[1],'actual HTTP retry was not exercised')
+                root=db.execute("SELECT run_id FROM run WHERE worker_position='root'").fetchone()[0]
+                attempts=db.execute("SELECT body_json FROM dispatch_observation WHERE generation_id=? AND phase='started' ORDER BY occurred_at",(generation,)).fetchall()
+                require(len(attempts)==2,'result reuse fabricated a new HTTP attempt')
+                require([json.loads(a[0]) for a in attempts]==before,'observed final request differs from actual HTTP body')
+                raw=''.join(r[0] or '' for r in db.execute('SELECT body_json FROM dispatch_observation'))
+                require(h.env['ERII_TRACE_KEY'] not in raw and 'Bearer ' not in raw,'wire capture persisted credentials')
+                facts=dict(main=main,root=root,generation=generation,counts={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in ('model_generation','provider_usage','tool_invocation','dispatch_observation','run_trace')})
+            tree=h.http('/api/developer/observations?'+urlencode(dict(run=main)))
+            require(sum(o['name']=='Provider HTTP' for o in tree['items'])>=2,'actual sends missing from observation tree')
+            h.stop(kill=True);h.start()
+            require(h.http('/api/developer/observations?'+urlencode(dict(run=main)))==tree,'completed trace changed across restart')
+            h.env['ERII_NATIVE_TRACE_FACTS']=json.dumps(facts)
+            h.browser(evidence.parent/'trace-ui','native-trace')
+            with sqlite3.connect(h.root/'data/state.db') as db:
+                after={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in facts['counts']}
+            require(after==facts['counts'],'browsing tracing mutated execution or observations')
+            report['scenarios']['native-traces']=dict(read_only=True,actual_attempts=2,restart=True)
+            report['checks'].append('Langfuse-style trace tree/timeline/details; actual Pi final HTTP bodies and retries, terminal restart without re-execution, missing usage/pricing, authenticated browser, responsive/no-JS and unchanged ledgers')
+        finally:
+            h.cleanup();server.shutdown();server.server_close();thread.join()
 
 
 def inspection_relationships(binary, evidence, report):
@@ -234,10 +300,15 @@ def inspection_relationships(binary, evidence, report):
                 endpoint='http://127.0.0.1:1/v1',wire_api='openai_completions',model_id='fixture-model',
                 context_window=65536,max_output_tokens=4096,generation_defaults={},
                 compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True)))
-            h.start()
+            h.start('after_generation_commit')
             h.wait_state(lambda status:status['readiness']=='ready','inspection runtime readiness',lambda _:h.http('/api/status'))
             h.http('/api/message',dict(source_id='inspect-tree',content=[dict(type='text',text=plan([
                 dict(name='builtin__task_manage',arguments=dict(operation='create',task=root))]))]))
+            def first_accepted(_):
+                with sqlite3.connect(h.root/'data/state.db') as db:
+                    return db.execute("SELECT count(*) FROM model_generation WHERE status='completed'").fetchone()[0]==1
+            h.wait_state(first_accepted,'accepted model result before checkpoint',timeout=10)
+            h.stop(kill=True);h.start()
             h.wait(lambda s:sum(r['worker_position']=='child' for r in s['runs'])==2
                    and all(r['status'] in ('completed','failed','cancelled') for r in s['runs'])
                    and all(d['status']=='sent' for d in s['deliveries']), 'completed inspection tree')
@@ -268,6 +339,13 @@ def inspection_relationships(binary, evidence, report):
                 ids.extend(r['run_id'] for r in page['items']);cursor=page.get('next','')
                 if not cursor:break
             require(len(ids)==len(set(ids))==len(original['runs']) and set(ids)=={r['id'] for r in original['runs']},'inspection pagination omitted or duplicated an execution')
+            with sqlite3.connect(h.root/'data/state.db') as db:
+                first=db.execute('SELECT generation_id FROM model_generation WHERE run_id=? ORDER BY step_index LIMIT 1',(original['main'],)).fetchone()[0]
+            audited=[json.loads(line) for line in (h.root/'data/fake-provider-calls.jsonl').read_text().splitlines()]
+            require(sum(row['generation_id']==first for row in audited)==1,'accepted model result dispatched twice after recovery')
+            trace=h.http('/api/developer/observations?'+urlencode(dict(run=original['main'])))
+            require(any(node['status']=='reused' for node in trace['items']),'accepted result reuse missing from trace')
+            require(not any(node['name']=='Provider HTTP' for node in trace['items']),'scripted provider fabricated HTTP attempts')
             source=h.http('/api/developer/relationships?'+urlencode(dict(run=original['main'])))
             require(len(source['tasks'])==1 and source['tasks'][0]['task_ref']==original['task'] and source['tasks'][0]['operation']=='create','Main creation receipt missing')
             tree=h.http('/api/developer/relationships?'+urlencode(dict(task=original['task'])))

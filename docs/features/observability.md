@@ -24,9 +24,9 @@
 
 **需求**：开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。
 
-**当前实现**：Web 侧栏的可折叠 Developer 区域提供 Observability。可按 Main/Root/Child、Run 状态及 UTC 创建时间筛选并翻页；选择 Main 查看原始已提交 Task 行为回执，选择 Task 或 Worker 查看创建来源、分 epoch 的 Root/Child 树及直接 Parent/Root 导航。
+**当前实现**：Web Developer → Observability 提供 Trace 列表，按 Main / Root、状态和 UTC 时间筛选；Conversation 作为 Session 关联 Main 与后台工作。选中 Trace 后在同页查看 observation 树、时间线和节点详情，支持键盘/原生链接、浏览器前后退与刷新。Main 的 Task 创建/管理回执作为跨 trace 因果链接；Task 页面列出各 epoch 的 Root，Child 在实际 Parent Worker 的 trace 内展示。
 
-**边界**：只读关系元数据和最多 240 字符的 Task 标题，不显示原始指令、工具参数/结果、凭据、模型请求或内部所有权 token。Main 创建 Task 是因果关联，Root 没有 Main parent。历史或自动化入口没有 Main 创建回执时明确说明来源未记录，不推断。每页默认 40、最多 100 条；关系分页可能从一棵树的中间开始，Parent 可直接打开。跨页状态不是冻结快照；按页读取当前已提交状态。返回 Conversation 和 Ongoing work 的链接保留，旧 Task 可能不在 Ongoing work 的近期窗口内。
+**边界**：一个 Main Run 或一个 Task epoch 的 Root 执行树是一条 trace；Root 没有 Main parent。每页最多 100 个 observation，分页缺席的 parent 明确标记并可打开；不同分页看到当前提交状态。只读且沿用现有所有者授权。输入/输出与 Task 标题在列表中使用有界预览，节点详情和冻结上下文有完整读取入口；旧元数据 API 仍保持原含义。
 
 **验收目标**：真实工作能从入口定位到 Main、Task、Root 和 Child；Root 不被误标为 Main 的 Child。
 
@@ -48,9 +48,9 @@
 
 **需求**：开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。
 
-**当前实现**：Bridge 会合并 system、转换工具并加入图片；当前缺完整发送边界观测记录。
+**当前实现**：新版本生产 Bridge 在 SDK 完成 system 合并、工具转换及图片投影后，在实际 HTTP fetch 边界记录独立 attempt。选中 Generation 或 Provider HTTP 节点，打开 **Wire** 查看脱敏最终请求、格式版本、UTC 时间与脱敏正文 hash。HTTP 重试各有独立 attempt，不把 generation 恢复接纳计数当网络次数。
 
-**边界与剩余工作**：在最终发送边界保存受控脱敏记录，标识发送尝试与转换版本；凭据和图片 Base64 不进入普通轨迹。
+**边界**：不保存请求头、connection、API key 或 access token；Node 与 Host 都移除已知凭据。图片像素替换为 Artifact 引用（已知时）、预览 JPEG hash、原图/预览尺寸，不保存 Base64。脱敏正文最多 256 KiB，超限保留 hash 与明确省略原因；详情按 8192 字节续读。capture 为 best-effort，旧 Bridge/历史记录、队列溢出、数据库故障或强制退出可留空；缺失不能证明没有发送。开始事件表示 fetch 尝试，响应头事件不代表模型成功或服务端业务接受；原始 SSE 响应正文不另存。
 
 **验收目标**：HTTP peer 接收的请求与观测记录对应，差异明确标记为脱敏或媒体引用；请求头凭据不可见。
 
@@ -60,9 +60,9 @@
 
 **需求**：开发者能看出何时执行、等待审批或 Child、失败、重新尝试、重放或复用结果，并查看已有用量。
 
-**当前实现**：调用、trace、generation 与 usage 数据已有，CLI 只提供有限投影。
+**当前实现**：统一 Agent、Generation、Tool、Retriever、上下文准备、审批/费用授权等待、工具执行片段、HTTP 尝试和恢复事件。节点详情展示保存的输入/输出、模型、时间信息与可用来源；generation 提供可读角色消息、工具调用卡片、完整上下文、Diff 与最终请求入口。汇总唯一已接纳 generation 的 token/cache、已有 provider operation 耗时与按币种区分的已记账费用。
 
-**边界与剩余工作**：聚合模型/工具时间线、状态、已有 Token/耗时；区分 Generation、dispatch attempt 和结果复用。
+**边界**：生命周期耗时含等待，不标成模型推理时间；HTTP 条仅测 fetch 到响应头，provider operation 含准备/流式读取。没有起止记录的召回/准备事件是时间点，未知耗时/usage/价格保持未知，部分 usage 标明已知记录数。恢复使用已接纳结果产生 reuse 事件，不新增 generation、usage 或 HTTP 尝试；工具 unknown 不由浏览触发重试。新工具事件携带原始 invocation ID，旧事件无该字段时不以重复的 provider call ID 猜测对应关系。
 
 **验收目标**：受控中断恢复后，UI 不把复用结果显示成新外部调用；未知结果、缺失 usage 和未 dispatch 等待如实展示。
 
@@ -70,15 +70,15 @@
 
 登录现有 Web，展开侧栏 **Developer → Observability**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。
 
-1. 在 Execution list 中按角色、状态和创建时间查找。时间筛选使用 UTC，起点包含、终点不包含；Apply filters 重置分页与选择，Older executions 读取下一页。
-2. 打开 Main，沿 Task action timeline 查看原始创建、追加或控制回执。时间标记为来源调用的接纳时间，不冒充外部 dispatch 时间。点击 Task 查看执行树。
-3. 打开 Root/Child，核对实际 Parent、Root 和 Task epoch；Parent/Root/创建者链接可相互跳转。More relationships 读取后续节点或回执，刷新页面获取最新状态。
-4. 在选中执行内点击 **Inspect frozen context**，选择 Step，然后切换 messages / tools / response / provenance / recall。messages 中按原始索引选择消息，Readable text 查看正文，Complete stored item (JSON) 核对工具调用、响应与全部元数据；Continue full content 连续读取长内容。Adjacent round diff 的 Before / After 打开对应原始项；第一轮明确没有前一轮。
-5. Back to conversation 和 Ongoing work 返回日常工作入口。该页面没有重放、审批、取消或外部发送动作；关闭 JavaScript 仍可使用导航、筛选和分页。
+1. 按角色、状态和 UTC 创建时间筛选 Trace；起点包含、终点不包含。点击 Session 查看同一 Conversation 的相关 Trace。
+2. 点击 Main 或 Root，查看三栏：**Trace tree → Timeline → Observation details**。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
+3. 选择 Generation，展开 system/user/assistant/tool 消息与响应；Context 查看准备/来源和工具列表，Diff 比较相邻冻结输入，Wire 查看最终 HTTP 请求，Metadata 查看保存的观测字段。**Inspect frozen context** 继续提供完整 messages / tools / response / provenance / recall，支持长正文连续读取。
+4. 选择 Tool、Retriever、等待或 HTTP 节点，核对各自保存的数据和时间语义。API/Page 不提供重试、重放、审批或取消动作；无 JavaScript 时原生导航、筛选和分页仍然可用。
+5. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Ongoing work 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
 
-上下文含私有对话与工具正文，沿用同一安装所有者的 Web token/session 与 binding 授权，仅用于受控开发检查；不新增公开入口、自动导出、观测副本或长期保留策略。现有权威记录的保留/备份规则继续适用，API/Page 使用 no-store 与 CSP。不会读取模型凭据、配置快照、所有权 token 或图片字节。
+这是安装所有者授权下的敏感诊断。原有冻结 context 与新增脱敏最终请求均保留在本地 state.db，沿用其保留及加密备份边界；页面/API no-store，不新增公开访问、导出或第三方发送。观测故障不决定执行或重放。旧元数据 API、CLI `erii ops trace RUN_ID` 保留。
 
-`erii ops trace RUN_ID` 继续提供既有简化事件。供应商最终请求与调用/用量时间线尚未实现，由 F-035/F-036 维护；已保存 generation 结果不等于一次新的外部发送。
+当前对齐 Langfuse 的 Session/Trace/Observation 数据与浏览体验；不依赖 Langfuse 服务，未接入 OTel 导出、Prompt Management、Dataset/Evals、聚合 Agent Graph 或全文搜索。Prompt 继续由项目文件/Git 管理，模型效果评测继续离线维护。
 
 ## 详细操作参考
 

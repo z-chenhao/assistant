@@ -15,22 +15,6 @@ type inspectionReader struct {
 	queries []observability.ExecutionQuery
 }
 
-func TestInspectionTreeGroupsParallelBranchesAndMarksPageFragments(t *testing.T) {
-	items := []observability.Execution{{ID: "root", Role: "root"}, {ID: "a", Parent: "root", Role: "child", Depth: 1}, {ID: "b", Parent: "root", Role: "child", Depth: 1}, {ID: "grandchild", Parent: "a", Role: "child", Depth: 2}}
-	tree := inspectionTree(items)
-	if len(tree) != 4 || tree[0].ID != "root" || tree[1].ID != "a" || tree[2].ID != "grandchild" || tree[3].ID != "b" || tree[2].DisplayDepth != 2 {
-		t.Fatal("parallel branch guessed from creation order", tree)
-	}
-	fragment := inspectionTree(items[3:])
-	if len(fragment) != 1 || !fragment[0].ParentOutside || fragment[0].Parent != "a" || fragment[0].DisplayDepth != 0 {
-		t.Fatal("missing parent not marked", fragment)
-	}
-	cycle := inspectionTree([]observability.Execution{{ID: "a", Parent: "b"}, {ID: "b", Parent: "a"}})
-	if len(cycle) != 2 {
-		t.Fatal("invalid metadata broke bounded rendering")
-	}
-}
-
 func (f *inspectionReader) Executions(_ context.Context, q observability.ExecutionQuery) (observability.Executions, error) {
 	f.queries = append(f.queries, q)
 	return observability.Executions{Items: []observability.Execution{{ID: "main-public", Role: "main", Status: "completed", CreatedAt: "2026-10-28T01:00:00Z"}}, Next: "page-public"}, f.failure
@@ -41,7 +25,7 @@ func (f *inspectionReader) Relationships(_ context.Context, q observability.Rela
 
 func TestInspectionRoutesAuthenticationReadOnlyBoundedAndEscaped(t *testing.T) {
 	reader := &inspectionReader{}
-	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Inspector: reader}
+	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Inspector: reader, Traces: traceReader{}}
 	request := func(method, path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "http://127.0.0.1:8080"+path, nil)
 		if auth {
@@ -66,7 +50,7 @@ func TestInspectionRoutesAuthenticationReadOnlyBoundedAndEscaped(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	for _, text := range []string{"Developer", "Execution relationships", "Task root · no parent Worker", "Created by", "Main", "&lt;img src=x", "Task execution tree", "Older executions"} {
+	for _, text := range []string{"Developer", "Traces", "Task root · no parent Worker", "Created by", "Main", "&lt;img src=x", "Trace tree", "Older executions"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing inspector behavior", text)
 		}

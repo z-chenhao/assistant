@@ -1,5 +1,5 @@
-// Package sqlite reads bounded execution relationships from authoritative state.
-// It neither runs an Agent nor writes observation or domain records.
+// Package sqlite owns bounded diagnostic projections, a read-only inspector,
+// and the independent optional dispatch recorder. It never writes domain state.
 package sqlite
 
 import (

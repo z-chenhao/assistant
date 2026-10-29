@@ -74,6 +74,7 @@ type Models interface {
 type Server struct {
 	Inspector      ExecutionReader
 	Contexts       ContextReader
+	Traces         TraceReader
 	Config         Config
 	Core           Core
 	Models         Models
@@ -267,6 +268,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
+	case "/api/developer/traces":
+		s.traceAPI(w, r, "traces")
+	case "/api/developer/observations":
+		s.traceAPI(w, r, "observations")
+	case "/api/developer/observation-body":
+		s.traceAPI(w, r, "body")
 	case "/api/developer/rounds":
 		s.contextAPI(w, r, "rounds")
 	case "/api/developer/context":
