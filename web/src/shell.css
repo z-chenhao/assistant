@@ -32,3 +32,10 @@
  .workspace-main{margin-left:0;min-height:calc(100dvh - 115px)}.workspace-topbar{height:48px;gap:8px}.breadcrumbs{gap:7px;font-size:12px}
  .page-feedback{margin:16px 20px 0}.login{margin:6vh auto;padding:24px}.login>.brand{margin-bottom:26px}
 }
+
+@media(max-width:360px){
+ .app-sidebar{padding-inline:12px}
+ .app-sidebar>nav{gap:3px;min-width:0}
+ .app-sidebar>nav a{padding-inline:8px;gap:6px}
+ .app-sidebar>nav .icon{width:17px;height:17px}
+}

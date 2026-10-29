@@ -23,6 +23,15 @@ try{
   if(!await image.evaluate(img=>img.complete&&img.naturalWidth===1297&&img.naturalHeight===1212))throw new Error('Collie artwork failed to load');
  }
  if(phase==='setup'){
+  await page.evaluate(()=>document.fonts.ready);
+  await page.setViewportSize({width:320,height:740});
+  for(const link of await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link').all()){
+   const bounds=await link.boundingBox();
+   if(!bounds||bounds.x<0||bounds.x+bounds.width>320)throw Error('compact navigation is outside the viewport');
+  }
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('compact workspace overflows horizontally');
+  await page.screenshot({path:evidence+'/navigation-compact.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:980});
   if(!await page.getByRole('button',{name:'Send message',exact:true}).isDisabled())throw Error('unconfigured composer can send');
   if(await page.locator('.welcome').count())throw Error('setup competes with the normal welcome');
   await page.getByRole('link',{name:'Set up Collie',exact:false}).click();
