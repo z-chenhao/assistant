@@ -4,34 +4,30 @@
 
 ## 范围与证据
 
-本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导本次已通过或真实模型效果已达标。
-
-以功能文档中的需求为验收源；配置依赖、待实现分支、平台限制和未验证项单独报告。具体命令及 core/extended 编排以 [Testing](product.md) 和 [runner](../../tests/system/runner.py) 为准。
+证明 F-030 的真实 Settings → 测试 → 保存 → 明确重启 → 新 Run 闭环。诊断与软件回归不认证外部模型语义质量、真实账户授权或 native macOS Guest 兼容。
 
 ## 需求场景矩阵
 
-| 需求 | 需要验证的可观察行为 | 当前重点 |
+| 场景 | 可观察行为 | 验证入口 |
 | --- | --- | --- |
-| [F-030](../features/capability-setup.md#f-030) | 用户能识别未配置、不可用与已就绪，完成真实连接和修复；新设置不热改旧 Run 快照。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| 六类配置 | 列表/详情、真实未配置状态、失败后修正成功、候选刷新仍可保存 | channels 的 capability-settings 场景 |
+| 提交安全 | 未认证 401、伪造 Origin 403、未知详情 404、超限 413、未验证 Save 409 且文件不变 | 真实 HTTP + 浏览器 |
+| 证明约束 | 精确候选、完整源文件版本、过期证明拒绝，探测中外部变更丢弃结果 | config/setup 组件测试 |
+| 文件保护 | 0600、保留注释/其他 section、并发 Manager 至多一个成功、拒绝 symlink/删除源、无残留临时文件 | config/setup + discovery |
+| 数据边界 | 拒绝直接密钥轮换、embedding 身份变更不等于索引迁移、Computer bootstrap 结构正确 | config/setup 组件测试 |
+| 有界真实探测 | 固定 embedding 文本；实际沙箱 printf；MCP tools list 但无业务调用；实际 sidecar 握手 + sealed base 校验但无 VM | owned HTTP/stdio/Computer peers + 组件测试 |
+| 生命周期 | 保存前后旧快照一致；重启后新 Run 包含新 provider；旧快照仍一致 | channels 场景读取实际 SQLite 状态 |
+| 可访问操作 | 原生无 JavaScript Test 表单、320px 无横向溢出、浏览器无脚本错误 | channels browser 模块 |
 
-## 层级与关键路径
+## 维护入口
 
-未来从真实 Settings 操作配置未连接能力，验证探测失败可修复、状态不误报、凭据不回显和旧快照不热改。当前无 UI 回归入口，不能以静态页面截图作为完成。
+- `go test -race ./internal/config/... ./internal/interaction/web ./internal/computer/macosvm`：配置/文件并发、真实沙箱与协议适配器、共享 Computer 校验。
+- `make test lint`：代码/组件、现有 Node/Web/测试基础设施、文档与静态检查。
+- `make build` 后运行既有 `tests/system/runner.py --gate channels --binary bin/collie --evidence /absolute/path`；capability-settings 已并入该 gate，不增加 runner 或 CI gate。
+- 跨模块回归按 [Testing](product.md) 执行 core，以及涉及能力/Computer/recall 的现有 extended gates。
 
-- 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
-- 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
-- Live/质量：涉及真实账户、Guest 平台或语义质量时单独记录环境与证据；不适用项说明理由，不用软件回归代替。
+具体结果保存在每次运行的 evidence，本文定义验收而非替代执行报告。owned peers 是明确的受控外部服务，不伪造产品内部 Run/验证通过状态。测试在可丢弃根目录创建配置和资源，结束后回收进程/监听器；从不访问个人数据目录。
 
-## 已有检查与缺失覆盖
+## 平台与剩余证明范围
 
-| 入口 | 已有证据用途 | 本次执行状态 |
-| --- | --- | --- |
-| 暂无该目标入口的专属回归 | 先复用邻近真实执行链，随实现增加必要覆盖 | 尚待实现 |
-
-- **F-030 剩余覆盖**：定义能力配置/就绪投影及设置页面；不增加模型可见的第二套能力发现 API。
-
-## 执行与完成判定
-
-使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
-
-需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+Linux 验证了内核沙箱与受控 Lume 协议、tiny sealed base 和真实 Node runtime。Computer 诊断不启动 Guest，因此不以这份证据声称验证了 macOS/arm64 的实际桌面操作；该边界由 [Computer 测试方案](computer-use.md) 保持。真实外部 MCP/embedding 服务可通过同一 owner 入口按实际凭据测试，未配置时不自动补齐服务或选择默认模型。

@@ -160,28 +160,9 @@ func (p *Provider) lock(ctx context.Context, r computer.Request) (*os.File, erro
 			}
 		}
 	}
-	// A dedicated store is mandatory. Never enumerate or modify the user's
-	// default VM registry, even when a name happens to match.
-	raw, status, err := p.api(ctx, "GET", "/config", nil)
-	var config struct {
-		TelemetryEnabled *bool `json:"telemetryEnabled"`
-		CachingEnabled   *bool `json:"cachingEnabled"`
-		VMLocations      []struct {
-			Name string `json:"name"`
-			Path string `json:"path"`
-		} `json:"vmLocations"`
-	}
-	if err != nil || status != 200 || json.Unmarshal(raw, &config) != nil || config.TelemetryEnabled == nil || *config.TelemetryEnabled || config.CachingEnabled == nil || *config.CachingEnabled || len(config.VMLocations) != 1 || config.VMLocations[0].Path != filepath.Join(p.config.Root, "vms") {
+	if err := p.checkHost(ctx); err != nil {
 		f.Close()
-		return nil, computer.ErrUnavailable
-	}
-	raw, status, err = p.api(ctx, "GET", "/host/status", nil)
-	var host struct {
-		Version string `json:"version"`
-	}
-	if err != nil || status != 200 || json.Unmarshal(raw, &host) != nil || host.Version != p.config.Compatibility.ProviderVersion {
-		f.Close()
-		return nil, computer.ErrCompatibility
+		return nil, err
 	}
 	return f, nil
 }

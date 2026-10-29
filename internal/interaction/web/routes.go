@@ -106,6 +106,8 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		return e
 	}
 	switch r.URL.Path {
+	case "/capability/configure":
+		return s.capabilityAction(w, r)
 	case "/approval":
 		if err := s.decideApproval(r); err != nil {
 			return err

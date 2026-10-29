@@ -28,7 +28,7 @@ func TestStartRejectsRedirectedInputBeforeCreatingState(t *testing.T) {
 
 func TestDoctorReportsMissingInstallationWithoutCreatingState(t *testing.T) {
 	home := t.TempDir()
-	cfg, err := config.Load("", func(string) (string, bool) { return "", false })
+	cfg, err := config.Decode(nil, func(string) (string, bool) { return "", false })
 	if err != nil {
 		t.Fatal(err)
 	}

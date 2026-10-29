@@ -71,6 +71,7 @@ type Models interface {
 	AddProfile(context.Context, llm.ProfileInput) (llm.Profile, error)
 }
 type Server struct {
+	Capabilities   CapabilitySettings
 	Inspector      ExecutionReader
 	Contexts       ContextReader
 	Traces         TraceReader

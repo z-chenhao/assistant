@@ -1,6 +1,6 @@
 {{define "settings-page"}}
 <section class="workspace-page settings-page">
- <nav class="section-tabs" aria-label="Settings sections"><a href="/settings/models" {{if ne .Settings.Section "notifications"}}aria-current="page"{{end}}>Models</a><a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>Notifications</a></nav>
+ {{template "settings-tabs" .}}
  {{if eq .Settings.Section "notifications"}}{{template "notifications" .}}
  {{else if eq .Settings.Section "new"}}{{template "model-new" .}}
  {{else if eq .Settings.Section "model"}}{{template "model-detail" .}}
@@ -8,3 +8,5 @@
  <p class="settings-footer"><a href="/licenses.txt">Open source notices</a></p>
 </section>
 {{end}}
+
+{{define "settings-tabs"}} <nav class="section-tabs" aria-label="Settings sections"><a href="/settings/models" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities")}}aria-current="page"{{end}}>Models</a><a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>Notifications</a><a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>Capabilities</a></nav>{{end}}

@@ -1,4 +1,5 @@
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
+import {capabilitySetup} from './channels_capabilities.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 const [url,evidence,phase='conversation']=process.argv.slice(2);
@@ -22,6 +23,7 @@ try{
  for(const image of await page.getByAltText(/Collie (logo|default agent avatar)/).all()){
   if(!await image.evaluate(img=>img.complete&&img.naturalWidth===1297&&img.naturalHeight===1212))throw new Error('Collie artwork failed to load');
  }
+ if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
  if(phase==='setup'){
   await page.evaluate(()=>document.fonts.ready);
   await page.setViewportSize({width:320,height:740});
@@ -407,6 +409,7 @@ try{
  await page.locator('aside').getByRole('link',{name:'Tasks',exact:false}).click();
  if(await page.locator('form[action="/task/manage"]').count())throw Error('task browsing gained a second control plane');
  await page.screenshot({path:evidence+'/'+phase+'-progress.png',fullPage:true});
+ }
  if(remote.length)throw new Error('UI contacted an external service: '+remote.join(', '));
  if(errors.length)throw new Error(errors.join(';'));
 }catch(error){

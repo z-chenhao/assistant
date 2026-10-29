@@ -42,7 +42,7 @@ spend:
 }
 
 func TestDefaultsAndDeploymentOverrides(t *testing.T) {
-	cfg, err := Load("", noEnv)
+	cfg, err := Decode(nil, noEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 		t.Fatal("accepted missing file")
 	}
 	for _, key := range []string{"COLLIE_DATA_ROOT", "COLLIE_LOG_LEVEL"} {
-		if _, err := Load("", func(k string) (string, bool) { return "", k == key }); err == nil {
+		if _, err := Decode(nil, func(k string) (string, bool) { return "", k == key }); err == nil {
 			t.Fatalf("accepted empty %s override", key)
 		}
 	}
@@ -205,7 +205,7 @@ func TestNATSConfigAndOverrides(t *testing.T) {
 		}
 	}
 	for _, key := range []string{"COLLIE_NATS_URL", "COLLIE_NATS_STREAM_PREFIX"} {
-		if _, err := Load("", func(k string) (string, bool) { return "", k == key }); err == nil {
+		if _, err := Decode(nil, func(k string) (string, bool) { return "", k == key }); err == nil {
 			t.Fatalf("empty %s accepted", key)
 		}
 	}
