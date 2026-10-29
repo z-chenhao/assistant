@@ -28,6 +28,7 @@ type shownProjection struct {
 }
 type page struct {
 	Inspection *inspectionView
+	Context    *contextView
 	Accounts   []llm.AuthConnection
 	Bindings   []interaction.Binding
 	Preference interaction.Preference
@@ -83,6 +84,16 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 		p.Activity, err = s.Core.Activity(ctx)
 		if err != nil {
 			fail(w, 503)
+			return
+		}
+	}
+	if p.Tab == "/developer/context" {
+		p.Context, err = contextQuery(r)
+		if err == nil {
+			err = s.loadContext(ctx, p.Context, "")
+		}
+		if err != nil {
+			inspectionFailure(w, err)
 			return
 		}
 	}

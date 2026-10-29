@@ -73,6 +73,7 @@ type Models interface {
 }
 type Server struct {
 	Inspector      ExecutionReader
+	Contexts       ContextReader
 	Config         Config
 	Core           Core
 	Models         Models
@@ -266,6 +267,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
+	case "/api/developer/rounds":
+		s.contextAPI(w, r, "rounds")
+	case "/api/developer/context":
+		s.contextAPI(w, r, "context")
+	case "/api/developer/context-diff":
+		s.contextAPI(w, r, "diff")
 	case "/api/developer/executions":
 		s.inspectionAPI(w, r, false)
 	case "/api/developer/relationships":
@@ -324,7 +331,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": d.Name}))
 		_, _ = io.Copy(w, src)
-	case "/", "/settings", "/progress", "/developer/observability":
+	case "/", "/settings", "/progress", "/developer/observability", "/developer/context":
 		s.show(w, r)
 	default:
 		fail(w, 404)

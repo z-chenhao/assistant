@@ -60,3 +60,15 @@ html{overflow-anchor:none}
 .root-boundary{border-left:2px solid #ccc;padding-left:12px}
 @media(max-width:700px){.inspection{padding:24px 16px 40px}.inspection-filters{grid-template-columns:minmax(0,1fr)}.developer-nav{margin:8px 0 0;padding-top:4px}.developer-nav summary{font-size:11px;padding:8px 12px}.developer-nav nav{margin:0}.inspection-detail{padding:18px}.tree-indent{width:5px}.run-node{padding:12px}.inspection h1{font-size:27px}}
 .execution-table td:nth-child(2){min-width:100px;white-space:nowrap}.execution-table th{white-space:nowrap}.execution-table td:last-child{min-width:180px}
+
+/* Frozen context stays readable without introducing another frontend state owner. */
+.context-inspector .panel { margin-top: 1.5rem; padding: 1.5rem; min-width: 0; }
+.context-tabs { display: flex; flex-wrap: wrap; gap: .8rem; margin: 1.2rem 0; }
+.context-tabs a[aria-current] { font-weight: 700; text-decoration: underline; }
+.context-items, .round-list, .context-diff { padding-left: 1.5rem; overflow-wrap: anywhere; }
+.context-items li, .round-list li, .context-diff li { margin: .5rem 0; }
+.context-content { margin-top: 1.5rem; min-width: 0; }
+.frozen-content { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; padding: 1rem; background: #f6f3ee; border: 1px solid #e6e0d7; border-radius: .7rem; font: .85rem/1.6 ui-monospace, monospace; tab-size: 2; }
+.context-range { font-size: .8rem; color: #746e65; }
+.context-diff [data-change="added"] strong { color: #276145; }
+.context-diff [data-change="removed"] strong { color: #9a403b; }

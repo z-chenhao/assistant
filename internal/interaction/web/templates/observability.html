@@ -13,7 +13,7 @@
 {{with .Relations}}
 <section class="inspection-detail panel" aria-label="Selected relationships">
 {{with .Selected}}
-<p class="eyebrow">SELECTED EXECUTION</p><h2>{{runRole .Role}}</h2><code class="execution-id">{{.ID}}</code><p><span class="state">{{.Status}}</span>{{if .WaitReason}} · waiting for {{.WaitReason}}{{end}}</p>
+<p class="eyebrow">SELECTED EXECUTION</p><h2>{{runRole .Role}}</h2><code class="execution-id">{{.ID}}</code><p><a class="inspect-context" href="{{contextURL .ID}}">Inspect frozen context →</a></p><p><span class="state">{{.Status}}</span>{{if .WaitReason}} · waiting for {{.WaitReason}}{{end}}</p>
 <dl class="execution-facts"><div><dt>Created (UTC)</dt><dd><time>{{.CreatedAt}}</time></dd></div>{{if .StartedAt}}<div><dt>Started (UTC)</dt><dd><time>{{.StartedAt}}</time></dd></div>{{end}}{{if .EndedAt}}<div><dt>Ended (UTC)</dt><dd><time>{{.EndedAt}}</time></dd></div>{{end}}</dl>
 {{if .Parent}}<p>Delegated by <a class="parent-run" href="{{inspectURL $.Inspection "run" .Parent}}"><code>{{.Parent}}</code></a> · depth {{.Depth}}</p>{{else if eq .Role "root"}}<p class="root-boundary">Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.</p>{{end}}
 {{if and .Root (ne .Root .ID)}}<p>Root Worker: <a href="{{inspectURL $.Inspection "run" .Root}}"><code>{{.Root}}</code></a></p>{{end}}
@@ -40,6 +40,6 @@
 {{if .List.Next}}<p><a class="button secondary" href="{{inspectURL . "cursor" .List.Next}}">Older executions →</a></p>{{end}}
 </section>
 {{end}}
-<p class="inspection-note">This page shows relationship metadata. Per-round messages, prompt diffs, provider wire requests and dispatch/usage timelines are not available here yet.</p>
+<p class="inspection-note">Select an execution to inspect its frozen per-round context. Provider wire requests and dispatch/usage timelines are not available yet.</p>
 </section>
 {{end}}
