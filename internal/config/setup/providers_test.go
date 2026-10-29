@@ -16,6 +16,18 @@ import (
 	mcpfake "github.com/z-chenhao/collie/internal/tool/mcp/fake"
 )
 
+func privateFixtureDir(t *testing.T) string {
+	t.Helper()
+	root, e := filepath.EvalSymlinks(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Chmod(root, 0700); e != nil {
+		t.Fatal(e)
+	}
+	return root
+}
+
 func TestSetupMCPPeer(t *testing.T) {
 	for i, v := range os.Args {
 		if v == "collie-setup-mcp" && i+1 < len(os.Args) {
@@ -32,7 +44,7 @@ func TestMCPProbeDiscoversWithoutInvokingEffects(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	root := t.TempDir()
+	root := privateFixtureDir(t)
 	cfg := []mcp.Config{{Name: "owned", Command: binary, Directory: root, Args: []string{"-test.run=^TestSetupMCPPeer$", "--", "collie-setup-mcp", root}, Tools: map[string]string{"read": "read_only", "send": "external_effect"}}}
 	v := verify(t, m, "mcp", encode(cfg))
 	if v.State != "ready" {
@@ -54,13 +66,13 @@ func TestMCPProbeDiscoversWithoutInvokingEffects(t *testing.T) {
 }
 func TestComputerProbeChecksSealedBaseAndRuntimeWithoutBoot(t *testing.T) {
 	m := fixtureManager(t)
-	root := t.TempDir()
+	root := privateFixtureDir(t)
 	peer, e := fixture.New(root)
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer peer.Close()
-	source := t.TempDir()
+	source := privateFixtureDir(t)
 	for _, name := range []string{"disk.img", "nvram.bin"} {
 		if e = os.WriteFile(filepath.Join(source, name), []byte("owned-base"), 0600); e != nil {
 			t.Fatal(e)
@@ -106,7 +118,7 @@ func TestComputerProbeChecksSealedBaseAndRuntimeWithoutBoot(t *testing.T) {
 
 func TestBootstrapRetainsComputerDocumentShape(t *testing.T) {
 	m := fixtureManager(t)
-	peer, e := fixture.New(t.TempDir())
+	peer, e := fixture.New(privateFixtureDir(t))
 	if e != nil {
 		t.Fatal(e)
 	}
