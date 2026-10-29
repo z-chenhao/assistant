@@ -9,7 +9,8 @@ import (
 var templates embed.FS
 
 var layout = template.Must(template.New("layout.html").Funcs(template.FuncMap{
-	"traceURL": traceURL, "traceListURL": traceListURL,
+	"capabilityURL": capabilityURL,
+	"traceURL":      traceURL, "traceListURL": traceListURL,
 	"otherProfiles": otherProfiles,
 	"modelURL":      modelURL, "activeProfile": activeProfile, "canSend": canSend, "providerName": providerName,
 	"bindingTarget": bindingTarget, "humanTime": humanTime, "observedTime": humanTime, "toolLabel": toolLabel,

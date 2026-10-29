@@ -113,6 +113,12 @@ broker; restarting after a crash reopens the same durable stores.
 The default data directory is `~/.local/share/collie`. Override it explicitly with
 `COLLIE_DATA_ROOT=/absolute/path collie`. Do not use a temporary directory for real work.
 
+Without `-config`, Collie also reads the owner settings file at
+`$COLLIE_DATA_ROOT/config.yaml` (default `~/.local/share/collie/config.yaml`) if it
+exists; otherwise it uses built-in defaults. Settings → Capabilities saves there
+when no explicit file was selected. Changes require restarting Collie. An explicit
+`-config` file takes precedence. See [capability setup](capability-setup.md).
+
 An explicit config file or `COLLIE_NATS_URL` opts into your configured external
 broker instead of the managed local broker:
 

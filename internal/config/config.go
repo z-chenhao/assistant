@@ -3,6 +3,7 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"log/slog"
@@ -28,6 +29,7 @@ import (
 )
 
 type Config struct {
+	SourcePath string                `yaml:"-" json:"-"`
 	Web        *web.Config           `yaml:"web"`
 	Feishu     *feishu.Config        `yaml:"feishu"`
 	Computer   *macosvm.Config       `yaml:"computer"`
@@ -83,9 +85,52 @@ type App struct {
 	LogBackups  int    `yaml:"log_backups"`
 }
 
-// Load uses built-in defaults when path is empty. A supplied file must exist,
-// contain exactly one versioned YAML document, and contain only known fields.
+// Load discovers the owner settings file beneath the selected data root when
+// no explicit configuration is supplied. It never creates a file or directory.
 func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
+	if path == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return Config{}, errors.New("resolve home directory")
+		}
+		root := filepath.Join(home, ".local", "share", "collie")
+		if value, ok := lookupEnv("COLLIE_DATA_ROOT"); ok {
+			root = value
+		}
+		if !filepath.IsAbs(root) {
+			return Config{}, errors.New("app.data_root must be an absolute path")
+		}
+		path = filepath.Join(root, "config.yaml")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			cfg, e := Decode(nil, lookupEnv)
+			cfg.SourcePath = path
+			return cfg, e
+		}
+	}
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return Config{}, errors.New("resolve configuration file")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return Config{}, errors.New("open configuration file")
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, 256<<10+1))
+	if err != nil || len(raw) > 256<<10 {
+		return Config{}, errors.New("configuration exceeds 256 KiB")
+	}
+	cfg, err := Decode(raw, lookupEnv)
+	cfg.SourcePath = path
+	if err == nil {
+		err = cfg.ValidateSourcePath(path)
+	}
+	return cfg, err
+}
+
+// Decode shares strict, whole-configuration validation with owner settings.
+// A nil document selects built-in defaults; an empty file is invalid.
+func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return Config{}, errors.New("resolve home directory")
@@ -102,15 +147,9 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		App:       App{DataRoot: filepath.Join(home, ".local", "share", "collie"), LogLevel: "info", LogMaxBytes: 16 << 20, LogBackups: 2},
 		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "collie", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
-	if path != "" {
-		f, err := os.Open(path)
-		if err != nil {
-			return Config{}, errors.New("open configuration file")
-		}
-		defer f.Close()
-		decoder := yaml.NewDecoder(f)
+	if raw != nil {
+		decoder := yaml.NewDecoder(bytes.NewReader(raw))
 		decoder.KnownFields(true)
-		// File versions must be explicit, rather than inherited from defaults.
 		cfg.Version = 0
 		if err := decoder.Decode(&cfg); err != nil {
 			return Config{}, errors.New("invalid configuration YAML (fields, types, or syntax)")
@@ -120,6 +159,7 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 			return Config{}, errors.New("configuration must contain exactly one YAML document")
 		}
 	}
+
 	if value, ok := lookupEnv("COLLIE_DATA_ROOT"); ok {
 		cfg.App.DataRoot = value
 	}
@@ -263,6 +303,31 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
 	return cfg, nil
+}
+
+// ValidateSourcePath keeps owner configuration outside any model/provider
+// readable or writable resource, using the same canonical isolation rules.
+func (c Config) ValidateSourcePath(path string) error {
+	roots := []string{}
+	if c.Execution != nil {
+		roots = append(roots, c.Execution.Root)
+		roots = append(roots, c.Execution.ToolchainRoots...)
+	}
+	if c.Computer != nil {
+		roots = append(roots, c.Computer.Root)
+	}
+	if c.Skills != nil {
+		roots = append(roots, c.Skills.Root)
+	}
+	for _, server := range c.MCP {
+		roots = append(roots, server.Directory)
+	}
+	for _, root := range roots {
+		if overlaps(root, path) {
+			return errors.New("configuration file must be separate from execution, toolchain, Skills and provider scopes")
+		}
+	}
+	return nil
 }
 
 func overlaps(a, b string) bool {

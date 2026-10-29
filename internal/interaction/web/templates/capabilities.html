@@ -1,0 +1,26 @@
+{{define "capabilities-page"}}
+<section class="workspace-page settings-page capabilities-page">
+ {{template "settings-tabs" .}}
+ {{with .Capability}}
+ <a class="back-link" href="/settings/capabilities">← All capabilities</a>
+ <div class="page-heading"><div><h1>{{.Title}}</h1><p>{{.Description}}</p></div><span class="status-pill" data-status="{{.State}}">{{if eq .State "managed"}}Uses Computer{{else if eq .State "ready"}}Connection verified{{else if eq .State "unavailable"}}Needs attention{{else if .Configured}}Configured · not verified{{else}}Not configured{{end}}</span></div>
+ {{if and .PendingRestart (not .Candidate)}}<p class="feedback warning" role="status">Saved settings differ from the running configuration. Restart Collie to load them. Existing work keeps its original capabilities and may need a new request if the connection changes.</p>{{end}}
+ {{if .Candidate}}<p class="feedback" role="status">Unsaved candidate. Test this configuration, then save it for the next restart.</p>{{end}}
+ <p class="field-help">{{.Help}}</p>
+ {{if .Message}}<p class="feedback {{if eq .State "unavailable"}}error{{else}}success{{end}}" role="status">{{.Message}}</p>{{end}}
+ {{if not .TestedAt.IsZero}}<p class="muted">Last tested {{humanTime (.TestedAt.Format "2006-01-02T15:04:05Z07:00")}}. Successful candidate tests expire after five minutes.</p>{{end}}
+ <form class="capability-editor" action="/capability/configure" method="post">
+  <input type="hidden" name="capability" value="{{.ID}}"><input type="hidden" name="revision" value="{{.Revision}}">
+  <label for="capability-configuration">{{.Title}} configuration<textarea id="capability-configuration" name="configuration" rows="10" maxlength="65536" spellcheck="false" aria-describedby="capability-edit-help">{{.Text}}</textarea></label>
+  <p id="capability-edit-help" class="field-help">Use this capability's YAML fields only. Clear the field to disable it or restore its documented default. Store credentials in SecretStore and enter references only.</p>
+  <div class="actions"><button name="action" value="test" class="secondary">Test configuration</button><button name="action" value="save" {{if not .Verified}}disabled{{end}}>Save verified configuration</button></div>
+ </form>
+ <details class="technical-details"><summary>Configuration example</summary><pre>{{.Example}}</pre></details>
+ <details class="technical-details"><summary>Configuration source and lifecycle</summary><p>File: <code>{{.Path}}</code></p><p>{{if .Active}}This capability was configured when the process started.{{else}}This capability was not configured when the process started.{{end}} Saving preserves other sections and never modifies an active Run. After restarting, new Runs use the loaded settings; incompatible old snapshots are rejected rather than silently upgraded.</p></details>
+ {{else}}
+ <div class="page-heading"><div><h1>Capabilities</h1><p>Connect what Collie needs, and check that it works.</p></div></div>
+ <p class="field-help">Connections are optional and use your own services and local resources. Open a capability to configure and test it. Saved changes take effect after restarting Collie.</p>
+ <div class="object-list">{{range .Capabilities}}<a class="object-row" href="{{capabilityURL .ID}}"><div><strong>{{.Title}}</strong><span>{{.Description}}</span>{{if .PendingRestart}}<span>Restart required to load saved changes</span>{{end}}</div><div class="row-badges"><span class="status-pill" data-status="{{.State}}">{{if eq .State "managed"}}Uses Computer{{else if eq .State "ready"}}Verified{{else if eq .State "unavailable"}}Needs attention{{else if .Configured}}Not verified{{else}}Not configured{{end}}</span><span aria-hidden="true">→</span></div></a>{{end}}</div>
+ {{end}}
+</section>
+{{end}}

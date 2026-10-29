@@ -7,6 +7,7 @@ and independent Feishu HTTP Fake. All processes are foreground-owned and joined.
 import argparse
 import base64
 import socketserver
+import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -212,6 +213,7 @@ def run(binary,evidence):
             report['checks'].append('GC-12 channel/Security fragment; Approval: exact frozen-hash rejection, SIGKILL/restart, concurrent duplicate callbacks; one approved Tool dispatch')
             h.stop()
         finally:h.cleanup()
+    capability_settings(binary,evidence,report)
     dependency_recovery(binary,report)
     extra_scenarios(binary,report)
     native_components(binary, evidence, report)
@@ -220,6 +222,75 @@ def run(binary,evidence):
     native_trace_inspection(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def capability_settings(binary,evidence,report):
+    """Owner UI -> real config/probes -> restart, retaining frozen Run records."""
+    from verify_recall import Embeddings
+    with tempfile.TemporaryDirectory(prefix='collie-capability-settings-') as temp, Sandbox() as platform:
+        root=Path(temp);h=ChannelHarness(binary,root,platform,'terminal-input')
+        peer=Embeddings()
+        try:
+            skills=root/'skills';skills.mkdir(mode=0o700)
+            item=skills/'research';item.mkdir();(item/'SKILL.md').write_text('---\nname: research\ndescription: Inspect sources before making claims.\n---\nRead the evidence.\n')
+            provider=root/'provider';provider.mkdir(mode=0o700)
+            vm=root/'computer';vm.mkdir(mode=0o700)
+            source=root/'base-source';source.mkdir(mode=0o700)
+            for name in ('disk.img','nvram.bin'):(source/name).write_text('owned-'+name)
+            (source/'config.json').write_text(json.dumps(dict(macAddress='02:00:00:00:00:01',machineIdentifier='fixture-base',cpuCount=4)))
+            h.env.update(COLLIE_SETUP_MEMORY_KEY='k'*32,COLLIE_COMPUTER_FIXTURE_PASSWORD='fixture-only')
+            start=h.processes.start if h.processes is not None else subprocess.Popen
+            native=start([str(binary),'-test-computer-server',str(vm)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,cwd=root,env=h.env)
+            h.children.append(native)
+            with selectors.DefaultSelector() as selector:
+                selector.register(native.stdout,selectors.EVENT_READ);require(selector.select(10),'Computer diagnostic peer unavailable')
+            computer=json.loads(native.stdout.readline())
+            javascript=dict(command=shutil.which('node'),script=str(ROOT/'runtime/javascript/src/sidecar.mjs'))
+            preparing=root/'computer-prepare.yaml';preparing.write_text(json.dumps(dict(version=1,javascript=javascript,computer=computer)))
+            run=h.processes.run if h.processes is not None else subprocess.run
+            prepared=run([str(binary),'-config',str(preparing),'computer','prepare-base',str(source)],env=h.env,cwd=root,capture_output=True,text=True,timeout=20)
+            require(prepared.returncode==0,'Computer base preparation failed: '+prepared.stderr)
+            h.setup();h.start()
+            h.http('/api/message',dict(source_id='capability-baseline',content=[dict(type='text',text='Owner configuration baseline.')]))
+            h.wait(lambda state:state['deliveries'] and all(d['status']=='sent' for d in state['deliveries']),'baseline before configuration')
+            def snapshots():
+                with sqlite3.connect(root/'data/state.db') as db:return dict((r[0],r[1:]) for r in db.execute('SELECT snapshot_id,tool_specs_hash,tools_json FROM capability_snapshot'))
+            frozen=snapshots();original=h.config.read_bytes()
+            h.http('/settings/capabilities',auth=False,expected=401)
+            h.http('/settings/capabilities/unknown',expected=404)
+            form={'Content-Type':'application/x-www-form-urlencoded'}
+            # The owner-only mutations retain host/origin authentication guards.
+            h.http('/capability/configure',urlencode(dict(capability='memory',action='test')).encode(),headers={**form,'Origin':'http://evil.example'},expected=403)
+            revision=hashlib.sha256(original).hexdigest()
+            rejected=h.http('/capability/configure',urlencode(dict(capability='memory',action='save',revision=revision,configuration='encryption_key_ref: env:COLLIE_SETUP_MEMORY_KEY')).encode(),headers=form,expected=409)
+            require('test this exact configuration successfully before saving' in rejected,'unverified proof was not enforced')
+            h.http('/capability/configure',urlencode(dict(capability='memory',action='test',revision=revision,configuration='x'*65537)).encode(),headers=form,expected=413)
+            require(h.config.read_bytes()==original,'unverified save modified configuration')
+            h.env['COLLIE_CAPABILITY_SETUP_FACTS']=json.dumps(dict(embedding=f'http://127.0.0.1:{peer.server.server_port}/v1',skills=str(skills),provider=str(provider),binary=str(binary),workspace=str(root/'workspace'),computer=dict(computer=computer,javascript=javascript)))
+            h.browser(evidence.parent/'capability-setup-ui','capability-setup')
+            require(snapshots()==frozen,'settings changed existing frozen capabilities')
+            require(not (provider/'mcp-effects.jsonl').exists(),'MCP diagnostic invoked a business tool')
+            require(not list((vm/'vms').iterdir()),'Computer diagnostic booted or cloned a VM')
+            require(all(p['input']=='Collie embedding connection test' for p in peer.requests),'embedding diagnostic sent private conversation')
+            require('k'*32 not in h.config.read_text() and 'fixture-only' not in h.config.read_text(),'plaintext credential in settings')
+            require(h.config.stat().st_mode&0o777==0o600,'configuration is not private')
+            h.stop();h.start()
+            for kind in ('memory','embedding','mcp','skills','computer'):
+                require('configured when the process started' in h.http('/settings/capabilities/'+kind),'saved capability was not loaded after restart: '+kind)
+            h.http('/api/message',dict(source_id='capability-after-restart',content=[dict(type='text',text='Confirm the new setup is available.')]))
+            try:
+                h.wait(lambda state:len(state['deliveries'])==2 and all(d['status']=='sent' for d in state['deliveries']),'new request after restart')
+            except RuntimeError as error:
+                with sqlite3.connect(root/'data/state.db') as db:
+                    diagnostic=db.execute("SELECT status,json_extract(checkpoint_json,'$.phase'),json_extract(checkpoint_json,'$.error') FROM run ORDER BY created_at").fetchall()
+                raise RuntimeError(str(error)+'; '+json.dumps(diagnostic)) from error
+            after=snapshots();require(all(after.get(k)==v for k,v in frozen.items()),'restart rewrote old snapshots')
+            require(any('mcp__owner_catalog__read' in data[1] for key,data in after.items() if key not in frozen),'new Run missed the newly configured provider')
+            report['scenarios']['capability-settings']=dict(kinds=['memory','embedding','mcp','skills','execution','computer'],old_snapshots_retained=True,new_run_uses_new_tools=True,probe_does_not_boot_or_invoke=True,embedding_requests=len(peer.requests))
+            report['checks'].append('F-030: real owner UI config/test/save/restart for six capabilities; failed probes repaired, no-JS/mobile, exact candidate/revision checks, preserved frozen snapshots and newly loaded tools')
+            h.stop()
+        finally:
+            h.cleanup();peer.close()
 
 
 def native_trace_inspection(binary,evidence,report):

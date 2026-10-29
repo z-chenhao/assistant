@@ -25,7 +25,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 
 完成状态只属于本行需求，不自动扩展为整个模块、全部平台或所有业务场景完成。配置依赖、刻意限制、待实现内容和未验证项应分别说明。
 
-当前共 41 项需求：29 项已完成、8 项部分完成、2 项未实现、2 项待定义。此汇总随下表一起维护。
+当前共 41 项需求：30 项已完成、8 项部分完成、1 项未实现、2 项待定义。此汇总随下表一起维护。
 
 ## 需求索引
 
@@ -60,7 +60,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 操作员能检查健康、导出受控诊断、备份并隔离恢复数据。 | 是 · 已完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 操作员能查看用量，并按明确价格元数据控制账户费用。 | 是 · 已完成 |
-| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 用户能在设置中看见记忆、embedding、MCP、Skills、隔离执行环境及 Computer 是否已连接，并完成配置验证。 | 否 · 未实现 |
+| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 用户能在设置中看见记忆、embedding、MCP、Skills、隔离执行环境及 Computer 是否已连接，并完成配置验证。 | 是 · 已完成 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |
@@ -71,7 +71,6 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证及可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |
 | [F-040](features/engineering.md#f-040) | Go 模块边界与可读性重构 | 领域持有适配器和接口类型，入口分阶段，长事务函数分职责，保持现有协议。 | 是 · 已完成 |
-
 | [F-041](features/branding.md#f-041) | Collie 个人助手品牌与工作空间 | 边牧接球隐喻、统一视觉与新项目身份，保留真实执行与审批语义。 | 是 · 已完成 |
 
 ## 文档组织

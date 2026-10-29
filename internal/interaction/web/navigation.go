@@ -18,6 +18,10 @@ func pageRoute(path string) (tab, view, title string) {
 		return "/tasks", "tasks", "Tasks"
 	case strings.HasPrefix(path, "/tasks/") && task.ValidRef(strings.TrimPrefix(path, "/tasks/")):
 		return "/tasks", "task", "Task"
+	case path == "/settings/capabilities":
+		return "/settings", "capabilities", "Capabilities"
+	case strings.HasPrefix(path, "/settings/capabilities/") && validCapability(strings.TrimPrefix(path, "/settings/capabilities/")):
+		return "/settings", "capabilities", "Capability settings"
 	case path == "/settings/notifications":
 		return "/settings", "settings", "Notifications"
 	case path == "/settings" || path == "/settings/models":

@@ -24,6 +24,8 @@ type shownProjection struct {
 	Spec, Fallback string
 }
 type page struct {
+	Capabilities                                      []Capability
+	Capability                                        *Capability
 	Trace                                             *traceView
 	Tasks                                             *taskView
 	Settings                                          *settingsView
@@ -74,6 +76,8 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	p.AccountID = s.accountID
 	s.mu.Unlock()
 	switch p.View {
+	case "capabilities":
+		err = s.loadCapabilities(ctx, r, &p)
 	case "settings":
 		err = s.loadSettings(ctx, r, &p)
 	case "tasks", "task":

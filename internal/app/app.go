@@ -16,6 +16,7 @@ import (
 	"github.com/z-chenhao/collie/internal/agent/sqlite"
 	"github.com/z-chenhao/collie/internal/computer/macosvm"
 	"github.com/z-chenhao/collie/internal/config"
+	configsetup "github.com/z-chenhao/collie/internal/config/setup"
 	"github.com/z-chenhao/collie/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/collie/internal/conversation/sqlite"
 	"github.com/z-chenhao/collie/internal/delivery"
@@ -44,6 +45,7 @@ import (
 )
 
 type App struct {
+	capabilitySettings  *configsetup.Manager
 	core                atomic.Pointer[runtimeCore]
 	prepareCore         func(context.Context) error
 	eventsRequired      atomic.Bool
@@ -163,7 +165,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, errors.Join(err, t.Close())
 	}
 	store.Artifacts().Policy = cfg.Artifact
-	a := &App{rootLock: lock, store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
+	a := &App{capabilitySettings: configsetup.New(cfg, secrets), rootLock: lock, store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()

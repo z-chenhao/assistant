@@ -37,3 +37,7 @@
 @media(max-width:1000px){.task-detail-grid{grid-template-columns:minmax(0,1fr) 250px}}
 @media(max-width:800px){.task-detail-grid{grid-template-columns:1fr}.task-side{display:grid;grid-template-columns:1fr}.facts>div{grid-template-columns:1fr;gap:4px}}
 @media(max-width:700px){.workspace-page{padding:24px var(--workspace-gutter) 40px}.page-heading{align-items:flex-start;flex-wrap:wrap;gap:15px;margin-bottom:22px}.choice-grid{grid-template-columns:1fr}.choice-card{min-height:200px;padding:22px}.object-row{padding:17px 16px;gap:12px}.object-row .row-badges{flex-direction:column;align-items:flex-end;max-width:36%}.object-row .row-badges>span:last-child:not(.status-pill){display:none}.section-tabs{gap:20px}.current-model{padding:22px 0}.task-row-title strong{font-size:14px}}
+.capability-editor{max-width:760px;margin:24px 0}
+.capability-editor textarea{display:block;width:100%;margin-top:8px;min-height:220px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--foreground);font:14px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;tab-size:2}
+.capabilities-page .technical-details{max-width:760px}
+@media(max-width:700px){.capability-editor textarea{font-size:16px;padding:12px}.capability-editor .actions{align-items:stretch;flex-direction:column}.capabilities-page .object-row .row-badges{max-width:42%}}

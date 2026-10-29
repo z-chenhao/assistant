@@ -20,7 +20,8 @@
  <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>
  {{if .Error}}<div class="page-feedback feedback error" role="alert">{{.Error}}</div>{{end}}
  {{if .Notice}}<div class="page-feedback feedback success" role="status">{{.Notice}}</div>{{end}}
- {{if eq .View "settings"}}{{template "settings-page" .}}
+ {{if eq .View "capabilities"}}{{template "capabilities-page" .}}
+ {{else if eq .View "settings"}}{{template "settings-page" .}}
  {{else if eq .View "tasks"}}{{template "tasks-page" .}}
  {{else if eq .View "task"}}{{template "task-page" .}}
  {{else if or (eq .View "traces") (eq .View "trace")}}{{template "observability-page" .}}
