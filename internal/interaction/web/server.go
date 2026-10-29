@@ -203,13 +203,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	}
 	if file, ok := map[string]struct{ path, contentType string }{
-		"/style.css":                    {"assets/style.css", "text/css"},
-		"/app.js":                       {"assets/client.js", "text/javascript"},
-		"/licenses.txt":                 {"assets/licenses.txt", "text/plain; charset=utf-8"},
-		"/brand/collie.png":             {"assets/brand/collie.png", "image/png"},
-		"/brand/bricolagegrotesque.ttf": {"assets/brand/bricolagegrotesque.ttf", "font/ttf"},
-		"/brand/dmsans.ttf":             {"assets/brand/dmsans.ttf", "font/ttf"},
-		"/favicon.png":                  {"assets/brand/collie.png", "image/png"},
+		"/style.css":        {"assets/style.css", "text/css"},
+		"/app.js":           {"assets/client.js", "text/javascript"},
+		"/licenses.txt":     {"assets/licenses.txt", "text/plain; charset=utf-8"},
+		"/brand/collie.png": {"assets/brand/collie.png", "image/png"},
+		"/brand/lora.ttf":   {"assets/brand/lora.ttf", "font/ttf"},
+		"/brand/dmsans.ttf": {"assets/brand/dmsans.ttf", "font/ttf"},
+		"/favicon.png":      {"assets/brand/collie.png", "image/png"},
 	}[r.URL.Path]; ok {
 		body, err := assets.ReadFile(file.path)
 		if err != nil {
