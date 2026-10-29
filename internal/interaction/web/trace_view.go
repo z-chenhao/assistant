@@ -91,23 +91,6 @@ func observationRole(name string) string {
 	}
 	return ""
 }
-func observationIcon(kind string) string {
-	switch kind {
-	case "generation":
-		return "✧"
-	case "agent":
-		return "◈"
-	case "tool":
-		return "⌁"
-	case "retriever":
-		return "⌕"
-	case "chain":
-		return "◇"
-	case "event":
-		return "•"
-	}
-	return "↔"
-}
 func observationParent(id string) string { return strings.TrimPrefix(id, "agent:") }
 func money(m int64) string               { return fmt.Sprintf("%.6f", float64(m)/1e6) }
 func viewJSON(v any) string              { body, _ := json.MarshalIndent(v, "", "  "); return string(body) }
