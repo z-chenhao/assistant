@@ -1,0 +1,30 @@
+.app-sidebar{position:fixed;inset:0 auto 0 0;width:var(--sidebar-width);padding:26px 14px;background:#f8f8f9;border-right:1px solid var(--border);z-index:3}
+.brand{display:flex;align-items:center;gap:10px;padding:0 10px;text-decoration:none;font-size:20px;font-weight:600;letter-spacing:-.04em}
+.brand img{flex-shrink:0;object-fit:contain}
+.app-sidebar>nav{display:grid;gap:5px;margin-top:42px}
+.app-sidebar>nav a{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:8px;font-size:13px;text-decoration:none;color:#62626b}
+.app-sidebar>nav a:hover{background:#eeeef0}
+.app-sidebar>nav a[aria-current]{background:#eaeaec;color:var(--foreground);font-weight:550}
+.app-sidebar>.developer-nav{margin-top:28px;border-top:1px solid var(--border);padding-top:16px}
+.developer-nav a span{font-size:10px;color:var(--muted-foreground)}
+.workspace-main{margin-left:var(--sidebar-width);min-height:100dvh;min-width:0}
+.workspace-topbar{height:72px;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:0 var(--workspace-gutter);border-bottom:1px solid #f3f3f4}
+.breadcrumbs{display:flex;gap:10px;align-items:center;min-width:0;font-size:12px;color:var(--muted-foreground)}
+.breadcrumbs a{text-decoration:none}.breadcrumbs a:hover{text-decoration:underline}
+.breadcrumbs>:last-child{color:var(--foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#workspace-status{flex-shrink:0}
+.connection-feedback{position:fixed;right:20px;bottom:18px;z-index:8;max-width:min(420px,calc(100vw - 40px));font-size:12px;color:#52525b}
+.connection-feedback:not(:empty){padding:12px 16px;background:var(--background);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px #0001}
+.connection-feedback button{min-height:28px;padding:3px 8px;font-size:11px;margin-left:6px}
+.page-feedback{max-width:1048px;margin:24px var(--workspace-gutter) 0}
+.login{max-width:440px;margin:12vh auto;padding:28px}
+.login>.brand{padding:0;margin-bottom:38px}.login>h1{font-size:28px}.login>p{color:var(--muted-foreground)}
+.login form{margin:28px 0}.login form button{width:100%}
+@media(max-width:700px){
+ .app-sidebar{position:static;display:flex;align-items:center;flex-wrap:wrap;gap:12px;width:auto;padding:12px 16px;border-right:0;border-bottom:1px solid var(--border)}
+ .app-sidebar>.brand{padding:0;font-size:18px;margin-right:auto}.brand img{width:32px;height:32px}
+ .app-sidebar>nav{display:flex;flex:1 1 100%;gap:5px;margin:0;order:2}.app-sidebar>nav a{padding:8px 12px;font-size:12px}
+ .app-sidebar>.developer-nav{flex:0 0 auto;border:0;padding:0;margin:0;order:1}.developer-nav a span{display:none}
+ .workspace-main{margin-left:0}.workspace-topbar{height:50px;gap:8px}.breadcrumbs{gap:7px;font-size:11px}
+ .page-feedback{margin:16px 20px 0}.login{margin:6vh auto;padding:24px}.login>.brand{margin-bottom:26px}
+}

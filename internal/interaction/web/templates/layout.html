@@ -1,7 +1,39 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Erii · Personal assistant</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head><body>
-{{if .Login}}<main class="login"><img class="mark" src="/brand/eri-icon-192.png" alt="Erii character logo" width="80" height="80"><p class="eyebrow">YOUR PERSONAL ASSISTANT</p><h1>Welcome to Erii</h1><p>Connect to your private workspace.</p><form action="/session" method="post"><label>Workspace access token<input type="password" name="token" required autocomplete="off"></label><button>Open workspace →</button></form><small>The installation owner configures access through the credential store.</small></main>
-{{else}}<aside><a class="brand" href="/"><img src="/brand/eri-icon-192.png" alt="Erii character logo" width="40" height="40"><span>Erii</span></a><p class="eyebrow">WORKSPACE</p><nav><a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>◌ &nbsp; Conversation</a><a href="/progress" {{if eq .Tab "/progress"}}aria-current="page"{{end}}>◷ &nbsp; Ongoing work</a><a href="/settings" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>⚙ &nbsp; Settings</a></nav><details class="developer-nav" {{if or (eq .Tab "/developer/observability") (eq .Tab "/developer/context")}}open{{end}}><summary>Developer</summary><nav><a href="/developer/observability" {{if or (eq .Tab "/developer/observability") (eq .Tab "/developer/context")}}aria-current="page"{{end}}>Observability</a></nav></details><div class="aside-bottom"><img class="avatar" src="/brand/eri-icon-192.png" alt="Erii default agent avatar" width="36" height="36"><div><strong>Erii</strong><small>Private workspace</small></div><span class="dot"></span></div></aside>
-<main data-live-view="{{.Tab}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}"><header><span class="page-title">{{if eq .Tab "/progress"}}Ongoing work{{else if eq .Tab "/settings"}}Settings{{else if or (eq .Tab "/developer/observability") (eq .Tab "/developer/context")}}Observability{{else}}Conversation{{end}}</span><span id="live-update-status" role="status" aria-live="polite"></span><span class="state" id="workspace-status">{{template "status" .}}</span></header>
-{{if eq .Tab "/settings"}}{{template "settings-page" .}}{{else if eq .Tab "/progress"}}{{template "progress-page" .}}{{else if eq .Tab "/developer/context"}}{{template "context-page" .}}{{else if eq .Tab "/developer/observability"}}{{template "observability-page" .}}{{else}}{{template "conversation-page" .}}{{end}}</main>{{end}}</body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Erii · {{if .Title}}{{.Title}}{{else}}Workspace{{end}}</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
+<body>
+{{if .Login}}
+<main class="login">
+ <a class="brand" href="/"><img src="/brand/eri-icon-192.png" alt="Erii character logo" width="40" height="40">Erii</a>
+ <h1>Open your workspace</h1><p>Enter the access token for this installation.</p>
+ {{if .Error}}<p class="feedback error" role="alert">{{.Error}}</p>{{end}}
+ <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label>Workspace access token<input type="password" name="token" required autocomplete="off" autofocus></label><button>Open workspace →</button></form>
+ <p class="muted">Your workspace token is separate from your model provider account.</p>
+</main>
+{{else}}
+<aside class="app-sidebar">
+ <a class="brand" href="/"><img src="/brand/eri-icon-192.png" alt="Erii character logo" width="40" height="40"><span>Erii</span></a>
+ <nav aria-label="Workspace"><a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>Conversation</a><a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>Tasks</a><a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>Settings</a></nav>
+ <nav class="developer-nav" aria-label="Developer"><a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>Developer <span>Traces</span></a></nav>
+</aside>
+<main class="workspace-main" data-live-view="{{.Live}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}">
+ <header class="workspace-topbar"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Workspace</a><span>/</span>{{if eq .Tab "/settings"}}<a href="/settings/models">Settings</a><span>/</span>{{end}}{{if eq .View "task"}}<a href="/tasks">Tasks</a><span>/</span>{{end}}{{if eq .View "trace"}}<a href="{{traceListURL .Trace}}">Traces</a><span>/</span>{{end}}<span>{{.Title}}</span></nav><div id="workspace-status">{{template "status" .}}</div></header>
+ <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>
+ {{if .Error}}<div class="page-feedback feedback error" role="alert">{{.Error}}</div>{{end}}
+ {{if .Notice}}<div class="page-feedback feedback success" role="status">{{.Notice}}</div>{{end}}
+ {{if eq .View "settings"}}{{template "settings-page" .}}
+ {{else if eq .View "tasks"}}{{template "tasks-page" .}}
+ {{else if eq .View "task"}}{{template "task-page" .}}
+ {{else if or (eq .View "traces") (eq .View "trace")}}{{template "observability-page" .}}
+ {{else if eq .View "error"}}<section class="workspace-page"><h1>We couldn't open this page</h1><p>Use the navigation to return to your workspace.</p><a class="button secondary" href="{{if .Path}}{{.Path}}{{else}}/{{end}}">Try again</a></section>
+ {{else}}{{template "conversation-page" .}}{{end}}
+</main>
+{{end}}
+</body></html>
 
-{{define "status"}}<span class="dot"></span> {{.Status.Status}}{{end}}
+{{define "status"}}<span hidden data-can-send="{{canSend .Status}}"></span>
+{{if eq .Status.Readiness "setup_required"}}<a class="status-pill warning" href="/settings/models">Setup required</a>
+{{else if eq .Status.Readiness "degraded"}}<a class="status-pill warning" href="/settings/models">Model needs attention</a>
+{{else if eq .Status.Status "busy"}}<span class="status-pill working">Working</span>
+{{else if eq .Status.Status "idle"}}<span class="status-pill">Ready</span>
+{{else}}<span class="status-pill">Status unavailable</span>{{end}}
+{{end}}

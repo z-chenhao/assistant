@@ -3,8 +3,10 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
@@ -39,7 +41,20 @@ func (s *Server) acceptFormMessage(w http.ResponseWriter, r *http.Request) error
 	}
 	defer r.MultipartForm.RemoveAll()
 	key := r.FormValue("source_id")
-	e := interaction.InboundEvent{Channel: "web", Subject: Subject, Destination: Destination, EventID: key, SourceID: key, Content: conversation.Text(r.FormValue("text"))}
+	text := r.FormValue("text")
+	target := "/"
+	if ref := r.FormValue("task_ref"); ref != "" {
+		if s.Tasks == nil {
+			return errPageNotFound
+		}
+		d, err := s.Tasks.Detail(r.Context(), ref, "")
+		if err != nil {
+			return err
+		}
+		text = fmt.Sprintf("Regarding task %q (%s):\n%s", d.Title, d.TaskRef, text)
+		target = "/?task=" + url.QueryEscape(d.TaskRef)
+	}
+	e := interaction.InboundEvent{Channel: "web", Subject: Subject, Destination: Destination, EventID: key, SourceID: key, Content: conversation.Text(text)}
 	if err := e.Validate(); err != nil {
 		return err
 	}
@@ -65,7 +80,11 @@ func (s *Server) acceptFormMessage(w http.ResponseWriter, r *http.Request) error
 	if s.Wake != nil {
 		s.Wake()
 	}
-	http.Redirect(w, r, "/", 303)
+	if r.Header.Get("Accept") == "application/json" {
+		jsonResult(w, map[string]any{"accepted": true, "location": target})
+		return nil
+	}
+	http.Redirect(w, r, target, 303)
 	return nil
 }
 func (s *Server) uploadArtifact(w http.ResponseWriter, r *http.Request) error {

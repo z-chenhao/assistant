@@ -1,3 +1,4 @@
+import {enhanceSettings} from './settings';
 import {enhanceObservability} from './observability';
 import {enhanceComposer} from './composer';
 import {enhanceProjections} from './projections';
@@ -11,3 +12,5 @@ enhanceComposer();
 live?.start();
 
 enhanceObservability();
+
+enhanceSettings();

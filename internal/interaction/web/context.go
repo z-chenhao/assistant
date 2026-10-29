@@ -149,7 +149,7 @@ func (s *Server) contextAPI(w http.ResponseWriter, r *http.Request, kind string)
 	}
 }
 
-func contextURL(run string) string { return "/developer/context?" + url.Values{"run": {run}}.Encode() }
+func contextURL(run string) string { return tracePath(run) + "?tab=context&ctx=1" }
 
 // Keep section, item and byte pagination separate. Switching a round or section
 // clears all dependent offsets, so a stale offset cannot hide a new prompt.
@@ -208,7 +208,10 @@ func contextLink(v *contextView, field string, value any) string {
 	default:
 		q.Set(field, strconv.FormatInt(n, 10))
 	}
-	return "/developer/context?" + q.Encode()
+	q.Del("run")
+	q.Set("tab", "context")
+	q.Set("ctx", "1")
+	return tracePath(v.Query.RunID) + "?" + q.Encode()
 }
 
 func diffLink(v *contextView, step int64, item int) string {

@@ -6,18 +6,24 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
 func traceQuery(r *http.Request) (*traceView, error) {
 	values := r.URL.Query()
-	v := &traceView{Tab: "overview", Field: "output"}
+	v := &traceView{Tab: "overview", Field: "output", Compare: "messages"}
 	legacy := url.Values{}
 	for key, list := range values {
 		if len(list) != 1 {
 			return nil, observability.ErrInvalid
 		}
 		switch key {
+		case "compare":
+			if list[0] != "messages" && list[0] != "tools" {
+				return nil, observability.ErrInvalid
+			}
+			v.Compare = list[0]
 		case "session":
 			v.Query.Session = list[0]
 		case "obs":
@@ -118,6 +124,9 @@ func traceURL(v *traceView, field string, value any) string {
 		q.Set("offset", strconv.Itoa(v.Offset))
 		q.Set("field", v.Field)
 	}
+	if v.Tab == "diff" {
+		q.Set("compare", v.Compare)
+	}
 	text := fmt.Sprint(value)
 	switch x := value.(type) {
 	case *int:
@@ -143,6 +152,10 @@ func traceURL(v *traceView, field string, value any) string {
 		q.Set("tab", text)
 		q.Del("offset")
 		q.Del("field")
+	case "compare":
+		q.Set("compare", text)
+		q.Set("tab", "diff")
+		q.Del("diff_after")
 	case "session":
 		q = url.Values{"session": {text}}
 		q.Del("run")
@@ -159,5 +172,82 @@ func traceURL(v *traceView, field string, value any) string {
 	default:
 		q.Set(field, text)
 	}
-	return "/developer/observability?" + q.Encode()
+	path := "/developer/observability"
+	if run := q.Get("run"); run != "" {
+		path = tracePath(run)
+		q.Del("run")
+	}
+	return path + "?" + q.Encode()
+}
+
+func tracePath(run string) string { return "/developer/observability/" + url.PathEscape(run) }
+func tracePageQuery(r *http.Request) (*traceView, error) {
+	copy := r.Clone(r.Context())
+	u := *r.URL
+	q := r.URL.Query()
+	var full *contextView
+	for _, values := range q {
+		if len(values) != 1 {
+			return nil, observability.ErrInvalid
+		}
+	}
+	run := strings.TrimPrefix(r.URL.Path, "/developer/observability/")
+	if strings.HasPrefix(r.URL.Path, "/developer/observability/") {
+		if run == "" || strings.Contains(run, "/") {
+			return nil, observability.ErrInvalid
+		}
+		if old := q.Get("run"); old != "" && old != run {
+			return nil, observability.ErrInvalid
+		}
+		q.Set("run", run)
+	}
+	if r.URL.Path == "/developer/context" {
+		q.Set("ctx", "1")
+		q.Set("tab", "context")
+	}
+	if q.Get("ctx") == "1" {
+		cq := url.Values{"run": q["run"]}
+		for _, key := range []string{"step", "section", "item", "format", "after", "round_after", "diff_after", "offset"} {
+			if values, ok := q[key]; ok {
+				cq[key] = values
+				q.Del(key)
+			}
+		}
+		if q.Get("tab") != "context" {
+			return nil, observability.ErrInvalid
+		}
+		contextRequest := r.Clone(r.Context())
+		cu := *r.URL
+		cu.RawQuery = cq.Encode()
+		contextRequest.URL = &cu
+		var err error
+		full, err = contextQuery(contextRequest)
+		if err != nil {
+			return nil, err
+		}
+		q.Del("ctx")
+	}
+	u.RawQuery = q.Encode()
+	copy.URL = &u
+	v, err := traceQuery(copy)
+	if err != nil {
+		return nil, err
+	}
+	v.FullContext = full
+	return v, nil
+}
+
+func traceListURL(v *traceView) string {
+	if v == nil {
+		return "/developer/observability"
+	}
+	copy := *v
+	copy.Run = ""
+	copy.Task = ""
+	copy.Node = ""
+	copy.After = ""
+	copy.Tab = "overview"
+	copy.Offset = 0
+	copy.DiffAfter = 0
+	return traceURL(&copy, "cursor", v.Query.Cursor)
 }

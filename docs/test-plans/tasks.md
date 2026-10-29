@@ -110,3 +110,9 @@ to survive the command or test harness.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## Tasks 工作台回归
+
+`internal/agent/sqlite/workspace_test.go` 用真实 Main/Root/Child 与 SQLite 证明详情、原始用户消息定位和非空 Main 交付，读取前后领域计数不变；65 项任务在同 created_at 下完整分页，游标不得跨搜索/视图使用，其他 Agent 的 Task 不可读。`internal/task/sqlite/reader_test.go` 验证只读池不新建或改写数据库。既有 Activity 测试继续保护终端/API 摘要契约。
+
+既有 channels 浏览器测试打开任务详情，核对目标、审批冻结 hash、带任务上下文回 Main、移动端，以及生产 Pi peer 场景完成后的 Main 交付；不以原始 Worker result 代替用户回复。列表筛选不是新的 Task 状态；所有控制仍经 Main 和既有生命周期回归。

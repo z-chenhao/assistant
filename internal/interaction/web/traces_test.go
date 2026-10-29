@@ -20,6 +20,13 @@ func (traceReader) Observations(_ context.Context, q observability.ObservationQu
 	root := observability.Observation{ID: "agent:root-public", Key: "root-public", RunID: "root-public", Name: "Root Worker", Type: "agent", Status: "completed", Started: end - 1000000, Ended: &end, Timing: "lifecycle"}
 	gen := observability.Observation{ID: "generation:g", Key: "g", RunID: "root-public", Name: "Generate response", Type: "generation", Parent: root.ID, Step: &step, Status: "completed", Started: end - 800000, Ended: &end, Timing: "admission to acceptance"}
 	tree := observability.ObservationTree{Trace: observability.Trace{Execution: observability.Execution{ID: "root-public", Role: "root", Root: "root-public", Status: "completed", CreatedAt: "2026-10-29T01:00:00Z", EndedAt: "2026-10-29T01:00:01Z"}, Title: "Review report", Session: "conversation:owner", Model: "fixture-model"}, Items: []observability.Observation{root, gen}, Selected: root}
+	if q.Selected == "generation:next" {
+		gen.ID = q.Selected
+		gen.Key = "next"
+		step = 1
+		gen.Step = &step
+		tree.Items[1] = gen
+	}
 	if q.Selected == gen.ID {
 		tree.Selected = gen
 	}
@@ -43,7 +50,7 @@ func TestTraceWorkbenchAuthenticatedCompleteEscapedAndValidated(t *testing.T) {
 		s.ServeHTTP(w, r)
 		return w
 	}
-	for _, path := range []string{"/developer/observability?run=root-public&obs=generation:g", "/api/developer/traces", "/api/developer/observations?run=root-public", "/api/developer/observation-body?run=root-public&obs=generation:g"} {
+	for _, path := range []string{"/developer/observability/root-public?obs=generation:g", "/api/developer/traces", "/api/developer/observations?run=root-public", "/api/developer/observation-body?run=root-public&obs=generation:g"} {
 		if w := request(path, false); w.Code != 401 {
 			t.Fatal("trace auth", path, w.Code)
 		}
@@ -51,7 +58,7 @@ func TestTraceWorkbenchAuthenticatedCompleteEscapedAndValidated(t *testing.T) {
 			t.Fatal(path, w.Code, w.Body.String())
 		}
 	}
-	w := request("/developer/observability?run=root-public&obs=generation:g", true)
+	w := request("/developer/observability/root-public?obs=generation:g", true)
 	for _, text := range []string{"Trace tree", "Timeline", "Observation details", "Saved system prompt", "Private &lt;img", "Accepted &lt;script&gt;", "</html>"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing complete rendered view", text, w.Body.String())
@@ -86,5 +93,19 @@ func TestTraceRowsGroupActualParentsAndBoundWaterfall(t *testing.T) {
 	tree.Items = []observability.Observation{{ID: "a", Parent: "b"}, {ID: "b", Parent: "a"}}
 	if len(traceRows(tree)) != 2 {
 		t.Fatal("cycle escaped bounded rendering")
+	}
+}
+
+type detailOnlyReader struct{ traceReader }
+
+func (detailOnlyReader) Traces(context.Context, observability.TraceQuery) (observability.Traces, error) {
+	return observability.Traces{}, observability.ErrNotFound
+}
+func TestTraceDetailDoesNotDependOnGlobalList(t *testing.T) {
+	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Inspector: &inspectionReader{}, Traces: detailOnlyReader{}}
+	w := httptest.NewRecorder()
+	s.show(w, httptest.NewRequest("GET", "/developer/observability/root-public?obs=generation:g", nil))
+	if w.Code != 200 || strings.Contains(w.Body.String(), `class="obs-trace-list"`) {
+		t.Fatal("detail still depends on the list", w.Code, w.Body.String())
 	}
 }

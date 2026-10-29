@@ -28,7 +28,7 @@ func (f frozenReader) ContextDiff(context.Context, observability.DiffQuery) (obs
 }
 
 func TestFrozenContextAuthenticatedReadOnlyRoutesAndCompleteHTML(t *testing.T) {
-	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Contexts: frozenReader{}}
+	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Contexts: frozenReader{}, Traces: traceReader{}, Inspector: &inspectionReader{}}
 	request := func(method, path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "http://127.0.0.1:8080"+path, nil)
 		if auth {
@@ -38,7 +38,7 @@ func TestFrozenContextAuthenticatedReadOnlyRoutesAndCompleteHTML(t *testing.T) {
 		s.ServeHTTP(w, r)
 		return w
 	}
-	for _, path := range []string{"/developer/context?run=run&step=1", "/api/developer/rounds?run=run", "/api/developer/context?run=run&step=1", "/api/developer/context-diff?run=run&step=1"} {
+	for _, path := range []string{"/developer/observability/run?tab=context&ctx=1&step=1", "/api/developer/rounds?run=run", "/api/developer/context?run=run&step=1", "/api/developer/context-diff?run=run&step=1"} {
 		if w := request("GET", path, false); w.Code != 401 || strings.Contains(w.Body.String(), "PRIVATE_CONTEXT") {
 			t.Fatal("unauthenticated context", w.Code)
 		}
@@ -49,8 +49,8 @@ func TestFrozenContextAuthenticatedReadOnlyRoutesAndCompleteHTML(t *testing.T) {
 			t.Fatal("context action exposed", w.Code)
 		}
 	}
-	w := request("GET", "/developer/context?run=run&step=1", true)
-	for _, text := range []string{"Frozen context", "Step 0", "system", "PRIVATE_CONTEXT", "&lt;img src=x", "trace:recorded", "Continue full content", "Adjacent round diff", "Before [0]", "After [0]", "</html>"} {
+	w := request("GET", "/developer/observability/run?tab=context&ctx=1&step=1", true)
+	for _, text := range []string{"Full frozen context", "Step 0", "system", "PRIVATE_CONTEXT", "&lt;img src=x", "trace:recorded", "Continue full content", "</html>"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing complete rendered page", text, w.Body.String())
 		}
@@ -71,7 +71,7 @@ func TestFrozenContextAuthenticatedReadOnlyRoutesAndCompleteHTML(t *testing.T) {
 		t.Fatal(w.Code)
 	}
 	s.Contexts = frozenReader{failure: errors.New("PRIVATE_DATABASE_ERROR")}
-	w = request("GET", "/developer/context?run=run&step=1", true)
+	w = request("GET", "/developer/observability/run?tab=context&ctx=1&step=1", true)
 	if w.Code != 503 || strings.Contains(w.Body.String(), "PRIVATE_DATABASE_ERROR") {
 		t.Fatal("error leaked", w.Code)
 	}
@@ -80,12 +80,19 @@ func TestFrozenContextAuthenticatedReadOnlyRoutesAndCompleteHTML(t *testing.T) {
 func TestContextLinksResetDependentOffsets(t *testing.T) {
 	v := &contextView{Query: observability.ContextQuery{RunID: "run", Step: 1, Section: "response", Item: 5, Offset: 8192, After: 40, JSON: true}, RoundAfter: -1, DiffAfter: 40}
 	r := httptest.NewRequest("GET", contextLink(v, "step", int64(0)), nil)
-	next, err := contextQuery(r)
+	parsed, err := tracePageQuery(r)
+	var next *contextView
+	if parsed != nil {
+		next = parsed.FullContext
+	}
 	if err != nil || next.Query.Step != 0 || next.Query.Item != 0 || next.Query.Offset != 0 || next.Query.JSON || next.Query.Section != "messages" || next.DiffAfter != 0 {
 		t.Fatal(next, err)
 	}
 	r = httptest.NewRequest("GET", diffLink(v, 0, 41), nil)
-	next, err = contextQuery(r)
+	parsed, err = tracePageQuery(r)
+	if parsed != nil {
+		next = parsed.FullContext
+	}
 	if err != nil || next.Query.After != 40 || next.Query.Item != 41 || next.Query.Offset != 0 {
 		t.Fatal(next, err)
 	}

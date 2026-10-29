@@ -8,7 +8,7 @@
 
 用户能完成模型设置、交代工作、查历史和状态。
 
-用户能登录本地 Web，使用 Conversation、Ongoing work、Settings、附件和审批。
+用户能登录本地 Web，使用 Conversation、Tasks、Settings、附件和审批。
 
 用户阅读或编辑草稿时仍能接收状态和回复更新，且草稿不会丢失。
 
@@ -34,9 +34,9 @@
 
 ### F-018 · 基础 Web 工作台
 
-**需求**：用户能登录本地 Web，使用 Conversation、Ongoing work、Settings、附件和审批。
+**需求**：用户能登录本地 Web，使用 Conversation、Tasks、Settings、附件和审批。
 
-**当前实现**：认证路由、服务生命周期、前端嵌入与语义 fallback 已实现。
+**当前实现**：独立 Conversation、Tasks 列表/详情、分层 Settings 和 Developer Trace 列表/详情。模型配置按来源 → 保存 → 验证 → 显式选择推进；通知设置独立。认证、附件、冻结审批、原生表单和语义 fallback 保留。
 
 **边界与剩余工作**：实时区域刷新见 F-019；开发区由 F-031 跟踪。
 
@@ -70,7 +70,21 @@
 
 标准 `erii` 使用终端；配置 Web token 与运行时后执行 `erii web serve`，使用其打印的本地地址。
 
-飞书需配置应用凭据、回调入口，并通过可信 CLI `erii channel manage` 绑定个人身份；群聊不在当前范围。Settings 可选择未来通知渠道。当前 Web 的刷新方式仍有限。
+飞书需配置应用凭据、回调入口，并通过可信 CLI `erii channel manage` 绑定个人身份；群聊不在当前范围。Settings → Notifications 可选择未来通知渠道，保存后显示实际选择；原目的地不可用时显式提示，不回退成 Automatic。已提交的消息、审批、任务阶段与状态按区域更新。
+
+### Web 操作路线
+
+| 分区 | 入口与主要操作 | 下一步 |
+| --- | --- | --- |
+| Conversation | `/` 输入消息、添加/移除附件、确认具体审批；历史使用 Earlier messages | 后台工作在 Tasks 跟踪；缺少可用模型时进入设置 |
+| Tasks | `/tasks` 按 Open / Needs me / Finished / All tasks 筛选、搜索与翻页 | 点击任务查看目标、当前阶段、审批、Main 交付、附件与历史；返回原始请求或带任务上下文继续对话 |
+| Settings → Models | `/settings/models` 显示当前模型和其他已保存模型 | Connect model → 选择来源 → 保存 → 模型详情 Test connection → 勾选授权 → Select model → 开始对话 |
+| Settings → Notifications | `/settings/notifications` 显示已保存的通知目的地 | 显式保存未来通知偏好；不迁移已冻结交付 |
+| Developer → Traces | `/developer/observability` 筛选执行列表 | 打开独立 Trace 详情，选择树/时间线节点，检查 Context、Requests 或相邻轮次 Compare |
+
+Task 详情只展示该任务已由 Main 交付的内容，不将 Worker 结果冒充最终回复。Continue in conversation 会带上可见且可移除的任务上下文，再交给 Main 理解要求；页面不直接调用 Task 控制。审批只在每个页面显示一次主要操作，完整参数和原冻结哈希保留；不要求 Web 用户复制 CLI 命令。
+
+登录后回到原本的本地子页面。设置失败在对应页显示安全错误并保留可恢复字段；增强后的发送失败保留草稿和附件，不自动重发。没有 JavaScript 仍能通过原生链接和表单完成主要路线。`/settings`、`/progress` 和旧开发者深链接跳转到新页面。
 
 ## 详细操作参考
 
@@ -150,10 +164,12 @@ Account model additions use its authenticated visible-model catalog. Credentials
 ### User surfaces and callback contract
 
 - `/`: shared semantic conversation, attachments and pending frozen approvals.
-- `/settings`: local/account model metadata, explicit Test/Select and future
-  notification preference. Selecting a provider requires explicit consent.
-- `/progress`: read-only Task summaries and aggregate Child counts; no raw Tool,
-  model, Run ID or Child trace. Pause/continue/cancel stays in conversation.
+- `/settings/models`, `/settings/models/new`, `/settings/models/{profile}`: current
+  model, source choice and focused configuration/verification/explicit activation.
+  `/settings/notifications` owns future notification preference.
+- `/tasks`, `/tasks/{taskRef}`: bounded, searchable Task workspace and read-only
+  details including Main delivery and approvals. Pause/continue/cancel stays in
+  conversation; no raw Tool, model, Run ID or Child trace in everyday pages.
 - `GET /api/conversation`, `/api/progress`, `/api/status`, `/api/auth`: authenticated
   projections. `POST /api/message` accepts only `source_id` and semantic `content`.
   `POST /upload` stores a local Artifact; `/artifact?ref=...` resolves only through
@@ -218,6 +234,6 @@ New database files use mode 0600 in the private data root.
 
 ## Web 实时更新（F-019）
 
-打开 Conversation 或 Ongoing work 即可自动接收更新，不需要额外配置。阅读上方内容时，“New messages”只提示有新内容，点击后再定位到最新消息，草稿和附件仍保留。输入消息和选择文件不会停止后台更新；批准/拒绝具体动作也不会整页跳转。
+打开 Conversation 或 Tasks 即可自动接收更新，不需要额外配置。阅读上方内容时，“New messages”只提示有新内容，点击后再定位到最新消息，草稿和附件仍保留。输入消息和选择文件不会停止后台更新；批准/拒绝具体动作也不会整页跳转。
 
 短暂断网时页面提示重连，恢复后读取当前已提交状态。会话失效时，在提示中的 Sign in 打开另一页完成登录，再回到原页点击 Retry updates；原页保留的草稿和文件无需重填。Settings 只实时更新全局状态和登录过程，不在后台覆盖配置表单或更换活动模型。禁用 JavaScript 时仍提供原有语义 HTML 与表单提交。

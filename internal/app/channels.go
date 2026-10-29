@@ -40,7 +40,7 @@ func (a *App) WebStatus(ctx context.Context) (web.Status, error) {
 		return web.Status{}, err
 	}
 	status, err := a.store.AgentStatus(ctx)
-	return web.Status{Readiness: d.Readiness, Status: status, ConfigVersion: d.ConfigVersion}, err
+	return web.Status{Readiness: d.Readiness, Status: status, ConfigVersion: d.ConfigVersion, ActiveModelProfileID: d.ActiveModelProfileID}, err
 }
 func (a *App) ImportChannelArtifact(ctx context.Context, e interaction.InboundEvent, key string, input artifact.Input, src io.Reader) (string, error) {
 	return a.store.ImportChannelArtifact(ctx, e, key, input, src)
@@ -49,7 +49,7 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 	return a.store.WebProjection(ctx, m)
 }
 func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Config) error {
-	s := web.Server{Config: cfg, Core: a, Inspector: a.store.Inspector(), Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
+	s := web.Server{Config: cfg, Core: a, Tasks: a.store.TaskReader(), Inspector: a.store.Inspector(), Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
 	if a.feishu != nil {
 		s.Callback = feishu.Handler{Client: *a.feishu, Core: a, Wake: func() {
 			if s.Wake != nil {
@@ -139,4 +139,8 @@ func (a *App) Conversation(ctx context.Context, before int64) (conversation.Page
 		return conversation.Page{}, err
 	}
 	return a.history.Page(ctx, d.AgentID, before)
+}
+
+func (a *App) WebApprovals(ctx context.Context) ([]interaction.Approval, error) {
+	return a.runtimeRuns().ApprovalView(ctx)
 }

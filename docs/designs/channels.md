@@ -2,7 +2,7 @@
 
 [功能与需求](../features/channels.md) · [测试方案](../test-plans/channels.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+最近核对：2026-10-29。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -22,21 +22,35 @@ flowchart TD
 
 Web 在依赖准备期间开放，ingress 保持关闭；缺失能力修复后后台重试准备，成功后恢复接纳。TUI 在依赖恢复后刷新就绪提示并重新调度已接收工作；恢复提示与已有历史展示可独立到达。已持久化终态的 Main 模型失败由 Run 记录承载，不关闭 HTTP listener；未能确立权威状态的基础设施错误仍使执行循环明确失败。
 
-页面查询按用途分开：Settings 读取模型/账户/渠道设置，Progress 读取任务摘要，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Erii-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
+页面查询按用途分开：Models 读取模型与必要账户信息，Notifications 只读渠道设置，Tasks 通过独立只读池读取分页摘要/详情，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Erii-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
 
 ### Go 实现职责（F-040）
 
 Web POST 分发只选择有名动作处理函数；消息/附件、模型、账户、通知各自维护请求步骤，认证、CSRF 和 Server 生命周期仍为统一入口。
 
+### Web 信息架构与呈现职责（F-018）
+
+侧栏只有 Conversation、Tasks、Settings 和次级 Developer 入口；没有重复头像入口、静态绿色状态灯或未实现功能的空 Tab。共同的导航、面包屑、状态、按钮、面板和反馈使用一套中性样式。视觉主操作分别是发送、处理当前任务、配置下一步和选择观测节点。
+
+`routes.go` 维护认证后的路由分发，`navigation.go` 维护规范路径、旧地址跳转和本地返回地址校验；`page.go` 只组装共享框架与分派加载。`settings.go`、`tasks.go`、`conversation.go` 与 `approval_view.go` 拥有各自的查询/呈现。前端样式按 shell、workspace、conversation、observability 分开，共享设计变量；没有引入新框架或第二套状态管理。
+
+Models 概览 → 来源选择 → 新模型表单 → 模型详情验证/选择；Notifications 单独子页。候选模型的 probe 成功不等于 profile 已激活：呈现检查已存 Probe 的 profile/auth version、BridgeIdentity 和能力，真正选择仍由原 Control.Select 校验权限、实时凭据和版本。表单失败留在对应流程，凭据和底层错误不反射到页面。选中模型只影响新 Run，已有冻结执行树保持原配置。通知选项绑定实际持久化值，不可用的旧绑定明确提示。
+
+Tasks 的分页、详情、历史与 Main 交付由 `task/sqlite.Reader` 提供；共享同一进度定义的 TUI/旧 API 保持原摘要契约，见 [任务设计](tasks.md)。详情中的继续沟通先校验所有权，再作为带可见任务说明的普通用户消息进入现有 Main ingress；不增加 Task 控制 API。
+
+Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时间投影状态，不执行恢复、落库或唤醒；CLI/运行时仍调用原 `Runs.Approvals` 恢复。卡片只识别 security 来源且身份匹配的 Host 通知，不按正则删改用户文本，也不改写持久化 Conversation/投递投影；精确参数、完整 Raw action 和冻结哈希保留。
+
+旧 `/settings` → Models、`/progress` → Tasks；旧 Trace query/冻结上下文链接保留全部选择参数并跳转到规范详情路径。已知子页未登录返回 401 登录表单，成功后仅返回校验过的本地页面；API 认证响应不变。共享认证、CSRF、binding、CSP 和 no-store 继续先于业务处理，无 schema 迁移。
+
 ### Web 实时投影与界面生命周期（F-019）
 
-`GET /api/updates?view=/|/progress|/settings&before=...` 返回当前视图的具名 HTML 区域与 `latest` sequence；`before` 仅用于 Conversation 的排他历史游标。状态与内容由现有 Core 查询取得，复用 SSR 的 UISpec 验证、转义、语义 fallback 和审批投影。完整页面与后台读取共用 `loadConversation` 和具名模板；没有新 Agent Loop、模型请求、领域写入口、事件表或迁移。
+`GET /api/updates?view=/|/tasks|/tasks/{taskRef}|/settings/...&before=...` 返回当前视图的具名 HTML 区域与 `latest` sequence；`before` 仅用于 Conversation 的排他历史游标。状态与内容由现有 Core 查询取得，复用 SSR 的 UISpec 验证、转义、语义 fallback 和审批投影。完整页面与后台读取共用 `loadConversation` 和具名模板；没有新 Agent Loop、模型请求、领域写入口、事件表或迁移。
 
 每次请求先执行已有认证与渠道绑定检查，再判断 `If-None-Match`；未变化返回 304。响应不含 composer、source_id、原始 Run/Tool trace 或模型凭据。历史页保留原游标，同时读取最新头部 sequence 提示新消息，不悄悄跳回最新窗口。不同区域读取的是各自已提交投影，不宣称跨数据库的原子快照；下次读取收敛，审批提交始终重新校验冻结哈希与权限。
 
 浏览器每秒读取一次，单一调度链与请求取消防止过时响应覆盖新视图；单次 10 秒 deadline，网络失败最多退避到 30 秒。隐藏/离开页面时取消读取，返回时立即刷新。401/403 停止轮询并保留当前页面，另页登录和显式重试不会重建输入节点。设置表单不参与后台替换，避免覆盖用户填写或悄悄更换模型。
 
-前端职责拆分为：`main.tsx` 仅启动；`composer.ts` 只为原生输入区应用共享控件样式，不替换 DOM；`projections.tsx` 负责受控 UISpec 和 React root 生命周期；`live-updates.ts` 负责读取、区域协调、阅读位置与连接状态。按稳定消息 sequence/TaskRef/审批 ID 复用不变的组件节点，只释放被移除的 React root。文件选择器不序列化到网络或本地存储，也不随刷新重挂载。读者锚点移出最新 100 条窗口时保留当前内容，用户点击新消息提示后才切换。
+前端职责拆分为：`main.tsx` 仅启动；`composer.ts` 增强原生表单、附件状态和单次发送，不替换 DOM；`projections.tsx` 负责受控 UISpec 和 React root 生命周期；`live-updates.ts` 负责读取、区域协调、阅读位置与连接状态。按稳定消息 sequence/TaskRef/审批 ID 复用不变的组件节点，只释放被移除的 React root。文件选择器不序列化到网络或本地存储，也不随刷新重挂载。读者锚点移出最新 100 条窗口时保留当前内容，用户点击新消息提示后才切换。
 
 审批仍使用 `POST /approval`；渐进增强请求通过 `Accept: application/json` 获取接受回执，原 HTML 表单继续使用 303。前端只提交用户所点表单的 ID、原冻结哈希和决定，每次交互发送一次。确认丢失或旧审批失效时读取当前投影，不自动重发决定、不把旧同意转给新审批，也不把回执当成外部动作完成。
 
@@ -47,7 +61,7 @@ Web POST 分发只选择有名动作处理函数；消息/附件、模型、账�
 验证身份 → 规范输入与附件 → 接受并去重 → Actor 执行 → 冻结回复目标 → 适配呈现并发送。Web 通过带 ETag 的条件读取更新独立页面区域，输入状态保留在原节点。
 
 - **F-017**：标准启动/TUI/CLI、输入与已交付回复投影已接通。 终端输出没有远端确认协议，不宣称屏幕显示 exactly-once。
-- **F-018**：认证路由、服务生命周期、前端嵌入与语义 fallback 已实现。 实时更新与开发区分别由 F-019、F-031 跟踪。
+- **F-018**：分层 Models/Notifications、Tasks 列表/详情和独立 Trace 详情已接通，保留认证路由、前端嵌入与语义 fallback。 实时更新与开发区分别由 F-019、F-031 跟踪。
 - **F-019**：已提交会话、审批、全局状态、任务摘要和登录过程通过条件读取实时刷新；草稿、文件、焦点、选区和阅读位置独立保留。传输与模型 token streaming 分开；阶段摘要生产仍由 F-005 负责。
 - **F-020**：签名回调、p2p 身份绑定、收发和本地回执已实现；access token 由外部维护。 补凭据刷新/失效诊断体验；不确定远端投递目前只能依赖已保存本地回执，可信远端核实能力仍待定义。
 
@@ -244,6 +258,9 @@ replacement fallback supplied inside a projection. There is no HTML evaluator,
 dynamic component import, remote asset or browser credential input.
 
 ## Changelog
+
+2026-10-29：F-018/F-019 按用户任务重构整个 Web 信息架构。比较继续在 Settings/Trace 单页堆叠控件与按流程拆页，选择稳定子路由与共享 SSR 呈现；完整 Context 并入 Generation，保留深链接。独立 task 只读查询、纯 Web 审批读取和原生表单生命周期减少界面与执行的耦合；不新增控制管线、Task 状态、依赖、脚本、CI gate 或数据迁移。旧 HTML 地址仅跳转，原 API 与冻结执行语义不变。
+
 
 2026-10-29：输入区保留原生表单与文件选择器 DOM，只复用共享控件样式；修复脚本加载期间打开文件选择器后附件丢失的问题。真实浏览器延迟 bundle 后跨加载完成图片选择并核对实际 Pi HTTP pixels。
 

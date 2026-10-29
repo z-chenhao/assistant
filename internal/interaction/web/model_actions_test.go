@@ -27,7 +27,7 @@ func TestWebModelImageInputIsAnExplicitUnverifiedDeclaration(t *testing.T) {
 		form := url.Values{"endpoint": {"http://127.0.0.1:8000/v1"}, "model": {"vision"}, "image_input": {value}}
 		r := httptest.NewRequest("POST", "/model/add", strings.NewReader(form.Encode()))
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		if err := s.addModel(r); err != nil {
+		if _, err := s.addModel(r); err != nil {
 			t.Fatal(err)
 		}
 		if models.input.Capabilities.ImageInput != (value == "yes") || !models.input.Capabilities.TextInput {

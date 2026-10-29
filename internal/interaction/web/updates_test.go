@@ -47,7 +47,7 @@ func (c *updatesCore) Conversation(_ context.Context, before int64) (conversatio
 	}
 	return page, nil
 }
-func (c *updatesCore) Approvals(context.Context) ([]interaction.Approval, error) {
+func (c *updatesCore) WebApprovals(context.Context) ([]interaction.Approval, error) {
 	return c.approvals, nil
 }
 func (c *updatesCore) WebProjection(_ context.Context, m conversation.Message) (json.RawMessage, error) {
@@ -133,7 +133,7 @@ func TestLiveHistoryCursorAndFailuresDoNotProducePartialUpdates(t *testing.T) {
 	if result.Before != 4 || result.Latest != 5 || strings.Contains(result.Regions["conversation-messages"], "latest") || len(c.cursors) != 2 || c.cursors[0] != 4 || c.cursors[1] != 0 {
 		t.Fatal("history cursor jumped to latest", result, c.cursors)
 	}
-	for _, path := range []string{"/api/updates?view=unknown", "/api/updates?view=/&before=-1", "/api/updates?view=/progress&before=5"} {
+	for _, path := range []string{"/api/updates?view=unknown", "/api/updates?view=/&before=-1", "/api/updates?view=/tasks&before=5"} {
 		w = httptest.NewRecorder()
 		s.updates(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != 400 {
@@ -150,8 +150,8 @@ func TestLiveHistoryCursorAndFailuresDoNotProducePartialUpdates(t *testing.T) {
 
 func TestLiveProgressAndSettingsKeepPageQueryBoundaries(t *testing.T) {
 	// These intentionally expose no Conversation/Approval/model query methods.
-	for _, view := range []string{"/progress", "/settings"} {
-		s := &Server{Core: progressCore{}}
+	for _, view := range []string{"/tasks", "/settings/models/new"} {
+		s := &Server{Core: progressCore{}, Tasks: workspaceReader{}}
 		w := httptest.NewRecorder()
 		s.updates(w, httptest.NewRequest("GET", "/api/updates?view="+view, nil))
 		if w.Code != 200 {

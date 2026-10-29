@@ -8,6 +8,9 @@ import (
 )
 
 func (s *Server) startLogin(r *http.Request) error {
+	if s.Accounts == nil {
+		return llm.ErrNoBridge
+	}
 	s.mu.Lock()
 	if s.auth.Status == "pending" {
 		s.mu.Unlock()

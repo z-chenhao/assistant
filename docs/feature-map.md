@@ -10,6 +10,8 @@ F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让�
 
 F-031 提供 Developer → Observability 执行检查入口：按角色、状态和 UTC 时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；F-035/F-036 进一步统一为 Langfuse 式 Session/Trace/Observation 检查，支持真实 HTTP 尝试、恢复复用、输入输出、时间线和已有用量/费用。
 
+2026-10-29 Web 治理：F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
+
 ## 状态定义
 
 | 状态 | 是否完成 | 含义 |
@@ -44,7 +46,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可设定明确时区的 at/cron 计划，并修改或取消。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | 用户能登录本地 Web，使用 Conversation、Ongoing work、Settings、附件和审批。 | 是 · 已完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | 用户能使用聚焦的对话、任务列表/详情、分层模型/通知设置、附件和审批。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 用户阅读或编辑草稿时仍能接收已提交回复、审批与状态更新，保留草稿、附件和阅读位置。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 已绑定个人身份能接收消息、附件和审批，并维持长期可用。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 正常回复能产生适当的受控组件，失败可退回语义文本。 | 否 · 部分完成 |

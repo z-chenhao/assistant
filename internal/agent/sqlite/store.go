@@ -21,6 +21,7 @@ import (
 	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
 	llmsqlite "github.com/z-chenhao/erii/internal/llm/sqlite"
 	inspectionsqlite "github.com/z-chenhao/erii/internal/observability/sqlite"
+	tasksqlite "github.com/z-chenhao/erii/internal/task/sqlite"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -122,6 +123,7 @@ var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, local
 
 type Store struct {
 	inspector  *inspectionsqlite.Inspector
+	taskReader *tasksqlite.Reader
 	dispatches *inspectionsqlite.Recorder
 	scheduler  atomic.Pointer[agent.SchedulerLimits]
 	nextRun    *sql.Stmt
@@ -200,6 +202,10 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 		return nil, errors.Join(err, s.artifacts.Close(), db.Close())
 	}
 	s.inspector, err = inspectionsqlite.Open(path)
+	if err != nil {
+		return nil, errors.Join(err, s.Close())
+	}
+	s.taskReader, err = tasksqlite.Open(path)
 	if err != nil {
 		return nil, errors.Join(err, s.Close())
 	}
@@ -330,8 +336,11 @@ func (s *Store) Close() error {
 		_ = s.dispatches.Close()
 	}
 	var inspectionErr error
+	if s.taskReader != nil {
+		inspectionErr = s.taskReader.Close()
+	}
 	if s.inspector != nil {
-		inspectionErr = s.inspector.Close()
+		inspectionErr = errors.Join(inspectionErr, s.inspector.Close())
 	}
 	if s.artifacts != nil {
 		return errors.Join(inspectionErr, s.artifacts.Close(), s.db.Close())

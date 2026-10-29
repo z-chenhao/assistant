@@ -145,12 +145,25 @@ pixels at the actual Pi HTTP peer; text-only and recovery checks still apply.
 
 ## 工程基础重构回归
 
-F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failure 后仍服务并执行下一请求；`web/page_test.go` 证明 Settings/Progress 不依赖历史查询；`conversation/sqlite/store_test.go` 验证 205 条记录无重叠/遗漏分页和作用域查询。`tests/system/verify_channels.py` 通过实际 Web 证明缺失依赖不隐藏控制页、修复后恢复 ingress、GET 不修改已稳定业务状态。
+F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failure 后仍服务并执行下一请求；`web/page_test.go` 证明 Settings/Tasks 不依赖历史查询；`conversation/sqlite/store_test.go` 验证 205 条记录无重叠/遗漏分页和作用域查询。`tests/system/verify_channels.py` 通过实际 Web 证明缺失依赖不隐藏控制页、修复后恢复 ingress、GET 不修改已稳定业务状态。
 
 ## F-019 实时更新验收
 
-- `internal/interaction/web/updates_test.go`：条件 ETag、消息/审批/状态变化、历史游标、HTML 转义、无输入/内部字段、失败无部分响应；条件请求也必须重新认证和检查绑定；Settings/Progress 不查询 Conversation。
+- `internal/interaction/web/updates_test.go`：条件 ETag、消息/审批/状态变化、历史游标、HTML 转义、无输入/内部字段、失败无部分响应；条件请求也必须重新认证和检查绑定；Settings/Tasks 不查询 Conversation。
 - `tests/system/verify_channels.py` 调用维护中的 `channels_browser.mjs` live 场景：在真实 Actor/SQLite/HTTP/浏览器链路中，输入草稿和选择文件后收到新回复，保留原输入节点、request source ID、光标/选区、焦点和阅读锚点；断网后重连；Task/Worker 产生冻结审批与 busy 状态，拒绝动作不重载、不执行副作用；另一页显示任务取消；会话轮换后保留草稿并显式恢复。
 - 原有 setup/components/approval/移动端/无 JavaScript 场景继续验证渐进增强、受控投影和原表单兼容；整个渠道回归保留签名/身份/去重、未知副作用和重启场景。
 
 不增加 golden case、模型效果分数或独立 CI 编排。完整检查使用既有 `make test lint` 与 channels/core runner；执行结果保留在既有 evidence 报告中。
+
+## Web 信息架构与流程回归（F-018/F-019）
+
+沿用 `verify_channels.py` 和真实浏览器 action，不新增脚本或 CI gate：
+
+- 原生设置：模型来源 → 保存 → Verify → 明确授权 Select → Conversation；候选 probe 与活动状态分开；ChatGPT 登录、可见目录、重启和退出仍经真实 Manager/Bridge（外部 OAuth 为受控 peer）。通知保存后停留原页，重载仍选实际目的地。
+- 原生输入：延迟脚本时编辑、选文件与打开 picker，增强后保持同一节点/文件；拒绝或丢失确认不自动重发并保留草稿和附件；任务上下文可移除而不丢输入。
+- Tasks：列表筛选、分页、详情目标/阶段、对应的冻结审批、已由 Main 交付的结果，以及带任务上下文回到 Main；不能用 Worker 结果替代 Main 交付。详情和 Conversation 保留同一审批 hash。
+- Developer：列表打开独立 Trace 详情，树与时间线对齐；节点类型决定可用 Tab；完整 Context/JSON/来源/长正文和 Diff 深链接可达，原生链接、移动端与无 JavaScript 路径继续可用。
+- 读取边界：真实 SQLite 验证跨 20 条限制、同时间稳定游标、scope 拒绝、归属校验与只读池；Web 审批过期投影不写库/事件，原运行时恢复仍落库。Trace 详情不能依赖全局列表成功。
+- 模块测试：notification 持久化选择、候选 proof version、登录本地返回、Host 审批单卡片/用户文本不改写、任务消息通过既有 ingress；`make test lint` 检查所有包及嵌入资源一致。
+
+系统断言采用受控模型/HTTP 响应，证明产品链路与回归，不证明真实模型质量或真实账户可用性。执行结果与截图留在本次 evidence，不把测试计划写成执行报告。

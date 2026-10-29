@@ -31,6 +31,12 @@ flowchart LR
 - 新 GET API：`/api/developer/traces`、`/api/developer/observations`、`/api/developer/observation-body`。页面与 API 总期限 3 秒；非法查询 400，缺失/越界节点 404，读故障 503 且不泄露底层错误。沿用 loopback、binding、token/session、CSP、no-store；正文普通转义，SVG 使用数值属性，不注入动态内联脚本/样式。
 - 同页读取之间可看到不同的已提交状态；不承诺整次浏览或跨页数据库快照。刷新获取最新状态。原生链接无 JS 可用；渐进导航仅替换 workbench，保存树/时间线滚动位置与 URL/history，不轮询、不调度工作。
 
+### 页面职责与节点导航
+
+`/developer/observability` 只读取 Trace 列表，`/developer/observability/{runID}` 只读取该执行树与关系，详情不依赖全局列表查询成功。左侧单一树/时间线导航与右侧内容分开；移除重复的底部执行表，Task epoch 通过详情选择器切换。因果/内部标识折叠保留，Main→Task 仍是跨 Trace 链接，Root 不冒充 Main Child。
+
+节点类型决定 Tab：Generation Overview/Context/Requests，仅有前一存储轮次时增加 Compare；HTTP Overview/Requests；其他节点 Overview。技术 metadata 为折叠区。完整 contextReader 合并到 Generation Context 内，保留全部 messages/tools/response/provenance/recall、分页、原始 JSON、UTF-8 偏移及前后 Diff 内容；不再维护并列的冻结上下文页面。旧 context/run-query URL 经过原参数校验后仅跳转，API 不变。
+
 ## 时间、用量与恢复
 
 | 节点/指标 | 语义 |
@@ -50,7 +56,7 @@ Agent Loop 在实际复用结果和成功提交等待后发出 best-effort 事�
 
 ## F-034 冻结上下文
 
-逐轮内容继续由 `model_generation`、`context_compaction` 和 `run_recall` 提供，读取 Host 冻结输入、原始 Schema 与接受结果，不从当前 checkpoint/Memory 重建。Generation 详情默认按角色展示有界预览；完整消息、来源、Schema、压缩记录和旧/新内容由冻结上下文页与 Diff 入口读取。
+逐轮内容继续由 `model_generation`、`context_compaction` 和 `run_recall` 提供，读取 Host 冻结输入、原始 Schema 与接受结果，不从当前 checkpoint/Memory 重建。Generation 详情默认按角色展示有界预览；完整消息、来源、Schema、压缩记录和旧/新内容由同一 Generation 的 Context 阅读器与 Compare 入口读取。
 
 相邻输入比较同一 Run 的前一个已存 step，step 不要求连续。消息按 source.ref / tool_call_id / 旧位置，工具按名称，重复键按出现序号对齐，精确区分 added/removed/changed/moved，不做语义猜测。原始归档只显示引用，不因观测授予 Run-only Artifact 访问。
 
@@ -111,6 +117,9 @@ state schema **31** 新增 `dispatch_observation` 与 Root 查询索引；旧权
 - 内部异常先由 Main Agent Loop 解释和处理，不向用户直接暴露底层错误。
 
 ## Changelog
+
+2026-10-29：F-018/F-031/F-034 将观测列表与详情拆成稳定子路由，合并树/时间线导航，按节点类型提供内容，完整 Context 阅读器并入 Generation。比较继续维护独立 context 页面与统一选中节点，选择单入口减少重复导航；所有存储内容、来源、Diff 和旧深链接保留，不影响只读池、采集限额、schema 31 或冻结协议。
+
 
 2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
 
