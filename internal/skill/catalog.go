@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -156,7 +156,7 @@ func loadRoot(root *os.Root, scope string) ([]entry, error) {
 	for {
 		batch, err := dir.ReadDir(maxEntries)
 		for _, d := range batch {
-			if d.IsDir() && (strings.HasPrefix(d.Name(), ".erii-pending-") || strings.HasPrefix(d.Name(), ".erii-retired-")) {
+			if d.IsDir() && (strings.HasPrefix(d.Name(), ".collie-pending-") || strings.HasPrefix(d.Name(), ".collie-retired-")) {
 				continue
 			}
 			if !d.IsDir() || d.Type()&os.ModeSymlink != 0 || len(dirs) >= maxEntries {

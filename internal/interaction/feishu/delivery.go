@@ -6,10 +6,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/delivery"
-	"github.com/z-chenhao/erii/internal/delivery/ui"
-	"github.com/z-chenhao/erii/internal/interaction"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/collie/internal/delivery/ui"
+	"github.com/z-chenhao/collie/internal/interaction"
 )
 
 type DeliveryStore interface {

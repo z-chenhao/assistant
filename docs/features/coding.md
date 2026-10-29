@@ -28,7 +28,7 @@ execution:
   toolchain_roots: [/absolute/read-only/compiler-install]
 ```
 
-工具链可省略。工作区需独占、权限 0700，与应用数据、Skills、MCP 和可信运行时分开，不放凭据。Linux 需要系统 Python 3、bash、bubblewrap 及 user namespaces；macOS 本地执行需要系统 Python 3 和 Seatbelt。`erii doctor` 检查执行依赖。配置已有 macOS Computer 时无需 execution，四工具改用同一 Guest。
+工具链可省略。工作区需独占、权限 0700，与应用数据、Skills、MCP 和可信运行时分开，不放凭据。Linux 需要系统 Python 3、bash、bubblewrap 及 user namespaces；macOS 本地执行需要系统 Python 3 和 Seatbelt。`collie doctor` 检查执行依赖。配置已有 macOS Computer 时无需 execution，四工具改用同一 Guest。
 
 先 read 项目 AGENTS.md 和文件，再 edit（当前 before_hash、唯一 old_text、new_text）。write 创建时省略 before_hash；覆盖时必须提供当前哈希。用 bash 执行搜索、Git 和测试；每次在工作区开始。bash/edit/write 都会请求具体动作批准。读文件时指定 `as_artifact:true` 保存完整产物，再用 Artifact publish 选为交付内容；二进制读取自动生成 Artifact。
 

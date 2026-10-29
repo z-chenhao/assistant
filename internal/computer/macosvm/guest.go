@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/collie/internal/llm"
 	"golang.org/x/crypto/ssh"
 )
 

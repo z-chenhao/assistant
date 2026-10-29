@@ -3,9 +3,9 @@ package agent
 import (
 	"encoding/json"
 
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 // ProviderMessages is the only runtime -> provider message conversion. The

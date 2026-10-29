@@ -14,7 +14,7 @@ import (
 // Each archive gets a random 256-bit salt and a derived AES key; each record
 // has a strictly increasing 32-bit nonce suffix and a length in its AAD. The
 // authenticated empty final record rejects truncation and appended content.
-const magic = "ERII-BACKUP-1\n"
+const magic = "COLLIE-BACKUP-1\n"
 const chunk = 64 << 10
 
 type encryptWriter struct {

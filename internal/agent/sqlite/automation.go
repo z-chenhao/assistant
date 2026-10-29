@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/automation"
-	"github.com/z-chenhao/erii/internal/event"
-	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
-	"github.com/z-chenhao/erii/internal/task"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/automation"
+	"github.com/z-chenhao/collie/internal/event"
+	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 // ManageAutomation is the trusted CLI entry. Model callers use the same
@@ -188,7 +188,7 @@ func (r *Runs) ScheduleAutomations(ctx context.Context, now time.Time) error {
 			return e
 		}
 		for _, d := range ds {
-			ev, e := event.New("/erii/automations", "ai.erii.automation_fired.v1", d.id, struct {
+			ev, e := event.New("/collie/automations", "ai.collie.automation_fired.v1", d.id, struct {
 				AutomationID string `json:"automation_id"`
 				Version      int64  `json:"schedule_version"`
 				FireAt       int64  `json:"fire_at"`
@@ -415,7 +415,7 @@ func (r *Runs) SetTestAutomationClock(now time.Time) {
 }
 
 func automationEvent(ctx context.Context, tx *sql.Tx, id, kind string) error {
-	e, err := event.New("/erii/automations", "ai.erii.automation."+kind+".v1", id, struct {
+	e, err := event.New("/collie/automations", "ai.collie.automation."+kind+".v1", id, struct {
 		ID string `json:"id"`
 	}{id})
 	if err != nil {

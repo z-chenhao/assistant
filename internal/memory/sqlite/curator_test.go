@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm/memory"
-	mem "github.com/z-chenhao/erii/internal/memory"
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/recall/fake"
-	"github.com/z-chenhao/erii/internal/recall/sqliteindex"
+	"github.com/z-chenhao/collie/internal/llm/memory"
+	mem "github.com/z-chenhao/collie/internal/memory"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall/fake"
+	"github.com/z-chenhao/collie/internal/recall/sqliteindex"
 )
 
 func TestCuratorEvidenceDedupEncryptionAndForget(t *testing.T) {
@@ -162,10 +162,10 @@ func TestPriorSensitiveMemorySealedBeforeProviderAdmission(t *testing.T) {
 		t.Fatal(e)
 	}
 	const personal = "My health diagnosis: synthetic sensitive prior record"
-	if _, e = db.Exec(`INSERT INTO memory_record(memory_id,user_id,scope_type,scope_id,tier,content,source_refs,created_at) VALUES('prior','alice','agent','erii','recall',?,'[{"source_type":"conversation","source_ref":"conversation:prior"}]',100000000)`, personal); e != nil {
+	if _, e = db.Exec(`INSERT INTO memory_record(memory_id,user_id,scope_type,scope_id,tier,content,source_refs,created_at) VALUES('prior','alice','agent','collie','recall',?,'[{"source_type":"conversation","source_ref":"conversation:prior"}]',100000000)`, personal); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = db.Exec(`INSERT INTO recall_document(ref,user_id,agent_id,content,occurred_at,author_role,core,active) VALUES('memory:prior','alice','erii',?,100000000,'',0,1)`, personal); e != nil {
+	if _, e = db.Exec(`INSERT INTO recall_document(ref,user_id,agent_id,content,occurred_at,author_role,core,active) VALUES('memory:prior','alice','collie',?,100000000,'',0,1)`, personal); e != nil {
 		t.Fatal(e)
 	}
 	if e = db.Close(); e != nil {

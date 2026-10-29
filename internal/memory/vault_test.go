@@ -3,7 +3,7 @@ package memory
 import (
 	"bytes"
 	"context"
-	secrets "github.com/z-chenhao/erii/internal/llm/memory"
+	secrets "github.com/z-chenhao/collie/internal/llm/memory"
 	"testing"
 )
 

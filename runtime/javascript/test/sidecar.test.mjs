@@ -22,10 +22,10 @@ async function fixture(t, host = async () => ({value: 'ok'})) {
  p.once('exit',()=>{for(const f of pending.values()) f({error:{message:'sidecar exited: '+stderr}})});
  t.after(async()=>{p.stdin.end();p.kill();await closed;lines.close()});
  const rpc=(method,params)=>new Promise(resolve=>{const id=++next;pending.set(id,resolve);send({id,method,params})});
- const identity=(await rpc('runtime.initialize',{protocolVersion:'1',runtimeVersion:'erii-js-v2',preludeVersion:'erii-prelude-v3'})).result;assert.ok(identity,stderr);
+ const identity=(await rpc('runtime.initialize',{protocolVersion:'1',runtimeVersion:'collie-js-v2',preludeVersion:'collie-prelude-v3'})).result;assert.ok(identity,stderr);
  let execution=0;
  async function run(source, tools=[], options={}){
-  const req={protocolVersion:'1',runtimeVersion:'erii-js-v2',preludeVersion:'erii-prelude-v3',executionId:'execution-'+ ++execution,
+  const req={protocolVersion:'1',runtimeVersion:'collie-js-v2',preludeVersion:'collie-prelude-v3',executionId:'execution-'+ ++execution,
    runtimeHash:identity.runtimeHash,preludeHash:identity.preludeHash,claimToken:'claim',executionEpoch:1,providerCallId:'provider-call',parentInvocationId:'invocation-'+execution,runId:'run',kind:'worker',source,sourceHash:createHash('sha256').update(source).digest('hex'),tools,
    limits:{timeoutMs:3000,memoryBytes:32<<20,outputBytes:65536,pendingCalls:128,interruptBudget:10000},...options};
   return (await rpc('execution.start',req));

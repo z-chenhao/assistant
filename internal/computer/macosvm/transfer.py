@@ -14,12 +14,12 @@ def run(a):
     try:
         for component in root.strip('/').split('/'):
             if component in ('', '.', '..'): raise ValueError('root')
-            if component == 'EriiTransfer':
+            if component == 'CollieTransfer':
                 try: os.mkdir(component, 0o700, dir_fd=fd)
                 except FileExistsError: pass
             child = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             os.close(fd); fd = child
-            if component == "EriiTransfer":
+            if component == "CollieTransfer":
                 info=os.fstat(fd)
                 if info.st_uid != os.getuid() or info.st_mode & 0o077: raise ValueError("root permissions")
         try: os.mkdir(parts[0], 0o700, dir_fd=fd)

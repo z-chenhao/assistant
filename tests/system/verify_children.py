@@ -18,7 +18,7 @@ from verify_tasks import state as task_state
 
 def state(h):
     value = task_state(h)
-    with sqlite3.connect(Path(h.env["ERII_DATA_ROOT"]) / "state.db") as db:
+    with sqlite3.connect(Path(h.env["COLLIE_DATA_ROOT"]) / "state.db") as db:
         db.row_factory = sqlite3.Row
         for name, query in {
             "child_links": "SELECT * FROM agent_invocation ORDER BY invocation_id",
@@ -56,7 +56,7 @@ def check(value, children=2, completed=True):
         for gen in value["generations"]:
             if gen["run_id"] == child["run_id"]:
                 messages = json.loads(gen["request_json"])["messages"]
-                require(not any("Task anchor:" in m["text"] or "Main private conversation" in m["text"] or "You are Erii." in m["text"] for m in messages), "Child context inherited")
+                require(not any("Task anchor:" in m["text"] or "Main private conversation" in m["text"] or "You are Collie." in m["text"] for m in messages), "Child context inherited")
     if completed:
         require(all(r["status"] in ("completed", "failed") for r in value["runs"]), "tree left unfinished")
         require(len(value["updates"]) == 1 and len(value["inbox"]) == 1 and sum(m["source"] == "main" and m["role"] == "assistant" for m in value["conversation"]) == 2 and len(value["deliveries"]) == sum(m["role"] == "assistant" for m in value["conversation"]), "Child bypassed direct Parent")
@@ -68,8 +68,8 @@ def check(value, children=2, completed=True):
 
 
 def run(binary, scenario_jobs=1):
-    report = {"version": 1, "scope": "ERII-17 Direct Tool Child admission and result path; M4 scheduling and M5 CodeCall/JavaScript remain due later", "checks": [], "crashes": [], "scenario_jobs": scenario_jobs}
-    with tempfile.TemporaryDirectory(prefix="erii-children-") as directory:
+    report = {"version": 1, "scope": "COLLIE-17 Direct Tool Child admission and result path; M4 scheduling and M5 CodeCall/JavaScript remain due later", "checks": [], "crashes": [], "scenario_jobs": scenario_jobs}
+    with tempfile.TemporaryDirectory(prefix="collie-children-") as directory:
         root = Path(directory)
 
         def scenario(name, action):
@@ -94,7 +94,7 @@ def run(binary, scenario_jobs=1):
                 t.expect("You> ")
                 t.send("Delegate: Child tree. Main private conversation.")
                 t.expect("Main follow-up:")
-                t.expect("Erii: idle")
+                t.expect("Collie: idle")
                 require(t.stop() == 0, "TUI cleanup")
                 transcript = t.transcript()
             value = state(h)
@@ -202,7 +202,7 @@ def run(binary, scenario_jobs=1):
                 before = h.wait_state(lambda v: any(g["status"] == "pending" and any(m["text"] == "Hold child" for m in json.loads(g["request_json"])["messages"]) for g in v["generations"]), "Child model pending", reader=state)
                 t.send("Cancel: Child hold")
                 t.expect("Main accepted the work.")
-                t.expect("Erii: idle")
+                t.expect("Collie: idle")
                 require(t.stop() == 0, "cancel TUI cleanup")
                 transcript = t.transcript()
             after = state(h)
@@ -241,7 +241,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
+    parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("COLLIE_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
     args.evidence.unlink(missing_ok=True)
     binary = args.binary.resolve()

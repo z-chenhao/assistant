@@ -46,7 +46,7 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Computer != nil || cfg.Execution == nil || cfg.Execution.Root != cfg.App.DataRoot+".computer" || cfg.Version != 1 || !filepath.IsAbs(cfg.App.DataRoot) || cfg.App.LogLevel != "info" {
+	if filepath.Base(cfg.App.DataRoot) != "collie" || cfg.NATS.StreamPrefix != "collie" || cfg.Computer != nil || cfg.Execution == nil || cfg.Execution.Root != cfg.App.DataRoot+".computer" || cfg.Version != 1 || !filepath.IsAbs(cfg.App.DataRoot) || cfg.App.LogLevel != "info" {
 		t.Fatalf("defaults: %+v", cfg)
 	}
 	dir := t.TempDir()
@@ -56,9 +56,9 @@ func TestDefaultsAndDeploymentOverrides(t *testing.T) {
 	}
 	cfg, err = Load(path, func(key string) (string, bool) {
 		switch key {
-		case "ERII_DATA_ROOT":
+		case "COLLIE_DATA_ROOT":
 			return dir, true
-		case "ERII_LOG_LEVEL":
+		case "COLLIE_LOG_LEVEL":
 			return "debug", true
 		default:
 			return "", false
@@ -158,7 +158,7 @@ func TestRejectInvalidConfigWithoutEchoingValues(t *testing.T) {
 	if _, err := Load(filepath.Join(t.TempDir(), "missing"), noEnv); err == nil {
 		t.Fatal("accepted missing file")
 	}
-	for _, key := range []string{"ERII_DATA_ROOT", "ERII_LOG_LEVEL"} {
+	for _, key := range []string{"COLLIE_DATA_ROOT", "COLLIE_LOG_LEVEL"} {
 		if _, err := Load("", func(k string) (string, bool) { return "", k == key }); err == nil {
 			t.Fatalf("accepted empty %s override", key)
 		}
@@ -172,9 +172,9 @@ func TestNATSConfigAndOverrides(t *testing.T) {
 	}
 	cfg, err := Load(path, func(k string) (string, bool) {
 		switch k {
-		case "ERII_NATS_URL":
+		case "COLLIE_NATS_URL":
 			return "nats://127.0.0.1:4444", true
-		case "ERII_NATS_STREAM_PREFIX":
+		case "COLLIE_NATS_STREAM_PREFIX":
 			return "isolated", true
 		}
 		return "", false
@@ -204,7 +204,7 @@ func TestNATSConfigAndOverrides(t *testing.T) {
 			t.Fatalf("NATS config rejected unsafely: %v", err)
 		}
 	}
-	for _, key := range []string{"ERII_NATS_URL", "ERII_NATS_STREAM_PREFIX"} {
+	for _, key := range []string{"COLLIE_NATS_URL", "COLLIE_NATS_STREAM_PREFIX"} {
 		if _, err := Load("", func(k string) (string, bool) { return "", k == key }); err == nil {
 			t.Fatalf("empty %s accepted", key)
 		}

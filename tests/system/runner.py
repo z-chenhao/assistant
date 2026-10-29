@@ -136,7 +136,7 @@ def main(argv=None):
     parser.add_argument('--gate', action='append')
     parser.add_argument('--repeat', type=int, choices=range(1, 6), default=1)
     parser.add_argument('--list', action='store_true')
-    parser.add_argument('--binary', type=Path, default=Path('bin/erii'))
+    parser.add_argument('--binary', type=Path, default=Path('bin/collie'))
     parser.add_argument('--evidence', type=Path, default=Path('evidence/e2e'))
     args = parser.parse_args(argv)
     names = args.gate if args.gate is not None else list(CORE if args.suite == 'core' else REGISTRY)

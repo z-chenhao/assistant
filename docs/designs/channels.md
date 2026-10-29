@@ -22,7 +22,7 @@ flowchart TD
 
 Web 在依赖准备期间开放，ingress 保持关闭；缺失能力修复后后台重试准备，成功后恢复接纳。TUI 在依赖恢复后刷新就绪提示并重新调度已接收工作；恢复提示与已有历史展示可独立到达。已持久化终态的 Main 模型失败由 Run 记录承载，不关闭 HTTP listener；未能确立权威状态的基础设施错误仍使执行循环明确失败。
 
-页面查询按用途分开：Models 读取模型与必要账户信息，Notifications 只读渠道设置，Tasks 通过独立只读池读取分页摘要/详情，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Erii-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
+页面查询按用途分开：Models 读取模型与必要账户信息，Notifications 只读渠道设置，Tasks 通过独立只读池读取分页摘要/详情，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Collie-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
 
 ### Go 实现职责（F-040）
 
@@ -107,9 +107,9 @@ Feishu uses a controlled plain-text card and uploaded file attachments. Each
 outbound file retains its name and exact bytes. Missing/oversized resources fail
 closed rather than exposing a host path or silently sending the wrong attachment.
 
-The Web shell uses the requested ChatGPT-style neutral layout, locally bundled
+The Web shell uses the Collie personal-agent layout, locally bundled
 ad-agent Button/Card components and shared native-control styles, OpenIntelligentUI's native DataTable,
-and the original Eri character logo/default agent avatar. The React layer only
+and the owner-selected Collie border collie logo/default agent avatar. The React layer only
 enhances fixed UISpec v1 components; it does not add a second
 Agent or model connection. Server rendering remains the semantic fallback.
 The composer keeps its server-rendered form and input nodes throughout enhancement.
@@ -141,9 +141,9 @@ from authoritative receipts; an uncertain Feishu send stays query-only.
 The service revalidates the live fence before starting transport, so a scheduling
 pause that consumes the original lease cannot authorize even a fast send.
 
-<a id="delivery-recoverable-semantic-delivery-erii-15"></a>
+<a id="delivery-recoverable-semantic-delivery-collie-15"></a>
 
-## Recoverable semantic delivery (ERII-15)
+## Recoverable semantic delivery (retired task #15)
 
 Main replies reach the local terminal through a durable Delivery Outbox. The
 Conversation stores semantic content; `state.db` stores delivery intent,
@@ -219,13 +219,13 @@ recovery path delivers them. `/approve ID HASH` and `/deny ID HASH` submit the
 displayed frozen hash to Security and wake the original Run. Duplicate matching
 decisions remain idempotent. Approval expiry/invalidation still fails closed.
 
-<a id="web-components-erii-web-components"></a>
+<a id="web-components-collie-web-components"></a>
 
-## Erii Web components
+## Collie Web components
 
 This is a locally bundled presentation layer for the existing Go Web server.
-The conversation layout follows the requested ChatGPT-style neutral sidebar,
-centered thread and rounded composer. React enhances the escaped server HTML;
+The conversation layout uses a warm neutral canvas, dark selected navigation,
+a tennis-green submit action, centered thread and rounded composer. React enhances the escaped server HTML;
 the existing forms and semantic fallback remain usable without JavaScript.
 
 <a id="web-components-pinned-source-and-changes"></a>
@@ -234,9 +234,10 @@ the existing forms and semantic fallback remain usable without JavaScript.
 
 | Source | Revision | Reused code or asset | Local changes |
 | --- | --- | --- | --- |
-| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Erii supplies layout, routes and content |
+| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Collie supplies layout, routes and content |
 | [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | `apps/app/src/components/generative-ui/table-catalog.tsx` native `DataTable` and Zod props | Remove the CopilotKit catalog registration/import; retain validation and accessible table; map the existing UISpec table through a private adapter |
-| [eri](https://github.com/z-chenhao/eri) | `f4dcf11f29d17a2be517acb2a50dad08318edc40` | `assets/brand/eri-icon-192.png`, `eri-favicon-32.png` | Original bytes; the same character is the logo and default agent avatar |
+| Collie brand | Owner-selected 2026-10-29 generation | `assets/brand/collie.png` | Unmodified original image, displayed at different sizes by CSS |
+| [Google Fonts](https://github.com/google/fonts) | Included OFL notices | Bricolage Grotesque and DM Sans variable fonts | Unmodified, self-hosted font files; no CDN |
 
 Upstream licenses and artwork provenance are in `licenses/`. The binary embeds
 the required MIT/Apache-2.0 license texts and serves them at `/licenses.txt`.
@@ -246,7 +247,7 @@ checked-in local assets; they do not run as product services.
 
 OpenIntelligentUI's native component is integrated here. Its Python agent,
 CopilotKit/AG-UI transport, model routing, browser-key flow and generated
-HTML/JavaScript sandbox are not integrated. Erii's frozen ModelSnapshot,
+HTML/JavaScript sandbox are not integrated. Collie's frozen ModelSnapshot,
 SecretStore, Actor, approval and controlled UISpec v1 contracts remain the owners
 of those responsibilities. Enabling arbitrary generated code requires a separate
 architecture/security decision.

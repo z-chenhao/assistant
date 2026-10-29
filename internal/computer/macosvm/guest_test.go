@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer"
-	"github.com/z-chenhao/erii/internal/computer/macosvm"
-	"github.com/z-chenhao/erii/internal/computer/macosvm/fixture"
-	"github.com/z-chenhao/erii/internal/llm/secret"
+	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer/macosvm"
+	"github.com/z-chenhao/collie/internal/computer/macosvm/fixture"
+	"github.com/z-chenhao/collie/internal/llm/secret"
 )
 
 func TestSSHNegotiationFrozenIdentityAndCompatibility(t *testing.T) {
@@ -28,7 +28,7 @@ func TestSSHNegotiationFrozenIdentityAndCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	t.Setenv("ERII_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
+	t.Setenv("COLLIE_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
 	g := macosvm.SSHGuest{Config: s.Config.Guest, Secrets: secret.Store{}}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

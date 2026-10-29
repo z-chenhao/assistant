@@ -76,7 +76,7 @@ export class AccountAuth {
     const p = {state,nonce,verifier,registration,credential,status:'pending',expires:this.now()+this.ttl,used:false};
     const server = createServer((req,res)=> {
       // No access log; every response is constant, including errors.
-      const send = status => { res.writeHead(status,{'content-type':'text/plain','cache-control':'no-store','referrer-policy':'no-referrer'});res.end(status===200?'Erii: authorization received. You can close this window.':'Erii: invalid or expired authorization.'); };
+      const send = status => { res.writeHead(status,{'content-type':'text/plain','cache-control':'no-store','referrer-policy':'no-referrer'});res.end(status===200?'Collie: authorization received. You can close this window.':'Collie: invalid or expired authorization.'); };
       let u; try { u = new URL(req.url, p.redirect); } catch {send(400);return;}
       if (req.method!=='GET' || req.headers.host!==new URL(p.redirect).host || u.origin!==new URL(p.redirect).origin || u.pathname!=='/auth/callback' || u.hash || p.used || this.now()>=p.expires ||
           u.searchParams.getAll('state').length!==1 || u.searchParams.get('state')!==state) {send(400);return;}
@@ -96,7 +96,7 @@ export class AccountAuth {
     this.pending=p;
     const url = new URL(AUTH+'/api/accounts/authorize');
     url.search = new URLSearchParams({client_id:registration?.client_id ?? 'dynamic_agent_client',
-      ...(registration?{}:{agent_name_hint:'Erii'}),ext_agent_host_id:'urn:uuid:'+device_id,
+      ...(registration?{}:{agent_name_hint:'Collie'}),ext_agent_host_id:'urn:uuid:'+device_id,
       response_type:'code',redirect_uri:p.redirect,resource:API,scope,state,nonce,code_challenge:challenge,code_challenge_method:'S256',
       ...(credential?.id_token?{id_token_hint:credential.id_token}:{})}).toString();
     return {status:'pending',events:[{kind:'open_url',url:url.toString()}]};

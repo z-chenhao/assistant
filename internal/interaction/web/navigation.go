@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/observability"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 func pageRoute(path string) (tab, view, title string) {

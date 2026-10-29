@@ -1,3 +1,4 @@
+import {enhanceBrandMotion} from './brand';
 import {enhanceSettings} from './settings';
 import {enhanceObservability} from './observability';
 import {enhanceComposer} from './composer';
@@ -14,3 +15,5 @@ live?.start();
 enhanceObservability();
 
 enhanceSettings();
+
+enhanceBrandMotion();

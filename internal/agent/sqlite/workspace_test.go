@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 func TestTaskWorkspaceUsesOwnerScopeStablePaginationAndMainDeliveries(t *testing.T) {

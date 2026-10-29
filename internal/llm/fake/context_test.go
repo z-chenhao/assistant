@@ -3,9 +3,9 @@ package fake
 import (
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	contextbuilder "github.com/z-chenhao/erii/internal/context"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/agent"
+	contextbuilder "github.com/z-chenhao/collie/internal/context"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func TestToolFreeSummaryRetainsFixtureReceiptProgress(t *testing.T) {

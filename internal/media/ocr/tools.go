@@ -1,6 +1,6 @@
 package ocr
 
-import "github.com/z-chenhao/erii/internal/tool"
+import "github.com/z-chenhao/collie/internal/tool"
 
 const Name = "builtin__image_ocr"
 const Schema = `{"type":"object","properties":{"artifactRef":{"type":"string","minLength":9,"maxLength":256}},"required":["artifactRef"],"additionalProperties":false}`

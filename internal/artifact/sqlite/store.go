@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/z-chenhao/erii/internal/artifact"
+	"github.com/z-chenhao/collie/internal/artifact"
 )
 
 type Store struct {

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/z-chenhao/erii/internal/memory"
+	"github.com/z-chenhao/collie/internal/memory"
 )
 
 func (a *App) ManageMemory(ctx context.Context, key string, m memory.Mutation) (map[string]any, error) {

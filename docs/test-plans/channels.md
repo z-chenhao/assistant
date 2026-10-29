@@ -49,9 +49,9 @@ make test
 make test-race
 make lint
 make test-full
-python3 tests/system/verify_channels.py --binary bin/erii --evidence evidence/channels.json
-python3 tests/system/verify_channels.py --binary bin/erii --evidence evidence/channel-leases.json --delivery-lease-only
-python3 tests/system/verify_channels.py --binary bin/erii --evidence evidence/components.json --ui-components-only
+python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/channels.json
+python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/channel-leases.json --delivery-lease-only
+python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/components.json --ui-components-only
 ```
 
 `verify_channels.py` owns Launch (private root, local platform Fake and real Web
@@ -119,7 +119,7 @@ npm run build --prefix web
 make build
 npm run check --prefix web
 npm run lint --prefix web
-python3 tests/system/verify_channels.py --binary bin/erii --evidence evidence/components.json --ui-components-only
+python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/components.json --ui-components-only
 ```
 
 Commit component source, lockfile and generated assets together. `make test`

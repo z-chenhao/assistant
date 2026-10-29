@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/memory"
-	memorysqlite "github.com/z-chenhao/erii/internal/memory/sqlite"
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/recall/fake"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/memory"
+	memorysqlite "github.com/z-chenhao/collie/internal/memory/sqlite"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall/fake"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func TestForgetRevokesFrozenPendingGeneration(t *testing.T) {

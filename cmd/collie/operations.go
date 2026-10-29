@@ -8,11 +8,11 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/config"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/secret"
-	"github.com/z-chenhao/erii/internal/maintenance"
+	"github.com/z-chenhao/collie/internal/app"
+	"github.com/z-chenhao/collie/internal/config"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/secret"
+	"github.com/z-chenhao/collie/internal/maintenance"
 )
 
 func runOfflineOperation(ctx context.Context, cfg config.Config, flags *flag.FlagSet, secretsPath string, out io.Writer) (bool, error) {

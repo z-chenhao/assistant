@@ -8,14 +8,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/observability"
-	"github.com/z-chenhao/erii/internal/prompt"
-	"github.com/z-chenhao/erii/internal/task"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/collie/internal/prompt"
+	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func TestContinuationExcludesChildPrivateTrace(t *testing.T) {

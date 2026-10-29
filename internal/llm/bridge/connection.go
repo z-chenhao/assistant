@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 // Connection is an ephemeral Host-to-Bridge Secret RPC envelope. Never persist it.

@@ -31,7 +31,7 @@ class Harness(MainHarness):
 
 def state(h):
     result = {}
-    root = Path(h.env["ERII_DATA_ROOT"])
+    root = Path(h.env["COLLIE_DATA_ROOT"])
     for filename, queries in {
         "state.db": {
             "requests": "SELECT * FROM delivery_request ORDER BY created_at,delivery_id",
@@ -41,7 +41,7 @@ def state(h):
             "generations": "SELECT generation_id,status,attempt_count FROM model_generation ORDER BY created_at",
             "intents": "SELECT * FROM conversation_intent ORDER BY sequence",
             "replies": "SELECT * FROM main_reply ORDER BY rowid",
-            "events": "SELECT type,payload_json FROM event_outbox WHERE type LIKE 'ai.erii.delivery.%' ORDER BY occurred_at,event_id",
+            "events": "SELECT type,payload_json FROM event_outbox WHERE type LIKE 'ai.collie.delivery.%' ORDER BY occurred_at,event_id",
             "approvals": "SELECT * FROM approval ORDER BY created_at",
             "task_updates": "SELECT * FROM task_update ORDER BY occurred_at",
         },
@@ -72,7 +72,7 @@ def assert_delivered(value, count):
 def run(binary, feedback=False, scenario_jobs=1):
     report = {"version": 1, "scope": "M3 durable semantic delivery to the local terminal inbox; stdout redisplay and remote provider exactly-once are not claimed", "checks": [], "crashes": [],
               "evidence_scope": "early_feedback" if feedback else "full", "scenario_jobs": scenario_jobs}
-    with tempfile.TemporaryDirectory(prefix="erii-delivery-") as directory:
+    with tempfile.TemporaryDirectory(prefix="collie-delivery-") as directory:
         root = Path(directory)
 
         def scenario(name, action, fixture="main"):
@@ -203,7 +203,7 @@ if __name__ == "__main__":
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--feedback", action="store_true", help="additional early transport/approval checks; not full merge evidence")
-    parser.add_argument("--scenario-jobs", type=int, choices=[1, 2, 4], default=int(os.environ.get("ERII_VERIFY_CASE_JOBS", "1")))
+    parser.add_argument("--scenario-jobs", type=int, choices=[1, 2, 4], default=int(os.environ.get("COLLIE_VERIFY_CASE_JOBS", "1")))
     args = parser.parse_args()
     args.evidence.unlink(missing_ok=True)
     report = run(args.binary.resolve(), args.feedback, args.scenario_jobs)

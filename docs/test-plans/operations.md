@@ -53,8 +53,8 @@ make test
 make test-race
 make lint
 make test-full
-python3 tests/system/verify_operations.py --binary bin/erii --evidence evidence/operations.json
-python3 tests/system/verify_capacity.py --binary bin/erii --evidence evidence/capacity.json
+python3 tests/system/verify_operations.py --binary bin/collie --evidence evidence/operations.json
+python3 tests/system/verify_capacity.py --binary bin/collie --evidence evidence/capacity.json
 ```
 
 Real interactive acceptance shares `tests/system/event_broker.py`: an owned, pinned

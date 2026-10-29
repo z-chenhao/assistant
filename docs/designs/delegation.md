@@ -54,7 +54,7 @@ Prompt 使用可组合片段，不为三种 Run 维护三份彼此分叉的完�
 | `agent.run()` 能力说明 | 无 | 有 | 按 Capability Policy 提供 |
 
 - Main 面向用户，对用户关系、意图协调和最终表达负责。
-- Root Worker 面向 Task，保持该 Erii 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
+- Root Worker 面向 Task，保持该 Collie 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
 - Child 面向直接 Parent，是无独立人格的通用执行单元；它不得凭空假设未显式提供的用户背景。
 - Prompt 片段统一由 `internal/agent/context.go` 按 Run 位置和冻结能力组装；是否暴露 `agent.run()` 由 Tool Exposure/Capability Policy 决定，而不是通过复制或分叉 Agent Loop 实现。
 - Main 与 Root 共享同一份 Agent 基础能力配置，包括普通 Tool、CUA、Skill、数据作用域和 Security Policy；Host 再按 Run Role 自动派生能力表面。Main 额外拥有 Task 控制和用户交付能力且默认没有 `agent.run()`；Root 不拥有 Task 控制或用户交付能力，但拥有 `agent.run()`。
@@ -386,7 +386,7 @@ runtime/javascript/
 
 ## Direct Child delegation
 
-ERII-17 adds `builtin__agent_run` v1 to new Worker capabilities. A Root or
+retired task #17 adds `builtin__agent_run` v1 to new Worker capabilities. A Root or
 Child can delegate explicit work to one general Worker. Main continues to use
 Task tools. Every Child executes the same `RunAgentLoop` kernel.
 
@@ -455,9 +455,9 @@ Task pause/cancel uses the existing Task epoch and stop pipeline. New admissions
 and late model/tool results immediately fail fencing. Descendants settle before
 ancestors. A later append creates a new Root; it never revives old Runs.
 
-<a id="children-fair-scheduling-and-batch-evidence-erii-18"></a>
+<a id="children-fair-scheduling-and-batch-evidence-collie-18"></a>
 
-### Fair scheduling and batch evidence (ERII-18)
+### Fair scheduling and batch evidence (retired task #18)
 
 `scheduler.child_concurrency` defaults to 16 active Child leases per Root tree.
 Global, local-user, Agent and frozen provider account/endpoint limits default to
@@ -509,7 +509,7 @@ guidance asks it to collect available results and deduplicate genuine blockers;
 the Fake fixture tests transport and aggregation, not real-model judgment.
 
 ```sh
-python3 tests/system/verify_scheduling.py --binary bin/erii --evidence evidence/scheduling.json
+python3 tests/system/verify_scheduling.py --binary bin/collie --evidence evidence/scheduling.json
 ```
 
 This maintained harness owns Launch, Doctor, Drive, Evidence and Cleanup. Its
@@ -539,7 +539,7 @@ settles each reservation exactly once in the same transaction as the model
 result. Missing usage retains unknown actual cost and its conservative reserve.
 No token allowance substitutes for monetary authorization.
 
-`erii -config config.yaml spend status` displays sanitized account
+`collie -config config.yaml spend status` displays sanitized account
 keys, snapshot/price versions, cumulative committed microcurrency, unknown usage
 and historical unpriced call counts. It reports `configured`, `unpriced`,
 `unconfigured` or `unpriced_unconfigured`; it never invents prices. The account
@@ -597,6 +597,6 @@ semantic Golden Case or M5 JavaScript/Durable Replay claim.
 
 以下是早期阶段记录，保留当时边界，不描述当前完成状态；当前需求状态以 Feature Map 为准。
 
-ERII-17 Direct Tool 实现说明：`builtin__agent_run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/designs/delegation.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
+retired task #17 Direct Tool 实现说明：`builtin__agent_run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/designs/delegation.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
 
-ERII-18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/designs/delegation.md`。
+retired task #18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/designs/delegation.md`。

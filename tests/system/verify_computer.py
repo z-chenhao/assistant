@@ -29,7 +29,7 @@ class ComputerHarness(CapabilityHarness):
                 '-test-bridge', 'computer', *args]
 
     def guest_command(self, live_root, command):
-        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
+        with sqlite3.connect(Path(self.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
             instance = json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
         from lume_live import Live
         return Live(live_root, 'product', instance['native_name']).guest(command)
@@ -40,7 +40,7 @@ class ComputerHarness(CapabilityHarness):
         release = self.root / ('release-' + boundary)
         child = self.hold(boundary, extra_flags=('-test-main-release', str(release)), timeout=30)
         held = self.command('computer', 'status')
-        state = Path(self.env['ERII_DATA_ROOT']) / 'state.db'
+        state = Path(self.env['COLLIE_DATA_ROOT']) / 'state.db'
         with sqlite3.connect(state) as db:
             task_id, ref = db.execute("SELECT task_id,task_ref FROM task WHERE status='active'").fetchone()
         self.send('cancel-' + boundary, 'Capabilities: ' + json.dumps([
@@ -63,7 +63,7 @@ class ComputerHarness(CapabilityHarness):
                 'after_cancel': self.command('computer', 'status')}
 
     def cancelled_state(self, task_id):
-        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
+        with sqlite3.connect(Path(self.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
             task = db.execute('SELECT status,task_epoch FROM task WHERE task_id=?', (task_id,)).fetchone()
             runs = db.execute('SELECT run_id,status,desired_state FROM run WHERE task_id=? ORDER BY run_id', (task_id,)).fetchall()
             codes = db.execute('SELECT s.execution_id,s.state,s.desired_state,s.claim_token IS NULL FROM code_execution_state s JOIN tool_invocation i ON i.invocation_id=s.execution_id JOIN run r USING(run_id) WHERE r.task_id=? ORDER BY s.execution_id', (task_id,)).fetchall()
@@ -86,7 +86,7 @@ def request(endpoint, path, value=None):
 def run(binary):
     report = {'version': 1, 'scope': 'offline lifecycle HTTP/SSH and durable CLI contracts; not real VM compatibility',
               'checks': [], 'crashes': [], 'cleanup': False}
-    with tempfile.TemporaryDirectory(prefix='erii-computer-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-computer-') as temp:
         root = Path(temp).resolve()
         vm_root, source = root / 'vm', root / 'source'
         vm_root.mkdir(mode=0o700)
@@ -95,7 +95,7 @@ def run(binary):
             (source / name).write_text('base-' + name)
         (source / 'config.json').write_text(json.dumps({'macAddress': '02:00:00:00:00:01', 'machineIdentifier': 'fixture-base', 'cpuCount': 4}))
         h = ComputerHarness(binary, root, fixture='computer')
-        h.env['ERII_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
+        h.env['COLLIE_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
         server = subprocess.Popen([str(binary), '-test-computer-server', str(vm_root)],
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                   env=h.env, cwd=root)
@@ -146,13 +146,13 @@ def run(binary):
                     require(receipt['files'][name] == hashes[name], 'checkpoint receipt mismatch')
                 require(set(p.name for p in checkpoint.iterdir()) == {*expected, 'receipt.json'}, 'session/heap files entered checkpoint')
                 require(receipt['manifest']['artifact_refs'] == [artifact['artifact_ref']], 'stable Artifact reference lost')
-                require(not list((vm_root / 'vms').glob('erii-*')), 'disposable instance retained')
+                require(not list((vm_root / 'vms').glob('collie-*')), 'disposable instance retained')
                 require(not list((vm_root / 'vms').glob('.stage-*')) and not list((vm_root / 'checkpoints').glob('.stage-*')), 'abandoned staging unit retained')
                 require(request(computer['endpoint'], '/fixture/status')['running'] == 0, 'CPU/RAM lock not released')
                 opened = subprocess.run(h.args('artifact', 'open', artifact['artifact_ref']), env=h.env,
                                         capture_output=True, text=True, timeout=20)
                 require(opened.returncode == 0 and opened.stdout == 'stable Artifact across VM instances', 'Artifact bytes/identity lost')
-                with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+                with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
                     phases = db.execute('SELECT kind,status FROM computer_operation ORDER BY rowid').fetchall()
                     nested = db.execute("SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__computer_discover' AND parent_invocation_id IS NOT NULL AND status='succeeded'").fetchone()[0]
                     require(nested >= 1, 'Computer bypassed ToolInvocation')
@@ -171,7 +171,7 @@ def run(binary):
                 if boundary == 'computer_after_destroy':
                     require(held['phase'] == 'checkpointing' and held['checkpoint'] is not None,
                             'post-disposal boundary lacks committed progress')
-                    require(not list((vm_root / 'vms').glob('erii-*')), 'post-disposal instance still exists')
+                    require(not list((vm_root / 'vms').glob('collie-*')), 'post-disposal instance still exists')
                 child.kill()
                 child.communicate(timeout=10)
                 h.command('chat', 'work')
@@ -189,7 +189,7 @@ def run(binary):
             fresh = h.command('computer', 'status')
             require(fresh['computer_id'] == recovered['computer_id'] and fresh['instance_epoch'] == recovered['instance_epoch'] + 1,
                     'fresh cell cannot restore after interrupted disposal')
-            with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+            with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
                 results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at").fetchall()
                 require(len(results) == 5 and all(row[0] == 'succeeded' for row in results),
                         'resumed or fresh cell failed after disposal')
@@ -204,7 +204,7 @@ def run(binary):
                 if boundary == 'computer_after_destroy':
                     require(held['phase'] == 'checkpointing' and held['checkpoint'] is not None,
                             'cancel boundary lacks committed checkpoint')
-                    require(not list((vm_root / 'vms').glob('erii-*')), 'cancelled source instance retained')
+                    require(not list((vm_root / 'vms').glob('collie-*')), 'cancelled source instance retained')
                     cancelled['committed_unit'] = evidence(held)
                 h.send('fresh-after-cancel-' + boundary, 'Capabilities: ' + plan)
                 h.command('chat', 'work')
@@ -213,7 +213,7 @@ def run(binary):
                         'fresh invocation lost cancelled Computer identity/epoch')
                 require(restored['phase'] == 'checkpointed', 'fresh invocation failed after Task cancellation')
                 require(h.cancelled_state(cancelled['task_id']) == terminal, 'recovery changed cancelled terminal state')
-                with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db') as db:
+                with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
                     status = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at DESC LIMIT 1").fetchone()[0]
                     require(status == 'succeeded', 'fresh cell failed after cancellation')
                     if boundary == 'computer_after_destroy':
@@ -244,13 +244,13 @@ def run_live(binary, live_root, config_path):
     require(config_path.absolute().parent == live_root and not config_path.is_symlink(), 'live config must be in the owned root')
     config = json.loads(config_path.read_text())
     require(config['computer']['root'] == str(live_root / 'product'), 'live adapter must use the dedicated product store')
-    require(config['computer']['guest']['password_ref'] == 'env:ERII_COMPUTER_GUEST_TEST_LOGIN', 'live fixture uses only the public test Guest login')
+    require(config['computer']['guest']['password_ref'] == 'env:COLLIE_COMPUTER_GUEST_TEST_LOGIN', 'live fixture uses only the public test Guest login')
     root = live_root / 'product-cli'
     root.mkdir(mode=0o700, exist_ok=True)
     h = ComputerHarness(binary, root, fixture='computer')
-    h.env['ERII_COMPUTER_GUEST_TEST_LOGIN'] = 'lume'
-    path = '/Users/lume/erii24-product-fixture.txt'
-    payload = 'ERII-24 production Provider durable fixture.\n'
+    h.env['COLLIE_COMPUTER_GUEST_TEST_LOGIN'] = 'lume'
+    path = '/Users/lume/collie24-product-fixture.txt'
+    payload = 'COLLIE-24 production Provider durable fixture.\n'
     expected = hashlib.sha256(payload.encode()).hexdigest()
     config['computer']['manifest'] = {'version': 1, 'applications': [{'bundle_id': 'com.apple.TextEdit', 'documents': [path]}], 'artifact_refs': []}
     target = root / 'config.yaml'
@@ -284,7 +284,7 @@ def run_live(binary, live_root, config_path):
         output = guest('/usr/bin/shasum -a 256 ' + path)
         windows = json.loads(guest("/Applications/CuaDriver.app/Contents/MacOS/cua-driver call list_windows '{}'"))
         titles = [w.get('title') for w in windows.get('windows', []) if w.get('app_name') == 'TextEdit']
-        require(digest in output and any('erii24-product-fixture.txt' in title for title in titles if title), 'Guest file or semantic document restoration failed')
+        require(digest in output and any('collie24-product-fixture.txt' in title for title in titles if title), 'Guest file or semantic document restoration failed')
         return {'file_readback': output.strip(), 'TextEdit_window_titles': titles}
 
     try:
@@ -315,7 +315,7 @@ def run_live(binary, live_root, config_path):
         base = json.loads((live_root / 'product/base/config.json').read_text())
         require(all(identity[key] != base[key] for key in identity), 'initial Computer reused base MAC or machine identity')
         report['hardware_identity_sha256'] = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
-        output = guest("printf '%s\\n' 'ERII-24 production Provider durable fixture.' > " + path + '; /usr/bin/shasum -a 256 ' + path + '; /bin/test ! -e /Users/lume/erii24-fixtures; /bin/test ! -e /Users/lume/Movies/erii24-live')
+        output = guest("printf '%s\\n' 'COLLIE-24 production Provider durable fixture.' > " + path + '; /usr/bin/shasum -a 256 ' + path + '; /bin/test ! -e /Users/lume/collie24-fixtures; /bin/test ! -e /Users/lume/Movies/collie24-live')
         require(expected in output, 'Guest fixture write hash mismatch')
         release.touch()
         stdout, stderr = child.communicate(timeout=295)
@@ -333,7 +333,7 @@ def run_live(binary, live_root, config_path):
         reopened = prove_reopened(expected)
         changed = payload + 'Saved after the last checkpoint, before Agent SIGKILL.\n'
         changed_hash = hashlib.sha256(changed.encode()).hexdigest()
-        written = guest("printf '%s\\n' 'ERII-24 production Provider durable fixture.' 'Saved after the last checkpoint, before Agent SIGKILL.' > " + path + '; /usr/bin/shasum -a 256 ' + path)
+        written = guest("printf '%s\\n' 'COLLIE-24 production Provider durable fixture.' 'Saved after the last checkpoint, before Agent SIGKILL.' > " + path + '; /usr/bin/shasum -a 256 ' + path)
         require(changed_hash in written, 'uncheckpointed Guest fixture write failed')
         child.kill()
         child.communicate(timeout=10)
@@ -350,7 +350,7 @@ def run_live(binary, live_root, config_path):
         require(first['computer_id'] == second['computer_id'] == third['computer_id'] == final['computer_id'], 'native restart changed logical identity')
         epoch = first['instance_epoch']
         require([first['instance_epoch'], second['instance_epoch'], third['instance_epoch']] == [epoch, epoch + 1, epoch + 2], 'native instance epochs were not fenced')
-        require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('erii-*')), 'native instance or CPU/RAM retained')
+        require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('collie-*')), 'native instance or CPU/RAM retained')
         checkpoint = live_root / 'product/checkpoints' / final['checkpoint']['checkpoint_id']
         receipt = json.loads((checkpoint / 'receipt.json').read_text())
         hashes = {}
@@ -368,7 +368,7 @@ def run_live(binary, live_root, config_path):
         child = h.hold('computer_after_destroy', timeout=295)
         disposed = h.command('computer', 'status')
         require(disposed['phase'] == 'checkpointing' and disposed['checkpoint'] is not None and
-                not list((live_root / 'product/vms').glob('erii-*')), 'native post-disposal boundary not reached')
+                not list((live_root / 'product/vms').glob('collie-*')), 'native post-disposal boundary not reached')
         child.kill()
         child.communicate(timeout=10)
         require(child.returncode < 0, 'post-disposal fault did not terminate Agent')
@@ -396,7 +396,7 @@ def run_live(binary, live_root, config_path):
         _, stderr = child.communicate(timeout=295)
         require(child.returncode == 0, 'fresh native cell failed after disposal recovery: ' + stderr)
         final = h.command('computer', 'status')
-        require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('erii-*')),
+        require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('collie-*')),
                 'fresh native cell retained resources')
         with sqlite3.connect(root / 'data/state.db') as db:
             results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at DESC LIMIT 2").fetchall()

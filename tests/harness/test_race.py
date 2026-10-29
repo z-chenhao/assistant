@@ -135,7 +135,7 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, \
              patch.object(race, 'run_command', side_effect=execute), \
              patch.object(race, 'cpu_budget', return_value=4):
-            result = race.run_remainder([race.SQLITE, 'github.com/z-chenhao/erii/new/pkg'],
+            result = race.run_remainder([race.SQLITE, 'github.com/z-chenhao/collie/new/pkg'],
                                         Path(directory), threading.Event())
         self.assertEqual(result['returncode'], 0)
         self.assertTrue(result['selection_complete'])
@@ -187,7 +187,7 @@ class SQLiteRaceInventoryTests(unittest.TestCase):
                  patch.object(race, 'cpu_budget', return_value=4), \
                  ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(race.run_remainder,
-                                     [race.SQLITE, 'github.com/z-chenhao/erii/new/pkg'], folder, stopped)
+                                     [race.SQLITE, 'github.com/z-chenhao/collie/new/pkg'], folder, stopped)
                 try:
                     deadline = time.monotonic() + 3
                     while len(list(folder.glob('*.ready'))) != 4 and time.monotonic() < deadline:

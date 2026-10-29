@@ -31,7 +31,7 @@ def launch(binary, root, live_config=None, browser_peer=None):
     try:
         if live_config:
             computer = json.loads(Path(live_config).read_text())['computer']
-            h.env['ERII_COMPUTER_GUEST_TEST_LOGIN'] = 'lume'
+            h.env['COLLIE_COMPUTER_GUEST_TEST_LOGIN'] = 'lume'
             computer['manifest']={'version':1,'applications':[],'artifact_refs':[]}
         else:
             source.mkdir(mode=0o700)
@@ -41,7 +41,7 @@ def launch(binary, root, live_config=None, browser_peer=None):
             for name in ('disk.img', 'nvram.bin', 'config.json'):
                 (source / name).write_text('fixture-' + name)
             (source / 'config.json').write_text(json.dumps({'macAddress': '02:00:00:00:00:01', 'machineIdentifier': 'fixture', 'cpuCount': 4}))
-            h.env['ERII_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
+            h.env['COLLIE_COMPUTER_FIXTURE_PASSWORD'] = 'fixture-only'
             start = h.processes.start if h.processes else subprocess.Popen
             server = start([str(binary), '-test-computer-server', str(vm)], stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, text=True, env=h.env, cwd=root)
@@ -96,16 +96,16 @@ def collect_observations(h, report, live_root):
 def run(binary, live_config=None, live_root=None, work_root=None, native_only=False, provision=False, browser_live=False):
     drive_nonce = str(time.time_ns())
     report = {'version': 1, 'scope': 'real Guest' if live_config else 'offline SSH/Cua/Playwright protocol peers; no real GUI claim', 'checks': [], 'cleanup': False}
-    with (nullcontext(work_root) if work_root else nullcontext(tempfile.mkdtemp(prefix='erii25-cua-use-',dir=live_root)) if live_config else tempfile.TemporaryDirectory(prefix='erii-cua-use-')) as temporary:
+    with (nullcontext(work_root) if work_root else nullcontext(tempfile.mkdtemp(prefix='collie25-cua-use-',dir=live_root)) if live_config else tempfile.TemporaryDirectory(prefix='collie-cua-use-')) as temporary:
         root = Path(temporary).resolve()
         with launch(binary, root, live_config) as h:
-            state = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
+            state = Path(h.env['COLLIE_DATA_ROOT']) / 'state.db'
             if native_only or browser_live:
                 metadata={'name':'CUA live evidence','provider_kind':'openai_compatible','endpoint':'http://127.0.0.1:1/v1','wire_api':'openai_completions','model_id':'fixture-model','context_window':65536,'max_output_tokens':4096,'compatibility':{'tool_result_format':'openai'},'capabilities':{'text_input':True,'tool_calls':True,'streaming':True}}
                 h.setup(metadata=metadata)
             if browser_live:
                 config=json.loads((root/'config.yaml').read_text())
-                config['computer']['browser']={'node':'/Users/lume/erii25-runtime/node/bin/node','module':'/Users/lume/erii25-runtime/browser/node_modules/playwright-core/index.mjs','port':9222}
+                config['computer']['browser']={'node':'/Users/lume/collie25-runtime/node/bin/node','module':'/Users/lume/collie25-runtime/browser/node_modules/playwright-core/index.mjs','port':9222}
                 (root/'config.yaml').write_text(json.dumps(config))
             artifact = h.command('artifact', 'save', 'private-fixture.txt', 'text/plain', text='private fixture bytes')
             def rows():
@@ -131,11 +131,11 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                             instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
                         from lume_live import Live
                         live=Live(live_root,'product',instance['native_name'])
-                        live.put_fixture('erii25Fixture')
-                        plist='<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Fixture</string><key>CFBundleIdentifier</key><string>com.erii.fixture</string><key>CFBundleName</key><string>Erii CUA Fixture</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>'
+                        live.put_fixture('collie25Fixture')
+                        plist='<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Fixture</string><key>CFBundleIdentifier</key><string>com.collie.fixture</string><key>CFBundleName</key><string>Collie CUA Fixture</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>'
                         import shlex
-                        directory='/Users/lume/Applications/EriiCUAFixture.app/Contents'
-                        h.guest_command(live_root,'mkdir -p '+directory+'/MacOS && cp /Users/lume/erii24-fixtures/erii25Fixture '+directory+'/MacOS/Fixture && chmod 755 '+directory+'/MacOS/Fixture && printf %s '+shlex.quote(plist)+' > '+directory+'/Info.plist && /usr/bin/codesign --force --sign - '+directory+'/.. && /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f '+directory+'/..')
+                        directory='/Users/lume/Applications/CollieCUAFixture.app/Contents'
+                        h.guest_command(live_root,'mkdir -p '+directory+'/MacOS && cp /Users/lume/collie24-fixtures/collie25Fixture '+directory+'/MacOS/Fixture && chmod 755 '+directory+'/MacOS/Fixture && printf %s '+shlex.quote(plist)+' > '+directory+'/Info.plist && /usr/bin/codesign --force --sign - '+directory+'/.. && /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f '+directory+'/..')
                         release.touch();worker.communicate(timeout=320);require(worker.returncode==0,'live initial worker failed')
                     elif browser_live and _==0:
                         release=root/'release-browser-doctor'
@@ -144,12 +144,12 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                         with sqlite3.connect(state) as db: instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
                         from lume_live import Live
                         live=Live(live_root,'product',instance['native_name'])
-                        target=live_root/'fixtures/erii25-browser-doctor.sh'
+                        target=live_root/'fixtures/collie25-browser-doctor.sh'
                         require(not target.exists(),'refusing to replace an existing Doctor fixture')
                         shutil.copyfile(Path(__file__).resolve().parents[2]/'tests/fixtures/computer-use-v1/doctor_browser.sh',target)
                         try: live.put_fixture(target.name)
                         finally: target.unlink()
-                        try: report['guest_browser_doctor']=live.guest('/bin/bash /Users/lume/erii24-fixtures/erii25-browser-doctor.sh',timeout=45)
+                        try: report['guest_browser_doctor']=live.guest('/bin/bash /Users/lume/collie24-fixtures/collie25-browser-doctor.sh',timeout=45)
                         finally: release.touch()
                         worker.communicate(timeout=320)
                         require(worker.returncode==0,'browser Doctor worker failed')
@@ -160,7 +160,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                         with sqlite3.connect(state) as db: instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
                         from lume_live import Live
                         live=Live(live_root,'product',instance['native_name'])
-                        sources={'erii25-package.json':'guest-browser/package.json','erii25-package-lock.json':'guest-browser/package-lock.json','erii25-transfer.py':'internal/computer/macosvm/transfer.py','erii25-site.mjs':'tests/fixtures/computer-use-v1/site.mjs','erii25-provision.sh':'tests/fixtures/computer-use-v1/provision_browser.sh'}
+                        sources={'collie25-package.json':'guest-browser/package.json','collie25-package-lock.json':'guest-browser/package-lock.json','collie25-transfer.py':'internal/computer/macosvm/transfer.py','collie25-site.mjs':'tests/fixtures/computer-use-v1/site.mjs','collie25-provision.sh':'tests/fixtures/computer-use-v1/provision_browser.sh'}
                         repository=Path(__file__).resolve().parents[2]
                         for name,path in sources.items():
                             target=live_root/'fixtures'/name
@@ -168,7 +168,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                             shutil.copyfile(repository/path,target)
                             try: live.put_fixture(name)
                             finally: target.unlink()
-                        report['guest_browser_provision']=live.guest('/bin/bash /Users/lume/erii24-fixtures/erii25-provision.sh',timeout=180)
+                        report['guest_browser_provision']=live.guest('/bin/bash /Users/lume/collie24-fixtures/collie25-provision.sh',timeout=180)
                         release.touch();worker.communicate(timeout=320);require(worker.returncode==0,'provision worker failed')
                     else:
                         h.command('chat', 'work')
@@ -195,24 +195,24 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                 return output, approvals
 
             if not native_only and not browser_live:
-                app = 'com.erii.fixture' if live_config else 'com.apple.TextEdit'
+                app = 'com.collie.fixture' if live_config else 'com.apple.TextEdit'
                 output, _ = execute('inventory-bind-observe-independent-revisions', f'''
     const inventory=await cua.getState();
-    {('await cua.computer.launchApp({app:"com.erii.fixture"});' if live_config else '')}
+    {('await cua.computer.launchApp({app:"com.collie.fixture"});' if live_config else '')}
     const app=await cua.getApp({json.dumps(app)});
     const ax=await app.getAXState({{full:true}});
     const shot=await app.getScreenshot();
     image(shot.image);
     return {{computer:inventory.computerId, ax:ax.state, revision:ax.revision, screenshot:shot.revision}};
     ''')
-                require(output[0]['type'] == 'image' and output[0]['mimeType'] == 'application/x-erii-artifact', 'explicit image reference output missing')
+                require(output[0]['type'] == 'image' and output[0]['mimeType'] == 'application/x-collie-artifact', 'explicit image reference output missing')
                 image_ref = output[0]['data']
                 image_bytes = subprocess.run(h.args('artifact', 'open', image_ref), env=h.env, capture_output=True, timeout=20)
                 require(image_bytes.returncode == 0 and image_bytes.stdout.startswith(b'\x89PNG'), 'screenshot Artifact not readable')
                 report['screenshot_sha256'] = hashlib.sha256(image_bytes.stdout).hexdigest()
 
                 output, approvals = execute('action-observe-old-reference-and-wait', f'''
-    {('await cua.computer.launchApp({app:"com.erii.fixture"});' if live_config else '')}
+    {('await cua.computer.launchApp({app:"com.collie.fixture"});' if live_config else '')}
     const app=await cua.getApp({json.dumps(app)});
     const old=await app.getAXState();
     await app.typeText("approved fixture");
@@ -228,8 +228,8 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
 
             if live_config and not browser_live:
                 output,_=execute('native-elements-secondary-selection-and-coordinates', r'''
-await cua.computer.launchApp({app:"com.erii.fixture"});
-const window=(await cua.listWindows()).find(w=>w.name==="Erii CUA Fixture");
+await cua.computer.launchApp({app:"com.collie.fixture"});
+const window=(await cua.listWindows()).find(w=>w.name==="Collie CUA Fixture");
 if(!window)throw new Error("fixture window not discovered");
 const app=await cua.getApp({windowId:window.id});
 const field=ax=>Number(ax.state.match(/\[(\d+)\] AXTextField/)[1]);
@@ -366,7 +366,7 @@ if __name__ == '__main__':
     parser.add_argument('--collect-observations', type=Path, help='read an existing live report and its scoped screenshot Artifacts without starting services')
     args = parser.parse_args()
     if args.collect_observations:
-        require(args.resume_root and args.live_root and args.resume_root.parent.resolve()==args.live_root.resolve() and args.resume_root.name.startswith('erii25-cua-use-'), 'collection requires the owned live evidence root')
+        require(args.resume_root and args.live_root and args.resume_root.parent.resolve()==args.live_root.resolve() and args.resume_root.name.startswith('collie25-cua-use-'), 'collection requires the owned live evidence root')
         report=json.loads(args.collect_observations.read_text())
         require(report.get('scope')=='real Guest' and report.get('cleanup'), 'collection requires a completed live report')
         h=ComputerHarness(args.binary.resolve(),args.resume_root)
@@ -382,15 +382,15 @@ if __name__ == '__main__':
         if args.live_config:
             require(args.live_root is not None,'--live-root is required with --live-config')
             if args.resume_root:
-                require(args.resume_root.parent.resolve()==args.live_root.resolve() and args.resume_root.name.startswith('erii25-cua-use-'),'resume must use the owned evidence directory')
+                require(args.resume_root.parent.resolve()==args.live_root.resolve() and args.resume_root.name.startswith('collie25-cua-use-'),'resume must use the owned evidence directory')
             from lume_live import Live
             live=Live(args.live_root,'product')
             live.doctor()
             fixture=Path(__file__).resolve().parents[2]/'tests/fixtures/computer-use-v1/Fixture.swift'
-            compiled=args.live_root/'fixtures/erii25Fixture'
+            compiled=args.live_root/'fixtures/collie25Fixture'
             require(not compiled.exists(),'refusing to replace an existing live fixture')
             subprocess.run(['xcrun','swiftc','-target','arm64-apple-macos15.0','-framework','AppKit',str(fixture),'-o',str(compiled)],check=True,timeout=60)
-            log=(args.live_root/'logs/erii25-server.log').open('w')
+            log=(args.live_root/'logs/collie25-server.log').open('w')
             server=subprocess.Popen([sys.executable,str(Path(__file__).with_name('lume_live.py')),'--root',str(args.live_root),'--profile','product','serve'],stdout=log,stderr=log)
             endpoint=json.loads(args.live_config.read_text())['computer']['endpoint']
             for _ in range(100):

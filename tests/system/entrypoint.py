@@ -28,8 +28,8 @@ def main():
     try:
         runpy.run_path(str(script), run_name='__main__')
     finally:
-        if os.environ.get('ERII_TEST_METRICS_DIR'):
-            folder = Path(os.environ['ERII_TEST_METRICS_DIR'])
+        if os.environ.get('COLLIE_TEST_METRICS_DIR'):
+            folder = Path(os.environ['COLLIE_TEST_METRICS_DIR'])
             folder.mkdir(parents=True, exist_ok=True)
             usage = resource.getrusage(resource.RUSAGE_SELF)
             (folder / (script.stem + '.json')).write_text(json.dumps(dict(

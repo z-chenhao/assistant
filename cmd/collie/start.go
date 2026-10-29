@@ -10,21 +10,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/computer/environment"
-	"github.com/z-chenhao/erii/internal/config"
-	"github.com/z-chenhao/erii/internal/media/ocr"
+	"github.com/z-chenhao/collie/internal/computer/environment"
+	"github.com/z-chenhao/collie/internal/config"
+	"github.com/z-chenhao/collie/internal/media/ocr"
 )
 
 // A source build and an installed bundle share the same relative layout. Use
-// the executable, never cwd: users can launch Erii from any working directory.
+// the executable, never cwd: users can launch Collie from any working directory.
 func runtimeHome() (string, error) {
 	path, err := os.Executable()
 	if err != nil {
-		return "", errors.New("locate Erii installation")
+		return "", errors.New("locate Collie installation")
 	}
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
-		return "", errors.New("resolve Erii installation")
+		return "", errors.New("resolve Collie installation")
 	}
 	return filepath.Dir(filepath.Dir(path)), nil
 }
@@ -55,7 +55,7 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if cfg.LLM.ProviderBridgeCommand != "" {
 		runtimes = append(runtimes, runtimeCheck{"model bridge", cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, "node_modules/@earendil-works/pi-ai/package.json"})
 	} else {
-		fmt.Fprintln(out, "SKIP model bridge: not configured; use default erii startup or add llm settings")
+		fmt.Fprintln(out, "SKIP model bridge: not configured; use default collie startup or add llm settings")
 	}
 	if cfg.JavaScript != nil {
 		runtimes = append(runtimes, runtimeCheck{"JavaScript runtime", cfg.JavaScript.Command, cfg.JavaScript.Script, "../node_modules/quickjs-wasi/package.json"})
@@ -85,6 +85,6 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 	if failed {
 		return errors.New("installation incomplete; check Node 24.21.0 and execution dependencies (Python 3, bash, bubblewrap on Linux), then rerun ./install.sh (see docs/features/installation.md)")
 	}
-	fmt.Fprintln(out, "Ready to start. Run erii; connect a local model or sign in with ChatGPT in setup.")
+	fmt.Fprintln(out, "Ready to start. Run collie; connect a local model or sign in with ChatGPT in setup.")
 	return nil
 }

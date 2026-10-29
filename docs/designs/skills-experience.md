@@ -29,7 +29,7 @@ flowchart TD
 - [internal/skill/catalog.go](../../internal/skill/catalog.go)
 - [internal/skill/experience.go](../../internal/skill/experience.go)
 - [internal/agent/sqlite/experience.go](../../internal/agent/sqlite/experience.go)
-- [cmd/erii/resources.go](../../cmd/erii/resources.go)
+- [cmd/collie/resources.go](../../cmd/collie/resources.go)
 
 ## 验证与交付
 

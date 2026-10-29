@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/collie/internal/tool"
 	"golang.org/x/sys/unix"
 )
 
@@ -456,7 +456,7 @@ func TestComputerBridgeDefinitions(t *testing.T) {
 }
 
 func TestCheckpointProcessDeathHelper(t *testing.T) {
-	root := os.Getenv("ERII_COMPUTER_CRASH_ROOT")
+	root := os.Getenv("COLLIE_COMPUTER_CRASH_ROOT")
 	if root == "" {
 		return
 	}
@@ -469,7 +469,7 @@ func TestCheckpointProcessDeathHelper(t *testing.T) {
 		os.Exit(82)
 	}
 	p.Boundary = func(point string) {
-		if point == os.Getenv("ERII_COMPUTER_CRASH_POINT") {
+		if point == os.Getenv("COLLIE_COMPUTER_CRASH_POINT") {
 			os.Exit(91)
 		}
 	}
@@ -503,7 +503,7 @@ func TestCheckpointProcessDeathNeverPublishesMixedUnit(t *testing.T) {
 				t.Fatal(err)
 			}
 			command := exec.Command(os.Args[0], "-test.run=^TestCheckpointProcessDeathHelper$")
-			command.Env = append(os.Environ(), "ERII_COMPUTER_CRASH_ROOT="+p.config.Root, "ERII_COMPUTER_CRASH_POINT="+point)
+			command.Env = append(os.Environ(), "COLLIE_COMPUTER_CRASH_ROOT="+p.config.Root, "COLLIE_COMPUTER_CRASH_POINT="+point)
 			output, err := command.CombinedOutput()
 			var exit *exec.ExitError
 			if !errors.As(err, &exit) || exit.ExitCode() != 91 {

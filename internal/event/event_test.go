@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/event"
-	"github.com/z-chenhao/erii/internal/event/fake"
+	"github.com/z-chenhao/collie/internal/event"
+	"github.com/z-chenhao/collie/internal/event/fake"
 )
 
 func TestCloudEventsProfile(t *testing.T) {
-	e, err := event.New("/erii/test", "ai.erii.test.v1", "aggregate/with . * >", map[string]any{"version": 1})
+	e, err := event.New("/collie/test", "ai.collie.test.v1", "aggregate/with . * >", map[string]any{"version": 1})
 	if err != nil {
 		t.Fatal(err)
 	}

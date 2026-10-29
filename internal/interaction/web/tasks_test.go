@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 type workspaceReader struct{ err error }
@@ -39,7 +39,7 @@ func TestTaskPagesAreAuthenticatedReadOnlyAndErrorsStayPrivate(t *testing.T) {
 		}
 	}
 	w := request("/tasks/task:visible", true)
-	for _, text := range []string{"Review &lt;img src=x&gt;", "Continue this task", "before=9", "Related updates from Erii", "Delegated work · 4 total", "Completed / failed", "Running / queued / waiting"} {
+	for _, text := range []string{"Review &lt;img src=x&gt;", "Continue this task", "before=9", "Related updates from Collie", "Delegated work · 4 total", "Completed / failed", "Running / queued / waiting"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing task flow", text)
 		}

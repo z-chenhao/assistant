@@ -10,7 +10,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer"
 )
 
 // BrowserConfig is Guest provisioning configuration, never a model parameter.
@@ -350,7 +350,7 @@ func (p *Provider) Act(ctx context.Context, i computer.Instance, t computer.Targ
 	// Never leak raw native IDs or provider metadata from an action response.
 	return map[string]any{"effect": v["effect"], "verified": v["verified"]}, nil
 }
-func (p *Provider) transferRoot() string { return "/Users/" + p.config.Guest.User + "/EriiTransfer" }
+func (p *Provider) transferRoot() string { return "/Users/" + p.config.Guest.User + "/CollieTransfer" }
 func (p *Provider) transfer(ctx context.Context, i computer.Instance, method, path string, overwrite bool, data []byte) ([]byte, error) {
 	if !computer.SafeTransferPath(path) {
 		return nil, computer.ErrIntegrity

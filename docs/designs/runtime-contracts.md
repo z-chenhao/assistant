@@ -231,14 +231,14 @@ security.policy_file / artifact.retention / delivery.default_channel
 
 #### 16.6 进程启动、关闭与恢复顺序
 
-桌面安装通过 `install.sh` 安装 `erii`；裸命令进入终端设置/对话。
-无显式配置或 `ERII_NATS_URL` 时，启动器在独立 data-root 锁内托管一个
+桌面安装通过 `install.sh` 安装 `collie`；裸命令进入终端设置/对话。
+无显式配置或 `COLLIE_NATS_URL` 时，启动器在独立 data-root 锁内托管一个
 loopback 随机端口、文件持久化的 JetStream，随后仍按下述顺序连接 Broker
 并开放 Ingress。显式配置保留外部 Broker 路径。没有 Active Profile 时仍
 保持 `setup_required`，不自动选择模型。用户数据与版本化安装目录分离；
 App 关闭完成后再停止本地 Broker。入口由原 `cmd/personal-agent` 改名为
-唯一的 `cmd/erii`；数据库、ModelSnapshot 与协议无需迁移。
-安装和组织决定见 [ADR 004](installation.md#decision-004-004--erii-installation-and-repository-layout)。
+唯一的 `cmd/collie`；数据库、ModelSnapshot 与协议无需迁移。
+安装和组织决定见 [ADR 004](installation.md#decision-004-004--collie-installation-and-repository-layout)。
 
 启动顺序固定为：
 

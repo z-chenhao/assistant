@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/z-chenhao/erii/internal/memory"
-	"github.com/z-chenhao/erii/internal/recall"
+	"github.com/z-chenhao/collie/internal/memory"
+	"github.com/z-chenhao/collie/internal/recall"
 	"strings"
 	"time"
 )

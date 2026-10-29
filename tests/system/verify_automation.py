@@ -27,7 +27,7 @@ class Harness(MainHarness):
 
     def evidence(self):
         value = self.state()
-        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'state.db') as db:
+        with sqlite3.connect(Path(self.env['COLLIE_DATA_ROOT']) / 'state.db') as db:
             db.row_factory = sqlite3.Row
             for table in ('automation', 'automation_fire', 'task', 'task_update', 'task_instruction', 'tool_invocation', 'main_inbox', 'memory_privacy'):
                 value[table] = [dict(row) for row in db.execute('SELECT * FROM ' + table)]
@@ -40,8 +40,8 @@ class MemoryHarness(Harness):
         return super().args('-config', str(self.root / 'config.yaml'), *args)
 
     def setup(self):
-        (self.root / 'config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:ERII_MEMORY_KEY\n')
-        self.env['ERII_MEMORY_KEY'] = 'S' * 32  # Explicit disposable fixture key.
+        (self.root / 'config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:COLLIE_MEMORY_KEY\n')
+        self.env['COLLIE_MEMORY_KEY'] = 'S' * 32  # Explicit disposable fixture key.
         return super().setup()
 
 
@@ -60,7 +60,7 @@ def first_fire_forget(h, *, persist_before_forget):
     forget = h.command('memory', 'manage', 'forget-health', text=json.dumps(dict(operation='forget', category='health')))
     require(forget.get('accepted') is True, 'Forget not accepted')
     h.command('memory', 'work')
-    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'memory.db') as db:
+    with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'memory.db') as db:
         db.row_factory = sqlite3.Row
         tombstones = [dict(row) for row in db.execute('SELECT memory_id,created_at,deleted_at FROM memory_record')]
     require(tombstones and all(row['deleted_at'] is not None for row in tombstones), 'health Memory not tombstoned')
@@ -101,7 +101,7 @@ def list_after_forget(h):
     forget = h.command('memory', 'manage', 'forget-health', text=json.dumps(dict(operation='forget', category='health')))
     require(forget.get('accepted') is True, 'Forget not accepted')
     h.command('memory', 'work')
-    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'memory.db') as db:
+    with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'memory.db') as db:
         db.row_factory = sqlite3.Row
         tombstones = [dict(row) for row in db.execute('SELECT memory_id,deleted_at FROM memory_record')]
     require(tombstones and all(row['deleted_at'] is not None for row in tombstones), 'health Memory not tombstoned')
@@ -146,7 +146,7 @@ def list_after_forget(h):
 def run(binary):
     fixture = json.loads(FIXTURE.read_text())
     report = dict(version=1, fixture=fixture, scenarios={}, scope='Deterministic scheduling and notification fragments of GC-02/08/14, SC-05/12; no full M7 or model-quality score')
-    with tempfile.TemporaryDirectory(prefix='erii-automation-') as folder:
+    with tempfile.TemporaryDirectory(prefix='collie-automation-') as folder:
         def scenario(name, action, harness=Harness):
             root = Path(folder) / name
             root.mkdir()

@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/tool"
-	toolfake "github.com/z-chenhao/erii/internal/tool/fake"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/tool"
+	toolfake "github.com/z-chenhao/collie/internal/tool/fake"
 )
 
 // admitPolicy drives the persisted provider exchange and real ToolStore; it
@@ -105,7 +105,7 @@ func TestToolApprovalWrongPrincipalHashDuplicateAndFrozenAdmission(t *testing.T)
 	if err = s.db.QueryRow(`SELECT idempotency_key,policy_json FROM tool_invocation`).Scan(&key, &policy); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(policy, `"risk":"high"`) || key == "" || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.tool_invocation.accepted.v1'`) != 1 {
+	if !strings.Contains(policy, `"risk":"high"`) || key == "" || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.collie.tool_invocation.accepted.v1'`) != 1 {
 		t.Fatal("admission not frozen/atomic")
 	}
 	for _, query := range []string{`UPDATE tool_invocation SET arguments_json='{}',version=version+1`, `UPDATE tool_invocation SET policy_json='{}',version=version+1`, `UPDATE tool_invocation SET conflict_keys='[]',version=version+1`, `UPDATE approval SET frozen_arguments_hash='drift',version=version+1`} {
@@ -559,14 +559,14 @@ func TestToolAcceptanceRollbackIncludesPolicyKeyAndOutbox(t *testing.T) {
 		}()
 		_, _ = e.Store.Accept(ctx, x, calls, e.Registry.Describe())
 	}()
-	if !crashed || scalar(t, s, `SELECT count(*) FROM tool_invocation`) != 0 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.tool_invocation.accepted.v1'`) != 0 {
+	if !crashed || scalar(t, s, `SELECT count(*) FROM tool_invocation`) != 0 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.collie.tool_invocation.accepted.v1'`) != 0 {
 		t.Fatal("partially accepted invocation")
 	}
 	s.MainBoundary = nil
 	if _, err := e.Store.Accept(ctx, x, calls, e.Registry.Describe()); err != nil {
 		t.Fatal(err)
 	}
-	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE policy_json!='{}' AND idempotency_key!=''`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.tool_invocation.accepted.v1'`) != 1 {
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE policy_json!='{}' AND idempotency_key!=''`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.collie.tool_invocation.accepted.v1'`) != 1 {
 		t.Fatal("missing atomic admission fields")
 	}
 }

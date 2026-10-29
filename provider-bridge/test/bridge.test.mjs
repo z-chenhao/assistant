@@ -122,10 +122,10 @@ test('Pi tool call and result continuation',{timeout:10000},async t=>{
 
 test('Main prompt fragments reach the provider as one System Prompt',{timeout:10000},async t=>{
  const f=await fixture(t);
- await f.rpc('generation.start',f.request({messages:[{role:'system',text:'Core rules'},{role:'system',text:'Erii identity'},{role:'user',text:'hello'}]}));
+ await f.rpc('generation.start',f.request({messages:[{role:'system',text:'Core rules'},{role:'system',text:'Collie identity'},{role:'user',text:'hello'}]}));
  await f.wait(e=>e.kind==='completed');
  assert.equal(f.requests[0].body.messages[0].role,'system');
- assert.equal(f.requests[0].body.messages[0].content,'Core rules\n\nErii identity');
+ assert.equal(f.requests[0].body.messages[0].content,'Core rules\n\nCollie identity');
 });
 
 for(const messages of [

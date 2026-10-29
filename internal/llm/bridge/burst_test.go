@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/bridge"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/bridge"
 )
 
 // A real peer emits the entire burst before reading another RPC. Its catalog

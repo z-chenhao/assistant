@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer/sandbox"
+	"github.com/z-chenhao/collie/internal/computer/sandbox"
 )
 
 var ErrUnavailable = errors.New("local OCR unavailable")

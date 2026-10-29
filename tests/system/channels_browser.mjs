@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const [url,evidence,phase='conversation']=process.argv.slice(2);
 await mkdir(evidence,{recursive:true});
 const options={headless:true};
-if(process.env.ERII_BROWSER_EXECUTABLE)options.executablePath=process.env.ERII_BROWSER_EXECUTABLE;
+if(process.env.COLLIE_BROWSER_EXECUTABLE)options.executablePath=process.env.COLLIE_BROWSER_EXECUTABLE;
 const browser=await chromium.launch(options);
 let page;
 try{
@@ -13,19 +13,19 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const remote=[];page.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});
  await page.goto(url);
- await page.getByLabel('Workspace access token').fill(process.env.ERII_WEB_TEST_TOKEN);
+ await page.getByLabel('Workspace access token').fill(process.env.COLLIE_WEB_TEST_TOKEN);
  await page.getByRole('button',{name:'Open workspace'}).click();
  await page.waitForURL(url+'/');
  await page.locator('#composer-root textarea').waitFor();
  // Prove the maintained frontend bundle is running, not just its HTML fallback.
  await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
- for(const image of await page.getByAltText(/Erii (character logo|default agent avatar)/).all()){
-  if(!await image.evaluate(img=>img.complete&&img.naturalWidth===192))throw new Error('Eri artwork failed to load');
+ for(const image of await page.getByAltText(/Collie (logo|default agent avatar)/).all()){
+  if(!await image.evaluate(img=>img.complete&&img.naturalWidth===1297&&img.naturalHeight===1212))throw new Error('Collie artwork failed to load');
  }
  if(phase==='setup'){
   if(!await page.getByRole('button',{name:'Send message',exact:true}).isDisabled())throw Error('unconfigured composer can send');
   if(await page.locator('.welcome').count())throw Error('setup competes with the normal welcome');
-  await page.getByRole('link',{name:'Set up Erii',exact:false}).click();
+  await page.getByRole('link',{name:'Set up Collie',exact:false}).click();
   await page.getByRole('link',{name:'Connect a model',exact:true}).click();
   await page.getByRole('link',{name:'Local or compatible API',exact:false}).click();
   if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
@@ -48,17 +48,21 @@ try{
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
   const selecting=page.getByRole('link',{name:'Start a conversation',exact:false}).click();
   await loading;
-  await page.getByLabel('Message Erii').fill('Plan my day: finish the release risk note before noon.');
+  await page.getByLabel('Message Collie').fill('Plan my day: finish the release risk note before noon.');
   await page.getByLabel('Attach a file').setInputFiles({name:'web-note.txt',mimeType:'text/plain',buffer:Buffer.from('Web owner attachment fixture.\n')});
-  await page.getByLabel('Message Erii').focus();
-  await page.getByLabel('Message Erii').press('ArrowLeft');
+  await page.getByLabel('Message Collie').focus();
+  await page.getByLabel('Message Collie').press('ArrowLeft');
   const earlySource=await page.locator('input[name="source_id"]').inputValue();
-  const selection=await page.getByLabel('Message Erii').evaluate(input=>[input.selectionStart,input.selectionEnd]);
+  const selection=await page.getByLabel('Message Collie').evaluate(input=>[input.selectionStart,input.selectionEnd]);
   release();await selecting;
   await page.unroute('**/app.js');
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
-  if(await page.getByLabel('Message Erii').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
-  const preserved=await page.getByLabel('Message Erii').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
+  await page.evaluate(()=>document.fonts.ready);
+  await page.locator('.welcome').evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
+  if(!await page.evaluate(()=>document.fonts.check('500 16px "DM Sans"')&&document.fonts.check('600 32px "Bricolage Grotesque"')))throw Error('local brand typography unavailable');
+  await page.screenshot({path:evidence+'/welcome.png',fullPage:true});
+  if(await page.getByLabel('Message Collie').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
+  const preserved=await page.getByLabel('Message Collie').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
   if(preserved!==JSON.stringify(selection)||await page.locator('input[name="source_id"]').inputValue()!==earlySource)throw new Error('frontend enhancement changed draft focus, selection or source identity');
   const file=await page.getByLabel('Attach a file').evaluate(async input=>input.files[0]?{name:input.files[0].name,text:await input.files[0].text()}:null);
   if(file?.name!=='web-note.txt'||file?.text!=='Web owner attachment fixture.\n')throw new Error('frontend enhancement lost early attachment');
@@ -82,7 +86,7 @@ try{
  }
 
  if(phase==='native-trace'){
-  const facts=JSON.parse(process.env.ERII_NATIVE_TRACE_FACTS);
+  const facts=JSON.parse(process.env.COLLIE_NATIVE_TRACE_FACTS);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
   await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
@@ -124,7 +128,7 @@ try{
 
  }
  if(phase==='inspection'){
-  const facts=JSON.parse(process.env.ERII_INSPECTION_FACTS);
+  const facts=JSON.parse(process.env.COLLIE_INSPECTION_FACTS);
   const main=facts.main,root=facts.runs.find(r=>r.role==='root'),child=facts.runs.find(r=>r.role==='child'&&r.parent!==root.id);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
@@ -214,7 +218,7 @@ try{
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
   await page.getByRole('link',{name:'Manage model',exact:false}).click();
-  const capability=process.env.ERII_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
+  const capability=process.env.COLLIE_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
   await page.getByText(capability,{exact:false}).waitFor();
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
@@ -224,14 +228,14 @@ try{
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
   const navigation=page.locator('.app-sidebar').getByRole('link',{name:'Conversation',exact:true}).click();
   await loading;
-  await page.getByLabel('Message Erii',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
+  await page.getByLabel('Message Collie',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
   const [picker]=await Promise.all([page.waitForEvent('filechooser'),page.getByLabel('Attach a file').click()]);
   release();await navigation;await page.unroute('**/app.js');
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
   if(!await picker.element().evaluate(input=>input===document.querySelector('.composer input[type=file]')))throw new Error('enhancement replaced the open file picker');
-  await picker.setFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.ERII_TEST_PICTURE,'base64')});
+  await picker.setFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.COLLIE_TEST_PICTURE,'base64')});
   await page.getByRole('button',{name:'Send message',exact:true}).click();
-  const expected=process.env.ERII_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
+  const expected=process.env.COLLIE_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
   await page.locator('.message.assistant').filter({hasText:expected}).waitFor();
  }
  if(phase==='live'){
@@ -245,7 +249,7 @@ try{
   const echo=async(key,text)=>send(key,plan('mcp__fixture__echo',{text}));
   await echo('live-initial','Opening note\n'+'Context line\n'.repeat(55)+'INITIAL_DONE');
   await page.locator('.message.assistant').filter({hasText:'INITIAL_DONE'}).waitFor();
-  const editor=page.getByLabel('Message Erii',{exact:true});
+  const editor=page.getByLabel('Message Collie',{exact:true});
   await editor.fill('Keep this unsent draft exactly.');
   await page.getByLabel('Attach a file').setInputFiles({name:'pending.txt',mimeType:'text/plain',buffer:Buffer.from('Unsent attachment bytes.\n')});
   await editor.focus();await editor.press('ArrowLeft');
@@ -308,9 +312,9 @@ try{
     const communication=await context.newPage();try{
      await communication.goto(await detail.getByRole('link',{name:'Continue this task',exact:false}).getAttribute('href').then(path=>url+path));
      if(await communication.locator('input[name=task_ref]').inputValue()!==ref)throw Error('continuation lost task context');
-     await communication.getByLabel('Message Erii',{exact:true}).fill('Keep this task draft.');
+     await communication.getByLabel('Message Collie',{exact:true}).fill('Keep this task draft.');
      await communication.getByRole('button',{name:'Clear task context',exact:true}).click();
-     if(await communication.getByLabel('Message Erii',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
+     if(await communication.getByLabel('Message Collie',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
     }finally{await communication.close()}
     await detail.screenshot({path:evidence+'/task-detail.png',fullPage:true});
     await detail.setViewportSize({width:390,height:844});if(await detail.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile task detail overflow');
@@ -335,10 +339,10 @@ try{
   // Another authenticated browser rotates the session. The old page must keep
   // its draft and offer explicit reconnect, without redirecting to login.
   const other=await browser.newContext();
-  try{await other.request.post(url+'/session',{form:{token:process.env.ERII_WEB_TEST_TOKEN}})}finally{await other.close()}
+  try{await other.request.post(url+'/session',{form:{token:process.env.COLLIE_WEB_TEST_TOKEN}})}finally{await other.close()}
   await page.getByRole('status').filter({hasText:'Updates paused'}).waitFor();
   await checkDraft(false);
-  await context.request.post(url+'/session',{form:{token:process.env.ERII_WEB_TEST_TOKEN}});
+  await context.request.post(url+'/session',{form:{token:process.env.COLLIE_WEB_TEST_TOKEN}});
   const resumed=page.waitForResponse(response=>response.url().includes('/api/updates?')&&[200,304].includes(response.status()));
   await page.getByRole('button',{name:'Retry updates',exact:true}).click();await resumed;
   await checkDraft(false);
@@ -372,7 +376,7 @@ try{
   await mobile.setViewportSize({width:390,height:844});
   await mobile.goto(url);
   await mobile.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
-  await mobile.getByLabel('Message Erii',{exact:true}).fill('');
+  await mobile.getByLabel('Message Collie',{exact:true}).fill('');
   await mobile.evaluate(()=>{document.querySelector('textarea').blur();scrollTo(0,0)});
   await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const geometry=await mobile.evaluate(()=>({width:innerWidth,height:innerHeight,content:document.documentElement.scrollWidth,footerBottom:document.querySelector('footer').getBoundingClientRect().bottom}));
@@ -386,7 +390,7 @@ try{
    await plain.addCookies(await context.cookies());
    const fallback=await plain.newPage();await fallback.goto(url);
    if(await fallback.locator('.message').count()!==await page.locator('.message').count())throw new Error('no-JavaScript fallback lost messages');
-   if(!await fallback.getByLabel('Message Erii',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
+   if(!await fallback.getByLabel('Message Collie',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
    if(!await fallback.getByText('Processed: Retain this semantic answer.',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost semantics');
    await fallback.screenshot({path:evidence+'/'+phase+'-no-script.png',fullPage:true});
   }finally{await plain.close()}

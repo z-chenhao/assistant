@@ -17,13 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/interaction"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/account"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/account"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 type Config struct {
@@ -155,7 +155,7 @@ func (s *Server) authorized(r *http.Request) bool {
 	if value, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && subtle.ConstantTimeCompare([]byte(value), token) == 1 {
 		return true
 	}
-	cookie, e := r.Cookie("erii_session")
+	cookie, e := r.Cookie("collie_session")
 	if e != nil {
 		return false
 	}
@@ -176,7 +176,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "same-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	if r.URL.Path == "/feishu/callback" && s.Callback != nil {
 		s.Callback.ServeHTTP(w, r)
 		return
@@ -203,11 +203,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	}
 	if file, ok := map[string]struct{ path, contentType string }{
-		"/style.css":              {"assets/style.css", "text/css"},
-		"/app.js":                 {"assets/client.js", "text/javascript"},
-		"/licenses.txt":           {"assets/licenses.txt", "text/plain; charset=utf-8"},
-		"/brand/eri-icon-192.png": {"assets/brand/eri-icon-192.png", "image/png"},
-		"/favicon.ico":            {"assets/brand/eri-favicon-32.png", "image/png"},
+		"/style.css":                    {"assets/style.css", "text/css"},
+		"/app.js":                       {"assets/client.js", "text/javascript"},
+		"/licenses.txt":                 {"assets/licenses.txt", "text/plain; charset=utf-8"},
+		"/brand/collie.png":             {"assets/brand/collie.png", "image/png"},
+		"/brand/bricolagegrotesque.ttf": {"assets/brand/bricolagegrotesque.ttf", "font/ttf"},
+		"/brand/dmsans.ttf":             {"assets/brand/dmsans.ttf", "font/ttf"},
+		"/favicon.png":                  {"assets/brand/collie.png", "image/png"},
 	}[r.URL.Path]; ok {
 		body, err := assets.ReadFile(file.path)
 		if err != nil {
@@ -243,7 +245,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.session = session
 		s.sessionExpires = time.Now().Add(time.Hour)
 		s.mu.Unlock()
-		http.SetCookie(w, &http.Cookie{Name: "erii_session", Value: session, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/", MaxAge: 3600})
+		http.SetCookie(w, &http.Cookie{Name: "collie_session", Value: session, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/", MaxAge: 3600})
 		http.Redirect(w, r, safePageReturn(r.FormValue("next")), 303)
 		return
 	}

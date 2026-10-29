@@ -7,7 +7,7 @@ import (
 	"image"
 	_ "image/jpeg"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 // Decode the actual Host image envelope in the explicit Fake. This proves

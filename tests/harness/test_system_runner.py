@@ -18,7 +18,7 @@ class SystemRunnerTests(unittest.TestCase):
         scripts.mkdir(parents=True)
         shutil.copy2(runner.ROOT / 'tests/system/entrypoint.py', scripts / 'entrypoint.py')
         self.script = scripts / 'fixture.py'
-        self.binary = self.root / 'erii'
+        self.binary = self.root / 'collie'
         self.binary.touch()
         self.output = self.root / 'evidence'
 

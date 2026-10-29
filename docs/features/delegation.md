@@ -63,7 +63,7 @@ Agent Tool do not gain it on upgrade. Existing Root counters initialize from
 stored Runs/invocations. Downgrades fail closed; back up the data root before
 upgrading. No credentials or external account are needed for deterministic CI.
 
-ERII-18 adds fair queues and the larger Direct Tool batch scenario described
+retired task #18 adds fair queues and the larger Direct Tool batch scenario described
 below. M5 adds CodeCall and JavaScript `agent.run()`
 using this same admission and ToolInvocation path. This slice does not claim
 M4 completion, JavaScript execution, general Durable Replay or full GC-16/17/18/20

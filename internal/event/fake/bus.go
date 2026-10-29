@@ -7,7 +7,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/z-chenhao/erii/internal/event"
+	"github.com/z-chenhao/collie/internal/event"
 )
 
 type Bus struct {

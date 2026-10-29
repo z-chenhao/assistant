@@ -6,8 +6,8 @@ import (
 	"flag"
 	"io"
 
-	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/automation"
+	"github.com/z-chenhao/collie/internal/app"
+	"github.com/z-chenhao/collie/internal/automation"
 )
 
 func runAutomation(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer, foreground func(func(context.Context) error) error) error {

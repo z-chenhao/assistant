@@ -170,7 +170,7 @@ func TestFreshSchemaCollisionPreservesUnversionedData(t *testing.T) {
 }
 
 func TestFreshSchemaCrashHelper(t *testing.T) {
-	root := os.Getenv("ERII_TEST_SCHEMA_CRASH_ROOT")
+	root := os.Getenv("COLLIE_TEST_SCHEMA_CRASH_ROOT")
 	if root == "" {
 		return
 	}
@@ -190,7 +190,7 @@ func TestFreshSchemaCrashHelper(t *testing.T) {
 	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version=%d", freshSchemaVersion)); err != nil {
 		t.Fatal(err)
 	}
-	if os.Getenv("ERII_TEST_SCHEMA_CRASH_PHASE") == "after_commit" {
+	if os.Getenv("COLLIE_TEST_SCHEMA_CRASH_PHASE") == "after_commit" {
 		if err := tx.Commit(); err != nil {
 			t.Fatal(err)
 		}
@@ -208,7 +208,7 @@ func TestFreshSchemaKillRestart(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestFreshSchemaCrashHelper$")
-			child.Env = append(os.Environ(), "ERII_TEST_SCHEMA_CRASH_ROOT="+root, "ERII_TEST_SCHEMA_CRASH_PHASE="+phase)
+			child.Env = append(os.Environ(), "COLLIE_TEST_SCHEMA_CRASH_ROOT="+root, "COLLIE_TEST_SCHEMA_CRASH_PHASE="+phase)
 			output, err := child.StdoutPipe()
 			if err != nil {
 				t.Fatal(err)
@@ -264,7 +264,7 @@ func TestFreshSchemaKillRestart(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if d.SchemaVersion != len(migrations) || scalar(t, s, "SELECT count(*) FROM agent_config") != 1 || scalar(t, s, "SELECT count(*) FROM event_outbox WHERE type='ai.erii.agent.initialized.v1'") != 1 {
+			if d.SchemaVersion != len(migrations) || scalar(t, s, "SELECT count(*) FROM agent_config") != 1 || scalar(t, s, "SELECT count(*) FROM event_outbox WHERE type='ai.collie.agent.initialized.v1'") != 1 {
 				t.Fatal("restart lost schema or duplicated bootstrap", d)
 			}
 			if err := s.Close(); err != nil {

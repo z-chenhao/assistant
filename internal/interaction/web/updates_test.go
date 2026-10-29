@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
-	"github.com/z-chenhao/erii/internal/delivery/ui"
-	"github.com/z-chenhao/erii/internal/interaction"
-	"github.com/z-chenhao/erii/internal/task"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/collie/internal/delivery/ui"
+	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/collie/internal/task"
 )
 
 type updatesCore struct {

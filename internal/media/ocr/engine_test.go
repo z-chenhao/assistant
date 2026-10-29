@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/media"
+	"github.com/z-chenhao/collie/internal/media"
 )
 
 func installedEngine(t *testing.T) *Engine {
@@ -137,7 +137,7 @@ waiting:
 			<-done
 			t.Fatal("sandbox did not start")
 		case <-tick.C:
-			paths, _ := filepath.Glob(filepath.Join(jobs, "erii-ocr-*", "started"))
+			paths, _ := filepath.Glob(filepath.Join(jobs, "collie-ocr-*", "started"))
 			if len(paths) == 1 {
 				break waiting
 			}

@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	contextbuilder "github.com/z-chenhao/erii/internal/context"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
-	deliverysqlite "github.com/z-chenhao/erii/internal/delivery/sqlite"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	contextbuilder "github.com/z-chenhao/collie/internal/context"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery"
+	deliverysqlite "github.com/z-chenhao/collie/internal/delivery/sqlite"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) (agent.Generation, error) {

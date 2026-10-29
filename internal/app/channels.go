@@ -7,13 +7,13 @@ import (
 	"io"
 	"net"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
-	"github.com/z-chenhao/erii/internal/interaction"
-	"github.com/z-chenhao/erii/internal/interaction/feishu"
-	"github.com/z-chenhao/erii/internal/interaction/web"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/collie/internal/interaction/feishu"
+	"github.com/z-chenhao/collie/internal/interaction/web"
 )
 
 func (a *App) BindChannel(ctx context.Context, c, s, d string, enabled bool, v int64) (interaction.Binding, error) {

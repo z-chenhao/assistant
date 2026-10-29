@@ -3,12 +3,12 @@
   "description": "Scheduling hints only, never an execution inventory. Maximum completed root elapsed time across the retained Ubuntu race runs; seconds retain original discovery order. New roots use the mean known cost.",
   "sources": [
     {
-      "run": "https://github.com/z-chenhao/erii/actions/runs/39572139854",
+      "run": "https://github.com/z-chenhao/collie/actions/runs/39572139854",
       "sha": "b12ad49a622cf3b5ed6306912a5e7611da0179f7",
       "complete": true
     },
     {
-      "run": "https://github.com/z-chenhao/erii/actions/runs/39575536939",
+      "run": "https://github.com/z-chenhao/collie/actions/runs/39575536939",
       "sha": "980dc12164c89c12ec9bc475750a3f0d888179c8",
       "complete": false
     }

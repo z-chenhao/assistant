@@ -7,12 +7,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/automation"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/skill"
-	"github.com/z-chenhao/erii/internal/task"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/automation"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/skill"
+	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 // createMain is shared by user ingress and durable Reporter follow-ups. Both

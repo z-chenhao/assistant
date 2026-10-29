@@ -37,9 +37,9 @@ class ChannelHarness(MainHarness):
         self.production_events = False
         super().__init__(binary, root, fixture)
         self.config = root / 'config.yaml'
-        self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:ERII_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:ERII_FEISHU_VERIFY\n  encrypt_key_ref: env:ERII_FEISHU_ENCRYPT\n  access_token_ref: env:ERII_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
-        self.env.update(ERII_WEB_TEST_TOKEN=TOKEN, ERII_FEISHU_VERIFY='sandbox-verify-token',
-                        ERII_FEISHU_ENCRYPT='sandbox-encrypt-key', ERII_FEISHU_ACCESS='sandbox-access-token')
+        self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:COLLIE_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:COLLIE_FEISHU_VERIFY\n  encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT\n  access_token_ref: env:COLLIE_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
+        self.env.update(COLLIE_WEB_TEST_TOKEN=TOKEN, COLLIE_FEISHU_VERIFY='sandbox-verify-token',
+                        COLLIE_FEISHU_ENCRYPT='sandbox-encrypt-key', COLLIE_FEISHU_ACCESS='sandbox-access-token')
         self.bind = self.command('channel','manage',text=json.dumps(dict(op='bind',channel='feishu',subject='sandbox-tenant:sandbox-app:owner',destination='bound-chat',enabled=True,version=0)))
         self.process = None
 
@@ -107,7 +107,7 @@ class ChannelHarness(MainHarness):
     def browser(self,evidence,phase):
         env=self.env.copy()
         executable=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-        if executable.exists():env['ERII_BROWSER_EXECUTABLE']=str(executable)
+        if executable.exists():env['COLLIE_BROWSER_EXECUTABLE']=str(executable)
         run=self.processes.run if self.processes is not None else subprocess.run
         result=run(['node',str(ROOT/'tests/system/channels_browser.mjs'),self.url,str(evidence),phase],env=env,capture_output=True,text=True,timeout=45)
         require(result.returncode==0,'browser drive failed: '+result.stderr)
@@ -115,7 +115,7 @@ class ChannelHarness(MainHarness):
 
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
-    with tempfile.TemporaryDirectory(prefix='erii-channels-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.start()
@@ -144,7 +144,7 @@ def run(binary,evidence):
             require(len(h.rows()['inputs'])==2 and len(platform.evidence()['messages'])==1,'restart duplicated accepted callback/delivery')
             h.browser(evidence.parent/'channels-ui','conversation')
             with Terminal(h.args('tui'),h.env,h.root) as terminal:
-                terminal.expect('Erii: idle');terminal.send('/history')
+                terminal.expect('Collie: idle');terminal.send('/history')
                 terminal.expect('Processed: Continue the same plan in Feishu.')
                 require(terminal.stop()==0,'shared-history TUI did not stop')
                 report['scenarios']['tui-history']=terminal.transcript()
@@ -167,7 +167,7 @@ def run(binary,evidence):
 
     # F-019: keep a real browser draft and attachment across committed replies,
     # approval decisions, Task status, network loss and session rotation.
-    with tempfile.TemporaryDirectory(prefix='erii-channel-live-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-channel-live-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'capabilities')
         try:
             h.setup();h.start()
@@ -183,15 +183,15 @@ def run(binary,evidence):
 
     # Approval recovery uses the same external-effect Fake and persistent Security
     # lifecycle as TUI. Callback races cross two authenticated transports.
-    with tempfile.TemporaryDirectory(prefix='erii-channel-approval-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-channel-approval-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'approval')
         try:
             h.setup();h.start()
-            h.callback('effect-source',json.dumps(dict(target='alex.chen@example.test',text='Erii review: 2026-10-19 15:00–15:30 +08:00')))
+            h.callback('effect-source',json.dumps(dict(target='alex.chen@example.test',text='Collie review: 2026-10-19 15:00–15:30 +08:00')))
             state=h.wait(lambda s:len(s['approvals'])==1 and s['approvals'][0]['status']=='pending','approval notice')
             old=state['approvals'][0]
             h.browser(evidence.parent/'channels-ui','approval')
-            h.http('/api/message',dict(source_id='steering',content=[dict(type='text',text=json.dumps(dict(target='alex.chen@example.test',text='Erii review: 2026-10-20 11:00–11:30 +08:00; do not use Monday.')))]))
+            h.http('/api/message',dict(source_id='steering',content=[dict(type='text',text=json.dumps(dict(target='alex.chen@example.test',text='Collie review: 2026-10-20 11:00–11:30 +08:00; do not use Monday.')))]))
             state=h.wait(lambda s:len(s['approvals'])==2 and s['approvals'][-1]['status']=='pending','steering invalidates old approval')
             require(state['approvals'][0]['status']=='invalidated','old Monday approval remained valid')
             approval=state['approvals'][-1]
@@ -235,15 +235,15 @@ def native_trace_inspection(binary,evidence,report):
                 self.server.requests.append(dict(method='POST',auth=self.headers.get('Authorization'),session=self.headers.get('session_id'),body=body))
                 self.send_response(503);self.send_header('Content-Length','0');self.end_headers();return
             return super().do_POST()
-    with tempfile.TemporaryDirectory(prefix='erii-native-traces-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+    with tempfile.TemporaryDirectory(prefix='collie-native-traces-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
         server=ThreadingHTTPServer(('127.0.0.1',0),TraceEndpoint);server.daemon_threads=True
         server.requests=[];server.mode='success'
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         h=ChannelHarness(binary,Path(temp),platform,'')
         try:
             h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(ROOT/'provider-bridge/bridge.mjs'))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
-            h.env['ERII_TRACE_KEY']='SYNTHETIC_TRACE_CREDENTIAL_NEVER_STORE'
-            auth=h.command('model','login','ERII_TRACE_KEY')
+            h.env['COLLIE_TRACE_KEY']='SYNTHETIC_TRACE_CREDENTIAL_NEVER_STORE'
+            auth=h.command('model','login','COLLIE_TRACE_KEY')
             h.setup(metadata=dict(name='Trace HTTP fixture',provider_kind='openai_compatible',endpoint=f'http://127.0.0.1:{server.server_port}/v1',wire_api='openai_completions',model_id='fixture-model',context_window=65536,max_output_tokens=4096,generation_defaults={},compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True),auth_connection_id=auth['connection_id']))
             server.mode='tasks';server.reject_next=True
             h.start()
@@ -270,13 +270,13 @@ def native_trace_inspection(binary,evidence,report):
                 require(len(attempts)==2,'result reuse fabricated a new HTTP attempt')
                 require([json.loads(a[0]) for a in attempts]==before,'observed final request differs from actual HTTP body')
                 raw=''.join(r[0] or '' for r in db.execute('SELECT body_json FROM dispatch_observation'))
-                require(h.env['ERII_TRACE_KEY'] not in raw and 'Bearer ' not in raw,'wire capture persisted credentials')
+                require(h.env['COLLIE_TRACE_KEY'] not in raw and 'Bearer ' not in raw,'wire capture persisted credentials')
                 facts=dict(main=main,root=root,generation=generation,counts={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in ('model_generation','provider_usage','tool_invocation','dispatch_observation','run_trace')})
             tree=h.http('/api/developer/observations?'+urlencode(dict(run=main)))
             require(sum(o['name']=='Provider HTTP' for o in tree['items'])>=2,'actual sends missing from observation tree')
             h.stop(kill=True);h.start()
             require(h.http('/api/developer/observations?'+urlencode(dict(run=main)))==tree,'completed trace changed across restart')
-            h.env['ERII_NATIVE_TRACE_FACTS']=json.dumps(facts)
+            h.env['COLLIE_NATIVE_TRACE_FACTS']=json.dumps(facts)
             h.browser(evidence.parent/'trace-ui','native-trace')
             with sqlite3.connect(h.root/'data/state.db') as db:
                 after={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in facts['counts']}
@@ -293,7 +293,7 @@ def inspection_relationships(binary, evidence, report):
     leaf=plan([dict(name='mcp__fixture__echo',arguments=dict(text='Inspection leaf completed.'))])
     child=plan([dict(name='builtin__agent_run',arguments=dict(task=leaf))])
     root='Inspection Task <img src=x onerror="unsafe()">\n'+plan([dict(name='builtin__agent_run',arguments=dict(task=child))])
-    with tempfile.TemporaryDirectory(prefix='erii-inspection-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-inspection-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'capabilities')
         try:
             h.setup(metadata=dict(name='inspection fixture',provider_kind='openai_compatible',
@@ -354,7 +354,7 @@ def inspection_relationships(binary, evidence, report):
             require(tree['creator']['run_id']==original['main'],'Task origin lost')
             require(all(parent!=original['main'] for _,parent,_ in actual.values()),'Root mislabeled as Main Child')
             inspect_frozen_context(h)
-            h.env['ERII_INSPECTION_FACTS']=json.dumps(original)
+            h.env['COLLIE_INSPECTION_FACTS']=json.dumps(original)
             h.browser(evidence.parent/'inspection-ui','inspection')
             require(facts()==original,'opening inspection changed execution or domain records')
             h.stop(kill=True);h.start()
@@ -404,12 +404,12 @@ def inspect_frozen_context(h):
 
 
 def dependency_recovery(binary, report):
-    with tempfile.TemporaryDirectory(prefix='erii-channel-repair-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+    with tempfile.TemporaryDirectory(prefix='collie-channel-repair-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
         h = ChannelHarness(binary, Path(temp), platform)
         try:
             h.setup()
             h.production_events = True
-            h.env['ERII_NATS_URL'] = broker.url
+            h.env['COLLIE_NATS_URL'] = broker.url
             catalog = h.root / 'repaired-skills'
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
@@ -442,7 +442,7 @@ def native_components(binary, evidence, report):
     Semantic inputs still enter the real signed callback/Actor boundary. Only
     Host-owned presentation fixtures are inserted; no model HTML is enabled.
     """
-    with tempfile.TemporaryDirectory(prefix='erii-channel-components-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-channel-components-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.setup();h.start('before_delivery_send')
@@ -476,13 +476,13 @@ def native_components(binary, evidence, report):
             h.browser(evidence.parent/'channels-ui','components')
             require(h.http('/api/conversation')[-1]==messages[-1],'presentation changed semantic Conversation')
             report['scenarios']['native-components']=dict(state=h.rows(),specs=specs,conversation_unchanged=True)
-            report['checks'].append('UI: bundled ad-agent components, OpenIntelligentUI native table, original Eri logo/avatar, desktop/mobile layouts; escaped cells, unknown/invalid component fallback; no external frontend requests')
+            report['checks'].append('UI: bundled ad-agent components, OpenIntelligentUI native table, Collie logo/avatar, desktop/mobile layouts; escaped cells, unknown/invalid component fallback; no external frontend requests')
             h.stop()
         finally:h.cleanup()
 
 
 def early_composer(binary, evidence, report):
-    with tempfile.TemporaryDirectory(prefix='erii-channel-early-composer-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-channel-early-composer-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.start()
@@ -502,7 +502,7 @@ def delivery_leases(binary, report):
             ('slow-send', 'main', 7, 0),
             ('slow-upload', 'artifacts', 0, 6),
             ('cumulative-multipart', 'artifacts', 2, 2)):
-        with tempfile.TemporaryDirectory(prefix='erii-channel-lease-') as temp, Sandbox(send_delay, upload_delay) as platform:
+        with tempfile.TemporaryDirectory(prefix='collie-channel-lease-') as temp, Sandbox(send_delay, upload_delay) as platform:
             h = ChannelHarness(binary, Path(temp), platform, fixture)
             try:
                 h.setup(); h.start()
@@ -541,7 +541,7 @@ def delivery_leases(binary, report):
     # Expire a live sender after the platform recorded the effect, then use the
     # real CLI as a competing recovery owner. The old HTTP call must cancel and
     # join without taking down Web ingress; uncertainty is still query-only.
-    with tempfile.TemporaryDirectory(prefix='erii-channel-lost-claim-') as temp, Sandbox(send_delay=6) as platform:
+    with tempfile.TemporaryDirectory(prefix='collie-channel-lost-claim-') as temp, Sandbox(send_delay=6) as platform:
         h = ChannelHarness(binary, Path(temp), platform)
         try:
             h.setup(); h.start()
@@ -574,7 +574,7 @@ def extra_scenarios(binary,report):
     # Outbound attachment: semantic Artifact -> same DeliveryRequest -> real
     # multipart upload + bound-recipient platform message -> durable receipts.
     for lost_ack in (False, True):
-        with tempfile.TemporaryDirectory(prefix='erii-channel-output-') as temp, Sandbox() as platform:
+        with tempfile.TemporaryDirectory(prefix='collie-channel-output-') as temp, Sandbox() as platform:
             h=ChannelHarness(binary,Path(temp),platform,'artifacts')
             try:
                 h.setup();platform.drop_response=lost_ack;h.start()
@@ -603,7 +603,7 @@ def extra_scenarios(binary,report):
     # SIGKILL immediately before and after the input transaction, and after a
     # channel accepted delivery but before outbox acknowledgement.
     for boundary in ('before_channel_input_commit','after_channel_input_commit','after_delivery_send'):
-        with tempfile.TemporaryDirectory(prefix='erii-channel-kill-') as temp, Sandbox() as platform:
+        with tempfile.TemporaryDirectory(prefix='collie-channel-kill-') as temp, Sandbox() as platform:
             h=ChannelHarness(binary,Path(temp),platform)
             try:
                 h.setup();h.start(boundary)
@@ -627,7 +627,7 @@ def extra_scenarios(binary,report):
 
     # Exercise Task continuity and notification deduplication through the transports.
     for case,fixture in (('task-continuation','tasks'),('scheduled-delivery','automation')):
-        with tempfile.TemporaryDirectory(prefix='erii-channel-'+case+'-') as temp, Sandbox() as platform:
+        with tempfile.TemporaryDirectory(prefix='collie-channel-'+case+'-') as temp, Sandbox() as platform:
             h=ChannelHarness(binary,Path(temp),platform,fixture)
             try:
                 h.setup()
@@ -683,13 +683,13 @@ def account_presentation(binary,report):
             server.lock=threading.Lock();server.sensitive=set();os.chmod(socket,0o600)
             thread=threading.Thread(target=server.serve_forever);thread.start()
             h=object.__new__(ChannelHarness);MainHarness.__init__(h,binary,root,fixture='')
-            h.env.update(ERII_NATS_URL=broker.url,ERII_NATS_STREAM_PREFIX='web_account')
+            h.env.update(COLLIE_NATS_URL=broker.url,COLLIE_NATS_STREAM_PREFIX='web_account')
             try:
                 h.config=account_config(root,ROOT/'provider-bridge/bridge.mjs',endpoint)
                 with h.config.open('a') as out:out.write('web:\n  listen: 127.0.0.1:0\n  token_ref: credential:web-owner\n')
                 original=h.args
                 h.args=lambda *args:original('-test-secret-store',str(socket),*args)
-                h.env['ERII_WEB_TEST_TOKEN']=TOKEN;h.process=None;h.start()
+                h.env['COLLIE_WEB_TEST_TOKEN']=TOKEN;h.process=None;h.start()
                 form={'Content-Type':'application/x-www-form-urlencoded'}
                 h.http('/auth/login',b'',headers=form)
                 pending=h.wait_state(lambda s:any(e['kind']=='open_url' for e in s['events']),'UI-neutral account authorization event',lambda _:h.http('/api/auth'))

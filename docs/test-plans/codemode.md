@@ -44,8 +44,8 @@ Install Node **24.21.0**, then install the exact WASM dependency:
 ```sh
 npm ci --prefix runtime/javascript --ignore-scripts
 make build
-python3 tests/system/verify_codemode.py --binary bin/erii --evidence evidence/codemode.json
-python3 tests/system/verify_code_recovery.py --binary bin/erii --evidence evidence/code-recovery.json
+python3 tests/system/verify_codemode.py --binary bin/collie --evidence evidence/codemode.json
+python3 tests/system/verify_code_recovery.py --binary bin/collie --evidence evidence/code-recovery.json
 ```
 
 The reusable harness owns Launch, Doctor, Drive, Evidence, and Cleanup. It
@@ -70,7 +70,7 @@ To enable Code Mode in an ordinary installation:
 version: 1
 javascript:
   command: /absolute/path/to/node
-  script: /absolute/path/to/erii/runtime/javascript/src/sidecar.mjs
+  script: /absolute/path/to/collie/runtime/javascript/src/sidecar.mjs
 ```
 
 Both paths must be trusted and outside an editable coding workspace. There is

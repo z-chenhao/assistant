@@ -20,7 +20,7 @@ from verify_main import require
 def run(binary):
     report = {'version': 1, 'scope': 'QuickJS/ToolInvocation contract; full fixed-source kill/restart gates are verify_code_recovery.py',
               'checks': [], 'cleanup': False}
-    with tempfile.TemporaryDirectory(prefix='erii-codemode-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-codemode-') as temp:
         root = Path(temp)
         node = shutil.which('node')
         require(node, 'doctor: Node required')
@@ -29,7 +29,7 @@ def run(binary):
         (root / 'config.yaml').write_text('version: 1\njavascript:\n  command: ' + json.dumps(node) + '\n  script: ' + json.dumps(str(script)) + '\n')
         h = CodeHarness(binary, root, fixture='codemode')
         h.setup()
-        db_path = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
+        db_path = Path(h.env['COLLIE_DATA_ROOT']) / 'state.db'
 
         def execute(key, source, worker=False, timeout=320):
             plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': source}}])
@@ -192,7 +192,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             with sqlite3.connect(db_path) as db:
                 final = db.execute('SELECT result_json,status FROM tool_invocation WHERE invocation_id=?', (p['invocation_id'],)).fetchone()
             require(final[1] == 'succeeded' and json.loads(json.loads(final[0])['text']) == [{'type':'return','value':'APPROVAL_DENIED'}], f'approval rejection not caught: {final}')
-            require(not (Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db').exists(), 'denied effect reached Provider')
+            require(not (Path(h.env['COLLIE_DATA_ROOT']) / 'effect-ledger.db').exists(), 'denied effect reached Provider')
             report['checks'].append({'name': 'exact-action-approval-rejection', 'attempt_count': nested[0]['attempt_count']})
 
             p, nested = execute('parallel-child-batch', 'const rows = await Promise.allSettled(Array.from({length:3},()=>agent.run({task:"Capabilities: []"}))); return rows.map(row=>row.status);', worker=True)
@@ -245,7 +245,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
                     after = db.execute('SELECT idempotency_key,status,attempt_count FROM tool_invocation WHERE invocation_id=?', (nested[0]['invocation_id'],)).fetchone()
                     parent_status = db.execute('SELECT status FROM tool_invocation WHERE invocation_id=?', (p['invocation_id'],)).fetchone()[0]
                     count = db.execute('SELECT count(*) FROM code_call WHERE execution_id=?', (p['invocation_id'],)).fetchone()[0]
-                with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'effect-ledger.db') as db:
+                with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'effect-ledger.db') as db:
                     effects = db.execute('SELECT key,args FROM effects WHERE key=?', (before[0],)).fetchall()
                 require(parent_status == 'succeeded' and after[0] == before[0] and after[1] == 'succeeded' and count == 1 and len(effects) == 1, 'nested effect recovery duplicated/lost identity or outcome')
                 report['checks'].append({'name':'nested-effect-SIGKILL', 'boundary':boundary, 'before':before, 'after':after, 'effects':effects, 'code_calls':count})

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func Artifacts() []tool.Definition {

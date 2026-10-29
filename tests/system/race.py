@@ -20,8 +20,8 @@ import time
 
 from runner import run_command, source_state
 
-BRIDGE = 'github.com/z-chenhao/erii/internal/llm/bridge'
-SQLITE = 'github.com/z-chenhao/erii/internal/agent/sqlite'
+BRIDGE = 'github.com/z-chenhao/collie/internal/llm/bridge'
+SQLITE = 'github.com/z-chenhao/collie/internal/agent/sqlite'
 RACE = ['go', 'test', '-race', '-count=1', '-timeout=15m']
 # One unchanged five-second context spans three approval/Drain phases. Give
 # this measured timing-sensitive contract the full CPU budget before overlap.
@@ -31,7 +31,7 @@ SERIAL_SQLITE = ['TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases']
 def groups(packages, part=None):
     if (not packages or len(set(packages)) != len(packages) or
             not {BRIDGE, SQLITE} <= set(packages) or
-            any(not isinstance(p, str) or not p.startswith('github.com/z-chenhao/erii/') or
+            any(not isinstance(p, str) or not p.startswith('github.com/z-chenhao/collie/') or
                 any(c.isspace() for c in p) for p in packages)):
         raise ValueError('invalid or incomplete Go package inventory')
     if part == 'sqlite':

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/conversation"
+	"github.com/z-chenhao/collie/internal/conversation"
 )
 
 func TestConversationOrderedIdempotentConcurrentAndRestart(t *testing.T) {

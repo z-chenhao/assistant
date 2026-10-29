@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func (s *Server) startLogin(r *http.Request) error {

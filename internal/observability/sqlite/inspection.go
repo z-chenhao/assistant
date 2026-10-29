@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/observability"
+	"github.com/z-chenhao/collie/internal/observability"
 	_ "modernc.org/sqlite"
 )
 

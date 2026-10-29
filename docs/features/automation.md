@@ -40,9 +40,9 @@
 
 ## 如何使用
 
-用户可在对话中交代明确时间或周期的工作。CLI `erii automation list` 查看计划，`erii automation manage REQUEST_KEY` 从 stdin 接受 create/update/cancel JSON。
+用户可在对话中交代明确时间或周期的工作。CLI `collie automation list` 查看计划，`collie automation manage REQUEST_KEY` 从 stdin 接受 create/update/cancel JSON。
 
-保持正常应用、Web 服务或 `erii automation work` 前台运行。`automation tick` 只保存到期事件；监控仍需要可用工具取得实际观察值。
+保持正常应用、Web 服务或 `collie automation work` 前台运行。`automation tick` 只保存到期事件；监控仍需要可用工具取得实际观察值。
 
 ## 详细操作参考
 
@@ -57,7 +57,7 @@
 ## Automation operations
 
 Automation persists user intent separately from Task. The scheduler writes one
-`automation_fire` and `ai.erii.automation_fired.v1` Outbox event atomically. It
+`automation_fire` and `ai.collie.automation_fired.v1` Outbox event atomically. It
 never runs a model. Actor's ordinary `Next` recovery consumes authoritative fire
 rows, writes its Inbox receipt, creates an ongoing Task if needed, freezes the
 current model/capabilities in a new Root, and emits `run_ready` in one transaction.
@@ -67,7 +67,7 @@ Main Reporter/Delivery path. Lost or repeated queue wakes cannot duplicate work.
 Run the foreground scheduler/executor with an active, tested profile:
 
 ```sh
-erii automation work
+collie automation work
 ```
 
 Keep that command running under the installation's process supervisor. It scans
@@ -81,8 +81,8 @@ No scheduler process is implicitly detached by the application.
 Create from a JSON object on stdin, with a stable request key for retries:
 
 ```sh
-erii automation manage monthly-review < review.json
-erii automation list
+collie automation manage monthly-review < review.json
+collie automation list
 ```
 
 `review.json`:

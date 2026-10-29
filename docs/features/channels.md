@@ -68,9 +68,9 @@
 
 ## 如何使用
 
-标准 `erii` 使用终端；配置 Web token 与运行时后执行 `erii web serve`，使用其打印的本地地址。
+标准 `collie` 使用终端；配置 Web token 与运行时后执行 `collie web serve`，使用其打印的本地地址。
 
-飞书需配置应用凭据、回调入口，并通过可信 CLI `erii channel manage` 绑定个人身份；群聊不在当前范围。Settings → Notifications 可选择未来通知渠道，保存后显示实际选择；原目的地不可用时显式提示，不回退成 Automatic。已提交的消息、审批、任务阶段与状态按区域更新。
+飞书需配置应用凭据、回调入口，并通过可信 CLI `collie channel manage` 绑定个人身份；群聊不在当前范围。Settings → Notifications 可选择未来通知渠道，保存后显示实际选择；原目的地不可用时显式提示，不回退成 Automatic。已提交的消息、审批、任务阶段与状态按区域更新。
 
 ### Web 操作路线
 
@@ -100,7 +100,7 @@ Task 详情只展示该任务已由 Main 交付的内容，不将 Worker 结果�
 
 ## Web, Feishu and safe delivery
 
-ERII-28 adds authenticated interaction and rendering to the existing
+retired task #28 adds authenticated interaction and rendering to the existing
 `InboundEvent -> Actor -> Main/Worker -> ToolInvocation -> Conversation ->
 DeliveryRequest/Outbox -> Adapter` path. There is one Conversation per Agent.
 No channel creates its own reasoning loop, Task state machine or approval store.
@@ -116,13 +116,13 @@ active, tested profile the Web setup page remains available and ingress stays
 ```yaml
 web:
   listen: 127.0.0.1:8787
-  token_ref: env:ERII_WEB_TOKEN
+  token_ref: env:COLLIE_WEB_TOKEN
 feishu:
   app_id: your-app-id
   tenant_key: your-tenant-key
-  verification_token_ref: env:ERII_FEISHU_VERIFICATION_TOKEN
-  encrypt_key_ref: env:ERII_FEISHU_ENCRYPT_KEY
-  access_token_ref: env:ERII_FEISHU_ACCESS_TOKEN
+  verification_token_ref: env:COLLIE_FEISHU_VERIFICATION_TOKEN
+  encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT_KEY
+  access_token_ref: env:COLLIE_FEISHU_ACCESS_TOKEN
 ```
 
 These are SecretStore references, never literal tokens. Web access tokens need
@@ -136,8 +136,8 @@ through the OS-authenticated CLI. A callback cannot enroll itself. Group chats
 and bot senders are rejected to avoid broadening access to the personal history.
 
 ```sh
-printf '%s' '{"op":"bind","channel":"feishu","subject":"your-tenant-key:your-app-id:your-open-id","destination":"your-chat-id","enabled":true,"version":0}' | bin/erii -config /absolute/config.yaml channel manage
-bin/erii -config /absolute/config.yaml web serve
+printf '%s' '{"op":"bind","channel":"feishu","subject":"your-tenant-key:your-app-id:your-open-id","destination":"your-chat-id","enabled":true,"version":0}' | bin/collie -config /absolute/config.yaml channel manage
+bin/collie -config /absolute/config.yaml web serve
 ```
 
 `web serve` prints its loopback URL, enrolls the local browser identity once,
@@ -202,10 +202,10 @@ redirect accepted messages. Revocation rejects pending deliveries to that bindin
 ### Commands and operations
 
 ```sh
-bin/erii delivery list  # retained requests, including unknown/failed
-bin/erii delivery work  # one eligible transport/reconciliation scan
-bin/erii chat work      # drain Agent work, then delivery
-bin/erii tui            # live delivery polling and /history
+bin/collie delivery list  # retained requests, including unknown/failed
+bin/collie delivery work  # one eligible transport/reconciliation scan
+bin/collie chat work      # drain Agent work, then delivery
+bin/collie tui            # live delivery polling and /history
 ```
 
 Delivery work runs even with `setup_required`; it does not activate an implicit

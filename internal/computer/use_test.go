@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer"
-	"github.com/z-chenhao/erii/internal/computer/fake"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer/fake"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 type store struct {

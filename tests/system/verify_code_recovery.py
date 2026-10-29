@@ -23,7 +23,7 @@ def read(db_path, query, args=()):
 
 def run(binary):
     report = {'version': 1, 'checks': [], 'cleanup': False}
-    with tempfile.TemporaryDirectory(prefix='erii-code-recovery-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-code-recovery-') as temp:
         root = Path(temp)
         node = shutil.which('node')
         script = Path(__file__).resolve().parents[2] / 'runtime/javascript/src/sidecar.mjs'
@@ -34,7 +34,7 @@ def run(binary):
             (work / 'config.yaml').write_text('version: 1\njavascript:\n  command: ' + json.dumps(node) + '\n  script: ' + json.dumps(str(script)) + '\n')
             h = CodeHarness(binary, work, fixture='codemode')
             h.setup()
-            state = Path(h.env['ERII_DATA_ROOT']) / 'state.db'
+            state = Path(h.env['COLLIE_DATA_ROOT']) / 'state.db'
             release = work / 'release'
             try:
                 # First 37 provider calls finish. Eight accepted Workers then
@@ -57,7 +57,7 @@ return {count:first.length+active.length+rest.length};
                 done_generations = [g['generation_id'] for g in generations if g['run_id'] in completed]
                 require(len(done_generations) == 37, 'completed work did not use exactly 37 provider calls')
                 # The Fake peer owns an independent append-only dispatch audit.
-                audit_path = Path(h.env['ERII_DATA_ROOT']) / 'fake-provider-calls.jsonl'
+                audit_path = Path(h.env['COLLIE_DATA_ROOT']) / 'fake-provider-calls.jsonl'
                 audit = Counter(json.loads(line)['generation_id'] for line in audit_path.read_text().splitlines())
                 require(all(audit[g] == 1 for g in done_generations), 'provider dispatched completed work more than once before kill')
                 sidecar_pid = None

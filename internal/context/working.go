@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/prompt"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/prompt"
 )
 
 type Budget struct {

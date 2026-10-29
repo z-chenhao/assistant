@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
-	"github.com/z-chenhao/erii/internal/maintenance"
+	"github.com/z-chenhao/collie/internal/maintenance"
 	"golang.org/x/sys/unix"
 )
 
@@ -35,7 +35,7 @@ func OpenLocalBroker(ctx context.Context, root string) (*LocalBroker, error) {
 	}
 	b.lock = os.NewFile(uintptr(fd), "local startup lock")
 	if err := unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
-		return fail(errors.New("Erii is already running for this data root"))
+		return fail(errors.New("Collie is already running for this data root"))
 	}
 	dir := filepath.Join(root, "broker")
 	if err := os.MkdirAll(dir, 0700); err != nil {

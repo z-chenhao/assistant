@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	contextbuilder "github.com/z-chenhao/erii/internal/context"
-	"github.com/z-chenhao/erii/internal/llm"
+	contextbuilder "github.com/z-chenhao/collie/internal/context"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func TestCapabilityPlanProgressSurvivesCompactionAndIdenticalCalls(t *testing.T) {

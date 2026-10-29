@@ -139,7 +139,7 @@ class FixturePoolTests(unittest.TestCase):
                 ' (root/"cleanup").touch()\n'
                 ' while not (root/"release").exists(): time.sleep(.01)\n'
                 ' (root/"state").rmdir()\n')
-            env = dict(os.environ, ERII_TEST_METRICS_DIR=str(root / 'profiles'))
+            env = dict(os.environ, COLLIE_TEST_METRICS_DIR=str(root / 'profiles'))
             with (root / 'log').open('w') as log:
                 child = subprocess.Popen([sys.executable, 'tests/system/entrypoint.py', str(script)],
                                          cwd=suite.ROOT, env=env, stdout=log, stderr=subprocess.STDOUT,
@@ -217,7 +217,7 @@ class FixturePoolTests(unittest.TestCase):
                 shell = root / 'step.sh'
                 shell.write_text(('exec ' if line.startswith('run: exec ') else '') + shlex.join(command) + '\n')
                 entry_log = (root / 'log').open('w')
-                env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'tests/system'), ERII_TEST_METRICS_DIR=str(root / 'profiles'))
+                env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'tests/system'), COLLIE_TEST_METRICS_DIR=str(root / 'profiles'))
                 entry = subprocess.Popen(['bash','--noprofile','--norc','-e','-o','pipefail',str(shell)],
                                          cwd=suite.ROOT,env=env,stdout=entry_log,stderr=subprocess.STDOUT,
                                          start_new_session=True)
@@ -241,7 +241,7 @@ class FixturePoolTests(unittest.TestCase):
             metrics = {}
             started = time.monotonic()
             try:
-                env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'tests/system'), ERII_TEST_METRICS_DIR=str(root / 'profiles'))
+                env = dict(os.environ, PYTHONPATH=str(suite.ROOT / 'tests/system'), COLLIE_TEST_METRICS_DIR=str(root / 'profiles'))
                 if actions_shell:
                     code = entry.wait(timeout=7.5)
                     metrics.update(json.loads((suite.ROOT / 'evidence/steps' / (step_name + '.json')).read_text()))

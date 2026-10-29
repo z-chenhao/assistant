@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/config"
-	"github.com/z-chenhao/erii/internal/llm/memory"
-	"github.com/z-chenhao/erii/internal/skill"
+	"github.com/z-chenhao/collie/internal/config"
+	"github.com/z-chenhao/collie/internal/llm/memory"
+	"github.com/z-chenhao/collie/internal/skill"
 )
 
 func TestCoreExecutionAndSkillDiscoveryAreAvailableWithoutOptionalConfig(t *testing.T) {
 	root := t.TempDir()
-	cfg, err := config.Load("", func(key string) (string, bool) { return root, key == "ERII_DATA_ROOT" })
+	cfg, err := config.Load("", func(key string) (string, bool) { return root, key == "COLLIE_DATA_ROOT" })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestCoreExecutionAndSkillDiscoveryAreAvailableWithoutOptionalConfig(t *test
 
 func TestRuntimePreparationRetriesAfterDependencyRepair(t *testing.T) {
 	root := t.TempDir()
-	cfg, err := config.Load("", func(key string) (string, bool) { return root, key == "ERII_DATA_ROOT" })
+	cfg, err := config.Load("", func(key string) (string, bool) { return root, key == "COLLIE_DATA_ROOT" })
 	if err != nil {
 		t.Fatal(err)
 	}

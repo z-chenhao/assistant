@@ -5,7 +5,7 @@ package secret
 import (
 	"context"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func get(context.Context, string) ([]byte, error) { return nil, llm.ErrSecretStore }

@@ -13,10 +13,10 @@ import (
 	"syscall"
 
 	"github.com/mattn/go-isatty"
-	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/computer/macosvm"
-	"github.com/z-chenhao/erii/internal/config"
-	"github.com/z-chenhao/erii/internal/startup"
+	"github.com/z-chenhao/collie/internal/app"
+	"github.com/z-chenhao/collie/internal/computer/macosvm"
+	"github.com/z-chenhao/collie/internal/config"
+	"github.com/z-chenhao/collie/internal/startup"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 		args = []string{"start"}
 	}
 	if err := run(ctx, args, os.Stdin, os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "erii:", err)
+		fmt.Fprintln(os.Stderr, "collie:", err)
 		os.Exit(1)
 	}
 }
@@ -77,7 +77,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 				return err
 			}
 		}
-		if _, external := os.LookupEnv("ERII_NATS_URL"); options.configPath == "" && !external {
+		if _, external := os.LookupEnv("COLLIE_NATS_URL"); options.configPath == "" && !external {
 			broker, err := startup.OpenLocalBroker(ctx, cfg.App.DataRoot)
 			if err != nil {
 				return err

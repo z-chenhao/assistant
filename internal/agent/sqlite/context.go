@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	contextbuilder "github.com/z-chenhao/erii/internal/context"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	contextbuilder "github.com/z-chenhao/collie/internal/context"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 type workingPreparation struct {

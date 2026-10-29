@@ -27,7 +27,7 @@ class CapabilityHarness(MainHarness):
         run = self.processes.run if self.processes is not None else subprocess.run
         result = run(self.args(*args), input=text, text=True, capture_output=True,
                                 env=self.env, cwd=self.root, timeout=timeout)
-        if os.environ.get('ERII_CAPABILITY_DIAGNOSTICS') and (result.returncode or result.stderr):
+        if os.environ.get('COLLIE_CAPABILITY_DIAGNOSTICS') and (result.returncode or result.stderr):
             self.capture_diagnostic(args, result)
         require(not ok or result.returncode == 0, f'{args}: {result.stderr}')
         return json.loads(result.stdout) if ok else result
@@ -35,7 +35,7 @@ class CapabilityHarness(MainHarness):
     def capture_diagnostic(self, args, result):
         # Opt-in disposable Fake fixtures only. Never copy credential stores,
         # configuration, stdin, or an arbitrary data-root directory.
-        folder = Path(os.environ['ERII_CAPABILITY_DIAGNOSTICS']) / uuid.uuid4().hex
+        folder = Path(os.environ['COLLIE_CAPABILITY_DIAGNOSTICS']) / uuid.uuid4().hex
         folder.mkdir(parents=True)
         if not hasattr(self, 'diagnostic_binary_sha256'):
             self.diagnostic_binary_sha256 = digest(self.binary)
@@ -98,8 +98,8 @@ def prepare(binary, root, mode='edit'):
               json.dumps(str(Path(shutil.which('go')).resolve().parent.parent)) + ']\n')
     (root / 'config.yaml').write_text(config)
     h = CapabilityHarness(binary, root, fixture='capabilities')
-    if os.environ.get('ERII_CAPABILITY_DIAGNOSTICS'):
-        h.env['ERII_SQL_FIXTURE_DIAGNOSTIC'] = '1'
+    if os.environ.get('COLLIE_CAPABILITY_DIAGNOSTICS'):
+        h.env['COLLIE_SQL_FIXTURE_DIAGNOSTIC'] = '1'
     h.setup()
     return h
 
@@ -127,7 +127,7 @@ def content(invocation):
 def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
     report = {'version': 1, 'scope': 'MCP/Skill and native file/command contracts; approvals, isolated persistent execution, CAS and unknown effects',
               'checks': [], 'crashes': [], 'cleanup': False, 'scenario_jobs': scenario_jobs}
-    with tempfile.TemporaryDirectory(prefix='erii-capabilities-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-capabilities-') as temp:
         root = Path(temp)
         cases = []
         def scenario(name, fn, mode='edit', kind='checks'):
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash'],
                         help='Run one maintained scenario; omit for the complete gate')
-    parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("ERII_VERIFY_CASE_JOBS","1")))
+    parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("COLLIE_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
     report = run(args.binary.resolve(), args.scenario, scenario_jobs=args.scenario_jobs)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)

@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/conversation"
-	conversationsqlite "github.com/z-chenhao/erii/internal/conversation/sqlite"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/conversation"
+	conversationsqlite "github.com/z-chenhao/collie/internal/conversation/sqlite"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 type loopProvider struct {
@@ -402,9 +402,9 @@ func TestLoopModelAndReplyPersistenceFailureRecoverWithoutDuplicate(t *testing.T
 			s, r, _, a, p := loopFixture(t)
 			mustSubmit(t, a, "one", "hello")
 			// Outbox failure proves domain/result writes roll back with the event.
-			query := fmt.Sprintf(`CREATE TRIGGER fail_main BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.%s.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`, boundary)
+			query := fmt.Sprintf(`CREATE TRIGGER fail_main BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.%s.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`, boundary)
 			if boundary == "run.checkpointed" {
-				query = `CREATE TRIGGER fail_main BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.run.checkpointed.v1' AND EXISTS(SELECT 1 FROM model_generation WHERE status='completed') BEGIN SELECT RAISE(ABORT,'injected'); END`
+				query = `CREATE TRIGGER fail_main BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.run.checkpointed.v1' AND EXISTS(SELECT 1 FROM model_generation WHERE status='completed') BEGIN SELECT RAISE(ABORT,'injected'); END`
 			}
 			if _, err := s.db.Exec(query); err != nil {
 				t.Fatal(err)
@@ -578,7 +578,7 @@ func TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit(t *testing.T) {
 func TestLoopDeliveryCommitBeforeCheckpointFailureIsRecoverable(t *testing.T) {
 	s, r, h, a, p := loopFixture(t)
 	mustSubmit(t, a, "one", "hello")
-	if _, err := s.db.Exec(`CREATE TRIGGER fail_reply BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.run.checkpointed.v1' AND EXISTS(SELECT 1 FROM main_reply) BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+	if _, err := s.db.Exec(`CREATE TRIGGER fail_reply BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.run.checkpointed.v1' AND EXISTS(SELECT 1 FROM main_reply) BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.Drain(context.Background()); !errors.Is(err, agent.ErrStorage) {
@@ -591,7 +591,7 @@ func TestLoopDeliveryCommitBeforeCheckpointFailureIsRecoverable(t *testing.T) {
 	if scalar(t, s, `SELECT count(*) FROM delivery_request`) != 1 || scalar(t, s, `SELECT count(*) FROM delivery_outbox`) != 1 {
 		t.Fatal("delivery must commit before the reply checkpoint")
 	}
-	if scalar(t, s, `SELECT count(*) FROM run WHERE json_extract(checkpoint_json,'$.phase')='reply'`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.delivery.pending.v1'`) != 1 {
+	if scalar(t, s, `SELECT count(*) FROM run WHERE json_extract(checkpoint_json,'$.phase')='reply'`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.collie.delivery.pending.v1'`) != 1 {
 		t.Fatal("delivery/event not committed before checkpoint")
 	}
 	if _, err = s.db.Exec(`DROP TRIGGER fail_reply`); err != nil {

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/account"
-	"github.com/z-chenhao/erii/internal/llm/memory"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/account"
+	"github.com/z-chenhao/collie/internal/llm/memory"
 )
 
 type accountPeer struct {
@@ -416,7 +416,7 @@ func TestAccountStateTransactionRollbackAndSecretRedaction(t *testing.T) {
 	s, m, _, _, a := accountManager(t)
 	ctx := context.Background()
 	activateAccount(t, s, m, a)
-	if _, err := s.db.Exec(`CREATE TRIGGER fail_auth_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.auth_connection.updated.v1' BEGIN SELECT RAISE(ABORT,'secret-marker'); END`); err != nil {
+	if _, err := s.db.Exec(`CREATE TRIGGER fail_auth_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.auth_connection.updated.v1' BEGIN SELECT RAISE(ABORT,'secret-marker'); END`); err != nil {
 		t.Fatal(err)
 	}
 	before := countRows(t, s, "event_outbox")

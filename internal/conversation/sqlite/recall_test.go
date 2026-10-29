@@ -15,10 +15,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/recall/embedding"
-	"github.com/z-chenhao/erii/internal/recall/fake"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall/embedding"
+	"github.com/z-chenhao/collie/internal/recall/fake"
 )
 
 type appendDuringQuery struct {
@@ -45,12 +45,12 @@ func TestRecallConcurrentPendingAppendFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	scope := recall.Scope{UserID: "local", AgentID: "erii"}
-	if err = s.BindConversation(ctx, "erii", scope); err != nil {
+	scope := recall.Scope{UserID: "local", AgentID: "collie"}
+	if err = s.BindConversation(ctx, "collie", scope); err != nil {
 		t.Fatal(err)
 	}
 	appendMessage := func(id string) error {
-		return s.Append(ctx, []conversation.Message{{MessageID: id, ConversationID: "erii",
+		return s.Append(ctx, []conversation.Message{{MessageID: id, ConversationID: "collie",
 			Role: "assistant", Content: conversation.Text("tea " + id), Source: "main",
 			CreatedAt: time.Unix(1, 0)}})
 	}
@@ -77,7 +77,7 @@ func TestRecallConcurrentPendingAppendFailsClosed(t *testing.T) {
 	if err != nil || len(hits) != 2 {
 		t.Fatal("later explicit caller could not recover both originals", hits, err)
 	}
-	originals, err := s.List(ctx, "erii")
+	originals, err := s.List(ctx, "collie")
 	if err != nil || len(originals) != 2 || originals[0].MessageID != "original" || originals[1].MessageID != "concurrent" {
 		t.Fatal("immutable originals changed", originals, err)
 	}
@@ -111,7 +111,7 @@ func TestMultipartHistoryWithHTTPEmbedding(t *testing.T) {
 				_, err = db.Exec(`CREATE TABLE conversation_message(message_id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,sequence INTEGER NOT NULL,role TEXT NOT NULL,content_json TEXT NOT NULL,source TEXT NOT NULL,source_event_id TEXT,created_at INTEGER NOT NULL,UNIQUE(conversation_id,sequence)) STRICT;
 PRAGMA user_version=1;`)
 				if err == nil {
-					_, err = db.Exec(`INSERT INTO conversation_message VALUES('multipart','erii',1,'user',?,'cli','event',1000000)`, string(original))
+					_, err = db.Exec(`INSERT INTO conversation_message VALUES('multipart','collie',1,'user',?,'cli','event',1000000)`, string(original))
 				}
 				db.Close()
 				if err != nil {
@@ -124,7 +124,7 @@ PRAGMA user_version=1;`)
 			}
 			defer func() { s.Close() }()
 			if state != "prior-v1" {
-				err = s.Append(ctx, []conversation.Message{{MessageID: "multipart", ConversationID: "erii", Role: "user", Content: parts, Source: "cli", SourceEventID: "event", CreatedAt: time.Unix(1, 0)}})
+				err = s.Append(ctx, []conversation.Message{{MessageID: "multipart", ConversationID: "collie", Role: "user", Content: parts, Source: "cli", SourceEventID: "event", CreatedAt: time.Unix(1, 0)}})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -138,7 +138,7 @@ PRAGMA user_version=1;`)
 					t.Fatal(err)
 				}
 			}
-			before, err := s.List(ctx, "erii")
+			before, err := s.List(ctx, "collie")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -189,7 +189,7 @@ PRAGMA user_version=1;`)
 			if err = s.Configure(ctx, client); err != nil {
 				t.Fatal(err)
 			}
-			scope := recall.Scope{UserID: "local", AgentID: "erii"}
+			scope := recall.Scope{UserID: "local", AgentID: "collie"}
 			query := recall.Query{Query: "tailmarker"}
 			if hits, err := s.Search(ctx, scope, query); err == nil || hits != nil {
 				t.Fatal("partial indexing admitted recall", hits, err)
@@ -214,7 +214,7 @@ PRAGMA user_version=1;`)
 			if got = takeRequests(); err != nil || !reflect.DeepEqual(got, []string{query.Query}) {
 				t.Fatal("completed vector not reused", got, err)
 			}
-			after, err := s.List(ctx, "erii")
+			after, err := s.List(ctx, "collie")
 			if err != nil || !reflect.DeepEqual(before, after) {
 				t.Fatal("original rewritten", err)
 			}
@@ -235,7 +235,7 @@ func TestPriorConversationMigrationPreservesOriginalAndHybridRecall(t *testing.T
 	}
 	// Exact M1 table columns; migration must not rewrite the original JSON or ID.
 	_, e = db.Exec(`CREATE TABLE conversation_message(message_id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,sequence INTEGER NOT NULL,role TEXT NOT NULL,content_json TEXT NOT NULL,source TEXT NOT NULL,source_event_id TEXT,created_at INTEGER NOT NULL,UNIQUE(conversation_id,sequence)) STRICT;
-INSERT INTO conversation_message VALUES('original','erii',1,'user','[{"type":"text","text":"chai preference"}]','cli','event',1000000);PRAGMA user_version=1;`)
+INSERT INTO conversation_message VALUES('original','collie',1,'user','[{"type":"text","text":"chai preference"}]','cli','event',1000000);PRAGMA user_version=1;`)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -248,15 +248,15 @@ INSERT INTO conversation_message VALUES('original','erii',1,'user','[{"type":"te
 	if e = s.Configure(ctx, fake.Embedding{}); e != nil {
 		t.Fatal(e)
 	}
-	before, e := s.List(ctx, "erii")
+	before, e := s.List(ctx, "collie")
 	if e != nil {
 		t.Fatal(e)
 	}
-	h, e := s.Search(ctx, recall.Scope{UserID: "local", AgentID: "erii"}, recall.Query{Query: "tea"})
+	h, e := s.Search(ctx, recall.Scope{UserID: "local", AgentID: "collie"}, recall.Query{Query: "tea"})
 	if e != nil || len(h) != 1 || h[0].SourceRef != "conversation:original" || h[0].AuthorRole != "user" || !h[0].OccurredAt.Equal(time.Unix(1, 0)) {
 		t.Fatal(h, e)
 	}
-	after, _ := s.List(ctx, "erii")
+	after, _ := s.List(ctx, "collie")
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("original rewritten")
 	}
@@ -265,10 +265,10 @@ INSERT INTO conversation_message VALUES('original','erii',1,'user','[{"type":"te
 	if raw != `[{"type":"text","text":"chai preference"}]` {
 		t.Fatal(raw)
 	}
-	if e = s.BindConversation(ctx, "different-channel", recall.Scope{UserID: "local", AgentID: "erii"}); e != nil {
+	if e = s.BindConversation(ctx, "different-channel", recall.Scope{UserID: "local", AgentID: "collie"}); e != nil {
 		t.Fatal(e)
 	}
-	if e = s.BindConversation(ctx, "foreign", recall.Scope{UserID: "bob", AgentID: "erii"}); e != nil {
+	if e = s.BindConversation(ctx, "foreign", recall.Scope{UserID: "bob", AgentID: "collie"}); e != nil {
 		t.Fatal(e)
 	}
 	for _, c := range []string{"different-channel", "foreign", "other-agent"} {
@@ -276,14 +276,14 @@ INSERT INTO conversation_message VALUES('original','erii',1,'user','[{"type":"te
 			t.Fatal(e)
 		}
 	}
-	h, e = s.Search(ctx, recall.Scope{UserID: "local", AgentID: "erii"}, recall.Query{Query: "tea"})
+	h, e = s.Search(ctx, recall.Scope{UserID: "local", AgentID: "collie"}, recall.Query{Query: "tea"})
 	if e != nil || len(h) != 2 || h[0].SourceRef != "conversation:different-channel" {
 		t.Fatal(h, e)
 	}
-	if e = s.BindConversation(ctx, "different-channel", recall.Scope{UserID: "bob", AgentID: "erii"}); e != recall.ErrConflict {
+	if e = s.BindConversation(ctx, "different-channel", recall.Scope{UserID: "bob", AgentID: "collie"}); e != recall.ErrConflict {
 		t.Fatal("rebound ownership", e)
 	}
-	for _, statement := range []string{`UPDATE conversation_scope SET user_id='bob'`, `DELETE FROM conversation_scope`, `INSERT OR REPLACE INTO conversation_scope VALUES('different-channel','bob','erii')`} {
+	for _, statement := range []string{`UPDATE conversation_scope SET user_id='bob'`, `DELETE FROM conversation_scope`, `INSERT OR REPLACE INTO conversation_scope VALUES('different-channel','bob','collie')`} {
 		if _, e = s.db.Exec(statement); e == nil {
 			t.Fatal("mutable persisted ownership", statement)
 		}
@@ -301,11 +301,11 @@ func TestConversationIndexRollbackAndFaultFailsClosed(t *testing.T) {
 	defer s.Close()
 	s.Configure(ctx, fake.Embedding{})
 	s.db.Exec(`CREATE TRIGGER index_fault BEFORE INSERT ON recall_document BEGIN SELECT RAISE(ABORT,'fault'); END`)
-	m := conversation.Message{MessageID: "m", ConversationID: "erii", Role: "user", Content: conversation.Text("tea"), Source: "cli", CreatedAt: time.Now()}
+	m := conversation.Message{MessageID: "m", ConversationID: "collie", Role: "user", Content: conversation.Text("tea"), Source: "cli", CreatedAt: time.Now()}
 	if e = s.Append(ctx, []conversation.Message{m}); e == nil {
 		t.Fatal("partial append")
 	}
-	history, _ := s.List(ctx, "erii")
+	history, _ := s.List(ctx, "collie")
 	if len(history) != 0 {
 		t.Fatal(history)
 	}
@@ -314,7 +314,7 @@ func TestConversationIndexRollbackAndFaultFailsClosed(t *testing.T) {
 		t.Fatal(e)
 	}
 	s.db.Exec(`DROP TABLE recall_fts`)
-	h, e := s.Search(ctx, recall.Scope{UserID: "local", AgentID: "erii"}, recall.Query{Query: "tea"})
+	h, e := s.Search(ctx, recall.Scope{UserID: "local", AgentID: "collie"}, recall.Query{Query: "tea"})
 	if e == nil || h != nil {
 		t.Fatal("vector-only degraded success", h, e)
 	}
@@ -336,18 +336,18 @@ func TestMediaOnlyOriginalDoesNotBlockTextRecall(t *testing.T) {
 	}
 	defer s.Close()
 	s.Configure(ctx, rejectEmptyEmbedding{})
-	media := conversation.Message{MessageID: "media", ConversationID: "erii", Role: "user", Source: "cli", CreatedAt: time.Unix(1, 0), Content: []conversation.ContentPart{{Type: "image", ArtifactRef: "artifact:opaque"}}}
+	media := conversation.Message{MessageID: "media", ConversationID: "collie", Role: "user", Source: "cli", CreatedAt: time.Unix(1, 0), Content: []conversation.ContentPart{{Type: "image", ArtifactRef: "artifact:opaque"}}}
 	text := media
 	text.MessageID = "text"
 	text.Content = conversation.Text("chai preference")
 	if e = s.Append(ctx, []conversation.Message{media, text}); e != nil {
 		t.Fatal(e)
 	}
-	h, e := s.Search(ctx, recall.Scope{UserID: "local", AgentID: "erii"}, recall.Query{Query: "tea"})
+	h, e := s.Search(ctx, recall.Scope{UserID: "local", AgentID: "collie"}, recall.Query{Query: "tea"})
 	if e != nil || len(h) != 1 || h[0].SourceRef != "conversation:text" {
 		t.Fatal(h, e)
 	}
-	original, e := s.List(ctx, "erii")
+	original, e := s.List(ctx, "collie")
 	if e != nil || len(original) != 2 || original[0].Content[0].ArtifactRef != "artifact:opaque" {
 		t.Fatal(original, e)
 	}

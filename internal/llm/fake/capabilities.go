@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 // Explicit scripted model fixture. Results still come from the real registry,

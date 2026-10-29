@@ -24,8 +24,8 @@ const manifest = require(base + '/browsers.json');
         if (version !== manifest.browsers.find(item => item.name === name).browserVersion)
           throw new Error(`${name}: cached browser version ${version} differs from locked manifest`);
         const page = await browser.newPage();
-        await page.goto('data:text/html,<title>erii-setup</title>');
-        if (await page.title() !== 'erii-setup') throw new Error(`${name}: browser smoke failed`);
+        await page.goto('data:text/html,<title>collie-setup</title>');
+        if (await page.title() !== 'collie-setup') throw new Error(`${name}: browser smoke failed`);
       } finally {
         await browser.close();
       }

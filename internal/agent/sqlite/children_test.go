@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	artifacttools "github.com/z-chenhao/erii/internal/artifact/tools"
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/task"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	artifacttools "github.com/z-chenhao/collie/internal/artifact/tools"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func childFixture(t *testing.T, more ...tool.Definition) (*Store, *Runs, agent.Actor, *loopProvider) {
@@ -90,7 +90,7 @@ func TestChildDirectToolRootChildGrandchild(t *testing.T) {
 		if strings.Contains(req.Messages[2].Text, "root private instruction") {
 			t.Fatal("wrong prompt fragments")
 		}
-		if req.Messages[1].Text == "You are Erii. Follow stable safety and evidence principles." {
+		if source := req.Messages[1].Source; source != nil && source.Kind == "identity" {
 			continue
 		}
 		raw, _ := json.Marshal(req.Messages)

@@ -1,4 +1,4 @@
-# Erii 产品架构与流程总览
+# Collie 产品架构与流程总览
 
 [Feature Map：需求与完成状态](../feature-map.md) · [跨功能协议与约束](#contract-0-文档效力与实现规则) · [测试边界](../test-plans/product.md)
 
@@ -10,7 +10,7 @@
 
 ## 当前架构
 
-Erii 是本地 Go 模块化单体，使用独立 Node 模型 Bridge 和 QuickJS 运行时。Main 与 Worker 共用一套 Agent Loop；Root/Child 表示 Worker 在执行树中的位置。SQLite 保存权威领域状态，JetStream 提供事件唤醒。Web 资源嵌入应用，不需要独立前端服务。
+Collie 是本地 Go 模块化单体，使用独立 Node 模型 Bridge 和 QuickJS 运行时。Main 与 Worker 共用一套 Agent Loop；Root/Child 表示 Worker 在执行树中的位置。SQLite 保存权威领域状态，JetStream 提供事件唤醒。Web 资源嵌入应用，不需要独立前端服务。
 
 ```mermaid
 flowchart TD
@@ -85,7 +85,7 @@ Evals 未来页面不改变独立评测项目的职责。Database 首版只读�
 
 迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
-<a id="contract-erii-技术方案基线已确认设计"></a>
+<a id="contract-collie-技术方案基线已确认设计"></a>
 
 ### 跨功能协议的维护范围
 
@@ -188,13 +188,13 @@ flowchart TD
 
 以下选择不阻塞 Coding Agent 按 M0–M5 开工；实现必须放在接口后，不得把某个临时选择泄漏到领域协议：
 
-1. Embedding 与 SQLite 向量实现已在 ERII-22 选择：显式配置 OpenAI-compatible embedding endpoint/model/dimensions，SecretStore 引用凭据；SQLite 保存 dense vectors，私有 adapter 在用户/Agent/时间分区内执行 exact cosine，并与 FTS5/BM25 并行后 RRF。无新增 native extension，不声称 ANN 或次线性性能。未配置 embedding 时不提供召回能力，不将 FTS-only 视作完整向量交付。实现与离线重建限制见 `docs/designs/memory-context.md`；模型质量留给 release-time Live Shadow。
+1. Embedding 与 SQLite 向量实现已在 retired task #22 选择：显式配置 OpenAI-compatible embedding endpoint/model/dimensions，SecretStore 引用凭据；SQLite 保存 dense vectors，私有 adapter 在用户/Agent/时间分区内执行 exact cosine，并与 FTS5/BM25 并行后 RRF。无新增 native extension，不声称 ANN 或次线性性能。未配置 embedding 时不提供召回能力，不将 FTS-only 视作完整向量交付。实现与离线重建限制见 `docs/designs/memory-context.md`；模型质量留给 release-time Live Shadow。
 2. Web 框架、TUI 框架、飞书 SDK 与视觉实现；TUI 只需支持首次模型设置、首条纵向链路和审批。
 3. Context Compaction 的最终阈值与 Token 分配；算法和配置点先实现，数值通过用户选择的模型压测冻结。
 4. 各具体 Tool 的风险映射、范围授权文案与审批 UI；未知副作用 Tool 默认要求审批且 `replay_policy=never`。
 5. Artifact 的最终保留周期、配额与清理批次；MVP 必须先有可配置默认值、引用计数/作用域检查和 dry-run 清理。
 6. 公平调度权重、NATS Stream/Consumer/DLQ、租约时长、退避与 watchdog 的生产参数；先使用保守可配置默认值并记录指标。
-   ERII-29 将首版运维参数落在 `docs/features/operations.md`：事件 Stream 默认 7 天/1 GiB/100 万条/单条 1 MiB，DLQ 仅保留无正文的诊断 receipt，5 次毒消息阈值，32 个未确认消费窗口。远程 NATS 必须 TLS + SecretStore token 引用，既有无界 Stream 通过显式、无立即丢弃的运维命令升级。三个数据库和 Artifact 使用独占冷备、认证加密清单及新目录原子还原；凭据独立保管，还原先禁用，确认源实例退役及外部结果后显式启用。正常关闭不改变 Task 状态；备份不承诺外部副作用 exactly-once。
+   retired task #29 将首版运维参数落在 `docs/features/operations.md`：事件 Stream 默认 7 天/1 GiB/100 万条/单条 1 MiB，DLQ 仅保留无正文的诊断 receipt，5 次毒消息阈值，32 个未确认消费窗口。远程 NATS 必须 TLS + SecretStore token 引用，既有无界 Stream 通过显式、无立即丢弃的运维命令升级。三个数据库和 Artifact 使用独占冷备、认证加密清单及新目录原子还原；凭据独立保管，还原先禁用，确认源实例退役及外部结果后显式启用。正常关闭不改变 Task 状态；备份不承诺外部副作用 exactly-once。
 7. 高安全上限的最终容量校准、成本估算与可复用脚本管理界面；模型仍不获得预算查询工具。
 8. 金融交易与其他受监管能力的合规设计；未单独评审前不得启用真实交易 Tool。
 9. 云端服务拆分、租户隔离、多 Agent 创建体验和迁移；一期保持模块化单体与单 Agent 产品面。
@@ -227,7 +227,7 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 
 #### M0：工程骨架与持久化
 
-- 建立 `cmd/erii`、`internal/*`、配置、日志、Trace、SQLite migration 和 NATS 薄适配层。
+- 建立 `cmd/collie`、`internal/*`、配置、日志、Trace、SQLite migration 和 NATS 薄适配层。
 - 实现 ID/时间/版本约定、Outbox/Inbox、ModelProfile/ModelSnapshot/AuthConnection、SecretStore Fake、Fake LLM 与测试夹具。
 - 建立版本化 Model Provider Bridge RPC 骨架和 Fake Bridge；此阶段不要求真实账号登录。
 - 提供 `make test` 或等价单命令，不依赖真实外部服务运行单元测试。

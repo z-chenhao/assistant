@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/app"
-	"github.com/z-chenhao/erii/internal/automation"
-	computerfixture "github.com/z-chenhao/erii/internal/computer/macosvm/fixture"
-	"github.com/z-chenhao/erii/internal/llm/fake"
-	mcpfake "github.com/z-chenhao/erii/internal/tool/mcp/fake"
+	"github.com/z-chenhao/collie/internal/app"
+	"github.com/z-chenhao/collie/internal/automation"
+	computerfixture "github.com/z-chenhao/collie/internal/computer/macosvm/fixture"
+	"github.com/z-chenhao/collie/internal/llm/fake"
+	mcpfake "github.com/z-chenhao/collie/internal/tool/mcp/fake"
 )
 
 func runTestPeer(ctx context.Context, args []string, in io.Reader, out io.Writer) (bool, error) {

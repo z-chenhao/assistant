@@ -62,7 +62,7 @@ export async function startFixture() {
       if(b.input.some(i=>i.type==='function_call_output')) {
         const call=b.input.find(i=>i.type==='function_call');
         const declared=b.tools?.flatMap(t=>t.tools ?? []) ?? [];
-        const valid=call?.namespace==='erii' && declared.some(t=>t.name===call.name) && b.input.some(i=>i.type==='function_call_output' && i.call_id===call.call_id);
+        const valid=call?.namespace==='collie' && declared.some(t=>t.name===call.name) && b.input.some(i=>i.type==='function_call_output' && i.call_id===call.call_id);
         stats.request_valid &&= valid;
         if(!valid)return json({error:{code:'invalid_tool_namespace'}},400);
       }
@@ -73,7 +73,7 @@ export async function startFixture() {
       if(b.tools?.length && !hasResult){
         const names=b.tools[0].tools.map(t=>t.name);
         const name=names.includes('builtin__artifact_search')?'builtin__artifact_search':names[0];
-        const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'erii',arguments:name==='builtin__artifact_search'?'{}':'{"value":"OK"}'};
+        const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'collie',arguments:name==='builtin__artifact_search'?'{}':'{"value":"OK"}'};
         emit('response.output_item.added',{output_index:0,item:{...item,arguments:''}});
         emit('response.function_call_arguments.delta',{output_index:0,item_id:item.id,delta:item.arguments});
         emit('response.output_item.done',{output_index:0,item});

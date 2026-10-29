@@ -1,7 +1,7 @@
 // Package operations defines the bounded local operator read models.
 package operations
 
-import "github.com/z-chenhao/erii/internal/agent"
+import "github.com/z-chenhao/collie/internal/agent"
 
 // Operations is an operator-only bounded projection. It deliberately excludes
 // prompts, arguments, results, destinations, endpoint/account and credential refs.

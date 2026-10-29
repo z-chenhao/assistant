@@ -54,7 +54,7 @@
 
 ## 如何使用
 
-Web 的附件选择器可随文字提交文件。CLI 用 `erii artifact save NAME MEDIA_TYPE` 从 stdin 保存，随后用 `erii artifact describe REF` 或 `erii artifact open REF` 检查和读取。
+Web 的附件选择器可随文字提交文件。CLI 用 `collie artifact save NAME MEDIA_TYPE` 从 stdin 保存，随后用 `collie artifact describe REF` 或 `collie artifact open REF` 检查和读取。
 
 在 Settings 添加模型时，按需勾选 **Enable image input (verified when tested)**，执行 Test connection，通过后再 Select model。Saved models 显示 Image input verified；未启用时显示 Text only。随后随消息上传 PNG/JPEG 即可。CLI 的模型 JSON 输入使用 `capabilities.image_input: true`，图片 ContentPart 必须为 `{"type":"image","artifact_ref":"artifact:..."}`；普通 `file` 不自动加载像素。
 
@@ -64,14 +64,14 @@ Web 的附件选择器可随文字提交文件。CLI 用 `erii artifact save NAM
 
 上传 PNG/JPEG 后可要求 Agent「识别图片中的文字」。模型通过 `builtin__image_ocr({artifactRef})` 显式调用本地 OCR，Direct Tool 和 Code Mode 使用同一执行路径。视觉模型也可使用此工具；OCR 不改变所选模型，不调用另一家视觉服务。支持英文、简体中文和繁体中文语言包，以返回的 `languages` 为本次实际使用的语言。
 
-先安装运行依赖，再启动 Erii：
+先安装运行依赖，再启动 Collie：
 
 ```sh
 # Ubuntu / Debian，简体中文和英文
 sudo apt-get install tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim bubblewrap
 # macOS
 brew install tesseract tesseract-lang
-erii doctor
+collie doctor
 ```
 
 繁体中文在 Debian/Ubuntu 另装 `tesseract-ocr-chi-tra`。自定义语言目录可在启动前设置绝对路径 `TESSDATA_PREFIX`。只使用已安装的 eng/chi_sim/chi_tra；缺少某语言包不会推定能够识别该语言。Doctor 报告依赖与语言包，缺少 OCR 不阻止普通对话，调用会明确失败 `PROVIDER_UNAVAILABLE`。Linux 还需要启用非特权 user namespaces；macOS 使用 Seatbelt。没有无沙箱执行回退。
@@ -84,15 +84,15 @@ OCR 能提供截图中的文字证据，不能证明布局、颜色、图表关�
 
 ## 详细操作参考
 
-- [文件操作详情](#artifacts-artifact-storage-and-operations-erii-14)
+- [文件操作详情](#artifacts-artifact-storage-and-operations-collie-14)
 
 ## 操作说明与配置细节
 
 迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
-<a id="artifacts-artifact-storage-and-operations-erii-14"></a>
+<a id="artifacts-artifact-storage-and-operations-collie-14"></a>
 
-## Artifact storage and operations (ERII-14)
+## Artifact storage and operations (retired task #14)
 
 Artifacts reopen through opaque `artifact:` references. Only the Store resolves
 references to storage keys. Files live beneath `app.data_root/artifacts`;
@@ -112,12 +112,12 @@ refs. Same Task visibility does not inject any file contents into context.
 ### CLI boundary
 
 ```sh
-printf 'report text' | bin/erii artifact save report.md text/markdown
-bin/erii artifact describe ARTIFACT_REF
-bin/erii artifact open ARTIFACT_REF > ./download.md
-bin/erii artifact delete ARTIFACT_REF VERSION
-bin/erii artifact cleanup
-bin/erii artifact cleanup apply
+printf 'report text' | bin/collie artifact save report.md text/markdown
+bin/collie artifact describe ARTIFACT_REF
+bin/collie artifact open ARTIFACT_REF > ./download.md
+bin/collie artifact delete ARTIFACT_REF VERSION
+bin/collie artifact cleanup
+bin/collie artifact cleanup apply
 ```
 
 `save` streams stdin and accepts a display name and MIME type. It accepts no

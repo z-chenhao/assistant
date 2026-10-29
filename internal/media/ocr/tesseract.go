@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/z-chenhao/erii/internal/computer/sandbox"
-	"github.com/z-chenhao/erii/internal/media"
+	"github.com/z-chenhao/collie/internal/computer/sandbox"
+	"github.com/z-chenhao/collie/internal/media"
 )
 
 func (e *Engine) Extract(ctx context.Context, kind string, data []byte) (Document, error) {
@@ -27,7 +27,7 @@ func (e *Engine) Extract(ctx context.Context, kind string, data []byte) (Documen
 		return Document{}, err
 	}
 	width, height := img.Bounds().Dx(), img.Bounds().Dy()
-	root, err := os.MkdirTemp("", "erii-ocr-")
+	root, err := os.MkdirTemp("", "collie-ocr-")
 	if err != nil {
 		return Document{}, ErrUnavailable
 	}

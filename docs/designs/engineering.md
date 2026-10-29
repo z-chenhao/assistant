@@ -52,7 +52,7 @@ flowchart TD
 | --- | --- | --- |
 | P2 · 领域持久化依赖反向集中 | `agent/sqlite/computer.go` 把 Computer 生命周期 SQL 与私有 `codeBridge` 绑定，增加 Computer 变化牵动 Agent 适配器的范围。 | `computer/sqlite` 持有生命周期和 status；Run 适配器只绑定同一事务内的 claim 检查与事件写入。 |
 | P2 · 只读查询与接口类型泄漏 | 运维报表与 DTO、额度 DTO、审批别名、ToolOutcome 位于 SQLite 包，App 的对外方法把实现包变成调用方的依赖。 | `operations` 定义报表、`operations/sqlite` 查询；其余 DTO 归 `agent`、`interaction`、`tool`，删除无意义的审批类型别名。 |
-| P2 · CLI 入口职责混合 | `cmd/erii.run` 约 380 行，混合语法判断、模型输入、配置、离线备份、初始化、测试屏障和分发；大量并行布尔变量掩盖互斥命令。 | 用单一语法表选择命令种类；按 options、command、model_input、operations、test_options、dispatch 分阶段；`run` 只保留进程生命周期组装。 |
+| P2 · CLI 入口职责混合 | `cmd/collie.run` 约 380 行，混合语法判断、模型输入、配置、离线备份、初始化、测试屏障和分发；大量并行布尔变量掩盖互斥命令。 | 用单一语法表选择命令种类；按 options、command、model_input、operations、test_options、dispatch 分阶段；`run` 只保留进程生命周期组装。 |
 | P2 · Web 操作分发承载业务动作 | 约 200 行 POST 方法混合 JSON/form/multipart、模型选择与账户 goroutine 状态，审查权限/关闭行为时难以追踪。 | 单一认证/CSRF 边界保持不变，路由调用有名的消息、附件、模型、账户与通知处理函数。 |
 | P2 · Task 事务闭包包含多种职责 | 约 235 行 executeTask 混合 frozen-call 验证、两层 replay receipt、创建和已有 Task 状态变化，依赖大量捕获变量。 | 接纳与 replay 留在 executeTask，具体创建/控制在命名事务内 helper；`taskChange` 明确保存当前行、请求与变更状态。 |
 | P2 · 注册与实例组装混在一起 | `app.prepareRuntime` 一边发现/校验能力，一边配置 provider、Runs 与测试注入，阅读失败路径要跨越整个函数。 | builtinDefinitions、runtimeRegistry、prepareRuntime 分别建立能力、校验 registry、组装实例；成功后一次发布。 |
@@ -60,7 +60,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    CLI["cmd/erii：语法 → 输入 → 生命周期 → 分发"] --> APP["app：组合根 / 领域类型接口"]
+    CLI["cmd/collie：语法 → 输入 → 生命周期 → 分发"] --> APP["app：组合根 / 领域类型接口"]
     WEB["web：认证与 CSRF → 有名的动作处理"] --> APP
     APP --> OPS["operations 报表类型"]
     OPSQ["operations/sqlite：只读查询"] --> OPS
@@ -109,13 +109,13 @@ Computer 的 Begin 拆为已接纳计划读取、当前实例决策和原子计�
 #### 14.1 Go 工程组织
 
 - 一期只使用 `cmd/ + internal/`，暂不创建 `pkg/`；只有未来确实需要对外 SDK 时才增加公共包。
-- `cmd/erii` 是一期唯一的 Go 主进程入口。
+- `cmd/collie` 是一期唯一的 Go 主进程入口。
 - `internal/app` 是不包含业务逻辑的 Composition Root，负责依赖组装、启动和关闭。
 - 接口由使用方所在模块定义；SQLite、NATS、飞书、macOS VM 等实现放在对应模块的具名子包中。
 - 不建立通用的 `ports/`、`adapters/`、`controller/`、`service/`、`repository/` 大目录。
 
 ```text
-cmd/erii/
+cmd/collie/
 web/                     # TypeScript 展示层；构建产物嵌入 Go Web Adapter
 provider-bridge/          # Pi AI Provider/Auth Bridge；无 Tool/Computer 权限
 internal/
@@ -247,7 +247,7 @@ separate outcomes.
 
 | Location | Purpose |
 | --- | --- |
-| `cmd/erii`, `internal/` | Application and Go tests beside their implementation |
+| `cmd/collie`, `internal/` | Application and Go tests beside their implementation |
 | `provider-bridge`, `runtime/javascript`, `guest-browser`, `web` | Product runtimes, frontend and their local tests |
 | `tests/system/` | Deterministic CLI/UI/process tests and shared fixture support |
 | `tests/harness/` | Unit/component regressions for retained test and setup utilities |

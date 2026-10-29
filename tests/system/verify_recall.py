@@ -71,12 +71,12 @@ class Embeddings:
 
 
 def main_completed(h, run_id):
-    with closing(sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db')) as db:
+    with closing(sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db')) as db:
         return db.execute("SELECT status='completed' FROM run WHERE run_id=? AND kind='main'", (run_id,)).fetchone() == (1,)
 
 
 def worker_requests(h):
-    root = Path(h.env['ERII_DATA_ROOT'])
+    root = Path(h.env['COLLIE_DATA_ROOT'])
     with closing(sqlite3.connect(root / 'state.db')) as db:
         ids = {r[0] for r in db.execute("SELECT generation_id FROM model_generation JOIN run USING(run_id) WHERE kind='worker'")}
     audit = root / 'fake-provider-calls.jsonl'
@@ -138,7 +138,7 @@ class Harness(MainHarness):
     def snapshot(self):
         result = self.state()
         result['agent_id'] = self.command('status')['agent_id']
-        root = Path(self.env['ERII_DATA_ROOT'])
+        root = Path(self.env['COLLIE_DATA_ROOT'])
         with sqlite3.connect(root / 'state.db') as db:
             db.row_factory = sqlite3.Row
             result['recall'] = [dict(r) for r in db.execute('SELECT * FROM run_recall ORDER BY run_id,step_index')]
@@ -156,7 +156,7 @@ class Harness(MainHarness):
     def seed(self, legacy=False):
         """Launch fixture only. Production mutations are tested via Memory.Apply."""
         agent = self.command('status')['agent_id']
-        root = Path(self.env['ERII_DATA_ROOT'])
+        root = Path(self.env['COLLIE_DATA_ROOT'])
         with sqlite3.connect(root / 'memory.db') as db:
             for id_, user, agent_, text in [
                     ('lexical', 'local', agent, 'tea preference from explicit evidence'),
@@ -188,7 +188,7 @@ class Harness(MainHarness):
         raw = json.dumps(parts, ensure_ascii=False)
         text = '\n'.join(p['text'] for p in parts)
         require(len(text.encode('utf-8')) == 80001, 'multipart fixture size drift')
-        with sqlite3.connect(Path(self.env['ERII_DATA_ROOT']) / 'conversation.db') as db:
+        with sqlite3.connect(Path(self.env['COLLIE_DATA_ROOT']) / 'conversation.db') as db:
             db.execute('INSERT INTO conversation_scope SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM conversation_scope WHERE conversation_id=?)',
                        (agent, 'local', agent, agent))
             db.execute('INSERT INTO conversation_message VALUES(?,?,(SELECT coalesce(max(sequence),0)+1 FROM conversation_message WHERE conversation_id=?),?,?,?,?,?)',
@@ -245,7 +245,7 @@ def failure_state(h, embeddings, scenario, stage):
     """Read only structural evidence; never copy corpus, prompts or HTTP bodies."""
     value = dict(scenario=scenario, stage=stage, embedding_requests=len(embeddings.requests),
                  embedding_failure_enabled=embeddings.fail, databases={})
-    root = Path(h.env['ERII_DATA_ROOT'])
+    root = Path(h.env['COLLIE_DATA_ROOT'])
     agents = []
     for name in ('state', 'memory', 'conversation'):
         path = root / (name + '.db')
@@ -287,7 +287,7 @@ def concurrent_append_case(binary, root, failure_evidence=None):
             release.touch(exist_ok=False)
             h.wait_state(bool, 'Main publication during Root query',
                          reader=lambda _: h.main_completed(receipt['run_id']))
-            with closing(sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'conversation.db')) as db:
+            with closing(sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'conversation.db')) as db:
                 observed['pending_assistant_vectors'] = db.execute("SELECT count(*) FROM recall_document WHERE active=1 AND vector_json IS NULL AND author_role='assistant' AND user_id='local'").fetchone()[0]
             require(observed['pending_assistant_vectors'] == 1, 'concurrent append boundary was not forced')
         barrier = threading.Barrier(2, action=append_after_catch_up)
@@ -299,7 +299,7 @@ def concurrent_append_case(binary, root, failure_evidence=None):
         stage = 'forced-conflict'
         child = h.hold('after_task_commit', extra_flags=('-test-main-release', str(release)))
         _, error = child.communicate(timeout=20)
-        require(child.returncode == 1 and error.strip() == 'erii: PROVIDER_UNAVAILABLE',
+        require(child.returncode == 1 and error.strip() == 'collie: PROVIDER_UNAVAILABLE',
                 'concurrent pending append did not fail the CLI closed')
         require(not embeddings.callback_errors and observed['query_requests'] == 2,
                 'embedding barrier failed instead of exercising recall')
@@ -340,8 +340,8 @@ def concurrent_append_case(binary, root, failure_evidence=None):
 
 
 def run(binary, failure_evidence=None):
-    report = dict(version=1, scope='ERII-22 read-only hybrid recall and frozen context; Curator/manage/compaction and full SC-08 remain ERII-23', scenarios=[])
-    with tempfile.TemporaryDirectory(prefix='erii-recall-') as directory:
+    report = dict(version=1, scope='COLLIE-22 read-only hybrid recall and frozen context; Curator/manage/compaction and full SC-08 remain COLLIE-23', scenarios=[])
+    with tempfile.TemporaryDirectory(prefix='collie-recall-') as directory:
         for name in ('ordinary', 'kill-restart', 'embedding-failure', 'multipart', 'multipart-prior'):
             root = Path(directory) / name
             root.mkdir()
@@ -378,7 +378,7 @@ def run(binary, failure_evidence=None):
                     require(len(before['recall']) == 1 and not before['generations'], 'wrong kill boundary')
                     # Change corpus after the turn was frozen; restart must reuse it.
                     frozen = before['recall'][0]
-                    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'memory.db') as db:
+                    with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'memory.db') as db:
                         db.execute('INSERT INTO memory_record(memory_id,user_id,scope_type,scope_id,tier,content,source_refs,created_at) VALUES(?,?,?,?,?,?,?,?)',
                                    ('after-freeze', 'local', 'agent', agent, 'recall',
                                     'tea NEW_AFTER_FREEZE', '[{"source_type":"conversation","source_ref":"conversation:original"}]', 2000000))
@@ -396,7 +396,7 @@ def run(binary, failure_evidence=None):
                             document['content'] == joined_text, 'multipart document missing or pending')
                     chunks = [r['input'] for r in embeddings.requests if len(r['input'].encode('utf-8')) > 4096]
                     require(len(chunks) == 2 and ''.join(chunks) == joined_text, 'multipart truncated or reindexed')
-                    with sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'conversation.db') as db:
+                    with sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'conversation.db') as db:
                         stored = db.execute("SELECT content_json FROM conversation_message WHERE message_id='multipart'").fetchone()[0]
                     require(stored == original_json and value['conversation_schema'] == 3, 'migration rewrote original')
                     require(len(value['generations']) == 9 and len(value['runs']) == 4, 'multipart blocked later model admission')

@@ -3,8 +3,8 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"github.com/z-chenhao/erii/internal/recall"
-	"github.com/z-chenhao/erii/internal/recall/sqliteindex"
+	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall/sqliteindex"
 )
 
 func (s *Store) lockSearch(ctx context.Context) error {

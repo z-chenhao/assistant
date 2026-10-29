@@ -32,8 +32,8 @@ class Broker:
         try:
             self.scope.run(['go', 'test', '-c', '-o', str(peer), './internal/event/integration'],
                            cwd=ROOT, capture_output=True, check=True, timeout=120)
-            env = {k: v for k, v in os.environ.items() if not k.startswith('ERII_')}
-            env.update(ERII_BROKER_FIXTURE='1', TMPDIR=str(folder))
+            env = {k: v for k, v in os.environ.items() if not k.startswith('COLLIE_')}
+            env.update(COLLIE_BROKER_FIXTURE='1', TMPDIR=str(folder))
             self.child = self.scope.start([str(peer), '-test.run=^TestBrokerFixture$', '-test.timeout=10m'],
                                           stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           text=True, env=env, cwd=folder)

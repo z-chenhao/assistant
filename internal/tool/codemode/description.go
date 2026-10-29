@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 type ToolDescription struct {

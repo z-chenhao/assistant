@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 var ErrTransport = errors.New("javascript runtime transport unavailable")
@@ -130,7 +130,7 @@ func outcomeResult(outcome Outcome) tool.Result {
 				Data     string
 				MimeType string
 			}
-			if json.Unmarshal(raw, &item) == nil && item.Type == "image" && item.MimeType == "application/x-erii-artifact" {
+			if json.Unmarshal(raw, &item) == nil && item.Type == "image" && item.MimeType == "application/x-collie-artifact" {
 				result.ImageRefs = append(result.ImageRefs, item.Data)
 				result.ArtifactRefs = append(result.ArtifactRefs, item.Data)
 			}

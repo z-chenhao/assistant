@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func TestCompleteContract(t *testing.T) {

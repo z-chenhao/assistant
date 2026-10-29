@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
-	"github.com/z-chenhao/erii/internal/llm/bridge"
+	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm/bridge"
 )
 
 // Resolver uses the frozen endpoint hash, never a profile's current endpoint.

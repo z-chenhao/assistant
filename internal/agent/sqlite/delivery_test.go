@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery"
-	deliveryfake "github.com/z-chenhao/erii/internal/delivery/fake"
-	deliverysqlite "github.com/z-chenhao/erii/internal/delivery/sqlite"
-	deliveryterminal "github.com/z-chenhao/erii/internal/delivery/terminal"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery"
+	deliveryfake "github.com/z-chenhao/collie/internal/delivery/fake"
+	deliverysqlite "github.com/z-chenhao/collie/internal/delivery/sqlite"
+	deliveryterminal "github.com/z-chenhao/collie/internal/delivery/terminal"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 func terminalFixture(t *testing.T) (*Store, delivery.Service, *deliveryterminal.Adapter) {
@@ -188,7 +188,7 @@ func TestDeliveryCrashBeforeSendReattachesLastAllowedAttempt(t *testing.T) {
 func TestDeliveryAckEventFailureRecoversAcceptedReceipt(t *testing.T) {
 	s, service, adapter := terminalFixture(t)
 	ctx := context.Background()
-	if _, err := s.db.Exec(`CREATE TRIGGER reject_sent_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.delivery.sent.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+	if _, err := s.db.Exec(`CREATE TRIGGER reject_sent_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.delivery.sent.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if err := service.Drain(ctx); !errors.Is(err, delivery.ErrStorage) {
@@ -213,7 +213,7 @@ func TestDeliveryAckEventFailureRecoversAcceptedReceipt(t *testing.T) {
 func TestTerminalAcceptanceRollsBackWithItsEvent(t *testing.T) {
 	s, service, adapter := terminalFixture(t)
 	ctx := context.Background()
-	if _, err := s.db.Exec(`CREATE TRIGGER reject_accepted_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.delivery.accepted.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+	if _, err := s.db.Exec(`CREATE TRIGGER reject_accepted_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.delivery.accepted.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if err := service.Drain(ctx); err != nil {
@@ -231,7 +231,7 @@ func TestTerminalAcceptanceRollsBackWithItsEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	inbox, _ = adapter.Messages(ctx, service.Destination)
-	if len(inbox) != 1 || deliveryRows(t, s)[0].Status != "sent" || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.erii.delivery.accepted.v1'`) != 1 {
+	if len(inbox) != 1 || deliveryRows(t, s)[0].Status != "sent" || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type='ai.collie.delivery.accepted.v1'`) != 1 {
 		t.Fatal("terminal acceptance did not recover atomically")
 	}
 }
@@ -263,7 +263,7 @@ func TestDeliveryEnqueueIdentityRollbackAndTransitions(t *testing.T) {
 	other.DeliveryID = "delivery:new"
 	other.MessageID = "message:new"
 	other.IdempotencyKey = other.DeliveryID
-	if _, err := s.db.Exec(`CREATE TRIGGER reject_delivery_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.erii.delivery.pending.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
+	if _, err := s.db.Exec(`CREATE TRIGGER reject_delivery_event BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.delivery.pending.v1' BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Transaction(ctx, func(tx *sql.Tx) error { return deliverysqlite.Enqueue(ctx, tx, other) }); err == nil {

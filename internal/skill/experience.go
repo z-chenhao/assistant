@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/z-chenhao/erii/internal/memory"
+	"github.com/z-chenhao/collie/internal/memory"
 )
 
 // Experience management belongs to the trusted Reviewer control path. Ordinary
@@ -106,7 +106,7 @@ func Publish(ctx context.Context, c Config, id, name, description, procedure str
 	if _, e = root.Lstat(name); !os.IsNotExist(e) {
 		return invalid
 	}
-	staging := ".erii-pending-" + id
+	staging := ".collie-pending-" + id
 	if e = root.Mkdir(staging, 0700); e != nil && !os.IsExist(e) {
 		return invalid
 	}
@@ -151,9 +151,9 @@ func Retire(c Config, id, name, description, procedure string) error {
 		if string(old) != string(content(name, description, procedure)) {
 			return invalid
 		}
-		return root.Rename(name, ".erii-retired-"+id)
+		return root.Rename(name, ".collie-retired-"+id)
 	}
-	if old, e := readFile(root, ".erii-retired-"+id+"/SKILL.md"); e == nil && string(old) == string(content(name, description, procedure)) {
+	if old, e := readFile(root, ".collie-retired-"+id+"/SKILL.md"); e == nil && string(old) == string(content(name, description, procedure)) {
 		return nil
 	}
 	return invalid

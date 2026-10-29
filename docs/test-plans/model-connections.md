@@ -53,7 +53,7 @@ Security/cancellation contracts use the current Go/Node and system regression en
 For optional owned native Keychain read/update/delete verification on macOS:
 
 ```sh
-ERII_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTrip -v -timeout 30s
+COLLIE_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTrip -v -timeout 30s
 ```
 
 CI uses deterministic Fakes/environment references and requires no OS credential

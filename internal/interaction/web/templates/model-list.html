@@ -1,5 +1,5 @@
 {{define "model-list"}}
-<div class="page-heading"><div><h1>Models</h1><p>Choose what Erii uses for new work.</p></div><a class="button {{if .Status.ActiveModelProfileID}}secondary{{end}}" href="/settings/models/new">Connect a model</a></div>
+<div class="page-heading"><div><h1>Models</h1><p>Choose what Collie uses for new work.</p></div><a class="button {{if .Status.ActiveModelProfileID}}secondary{{end}}" href="/settings/models/new">Connect a model</a></div>
 {{if .Status.ActiveModelProfileID}}
  {{range .Profiles}}{{if eq .ProfileID (activeProfile $.Status)}}<section class="panel current-model" aria-label="Current model"><div class="row-heading"><span class="eyebrow">CURRENT MODEL</span><span class="status-pill" data-status="{{.Status}}">{{.Status}}</span></div><h2>{{.Name}}</h2><p>{{if ne .Name .ModelID}}{{.ModelID}} · {{end}}{{providerName .ProviderKind}}</p><p class="model-endpoint">{{if .Endpoint}}{{.Endpoint}}{{else}}Connected ChatGPT account{{end}}</p><a class="text-link" href="{{modelURL .ProfileID}}">Manage model →</a></section>{{end}}{{end}}
 {{else}}<section class="empty-state"><h2>No model selected</h2><p>Connect a provider, verify it, then explicitly enable it for new work.</p></section>{{end}}

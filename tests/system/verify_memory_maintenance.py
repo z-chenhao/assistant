@@ -14,7 +14,7 @@ from verify_recall import Embeddings
 
 
 def readback(h):
-    root = Path(h.env['ERII_DATA_ROOT'])
+    root = Path(h.env['COLLIE_DATA_ROOT'])
     out = {}
     for name, queries in {
         'state': {'events': 'SELECT * FROM memory_mutation ORDER BY sequence',
@@ -64,16 +64,16 @@ def skill_list(h, key):
 def run(binary, failure_evidence=None):
     report = {'scope': 'M6 memory/context/Skill contracts and GC-01/02/03/06 fragments; not full product scores',
               'scenarios': [], 'passed': False}
-    with tempfile.TemporaryDirectory(prefix='erii-memory-maintenance-') as temp:
+    with tempfile.TemporaryDirectory(prefix='collie-memory-maintenance-') as temp:
         root = Path(temp)
         embeddings = Embeddings()
         h = None
         try:
             h = prepare(binary, root)
-            h.env['ERII_MEMORY_KEY'] = 'S' * 32
-            require(len(h.env['ERII_MEMORY_KEY']) == 32, 'synthetic key length')
+            h.env['COLLIE_MEMORY_KEY'] = 'S' * 32
+            require(len(h.env['COLLIE_MEMORY_KEY']) == 32, 'synthetic key length')
             with (root / 'config.yaml').open('a') as cfg:
-                cfg.write('memory:\n  encryption_key_ref: env:ERII_MEMORY_KEY\n'
+                cfg.write('memory:\n  encryption_key_ref: env:COLLIE_MEMORY_KEY\n'
                           f'embedding:\n  provider: openai_compatible\n  endpoint: http://127.0.0.1:{embeddings.server.server_port}/v1\n'
                           '  model: semantic-fixture-v1\n  dimensions: 5\n')
             # Doctor: same activated profile, explicit local Fakes, no online account.
@@ -121,7 +121,7 @@ def run(binary, failure_evidence=None):
             hits = json.loads(content(found)['text'])
             require(any(hit['content'] == corrected for hit in hits), 'finance correction not recalled')
             require(not any(hit['content'] == finance for hit in hits), 'superseded finance fact recalled')
-            for path in Path(h.env['ERII_DATA_ROOT']).glob('memory.db*'):
+            for path in Path(h.env['COLLIE_DATA_ROOT']).glob('memory.db*'):
                 require(finance.encode() not in path.read_bytes() and corrected.encode() not in path.read_bytes(),
                         'sensitive Memory plaintext at rest')
             require(any(corrected in req['input'] for req in embeddings.requests),
@@ -260,7 +260,7 @@ def run(binary, failure_evidence=None):
                          if json.loads(row['provenance_json'])['stage'] == 'summary_request'
                          and row['run_id'] in {source['run_id'] for source in submitted}]
             require(summaries and snapshot['conversation']['summaries'], 'long context was not summarized and persisted')
-            with closing(sqlite3.connect(Path(h.env['ERII_DATA_ROOT']) / 'state.db')) as db:
+            with closing(sqlite3.connect(Path(h.env['COLLIE_DATA_ROOT']) / 'state.db')) as db:
                 for summary in summaries:
                     generation = db.execute('SELECT status,request_json,result_json FROM model_generation WHERE run_id=? AND step_index=?',
                                             (summary['run_id'], summary['step_index'])).fetchone()
@@ -306,7 +306,7 @@ def run(binary, failure_evidence=None):
                 folder.mkdir()
                 (folder / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: Fixture.\n---\nMethod.\n')
             retained = []
-            for prefix, count in (('.erii-retired-', 140), ('.erii-pending-', 5)):
+            for prefix, count in (('.collie-retired-', 140), ('.collie-pending-', 5)):
                 for i in range(count):
                     folder = skills / f'{prefix}fixture-{i}'
                     folder.mkdir()
@@ -318,7 +318,7 @@ def run(binary, failure_evidence=None):
             def retire_skill(request, name):
                 retired = h.command('skill', 'manage', text=json.dumps(dict(request, operation='retire')))
                 require(retired['status'] == 'retired' and not (skills / name).exists(), 'retirement failed')
-                require((skills / ('.erii-retired-' + request['candidate_ref'].removeprefix('experience:')) / 'SKILL.md').is_file(),
+                require((skills / ('.collie-retired-' + request['candidate_ref'].removeprefix('experience:')) / 'SKILL.md').is_file(),
                         'retirement lost audit copy')
                 require(h.command('status')['agent_ingress_enabled'], 'retirement disabled configured startup')
                 remaining = skill_list(h, name + '-retired-list')

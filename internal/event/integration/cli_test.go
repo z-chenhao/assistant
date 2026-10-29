@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	agentsqlite "github.com/z-chenhao/erii/internal/agent/sqlite"
-	"github.com/z-chenhao/erii/internal/event/testbroker"
+	agentsqlite "github.com/z-chenhao/collie/internal/agent/sqlite"
+	"github.com/z-chenhao/collie/internal/event/testbroker"
 )
 
 func TestRelayCLI(t *testing.T) {
-	binary := os.Getenv("ERII_TEST_BINARY")
+	binary := os.Getenv("COLLIE_TEST_BINARY")
 	if binary == "" {
 		t.Skip("real CLI is driven by make verify after make build")
 	}
@@ -34,7 +34,7 @@ func TestRelayCLI(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(childCtx, binary, "-config", configuration, "relay")
 	for _, entry := range os.Environ() {
-		if !strings.HasPrefix(entry, "ERII_") {
+		if !strings.HasPrefix(entry, "COLLIE_") {
 			cmd.Env = append(cmd.Env, entry)
 		}
 	}
@@ -117,7 +117,7 @@ func TestRelayCLI(t *testing.T) {
 	raw, err = json.MarshalIndent(report, "", "  ")
 	checkErr(t, err)
 	t.Log(string(raw))
-	if path := os.Getenv("ERII_EVENT_EVIDENCE"); path != "" {
+	if path := os.Getenv("COLLIE_EVENT_EVIDENCE"); path != "" {
 		checkErr(t, os.WriteFile(filepath.Join(filepath.Dir(path), "relay.json"), append(raw, '\n'), 0600))
 	}
 }

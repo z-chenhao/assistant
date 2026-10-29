@@ -2,7 +2,7 @@
 
 [功能与需求](../features/observability.md) · [测试方案](../test-plans/observability.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-29。当前实现对齐 Langfuse 的观测概念与浏览体验；视觉沿用 Erii 的共享主题、控件和间距，只有状态使用语义颜色。运行状态、冻结请求和重放仍由 Erii 持有。参考 [Core concepts](https://langfuse.com/docs/observability/data-model)、[Observation types](https://langfuse.com/docs/observability/features/observation-types) 与 [Good traces](https://langfuse.com/docs/observability/best-practices)。跨功能语义服从 [运行时契约](runtime-contracts.md)。
+最近核对：2026-10-29。当前实现对齐 Langfuse 的观测概念与浏览体验；视觉沿用 Collie 的共享主题、控件和间距，只有状态使用语义颜色。运行状态、冻结请求和重放仍由 Collie 持有。参考 [Core concepts](https://langfuse.com/docs/observability/data-model)、[Observation types](https://langfuse.com/docs/observability/features/observation-types) 与 [Good traces](https://langfuse.com/docs/observability/best-practices)。跨功能语义服从 [运行时契约](runtime-contracts.md)。
 
 ## 当前架构
 

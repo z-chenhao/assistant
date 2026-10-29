@@ -3,7 +3,7 @@ package embedding
 import (
 	"context"
 	"fmt"
-	"github.com/z-chenhao/erii/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall"
 	"net/http"
 	"net/http/httptest"
 	"strings"

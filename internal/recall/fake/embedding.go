@@ -3,7 +3,7 @@ package fake
 
 import (
 	"context"
-	"github.com/z-chenhao/erii/internal/recall"
+	"github.com/z-chenhao/collie/internal/recall"
 	"strings"
 )
 

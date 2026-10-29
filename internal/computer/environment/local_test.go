@@ -44,7 +44,7 @@ type toolValue struct {
 
 func TestPersistentReadBashEditWriteAndHostIsolation(t *testing.T) {
 	l := localFixture(t)
-	t.Setenv("ERII_SECRET_SENTINEL", "host-credential-not-exported")
+	t.Setenv("COLLIE_SECRET_SENTINEL", "host-credential-not-exported")
 	host := filepath.Join(t.TempDir(), "host-only")
 	if err := os.WriteFile(host, []byte("HOST_PRIVATE"), 0600); err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestPersistentReadBashEditWriteAndHostIsolation(t *testing.T) {
 	execute(t, l, "edit", map[string]any{"path": "nested/file.txt", "old_text": "one", "new_text": "two", "before_hash": read.Hash})
 	read = execute(t, l, "read", map[string]any{"path": "nested/file.txt"})
 	execute(t, l, "edit", map[string]any{"path": "nested/file.txt", "old_text": "two", "new_text": "three", "before_hash": read.Hash})
-	result := execute(t, l, "bash", map[string]any{"command": "cat nested/file.txt; test ! -e " + host + "; test -z \"$ERII_SECRET_SENTINEL\"; printf 'shell file' > shell.txt"})
+	result := execute(t, l, "bash", map[string]any{"command": "cat nested/file.txt; test ! -e " + host + "; test -z \"$COLLIE_SECRET_SENTINEL\"; printf 'shell file' > shell.txt"})
 	if result.ExitCode != 0 || !strings.Contains(result.Output, "user line\nagent three") {
 		t.Fatal(result)
 	}

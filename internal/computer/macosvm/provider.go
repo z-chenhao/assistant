@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/computer"
+	"github.com/z-chenhao/collie/internal/computer"
 	"golang.org/x/sys/unix"
 )
 
@@ -70,7 +70,7 @@ func New(c Config, guest Guest) (*Provider, error) {
 	var marker struct {
 		Version int `json:"version"`
 	}
-	if readJSON(filepath.Join(c.Root, "erii-computer.json"), &marker) != nil || marker.Version != 1 {
+	if readJSON(filepath.Join(c.Root, "collie-computer.json"), &marker) != nil || marker.Version != 1 {
 		return nil, computer.ErrInvalid
 	}
 	for _, dir := range []string{"vms", "checkpoints", "operations", "base"} {
@@ -245,7 +245,7 @@ func (p *Provider) ensure(ctx context.Context, r computer.Request, saved *receip
 	dir := filepath.Join(p.config.Root, "vms", r.Instance.NativeName)
 	operation := filepath.Join(p.config.Root, "operations", r.OperationID+".json")
 	if saved == nil {
-		if _, err := os.Lstat(filepath.Join(dir, "erii-instance.json")); os.IsNotExist(err) {
+		if _, err := os.Lstat(filepath.Join(dir, "collie-instance.json")); os.IsNotExist(err) {
 			var base receipt
 			source := filepath.Join(p.config.Root, "base")
 			if readJSON(filepath.Join(source, "receipt.json"), &base) != nil || !reflect.DeepEqual(base.Compatibility, r.Compatibility) {
@@ -292,7 +292,7 @@ func (p *Provider) ensure(ctx context.Context, r computer.Request, saved *receip
 		if err != nil || !sameStamps(before, after) {
 			return computer.Instance{}, computer.ErrIntegrity
 		}
-		if err := writeJSON(filepath.Join(stage, "erii-instance.json"), r.Instance); err != nil {
+		if err := writeJSON(filepath.Join(stage, "collie-instance.json"), r.Instance); err != nil {
 			return computer.Instance{}, err
 		}
 		p.boundary("before_instance_publish")
@@ -309,7 +309,7 @@ func (p *Provider) ensure(ctx context.Context, r computer.Request, saved *receip
 		return computer.Instance{}, computer.ErrIntegrity
 	}
 	var owner computer.Instance
-	if readJSON(filepath.Join(dir, "erii-instance.json"), &owner) != nil || owner != r.Instance {
+	if readJSON(filepath.Join(dir, "collie-instance.json"), &owner) != nil || owner != r.Instance {
 		return computer.Instance{}, computer.ErrStale
 	}
 	status, ip, err := p.state(ctx, r.Instance.NativeName)
@@ -401,7 +401,7 @@ func (p *Provider) Checkpoint(ctx context.Context, r computer.Request) (computer
 		return cp, r.Fence(ctx)
 	}
 	var instance computer.Instance
-	if readJSON(filepath.Join(dir, "erii-instance.json"), &instance) != nil || instance != r.Instance {
+	if readJSON(filepath.Join(dir, "collie-instance.json"), &instance) != nil || instance != r.Instance {
 		return computer.Checkpoint{}, computer.ErrStale
 	}
 	status, ip, err := p.state(ctx, r.Instance.NativeName)
@@ -529,7 +529,7 @@ func (p *Provider) Destroy(ctx context.Context, r computer.Request) error {
 		return r.Fence(ctx)
 	}
 	var owner computer.Instance
-	if readJSON(filepath.Join(dir, "erii-instance.json"), &owner) != nil || owner != r.Instance {
+	if readJSON(filepath.Join(dir, "collie-instance.json"), &owner) != nil || owner != r.Instance {
 		return computer.ErrStale
 	}
 	native, err := quiescent(dir, false)
@@ -589,7 +589,7 @@ func ProvisionBase(ctx context.Context, root, source string, compatibility compu
 	if err := syncDir(filepath.Join(root, "base")); err != nil {
 		return err
 	}
-	if err := writeJSON(filepath.Join(root, "erii-computer.json"), map[string]int{"version": 1}); err != nil {
+	if err := writeJSON(filepath.Join(root, "collie-computer.json"), map[string]int{"version": 1}); err != nil {
 		return err
 	}
 	return syncDir(root)

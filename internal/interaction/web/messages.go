@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/conversation"
-	"github.com/z-chenhao/erii/internal/delivery/ui"
-	"github.com/z-chenhao/erii/internal/interaction"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/collie/internal/delivery/ui"
+	"github.com/z-chenhao/collie/internal/interaction"
 )
 
 func (s *Server) acceptJSONMessage(w http.ResponseWriter, r *http.Request) error {

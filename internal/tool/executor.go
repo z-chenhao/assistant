@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 type Error struct {

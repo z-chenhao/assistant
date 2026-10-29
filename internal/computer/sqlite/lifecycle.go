@@ -11,8 +11,8 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/erii/internal/computer"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 // ExecutionHost binds an accepted Code execution. Write must check its live
@@ -350,7 +350,7 @@ type lifecycleChange struct {
 
 func (s Store) publishPlan(ctx context.Context, tx *sql.Tx, plan *computer.Plan, change lifecycleChange) error {
 	var err error
-	change.instance.NativeName = "erii-" + change.instance.ComputerID + "-" + strconv.FormatInt(change.instance.Epoch, 10)
+	change.instance.NativeName = "collie-" + change.instance.ComputerID + "-" + strconv.FormatInt(change.instance.Epoch, 10)
 	if plan.Request.OperationID == "" {
 		plan.Request = computer.Request{Instance: change.instance, OperationID: newID(), CheckpointID: newID(), Compatibility: change.compatibility, Manifest: change.manifest}
 	}

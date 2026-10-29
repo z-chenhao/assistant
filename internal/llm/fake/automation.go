@@ -2,8 +2,8 @@ package fake
 
 import (
 	"encoding/json"
-	"github.com/z-chenhao/erii/internal/automation"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/automation"
+	"github.com/z-chenhao/collie/internal/llm"
 	"strings"
 )
 

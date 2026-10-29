@@ -10,31 +10,31 @@ trap 'rm -rf "$stage"' EXIT
 trap 'exit 1' HUP INT TERM
 # The same installer owns compilation and pinned runtime dependencies.
 sh "$root/install.sh" --prefix "$stage/install"
-bundle=$stage/erii
+bundle=$stage/collie
 mkdir "$bundle"
-cp -R "$stage/install/lib/erii/current/." "$bundle/"
+cp -R "$stage/install/lib/collie/current/." "$bundle/"
 cp "$root/install.sh" "$bundle/"
 cat > "$bundle/README.md" <<'EOF'
-# Erii native package
+# Collie native package
 
 Install Node.js 24.21.0, then run `sh install.sh` in this directory.
-Start Erii with `~/.local/bin/erii`. First launch guides model setup.
+Start Collie with `~/.local/bin/collie`. First launch guides model setup.
 Type `/quit` or press Ctrl-C to stop. No daemon is installed.
 
-Your data stays in `~/.local/share/erii`; reinstalling keeps it.
+Your data stays in `~/.local/share/collie`; reinstalling keeps it.
 Use `sh install.sh --prefix /absolute/path` for another installation location.
 
-Documentation: https://github.com/z-chenhao/erii/blob/main/docs/README.md
+Documentation: https://github.com/z-chenhao/collie/blob/main/docs/README.md
 EOF
 platform=$(go env GOOS)
 arch=$(go env GOARCH)
-tar -czf "$output/erii-$platform-$arch.tar.gz" -C "$stage" erii
+tar -czf "$output/collie-$platform-$arch.tar.gz" -C "$stage" collie
 (
   cd "$output"
   if command -v sha256sum >/dev/null; then
-    sha256sum "erii-$platform-$arch.tar.gz" > "erii-$platform-$arch.tar.gz.sha256"
+    sha256sum "collie-$platform-$arch.tar.gz" > "collie-$platform-$arch.tar.gz.sha256"
   else
-    shasum -a 256 "erii-$platform-$arch.tar.gz" > "erii-$platform-$arch.tar.gz.sha256"
+    shasum -a 256 "collie-$platform-$arch.tar.gz" > "collie-$platform-$arch.tar.gz.sha256"
   fi
 )
-echo "$output/erii-$platform-$arch.tar.gz"
+echo "$output/collie-$platform-$arch.tar.gz"

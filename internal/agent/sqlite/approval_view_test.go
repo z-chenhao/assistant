@@ -3,7 +3,7 @@ package sqlite
 import (
 	"context"
 	"errors"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/tool"
 	"testing"
 	"time"
 )

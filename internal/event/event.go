@@ -45,7 +45,7 @@ func New(source, typ, subject string, data any) (CloudEvent, error) {
 	return e, Validate(e)
 }
 
-// Validate is Erii's CloudEvents 1.0 JSON profile: a subject and timestamp are
+// Validate is Collie's CloudEvents 1.0 JSON profile: a subject and timestamp are
 // required and payloads are JSON. The SDK preserves standard/extension fields.
 func Validate(e CloudEvent) error {
 	if err := e.Validate(); err != nil {

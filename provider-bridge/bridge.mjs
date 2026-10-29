@@ -104,7 +104,7 @@ function assistantContent(message, model) {
   const text = message.text ? [{ type: 'text', text: message.text }] : [];
   const toolCalls = (message.tool_calls ?? []).map(call => ({
     type: 'toolCall', id: call.id, name: call.name, arguments: JSON.parse(call.arguments),
-    ...(model.provider === 'openai' ? { namespace: 'erii' } : {})
+    ...(model.provider === 'openai' ? { namespace: 'collie' } : {})
   }));
   return {
     role: 'assistant', content: [...text, ...toolCalls], api: model.api,
@@ -173,13 +173,13 @@ async function generate(r, job, send) {
     }
     if (r.session_id !== r.run_id || !r.run_id || !s.snapshot_id || !isAccount && (s.provider_kind !== 'openai_compatible' || s.wire_api !== 'openai_completions' || s.endpoint_hash !== hash(r.connection.endpoint)) || s.max_output_tokens < 1 || s.max_output_tokens > 65536 || s.context_window > 1048576) fail('MODEL_INCOMPATIBLE');
     if (s.max_output_tokens > s.context_window || s.context_window < 1 || s.reasoning_effort || Object.keys(s.generation_defaults ?? {}).length || ['developer_role','reasoning_effort','parallel_tool_calls','stream_usage'].some(k=>s.compatibility?.[k]) || s.compatibility?.tool_result_format !== 'openai') fail('MODEL_INCOMPATIBLE');
-    const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'erii-local',baseUrl:r.connection.endpoint,reasoning:false,input:s.capabilities?.image_input?['text','image']:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
+    const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'collie-local',baseUrl:r.connection.endpoint,reasoning:false,input:s.capabilities?.image_input?['text','image']:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
     // Optional compatibility and sampling stay conservative until individually probed.
     if(isAccount) {model.api='openai-responses';model.provider='openai';model.baseUrl=API;model.compat={supportsDeveloperRole:false,supportsStrictMode:false,supportsMaxOutputTokens:false};}
     const guardedFetch=transport(r.connection,job.controller.signal,state,wireObserver(r,send));
     const fetcher=isAccount ? async(input,init)=>{
       const body=JSON.parse(init.body);
-      if(body.tools?.length) body.tools=[{type:'namespace',name:'erii',description:'Erii tools',tools:body.tools}];
+      if(body.tools?.length) body.tools=[{type:'namespace',name:'collie',description:'Collie tools',tools:body.tools}];
       return guardedFetch(input,{...init,body:JSON.stringify(body)});
     } : guardedFetch;
     const events = (isAccount ? accountStream : stream)(model, normalizeContext(context(r, model)), { apiKey:r.connection.access_token || r.connection.api_key || 'sdk-constructor-only', cacheRetention:isAccount?'none':undefined, fetch:fetcher, signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:30000, onProviderStreamEvent:e=>{

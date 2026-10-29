@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/event"
-	eventsqlite "github.com/z-chenhao/erii/internal/event/sqlite"
-	"github.com/z-chenhao/erii/internal/task"
-	"github.com/z-chenhao/erii/internal/tool"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/event"
+	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/collie/internal/tool"
 )
 
 func (r *Runs) searchTasks(ctx context.Context, tx *sql.Tx, runID string, request task.SearchRequest) (tool.Result, error) {
@@ -160,7 +160,7 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 	return r.taskUpdate(ctx, tx, taskID.String, runID, epoch, status, content)
 }
 func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string, epoch int64, kind, content string) error {
-	e, err := event.New("/erii/tasks", "ai.erii.task_update.v1", taskID, struct {
+	e, err := event.New("/collie/tasks", "ai.collie.task_update.v1", taskID, struct {
 		TaskID    string `json:"task_id"`
 		RootRunID string `json:"root_run_id"`
 		Epoch     int64  `json:"task_epoch"`

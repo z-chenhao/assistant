@@ -1,13 +1,13 @@
 #!/bin/bash
 # Readiness for the explicitly owned synthetic Guest services, never product discovery.
 set -eu
-erii_runtime=/Users/lume/erii25-runtime
-/usr/bin/python3 -c 'import json; assert json.load(open("/Users/lume/erii25-runtime/owned.json"))=={"issue_id":"01a14029-5486-7700-8253-9d891a1093c9"}'
-erii_uid=$(/usr/bin/id -u)
-for erii_label in com.erii.fixture.site com.erii.fixture.browser; do
-  /bin/launchctl print "gui/$erii_uid/$erii_label" >/dev/null 2>&1 || /bin/launchctl bootstrap "gui/$erii_uid" "/Users/lume/Library/LaunchAgents/$erii_label.plist"
+collie_runtime=/Users/lume/collie25-runtime
+/usr/bin/python3 -c 'import json; assert json.load(open("/Users/lume/collie25-runtime/owned.json"))=={"issue_id":"01a14029-5486-7700-8253-9d891a1093c9"}'
+collie_uid=$(/usr/bin/id -u)
+for collie_label in com.collie.fixture.site com.collie.fixture.browser; do
+  /bin/launchctl print "gui/$collie_uid/$collie_label" >/dev/null 2>&1 || /bin/launchctl bootstrap "gui/$collie_uid" "/Users/lume/Library/LaunchAgents/$collie_label.plist"
 done
-"$erii_runtime/node/bin/node" --input-type=module - <<'JS'
+"$collie_runtime/node/bin/node" --input-type=module - <<'JS'
 import fs from 'node:fs';
 let ready;
 for(let i=0;i<60;i++){
@@ -20,7 +20,7 @@ for(let i=0;i<60;i++){
 }
 if(!ready){
  for(const label of ['site','browser']){
- const p=`/Users/lume/erii25-runtime/com.erii.fixture.${label}.log`;
+ const p=`/Users/lume/collie25-runtime/com.collie.fixture.${label}.log`;
  console.log(label,fs.existsSync(p)?fs.readFileSync(p,'utf8').slice(-4096):'no log');
  }
  process.exitCode=1;

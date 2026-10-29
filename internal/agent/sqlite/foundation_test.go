@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/erii/internal/agent"
-	"github.com/z-chenhao/erii/internal/artifact"
-	"github.com/z-chenhao/erii/internal/interaction/web"
-	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/collie/internal/interaction/web"
+	"github.com/z-chenhao/collie/internal/llm"
 )
 
 type gatedArtifactReader struct {
@@ -140,11 +140,14 @@ func TestWebSurvivesTerminalMainFailureAndAcceptsNextRequest(t *testing.T) {
 		}
 	}
 	client := &http.Client{Timeout: time.Second}
-	response, err := client.Get("http://" + listener.Addr().String() + "/favicon.ico")
+	response, err := client.Get("http://" + listener.Addr().String() + "/favicon.png")
 	if err != nil {
 		t.Fatal("listener lost after model failure", err)
 	}
 	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatal("brand asset unavailable after model failure", response.StatusCode)
+	}
 	cancel()
 	select {
 	case err := <-done:
