@@ -1,14 +1,9 @@
-/* Developer tracing owns its layout;
-product conversation islands stay separate. */
+/* Trace layout uses the shared Erii theme; conversation islands stay separate. */
 .observability {
-  --obs-border:#e7e9ee;
-  --obs-muted:#7c8290;
-  --obs-ink:#263142;
-  --obs-purple:#7961d8;
   max-width:none;
-  padding:0 32px 24px;
-  color:var(--obs-ink);
-  font-size:13px;
+  padding:24px var(--workspace-gutter) 40px;
+  color:var(--foreground);
+  font-size:14px;
 }
 .obs-page-heading {
   display:flex;
@@ -17,11 +12,11 @@ product conversation islands stay separate. */
   margin:16px 0 25px;
 }
 .obs-page-heading h1 {
-  font-size:32px;
+  font-size:34px;
   margin:6px 0;
 }
 .obs-subtitle {
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   margin:0;
 }
 .obs-heading-links {
@@ -33,15 +28,15 @@ product conversation islands stay separate. */
   gap:12px;
   align-items:end;
   flex-wrap:wrap;
-  border:1px solid var(--obs-border);
+  border:1px solid var(--border);
   padding:14px 16px;
-  border-radius:10px;
-  background:#fff;
+  border-radius:12px;
+  background:var(--background);
 }
 .obs-filters label {
   min-width:100px;
   font-size:11px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   margin:0;
 }
 .obs-filters input,.obs-filters select {
@@ -49,21 +44,18 @@ product conversation islands stay separate. */
   max-width:190px;
   height:34px;
   padding:5px 9px;
-  border-color:var(--obs-border);
+  border-color:var(--border);
   font-size:12px;
 }
 .obs-filters button {
   height:34px;
   padding:5px 13px;
-  background:#6550bd;
-  border:0;
-  color:#fff;
 }
 .obs-causality {
   padding:12px 16px;
   margin:14px 0;
-  background:#f8f7fc;
-  border:1px solid #e7e2f5;
+  background:var(--muted);
+  border:1px solid var(--border);
   border-radius:9px;
   overflow-wrap:anywhere;
 }
@@ -71,7 +63,7 @@ product conversation islands stay separate. */
   margin:0 12px 0 8px;
 }
 .obs-causality small,.obs-privacy-note {
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   font-size:11px;
 }
 .obs-causality summary {
@@ -86,9 +78,9 @@ product conversation islands stay separate. */
   margin:16px 0;
 }
 .obs-trace-header {
-  background:#fff;
-  border:1px solid var(--obs-border);
-  border-radius:10px 10px 0 0;
+  background:var(--background);
+  border:1px solid var(--border);
+  border-radius:12px 12px 0 0;
   margin-top:20px;
   padding:18px 20px 0;
 }
@@ -111,57 +103,45 @@ product conversation islands stay separate. */
   letter-spacing:.05em;
   border-radius:5px;
   padding:4px 7px;
-  background:#eee9fc;
-  color:#6b51b3;
+  background:var(--muted);
+  color:var(--foreground);
   text-transform:uppercase;
-}
-.obs-kind.generation {
-  color:#c24b95;
-  background:#f9e8f3;
-}
-.obs-kind.tool {
-  color:#3c79aa;
-  background:#e8f3fc;
-}
-.obs-kind.retriever {
-  color:#b77e25;
-  background:#fcf3df;
 }
 .obs-status {
   font-size:10px;
   padding:4px 7px;
-  background:#f0f3f6;
+  background:var(--muted);
   border-radius:5px;
   white-space:nowrap;
 }
 .obs-status[data-status=completed],.obs-status[data-status=succeeded],.obs-status[data-status=headers_received] {
-  color:#36816c;
-  background:#e8f5ef;
+  color:var(--success);
+  background:var(--success-surface);
 }
 .obs-status[data-status=failed],.obs-status[data-status=unknown],.obs-status[data-status=http_error] {
-  color:#b6535b;
-  background:#fcebed;
+  color:var(--danger);
+  background:var(--danger-surface);
 }
 .obs-status[data-status=waiting],.obs-status[data-status=pending] {
-  color:#a27931;
-  background:#fcf3df;
+  color:var(--warning);
+  background:var(--warning-surface);
 }
 .obs-refresh {
-  color:#7a6b9b;
+  color:var(--foreground);
   font-size:11px;
 }
 .obs-trace-identity {
   font-size:10px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   overflow-wrap:anywhere;
 }
 .obs-trace-header .root-boundary {
   font-size:11px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-metrics {
   display:flex;
-  border-top:1px solid var(--obs-border);
+  border-top:1px solid var(--border);
   margin-top:14px;
   padding:14px 0;
   gap:20px;
@@ -174,7 +154,7 @@ product conversation islands stay separate. */
 .obs-metrics small {
   display:block;
   font-size:10px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   margin:4px 0;
 }
 .obs-metrics strong {
@@ -185,12 +165,12 @@ product conversation islands stay separate. */
 .obs-workbench {
   display:grid;
   grid-template-columns:minmax(180px,.85fr) minmax(220px,1fr) minmax(340px,1.6fr);
-  border:1px solid var(--obs-border);
+  border:1px solid var(--border);
   border-top:0;
-  border-radius:0 0 10px 10px;
+  border-radius:0 0 12px 12px;
   min-height:570px;
   overflow:hidden;
-  background:#fff;
+  background:var(--background);
 }
 .obs-tree-pane,.obs-waterfall-pane,.obs-detail-pane {
   min-width:0;
@@ -199,7 +179,7 @@ product conversation islands stay separate. */
   padding:14px;
 }
 .obs-tree-pane,.obs-waterfall-pane {
-  border-right:1px solid var(--obs-border);
+  border-right:1px solid var(--border);
 }
 .obs-detail-pane {
   padding:18px 20px;
@@ -217,14 +197,14 @@ product conversation islands stay separate. */
 }
 .obs-pane-heading>span {
   font-size:10px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-pane-heading .obs-kind {
-  color:#6b51b3;
+  color:var(--foreground);
 }
 .obs-pane-note,.obs-detail-note {
   font-size:10px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   line-height:1.6;
   overflow-wrap:anywhere;
 }
@@ -247,7 +227,7 @@ product conversation islands stay separate. */
   min-width:0;
   font-size:11px;
   text-decoration:none;
-  color:#434a5c;
+  color:var(--foreground);
 }
 .obs-node-name {
   overflow:hidden;
@@ -261,36 +241,28 @@ product conversation islands stay separate. */
   max-width:8px;
 }
 .obs-type-icon {
-  color:#826bd2;
+  color:var(--muted-foreground);
   font-size:12px;
 }
-.obs-type-icon.generation {
-  color:#d369a4;
-}
-.obs-type-icon.tool {
-  color:#3c8ec3;
-}
-.obs-type-icon.retriever {
-  color:#c69844;
-}
 .obs-tree a[aria-current=true],.obs-waterfall-row[aria-current=true] {
-  background:#f0edf9;
-  color:#654cb1;
+  background:var(--muted);
+  color:var(--foreground);
+  font-weight:500;
 }
 .obs-node-status {
   font-size:7px;
-  color:#80b59e;
+  color:var(--success);
 }
 .obs-node-status[data-status=waiting],.obs-node-status[data-status=pending] {
-  color:#d4b165;
+  color:var(--warning);
 }
 .obs-node-status[data-status=failed],.obs-node-status[data-status=unknown],.obs-node-status[data-status=http_error] {
-  color:#cc7b85;
+  color:var(--danger);
 }
 .obs-waterfall-ruler {
   display:flex;
   justify-content:space-between;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   font-size:9px;
   margin:17px 0 10px;
 }
@@ -315,14 +287,14 @@ product conversation islands stay separate. */
   display:flex;
   justify-content:space-between;
   gap:5px;
-  color:#575e70;
+  color:var(--foreground);
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 .obs-waterfall-label small {
   font-size:9px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-waterfall svg {
   display:block;
@@ -331,26 +303,14 @@ product conversation islands stay separate. */
   margin-top:3px;
 }
 .obs-track {
-  stroke:#f1f2f6;
+  stroke:var(--muted);
   stroke-width:1;
 }
 .obs-bar {
-  fill:#8e79d8;
+  fill:var(--muted-foreground);
 }
-.obs-bar.generation {
-  fill:#df91bd;
-}
-.obs-bar.tool {
-  fill:#7fb3dc;
-}
-.obs-bar.retriever {
-  fill:#e6c17e;
-}
-.obs-bar.event {
-  fill:#b9bec9;
-}
-.obs-bar.chain {
-  fill:#83bdb8;
+.obs-waterfall-row[aria-current=true] .obs-bar {
+  fill:var(--foreground);
 }
 .obs-selected-name {
   font-size:17px;
@@ -359,7 +319,7 @@ product conversation islands stay separate. */
 }
 .obs-selected-id {
   font-size:9px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   overflow-wrap:anywhere;
 }
 .obs-detail-facts {
@@ -367,7 +327,7 @@ product conversation islands stay separate. */
   gap:9px;
   flex-wrap:wrap;
   font-size:10px;
-  color:#808798;
+  color:var(--muted-foreground);
 }
 .obs-parent {
   font-size:10px;
@@ -377,7 +337,7 @@ product conversation islands stay separate. */
   display:flex;
   gap:14px;
   overflow:auto;
-  border-bottom:1px solid var(--obs-border);
+  border-bottom:1px solid var(--border);
   padding-bottom:10px;
   margin:20px 0;
 }
@@ -385,11 +345,11 @@ product conversation islands stay separate. */
   text-transform:capitalize;
   font-size:11px;
   white-space:nowrap;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   text-decoration:none;
 }
 .obs-detail-tabs a[aria-current=page] {
-  color:#7254c1;
+  color:var(--foreground);
   font-weight:700;
 }
 .obs-detail-pane h3 {
@@ -398,7 +358,7 @@ product conversation islands stay separate. */
 }
 .obs-muted {
   font-size:10px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
   font-weight:400;
   margin-left:5px;
 }
@@ -407,13 +367,13 @@ product conversation islands stay separate. */
   flex-wrap:wrap;
   gap:5px;
   font-size:10px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-context-actions a {
-  color:#7a61be;
+  color:var(--foreground);
 }
 .obs-message {
-  border:1px solid var(--obs-border);
+  border:1px solid var(--border);
   border-radius:7px;
   margin:9px 0;
   overflow:hidden;
@@ -422,31 +382,31 @@ product conversation islands stay separate. */
   display:flex;
   align-items:center;
   gap:8px;
-  background:#fafbfc;
+  background:var(--muted);
   padding:9px 11px;
   cursor:pointer;
   font-size:10px;
 }
 .obs-message summary>span:last-child {
   margin-left:auto;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-message-role {
   text-transform:uppercase;
-  color:#687083;
+  color:var(--foreground);
   font-weight:650;
   font-size:9px;
   letter-spacing:.05em;
 }
 .role-user {
-  border-color:#ded8f0;
+  border-color:var(--border);
 }
 .role-user summary {
-  background:#f6f3fb;
+  background:var(--muted);
 }
 .role-assistant {
-  background:#f3faf7;
-  border-color:#dfeee5;
+  background:var(--muted);
+  border-color:var(--border);
 }
 .obs-message-text {
   white-space:pre-wrap;
@@ -458,9 +418,9 @@ product conversation islands stay separate. */
 .obs-call-card {
   padding:10px;
   margin:8px;
-  border:1px solid #d9e7f1;
+  border:1px solid var(--border);
   border-radius:6px;
-  background:#f1f7fb;
+  background:var(--muted);
 }
 .obs-call-card strong,.obs-call-card small {
   display:block;
@@ -476,9 +436,9 @@ product conversation islands stay separate. */
   font-size:10px;
   line-height:1.65;
   padding:12px;
-  border:1px solid var(--obs-border);
+  border:1px solid var(--border);
   border-radius:7px;
-  background:#fafbfc;
+  background:var(--muted);
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   word-break:break-word;
@@ -486,9 +446,9 @@ product conversation islands stay separate. */
 }
 .obs-empty {
   padding:18px 12px;
-  background:#fafbfc;
-  border:1px dashed var(--obs-border);
-  color:var(--obs-muted);
+  background:var(--muted);
+  border:1px dashed var(--border);
+  color:var(--muted-foreground);
   font-size:11px;
   border-radius:7px;
   line-height:1.6;
@@ -497,12 +457,12 @@ product conversation islands stay separate. */
   display:inline-block;
   margin:12px 0;
   font-size:11px;
-  color:#7959c6;
+  color:var(--foreground);
 }
 .obs-trace-list {
-  border:1px solid var(--obs-border);
-  border-radius:10px;
-  background:#fff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--background);
   margin-top:24px;
   overflow:hidden;
 }
@@ -521,14 +481,14 @@ product conversation islands stay separate. */
 .obs-trace-list th {
   text-align:left;
   font-weight:500;
-  color:var(--obs-muted);
-  background:#fafbfc;
-  border-top:1px solid var(--obs-border);
+  color:var(--muted-foreground);
+  background:var(--muted);
+  border-top:1px solid var(--border);
   padding:11px 15px;
 }
 .obs-trace-list td {
   vertical-align:top;
-  border-top:1px solid var(--obs-border);
+  border-top:1px solid var(--border);
   padding:15px;
   max-width:280px;
 }
@@ -539,11 +499,11 @@ product conversation islands stay separate. */
 }
 .obs-trace-list td code {
   font-size:8px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-trace-list td small {
   font-size:9px;
-  color:var(--obs-muted);
+  color:var(--muted-foreground);
 }
 .obs-trace-list .obs-kind {
   margin-right:7px;
@@ -562,11 +522,11 @@ product conversation islands stay separate. */
   overflow-wrap:anywhere;
 }
 .obs-output-preview {
-  color:#6b9585;
+  color:var(--muted-foreground);
 }
 .obs-session-filter {
   font-size:11px;
-  color:#8975ad;
+  color:var(--foreground);
 }
 .obs-privacy-note {
   margin:18px 0;
@@ -588,7 +548,7 @@ product conversation islands stay separate. */
     grid-column:1/-1;
     grid-row:2;
     border-right:0;
-    border-top:1px solid var(--obs-border);
+    border-top:1px solid var(--border);
     max-height:300px;
   }
   .obs-detail-pane {
@@ -627,7 +587,7 @@ product conversation islands stay separate. */
   .obs-tree-pane {
     max-height:300px;
     border-right:0;
-    border-bottom:1px solid var(--obs-border);
+    border-bottom:1px solid var(--border);
   }
   .obs-detail-pane {
     max-height:none;
@@ -655,8 +615,14 @@ product conversation islands stay separate. */
     display:block;
     margin:5px 0;
   }
+
+}
+
+@media(max-width:700px) {
   .observability {
-    padding:0 15px 20px;
-    max-width:100%;
+    padding:24px 20px 40px;
+  }
+  .obs-page-heading h1 {
+    font-size:28px;
   }
 }

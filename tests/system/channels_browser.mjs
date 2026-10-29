@@ -181,9 +181,20 @@ try{
   const capability=process.env.ERII_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
   await page.getByText(capability,{exact:false}).waitFor();
   if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).first().isChecked())throw new Error('vision declaration enabled implicitly');
-  await page.getByRole('link',{name:'Conversation',exact:false}).click();
+  // The owner may open the native picker while the enhancement bundle loads.
+  // Its input must survive that enhancement, including an unfinished selection.
+  let release,requested;
+  const bundle=new Promise(resolve=>{release=resolve});
+  const loading=new Promise(resolve=>{requested=resolve});
+  await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
+  const navigation=page.getByRole('link',{name:'Conversation',exact:false}).click();
+  await loading;
   await page.getByLabel('Message Erii',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
-  await page.getByLabel('Attach a file').setInputFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.ERII_TEST_PICTURE,'base64')});
+  const [picker]=await Promise.all([page.waitForEvent('filechooser'),page.getByLabel('Attach a file').click()]);
+  release();await navigation;await page.unroute('**/app.js');
+  await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
+  if(!await picker.element().evaluate(input=>input===document.querySelector('.composer input[type=file]')))throw new Error('enhancement replaced the open file picker');
+  await picker.setFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.ERII_TEST_PICTURE,'base64')});
   await page.getByRole('button',{name:'Send message',exact:true}).click();
   const expected=process.env.ERII_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
   await page.locator('.message.assistant').filter({hasText:expected}).waitFor();
