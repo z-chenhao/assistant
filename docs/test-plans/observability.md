@@ -13,13 +13,13 @@
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
 | [F-031](../features/observability.md#f-031) | 真实工作能从入口定位到 Main、Task、Root 和 Child；Root 不被误标为 Main 的 Child。 | 已有真实 Actor/SQLite 与浏览器入口；逐轮内容不是本行完成范围 |
-| [F-034](../features/observability.md#f-034) | UI 与被冻结的 Host 请求逐项一致，工具调用/结果对应正确，来源和省略可追溯，长文本可完整查看。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| [F-034](../features/observability.md#f-034) | UI 与被冻结的 Host 请求逐项一致，工具调用/结果对应正确，来源和省略可追溯，长文本可完整查看。 | 已有冻结记录/API 比对、真实压缩恢复与浏览器入口；无发送边界观测或模型质量结论 |
 | [F-035](../features/observability.md#f-035) | HTTP peer 接收的请求与观测记录对应，差异明确标记为脱敏或媒体引用；请求头凭据不可见。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-036](../features/observability.md#f-036) | 受控中断恢复后，UI 不把复用结果显示成新外部调用；未知结果、缺失 usage 和未 dispatch 等待如实展示。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 
 ## 层级与关键路径
 
-F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider 决定调用，ToolInvocation、Task 和递归 Child 由真实执行链产生；页面读取真实保存的数据，不为 Inspector 新建执行引擎。其他 ID 的内容观测仍待实现。
+F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider 决定调用，ToolInvocation、Task 和递归 Child 由真实执行链产生；页面读取真实保存的数据，不为 Inspector 新建执行引擎。F-034 沿用同一真实执行与冻结存储；F-035/F-036 的发送边界和时间线仍待实现。
 
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
@@ -27,7 +27,7 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 
 ## 首版具体场景
 
-下表维护整组功能的验收用例；F-031 的已有入口见下节，其余场景仍待相应 feature 实现，不由关系检查通过推定。
+下表维护整组功能的验收用例；F-031 的已有入口见下节，F-034 的具体证据也列在下节；F-035/F-036 场景仍待实现，不由关系/context 检查通过推定。
 
 | 场景 | 关联需求 | 输入 / 操作 | 预期断言 | 层级 |
 | --- | --- | --- | --- | --- |
@@ -51,10 +51,13 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 | [internal/agent/sqlite/inspection_test.go](../../internal/agent/sqlite/inspection_test.go) | 真实 Main/Task/Root/递归 Child、原始提交因果、选择与分页、相同时间游标、角色/状态/UTC 边界、Agent 隔离、只读并发、schema 29→30 回滚与冻结数据保持 | 执行结果在对应日志维护 |
 | [internal/observability/sqlite/inspection_test.go](../../internal/observability/sqlite/inspection_test.go) | 数据库层拒绝检查器写入，缺失状态文件不能由读操作创建；读取失败不成为 Runtime 启动依赖 | 执行结果在对应日志维护 |
 | [internal/interaction/web/inspection_test.go](../../internal/interaction/web/inspection_test.go) | 认证、无执行 runtime 依赖、参数校验、标题转义、元数据页面、无 POST 动作、脱敏失败 | 执行结果在对应日志维护 |
-| [verify_channels.py](../../tests/system/verify_channels.py) 的 inspection_relationships / [channels_browser.mjs](../../tests/system/channels_browser.mjs) | CLI 设置 → 实际 Web Main 创建 Task 与递归 Child → API 与数据库关系比对 → 浏览器导航/角色状态时间筛选/桌面移动/无 JS → 原始领域计数不变 → SIGKILL 重启不重跑 | 随既有 channels gate 运行，不新增脚本或 gate |
+| [verify_channels.py](../../tests/system/verify_channels.py) 的 inspection_relationships / [channels_browser.mjs](../../tests/system/channels_browser.mjs) | CLI 设置 → 实际 Web Main 创建 Task 与递归 Child → API 与数据库关系比对 → 浏览器导航/角色状态时间筛选/桌面移动/无 JS → 逐轮内容与实际冻结 JSON 比对、Diff 和长 Unicode 正文续读 → 原始领域计数和冻结哈希不变 → SIGKILL 重启不重跑 | 随既有 channels gate 运行，不新增脚本或 gate |
+| [context_inspection_test.go](../../internal/agent/sqlite/context_inspection_test.go) / [context_test.go](../../internal/agent/sqlite/context_test.go) | 真实 Main/Root/递归 Child、语义摘要恢复各轮的完整 messages/tools/response 与冻结记录逐项一致；原请求/效果与归档隐私不变 | 执行结果在对应日志维护 |
+| [observability/sqlite/context_test.go](../../internal/observability/sqlite/context_test.go) | 长中文/emoji/NUL、8192 字节续读、40 项分页、来源隔离、重复键 Diff、增加/移除/改变/移动、未知响应与压缩/召回原记录、独立并发读取 | 执行结果在对应日志维护 |
+| [web/context_test.go](../../internal/interaction/web/context_test.go) | 同一授权边界、参数/偏移校验、完整模板含 step 0 的前后链接、安全转义、无 POST、no-store 与 CSP | 执行结果在对应日志维护 |
 
 - **F-031 证明范围**：O-01 导航、O-09 的关系元数据分页、O-10 的认证/只读/转义已有入口。缺少来源记录时明确未知；标题裁切、跨页状态变化和树片段有说明。截图不证明后续逐轮内容或模型质量。
-- **F-034 剩余覆盖**：实现完整有序消息查看、来源关联、压缩省略说明、相邻轮次新增/删除/变化展示。
+- **F-034 证明范围**：O-02/03/04/09/10 由实际冻结记录比对、语义压缩/恢复检查、SQL 边界测试和真实浏览器共同覆盖。完整内容是保存的 Host 请求和已接纳结果；旧来源缺失明确未知，压缩归档仅显示引用，不授予新 Artifact 访问。
 - **F-035 剩余覆盖**：在最终发送边界保存受控脱敏记录，标识发送尝试与转换版本；凭据和图片 Base64 不进入普通轨迹。
 - **F-036 剩余覆盖**：聚合模型/工具时间线、状态、已有 Token/耗时；区分 Generation、dispatch attempt 和结果复用。
 

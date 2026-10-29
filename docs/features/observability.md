@@ -36,9 +36,9 @@
 
 **需求**：展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。
 
-**当前实现**：model_generation 已保存冻结请求与结果；召回、压缩有独立记录，缺聚合查询与页面。
+**当前实现**：在执行详情点击 Inspect frozen context，按 step 顺序打开已接纳的模型轮次，查看有序 system/user/assistant/tool 消息、工具 Schema、模型响应、压缩来源/省略记录与冻结召回。消息有可读正文和完整存储 JSON 两种视图；JSON 保留工具调用 ID、参数、结果、图片引用及原始来源。相邻轮次可查看新增、移除、变化与移动项，并打开前后完整内容。
 
-**边界与剩余工作**：实现完整有序消息查看、来源关联、压缩省略说明、相邻轮次新增/删除/变化展示。
+**边界**：读取 Host 冻结记录，不重新组装 context，不冒充 Bridge/SDK 最终请求。来源 kind/ref、召回 hit、summary_request/working_set、省略引用和 history_artifact 按已存记录呈现；旧记录没有细粒度来源时明确未知，不解析文本猜测来源或自动开放私有压缩归档。Diff 按保存的 source ref / tool call ID 对齐，旧消息按位置、工具按名称、重复键按出现顺序；比较存储项，不做语义相似度匹配。每页最多 40 条，正文每段最多 8192 UTF-8 字节，链接可读完全部正文与 JSON；不静默截断。待完成或失败 generation 不伪造响应，已保存的 clipped 标记在响应 JSON 中保留。
 
 **验收目标**：UI 与被冻结的 Host 请求逐项一致，工具调用/结果对应正确，来源和省略可追溯，长文本可完整查看。
 
@@ -73,9 +73,12 @@
 1. 在 Execution list 中按角色、状态和创建时间查找。时间筛选使用 UTC，起点包含、终点不包含；Apply filters 重置分页与选择，Older executions 读取下一页。
 2. 打开 Main，沿 Task action timeline 查看原始创建、追加或控制回执。时间标记为来源调用的接纳时间，不冒充外部 dispatch 时间。点击 Task 查看执行树。
 3. 打开 Root/Child，核对实际 Parent、Root 和 Task epoch；Parent/Root/创建者链接可相互跳转。More relationships 读取后续节点或回执，刷新页面获取最新状态。
-4. Back to conversation 和 Ongoing work 返回日常工作入口。该页面没有重放、审批、取消或外部发送动作；关闭 JavaScript 仍可使用导航、筛选和分页。
+4. 在选中执行内点击 **Inspect frozen context**，选择 Step，然后切换 messages / tools / response / provenance / recall。messages 中按原始索引选择消息，Readable text 查看正文，Complete stored item (JSON) 核对工具调用、响应与全部元数据；Continue full content 连续读取长内容。Adjacent round diff 的 Before / After 打开对应原始项；第一轮明确没有前一轮。
+5. Back to conversation 和 Ongoing work 返回日常工作入口。该页面没有重放、审批、取消或外部发送动作；关闭 JavaScript 仍可使用导航、筛选和分页。
 
-`erii ops trace RUN_ID` 继续提供既有简化事件。完整逐轮 context、Diff、供应商最终请求与调用/用量时间线尚未实现，分别由 F-034/F-035/F-036 维护。
+上下文含私有对话与工具正文，沿用同一安装所有者的 Web token/session 与 binding 授权，仅用于受控开发检查；不新增公开入口、自动导出、观测副本或长期保留策略。现有权威记录的保留/备份规则继续适用，API/Page 使用 no-store 与 CSP。不会读取模型凭据、配置快照、所有权 token 或图片字节。
+
+`erii ops trace RUN_ID` 继续提供既有简化事件。供应商最终请求与调用/用量时间线尚未实现，由 F-035/F-036 维护；已保存 generation 结果不等于一次新的外部发送。
 
 ## 详细操作参考
 

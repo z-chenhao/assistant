@@ -230,18 +230,29 @@ def inspection_relationships(binary, evidence, report):
     with tempfile.TemporaryDirectory(prefix='erii-inspection-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'capabilities')
         try:
-            h.setup();h.start()
+            h.setup(metadata=dict(name='inspection fixture',provider_kind='openai_compatible',
+                endpoint='http://127.0.0.1:1/v1',wire_api='openai_completions',model_id='fixture-model',
+                context_window=65536,max_output_tokens=4096,generation_defaults={},
+                compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True)))
+            h.start()
             h.wait_state(lambda status:status['readiness']=='ready','inspection runtime readiness',lambda _:h.http('/api/status'))
             h.http('/api/message',dict(source_id='inspect-tree',content=[dict(type='text',text=plan([
                 dict(name='builtin__task_manage',arguments=dict(operation='create',task=root))]))]))
             h.wait(lambda s:sum(r['worker_position']=='child' for r in s['runs'])==2
                    and all(r['status'] in ('completed','failed','cancelled') for r in s['runs'])
                    and all(d['status']=='sent' for d in s['deliveries']), 'completed inspection tree')
+            # A real long user turn proves continuation through the actual Web
+            # surface; no synthetic internal acceptance or checkpoint rewrite.
+            h.http('/api/message',dict(source_id='inspect-long-context',content=[dict(type='text',text='Capabilities: []\n'+'完整上下文🦊 '*1000+'<img src=x onerror="unsafe()">LONG_CONTEXT_END')]))
+            h.wait(lambda s:all(r['status'] in ('completed','failed','cancelled') for r in s['runs'])
+                   and all(d['status']=='sent' for d in s['deliveries']), 'completed long context turn')
             def facts():
                 with sqlite3.connect(h.root/'data/state.db') as db:
                     return dict(runs=[dict(zip(('id','role','parent','root'),row)) for row in db.execute(
                         "SELECT run_id,CASE WHEN kind='main' THEN 'main' ELSE worker_position END,coalesce(parent_run_id,''),coalesce(root_run_id,'') FROM run ORDER BY created_at,run_id")],
                         task=db.execute('SELECT task_ref FROM task').fetchone()[0],
+                        long_context=dict(zip(('run','step','item'),db.execute("SELECT g.run_id,g.step_index,cast(j.key AS integer) FROM model_generation g,json_each(g.request_json,'$.messages') j WHERE json_extract(j.value,'$.text') LIKE '%LONG_CONTEXT_END%' ORDER BY g.created_at DESC LIMIT 1").fetchone())),
+                        frozen_hash=hashlib.sha256(json.dumps(db.execute('SELECT generation_id,request_hash,request_json,result_json FROM model_generation ORDER BY generation_id').fetchall()).encode()).hexdigest(),
                         main=db.execute("SELECT i.run_id FROM task_request q JOIN tool_invocation i USING(invocation_id) WHERE json_extract(i.arguments_json,'$.operation')='create'").fetchone()[0],
                         counts={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in
                                 ('run','task','tool_invocation','task_request','task_invocation','model_generation','run_trace','event_outbox')})
@@ -264,15 +275,54 @@ def inspection_relationships(binary, evidence, report):
             require(actual=={r['id']:(r['role'],r['parent'],r['root']) for r in original['runs'] if r['role']!='main'},'inspection tree differs from authoritative Run links')
             require(tree['creator']['run_id']==original['main'],'Task origin lost')
             require(all(parent!=original['main'] for _,parent,_ in actual.values()),'Root mislabeled as Main Child')
+            inspect_frozen_context(h)
             h.env['ERII_INSPECTION_FACTS']=json.dumps(original)
             h.browser(evidence.parent/'inspection-ui','inspection')
             require(facts()==original,'opening inspection changed execution or domain records')
             h.stop(kill=True);h.start()
             recovered=h.http('/api/developer/relationships?'+urlencode(dict(task=original['task'])))
             require(recovered==tree and facts()==original,'inspection restart rewrote or reran completed work')
+            inspect_frozen_context(h)
             report['scenarios']['inspection']=dict(source=source,tree=tree,paginated_ids=ids,read_only=True,restart=True)
             report['checks'].append('Developer Observability: actual Main/Task/Root/recursive Child, paged metadata, original receipt causality, browser filters/navigation/escaping/mobile, read-only restart')
+            report['checks'].append('Frozen context: ordered stored messages/tools/responses, recorded provenance, adjacent input diff, complete UTF-8 content, authenticated browser and restart without re-execution')
         finally:h.cleanup()
+
+
+def inspect_frozen_context(h):
+    """Compare the HTTP projection with the actual frozen Host records."""
+    def content(run,step,section,index):
+        parts=[];offset=0
+        for _ in range(1000):
+            view=h.http('/api/developer/context?'+urlencode(dict(run=run,step=step,section=section,item=index,offset=offset,format='json')))
+            require(len(view['content'].encode())<=8192,'unbounded context part')
+            parts.append(view['content'])
+            if 'next_offset' not in view:return json.loads(''.join(parts))
+            require(view['next_offset']>offset,'context continuation did not advance')
+            offset=view['next_offset']
+        raise AssertionError('context continuation never completed')
+    h.http('/api/developer/rounds?run=missing',auth=False,expected=401)
+    h.http('/api/developer/context?run=missing&step=0',expected=404)
+    h.http('/api/developer/context?run=missing&step=-1',expected=400)
+    with sqlite3.connect(h.root/'data/state.db') as db:
+        frozen=db.execute('SELECT run_id,step_index,request_json,result_json,status FROM model_generation ORDER BY run_id,step_index').fetchall()
+        for run in {row[0] for row in frozen}:
+            rounds=h.http('/api/developer/rounds?'+urlencode(dict(run=run)))
+            require([r['step'] for r in rounds['items']]==[row[1] for row in frozen if row[0]==run],'round order differs from frozen history')
+        for run,step,raw,result,status in frozen:
+            request=json.loads(raw)
+            for section in ('messages','tools'):
+                items=request.get(section,[])
+                if not items:continue
+                view=h.http('/api/developer/context?'+urlencode(dict(run=run,step=step,section=section)))
+                require([item['index'] for item in view['items']]==list(range(len(items))),'context order differs from snapshot')
+                for index,expected in enumerate(items):
+                    require(content(run,step,section,index)==expected,'HTTP inspection changed frozen '+section)
+                diff=h.http('/api/developer/context-diff?'+urlencode(dict(run=run,step=step,section=section)))
+                require(all(change['kind'] in ('added','removed','changed','moved') for change in diff['items']),'unknown diff semantics')
+            if status=='completed':require(content(run,step,'response',0)==json.loads(result),'response or tool calls differ from accepted result')
+            provenance=db.execute('SELECT provenance_json FROM context_compaction WHERE run_id=? AND step_index=?',(run,step)).fetchone()
+            if provenance:require(content(run,step,'provenance',0)==json.loads(provenance[0]),'compaction provenance rewritten')
 
 
 def dependency_recovery(binary, report):

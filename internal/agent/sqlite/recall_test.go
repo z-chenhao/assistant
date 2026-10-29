@@ -103,6 +103,7 @@ func TestRecallFrozenPerTurnAndFenced(t *testing.T) {
 	if !strings.Contains(raw, "NEW_AFTER_FREEZE") {
 		t.Fatal("new turn failed to retrieve", raw)
 	}
+	assertFrozenContextRun(t, s, run.ID)
 	// Static system prefix is byte stable; runtime evidence is a suffix.
 	if !reflect.DeepEqual(first.Request.Messages[:2], next.Request.Messages[:2]) || next.Request.Messages[len(next.Request.Messages)-1].Origin != "runtime" {
 		t.Fatal("cache prefix changed")

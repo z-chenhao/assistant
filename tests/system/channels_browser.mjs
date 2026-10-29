@@ -101,6 +101,44 @@ try{
   }finally{await compact.close()}
   const plain=await browser.newContext({javaScriptEnabled:false});
   try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());if(await fallback.locator('.run-node').count()!==3)throw new Error('inspector requires JavaScript')}finally{await plain.close()}
+  await page.getByRole('link',{name:'Inspect frozen context',exact:false}).click();
+  await page.getByRole('heading',{name:'Frozen context',exact:true}).waitFor();
+  await page.locator('.round-link').last().click();
+  await page.getByRole('heading',{name:'Adjacent round diff',exact:true}).waitFor();
+  if(!await page.locator('.context-diff [data-change="added"]').count())throw new Error('tool continuation additions missing from diff');
+  const system=page.locator('.context-item-link').filter({hasText:'system'}).first();await system.click();
+  const frozen=await (await context.request.get(page.url().replace('/developer/context?','/api/developer/context?'))).json();
+  if(!frozen.content||await page.locator('.frozen-content').textContent()!==frozen.content)throw new Error('system prompt differs from frozen Host content');
+  await page.getByRole('link',{name:'Complete stored item (JSON)',exact:true}).click();
+  if(!(await page.locator('.frozen-content').innerText()).includes('"role":"system"'))throw new Error('stored message JSON unavailable');
+  await page.getByRole('link',{name:'tools',exact:true}).click();
+  if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('input_schema')))throw new Error('Tool schema unavailable');
+  await page.getByRole('link',{name:'response',exact:true}).click();
+  await page.getByRole('link',{name:'Complete stored item (JSON)',exact:true}).click();
+  if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('tool_calls')))throw new Error('model response unavailable');
+  await page.getByRole('link',{name:'provenance',exact:true}).click();
+  if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('stage')))throw new Error('saved compaction provenance unavailable');
+  const long=facts.long_context;
+  await page.goto(url+'/developer/observability?run='+encodeURIComponent(long.run));
+  await page.getByRole('link',{name:'Inspect frozen context',exact:false}).click();
+  await page.getByRole('link',{name:'Step '+long.step,exact:true}).click();
+  await page.locator('.context-item-link').filter({hasText:'['+long.item+']'}).click();
+  let full='';
+  for(let i=0;i<20;i++){
+   full+=await page.locator('.frozen-content').innerText();
+   const more=page.getByRole('link',{name:'Continue full content',exact:false});
+   if(!await more.count())break;
+   await more.click();
+  }
+  if(!full.includes('LONG_CONTEXT_END')||!full.includes('完整上下文🦊'))throw new Error('long Unicode context silently clipped');
+  if(await page.locator('.context-content img').count())throw new Error('context interpreted as HTML');
+  await page.screenshot({path:evidence+'/context-content.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('mobile context overflowed viewport');
+  await page.screenshot({path:evidence+'/context-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:980});
+  const nojs=await browser.newContext({javaScriptEnabled:false});
+  try{await nojs.addCookies(await context.cookies());const fallback=await nojs.newPage();await fallback.goto(page.url());if(!await fallback.locator('.frozen-content').innerText().then(text=>text.includes('LONG_CONTEXT_END')))throw new Error('context requires JavaScript')}finally{await nojs.close()}
  }
  if(phase==='image'){
   await page.getByRole('link',{name:'Settings',exact:false}).click();

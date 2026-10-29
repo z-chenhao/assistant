@@ -12,6 +12,7 @@ import (
 	"github.com/z-chenhao/erii/internal/artifact"
 	"github.com/z-chenhao/erii/internal/conversation"
 	"github.com/z-chenhao/erii/internal/llm"
+	"github.com/z-chenhao/erii/internal/observability"
 	"github.com/z-chenhao/erii/internal/prompt"
 	"github.com/z-chenhao/erii/internal/task"
 	"github.com/z-chenhao/erii/internal/tool"
@@ -272,6 +273,11 @@ func TestSemanticCompactionRecoversAcceptedSummaryWithoutToolReplay(t *testing.T
 	}
 	if !sawState {
 		t.Fatal("summary was not used as runtime working context")
+	}
+	assertFrozenContextRun(t, s, run.ID)
+	provenance, e := s.Inspector().Context(ctx, observability.ContextQuery{RunID: run.ID, Step: 0, Section: "provenance"})
+	if e != nil || !strings.Contains(provenance.Content, "summary_request") || !strings.Contains(provenance.Content, "history_artifact") {
+		t.Fatal("semantic compaction provenance not inspectable", provenance, e)
 	}
 	if strings.Contains(userStream.String(), "PRIVATE_SUMMARY_DELTA") || !strings.Contains(userStream.String(), "PUBLIC_RESULT_DELTA") {
 		t.Fatal("internal summary stream reached user delivery", userStream.String())
