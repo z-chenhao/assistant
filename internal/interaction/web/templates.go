@@ -23,7 +23,6 @@ var layout = template.Must(template.New("layout.html").Funcs(template.FuncMap{
 	"obsStatuses": func() []string { return []string{"queued", "running", "waiting", "completed", "failed", "cancelled"} },
 	"obsRole":     observationRole,
 	"parentRun":   observationParent,
-	"obsIcon":     observationIcon,
 
 	"money":           money,
 	"obsJSON":         viewJSON,
