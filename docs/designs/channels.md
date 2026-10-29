@@ -224,7 +224,7 @@ decisions remain idempotent. Approval expiry/invalidation still fails closed.
 ## Collie Web components
 
 This is a locally bundled presentation layer for the existing Go Web server.
-The conversation layout uses a warm neutral canvas, dark selected navigation,
+The conversation layout uses a warm neutral canvas, soft selected navigation,
 a tennis-green submit action, centered thread and rounded composer. React enhances the escaped server HTML;
 the existing forms and semantic fallback remain usable without JavaScript.
 
@@ -237,7 +237,7 @@ the existing forms and semantic fallback remain usable without JavaScript.
 | [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Collie supplies layout, routes and content |
 | [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | `apps/app/src/components/generative-ui/table-catalog.tsx` native `DataTable` and Zod props | Remove the CopilotKit catalog registration/import; retain validation and accessible table; map the existing UISpec table through a private adapter |
 | Collie brand | Owner-selected 2026-10-29 generation | `assets/brand/collie.png` | Unmodified original image, displayed at different sizes by CSS |
-| [Google Fonts](https://github.com/google/fonts) | Included OFL notices | Bricolage Grotesque and DM Sans variable fonts | Unmodified, self-hosted font files; no CDN |
+| [Google Fonts](https://github.com/google/fonts) | Included OFL notices | Lora and DM Sans variable fonts | Unmodified, self-hosted font files; no CDN |
 
 Upstream licenses and artwork provenance are in `licenses/`. The binary embeds
 the required MIT/Apache-2.0 license texts and serves them at `/licenses.txt`.

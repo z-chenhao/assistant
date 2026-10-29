@@ -20,7 +20,7 @@ try{
   if(!css.length)throw new Error('Tailwind produced an empty stylesheet');
 }finally{rmSync(cssTemp,{recursive:true,force:true});}
 const dependencies={react:'LICENSE','react-dom':'LICENSE',scheduler:'LICENSE',zod:'LICENSE',clsx:'license','class-variance-authority':'LICENSE','tailwind-merge':'LICENSE.md',tailwindcss:'LICENSE'};
-const licenses=[notices,readFileSync(root+'licenses/collie-artwork.md','utf8'),readFileSync(root+'licenses/bricolagegrotesque-OFL.txt','utf8'),readFileSync(root+'licenses/dmsans-OFL.txt','utf8'),...Object.entries(dependencies).map(([name,file])=>name+'\n'+readFileSync(root+'node_modules/'+name+'/'+file,'utf8'))].join('\n\n');
+const licenses=[notices,readFileSync(root+'licenses/collie-artwork.md','utf8'),readFileSync(root+'licenses/lora-OFL.txt','utf8'),readFileSync(root+'licenses/dmsans-OFL.txt','utf8'),...Object.entries(dependencies).map(([name,file])=>name+'\n'+readFileSync(root+'node_modules/'+name+'/'+file,'utf8'))].join('\n\n');
 const outputs={'client.js':js.outputFiles[0].contents,'style.css':css,'licenses.txt':licenses,'brand/NOTICE.txt':readFileSync(root+'licenses/collie-artwork.md')};
 for(const [name,bytes] of Object.entries(outputs)){
   const path=root+'../internal/interaction/web/assets/'+name;

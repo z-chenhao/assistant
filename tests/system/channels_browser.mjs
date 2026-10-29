@@ -59,7 +59,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
   await page.evaluate(()=>document.fonts.ready);
   await page.locator('.welcome').evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
-  if(!await page.evaluate(()=>document.fonts.check('500 16px "DM Sans"')&&document.fonts.check('600 32px "Bricolage Grotesque"')))throw Error('local brand typography unavailable');
+  if(!await page.evaluate(()=>document.fonts.check('500 16px "DM Sans"')&&document.fonts.check('400 40px "Lora"')))throw Error('local brand typography unavailable');
   await page.screenshot({path:evidence+'/welcome.png',fullPage:true});
   if(await page.getByLabel('Message Collie').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
   const preserved=await page.getByLabel('Message Collie').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));

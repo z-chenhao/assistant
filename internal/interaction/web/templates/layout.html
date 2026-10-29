@@ -3,7 +3,7 @@
 <body>
 {{if .Login}}
 <main class="login">
- <a class="brand" href="/"><img src="/brand/collie.png" alt="Collie logo" width="40" height="40">Collie</a>
+ {{template "brand"}}
  <h1>Open your workspace</h1><p>Enter the access token for this installation.</p>
  {{if .Error}}<p class="feedback error" role="alert">{{.Error}}</p>{{end}}
  <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label>Workspace access token<input type="password" name="token" required autocomplete="off" autofocus></label><button>Open workspace →</button></form>
@@ -11,10 +11,10 @@
 </main>
 {{else}}
 <aside class="app-sidebar">
- <a class="brand" href="/"><img src="/brand/collie.png" alt="Collie logo" width="40" height="40"><span>collie<span class="brand-period">.</span></span></a>
+ {{template "brand"}}
  <nav aria-label="Workspace"><a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>Conversation</span></a><a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>Tasks</span></a><a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>Settings</span></a></nav>
  <nav class="developer-nav" aria-label="Developer"><a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>Developer</span></a></nav>
-<p class="sidebar-note">A task out.<br>A little more life back.</p></aside>
+</aside>
 <main class="workspace-main" data-live-view="{{.Live}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}">
  <header class="workspace-topbar"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Workspace</a><span>/</span>{{if eq .Tab "/settings"}}<a href="/settings/models">Settings</a><span>/</span>{{end}}{{if eq .View "task"}}<a href="/tasks">Tasks</a><span>/</span>{{end}}{{if eq .View "trace"}}<a href="{{traceListURL .Trace}}">Traces</a><span>/</span>{{end}}<span>{{.Title}}</span></nav><div id="workspace-status">{{template "status" .}}</div></header>
  <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>
@@ -37,3 +37,5 @@
 {{else if eq .Status.Status "idle"}}<span class="status-pill">Ready</span>
 {{else}}<span class="status-pill">Status unavailable</span>{{end}}
 {{end}}
+
+{{define "brand"}}<a class="brand" href="/"><img src="/brand/collie.png" alt="Collie logo" width="40" height="40"><span>collie<span class="brand-period">.</span></span></a>{{end}}

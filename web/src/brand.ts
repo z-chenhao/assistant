@@ -1,4 +1,4 @@
-// Gentle pointer response for the welcome mascot and primary action. Delegation
+// Gentle pointer response for the welcome mascot. Delegation
 // also covers a welcome region inserted after model setup by live updates.
 export function enhanceBrandMotion(){
  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
@@ -7,7 +7,7 @@ export function enhanceBrandMotion(){
  const reset=()=>{active?.style.removeProperty('--pointer-x');active?.style.removeProperty('--pointer-y');active=null};
  document.addEventListener('pointermove',event=>{
   if(reduced.matches||!fine.matches){reset();return}
-  const target=event.target instanceof Element?event.target.closest<HTMLElement>('.welcome-collie, .send-button'):null;
+  const target=event.target instanceof Element?event.target.closest<HTMLElement>('.welcome-collie'):null;
   if(!target||target.matches(':disabled')){reset();return}
   if(active!==target){reset();active=target}
   const bounds=target.getBoundingClientRect();
