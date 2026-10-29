@@ -30,7 +30,7 @@ var observationSources = []string{
 	`SELECT 'context:'||r.run_id||':'||c.step_index,'agent:'||r.run_id,'chain','Prepare context',r.run_id,cast(c.step_index AS text),c.step_index,'saved',c.created_at,NULL,'saved point',coalesce(json_extract(c.provenance_json,'$.stage'),'unknown')
  FROM context_compaction c JOIN members r USING(run_id)`,
 	`SELECT 'dispatch:'||d.attempt,'generation:'||d.generation_id,'span','Provider HTTP',r.run_id,d.attempt,g.step_index,
- CASE WHEN e.phase='error' THEN 'failed' WHEN e.http_status>=300 THEN 'http_error' WHEN e.phase='headers' THEN 'headers_received' ELSE 'in_flight' END,
+ CASE WHEN e.phase='error' THEN 'failed' WHEN e.http_status>=300 THEN 'http_error' WHEN e.phase='headers' THEN 'headers_received' WHEN g.status!='pending' OR r.status IN ('completed','failed','cancelled') THEN 'unknown' ELSE 'in_flight' END,
  d.occurred_at,e.occurred_at,'HTTP to headers',CASE WHEN e.phase='error' THEN e.error_code WHEN e.http_status>0 THEN 'HTTP '||e.http_status ELSE 'Outcome not recorded' END
  FROM dispatch_observation d JOIN model_generation g USING(generation_id) JOIN members r USING(run_id)
  LEFT JOIN dispatch_observation e ON e.generation_id=d.generation_id AND e.attempt=d.attempt AND e.phase IN ('headers','error') WHERE d.phase='started'`,

@@ -144,3 +144,20 @@ func TestTraceObservationPaginationHasStableScopedKeys(t *testing.T) {
 		t.Fatal("cursor crossed trace", e)
 	}
 }
+
+func TestTraceMissingHTTPTerminalRemainsUnknownAfterCompletion(t *testing.T) {
+	s, _, a, p := childFixture(t)
+	p.respond = childPolicy
+	main := mustSubmit(t, a, "incomplete-http", "inspect a completed trace")
+	mustDrain(t, a)
+	if _, err := s.db.Exec(`INSERT INTO dispatch_observation SELECT generation_id,'incomplete','started',created_at,'test',NULL,'','',0,'' FROM model_generation WHERE run_id=? LIMIT 1`, main.RunID); err != nil {
+		t.Fatal(err)
+	}
+	tree, err := s.Inspector().Observations(context.Background(), observability.ObservationQuery{RunID: main.RunID, Selected: "dispatch:incomplete"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tree.Selected.Status != "unknown" || tree.Selected.Ended != nil || tree.Selected.Detail != "Outcome not recorded" {
+		t.Fatalf("missing terminal evidence misrepresented as a running/completed request: %+v", tree.Selected)
+	}
+}
