@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/z-chenhao/erii/internal/llm"
+	sqlitedriver "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // Recorder owns a bounded, lossy diagnostic mailbox and its own short-lived
@@ -59,13 +62,32 @@ func (r *Recorder) Record(req llm.GenerationRequest, d llm.Dispatch) {
 func (r *Recorder) run() {
 	defer close(r.done)
 	for d := range r.queue {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		var body any
-		if d.Body != nil {
-			body = string(d.Body)
+		r.write(d)
+	}
+}
+
+func (r *Recorder) write(d llm.Dispatch) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	var body any
+	if d.Body != nil {
+		body = string(d.Body)
+	}
+	for {
+		_, err := r.db.ExecContext(ctx, `INSERT INTO dispatch_observation VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`, d.GenerationID, d.Attempt, d.Phase, d.At, d.Format, body, d.BodyHash, d.Omitted, d.HTTPStatus, d.Error)
+		var sqliteErr *sqlitedriver.Error
+		if err == nil || ctx.Err() != nil || !errors.As(err, &sqliteErr) || (sqliteErr.Code()&0xff != sqlite3.SQLITE_BUSY && sqliteErr.Code()&0xff != sqlite3.SQLITE_LOCKED) {
+			return
 		}
-		_, _ = r.db.ExecContext(ctx, `INSERT INTO dispatch_observation VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`, d.GenerationID, d.Attempt, d.Phase, d.At, d.Format, body, d.BodyHash, d.Omitted, d.HTTPStatus, d.Error)
-		cancel()
+		// Retry only this idempotent diagnostic insert within its original budget.
+		// A short domain write should not discard an otherwise available attempt.
+		timer := time.NewTimer(5 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
 	}
 }
 

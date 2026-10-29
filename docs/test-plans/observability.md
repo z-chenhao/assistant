@@ -71,3 +71,5 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+HTTP 诊断写入以真实 SQLite 锁验证：60ms 的短业务写锁释放后保存记录；持续锁定时在预算内放弃，调用方不等待诊断锁。`go test -race ./internal/observability/sqlite -run TestRecorder` 覆盖两条边界。原 native Pi/HTTP 回归保留完整 attempts/headers 数量断言，失败输出已接收请求数、诊断阶段和 generation 状态计数。

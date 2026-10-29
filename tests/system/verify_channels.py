@@ -250,12 +250,17 @@ def native_trace_inspection(binary,evidence,report):
             h.wait_state(lambda status:status['readiness']=='ready','native trace runtime readiness',lambda _:h.http('/api/status'))
             h.http('/api/message',dict(source_id='native-trace',content=[dict(type='text',text='Compare the available evidence and prepare an independent report. Keep the original sources and return a concise summary.')]))
             h.wait(lambda state:any(r['worker_position']=='root' for r in state['runs']) and all(r['status'] in ('completed','failed','cancelled') for r in state['runs']) and all(d['status']=='sent' for d in state['deliveries']),'native trace completion')
+            capture_state={}
             def captured(_):
                 with sqlite3.connect(h.root/'data/state.db') as db:
                     runs={r[0] for r in db.execute('SELECT run_id FROM run')}
                     physical=[r for r in server.requests if r.get('session') in runs and r['method']=='POST']
+                    capture_state.update(physical=len(physical),phases=db.execute('SELECT phase,count(*) FROM dispatch_observation GROUP BY phase').fetchall(),generations=db.execute('SELECT status,count(*) FROM model_generation GROUP BY status').fetchall())
                     return db.execute("SELECT count(*) FROM dispatch_observation WHERE phase='headers'").fetchone()[0]==len(physical)
-            h.wait_state(captured,'all terminal HTTP observations persisted',timeout=10)
+            try:
+                h.wait_state(captured,'all terminal HTTP observations persisted',timeout=10)
+            except RuntimeError as error:
+                raise RuntimeError(str(error)+'; '+json.dumps(capture_state)) from error
             with sqlite3.connect(h.root/'data/state.db') as db:
                 generation,main=db.execute('SELECT generation_id,run_id FROM model_generation ORDER BY created_at LIMIT 1').fetchone()
                 before=[r['body'] for r in server.requests if r.get('session')==main and r['method']=='POST'][:2]
