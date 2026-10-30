@@ -54,7 +54,7 @@ var commandGrammars = map[string]commandGrammar{
 	"spend":      {commandSpend, map[string][]int{"status": {2}}},
 	"computer":   {commandComputer, map[string][]int{"status": {2}, "prepare-base": {3}}},
 	"web":        {commandWeb, map[string][]int{"serve": {2}}},
-	"channel":    {commandChannel, map[string][]int{"manage": {2}}},
+	"channel":    {commandChannel, map[string][]int{"manage": {2}, "status": {2}, "check": {2}}},
 	"automation": {commandAutomation, map[string][]int{"manage": {3}, "list": {2}, "tick": {2}, "work": {2}}},
 	"ops":        {commandOps, map[string][]int{"health": {2}, "report": {2}, "broker": {2}, "upgrade-broker": {2}, "trace": {3}, "activate": {3}, "backup": {4}, "restore": {4}, "retry-event": {4}}},
 }

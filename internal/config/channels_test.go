@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/z-chenhao/collie/internal/interaction/feishu"
 )
 
 func TestChannelConfigRejectsPublicListenerLiteralSecretsAndUntrustedAPI(t *testing.T) {
@@ -19,6 +21,24 @@ func TestChannelConfigRejectsPublicListenerLiteralSecretsAndUntrustedAPI(t *test
 		}
 		if _, err := Load(path, func(string) (string, bool) { return "", false }); err == nil {
 			t.Fatal("unsafe channel config accepted")
+		}
+	}
+}
+
+func TestFeishuExplicitCredentialMode(t *testing.T) {
+	base := feishu.Config{AppID: "app", TenantKey: "tenant", VerificationTokenRef: "env:VERIFY", EncryptKeyRef: "env:ENCRYPT"}
+	for _, test := range []struct {
+		access, secret string
+		valid          bool
+	}{
+		{"env:ACCESS", "", true}, {"", "credential:feishu-app-secret", true}, {"", "", false},
+		{"env:ACCESS", "env:SECRET", false}, {"", "plain-secret", false}, {"", "env:BAD NAME", false},
+	} {
+		cfg := base
+		cfg.AccessTokenRef = test.access
+		cfg.AppSecretRef = test.secret
+		if err := cfg.Validate(); (err == nil) != test.valid {
+			t.Fatalf("credential mode valid=%v: %v", test.valid, err)
 		}
 	}
 }

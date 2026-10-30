@@ -12,7 +12,13 @@ import time
 
 
 class Sandbox:
-    def __init__(self, send_delay=0, upload_delay=0):
+    def __init__(self, send_delay=0, upload_delay=0, managed_auth=False, token_ttl=7200):
+        self.managed_auth = managed_auth
+        self.token_ttl = token_ttl
+        self.auth_requests = 0
+        self.auth_rejections = 0
+        self.current_token = None if managed_auth else 'sandbox-access-token'
+        self.token_expiry = 0
         self.messages = {}
         self.send_attempts = []
         self.uploads = []
@@ -30,11 +36,43 @@ class Sandbox:
             def log_message(self, *_):
                 pass
 
+            def json_reply(self, value, status=200):
+                body = json.dumps(value).encode()
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def authorized(self):
+                with outer.lock:
+                    valid = outer.current_token is not None and self.headers.get('Authorization') == 'Bearer ' + outer.current_token
+                    valid = valid and (not outer.managed_auth or time.monotonic() < outer.token_expiry)
+                    if not valid:
+                        outer.auth_rejections += 1
+                if not valid:
+                    self.json_reply(dict(code=99991663, msg='token rejected'), 401)
+                return valid
+
             def do_POST(self):
-                if self.headers.get('Authorization') != 'Bearer sandbox-access-token':
-                    self.send_error(401)
-                    return
                 raw = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+                if self.path == '/open-apis/auth/v3/tenant_access_token/internal':
+                    if not outer.managed_auth:
+                        self.send_error(404)
+                        return
+                    q = json.loads(raw)
+                    if q != dict(app_id='sandbox-app', app_secret='sandbox-app-secret'):
+                        self.json_reply(dict(code=10003, msg='application credentials rejected'))
+                        return
+                    with outer.lock:
+                        outer.auth_requests += 1
+                        outer.current_token = 'sandbox-managed-token-' + str(outer.auth_requests)
+                        outer.token_expiry = time.monotonic() + outer.token_ttl
+                        token = outer.current_token
+                    self.json_reply(dict(code=0, tenant_access_token=token, expire=outer.token_ttl))
+                    return
+                if not self.authorized():
+                    return
                 drop = False
                 with outer.lock:
                     if self.path == '/open-apis/im/v1/files':
@@ -87,8 +125,10 @@ class Sandbox:
                     pass  # A fenced/cancelled client can leave a real effect.
 
             def do_GET(self):
-                if self.headers.get('Authorization') != 'Bearer sandbox-access-token':
-                    self.send_error(401)
+                if not self.authorized():
+                    return
+                if self.path == '/open-apis/bot/v3/info/':
+                    self.json_reply(dict(code=0, bot=dict(open_id='sandbox-bot', activate_status=2)))
                     return
                 if self.path == '/open-apis/im/v1/messages/media-message/resources/file-key?type=file':
                     body = b'Inbound attachment from the authenticated Feishu owner.\n'

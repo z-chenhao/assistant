@@ -18,6 +18,7 @@ func TestCommandGrammarRejectsBeforeOpeningApplicationState(t *testing.T) {
 		{"artifact", "cleanup", "force"},
 		{"ops", "trace"},
 		{"web", "serve", "unexpected"},
+		{"channel", "check", "unexpected"},
 		{"delivery", "unknown"},
 		{"chat", "send", "one", "two"},
 		{"start"},
@@ -43,6 +44,8 @@ func TestCommandSelectionKeepsControlAndExecutionKindsDistinct(t *testing.T) {
 		{[]string{"artifact", "cleanup", "apply"}, commandArtifact},
 		{[]string{"chat", "send-parts", "request-key"}, commandChat},
 		{[]string{"automation", "work"}, commandAutomation},
+		{[]string{"channel", "status"}, commandChannel},
+		{[]string{"channel", "check"}, commandChannel},
 		{[]string{"ops", "backup", "archive", "credential:key"}, commandOps},
 	} {
 		options, err := parseOptions(test.args, &bytes.Buffer{})

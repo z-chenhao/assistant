@@ -60,9 +60,9 @@
 
 **需求**：已绑定个人身份能接收消息、附件和审批，并维持长期可用。
 
-**当前实现**：签名回调、p2p 身份绑定、收发和本地回执已实现；access token 由外部维护。
+**当前实现**：签名回调、p2p 身份绑定、收发和本地回执已实现。自建应用可通过 SecretStore 中的 app secret 自动换取 tenant access token，按有效期提前刷新，并发请求共用刷新结果；CLI 可检查连接与凭据失效状态。也可显式选择外部维护 access token。
 
-**边界与剩余工作**：补凭据刷新/失效诊断体验；不确定远端投递目前只能依赖已保存本地回执，可信远端核实能力仍待定义。
+**边界**：完成范围为配置型自建单租户应用与已绑定个人 p2p 渠道；不包含应用商店多租户授权。没有可信远端回执的投递保留 `unknown`、只查询本地已存回执，不通过重发消除未知。真实飞书账户的权限、可达性和平台行为需单独 Live 验证。
 
 **验收目标**：验证真实绑定、token 生命周期、通知偏好、撤销、重启与不确定投递；未知结果不盲目重发。
 
@@ -71,6 +71,30 @@
 标准 `collie` 使用终端；配置 Web token 与运行时后执行 `collie web serve`，使用其打印的本地地址。
 
 飞书需配置应用凭据、回调入口，并通过可信 CLI `collie channel manage` 绑定个人身份；群聊不在当前范围。Settings → Notifications 可选择未来通知渠道，保存后显示实际选择；原目的地不可用时显式提示，不回退成 Automatic。已提交的消息、审批、任务阶段与状态按区域更新。
+
+### 飞书凭据与连接检查（F-020）
+
+自建应用可选择自动维护 tenant access token：
+
+```yaml
+feishu:
+  app_id: your-app-id
+  tenant_key: your-tenant-key
+  verification_token_ref: env:COLLIE_FEISHU_VERIFICATION_TOKEN
+  encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT_KEY
+  app_secret_ref: env:COLLIE_FEISHU_APP_SECRET
+```
+
+这里只填写 SecretStore 引用，实际密钥不进入 YAML。`app_secret_ref` 与 `access_token_ref` 必须且只能配置一个。原有外部 token 方式仍可用；新配置在重启后生效，不改变已绑定的身份或通知目标。缓存只存在于进程内，不向领域数据库保存 access token。
+
+```sh
+collie -config config.yaml channel status
+collie -config config.yaml channel check
+```
+
+`status` 只显示配置模式，不发网络请求；新 CLI 进程显示 `unchecked` 是正常情况。`check` 按需取得 token 并读取机器人的自身信息，不发送消息、不修改绑定或处理未知投递。无需先设置活动模型。结果以 `state` 为准：`ready`、`credentials_unavailable`、`credentials_rejected`、`unavailable` 或 `not_configured`；失败时附安全的 `action`，不回显密钥或供应商原始响应。`ready` 证明检查当时机器人信息接口鉴权成功，不保证全部业务 API 权限。
+
+自动模式在到期前刷新；显式 token 拒绝会使对应缓存失效，下一次由原 Delivery 队列调度的安全尝试使用新 token。临时取得凭据失败允许既有有限退避；应用凭据被明确拒绝会终止该次投递，并保存 `credentials_rejected`。已经发出的消息若超时、断连或缺少有效回执，仍是 `unknown`，重启和凭据刷新都不会授权重发。修正凭据后先 `channel check`，再通过正常对话继续工作；不把旧未知消息当作未发送。
 
 ### Web 操作路线
 

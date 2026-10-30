@@ -48,6 +48,10 @@ func runWeb(ctx context.Context, application *app.App, cfg config.Config, out io
 }
 
 func runChannel(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer) error {
+	if flags.Arg(1) == "status" || flags.Arg(1) == "check" {
+		return json.NewEncoder(out).Encode(application.FeishuStatus(ctx, flags.Arg(1) == "check"))
+	}
+
 	var q struct {
 		Op          string `json:"op"`
 		Channel     string `json:"channel"`

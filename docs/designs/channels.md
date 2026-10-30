@@ -63,7 +63,7 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 - **F-017**：标准启动/TUI/CLI、输入与已交付回复投影已接通。 终端输出没有远端确认协议，不宣称屏幕显示 exactly-once。
 - **F-018**：分层 Models/Notifications、Tasks 列表/详情和独立 Trace 详情已接通，保留认证路由、前端嵌入与语义 fallback。 实时更新与开发区分别由 F-019、F-031 跟踪。
 - **F-019**：已提交会话、审批、全局状态、任务摘要和登录过程通过条件读取实时刷新；草稿、文件、焦点、选区和阅读位置独立保留。传输与模型 token streaming 分开；阶段摘要生产仍由 F-005 负责。
-- **F-020**：签名回调、p2p 身份绑定、收发和本地回执已实现；access token 由外部维护。 补凭据刷新/失效诊断体验；不确定远端投递目前只能依赖已保存本地回执，可信远端核实能力仍待定义。
+- **F-020**：签名回调、p2p身份绑定、收发、本地回执、自建应用token自动维护与CLI诊断已实现；未知远端结果保持query-only，不靠刷新或重发推定成功。
 
 ## 代码与依赖
 
@@ -121,6 +121,18 @@ MIT/Apache-2.0 notices, build and verification commands are recorded in
 `web/README.md`; bundled notices are at `/licenses.txt`.
 OpenIntelligentUI's arbitrary generated HTML/JS path is outside this integration
 and requires an explicit architecture/security decision under the baseline.
+
+### Feishu application credential lifecycle
+
+`feishu.NewClient` 在应用组合根创建一个共享客户端。`auth.go` 只负责 token 获取、进程内缓存、有效期、安全失效与关闭；`status.go` 负责安全诊断与只读连接检查。回调、下载、上传和发送复用同一凭据源；客户端的值拷贝共享缓存，不把 mutex 复制给各调用方。
+
+配置必须显式二选一：`app_secret_ref` 由 SecretStore 读取自建应用凭据，POST 官方 `/open-apis/auth/v3/tenant_access_token/internal`；`access_token_ref` 沿用外部维护模式。无默认账户、服务切换或持久 token 表。端点只能是官方 HTTPS 或显式 loopback 测试 peer；即使注入 HTTP client 也禁止跟随重定向，并限制15秒超时。原始响应、密钥与 Authorization 不进入诊断或领域记录。
+
+进程内并发刷新只有一个 owner；等待者可独立取消。有效期从请求开始保守计算，提前 `min(60s, TTL/10)` 刷新；拒绝缺失、无效或越界 TTL，不回退使用失效 token。短暂失败在内存中退避1秒，避免失败风暴；新进程重新获取，关闭后清除缓存且迟到响应不能复活凭据。旧请求的鉴权失败只失效自己使用的 token，不能清掉已更新的 token。
+
+只有 HTTP 401 或明确 token 错误码构成已拒绝动作。发送/上传客户端不在内部重发。取凭据失败或明确鉴权拒绝返回 Delivery 的 `retry`，由既有持久队列、回执与有限退避决定后续尝试；应用凭据明确拒绝返回 `failed/credentials_rejected`。`credentials_unavailable` 与 `credentials_rejected` 为安全的投递错误码，沿用原状态/schema。超时、断连、无有效回执或其他不确定响应仍为 `unknown`；恢复的非幂等投递不增加发送权限。
+
+CLI `channel status` 无网络；`channel check` 获取凭据并 GET `/open-apis/bot/v3/info/`，只有这个只读查询可在显式 token 拒绝后刷新一次重查。输出模式、状态、可用的到期时间与恢复建议，不进行通知、绑定或投递核实。真实平台与业务权限需独立验证；不扩大为多租户应用授权或永久 exactly-once。
 
 Local Web receipt acceptance is durable and idempotent. Feishu UUID deduplication
 has a bounded provider window, so the adapter does **not** promise indefinite
@@ -280,3 +292,8 @@ dynamic component import, remote asset or browser credential input.
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
 
 2026-10-28：F-019 将五秒条件整页 reload 替换为独立区域条件读取。比较整页轮询、事件推送与已提交投影读取；选择复用现有查询和 SSR，保持输入/渲染/更新生命周期各自内聚。接口新增只读 updates 与可选 JSON 审批回执，原接口默认行为和领域协议不变；无需数据迁移。真实浏览器验证草稿/附件/焦点/选区/阅读位置、状态与审批、断网和会话恢复。
+
+
+### 2026-10-30 · F-020 飞书凭据自动维护
+
+选择在既有飞书模块集中 token 生命周期与CLI诊断，应用层只注入一个共享客户端；未采用逐请求换 token、凭据落入领域数据库或鉴权失败即在发送客户端内部重发。新增可选 `app_secret_ref`、`channel status/check` 与两个安全投递错误码；外部 token 配置继续可用，不需数据迁移。不改变审批、通知目的地、冻结动作、回执或未知副作用规则；没有修改Web页面。
