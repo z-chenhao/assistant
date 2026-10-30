@@ -33,12 +33,23 @@ type Config struct {
 	VerificationTokenRef string `yaml:"verification_token_ref"`
 	EncryptKeyRef        string `yaml:"encrypt_key_ref"`
 	AccessTokenRef       string `yaml:"access_token_ref"`
+	AppSecretRef         string `yaml:"app_secret_ref"`
 	APIBase              string `yaml:"api_base"`
 }
 
 func (c Config) Validate() error {
-	if c.AppID == "" || c.TenantKey == "" || !interaction.ValidCredentialRef(c.VerificationTokenRef) || !interaction.ValidCredentialRef(c.EncryptKeyRef) || !interaction.ValidCredentialRef(c.AccessTokenRef) {
+	if c.AppID == "" || c.TenantKey == "" || !interaction.ValidCredentialRef(c.VerificationTokenRef) || !interaction.ValidCredentialRef(c.EncryptKeyRef) {
 		return errors.New("Feishu requires app, tenant and credential references")
+	}
+	if (c.AccessTokenRef == "") == (c.AppSecretRef == "") {
+		return errors.New("Feishu requires exactly one of access_token_ref or app_secret_ref")
+	}
+	ref := c.AccessTokenRef
+	if c.AppSecretRef != "" {
+		ref = c.AppSecretRef
+	}
+	if !interaction.ValidCredentialRef(ref) {
+		return errors.New("Feishu requires a credential reference")
 	}
 	if c.APIBase != "" && c.APIBase != "https://open.feishu.cn" {
 		u, e := url.Parse(c.APIBase)
@@ -55,9 +66,13 @@ type Client struct {
 	Config  Config
 	Secrets llm.SecretStore
 	HTTP    *http.Client
+	tokens  *tokenCache
 }
 
 func (c Client) secret(ctx context.Context, ref string) ([]byte, error) {
+	if c.Secrets == nil {
+		return nil, ErrProtocol
+	}
 	v, e := c.Secrets.Get(ctx, ref)
 	if e != nil || len(v) == 0 {
 		return nil, ErrProtocol
@@ -76,13 +91,18 @@ func (c Client) base() string {
 	return "https://open.feishu.cn"
 }
 func (c Client) http() *http.Client {
+	client := http.Client{}
 	if c.HTTP != nil {
-		return c.HTTP
+		client = *c.HTTP
 	}
-	return &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	if client.Timeout <= 0 || client.Timeout > 15*time.Second {
+		client.Timeout = 15 * time.Second
+	}
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &client
 }
 func (c Client) request(ctx context.Context, method, path, kind string, body io.Reader) (*http.Response, error) {
-	token, e := c.secret(ctx, c.Config.AccessTokenRef)
+	token, e := c.accessToken(ctx)
 	if e != nil {
 		return nil, e
 	}
@@ -101,16 +121,31 @@ func (c Client) request(ctx context.Context, method, path, kind string, body io.
 	}
 	return resp, nil
 }
-func decodeResponse(resp *http.Response, err error) (map[string]json.RawMessage, error) {
+func (c Client) decodeResponse(resp *http.Response, err error) (map[string]json.RawMessage, error) {
 	if err != nil {
-		return nil, ErrProtocol
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var r struct {
-		Code int                        `json:"code"`
+		Code *int                       `json:"code"`
 		Data map[string]json.RawMessage `json:"data"`
 	}
-	if resp.StatusCode != 200 || json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&r) != nil || r.Code != 0 || r.Data == nil {
+	if json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&r) != nil {
+		if resp.StatusCode == http.StatusUnauthorized {
+			c.invalidate(resp)
+			return nil, ErrAuthentication
+		}
+		return nil, ErrProtocol
+	}
+	code := -1
+	if r.Code != nil {
+		code = *r.Code
+	}
+	if authenticationRejected(resp.StatusCode, code) {
+		c.invalidate(resp)
+		return nil, ErrAuthentication
+	}
+	if resp.StatusCode != 200 || r.Code == nil || code != 0 || r.Data == nil {
 		return nil, ErrProtocol
 	}
 	return r.Data, nil
@@ -121,9 +156,12 @@ func (c Client) Send(ctx context.Context, destination, key, kind string, content
 		return "", ErrProtocol
 	}
 	payload, _ := json.Marshal(map[string]any{"receive_id": destination, "uuid": key, "msg_type": kind, "content": string(raw)})
-	data, e := decodeResponse(c.request(ctx, "POST", "/im/v1/messages?receive_id_type=chat_id", "application/json", bytes.NewReader(payload)))
+	data, e := c.decodeResponse(c.request(ctx, "POST", "/im/v1/messages?receive_id_type=chat_id", "application/json", bytes.NewReader(payload)))
 	var id string
-	if e != nil || json.Unmarshal(data["message_id"], &id) != nil || id == "" {
+	if e != nil {
+		return "", e
+	}
+	if json.Unmarshal(data["message_id"], &id) != nil || id == "" {
 		return "", ErrProtocol
 	}
 	return id, nil
@@ -148,9 +186,12 @@ func (c Client) Upload(ctx context.Context, d artifact.Descriptor, src io.Reader
 	if w.Close() != nil {
 		return "", ErrProtocol
 	}
-	data, e := decodeResponse(c.request(ctx, "POST", "/im/v1/files", w.FormDataContentType(), &buf))
+	data, e := c.decodeResponse(c.request(ctx, "POST", "/im/v1/files", w.FormDataContentType(), &buf))
 	var key string
-	if e != nil || json.Unmarshal(data["file_key"], &key) != nil || key == "" {
+	if e != nil {
+		return "", e
+	}
+	if json.Unmarshal(data["file_key"], &key) != nil || key == "" {
 		return "", ErrProtocol
 	}
 	return key, nil
@@ -165,6 +206,10 @@ func (c Client) Download(ctx context.Context, message, key, kind string) ([]byte
 		return nil, "", e
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		c.invalidate(resp)
+		return nil, "", ErrAuthentication
+	}
 	if resp.StatusCode != 200 {
 		return nil, "", ErrProtocol
 	}

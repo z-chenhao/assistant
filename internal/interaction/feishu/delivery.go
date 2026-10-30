@@ -3,6 +3,7 @@ package feishu
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 
@@ -95,17 +96,27 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 			key, err := a.Client.Upload(ctx, d, src)
 			_ = src.Close()
 			if err != nil {
-				return fail
+				return credentialObservation(err)
 			}
 			content = map[string]string{"file_key": key}
 		}
 		remote, err = a.Client.Send(ctx, e.Request.DestinationRef, keyFor(e.Request.DeliveryID, i), p.kind, content)
 		if err != nil {
-			return fail
+			return credentialObservation(err)
 		}
 		if a.Store.AcceptChannelReceipt(ctx, e.Request.DeliveryID, i, hash, remote) != nil {
 			return fail
 		}
 	}
 	return delivery.Observation{Outcome: delivery.Delivered}
+}
+
+func credentialObservation(err error) delivery.Observation {
+	if errors.Is(err, ErrCredentialsRejected) {
+		return delivery.Observation{Outcome: delivery.Failed, Code: "credentials_rejected"}
+	}
+	if errors.Is(err, ErrCredentialsUnavailable) || errors.Is(err, ErrAuthentication) {
+		return delivery.Observation{Outcome: delivery.Retry, Code: "credentials_unavailable"}
+	}
+	return delivery.Observation{Outcome: delivery.Unknown}
 }

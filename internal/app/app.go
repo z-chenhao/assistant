@@ -197,7 +197,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	}
 	a.deliveryPolicy = cfg.Delivery
 	if cfg.Feishu != nil {
-		a.feishu = &feishu.Client{Config: *cfg.Feishu, Secrets: secrets}
+		a.feishu = feishu.NewClient(*cfg.Feishu, secrets)
 	}
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
@@ -331,6 +331,9 @@ func (a *App) Catalog(ctx context.Context) ([]llm.CatalogModel, error) {
 }
 
 func (a *App) Close() error {
+	if a.feishu != nil {
+		defer a.feishu.Close()
+	}
 	if a.memoryCancel != nil {
 		a.memoryCancel()
 		<-a.memoryDone

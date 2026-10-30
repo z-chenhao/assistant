@@ -159,4 +159,6 @@ context:
 #   tenant_key: your-tenant-key
 #   verification_token_ref: env:COLLIE_FEISHU_VERIFICATION_TOKEN
 #   encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT_KEY
-#   access_token_ref: env:COLLIE_FEISHU_ACCESS_TOKEN
+#   app_secret_ref: env:COLLIE_FEISHU_APP_SECRET  # self-built app; automatic tenant token refresh
+#   # Alternative: externally maintained token (choose exactly one mode)
+#   # access_token_ref: env:COLLIE_FEISHU_ACCESS_TOKEN

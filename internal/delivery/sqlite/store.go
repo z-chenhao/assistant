@@ -148,7 +148,7 @@ func (s Store) Settle(ctx context.Context, c delivery.Claim, o delivery.Observat
 	}
 	code := ""
 	switch o.Code {
-	case "unavailable", "rejected", "retry_exhausted", "unconfirmed":
+	case "unavailable", "rejected", "retry_exhausted", "unconfirmed", "credentials_unavailable", "credentials_rejected":
 		code = o.Code
 	}
 	if o.Outcome == delivery.Unknown {

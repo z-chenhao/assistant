@@ -167,3 +167,11 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 - 模块测试：notification 持久化选择、候选 proof version、登录本地返回、Host 审批单卡片/用户文本不改写、任务消息通过既有 ingress；`make test lint` 检查所有包及嵌入资源一致。
 
 系统断言采用受控模型/HTTP 响应，证明产品链路与回归，不证明真实模型质量或真实账户可用性。执行结果与截图留在本次 evidence，不把测试计划写成执行报告。
+
+
+## F-020 自建应用凭据与失效诊断
+
+- `internal/interaction/feishu/auth_test.go`：真实loopback HTTP验证并发单飞、提前到期刷新、旧响应不能失效新token、取消等待者、临时刷新失败与恢复、过期token不回退、关闭中迟到结果、异常TTL/缺失字段、密钥不回显、重定向不泄密、仅只读探测可重查。
+- `internal/config/channels_test.go` 与既有CLI语法回归：凭据模式二选一、SecretStore引用、受限端点与 `channel status/check`。
+- 既有 `verify_channels.py` 的 `feishu_auth_lifecycle`：无需浏览器，以真实CLI/Actor/Delivery和受控飞书HTTP peer验证配置检查、token拒绝后的持久安全重试、过期主动刷新、无效凭据的安全诊断与持久失败码、撤销绑定、凭据不落盘，以及已发生副作用但回执丢失后重启仍不重发。该场景接入现有channels门禁，不新增脚本或CI阶段。
+- 真实飞书自建应用、实际账户权限和公网回调配置需独立Live验证；软件peer不证明真实平台授权、模型效果或永久 exactly-once。

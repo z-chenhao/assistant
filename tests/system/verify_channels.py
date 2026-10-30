@@ -114,8 +114,87 @@ class ChannelHarness(MainHarness):
         require(result.returncode==0,'browser drive failed: '+result.stderr)
 
 
+def feishu_auth_lifecycle(binary, report):
+    """Real CLI/Actor/Delivery against the HTTP peer; no browser or real account."""
+    with tempfile.TemporaryDirectory(prefix='collie-feishu-auth-') as temp, Sandbox(managed_auth=True, token_ttl=2) as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.config.write_text(h.config.read_text().replace('access_token_ref: env:COLLIE_FEISHU_ACCESS', 'app_secret_ref: env:COLLIE_FEISHU_APP_SECRET'))
+            h.env['COLLIE_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
+            status = h.command('channel', 'status')
+            require(status['mode'] == 'app_credentials' and status['state'] == 'unchecked' and platform.auth_requests == 0, 'status unexpectedly acquired credentials')
+            checked = h.command('channel', 'check')
+            require(checked['state'] == 'ready' and checked['expires_at'] and platform.auth_requests == 1, 'CLI check did not authenticate the bot')
+            h.setup()
+            h.start()
+            h.callback('managed-first', 'First managed credential message.')
+            h.wait(lambda s: len(s['deliveries']) == 1 and all(d['status'] == 'sent' for d in s['deliveries']), 'first managed delivery')
+            with platform.lock:
+                require(platform.auth_requests == 2, 'process cache did not acquire once')
+                platform.current_token = None
+            h.callback('managed-revoked', 'Continue after an explicitly rejected token.')
+            h.wait(lambda s: len(s['deliveries']) == 2 and all(d['status'] == 'sent' for d in s['deliveries']), 'token rejection recovered through the durable retry')
+            with platform.lock:
+                require(platform.auth_requests == 3 and platform.auth_rejections == 1 and len(platform.send_attempts) == 2, 'rejection did not refresh safely')
+                expiry = platform.token_expiry
+            while time.monotonic() < expiry + .05:
+                time.sleep(.025)
+            h.callback('managed-expired', 'Continue after the cached credential expires.')
+            h.wait(lambda s: len(s['deliveries']) == 3 and all(d['status'] == 'sent' for d in s['deliveries']), 'proactive refresh')
+            with platform.lock:
+                require(platform.auth_requests == 4 and platform.auth_rejections == 1 and len(platform.send_attempts) == 3, 'expired token reached the transport or message repeated')
+            h.stop()
+            h.env['COLLIE_FEISHU_APP_SECRET'] = 'wrong-private-app-secret'
+            rejected = h.command('channel', 'check')
+            require(rejected['state'] == 'credentials_rejected' and rejected['action'], 'bad app secret has no sanitized diagnosis')
+            h.env['COLLIE_FEISHU_APP_SECRET'] = ''
+            missing = h.command('channel', 'check')
+            require(missing['state'] == 'credentials_unavailable' and missing['action'], 'missing credential has no recovery action')
+            h.env['COLLIE_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
+            h.start()
+            with platform.lock:
+                platform.drop_response = True
+            h.callback('managed-uncertain', 'An accepted send loses its response.')
+            h.wait(lambda s: any(d['status'] == 'unknown' for d in s['deliveries']), 'uncertain managed delivery')
+            h.stop()
+            with platform.lock:
+                attempts, issues = len(platform.send_attempts), platform.auth_requests
+                require(attempts == 4, 'unexpected accepted transport count')
+                platform.drop_response = False
+            h.command('delivery', 'work')
+            rows = h.rows()
+            require(sum(d['status'] == 'unknown' for d in rows['deliveries']) == 1, 'restart cleared uncertainty without evidence')
+            with platform.lock:
+                require(len(platform.send_attempts) == attempts and platform.auth_requests == issues, 'recovery acquired credentials or resent an unknown message')
+            h.env['COLLIE_FEISHU_APP_SECRET'] = 'wrong-private-app-secret'
+            h.start()
+            h.callback('managed-invalid-secret', 'This notification must fail before transport.')
+            h.wait(lambda s: any(d['status'] == 'failed' for d in s['deliveries']), 'permanent credential failure has a durable diagnostic')
+            with sqlite3.connect(h.root / 'data/state.db') as db:
+                require(db.execute("SELECT last_error FROM delivery_request WHERE status='failed'").fetchone() == ('credentials_rejected',), 'credential failure code was not preserved')
+            h.stop()
+            with platform.lock:
+                require(len(platform.send_attempts) == attempts, 'invalid app secret reached the message endpoint')
+            h.env['COLLIE_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
+            binding = next(b for b in h.command('channel', 'manage', text='{"op":"list"}') if b['channel'] == 'feishu')
+            h.command('channel', 'manage', text=json.dumps(dict(op='bind', channel='feishu', subject=binding['subject'], destination=binding['destination'], enabled=False, version=binding['version'])))
+            h.start()
+            h.callback('managed-revoked-binding', 'This revoked identity cannot submit.', expected=403)
+            h.stop()
+            secrets = [b'sandbox-app-secret', b'wrong-private-app-secret', b'sandbox-managed-token-']
+            for path in (h.root / 'data').rglob('*'):
+                if path.is_file():
+                    require(all(secret not in path.read_bytes() for secret in secrets), 'channel credentials leaked into durable state')
+            require(all(secret.decode() not in json.dumps([checked, rejected, missing]) for secret in secrets), 'channel diagnostics leaked credentials')
+            report['scenarios']['feishu-auth'] = dict(mode='app_credentials', initial_check='ready', accepted_messages=attempts, explicit_rejections_recovered=1, proactive_refresh=True, rejected_secret=rejected['state'], missing_secret=missing['state'], unknown_after_restart=1, unknown_not_resent=True, revoked_binding_rejected=True, invalid_credentials_delivery='credentials_rejected', credential_scan='clean')
+            report['checks'].append('Feishu CLI/Actor/Delivery: managed tokens, rejection retry, expiry refresh, safe diagnostics, revoked binding and query-only unknown recovery; no real external account')
+        finally:
+            h.cleanup()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
+    feishu_auth_lifecycle(binary,report)
     with tempfile.TemporaryDirectory(prefix='collie-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
