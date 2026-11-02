@@ -217,7 +217,16 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 				// Same call IDs on distinct exchanges deliberately exercise the
 				// (run, exchange, call) association, never global call-ID dedup.
 				sequence := int64(1)
-				if last.Role == "user" {
+				if last.Origin == "runtime" && strings.HasPrefix(last.Text, "Runtime tool_results") || last.Role == "user" && last.Text == "F003:ping" {
+					text := "F003:pong"
+					if last.Origin == "runtime" {
+						text = "F003:finished " + last.Text
+					}
+					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: text}); err != nil {
+						return err
+					}
+					sequence++
+				} else if last.Role == "user" {
 					for _, id := range []string{"echo-a", "echo-b"} {
 						args, _ := json.Marshal(struct {
 							Text string `json:"text"`

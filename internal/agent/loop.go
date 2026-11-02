@@ -40,7 +40,9 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, options LoopOptions)
 	if execution == nil {
 		execution = work
 	}
-	return (agentLoop{claim: claim, options: options, work: work, execution: execution}).run(ctx)
+	l := agentLoop{claim: claim, options: options, work: work, execution: execution, jobs: map[string]*toolJob{}}
+	defer l.joinTools(true)
+	return l.run(ctx)
 }
 
 // The runner owns no durable state. Every phase reloads the authoritative Run;
@@ -52,9 +54,10 @@ type agentLoop struct {
 	options   LoopOptions
 	work      context.Context
 	execution context.Context
+	jobs      map[string]*toolJob
 }
 
-func (l agentLoop) run(ctx context.Context) error {
+func (l *agentLoop) run(ctx context.Context) error {
 	r, err := l.options.Store.Load(l.work, l.claim)
 	if err != nil {
 		return err
@@ -62,6 +65,8 @@ func (l agentLoop) run(ctx context.Context) error {
 	l.emit(r, "agent_start", "", "")
 	for {
 		if ctx.Err() != nil {
+			// Shutdown joins accepted work; it is not a business cancellation.
+			l.joinTools(false)
 			return ctx.Err()
 		}
 		r, err = l.options.Store.Load(l.work, l.claim)
@@ -71,7 +76,7 @@ func (l agentLoop) run(ctx context.Context) error {
 		// Settlement can request consent after a final model result was saved.
 		// Hold that result without regenerating it.
 		if r.SpendStatus == "pending" {
-			return l.options.Store.Wait(l.work, l.claim, r.Version, "resource")
+			return l.wait(r, "resource")
 		}
 		// Accepted Tool calls must drain and adopt terminal Child results even
 		// when monetary authorization is denied at the next model boundary.
@@ -81,13 +86,30 @@ func (l agentLoop) run(ctx context.Context) error {
 		var stopped bool
 		switch r.Checkpoint.Phase {
 		case ModelPhase:
+			if r.ResponsiveTools && len(r.Checkpoint.PendingTools) > 0 {
+				changed, collectErr := l.collectTools(r)
+				if collectErr != nil {
+					return collectErr
+				}
+				if changed {
+					continue
+				}
+			}
 			stopped, err = l.modelTurn(r)
 		case ToolsPhase:
-			stopped, err = l.toolsTurn(r)
+			if r.ResponsiveTools {
+				stopped, err = l.responsiveTools(ctx, r)
+			} else {
+				stopped, err = l.toolsTurn(r)
+			}
 		case ReplyPhase:
 			stopped, err = l.replyTurn(r)
 		case SettlePhase:
-			stopped, err = l.settleTurn(r)
+			if r.ResponsiveTools && len(r.Checkpoint.PendingTools) > 0 {
+				stopped, err = l.waitTools(ctx, r)
+			} else {
+				stopped, err = l.settleTurn(r)
+			}
 		default:
 			return ErrStorage
 		}
@@ -97,7 +119,7 @@ func (l agentLoop) run(ctx context.Context) error {
 	}
 }
 
-func (l agentLoop) modelTurn(r Run) (bool, error) {
+func (l *agentLoop) modelTurn(r Run) (bool, error) {
 	cp := r.Checkpoint
 	inputs, err := l.options.Store.Steering(l.work, l.claim, cp.InputSequence)
 	if errors.Is(err, ErrConflict) {
@@ -138,7 +160,7 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 		return false, err
 	}
 	if generation.Waiting {
-		if err := l.options.Store.Wait(l.work, l.claim, r.Version, "resource"); err != nil {
+		if err := l.wait(r, "resource"); err != nil {
 			return false, err
 		}
 		l.emit(r, "agent_wait", "resource", "")
@@ -195,7 +217,7 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 				return false, loadErr
 			}
 			if latest.SpendStatus == "pending" {
-				if err := l.options.Store.Wait(l.work, l.claim, latest.Version, "resource"); err != nil {
+				if err := l.wait(latest, "resource"); err != nil {
 					return false, err
 				}
 				l.emit(r, "agent_wait", "resource", "")
@@ -248,7 +270,7 @@ func (l agentLoop) modelTurn(r Run) (bool, error) {
 	return false, nil
 }
 
-func (l agentLoop) toolsTurn(r Run) (bool, error) {
+func (l *agentLoop) toolsTurn(r Run) (bool, error) {
 	cp := r.Checkpoint
 	results, err := l.options.Tools.Execute(l.execution, cp.ExchangeID, cp.Result.ToolCalls)
 	if errors.Is(err, tool.ErrSuspended) {
@@ -265,6 +287,11 @@ func (l agentLoop) toolsTurn(r Run) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	return l.finishTools(r, results)
+}
+
+func (l *agentLoop) finishTools(r Run, results []tool.Result) (bool, error) {
+	cp := r.Checkpoint
 	unknownExchange := false
 	for _, result := range results {
 		if result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT" {
@@ -296,14 +323,14 @@ func (l agentLoop) toolsTurn(r Run) (bool, error) {
 	cp.Phase = ModelPhase
 	cp.ExchangeID = ""
 	cp.Result = nil
-	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
+	if err := l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
 		return false, err
 	}
 	l.emit(r, "turn_end", "", "")
 	return false, nil
 }
 
-func (l agentLoop) replyTurn(r Run) (bool, error) {
+func (l *agentLoop) replyTurn(r Run) (bool, error) {
 	cp := r.Checkpoint
 	ready, err := l.options.Store.PrepareReply(l.work, l.claim, r)
 	if err != nil {
@@ -328,7 +355,7 @@ func (l agentLoop) replyTurn(r Run) (bool, error) {
 	return false, nil
 }
 
-func (l agentLoop) settleTurn(r Run) (bool, error) {
+func (l *agentLoop) settleTurn(r Run) (bool, error) {
 	cp := r.Checkpoint
 	done, err := l.options.Store.Complete(l.work, l.claim, r.Version)
 	if err != nil {
@@ -351,7 +378,23 @@ func (l agentLoop) emit(r Run, kind, text, call string) {
 	}
 }
 
-func (l agentLoop) fail(r Run, code string) error {
+func (l *agentLoop) wait(r Run, reason string) error {
+	// Waiting revokes the running-state fence. Drain accepted batches before
+	// that transition so model consent cannot cancel or orphan their outcomes.
+	if err := l.drainTools(r); err != nil {
+		return err
+	}
+	return l.options.Store.Wait(l.work, l.claim, r.Version, reason)
+}
+
+func (l *agentLoop) fail(r Run, code string) error {
+	if code == "SPEND_AUTHORIZATION_DENIED" {
+		if err := l.drainTools(r); err != nil {
+			return err
+		}
+	} else {
+		l.joinTools(true)
+	}
 	if err := l.options.Store.Fail(l.work, l.claim, r.Version, code); err != nil {
 		return err
 	}

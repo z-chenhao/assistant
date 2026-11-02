@@ -222,7 +222,13 @@ func (t *tools) Start(ctx context.Context, id string) error {
 		// The Code Mode wrapper coordinates nested ToolInvocations; it never
 		// owns their execution slots. Counting it would deadlock a limit of one.
 		// Its VM remains bounded by the Loop/Executor and JavaScript limits.
-		if inv.Call.Name != codemode.ToolName {
+		// Main must be able to search/control Tasks while its data tools fill
+		// every execution slot. These bounded Host transactions have no provider
+		// effect and retain ordinary admission, fencing and role checks.
+		family, trusted := tool.HostFamily(inv.Call.Name)
+		definition, registered := t.runs.registry.Resolve(inv.Call.Name)
+		control := trusted && registered && definition.Host && family == tool.TaskBuiltin
+		if inv.Call.Name != codemode.ToolName && !control {
 			// Actual Tools share atomic quotas/conflicts across direct and nested
 			// calls. Expired owners and wrappers retain no execution capacity.
 			var global, byAgent, byRun, byProvider, byTool, conflicts int
@@ -564,11 +570,11 @@ var _ tool.PolicyStore = (*tools)(nil)
 func (t *tools) WaitReason(ctx context.Context) (string, error) {
 	// Any resource/retry wait needs a scheduler wake even if another call is
 	// awaiting approval. Approval-only batches release the Run indefinitely.
-	var pending int
-	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT count(*) FROM tool_invocation WHERE run_id=? AND status='waiting' AND wait_reason!='approval'`, t.claim.RunID()).Scan(&pending); err != nil {
+	var pending, total int
+	if err := t.runs.host.db.QueryRowContext(ctx, `SELECT coalesce(sum(wait_reason!='approval'),0),count(*) FROM tool_invocation WHERE run_id=? AND status='waiting'`, t.claim.RunID()).Scan(&pending, &total); err != nil {
 		return "", agent.ErrStorage
 	}
-	if pending > 0 {
+	if pending > 0 || total == 0 {
 		return "resource", nil
 	}
 	return "approval", nil

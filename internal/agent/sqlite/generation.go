@@ -348,6 +348,11 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 		_, err = tx.ExecContext(ctx, `INSERT INTO run_trace VALUES(?,?,?,?)`, c.RunID(), e.Sequence, raw, e.OccurredAt.UnixMicro())
 		return err
 	})
+	if err == nil && e.Kind == "tool_execution_start" {
+		// Explicit fault/barrier injection is outside the transaction, so a
+		// held tool cannot monopolize SQLite and prevent concurrent ingress.
+		r.host.boundary("after_tool_execution_start")
+	}
 	return e, err
 }
 

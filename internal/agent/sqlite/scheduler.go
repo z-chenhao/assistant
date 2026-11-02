@@ -35,7 +35,8 @@ const mainPredecessorsJoined = `(r.kind!='main' OR NOT EXISTS(SELECT 1 FROM run 
 const runnable = mainPredecessorsJoined + ` AND NOT EXISTS(SELECT 1 FROM spend_approval sa WHERE sa.root_run_id=coalesce(r.root_run_id,r.run_id) AND sa.status='pending') AND r.desired_state='running' AND
  (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')) AND
  (r.status IN ('queued','running') OR (r.status='waiting' AND
- ((r.wait_reason='user_input' AND
+ ((r.kind='main' AND EXISTS(SELECT 1 FROM main_tool_protocol p WHERE p.run_id=r.run_id) AND EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence'))) OR
+ (r.wait_reason='user_input' AND
  (EXISTS(SELECT 1 FROM main_input i WHERE i.run_id=r.run_id AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')) OR
  EXISTS(SELECT 1 FROM task_instruction i WHERE i.task_id=r.task_id AND i.task_epoch=r.task_epoch AND r.worker_position='root' AND i.sequence>json_extract(r.checkpoint_json,'$.input_sequence')))) OR
  (r.wait_reason='resource' AND (

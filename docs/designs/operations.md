@@ -36,6 +36,14 @@ flowchart TD
 - [internal/agent/sqlite/spend.go](../../internal/agent/sqlite/spend.go)
 - [internal/llm/sqlite/local.go](../../internal/llm/sqlite/local.go)
 
+## 待实现方案
+
+以下方案尚未实现。接口、持久化结构、迁移与精确时序须在实现前确定；当前执行仍遵循已有运行时契约。验收范围见功能说明及并列测试方案。
+
+### F-028 · 本地持续运行与独立健康巡检
+
+后台服务与交互界面分离生命周期，独立巡检不能依赖主执行循环存活；复用数据根锁、Claim/fencing 和既有恢复顺序。故障分类与停机意图是机制，重启次数、退避和通知是政策。平台 supervisor、安装/卸载与升级协议待设计，并同步 installation；只稳定实际支持的平台行为，不建立通用云部署层或模型自治修复平台。
+
 ## 验证与交付
 
 验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/operations.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。

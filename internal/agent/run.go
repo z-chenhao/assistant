@@ -57,6 +57,7 @@ func ProviderTools(specs []tool.Spec) []llm.ToolSpec {
 }
 
 type Checkpoint struct {
+	PendingTools   []PendingToolBatch    `json:"pending_tools,omitempty"`
 	ContextVersion int                   `json:"context_version,omitempty"`
 	WorkingState   *WorkingState         `json:"working_state,omitempty"`
 	ContextRetries int                   `json:"context_retries,omitempty"`
@@ -69,17 +70,18 @@ type Checkpoint struct {
 	Result         *llm.GenerationResult `json:"result,omitempty"`
 }
 type Run struct {
-	SpendStatus    string       `json:"-"`
-	ID             string       `json:"run_id"`
-	AgentID        string       `json:"agent_id"`
-	ConversationID string       `json:"conversation_id"`
-	Kind           Role         `json:"kind"`
-	Status         RunStatus    `json:"status"`
-	WaitReason     string       `json:"wait_reason,omitempty"`
-	Version        int64        `json:"version"`
-	Snapshot       llm.Snapshot `json:"model_snapshot"`
-	Tools          []tool.Spec  `json:"tools"`
-	Checkpoint     Checkpoint   `json:"checkpoint"`
+	ResponsiveTools bool         `json:"-"`
+	SpendStatus     string       `json:"-"`
+	ID              string       `json:"run_id"`
+	AgentID         string       `json:"agent_id"`
+	ConversationID  string       `json:"conversation_id"`
+	Kind            Role         `json:"kind"`
+	Status          RunStatus    `json:"status"`
+	WaitReason      string       `json:"wait_reason,omitempty"`
+	Version         int64        `json:"version"`
+	Snapshot        llm.Snapshot `json:"model_snapshot"`
+	Tools           []tool.Spec  `json:"tools"`
+	Checkpoint      Checkpoint   `json:"checkpoint"`
 }
 type Input struct {
 	Sequence int64

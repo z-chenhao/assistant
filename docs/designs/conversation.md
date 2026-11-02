@@ -13,13 +13,17 @@ flowchart TD
     I["持久输入"] --> A["Actor / Claim"]
     A --> L["共享 Agent Loop：Main 角色"]
     L <--> M["Model Provider"]
-    L <--> T["ToolExecutor"]
+    L <--> T["ToolExecutor / 持久工具结果"]
+    T --> P["慢调用 + 新输入 → pending 回执 / 待交付关系"]
+    P --> L
+    T --> E["已持久化最终结果 → runtime tool_results"]
+    E --> L
     L --> R["Conversation / Delivery"]
 ```
 
 ## 当前流程与目标差异
 
-接受输入并去重 → 调度 Main → 组装冻结请求 → 调用模型 → 有工具则执行并续轮 → 保存最终回复 → 交付。
+接受输入并去重 → 调度唯一 Main → 组装冻结请求 → 调用模型 → 工具执行与结果交付 → 保存回复 → 交付。快工具同步返回；慢调用收到新输入后可先返回 pending 回执，最终结果通过同一 Main 的运行时消息继续推理。Main 仍有待交付结果时不提交完成终态。
 
 - **F-003**：Actor 管理输入与执行权；共享 Loop 在 model/tools/reply/settle 阶段推进，保存模型交换和回复。 本需求不包含实时 Web 推送或高质量语义压缩，分别由 F-019、F-011 跟踪。
 
@@ -30,9 +34,25 @@ flowchart TD
 - [internal/agent/run.go](../../internal/agent/run.go)
 - [internal/agent/sqlite/generation.go](../../internal/agent/sqlite/generation.go)
 
+## Main 工具结果交付（F-003）
+
+需求是让当前单用户在 Main 的慢工具执行期间继续交代和查询工作，保持已有 Main/Worker、原生工具关联、冻结审批与 Durable Replay 契约。阻塞点是 Loop 在 ToolsPhase 同步等待整批结果；实现见 [responsive.go](../../internal/agent/responsive.go)，持久输入检查见 [SQLite port](../../internal/agent/sqlite/responsive.go)。
+
+1. 工具仍经唯一 ToolExecutor 接纳并执行。默认等待 200 ms 后，如有尚未消费的新输入，则将原 exchange、调用及 step 保存到 checkpoint 的 pending_tools，与模型可见的 pending ToolResult 一起提交；它不更新 ToolInvocation 终态。
+2. pending 回执带 operation_ref，格式为 operation:<step>:<batch-index>，不暴露 Run/Invocation ID，不作为权限或控制句柄。调用—ToolResult 的原生配对完整，随后再注入用户消息；模型可先对新输入回复。
+3. 原调用继续使用同一 Run claim、冻结能力与审批。最终结果只在未冻结的 model/settle 边界加入带来源的 runtime tool_results；operation_ref 关联原回执，文本、产物、图片和错误保留原语义。已接受请求和压缩帧不被后台结果改写。
+4. 最终结果注入与移除 pending_tools 在一个 checkpoint 提交。故障后从原 exchange 与 ToolInvocation 重建交付：完成结果复用，未完成调用遵循 safe/query_before_retry/never，unknown 仅核实、不重发。待交付结果未清空时，Main 不得完成。
+5. 有实际调用运行时保留 Main 所有权；仅有审批/资源等待时释放 claim，由原调度器唤醒。模型费用审批等待前，先让已接纳的调用保存结果，再撤销运行态写入权限；费用拒绝不取消这些已接纳的调用。新输入可唤醒使用新协议的等待 Main；等待期间没有未持久化的回复意图。退出时加入已接纳的工作，正常关闭不作为用户取消；遗忘或所有权撤销仍由原 fencing 阻止迟到写入。
+
+接纳、交付、去重和权限属于机制。200 ms 同步窗口、50 ms 活动扫描及最多 8 批待交付调用属于宿主政策，不新增模型可见配置；数据工具继续受原共享并发与冲突键约束。仅可信的 Task Host 查询/控制事务不占数据工具执行槽，以便满载时仍可处理任务干预。容量拒绝持久化为 RESOURCE_LIMIT，不启动另一个 Main 或隐式创建 Task。
+
+schema 32 增加私有 main_tool_protocol 记录，在创建新 Main 的事务中冻结 version=1；已有 Run 不回填。记录不可更新/删除，checkpoint 继续使用 context version 2；新字段记录交付关系，不序列化堆栈或工具进程。升级前备份，旧二进制因 schema 版本拒绝打开新库；旧 Run 和 Worker 继续使用原同步交付语义。模型工具名称、输入 schema 和 Task/Child 协议未变化。
+
+不暴露通用 job/session、跨 Worker 消息或独立取消 API；既有 Task 仍是耗时工作的显式委派边界。选择私有交付状态而非第二个 Main、自动升级 Task 或单纯提示词约束，保留用户输入顺序和可恢复调用身份。
+
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/conversation.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/conversation.md) 维护。CLI Main 检查覆盖慢调用期间响应及 SIGKILL 恢复；真实模型的响应时延与语义质量单独验证，不由脚本模型结论替代。
 
 ## 协议、实现与配置约束
 
@@ -124,7 +144,7 @@ fragments with the Run and Outbox event in one state transaction. An immutable
 history boundary selects earlier semantic history from `conversation.db` on
 first execution. The resulting context and each provider request are persisted
 before dispatch. Steering remains separate ordered messages, injected after a
-tool batch or before publishing a final answer. Steering arriving during a
+native result batch or a persisted pending receipt, or before publishing a final answer. Steering arriving during a
 final generation causes another model step before that answer is published.
 A recovered accepted exchange keeps its frozen context until its result is checkpointed, before newer steering is injected. Once a reply intent is committed, later input follows that reply and continues
 the same active Run until it reaches its terminal boundary.
@@ -210,5 +230,6 @@ Main 的原始 Conversation 仍保存用户语义历史。新 Main 额外交接�
 | 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
 | --- | --- | --- | --- | --- |
 | 2026-10-28 | 现状建档 | 保留 Actor 与智能循环的职责分离；Main、Root、Child 复用同一内核。诊断或评测不得引入另一套执行循环。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
+| 2026-11-02 | F-003 持续响应 | 保留唯一 Main 与统一 ToolExecutor，将慢调用的持久执行和结果交付分开；输入到来时提交 pending 回执，最终结果以低权限运行时证据接续。 | 比较第二 Main、隐式 Task 和提示词委派后采用私有 checkpoint 交付关系；schema 32 只为新 Main 冻结协议，旧 Run 不升级，unknown 不重试。200 ms 同步窗口与 50 ms 扫描为默认政策，不是模型 SLA。 | [功能](../features/conversation.md#f-003) · [测试](../test-plans/conversation.md) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。

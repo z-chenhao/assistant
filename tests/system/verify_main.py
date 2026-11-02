@@ -296,6 +296,61 @@ def run(binary):
         report["concurrent"] = scenario("concurrent", concurrent)
         report["checks"].append("16 simultaneous CLI inputs; one Main; ordered history; idempotency and drift rejection")
 
+        def responsive(h, crash):
+            h.setup()
+            h.send("long", "F003:long")
+            release = h.root / "release-tool"
+            seen, observed = set(), {}
+
+            def observe(boundary):
+                seen.add(boundary)
+                if "sent_at" not in observed:
+                    observed["sent_at"] = time.monotonic()
+                    h.send("ping", "F003:ping")
+
+            def progress():
+                if "sent_at" not in observed or "response_seconds" in observed:
+                    return
+                state = h.state()
+                if not any(m["role"] == "assistant" and any(
+                        p.get("text") == "F003:pong" for p in m["content"])
+                        for m in state["conversation"]):
+                    return
+                checkpoint = json.loads(state["runs"][0]["checkpoint_json"])
+                if not checkpoint.get("pending_tools"):
+                    # state.db is sampled before the separate history read;
+                    # a newly committed reply can race that first snapshot.
+                    return
+                observed["response_seconds"] = time.monotonic() - observed["sent_at"]
+                require(observed["response_seconds"] < 5, "foreground input did not respond while tool held")
+                require(len(state["runs"]) == 1, "responsive input opened another Main")
+                require(any(t["status"] == "running" for t in state["tools"]), "tool finished before foreground response")
+                observed["before_release"] = state
+                if crash:
+                    h.children[-1].kill()
+                else:
+                    release.touch()
+
+            result = h.drive_boundaries({"after_tool_execution_start": release}, observe, progress)
+            require("after_tool_execution_start" in seen and "response_seconds" in observed,
+                    "responsive scenario did not reach foreground response")
+            require(result.returncode != 0 if crash else result.returncode == 0, result.stderr)
+            if crash:
+                h.command("chat", "work")
+            state = h.state()
+            assert_final(state, 2, 2)
+            require(len(state["tools"]) == 2, "recovery created another logical Tool call")
+            require(all(t["status"] == "succeeded" for t in state["tools"]), "deferred Tools did not settle")
+            finals = [m for m in state["conversation"] if m["role"] == "assistant"]
+            require(any("F003:finished" in p.get("text", "") for p in finals[-1]["content"]),
+                    "original result was not delivered after foreground response")
+            observed["after"] = state
+            return observed
+
+        report["responsive"] = scenario("responsive", lambda h: responsive(h, False))
+        report["responsive_restart"] = scenario("responsive-restart", lambda h: responsive(h, True))
+        report["checks"].append("held Tool -> second CLI input -> reply before release; one Main; durable deferred results; SIGKILL and recovery")
+
         for boundary in ("after_compaction_commit", "before_generation_dispatch", "before_generation_commit", "after_generation_commit",
                          "before_conversation_append", "after_conversation_append", "before_reply_checkpoint",
                          "after_reply_checkpoint", "before_tool_commit", "after_tool_commit"):

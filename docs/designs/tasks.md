@@ -58,6 +58,20 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 - [internal/prompt/system/progress.md](../../internal/prompt/system/progress.md)：仅 Root 的阶段进度约定
 - [internal/agent/sqlite/reporter.go](../../internal/agent/sqlite/reporter.go)
 
+## 待实现方案
+
+以下方案尚未实现。接口、持久化结构、迁移与精确时序须在实现前确定；当前执行仍遵循已有运行时契约。验收范围见功能说明及并列测试方案。
+
+### F-004 · Task 生命周期与继续工作
+
+#### 跨渠道任务关联与事件续跑
+
+继续使用 Task、Run、Instruction、epoch 和现有任务接纳事务，不增加 Ticket/Assignment 生命周期。关联和去重是机制，哪些事件可续跑、何时须澄清是受宿主约束的政策。明确关联的上下文可直达对应执行，来源消息不变成用户授权；新范围交 Main。先验证必要关联基数及活动/终态续跑边界，不预设任意多对多订阅平台或自动跨账号身份映射。
+
+#### 结构化待决定问题与交付验收
+
+复用 Task、Main ingress、现有冻结 Approval 和 Artifact 归属，新增的待决定信息与成果审阅需具名数据语义；它们不替代 ToolInvocation 审批。持久关联、提交去重与过期检查属于机制，是否要求人工验收属于任务政策。交互记录、版本和接续协议待实现前设计，Worker 仍只向 Parent/Main 汇报，不获得用户消息发送能力；不重写现有 Task 状态机来表达所有展示阶段。
+
 ## 验证与交付
 
 验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/tasks.md) 维护。确定性组件与系统检查分别证明生产写入、只读展示和恢复边界；它们不证明真实模型生成摘要的质量。

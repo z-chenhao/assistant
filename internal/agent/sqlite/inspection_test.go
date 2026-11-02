@@ -204,8 +204,16 @@ func TestInspectionIndexUpgradeRollbackAndFrozenData(t *testing.T) {
 	}
 	defer history.Close()
 	registry := tool.FixtureRegistry()
+	// Seed with current constructors, then remove the v32 delivery metadata
+	// so the queued Run represents an actual pre-protocol migration fixture.
+	if _, err = db.Exec(responsiveMainSQL); err != nil {
+		t.Fatal(err)
+	}
 	actor := agent.Actor{Store: s.Runs(history, registry), Registry: registry, Ready: func(context.Context) bool { return true }}
 	receipt := mustSubmit(t, actor, "before-inspection-upgrade", "frozen before index upgrade")
+	if _, err = db.Exec(`DROP TRIGGER main_tool_protocol_retained; DROP TRIGGER main_tool_protocol_immutable; DROP TRIGGER main_tool_protocol_initial; DROP TABLE main_tool_protocol;`); err != nil {
+		t.Fatal(err)
+	}
 	var checkpoint string
 	if err = db.QueryRow(`SELECT checkpoint_json FROM run WHERE run_id=?`, receipt.RunID).Scan(&checkpoint); err != nil {
 		t.Fatal(err)

@@ -45,6 +45,9 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,kind,status,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,'main','queued',?,?,?,(SELECT coalesce(max(sequence),0) FROM conversation_intent),?,?,1)`, id, agentID, agentID, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return "", err
 	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO main_tool_protocol(run_id) VALUES(?)`, id); err != nil {
+		return "", err
+	}
 	// History grants remain within this local user's Conversation. Later Main
 	// Runs can reopen refs already supplied or explicitly delivered there.
 	if _, err = tx.ExecContext(ctx, `INSERT INTO artifact_reference SELECT json_extract(j.value,'$.artifact_ref'),'run',? FROM conversation_intent c,json_each(json_extract(c.message_json,'$.content')) j JOIN artifact a ON a.artifact_ref=json_extract(j.value,'$.artifact_ref') WHERE json_extract(c.message_json,'$.conversation_id')=? AND a.owner_agent_id=? ON CONFLICT DO NOTHING`, id, agentID, agentID); err != nil {

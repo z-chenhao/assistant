@@ -110,6 +110,8 @@ queued → running ↔ waiting → succeeded / failed / cancelled / unknown
 - Parent Run 或承载调用的 ToolInvocation 被取消时，取消意图递归传播到可取消的后代 ToolInvocation 和 Child Run；已经发生或无法确认的外部副作用仍按恢复策略进入确定终态或 `unknown`。
 - Code Mode 内部嵌套调用同样各自拥有 `ToolInvocation`，不能只持久化顶层 Code Mode 调用。
 
+Main 的 [持续响应协议](conversation.md#main-工具结果交付f-003) 可以先向模型交付 pending 回执；该回执不是 ToolInvocation 终态、工具完成事件或审批。真实结果仍按本节立即持久化，由原调用身份恢复，并在可变上下文边界以运行时证据交付。Worker 的原生结果协议保持不变。
+
 Pi 的参考边界必须保持明确：普通 Pi 使用 `tool_execution_start/update/end` 事件和统一 `execute()` 管线表达短时工具执行；Pi Durable 则把 generation 和每个 tool call 都建模为通用 Durable Task，并通过 ownership、`waiting/completing`、稳定嵌套调用 key 与 replay 恢复。本文只借鉴其统一工具管线、owner 边、稳定调用 key、持久化后暴露、等待释放资源、重放复用与自底向上取消；不采用“每个 Tool Call 都是 Task”，也不采用父调用结束时自动中止所有未等待嵌套调用的语义。
 
 <a id="contract-8-security-与审批"></a>
