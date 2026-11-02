@@ -47,6 +47,14 @@ flowchart TD
 - [internal/agent/sqlite/context.go](../../internal/agent/sqlite/context.go)
 - [internal/agent/sqlite/handoff.go](../../internal/agent/sqlite/handoff.go)
 
+## 待实现方案
+
+以下方案尚未实现。接口、持久化结构、迁移与精确时序须在实现前确定；当前执行仍遵循已有运行时契约。验收范围见功能说明及并列测试方案。
+
+### F-010 · 关联证据导航与按需续读
+
+按现有 TaskRef、ArtifactRef、Conversation 来源和 F-004 明确关联逐步展开，先补缺失的读取路径。引用解析、权限校验和续读位置是机制，摘要/内联预算是政策。按需召回保留来源并按轮冻结，不自动遍历全量历史，不把引用本身当成访问授权。具体工具 schema 与跨对象索引待真实消费者验证，暂不承诺稳定图查询 API。
+
 ## 验证与交付
 
 验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/memory-context.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。

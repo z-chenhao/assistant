@@ -75,6 +75,18 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 - [internal/interaction/feishu/delivery.go](../../internal/interaction/feishu/delivery.go)
 - [internal/app/channels.go](../../internal/app/channels.go)
 
+## 待实现方案
+
+以下方案尚未实现。接口、持久化结构、迁移与精确时序须在实现前确定；当前执行仍遵循已有运行时契约。验收范围见功能说明及并列测试方案。
+
+### F-018 · 优先呈现待用户处理事项
+
+读取 F-004、既有 Approval、Task 和诊断的具名事实，组成当前工作台的只读优先视图；处理动作回到各自所属入口。来源与事项身份、权限及陈旧检查是机制，排序/折叠规则是展示政策。详细布局与聚合查询待真实事项接通后设计，暂不新增面板框架、内部流水线标签页或第二套事实源。
+
+### F-020 · 原消息关联与渠道适配交付
+
+关联事实来自 F-004，Main 仍负责最终语义交付；复用 DeliveryRequest/Outbox 和渠道回执。冻结目的地、权限、消息身份与幂等是机制，渠道篇幅/摘要和是否通知是政策。先接通 GitHub 与已绑定飞书的一个场景，内容投影和跨渠道意图去重待设计；保留 unknown，不承诺远端 exactly-once 或隐式目的地回退。
+
 ## 验证与交付
 
 验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/channels.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。

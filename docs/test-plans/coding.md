@@ -14,6 +14,12 @@ F-026 验证四工具在真实隔离环境与统一 ToolExecutor 中的能力，
 | [CLI capabilities](../../tests/system/verify_capabilities.py) | 真实 red → Worker 精确修改多个文件 → bash go test → diff → Artifact；连续脏文件编辑/新建/过时哈希；审批拒绝不执行；SIGKILL 后 unknown 不重发；保留 MCP/Skill/角色回归 |
 | [memory maintenance](../../tests/system/verify_memory_maintenance.py) | Reviewer 只采纳真实 bash 的精确测试命令、退出码与完整输出证据；保留独立 Run 与晋升约束 |
 
+## 需求场景矩阵
+
+| 需求 | 可观察行为与验证方式 | 覆盖边界 |
+| --- | --- | --- |
+| [F-026](../features/coding.md#f-026) | 隔离 fixture 仓库含未提交修改，两个 Task 并行准备、修改和验证；检查修改集分离、原文件保留、准备失败隔离、重启复用与证据真实。远端受控 peer 验证幂等/unknown；真实 GitHub 授权及模型代码质量独立验证，沿用现有 coding 系统入口。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+
 ## 仍需独立验证
 
 macOS Seatbelt、本轮新增的真实 Lume/SSH Guest 命令与桌面文件互通，必须在对应平台做 Live 检查；Linux 软件回归和协议 Fake 不能代替。真实模型质量、联网依赖、真实仓库导入与远端交付按实际接入单独验收。

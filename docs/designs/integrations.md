@@ -30,6 +30,14 @@ flowchart TD
 - [internal/computer/sandbox/sandbox_linux.go](../../internal/computer/sandbox/sandbox_linux.go)
 - [internal/app/runtime.go](../../internal/app/runtime.go)
 
+## 待实现方案
+
+以下方案尚未实现。接口、持久化结构、迁移与精确时序须在实现前确定；当前执行仍遵循已有运行时契约。验收范围见功能说明及并列测试方案。
+
+### F-042 · 可靠的环境事件监听
+
+复用现有 InboundEvent、Outbox/Inbox 与 ToolExecutor。来源事件身份、消费进度和健康状态属于可靠接收机制；监听对象与事件种类是显式配置的政策。先由首个真实适配器确定私有接口、补读保证及幂等事务边界，暂不稳定通用 Source 插件协议，来源接口保持私有。F-025 提供实际服务认证，F-004 决定事件如何接续 Task。
+
 ## 验证与交付
 
 验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/integrations.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。

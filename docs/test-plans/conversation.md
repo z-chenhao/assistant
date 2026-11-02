@@ -12,7 +12,7 @@
 
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
-| [F-003](../features/conversation.md#f-003) | 验证输入去重、Steering、工具续轮、单 Main 所有权与中断后的回复恢复。 | 保护已接通的限定范围；Live/配置另行验证 |
+| [F-003](../features/conversation.md#f-003) | 验证输入去重、Steering、工具续轮、单 Main 所有权与回复恢复。通过真实对话入口启动受控慢工具，同时提交新问题与 Task 干预，检查响应、调用关联及最终交付；覆盖满负载、审批等待、重启及迟到结果。 | 真实 SQLite/Actor 及 CLI 已有回归；实际模型延迟与效果仍需独立验证，不以脚本模型得出性能结论 |
 
 ## 层级与关键路径
 
@@ -30,6 +30,22 @@
 | [tests/system/verify_terminal_input.py](../../tests/system/verify_terminal_input.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
 
 现有入口仍需在后续相关实现变更时按风险运行；需求范围变化时同步扩展场景。
+
+## 持续响应与恢复验证
+
+[responsive_test.go](../../internal/agent/sqlite/responsive_test.go) 使用真实 SQLite、Actor 和 ToolExecutor 验证慢工具仍运行时先回复、数据工具槽位占满时查询 Task、等待审批的新输入、模型费用等待不取消已接纳调用、费用拒绝后的重启恢复不重试未知副作用、完成/unknown 结果接续，以及协议迁移原子性。既有 Loop/Tool 测试继续验证冻结生成、所有权丢失、取消、权限和调用结果核实。
+
+[verify_main.py](../../tests/system/verify_main.py) 通过实际 CLI 持有已接纳的工具调用，在释放前提交第二条消息并观察回复；读回唯一 Main、pending_tools、调用身份及运行状态，再验证释放后的结果和 SIGKILL 后恢复。调用暂停点位于事务外，不以锁住数据库伪造工具耗时。观察断言小于 5 秒；结果仅证明脚本模型和本机机制，不构成真实模型 SLA。
+
+验证命令与证据目录：
+
+```sh
+go test ./internal/agent/... ./internal/tool/... ./internal/llm/...
+go test -race ./internal/agent/... ./internal/tool/...
+python3 tests/system/runner.py --gate main --gate tools --gate tasks --evidence evidence/f003-core-03
+```
+
+测试结果由对应执行日志与 runner 报告保存；全量回归中的执行沙箱/OCR 平台失败和未运行检查必须单列，不能按 F-003 的目标链路通过而宣称全仓通过。
 
 ## 详细测试入口与证明边界
 

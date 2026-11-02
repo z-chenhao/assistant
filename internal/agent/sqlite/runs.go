@@ -364,7 +364,7 @@ func (r *Runs) Load(ctx context.Context, c agent.RunClaim) (agent.Run, error) {
 		if err := fence(ctx, tx, c); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx, `SELECT r.run_id,r.agent_id,r.conversation_id,r.kind,r.status,coalesce(r.wait_reason,''),r.version,coalesce(a.status,''),r.model_snapshot_id,r.checkpoint_json,c.tools_json FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id LEFT JOIN spend_approval a ON a.root_run_id=coalesce(r.root_run_id,r.run_id) WHERE r.run_id=?`, c.RunID()).Scan(&run.ID, &run.AgentID, &run.ConversationID, &run.Kind, &run.Status, &run.WaitReason, &run.Version, &run.SpendStatus, &snapshotID, &cp, &tools)
+		return tx.QueryRowContext(ctx, `SELECT r.run_id,r.agent_id,r.conversation_id,r.kind,r.status,coalesce(r.wait_reason,''),r.version,coalesce(a.status,''),r.model_snapshot_id,r.checkpoint_json,c.tools_json,EXISTS(SELECT 1 FROM main_tool_protocol p WHERE p.run_id=r.run_id) FROM run r JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id LEFT JOIN spend_approval a ON a.root_run_id=coalesce(r.root_run_id,r.run_id) WHERE r.run_id=?`, c.RunID()).Scan(&run.ID, &run.AgentID, &run.ConversationID, &run.Kind, &run.Status, &run.WaitReason, &run.Version, &run.SpendStatus, &snapshotID, &cp, &tools, &run.ResponsiveTools)
 	})
 	if err != nil {
 		return run, err
@@ -635,10 +635,14 @@ func (r *Runs) terminal(ctx context.Context, c agent.RunClaim, version int64, st
 		}
 		if status == "completed" {
 			var phase string
-			if err := tx.QueryRowContext(ctx, `SELECT json_extract(checkpoint_json,'$.phase') FROM run WHERE run_id=?`, c.RunID()).Scan(&phase); err != nil {
+			var pendingTools int
+			if err := tx.QueryRowContext(ctx, `SELECT json_extract(checkpoint_json,'$.phase'),coalesce(json_array_length(checkpoint_json,'$.pending_tools'),0) FROM run WHERE run_id=?`, c.RunID()).Scan(&phase, &pendingTools); err != nil {
 				return err
 			}
 			if phase != "settle" {
+				return agent.ErrConflict
+			}
+			if pendingTools > 0 {
 				return agent.ErrConflict
 			}
 			var pending int

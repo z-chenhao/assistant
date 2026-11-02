@@ -58,7 +58,8 @@ func ProviderMessages(messages []AgentMessage, userImages bool) ([]llm.Message, 
 			case "text":
 				wire.Text += p.Text
 			case "image", "audio", "video", "file":
-				if p.Type == "image" && (m.Type == "tool_result" || userImages && m.Type == "user" && m.Origin != "runtime") {
+				toolImage := m.Type == "tool_result" || m.Origin == "runtime" && m.Source != nil && m.Source.Kind == "tool_results"
+				if p.Type == "image" && (toolImage || userImages && m.Type == "user" && m.Origin != "runtime") {
 					wire.ImageRefs = append(wire.ImageRefs, p.ArtifactRef)
 				}
 				raw, _ := json.Marshal(p)
