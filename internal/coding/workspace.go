@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/z-chenhao/assistant/internal/computer/sandbox"
 	"golang.org/x/sys/unix"
@@ -76,7 +77,9 @@ func scanTree(ctx context.Context, source, destination string, inventory func([]
 			if strings.EqualFold(name, ".git") {
 				continue
 			}
-			if strings.ContainsAny(name, "\r\n\x00") {
+			// JSON would otherwise replace distinct invalid path bytes with
+			// the same replacement character in the frozen manifest.
+			if !utf8.ValidString(name) || strings.ContainsAny(name, "\r\n\x00") {
 				return ErrInvalid
 			}
 			visited++
@@ -369,9 +372,10 @@ func Prepare(ctx context.Context, root, source, taskID, scope string, boundary f
 }
 
 type Diff struct {
-	Patch   string       `json:"patch"`
-	Changed bool         `json:"changed"`
-	Files   []FileChange `json:"files"`
+	Patch            string       `json:"patch"`
+	PatchUnavailable string       `json:"patch_unavailable,omitempty"`
+	Changed          bool         `json:"changed"`
+	Files            []FileChange `json:"files"`
 }
 type FileChange struct {
 	Path             string `json:"path"`
@@ -462,5 +466,11 @@ func Review(ctx context.Context, w Workspace) (Diff, error) {
 		changes = append(changes, change)
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
-	return Diff{Patch: string(output.Bytes()), Changed: len(changes) > 0, Files: changes}, nil
+	diff := Diff{Changed: len(changes) > 0, Files: changes}
+	if patch := output.Bytes(); utf8.Valid(patch) {
+		diff.Patch = string(patch)
+	} else {
+		diff.PatchUnavailable = "non_utf8"
+	}
+	return diff, nil
 }

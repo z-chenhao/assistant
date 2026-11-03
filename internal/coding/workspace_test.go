@@ -2,6 +2,9 @@ package coding
 
 import (
 	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,6 +137,49 @@ func TestReviewInventoryIncludesEmptyFilesAndKeepsPatchContent(t *testing.T) {
 	must(t, err)
 	if !diff.Changed || len(diff.Files) != 3 || diff.Files[0].Path != "empty-added" || diff.Files[0].Kind != "added" || diff.Files[1].Path != "empty-removed" || diff.Files[1].Kind != "deleted" || !strings.Contains(diff.Patch, "-"+old) || !strings.Contains(diff.Patch, "+"+changed) {
 		t.Fatal(diff)
+	}
+}
+
+func TestTaskTreeRejectsInvalidUTF8Filename(t *testing.T) {
+	source, root := paths(t)
+	ctx := context.Background()
+	name := "entry-\xff.txt"
+	invalid := filepath.Join(source, name)
+	if err := os.WriteFile(invalid, []byte("file"), 0600); err != nil {
+		if errors.Is(err, unix.EILSEQ) || errors.Is(err, unix.EINVAL) {
+			t.Skip("fixture filesystem rejects invalid UTF-8 filenames")
+		}
+		t.Fatal(err)
+	}
+	if _, err := Prepare(ctx, root, source, "invalid-name", "scope", nil); !errors.Is(err, ErrInvalid) {
+		t.Fatal("invalid path entered the import manifest", err)
+	}
+	must(t, os.Remove(invalid))
+	w, err := Prepare(ctx, root, source, "invalid-name", "scope", nil)
+	must(t, err)
+	must(t, os.WriteFile(filepath.Join(w.Directory, name), []byte("new"), 0600))
+	if _, err := Review(ctx, w); !errors.Is(err, ErrInvalid) {
+		t.Fatal("invalid path entered the review inventory", err)
+	}
+}
+
+func TestReviewKeepsByteHashesWhenDiffPatchIsNotUTF8(t *testing.T) {
+	source, root := paths(t)
+	ctx := context.Background()
+	before := []byte("before\xff\n")
+	after := []byte("after\xfe\n")
+	must(t, os.WriteFile(filepath.Join(source, "encoded.txt"), before, 0600))
+	w, err := Prepare(ctx, root, source, "encoding", "scope", nil)
+	must(t, err)
+	must(t, os.WriteFile(filepath.Join(w.Directory, "encoded.txt"), after, 0600))
+	review, err := Review(ctx, w)
+	must(t, err)
+	want := FileChange{Path: "encoded.txt", Kind: "modified", BeforeSHA256: fmt.Sprintf("%x", sha256.Sum256(before)), AfterSHA256: fmt.Sprintf("%x", sha256.Sum256(after))}
+	if !review.Changed || len(review.Files) != 1 || review.Files[0] != want {
+		t.Fatal(review)
+	}
+	if review.Patch != "" || review.PatchUnavailable != "non_utf8" {
+		t.Fatal("invalid patch text was not explicitly omitted", review)
 	}
 }
 
