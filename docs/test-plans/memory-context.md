@@ -35,6 +35,7 @@
 | [internal/evidence/evidence_test.go](../../internal/evidence/evidence_test.go) | 严格 schema、重复/null/伪造作用域拒绝、UTF-8 有界字节窗口与可前进游标 |
 | [cmd/steward/evidence_test.go](../../cmd/steward/evidence_test.go) | 真实 CLI 保存产物后，反复重开精确续读原文；执行依赖故障仍保持只读入口可用，非法/缺失引用不输出部分内容 |
 | [internal/agent/child_test.go](../../internal/agent/child_test.go) | Main Conversation 导航不进入 Worker/Child 的冻结工作面；旧 catalog Select 不自动追加新工具由 evidence 存储回归验证 |
+| [internal/llm/fake/context_test.go](../../internal/llm/fake/context_test.go) | 确定性 Delegate fixture 消费摘要保留的已接纳回执与 Host Task update，再次摘要仍保留进度；旧摘要位于新显式输入之前时不抑制新请求，仅验证测试协议而不代表模型语义质量 |
 
 - **F-009 剩余覆盖**：补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
 - **F-010 剩余覆盖**：memory: 精读/解密与谱系、外部 PR 关联尚未接通；实际模型自主导航路径的质量需外部效果评测，确定性工具调用链只证明机制。
