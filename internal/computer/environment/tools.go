@@ -18,13 +18,17 @@ import (
 var Source string
 
 type Config struct {
-	Root string `yaml:"root"`
+	Root             string `yaml:"root"`
+	RepositorySource string `yaml:"repository_source,omitempty" json:"RepositorySource,omitempty"`
 	// Optional operator-installed compilers/interpreters, mounted read-only.
 	ToolchainRoots []string `yaml:"toolchain_roots"`
 }
 
 func (c Config) Validate() error {
 	if !filepath.IsAbs(c.Root) || filepath.Clean(c.Root) == "/" {
+		return computer.ErrInvalid
+	}
+	if c.RepositorySource != "" && (!filepath.IsAbs(c.RepositorySource) || filepath.Clean(c.RepositorySource) == "/") {
 		return computer.ErrInvalid
 	}
 	for _, p := range c.ToolchainRoots {

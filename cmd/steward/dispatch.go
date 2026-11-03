@@ -23,6 +23,19 @@ func dispatchCommand(ctx context.Context, application *app.App, cfg config.Confi
 		application.StartMemory(ctx)
 	}
 	switch command.kind {
+	case commandCoding:
+		if flags.Arg(1) == "report" {
+			value, err := application.SaveCodeReport(ctx, flags.Arg(2))
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(value)
+		}
+		value, err := application.CodeReport(ctx, flags.Arg(2), flags.Arg(1) == "diff")
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(value)
 	case commandWeb:
 		return runWeb(ctx, application, cfg, out, foreground)
 	case commandChannel:

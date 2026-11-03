@@ -275,6 +275,12 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 			}
 		}
 		roots := append([]string{cfg.Execution.Root}, cfg.Execution.ToolchainRoots...)
+		if cfg.Execution.RepositorySource != "" {
+			if overlaps(cfg.Execution.RepositorySource, cfg.Execution.Root) {
+				return Config{}, errors.New("repository source must be separate from execution workspace")
+			}
+			roots = append(roots, cfg.Execution.RepositorySource)
+		}
 		if cfg.Execution.Validate() != nil {
 			return Config{}, errors.New("invalid execution workspace")
 		}

@@ -35,8 +35,7 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 		return err
 	}
 	runs := a.store.Runs(a.history, registry)
-	local := environment.Local{Config: cfg.ExecutionConfig()}
-	runs.ConfigureEnvironment(local.Execute)
+	runs.ConfigureLocalEnvironment(cfg.ExecutionConfig())
 	runs.ConfigureImageOCR(imageOCR)
 	if cfg.Computer != nil {
 		provider, e := macosvm.New(*cfg.Computer, macosvm.SSHGuest{Config: cfg.Computer.Guest, Secrets: secrets})

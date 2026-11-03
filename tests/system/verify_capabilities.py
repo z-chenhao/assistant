@@ -300,6 +300,67 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                     'crashed edit retried or falsely completed')
             return {'name': 'edit_after_effect_before_result_commit', 'signal': 'SIGKILL', 'state': value}
         scenario('crash', crash, kind='crashes')
+
+        def task_code_environments(h):
+            source = (h.root / 'repo').resolve()
+            workspaces = h.root.resolve() / 'task-workspaces'
+            text = (h.root / 'config.yaml').read_text()
+            old = 'execution:\n  root: ' + json.dumps(str(h.root / 'repo'))
+            new = 'execution:\n  root: ' + json.dumps(str(workspaces)) + '\n  repository_source: ' + json.dumps(str(source))
+            require(old in text, 'coding fixture execution configuration missing')
+            (h.root / 'config.yaml').write_text(text.replace(old, new))
+            original = tree(source)
+            before_hash = digest(source / 'docs/notes.md')
+            for label in ('A', 'B'):
+                plan = [
+                    dict(name='builtin__read', arguments=dict(path='AGENTS.md')),
+                    dict(name='builtin__edit', arguments=dict(path='docs/notes.md', before_hash=before_hash,
+                         old_text='USER_UNCOMMITTED_SENTINEL', new_text='USER_UNCOMMITTED_SENTINEL\nTask '+label)),
+                    dict(name='builtin__write', arguments=dict(path='task-result.txt', content=label+'\n')),
+                    dict(name='builtin__bash', arguments=dict(command='exit 7')),
+                    dict(name='builtin__bash', arguments=dict(command='test "$(cat task-result.txt)" = '+label))]
+                h.send('task-code-'+label, 'Delegate capabilities: '+json.dumps(plan))
+                h.command('chat', 'work')
+            def environments():
+                with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
+                    db.row_factory=sqlite3.Row
+                    return [dict(r) for r in db.execute('SELECT t.task_ref,e.directory,e.baseline_hash,e.status,e.error_code FROM task_code_environment e JOIN task t USING(task_id) ORDER BY t.created_at,t.task_id')]
+            copies = environments()
+            require(len(copies)==2 and all(w['status']=='ready' for w in copies) and copies[0]['directory']!=copies[1]['directory'], 'two pending Task copies were not isolated')
+            # Every CLI call is another process: pending approvals and directory
+            # identities must survive closing the original execution owner.
+            for _ in range(12):
+                approvals=[a for a in h.command('approval','list') if a['status']=='pending']
+                if not approvals: break
+                for a in approvals:
+                    h.command('approval','approve',a['approval_id'],a['frozen_arguments_hash'])
+                h.command('chat','work')
+            reports=[]
+            for label,w in zip(('A','B'),copies):
+                directory=Path(w['directory'])
+                require((directory/'task-result.txt').is_file(), 'scoped real tools did not produce the approved Task file')
+                require((directory/'task-result.txt').read_text()==label+'\n' and ('Task '+label) in (directory/'docs/notes.md').read_text(), 'Task edits contaminated another copy')
+                require(not (directory/'.git').exists(), 'source Git metadata was imported')
+                inspect=h.command('coding','inspect',w['task_ref'])
+                require(inspect['directory']==w['directory'] and inspect['baseline_sha256']==w['baseline_hash'], 'restart rebound the Task working copy')
+                commands=[json.loads(c['result']['text']) for c in inspect['commands']]
+                require([c['exit_code'] for c in commands]==[7,0], 'actual failed/successful command evidence was lost or invented')
+                artifact=h.command('coding','report',w['task_ref'])
+                review=h.command('artifact','open',artifact['artifact_ref'])
+                require('directory' not in review and review['diff']['changed'] and 'USER_UNCOMMITTED_SENTINEL' in review['diff']['patch'], 'review Artifact lost the imported dirty baseline or exposed host paths')
+                require(str(workspaces) not in review['diff']['patch'] and 'b/task-result.txt' in review['diff']['patch'], 'patch headers were not repository relative')
+                reports.append(dict(task_ref=w['task_ref'], artifact=artifact, command_exit_codes=[c['exit_code'] for c in commands]))
+            require(tree(source)==original and not (source/'hook-ran').exists(), 'source dirty files or Git hooks changed')
+            (source/'.git').rename(source/'.git-disabled')
+            try:
+                h.send('bad-source-task', 'Delegate capabilities: '+json.dumps([dict(name='builtin__read',arguments=dict(path='AGENTS.md'))]))
+                h.command('chat','work')
+            finally:
+                (source/'.git-disabled').rename(source/'.git')
+            value=environments()
+            require(sum(w['status']=='failed' and w['error_code']=='CODE_PREPARATION_FAILED' for w in value)==1 and sum(w['status']=='ready' for w in value)==2, 'preparation failure affected another Task')
+            return dict(name='task_code_environment_scope_diff_and_evidence', reports=reports, preparation_failure='isolated', source_preserved=True)
+        scenario('task-code-environments', task_code_environments)
         for kind, result in run_cases(cases, drive, scenario_jobs):
             report[kind].append(result)
         if not selected:
@@ -307,7 +368,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                         'continuous_dirty_edits_create_and_stale_hash_refusal',
                         'reads_automatic_mutations_require_exact_approval',
                         'MCP_transport_Skill_scope_role_denial_unknown',
-                        'malformed_stdio_effect_replies_stay_unknown'}
+                        'malformed_stdio_effect_replies_stay_unknown',
+                        'task_code_environment_scope_diff_and_evidence'}
             require(len(report['checks']) == len(expected) and
                     {row['name'] for row in report['checks']} == expected and
                     len(report['crashes']) == 1 and
@@ -322,7 +384,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash'],
+    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash', 'task-code-environments'],
                         help='Run one maintained scenario; omit for the complete gate')
     parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("STEWARD_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()

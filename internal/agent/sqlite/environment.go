@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/agent"
@@ -14,6 +15,14 @@ import (
 
 func (r *Runs) ConfigureEnvironment(execute func(context.Context, string, string) tool.Result) {
 	r.environmentExecute = execute
+}
+
+func (r *Runs) ConfigureLocalEnvironment(cfg environment.Config) {
+	r.localEnvironment = &cfg
+	r.environmentExecute = (environment.Local{Config: cfg}).Execute
+	r.localExecute = func(ctx context.Context, configuration environment.Config, name, args string) tool.Result {
+		return (environment.Local{Config: configuration}).Execute(ctx, name, args)
+	}
 }
 
 func (t *tools) executeEnvironment(ctx context.Context, inv tool.Invocation) (result tool.Result, executionErr error) {
@@ -73,6 +82,31 @@ func (t *tools) executeEnvironment(ctx context.Context, inv tool.Invocation) (re
 	}()
 	defer func() { cancel(); <-done }()
 	if t.runs.computerProvider == nil {
+		if t.runs.localEnvironment != nil {
+			cfg := *t.runs.localEnvironment
+			var taskID string
+			if err := t.runs.host.db.QueryRowContext(live, `SELECT coalesce(task_id,'') FROM run WHERE run_id=?`, t.claim.RunID()).Scan(&taskID); err != nil {
+				return tool.Result{}, agent.ErrStorage
+			}
+			if taskID != "" {
+				var directory, scope, status string
+				err := t.runs.host.db.QueryRowContext(live, `SELECT directory,scope_hash,status FROM task_code_environment WHERE task_id=?`, taskID).Scan(&directory, &scope, &status)
+				if err != nil && err != sql.ErrNoRows {
+					return tool.Result{}, agent.ErrStorage
+				}
+				if err == nil {
+					if scope != environment.ResourceHash(cfg) || status != "ready" {
+						return tool.Failure("PERMISSION_DENIED"), nil
+					}
+					info, err := os.Lstat(directory)
+					if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0077 != 0 {
+						return tool.Failure("PROVIDER_UNAVAILABLE"), nil
+					}
+					cfg.Root = directory
+					return t.runs.localExecute(live, cfg, inv.Call.Name, inv.Call.Arguments), nil
+				}
+			}
+		}
 		if t.runs.environmentExecute == nil {
 			return tool.Failure("PROVIDER_UNAVAILABLE"), nil
 		}
