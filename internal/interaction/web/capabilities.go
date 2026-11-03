@@ -94,7 +94,7 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 		}
 		w.WriteHeader(http.StatusConflict)
 	}
-	s.render(w, p)
+	s.render(w, r, p)
 	return nil
 }
 func validCapability(id string) bool {

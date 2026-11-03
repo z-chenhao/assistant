@@ -1,0 +1,21 @@
+{
+  "tool": "Built-in image_gen.imagegen; no CLI/API fallback",
+  "prompts": [
+    {
+      "asset": "ghost-charcoal-v1.png",
+      "selected": true,
+      "prompt": "Use case: identity-preserve + background-extraction.\nEdit target: the attached charcoal plush ghost character. Produce ONE production asset for a layered web avatar, not a redesign.\nPreserve its exact soft triangular domed silhouette, chubby scalloped lower hem, small hanging left arm, raised waving right arm, original slight right-facing pose, and subtle short plush texture. Preserve the original 3D softness and lighting. Body charcoal black, not featureless pure black.\nMake a clean full-body cutout with actual transparent alpha. Remove the pale background and ALL ground shadows. Center the entire ghost with a small even transparent margin, no cropped extremities.\nFor code-driven facial animation ONLY remove the two bright eye shapes and smiling mouth, leaving the face area uninterrupted matching charcoal plush texture. Do not add any new facial features, text, accessories, floor, glow, outline, or frame. This intentionally blank face is an intermediate rig layer; the original friendly eyes and smile will be drawn and animated separately in code.\nOutput a square transparent PNG, one character only, same perspective and full-body proportions as the edit target."
+    },
+    {
+      "asset": "ghost-ivory-v1.png",
+      "selected": true,
+      "prompt": "Use case: identity-preserve.\nEdit target: the transparent charcoal ghost body rig supplied here.\nMake its WHITE / warm ivory plush counterpart for dark-mode UI. Preserve EXACT canvas size, alpha silhouette, object placement, pose, scale, triangular rounded crown, scalloped chubby hem, left hanging arm and right raised arm. Do not change shape or camera.\nRecolor only the plush fabric from charcoal to soft warm off-white, with pale gray shading and the same fine short plush texture. Keep enough dimensional shading to read on a dark background, avoid pure white clipping.\nKeep the front face BLANK as in this rig source; eyes and smiling mouth will be drawn separately in code. No facial features, extra accessories, floor, cast shadow, border, frame, text, glow, backdrop or checkerboard. Preserve genuine transparent alpha. One full-body character only, square PNG."
+    },
+    {
+      "asset": "ivory cleanup experiment",
+      "selected": false,
+      "prompt": "Precise object edit / alpha cleanup only. This is a transparent warm-ivory plush ghost avatar body rig.\nKeep the current character pixels, blank face, color, lighting, texture, exact pose, shape, scale, margins and canvas size.\nClean the transparent cutout: remove ALL detached white crumbs, specks, isolated flecks and floating pixels outside the main connected ghost silhouette, especially around the inward gap between the dome and raised right arm. Make a clean antialiased alpha contour without a white matte fringe or halo. Preserve the smooth plush silhouette and all attached arms and scalloped hem. Do not add anything or redraw the subject, no eyes or mouth, background or shadow. Output genuine transparent PNG.",
+      "reason": "Not used; selected ivory cutout shares the charcoal alpha mask in the renderer."
+    }
+  ]
+}

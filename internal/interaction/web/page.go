@@ -32,12 +32,15 @@ type page struct {
 	Accounts                                          []llm.AuthConnection
 	Bindings                                          []interaction.Binding
 	Preference                                        interaction.Preference
+	Language                                          string
 	Login                                             bool
 	Tab, View, Title, Path, Next, Error, Notice, Live string
 	Status                                            Status
 	Cursor, Latest, Before                            int64
 	Messages                                          []shownMessage
 	Approvals                                         []approvalView
+	PendingCount                                      int
+	FirstPending                                      string
 	Profiles                                          []llm.Profile
 	SourceID                                          string
 	Auth                                              llm.AuthState
@@ -115,11 +118,13 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 		s.pageError(w, r, err)
 		return
 	}
-	s.render(w, p)
+	s.render(w, r, p)
 }
-func (s *Server) render(w http.ResponseWriter, p page) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, p page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = layout.Execute(w, p)
+	p.Language = requestLanguage(r)
+	w.Header().Set("Content-Language", p.Language)
+	_ = localizedLayout(p.Language).Execute(w, p)
 }
 func conversationCursor(r *http.Request) (int64, error) {
 	raw := r.URL.Query().Get("before")
@@ -134,6 +139,8 @@ func conversationCursor(r *http.Request) (int64, error) {
 }
 func notice(code string) string {
 	switch code {
+	case "language-saved":
+		return "Language saved."
 	case "added":
 		return "Model saved. Verify the connection before using it."
 	case "tested":

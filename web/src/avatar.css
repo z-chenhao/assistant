@@ -1,0 +1,27 @@
+/* Complete pre-rendered poses; fixed hitbox, independent composited whole-body drift. */
+.steward-avatar,.steward-avatar:hover{
+  --ghost-tone:charcoal;--ghost-atlas:url('/brand/ghost-charcoal-96.webp');--ghost-drift:2px;
+  width:44px;height:44px;min-width:44px;padding:0;position:relative;display:inline-block;vertical-align:middle;
+  background:transparent;color:var(--foreground);border:0;border-radius:0;overflow:visible;isolation:isolate;touch-action:manipulation;
+}
+.steward-avatar:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:10px}
+.dark .steward-avatar[data-ghost-style=auto],.steward-avatar[data-ghost-style=ivory]{--ghost-tone:ivory;--ghost-atlas:url('/brand/ghost-ivory-96.webp')}
+.ghost-art,.ghost-rest,.ghost-frames{position:absolute;inset:0;display:block;width:100%;height:100%;pointer-events:none;user-select:none}
+.ghost-rest{background-image:var(--ghost-atlas);background-size:800% 700%;background-position:0 0;background-repeat:no-repeat}
+.ghost-frames{visibility:hidden}
+.steward-avatar.is-ready .ghost-frames{visibility:visible}
+.steward-avatar.is-ready .ghost-rest{visibility:hidden}
+.ghost-shadow{position:absolute;left:28%;bottom:7%;width:43%;height:3%;border-radius:50%;background:var(--foreground);opacity:.12;filter:blur(1px);pointer-events:none}
+.welcome>.steward-avatar{width:120px;height:120px;min-width:120px;margin-bottom:12px}
+.profile>.steward-avatar{width:52px;height:52px;min-width:52px}
+.top-start>.steward-avatar{width:40px;height:40px;min-width:40px;margin:0 3px 0 0}
+@media(prefers-reduced-motion:no-preference){
+  .ghost-art{animation:ghost-drift 5.6s ease-in-out infinite;animation-play-state:paused}
+  .steward-avatar.is-visible .ghost-art{animation-play-state:running}
+  @keyframes ghost-drift{0%,100%{transform:translateY(0)}25%{transform:translateY(calc(-1 * var(--ghost-drift)))}75%{transform:translateY(var(--ghost-drift))}}
+}
+.ghost-motion-paused .ghost-art{animation-play-state:paused!important}
+@media(max-width:760px){.top-start>.steward-avatar{width:34px;height:34px;min-width:34px}}
+
+.message-label .steward-avatar,.topbar-start .steward-avatar{width:40px;height:40px;min-width:40px}
+.avatar-slot{display:inline-flex;align-items:center;vertical-align:middle}.avatar-fallback{display:block;width:40px;height:40px;background:url('/brand/ghost-charcoal-96.webp') 0 0/800% 700% no-repeat}.dark .avatar-fallback{background-image:url('/brand/ghost-ivory-96.webp')}.welcome>.avatar-slot{display:flex;justify-content:center;margin:0 auto 16px}.welcome>.avatar-slot>.steward-avatar,.welcome>.avatar-slot>.avatar-fallback{width:120px;height:120px;min-width:120px}

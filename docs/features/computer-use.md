@@ -194,3 +194,6 @@ accepted Tool pipeline. `computer status` is a read-only operator diagnostic.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/computer-use.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/computer-use.md)。
+
+
+Web Chat 的 Computer 面板提供只读桌面预览与操作进度，使用已有配置且已处于 ready 的实例。查看不分配/恢复 VM、不激活应用、不输入内容；关闭面板或页面转入后台后停止请求。画面来自独立 Driver 会话，不更新 Agent 的 AX/截图观察凭据；实际 macOS Guest 权限与显示环境仍需 Live 验证。

@@ -20,6 +20,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case p.Tab == "/":
 		fragments["conversation-messages"], fragments["conversation-approvals"] = "conversation", "approvals"
+		fragments["conversation-attention"] = "attention-summary"
 	case p.Tab == "/tasks":
 		fragments["ongoing-work"] = "tasks-list"
 	case strings.HasPrefix(p.Tab, "/tasks/"):
@@ -81,7 +82,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 	regions := map[string]string{}
 	for id, name := range fragments {
 		var html bytes.Buffer
-		if err = layout.ExecuteTemplate(&html, name, p); err != nil {
+		if err = localizedLayout(requestLanguage(r)).ExecuteTemplate(&html, name, p); err != nil {
 			fail(w, 500)
 			return
 		}

@@ -1,0 +1,130 @@
+{
+  "input": "User-supplied static plush ghost image, 2026-11-02",
+  "method": "Built-in image_gen identity-preserving charcoal cutout and ivory recolor; unchanged source PNGs feed an explicitly authorized whole-frame atlas bake. Blank source faces receive complete rendered eyes/smile in the derived frames. Selected and unused prompts are in ghost-prompts.json.",
+  "assets": [
+    {
+      "file": "internal/interaction/web/assets/brand/ghost-charcoal-v1.png",
+      "sha256": "7df674578406bfd1e6836173f71303bf01f607dc3f1a8d349c93ec0ca71a751c",
+      "bytes": 956021,
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": true
+    },
+    {
+      "file": "internal/interaction/web/assets/brand/ghost-ivory-v1.png",
+      "sha256": "57f6667b9461e00f18050109db2b7cf0e2ed327a1fe44590931546e13b7f17ad",
+      "bytes": 997511,
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": true
+    }
+  ],
+  "renderer": "Runtime predecoded complete-frame lossless WebP atlas playback in permanent per-avatar Canvas2D views, no runtime WebGL/mesh load. Eight columns by seven rows: frames0..48 wave over2.1s, frames49..55 blink over320ms; about24fps only while changing frames,8400ms idle blink wait. Below100px uses96px frames, otherwise256px. Complete first-frame CSS fallback while loading or decode failure. Fixed button hitbox, artwork pointer-events:none; ignore active greeting and2800ms cooldown. User-approved whole-artwork vertical drift +/-2px, preview +/-4px,5.6s; separate fixed shadow. Reduced motion, remembered pause, document/intersection visibility stop motion.",
+  "scope": "Private Steward Web presentation; no execution or model status contract.",
+  "tooling": "Unchanged ImageGen source PNGs feed tools/bake.html + tools/ghost-bake-mesh.js + tools/bake-server.py, served once on127.0.0.1:8789, which bake complete PNG frame atlases. tools/encode-frames.py invokes installed cwebp -lossless -exact -m 6, writes lossless WebP atlases, then removes intermediate baked PNGs. Continuous96x96 2D mesh, anchored shoulder(.75,.54), maximum.18rad wave envelope are build-only. dist/ghost-mesh.js is removed; no runtime WebGL or3D model. No measured GPU savings claim is made.",
+  "derivedArtifacts": [
+    {
+      "file": "internal/interaction/web/assets/brand/ghost-charcoal-96.webp",
+      "sha256": "2637c1305adb793fe11d2dac729899c37981adc99535d5cffe20292651441db6",
+      "bytes": 20768,
+      "format": "lossless WebP",
+      "frameSize": [
+        96,
+        96
+      ],
+      "atlasSize": [
+        768,
+        672
+      ],
+      "frameCount": 56,
+      "source": "dist/assets/ghost-charcoal-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "encoding": "cwebp -lossless -exact -m 6"
+    },
+    {
+      "file": "internal/interaction/web/assets/brand/ghost-charcoal-256.webp",
+      "sha256": "256e2b5a6dd99aa270b402b29f68a5649a82a04f3bbc95c695939315d82f0ce8",
+      "bytes": 134354,
+      "format": "lossless WebP",
+      "frameSize": [
+        256,
+        256
+      ],
+      "atlasSize": [
+        2048,
+        1792
+      ],
+      "frameCount": 56,
+      "source": "dist/assets/ghost-charcoal-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "encoding": "cwebp -lossless -exact -m 6"
+    },
+    {
+      "file": "internal/interaction/web/assets/brand/ghost-ivory-96.webp",
+      "sha256": "881a73962ee1fe5de2f34e0af02ca1642b6687937c28ee093cff6e54a4783d8d",
+      "bytes": 31406,
+      "format": "lossless WebP",
+      "frameSize": [
+        96,
+        96
+      ],
+      "atlasSize": [
+        768,
+        672
+      ],
+      "frameCount": 56,
+      "source": "dist/assets/ghost-ivory-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "encoding": "cwebp -lossless -exact -m 6"
+    },
+    {
+      "file": "internal/interaction/web/assets/brand/ghost-ivory-256.webp",
+      "sha256": "529614a679c3d87fc6ae34981ead040c18fa8dc4ac7b902beadad3e13d4b161e",
+      "bytes": 150946,
+      "format": "lossless WebP",
+      "frameSize": [
+        256,
+        256
+      ],
+      "atlasSize": [
+        2048,
+        1792
+      ],
+      "frameCount": 56,
+      "source": "dist/assets/ghost-ivory-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "encoding": "cwebp -lossless -exact -m 6"
+    }
+  ],
+  "buildTools": [
+    {
+      "file": "tools/bake.html",
+      "sha256": "6e443c4d83344bf56ea35bbdddc62b715d6c4a8997bd30b6628077207a9a4ba0",
+      "bytes": 1615,
+      "runtimeLoaded": false
+    },
+    {
+      "file": "tools/ghost-bake-mesh.js",
+      "sha256": "c8efd67ab7984e58708e530f30269c24fe93028cdd5e2cd758d6a016e098e120",
+      "bytes": 6621,
+      "runtimeLoaded": false
+    },
+    {
+      "file": "tools/bake-server.py",
+      "sha256": "ce0432fe67fa61d42ed8c44e744fe29e2aa6da9a1295c16a800fb32cab6878f8",
+      "bytes": 1037,
+      "runtimeLoaded": false
+    },
+    {
+      "file": "tools/encode-frames.py",
+      "sha256": "75d5f7e8db568a82e1f9a97aaa2f454f4ff050d496ac7c0d8d4995dbed026576",
+      "bytes": 539,
+      "runtimeLoaded": false
+    }
+  ],
+  "buildToolsReference": "tmp/neutral-web/tools; not bundled or loaded by the product."
+}

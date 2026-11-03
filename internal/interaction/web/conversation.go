@@ -47,6 +47,12 @@ func (s *Server) loadConversation(ctx context.Context, p *page) error {
 	indexed := map[string]interaction.Approval{}
 	for _, a := range approvals {
 		indexed[a.ID] = a
+		if a.Status == "pending" {
+			p.PendingCount++
+			if p.FirstPending == "" {
+				p.FirstPending = a.ID
+			}
+		}
 	}
 	messages, err := s.Core.Conversation(ctx, p.Cursor)
 	if err != nil {

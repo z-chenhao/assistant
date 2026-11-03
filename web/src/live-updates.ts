@@ -1,9 +1,10 @@
+import {t} from './i18n';
 import {z} from 'zod';
 import {enhanceProjections,releaseProjections} from './projections';
 
 const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
 function viewRegions(view:string):string[]|null {
- if(view==='/')return ['workspace-status','conversation-messages','conversation-approvals'];
+ if(view==='/')return ['workspace-status','conversation-attention','conversation-messages','conversation-approvals'];
  if(view==='/tasks')return ['workspace-status','ongoing-work'];
  if(view.startsWith('/tasks/'))return ['workspace-status','task-header','task-progress','task-decisions','task-messages','task-milestones'];
  if(view.startsWith('/settings/'))return ['workspace-status','signin-status'];
@@ -50,7 +51,7 @@ function viewportAnchor(){
  });
  return node?{node,top:node.getBoundingClientRect().top}:null;
 }
-function atBottom(){return scrollY+innerHeight>=document.documentElement.scrollHeight-100}
+function atBottom(){return !document.querySelector('#work-peek[open]')&&scrollY+innerHeight>=document.documentElement.scrollHeight-100}
 function scrollToLatest(){window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})}
 
 export function startLiveUpdates(){
@@ -61,20 +62,40 @@ export function startLiveUpdates(){
  const feedback=document.getElementById('live-update-status');
  const jump=document.querySelector<HTMLButtonElement>('#new-messages');
  let before=Number(main.dataset.liveBefore??0),latest=Number(main.dataset.liveLatest??0);
- let etag='',timer=0,generation=0,delay=1000,stopped=false,follow=false;
+ let etag='',timer=0,generation=0,delay=1000,stopped=false,follow=false,pendingTarget='';
  let request:AbortController|null=null;
- const say=(text:string)=>{if(feedback&&feedback.textContent!==text)feedback.textContent=text};
+ const say=(text:string)=>{if(feedback&&feedback.textContent!==t(text))feedback.textContent=t(text)};
  const accessLost=()=>{
   stopped=true;say('Updates paused. Your draft is kept. ');
   if(!feedback)return;
-  const signin=document.createElement('a');signin.href='/';signin.target='_blank';signin.rel='noreferrer';signin.textContent='Sign in';
-  const retry=document.createElement('button');retry.type='button';retry.textContent='Retry updates';
+  const signin=document.createElement('a');signin.href='/';signin.target='_blank';signin.rel='noreferrer';signin.textContent=t('Sign in');
+  const retry=document.createElement('button');retry.type='button';retry.textContent=t('Retry updates');
   retry.addEventListener('click',()=>{stopped=false;delay=1000;void refresh()});
   feedback.append(signin,document.createTextNode(' · '),retry);
  };
  const showJump=()=>{if(jump)jump.hidden=false};
  const pause=()=>{generation++;clearTimeout(timer);request?.abort();request=null};
- const finishFollow=()=>{scrollToLatest();if(jump)jump.hidden=true;follow=false};
+ const focusApproval=(id:string)=>{
+  const target=document.getElementById(id);
+  if(!target)return false;
+  target.scrollIntoView({block:'center'});target.focus({preventScroll:true});return true;
+ };
+ const finishFollow=()=>{
+  if(!pendingTarget||!focusApproval(pendingTarget))scrollToLatest();
+  pendingTarget='';if(jump)jump.hidden=true;follow=false;
+ };
+ const syncJump=()=>{if(jump&&view==='/')jump.hidden=before===0&&scrollY+innerHeight>=document.documentElement.scrollHeight-100};
+ if(view==='/')window.addEventListener('scroll',syncJump,{passive:true});
+ document.addEventListener('click',event=>{
+  const link=event.target instanceof Element?event.target.closest<HTMLAnchorElement>('[data-pending-jump]'):null;
+  if(!link||view!=='/')return;
+  event.preventDefault();
+  const id=decodeURIComponent(new URL(link.href).hash.slice(1));
+  if(focusApproval(id))return;
+  if(stopped)return;
+  pendingTarget=id;before=0;etag='';follow=true;
+  history.replaceState(null,'','/');void refresh();
+ });
 
  async function refresh(){
   if(stopped||document.visibilityState!=='visible')return;
@@ -103,7 +124,7 @@ export function startLiveUpdates(){
    for(const id of regions){if(id!=='conversation-messages'||!deferMessages||follow)patch(id,value.regions[id])}
    const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
    const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;
-   if(send&&form&&!form.dataset.submitting&&readiness){send.disabled=readiness!=='true';const hint=document.querySelector<HTMLElement>('#composer-feedback');if(hint?.dataset.modelNeeded&&readiness==='true'){hint.textContent='';delete hint.dataset.modelNeeded}}
+   if(send&&form&&!form.dataset.submitting&&readiness){send.disabled=readiness!=='true';const hint=document.querySelector<HTMLElement>('#composer-feedback');if(hint?.dataset.modelNeeded&&readiness==='true'){hint.textContent=t('');delete hint.dataset.modelNeeded}}
 
    if(view==='/'&&(follow||bottom&&before===0))finishFollow();
    else{
@@ -122,7 +143,7 @@ export function startLiveUpdates(){
  }
  jump?.addEventListener('click',()=>{
   if(stopped)return;
-  before=0;etag='';follow=true;
+  before=0;etag='';follow=true;pendingTarget='';
   history.replaceState(null,'','/');void refresh();
  });
  // Keep conversation drafts when approving a newly arrived action. Each POST
@@ -158,5 +179,11 @@ export function startLiveUpdates(){
  window.addEventListener('pagehide',pause);
  window.addEventListener('pageshow',event=>{if(event.persisted)void refresh()});
  if(before)showJump();
- return {start:()=>{void refresh()}};
+ return {start:()=>{
+  // The canonical home resumes the latest turn; explicit history links keep their anchor.
+  const navigation=performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming|undefined;
+  if(view==='/'&&before===0&&!location.hash&&navigation?.type!=='back_forward')scrollToLatest();
+  syncJump();
+  void refresh();
+ }};
 }

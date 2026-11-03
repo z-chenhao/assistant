@@ -163,3 +163,6 @@ expired worktree's JavaScript installation.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+
+Web 只读预览：macosvm 的 SSH/Lume peer 验证读取已存在桌面、缺失实例不被启动；Web 模块验证认证与绑定撤销、只读端点及 no-store。Inspector 的真实只读 SQLite 验证 Agent 归属、20条上限和参数不外露。对实际 Guest 的屏幕权限、桌面窗口、断连及持续刷新另行 Live 验证，peer 不冒充真实 macOS 图像质量。

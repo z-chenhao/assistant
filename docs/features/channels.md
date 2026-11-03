@@ -261,3 +261,18 @@ New database files use mode 0600 in the private data root.
 打开 Conversation 或 Tasks 即可自动接收更新，不需要额外配置。阅读上方内容时，“New messages”只提示有新内容，点击后再定位到最新消息，草稿和附件仍保留。输入消息和选择文件不会停止后台更新；批准/拒绝具体动作也不会整页跳转。
 
 短暂断网时页面提示重连，恢复后读取当前已提交状态。会话失效时，在提示中的 Sign in 打开另一页完成登录，再回到原页点击 Retry updates；原页保留的草稿和文件无需重填。Settings 只实时更新全局状态和登录过程，不在后台覆盖配置表单或更换活动模型。禁用 JavaScript 时仍提供原有语义 HTML 与表单提交。
+
+### Steward Web 视觉重构
+
+正式 Web 采用确认的 Steward 单侧栏黑白 Demo：对话、任务、审批、成果、模型/账户、通知、能力与 Developer 继续使用既有实现；Chat 右上角按需读取真实 Worker 执行及 Computer 只读画面。没有引入多会话或独立文件库。品牌与兼容范围见[品牌功能](branding.md)。
+
+Web 默认英文；Settings → Preferences → Interface language 可以保存简体中文。刷新、跨页和实时界面片段使用已选语言，原始对话和交付内容不变。见[品牌与界面语言](branding.md)。
+
+
+### Steward 工作区精修
+
+导航仅保留 Chat、Tasks、Settings、Developer；任务筛选留在 Tasks 内。Chat 顶部居中两行显示 Steward 名称与动态头像，下方持续对话；右上角显示 Computer 和当前 Worker，点击分别打开互斥详情面板。Worker 包括正在执行和已经结束的记录，按实际开始时间（未开始则取创建时间）倒排，状态保持后端原值，不把 Worker 结果标为用户交付。Task 恢复独立列表与详情，不额外查询 Conversation。成果从任务详情及交付消息进入。
+
+首页待审批提示与实际审批卡片使用同一份权威读取，覆盖已内嵌消息及独立待审批卡片，解决后同步移除。打开具体审批保留草稿；向上阅读可主动回到最新消息。当前提示仅覆盖已有审批，不宣称 F-004 的待回答、审阅闭环已实现。
+
+Chat 右上角 Computer 可展开只读桌面画面与已提交的操作进度；打开且页面可见时约每两秒读取一次完成的画面，关闭/后台停止。查看不会启动或恢复 VM，不提供鼠标键盘接管；离线、暂停、画面不可用及中断都有明确状态。机制与兼容性边界见[Computer 设计](../designs/computer-use.md)。

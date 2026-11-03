@@ -1,0 +1,3 @@
+{{define "worker-panel"}}
+<dialog class="computer-drawer workspace-panel" id="worker-panel" aria-labelledby="worker-title"><header><h2 id="worker-title">{{template "icon-progress"}}{{tr "Worker progress"}}</h2><div><button class="plain-button" type="button" data-panel-close aria-label="{{tr "Close Worker progress"}}">×</button></div></header><div class="computer-panel-body"><p class="muted">{{tr "Latest execution first · running and finished work"}}</p><p role="status" data-worker-status>{{tr "Loading Worker activity…"}}</p><div data-worker-list></div><a class="text-link" href="/developer/observability">{{tr "Open execution history"}} →</a></div></dialog>
+{{end}}

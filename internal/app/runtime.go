@@ -44,7 +44,9 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 			return e
 		}
 		runs.ConfigureComputer(provider, cfg.Computer.Compatibility, cfg.Computer.Manifest)
+		a.computerPreviewMu.Lock()
 		a.computer = provider
+		a.computerPreviewMu.Unlock()
 		provider.Boundary = func(point string) {
 			if a.testBoundary != nil {
 				a.testBoundary("computer_" + point)

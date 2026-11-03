@@ -1,3 +1,4 @@
+import {t} from './i18n';
 import {buttonVariants,textareaStyle} from './components/ui/styles';
 import {cn} from './lib/utils';
 
@@ -21,7 +22,7 @@ export function enhanceComposer(){
   event.preventDefault();if(pending||submit?.disabled)return;
   pending=true;form.dataset.submitting='true';if(submit)submit.disabled=true;
   const feedback=root.querySelector<HTMLElement>('#composer-feedback');
-  if(feedback)feedback.textContent='Sending…';
+  if(feedback)feedback.textContent=t('Sending…');
   void(async()=>{
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
    try{
@@ -30,7 +31,7 @@ export function enhanceComposer(){
     const result=await response.json();if(result.accepted!==true||typeof result.location!=='string')throw Error('invalid acknowledgement');
     const target=new URL(result.location,location.origin);if(target.origin!==location.origin||target.pathname!=='/')throw Error('invalid destination');
     location.assign(target);
-   }catch{if(feedback)feedback.textContent='Send was not confirmed. Your draft and attachment are kept. Check the conversation before sending again.';pending=false;delete form.dataset.submitting;if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
+   }catch{if(feedback)feedback.textContent=t('Send was not confirmed. Your draft and attachment are kept. Check the conversation before sending again.');pending=false;delete form.dataset.submitting;if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
    finally{clearTimeout(timeout)}
   })();
  });

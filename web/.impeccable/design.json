@@ -1,0 +1,715 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T10:44:06.346945+00:00",
+  "title": "Design System: Steward Web",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Background",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Foreground",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Muted Foreground",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "accent-ink": {
+        "role": "neutral",
+        "displayName": "Accent Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "success": {
+        "role": "neutral",
+        "displayName": "Success",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "success-surface": {
+        "role": "neutral",
+        "displayName": "Success Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "warning": {
+        "role": "neutral",
+        "displayName": "Warning",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "warning-surface": {
+        "role": "neutral",
+        "displayName": "Warning Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "danger": {
+        "role": "neutral",
+        "displayName": "Danger",
+        "tonalRamp": [
+          "oklch(15% 0.0440 22.9)",
+          "oklch(27% 0.0793 22.9)",
+          "oklch(38% 0.1116 22.9)",
+          "oklch(50% 0.1174 22.9)",
+          "oklch(62% 0.1174 22.9)",
+          "oklch(74% 0.1174 22.9)",
+          "oklch(85% 0.0705 22.9)",
+          "oklch(95% 0.0235 22.9)"
+        ]
+      },
+      "danger-surface": {
+        "role": "neutral",
+        "displayName": "Danger Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0036 17.3)",
+          "oklch(27% 0.0066 17.3)",
+          "oklch(38% 0.0092 17.3)",
+          "oklch(50% 0.0097 17.3)",
+          "oklch(62% 0.0097 17.3)",
+          "oklch(74% 0.0097 17.3)",
+          "oklch(85% 0.0058 17.3)",
+          "oklch(95% 0.0019 17.3)"
+        ]
+      },
+      "backdrop": {
+        "role": "neutral",
+        "displayName": "Backdrop",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-background": {
+        "role": "neutral",
+        "displayName": "Dark Background",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-sidebar": {
+        "role": "neutral",
+        "displayName": "Dark Sidebar",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-card": {
+        "role": "neutral",
+        "displayName": "Dark Card",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-foreground": {
+        "role": "neutral",
+        "displayName": "Dark Foreground",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "Dark Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-muted-foreground": {
+        "role": "neutral",
+        "displayName": "Dark Muted Foreground",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-border": {
+        "role": "neutral",
+        "displayName": "Dark Border",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-hover": {
+        "role": "neutral",
+        "displayName": "Dark Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-accent": {
+        "role": "primary",
+        "displayName": "Dark Accent",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-accent-ink": {
+        "role": "neutral",
+        "displayName": "Dark Accent Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-focus": {
+        "role": "neutral",
+        "displayName": "Dark Focus",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-success": {
+        "role": "neutral",
+        "displayName": "Dark Success",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-success-surface": {
+        "role": "neutral",
+        "displayName": "Dark Success Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-warning": {
+        "role": "neutral",
+        "displayName": "Dark Warning",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-warning-surface": {
+        "role": "neutral",
+        "displayName": "Dark Warning Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "dark-danger": {
+        "role": "neutral",
+        "displayName": "Dark Danger",
+        "tonalRamp": [
+          "oklch(15% 0.0254 18.6)",
+          "oklch(27% 0.0458 18.6)",
+          "oklch(38% 0.0644 18.6)",
+          "oklch(50% 0.0678 18.6)",
+          "oklch(62% 0.0678 18.6)",
+          "oklch(74% 0.0678 18.6)",
+          "oklch(85% 0.0407 18.6)",
+          "oklch(95% 0.0136 18.6)"
+        ]
+      },
+      "dark-danger-surface": {
+        "role": "neutral",
+        "displayName": "Dark Danger Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0085 18.5)",
+          "oklch(27% 0.0153 18.5)",
+          "oklch(38% 0.0216 18.5)",
+          "oklch(50% 0.0227 18.5)",
+          "oklch(62% 0.0227 18.5)",
+          "oklch(74% 0.0227 18.5)",
+          "oklch(85% 0.0136 18.5)",
+          "oklch(95% 0.0045 18.5)"
+        ]
+      },
+      "dark-backdrop": {
+        "role": "neutral",
+        "displayName": "Dark Backdrop",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      },
+      "ghost-light-ink": {
+        "role": "neutral",
+        "displayName": "Ghost Light Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0020 95.1)",
+          "oklch(27% 0.0037 95.1)",
+          "oklch(38% 0.0051 95.1)",
+          "oklch(50% 0.0054 95.1)",
+          "oklch(62% 0.0054 95.1)",
+          "oklch(74% 0.0054 95.1)",
+          "oklch(85% 0.0032 95.1)",
+          "oklch(95% 0.0011 95.1)"
+        ]
+      },
+      "ghost-dark-ink": {
+        "role": "neutral",
+        "displayName": "Ghost Dark Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.0)",
+          "oklch(27% 0.0000 0.0)",
+          "oklch(38% 0.0000 0.0)",
+          "oklch(50% 0.0000 0.0)",
+          "oklch(62% 0.0000 0.0)",
+          "oklch(74% 0.0000 0.0)",
+          "oklch(85% 0.0000 0.0)",
+          "oklch(95% 0.0000 0.0)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "Michroma brand only, loaded as StewardWordmark."
+      },
+      "display": {
+        "displayName": "Display",
+        "purpose": "Welcome heading."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Controls, navigation and general UI."
+      },
+      "reply": {
+        "displayName": "Reply",
+        "purpose": "Assistant response and task-delivery prose."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Small supporting UI labels."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Code and technical details."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "background .18s, color .18s",
+        "purpose": "Button state changes; disabled under reduced motion."
+      },
+      {
+        "name": "send-wait",
+        "value": ".9s linear infinite",
+        "purpose": "Pending send spinner."
+      },
+      {
+        "name": "ghost-blink",
+        "value": "8.7s ease-in-out infinite",
+        "purpose": "Visible avatar blinking, with pause and reduced-motion support."
+      },
+      {
+        "name": "ghost-wave",
+        "value": "2100ms",
+        "purpose": "Interaction-driven shoulder wave; cancel when hidden, paused or reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "task-side-narrow",
+        "value": "1000px"
+      },
+      {
+        "name": "task-stack",
+        "value": "800px"
+      },
+      {
+        "name": "mobile-navigation",
+        "value": "760px"
+      },
+      {
+        "name": "workspace-compact",
+        "value": "700px"
+      }
+    ],
+    "localization": {
+      "default": "en",
+      "supported": [
+        "en",
+        "zh-CN"
+      ],
+      "setting": "/settings/preferences",
+      "scope": "browser presentation only",
+      "content": "Preserve messages, task titles/summaries, files, model names, raw evidence and frozen arguments."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The real primary action treatment; disabled readiness remains a product state.",
+      "html": "<button class=\"ds-primary\">Approve</button>",
+      "css": ".ds-primary{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 15px;border:1px solid transparent;border-radius:9px;font-weight:500;cursor:pointer;transition:background .18s,color .18s;background:var(--accent,#212121);color:var(--accent-ink,#f9f9f9)}.ds-primary:hover{background:var(--foreground,#212121)}.ds-primary:focus-visible{outline:2px solid var(--focus,#767676);outline-offset:4px}.ds-primary:disabled{opacity:.45;cursor:default}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Bordered secondary actions and explicit alternatives.",
+      "html": "<button class=\"ds-secondary\">Decline</button>",
+      "css": ".ds-secondary{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 15px;border:1px solid transparent;border-radius:9px;font-weight:500;cursor:pointer;transition:background .18s,color .18s;background:transparent;color:var(--foreground,#212121);border-color:var(--border,#dfdfdf)}.ds-secondary:hover{background:var(--hover,#e9e9e9)}.ds-secondary:focus-visible{outline:2px solid var(--focus,#767676);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}"
+    },
+    {
+      "name": "Plain button",
+      "kind": "button",
+      "refersTo": "button-plain",
+      "description": "Quiet icon action with an accessible name.",
+      "html": "<button class=\"ds-plain\" aria-label=\"Remove attachment\">×</button>",
+      "css": ".ds-plain{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;min-width:32px;min-height:32px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted-foreground,#666);cursor:pointer;transition:background .18s,color .18s}.ds-plain:hover{background:var(--hover,#e9e9e9);color:var(--foreground,#212121)}.ds-plain:focus-visible{outline:2px solid var(--focus,#767676);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-plain{transition:none}}"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "A labeled real settings or search field.",
+      "html": "<label class=\"ds-label\">Find a task<input class=\"ds-field\" type=\"search\" placeholder=\"Find a task by title or goal\"></label>",
+      "css": ".ds-label{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:block;font-size:13px;color:var(--muted-foreground,#666)}.ds-field{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:block;width:100%;margin-top:7px;padding:10px 12px;border:1px solid var(--border,#dfdfdf);border-radius:10px;background:var(--card,#fcfcfc);color:var(--foreground,#212121)}.ds-field:focus-visible{outline:2px solid var(--focus,#767676);outline-offset:4px}"
+    },
+    {
+      "name": "Sidebar navigation",
+      "kind": "nav",
+      "refersTo": "navigation-item",
+      "description": "One soft 256px navigation surface; the current link uses tone and weight.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Workspace\"><a class=\"ds-nav-link\" href=\"/\" aria-current=\"page\">Conversation</a><a class=\"ds-nav-link\" href=\"/tasks\">Tasks</a></nav>",
+      "css": ".ds-nav{display:grid;gap:4px;max-width:232px;padding:12px;background:var(--sidebar,#f3f3f3)}.ds-nav-link{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:flex;align-items:center;min-height:42px;padding:10px 11px;border-radius:9px;text-decoration:none;color:var(--muted-foreground,#666)}.ds-nav-link:hover,.ds-nav-link[aria-current]{background:var(--hover,#e9e9e9);color:var(--foreground,#212121)}.ds-nav-link[aria-current]{font-weight:500}.ds-nav-link:focus-visible{outline:2px solid var(--focus,#767676);outline-offset:4px}"
+    },
+    {
+      "name": "Status pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Textual status paired with a quiet surface; this sample is informational, not an action.",
+      "html": "<span class=\"ds-status\">Ready</span>",
+      "css": ".ds-status{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border,#dfdfdf);border-radius:20px;padding:3px 9px;font-size:12px;line-height:1.6;white-space:nowrap;color:var(--muted-foreground,#666);background:var(--background,#f9f9f9)}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered container used for goals, progress, decisions and settings.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-panel-title\">Latest progress</h2><p class=\"ds-panel-text\">Task progress appears here when available.</p></section>",
+      "css": ".ds-panel{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;background:var(--card,#fcfcfc);color:var(--foreground,#212121);border:1px solid var(--border,#dfdfdf);border-radius:var(--radius,12px);padding:24px}.ds-panel-title{font-size:17px;font-weight:550;line-height:1.5;margin:0 0 12px}.ds-panel-text{color:var(--muted-foreground,#666);margin:0;line-height:1.6}"
+    },
+    {
+      "name": "Composer",
+      "kind": "custom",
+      "refersTo": "composer",
+      "description": "Multiline conversation entry; this preview does not submit a message.",
+      "html": "<div class=\"ds-composer\"><textarea class=\"ds-composer-input\" aria-label=\"Message Steward\" placeholder=\"Describe what you have in mind…\" rows=\"2\"></textarea><div class=\"ds-composer-actions\"><span class=\"ds-composer-hint\">Your ongoing conversation</span><button class=\"ds-send\" type=\"button\" aria-label=\"Send message\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 19V5m-6 6 6-6 6 6\"/></svg></button></div></div>",
+      "css": ".ds-composer{max-width:768px;padding:17px 17px 12px;border:1px solid var(--border,#dfdfdf);border-radius:23px;background:var(--card,#fcfcfc);color:var(--foreground,#212121)}.ds-composer:focus-within{border-color:var(--focus,#767676)}.ds-composer-input{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;display:block;width:100%;padding:0 3px 10px;min-height:62px;max-height:180px;border:0;resize:none;background:transparent;color:var(--foreground,#212121);font-size:16px;line-height:1.5;outline:none}.ds-composer-input::placeholder{color:var(--muted-foreground,#666)}.ds-composer-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-composer-hint{font-family:var(--font-ui,Inter,sans-serif);font-size:14px;font-size:11px;color:var(--muted-foreground,#666)}.ds-send{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:var(--accent,#212121);color:var(--accent-ink,#f9f9f9);cursor:pointer}.ds-send:hover{opacity:.85}.ds-send:focus-visible{outline:2px solid var(--focus,#767676);outline-offset:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Your personal AI steward.",
+    "overview": "Steward is a familiar, quiet conversation workspace: soft monochrome surfaces, readable document-style replies, restrained controls and a small plush ghost. The owner-approved `tmp/neutral-web/dist` demo defines this production presentation. This document records implemented values rather than adding a new product direction.\n\nThis is a private Web presentation system for the owner's ongoing conversation and delegated work. Server-owned HTML, bounded live-region patches and existing React UISpec islands remain the mechanism. Steward names the interface; Collie remains the compatible backend, CLI and storage identity. No public design API, domain rename or storage migration is implied. Latest refinement: four navigation entries, Task identity/progress/Worker workspace, read-only on-demand Computer desktop viewer, complete-frame ghost playback and Source Han unicode-range subsets.",
+    "keyCharacteristics": [
+      "One collapsible navigation sidebar and a centered conversation.",
+      "Near-white and charcoal surfaces with grayscale status treatments and restrained danger color.",
+      "Inter controls, serif reply prose, a Michroma wordmark and a stable, expressive ghost.",
+      "Real tasks, artifacts and frozen approvals presented with their existing semantics."
+    ],
+    "rules": [],
+    "dos": [
+      "Do use the semantic light/dark tokens and implemented font roles.",
+      "Do keep one application sidebar, a centered conversation and on-demand Computer and Worker detail panes.",
+      "Do preserve durable send, readiness, approval, attachment and replay contracts when changing presentation.",
+      "Do keep technical detail available through its existing disclosures and Developer pages."
+    ],
+    "donts": [
+      "Don't fabricate multiple chats, recent items, task counts, a global memory browser or a file library.",
+      "Don't imply that approval means execution completed, or resend an unknown external outcome.",
+      "Don't rename Collie backend/CLI/storage contracts to implement the Steward Web brand.",
+      "Don't introduce a permanent second navigation rail, decorative panel shadows or unapproved body scaling/rotation."
+    ]
+  }
+}

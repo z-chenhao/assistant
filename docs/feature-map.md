@@ -1,4 +1,4 @@
-# Collie Feature Map
+# Steward Feature Map
 
 本页是产品需求的主索引：记录每一个可迭代需求的简述和完成状态，链接到功能说明。功能说明分别关联技术方案和测试方案。测试命令与 CI 编排继续由 [Testing](test-plans/product.md) 管理。
 
@@ -50,7 +50,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可设定明确时区的 at/cron 计划，并修改或取消。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | 使用对话、任务、设置、附件和审批，优先定位待用户处理事项。 | 否 · 部分完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口工作台；对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面。 | 否 · 部分完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 用户阅读或编辑草稿时仍能接收已提交回复、审批与状态更新，保留草稿、附件和阅读位置。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 维护飞书身份、凭据与收发，交付关联原话题、适配渠道并去重，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 正常回复能产生适当的受控组件，失败可退回语义文本。 | 否 · 部分完成 |
@@ -73,7 +73,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证及可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |
 | [F-040](features/engineering.md#f-040) | Go 模块边界与可读性重构 | 领域持有适配器和接口类型，入口分阶段，长事务函数分职责，保持现有协议。 | 是 · 已完成 |
-| [F-041](features/branding.md#f-041) | Collie 个人助手品牌与工作空间 | 边牧接球隐喻、统一视觉与新项目身份，保留真实执行与审批语义。 | 是 · 已完成 |
+| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、黑白头像与统一中英文界面，保留真实执行与审批语义。 | 是 · 已完成 |
 | [F-042](features/integrations.md#f-042) | 可靠的环境事件监听 | 用户授权后可靠接收外部变化，支持去重、断连补读与监听故障提示。 | 否 · 未实现 |
 | [F-045](features/automation.md#f-045) | 主动规则的观察与启用 | 先观察规则拟开展的工作，再显式启用授权范围内的主动接单。 | 否 · 未实现 |
 

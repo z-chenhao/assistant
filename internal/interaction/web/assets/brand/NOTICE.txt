@@ -1,10 +1,7 @@
-# Collie artwork
+# Steward artwork and typography
 
-The Collie border collie holding a tennis ball was generated for this project
-with OpenAI image generation on 2026-10-29 and selected by the project owner.
-The supplied PNG is used unchanged for the welcome illustration, brand mark,
-agent avatar and favicon. Browser CSS controls its displayed size.
+The owner selected the Steward wordmark and plush ghost in the local Demo, and authorized adopting them in the product Web UI on 2026-11-02. No new raster generation was performed for this integration. The mascot was previously produced with the built-in imagegen tool using the owner-supplied character reference; exact prompts and selected/discarded results are in [ghost-prompts.json](ghost-prompts.json), with source and hashes in [ghost-assets.json](ghost-assets.json).
 
-Typography: Lora and DM Sans, distributed unchanged under their
-included SIL Open Font License notices. Font sources: google/fonts, ofl/
-lora and ofl/dmsans. No font service or image CDN is contacted.
+The selected charcoal and ivory PNGs are embedded without changing their pixels. Complete body, arm, eyes and smile are baked into lossless WebP atlases; runtime uses Canvas2D playback with a static first-frame fallback. The continuous mesh is build-only. Gentle whole-character drift and stationary ground shadow remain presentation effects. This notice records provenance and does not grant a project-wide license.
+
+Font provenance is in [typography-v2-assets.json](typography-v2-assets.json) and [steward-assets.json](steward-assets.json). Inter, Source Serif 4, Source Han Sans SC, JetBrains Mono and Michroma retain their adjacent SIL OFL license texts. Source Han subsets preserve all original codepoints and variable weights; their unicode ranges, byte sizes and hashes are in [source-han-subsets.json](source-han-subsets.json). Old Collie assets and notices remain solely for compatibility.

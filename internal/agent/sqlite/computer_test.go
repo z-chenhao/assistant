@@ -100,6 +100,10 @@ func TestComputerIdentityRecoveryArbitrationAndFencing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	preview, err := s.ComputerPreviewInstance(ctx)
+	if err != nil || preview != first {
+		t.Fatal("read-only preview lost the owned ready instance", preview, err)
+	}
 	for _, statement := range []string{
 		`UPDATE computer SET phase='checkpointed',execution_id=NULL,version=version+1`,
 		`UPDATE computer SET instance_epoch=instance_epoch+1,version=version+1`,

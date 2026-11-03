@@ -45,3 +45,57 @@ func TestSSHNegotiationFrozenIdentityAndCompatibility(t *testing.T) {
 		t.Fatal("wrong Guest key accepted or retried", err)
 	}
 }
+
+func TestReadOnlyPreviewCapturesExistingWindowAndNeverStartsMissingComputer(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Chmod(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	peer, err := fixture.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peer.Close()
+	t.Setenv("COLLIE_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
+	source, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Chmod(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"disk.img", "nvram.bin", "config.json"} {
+		data := []byte("fixture-" + name)
+		if name == "config.json" {
+			data = []byte(`{"macAddress":"02:00:00:00:00:01","machineIdentifier":"fixture-base","cpuCount":4}`)
+		}
+		if err = os.WriteFile(filepath.Join(source, name), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = macosvm.ProvisionBase(context.Background(), root, source, peer.Config.Compatibility); err != nil {
+		t.Fatal(err)
+	}
+	provider, err := macosvm.New(peer.Config, macosvm.SSHGuest{Config: peer.Config.Guest, Secrets: secret.Store{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer provider.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	instance := computer.Instance{ComputerID: "preview-computer", Epoch: 1, NativeName: "collie-preview-window"}
+	if _, err = provider.PreviewCapture(ctx, instance); err == nil {
+		t.Fatal("preview started a missing Computer")
+	}
+	request := computer.Request{Instance: instance, OperationID: "preview-provision", Compatibility: peer.Config.Compatibility, Manifest: peer.Config.Manifest, Fence: func(context.Context) error { return nil }}
+	if _, err = provider.Ensure(ctx, request); err != nil {
+		t.Fatal(err)
+	}
+	capture, err := provider.PreviewCapture(ctx, instance)
+	if err != nil || len(capture.PNG) == 0 || capture.Width < 1 || capture.Height < 1 {
+		t.Fatal("existing window preview unavailable", err, capture.Width, capture.Height)
+	}
+}
