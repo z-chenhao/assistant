@@ -23,6 +23,10 @@ func (s *Store) ComputerStatus(ctx context.Context) (computer.Status, error) {
 	return status, err
 }
 
+func (s *Store) ComputerPreviewInstance(ctx context.Context) (computer.Instance, error) {
+	return computersqlite.PreviewInstance(ctx, s.db)
+}
+
 // computerExecution binds Computer storage to the accepted Code claim. There
 // is one transaction owner: no Computer adapter opens its own state connection.
 type computerExecution struct{ bridge *codeBridge }

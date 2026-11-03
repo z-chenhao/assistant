@@ -1,5 +1,6 @@
 "use client";
 
+import {t} from "../i18n";
 import { z } from "zod";
 
 export const TableProps = z.object({
@@ -22,8 +23,7 @@ export function DataTable({ props }: { props: z.infer<typeof TableProps> }) {
   ) {
     return (
       <p role="alert">
-        This table has invalid rows or columns. Ask the assistant to regenerate
-        it.
+        {t('This table has invalid rows or columns. Ask the assistant to regenerate it.')}
       </p>
     );
   }
@@ -33,7 +33,7 @@ export function DataTable({ props }: { props: z.infer<typeof TableProps> }) {
       <div
         className="answer-table-scroll"
         role="region"
-        aria-label={`${title} table`}
+        aria-label={`${title} ${t('table')}`}
         tabIndex={0}
       >
         <table>
@@ -57,7 +57,7 @@ export function DataTable({ props }: { props: z.infer<typeof TableProps> }) {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p>No rows to display.</p>}
+        {rows.length === 0 && <p>{t('No rows to display.')}</p>}
       </div>
       <p className="answer-table-source">{source}</p>
     </section>

@@ -1,3 +1,4 @@
+import {t} from './i18n';
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
  const forms=document.querySelectorAll<HTMLFormElement>('.settings-page form');
@@ -13,7 +14,7 @@ export function enhanceSettings(){
   // clicked action before applying the double-submit guard.
   if(submitter instanceof HTMLButtonElement&&submitter.name){action=document.createElement('input');action.type='hidden';action.name=submitter.name;action.value=submitter.value;form.append(action)}
   form.dataset.submitting='true';form.setAttribute('aria-busy','true');
-  for(const button of buttons){button.disabled=true;button.textContent=form.getAttribute('action')?.endsWith('/model/test')?'Verifying…':'Working…'}
+  for(const button of buttons){button.disabled=true;button.textContent=form.getAttribute('action')?.endsWith('/model/test')?t('Verifying…'):t('Working…')}
   reset.set(form,()=>{action?.remove();delete form.dataset.submitting;form.removeAttribute('aria-busy');buttons.forEach((button,i)=>{button.disabled=disabled[i];button.textContent=labels[i]})});
  })}
  window.addEventListener('pageshow',event=>{if(event.persisted){for(const restore of reset.values())restore();reset.clear()}});

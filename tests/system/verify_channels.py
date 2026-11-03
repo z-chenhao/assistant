@@ -626,7 +626,7 @@ def native_components(binary, evidence, report):
             h.browser(evidence.parent/'channels-ui','components')
             require(h.http('/api/conversation')[-1]==messages[-1],'presentation changed semantic Conversation')
             report['scenarios']['native-components']=dict(state=h.rows(),specs=specs,conversation_unchanged=True)
-            report['checks'].append('UI: bundled ad-agent components, OpenIntelligentUI native table, Collie logo/avatar, desktop/mobile layouts; escaped cells, unknown/invalid component fallback; no external frontend requests')
+            report['checks'].append('UI: bundled ad-agent components, OpenIntelligentUI native table, Steward wordmark/avatar, desktop/mobile layouts; escaped cells, unknown/invalid component fallback; no external frontend requests')
             h.stop()
         finally:h.cleanup()
 

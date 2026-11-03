@@ -1,3 +1,4 @@
+import {t} from './i18n';
 import {Component,type ReactNode} from 'react';
 import {flushSync} from 'react-dom';
 import {createRoot,type Root} from 'react-dom/client';
@@ -29,10 +30,10 @@ class RenderBoundary extends Component<{children:ReactNode;fallback:string},{fai
 function NativeComponent({value:c}:{value:UIComponent}) {
   switch(c.type){
     case 'markdown':return <div className="semantic">{c.text}</div>;
-    case 'artifact':return <Card className="artifact-card"><CardContent><a className="artifact" href={'/artifact?ref='+encodeURIComponent(c.artifact_ref)}>↓ {c.text} attachment</a></CardContent></Card>;
-    case 'progress':return <p className="progress">{c.status} · {c.text}</p>;
-    case 'table':return <DataTable props={{title:'Comparison',columns:c.columns,rows:c.rows,source:'From this conversation'}}/>;
-    case 'confirmation':return <Card className="approval"><CardContent><p className="semantic">{c.text}</p><form action="/approval" method="post"><input type="hidden" name="approval_id" value={c.approval_id}/><input type="hidden" name="hash" value={c.frozen_arguments_hash}/><Button name="decision" value="approved">Approve</Button><Button variant="secondary" name="decision" value="denied">Decline</Button></form></CardContent></Card>;
+    case 'artifact':return <Card className="artifact-card"><CardContent><a className="artifact" href={'/artifact?ref='+encodeURIComponent(c.artifact_ref)}>↓ {c.text} {t('attachment')}</a></CardContent></Card>;
+    case 'progress':return <p className="progress">{t(c.status??'')} · {c.text}</p>;
+    case 'table':return <DataTable props={{title:t('Comparison'),columns:c.columns,rows:c.rows,source:t('From this conversation')}}/>;
+    case 'confirmation':return <Card className="approval"><CardContent><p className="semantic">{c.text}</p><form action="/approval" method="post"><input type="hidden" name="approval_id" value={c.approval_id}/><input type="hidden" name="hash" value={c.frozen_arguments_hash}/><Button name="decision" value="approved">{t('Approve')}</Button><Button variant="secondary" name="decision" value="denied">{t('Decline')}</Button></form></CardContent></Card>;
     case 'form':return <dl>{c.fields.map(f=><div key={f.name}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>;
   }
 }

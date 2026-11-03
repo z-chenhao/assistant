@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -82,7 +83,7 @@ func TestLiveProjectionUsesCommittedPagesStableETagsAndSafeHTML(t *testing.T) {
 	if err := json.Unmarshal(first.Body.Bytes(), &value); err != nil {
 		t.Fatal(err)
 	}
-	if value.Latest != 1 || value.Before != 0 || len(value.Regions) != 3 {
+	if value.Latest != 1 || value.Before != 0 || len(value.Regions) != 4 {
 		t.Fatal(value)
 	}
 	if strings.Contains(value.Regions["conversation-messages"], `<img src=x`) || !strings.Contains(value.Regions["conversation-messages"], "&lt;img") {
@@ -90,6 +91,9 @@ func TestLiveProjectionUsesCommittedPagesStableETagsAndSafeHTML(t *testing.T) {
 	}
 	if !strings.Contains(value.Regions["conversation-approvals"], `name="hash"`) || !strings.Contains(value.Regions["conversation-approvals"], strings.Repeat("a", 64)) {
 		t.Fatal("frozen approval missing")
+	}
+	if !strings.Contains(value.Regions["conversation-attention"], `href="/#approval-approval%3aone"`) || !strings.Contains(value.Regions["conversation-attention"], `<strong>1</strong>`) {
+		t.Fatal("pending summary does not link to the displayed action", value.Regions["conversation-attention"])
 	}
 	for _, private := range []string{"private-message-id", "composer-root", "source_id", "claim_token", "provider_exchange_id"} {
 		if strings.Contains(first.Body.String(), private) {
@@ -109,12 +113,38 @@ func TestLiveProjectionUsesCommittedPagesStableETagsAndSafeHTML(t *testing.T) {
 	if updated.Code != 200 || updated.Header().Get("ETag") == etag {
 		t.Fatal("status/approval changes did not invalidate view")
 	}
+	if err := json.Unmarshal(updated.Body.Bytes(), &value); err != nil || value.Regions["conversation-attention"] != "" {
+		t.Fatal("resolved actions remain in the attention summary", err)
+	}
 	if expired := request("/api/updates?view=/", etag, ""); expired.Code != 401 {
 		t.Fatal("conditional request bypassed authentication")
 	}
 	c.allowed = false
 	if revoked := request("/api/updates?view=/", etag, "private-token-at-least-24-bytes"); revoked.Code != 403 {
 		t.Fatal("conditional request bypassed revocation")
+	}
+}
+
+func TestPendingSummaryCountsInlineActionsOnceAndExcludesResolved(t *testing.T) {
+	c := &updatesCore{approvals: []interaction.Approval{
+		{ID: "inline", Status: "pending"},
+		{ID: "separate", Status: "pending"},
+		{ID: "resolved", Status: "approved"},
+	}, messages: []conversation.Message{{MessageID: "approval:inline", Source: "security", Role: "assistant", Sequence: 1}}}
+	s := &Server{Core: c}
+	p := page{}
+	if err := s.loadConversation(context.Background(), &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.PendingCount != 2 || p.FirstPending != "inline" || len(p.Approvals) != 1 || p.Approvals[0].ID != "separate" {
+		t.Fatalf("inconsistent summary and inline/separate cards: %+v", p)
+	}
+	var body bytes.Buffer
+	if err := layout.ExecuteTemplate(&body, "attention-summary", p); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body.String(), `href="/#approval-inline"`) || !strings.Contains(body.String(), `<strong>2</strong>`) {
+		t.Fatal(body.String())
 	}
 }
 

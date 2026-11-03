@@ -29,6 +29,7 @@ import (
 )
 
 type Server struct {
+	previews                    int
 	use                         *computerfake.Driver
 	Config                      macosvm.Config
 	mu                          sync.Mutex
@@ -274,7 +275,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/fixture/status" {
-		json.NewEncoder(w).Encode(map[string]int{"running": len(s.locks), "runs": s.runs, "shutdowns": s.shuts, "stops": s.stops, "reopens": s.reopens})
+		json.NewEncoder(w).Encode(map[string]int{"running": len(s.locks), "runs": s.runs, "shutdowns": s.shuts, "stops": s.stops, "reopens": s.reopens, "previews": s.previews})
 		return
 	}
 	if r.URL.Path == "/fixture/write" && r.Method == "POST" {

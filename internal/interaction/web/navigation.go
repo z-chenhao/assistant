@@ -22,6 +22,8 @@ func pageRoute(path string) (tab, view, title string) {
 		return "/settings", "capabilities", "Capabilities"
 	case strings.HasPrefix(path, "/settings/capabilities/") && validCapability(strings.TrimPrefix(path, "/settings/capabilities/")):
 		return "/settings", "capabilities", "Capability settings"
+	case path == "/settings/preferences":
+		return "/settings", "settings", "Preferences"
 	case path == "/settings/notifications":
 		return "/settings", "settings", "Notifications"
 	case path == "/settings" || path == "/settings/models":
@@ -61,7 +63,7 @@ func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {
 	tab, _, title := pageRoute(r.URL.Path)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(code)
-	s.render(w, page{Tab: tab, View: "error", Title: title, Path: r.URL.Path, Error: message})
+	s.render(w, r, page{Tab: tab, View: "error", Title: title, Path: r.URL.Path, Error: message})
 }
 
 // Old public bookmarks redirect to the single canonical view; no parallel UI.

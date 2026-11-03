@@ -61,6 +61,10 @@ func (s *Server) useCommand(command, input string) (any, bool) {
 			return map[string]any{"apps": []any{map[string]any{"bundle_id": "com.apple.TextEdit", "name": "TextEdit", "pid": 100, "running": true}}}, true
 		case "list_windows":
 			return map[string]any{"windows": []any{map[string]any{"app_name": "TextEdit", "title": "Fixture", "pid": 100, "window_id": 10, "bounds": map[string]any{"x": 0, "y": 0, "width": 100, "height": 100}}}}, true
+		case "get_desktop_state":
+			s.previews++
+			c, _ := s.use.Observe(ctx, instance, computer.Target{ID: "native"}, "web-preview", computer.ObserveOptions{Screenshot: true})
+			return capture(c), true
 		case "get_window_state":
 			c, _ := s.use.Observe(ctx, instance, computer.Target{ID: "native"}, "lease", computer.ObserveOptions{Accessibility: a["include_accessibility_tree"] != false, Screenshot: a["include_screenshot"] == true})
 			return capture(c), true

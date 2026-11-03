@@ -1,12 +1,19 @@
 {{define "settings-page"}}
 <section class="workspace-page settings-page">
  {{template "settings-tabs" .}}
- {{if eq .Settings.Section "notifications"}}{{template "notifications" .}}
+ {{if eq .Settings.Section "preferences"}}{{template "preferences" .}}
+ {{else if eq .Settings.Section "notifications"}}{{template "notifications" .}}
  {{else if eq .Settings.Section "new"}}{{template "model-new" .}}
  {{else if eq .Settings.Section "model"}}{{template "model-detail" .}}
  {{else}}{{template "model-list" .}}{{end}}
- <p class="settings-footer"><a href="/licenses.txt">Open source notices</a></p>
+ <p class="settings-footer"><a href="/licenses.txt">{{tr "Open source notices"}}</a></p>
 </section>
 {{end}}
 
-{{define "settings-tabs"}} <nav class="section-tabs" aria-label="Settings sections"><a href="/settings/models" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities")}}aria-current="page"{{end}}>Models</a><a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>Notifications</a><a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>Capabilities</a></nav>{{end}}
+{{define "settings-tabs"}} <nav class="section-tabs" aria-label="{{tr "Settings sections"}}"><a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{tr "Preferences"}}</a><a href="/settings/models" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{tr "Models"}}</a><a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{tr "Notifications"}}</a><a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>{{tr "Capabilities"}}</a></nav>{{end}}
+
+{{define "preferences"}}
+<div class="page-heading"><div><h1>{{tr "Preferences"}}</h1><p>{{tr "Choose the language used throughout your workspace."}}</p></div></div>
+<section class="panel form-panel"><h2>{{tr "Language"}}</h2>
+<form method="post" action="/settings/language"><label for="interface-language">{{tr "Interface language"}}<select id="interface-language" name="language"><option value="en" lang="en" {{if ne .Language "zh-CN"}}selected{{end}}>English</option><option value="zh-CN" lang="zh-CN" {{if eq .Language "zh-CN"}}selected{{end}}>简体中文</option></select></label><p class="field-help">{{tr "This preference applies to this browser. Your messages, replies and files keep their original language."}}</p><button>{{tr "Save language"}}</button></form></section>
+{{end}}

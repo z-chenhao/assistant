@@ -19,6 +19,14 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
+	case "/api/workers":
+		s.workerView(w, r, false)
+	case "/api/workers/current":
+		s.workerView(w, r, true)
+	case "/api/computer/status":
+		s.computerView(w, r, false)
+	case "/api/computer/frame":
+		s.computerView(w, r, true)
 	case "/api/developer/traces":
 		s.traceAPI(w, r, "traces")
 	case "/api/developer/observations":
@@ -106,6 +114,8 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		return e
 	}
 	switch r.URL.Path {
+	case "/settings/language":
+		return s.setLanguage(w, r)
 	case "/capability/configure":
 		return s.capabilityAction(w, r)
 	case "/approval":

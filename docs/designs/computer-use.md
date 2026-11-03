@@ -591,3 +591,10 @@ standard Tool errors, without raw paths, SSH diagnostics or credentials.
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
 
 2026-10-28：F-026 原生文件/命令工具复用 Computer 生命周期与 execution claim，不需要生成 JavaScript。直接调用结束前 checkpoint/dispose，嵌套调用随 cell 排空；四工具与桌面浏览器共享 Guest。schema 29 扩展原生终态清理，不重写冻结请求；详见[执行环境方案](coding.md)。
+
+
+### Web 只读预览 · 2026-11-02
+
+私有 operator 预览读取现有 ready instance，不调用 Ensure/Restore 或发送输入。macosvm 使用 get_desktop_state 与独立 steward-web-preview Driver session，关闭 accessibility tree；不接触模型持有的 handles、AX revision、截图 revision 或持久化 UseState。Host 读取实例，截帧，再复核 ready phase/ComputerID/epoch/native identity；发生切换或取消就丢弃该帧。并发预览串行且有请求期限；不在网络操作期间持有数据库事务。仅通过已认证 Web 连接返回 PNG，private/no-store，不写 Artifact 或新增回放事实。
+
+操作进度仅从配置 Agent 的已提交 Computer discover/bind/invoke 元数据取最近20条，保留机器状态和时间，不返回参数、结果、句柄或凭据。执行记录由只读 Inspector 查询，预览本身不伪装为 Agent 操作。此机制不建立新的 Computer 生命周期，也不稳定多用户直播或远程输入协议。

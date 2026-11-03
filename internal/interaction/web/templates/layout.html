@@ -1,42 +1,53 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Collie · {{if .Title}}{{.Title}}{{else}}Workspace{{end}}</title><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
+<html lang="{{if .Language}}{{.Language}}{{else}}en{{end}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Steward · {{if .Title}}{{tr .Title}}{{else}}{{tr "Workspace"}}{{end}}</title><link rel="icon" href="/brand/steward.svg"><script src="/appearance.js"></script><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
 <body>
+<a class="skip-link" href="#workspace-main">{{tr "Skip to content"}}</a>
 {{if .Login}}
 <main class="login">
  {{template "brand"}}
- <h1>Open your workspace</h1><p>Enter the access token for this installation.</p>
- {{if .Error}}<p class="feedback error" role="alert">{{.Error}}</p>{{end}}
- <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label>Workspace access token<input type="password" name="token" required autocomplete="off" autofocus></label><button>Open workspace →</button></form>
- <p class="muted">Your workspace token is separate from your model provider account.</p>
+ <h1>{{tr "Open your workspace"}}</h1><p>{{tr "Enter the access token for this installation."}}</p>
+ {{if .Error}}<p class="feedback error" role="alert">{{tr .Error}}</p>{{end}}
+ <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label>{{tr "Workspace access token"}}<input type="password" name="token" required autocomplete="off" autofocus></label><button>{{tr "Open workspace →"}}</button></form>
+ <p class="muted">{{tr "Your workspace token is separate from your model provider account."}}</p>
 </main>
 {{else}}
-<aside class="app-sidebar">
- {{template "brand"}}
- <nav aria-label="Workspace"><a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>Conversation</span></a><a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>Tasks</span></a><a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>Settings</span></a></nav>
- <nav class="developer-nav" aria-label="Developer"><a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>Developer</span></a></nav>
+<button type="button" class="sidebar-backdrop" aria-label="{{tr "Close navigation"}}" data-sidebar-close></button>
+<aside class="app-sidebar" id="workspace-navigation" aria-label="{{tr "Workspace navigation"}}">
+ <div class="brand-row">{{template "brand"}}<button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="{{tr "Close navigation"}}" aria-controls="workspace-navigation" aria-expanded="true">{{template "icon-sidebar"}}</button></div>
+ <nav aria-label="{{tr "Workspace"}}">
+  <a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>{{tr "Chat"}}</span></a>
+  <a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>{{tr "Tasks"}}</span></a>
+  <a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Settings"}}</span></a>
+  <a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>{{tr "Developer"}}</span></a>
+ </nav>
+ <div class="sidebar-footer">
+  <div><p>{{tr "Your personal AI steward."}}</p><button type="button" class="appearance-toggle" data-theme-toggle aria-label="{{tr "Switch appearance"}}">{{template "icon-appearance"}}</button></div>
+  <button type="button" class="avatar-pause" data-avatar-pause aria-pressed="false">{{tr "Pause avatar motion"}}</button>
+ </div>
 </aside>
-<main class="workspace-main" data-live-view="{{.Live}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}">
- <header class="workspace-topbar"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Workspace</a><span>/</span>{{if eq .Tab "/settings"}}<a href="/settings/models">Settings</a><span>/</span>{{end}}{{if eq .View "task"}}<a href="/tasks">Tasks</a><span>/</span>{{end}}{{if eq .View "trace"}}<a href="{{traceListURL .Trace}}">Traces</a><span>/</span>{{end}}<span>{{.Title}}</span></nav><div id="workspace-status">{{template "status" .}}</div></header>
+<main class="workspace-main" id="workspace-main" data-live-view="{{.Live}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}">
+ {{if eq .Tab "/"}}<header class="workspace-topbar chat-topbar"><div class="topbar-start"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button></div><div class="chat-identity"><span class="brand">Steward</span>{{template "agent-avatar"}}</div><div class="topbar-actions"><button class="button secondary" type="button" data-panel-open="computer-panel" aria-label="{{tr "Open Computer"}}" aria-controls="computer-panel" aria-expanded="false">{{template "icon-computer"}}<span>Computer</span></button><button class="button secondary worker-trigger" type="button" data-panel-open="worker-panel" aria-label="{{tr "Worker progress"}}" aria-controls="worker-panel" aria-expanded="false">{{template "icon-progress"}}<span data-worker-current>Worker</span></button></div><div id="workspace-status" class="chat-status">{{template "status" .}}</div></header>{{else}} <header class="workspace-topbar"><div class="topbar-start"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button><nav class="breadcrumbs" aria-label="{{tr "Breadcrumb"}}"><a href="/">{{tr "Workspace"}}</a><span>/</span>{{if eq .Tab "/settings"}}<a href="/settings/models">{{tr "Settings"}}</a><span>/</span>{{end}}{{if eq .View "task"}}<a href="/tasks">{{tr "Tasks"}}</a><span>/</span>{{end}}{{if eq .View "trace"}}<a href="{{traceListURL .Trace}}">{{tr "Traces"}}</a><span>/</span>{{end}}<span>{{tr .Title}}</span></nav></div><div class="topbar-actions"><div id="workspace-status">{{template "status" .}}</div><button type="button" class="appearance-toggle" data-theme-toggle aria-label="{{tr "Switch appearance"}}">{{template "icon-appearance"}}</button></div></header>{{end}}
  <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>
- {{if .Error}}<div class="page-feedback feedback error" role="alert">{{.Error}}</div>{{end}}
- {{if .Notice}}<div class="page-feedback feedback success" role="status">{{.Notice}}</div>{{end}}
+ {{if .Error}}<div class="page-feedback feedback error" role="alert">{{tr .Error}}</div>{{end}}
+ {{if .Notice}}<div class="page-feedback feedback success" role="status">{{tr .Notice}}</div>{{end}}
  {{if eq .View "capabilities"}}{{template "capabilities-page" .}}
  {{else if eq .View "settings"}}{{template "settings-page" .}}
  {{else if eq .View "tasks"}}{{template "tasks-page" .}}
  {{else if eq .View "task"}}{{template "task-page" .}}
  {{else if or (eq .View "traces") (eq .View "trace")}}{{template "observability-page" .}}
- {{else if eq .View "error"}}<section class="workspace-page"><h1>We couldn't open this page</h1><p>Use the navigation to return to your workspace.</p><a class="button secondary" href="{{if .Path}}{{.Path}}{{else}}/{{end}}">Try again</a></section>
+ {{else if eq .View "error"}}<section class="workspace-page"><h1>{{tr "We couldn't open this page"}}</h1><p>{{tr "Use the navigation to return to your workspace."}}</p><a class="button secondary" href="{{if .Path}}{{.Path}}{{else}}/{{end}}">{{tr "Try again"}}</a></section>
  {{else}}{{template "conversation-page" .}}{{end}}
 </main>
 {{end}}
 </body></html>
 
 {{define "status"}}<span hidden data-can-send="{{canSend .Status}}"></span>
-{{if eq .Status.Readiness "setup_required"}}<a class="status-pill warning" href="/settings/models">Setup required</a>
-{{else if eq .Status.Readiness "degraded"}}<a class="status-pill warning" href="/settings/models">Model needs attention</a>
-{{else if eq .Status.Status "busy"}}<span class="status-pill working">Working</span>
-{{else if eq .Status.Status "idle"}}<span class="status-pill">Ready</span>
-{{else}}<span class="status-pill">Status unavailable</span>{{end}}
+{{if eq .Status.Readiness "setup_required"}}<a class="status-pill warning" href="/settings/models">{{tr "Setup required"}}</a>
+{{else if eq .Status.Readiness "degraded"}}<a class="status-pill warning" href="/settings/models">{{tr "Model needs attention"}}</a>
+{{else if eq .Status.Status "busy"}}<span class="status-pill working">{{tr "Working"}}</span>
+{{else if eq .Status.Status "idle"}}<span class="status-pill">{{tr "Ready"}}</span>
+{{else}}<span class="status-pill">{{tr "Status unavailable"}}</span>{{end}}
 {{end}}
 
-{{define "brand"}}<a class="brand" href="/"><img src="/brand/collie.png" alt="Collie logo" width="40" height="40"><span>collie<span class="brand-period">.</span></span></a>{{end}}
+{{define "brand"}}<a class="brand" href="/" aria-label="{{tr "Steward home"}}">Steward</a>{{end}}
+{{define "agent-avatar"}}<span class="avatar-slot" aria-hidden="true"><span class="avatar-fallback"></span></span>{{end}}

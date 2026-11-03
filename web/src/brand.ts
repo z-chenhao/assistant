@@ -1,21 +1,25 @@
-// Gentle pointer response for the welcome mascot. Delegation
-// also covers a welcome region inserted after model setup by live updates.
+import {t} from './i18n';
+import {StewardGhost} from './avatar.js';
+
 export function enhanceBrandMotion(){
- const reduced=matchMedia('(prefers-reduced-motion: reduce)');
- const fine=matchMedia('(hover: hover) and (pointer: fine)');
- let active:HTMLElement|null=null;
- const reset=()=>{active?.style.removeProperty('--pointer-x');active?.style.removeProperty('--pointer-y');active=null};
- document.addEventListener('pointermove',event=>{
-  if(reduced.matches||!fine.matches){reset();return}
-  const target=event.target instanceof Element?event.target.closest<HTMLElement>('.welcome-collie'):null;
-  if(!target||target.matches(':disabled')){reset();return}
-  if(active!==target){reset();active=target}
-  const bounds=target.getBoundingClientRect();
-  const unit=(v:number,size:number)=>Math.max(-1,Math.min(1,v/Math.max(size,1)*2-1));
-  target.style.setProperty('--pointer-x',String(unit(event.clientX-bounds.left,bounds.width)));
-  target.style.setProperty('--pointer-y',String(unit(event.clientY-bounds.top,bounds.height)));
+ const enhance=()=>{
+  for(const slot of document.querySelectorAll<HTMLElement>('.avatar-slot')){
+   if(!slot.querySelector('.steward-avatar')){
+    slot.removeAttribute('aria-hidden');
+    slot.innerHTML=StewardGhost.markup();
+   }
+  }
+  StewardGhost.observe();
+ };
+ enhance();
+ const messages=document.getElementById('conversation-messages');
+ if(messages)new MutationObserver(enhance).observe(messages,{childList:true});
+ document.addEventListener('click',event=>{
+  const target=event.target instanceof Element?event.target:null;
+  const avatar=target?.closest<HTMLButtonElement>('.steward-avatar');
+  if(avatar)void StewardGhost.react(avatar);
  });
- document.addEventListener('pointerout',event=>{if(active&&!(event.relatedTarget instanceof Node&&active.contains(event.relatedTarget)))reset()});
- window.addEventListener('blur',reset);
- reduced.addEventListener('change',reset);fine.addEventListener('change',reset);
+ const pause=document.querySelector<HTMLButtonElement>('[data-avatar-pause]');
+ const sync=()=>{if(pause){pause.setAttribute('aria-pressed',String(StewardGhost.isPaused));pause.textContent=StewardGhost.isPaused?t('Resume avatar motion'):t('Pause avatar motion')}};
+ sync();pause?.addEventListener('click',()=>{StewardGhost.pause(!StewardGhost.isPaused);sync()});
 }

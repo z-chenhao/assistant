@@ -55,6 +55,7 @@ type App struct {
 	rootLock            *os.File
 	feishu              *feishu.Client
 	computer            *macosvm.Provider
+	computerPreviewMu   sync.Mutex
 	memoryCurator       *memory.Curator
 	memoryOnce          sync.Once
 	memoryCancel        context.CancelFunc
@@ -341,9 +342,11 @@ func (a *App) Close() error {
 	if a.provider != nil {
 		_ = a.provider.Close()
 	}
+	a.computerPreviewMu.Lock()
 	if a.computer != nil {
 		a.computer.Close()
 	}
+	a.computerPreviewMu.Unlock()
 	err := a.store.Close()
 	err = errors.Join(err, a.history.Close())
 	if a.memory != nil {

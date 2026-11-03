@@ -20,23 +20,38 @@ try{
  await page.locator('#composer-root textarea').waitFor();
  // Prove the maintained frontend bundle is running, not just its HTML fallback.
  await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
- for(const image of await page.getByAltText(/Collie (logo|default agent avatar)/).all()){
-  if(!await image.evaluate(img=>img.complete&&img.naturalWidth===1297&&img.naturalHeight===1212))throw new Error('Collie artwork failed to load');
+ if(await page.locator('.message').count()&&!new URL(page.url()).hash){
+  await page.waitForFunction(()=>{const message=document.querySelector('.message:last-child');return !message||message.getBoundingClientRect().bottom<=innerHeight});
  }
+ if(!await page.getByRole('link',{name:'Steward home',exact:true}).isVisible())throw Error('Steward wordmark unavailable');
+ if(await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link').count()!==4)throw Error('workspace navigation must have four entries');
+ const avatar=page.locator('.steward-avatar').first();
+ await avatar.waitFor();
+ await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.dataset.renderer==='prerendered');
+ const canvas=await avatar.locator('canvas').elementHandle();
+ await avatar.hover();
+ await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.classList.contains('is-waving'));
+ if(!await canvas.evaluate(node=>node.isConnected))throw Error('greeting replaced the complete-frame canvas');
+ await page.locator('[data-avatar-pause]').click();
+ if(await avatar.getAttribute('data-frame')!=='0')throw Error('paused avatar retained a moving pose');
+ if(await avatar.locator('.ghost-art').evaluate(node=>getComputedStyle(node).animationPlayState)!=='paused')throw Error('pause did not stop ghost drift');
+ await page.locator('[data-avatar-pause]').click();
  if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
  if(phase==='setup'){
   await page.evaluate(()=>document.fonts.ready);
   await page.setViewportSize({width:320,height:740});
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
   for(const link of await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link').all()){
    const bounds=await link.boundingBox();
    if(!bounds||bounds.x<0||bounds.x+bounds.width>320)throw Error('compact navigation is outside the viewport');
   }
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('compact workspace overflows horizontally');
   await page.screenshot({path:evidence+'/navigation-compact.png',fullPage:true});
+  await page.locator('.brand-row').getByRole('button',{name:'Close navigation',exact:true}).click();
   await page.setViewportSize({width:1400,height:980});
   if(!await page.getByRole('button',{name:'Send message',exact:true}).isDisabled())throw Error('unconfigured composer can send');
   if(await page.locator('.welcome').count())throw Error('setup competes with the normal welcome');
-  await page.getByRole('link',{name:'Set up Collie',exact:false}).click();
+  await page.getByRole('link',{name:'Set up Steward',exact:false}).click();
   await page.getByRole('link',{name:'Connect a model',exact:true}).click();
   await page.getByRole('link',{name:'Local or compatible API',exact:false}).click();
   if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
@@ -59,21 +74,21 @@ try{
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
   const selecting=page.getByRole('link',{name:'Start a conversation',exact:false}).click();
   await loading;
-  await page.getByLabel('Message Collie').fill('Plan my day: finish the release risk note before noon.');
+  await page.getByLabel('Message Steward').fill('Plan my day: finish the release risk note before noon.');
   await page.getByLabel('Attach a file').setInputFiles({name:'web-note.txt',mimeType:'text/plain',buffer:Buffer.from('Web owner attachment fixture.\n')});
-  await page.getByLabel('Message Collie').focus();
-  await page.getByLabel('Message Collie').press('ArrowLeft');
+  await page.getByLabel('Message Steward').focus();
+  await page.getByLabel('Message Steward').press('ArrowLeft');
   const earlySource=await page.locator('input[name="source_id"]').inputValue();
-  const selection=await page.getByLabel('Message Collie').evaluate(input=>[input.selectionStart,input.selectionEnd]);
+  const selection=await page.getByLabel('Message Steward').evaluate(input=>[input.selectionStart,input.selectionEnd]);
   release();await selecting;
   await page.unroute('**/app.js');
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
   await page.evaluate(()=>document.fonts.ready);
   await page.locator('.welcome').evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
-  if(!await page.evaluate(()=>document.fonts.check('500 16px "DM Sans"')&&document.fonts.check('400 40px "Lora"')))throw Error('local brand typography unavailable');
+  if(!await page.evaluate(()=>document.fonts.check('500 16px "Inter"')&&document.fonts.check('400 40px "Source Serif 4"')))throw Error('local brand typography unavailable');
   await page.screenshot({path:evidence+'/welcome.png',fullPage:true});
-  if(await page.getByLabel('Message Collie').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
-  const preserved=await page.getByLabel('Message Collie').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
+  if(await page.getByLabel('Message Steward').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
+  const preserved=await page.getByLabel('Message Steward').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
   if(preserved!==JSON.stringify(selection)||await page.locator('input[name="source_id"]').inputValue()!==earlySource)throw new Error('frontend enhancement changed draft focus, selection or source identity');
   const file=await page.getByLabel('Attach a file').evaluate(async input=>input.files[0]?{name:input.files[0].name,text:await input.files[0].text()}:null);
   if(file?.name!=='web-note.txt'||file?.text!=='Web owner attachment fixture.\n')throw new Error('frontend enhancement lost early attachment');
@@ -237,9 +252,9 @@ try{
   const bundle=new Promise(resolve=>{release=resolve});
   const loading=new Promise(resolve=>{requested=resolve});
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
-  const navigation=page.locator('.app-sidebar').getByRole('link',{name:'Conversation',exact:true}).click();
+  const navigation=page.locator('.app-sidebar').getByRole('link',{name:'Chat',exact:true}).click();
   await loading;
-  await page.getByLabel('Message Collie',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
+  await page.getByLabel('Message Steward',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
   const [picker]=await Promise.all([page.waitForEvent('filechooser'),page.getByLabel('Attach a file').click()]);
   release();await navigation;await page.unroute('**/app.js');
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
@@ -260,7 +275,7 @@ try{
   const echo=async(key,text)=>send(key,plan('mcp__fixture__echo',{text}));
   await echo('live-initial','Opening note\n'+'Context line\n'.repeat(55)+'INITIAL_DONE');
   await page.locator('.message.assistant').filter({hasText:'INITIAL_DONE'}).waitFor();
-  const editor=page.getByLabel('Message Collie',{exact:true});
+  const editor=page.getByLabel('Message Steward',{exact:true});
   await editor.fill('Keep this unsent draft exactly.');
   await page.getByLabel('Attach a file').setInputFiles({name:'pending.txt',mimeType:'text/plain',buffer:Buffer.from('Unsent attachment bytes.\n')});
   await editor.focus();await editor.press('ArrowLeft');
@@ -275,6 +290,25 @@ try{
    const file=await page.getByLabel('Attach a file').evaluate(async input=>({name:input.files[0]?.name,text:await input.files[0]?.text()}));
    if(file.name!=='pending.txt'||file.text!=='Unsent attachment bytes.\n')throw new Error('live update lost attachment');
   };
+  // Real read-only panels preserve the existing composer and its file. Switching
+  // panes must close the previous viewer without replacing the conversation.
+  await page.getByRole('button',{name:'Worker progress',exact:true}).click();
+  await page.locator('#worker-panel[open]').waitFor();await checkDraft(false);
+  await page.getByRole('button',{name:'Open Computer',exact:true}).click();
+  await page.locator('#computer-panel[open]').waitFor();
+  if(await page.locator('#worker-panel[open]').count())throw Error('two workspace panes opened');
+  await page.getByRole('button',{name:'Expand computer view',exact:true}).click();
+  if(!await page.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('expanded Computer did not protect focus');
+  await checkDraft(false);
+  await page.getByRole('button',{name:'Reduce computer view',exact:true}).click();
+  if(await page.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('reduced desktop pane kept conversation inert');
+  await checkDraft(false);
+  await page.getByRole('button',{name:'Close computer view',exact:true}).click();
+  if(await page.locator('.workspace-panel[open]').count())throw Error('workspace pane stayed open');
+  if(!await page.getByRole('button',{name:'Open Computer',exact:true}).evaluate(button=>document.activeElement===button))throw Error('pane did not restore trigger focus');
+  await editor.focus();await checkDraft();
+  const afterPanels=await page.locator('[data-live-key="'+anchor.key+'"]').evaluate(node=>({top:node.getBoundingClientRect().top,scroll:scrollY}));
+  if(Math.abs(afterPanels.top-anchor.top)>2)throw Error('pane roundtrip moved anchor: '+JSON.stringify({before:anchor,after:afterPanels}));
   let attemptedSends=0;
   await page.route('**/message',async route=>{attemptedSends++;await route.abort('failed')});
   await page.getByRole('button',{name:'Send message',exact:true}).click();
@@ -285,8 +319,8 @@ try{
   await page.locator('.message.assistant').filter({hasText:'LIVE_REPLY_WHILE_TYPING'}).waitFor();
   await checkDraft();
   const top=await page.locator('[data-live-key="'+anchor.key+'"]').evaluate(node=>node.getBoundingClientRect().top);
-  if(Math.abs(top-anchor.top)>2)throw new Error('background update moved reading position');
-  await page.getByRole('button',{name:'New messages'}).waitFor();
+  if(Math.abs(top-anchor.top)>2)throw new Error('background update moved reading position: '+JSON.stringify({before:anchor.top,after:top}));
+  await page.getByRole('button',{name:'Latest messages'}).waitFor();
   await page.waitForResponse(response=>response.url().includes('/api/updates?')&&response.status()===304);
   await checkDraft();
   // A real network failure retains the DOM and draft, then reads current state.
@@ -323,9 +357,9 @@ try{
     const communication=await context.newPage();try{
      await communication.goto(await detail.getByRole('link',{name:'Continue this task',exact:false}).getAttribute('href').then(path=>url+path));
      if(await communication.locator('input[name=task_ref]').inputValue()!==ref)throw Error('continuation lost task context');
-     await communication.getByLabel('Message Collie',{exact:true}).fill('Keep this task draft.');
+     await communication.getByLabel('Message Steward',{exact:true}).fill('Keep this task draft.');
      await communication.getByRole('button',{name:'Clear task context',exact:true}).click();
-     if(await communication.getByLabel('Message Collie',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
+     if(await communication.getByLabel('Message Steward',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
     }finally{await communication.close()}
     await detail.screenshot({path:evidence+'/task-detail.png',fullPage:true});
     await detail.setViewportSize({width:390,height:844});if(await detail.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile task detail overflow');
@@ -387,7 +421,7 @@ try{
   await mobile.setViewportSize({width:390,height:844});
   await mobile.goto(url);
   await mobile.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
-  await mobile.getByLabel('Message Collie',{exact:true}).fill('');
+  await mobile.getByLabel('Message Steward',{exact:true}).fill('');
   await mobile.evaluate(()=>{document.querySelector('textarea').blur();scrollTo(0,0)});
   await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const geometry=await mobile.evaluate(()=>({width:innerWidth,height:innerHeight,content:document.documentElement.scrollWidth,footerBottom:document.querySelector('footer').getBoundingClientRect().bottom}));
@@ -401,7 +435,7 @@ try{
    await plain.addCookies(await context.cookies());
    const fallback=await plain.newPage();await fallback.goto(url);
    if(await fallback.locator('.message').count()!==await page.locator('.message').count())throw new Error('no-JavaScript fallback lost messages');
-   if(!await fallback.getByLabel('Message Collie',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
+   if(!await fallback.getByLabel('Message Steward',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
    if(!await fallback.getByText('Processed: Retain this semantic answer.',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost semantics');
    await fallback.screenshot({path:evidence+'/'+phase+'-no-script.png',fullPage:true});
   }finally{await plain.close()}

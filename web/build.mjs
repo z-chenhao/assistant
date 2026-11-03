@@ -10,6 +10,7 @@ const js=await build({absWorkingDir:root,entryPoints:['src/main.tsx'],bundle:tru
   format:'iife',target:['es2022'],outfile:'../internal/interaction/web/assets/client.js',
   jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},
   banner:{js:'/*! Collie UI; bundled third-party licenses:\n'+notices+'\n*/'},legalComments:'inline'});
+const appearance=await build({absWorkingDir:root,entryPoints:['src/appearance.ts'],bundle:true,minify:true,write:false,format:'iife',target:['es2022']});
 // Use Tailwind's file output: a synchronous child can otherwise lose buffered stdout.
 const cssTemp=mkdtempSync(join(tmpdir(),'collie-web-css-'));
 let css;
@@ -20,8 +21,9 @@ try{
   if(!css.length)throw new Error('Tailwind produced an empty stylesheet');
 }finally{rmSync(cssTemp,{recursive:true,force:true});}
 const dependencies={react:'LICENSE','react-dom':'LICENSE',scheduler:'LICENSE',zod:'LICENSE',clsx:'license','class-variance-authority':'LICENSE','tailwind-merge':'LICENSE.md',tailwindcss:'LICENSE'};
-const licenses=[notices,readFileSync(root+'licenses/collie-artwork.md','utf8'),readFileSync(root+'licenses/lora-OFL.txt','utf8'),readFileSync(root+'licenses/dmsans-OFL.txt','utf8'),...Object.entries(dependencies).map(([name,file])=>name+'\n'+readFileSync(root+'node_modules/'+name+'/'+file,'utf8'))].join('\n\n');
-const outputs={'client.js':js.outputFiles[0].contents,'style.css':css,'licenses.txt':licenses,'brand/NOTICE.txt':readFileSync(root+'licenses/collie-artwork.md')};
+const stewardLicenses=['LICENSE-Inter.txt','LICENSE-SourceSerif4.md','LICENSE-SourceHanSans.txt','LICENSE-JetBrainsMono.txt','LICENSE-Michroma.txt'].map(name=>readFileSync(root+'licenses/'+name,'utf8').replace(/[ \t]+$/gm,'')).join('\n\n');
+const licenses=[notices,stewardLicenses,readFileSync(root+'licenses/collie-artwork.md','utf8'),readFileSync(root+'licenses/steward-artwork.md','utf8'),readFileSync(root+'licenses/lora-OFL.txt','utf8'),readFileSync(root+'licenses/dmsans-OFL.txt','utf8'),...Object.entries(dependencies).map(([name,file])=>name+'\n'+readFileSync(root+'node_modules/'+name+'/'+file,'utf8'))].join('\n\n');
+const outputs={'appearance.js':appearance.outputFiles[0].contents,'client.js':js.outputFiles[0].contents,'style.css':css,'licenses.txt':licenses,'brand/NOTICE.txt':readFileSync(root+'licenses/steward-artwork.md')};
 for(const [name,bytes] of Object.entries(outputs)){
   const path=root+'../internal/interaction/web/assets/'+name;
   if(process.argv.includes('--check')){

@@ -1,3 +1,6 @@
+import {enhanceWorkers} from './workers';
+import {enhanceComputerView} from './computer';
+import {enhanceShell} from './shell';
 import {enhanceBrandMotion} from './brand';
 import {enhanceSettings} from './settings';
 import {enhanceObservability} from './observability';
@@ -7,6 +10,9 @@ import {startLiveUpdates} from './live-updates';
 
 // Capture server markup before enhancement, so unchanged React islands remain
 // mounted. The composer has a separate lifetime from every live region.
+enhanceShell();
+enhanceComputerView();
+enhanceWorkers();
 const live=startLiveUpdates();
 enhanceProjections();
 enhanceComposer();

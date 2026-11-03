@@ -1,9 +1,12 @@
 @import "tailwindcss" source(none);
 /* Shared defaults precede page rules so equal-specificity primitives cannot
    override a page's deliberate layout, density or surface treatment. */
+@import "./source-han.css";
 @import "./foundation.css";
 @import "./shell.css";
 @import "./workspace.css";
 @import "./conversation.css";
 @import "./observability.css";
 @source "./";
+
+@import "./avatar.css";

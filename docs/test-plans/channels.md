@@ -177,3 +177,12 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 - `internal/config/channels_test.go` 与既有CLI语法回归：凭据模式二选一、SecretStore引用、受限端点与 `channel status/check`。
 - 既有 `verify_channels.py` 的 `feishu_auth_lifecycle`：无需浏览器，以真实CLI/Actor/Delivery和受控飞书HTTP peer验证配置检查、token拒绝后的持久安全重试、过期主动刷新、无效凭据的安全诊断与持久失败码、撤销绑定、凭据不落盘，以及已发生副作用但回执丢失后重启仍不重发。该场景接入现有channels门禁，不新增脚本或CI阶段。
 - 真实飞书自建应用、实际账户权限和公网回调配置需独立Live验证；软件peer不证明真实平台授权、模型效果或永久 exactly-once。
+
+Steward 重构检查补充：Chat 的 Computer/Worker 只读详情与真实执行状态一致；明暗切换、头像暂停、移动抽屉与键盘焦点恢复；发送、附件、审批冻结哈希、旧消息定位和 live 更新沿用本页原有场景。
+
+界面语言的默认、持久化、认证/CSRF、实时片段及冻结审批内容回归由 `internal/interaction/web/locale_test.go` 覆盖；中英文与移动浏览器检查见[品牌测试方案](branding.md)。
+
+
+工作区精修：updates_test 验证待审批计数包含内嵌卡片且不重复、解决后清空；computer_test 验证 status/frame 的认证、绑定撤销、身份裁剪与 no-store。渠道浏览器继续覆盖真实草稿、附件、审批、背景更新和最新消息入口；Task 读取维持独立于 Conversation，Worker 采用有界 Inspector 结果。执行报告保存在 evidence，不据软件 peer 宣称真实 Guest 画面兼容性。
+
+Chat / Worker：`workers_test.go` 验证认证与绑定撤销、只读字段和面板仅属于 Chat；`observability/sqlite/inspection_test.go` 验证真实只读数据库中的运行时间排序、50 条上限、运行中查询和 Agent 隔离。`channels_browser.mjs` 的 live 场景通过真实 Web 验证 Computer/Worker 互斥、焦点返回和草稿/附件节点保留。

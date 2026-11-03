@@ -70,5 +70,5 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(409)
-	s.render(w, p)
+	s.render(w, r, p)
 }

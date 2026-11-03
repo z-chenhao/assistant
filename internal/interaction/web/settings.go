@@ -30,6 +30,10 @@ func modelURL(id string) string { return "/settings/models/" + url.PathEscape(id
 func (s *Server) loadSettings(ctx context.Context, r *http.Request, p *page) error {
 	v := &settingsView{Verified: map[string]bool{}, Section: "models", Provider: r.URL.Query().Get("provider"), Endpoint: "http://127.0.0.1:8000/v1"}
 	p.Settings = v
+	if r.URL.Path == "/settings/preferences" {
+		v.Section = "preferences"
+		return nil
+	}
 	if r.URL.Path == "/settings/notifications" {
 		v.Section = "notifications"
 		var err error

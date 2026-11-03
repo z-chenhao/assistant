@@ -23,3 +23,23 @@ func Status(ctx context.Context, db *sql.DB) (computer.Status, error) {
 	}
 	return status, nil
 }
+
+// PreviewInstance never provisions or resumes a Computer. No transaction is held
+// while the caller captures a frame; callers revalidate the epoch afterward.
+func PreviewInstance(ctx context.Context, db *sql.DB) (computer.Instance, error) {
+	var raw string
+	var instance computer.Instance
+	err := db.QueryRowContext(ctx, `SELECT c.instance_json FROM computer c
+ JOIN tool_invocation i ON i.invocation_id=c.execution_id JOIN run r ON r.run_id=i.run_id
+ WHERE c.singleton=1 AND c.phase='ready' AND r.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1)`).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return instance, computer.ErrStale
+	}
+	if err != nil {
+		return instance, ErrStorage
+	}
+	if json.Unmarshal([]byte(raw), &instance) != nil || instance.ComputerID == "" || instance.Epoch < 1 || instance.NativeName == "" {
+		return computer.Instance{}, computer.ErrIntegrity
+	}
+	return instance, nil
+}
