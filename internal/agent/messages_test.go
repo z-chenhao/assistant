@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/conversation"
 )
 
 func TestUserImageProjectionPreservesRoleAndFrozenReferenceMode(t *testing.T) {

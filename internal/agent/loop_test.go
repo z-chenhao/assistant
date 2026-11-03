@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func TestRuntimeNormalizationAndProviderBoundary(t *testing.T) {

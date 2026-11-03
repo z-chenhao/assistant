@@ -23,7 +23,7 @@
 
 - `go test -race ./internal/config/... ./internal/interaction/web ./internal/computer/macosvm`：配置/文件并发、真实沙箱与协议适配器、共享 Computer 校验。
 - `make test lint`：代码/组件、现有 Node/Web/测试基础设施、文档与静态检查。
-- `make build` 后运行既有 `tests/system/runner.py --gate channels --binary bin/collie --evidence /absolute/path`；capability-settings 已并入该 gate，不增加 runner 或 CI gate。
+- `make build` 后运行既有 `tests/system/runner.py --gate channels --binary bin/steward --evidence /absolute/path`；capability-settings 已并入该 gate，不增加 runner 或 CI gate。
 - 跨模块回归按 [Testing](product.md) 执行 core，以及涉及能力/Computer/recall 的现有 extended gates。
 
 具体结果保存在每次运行的 evidence，本文定义验收而非替代执行报告。owned peers 是明确的受控外部服务，不伪造产品内部 Run/验证通过状态。测试在可丢弃根目录创建配置和资源，结束后回收进程/监听器；从不访问个人数据目录。
@@ -31,3 +31,5 @@
 ## 平台与剩余证明范围
 
 Linux 验证了内核沙箱与受控 Lume 协议、tiny sealed base 和真实 Node runtime。Computer 诊断不启动 Guest，因此不以这份证据声称验证了 macOS/arm64 的实际桌面操作；该边界由 [Computer 测试方案](computer-use.md) 保持。真实外部 MCP/embedding 服务可通过同一 owner 入口按实际凭据测试，未配置时不自动补齐服务或选择默认模型。
+
+普通表单补充：`capability_forms_test.go` 与 `capability_server_test.go` 验证六类往返、未展示字段保留、别名回退、MCP 顺序／权限、明文凭据拒绝、版本冲突、精确候选证明与转义。维护中的 channels_capabilities 浏览器场景覆盖主要记忆表单的失败／成功／修改后重测／保存，MCP 原生增删行、无 JavaScript 普通及高级表单。真实工作区／Computer 诊断若因本机环境不可用而失败，必须记录未完成范围并保持 Save 禁用，不能用 UI 成功状态替代。

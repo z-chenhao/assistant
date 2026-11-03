@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func TestLegacyBuiltinSnapshotIsRejectedWithoutAliasesOrMutation(t *testing.T) {

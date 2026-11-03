@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer"
 	"golang.org/x/sys/unix"
 )
 

@@ -1,4 +1,4 @@
-# Contributing to Collie
+# Contributing to Steward
 
 [Development and contribution workflow](docs/features/engineering.md#contributing-working-on-a-change) ·
 [Feature Map and documentation rules](docs/feature-map.md#文档维护规则) ·

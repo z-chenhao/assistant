@@ -10,10 +10,10 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/app"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/tui"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/app"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/tui"
 )
 
 func runChat(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer) error {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/tool"
-	mcpfake "github.com/z-chenhao/collie/internal/tool/mcp/fake"
+	"github.com/z-chenhao/assistant/internal/tool"
+	mcpfake "github.com/z-chenhao/assistant/internal/tool/mcp/fake"
 )
 
 type rewrite struct {
@@ -48,7 +48,7 @@ func TestMCPPeer(t *testing.T) {
 	if index < 0 {
 		return
 	}
-	if os.Getenv("COLLIE_TEST_SECRET") != "" {
+	if os.Getenv("STEWARD_TEST_SECRET") != "" {
 		os.Exit(3)
 	}
 	root := os.Args[index+1]
@@ -105,7 +105,7 @@ func TestMCPWireNameKeepsServerAndToolUnderscores(t *testing.T) {
 	}
 }
 func TestDiscoveryFreezesHostPolicyAndNormalizesErrors(t *testing.T) {
-	t.Setenv("COLLIE_TEST_SECRET", "secret")
+	t.Setenv("STEWARD_TEST_SECRET", "secret")
 	c := config(t)
 	defs, err := Definitions(context.Background(), c)
 	if err != nil {

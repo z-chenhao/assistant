@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/interaction"
 )
 
 func languageRequest(method, path, language, body string) *http.Request {
@@ -25,7 +25,7 @@ func languageRequest(method, path, language, body string) *http.Request {
 	return r
 }
 func languageServer() *Server {
-	return &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}}
+	return &Server{Config: Config{TokenRef: "credential:test"}, Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}}
 }
 func TestLanguageDefaultsToEnglishAndPersistsExplicitChoice(t *testing.T) {
 	s := languageServer()

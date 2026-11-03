@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 type TaskReader interface {
@@ -17,13 +17,18 @@ type TaskReader interface {
 	Detail(context.Context, string, string) (task.Detail, error)
 }
 type shownArtifact struct{ Ref, Name string }
+type scheduledTaskReader interface {
+	Scheduled(context.Context, string) ([]task.ScheduledWork, error)
+}
 type taskView struct {
-	Query     task.ListQuery
-	List      task.List
-	Detail    *task.Detail
-	Messages  []shownMessage
-	Approvals []approvalView
-	Artifacts []shownArtifact
+	Query                task.ListQuery
+	List                 task.List
+	Detail               *task.Detail
+	Messages             []shownMessage
+	Approvals            []approvalView
+	Artifacts            []shownArtifact
+	Scheduled            []task.ScheduledWork
+	SchedulesUnavailable bool
 }
 
 func taskURL(ref string) string { return "/tasks/" + url.PathEscape(ref) }
@@ -82,6 +87,16 @@ func (s *Server) loadTasks(ctx context.Context, r *http.Request, p *page) error 
 		}
 		v.Query = q
 		v.List, err = s.Tasks.List(ctx, q)
+		if err == nil && (q.View == "open" || q.View == "all") {
+			if reader, ok := s.Tasks.(scheduledTaskReader); ok {
+				var scheduleErr error
+				v.Scheduled, scheduleErr = reader.Scheduled(ctx, q.Query)
+				v.SchedulesUnavailable = scheduleErr != nil
+				if scheduleErr != nil {
+					v.Scheduled = nil
+				}
+			}
+		}
 		return err
 	}
 	ref := strings.TrimPrefix(r.URL.Path, "/tasks/")

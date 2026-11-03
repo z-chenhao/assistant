@@ -1,8 +1,8 @@
 package sqlite
 
 import (
-	inspectionsqlite "github.com/z-chenhao/collie/internal/observability/sqlite"
-	tasksqlite "github.com/z-chenhao/collie/internal/task/sqlite"
+	inspectionsqlite "github.com/z-chenhao/assistant/internal/observability/sqlite"
+	tasksqlite "github.com/z-chenhao/assistant/internal/task/sqlite"
 )
 
 // Inspector exposes the read-only projection, not the Runtime writer pool.

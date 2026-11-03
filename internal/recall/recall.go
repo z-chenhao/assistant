@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 var ErrUnavailable = errors.New("recall provider unavailable")

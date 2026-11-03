@@ -63,7 +63,7 @@ launches approved Worker effects, kills after the effect or terminal unknown
 commit, reconciles through the CLI, verifies bytes/hash and caller readback,
 replays without a second effect, and removes all disposable state.
 
-`python3 tests/system/verify_artifacts.py --binary bin/collie --evidence
+`python3 tests/system/verify_artifacts.py --binary bin/steward --evidence
 evidence/artifacts.json` owns Launch/Doctor/Drive/Evidence/Cleanup, using the
 explicit `artifacts` model and binary/large-output Tool Fakes. It drives actual
 CLI save/open/delete, large input refs, Task output publication, eight concurrent

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 func (r *Reader) history(ctx context.Context, out *task.Detail, after string) error {
@@ -89,4 +89,31 @@ func (r *Reader) messages(ctx context.Context, out *task.Detail) error {
 		return err
 	}
 	return r.db.QueryRowContext(ctx, `SELECT coalesce(min(c.sequence),0) FROM task_request q JOIN task t ON json_extract(q.receipt_json,'$.taskRef')=t.task_ref JOIN conversation_intent c ON json_extract(c.message_json,'$.message_id')=q.source_message_id AND json_extract(c.message_json,'$.conversation_id')=t.conversation_id WHERE t.task_ref=? AND t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1)`, out.TaskRef).Scan(&out.SourceSequence)
+}
+
+// Instructions are actual accepted additions, never inferred future steps. The
+// newest bounded set is shown in acceptance order independently of history pages.
+func (r *Reader) instructions(ctx context.Context, out *task.Detail) error {
+	rows, err := r.db.QueryContext(ctx, `SELECT i.instruction,i.created_at,i.task_epoch FROM task_instruction i JOIN task t USING(task_id) WHERE t.task_ref=? AND t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) ORDER BY i.sequence DESC LIMIT 21`, out.TaskRef)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v task.Instruction
+		var at int64
+		if err = rows.Scan(&v.Text, &at, &v.Epoch); err != nil {
+			return err
+		}
+		if len(out.Instructions) == 20 {
+			out.MoreInstructions = true
+			break
+		}
+		v.At = stamp(at)
+		out.Instructions = append(out.Instructions, v)
+	}
+	for i, j := 0, len(out.Instructions)-1; i < j; i, j = i+1, j-1 {
+		out.Instructions[i], out.Instructions[j] = out.Instructions[j], out.Instructions[i]
+	}
+	return rows.Err()
 }

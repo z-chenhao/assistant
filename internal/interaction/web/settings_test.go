@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 type notificationCore struct {
@@ -42,7 +42,7 @@ func (c *notificationCore) PreferChannel(_ context.Context, ch, b string, v int6
 
 func TestNotificationSaveStaysInItsPageAndReflectsCanonicalSelection(t *testing.T) {
 	core := &notificationCore{preference: interaction.Preference{Channel: "auto", Version: 3}}
-	s := &Server{Core: core, Secrets: fakeSecrets{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: core, Secrets: fakeSecrets{}}
 	req := httptest.NewRequest("POST", "http://127.0.0.1:8080/notification", strings.NewReader(url.Values{"target": {"tui:"}, "version": {"3"}}.Encode()))
 	req.Header.Set("Authorization", "Bearer private-token-at-least-24-bytes")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -101,7 +101,7 @@ func TestWorkspaceLoginReturnIsLocalAndPreservesDeepLinks(t *testing.T) {
 	if safePageReturn(valid) != valid {
 		t.Fatal("lost task deep link")
 	}
-	s := &Server{Secrets: fakeSecrets{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Secrets: fakeSecrets{}}
 	r := httptest.NewRequest("POST", "http://127.0.0.1:8080/session", strings.NewReader(url.Values{"token": {"private-token-at-least-24-bytes"}, "next": {valid}}.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()

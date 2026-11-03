@@ -42,7 +42,7 @@
 
 ```sh
 make build
-python3 tests/system/verify_capabilities.py --binary bin/collie --evidence evidence/capabilities.json
+python3 tests/system/verify_capabilities.py --binary bin/steward --evidence evidence/capabilities.json
 go test -race ./internal/tool/... ./internal/skill ./internal/computer/... ./internal/config
 ```
 

@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/media"
-	"github.com/z-chenhao/collie/internal/media/ocr"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/media"
+	"github.com/z-chenhao/assistant/internal/media/ocr"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // ImageOCR is the local content processor used by the Host. It receives only

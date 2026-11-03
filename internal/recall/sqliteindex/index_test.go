@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/recall"
-	"github.com/z-chenhao/collie/internal/recall/embedding"
+	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/recall/embedding"
 )
 
 type chunkEmbedding struct {

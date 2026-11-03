@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/assistant/internal/agent"
 )
 
 // Progress records meaningful Host/Worker progress under its current claim. It

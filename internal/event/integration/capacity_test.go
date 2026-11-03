@@ -6,8 +6,8 @@ import (
 
 	nat "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	eventnats "github.com/z-chenhao/collie/internal/event/nats"
-	"github.com/z-chenhao/collie/internal/event/testbroker"
+	eventnats "github.com/z-chenhao/assistant/internal/event/nats"
+	"github.com/z-chenhao/assistant/internal/event/testbroker"
 )
 
 func TestNATSReopensWithinReservedBrokerCapacity(t *testing.T) {

@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/interaction/web"
-	"github.com/z-chenhao/collie/internal/llm/secret"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/llm/secret"
 )
 
 func fixtureManager(t *testing.T) *Manager {
@@ -24,7 +24,7 @@ func fixtureManager(t *testing.T) *Manager {
 	if e := os.Mkdir(root, 0700); e != nil {
 		t.Fatal(e)
 	}
-	t.Setenv("COLLIE_DATA_ROOT", root)
+	t.Setenv("STEWARD_DATA_ROOT", root)
 	c, e := config.Load("", os.LookupEnv)
 	if e != nil {
 		t.Fatal(e)
@@ -51,8 +51,8 @@ func verify(t *testing.T, m *Manager, id, text string) web.Capability {
 func TestMemoryCandidateSaveAndRestart(t *testing.T) {
 	m := fixtureManager(t)
 	ctx := context.Background()
-	t.Setenv("COLLIE_SETUP_KEY", strings.Repeat("k", 32))
-	text := "encryption_key_ref: env:COLLIE_SETUP_KEY\n"
+	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("k", 32))
+	text := "encryption_key_ref: env:STEWARD_SETUP_KEY\n"
 	v := detail(t, m, "memory")
 	if v.Configured || v.Active || v.PendingRestart {
 		t.Fatal(v)
@@ -60,7 +60,7 @@ func TestMemoryCandidateSaveAndRestart(t *testing.T) {
 	if e := m.Save(ctx, "memory", v.Revision, text); !errors.Is(e, web.ErrCapabilityUnverified) {
 		t.Fatal(e)
 	}
-	failed, e := m.Test(ctx, "memory", v.Revision, "encryption_key_ref: env:MISSING_COLLIE_KEY\n")
+	failed, e := m.Test(ctx, "memory", v.Revision, "encryption_key_ref: env:MISSING_STEWARD_KEY\n")
 	if e != nil || failed.Verified || failed.State != "unavailable" {
 		t.Fatal(failed, e)
 	}
@@ -83,7 +83,7 @@ func TestMemoryCandidateSaveAndRestart(t *testing.T) {
 		t.Fatal(info.Mode())
 	}
 	c, e := config.Load("", os.LookupEnv)
-	if e != nil || c.Memory == nil || c.Memory.EncryptionKeyRef != "env:COLLIE_SETUP_KEY" {
+	if e != nil || c.Memory == nil || c.Memory.EncryptionKeyRef != "env:STEWARD_SETUP_KEY" {
 		t.Fatal(c.Memory, e)
 	}
 	restarted := detail(t, New(c, secret.Store{}), "memory")
@@ -98,8 +98,8 @@ func TestMemoryCandidateSaveAndRestart(t *testing.T) {
 func TestProofBoundToExactCandidateAndRevision(t *testing.T) {
 	m := fixtureManager(t)
 	ctx := context.Background()
-	t.Setenv("COLLIE_SETUP_KEY", strings.Repeat("a", 32))
-	a := "encryption_key_ref: env:COLLIE_SETUP_KEY\n"
+	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("a", 32))
+	a := "encryption_key_ref: env:STEWARD_SETUP_KEY\n"
 	v := verify(t, m, "memory", a)
 	if e := m.Save(ctx, "memory", v.Revision, "encryption_key_ref: env:DIFFERENT_KEY\n"); !errors.Is(e, web.ErrCapabilityUnverified) {
 		t.Fatal(e)
@@ -122,8 +122,8 @@ func TestConfigPreservesUnrelatedSectionsAndRejectsInvalidCandidates(t *testing.
 	if e := os.WriteFile(m.path, raw, 0600); e != nil {
 		t.Fatal(e)
 	}
-	t.Setenv("COLLIE_SETUP_KEY", strings.Repeat("a", 32))
-	v := verify(t, m, "memory", "encryption_key_ref: env:COLLIE_SETUP_KEY\n")
+	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("a", 32))
+	v := verify(t, m, "memory", "encryption_key_ref: env:STEWARD_SETUP_KEY\n")
 	if e := m.Save(context.Background(), "memory", v.Revision, v.Text); e != nil {
 		t.Fatal(e)
 	}
@@ -145,8 +145,8 @@ func TestConfigPreservesUnrelatedSectionsAndRejectsInvalidCandidates(t *testing.
 func TestConcurrentManagersCannotOverwriteSameRevision(t *testing.T) {
 	m := fixtureManager(t)
 	other := New(m.active, secret.Store{})
-	t.Setenv("COLLIE_SETUP_KEY", strings.Repeat("a", 32))
-	text := "encryption_key_ref: env:COLLIE_SETUP_KEY\n"
+	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("a", 32))
+	text := "encryption_key_ref: env:STEWARD_SETUP_KEY\n"
 	a, b := verify(t, m, "memory", text), verify(t, other, "memory", text)
 	var wins atomic.Int32
 	var wg sync.WaitGroup
@@ -172,7 +172,7 @@ func TestConcurrentManagersCannotOverwriteSameRevision(t *testing.T) {
 	if _, e := config.Load("", os.LookupEnv); e != nil {
 		t.Fatal(e)
 	}
-	paths, _ := filepath.Glob(filepath.Join(filepath.Dir(m.path), ".collie-config-*"))
+	paths, _ := filepath.Glob(filepath.Join(filepath.Dir(m.path), ".steward-config-*"))
 	if len(paths) != 0 {
 		t.Fatal(paths)
 	}
@@ -188,8 +188,8 @@ func TestRejectSymlinkAndExpiredProofAndKeyRotation(t *testing.T) {
 		t.Fatal(e)
 	}
 	os.Remove(m.path)
-	t.Setenv("COLLIE_SETUP_KEY", strings.Repeat("a", 32))
-	text := "encryption_key_ref: env:COLLIE_SETUP_KEY\n"
+	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("a", 32))
+	text := "encryption_key_ref: env:STEWARD_SETUP_KEY\n"
 	v := verify(t, m, "memory", text)
 	p := m.proofs["memory"]
 	p.at = p.at.Add(-6 * 60 * 1e9)
@@ -205,8 +205,8 @@ func TestRejectSymlinkAndExpiredProofAndKeyRotation(t *testing.T) {
 	if e := m.Save(context.Background(), "memory", v.Revision, text); e != nil {
 		t.Fatal(e)
 	}
-	t.Setenv("COLLIE_NEW_KEY", strings.Repeat("b", 32))
-	newText := "encryption_key_ref: env:COLLIE_NEW_KEY\n"
+	t.Setenv("STEWARD_NEW_KEY", strings.Repeat("b", 32))
+	newText := "encryption_key_ref: env:STEWARD_NEW_KEY\n"
 	v = verify(t, m, "memory", newText)
 	if e := m.Save(context.Background(), "memory", v.Revision, newText); !errors.Is(e, web.ErrCapabilityMigration) {
 		t.Fatal(e)
@@ -271,8 +271,8 @@ func TestRealSkillCatalogAndSandboxProbe(t *testing.T) {
 
 func TestDeletedSourceFailsClosed(t *testing.T) {
 	m := fixtureManager(t)
-	t.Setenv("COLLIE_SETUP_KEY", strings.Repeat("a", 32))
-	v := verify(t, m, "memory", "encryption_key_ref: env:COLLIE_SETUP_KEY\n")
+	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("a", 32))
+	v := verify(t, m, "memory", "encryption_key_ref: env:STEWARD_SETUP_KEY\n")
 	if e := m.Save(context.Background(), "memory", v.Revision, v.Text); e != nil {
 		t.Fatal(e)
 	}

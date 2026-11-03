@@ -6,7 +6,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery"
 )
 
 type Adapter struct {

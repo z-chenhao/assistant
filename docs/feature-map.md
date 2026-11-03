@@ -12,7 +12,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 
 2026-10-29 Web 治理：F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
 
-2026-10-29 F-041：项目统一为 Collie，采用所有者选定的边牧咬网球原图；首页与各工作页面共用暖白、墨黑、网球黄绿及本地字体；欢迎标题使用 Lora，操作与阅读使用 DM Sans，采用更轻的导航与清晰的发送按钮。命令、模块、配置、运行标识与默认数据根一次性重置，无旧身份兼容层。
+2026-11-03 F-041：产品品牌统一为 Steward，Agent 名为 Ghost。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
 
 2026-10-30 F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant access token，新增 CLI `channel status/check`；收发共用并发缓存，凭据拒绝有安全诊断，未知投递在重启后仍只查询。完成范围与真实平台验证边界见功能文档。
 
@@ -47,10 +47,10 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-012](features/artifacts-media.md#f-012) | 可重新打开的文件产物 | 用户能上传、保存、搜索、下载交付物，引用具有访问边界。 | 是 · 已完成 |
 | [F-013](features/artifacts-media.md#f-013) | 用户图片视觉输入与本地 OCR | 视觉模型收到授权图片；纯文本模型可通过本地 OCR 读取图片文字。 | 是 · 已完成 |
 | [F-014](features/artifacts-media.md#f-014) | 音视频与文档内容处理 | 用户交付音视频或文档后，Agent 能获取适合任务的内容和来源。 | 否 · 部分完成 |
-| [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可设定明确时区的 at/cron 计划，并修改或取消。 | 是 · 已完成 |
+| [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口工作台；对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面。 | 否 · 部分完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；任务与执行详情按可用宽度重排。 | 否 · 部分完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 用户阅读或编辑草稿时仍能接收已提交回复、审批与状态更新，保留草稿、附件和阅读位置。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 维护飞书身份、凭据与收发，交付关联原话题、适配渠道并去重，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 正常回复能产生适当的受控组件，失败可退回语义文本。 | 否 · 部分完成 |
@@ -62,7 +62,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 支持健康检查、加密备份恢复、显式后台运行和尊重人工停机的独立巡检。 | 否 · 部分完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 操作员能查看用量，并按明确价格元数据控制账户费用。 | 是 · 已完成 |
-| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 用户能在设置中看见记忆、embedding、MCP、Skills、隔离执行环境及 Computer 是否已连接，并完成配置验证。 | 是 · 已完成 |
+| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 六类能力以普通表单配置、验证和保存；高级 YAML 保留，重启边界与凭据引用不变。 | 是 · 已完成 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |

@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/delivery/ui"
-	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
+	"github.com/z-chenhao/assistant/internal/interaction"
 )
 
 func (s *Server) showMessage(ctx context.Context, m conversation.Message, approvals map[string]interaction.Approval) (shownMessage, error) {

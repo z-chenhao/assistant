@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/app"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/app"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer, input llm.ProfileInput, fixture bool, errOut io.Writer) error {
@@ -108,7 +108,7 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 		return json.NewEncoder(out).Encode(r)
 	case "select":
 		if !fixture {
-			fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to the selected provider (OpenAI account requests use https://api.openai.com/v1) or your configured local endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Collie never switches providers automatically.")
+			fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to the selected provider (OpenAI account requests use https://api.openai.com/v1) or your configured local endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Steward never switches providers automatically.")
 		}
 		pv, err := strconv.ParseInt(flags.Arg(3), 10, 64)
 		if err != nil || pv < 1 {

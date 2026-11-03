@@ -5,7 +5,7 @@ import (
 	"context"
 	"image/png"
 
-	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer"
 )
 
 // ComputerStatus is a read-only operator diagnostic. Lifecycle decisions remain

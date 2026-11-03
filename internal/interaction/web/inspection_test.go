@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 type inspectionReader struct {
@@ -25,7 +25,7 @@ func (f *inspectionReader) Relationships(_ context.Context, q observability.Rela
 
 func TestInspectionRoutesAuthenticationReadOnlyBoundedAndEscaped(t *testing.T) {
 	reader := &inspectionReader{}
-	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Inspector: reader, Traces: traceReader{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Inspector: reader, Traces: traceReader{}}
 	request := func(method, path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "http://127.0.0.1:8080"+path, nil)
 		if auth {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/prompt"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/prompt"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // These hashes guard the complete projection, including whitespace, section
@@ -26,7 +26,7 @@ func TestContextPromptBytes(t *testing.T) {
 		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:frozen", Text: "research"}}},
 		{Name: "builtin__computer_observe", Internal: true},
 	}
-	for _, tc := range []struct{ position, hash string }{{"main", "70cb82e5ee95b0579bf44e68c0f2266ca1251d05c3a2b07b2278f6eca3f5b9b7"}, {"root", "42cf87fa386cbc067269bc4cbf18654f8bc825e3c362bb0e2720730e98947aee"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
+	for _, tc := range []struct{ position, hash string }{{"main", "8c30e36cec292f610049e28519bcb0e9190fce7fd2387d21540cf08897966537"}, {"root", "cbc6daf863c55ebc97e55dd2c0c0e5f1152e88aed5d59c16a0901ff478c5488c"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
 		t.Run(tc.position, func(t *testing.T) {
 			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}), false)
 			if err != nil {

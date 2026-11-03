@@ -3,7 +3,7 @@ package recall_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/assistant/internal/recall"
 	"strings"
 	"testing"
 	"time"

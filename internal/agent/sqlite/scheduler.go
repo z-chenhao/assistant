@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/assistant/internal/agent"
 )
 
 func (r *Runs) ConfigureScheduler(l agent.SchedulerLimits) {

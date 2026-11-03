@@ -38,9 +38,9 @@ class ChannelHarness(MainHarness):
         self.production_events = False
         super().__init__(binary, root, fixture)
         self.config = root / 'config.yaml'
-        self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:COLLIE_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:COLLIE_FEISHU_VERIFY\n  encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT\n  access_token_ref: env:COLLIE_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
-        self.env.update(COLLIE_WEB_TEST_TOKEN=TOKEN, COLLIE_FEISHU_VERIFY='sandbox-verify-token',
-                        COLLIE_FEISHU_ENCRYPT='sandbox-encrypt-key', COLLIE_FEISHU_ACCESS='sandbox-access-token')
+        self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:STEWARD_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:STEWARD_FEISHU_VERIFY\n  encrypt_key_ref: env:STEWARD_FEISHU_ENCRYPT\n  access_token_ref: env:STEWARD_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
+        self.env.update(STEWARD_WEB_TEST_TOKEN=TOKEN, STEWARD_FEISHU_VERIFY='sandbox-verify-token',
+                        STEWARD_FEISHU_ENCRYPT='sandbox-encrypt-key', STEWARD_FEISHU_ACCESS='sandbox-access-token')
         self.bind = self.command('channel','manage',text=json.dumps(dict(op='bind',channel='feishu',subject='sandbox-tenant:sandbox-app:owner',destination='bound-chat',enabled=True,version=0)))
         self.process = None
 
@@ -108,7 +108,7 @@ class ChannelHarness(MainHarness):
     def browser(self,evidence,phase):
         env=self.env.copy()
         executable=Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-        if executable.exists():env['COLLIE_BROWSER_EXECUTABLE']=str(executable)
+        if executable.exists():env['STEWARD_BROWSER_EXECUTABLE']=str(executable)
         run=self.processes.run if self.processes is not None else subprocess.run
         result=run(['node',str(ROOT/'tests/system/channels_browser.mjs'),self.url,str(evidence),phase],env=env,capture_output=True,text=True,timeout=45)
         require(result.returncode==0,'browser drive failed: '+result.stderr)
@@ -116,11 +116,11 @@ class ChannelHarness(MainHarness):
 
 def feishu_auth_lifecycle(binary, report):
     """Real CLI/Actor/Delivery against the HTTP peer; no browser or real account."""
-    with tempfile.TemporaryDirectory(prefix='collie-feishu-auth-') as temp, Sandbox(managed_auth=True, token_ttl=2) as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-feishu-auth-') as temp, Sandbox(managed_auth=True, token_ttl=2) as platform:
         h = ChannelHarness(binary, Path(temp), platform)
         try:
-            h.config.write_text(h.config.read_text().replace('access_token_ref: env:COLLIE_FEISHU_ACCESS', 'app_secret_ref: env:COLLIE_FEISHU_APP_SECRET'))
-            h.env['COLLIE_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
+            h.config.write_text(h.config.read_text().replace('access_token_ref: env:STEWARD_FEISHU_ACCESS', 'app_secret_ref: env:STEWARD_FEISHU_APP_SECRET'))
+            h.env['STEWARD_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
             status = h.command('channel', 'status')
             require(status['mode'] == 'app_credentials' and status['state'] == 'unchecked' and platform.auth_requests == 0, 'status unexpectedly acquired credentials')
             checked = h.command('channel', 'check')
@@ -144,13 +144,13 @@ def feishu_auth_lifecycle(binary, report):
             with platform.lock:
                 require(platform.auth_requests == 4 and platform.auth_rejections == 1 and len(platform.send_attempts) == 3, 'expired token reached the transport or message repeated')
             h.stop()
-            h.env['COLLIE_FEISHU_APP_SECRET'] = 'wrong-private-app-secret'
+            h.env['STEWARD_FEISHU_APP_SECRET'] = 'wrong-private-app-secret'
             rejected = h.command('channel', 'check')
             require(rejected['state'] == 'credentials_rejected' and rejected['action'], 'bad app secret has no sanitized diagnosis')
-            h.env['COLLIE_FEISHU_APP_SECRET'] = ''
+            h.env['STEWARD_FEISHU_APP_SECRET'] = ''
             missing = h.command('channel', 'check')
             require(missing['state'] == 'credentials_unavailable' and missing['action'], 'missing credential has no recovery action')
-            h.env['COLLIE_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
+            h.env['STEWARD_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
             h.start()
             with platform.lock:
                 platform.drop_response = True
@@ -166,7 +166,7 @@ def feishu_auth_lifecycle(binary, report):
             require(sum(d['status'] == 'unknown' for d in rows['deliveries']) == 1, 'restart cleared uncertainty without evidence')
             with platform.lock:
                 require(len(platform.send_attempts) == attempts and platform.auth_requests == issues, 'recovery acquired credentials or resent an unknown message')
-            h.env['COLLIE_FEISHU_APP_SECRET'] = 'wrong-private-app-secret'
+            h.env['STEWARD_FEISHU_APP_SECRET'] = 'wrong-private-app-secret'
             h.start()
             h.callback('managed-invalid-secret', 'This notification must fail before transport.')
             h.wait(lambda s: any(d['status'] == 'failed' for d in s['deliveries']), 'permanent credential failure has a durable diagnostic')
@@ -175,7 +175,7 @@ def feishu_auth_lifecycle(binary, report):
             h.stop()
             with platform.lock:
                 require(len(platform.send_attempts) == attempts, 'invalid app secret reached the message endpoint')
-            h.env['COLLIE_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
+            h.env['STEWARD_FEISHU_APP_SECRET'] = 'sandbox-app-secret'
             binding = next(b for b in h.command('channel', 'manage', text='{"op":"list"}') if b['channel'] == 'feishu')
             h.command('channel', 'manage', text=json.dumps(dict(op='bind', channel='feishu', subject=binding['subject'], destination=binding['destination'], enabled=False, version=binding['version'])))
             h.start()
@@ -195,7 +195,7 @@ def feishu_auth_lifecycle(binary, report):
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
     feishu_auth_lifecycle(binary,report)
-    with tempfile.TemporaryDirectory(prefix='collie-channels-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.start()
@@ -224,7 +224,7 @@ def run(binary,evidence):
             require(len(h.rows()['inputs'])==2 and len(platform.evidence()['messages'])==1,'restart duplicated accepted callback/delivery')
             h.browser(evidence.parent/'channels-ui','conversation')
             with Terminal(h.args('tui'),h.env,h.root) as terminal:
-                terminal.expect('Collie: idle');terminal.send('/history')
+                terminal.expect('Steward: idle');terminal.send('/history')
                 terminal.expect('Processed: Continue the same plan in Feishu.')
                 require(terminal.stop()==0,'shared-history TUI did not stop')
                 report['scenarios']['tui-history']=terminal.transcript()
@@ -247,7 +247,7 @@ def run(binary,evidence):
 
     # F-019: keep a real browser draft and attachment across committed replies,
     # approval decisions, Task status, network loss and session rotation.
-    with tempfile.TemporaryDirectory(prefix='collie-channel-live-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-channel-live-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'capabilities')
         try:
             h.setup();h.start()
@@ -263,15 +263,15 @@ def run(binary,evidence):
 
     # Approval recovery uses the same external-effect Fake and persistent Security
     # lifecycle as TUI. Callback races cross two authenticated transports.
-    with tempfile.TemporaryDirectory(prefix='collie-channel-approval-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-channel-approval-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'approval')
         try:
             h.setup();h.start()
-            h.callback('effect-source',json.dumps(dict(target='alex.chen@example.test',text='Collie review: 2026-10-19 15:00–15:30 +08:00')))
+            h.callback('effect-source',json.dumps(dict(target='alex.chen@example.test',text='Steward review: 2026-10-19 15:00–15:30 +08:00')))
             state=h.wait(lambda s:len(s['approvals'])==1 and s['approvals'][0]['status']=='pending','approval notice')
             old=state['approvals'][0]
             h.browser(evidence.parent/'channels-ui','approval')
-            h.http('/api/message',dict(source_id='steering',content=[dict(type='text',text=json.dumps(dict(target='alex.chen@example.test',text='Collie review: 2026-10-20 11:00–11:30 +08:00; do not use Monday.')))]))
+            h.http('/api/message',dict(source_id='steering',content=[dict(type='text',text=json.dumps(dict(target='alex.chen@example.test',text='Steward review: 2026-10-20 11:00–11:30 +08:00; do not use Monday.')))]))
             state=h.wait(lambda s:len(s['approvals'])==2 and s['approvals'][-1]['status']=='pending','steering invalidates old approval')
             require(state['approvals'][0]['status']=='invalidated','old Monday approval remained valid')
             approval=state['approvals'][-1]
@@ -306,7 +306,7 @@ def run(binary,evidence):
 def capability_settings(binary,evidence,report):
     """Owner UI -> real config/probes -> restart, retaining frozen Run records."""
     from verify_recall import Embeddings
-    with tempfile.TemporaryDirectory(prefix='collie-capability-settings-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-capability-settings-') as temp, Sandbox() as platform:
         root=Path(temp);h=ChannelHarness(binary,root,platform,'terminal-input')
         peer=Embeddings()
         try:
@@ -317,7 +317,7 @@ def capability_settings(binary,evidence,report):
             source=root/'base-source';source.mkdir(mode=0o700)
             for name in ('disk.img','nvram.bin'):(source/name).write_text('owned-'+name)
             (source/'config.json').write_text(json.dumps(dict(macAddress='02:00:00:00:00:01',machineIdentifier='fixture-base',cpuCount=4)))
-            h.env.update(COLLIE_SETUP_MEMORY_KEY='k'*32,COLLIE_COMPUTER_FIXTURE_PASSWORD='fixture-only')
+            h.env.update(STEWARD_SETUP_MEMORY_KEY='k'*32,STEWARD_COMPUTER_FIXTURE_PASSWORD='fixture-only')
             start=h.processes.start if h.processes is not None else subprocess.Popen
             native=start([str(binary),'-test-computer-server',str(vm)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,cwd=root,env=h.env)
             h.children.append(native)
@@ -341,16 +341,16 @@ def capability_settings(binary,evidence,report):
             # The owner-only mutations retain host/origin authentication guards.
             h.http('/capability/configure',urlencode(dict(capability='memory',action='test')).encode(),headers={**form,'Origin':'http://evil.example'},expected=403)
             revision=hashlib.sha256(original).hexdigest()
-            rejected=h.http('/capability/configure',urlencode(dict(capability='memory',action='save',revision=revision,configuration='encryption_key_ref: env:COLLIE_SETUP_MEMORY_KEY')).encode(),headers=form,expected=409)
+            rejected=h.http('/capability/configure',urlencode(dict(capability='memory',action='save',revision=revision,configuration='encryption_key_ref: env:STEWARD_SETUP_MEMORY_KEY')).encode(),headers=form,expected=409)
             require('test this exact configuration successfully before saving' in rejected,'unverified proof was not enforced')
             h.http('/capability/configure',urlencode(dict(capability='memory',action='test',revision=revision,configuration='x'*65537)).encode(),headers=form,expected=413)
             require(h.config.read_bytes()==original,'unverified save modified configuration')
-            h.env['COLLIE_CAPABILITY_SETUP_FACTS']=json.dumps(dict(embedding=f'http://127.0.0.1:{peer.server.server_port}/v1',skills=str(skills),provider=str(provider),binary=str(binary),workspace=str(root/'workspace'),computer=dict(computer=computer,javascript=javascript)))
+            h.env['STEWARD_CAPABILITY_SETUP_FACTS']=json.dumps(dict(embedding=f'http://127.0.0.1:{peer.server.server_port}/v1',skills=str(skills),provider=str(provider),binary=str(binary),workspace=str(root/'workspace'),computer=dict(computer=computer,javascript=javascript)))
             h.browser(evidence.parent/'capability-setup-ui','capability-setup')
             require(snapshots()==frozen,'settings changed existing frozen capabilities')
             require(not (provider/'mcp-effects.jsonl').exists(),'MCP diagnostic invoked a business tool')
             require(not list((vm/'vms').iterdir()),'Computer diagnostic booted or cloned a VM')
-            require(all(p['input']=='Collie embedding connection test' for p in peer.requests),'embedding diagnostic sent private conversation')
+            require(all(p['input']=='Steward embedding connection test' for p in peer.requests),'embedding diagnostic sent private conversation')
             require('k'*32 not in h.config.read_text() and 'fixture-only' not in h.config.read_text(),'plaintext credential in settings')
             require(h.config.stat().st_mode&0o777==0o600,'configuration is not private')
             h.stop();h.start()
@@ -385,15 +385,15 @@ def native_trace_inspection(binary,evidence,report):
                 self.server.requests.append(dict(method='POST',auth=self.headers.get('Authorization'),session=self.headers.get('session_id'),body=body))
                 self.send_response(503);self.send_header('Content-Length','0');self.end_headers();return
             return super().do_POST()
-    with tempfile.TemporaryDirectory(prefix='collie-native-traces-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+    with tempfile.TemporaryDirectory(prefix='steward-native-traces-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
         server=ThreadingHTTPServer(('127.0.0.1',0),TraceEndpoint);server.daemon_threads=True
         server.requests=[];server.mode='success'
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         h=ChannelHarness(binary,Path(temp),platform,'')
         try:
             h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(ROOT/'provider-bridge/bridge.mjs'))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
-            h.env['COLLIE_TRACE_KEY']='SYNTHETIC_TRACE_CREDENTIAL_NEVER_STORE'
-            auth=h.command('model','login','COLLIE_TRACE_KEY')
+            h.env['STEWARD_TRACE_KEY']='SYNTHETIC_TRACE_CREDENTIAL_NEVER_STORE'
+            auth=h.command('model','login','STEWARD_TRACE_KEY')
             h.setup(metadata=dict(name='Trace HTTP fixture',provider_kind='openai_compatible',endpoint=f'http://127.0.0.1:{server.server_port}/v1',wire_api='openai_completions',model_id='fixture-model',context_window=65536,max_output_tokens=4096,generation_defaults={},compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True),auth_connection_id=auth['connection_id']))
             server.mode='tasks';server.reject_next=True
             h.start()
@@ -420,13 +420,13 @@ def native_trace_inspection(binary,evidence,report):
                 require(len(attempts)==2,'result reuse fabricated a new HTTP attempt')
                 require([json.loads(a[0]) for a in attempts]==before,'observed final request differs from actual HTTP body')
                 raw=''.join(r[0] or '' for r in db.execute('SELECT body_json FROM dispatch_observation'))
-                require(h.env['COLLIE_TRACE_KEY'] not in raw and 'Bearer ' not in raw,'wire capture persisted credentials')
+                require(h.env['STEWARD_TRACE_KEY'] not in raw and 'Bearer ' not in raw,'wire capture persisted credentials')
                 facts=dict(main=main,root=root,generation=generation,counts={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in ('model_generation','provider_usage','tool_invocation','dispatch_observation','run_trace')})
             tree=h.http('/api/developer/observations?'+urlencode(dict(run=main)))
             require(sum(o['name']=='Provider HTTP' for o in tree['items'])>=2,'actual sends missing from observation tree')
             h.stop(kill=True);h.start()
             require(h.http('/api/developer/observations?'+urlencode(dict(run=main)))==tree,'completed trace changed across restart')
-            h.env['COLLIE_NATIVE_TRACE_FACTS']=json.dumps(facts)
+            h.env['STEWARD_NATIVE_TRACE_FACTS']=json.dumps(facts)
             h.browser(evidence.parent/'trace-ui','native-trace')
             with sqlite3.connect(h.root/'data/state.db') as db:
                 after={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in facts['counts']}
@@ -443,7 +443,7 @@ def inspection_relationships(binary, evidence, report):
     leaf=plan([dict(name='mcp__fixture__echo',arguments=dict(text='Inspection leaf completed.'))])
     child=plan([dict(name='builtin__agent_run',arguments=dict(task=leaf))])
     root='Inspection Task <img src=x onerror="unsafe()">\n'+plan([dict(name='builtin__agent_run',arguments=dict(task=child))])
-    with tempfile.TemporaryDirectory(prefix='collie-inspection-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-inspection-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform,'capabilities')
         try:
             h.setup(metadata=dict(name='inspection fixture',provider_kind='openai_compatible',
@@ -504,7 +504,7 @@ def inspection_relationships(binary, evidence, report):
             require(tree['creator']['run_id']==original['main'],'Task origin lost')
             require(all(parent!=original['main'] for _,parent,_ in actual.values()),'Root mislabeled as Main Child')
             inspect_frozen_context(h)
-            h.env['COLLIE_INSPECTION_FACTS']=json.dumps(original)
+            h.env['STEWARD_INSPECTION_FACTS']=json.dumps(original)
             h.browser(evidence.parent/'inspection-ui','inspection')
             require(facts()==original,'opening inspection changed execution or domain records')
             h.stop(kill=True);h.start()
@@ -554,12 +554,12 @@ def inspect_frozen_context(h):
 
 
 def dependency_recovery(binary, report):
-    with tempfile.TemporaryDirectory(prefix='collie-channel-repair-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+    with tempfile.TemporaryDirectory(prefix='steward-channel-repair-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
         h = ChannelHarness(binary, Path(temp), platform)
         try:
             h.setup()
             h.production_events = True
-            h.env['COLLIE_NATS_URL'] = broker.url
+            h.env['STEWARD_NATS_URL'] = broker.url
             catalog = h.root / 'repaired-skills'
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
@@ -592,7 +592,7 @@ def native_components(binary, evidence, report):
     Semantic inputs still enter the real signed callback/Actor boundary. Only
     Host-owned presentation fixtures are inserted; no model HTML is enabled.
     """
-    with tempfile.TemporaryDirectory(prefix='collie-channel-components-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-channel-components-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.setup();h.start('before_delivery_send')
@@ -632,7 +632,7 @@ def native_components(binary, evidence, report):
 
 
 def early_composer(binary, evidence, report):
-    with tempfile.TemporaryDirectory(prefix='collie-channel-early-composer-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-channel-early-composer-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
             h.start()
@@ -652,7 +652,7 @@ def delivery_leases(binary, report):
             ('slow-send', 'main', 7, 0),
             ('slow-upload', 'artifacts', 0, 6),
             ('cumulative-multipart', 'artifacts', 2, 2)):
-        with tempfile.TemporaryDirectory(prefix='collie-channel-lease-') as temp, Sandbox(send_delay, upload_delay) as platform:
+        with tempfile.TemporaryDirectory(prefix='steward-channel-lease-') as temp, Sandbox(send_delay, upload_delay) as platform:
             h = ChannelHarness(binary, Path(temp), platform, fixture)
             try:
                 h.setup(); h.start()
@@ -691,7 +691,7 @@ def delivery_leases(binary, report):
     # Expire a live sender after the platform recorded the effect, then use the
     # real CLI as a competing recovery owner. The old HTTP call must cancel and
     # join without taking down Web ingress; uncertainty is still query-only.
-    with tempfile.TemporaryDirectory(prefix='collie-channel-lost-claim-') as temp, Sandbox(send_delay=6) as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-channel-lost-claim-') as temp, Sandbox(send_delay=6) as platform:
         h = ChannelHarness(binary, Path(temp), platform)
         try:
             h.setup(); h.start()
@@ -724,7 +724,7 @@ def extra_scenarios(binary,report):
     # Outbound attachment: semantic Artifact -> same DeliveryRequest -> real
     # multipart upload + bound-recipient platform message -> durable receipts.
     for lost_ack in (False, True):
-        with tempfile.TemporaryDirectory(prefix='collie-channel-output-') as temp, Sandbox() as platform:
+        with tempfile.TemporaryDirectory(prefix='steward-channel-output-') as temp, Sandbox() as platform:
             h=ChannelHarness(binary,Path(temp),platform,'artifacts')
             try:
                 h.setup();platform.drop_response=lost_ack;h.start()
@@ -753,7 +753,7 @@ def extra_scenarios(binary,report):
     # SIGKILL immediately before and after the input transaction, and after a
     # channel accepted delivery but before outbox acknowledgement.
     for boundary in ('before_channel_input_commit','after_channel_input_commit','after_delivery_send'):
-        with tempfile.TemporaryDirectory(prefix='collie-channel-kill-') as temp, Sandbox() as platform:
+        with tempfile.TemporaryDirectory(prefix='steward-channel-kill-') as temp, Sandbox() as platform:
             h=ChannelHarness(binary,Path(temp),platform)
             try:
                 h.setup();h.start(boundary)
@@ -777,7 +777,7 @@ def extra_scenarios(binary,report):
 
     # Exercise Task continuity and notification deduplication through the transports.
     for case,fixture in (('task-continuation','tasks'),('scheduled-delivery','automation')):
-        with tempfile.TemporaryDirectory(prefix='collie-channel-'+case+'-') as temp, Sandbox() as platform:
+        with tempfile.TemporaryDirectory(prefix='steward-channel-'+case+'-') as temp, Sandbox() as platform:
             h=ChannelHarness(binary,Path(temp),platform,fixture)
             try:
                 h.setup()
@@ -833,13 +833,13 @@ def account_presentation(binary,report):
             server.lock=threading.Lock();server.sensitive=set();os.chmod(socket,0o600)
             thread=threading.Thread(target=server.serve_forever);thread.start()
             h=object.__new__(ChannelHarness);MainHarness.__init__(h,binary,root,fixture='')
-            h.env.update(COLLIE_NATS_URL=broker.url,COLLIE_NATS_STREAM_PREFIX='web_account')
+            h.env.update(STEWARD_NATS_URL=broker.url,STEWARD_NATS_STREAM_PREFIX='web_account')
             try:
                 h.config=account_config(root,ROOT/'provider-bridge/bridge.mjs',endpoint)
                 with h.config.open('a') as out:out.write('web:\n  listen: 127.0.0.1:0\n  token_ref: credential:web-owner\n')
                 original=h.args
                 h.args=lambda *args:original('-test-secret-store',str(socket),*args)
-                h.env['COLLIE_WEB_TEST_TOKEN']=TOKEN;h.process=None;h.start()
+                h.env['STEWARD_WEB_TEST_TOKEN']=TOKEN;h.process=None;h.start()
                 form={'Content-Type':'application/x-www-form-urlencoded'}
                 h.http('/auth/login',b'',headers=form)
                 pending=h.wait_state(lambda s:any(e['kind']=='open_url' for e in s['events']),'UI-neutral account authorization event',lambda _:h.http('/api/auth'))

@@ -8,10 +8,10 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/z-chenhao/collie/internal/app"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/skill"
+	"github.com/z-chenhao/assistant/internal/app"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/skill"
 )
 
 func runArtifact(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer) error {

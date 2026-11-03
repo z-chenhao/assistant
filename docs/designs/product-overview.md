@@ -1,4 +1,4 @@
-# Collie 产品架构与流程总览
+# Steward 产品架构与流程总览
 
 [Feature Map：需求与完成状态](../feature-map.md) · [跨功能协议与约束](#contract-0-文档效力与实现规则) · [测试边界](../test-plans/product.md)
 
@@ -10,7 +10,7 @@
 
 ## 当前架构
 
-Collie 是本地 Go 模块化单体，使用独立 Node 模型 Bridge 和 QuickJS 运行时。Main 与 Worker 共用一套 Agent Loop；Root/Child 表示 Worker 在执行树中的位置。SQLite 保存权威领域状态，JetStream 提供事件唤醒。Web 资源嵌入应用，不需要独立前端服务。
+Steward 是本地 Go 模块化单体，使用独立 Node 模型 Bridge 和 QuickJS 运行时。Main 与 Worker 共用一套 Agent Loop；Root/Child 表示 Worker 在执行树中的位置。SQLite 保存权威领域状态，JetStream 提供事件唤醒。Web 资源嵌入应用，不需要独立前端服务。
 
 ```mermaid
 flowchart TD
@@ -85,7 +85,7 @@ Evals 未来页面不改变独立评测项目的职责。Database 首版只读�
 
 迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
-<a id="contract-collie-技术方案基线已确认设计"></a>
+<a id="contract-steward-技术方案基线已确认设计"></a>
 
 ### 跨功能协议的维护范围
 
@@ -228,7 +228,7 @@ Coding Agent 按纵向可运行切片实现。每个里程碑必须包含 migrat
 
 #### M0：工程骨架与持久化
 
-- 建立 `cmd/collie`、`internal/*`、配置、日志、Trace、SQLite migration 和 NATS 薄适配层。
+- 建立 `cmd/steward`、`internal/*`、配置、日志、Trace、SQLite migration 和 NATS 薄适配层。
 - 实现 ID/时间/版本约定、Outbox/Inbox、ModelProfile/ModelSnapshot/AuthConnection、SecretStore Fake、Fake LLM 与测试夹具。
 - 建立版本化 Model Provider Bridge RPC 骨架和 Fake Bridge；此阶段不要求真实账号登录。
 - 提供 `make test` 或等价单命令，不依赖真实外部服务运行单元测试。

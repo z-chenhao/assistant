@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/z-chenhao/collie/internal/computer/environment"
-	"github.com/z-chenhao/collie/internal/computer/macosvm"
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/recall/embedding"
-	"github.com/z-chenhao/collie/internal/skill"
-	"github.com/z-chenhao/collie/internal/tool/codemode"
-	"github.com/z-chenhao/collie/internal/tool/mcp"
+	"github.com/z-chenhao/assistant/internal/computer/environment"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/recall/embedding"
+	"github.com/z-chenhao/assistant/internal/skill"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
+	"github.com/z-chenhao/assistant/internal/tool/mcp"
 )
 
 func (m *Manager) probe(ctx context.Context, c config.Config, id string) (string, string) {
@@ -24,12 +24,12 @@ func (m *Manager) probe(ctx context.Context, c config.Config, id string) (string
 	}
 	switch id {
 	case "memory":
-		if _, e := (memory.Vault{Secrets: m.secrets, Ref: c.Memory.EncryptionKeyRef}).Digest(ctx, "Collie memory connection test"); e != nil {
+		if _, e := (memory.Vault{Secrets: m.secrets, Ref: c.Memory.EncryptionKeyRef}).Digest(ctx, "Steward memory connection test"); e != nil {
 			return "unavailable", "Memory key unavailable. Provide the referenced 32-byte key in SecretStore or the process environment."
 		}
 		return "ready", "The referenced 32-byte encryption key is available. No memory was read or written."
 	case "embedding":
-		v, e := (embedding.Client{Config: *c.Embedding, Secrets: m.secrets}).Embed(ctx, "Collie embedding connection test")
+		v, e := (embedding.Client{Config: *c.Embedding, Secrets: m.secrets}).Embed(ctx, "Steward embedding connection test")
 		if e != nil {
 			return "unavailable", "Embedding connection failed. Check the endpoint, model, dimensions and credential reference; redirects and invalid vectors are rejected."
 		}
@@ -51,7 +51,7 @@ func (m *Manager) probe(ctx context.Context, c config.Config, id string) (string
 		}
 		return "ready", fmt.Sprintf("%d isolated provider(s) advertised %d allowed tools. No advertised tool was invoked.", len(c.MCP), total)
 	case "execution":
-		r := (environment.Local{Config: c.ExecutionConfig()}).Execute(ctx, "builtin__bash", `{"command":"printf collie-connection-test","timeout":5}`)
+		r := (environment.Local{Config: c.ExecutionConfig()}).Execute(ctx, "builtin__bash", `{"command":"printf steward-connection-test","timeout":5}`)
 		if r.Error != nil {
 			return "unavailable", "Workspace diagnostic failed. Check private directory permissions, Python 3, bash, kernel sandbox permissions and read-only toolchain paths."
 		}
@@ -59,7 +59,7 @@ func (m *Manager) probe(ctx context.Context, c config.Config, id string) (string
 			ExitCode int    `json:"exit_code"`
 			Text     string `json:"output"`
 		}
-		if json.Unmarshal([]byte(r.ModelText()), &result) != nil || result.ExitCode != 0 || result.Text != "collie-connection-test" {
+		if json.Unmarshal([]byte(r.ModelText()), &result) != nil || result.ExitCode != 0 || result.Text != "steward-connection-test" {
 			return "unavailable", "The isolated diagnostic command did not complete successfully."
 		}
 		return "ready", "A fixed diagnostic command completed in the configured kernel sandbox. No user command or network access was used."

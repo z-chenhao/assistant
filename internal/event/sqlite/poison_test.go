@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/z-chenhao/collie/internal/event"
-	"github.com/z-chenhao/collie/internal/event/fake"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	"github.com/z-chenhao/assistant/internal/event"
+	"github.com/z-chenhao/assistant/internal/event/fake"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
 	"testing"
 )
 

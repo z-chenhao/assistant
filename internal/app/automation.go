@@ -5,10 +5,18 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/automation"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/automation"
+	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
+
+func (a *App) Schedule(ctx context.Context, ref string) (task.ScheduledWork, error) {
+	return a.store.TaskReader().ScheduledDetail(ctx, ref)
+}
+func (a *App) ConfigureSchedule(ctx context.Context, key string, q automation.OwnerConfiguration) (automation.OwnerReceipt, error) {
+	return a.runtimeRuns().ConfigureAutomation(ctx, "web:"+key, q, a.runtimeRuns().AutomationNow())
+}
 
 func (a *App) ManageAutomation(ctx context.Context, key string, q automation.Request) (tool.Result, error) {
 	return a.runtimeRuns().ManageAutomation(ctx, key, q, a.runtimeRuns().AutomationNow())

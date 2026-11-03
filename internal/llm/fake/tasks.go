@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 // A follow-up contains historical user text. Only input after its runtime notice

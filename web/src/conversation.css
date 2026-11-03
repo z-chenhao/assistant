@@ -4,7 +4,6 @@
 .setup-callout{padding:28px;border:1px solid var(--border);border-radius:var(--radius);margin:4vh 0 32px}.setup-callout h1{font-size:26px}.setup-callout p{color:var(--muted-foreground);margin:14px 0 24px}
 .message{padding:18px 0;font-size:16px;line-height:1.75;min-width:0;scroll-margin-top:88px}.message:target{background:var(--muted);outline:8px solid var(--muted);border-radius:8px}
 .message.user{margin:18px 0 20px auto;padding:13px 19px;background:var(--muted);border-radius:22px;width:fit-content;max-width:85%}
-.message-label{display:flex;align-items:center;gap:10px;font-family:var(--font-ui);font-size:14px;font-weight:500;color:var(--foreground);margin-bottom:18px}.message.user .message-label{font-size:12px;color:var(--muted-foreground);margin-bottom:4px}
 .message.assistant .semantic,.task-delivery .semantic{font-family:var(--font-display);font-size:16px;line-height:1.75;font-optical-sizing:auto}
 .semantic{white-space:pre-wrap;overflow-wrap:anywhere}.artifact-card{margin:16px 0}.artifact-card>div{padding:16px}.artifact{display:block;font-family:var(--font-ui);font-size:14px;text-decoration:none}.artifact:hover{text-decoration:underline}
 .panel.approval,.approval{background:var(--card);border-color:var(--border);margin:18px 0;line-height:1.65}.approval h2{font-size:17px}.approval-action{font-size:13px;margin:12px 0 20px;color:var(--foreground)!important;font-weight:500}
@@ -25,13 +24,7 @@
 /* Reserve the real composer height, including drafts, attachments and feedback. */
 .thread{padding-bottom:calc(var(--composer-height,220px) + 24px)}
 #new-messages{bottom:calc(var(--composer-height,220px) + 12px);min-height:40px;font-size:13px}
-.conversation-attention{position:sticky;top:120px;z-index:5;max-width:768px;margin:0 auto;padding:0 24px;background:var(--background)}
-.conversation-attention:empty{display:none}
-.attention-summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 0;border-bottom:1px solid var(--border);text-decoration:none;font-size:13px;font-weight:500}
-.attention-summary strong{margin-left:auto;min-width:24px;text-align:center;background:var(--muted);border-radius:var(--radius);font-size:13px}
-.attention-summary:hover>span:first-of-type{text-decoration:underline}
 @media(max-width:760px){
- .conversation-attention{top:116px;margin:0 20px;padding:0}
  .composer .send-button,.attachment-picker{width:44px;height:44px;min-height:44px}
  .composer-actions{gap:8px}
  .composer-note{font-size:12px}

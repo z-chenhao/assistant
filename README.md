@@ -1,12 +1,12 @@
-# Collie
+# Steward
 
-[![CI](https://github.com/z-chenhao/collie/actions/workflows/ci.yml/badge.svg)](https://github.com/z-chenhao/collie/actions/workflows/ci.yml)
+[![CI](https://github.com/z-chenhao/assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/z-chenhao/assistant/actions/workflows/ci.yml)
 
-<img src="internal/interaction/web/assets/brand/collie.png" alt="Collie holding a tennis ball" width="160">
+<img src="internal/interaction/web/assets/brand/steward.svg" alt="Steward" width="96">
 
-**Throw me a task. Get a little more life back.**
+**Your personal AI steward.**
 
-Collie is your personal agent: a conversation when you need a hand, a capable
+Steward is your personal agent: a conversation when you need a hand, a capable
 worker when you need something done. Give it a question, an idea or a task;
 follow the work, approve consequential actions and get a result you can inspect.
 Conversation, tools, memory and delegated tasks share one durable execution core.
@@ -16,8 +16,8 @@ make setup
 make run
 ```
 
-The command is `collie`, configuration uses `COLLIE_*`, and the default data
-root is `~/.local/share/collie`. [Brand and workspace](docs/features/branding.md).
+The command is `steward`, configuration uses `STEWARD_*`, and the default data
+root is `~/.local/share/steward`. The agent is named Ghost. [Brand and workspace](docs/features/branding.md).
 
 - [Feature Map: requirements, completion and usage](docs/feature-map.md)
 - [Documentation navigation](docs/README.md)

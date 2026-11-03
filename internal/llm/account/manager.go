@@ -1,4 +1,4 @@
-// Package account owns Collie's independent, trusted account lifecycle.
+// Package account owns Steward's independent, trusted account lifecycle.
 package account
 
 import (
@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 type Store interface {

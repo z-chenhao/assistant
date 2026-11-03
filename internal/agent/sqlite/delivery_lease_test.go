@@ -3,12 +3,12 @@ package sqlite
 import (
 	"context"
 	"errors"
-	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/conversation"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery"
 )
 
 func TestDeliveryRenewRejectsExpiredStaleAndTakenOverClaims(t *testing.T) {

@@ -5,9 +5,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/computer"
-	"github.com/z-chenhao/collie/internal/computer/environment"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer/environment"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // ExecuteEnvironment runs only in the authenticated, epoch-bound Guest. Its
@@ -17,7 +17,7 @@ func (p *Provider) ExecuteEnvironment(ctx context.Context, instance computer.Ins
 	if err != nil {
 		return tool.Failure("PROVIDER_UNAVAILABLE")
 	}
-	root := "/Users/" + g.Config.User + "/CollieWorkspace"
+	root := "/Users/" + g.Config.User + "/StewardWorkspace"
 	request, err := environment.Request(root, name, arguments)
 	if err != nil {
 		return tool.Failure("INVALID_ARGUMENT")

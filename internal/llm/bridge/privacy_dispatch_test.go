@@ -3,7 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 	"testing"
 )
 

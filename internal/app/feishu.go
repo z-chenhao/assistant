@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"github.com/z-chenhao/collie/internal/interaction/feishu"
+	"github.com/z-chenhao/assistant/internal/interaction/feishu"
 )
 
 func (a *App) FeishuStatus(ctx context.Context, check bool) feishu.ConnectionStatus {

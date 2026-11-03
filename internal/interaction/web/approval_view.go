@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/interaction"
 )
 
 type approvalField struct{ Name, Value string }

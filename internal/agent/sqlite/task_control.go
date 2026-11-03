@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/assistant/internal/agent"
 )
 
 // stopTask persists intent before any executor is signalled. The Task epoch

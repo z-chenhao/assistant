@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/recall"
-	"github.com/z-chenhao/collie/internal/recall/sqliteindex"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/recall/sqliteindex"
 	_ "modernc.org/sqlite"
 )
 

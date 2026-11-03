@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/interaction/feishu"
+	"github.com/z-chenhao/assistant/internal/interaction/feishu"
 )
 
 func TestChannelConfigRejectsPublicListenerLiteralSecretsAndUntrustedAPI(t *testing.T) {

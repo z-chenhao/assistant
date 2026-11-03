@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery"
 )
 
 func managedClient(base string) *Client {

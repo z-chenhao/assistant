@@ -10,10 +10,10 @@ import (
 )
 
 func TestKeychainOwnedRoundTrip(t *testing.T) {
-	if os.Getenv("COLLIE_TEST_KEYCHAIN") != "1" {
+	if os.Getenv("STEWARD_TEST_KEYCHAIN") != "1" {
 		t.Skip("owned macOS Keychain verification is opt-in; CI uses Fakes/env references")
 	}
-	ref := "collie-test:" + uuid.NewString()
+	ref := "steward-test:" + uuid.NewString()
 	ctx := context.Background()
 	s := Store{}
 	t.Cleanup(func() {

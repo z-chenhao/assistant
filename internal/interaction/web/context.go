@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 // ContextReader reads sensitive frozen input under the existing workspace

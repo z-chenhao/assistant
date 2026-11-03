@@ -263,7 +263,7 @@ type ExecutionOutcome struct {
 - `ExecutionEventSink` 必须先将重要事件写入 RunTrace/CodeCall Ledger，再确认 Sidecar 事件；日志或 Token 流等非权威信息可以降级丢弃。
 - Runtime 替换不得改变 Host Call、错误码、输出裁剪、取消和重放语义；语言实现是基础设施细节，不进入 Agent、Task 或 Run 的领域 API。
 
-<a id="codemode-javascript-code-mode-runtime-collie-19--collie-20"></a>
+<a id="codemode-javascript-code-mode-runtime-steward-19--steward-20"></a>
 
 ## JavaScript Code Mode runtime (retired task #19 / retired task #20)
 
@@ -285,7 +285,7 @@ the Go adapter closes pipes and reaps its exact child process before returning.
 The process is currently scoped to `Start`; it is not a resident shared pool.
 
 The Pi 1.3.0 VM/Prelude is vendored with its MIT notice and exact npm integrity.
-Collie retains Pi's Promise scheduling, JSON boundary, output controls and
+Steward retains Pi's Promise scheduling, JSON boundary, output controls and
 intrinsic lockdown. Its checked Prelude adaptations prohibit time/random and
 provide synchronous Host-backed Store plus the CUA/Agent facades. Node is the
 host; QuickJS is the script boundary. Scripts have no Node objects, filesystem,
@@ -323,7 +323,7 @@ ordinary Code Mode ToolInvocation. The manifest saves source and explicit
 empty input JSON, hashes both, and binds the model/capability snapshots,
 complete frozen Tools, limits, Runtime/Prelude versions and installed bytes.
 Runtime fingerprints cover Sidecar/Worker/VM sources, package lock and WASM;
-Prelude fingerprints cover both Collie adaptations and the pinned upstream file.
+Prelude fingerprints cover both Steward adaptations and the pinned upstream file.
 The registry includes installed Runtime/Prelude hashes in its ResourceHash, so
 Run creation freezes them before any cell starts. Recovery rejects drift.
 No heap or stack is serialized.

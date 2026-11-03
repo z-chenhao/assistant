@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/conversation"
 	"time"
 )
 

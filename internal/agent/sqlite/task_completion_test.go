@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 func assertCompleteRejected(t *testing.T, s *Store, r *Runs, a agent.Actor, key string) {

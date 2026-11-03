@@ -1,0 +1,49 @@
+/* Objective and execution policy lead; activity and deliveries support them. */
+.task-objective,.task-configuration,.task-instructions,.task-current-progress,.task-results{margin:0 0 28px;padding:0 0 28px;border-bottom:1px solid var(--border);min-width:0}
+.task-objective .semantic{font-size:16px;line-height:1.75;max-width:72ch}
+.task-rule-name{font-size:15px;font-weight:550;margin:0 0 8px}
+.task-rule-facts{display:grid;gap:12px;margin:20px 0}
+.task-rule-facts>div{display:grid;grid-template-columns:minmax(140px,.8fr) minmax(0,1.4fr);gap:18px}
+.task-rule-facts dt{font-size:13px;color:var(--muted-foreground)}
+.task-rule-facts dd{font-size:14px;margin:0;overflow-wrap:anywhere}
+.task-rule-facts time{font-size:14px;color:var(--foreground);margin:0}
+.task-instructions ol{list-style:none;margin:0;padding:0}
+.task-instructions li+li{margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
+.task-instructions time{display:block;color:var(--muted-foreground);font-size:12px;margin-top:8px}
+.task-scheduled-instructions .semantic{margin-top:12px}
+.task-objective-preview{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;color:var(--muted-foreground);max-width:72ch}
+.task-row .task-list-rule{font-size:12px;color:var(--muted-foreground);margin-top:12px}
+.task-list-rule time{display:inline;font:inherit;color:inherit;margin:0}
+.task-results h2{font-size:17px}
+@container task-layout (max-width:760px){.task-rule-facts>div{grid-template-columns:minmax(0,1fr);gap:4px}}
+@media(max-width:700px){.task-objective,.task-configuration,.task-instructions,.task-current-progress,.task-results{margin-bottom:24px;padding-bottom:24px}}
+
+.scheduled-work{margin:28px 0 36px}
+.scheduled-work-list{border-top:1px solid var(--border)}
+.scheduled-work-row{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:22px 0;border-bottom:1px solid var(--border)}
+.scheduled-work-row>div{min-width:0}.scheduled-work-row>div:first-child{flex:1}
+.scheduled-work-row h3{font-size:15px;line-height:1.6;font-weight:550;margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:72ch}
+.scheduled-work-row .field-help{margin:8px 0 0}.scheduled-work-row .task-list-rule{font-size:13px;margin:0}
+.scheduled-rule-details{margin:10px 0 0}
+.scheduled-work-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:12px;max-width:38%;font-size:13px}
+.scheduled-work-actions .technical-details{margin:0;font-size:12px;overflow-wrap:anywhere}
+.scheduled-work-actions .text-link{min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:700px){.scheduled-work-row{flex-direction:column;gap:12px}.scheduled-work-actions{justify-content:flex-start;max-width:100%;gap:12px}}
+
+.schedule-editor-page{max-width:920px}.schedule-editor{max-width:680px}
+.schedule-editor>label,.schedule-editor>.schedule-field,.schedule-editor>[data-schedule-fields]{display:block;margin-bottom:20px}
+.schedule-editor>.schedule-field>label{margin-bottom:0}
+.schedule-editor textarea{display:block;width:100%;resize:vertical;min-height:130px;margin-top:8px;font:16px/1.6 var(--font-ui)}
+.schedule-editor .schedule-enabled{display:flex;align-items:center;gap:8px;margin:0}
+.schedule-editor .schedule-enabled input{width:auto;margin:0}
+.schedule-editor>p.field-help{margin:8px 0 24px}.schedule-editor>.technical-details{margin:24px 0}
+.schedule-editor .technical-details>label{display:block;margin-top:16px}
+.schedule-editor [data-schedule-fields]{display:none}
+.schedule-editor [data-schedule-fields="clock"]{display:block}
+.schedule-editor:has([name="frequency"] option[value="once"]:checked) [data-schedule-fields="once"],
+.schedule-editor:has([name="frequency"] option[value="weekly"]:checked) [data-schedule-fields="weekly"],
+.schedule-editor:has([name="frequency"] option[value="monthly"]:checked) [data-schedule-fields="monthly"],
+.schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="custom"]{display:block}
+.schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="clock"]{display:none}
+@media(max-width:700px){.schedule-editor .actions{align-items:stretch;flex-direction:column}.schedule-editor input,.schedule-editor select{font-size:16px}}
+.schedule-editor textarea{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground)}

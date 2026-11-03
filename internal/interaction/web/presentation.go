@@ -1,8 +1,8 @@
 package web
 
 import (
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/llm"
 	"strings"
 	"time"
 )

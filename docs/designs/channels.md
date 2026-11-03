@@ -22,7 +22,7 @@ flowchart TD
 
 Web 在依赖准备期间开放，ingress 保持关闭；缺失能力修复后后台重试准备，成功后恢复接纳。TUI 在依赖恢复后刷新就绪提示并重新调度已接收工作；恢复提示与已有历史展示可独立到达。已持久化终态的 Main 模型失败由 Run 记录承载，不关闭 HTTP listener；未能确立权威状态的基础设施错误仍使执行循环明确失败。
 
-页面查询按用途分开：Models 读取模型与必要账户信息，Notifications 只读渠道设置，Tasks 通过独立只读池读取分页摘要/详情，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Collie-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
+页面查询按用途分开：Models 读取模型与必要账户信息，Notifications 只读渠道设置，Tasks 通过独立只读池读取分页摘要/详情，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Steward-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
 
 ### Go 实现职责（F-040）
 
@@ -119,9 +119,9 @@ Feishu uses a controlled plain-text card and uploaded file attachments. Each
 outbound file retains its name and exact bytes. Missing/oversized resources fail
 closed rather than exposing a host path or silently sending the wrong attachment.
 
-The Web shell uses the Collie personal-agent layout, locally bundled
+The Web shell uses the Steward personal-agent layout, locally bundled
 ad-agent Button/Card components and shared native-control styles, OpenIntelligentUI's native DataTable,
-and the owner-selected Collie border collie logo/default agent avatar. The React layer only
+and the owner-selected Steward wordmark and Ghost agent avatar. The React layer only
 enhances fixed UISpec v1 components; it does not add a second
 Agent or model connection. Server rendering remains the semantic fallback.
 The composer keeps its server-rendered form and input nodes throughout enhancement.
@@ -165,7 +165,7 @@ from authoritative receipts; an uncertain Feishu send stays query-only.
 The service revalidates the live fence before starting transport, so a scheduling
 pause that consumes the original lease cannot authorize even a fast send.
 
-<a id="delivery-recoverable-semantic-delivery-collie-15"></a>
+<a id="delivery-recoverable-semantic-delivery-steward-15"></a>
 
 ## Recoverable semantic delivery (retired task #15)
 
@@ -243,13 +243,13 @@ recovery path delivers them. `/approve ID HASH` and `/deny ID HASH` submit the
 displayed frozen hash to Security and wake the original Run. Duplicate matching
 decisions remain idempotent. Approval expiry/invalidation still fails closed.
 
-<a id="web-components-collie-web-components"></a>
+<a id="web-components-steward-web-components"></a>
 
-## Collie Web components
+## Steward Web components
 
 This is a locally bundled presentation layer for the existing Go Web server.
-The conversation layout uses a warm neutral canvas, soft selected navigation,
-a tennis-green submit action, centered thread and rounded composer. React enhances the escaped server HTML;
+The conversation layout uses soft monochrome surfaces, restrained selected navigation,
+a graphite submit action, centered thread and rounded composer. React enhances the escaped server HTML;
 the existing forms and semantic fallback remain usable without JavaScript.
 
 <a id="web-components-pinned-source-and-changes"></a>
@@ -258,10 +258,10 @@ the existing forms and semantic fallback remain usable without JavaScript.
 
 | Source | Revision | Reused code or asset | Local changes |
 | --- | --- | --- | --- |
-| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Collie supplies layout, routes and content |
+| [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Steward supplies layout, routes and content |
 | [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | `apps/app/src/components/generative-ui/table-catalog.tsx` native `DataTable` and Zod props | Remove the CopilotKit catalog registration/import; retain validation and accessible table; map the existing UISpec table through a private adapter |
-| Collie brand | Owner-selected 2026-10-29 generation | `assets/brand/collie.png` | Unmodified original image, displayed at different sizes by CSS |
-| [Google Fonts](https://github.com/google/fonts) | Included OFL notices | Lora and DM Sans variable fonts | Unmodified, self-hosted font files; no CDN |
+| Steward / Ghost | Owner-selected 2026-11-02 assets | Michroma wordmark and charcoal/ivory ghost PNGs and lossless WebP atlases | Self-hosted; complete-frame animation, static fallback and reduced-motion support; provenance in `web/licenses/steward-artwork.md` |
+| Open font projects | Included OFL notices | Inter, Source Serif 4, Source Han Sans SC, JetBrains Mono and Michroma | Self-hosted; Chinese unicode-range subsets; original sources and hashes in `web/licenses/` |
 
 Upstream licenses and artwork provenance are in `licenses/`. The binary embeds
 the required MIT/Apache-2.0 license texts and serves them at `/licenses.txt`.
@@ -271,7 +271,7 @@ checked-in local assets; they do not run as product services.
 
 OpenIntelligentUI's native component is integrated here. Its Python agent,
 CopilotKit/AG-UI transport, model routing, browser-key flow and generated
-HTML/JavaScript sandbox are not integrated. Collie's frozen ModelSnapshot,
+HTML/JavaScript sandbox are not integrated. Steward's frozen ModelSnapshot,
 SecretStore, Actor, approval and controlled UISpec v1 contracts remain the owners
 of those responsibilities. Enabling arbitrary generated code requires a separate
 architecture/security decision.
@@ -324,3 +324,17 @@ Computer 查看独立于 Agent 执行机制：只读 HTTP 端点复用现有 Bro
 比较了复用 Agent capture 会话、暴露远程控制/VNC 与单独只读截帧，选择独立 Driver session，避免污染 Agent 的观察凭据，也不增加新的执行或审批管线。此处协议保持私有，不泛化多用户屏幕广播、远程接管或通用视频平台。
 
 Chat 顶部居中两行显示名称与动态头像。Computer 与 Worker 为互斥详情面板，保留持续对话、草稿、附件和阅读锚点；Tasks 保留独立列表和详情。Worker 的当前运行查询独立于历史上限，避免长期运行记录被较新的终态记录挤掉；历史最多 50 条，更多记录回 Developer，不泛化查询协议。
+
+### 2026-11-03 · 本机 Web 直接访问
+
+当前用户需求是本机访问省去 workspace token 输入。`web.listen` 仍必须是明确的 `127.0.0.1` 或 `::1`；省略 `token_ref` 时直接信任 loopback TCP peer，不读取 SecretStore、不建立登录会话。配置 `token_ref` 则继续使用原有 Bearer/session 机制，保持已有安装和自动化客户端兼容，不增加新的 auth 枚举或用户系统。
+
+免 token 模式同时校验实际监听地址、直连 peer、字面 Host、Origin 与 Fetch Metadata，拒绝跨站及不同本地 origin；不信任转发头。渠道绑定、冻结动作审批、只读 Computer 边界与 CSP 不变。此模式信任可连接本机端口的本地进程，不提供 OS 用户间隔离；不开放公网访问。未选择隐藏页面表单但继续强制 SecretStore 口令，避免把登录复杂度留在配置里。
+
+### 2026-11-03 · 工作区布局与键盘定位
+
+当前所有者在桌面、平板和窄屏上阅读持续对话、任务及执行证据。Task 和 Developer 的双列布局使用各自内容容器的 760px 断点，避免仅按视口判断而忽略固定导航的占宽。Chat 在 1280px 以下复用已有 modal 面板，宽屏继续并列显示；选择保守的单一阈值，暂不引入依据侧栏状态切换的额外面板模式。
+
+这些都是私有表现策略，不改变 HTTP 路由、任务状态、source ID、审批表单或冻结数据。标签露出只调整所在横向条的滚动；导航先解除目标的 inert 再移动焦点；执行片段替换以替换前最新的焦点、原区域和控制类型定位对应链接，避免同 URL 的 Refresh 抢走树节点焦点。同一观察刷新保留详情滚动，切换到不同观察从新详情顶部阅读。
+
+能力示例前置并仅在空白未配置时展开，例子区最多 240px 高度，完整字段仍可滚动查看。没有增加 schema 编辑器、配置向导、通用导航框架或新公共接口。

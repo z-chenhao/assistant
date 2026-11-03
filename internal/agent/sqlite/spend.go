@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func (r *Runs) ConfigureSpend(p agent.SpendPolicy) { r.spend = p }

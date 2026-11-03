@@ -39,7 +39,7 @@ Settings 的图片复选框只是候选声明；既有 Host 蓝色方块 Probe �
 - 每次调用验证引擎、复制并校验冻结语言文件到私有临时目录，在既有 Linux bubblewrap / macOS Seatbelt 边界中经 stdin 处理原图，以 TSV 返回。无网络、无模型凭据，进程环境为固定白名单；仅作业目录可写，沿用系统运行库只读挂载。完成后再次验证引擎，取消时杀死并等待进程组；正常退出清理临时目录。崩溃临时文件位于 OS temp，由系统临时文件清理策略回收，不作为 Artifact 或可重放输入。
 - 原图上限 8 MiB/32 × 1024² 像素；引擎 stdout 上限 2 MiB，丢弃 stderr。TSV 严格验证列、UTF-8、有限置信分数与原图范围内的词框；最多 4096 词/128 KiB 文本，明确截断。预览限制为 2048 字节文字、16 词框，每词最多 128 字节；完整 JSON 走既有 BinaryOutput → Artifact → Tool 终态原子提交，原图和结果均 pin。坐标不经过视觉缩图变换。
 - 通过共享 Executor/Code Mode/OutputStore 处理期限、并发、取消、错误和重放。已完成调用不重新识别；未完成的只读调用可按原冻结身份重试。OCR 不自动 publish，不写长期 Memory，不修改 system prompt，也不切换模型。返回的文字是低信任证据，空结果不证明图片没有文字或无需视觉分析。
-- 比较 [Codex view_image](https://github.com/openai/codex/blob/ce2d47bdc4dd2513d5b3567090593b07b0fdfa0a/codex-rs/core/src/tools/handlers/view_image.rs#L99)：它要求视觉模型并返回 InputImage，本链路没有 OCR 回退。借鉴统一媒体处理，保留 Collie 的 Artifact 引用和独立 OCR 语义。本增强不新增 feature 编号，也不把 OCR 质量评测放入 CI。
+- 比较 [Codex view_image](https://github.com/openai/codex/blob/ce2d47bdc4dd2513d5b3567090593b07b0fdfa0a/codex-rs/core/src/tools/handlers/view_image.rs#L99)：它要求视觉模型并返回 InputImage，本链路没有 OCR 回退。借鉴统一媒体处理，保留 Steward 的 Artifact 引用和独立 OCR 语义。本增强不新增 feature 编号，也不把 OCR 质量评测放入 CI。
 
 ### 短事务与文件所有权（F-039）
 

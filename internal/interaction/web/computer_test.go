@@ -2,7 +2,7 @@ package web
 
 import (
 	"context"
-	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -24,7 +24,7 @@ func (p *previewReader) ComputerActivity(context.Context) ([]computer.Activity, 
 func TestComputerPreviewRequiresCurrentAuthAndNeverExposesNativeIdentity(t *testing.T) {
 	core := &updatesCore{allowed: true}
 	reader := &previewReader{}
-	server := &Server{Core: core, Secrets: fakeSecrets{}, Computer: reader}
+	server := &Server{Config: Config{TokenRef: "credential:test"}, Core: core, Secrets: fakeSecrets{}, Computer: reader}
 	request := func(method, path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "http://127.0.0.1:8080"+path, nil)
 		if auth {

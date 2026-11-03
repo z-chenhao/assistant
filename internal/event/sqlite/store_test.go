@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	agentsqlite "github.com/z-chenhao/collie/internal/agent/sqlite"
-	"github.com/z-chenhao/collie/internal/event"
-	"github.com/z-chenhao/collie/internal/event/fake"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	agentsqlite "github.com/z-chenhao/assistant/internal/agent/sqlite"
+	"github.com/z-chenhao/assistant/internal/event"
+	"github.com/z-chenhao/assistant/internal/event/fake"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
 )
 
 var ctx = context.Background()
@@ -48,7 +48,7 @@ func count(t *testing.T, s *agentsqlite.Store, query string) int {
 }
 func newEvent(t *testing.T, version, epoch int) event.CloudEvent {
 	t.Helper()
-	e, err := event.New("/test", "ai.collie.test.v1", "aggregate", map[string]int{"version": version, "epoch": epoch})
+	e, err := event.New("/test", "ai.steward.test.v1", "aggregate", map[string]int{"version": version, "epoch": epoch})
 	if err != nil {
 		t.Fatal(err)
 	}

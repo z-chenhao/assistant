@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 func TestTraceReadModelMainRootChildUsageAndBodies(t *testing.T) {

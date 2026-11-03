@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/event"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
-	"github.com/z-chenhao/collie/internal/task"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/event"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
+	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func (r *Runs) searchTasks(ctx context.Context, tx *sql.Tx, runID string, request task.SearchRequest) (tool.Result, error) {
@@ -160,7 +160,7 @@ func (r *Runs) finishTask(ctx context.Context, tx *sql.Tx, runID, status, reason
 	return r.taskUpdate(ctx, tx, taskID.String, runID, epoch, status, content)
 }
 func (r *Runs) taskUpdate(ctx context.Context, tx *sql.Tx, taskID, runID string, epoch int64, kind, content string) error {
-	e, err := event.New("/collie/tasks", "ai.collie.task_update.v1", taskID, struct {
+	e, err := event.New("/steward/tasks", "ai.steward.task_update.v1", taskID, struct {
 		TaskID    string `json:"task_id"`
 		RootRunID string `json:"root_run_id"`
 		Epoch     int64  `json:"task_epoch"`

@@ -1,6 +1,6 @@
 {
   "date": "2026-11-02",
-  "scope": "Local demo, logo font unchanged. macOS Chinese PingFang SC first; cross-platform fallback genuine Source Han Sans CN variable font. Source Serif 4 is active prose; Newsreader is a documented alternative, not loaded.",
+  "scope": "Steward Web typography. macOS Chinese PingFang SC first; cross-platform fallback genuine Source Han Sans CN variable font. Source Serif 4 is active prose; Newsreader is a documented alternative, not loaded.",
   "assets": [
     {
       "file": "InterVariable.woff2",
@@ -28,6 +28,7 @@
     },
     {
       "file": "SourceHanSansCN-VF.woff2",
+      "distribution": "Upstream source only; the binary ships unicode-range subsets listed in source-han-subsets.json.",
       "source": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/Variable/WOFF2/OTF/Subset/SourceHanSansCN-VF.otf.woff2",
       "bytes": 7995716,
       "sha256": "7087698d52240614659957608d8c4ad446759aee3208409dc9f566412e7af8f4"

@@ -11,21 +11,21 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/automation"
-	"github.com/z-chenhao/collie/internal/computer"
-	contextbuilder "github.com/z-chenhao/collie/internal/context"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/delivery"
-	"github.com/z-chenhao/collie/internal/event"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/recall"
-	"github.com/z-chenhao/collie/internal/tool"
-	"github.com/z-chenhao/collie/internal/tool/codemode"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/automation"
+	"github.com/z-chenhao/assistant/internal/computer"
+	contextbuilder "github.com/z-chenhao/assistant/internal/context"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/event"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -72,7 +72,7 @@ func newID() string                 { return uuid.Must(uuid.NewV7()).String() }
 func encoded(v any) (string, error) { b, e := llm.CanonicalJSON(v); return string(b), e }
 func digest(v string) string        { h := sha256.Sum256([]byte(v)); return hex.EncodeToString(h[:]) }
 func runEvent(ctx context.Context, tx *sql.Tx, id, kind string, version int64) error {
-	e, err := event.New("/collie/runs", "ai.collie."+kind+".v1", id, struct {
+	e, err := event.New("/steward/runs", "ai.steward."+kind+".v1", id, struct {
 		ID      string `json:"id"`
 		Version int64  `json:"version"`
 	}{id, version})

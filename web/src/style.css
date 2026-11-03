@@ -5,6 +5,8 @@
 @import "./foundation.css";
 @import "./shell.css";
 @import "./workspace.css";
+@import "./task-planning.css";
+@import "./capability-forms.css";
 @import "./conversation.css";
 @import "./observability.css";
 @source "./";

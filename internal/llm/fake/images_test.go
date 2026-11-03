@@ -9,7 +9,7 @@ import (
 	"image/jpeg"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func TestImageFakeDecodesActualPixelsAndRejectsMissingOrInvalidEnvelope(t *testing.T) {

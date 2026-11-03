@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/automation"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/memory"
-	memorysqlite "github.com/z-chenhao/collie/internal/memory/sqlite"
-	"github.com/z-chenhao/collie/internal/task"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/automation"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/memory"
+	memorysqlite "github.com/z-chenhao/assistant/internal/memory/sqlite"
+	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // Historical upgrade fixtures first remove the later, empty Automation schema.
@@ -125,7 +125,7 @@ func TestAutomationAtomicFireDelayedCancelAndCAS(t *testing.T) {
 	id := createAutomation(t, r, now, nil)
 	fire := now.AddDate(0, 0, 3)
 	// Transaction failure after Outbox write must leave schedule and fires intact.
-	_, e := s.db.Exec(`CREATE TRIGGER reject_fire BEFORE INSERT ON event_outbox WHEN NEW.type='ai.collie.automation_fired.v1' BEGIN SELECT RAISE(ABORT,'fault'); END;`)
+	_, e := s.db.Exec(`CREATE TRIGGER reject_fire BEFORE INSERT ON event_outbox WHEN NEW.type='ai.steward.automation_fired.v1' BEGIN SELECT RAISE(ABORT,'fault'); END;`)
 	if e != nil {
 		t.Fatal(e)
 	}

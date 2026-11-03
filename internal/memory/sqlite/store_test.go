@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/recall"
-	"github.com/z-chenhao/collie/internal/recall/fake"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/recall/fake"
 )
 
 var ctx = context.Background()
-var scope = recall.Scope{UserID: "alice", AgentID: "collie"}
+var scope = recall.Scope{UserID: "alice", AgentID: "steward"}
 
 func openTest(t *testing.T) *Store {
 	t.Helper()
@@ -30,7 +30,7 @@ func openTest(t *testing.T) *Store {
 	return s
 }
 func record(id, text string) memory.Record {
-	return memory.Record{ID: id, UserID: "alice", ScopeType: "agent", ScopeID: "collie", Tier: "recall", Content: text, SourceRefs: []memory.SourceRef{{Type: "conversation", Ref: "conversation:original"}}, CreatedAt: time.Unix(100, 0).UTC()}
+	return memory.Record{ID: id, UserID: "alice", ScopeType: "agent", ScopeID: "steward", Tier: "recall", Content: text, SourceRefs: []memory.SourceRef{{Type: "conversation", Ref: "conversation:original"}}, CreatedAt: time.Unix(100, 0).UTC()}
 }
 func put(t *testing.T, s *Store, r memory.Record) {
 	t.Helper()

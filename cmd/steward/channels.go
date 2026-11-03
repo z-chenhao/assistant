@@ -9,10 +9,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/app"
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/delivery"
-	"github.com/z-chenhao/collie/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/app"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
 )
 
 func runWeb(ctx context.Context, application *app.App, cfg config.Config, out io.Writer, foreground func(func(context.Context) error) error) error {

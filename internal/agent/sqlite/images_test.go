@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	contextbuilder "github.com/z-chenhao/collie/internal/context"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	contextbuilder "github.com/z-chenhao/assistant/internal/context"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func TestUserImagesScopedGenerationAndFrozenRecovery(t *testing.T) {

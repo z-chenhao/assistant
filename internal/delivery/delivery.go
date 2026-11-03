@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/conversation"
 )
 
 var (

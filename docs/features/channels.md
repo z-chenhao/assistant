@@ -68,9 +68,9 @@
 
 ## 如何使用
 
-标准 `collie` 使用终端；配置 Web token 与运行时后执行 `collie web serve`，使用其打印的本地地址。
+标准 `steward` 使用终端；配置 Web 本地监听与运行时后执行 `steward web serve`，使用其打印的本地地址。默认本机直接进入；`token_ref` 是可选登录保护。
 
-飞书需配置应用凭据、回调入口，并通过可信 CLI `collie channel manage` 绑定个人身份；群聊不在当前范围。Settings → Notifications 可选择未来通知渠道，保存后显示实际选择；原目的地不可用时显式提示，不回退成 Automatic。已提交的消息、审批、任务阶段与状态按区域更新。
+飞书需配置应用凭据、回调入口，并通过可信 CLI `steward channel manage` 绑定个人身份；群聊不在当前范围。Settings → Notifications 可选择未来通知渠道，保存后显示实际选择；原目的地不可用时显式提示，不回退成 Automatic。已提交的消息、审批、任务阶段与状态按区域更新。
 
 ### 飞书凭据与连接检查（F-020）
 
@@ -80,16 +80,16 @@
 feishu:
   app_id: your-app-id
   tenant_key: your-tenant-key
-  verification_token_ref: env:COLLIE_FEISHU_VERIFICATION_TOKEN
-  encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT_KEY
-  app_secret_ref: env:COLLIE_FEISHU_APP_SECRET
+  verification_token_ref: env:STEWARD_FEISHU_VERIFICATION_TOKEN
+  encrypt_key_ref: env:STEWARD_FEISHU_ENCRYPT_KEY
+  app_secret_ref: env:STEWARD_FEISHU_APP_SECRET
 ```
 
 这里只填写 SecretStore 引用，实际密钥不进入 YAML。`app_secret_ref` 与 `access_token_ref` 必须且只能配置一个。原有外部 token 方式仍可用；新配置在重启后生效，不改变已绑定的身份或通知目标。缓存只存在于进程内，不向领域数据库保存 access token。
 
 ```sh
-collie -config config.yaml channel status
-collie -config config.yaml channel check
+steward -config config.yaml channel status
+steward -config config.yaml channel check
 ```
 
 `status` 只显示配置模式，不发网络请求；新 CLI 进程显示 `unchecked` 是正常情况。`check` 按需取得 token 并读取机器人的自身信息，不发送消息、不修改绑定或处理未知投递。无需先设置活动模型。结果以 `state` 为准：`ready`、`credentials_unavailable`、`credentials_rejected`、`unavailable` 或 `not_configured`；失败时附安全的 `action`，不回显密钥或供应商原始响应。`ready` 证明检查当时机器人信息接口鉴权成功，不保证全部业务 API 权限。
@@ -140,17 +140,16 @@ active, tested profile the Web setup page remains available and ingress stays
 ```yaml
 web:
   listen: 127.0.0.1:8787
-  token_ref: env:COLLIE_WEB_TOKEN
+  # Optional: token_ref: env:STEWARD_WEB_TOKEN
 feishu:
   app_id: your-app-id
   tenant_key: your-tenant-key
-  verification_token_ref: env:COLLIE_FEISHU_VERIFICATION_TOKEN
-  encrypt_key_ref: env:COLLIE_FEISHU_ENCRYPT_KEY
-  access_token_ref: env:COLLIE_FEISHU_ACCESS_TOKEN
+  verification_token_ref: env:STEWARD_FEISHU_VERIFICATION_TOKEN
+  encrypt_key_ref: env:STEWARD_FEISHU_ENCRYPT_KEY
+  access_token_ref: env:STEWARD_FEISHU_ACCESS_TOKEN
 ```
 
-These are SecretStore references, never literal tokens. Web access tokens need
-at least 24 bytes. Set credentials through the installation's credential store
+Web opens directly for a loopback client when `token_ref` is omitted; no workspace token or session is required. An explicit `token_ref` opts into the existing token/session login, with tokens of at least 24 bytes. Credential values are SecretStore references, never literal tokens. Set credentials through the installation's credential store
 or its explicit environment-reference backend. Feishu's configured access token
 must remain valid; rotation/refresh belongs to the credential owner. A missing
 or expired credential never falls back to another account or recipient.
@@ -160,8 +159,8 @@ through the OS-authenticated CLI. A callback cannot enroll itself. Group chats
 and bot senders are rejected to avoid broadening access to the personal history.
 
 ```sh
-printf '%s' '{"op":"bind","channel":"feishu","subject":"your-tenant-key:your-app-id:your-open-id","destination":"your-chat-id","enabled":true,"version":0}' | bin/collie -config /absolute/config.yaml channel manage
-bin/collie -config /absolute/config.yaml web serve
+printf '%s' '{"op":"bind","channel":"feishu","subject":"your-tenant-key:your-app-id:your-open-id","destination":"your-chat-id","enabled":true,"version":0}' | bin/steward -config /absolute/config.yaml channel manage
+bin/steward -config /absolute/config.yaml web serve
 ```
 
 `web serve` prints its loopback URL, enrolls the local browser identity once,
@@ -175,7 +174,7 @@ There is no destination migration: enroll a new destination and select it for
 future work. Frozen deliveries keep their original destination. A changed Feishu app/tenant
 cannot acquire an old binding’s pending delivery.
 
-Web uses a process-local, one-hour HttpOnly/SameSite=Strict session after token
+When `token_ref` is configured, Web uses a process-local, one-hour HttpOnly/SameSite=Strict session after token
 login, or a Bearer token for API access. It rejects DNS rebinding, cross-site
 POSTs and invalid identities, provides no CORS access, and serves a restrictive
 CSP. Auth URLs and device-code events stay ephemeral and are visible only in the
@@ -226,10 +225,10 @@ redirect accepted messages. Revocation rejects pending deliveries to that bindin
 ### Commands and operations
 
 ```sh
-bin/collie delivery list  # retained requests, including unknown/failed
-bin/collie delivery work  # one eligible transport/reconciliation scan
-bin/collie chat work      # drain Agent work, then delivery
-bin/collie tui            # live delivery polling and /history
+bin/steward delivery list  # retained requests, including unknown/failed
+bin/steward delivery work  # one eligible transport/reconciliation scan
+bin/steward chat work      # drain Agent work, then delivery
+bin/steward tui            # live delivery polling and /history
 ```
 
 Delivery work runs even with `setup_required`; it does not activate an implicit
@@ -271,8 +270,12 @@ Web 默认英文；Settings → Preferences → Interface language 可以保存�
 
 ### Steward 工作区精修
 
-导航仅保留 Chat、Tasks、Settings、Developer；任务筛选留在 Tasks 内。Chat 顶部居中两行显示 Steward 名称与动态头像，下方持续对话；右上角显示 Computer 和当前 Worker，点击分别打开互斥详情面板。Worker 包括正在执行和已经结束的记录，按实际开始时间（未开始则取创建时间）倒排，状态保持后端原值，不把 Worker 结果标为用户交付。Task 恢复独立列表与详情，不额外查询 Conversation。成果从任务详情及交付消息进入。
+导航仅保留 Chat、Tasks、Settings、Developer；任务筛选留在 Tasks 内。Chat 顶部居中两行显示 Agent 名称 Ghost 与动态头像，下方持续对话；右上角显示 Computer 和当前 Worker，点击分别打开互斥详情面板。Worker 包括正在执行和已经结束的记录，按实际开始时间（未开始则取创建时间）倒排，状态保持后端原值，不把 Worker 结果标为用户交付。Task 恢复独立列表与详情，不额外查询 Conversation。成果从任务详情及交付消息进入。
 
 首页待审批提示与实际审批卡片使用同一份权威读取，覆盖已内嵌消息及独立待审批卡片，解决后同步移除。打开具体审批保留草稿；向上阅读可主动回到最新消息。当前提示仅覆盖已有审批，不宣称 F-004 的待回答、审阅闭环已实现。
 
 Chat 右上角 Computer 可展开只读桌面画面与已提交的操作进度；打开且页面可见时约每两秒读取一次完成的画面，关闭/后台停止。查看不会启动或恢复 VM，不提供鼠标键盘接管；离线、暂停、画面不可用及中断都有明确状态。机制与兼容性边界见[Computer 设计](../designs/computer-use.md)。
+
+Chat 的 Computer、Worker 与待确认入口依次在右上角上下排列；窄屏使用具名图标按钮，仍采用互斥详情面板。
+
+任务与执行详情根据导航之后的实际内容宽度切换双列／上下布局。窗口小于 1280px 时，Computer／Worker 使用浮层，避免挤压对话与输入框。设置标签条自动露出当前栏目；能力配置示例放在编辑框之前，空白未配置时展开。键盘打开／关闭导航和切换执行树节点保留正确焦点。

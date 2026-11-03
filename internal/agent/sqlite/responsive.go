@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/assistant/internal/agent"
 )
 
 // MainActivity observes ingress without injecting it into a frozen exchange.

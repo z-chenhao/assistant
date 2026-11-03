@@ -9,7 +9,7 @@ import (
 func TestOwnerSettingsDiscoveryExplicitPrecedenceAndReadOnly(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "data")
 	env := func(k string) (string, bool) {
-		if k == "COLLIE_DATA_ROOT" {
+		if k == "STEWARD_DATA_ROOT" {
 			return root, true
 		}
 		return "", false
@@ -43,7 +43,7 @@ func TestLoadRejectsOwnerFileWithinExecutionScope(t *testing.T) {
 	if e := os.WriteFile(path, []byte(raw), 0600); e != nil {
 		t.Fatal(e)
 	}
-	if _, e := Load(path, func(k string) (string, bool) { return data, k == "COLLIE_DATA_ROOT" }); e == nil {
+	if _, e := Load(path, func(k string) (string, bool) { return data, k == "STEWARD_DATA_ROOT" }); e == nil {
 		t.Fatal("owner configuration exposed to execution")
 	}
 }

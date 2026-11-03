@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/computer/macosvm"
-	"github.com/z-chenhao/collie/internal/computer/macosvm/fixture"
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/interaction/web"
-	"github.com/z-chenhao/collie/internal/tool/mcp"
-	mcpfake "github.com/z-chenhao/collie/internal/tool/mcp/fake"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm/fixture"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/tool/mcp"
+	mcpfake "github.com/z-chenhao/assistant/internal/tool/mcp/fake"
 )
 
 func privateFixtureDir(t *testing.T) string {
@@ -30,7 +30,7 @@ func privateFixtureDir(t *testing.T) string {
 
 func TestSetupMCPPeer(t *testing.T) {
 	for i, v := range os.Args {
-		if v == "collie-setup-mcp" && i+1 < len(os.Args) {
+		if v == "steward-setup-mcp" && i+1 < len(os.Args) {
 			if mcpfake.Serve(os.Stdin, os.Stdout, os.Args[i+1]) != nil {
 				os.Exit(2)
 			}
@@ -45,7 +45,7 @@ func TestMCPProbeDiscoversWithoutInvokingEffects(t *testing.T) {
 		t.Fatal(e)
 	}
 	root := privateFixtureDir(t)
-	cfg := []mcp.Config{{Name: "owned", Command: binary, Directory: root, Args: []string{"-test.run=^TestSetupMCPPeer$", "--", "collie-setup-mcp", root}, Tools: map[string]string{"read": "read_only", "send": "external_effect"}}}
+	cfg := []mcp.Config{{Name: "owned", Command: binary, Directory: root, Args: []string{"-test.run=^TestSetupMCPPeer$", "--", "steward-setup-mcp", root}, Tools: map[string]string{"read": "read_only", "send": "external_effect"}}}
 	v := verify(t, m, "mcp", encode(cfg))
 	if v.State != "ready" {
 		t.Fatal(v)
@@ -53,7 +53,7 @@ func TestMCPProbeDiscoversWithoutInvokingEffects(t *testing.T) {
 	if _, e := os.Stat(filepath.Join(root, "mcp-effects.jsonl")); !os.IsNotExist(e) {
 		t.Fatal("probe called an effect", e)
 	}
-	left, _ := filepath.Glob(filepath.Join(root, ".collie-mcp-*"))
+	left, _ := filepath.Glob(filepath.Join(root, ".steward-mcp-*"))
 	if len(left) != 0 {
 		t.Fatal(left)
 	}
@@ -82,7 +82,7 @@ func TestComputerProbeChecksSealedBaseAndRuntimeWithoutBoot(t *testing.T) {
 	if e = macosvm.ProvisionBase(context.Background(), root, source, peer.Config.Compatibility); e != nil {
 		t.Fatal(e)
 	}
-	t.Setenv("COLLIE_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
+	t.Setenv("STEWARD_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
 	node, e := exec.LookPath("node")
 	if e != nil {
 		t.Fatal(e)

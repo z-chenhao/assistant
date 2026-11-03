@@ -58,9 +58,9 @@ Offline Launch/Doctor/Drive/Evidence/Cleanup:
 npm ci --prefix guest-browser --ignore-scripts
 node guest-browser/node_modules/playwright-core/cli.js install chromium
 make test
-python3 tests/system/verify_computer_use.py --binary bin/collie --evidence evidence/computer-use.json
+python3 tests/system/verify_computer_use.py --binary bin/steward --evidence evidence/computer-use.json
 npm test --prefix guest-browser
-python3 tests/system/verify_local_provider.py --binary bin/collie --evidence evidence/local-provider.json
+python3 tests/system/verify_local_provider.py --binary bin/steward --evidence evidence/local-provider.json
 ```
 
 The system runner selects the Computer Use CLI contract; repeat count is explicit. `make test` includes
@@ -72,7 +72,7 @@ on Ubuntu use `install --with-deps chromium`.
 For the previously authorized isolated Lume test root, run:
 
 ```sh
-python3 tests/system/verify_computer_use.py --binary bin/collie --live-config TEST_ROOT/product-live.json --live-root TEST_ROOT --evidence evidence/computer-use-live.json
+python3 tests/system/verify_computer_use.py --binary bin/steward --live-config TEST_ROOT/product-live.json --live-root TEST_ROOT --evidence evidence/computer-use-live.json
 ```
 
 This command owns the foreground Lume server, compiles the project-local AppKit
@@ -82,11 +82,11 @@ AX and nested invocation evidence and checks checkpoint/release. Guest/browser
 compatibility is distinct from offline conformance and Golden Case scoring.
 
 To add the pinned browser runtime to that disposable Guest checkpoint and then
-exercise the full Guest browser path, use its retained `collie25-cua-use-*` root:
+exercise the full Guest browser path, use its retained `steward25-cua-use-*` root:
 
 ```sh
-python3 tests/system/verify_computer_use.py --binary bin/collie --live-config TEST_ROOT/product-live.json --live-root TEST_ROOT --resume-root TEST_ROOT/collie25-cua-use-INSTANCE --native-actions-only --provision-browser --evidence evidence/computer-use-native-live.json
-python3 tests/system/verify_computer_use.py --binary bin/collie --live-config TEST_ROOT/product-live.json --live-root TEST_ROOT --resume-root TEST_ROOT/collie25-cua-use-INSTANCE --live-browser --evidence evidence/computer-use-browser-live.json
+python3 tests/system/verify_computer_use.py --binary bin/steward --live-config TEST_ROOT/product-live.json --live-root TEST_ROOT --resume-root TEST_ROOT/steward25-cua-use-INSTANCE --native-actions-only --provision-browser --evidence evidence/computer-use-native-live.json
+python3 tests/system/verify_computer_use.py --binary bin/steward --live-config TEST_ROOT/product-live.json --live-root TEST_ROOT --resume-root TEST_ROOT/steward25-cua-use-INSTANCE --live-browser --evidence evidence/computer-use-browser-live.json
 ```
 
 Provisioning downloads checksum-verified Node and locked Playwright/Chromium into
@@ -104,7 +104,7 @@ To collect every recorded screenshot from a completed live report without
 starting a VM or sending input:
 
 ```sh
-python3 tests/system/verify_computer_use.py --binary bin/collie --live-root TEST_ROOT --resume-root TEST_ROOT/collie25-cua-use-INSTANCE --collect-observations evidence/computer-use-native-live.json --evidence evidence/computer-use-native-live.json
+python3 tests/system/verify_computer_use.py --binary bin/steward --live-root TEST_ROOT --resume-root TEST_ROOT/steward25-cua-use-INSTANCE --collect-observations evidence/computer-use-native-live.json --evidence evidence/computer-use-native-live.json
 ```
 
 Collection reads each opaque ref through the Artifact CLI and records the PNG
@@ -116,7 +116,7 @@ filename and SHA-256 beside the nested AX/action evidence.
 
 ```sh
 go test ./internal/computer/... ./internal/agent/sqlite -run 'TestComputer|TestLifecycle|TestCheckpoint|TestSSH|TestUnknown|TestCorrupt|TestNoCheckpoint|TestStopped|TestUnit'
-python3 tests/system/verify_computer.py --binary bin/collie --evidence evidence/computer.json
+python3 tests/system/verify_computer.py --binary bin/steward --evidence evidence/computer.json
 ```
 
 The maintained offline harness launches the real CLI and production HTTP/SSH
@@ -138,7 +138,7 @@ foreground `lume_live.py --profile product serve` with its isolated product
 configuration. Then use:
 
 ```sh
-python3 tests/system/verify_computer.py --binary bin/collie --live-root TEST_ROOT --live-config TEST_ROOT/product-live.json --evidence TEST_ROOT/evidence/computer-provider-live.json
+python3 tests/system/verify_computer.py --binary bin/steward --live-root TEST_ROOT --live-config TEST_ROOT/product-live.json --evidence TEST_ROOT/evidence/computer-provider-live.json
 ```
 
 This mode uses the real Lume/macOS/Driver path and a deterministic model fixture.

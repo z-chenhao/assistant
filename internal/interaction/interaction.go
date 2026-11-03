@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/conversation"
 )
 
 var ErrUnauthorized = errors.New("channel identity is not bound")

@@ -10,7 +10,7 @@ import (
 	_ "time/tzdata"
 	"unicode/utf8"
 
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 const ManageName = "builtin__automation_manage"

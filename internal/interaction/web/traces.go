@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 type TraceReader interface {

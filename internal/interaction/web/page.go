@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 type shownMessage struct {
@@ -28,6 +28,7 @@ type page struct {
 	Capability                                        *Capability
 	Trace                                             *traceView
 	Tasks                                             *taskView
+	Schedule                                          *scheduleEditor
 	Settings                                          *settingsView
 	Accounts                                          []llm.AuthConnection
 	Bindings                                          []interaction.Binding
@@ -79,6 +80,8 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	p.AccountID = s.accountID
 	s.mu.Unlock()
 	switch p.View {
+	case "schedule":
+		err = s.loadSchedule(ctx, r, &p)
 	case "capabilities":
 		err = s.loadCapabilities(ctx, r, &p)
 	case "settings":
@@ -139,6 +142,8 @@ func conversationCursor(r *http.Request) (int64, error) {
 }
 func notice(code string) string {
 	switch code {
+	case "schedule-saved":
+		return "Schedule saved. Future triggers use these settings."
 	case "language-saved":
 		return "Language saved."
 	case "added":

@@ -2,7 +2,7 @@
 // the ordinary ToolInvocation pipeline; ownership never comes from arguments.
 package tools
 
-import "github.com/z-chenhao/collie/internal/tool"
+import "github.com/z-chenhao/assistant/internal/tool"
 
 const Manage = "builtin__artifact_manage"
 const Search = "builtin__artifact_search"
