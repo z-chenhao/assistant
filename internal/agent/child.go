@@ -39,7 +39,7 @@ func ParseAgentRun(args string) (AgentRunRequest, error) {
 func WorkerTools(specs []tool.Spec) []tool.Spec {
 	out := []tool.Spec{}
 	for _, s := range specs {
-		if strings.HasPrefix(s.Name, "builtin__task_") {
+		if strings.HasPrefix(s.Name, "builtin__task_") || s.Name == "builtin__evidence_read" {
 			continue
 		}
 		switch s.Permission {

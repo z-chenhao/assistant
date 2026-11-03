@@ -42,7 +42,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-007](features/tools-approvals.md#f-007) | 工具、审批与未知副作用处理 | 用户能确认具体外部动作；重复请求或重启不能盲目重复副作用。 | 是 · 已完成 |
 | [F-008](features/codemode.md#f-008) | 可恢复的 JavaScript 编排 | Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果。 | 是 · 已完成 |
 | [F-009](features/memory-context.md#f-009) | 自动记忆形成与语义归并 | 后台从用户事实与反馈形成记忆，能处理纠正、重复和过时信息。 | 否 · 部分完成 |
-| [F-010](features/memory-context.md#f-010) | 按作用域召回记忆与对话 | 检索可访问的记忆与对话，沿明确引用导航任务、产物和原始证据并续读。 | 否 · 部分完成 |
+| [F-010](features/memory-context.md#f-010) | 按作用域召回记忆与对话 | 检索记忆与对话；Main/本机沿显式消息、Task、授权产物单跳导航并续读原文，Memory 精读及外部关联仍待接通。 | 否 · 部分完成 |
 | [F-011](features/memory-context.md#f-011) | 长期上下文压缩 | 长对话保留目标、决策、约束和待办，省略内容可追溯。 | 否 · 部分完成 |
 | [F-012](features/artifacts-media.md#f-012) | 可重新打开的文件产物 | 用户能上传、保存、搜索、下载交付物，引用具有访问边界。 | 是 · 已完成 |
 | [F-013](features/artifacts-media.md#f-013) | 用户图片视觉输入与本地 OCR | 视觉模型收到授权图片；纯文本模型可通过本地 OCR 读取图片文字。 | 是 · 已完成 |

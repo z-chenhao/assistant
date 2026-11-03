@@ -14,9 +14,10 @@ import (
 // receipt ordinals so protocol tests can continue after real context selection.
 // This deliberately makes no claim about semantic summarization quality.
 type fixtureContextSummary struct {
-	Fixture   bool                `json:"fixture_context_summary"`
-	Completed []string            `json:"completed_call_ids"`
-	Batch     fixtureBatchSummary `json:"batch"`
+	Fixture    bool                `json:"fixture_context_summary"`
+	Completed  []string            `json:"completed_call_ids"`
+	Batch      fixtureBatchSummary `json:"batch"`
+	TaskUpdate bool                `json:"task_update,omitempty"`
 }
 
 type fixtureBatchSummary struct {
@@ -40,6 +41,7 @@ func contextReply(request llm.GenerationRequest) llm.GenerationResult {
 	seen := map[string]bool{}
 	for _, m := range sources {
 		old := contextSummary(m)
+		summary.TaskUpdate = summary.TaskUpdate || old.TaskUpdate || m.Origin == "runtime" && m.Source != nil && m.Source.Kind == "task_update"
 		if old.Fixture && old.Batch.Next > summary.Batch.Next {
 			summary.Batch = old.Batch
 		}

@@ -34,6 +34,8 @@ func (t *tools) ExecuteBuiltin(ctx context.Context, inv tool.Invocation) (tool.R
 		return t.manageMemory(ctx, inv)
 	case tool.MemorySearchBuiltin:
 		return t.searchMemory(ctx, inv)
+	case tool.EvidenceBuiltin:
+		return t.readLinkedEvidence(ctx, inv)
 	case tool.TaskBuiltin:
 		return t.executeTaskAdmission(ctx, inv)
 	case tool.ArtifactBuiltin:

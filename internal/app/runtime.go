@@ -14,6 +14,7 @@ import (
 	computerfake "github.com/z-chenhao/assistant/internal/computer/fake"
 	"github.com/z-chenhao/assistant/internal/computer/macosvm"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/evidence"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 	"github.com/z-chenhao/assistant/internal/memory"
@@ -184,6 +185,7 @@ func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Defi
 		searchMemory.Spec.Description += " Not configured: requires an explicit embedding provider; calls fail with PROVIDER_UNAVAILABLE until configured."
 	}
 	defs = append(defs, searchMemory)
+	defs = append(defs, evidence.Definition())
 
 	if cfg.JavaScript != nil {
 		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}

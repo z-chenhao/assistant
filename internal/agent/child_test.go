@@ -50,3 +50,12 @@ func TestChildFixedReductionDoesNotAddCapabilities(t *testing.T) {
 		t.Fatal("capability introduced")
 	}
 }
+
+func TestEvidenceConversationNavigationRemainsMainOnly(t *testing.T) {
+	input := []tool.Spec{{Name: "builtin__evidence_read", Permission: "read_only"}, {Name: "builtin__read", Permission: "read_only"}}
+	for _, reduced := range [][]tool.Spec{WorkerTools(input), ChildTools(input)} {
+		if len(reduced) != 1 || reduced[0].Name != "builtin__read" {
+			t.Fatal("Worker gained Main conversation navigation", reduced)
+		}
+	}
+}
