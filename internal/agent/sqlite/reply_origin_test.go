@@ -186,7 +186,7 @@ func TestReplySourceMigrationRetainsOldFrozenRoutesAndRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustDrain(t, a)
-	if _, err := s.db.Exec(removeGitHubContinuationFixtureSchema + `DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; PRAGMA user_version=34`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_code_environment; ` + removeGitHubContinuationFixtureSchema + `DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; PRAGMA user_version=34`); err != nil {
 		t.Fatal(err)
 	}
 	broken := append(append([]string{}, migrations[:34]...), feishuReplySourcesSQL+"; invalid SQL")

@@ -23,7 +23,7 @@ const preGitHubTaskColumns = `task_id,task_ref,agent_id,conversation_id,title,an
 const removeGitHubContinuationFixtureSchema = `DROP TABLE IF EXISTS github_task_followup; DROP TABLE IF EXISTS github_task_binding; ALTER TABLE task DROP COLUMN explicit_end_epoch;
  DROP TRIGGER run_desired_state; CREATE TRIGGER run_desired_state BEFORE UPDATE ON run WHEN NEW.desired_state NOT IN('running','task_paused','task_cancelled','memory_forgotten') OR (OLD.desired_state!='running' AND NEW.desired_state='running') BEGIN SELECT RAISE(ABORT,'invalid desired state'); END; `
 const removeGitHubFixtureSchema = removeGitHubContinuationFixtureSchema + `DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; DROP TABLE IF EXISTS task_feedback; DROP TABLE IF EXISTS github_observation; DROP TABLE IF EXISTS github_watch; `
-const removeInspectionFixtureSchema = removeGitHubFixtureSchema + `DROP TABLE IF EXISTS dispatch_observation; DROP INDEX IF EXISTS run_observation_root; DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
+const removeInspectionFixtureSchema = `DROP TABLE IF EXISTS task_code_environment; ` + removeGitHubFixtureSchema + `DROP TABLE IF EXISTS dispatch_observation; DROP INDEX IF EXISTS run_observation_root; DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
 
 func TestInspectionUsesRealMainTaskRootChildCausality(t *testing.T) {
 	ctx := context.Background()

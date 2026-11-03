@@ -188,7 +188,7 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 			a.Sink(event)
 		}
 	}
-	err := a.Store.Initialize(context.WithoutCancel(work), claim)
+	err := a.Store.Initialize(tool.WithShutdownSignal(context.WithoutCancel(work), work.Done()), claim)
 	if err == nil {
 		run, loadErr := a.Store.Load(context.WithoutCancel(work), claim)
 		if loadErr != nil {

@@ -18,6 +18,10 @@ type RunFailure struct{ cause error }
 func (e *RunFailure) Error() string { return e.cause.Error() }
 func (e *RunFailure) Unwrap() error { return e.cause }
 
+// CommittedRunFailure is used by initialization only after the same RunStore
+// terminal failure has committed. It preserves normal Worker failure isolation.
+func CommittedRunFailure(cause error) error { return &RunFailure{cause: cause} }
+
 type LoopOptions struct {
 	Store    RunStore
 	Provider llm.LLMProvider

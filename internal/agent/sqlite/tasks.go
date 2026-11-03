@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/agent"
@@ -63,6 +64,9 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 }
 
 func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error {
+	if err := r.bindTaskCode(ctx, tx, taskID); err != nil {
+		return err
+	}
 	var revoked bool
 	if e := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM task t JOIN memory_privacy p USING(agent_id) WHERE t.task_id=? AND t.created_at<=p.updated_at)`, taskID).Scan(&revoked); e != nil {
 		return e
@@ -111,6 +115,13 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 		return agent.ErrStorage
 	}
 	messages := agent.InitialContext(agent.ContextOptions{Position: "root", Tools: specs, Title: title, Task: brief, ArtifactRefs: artifactRefs})
+	var codeWorkspace int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_code_environment WHERE task_id=?`, taskID).Scan(&codeWorkspace); err != nil {
+		return err
+	}
+	if codeWorkspace > 0 {
+		messages = slices.Insert(messages, len(messages)-1, agent.RuntimeContext("task_code_environment", "", false, "This Task has a dedicated repository working copy. File and bash tools operate in that copy; use relative paths and read its AGENTS.md first. The import baseline includes owner dirty files, excludes all .git metadata, and is independent of the source Git HEAD. Check actual command exit codes; preserve diff and validation evidence as Artifacts. Previous shared-workspace observations do not establish facts about this copy."))
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT instruction,artifact_refs FROM task_instruction WHERE task_id=? AND task_epoch<? ORDER BY sequence`, taskID, epoch)
 	if err != nil {
 		return err
@@ -163,6 +174,7 @@ func (r *Runs) createRoot(ctx context.Context, tx *sql.Tx, taskID string) error 
 	if progress != "" {
 		messages = append(messages, agent.RuntimeContext("task_progress", "", false, progress))
 	}
+
 	cp, _ := encoded(agent.Checkpoint{ContextVersion: 2, ContextReady: true, Phase: "model", Messages: messages})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,task_id,root_run_id,kind,worker_position,status,task_epoch,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,?,?,'worker','root','queued',?,?,?,?,0,?,?,1)`, id, agentID, conversationID, taskID, id, epoch, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return err

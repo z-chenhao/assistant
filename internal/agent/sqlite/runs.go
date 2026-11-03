@@ -15,6 +15,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/artifact"
 	"github.com/z-chenhao/assistant/internal/automation"
 	"github.com/z-chenhao/assistant/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer/environment"
 	contextbuilder "github.com/z-chenhao/assistant/internal/context"
 	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/delivery"
@@ -34,6 +35,8 @@ import (
 type Runs struct {
 	imageOCR              ImageOCR
 	environmentExecute    func(context.Context, string, string) tool.Result
+	localEnvironment      *environment.Config
+	localExecute          func(context.Context, environment.Config, string, string) tool.Result
 	automationClock       func() time.Time
 	computerProvider      computer.Provider
 	computerCompatibility computer.Compatibility
@@ -464,7 +467,7 @@ func (r *Runs) Initialize(ctx context.Context, c agent.RunClaim) error {
 		return err
 	}
 	if run.Kind == "worker" {
-		return nil
+		return r.prepareTaskCode(ctx, c, run)
 	}
 	if run.Checkpoint.ContextReady {
 		return nil

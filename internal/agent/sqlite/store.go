@@ -134,7 +134,10 @@ var feishuReplySourcesSQL string
 //go:embed migrations/036_github_task_continuation.sql
 var githubTaskContinuationSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL}
+//go:embed migrations/037_task_code_environments.sql
+var taskCodeEnvironmentsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL}
 
 type Store struct {
 	inspector   *inspectionsqlite.Inspector
@@ -146,6 +149,7 @@ type Store struct {
 	activeRun   *sql.Stmt
 	db          *sql.DB
 	path        string
+	codeRoot    string
 	artifacts   *artifactsqlite.Store
 	// MainBoundary is explicit fault injection; production composition leaves it nil.
 	MainBoundary func(string)
@@ -165,6 +169,10 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 	}
 	if err := os.MkdirAll(dataRoot, 0700); err != nil {
 		return nil, fmt.Errorf("create data root: %w", err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(dataRoot)
+	if err != nil {
+		return nil, fmt.Errorf("resolve database data root: %w", err)
 	}
 	path := filepath.Join(dataRoot, "state.db")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
@@ -193,7 +201,7 @@ func Open(ctx context.Context, dataRoot string) (*Store, error) {
 	if err := migrate(ctx, db, migrations); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
-	s := &Store{db: db, path: path}
+	s := &Store{db: db, path: path, codeRoot: canonicalRoot + ".task-code"}
 	if err := s.bootstrap(ctx); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}

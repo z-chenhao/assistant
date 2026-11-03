@@ -104,7 +104,7 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	var application *app.App
 	if (options.testBridge == "" || options.testEvents) && (command.kind == commandWeb || command.kind == commandTerminal || command.kind == commandAutomation && flags.Arg(1) == "work") {
 		application, err = app.OpenRuntime(ctx, cfg, options.testBridge, options.testSecrets)
-	} else if command.kind == commandModel || command.kind == commandOps || command.kind == commandGitHub || command.kind == commandEvidence || command.kind == commandTask && flags.Arg(1) == "feedbacks" || flags.Arg(0) == "status" {
+	} else if command.kind == commandModel || command.kind == commandOps || command.kind == commandGitHub || command.kind == commandCoding || command.kind == commandEvidence || command.kind == commandTask && flags.Arg(1) == "feedbacks" || flags.Arg(0) == "status" {
 		application, err = app.OpenControl(ctx, cfg, options.testBridge, options.testSecrets)
 	} else if options.testBridge != "" {
 		application, err = app.OpenWithTestBridge(ctx, cfg, options.testBridge)

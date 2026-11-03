@@ -67,7 +67,7 @@ def tree(root):
     return {str(p.relative_to(root)): digest(p) for p in sorted(root.rglob('*')) if p.is_file()}
 
 
-def prepare(binary, root, mode='edit'):
+def prepare(binary, root, mode='edit', metadata=None):
     repo = root / 'repo'
     shutil.copytree(Path(__file__).resolve().parents[2] / 'tests/fixtures/coding-v1', repo)
     for args in [('init', '-q', '-b', 'feature/eval'), ('add', '.'),
@@ -100,7 +100,7 @@ def prepare(binary, root, mode='edit'):
     h = CapabilityHarness(binary, root, fixture='capabilities')
     if os.environ.get('STEWARD_CAPABILITY_DIAGNOSTICS'):
         h.env['STEWARD_SQL_FIXTURE_DIAGNOSTIC'] = '1'
-    h.setup()
+    h.setup(metadata=metadata)
     return h
 
 
@@ -138,7 +138,15 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             name, fn, mode, kind = item
             folder = root / name
             folder.mkdir()
-            h = prepare(binary, folder, mode)
+            metadata = None
+            if name == 'task-code-environments':
+                # Keep the five accepted calls, exact approvals, and their
+                # receipts inside the profile's protected-context budget.
+                metadata = dict(name='Task coding workload', provider_kind='openai_compatible',
+                                endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                model_id='fixture-model', context_window=16384, max_output_tokens=1024,
+                                compatibility={'tool_result_format': 'openai'}, capabilities={'text_input': True})
+            h = prepare(binary, folder, mode, metadata)
             try:
                 if fixture_context:
                     h.send('fixture-context', fixture_context)
@@ -300,6 +308,114 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                     'crashed edit retried or falsely completed')
             return {'name': 'edit_after_effect_before_result_commit', 'signal': 'SIGKILL', 'state': value}
         scenario('crash', crash, kind='crashes')
+
+        def enable_task_code_source(h):
+            source = (h.root / 'repo').resolve()
+            workspaces = h.root.resolve() / 'task-workspaces'
+            text = (h.root / 'config.yaml').read_text()
+            old = 'execution:\n  root: ' + json.dumps(str(h.root / 'repo'))
+            new = 'execution:\n  root: ' + json.dumps(str(workspaces)) + '\n  repository_source: ' + json.dumps(str(source))
+            require(old in text, 'coding fixture execution configuration missing')
+            (h.root / 'config.yaml').write_text(text.replace(old, new))
+            return source, workspaces
+
+        def task_code_environments(h):
+            source, workspaces = enable_task_code_source(h)
+            original = tree(source)
+            before_hash = digest(source / 'docs/notes.md')
+            for label in ('A', 'B'):
+                plan = [
+                    dict(name='builtin__read', arguments=dict(path='AGENTS.md')),
+                    dict(name='builtin__edit', arguments=dict(path='docs/notes.md', before_hash=before_hash,
+                         old_text='USER_UNCOMMITTED_SENTINEL', new_text='USER_UNCOMMITTED_SENTINEL\nTask '+label)),
+                    dict(name='builtin__write', arguments=dict(path='task-result.txt', content=label+'\n')),
+                    dict(name='builtin__bash', arguments=dict(command='exit 7')),
+                    dict(name='builtin__bash', arguments=dict(command='test "$(cat task-result.txt)" = '+label))]
+                h.send('task-code-'+label, 'Delegate capabilities: '+json.dumps(plan))
+                h.command('chat', 'work')
+            def environments():
+                with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
+                    db.row_factory=sqlite3.Row
+                    return [dict(r) for r in db.execute('SELECT t.task_ref,e.directory,e.baseline_hash,e.status,e.error_code FROM task_code_environment e JOIN task t USING(task_id) ORDER BY t.created_at,t.task_id')]
+            copies = environments()
+            require(len(copies)==2 and all(w['status']=='ready' for w in copies) and copies[0]['directory']!=copies[1]['directory'], 'two pending Task copies were not isolated')
+            # Every CLI call is another process: pending approvals and directory
+            # identities must survive closing the original execution owner.
+            for _ in range(12):
+                approvals=[a for a in h.command('approval','list') if a['status']=='pending']
+                if not approvals: break
+                for a in approvals:
+                    h.command('approval','approve',a['approval_id'],a['frozen_arguments_hash'])
+                h.command('chat','work')
+            reports=[]
+            for label,w in zip(('A','B'),copies):
+                directory=Path(w['directory'])
+                if not (directory/'task-result.txt').is_file():
+                    attempts = [(i['tool_name'], i['status'], i['attempt_count'], i['result_json']) for i in h.state()['tools']]
+                    raise RuntimeError('scoped real tools did not produce the approved Task file: ' + str(attempts))
+                require((directory/'task-result.txt').read_text()==label+'\n' and ('Task '+label) in (directory/'docs/notes.md').read_text(), 'Task edits contaminated another copy')
+                require(not (directory/'.git').exists(), 'source Git metadata was imported')
+                inspect=h.command('coding','inspect',w['task_ref'])
+                require(inspect['directory']==w['directory'] and inspect['baseline_sha256']==w['baseline_hash'], 'restart rebound the Task working copy')
+                commands=[json.loads(c['result']['text']) for c in inspect['commands']]
+                require([c['exit_code'] for c in commands]==[7,0], 'actual failed/successful command evidence was lost or invented')
+                artifact=h.command('coding','report',w['task_ref'])
+                review=h.command('artifact','open',artifact['artifact_ref'])
+                require('directory' not in review and review['diff']['changed'] and 'USER_UNCOMMITTED_SENTINEL' in review['diff']['patch'], 'review Artifact lost the imported dirty baseline or exposed host paths')
+                require(str(workspaces) not in review['diff']['patch'] and 'b/task-result.txt' in review['diff']['patch'], 'patch headers were not repository relative')
+                reports.append(dict(task_ref=w['task_ref'], artifact=artifact, command_exit_codes=[c['exit_code'] for c in commands]))
+            require(tree(source)==original and not (source/'hook-ran').exists(), 'source dirty files or Git hooks changed')
+            (source/'.git').rename(source/'.git-disabled')
+            try:
+                h.send('bad-source-task', 'Delegate capabilities: '+json.dumps([dict(name='builtin__read',arguments=dict(path='AGENTS.md'))]))
+                h.command('chat','work')
+            finally:
+                (source/'.git-disabled').rename(source/'.git')
+            value=environments()
+            require(sum(w['status']=='failed' and w['error_code']=='CODE_PREPARATION_FAILED' for w in value)==1 and sum(w['status']=='ready' for w in value)==2, 'preparation failure affected another Task')
+            return dict(name='task_code_environment_scope_diff_and_evidence', reports=reports, preparation_failure='isolated', source_preserved=True)
+        scenario('task-code-environments', task_code_environments)
+
+        def task_code_recovery(h):
+            source, _ = enable_task_code_source(h)
+            note = source / 'docs/notes.md'
+            results = []
+            def environment():
+                with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
+                    db.row_factory = sqlite3.Row
+                    return dict(db.execute("""SELECT t.task_ref,e.directory,e.status,e.error_code,r.status AS root_status
+                        FROM task_code_environment e JOIN task t USING(task_id) JOIN run r USING(task_id)
+                        WHERE r.worker_position='root' ORDER BY t.created_at DESC,t.task_id DESC LIMIT 1""").fetchone())
+            for index, (boundary, stop) in enumerate((('before_task_code_publish', signal.SIGTERM),
+                     ('before_task_code_publish', signal.SIGKILL), ('after_task_code_publish', signal.SIGKILL))):
+                original = f'owner dirty {index}\n'
+                note.write_text(original)
+                h.send(f'code-recovery-{index}', 'Delegate capabilities: []')
+                child = h.hold(boundary)
+                pending = environment()
+                directory = Path(pending['directory'])
+                published = boundary.startswith('after_')
+                require(pending['status']=='pending' and directory.is_dir()==published, 'wrong publication boundary')
+                child.send_signal(stop)
+                child.communicate(timeout=10)
+                expected_exit = -signal.SIGKILL if stop == signal.SIGKILL else 0
+                require(child.returncode == expected_exit, f'{stop.name} returned {child.returncode}, expected {expected_exit}')
+                stopped = environment()
+                require(stopped['status']=='pending' and stopped['error_code']=='' and stopped['root_status']!='failed',
+                        'interruption falsely failed Task preparation')
+                newer = f'owner later edit {index}\n'
+                note.write_text(newer)
+                h.command('chat','work')
+                resumed = environment()
+                require(resumed['task_ref']==pending['task_ref'] and resumed['directory']==pending['directory'] and
+                        resumed['status']=='ready' and resumed['root_status']=='completed', 'restart rebound or lost Task')
+                require((directory/'docs/notes.md').read_text()==(original if published else newer) and note.read_text()==newer,
+                        'restart recopied a published receipt or altered the source')
+                require(not list(directory.parent.parent.glob('.prepare-*')), 'stale staging survived recovery')
+                results.append(dict(boundary=boundary, signal=stop.name, returncode=child.returncode,
+                                    reused_published_snapshot=published))
+            return dict(name='task_code_publish_recovery', boundaries=results)
+        scenario('task-code-recovery', task_code_recovery, kind='crashes')
         for kind, result in run_cases(cases, drive, scenario_jobs):
             report[kind].append(result)
         if not selected:
@@ -307,11 +423,12 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                         'continuous_dirty_edits_create_and_stale_hash_refusal',
                         'reads_automatic_mutations_require_exact_approval',
                         'MCP_transport_Skill_scope_role_denial_unknown',
-                        'malformed_stdio_effect_replies_stay_unknown'}
+                        'malformed_stdio_effect_replies_stay_unknown',
+                        'task_code_environment_scope_diff_and_evidence'}
             require(len(report['checks']) == len(expected) and
                     {row['name'] for row in report['checks']} == expected and
-                    len(report['crashes']) == 1 and
-                    report['crashes'][0]['name'] == 'edit_after_effect_before_result_commit',
+                    {row['name'] for row in report['crashes']} == {'edit_after_effect_before_result_commit', 'task_code_publish_recovery'} and
+                    len(report['crashes']) == 2,
                     'complete software capability scenario inventory required')
     report['cleanup'] = not root.exists()
     require(report['cleanup'], 'disposable roots remain')
@@ -322,7 +439,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash'],
+    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash', 'task-code-environments', 'task-code-recovery'],
                         help='Run one maintained scenario; omit for the complete gate')
     parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("STEWARD_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()
