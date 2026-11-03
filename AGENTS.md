@@ -2,39 +2,38 @@
 
 ## Project Structure & Module Organization
 
-Steward is a personal agent with a Go execution core. `cmd/steward/` is the process entry point; `internal/` contains domain packages and adapters such as `event/nats` and `memory/sqlite`. Keep `internal/app/` focused on composition.
-
-`web/src/` holds TypeScript/React components and CSS; embedded assets live in `internal/interaction/web/assets/`. Node sidecars live in `provider-bridge/` and `runtime/javascript/`; browser checks live in `guest-browser/`. Go tests sit beside source files. `tests/system/`, `tests/harness/`, and `tests/fixtures/` hold system checks, Python harness tests, and fixtures. Operational helpers belong in `scripts/`.
+Steward’s Go entry point is `cmd/steward/`; domain packages and adapters live in `internal/`. Keep `internal/app/` focused on composition. React/TypeScript sources live in `web/src/`; generated assets in `internal/interaction/web/assets/`. Node sidecars occupy `provider-bridge/` and `runtime/javascript/`. `guest-browser/` contains browser checks; `tests/{system,harness,fixtures}/` holds system flows, Python regressions, and fixtures. Operational helpers belong in `scripts/`.
 
 ## Build, Test, and Development Commands
 
-Use Go 1.26.10+, Node 24.21.0 (`.node-version`), Python 3.10.12+, and a C compiler.
+Use Go 1.26.10+, Node 24.21.0 (`.node-version`), Python 3.10.12+, bash, and a C compiler.
 
-- `make setup`: install pinned development dependencies.
-- `make build`: compile `bin/steward`; `make run`: build and start locally.
-- `make test`: run Go, Node, browser, frontend-output, and Python harness checks.
-- `make lint`: validate documentation, formatting, types, workflows, shell syntax, and dependencies.
-- `make audit`: query current Go/npm advisories (network required; separate from deterministic regressions).
-- `make test-e2e E2E_EVIDENCE=evidence/my-change`: run core deterministic system flows; use a fresh evidence directory per run.
-- `make test-full` / `make test-race`: run extended system coverage / race checks.
+- `make setup`: install pinned dependencies.
+- `make build` / `make run`: compile `bin/steward` / build and start locally.
+- `make test lint`: run Go, Node, browser, frontend-output, Python, formatting, type, documentation, and workflow checks.
+- `make test-e2e E2E_EVIDENCE=evidence/my-change`: run core system flows; always choose a fresh evidence directory.
+- `make test-full` / `make test-race`: extended system coverage / Go race checks.
+- `make audit`: query current Go/npm advisories; requires network access.
 - `python3 scripts/check_docs.py`: validate documentation-only changes.
 
 ## Coding Style & Naming Conventions
 
-Format Go with `gofmt` (tabs); use lowercase package names and define interfaces in consuming packages. Keep adapters in named domain subpackages; avoid generic service/repository layers. Follow nearby JavaScript/TypeScript conventions: two-space indentation, camelCase functions, PascalCase React components, and kebab-case component filenames. Linting uses `go vet`, pinned Staticcheck, TypeScript, and Node syntax checks. Keep compatibility exceptions narrow and documented at their source.
+Use `gofmt`, tabs, lowercase Go packages, and interfaces defined by consumers. Keep adapters within domain subpackages. JavaScript/TypeScript uses two-space indentation, camelCase functions, PascalCase React components, and kebab-case component filenames. Linting includes `go vet`, pinned Staticcheck, TypeScript, and Node syntax checks.
 
 ## Testing Guidelines
 
-Use Go `testing` (`*_test.go`), Node `node:test` (`*.test.mjs`), and Python `unittest` (`test_*.py`). Run focused checks first, then `make test lint` and relevant system gates for cross-module changes. Coverage follows observable scenarios, without a mandated percentage. Exercise real stores/protocols for persistence changes and failure/restart/race paths for replay or concurrency. Report skipped and unrun checks explicitly. See the [testing guide](docs/test-plans/product.md).
+Use Go `testing` (`*_test.go`, beside sources), Node `node:test` (`*.test.mjs`), and Python `unittest` (`test_*.py`). Coverage targets observable scenarios, without a fixed percentage. Run focused checks first; cross-module changes require `make test lint` and relevant system gates. Follow the [testing guide](docs/test-plans/product.md); report skipped/unrun checks.
 
-Close Python SQLite connections explicitly with `contextlib.closing`; the connection context manager only commits or rolls back transactions. Use a read transaction when a predicate needs a consistent snapshot across tables.
+Use disposable `STEWARD_DATA_ROOT` directories. Close Python SQLite connections with `contextlib.closing`; use read transactions for consistent cross-table predicates.
 
 ## Commit & Pull Request Guidelines
 
-Recent history favors imperative subjects with `feat:`, `refactor:`, or `chore:` prefixes and optional scopes, e.g. `feat(web): improve task navigation`. Keep changes focused. Follow the PR template: describe behavior, link an existing issue, provide exact validation commands/evidence, and identify residual risks. Update the [Feature Map](docs/feature-map.md), owning feature, design, and test plan when behavior changes. Follow the [documentation policy](docs/README.md#强制维护规则): update current topics in place; keep dated reviews, development logs, append-only changelogs and execution results in PRs, Git history or CI artifacts, not `docs/`.
+Use imperative subjects with customary prefixes, e.g. `feat(web): improve task navigation`, `fix:`, or `refactor:`. Keep PRs focused. Follow the [PR template](.github/pull_request_template.md): describe behavior, link existing issues, record exact validation/evidence, and identify compatibility implications and residual risks. Small fixes need no issue.
+
+Update the [Feature Map](docs/feature-map.md), owning feature, design, and test plan when behavior changes. [Documentation policy](docs/README.md#强制维护规则) requires current topics; keep development logs and execution results in PRs or CI artifacts.
 
 ## Security & Agent Instructions
 
-Follow the [contribution workflow](docs/features/engineering.md) and [runtime contracts](docs/designs/runtime-contracts.md). See [governance](GOVERNANCE.md) for branch and release ownership. Preserve approval, frozen-snapshot, and durable-replay guarantees. Store credentials only in SecretStore. Tests must use disposable `STEWARD_DATA_ROOT` directories. Publishing releases requires explicit authorization.
+Follow the [engineering workflow](docs/features/engineering.md), [runtime contracts](docs/designs/runtime-contracts.md), and [governance](GOVERNANCE.md). Preserve approvals, frozen snapshots, and durable replay. Store credentials only in SecretStore. Releases require explicit authorization; remote branch deletion requires governance checks and exact-head leases.
 
-Keep the README and favicon derived from the current Ghost atlas; `web/artwork/source/` contains build inputs, not public assets. Preserve third-party notices in native packages. Before deleting remote branches, check exact heads and open PRs. Normally require merged PR evidence. The owner may explicitly retire unmerged work after a verified restorable backup; never infer that authorization from age or failing checks. Use exact-head leases for deletion. See governance for the full rule.
+Derive README/favicon artwork from the current Ghost atlas; `web/artwork/source/` is build input. Preserve third-party notices.
