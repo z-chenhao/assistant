@@ -51,6 +51,11 @@ func (t *tools) requestTaskFeedback(ctx context.Context, tx *sql.Tx, change *tas
 			return tool.Result{}, err
 		}
 	}
+	if kind == "input" {
+		if err := saveFeishuTaskQuestion(ctx, tx, change, source); err != nil {
+			return tool.Result{}, err
+		}
+	}
 	change.receiptStatus = change.status
 	return tool.Result{}, nil
 }
@@ -137,10 +142,10 @@ func (r *Runs) RespondTaskFeedback(ctx context.Context, ref, answer string) (age
 	return r.respondTaskFeedback(ctx, ref, answer, nil)
 }
 
-// RespondTaskFeedbackInbound accepts a bound Web response through the same
+// RespondTaskFeedbackInbound accepts a bound Web or Feishu response through the same
 // feedback identity as the owner CLI. The first accepted source keeps its route.
 func (r *Runs) RespondTaskFeedbackInbound(ctx context.Context, e interaction.InboundEvent, ref, answer string) (agent.Receipt, error) {
-	if e.Channel != "web" || e.Validate() != nil {
+	if e.Validate() != nil {
 		return agent.Receipt{}, interaction.ErrUnauthorized
 	}
 	return r.respondTaskFeedback(ctx, ref, answer, &e)
@@ -186,7 +191,9 @@ func (r *Runs) respondTaskFeedback(ctx context.Context, ref, answer string, inbo
 	if inbound != nil {
 		// The question is the logical source; page submissions are callback
 		// aliases. This preserves cross-page retries without extra source rows.
-		inbound.SourceID = "task-feedback:" + ref
+		if inbound.Channel == "web" {
+			inbound.SourceID = "task-feedback:" + ref
+		}
 		inbound.Content = parts
 	}
 	return r.submit(ctx, "task-feedback:"+ref, parts, inbound, ref)

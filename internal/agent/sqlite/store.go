@@ -140,7 +140,10 @@ var taskCodeEnvironmentsSQL string
 //go:embed migrations/038_github_rule_observation.sql
 var githubRuleObservationSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL, githubRuleObservationSQL}
+//go:embed migrations/039_feishu_task_questions.sql
+var feishuTaskQuestionsSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL, githubRuleObservationSQL, feishuTaskQuestionsSQL}
 
 type Store struct {
 	inspector   *inspectionsqlite.Inspector

@@ -106,6 +106,7 @@ class Sandbox:
                             return
                         outer.messages[key] = message
                         result = dict(message_id='remote-' + key)
+                        outer.sources[result['message_id']] = message['receive_id']
                         kind, delay = 'send', outer.send_delay
                         drop = outer.drop_response
                     else:

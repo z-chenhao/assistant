@@ -52,6 +52,14 @@
 
 聚焦验证可复用已有函数：`PYTHONPATH=tests/system python3 -c 'from pathlib import Path; from verify_channels import feishu_topic_delivery; feishu_topic_delivery(Path("bin/steward").resolve(), {"checks": [], "scenarios": {}})'`。跨模块变更仍运行 `make test lint` 和相关 channels 系统门禁。合成模型证明机械链路，不证明摘要的真实模型质量或远端平台可达性。
 
+<a id="feishu-task-question-tests"></a>
+
+### 个人飞书 Task 问题卡（F-004/F-020）
+
+`verify_channels.py --feishu-questions-only` 从签名原消息经过真实 Main、持久问题、投递 outbox 和受控 HTTP peer 生成卡片。使用实际卡片回执提交新版签名表单，验证 durable Main 输入、同 Task 一次接续、同步回复引用卡片与异步结果引用原 Task 消息。覆盖 CLI/Web/飞书同答重试、不同答案冲突、错误身份/会话、转发/换卡、审批组件、过期因果、暂停、撤权重绑、显式 TUI 偏好与本地来源。发送已到 peer 但丢失确认时，拒绝该卡回应，重启保持查询语义。
+
+[Feishu 任务问题边界测试](../../internal/agent/sqlite/feishu_task_question_test.go) 阻塞真实本地 HTTP token 交换，验证凭据返回前撤权和 Forget 后卡片无法发送。已有回执上的 CLI 优先回复保留原路由，Forget 后拒绝飞书重放并保留既有投递回执。真实飞书客户端的表单呈现、权限与回调仍需单独验证。
+
 ## 详细测试入口与证明边界
 
 本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
