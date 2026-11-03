@@ -13,7 +13,7 @@
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
 | [F-028](../features/operations.md#f-028) | 验证备份认证、坏包拒绝、隔离恢复、兼容升级及激活 fencing。 | 保护已接通的限定范围；Live/配置另行验证 |
-| [F-028](../features/operations.md#f-028) | 首个支持平台实际安装/启用/关闭界面、杀死主服务、依赖失效、正常重启、升级与人工停机；检查巡检独立、单实例、持久工作不丢失、unknown 不重发、通知去重。先用隔离服务与数据根，再做平台 Live；既有前台恢复测试不能证明后台部署完成。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+| [F-028](../features/operations.md#f-028) | macOS 后台安装保持 inactive；start/stop/卸载、关闭浏览器、进程死亡、未配置/凭据/依赖退化、重启限速、修复升级及人工停止竞争。OS 锁保持单实例，独立巡检只恢复进程，不重放副作用，固定提示去重。 | 服务包使用真实文件/OS 锁与 launchctl 注册协议 peer；CLI 运行真实 Web/runtime；隔离 macOS 账户的 launchd/登录/Keychain Live 验收与主动渠道告警仍待补 |
 | [F-029](../features/operations.md#f-029) | 验证价格冻结、并发预留、usage 缺失和授权等待/拒绝的执行边界。 | 保护已接通的限定范围；Live/配置另行验证 |
 
 ## 层级与关键路径
@@ -30,8 +30,12 @@
 | --- | --- |
 | [tests/system/verify_operations.py](../../tests/system/verify_operations.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_spend.py](../../tests/system/verify_spend.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [internal/operations/service/service_test.go](../../internal/operations/service/service_test.go) | 安装不启用、XML/argv、凭据不复制、持久停止及信号失败、双实例拒绝、独立巡检、健康过期、有限崩溃恢复、提示去重、配置修复/升级与元数据 fail-closed；外部 launchctl 用注册协议 peer，不更改宿主登录会话 |
+| [cmd/steward/service_test.go](../../cmd/steward/service_test.go) | 真 CLI service install/run/status/inspect 与 loopback Web/setup_required；浏览器断开不关闭服务、持久停机被运行时观察到、排队启动不恢复停止意图；macOS 才执行实际后台 CLI，其他平台验证明确拒绝 |
 
 现有入口仍需在后续相关实现变更时按风险运行；需求范围变化时同步扩展场景。
+
+后台变更运行 `go test -race ./internal/operations/service ./cmd/steward`，再运行跨模块门禁。CLI 测试以隔离 HOME/data root 安装不活动 jobs，并以 enabled 元数据作为启动进程边界 fixture；完整 start/launchctl 注册流程由服务包 peer 验证，不能将此称为真实 launchd 安装启用验收。真实平台补充场景：隔离 macOS 用户中从已安装二进制启用，关闭浏览器、SIGKILL 主进程、注销/重新登录、Keychain 锁定/失效、升级重装、人工 stop 与检查并发；核对已有 Task/冻结审批/unknown 状态未被重置。现有 runtime 恢复门禁证明持久工作边界，不代替该平台验证。主动渠道通知尚未实现，本轮只验证本地 notice 去重。
 
 ## 详细测试入口与证明边界
 

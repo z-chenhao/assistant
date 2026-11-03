@@ -30,6 +30,8 @@ const (
 	commandChannel
 	commandAutomation
 	commandOps
+	commandGitHub
+	commandService
 	commandEvidence
 )
 
@@ -46,6 +48,7 @@ type commandGrammar struct {
 // configuration/state is opened; handlers do not independently admit commands.
 var commandGrammars = map[string]commandGrammar{
 	"evidence":   {commandEvidence, map[string][]int{"read": {2}}},
+	"github":     {commandGitHub, map[string][]int{"status": {2}, "poll": {2}, "events": {2, 3}, "stop": {2}, "resume": {2}}},
 	"model":      {commandModel, map[string][]int{"add": {2, 4, 5}, "discover": {3, 4}, "list": {2}, "cancel": {2}, "accounts": {2}, "catalog": {2, 3}, "login": {2, 3}, "login-chatgpt": {2, 3}, "test": {3}, "refresh": {3}, "logout": {3}, "account-catalog": {3}, "account-add": {4}, "select": {5}}},
 	"chat":       {commandChat, map[string][]int{"send": {2, 3}, "send-parts": {2, 3}, "work": {2}, "history": {2}}},
 	"artifact":   {commandArtifact, map[string][]int{"save": {4}, "delete": {4}, "open": {3}, "describe": {3}, "cleanup": {2, 3}}},
@@ -59,6 +62,7 @@ var commandGrammars = map[string]commandGrammar{
 	"channel":    {commandChannel, map[string][]int{"manage": {2}, "status": {2}, "check": {2}}},
 	"automation": {commandAutomation, map[string][]int{"manage": {3}, "list": {2}, "tick": {2}, "work": {2}}},
 	"ops":        {commandOps, map[string][]int{"health": {2}, "report": {2}, "broker": {2}, "upgrade-broker": {2}, "trace": {3}, "activate": {3}, "backup": {4}, "restore": {4}, "retry-event": {4}}},
+	"service":    {commandService, map[string][]int{"install": {2}, "start": {2, 3}, "stop": {2, 3}, "status": {2, 3}, "uninstall": {2, 3}, "run": {3}, "inspect": {3}}},
 }
 
 func selectCommand(flags *flag.FlagSet, in io.Reader) (command, error) {

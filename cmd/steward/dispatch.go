@@ -25,6 +25,8 @@ func dispatchCommand(ctx context.Context, application *app.App, cfg config.Confi
 	switch command.kind {
 	case commandEvidence:
 		return runEvidence(ctx, application, in, out)
+	case commandGitHub:
+		return runGitHub(ctx, application, flags, out)
 	case commandWeb:
 		return runWeb(ctx, application, cfg, out, foreground)
 	case commandChannel:
