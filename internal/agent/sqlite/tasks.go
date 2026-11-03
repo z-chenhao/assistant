@@ -269,8 +269,18 @@ func (t *tools) executeTask(ctx context.Context, inv tool.Invocation) (tool.Resu
 		if source == "" {
 			return agent.ErrConflict
 		}
+
 		err = tx.QueryRowContext(ctx, `SELECT receipt_json FROM task_request WHERE source_message_id=? AND request_hash=?`, source, hash).Scan(&receipt)
 		if err == sql.ErrNoRows {
+			if request.Operation == "append" {
+				if err := t.runs.guardFeedbackAppend(ctx, tx, source, request.TaskRef, request.FeedbackRef); err != nil {
+					if errors.Is(err, task.ErrFeedbackStale) {
+						result = tool.Failure("INVALID_ARGUMENT")
+						return nil
+					}
+					return err
+				}
+			}
 			var agentID, conv string
 			if err = tx.QueryRowContext(ctx, `SELECT agent_id,conversation_id FROM run WHERE run_id=?`, t.claim.RunID()).Scan(&agentID, &conv); err != nil {
 				return err
@@ -293,7 +303,7 @@ func (t *tools) executeTask(ctx context.Context, inv tool.Invocation) (tool.Resu
 			}
 			ref, taskID, receiptStatus, epoch = change.reference, change.id, change.receiptStatus, change.epoch
 
-			receipt, _ = encoded(task.Receipt{TaskRef: ref, Status: receiptStatus, Accepted: true})
+			receipt, _ = encoded(task.Receipt{TaskRef: ref, Status: receiptStatus, Accepted: true, FeedbackRef: change.feedbackRef})
 			if _, err = tx.ExecContext(ctx, `INSERT INTO task_request VALUES(?,?,?,?)`, source, hash, receipt, inv.ID); err != nil {
 				return err
 			}

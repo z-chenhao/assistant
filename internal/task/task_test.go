@@ -8,6 +8,66 @@ import (
 	"github.com/z-chenhao/assistant/internal/tool"
 )
 
+func TestTaskFeedbackContract(t *testing.T) {
+	for _, raw := range []string{
+		`{"operation":"request_input","taskRef":"task:opaque","prompt":"Which date?"}`,
+		`{"operation":"request_review","taskRef":"task:opaque","prompt":"Review revision A","artifactRefs":["artifact:revision-a"]}`,
+		`{"operation":"append","taskRef":"task:opaque","instruction":"Revise it","feedbackRef":"feedback:opaque"}`,
+	} {
+		if _, err := ParseManage(raw); err != nil || !tool.Validate(ManageSchema, raw) {
+			t.Fatal("valid feedback rejected", raw, err)
+		}
+	}
+	for _, raw := range []string{
+		`{"operation":"request_input","taskRef":"task:opaque","prompt":""}`,
+		`{"operation":"request_input","taskRef":"task:opaque","prompt":null}`,
+		`{"operation":"request_input","taskRef":"task:opaque","prompt":"One","prompt":"Two"}`,
+		`{"operation":"request_input","taskRef":"task:opaque","prompt":"Which?","instruction":"Act"}`,
+		`{"operation":"request_input","taskRef":"task:opaque","prompt":"Which?","artifactRefs":[]}`,
+		`{"operation":"request_review","taskRef":"task:opaque","prompt":"Review"}`,
+		`{"operation":"request_review","taskRef":"task:opaque","prompt":"Review","artifactRefs":[]}`,
+		`{"operation":"request_review","taskRef":"task:opaque","prompt":"Review","artifactRefs":null}`,
+		`{"operation":"append","taskRef":"task:opaque","instruction":"Act","feedbackRef":""}`,
+		`{"operation":"append","taskRef":"task:opaque","instruction":"Act","feedbackRef":"feedback:"}`,
+		`{"operation":"append","taskRef":"task:opaque","instruction":"Act","feedbackRef":null}`,
+		`{"operation":"pause","taskRef":"task:opaque","feedbackRef":"feedback:opaque"}`,
+	} {
+		if _, err := ParseManage(raw); err == nil {
+			t.Fatal("invalid feedback accepted", raw)
+		}
+	}
+	tooMany := make([]string, 17)
+	for i := range tooMany {
+		tooMany[i] = "artifact:revision"
+	}
+	refs, _ := json.Marshal(tooMany)
+	if _, err := ParseManage(`{"operation":"request_review","taskRef":"task:opaque","prompt":"Review","artifactRefs":` + string(refs) + `}`); err == nil {
+		t.Fatal("unbounded review accepted")
+	}
+	// Simulate the immediately preceding schema: frozen old Main requests retain
+	// their exact definitions, and cannot silently gain the new feedback arms.
+	defs := Definitions()
+	var old tool.Spec
+	for i := range defs {
+		if defs[i].Spec.Name != ManageName {
+			continue
+		}
+		var schema map[string]any
+		if err := json.Unmarshal([]byte(defs[i].Spec.InputSchema), &schema); err != nil {
+			t.Fatal(err)
+		}
+		arms := schema["oneOf"].([]any)[:5]
+		delete(arms[1].(map[string]any)["properties"].(map[string]any), "feedbackRef")
+		schema["oneOf"] = arms
+		raw, _ := json.Marshal(schema)
+		defs[i].Spec.InputSchema = string(raw)
+		old = defs[i].Spec
+	}
+	if _, err := Registry().Select([]tool.Spec{old}); err == nil {
+		t.Fatal("old frozen feedback schema silently replaced")
+	}
+}
+
 func TestCompleteContract(t *testing.T) {
 	raw := `{"operation":"complete","taskRef":"task:opaque"}`
 	if _, err := ParseManage(raw); err != nil || !tool.Validate(ManageSchema, raw) {

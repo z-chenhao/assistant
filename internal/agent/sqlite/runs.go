@@ -24,6 +24,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/memory"
 	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
 	sqlitedriver "modernc.org/sqlite"
@@ -100,7 +101,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{artifact.ErrNotFound, artifact.ErrIntegrity, artifact.ErrInvalid, artifact.ErrLimit, artifact.ErrConflict, interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{task.ErrFeedbackStale, task.ErrNotFound, artifact.ErrNotFound, artifact.ErrIntegrity, artifact.ErrInvalid, artifact.ErrLimit, artifact.ErrConflict, interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -123,17 +124,17 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 }
 
 func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.ContentPart) (agent.Receipt, error) {
-	return r.submit(ctx, key, parts, nil)
+	return r.submit(ctx, key, parts, nil, "")
 }
 
 func (r *Runs) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
 	if err := e.Validate(); err != nil {
 		return agent.Receipt{}, err
 	}
-	return r.submit(ctx, "", e.Content, &e)
+	return r.submit(ctx, "", e.Content, &e, "")
 }
 
-func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent) (agent.Receipt, error) {
+func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent, feedbackRef string) (agent.Receipt, error) {
 	parts, err := conversation.Normalize(parts)
 	if err != nil {
 		return agent.Receipt{}, err
@@ -175,6 +176,11 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		if err != sql.ErrNoRows {
 			return err
 		}
+		if feedbackRef != "" {
+			if err := r.requireCurrentFeedback(ctx, tx, feedbackRef, "", false); err != nil {
+				return err
+			}
+		}
 		if profile == "" || status != "ready" {
 			return agent.ErrSetup
 		}
@@ -214,6 +220,12 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		if _, err = tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, receipt.MessageID, raw); err != nil {
 			return err
 		}
+		if feedbackRef != "" {
+			if _, err = tx.ExecContext(ctx, `UPDATE task_feedback SET status='answered',response_message_id=? WHERE feedback_ref=? AND status='pending'`, receipt.MessageID, feedbackRef); err != nil {
+				return err
+			}
+			r.host.boundary("before_task_feedback_response_commit")
+		}
 		if bindingID != "" {
 			if _, err = tx.ExecContext(ctx, `INSERT INTO message_route VALUES(?,?)`, receipt.MessageID, bindingID); err != nil {
 				return err
@@ -226,6 +238,9 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 	})
 	if inbound != nil && err == nil {
 		r.host.boundary("after_channel_input_commit")
+	}
+	if feedbackRef != "" && err == nil {
+		r.host.boundary("after_task_feedback_response_commit")
 	}
 	return receipt, err
 }

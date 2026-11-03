@@ -19,6 +19,7 @@ def state(h):
         db.row_factory = sqlite3.Row
         for key, query in {
             "tasks": "SELECT * FROM task ORDER BY created_at,task_id",
+            "feedbacks": "SELECT * FROM task_feedback ORDER BY rowid",
             "instructions": "SELECT * FROM task_instruction ORDER BY sequence",
             "updates": "SELECT * FROM task_update ORDER BY occurred_at,event_id",
             "inbox": "SELECT * FROM main_inbox ORDER BY sequence",
@@ -143,6 +144,96 @@ def run(binary):
 
         report["ongoing"] = scenario("ongoing", ongoing)
         report["checks"].append("Explicit ongoing create -> Root stays active -> complete and duplicate/rejection -> append/new Root -> pause/continue/cancel; no synthetic update")
+
+        def feedback(h):
+            h.send("feedback-create", "Ongoing: Report scope")
+            h.command("chat", "work")
+            first = state(h)
+            ref = first["tasks"][0]["task_ref"]
+            h.send("question", f"Question: {ref} | Which reporting period?")
+            h.command("chat", "work")
+            page = h.command("task", "feedbacks", ref)
+            require(len(page["items"]) == 1 and page["items"][0]["kind"] == "input", "question not visible through owner CLI")
+            question = page["items"][0]
+            require(question["task_ref"] == ref and question["source_message_id"], "question lost exact Task/message linkage")
+            before = state(h)
+            receipt = h.command("task", "respond", question["feedback_ref"], text="Use the last full quarter.")
+            require(h.command("task", "respond", question["feedback_ref"], text="Use the last full quarter.") == receipt,
+                    "retry/restart changed response receipt")
+            accepted = state(h)
+            require(len([r for r in accepted["runs"] if r["kind"] == "worker"]) == 1 and accepted["instructions"] == before["instructions"],
+                    "owner response directly started work")
+            h.command("chat", "work")
+            continued = state(h)
+            check(continued, roots=2, updates=2)
+            require(continued["tasks"][0]["task_ref"] == ref and len(continued["instructions"]) == 1,
+                    "Main did not continue original Task exactly once")
+            require(h.command("task", "feedbacks")["items"] == [], "answered feedback remains actionable")
+            conflict = h.command("task", "respond", question["feedback_ref"], text="Different answer", ok=False)
+            require(conflict.returncode != 0, "different duplicate answer accepted")
+            h.send("stale-question", f"Question: {ref} | Confirm the date?")
+            h.command("chat", "work")
+            pending = h.command("task", "feedbacks", ref)["items"][0]
+            h.send("stop-feedback", "Pause: Report scope")
+            h.command("chat", "work")
+            stale = h.command("task", "respond", pending["feedback_ref"], text="Continue", ok=False)
+            require(stale.returncode != 0 and h.command("task", "feedbacks")["items"] == [], "paused question remained actionable")
+            return {"question": question, "receipt": receipt, "accepted": accepted, "continued": continued,
+                    "paused": state(h), "stale_error": stale.stderr}
+
+        report["feedback"] = scenario("feedback", feedback)
+        report["checks"].append("Main saves exact Task/message question -> owner CLI list/respond across processes -> dedup -> Main append -> same Task Root; paused stale response rejected")
+
+        def artifact_review(h):
+            h.send("create", "Ongoing: Report review")
+            h.command("chat", "work")
+            ref = state(h)["tasks"][0]["task_ref"]
+            artifact = h.command("artifact", "save", "report.txt", "text/plain", text="Report revision A")
+            parts = [{"type": "text", "text": f"Review: {ref} | {artifact['artifact_ref']} | Review the introduction."},
+                     {"type": "file", "artifact_ref": artifact["artifact_ref"]}]
+            h.command("chat", "send-parts", "review-request", text=json.dumps(parts))
+            h.command("chat", "work")
+            review = h.command("task", "feedbacks", ref)["items"][0]
+            require(review["kind"] == "review" and review["artifact_refs"] == [artifact["artifact_ref"]], "review lost exact artifact revision")
+            h.command("task", "respond", review["feedback_ref"], text="Clarify the introduction.")
+            require(h.command("approval", "list") == [], "artifact review became an action approval")
+            h.command("chat", "work")
+            result = state(h)
+            check(result, roots=2, updates=2)
+            require(len(result["instructions"]) == 1 and result["tasks"][0]["task_ref"] == ref
+                    and json.loads(result["instructions"][0]["artifact_refs"]) == [artifact["artifact_ref"]],
+                    "review did not continue exact original task/revision")
+            require(h.command("artifact", "describe", artifact["artifact_ref"])["content_hash"] == artifact["content_hash"],
+                    "review changed artifact revision")
+            return {"review": review, "artifact": artifact, "continued": result}
+
+        report["artifact_review"] = scenario("artifact-review", artifact_review)
+        report["checks"].append("Uploaded exact ArtifactRef -> Main saved review -> owner feedback -> Main continuation; action approval stays separate")
+
+        for boundary in ("before_task_feedback_response_commit", "after_task_feedback_response_commit"):
+            def feedback_crash(h):
+                h.send("create", "Ongoing: Report feedback recovery")
+                h.command("chat", "work")
+                ref = state(h)["tasks"][0]["task_ref"]
+                h.send("question", f"Question: {ref} | Which reporting period?")
+                h.command("chat", "work")
+                item = h.command("task", "feedbacks", ref)["items"][0]
+                child = h.hold(boundary, command=("task", "respond", item["feedback_ref"]), input_text="Use the last quarter.")
+                child.kill(); child.wait(timeout=5)
+                killed = state(h)
+                expected = "pending" if boundary.startswith("before") else "answered"
+                require(killed["feedbacks"][0]["status"] == expected, "response transaction crossed its kill boundary")
+                receipt = h.command("task", "respond", item["feedback_ref"], text="Use the last quarter.")
+                require(h.command("task", "respond", item["feedback_ref"], text="Use the last quarter.") == receipt,
+                        "response recovery lost dedup")
+                h.command("chat", "work")
+                recovered = state(h)
+                check(recovered, roots=2, updates=2)
+                require(len(recovered["instructions"]) == 1 and recovered["feedbacks"][0]["status"] == "answered",
+                        "response recovery repeated continuation")
+                return {"boundary": boundary, "killed": killed, "recovered": recovered}
+            report["crashes"].append(scenario(boundary, feedback_crash))
+        report["checks"].append("SIGKILL before/after atomic feedback response -> reopen/retry -> one Main input and one continuation")
 
         for boundary in ("before_task_commit", "after_task_commit", "before_result_commit", "after_result_commit"):
             def ongoing_crash(h):

@@ -23,6 +23,8 @@ func dispatchCommand(ctx context.Context, application *app.App, cfg config.Confi
 		application.StartMemory(ctx)
 	}
 	switch command.kind {
+	case commandTask:
+		return runTask(ctx, application, flags, in, out)
 	case commandWeb:
 		return runWeb(ctx, application, cfg, out, foreground)
 	case commandChannel:
