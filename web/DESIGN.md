@@ -147,7 +147,7 @@ This is a private Web presentation system for the owner's ongoing conversation a
 
 **Key Characteristics:**
 - One collapsible navigation sidebar and a centered conversation.
-- Near-white and charcoal surfaces with grayscale status treatments and restrained danger color.
+- Near-white and charcoal surfaces with muted status labels and small semantic dots: green ready, blue working, amber setup, red degraded and gray unknown. Light/dark status colors are defined in foundation.css; status text remains explicit so color is never the only signal.
 - Inter controls, serif reply prose, a Michroma wordmark and a stable, expressive ghost.
 - Real tasks, artifacts and frozen approvals presented with their existing semantics.
 
