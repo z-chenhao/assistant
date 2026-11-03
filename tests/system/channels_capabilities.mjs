@@ -20,7 +20,7 @@ export async function capabilitySetup(page,context,url,evidence){
  await test('encryption_key_ref: env:COLLIE_SETUP_MEMORY_KEY\n');
  await page.getByText('The referenced 32-byte encryption key is available.',{exact:false}).waitFor();
  await page.reload();if(!await page.locator('#capability-configuration').inputValue().then(v=>v.includes('COLLIE_SETUP_MEMORY_KEY')))throw Error('PRG lost tested draft');
- await save();await page.getByRole('status').filter({hasText:'Restart Collie to load'}).waitFor();
+ await save();await page.getByRole('status').filter({hasText:'Restart Steward to load'}).waitFor();
  await page.screenshot({path:evidence+'/memory-saved.png',fullPage:true});
  await open('embedding');
  await test({provider:'openai_compatible',endpoint:facts.embedding,model:'semantic-fixture-v1',dimensions:2});
