@@ -46,7 +46,7 @@
 
 原消息与成果投影回归入口：
 
-- [reply_origin_test.go](../../internal/agent/sqlite/reply_origin_test.go)：真实 SQLite 与 Actor 验证 create 来源、同步/Task 结果、显式偏好、旧路由不回填及失败迁移回滚；既有 Channel 回归继续覆盖 CAS、撤权、route/projection 冻结和回调去重。
+- [reply_origin_test.go](../../internal/agent/sqlite/reply_origin_test.go)：真实 SQLite 与 Actor 验证 create 来源、同步/Task 结果、显式偏好、旧路由不回填及失败迁移回滚；CLI/Web 反馈回复保留实际作答渠道，接续 Task 的异步结果仍回原飞书话题，同答 CLI 重试复用原 receipt 且不增加通知。既有 Channel 回归继续覆盖 CAS、撤权、route/projection 冻结和回调去重。
 - [projection_test.go](../../internal/interaction/feishu/projection_test.go)：真实 HTTP reply wire、原来源转义、无自选接收者、目标失效无 fallback、可信 origin 校验、摘要边界和审批全文。
 - `verify_channels.py` 的 `feishu_topic_delivery`：签名 callback→Main→Task→冻结 Delivery→HTTP peer，检查原消息回传、Conversation 分页锚点、完整 Artifact、单一简短通知、重启/重复回调、显式 TUI 偏好与 unknown 不重发。`feishu_auth_lifecycle` 和现有 multipart/租约场景同时覆盖 source reply；无 workspace 配置保留原全文/附件。
 
