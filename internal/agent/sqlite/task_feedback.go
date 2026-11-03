@@ -78,7 +78,12 @@ func scanFeedback(row interface{ Scan(...any) error }) (task.Feedback, error) {
 // revocation excludes old question content; reads never mutate lifecycle.
 func (s *Store) TaskFeedbacks(ctx context.Context, taskRef, before string) (task.FeedbackPage, error) {
 	out := task.FeedbackPage{Items: []task.Feedback{}}
-	rows, err := s.db.QueryContext(ctx, `SELECT `+feedbackColumns+` FROM task_feedback f JOIN task t USING(task_id) LEFT JOIN memory_privacy p USING(agent_id)
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return out, agent.ErrStorage
+	}
+	defer tx.Rollback()
+	rows, err := tx.QueryContext(ctx, `SELECT `+feedbackColumns+` FROM task_feedback f JOIN task t USING(task_id) LEFT JOIN memory_privacy p USING(agent_id)
  WHERE t.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1)
  AND (?='' OR t.task_ref=?) AND (?='' OR f.rowid<(SELECT b.rowid FROM task_feedback b JOIN task bt USING(task_id) WHERE b.feedback_ref=? AND bt.agent_id=t.agent_id))
  AND f.status='pending' AND f.expires_at>? AND f.task_epoch=t.task_epoch AND t.status IN ('active','completed')
@@ -87,19 +92,41 @@ func (s *Store) TaskFeedbacks(ctx context.Context, taskRef, before string) (task
 	if err != nil {
 		return out, agent.ErrStorage
 	}
-	defer rows.Close()
+	candidates := []task.Feedback{}
 	for rows.Next() {
 		v, err := scanFeedback(rows)
 		if err != nil {
+			rows.Close()
 			return out, agent.ErrStorage
 		}
-		if len(out.Items) == 50 {
-			out.Next = out.Items[49].Ref
+		if len(candidates) == 50 {
+			out.Next = candidates[49].Ref
 			break
+		}
+		candidates = append(candidates, v)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return out, agent.ErrStorage
+	}
+	// Reuse ArtifactStore's owner/access/retention predicates in the same read
+	// snapshot. Do not duplicate its task-protected expiry rules or open blobs.
+	// A page inspects at most 50 candidates; Next also advances past hidden
+	// stale artifacts, so filtering cannot strand older current requests.
+	for _, v := range candidates {
+		if err := s.requireCurrentFeedback(ctx, tx, v.Ref, v.TaskRef, false); err != nil {
+			if errors.Is(err, task.ErrFeedbackStale) {
+				continue
+			}
+			return out, agent.ErrStorage
 		}
 		out.Items = append(out.Items, v)
 	}
-	return out, rows.Err()
+	if err := tx.Commit(); err != nil {
+		return out, agent.ErrStorage
+	}
+	return out, nil
 }
 
 // RespondTaskFeedback only accepts owner input to Main. The existing Main
@@ -147,7 +174,7 @@ func (r *Runs) RespondTaskFeedback(ctx context.Context, ref, answer string) (age
 
 // requireCurrentFeedback joins ingress and later Main Task admission so a
 // pause/cancel/Forget/new epoch after an answer cannot be undone by that answer.
-func (r *Runs) requireCurrentFeedback(ctx context.Context, tx *sql.Tx, ref, taskRef string, answered bool) error {
+func (s *Store) requireCurrentFeedback(ctx context.Context, tx *sql.Tx, ref, taskRef string, answered bool) error {
 	status := "pending"
 	if answered {
 		status = "answered"
@@ -167,7 +194,7 @@ func (r *Runs) requireCurrentFeedback(ctx context.Context, tx *sql.Tx, ref, task
 	// Artifact refs are immutable revisions; a new review supersedes the old
 	// request, and deletion/expiry must not turn into a review of missing data.
 	for _, ref := range artifacts {
-		if _, err := r.host.Artifacts().DescribeTx(ctx, tx, artifact.Scope{UserID: artifact.LocalUser, AgentID: agentID, Owner: true}, ref, true); err != nil {
+		if _, err := s.Artifacts().DescribeTx(ctx, tx, artifact.Scope{UserID: artifact.LocalUser, AgentID: agentID, Owner: true}, ref, true); err != nil {
 			if errors.Is(err, artifact.ErrNotFound) || errors.Is(err, artifact.ErrIntegrity) {
 				return task.ErrFeedbackStale
 			}
@@ -182,7 +209,7 @@ func (r *Runs) guardFeedbackAppend(ctx context.Context, tx *sql.Tx, source, task
 	err := tx.QueryRowContext(ctx, `SELECT feedback_ref FROM task_feedback WHERE response_message_id=?`, source).Scan(&ref)
 	if err == sql.ErrNoRows {
 		if expectedRef != "" {
-			return r.requireCurrentFeedback(ctx, tx, expectedRef, taskRef, true)
+			return r.host.requireCurrentFeedback(ctx, tx, expectedRef, taskRef, true)
 		}
 		return nil
 	}
@@ -192,5 +219,5 @@ func (r *Runs) guardFeedbackAppend(ctx context.Context, tx *sql.Tx, source, task
 	if expectedRef != "" && expectedRef != ref {
 		return task.ErrFeedbackStale
 	}
-	return r.requireCurrentFeedback(ctx, tx, ref, taskRef, true)
+	return r.host.requireCurrentFeedback(ctx, tx, ref, taskRef, true)
 }

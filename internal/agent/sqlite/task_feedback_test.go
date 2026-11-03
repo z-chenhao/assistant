@@ -152,7 +152,7 @@ func TestTaskFeedbackRejectsStaleAndKeepsApprovalsSeparate(t *testing.T) {
 
 			case "wrong_task":
 				if err := r.write(context.Background(), func(tx *sql.Tx) error {
-					return r.requireCurrentFeedback(context.Background(), tx, f.Ref, "task:another", false)
+					return s.requireCurrentFeedback(context.Background(), tx, f.Ref, "task:another", false)
 				}); !errors.Is(err, task.ErrFeedbackStale) {
 					t.Fatal("wrong task accepted", err)
 				}
@@ -323,7 +323,7 @@ func TestTaskFeedbackReviewRetainsExactArtifactRevision(t *testing.T) {
 	if next.Ref == f.Ref || next.ArtifactRefs[0] == artifactRef {
 		t.Fatal("new revision reused old review", next)
 	}
-	if err := r.write(context.Background(), func(tx *sql.Tx) error { return r.requireCurrentFeedback(context.Background(), tx, f.Ref, ref, true) }); !errors.Is(err, task.ErrFeedbackStale) {
+	if err := r.write(context.Background(), func(tx *sql.Tx) error { return s.requireCurrentFeedback(context.Background(), tx, f.Ref, ref, true) }); !errors.Is(err, task.ErrFeedbackStale) {
 		t.Fatal("old revision feedback became current", err)
 	}
 	feedbackAction(t, a, p, "continue-old-review", task.ManageRequest{Operation: "append", TaskRef: ref, FeedbackRef: f.Ref, Instruction: "Use the old review"})
@@ -390,5 +390,87 @@ func TestTaskFeedbackEscapedAnswerRetainsValidContentBounds(t *testing.T) {
 	}
 	if _, err := conversation.Normalize(message.Content); err != nil {
 		t.Fatal("stored response does not satisfy provider content contract", err)
+	}
+}
+
+func TestTaskFeedbackListReusesArtifactAccessAndProtectedExpiry(t *testing.T) {
+	for _, mode := range []string{"deleted", "missing", "other_owner", "expired", "protected"} {
+		t.Run(mode, func(t *testing.T) {
+			s, r, a, p, ref := feedbackFixture(t)
+			scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), Owner: true}
+			artifactRef, err := s.Artifacts().Put(context.Background(), scope, artifact.Input{Name: "revision.txt", MediaType: "text/plain"}, strings.NewReader("A"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			f := requestFeedback(t, s, a, p, ref, artifactRef)
+			if mode == "deleted" {
+				if _, err := s.db.Exec(`UPDATE artifact SET deleted_at=?,version=version+1 WHERE artifact_ref=?`, time.Now().UnixMicro(), artifactRef); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				// A metadata read fixture checks unusable historical references and
+				// protected TTLs without opening a blob or bypassing a model guard.
+				fixtureRef := "artifact:" + digest(newID())
+				owner := artifact.LocalUser
+				expires := int64(2)
+				if mode == "other_owner" {
+					owner = "another-user"
+					expires = time.Now().Add(24 * time.Hour).UnixMicro()
+				}
+				if mode != "missing" {
+					if _, err := s.db.Exec(`INSERT INTO artifact(artifact_id,artifact_ref,owner_user_id,owner_agent_id,media_type,name,byte_size,content_hash,storage_key,visibility,retention_class,created_at,expires_at) SELECT ?,?,?,owner_agent_id,media_type,name,byte_size,content_hash,?,'agent','standard',1,? FROM artifact WHERE artifact_ref=?`, newID(), fixtureRef, owner, "unopened-"+newID(), expires, artifactRef); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if mode == "protected" {
+					if _, err := s.db.Exec(`INSERT INTO artifact_reference SELECT ?,'task',task_id FROM task WHERE task_ref=?`, fixtureRef, ref); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, err := s.db.Exec(`UPDATE task_feedback SET status='superseded' WHERE feedback_ref=?`, f.Ref); err != nil {
+					t.Fatal(err)
+				}
+				refs, _ := encoded([]string{fixtureRef})
+				newRef := "feedback:" + newID()
+				if _, err := s.db.Exec(`INSERT INTO task_feedback(feedback_ref,task_id,task_epoch,privacy_epoch,kind,prompt,source_message_id,artifact_refs,status,created_at,expires_at) SELECT ?,task_id,task_epoch,privacy_epoch,kind,prompt,source_message_id,?,'pending',created_at,expires_at FROM task_feedback WHERE feedback_ref=?`, newRef, refs, f.Ref); err != nil {
+					t.Fatal(err)
+				}
+				f.Ref = newRef
+			}
+			page, err := s.TaskFeedbacks(context.Background(), ref, "")
+			want := 0
+			if mode == "protected" {
+				want = 1
+			}
+			if err != nil || len(page.Items) != want {
+				t.Fatal("list disagrees with artifact liveness", page, err)
+			}
+			if mode != "protected" {
+				if _, err := r.RespondTaskFeedback(context.Background(), f.Ref, "Review response"); !errors.Is(err, task.ErrFeedbackStale) {
+					t.Fatal("unusable artifact response accepted", err)
+				}
+			}
+		})
+	}
+}
+
+func TestTaskFeedbackListDoesNotAcquireWriteReservation(t *testing.T) {
+	s, _, a, p, ref := feedbackFixture(t)
+	requestFeedback(t, s, a, p, ref)
+	other, err := Open(context.Background(), filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	writer, err := other.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Rollback()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	page, err := s.TaskFeedbacks(ctx, ref, "")
+	if err != nil || len(page.Items) != 1 {
+		t.Fatal("read waited for another process's write reservation", page, err)
 	}
 }

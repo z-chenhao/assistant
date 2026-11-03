@@ -43,7 +43,7 @@ flowchart TD
 
 schema v34 的私有 `task_feedback` 保存确切 Task/epoch、隐私 epoch、问题种类/正文、可定位的原用户消息、成果引用、七天有效期与回应消息。一次事务替代旧 pending 并保存新记录、原有工具回执和事件；成果经原 ArtifactStore 保留。源是 Reporter 运行时事件时，回溯真实用户消息，而不把事件 ID 冒充消息 ID。新请求也使旧的已回答记录失去接续因果效力。
 
-所有者 `task feedbacks` 仅读取当前可处理 pending，按不可变行顺序以不透明 feedback ref 分页，每页最多 50 条，并可按确切 TaskRef 筛选。过期、停止、旧 epoch 和隐私撤销在读谓词中排除；历史记录保留作审计，不作为待办回传。回答先载入不可变记录构造具名上下文，再在现有 Main submit 的同一事务中权威验证当前状态/隐私/成果可访问性，提交确定性 request key、Main input、Conversation intent、已回答状态和原有唤醒事件。任何失败全部回滚；相同重试回原 receipt，不同文本冲突。
+所有者 `task feedbacks` 仅读取当前可处理 pending，按不可变行顺序以不透明 feedback ref 分页，每页最多 50 条，并可按确切 TaskRef 筛选。过期、停止、旧 epoch 和隐私撤销在读谓词中排除；同一个只读事务复用 ArtifactStore 的访问与 Task 保护型到期规则，过滤缺失、删除和不可访问成果而不打开 blob。每页检查至多 50 个候选，过滤后仍按已检查位置推进游标；历史记录保留作审计，不作为待办回传。回答先载入不可变记录构造具名上下文，再在现有 Main submit 的同一事务中权威验证当前状态/隐私/成果可访问性，提交确定性 request key、Main input、Conversation intent、已回答状态和原有唤醒事件。任何失败全部回滚；相同重试回原 receipt，不同文本冲突。
 
 回答只是用户输入，接续仍由受信 Main 调用原 append。当前消费源是反馈时，Host 自动验证关联 Task 与反馈；显式 `feedbackRef` 在后到其他用户输入时仍保留原因果检查。已接受工具请求先复用原回执，不能因接续后 epoch 增加而破坏重放。暂停/取消/Forget/新 epoch/新审阅后拒绝旧因果。全新的普通用户消息保持既有 Main 判断与生命周期语义，Host 不通过自由文本证明授权。
 

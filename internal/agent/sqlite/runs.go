@@ -177,7 +177,7 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 			return err
 		}
 		if feedbackRef != "" {
-			if err := r.requireCurrentFeedback(ctx, tx, feedbackRef, "", false); err != nil {
+			if err := r.host.requireCurrentFeedback(ctx, tx, feedbackRef, "", false); err != nil {
 				return err
 			}
 		}
