@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/interaction/web"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/recall/embedding"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/recall/embedding"
 )
 
 const maxConfig = 256 << 10

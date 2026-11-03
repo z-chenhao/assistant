@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
 )
 
 // mainHandoff carries only the immediately preceding Main's working state and

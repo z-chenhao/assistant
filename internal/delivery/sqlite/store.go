@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/collie/internal/delivery"
-	"github.com/z-chenhao/collie/internal/event"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/event"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
 )
 
 type Store struct{ DB *sql.DB }
 
 func changed(ctx context.Context, tx *sql.Tx, id, status string) error {
-	e, err := event.New("/collie/delivery", "ai.collie.delivery."+status+".v1", id, struct {
+	e, err := event.New("/steward/delivery", "ai.steward.delivery."+status+".v1", id, struct {
 		ID     string `json:"delivery_id"`
 		Status string `json:"status"`
 	}{id, status})

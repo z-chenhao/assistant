@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/z-chenhao/collie/internal/delivery"
-	"github.com/z-chenhao/collie/internal/delivery/ui"
-	"github.com/z-chenhao/collie/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
+	"github.com/z-chenhao/assistant/internal/interaction"
 )
 
 type ProjectionStore interface {

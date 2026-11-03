@@ -2,14 +2,14 @@ package secret
 
 import (
 	"context"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 	"testing"
 )
 
 func TestExplicitEnvironmentSecretAndInvalidReference(t *testing.T) {
-	t.Setenv("COLLIE_SECRET_FIXTURE", "synthetic")
+	t.Setenv("STEWARD_SECRET_FIXTURE", "synthetic")
 	s := Store{}
-	value, err := s.Get(context.Background(), "env:COLLIE_SECRET_FIXTURE")
+	value, err := s.Get(context.Background(), "env:STEWARD_SECRET_FIXTURE")
 	if err != nil || string(value) != "synthetic" {
 		t.Fatal("explicit reference failed")
 	}

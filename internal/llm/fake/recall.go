@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/recall"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 // Scripted transport evidence, never a model-quality or full SC-08 verdict.

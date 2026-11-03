@@ -2,7 +2,7 @@ package web
 
 import (
 	"context"
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 	"net/http"
 	"time"
 )

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 type frozenReader struct{ failure error }
@@ -28,7 +28,7 @@ func (f frozenReader) ContextDiff(context.Context, observability.DiffQuery) (obs
 }
 
 func TestFrozenContextAuthenticatedReadOnlyRoutesAndCompleteHTML(t *testing.T) {
-	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Contexts: frozenReader{}, Traces: traceReader{}, Inspector: &inspectionReader{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Contexts: frozenReader{}, Traces: traceReader{}, Inspector: &inspectionReader{}}
 	request := func(method, path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "http://127.0.0.1:8080"+path, nil)
 		if auth {

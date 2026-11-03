@@ -2,7 +2,7 @@ package bridge
 
 import (
 	"context"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func (c *Client) AccountStart(ctx context.Context, device string, registration *llm.AccountRegistration, credential *llm.OAuthCredential) (llm.AccountLogin, error) {

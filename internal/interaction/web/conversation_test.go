@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 func TestAuthoritativeApprovalHasOneCardWithoutRewritingUserText(t *testing.T) {

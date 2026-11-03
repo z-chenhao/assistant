@@ -6,12 +6,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/event"
-	eventnats "github.com/z-chenhao/collie/internal/event/nats"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
-	"github.com/z-chenhao/collie/internal/tool/codemode"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/event"
+	eventnats "github.com/z-chenhao/assistant/internal/event/nats"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
 
 // WaitForRuntime is the interactive selection boundary, not a model API.

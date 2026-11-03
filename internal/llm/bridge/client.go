@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 const ProtocolVersion = 1

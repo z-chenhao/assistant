@@ -42,7 +42,7 @@
 
 ```sh
 make build
-python3 tests/system/verify_automation.py --binary bin/collie --evidence evidence/automation.json
+python3 tests/system/verify_automation.py --binary bin/steward --evidence evidence/automation.json
 go test -race ./internal/automation ./internal/agent/sqlite -run 'TestAutomation|TestCalendar|TestRejectMalformed' -count=5
 ```
 
@@ -60,3 +60,9 @@ and [operations](../features/operations.md) for those implementations and their 
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## Web 手动计划回归
+
+`automation_owner_test.go` 覆盖真实 SQLite 的创建／修改／停用、版本冲突、重复收据、相同 key 的载荷漂移、所有者与撤销意图边界、未接单 fire 失效及已接单指令／快照不变。`schedules_test.go` 覆盖六类友好频率、阈值空值／0、日期时区、DST 空缺／重复、已有精确时刻往返及超限中文草稿保留；真实 HTTP 适配测试验证创建与纳秒级单次编辑重复 POST、原始时刻证明篡改拒绝。
+
+维护中的 `channels_browser.mjs` schedule 场景验证原生表单创建、修改、停用／恢复、两页冲突保留输入、重复请求与漂移拒绝、保存未来安排不派发 Task、无效时间反馈和320px布局。不新增 runner 或 CI gate。既有 automation 系统入口继续保护 CLI/Main、调度与重启恢复；结果留在本次 evidence。

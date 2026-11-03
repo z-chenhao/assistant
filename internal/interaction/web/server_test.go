@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -70,5 +72,98 @@ func TestAuthenticationCSRFRebindingSessionExpiryAndSafeErrors(t *testing.T) {
 	}
 	if AuthURL("javascript:alert(1)") != "" || AuthURL("http://untrusted") != "" {
 		t.Fatal("unsafe auth URL")
+	}
+}
+
+func TestOptionalTokenConfigKeepsLiteralLoopbackBoundary(t *testing.T) {
+	for _, config := range []Config{{Listen: "127.0.0.1:8787"}, {Listen: "[::1]:8787"}, {Listen: "127.0.0.1:8787", TokenRef: "env:WEB_TOKEN"}} {
+		if err := config.Validate(); err != nil {
+			t.Fatal(config, err)
+		}
+	}
+	for _, config := range []Config{{Listen: "0.0.0.0:8787"}, {Listen: "localhost:8787"}, {Listen: "127.0.0.1:8787", TokenRef: "literal-secret"}} {
+		if config.Validate() == nil {
+			t.Fatal("unsafe config accepted", config)
+		}
+	}
+}
+
+func TestLocalWorkspaceWithoutTokenUsesRealLoopbackAndKeepsRequestGuards(t *testing.T) {
+	core := &updatesCore{allowed: true, status: "idle"}
+	workers := &workerReader{}
+	s := &Server{Core: core, Workers: workers}
+	host := httptest.NewServer(s)
+	defer host.Close()
+	client := host.Client()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	request := func(method, path, origin, site, hostname string) *http.Response {
+		r, err := http.NewRequest(method, host.URL+path, strings.NewReader("language=zh-CN"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if origin != "" {
+			r.Header.Set("Origin", origin)
+		}
+		if site != "" {
+			r.Header.Set("Sec-Fetch-Site", site)
+		}
+		if hostname != "" {
+			r.Host = hostname
+		}
+		response, err := client.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return response
+	}
+	r := request("GET", "/", "", "none", "")
+	body, _ := io.ReadAll(r.Body)
+	r.Body.Close()
+	if r.StatusCode != 200 || strings.Contains(string(body), "Workspace access token") || !strings.Contains(string(body), `class="chat-identity"`) {
+		t.Fatal(r.StatusCode, string(body))
+	}
+	if len(r.Cookies()) != 0 {
+		t.Fatal("direct access created an auth session")
+	}
+	r = request("GET", "/api/workers", "", "same-origin", "")
+	r.Body.Close()
+	if r.StatusCode != 200 || workers.calls != 1 {
+		t.Fatal(r.StatusCode, workers.calls)
+	}
+	r = request("POST", "/settings/language", host.URL, "same-origin", "")
+	r.Body.Close()
+	if r.StatusCode != 303 || len(r.Cookies()) != 1 || r.Cookies()[0].Name != languageCookie {
+		t.Fatal("same-origin form failed", r.StatusCode, r.Cookies())
+	}
+	for _, test := range []struct{ method, origin, site, host string }{{"GET", "http://evil.example", "cross-site", ""}, {"GET", "", "cross-site", ""}, {"GET", "", "same-site", ""}, {"POST", "http://127.0.0.1:1", "same-site", ""}, {"GET", "", "", "evil.example:8787"}} {
+		r = request(test.method, "/api/workers", test.origin, test.site, test.host)
+		r.Body.Close()
+		if r.StatusCode != 403 {
+			t.Fatal("untrusted request accepted", test, r.StatusCode)
+		}
+	}
+	forged := httptest.NewRequest("GET", host.URL+"/api/workers", nil)
+	forged.RemoteAddr = "192.0.2.5:8080"
+	forged.Header.Set("X-Forwarded-For", "127.0.0.1")
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, forged)
+	if w.Code != 403 || workers.calls != 1 {
+		t.Fatal("forwarded peer trusted", w.Code, workers.calls)
+	}
+	core.allowed = false
+	r = request("GET", "/api/workers", "", "same-origin", "")
+	r.Body.Close()
+	if r.StatusCode != 403 || workers.calls != 1 {
+		t.Fatal("binding revocation bypassed", r.StatusCode, workers.calls)
+	}
+}
+
+type nonLoopbackListener struct{ net.Listener }
+
+func (nonLoopbackListener) Addr() net.Addr { return &net.TCPAddr{IP: net.IPv4zero, Port: 8787} }
+func TestTokenFreeServeRejectsNonLoopbackListener(t *testing.T) {
+	if err := (&Server{}).Serve(context.Background(), nonLoopbackListener{}); err == nil {
+		t.Fatal("token-free public listener accepted")
 	}
 }

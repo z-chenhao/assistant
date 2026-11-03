@@ -7,13 +7,13 @@ import (
 	"io"
 	"net"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/delivery"
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/interaction/feishu"
-	"github.com/z-chenhao/collie/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/interaction/feishu"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
 )
 
 func (a *App) BindChannel(ctx context.Context, c, s, d string, enabled bool, v int64) (interaction.Binding, error) {
@@ -49,7 +49,7 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 	return a.store.WebProjection(ctx, m)
 }
 func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Config) error {
-	s := web.Server{Workers: a.store.Inspector(), Computer: a, Capabilities: a.capabilitySettings, Config: cfg, Core: a, Tasks: a.store.TaskReader(), Inspector: a.store.Inspector(), Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
+	s := web.Server{Workers: a.store.Inspector(), Computer: a, Capabilities: a.capabilitySettings, Config: cfg, Core: a, Tasks: a.store.TaskReader(), Schedules: a, Inspector: a.store.Inspector(), Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
 	if a.feishu != nil {
 		s.Callback = feishu.Handler{Client: *a.feishu, Core: a, Wake: func() {
 			if s.Wake != nil {

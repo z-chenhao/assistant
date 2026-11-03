@@ -2,7 +2,7 @@ package macosvm
 
 import (
 	"context"
-	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer"
 )
 
 // PreviewCapture reads the existing desktop using a separate Driver session.

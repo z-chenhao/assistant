@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer"
 )
 
 func Status(ctx context.Context, db *sql.DB) (computer.Status, error) {

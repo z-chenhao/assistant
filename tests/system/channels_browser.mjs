@@ -5,7 +5,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const [url,evidence,phase='conversation']=process.argv.slice(2);
 await mkdir(evidence,{recursive:true});
 const options={headless:true};
-if(process.env.COLLIE_BROWSER_EXECUTABLE)options.executablePath=process.env.COLLIE_BROWSER_EXECUTABLE;
+if(process.env.STEWARD_BROWSER_EXECUTABLE)options.executablePath=process.env.STEWARD_BROWSER_EXECUTABLE;
 const browser=await chromium.launch(options);
 let page;
 try{
@@ -14,7 +14,7 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const remote=[];page.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});
  await page.goto(url);
- await page.getByLabel('Workspace access token').fill(process.env.COLLIE_WEB_TEST_TOKEN);
+ await page.getByLabel('Workspace access token').fill(process.env.STEWARD_WEB_TEST_TOKEN);
  await page.getByRole('button',{name:'Open workspace'}).click();
  await page.waitForURL(url+'/');
  await page.locator('#composer-root textarea').waitFor();
@@ -24,6 +24,8 @@ try{
   await page.waitForFunction(()=>{const message=document.querySelector('.message:last-child');return !message||message.getBoundingClientRect().bottom<=innerHeight});
  }
  if(!await page.getByRole('link',{name:'Steward home',exact:true}).isVisible())throw Error('Steward wordmark unavailable');
+ if(await page.locator('.chat-identity .agent-name').innerText()!=='Ghost')throw Error('Chat agent identity is not Ghost');
+ if(await page.locator('#conversation-messages .avatar-slot,#conversation-messages .steward-avatar').count())throw Error('conversation repeated the header avatar');
  if(await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link').count()!==4)throw Error('workspace navigation must have four entries');
  const avatar=page.locator('.steward-avatar').first();
  await avatar.waitFor();
@@ -74,12 +76,12 @@ try{
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
   const selecting=page.getByRole('link',{name:'Start a conversation',exact:false}).click();
   await loading;
-  await page.getByLabel('Message Steward').fill('Plan my day: finish the release risk note before noon.');
+  await page.getByLabel('Message Ghost').fill('Plan my day: finish the release risk note before noon.');
   await page.getByLabel('Attach a file').setInputFiles({name:'web-note.txt',mimeType:'text/plain',buffer:Buffer.from('Web owner attachment fixture.\n')});
-  await page.getByLabel('Message Steward').focus();
-  await page.getByLabel('Message Steward').press('ArrowLeft');
+  await page.getByLabel('Message Ghost').focus();
+  await page.getByLabel('Message Ghost').press('ArrowLeft');
   const earlySource=await page.locator('input[name="source_id"]').inputValue();
-  const selection=await page.getByLabel('Message Steward').evaluate(input=>[input.selectionStart,input.selectionEnd]);
+  const selection=await page.getByLabel('Message Ghost').evaluate(input=>[input.selectionStart,input.selectionEnd]);
   release();await selecting;
   await page.unroute('**/app.js');
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
@@ -87,8 +89,8 @@ try{
   await page.locator('.welcome').evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
   if(!await page.evaluate(()=>document.fonts.check('500 16px "Inter"')&&document.fonts.check('400 40px "Source Serif 4"')))throw Error('local brand typography unavailable');
   await page.screenshot({path:evidence+'/welcome.png',fullPage:true});
-  if(await page.getByLabel('Message Steward').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
-  const preserved=await page.getByLabel('Message Steward').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
+  if(await page.getByLabel('Message Ghost').inputValue()!=='Plan my day: finish the release risk note before noon.')throw new Error('frontend enhancement lost early draft');
+  const preserved=await page.getByLabel('Message Ghost').evaluate(input=>document.activeElement===input&&JSON.stringify([input.selectionStart,input.selectionEnd]));
   if(preserved!==JSON.stringify(selection)||await page.locator('input[name="source_id"]').inputValue()!==earlySource)throw new Error('frontend enhancement changed draft focus, selection or source identity');
   const file=await page.getByLabel('Attach a file').evaluate(async input=>input.files[0]?{name:input.files[0].name,text:await input.files[0].text()}:null);
   if(file?.name!=='web-note.txt'||file?.text!=='Web owner attachment fixture.\n')throw new Error('frontend enhancement lost early attachment');
@@ -112,7 +114,7 @@ try{
  }
 
  if(phase==='native-trace'){
-  const facts=JSON.parse(process.env.COLLIE_NATIVE_TRACE_FACTS);
+  const facts=JSON.parse(process.env.STEWARD_NATIVE_TRACE_FACTS);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
   await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
@@ -148,13 +150,13 @@ try{
   await page.locator('.app-sidebar').getByRole('link',{name:'Tasks',exact:true}).click();
   await page.getByRole('link',{name:'All tasks',exact:true}).click();
   await page.locator('.task-row').first().click();
-  await page.getByRole('heading',{name:'Goal',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Planned objective',exact:true}).waitFor();
   if(!await page.locator('#task-messages').innerText().then(text=>text.includes('Main Task follow-up through Pi.')))throw Error('completed task did not show Main delivery');
   await page.screenshot({path:evidence+'/task-result.png',fullPage:true});
 
  }
  if(phase==='inspection'){
-  const facts=JSON.parse(process.env.COLLIE_INSPECTION_FACTS);
+  const facts=JSON.parse(process.env.STEWARD_INSPECTION_FACTS);
   const main=facts.main,root=facts.runs.find(r=>r.role==='root'),child=facts.runs.find(r=>r.role==='child'&&r.parent!==root.id);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
@@ -189,6 +191,15 @@ try{
   await page.getByRole('heading',{name:'No matching executions',exact:true}).waitFor();
   await page.getByRole('link',{name:'Reset',exact:true}).click();
   await page.locator('[data-execution-id="'+root.id+'"] td').first().getByRole('link').click();
+  for(const width of [851,900]){
+   await page.setViewportSize({width,height:900});
+   const workbench=await page.locator('.obs-workbench').evaluate(node=>{
+    const tree=node.querySelector('.obs-tree-pane').getBoundingClientRect(),detail=node.querySelector('.obs-detail-pane').getBoundingClientRect(),bounds=node.getBoundingClientRect();
+    return {stacked:detail.top>=tree.bottom-1,contained:detail.right<=bounds.right+1};
+   });
+   if(!workbench.stacked||!workbench.contained)throw Error('intermediate trace details are clipped instead of stacked');
+  }
+  await page.setViewportSize({width:1400,height:980});
   await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
   await page.screenshot({path:evidence+'/inspection-tree.png',fullPage:true});
@@ -200,7 +211,13 @@ try{
   }finally{await compact.close()}
   const plain=await browser.newContext({javaScriptEnabled:false});
   try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());if(await fallback.locator('.run-node').count()!==3)throw new Error('inspector requires JavaScript')}finally{await plain.close()}
-  await page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first().click();
+  const generationLink=page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first();
+  const generationHref=await generationLink.getAttribute('href');
+  await generationLink.focus();
+  const selectedGeneration=page.waitForResponse(response=>response.url()===new URL(generationHref,url).href);
+  await generationLink.press('Enter');await selectedGeneration;
+  await page.waitForFunction(()=>!document.querySelector('#observability-workbench')?.classList.contains('obs-loading'));
+  if(!await page.evaluate(href=>document.activeElement?.getAttribute('href')===href&&!!document.activeElement?.closest('.obs-tree'),generationHref))throw Error('trace selection lost keyboard focus in its tree row');
   await page.getByRole('link',{name:'Compare',exact:true}).click();
   await page.getByRole('heading',{name:'Adjacent input diff',exact:true}).waitFor();
   if(!await page.locator('.context-diff [data-change="added"]').count())throw Error('tool continuation additions missing from diff');
@@ -244,7 +261,7 @@ try{
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
   await page.getByRole('link',{name:'Manage model',exact:false}).click();
-  const capability=process.env.COLLIE_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
+  const capability=process.env.STEWARD_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
   await page.getByText(capability,{exact:false}).waitFor();
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
@@ -254,14 +271,14 @@ try{
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
   const navigation=page.locator('.app-sidebar').getByRole('link',{name:'Chat',exact:true}).click();
   await loading;
-  await page.getByLabel('Message Steward',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
+  await page.getByLabel('Message Ghost',{exact:true}).fill('USER_IMAGE_INPUT: inspect this upload.');
   const [picker]=await Promise.all([page.waitForEvent('filechooser'),page.getByLabel('Attach a file').click()]);
   release();await navigation;await page.unroute('**/app.js');
   await page.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
   if(!await picker.element().evaluate(input=>input===document.querySelector('.composer input[type=file]')))throw new Error('enhancement replaced the open file picker');
-  await picker.setFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.COLLIE_TEST_PICTURE,'base64')});
+  await picker.setFiles({name:'user-picture.png',mimeType:'image/png',buffer:Buffer.from(process.env.STEWARD_TEST_PICTURE,'base64')});
   await page.getByRole('button',{name:'Send message',exact:true}).click();
-  const expected=process.env.COLLIE_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
+  const expected=process.env.STEWARD_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
   await page.locator('.message.assistant').filter({hasText:expected}).waitFor();
  }
  if(phase==='live'){
@@ -275,7 +292,7 @@ try{
   const echo=async(key,text)=>send(key,plan('mcp__fixture__echo',{text}));
   await echo('live-initial','Opening note\n'+'Context line\n'.repeat(55)+'INITIAL_DONE');
   await page.locator('.message.assistant').filter({hasText:'INITIAL_DONE'}).waitFor();
-  const editor=page.getByLabel('Message Steward',{exact:true});
+  const editor=page.getByLabel('Message Ghost',{exact:true});
   await editor.fill('Keep this unsent draft exactly.');
   await page.getByLabel('Attach a file').setInputFiles({name:'pending.txt',mimeType:'text/plain',buffer:Buffer.from('Unsent attachment bytes.\n')});
   await editor.focus();await editor.press('ArrowLeft');
@@ -342,6 +359,12 @@ try{
   const approval=page.locator('.approval form').first();await approval.waitFor();
   await page.locator('#workspace-status').filter({hasText:'Working'}).waitFor();
   await checkDraft();
+  const pending=page.locator('[data-pending-jump]');await pending.waitFor();
+  const stack=await page.locator('.chat-topbar .topbar-actions').evaluate(node=>Array.from(node.querySelectorAll('[data-panel-open],[data-pending-jump]')).map(item=>({top:item.getBoundingClientRect().top,bottom:item.getBoundingClientRect().bottom,left:item.getBoundingClientRect().left})));
+  if(stack.length!==3||stack[1].top<stack[0].bottom||stack[2].top<stack[1].bottom||stack.some(item=>Math.abs(item.left-stack[0].left)>1))throw Error('approval entry is not below Computer and Worker');
+  await pending.click();await checkDraft(false);
+  if(!await page.locator('.approval').first().evaluate(node=>document.activeElement===node))throw Error('pending entry did not focus its approval');
+  await editor.focus();
   const frozen=await approval.locator('input[name="hash"]').inputValue();
   const progress=await context.newPage();
   try{
@@ -352,16 +375,24 @@ try{
    const detail=await context.newPage();
    try{
     await detail.goto(url+'/tasks/'+encodeURIComponent(ref));
-    await detail.getByRole('heading',{name:'Goal',exact:true}).waitFor();
+    await detail.getByRole('heading',{name:'Planned objective',exact:true}).waitFor();
     if(await detail.locator('.approval form input[name=hash]').inputValue()!==frozen)throw Error('task detail displayed another approval');
     const communication=await context.newPage();try{
      await communication.goto(await detail.getByRole('link',{name:'Continue this task',exact:false}).getAttribute('href').then(path=>url+path));
      if(await communication.locator('input[name=task_ref]').inputValue()!==ref)throw Error('continuation lost task context');
-     await communication.getByLabel('Message Steward',{exact:true}).fill('Keep this task draft.');
+     await communication.getByLabel('Message Ghost',{exact:true}).fill('Keep this task draft.');
      await communication.getByRole('button',{name:'Clear task context',exact:true}).click();
-     if(await communication.getByLabel('Message Steward',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
+     if(await communication.getByLabel('Message Ghost',{exact:true}).inputValue()!=='Keep this task draft.'||await communication.locator('input[name=task_ref]').count())throw Error('clearing task context discarded its draft');
     }finally{await communication.close()}
     await detail.screenshot({path:evidence+'/task-detail.png',fullPage:true});
+    for(const width of [820,900]){
+     await detail.setViewportSize({width,height:900});
+     const layout=await detail.locator('.task-detail-grid').evaluate(node=>{
+      const primary=node.children[0].getBoundingClientRect(),side=node.children[1].getBoundingClientRect();
+      return {stacked:side.top>=primary.bottom-1,values:[...node.querySelectorAll('.facts dd')].every(value=>value.getBoundingClientRect().width>=100)};
+     });
+     if(!layout.stacked||!layout.values)throw Error('intermediate task content or progress values are compressed');
+    }
     await detail.setViewportSize({width:390,height:844});if(await detail.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile task detail overflow');
     await detail.screenshot({path:evidence+'/task-detail-mobile.png',fullPage:true});
    }finally{await detail.close()}
@@ -371,11 +402,14 @@ try{
    const acknowledged=await decision;
    if(acknowledged.status()!==200||!(await acknowledged.json()).accepted)throw new Error('live approval was not acknowledged');
    if(!acknowledged.request().postData().includes(frozen))throw new Error('approval changed the frozen action hash');
-   await page.waitForFunction(()=>!document.querySelector('.approval form'));
+   await page.waitForFunction(()=>!document.querySelector('.approval form')&&!document.querySelector('[data-pending-jump]'));
    await checkDraft(false);
    await progress.bringToFront();
    await ongoing.filter({hasText:'This round is complete; the task remains open'}).waitFor();
-   if((await ongoing.innerText()).includes('must not be written'))throw new Error('raw tool arguments became stage progress');
+   // The planned objective now displays the original request, including this fixture's
+   // capability script. Only stage/progress text must exclude raw tool arguments.
+   const progressText=(await ongoing.locator('p:not(.task-objective-preview):not(.task-list-rule)').allTextContents()).join('\n');
+   if(progressText.includes('must not be written'))throw new Error('raw tool arguments became stage progress');
    await send('live-cancel',plan('builtin__task_manage',{operation:'cancel',taskRef:ref}));
    await progress.bringToFront();
    await progress.locator('[data-live-key="task:'+ref+'"] .state').filter({hasText:'cancelled'}).waitFor();
@@ -384,15 +418,69 @@ try{
   // Another authenticated browser rotates the session. The old page must keep
   // its draft and offer explicit reconnect, without redirecting to login.
   const other=await browser.newContext();
-  try{await other.request.post(url+'/session',{form:{token:process.env.COLLIE_WEB_TEST_TOKEN}})}finally{await other.close()}
+  try{await other.request.post(url+'/session',{form:{token:process.env.STEWARD_WEB_TEST_TOKEN}})}finally{await other.close()}
   await page.getByRole('status').filter({hasText:'Updates paused'}).waitFor();
   await checkDraft(false);
-  await context.request.post(url+'/session',{form:{token:process.env.COLLIE_WEB_TEST_TOKEN}});
+  await context.request.post(url+'/session',{form:{token:process.env.STEWARD_WEB_TEST_TOKEN}});
   const resumed=page.waitForResponse(response=>response.url().includes('/api/updates?')&&[200,304].includes(response.status()));
   await page.getByRole('button',{name:'Retry updates',exact:true}).click();await resumed;
   await checkDraft(false);
   if(navigations!==0)throw new Error('live updates navigated the document');
   await writeFile(evidence+'/live-contract.json',JSON.stringify({draft:true,attachment:true,focus:true,selection:true,scroll:true,conditional:true,reconnect:true,approval:true,progress:true,semanticStages:true,session:true,navigations},null,2));
+ }
+ if(phase==='schedule'){
+  const taskCount=(await (await context.request.get(url+'/api/progress')).json()).length;
+  await page.getByRole('link',{name:'Tasks',exact:true}).click();
+  await page.getByRole('link',{name:'Create schedule',exact:true}).click();
+  const editor=page.locator('form.schedule-editor');
+  await page.getByLabel('Instructions',{exact:true}).fill('Review recurring subscriptions and VPS renewals; do not pay or renew automatically.');
+  await page.getByLabel('Frequency',{exact:true}).selectOption('weekdays');
+  await page.getByLabel('Local time',{exact:true}).fill('07:40');
+  await page.getByLabel('Time zone',{exact:true}).fill('Asia/Shanghai');
+  const submitted=await editor.evaluate(form=>Object.fromEntries(new FormData(form)));
+  await page.getByRole('button',{name:'Save schedule',exact:true}).click();
+  await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
+  if(await page.getByLabel('Frequency',{exact:true}).inputValue()!=='weekdays'||await page.getByLabel('Local time',{exact:true}).inputValue()!=='07:40'||await page.getByLabel('Time zone',{exact:true}).inputValue()!=='Asia/Shanghai')throw Error('schedule did not persist friendly fields');
+  const editURL=page.url();
+  const replay=await context.request.post(url+'/schedule/configure',{form:submitted,maxRedirects:0});
+  if(replay.status()!==303)throw Error('identical schedule retry did not return its durable receipt');
+  const drift=await context.request.post(url+'/schedule/configure',{form:{...submitted,instruction:'Changed payload under the same request identity'},maxRedirects:0});
+  if(drift.status()!==409)throw Error('schedule request-key drift was accepted');
+  await page.getByLabel('Schedule enabled',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Save schedule',exact:true}).click();
+  await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
+  if(await page.getByLabel('Schedule enabled',{exact:true}).isChecked())throw Error('schedule disable was not persisted');
+  await page.getByLabel('Schedule enabled',{exact:true}).check();
+  await page.getByRole('button',{name:'Save schedule',exact:true}).click();
+  await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
+  const stale=await context.newPage();
+  try{
+   await stale.goto(editURL);
+   await page.getByLabel('Instructions',{exact:true}).fill('Updated future instruction from the first editor.');
+   await page.getByRole('button',{name:'Save schedule',exact:true}).click();
+   await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
+   await stale.getByLabel('Instructions',{exact:true}).fill('Preserve this stale draft.');
+   await stale.getByRole('button',{name:'Save schedule',exact:true}).click();
+   await stale.getByRole('alert').filter({hasText:'This schedule changed'}).waitFor();
+   if(await stale.getByLabel('Instructions',{exact:true}).inputValue()!=='Preserve this stale draft.')throw Error('schedule conflict lost the owner draft');
+  }finally{await stale.close()}
+  if((await (await context.request.get(url+'/api/progress')).json()).length!==taskCount)throw Error('saving a future schedule dispatched a Task');
+  await page.goto(url+'/tasks');
+  await page.getByRole('heading',{name:'Scheduled work',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Create schedule',exact:true}).click();
+  await page.getByLabel('Instructions',{exact:true}).fill('One-time future review.');
+  await page.getByLabel('Frequency',{exact:true}).selectOption('once');
+  await page.getByLabel('Date',{exact:true}).fill('2027-03-14');
+  await page.getByLabel('Local time',{exact:true}).fill('02:30');
+  await page.getByLabel('Time zone',{exact:true}).fill('America/New_York');
+  await page.getByRole('button',{name:'Save schedule',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'unambiguous'}).waitFor();
+  if(await page.getByLabel('Local time',{exact:true}).inputValue()!=='02:30')throw Error('invalid local schedule time lost draft');
+  await page.setViewportSize({width:320,height:740});
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('schedule editor overflowed compact viewport');
+  await page.screenshot({path:evidence+'/schedule-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:980});
+  await page.goto(url);
  }
  if(phase==='components'){
   await page.locator('[data-renderer="native"] .answer-table').waitFor();
@@ -421,13 +509,29 @@ try{
   await mobile.setViewportSize({width:390,height:844});
   await mobile.goto(url);
   await mobile.waitForFunction(()=>document.querySelector('.composer textarea')?.getAttribute('class')?.includes('resize-none'));
-  await mobile.getByLabel('Message Steward',{exact:true}).fill('');
+  await mobile.getByLabel('Message Ghost',{exact:true}).fill('');
   await mobile.evaluate(()=>{document.querySelector('textarea').blur();scrollTo(0,0)});
   await mobile.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const geometry=await mobile.evaluate(()=>({width:innerWidth,height:innerHeight,content:document.documentElement.scrollWidth,footerBottom:document.querySelector('footer').getBoundingClientRect().bottom}));
   if(geometry.content>geometry.width||geometry.footerBottom>geometry.height)throw new Error('mobile layout exceeds viewport');
   await mobile.screenshot({path:evidence+'/'+phase+'-mobile.png'});
   await writeFile(evidence+'/'+phase+'-mobile.json',JSON.stringify(geometry,null,2));
+  await mobile.getByRole('button',{name:'Open navigation',exact:true}).focus();
+  await mobile.getByRole('button',{name:'Open navigation',exact:true}).press('Enter');
+  if(!await mobile.locator('#workspace-navigation').evaluate(node=>node.contains(document.activeElement)))throw Error('opening mobile navigation lost keyboard focus');
+  await mobile.locator('.brand-row').getByRole('button',{name:'Close navigation',exact:true}).press('Enter');
+  if(!await mobile.getByRole('button',{name:'Open navigation',exact:true}).evaluate(node=>node===document.activeElement))throw Error('closing mobile navigation lost keyboard focus');
+  await mobile.setViewportSize({width:320,height:740});await mobile.goto(url+'/settings/capabilities');
+  await mobile.evaluate(()=>document.fonts.ready);
+  const selectedTab=await mobile.locator('.section-tabs').evaluate(node=>{
+   const selected=node.querySelector('[aria-current]').getBoundingClientRect(),bounds=node.getBoundingClientRect();
+   return selected.left>=bounds.left-1&&selected.right<=bounds.right+1;
+  });
+  if(!selectedTab)throw Error('current Settings section is hidden outside the mobile tab strip');
+  await mobile.setViewportSize({width:1001,height:900});await mobile.goto(url);
+  await mobile.getByRole('button',{name:'Open Computer',exact:true}).click();
+  if(!await mobile.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('Computer compresses Chat at intermediate widths');
+  await mobile.getByRole('button',{name:'Close computer view',exact:true}).click();
  }finally{await mobile.close()}
  if(phase==='components'){
   const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:1400,height:980}});
@@ -435,7 +539,7 @@ try{
    await plain.addCookies(await context.cookies());
    const fallback=await plain.newPage();await fallback.goto(url);
    if(await fallback.locator('.message').count()!==await page.locator('.message').count())throw new Error('no-JavaScript fallback lost messages');
-   if(!await fallback.getByLabel('Message Steward',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
+   if(!await fallback.getByLabel('Message Ghost',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost composer');
    if(!await fallback.getByText('Processed: Retain this semantic answer.',{exact:true}).isVisible())throw new Error('no-JavaScript fallback lost semantics');
    await fallback.screenshot({path:evidence+'/'+phase+'-no-script.png',fullPage:true});
   }finally{await plain.close()}

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +57,7 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if p.Before != 0 {
-			w.Header().Set("X-Collie-Before", strconv.FormatInt(p.Before, 10))
+			w.Header().Set("X-Steward-Before", strconv.FormatInt(p.Before, 10))
 		}
 		jsonResult(w, p.Messages)
 	case "/api/progress":
@@ -114,6 +114,8 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		return e
 	}
 	switch r.URL.Path {
+	case "/schedule/configure":
+		return s.configureSchedule(w, r)
 	case "/settings/language":
 		return s.setLanguage(w, r)
 	case "/capability/configure":

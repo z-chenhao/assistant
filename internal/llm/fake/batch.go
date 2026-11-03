@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 // batchReply is deterministic Direct Tool evidence. Four 25-call exchanges keep

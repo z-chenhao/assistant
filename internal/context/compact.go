@@ -6,7 +6,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 type Policy struct {

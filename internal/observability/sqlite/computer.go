@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer"
 )
 
 // ComputerActivity reads committed Tool metadata only, scoped to the configured

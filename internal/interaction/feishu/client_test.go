@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/z-chenhao/collie/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/artifact"
 	"net/http"
 	"net/http/httptest"
 	"strconv"

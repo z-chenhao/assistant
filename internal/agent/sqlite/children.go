@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/skill"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/skill"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func (r *Runs) ConfigureChildLimits(l agent.ChildLimits) { r.childLimits = l }

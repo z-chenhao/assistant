@@ -4,7 +4,7 @@
   "retrieved": "2026-11-02",
   "sha256": "b62301163788bc5b7f8fcac0b74b184e34e1827e577b499ecb724da065098f87",
   "license": "SIL Open Font License 1.1",
-  "licenseFile": "dist/assets/LICENSE-Michroma.txt",
+  "licenseFile": "web/licenses/LICENSE-Michroma.txt",
   "use": "Steward text wordmark ONLY, unchanged16px400. Interface English Inter, reply English Source Serif4, Chinese PingFang SC then Source Han Sans, code JetBrains Mono; see typography-v2-assets.json.",
-  "avatar": "Original inline SVG circle (24,25,r22 in48), pale face #f4f3ef, two tilted dark eyes #232323 shifted right toward content; rightward peeking and rare blink. User image reference, no copied raster, torso, Siri or soundwave."
+  "avatar": "Ghost: owner-selected charcoal and ivory plush ghost; complete-frame Canvas2D playback. See ghost-assets.json and ghost-prompts.json for the selected sources and animation provenance."
 }

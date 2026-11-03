@@ -1,4 +1,4 @@
-module github.com/z-chenhao/collie
+module github.com/z-chenhao/assistant
 
 go 1.26.2
 

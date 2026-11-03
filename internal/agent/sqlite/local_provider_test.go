@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/llm/memory"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm/memory"
 )
 
 func TestFrozenEndpointAndUsageSurviveProfileEditAndRestart(t *testing.T) {

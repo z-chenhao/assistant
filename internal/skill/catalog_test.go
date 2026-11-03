@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func catalog(t *testing.T) Config {

@@ -108,3 +108,13 @@ binaries reject schema 24. No credentials enter these records.
 | 2026-10-28 | 现状建档 | 调度器不执行模型；自动化复用现有执行、审批和交付路径，保留安静通知与版本 fencing。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
 
 后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
+
+## 2026-11-03 · Web 所有者直接编辑
+
+具体需求是让所有者在 Task 页面看见待执行安排并手工修改配置，参考成熟自动化表单的指令／频率／时间层级。CLI 与 Main 工具已共用 Runs 的事务、automation_request 收据、schedule_version fencing；它们的 cancel 同时取消关联 Task，无法充当可恢复的安排停用开关。
+
+新增内部 OwnerConfiguration/OwnerReceipt 与 ConfigureAutomation，使用同一 Runs.write 和不可变收据机制。此为私有所有者配置契约，不扩展模型 Tool schema，不把 TaskReader 改成写入接口，也不新增数据库表。版本、当前所有者和原意图 privacy epoch 在事务内校验；仅更新安排及触发版本，不修改已接单 fire、Task 指令或 Run 快照。停用不取消 Task；已过时的未接单 fire 由既有版本检查拒绝，旧版本阈值观察不再具备通知资格。
+
+Web 使用独立的 ScheduleSettings 读写适配。source_id 保留跨未知响应的重试身份；匹配收据在当前版本检查前返回，改变同 key 的请求被拒绝。未修改的单次时刻通过原始精确 Spec/时区证明保留秒、小数和既定偏移；新写入须在事务内匹配原配置与提交版本，避免隐藏字段成为任意回写入口。新输入的本地日期时间须唯一对应一个真实时刻；拒绝夏令时空缺／重复而不静默归一化。
+
+保留了原始任务和完成规则不可变的边界；没有引入可编辑 Task anchor、通用工作流、结束日期或单项模型选择。安排读失败仅降级安排区域，普通任务仍可读。此实现不承诺执行恰好发生在触发时间，也不新增后台守护进程。

@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/observability"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/observability"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 func pageRoute(path string) (tab, view, title string) {
@@ -16,6 +16,8 @@ func pageRoute(path string) (tab, view, title string) {
 		return "/", "conversation", "Conversation"
 	case path == "/tasks" || path == "/progress":
 		return "/tasks", "tasks", "Tasks"
+	case path == "/tasks/schedules/new" || strings.HasPrefix(path, "/tasks/schedules/automation:") && pageLeaf(strings.TrimPrefix(path, "/tasks/schedules/")):
+		return "/tasks", "schedule", "Schedule settings"
 	case strings.HasPrefix(path, "/tasks/") && task.ValidRef(strings.TrimPrefix(path, "/tasks/")):
 		return "/tasks", "task", "Task"
 	case path == "/settings/capabilities":

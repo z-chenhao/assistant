@@ -1,6 +1,5 @@
 {{define "conversation-page"}}
 {{template "computer-panel" .}}{{template "worker-panel" .}}
-<div id="conversation-attention" class="conversation-attention">{{template "attention-summary" .}}</div>
 <section class="thread">
  <div id="conversation-messages">{{template "conversation" .}}</div>
  <div id="conversation-approvals">{{template "approvals" .}}</div>
@@ -9,7 +8,7 @@
  <form class="composer" action="/message" method="post" enctype="multipart/form-data">
   <input type="hidden" name="source_id" value="{{.SourceID}}">
   {{with .DraftTask}}<div class="task-context-chip"><input type="hidden" name="task_ref" value="{{.Ref}}"><span>{{tr "Regarding"}} <a href="{{taskURL .Ref}}">{{.Title}}</a></span><button class="plain-button" type="button" data-clear-task aria-label="{{tr "Clear task context"}}">×</button></div>{{end}}
-  <label for="message" class="sr-only">{{tr "Message Steward"}}</label>
+  <label for="message" class="sr-only">{{tr "Message Ghost"}}</label>
   <textarea id="message" name="text" placeholder="{{tr "Describe what you have in mind…"}}" required rows="2" maxlength="16384">{{.Draft}}</textarea>
   <div class="composer-actions"><div class="attachment-controls"><label class="attachment-picker" title="{{tr "Attach a file"}}">{{template "icon-attach"}}<span class="sr-only">{{tr "Attach a file"}}</span><input type="file" name="file" aria-label="{{tr "Attach a file"}}"></label><span class="attachment-status" aria-live="polite"></span><button type="button" class="plain-button" data-remove-file hidden aria-label="{{tr "Remove attachment"}}">×</button></div><button type="submit" class="send-button" aria-label="{{tr "Send message"}}" {{if not (canSend .Status)}}disabled{{end}}>{{template "icon-send"}}</button></div>
   <p id="composer-feedback" {{if not (canSend .Status)}}data-model-needed="true"{{end}} class="composer-feedback" role="status" aria-live="polite">{{if not (canSend .Status)}}{{tr "Connect a ready model before sending. Your draft can stay here."}}{{end}}</p>
@@ -17,11 +16,11 @@
 <p class="composer-note">{{tr "Your ongoing conversation · Review important actions before they run."}}</p>
 </div></footer><button type="button" id="new-messages" hidden>{{tr "Latest messages ↓"}}</button>
 {{end}}
-{{define "attention-summary"}}{{if .PendingCount}}<a class="attention-summary" data-pending-jump href="/#approval-{{.FirstPending}}">{{template "icon-attention"}}<span>{{tr "Needs your decision"}}</span><strong>{{.PendingCount}}</strong><span aria-hidden="true">→</span></a>{{end}}{{end}}
+{{define "attention-summary"}}{{if .PendingCount}}<a class="button secondary attention-summary" data-pending-jump aria-label="{{tr "Needs your decision"}} · {{.PendingCount}}" href="/#approval-{{.FirstPending}}">{{template "icon-attention"}}<span>{{tr "Pending approval"}}</span><strong>{{.PendingCount}}</strong></a>{{end}}{{end}}
 {{define "conversation"}}
 {{if not (canSend .Status)}}<div class="setup-callout" data-live-key="setup">{{if eq .Status.Readiness "setup_required"}}<h1>{{tr "Let's connect your model."}}</h1><p>{{tr "Choose a provider and verify a model to start working with Steward."}}</p>{{else}}<h1>{{tr "Steward needs attention"}}</h1><p>{{tr "Your draft is kept. Check the model connection and workspace setup before sending new work."}}</p>{{end}}<a class="button" href="/settings/models">{{tr "Set up Steward →"}}</a></div>{{end}}
 {{if .Before}}<a data-live-key="earlier" class="back-link" href="/?before={{.Before}}">{{tr "Earlier messages"}}</a>{{end}}
-{{range .Messages}}<article class="message {{.Role}}" id="message-{{.Sequence}}" data-live-key="message:{{.Sequence}}"><div class="message-label">{{if eq .Role "user"}}{{tr "You"}}{{else}}{{template "agent-avatar"}}Steward{{end}}</div>{{if .Approval}}{{template "approval-card" .Approval}}{{else}}<div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div>{{end}}</article>
-{{else}}{{if canSend .Status}}<div class="welcome" data-live-key="welcome">{{template "agent-avatar"}}<h1>{{tr "What would you like to work on?"}}</h1><p>{{tr "Research, build, or keep a longer task moving. We can start here."}}</p></div>{{end}}{{end}}
+{{range .Messages}}<article class="message {{.Role}}" id="message-{{.Sequence}}" data-live-key="message:{{.Sequence}}"><span class="sr-only">{{if eq .Role "user"}}{{tr "You"}}{{else}}Ghost{{end}}</span>{{if .Approval}}{{template "approval-card" .Approval}}{{else}}<div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div>{{end}}</article>
+{{else}}{{if canSend .Status}}<div class="welcome" data-live-key="welcome"><h1>{{tr "What would you like to work on?"}}</h1><p>{{tr "Research, build, or keep a longer task moving. We can start here."}}</p></div>{{end}}{{end}}
 {{end}}
 {{define "approvals"}}{{range .Approvals}}<div data-live-key="approval:{{.ID}}">{{template "approval-card" .}}</div>{{end}}{{end}}

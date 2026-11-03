@@ -54,7 +54,7 @@ Prompt 使用可组合片段，不为三种 Run 维护三份彼此分叉的完�
 | `agent.run()` 能力说明 | 无 | 有 | 按 Capability Policy 提供 |
 
 - Main 面向用户，对用户关系、意图协调和最终表达负责。
-- Root Worker 面向 Task，保持该 Collie 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
+- Root Worker 面向 Task，保持该 Steward 的稳定身份与行为原则，但不承担聊天语气和渠道表达。
 - Child 面向直接 Parent，是无独立人格的通用执行单元；它不得凭空假设未显式提供的用户背景。
 - Prompt 片段统一由 `internal/agent/context.go` 按 Run 位置和冻结能力组装；是否暴露 `agent.run()` 由 Tool Exposure/Capability Policy 决定，而不是通过复制或分叉 Agent Loop 实现。
 - Main 与 Root 共享同一份 Agent 基础能力配置，包括普通 Tool、CUA、Skill、数据作用域和 Security Policy；Host 再按 Run Role 自动派生能力表面。Main 额外拥有 Task 控制和用户交付能力且默认没有 `agent.run()`；Root 不拥有 Task 控制或用户交付能力，但拥有 `agent.run()`。
@@ -455,7 +455,7 @@ Task pause/cancel uses the existing Task epoch and stop pipeline. New admissions
 and late model/tool results immediately fail fencing. Descendants settle before
 ancestors. A later append creates a new Root; it never revives old Runs.
 
-<a id="children-fair-scheduling-and-batch-evidence-collie-18"></a>
+<a id="children-fair-scheduling-and-batch-evidence-steward-18"></a>
 
 ### Fair scheduling and batch evidence (retired task #18)
 
@@ -509,7 +509,7 @@ guidance asks it to collect available results and deduplicate genuine blockers;
 the Fake fixture tests transport and aggregation, not real-model judgment.
 
 ```sh
-python3 tests/system/verify_scheduling.py --binary bin/collie --evidence evidence/scheduling.json
+python3 tests/system/verify_scheduling.py --binary bin/steward --evidence evidence/scheduling.json
 ```
 
 This maintained harness owns Launch, Doctor, Drive, Evidence and Cleanup. Its
@@ -539,7 +539,7 @@ settles each reservation exactly once in the same transaction as the model
 result. Missing usage retains unknown actual cost and its conservative reserve.
 No token allowance substitutes for monetary authorization.
 
-`collie -config config.yaml spend status` displays sanitized account
+`steward -config config.yaml spend status` displays sanitized account
 keys, snapshot/price versions, cumulative committed microcurrency, unknown usage
 and historical unpriced call counts. It reports `configured`, `unpriced`,
 `unconfigured` or `unpriced_unconfigured`; it never invents prices. The account

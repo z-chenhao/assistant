@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	contextbuilder "github.com/z-chenhao/collie/internal/context"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/agent"
+	contextbuilder "github.com/z-chenhao/assistant/internal/context"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func (r *Runs) ConfigureContext(p contextbuilder.Policy) { r.contextPolicy = p }

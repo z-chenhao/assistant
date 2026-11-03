@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Steward animation build</title>
+<base href="/"><h1>预生成完整角色帧</h1><p id="status">生成中…</p>
+<script src="/ghost-bake-mesh.js"></script>
+<script>
+(async () => {
+  const renderer = await createStewardGhostMesh();
+  const assets = {};
+  for (const tone of ['charcoal', 'ivory']) {
+    const atlases = [96, 256].map(size => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size * 8; canvas.height = size * 7;
+      return {size, canvas, ctx: canvas.getContext('2d')};
+    });
+    for (let frame = 0; frame < 56; frame++) {
+      let angle = 0, eye = 1;
+      if (frame <= 48) {
+        const p = frame / 48;
+        angle = Math.sin(p * Math.PI * 6) * Math.pow(Math.sin(Math.PI * p), 1.2) * .18;
+      } else eye = 1 - .92 * Math.sin(Math.PI * (frame - 48) / 8);
+      renderer.draw(512 / devicePixelRatio, angle, tone === 'ivory', eye);
+      for (const {size, ctx} of atlases) {
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(renderer.canvas, frame % 8 * size, Math.floor(frame / 8) * size, size, size);
+      }
+    }
+    for (const {size, canvas} of atlases) assets[`ghost-${tone}-${size}.png`] = canvas.toDataURL('image/png');
+  }
+  const response = await fetch('/save', {method:'POST', body:JSON.stringify(assets)});
+  if (!response.ok) throw Error('Save failed');
+  document.querySelector('#status').textContent = '完成：黑白两套，各含 56 个完整帧，96px 与 256px 两档。';
+})().catch(error => { document.querySelector('#status').textContent = error.message; });
+</script>

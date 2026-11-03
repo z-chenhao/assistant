@@ -12,19 +12,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/computer/environment"
-	"github.com/z-chenhao/collie/internal/computer/macosvm"
-	contextbuilder "github.com/z-chenhao/collie/internal/context"
-	"github.com/z-chenhao/collie/internal/delivery"
-	eventnats "github.com/z-chenhao/collie/internal/event/nats"
-	"github.com/z-chenhao/collie/internal/interaction/feishu"
-	"github.com/z-chenhao/collie/internal/interaction/web"
-	"github.com/z-chenhao/collie/internal/memory"
-	"github.com/z-chenhao/collie/internal/recall/embedding"
-	"github.com/z-chenhao/collie/internal/skill"
-	"github.com/z-chenhao/collie/internal/tool/mcp"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/computer/environment"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm"
+	contextbuilder "github.com/z-chenhao/assistant/internal/context"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	eventnats "github.com/z-chenhao/assistant/internal/event/nats"
+	"github.com/z-chenhao/assistant/internal/interaction/feishu"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/recall/embedding"
+	"github.com/z-chenhao/assistant/internal/skill"
+	"github.com/z-chenhao/assistant/internal/tool/mcp"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -93,8 +93,8 @@ func Load(path string, lookupEnv func(string) (string, bool)) (Config, error) {
 		if err != nil {
 			return Config{}, errors.New("resolve home directory")
 		}
-		root := filepath.Join(home, ".local", "share", "collie")
-		if value, ok := lookupEnv("COLLIE_DATA_ROOT"); ok {
+		root := filepath.Join(home, ".local", "share", "steward")
+		if value, ok := lookupEnv("STEWARD_DATA_ROOT"); ok {
 			root = value
 		}
 		if !filepath.IsAbs(root) {
@@ -144,8 +144,8 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 		Artifact:  artifact.DefaultPolicy(),
 		Tools:     ToolLimits{ApprovalTTLSeconds: 3600, Global: 32, Agent: 24, Run: 4, Provider: 16, Tool: 8},
 		Tasks:     Tasks{RecentDays: 30, RecentLimit: 200},
-		App:       App{DataRoot: filepath.Join(home, ".local", "share", "collie"), LogLevel: "info", LogMaxBytes: 16 << 20, LogBackups: 2},
-		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "collie", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
+		App:       App{DataRoot: filepath.Join(home, ".local", "share", "steward"), LogLevel: "info", LogMaxBytes: 16 << 20, LogBackups: 2},
+		NATS:      eventnats.Options{URL: "nats://127.0.0.1:4222", StreamPrefix: "steward", Timeout: 2 * time.Second, AckWait: 30 * time.Second, RetryInterval: time.Second},
 	}
 	if raw != nil {
 		decoder := yaml.NewDecoder(bytes.NewReader(raw))
@@ -160,16 +160,16 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 		}
 	}
 
-	if value, ok := lookupEnv("COLLIE_DATA_ROOT"); ok {
+	if value, ok := lookupEnv("STEWARD_DATA_ROOT"); ok {
 		cfg.App.DataRoot = value
 	}
-	if value, ok := lookupEnv("COLLIE_LOG_LEVEL"); ok {
+	if value, ok := lookupEnv("STEWARD_LOG_LEVEL"); ok {
 		cfg.App.LogLevel = value
 	}
-	if value, ok := lookupEnv("COLLIE_NATS_URL"); ok {
+	if value, ok := lookupEnv("STEWARD_NATS_URL"); ok {
 		cfg.NATS.URL = value
 	}
-	if value, ok := lookupEnv("COLLIE_NATS_STREAM_PREFIX"); ok {
+	if value, ok := lookupEnv("STEWARD_NATS_STREAM_PREFIX"); ok {
 		cfg.NATS.StreamPrefix = value
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {

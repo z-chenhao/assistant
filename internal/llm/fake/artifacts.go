@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	artifacttools "github.com/z-chenhao/collie/internal/artifact/tools"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/task"
+	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 // artifactsReply only selects actions; independent CLI readback judges them.

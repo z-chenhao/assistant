@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/skill"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/skill"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
@@ -109,7 +109,7 @@ func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 	if _, e := skill.Definitions(c); e != nil {
 		t.Fatal("rejected promotion broke startup", e)
 	}
-	if e := os.Rename(filepath.Join(c.Root, "fixture-000"), filepath.Join(c.Root, ".collie-retired-fixture")); e != nil {
+	if e := os.Rename(filepath.Join(c.Root, "fixture-000"), filepath.Join(c.Root, ".steward-retired-fixture")); e != nil {
 		t.Fatal(e)
 	}
 	if _, e := s.db.Exec(`CREATE TRIGGER fail_experience_commit BEFORE UPDATE OF status ON skill_candidate

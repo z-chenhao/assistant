@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {

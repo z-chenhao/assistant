@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 func contextFixture(t *testing.T, old, next any) (*Inspector, *sql.DB) {

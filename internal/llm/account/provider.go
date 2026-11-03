@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/llm/bridge"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm/bridge"
 )
 
 func (m *Manager) Check(ctx context.Context, id string) (int64, error) {

@@ -1,7 +1,7 @@
 package agent
 
 import (
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool"
 	"reflect"
 	"testing"
 )

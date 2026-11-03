@@ -7,7 +7,7 @@ export const StewardGhost = (() => {
   try { paused = localStorage.getItem('steward-avatar-motion') === 'paused'; } catch {}
   document.documentElement.classList.toggle('ghost-motion-paused', paused);
   function markup(style = 'auto') {
-    return `<button type="button" class="steward-avatar" data-ghost-style="${style}" data-action="peek" aria-label="${t('Say hello to Steward')}" title="${t('Click to say hello')}"><span class="ghost-shadow" aria-hidden="true"></span><span class="ghost-art" aria-hidden="true"><span class="ghost-rest"></span><canvas class="ghost-frames"></canvas></span><span class="ghost-feedback sr-only" role="status"></span></button>`;
+    return `<button type="button" class="steward-avatar" data-ghost-style="${style}" data-action="peek" aria-label="${t('Say hello to Ghost')}" title="${t('Click to say hello')}"><span class="ghost-shadow" aria-hidden="true"></span><span class="ghost-art" aria-hidden="true"><span class="ghost-rest"></span><canvas class="ghost-frames"></canvas></span><span class="ghost-feedback sr-only" role="status"></span></button>`;
   }
   function image(path) {
     if (!atlases.has(path)) {
@@ -74,7 +74,7 @@ export const StewardGhost = (() => {
   }
   function react(button) {
     const feedback = button.querySelector('.ghost-feedback');
-    if (feedback) feedback.textContent = t('Steward waves hello.');
+    if (feedback) feedback.textContent = t('Ghost waves hello.');
     const state = states.get(button), now = performance.now();
     // The fixed button owns hit testing; animated descendants never trigger re-entry.
     if (!state || paused || reduced.matches || hidden || state.waveAt !== null || now < state.cooldown) return;

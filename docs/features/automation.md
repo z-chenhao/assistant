@@ -54,9 +54,9 @@
 
 ## 如何使用
 
-用户可在对话中交代明确时间或周期的工作。CLI `collie automation list` 查看计划，`collie automation manage REQUEST_KEY` 从 stdin 接受 create/update/cancel JSON。
+用户可在对话中交代明确时间或周期的工作。CLI `steward automation list` 查看计划，`steward automation manage REQUEST_KEY` 从 stdin 接受 create/update/cancel JSON。
 
-保持正常应用、Web 服务或 `collie automation work` 前台运行。`automation tick` 只保存到期事件；监控仍需要可用工具取得实际观察值。
+保持正常应用、Web 服务或 `steward automation work` 前台运行。`automation tick` 只保存到期事件；监控仍需要可用工具取得实际观察值。
 
 ## 详细操作参考
 
@@ -71,7 +71,7 @@
 ## Automation operations
 
 Automation persists user intent separately from Task. The scheduler writes one
-`automation_fire` and `ai.collie.automation_fired.v1` Outbox event atomically. It
+`automation_fire` and `ai.steward.automation_fired.v1` Outbox event atomically. It
 never runs a model. Actor's ordinary `Next` recovery consumes authoritative fire
 rows, writes its Inbox receipt, creates an ongoing Task if needed, freezes the
 current model/capabilities in a new Root, and emits `run_ready` in one transaction.
@@ -81,7 +81,7 @@ Main Reporter/Delivery path. Lost or repeated queue wakes cannot duplicate work.
 Run the foreground scheduler/executor with an active, tested profile:
 
 ```sh
-collie automation work
+steward automation work
 ```
 
 Keep that command running under the installation's process supervisor. It scans
@@ -95,8 +95,8 @@ No scheduler process is implicitly detached by the application.
 Create from a JSON object on stdin, with a stable request key for retries:
 
 ```sh
-collie automation manage monthly-review < review.json
-collie automation list
+steward automation manage monthly-review < review.json
+steward automation list
 ```
 
 `review.json`:
@@ -189,3 +189,11 @@ no Main turn or DeliveryRequest. Workers never deliver directly to the user.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/automation.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/automation.md)。
+
+## Web 手动配置执行计划
+
+Tasks → Create schedule 可以直接填写任务指令、是否启用、单次／每天／工作日／每周／每月／自定义 cron、日期时间和明确的 IANA 时区。已有安排通过 Edit schedule 修改；下一次触发以保存的时区显示。高级阈值可以留空，0 是有效值。保存仅配置后续触发，不立即创建 Task 或运行模型。
+
+停用安排只停止后续触发，不等于取消已派发任务；需要停下具体任务时仍走原有任务控制。已派发工作保留冻结指令，旧版本阈值观察不再产生通知。不同页面同时编辑时拒绝覆盖并保留草稿；重复提交同一份请求返回原收据。新输入的单次本地时间若处于夏令时空缺或重复区间会拒绝；已有单次安排的精确时刻和选定偏移在未修改日期／时间／时区时保留。
+
+当前不提供结束重复日期、独立标题或每项计划的模型覆盖。Task 的原始目标和单次／持续完成规则仍不可变；没有计划的 Task 可创建一项独立安排，不会伪装成修改原 Task。

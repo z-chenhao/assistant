@@ -36,13 +36,22 @@
  .topbar-start .avatar-slot{display:none}
 }
 
-.chat-topbar{height:120px;align-items:flex-start;padding-top:18px;isolation:isolate}
+.chat-topbar{height:160px;align-items:flex-start;padding-top:18px;isolation:isolate}
 .chat-identity{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
-.chat-identity .brand{font-size:18px}.chat-identity .avatar-slot{display:block;pointer-events:auto}
+.chat-identity .agent-name{font-family:var(--font-ui);font-size:18px;font-weight:500;line-height:28px}.chat-identity .avatar-slot{display:block;pointer-events:auto}
 .chat-identity .steward-avatar,.chat-identity .avatar-fallback{width:58px;height:58px;min-width:58px;--ghost-drift:2px}
-.chat-topbar .topbar-actions{position:relative;margin-left:auto;max-width:calc(50% - 80px);gap:6px}.chat-topbar .button{min-height:40px;font-size:12px;padding:8px 10px;gap:6px}
+.chat-topbar .topbar-actions{position:absolute;top:14px;right:28px;display:flex;flex-direction:column;align-items:stretch;max-width:min(200px,calc(50% - 80px));gap:6px}.chat-topbar .button{min-height:40px;font-size:12px;padding:8px 10px;gap:6px;justify-content:flex-start}
 .worker-trigger{min-width:0;max-width:200px}.worker-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-status{position:absolute;left:28px;bottom:18px}.chat-topbar .topbar-start{flex:0}
 @media(max-width:1200px){.chat-topbar .topbar-actions{max-width:none}.chat-topbar .topbar-actions .button>span{display:none}.chat-topbar .topbar-actions .button{width:44px;height:44px;padding:10px}}
-@media(max-width:760px){.chat-topbar{height:116px;padding:52px 12px 0}.chat-identity{top:12px}.chat-identity .brand{font-size:17px}.chat-status{left:16px;bottom:auto;top:14px}.chat-status .status-pill{max-width:82px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-topbar .topbar-start .sidebar-open{display:inline-flex}}
+@media(max-width:760px){.chat-topbar{height:168px;padding:52px 12px 0}.chat-identity{top:12px}.chat-identity .agent-name{font-size:17px}.chat-status{left:16px;bottom:auto;top:14px}.chat-status .status-pill{max-width:82px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-topbar .topbar-start .sidebar-open{display:inline-flex}}
 .workspace-panel-open .chat-topbar .topbar-actions{max-width:none}.workspace-panel-open .chat-topbar .topbar-actions .button>span{display:none}.workspace-panel-open .chat-topbar .topbar-actions .button{width:44px;height:44px;padding:10px}
+
+@media(max-width:760px){.chat-topbar .topbar-actions{top:12px;right:12px}}
+
+/* Reserve three rows so arriving/resolved approvals do not resize the header. */
+.conversation-attention:empty{display:none}
+.attention-summary{position:relative;width:100%;white-space:nowrap;text-decoration:none}
+.attention-summary strong{margin-left:auto;min-width:18px;padding:0 3px;text-align:center;line-height:18px;font-size:12px;background:var(--muted);border-radius:6px}
+@media(max-width:1200px){.attention-summary strong{position:absolute;right:-4px;top:-4px}}
+.workspace-panel-open .attention-summary strong{position:absolute;right:-4px;top:-4px}

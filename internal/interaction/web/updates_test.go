@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/delivery"
-	"github.com/z-chenhao/collie/internal/delivery/ui"
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 type updatesCore struct {
@@ -61,7 +61,7 @@ func (c *updatesCore) Activity(context.Context) ([]task.Summary, error) {
 func TestLiveProjectionUsesCommittedPagesStableETagsAndSafeHTML(t *testing.T) {
 	c := &updatesCore{status: "busy", allowed: true, messages: []conversation.Message{{MessageID: "private-message-id", Sequence: 1, Role: "assistant", Content: conversation.Text(`<img src=x onerror="unsafe()">`)}}}
 	c.approvals = []interaction.Approval{{ID: "approval:one", Status: "pending", Hash: strings.Repeat("a", 64), Tool: "builtin__write", Arguments: `{"path":"result.txt","content":"confirmed"}`}}
-	s := &Server{Core: c, Secrets: fakeSecrets{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: c, Secrets: fakeSecrets{}}
 	request := func(path, etag, token string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", "http://127.0.0.1:8080"+path, nil)
 		if token != "" {

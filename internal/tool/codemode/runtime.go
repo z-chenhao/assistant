@@ -6,12 +6,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 const ToolName = "builtin__codemode_execute"
-const RuntimeVersion = "collie-js-v2"
-const PreludeVersion = "collie-prelude-v3"
+const RuntimeVersion = "steward-js-v2"
+const PreludeVersion = "steward-prelude-v3"
 const ProtocolVersion = "1"
 const Schema = `{"type":"object","properties":{"source":{"type":"string","minLength":1,"maxLength":65536}},"required":["source"],"additionalProperties":false}`
 

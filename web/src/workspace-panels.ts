@@ -3,7 +3,7 @@ import {t} from './i18n';
 // Two read-only Chat detail panes share one reserved area. They never replace
 // the conversation or its composer, and only one pane can be open at a time.
 const panels=new Map<HTMLDialogElement,()=>void>();
-const compact=matchMedia('(max-width:1000px)');
+const compact=matchMedia('(max-width:1279px)');
 let readingAnchor:{node:HTMLElement;top:number}|null=null;
 // Keep the same message anchor across open/switch/close. Reflow can otherwise
 // change which message crosses the header and produce a cumulative jump.

@@ -51,9 +51,9 @@ make test
 make test-race
 make lint
 make test-full
-python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/channels.json
-python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/channel-leases.json --delivery-lease-only
-python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/components.json --ui-components-only
+python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/channels.json
+python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/channel-leases.json --delivery-lease-only
+python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/components.json --ui-components-only
 ```
 
 `verify_channels.py` owns Launch (private root, local platform Fake and real Web
@@ -121,7 +121,7 @@ npm run build --prefix web
 make build
 npm run check --prefix web
 npm run lint --prefix web
-python3 tests/system/verify_channels.py --binary bin/collie --evidence evidence/components.json --ui-components-only
+python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/components.json --ui-components-only
 ```
 
 Commit component source, lockfile and generated assets together. `make test`
@@ -186,3 +186,9 @@ Steward 重构检查补充：Chat 的 Computer/Worker 只读详情与真实执�
 工作区精修：updates_test 验证待审批计数包含内嵌卡片且不重复、解决后清空；computer_test 验证 status/frame 的认证、绑定撤销、身份裁剪与 no-store。渠道浏览器继续覆盖真实草稿、附件、审批、背景更新和最新消息入口；Task 读取维持独立于 Conversation，Worker 采用有界 Inspector 结果。执行报告保存在 evidence，不据软件 peer 宣称真实 Guest 画面兼容性。
 
 Chat / Worker：`workers_test.go` 验证认证与绑定撤销、只读字段和面板仅属于 Chat；`observability/sqlite/inspection_test.go` 验证真实只读数据库中的运行时间排序、50 条上限、运行中查询和 Agent 隔离。`channels_browser.mjs` 的 live 场景通过真实 Web 验证 Computer/Worker 互斥、焦点返回和草稿/附件节点保留。
+
+本机免 token：`server_test.go` 通过真实 loopback HTTP 验证无 SecretStore 时直接进入页面及只读 API、同源设置表单、绑定撤销；拒绝远端 peer、跨站／同站不同 origin、伪造 Host 与转发身份。显式 token 模式的原有认证、CSRF、session 过期回归继续执行；配置检查覆盖可省略 token 与非法引用。
+
+待确认入口沿用 live 浏览器场景：真实审批到来时，入口按 Computer → Worker → 待确认排列，点击聚焦原审批；冻结 hash、未发草稿和附件仍保留，解决后入口消失。顶栏预留三行，计数变化不改变对话偏移。
+
+布局与焦点回归沿用同一个 `channels_browser.mjs`：inspection 在 851／900px 断言详情完整堆叠，Enter 选择 Generation 后焦点仍位于对应树行；live 在 820／900px 验证任务正文与进度值没有压缩为零宽；共用移动检查通过键盘打开／关闭导航、320px 当前设置标签露出及 1001px Computer modal。原有草稿、附件、审批、滚动、会话恢复与无 JavaScript 检查继续执行。人工补充检查明暗主题、模型／通知／六类能力详情、长内容和宽屏恢复；模拟视口不等同于物理触摸或屏幕阅读器验证。

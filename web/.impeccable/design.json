@@ -691,7 +691,7 @@
   ],
   "narrative": {
     "northStar": "Your personal AI steward.",
-    "overview": "Steward is a familiar, quiet conversation workspace: soft monochrome surfaces, readable document-style replies, restrained controls and a small plush ghost. The owner-approved `tmp/neutral-web/dist` demo defines this production presentation. This document records implemented values rather than adding a new product direction.\n\nThis is a private Web presentation system for the owner's ongoing conversation and delegated work. Server-owned HTML, bounded live-region patches and existing React UISpec islands remain the mechanism. Steward names the interface; Collie remains the compatible backend, CLI and storage identity. No public design API, domain rename or storage migration is implied. Latest refinement: four navigation entries, centered two-row Chat identity, continuous conversation and independent Task list/detail, read-only on-demand Computer desktop viewer, complete-frame ghost playback and Source Han unicode-range subsets.",
+    "overview": "Steward is a familiar, quiet conversation workspace: soft monochrome surfaces, readable document-style replies, restrained controls and a small plush ghost. The current server templates, shared CSS tokens and self-hosted assets define this production presentation. This document records implemented values rather than adding a new product direction.\n\nThis is a private Web presentation system for the owner's ongoing conversation and delegated work. Server-owned HTML, bounded live-region patches and existing React UISpec islands remain the mechanism. Steward is the product and Ghost is the agent. The CLI, configuration, storage and internal protocol identifiers use the same product identity; no alternate brand aliases are provided. No public design API is implied. Latest refinement: four navigation entries, centered two-row Chat identity, continuous conversation and independent Task list/detail, read-only on-demand Computer desktop viewer, complete-frame ghost playback and Source Han unicode-range subsets.",
     "keyCharacteristics": [
       "One collapsible navigation sidebar and a centered conversation.",
       "Near-white and charcoal surfaces with grayscale status treatments and restrained danger color.",
@@ -708,7 +708,7 @@
     "donts": [
       "Don't fabricate multiple chats, recent items, task counts, a global memory browser or a file library.",
       "Don't imply that approval means execution completed, or resend an unknown external outcome.",
-      "Don't rename Collie backend/CLI/storage contracts to implement the Steward Web brand.",
+      "Don't introduce alternate product names or brand compatibility aliases across Web, CLI, configuration or storage.",
       "Don't introduce a permanent second navigation rail, decorative panel shadows or unapproved body scaling/rotation."
     ]
   }

@@ -278,7 +278,7 @@ interface Tab extends Surface {
 
 - App 与 Tab 复用相同观察和指针操作协议；输入方法单独定义，因为 Browser 可能需要先聚焦具体元素，而原生 App 通常对当前焦点输入。
 - 导航、关闭等方法为可选能力；Provider 不支持时不伪造实现，而是在 `documentation()` 与 Capability Inventory 中明确缺失。
-- 不复制 Codex 的 `markDeliverable/markHandoff` 到 CUA 核心协议。Collie 的长期 Tab 生命周期属于 Run/Computer 的资源保留策略，而不是 UI Driver 方法。
+- 不复制 Codex 的 `markDeliverable/markHandoff` 到 CUA 核心协议。Steward 的长期 Tab 生命周期属于 Run/Computer 的资源保留策略，而不是 UI Driver 方法。
 - Agent 创建的临时 Tab 默认属于当前 Run Lease；需要跨 Run 保留时，由上层 Resource Policy 持久化稳定 Tab Reference，不能依赖 JavaScript Handle。
 
 <a id="contract-964-等待模型"></a>
@@ -456,7 +456,7 @@ const artifact = await cua.files.exportArtifact({path: file.path});
 return artifact;
 ```
 
-The fixed Guest Transfer Root is `/Users/<configured-guest-user>/CollieTransfer`.
+The fixed Guest Transfer Root is `/Users/<configured-guest-user>/StewardTransfer`.
 Only registered `imports/<name>` and `downloads/<name>` refs are accepted. No
 Host path, arbitrary URL, external Guest path or script-provided ID authorizes
 access. ArtifactStore enforces the current Agent/Task/Run scope. Imports,

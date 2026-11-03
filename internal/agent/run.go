@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/task"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 var ErrClaimLost = errors.New("CLAIM_LOST")

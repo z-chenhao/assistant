@@ -141,9 +141,9 @@ components:
 
 **Creative North Star: "Your personal AI steward."**
 
-Steward is a familiar, quiet conversation workspace: soft monochrome surfaces, readable document-style replies, restrained controls and a small plush ghost. The owner-approved `tmp/neutral-web/dist` demo defines this production presentation. This document records implemented values rather than adding a new product direction.
+Steward is a familiar, quiet conversation workspace: soft monochrome surfaces, readable document-style replies, restrained controls and a small plush ghost. The current server templates, shared CSS tokens and self-hosted assets define this production presentation. This document records implemented values rather than adding a new product direction.
 
-This is a private Web presentation system for the owner's ongoing conversation and delegated work. Server-owned HTML, bounded live-region patches and existing React UISpec islands remain the mechanism. Steward names the interface; Collie remains the compatible backend, CLI and storage identity. No public design API, domain rename or storage migration is implied.
+This is a private Web presentation system for the owner's ongoing conversation and delegated work. Server-owned HTML, bounded live-region patches and existing React UISpec islands remain the mechanism. Steward is the product and Ghost is the agent. The CLI, configuration, storage and internal protocol identifiers use the same product identity; no alternate brand aliases are provided. No public design API is implied.
 
 **Key Characteristics:**
 - One collapsible navigation sidebar and a centered conversation.
@@ -185,11 +185,11 @@ Keep controls and artifact links in the UI family even when they appear beside s
 
 ## Layout
 
-Desktop has one fixed 256px sidebar and a main workspace offset by its width. Collapsing it removes that offset. The Chat sticky header is 120px high with a centered two-row name/avatar; other pages use a 72px topbar. The conversation's 840px border box includes 36px horizontal padding, yielding a 768px dialogue; the composer also caps at 768px. Standard workspace pages cap at 1040px, settings at 920px, with 40px workspace gutters.
+Desktop has one fixed 256px sidebar and a main workspace offset by its width. Collapsing it removes that offset. The Chat sticky header is 160px high with a centered two-row name/avatar; other pages use a 72px topbar. The conversation's 840px border box includes 36px horizontal padding, yielding a 768px dialogue; the composer also caps at 768px. Standard workspace pages cap at 1040px, settings at 920px, with 40px workspace gutters.
 
-At 760px and below, the sidebar becomes an on-demand 256px overlay with backdrop, the workspace fills the viewport, the Chat header becomes 116px (other topbars 60px) and gutters become 20px. The dialogue uses 20px horizontal padding; composer gutters become 12px with safe-area bottom support. Without JavaScript, mobile navigation remains available in normal flow. Task detail has a local 290px supporting column (250px below 1000px) and stacks below 800px; this is page content, not another application sidebar. Page headings and choice cards adapt below 700px. The document minimum width is 320px.
+At 760px and below, the sidebar becomes an on-demand 256px overlay with backdrop, the workspace fills the viewport, the Chat header becomes 168px (other topbars 60px) and gutters become 20px. The dialogue uses 20px horizontal padding; composer gutters become 12px with safe-area bottom support. Without JavaScript, mobile navigation remains available in normal flow. Task detail has a local 290px supporting column (250px below 1000px) and stacks when its content container is at most 760px wide; this is page content, not another application sidebar. Page headings and choice cards adapt below 700px. The document minimum width is 320px.
 
-The conversation footer is fixed for an active transcript with bottom clearance in the thread. On the welcome view it returns to normal flow below the greeting. Read-only Computer/Worker detail panes reserve 460px on desktop; mobile uses one modal sheet.
+The conversation footer is fixed for an active transcript with bottom clearance in the thread. On the welcome view it returns to normal flow below the greeting. Read-only Computer/Worker detail panes reserve 460px at viewport widths of 1280px and above; smaller windows use one modal sheet to preserve conversation width. Developer tree/detail also stacks when its content container is at most 760px wide.
 
 ## Elevation & Depth
 
@@ -234,7 +234,7 @@ Keep the skip link, semantic landmarks, native details, field labels, named icon
 ### Don't:
 - **Don't** fabricate multiple chats, recent items, task counts, a global memory browser or a file library.
 - **Don't** imply that approval means execution completed, or resend an unknown external outcome.
-- **Don't** rename Collie backend/CLI/storage contracts to implement the Steward Web brand.
+- **Don't** introduce alternate product names or brand compatibility aliases across Web, CLI, configuration or storage.
 - **Don't** introduce a permanent second navigation rail, decorative panel shadows or unapproved scaling/rotation of the ghost; the approved vertical drift is intentional.
 
 Evidence: `BRIEF.md`, `../PRODUCT.md`, `src/foundation.css`, `src/shell.css`, `src/conversation.css`, `src/avatar.css`, `src/workspace.css`, `src/shell.ts`, `src/live-updates.ts`, `src/appearance.ts`, `src/avatar.js` and `../internal/interaction/web/templates/`. Production Web authority is the approved demo and implementation, with authorization and backend compatibility recorded in PRODUCT.md and BRIEF.md.
@@ -244,10 +244,20 @@ Interface language is English by default. Settings → Preferences → Interface
 
 ### Chat workspace and Computer / Worker viewers · 2026-11-02
 
-Navigation contains exactly Chat, Tasks, Settings and Developer. Work filters remain inside Tasks. Chat places Steward's name above its animated avatar at the top center, with continuous conversation below. Computer and current Worker triggers sit at the top right. Mutually exclusive detail panes preserve the conversation/composer DOM. Worker records come from a read-only, agent-scoped bounded query, including running and finished executions ordered by coalesced started/created time with a deterministic ID tie-break. The current running query is independent of history limits; backend states are preserved and unavailable reads labeled. Task routes remain independent list/detail pages. Task detail preserves goal, approvals, milestones, delivered files and continuation links.
+Navigation contains exactly Chat, Tasks, Settings and Developer. Work filters remain inside Tasks. Chat places the agent name Ghost (Inter UI, distinct from the Steward wordmark) above its animated avatar at the top center, with continuous conversation below. Computer and current Worker triggers form a vertical stack at the top right, Computer above Worker, followed by the pending-approval entry when needed. Three rows are reserved to keep conversation position stable as approvals arrive or resolve. Mutually exclusive detail panes preserve the conversation/composer DOM. Worker records come from a read-only, agent-scoped bounded query, including running and finished executions ordered by coalesced started/created time with a deterministic ID tie-break. The current running query is independent of history limits; backend states are preserved and unavailable reads labeled. Task routes remain independent list/detail pages. Task detail preserves goal, approvals, milestones, delivered files and continuation links.
 
 Computer opens a read-only right pane on desktop, expandable to a wider view; narrow viewports and the expanded overlay use a modal sheet to keep keyboard focus out of covered content. Only an open visible pane polls authenticated status/activity and desktop PNG endpoints, about2s after each completed image. It keeps the last decoded image during refresh and labels interrupted/stale reception. Closing, hiding or navigation cancels scheduling. Preview cannot start/resume Computer, choose VM targets or send input. The Host captures the already-ready instance in a separate Driver session and rechecks the instance epoch before returning pixels. A missing/paused computer has a truthful empty state. Real macOS Guest compatibility remains a live-environment check.
 
 A pending-decision summary is derived from the same authoritative approvals as displayed cards, counting inline and separate pending cards once. It links to the exact card without losing the composer; history views refresh to latest when necessary. Latest-message navigation appears when reading above the bottom. Composer height is measured to reserve space, including feedback and attachments. Mobile icon controls have44px targets and important auxiliary text is at least12px.
 
 Source Han Sans retains PingFang priority. Disjoint unicode-range subsets preserve the original30926 codepoints and variable weights; the common6243-character pack is1283768bytes versus7995716bytes for the full source. Remaining characters load their own blocks. The original source is retained for provenance, so this is a network-loading improvement rather than a binary-size reduction. Hashes and ranges: licenses/source-han-subsets.json.
+
+The header is the sole visible Ghost identity in Chat. User and assistant messages omit visible speaker labels/avatars; screen-reader labels remain. The welcome state uses the same header avatar without a duplicate mascot.
+
+Layout and focus refinement · 2026-11-03: active section tabs reveal themselves within their own scroll strip on load, local navigation and resize. Mobile navigation updates inert state before moving focus. Trace replacement restores the latest focused link within its original region and control type, keeping same-observation detail scroll. Capability examples precede the editor, open for blank unconfigured capabilities, and use a bounded240px example area. No branding, form contract or runtime state changes.
+
+### Planning and owner configuration · 2026-11-03
+
+Tasks leads with saved schedules, then dispatched Tasks. Objective, execution rule and accepted instructions precede progress/results. The owner can create or edit schedules using ordinary labeled controls for instructions, enabled state, friendly frequency/date/time and a saved IANA zone. Custom cron and threshold details stay available without inventing unsupported end dates or per-task model choice. Future triggers are configuration, not immediate execution; immutable Task facts stay readable.
+
+Capabilities use domain-specific native forms; MCP provider/tool rows can be edited without JavaScript. Computer compatibility and runtime details collapse after setup. Advanced YAML retains complete supported configuration and unrepresented fields. Both editors require testing the exact current candidate before explicit Save; revisions, credential references and restart semantics remain authoritative.

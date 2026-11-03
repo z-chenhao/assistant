@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/z-chenhao/collie/internal/event"
-	eventsqlite "github.com/z-chenhao/collie/internal/event/sqlite"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/event"
+	eventsqlite "github.com/z-chenhao/assistant/internal/event/sqlite"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 type Store struct{ db *sql.DB }
@@ -59,7 +59,7 @@ func (s *Store) write(ctx context.Context, fn func(*sql.Tx) error) error {
 }
 
 func enqueue(ctx context.Context, tx *sql.Tx, kind, id string, version int64) error {
-	e, err := event.New("/collie/models", "ai.collie."+kind+".v1", id, map[string]any{"id": id, "version": version})
+	e, err := event.New("/steward/models", "ai.steward."+kind+".v1", id, map[string]any{"id": id, "version": version})
 	if err != nil {
 		return err
 	}

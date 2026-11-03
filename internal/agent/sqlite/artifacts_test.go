@@ -17,13 +17,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	artifacttools "github.com/z-chenhao/collie/internal/artifact/tools"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/tool"
-	toolfake "github.com/z-chenhao/collie/internal/tool/fake"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/tool"
+	toolfake "github.com/z-chenhao/assistant/internal/tool/fake"
 )
 
 func artifactOwner(t *testing.T, s *Store) artifact.Scope {
@@ -96,7 +96,7 @@ func TestArtifactStoreContractScopeIntegrityAndTombstone(t *testing.T) {
 	if err != nil || report.Objects != 1 {
 		t.Fatal(report, err)
 	}
-	if scalar(t, s, `SELECT count(*) FROM artifact`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type LIKE 'ai.collie.artifact.%'`) != 2 {
+	if scalar(t, s, `SELECT count(*) FROM artifact`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox WHERE type LIKE 'ai.steward.artifact.%'`) != 2 {
 		t.Fatal("audit missing")
 	}
 }

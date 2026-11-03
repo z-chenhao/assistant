@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -184,7 +184,7 @@ func (m *Manager) write(raw []byte, revision string) error {
 	if _, e = rand.Read(nonce); e != nil {
 		return web.ErrCapabilityUnavailable
 	}
-	tmp := ".collie-config-" + hex.EncodeToString(nonce)
+	tmp := ".steward-config-" + hex.EncodeToString(nonce)
 	f, e := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
 		return web.ErrCapabilityUnavailable

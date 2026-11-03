@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/recall"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/recall"
 )
 
 type Config struct {

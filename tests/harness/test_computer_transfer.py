@@ -15,7 +15,7 @@ class TransferTests(unittest.TestCase):
     def test_roundtrip_overwrite_traversal_symlinks_hardlinks_and_fifo(self):
         with tempfile.TemporaryDirectory() as temp:
             parent = Path(temp).resolve()
-            root = parent / 'CollieTransfer'
+            root = parent / 'StewardTransfer'
             def call(operation, path, data=b'fixture', overwrite=False):
                 return json.loads(subprocess.check_output([sys.executable, str(HELPER)], input=json.dumps({
                     'root': str(root), 'operation': operation, 'path': path,
@@ -46,9 +46,9 @@ class TransferTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             parent = Path(temp).resolve()
             (parent / 'target').mkdir()
-            (parent / 'CollieTransfer').symlink_to(parent / 'target')
+            (parent / 'StewardTransfer').symlink_to(parent / 'target')
             result = subprocess.check_output([sys.executable, str(HELPER)], input=json.dumps({
-                'root': str(parent / 'CollieTransfer'), 'operation': 'write', 'path': 'imports/x',
+                'root': str(parent / 'StewardTransfer'), 'operation': 'write', 'path': 'imports/x',
                 'overwrite': False, 'data': ''}).encode(), timeout=3)
             self.assertIn('error', json.loads(result))
             self.assertEqual(list((parent / 'target').iterdir()), [])

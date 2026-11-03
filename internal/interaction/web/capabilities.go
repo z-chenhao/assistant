@@ -20,6 +20,8 @@ type Capability struct {
 	ID, Title, Description, State, Revision, Text, Example, Help, Message, Path string
 	Configured, Active, PendingRestart, Verified, Candidate                     bool
 	TestedAt                                                                    time.Time
+	Form                                                                        *capabilityForm
+	Advanced                                                                    bool
 }
 
 var ErrCapabilityConflict = errors.New("capability configuration changed; reopen the page and test again")
@@ -41,6 +43,8 @@ func (s *Server) loadCapabilities(ctx context.Context, r *http.Request, p *page)
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/settings/capabilities/")
 	v, err := s.Capabilities.Detail(ctx, id)
+	prepareCapabilityForm(&v)
+	v.Advanced = r.URL.Query().Get("editor") == "advanced"
 	p.Capability = &v
 	return err
 }
@@ -62,22 +66,54 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 	if err != nil {
 		return err
 	}
-	switch r.FormValue("action") {
-	case "test":
-		_, e := s.Capabilities.Test(r.Context(), id, r.FormValue("revision"), r.FormValue("configuration"))
-		err = e
-		if e == nil {
-			http.Redirect(w, r, capabilityURL(id), 303)
+	text := r.FormValue("configuration")
+	var guided *capabilityForm
+	if r.FormValue("editor") == "guided" {
+		guided, err = postedCapabilityForm(id, r.PostForm)
+		if err == nil && id == "mcp" && editCapabilityRows(guided, r.FormValue("action")) {
+			p.Capability.Form = guided
+			p.Capability.Revision = r.FormValue("revision")
+			p.Capability.Verified = false
+			p.Capability.Candidate = true
+			p.Capability.Text = text
+			p.Capability.Message = ""
+			p.Capability.TestedAt = time.Time{}
+			p.Capability.State = "configured"
+			s.render(w, r, p)
 			return nil
 		}
-	case "save":
-		err = s.Capabilities.Save(r.Context(), id, r.FormValue("revision"), r.FormValue("configuration"))
 		if err == nil {
-			http.Redirect(w, r, capabilityURL(id), 303)
-			return nil
+			text, err = guidedCapabilityText(id, text, guided)
 		}
-	default:
-		err = ErrCapabilityInvalid
+	}
+	status := http.StatusConflict
+	location := capabilityURL(id)
+	if guided == nil {
+		location += "?editor=advanced"
+	}
+	if err == nil {
+		switch r.FormValue("action") {
+		case "test":
+			_, e := s.Capabilities.Test(r.Context(), id, r.FormValue("revision"), text)
+			err = e
+			if e == nil {
+				// A completed probe can be unavailable with no Go error. Detail
+				// reports that stored result and only a ready proof enables Save;
+				// redirecting does not assert that the connection succeeded.
+				http.Redirect(w, r, location, 303)
+				return nil
+			}
+		case "save":
+			err = s.Capabilities.Save(r.Context(), id, r.FormValue("revision"), text)
+			if err == nil {
+				http.Redirect(w, r, location, 303)
+				return nil
+			}
+		default:
+			err = ErrCapabilityInvalid
+		}
+	} else {
+		status = http.StatusUnprocessableEntity
 	}
 	if err != nil {
 		p.Capability.Verified = false
@@ -85,14 +121,26 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 		p.Capability.Message = ""
 		p.Capability.TestedAt = time.Time{}
 		p.Capability.Candidate = true
-		p.Capability.Text = r.FormValue("configuration")
+		p.Capability.Text = text
+		prepareCapabilityForm(p.Capability)
+		p.Capability.Advanced = guided == nil
+		if guided != nil {
+			p.Capability.Form = guided
+			p.Capability.Revision = r.FormValue("revision")
+			if status == http.StatusUnprocessableEntity {
+				guided.Error = err.Error()
+			}
+		}
 		p.Error = ErrCapabilityUnavailable.Error()
 		for _, known := range []error{ErrCapabilityConflict, ErrCapabilityInvalid, ErrCapabilityUnverified, ErrCapabilityMigration} {
 			if errors.Is(err, known) {
 				p.Error = known.Error()
 			}
 		}
-		w.WriteHeader(http.StatusConflict)
+		if guided != nil && guided.Error != "" {
+			p.Error = ""
+		}
+		w.WriteHeader(status)
 	}
 	s.render(w, r, p)
 	return nil

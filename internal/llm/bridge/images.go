@@ -8,8 +8,8 @@ import (
 	"image/jpeg"
 	"math"
 
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/media"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/media"
 )
 
 type imagePayload struct {

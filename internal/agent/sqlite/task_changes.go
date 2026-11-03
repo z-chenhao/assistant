@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/task"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 type taskChange struct {

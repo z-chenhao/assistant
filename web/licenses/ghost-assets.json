@@ -25,7 +25,7 @@
   ],
   "renderer": "Runtime predecoded complete-frame lossless WebP atlas playback in permanent per-avatar Canvas2D views, no runtime WebGL/mesh load. Eight columns by seven rows: frames0..48 wave over2.1s, frames49..55 blink over320ms; about24fps only while changing frames,8400ms idle blink wait. Below100px uses96px frames, otherwise256px. Complete first-frame CSS fallback while loading or decode failure. Fixed button hitbox, artwork pointer-events:none; ignore active greeting and2800ms cooldown. User-approved whole-artwork vertical drift +/-2px, preview +/-4px,5.6s; separate fixed shadow. Reduced motion, remembered pause, document/intersection visibility stop motion.",
   "scope": "Private Steward Web presentation; no execution or model status contract.",
-  "tooling": "Unchanged ImageGen source PNGs feed tools/bake.html + tools/ghost-bake-mesh.js + tools/bake-server.py, served once on127.0.0.1:8789, which bake complete PNG frame atlases. tools/encode-frames.py invokes installed cwebp -lossless -exact -m 6, writes lossless WebP atlases, then removes intermediate baked PNGs. Continuous96x96 2D mesh, anchored shoulder(.75,.54), maximum.18rad wave envelope are build-only. dist/ghost-mesh.js is removed; no runtime WebGL or3D model. No measured GPU savings claim is made.",
+  "tooling": "Unchanged ImageGen source PNGs feed web/artwork/bake.html + web/artwork/ghost-bake-mesh.js + web/artwork/bake-server.py, served once on127.0.0.1:8789, which bake complete PNG frame atlases. web/artwork/encode-frames.py invokes installed cwebp -lossless -exact -m 6, writes lossless WebP atlases, then removes intermediate baked PNGs. Continuous96x96 2D mesh, anchored shoulder(.75,.54), maximum.18rad wave envelope are build-only. No runtime WebGL or3D model is loaded. No measured GPU savings claim is made.",
   "derivedArtifacts": [
     {
       "file": "internal/interaction/web/assets/brand/ghost-charcoal-96.webp",
@@ -41,8 +41,8 @@
         672
       ],
       "frameCount": 56,
-      "source": "dist/assets/ghost-charcoal-v1.png",
-      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "source": "internal/interaction/web/assets/brand/ghost-charcoal-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via web/artwork/bake.html and web/artwork/ghost-bake-mesh.js -> lossless WebP via web/artwork/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
       "encoding": "cwebp -lossless -exact -m 6"
     },
     {
@@ -59,8 +59,8 @@
         1792
       ],
       "frameCount": 56,
-      "source": "dist/assets/ghost-charcoal-v1.png",
-      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "source": "internal/interaction/web/assets/brand/ghost-charcoal-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via web/artwork/bake.html and web/artwork/ghost-bake-mesh.js -> lossless WebP via web/artwork/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
       "encoding": "cwebp -lossless -exact -m 6"
     },
     {
@@ -77,8 +77,8 @@
         672
       ],
       "frameCount": 56,
-      "source": "dist/assets/ghost-ivory-v1.png",
-      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "source": "internal/interaction/web/assets/brand/ghost-ivory-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via web/artwork/bake.html and web/artwork/ghost-bake-mesh.js -> lossless WebP via web/artwork/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
       "encoding": "cwebp -lossless -exact -m 6"
     },
     {
@@ -95,36 +95,36 @@
         1792
       ],
       "frameCount": 56,
-      "source": "dist/assets/ghost-ivory-v1.png",
-      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via tools/bake.html and tools/ghost-bake-mesh.js -> lossless WebP via tools/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
+      "source": "internal/interaction/web/assets/brand/ghost-ivory-v1.png",
+      "derivation": "Unchanged source PNG -> whole-character browser-baked PNG atlas via web/artwork/bake.html and web/artwork/ghost-bake-mesh.js -> lossless WebP via web/artwork/encode-frames.py. Intermediate baked PNG removed; source PNG retained.",
       "encoding": "cwebp -lossless -exact -m 6"
     }
   ],
   "buildTools": [
     {
-      "file": "tools/bake.html",
-      "sha256": "6e443c4d83344bf56ea35bbdddc62b715d6c4a8997bd30b6628077207a9a4ba0",
-      "bytes": 1615,
+      "file": "web/artwork/bake.html",
+      "sha256": "3031f3daa3c0827050c27fd5c78309fd6948700df4b707d8946af5c52e9a94c2",
+      "bytes": 1604,
       "runtimeLoaded": false
     },
     {
-      "file": "tools/ghost-bake-mesh.js",
-      "sha256": "c8efd67ab7984e58708e530f30269c24fe93028cdd5e2cd758d6a016e098e120",
-      "bytes": 6621,
+      "file": "web/artwork/ghost-bake-mesh.js",
+      "sha256": "de8f693702da8cb84ae2657e8c120dd23e6c546ac06b2c3603caf853e20b6683",
+      "bytes": 6607,
       "runtimeLoaded": false
     },
     {
-      "file": "tools/bake-server.py",
-      "sha256": "ce0432fe67fa61d42ed8c44e744fe29e2aa6da9a1295c16a800fb32cab6878f8",
-      "bytes": 1037,
+      "file": "web/artwork/bake-server.py",
+      "sha256": "5bdca52493589fc17e449e2796dfe5aacbb305d625ca5644f1a21cb8b2524eee",
+      "bytes": 1571,
       "runtimeLoaded": false
     },
     {
-      "file": "tools/encode-frames.py",
-      "sha256": "75d5f7e8db568a82e1f9a97aaa2f454f4ff050d496ac7c0d8d4995dbed026576",
-      "bytes": 539,
+      "file": "web/artwork/encode-frames.py",
+      "sha256": "18aa1d158bda27aa77b7ebae93c5db25e94780afe7ab8ff7c6d1f99e02c2b335",
+      "bytes": 565,
       "runtimeLoaded": false
     }
   ],
-  "buildToolsReference": "tmp/neutral-web/tools; not bundled or loaded by the product."
+  "buildToolsReference": "web/artwork; build-only, not bundled or loaded by the product."
 }

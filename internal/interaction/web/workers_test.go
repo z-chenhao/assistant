@@ -3,7 +3,7 @@ package web
 import (
 	"context"
 	"errors"
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -23,7 +23,7 @@ func (r *workerReader) WorkspaceWorkers(_ context.Context, running bool) (observ
 func TestWorkerViewRequiresCurrentBindingAndReturnsOnlyActivity(t *testing.T) {
 	core := &updatesCore{allowed: true}
 	reader := &workerReader{}
-	s := &Server{Core: core, Secrets: fakeSecrets{}, Workers: reader}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: core, Secrets: fakeSecrets{}, Workers: reader}
 	request := func(path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", "http://127.0.0.1:8080"+path, nil)
 		if auth {
@@ -62,7 +62,7 @@ func TestWorkerViewRequiresCurrentBindingAndReturnsOnlyActivity(t *testing.T) {
 	}
 }
 func TestChatOwnsComputerAndWorkerWhileTasksRemainIndependent(t *testing.T) {
-	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Tasks: workspaceReader{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Tasks: workspaceReader{}}
 	for _, path := range []string{"/", "/tasks", "/tasks/task:visible"} {
 		r := httptest.NewRequest("GET", "http://127.0.0.1:8080"+path, nil)
 		r.Header.Set("Authorization", "Bearer private-token-at-least-24-bytes")

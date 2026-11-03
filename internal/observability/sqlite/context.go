@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 func (s Inspector) Rounds(ctx context.Context, q observability.RoundQuery) (observability.Rounds, error) {

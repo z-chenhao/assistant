@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/conversation"
 )
 
 var ErrNotFound = errors.New("task not found")
@@ -79,9 +79,31 @@ func (p Progress) Stage(status string) string {
 type Entry struct {
 	Summary
 	Stage, CreatedAt string
+	CompletionPolicy string
+	Schedule         *Schedule
 	NeedsAttention   bool
 	Epoch            int64
 	Progress         Progress
+}
+
+// Schedule is owner-facing Automation configuration. It is not a promised
+// execution time or a frozen Run snapshot.
+type Schedule struct {
+	Ref, Instruction, Type, Spec, Timezone, NextAt string
+	Version                                        int64
+	Enabled, Restricted                            bool
+	Below                                          *int64
+}
+
+// ScheduledWork may exist before a Task has been dispatched. TaskRef is present
+// only when the scheduler has actually linked one; Ref remains Automation identity.
+type ScheduledWork struct {
+	TaskRef string
+	Schedule
+}
+type Instruction struct {
+	Text, At string
+	Epoch    int64
 }
 type List struct {
 	Items []Entry
@@ -90,10 +112,12 @@ type List struct {
 type History struct{ ID, Kind, Text, At string }
 type Detail struct {
 	Entry
-	Artifacts      []string
-	History        []History
-	HistoryNext    string
-	Messages       []conversation.Message
-	ApprovalIDs    []string
-	SourceSequence int64
+	Artifacts        []string
+	History          []History
+	HistoryNext      string
+	Messages         []conversation.Message
+	ApprovalIDs      []string
+	SourceSequence   int64
+	Instructions     []Instruction
+	MoreInstructions bool
 }

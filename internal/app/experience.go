@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/skill"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/skill"
 )
 
 func (a *App) ReviewExperience(ctx context.Context, q skill.ReviewRequest) (map[string]any, error) {

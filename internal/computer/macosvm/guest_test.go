@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/computer"
-	"github.com/z-chenhao/collie/internal/computer/macosvm"
-	"github.com/z-chenhao/collie/internal/computer/macosvm/fixture"
-	"github.com/z-chenhao/collie/internal/llm/secret"
+	"github.com/z-chenhao/assistant/internal/computer"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm/fixture"
+	"github.com/z-chenhao/assistant/internal/llm/secret"
 )
 
 func TestSSHNegotiationFrozenIdentityAndCompatibility(t *testing.T) {
@@ -28,7 +28,7 @@ func TestSSHNegotiationFrozenIdentityAndCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	t.Setenv("COLLIE_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
+	t.Setenv("STEWARD_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
 	g := macosvm.SSHGuest{Config: s.Config.Guest, Secrets: secret.Store{}}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -59,7 +59,7 @@ func TestReadOnlyPreviewCapturesExistingWindowAndNeverStartsMissingComputer(t *t
 		t.Fatal(err)
 	}
 	defer peer.Close()
-	t.Setenv("COLLIE_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
+	t.Setenv("STEWARD_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
 	source, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestReadOnlyPreviewCapturesExistingWindowAndNeverStartsMissingComputer(t *t
 	defer provider.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	instance := computer.Instance{ComputerID: "preview-computer", Epoch: 1, NativeName: "collie-preview-window"}
+	instance := computer.Instance{ComputerID: "preview-computer", Epoch: 1, NativeName: "steward-preview-window"}
 	if _, err = provider.PreviewCapture(ctx, instance); err == nil {
 		t.Fatal("preview started a missing Computer")
 	}

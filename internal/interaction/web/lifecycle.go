@@ -3,7 +3,7 @@ package web
 import (
 	"context"
 	"errors"
-	"github.com/z-chenhao/collie/internal/agent"
+	"github.com/z-chenhao/assistant/internal/agent"
 	"net"
 	"time"
 )

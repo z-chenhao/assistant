@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func TestDisposeAcknowledgementSettlesGenerateAndContinue(t *testing.T) {

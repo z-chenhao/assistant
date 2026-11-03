@@ -1,4 +1,4 @@
-// Package web presents the authenticated local control and conversation surface.
+// Package web presents the loopback control and conversation surface.
 // HTTP handlers do not implement a second execution or approval lifecycle.
 package web
 
@@ -17,13 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/artifact"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/interaction"
-	"github.com/z-chenhao/collie/internal/llm"
-	"github.com/z-chenhao/collie/internal/llm/account"
-	"github.com/z-chenhao/collie/internal/task"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/artifact"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/interaction"
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm/account"
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 type Config struct {
@@ -33,8 +33,8 @@ type Config struct {
 
 func (c Config) Validate() error {
 	host, _, err := net.SplitHostPort(c.Listen)
-	if err != nil || (host != "127.0.0.1" && host != "::1") || !interaction.ValidCredentialRef(c.TokenRef) {
-		return errors.New("Web requires a literal loopback listener and credential reference")
+	if err != nil || (host != "127.0.0.1" && host != "::1") || c.TokenRef != "" && !interaction.ValidCredentialRef(c.TokenRef) {
+		return errors.New("Web requires a literal loopback listener and an optional valid credential reference")
 	}
 	return nil
 }
@@ -78,6 +78,7 @@ type Server struct {
 	Contexts       ContextReader
 	Traces         TraceReader
 	Tasks          TaskReader
+	Schedules      ScheduleSettings
 	Config         Config
 	Core           Core
 	Models         Models
@@ -100,6 +101,12 @@ type Server struct {
 }
 
 func (s *Server) Serve(ctx context.Context, l net.Listener) error {
+	if s.Config.TokenRef == "" {
+		address, ok := l.Addr().(*net.TCPAddr)
+		if !ok || !address.IP.IsLoopback() {
+			return errors.New("token-free Web requires a loopback listener")
+		}
+	}
 	s.lifetime = ctx
 	srv := &http.Server{Handler: s, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
 	served := make(chan error, 1)
@@ -146,6 +153,13 @@ func jsonResult(w http.ResponseWriter, v any) {
 }
 func fail(w http.ResponseWriter, status int) { http.Error(w, http.StatusText(status), status) }
 func (s *Server) authorized(r *http.Request) bool {
+	if s.Config.TokenRef == "" {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		return err == nil && net.ParseIP(host).IsLoopback()
+	}
+	if s.Secrets == nil {
+		return false
+	}
 	token, e := s.Secrets.Get(r.Context(), s.Config.TokenRef)
 	if e != nil || len(token) < 24 {
 		return false
@@ -158,7 +172,7 @@ func (s *Server) authorized(r *http.Request) bool {
 	if value, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && subtle.ConstantTimeCompare([]byte(value), token) == 1 {
 		return true
 	}
-	cookie, e := r.Cookie("collie_session")
+	cookie, e := r.Cookie("steward_session")
 	if e != nil {
 		return false
 	}
@@ -189,6 +203,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if e != nil || (host != "127.0.0.1" && host != "::1") {
 		fail(w, 403)
 		return
+	}
+	// Without a configured token, only the direct loopback peer is trusted.
+	// Fetch Metadata and Origin reject other websites, including another local
+	// port; forwarded headers never supply identity. Bindings still gate routes.
+	if s.Config.TokenRef == "" {
+		if origin := r.Header.Get("Origin"); origin != "" && origin != "http://"+r.Host {
+			fail(w, 403)
+			return
+		}
+		if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "none" && site != "same-origin" {
+			fail(w, 403)
+			return
+		}
 	}
 	if r.Method != "GET" && r.Method != "POST" {
 		fail(w, 405)
@@ -226,9 +253,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"/appearance.js":                     {"assets/appearance.js", "text/javascript"},
 		"/app.js":                            {"assets/client.js", "text/javascript"},
 		"/licenses.txt":                      {"assets/licenses.txt", "text/plain; charset=utf-8"},
-		"/brand/collie.png":                  {"assets/brand/collie.png", "image/png"},
-		"/brand/lora.ttf":                    {"assets/brand/lora.ttf", "font/ttf"},
-		"/brand/dmsans.ttf":                  {"assets/brand/dmsans.ttf", "font/ttf"},
 		"/brand/steward.svg":                 {"assets/brand/steward.svg", "image/svg+xml"},
 		"/brand/ghost-ivory-v1.png":          {"assets/brand/ghost-ivory-v1.png", "image/png"},
 		"/brand/ghost-charcoal-v1.png":       {"assets/brand/ghost-charcoal-v1.png", "image/png"},
@@ -238,7 +262,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"/brand/ghost-ivory-256.webp":        {"assets/brand/ghost-ivory-256.webp", "image/webp"},
 		"/brand/Michroma-Regular.ttf":        {"assets/brand/Michroma-Regular.ttf", "font/ttf"},
 		"/brand/JetBrainsMono-Regular.woff2": {"assets/brand/JetBrainsMono-Regular.woff2", "font/woff2"},
-		"/brand/SourceHanSansCN-VF.woff2":    {"assets/brand/SourceHanSansCN-VF.woff2", "font/woff2"},
 		"/brand/SourceSerif4-Roman.woff2":    {"assets/brand/SourceSerif4-Roman.woff2", "font/woff2"},
 		"/brand/InterVariable.woff2":         {"assets/brand/InterVariable.woff2", "font/woff2"},
 		"/favicon.png":                       {"assets/brand/ghost-charcoal-v1.png", "image/png"},
@@ -252,7 +275,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 		return
 	}
-	if r.URL.Path == "/session" && r.Method == "POST" {
+	if r.URL.Path == "/session" && r.Method == "POST" && s.Config.TokenRef != "" {
+		if s.Secrets == nil {
+			fail(w, 503)
+			return
+		}
 		if r.ParseForm() != nil {
 			fail(w, 400)
 			return
@@ -277,11 +304,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.session = session
 		s.sessionExpires = time.Now().Add(time.Hour)
 		s.mu.Unlock()
-		http.SetCookie(w, &http.Cookie{Name: "collie_session", Value: session, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/", MaxAge: 3600})
+		http.SetCookie(w, &http.Cookie{Name: "steward_session", Value: session, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/", MaxAge: 3600})
 		http.Redirect(w, r, safePageReturn(r.FormValue("next")), 303)
 		return
 	}
 	if !s.authorized(r) {
+		if s.Config.TokenRef == "" {
+			fail(w, 403)
+			return
+		}
 		_, view, _ := pageRoute(r.URL.Path)
 		if view != "" && r.Method == "GET" {
 			if r.URL.Path != "/" {
@@ -296,6 +327,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.Core.CheckChannel(r.Context(), "web", Subject, Destination) != nil {
 		fail(w, 403)
+		return
+	}
+	if r.URL.Path == "/session" && r.Method == "POST" && s.Config.TokenRef == "" {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	if r.Method == "GET" {

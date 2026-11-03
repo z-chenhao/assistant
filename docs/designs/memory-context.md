@@ -253,7 +253,7 @@ forget
 - Memory 维护、晋升、淘汰及其暂时性失败默认不告知用户，只进入内部可观测性系统；用户可随时查询、更正、删除或要求“不再记住”某类信息。
 - Memory 写入不属于副作用审批。Security Approval 只约束发送、购买、删除、发布等外部动作，不能复用来打断后台记忆维护。
 
-<a id="recall-durable-context-recall-collie-22"></a>
+<a id="recall-durable-context-recall-steward-22"></a>
 
 ## Durable context recall (retired task #22)
 
@@ -437,7 +437,7 @@ Runs use the current assembly while preserving Task epochs and role reductions.
 
 2026-10-28：将内置角色、能力指导与摘要指令迁入嵌入式 Markdown 产品资产，便于独立审阅和迭代；保留 Go 中的装配与权限判断。相较运行时加载外部文件，`go:embed` 保持单二进制部署和显式升级；本次完整消息与摘要请求逐字节不变，不引入 schema、配置或冻结请求迁移。
 
-2026-10-28：F-003/F-004/F-006/F-011/F-022 上下文治理。借鉴 Pi 的分区装配和工作摘要；保留 Collie 的 Main/Worker、Task epoch、显式交接、冻结能力、费用与重放边界。相较汇总整棵树，改用 Root 可见业务输出和 Host 未知效果；相较纯摘录，新 Run 使用同模型的工具关闭摘要轮次。state schema 27 校验 context version 和工作状态边界；旧 checkpoint 及已接受请求保持原实现与 hash，新 context version 不回填旧 Run，所有进程需统一升级。
+2026-10-28：F-003/F-004/F-006/F-011/F-022 上下文治理。借鉴 Pi 的分区装配和工作摘要；保留 Steward 的 Main/Worker、Task epoch、显式交接、冻结能力、费用与重放边界。相较汇总整棵树，改用 Root 可见业务输出和 Host 未知效果；相较纯摘录，新 Run 使用同模型的工具关闭摘要轮次。state schema 27 校验 context version 和工作状态边界；旧 checkpoint 及已接受请求保持原实现与 hash，新 context version 不回填旧 Run，所有进程需统一升级。
 
 2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
 

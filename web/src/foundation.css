@@ -46,6 +46,7 @@ button:hover,.button:hover{background:var(--foreground)}
 .secondary{background:transparent;border-color:var(--border);color:var(--foreground)}.secondary:hover{background:var(--hover)}
 .plain-button{padding:0;min-height:32px;min-width:32px;background:transparent;color:var(--muted-foreground);border:0}.plain-button:hover{background:var(--hover);color:var(--foreground)}
 .check{display:flex;align-items:flex-start;gap:9px;color:var(--foreground)}.check input{display:inline-block;width:auto;margin:4px 0 0;flex-shrink:0}
+input[type=checkbox],input[type=radio]{accent-color:var(--foreground)}
 .muted,.field-help{color:var(--muted-foreground);font-size:14px;line-height:1.7}.field-help{margin:12px 0 18px}
 .actions,.row-heading,.row-badges{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row-heading{justify-content:space-between}.row-heading h2{margin:0}
 .back-link{display:inline-block;font-size:13px;color:var(--muted-foreground);margin:0 0 18px;text-decoration:none}.back-link:hover,.text-link:hover{text-decoration:underline}.text-link{font-size:14px;font-weight:500}

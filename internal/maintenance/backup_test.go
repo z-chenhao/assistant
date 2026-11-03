@@ -5,9 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/z-chenhao/collie/internal/app"
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/maintenance"
+	"github.com/z-chenhao/assistant/internal/app"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/maintenance"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,7 +17,7 @@ import (
 func fixture(t *testing.T) (string, []byte) {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "data")
-	cfg, e := config.Load("", func(k string) (string, bool) { return root, k == "COLLIE_DATA_ROOT" })
+	cfg, e := config.Load("", func(k string) (string, bool) { return root, k == "STEWARD_DATA_ROOT" })
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -35,7 +35,7 @@ func TestEncryptedOfflineRoundtripAndFailClosed(t *testing.T) {
 	ctx := context.Background()
 	root, key := fixture(t)
 	max := app.SchemaVersions()
-	archive := filepath.Join(t.TempDir(), "backup.collie")
+	archive := filepath.Join(t.TempDir(), "backup.steward")
 	lock, e := maintenance.Lock(root, false)
 	if e != nil {
 		t.Fatal(e)
@@ -67,7 +67,7 @@ func TestEncryptedOfflineRoundtripAndFailClosed(t *testing.T) {
 			if name == "corrupted" {
 				raw[len(raw)/2] ^= 1
 			}
-			path := filepath.Join(t.TempDir(), "bad.collie")
+			path := filepath.Join(t.TempDir(), "bad.steward")
 			if e = os.WriteFile(path, raw, 0600); e != nil {
 				t.Fatal(e)
 			}
@@ -125,7 +125,7 @@ func TestAllDatabaseVersionPreflightBeforeAnyMigration(t *testing.T) {
 		}
 		db.Close()
 	}
-	cfg, e := config.Load("", func(k string) (string, bool) { return root, k == "COLLIE_DATA_ROOT" })
+	cfg, e := config.Load("", func(k string) (string, bool) { return root, k == "STEWARD_DATA_ROOT" })
 	if e != nil {
 		t.Fatal(e)
 	}

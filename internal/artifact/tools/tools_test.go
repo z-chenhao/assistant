@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"github.com/z-chenhao/collie/internal/tool"
-	"github.com/z-chenhao/collie/internal/tool/codemode"
+	"github.com/z-chenhao/assistant/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
 	"strings"
 	"testing"
 )

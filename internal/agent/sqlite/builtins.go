@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // ExecuteBuiltin routes the accepted, persisted Tool name through the shared

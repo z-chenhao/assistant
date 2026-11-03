@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/conversation"
-	"github.com/z-chenhao/collie/internal/delivery"
-	deliverysqlite "github.com/z-chenhao/collie/internal/delivery/sqlite"
-	deliveryterminal "github.com/z-chenhao/collie/internal/delivery/terminal"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	deliverysqlite "github.com/z-chenhao/assistant/internal/delivery/sqlite"
+	deliveryterminal "github.com/z-chenhao/assistant/internal/delivery/terminal"
 )
 
 func (s *Store) TerminalInbox() *deliveryterminal.Adapter { return deliveryterminal.New(s.db) }

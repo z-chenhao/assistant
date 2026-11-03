@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/z-chenhao/collie/internal/computer"
-	"github.com/z-chenhao/collie/internal/tool"
+	"github.com/z-chenhao/assistant/internal/computer"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 //go:embed operations.py

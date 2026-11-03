@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/agent"
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func spendPolicy(t *testing.T, boundary int64) agent.SpendPolicy {

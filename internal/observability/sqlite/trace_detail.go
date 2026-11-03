@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 func selectedObservation(ctx context.Context, tx *sql.Tx, q observability.ObservationQuery) (observability.Observation, error) {

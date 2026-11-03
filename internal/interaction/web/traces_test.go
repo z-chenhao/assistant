@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/z-chenhao/collie/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observability"
 )
 
 type traceReader struct{}
@@ -40,7 +40,7 @@ func (traceReader) ChatPreview(context.Context, observability.ObservationQuery) 
 }
 
 func TestTraceWorkbenchAuthenticatedCompleteEscapedAndValidated(t *testing.T) {
-	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Inspector: &inspectionReader{}, Traces: traceReader{}}
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: &updatesCore{allowed: true, status: "idle"}, Secrets: fakeSecrets{}, Inspector: &inspectionReader{}, Traces: traceReader{}}
 	request := func(path string, auth bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", "http://127.0.0.1:8080"+path, nil)
 		if auth {

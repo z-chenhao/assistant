@@ -7,7 +7,7 @@ import (
 	"flag"
 	"io"
 
-	"github.com/z-chenhao/collie/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm"
 )
 
 func readModelInput(command command, flags *flag.FlagSet, in io.Reader) (llm.ProfileInput, error) {

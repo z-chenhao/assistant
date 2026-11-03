@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/z-chenhao/collie/internal/computer/macosvm"
-	"github.com/z-chenhao/collie/internal/config"
-	"github.com/z-chenhao/collie/internal/interaction/web"
+	"github.com/z-chenhao/assistant/internal/computer/macosvm"
+	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/interaction/web"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -64,7 +64,7 @@ func description(id, root string) web.Capability {
 		v.Title = "Memory"
 		v.Description = "Remember preferences and corrections across conversations."
 		v.Help = "Use an existing SecretStore reference to the same 32-byte encryption key. Keep this key for existing memories and backups. Secret values never belong in this editor."
-		v.Example = "encryption_key_ref: env:COLLIE_MEMORY_KEY\n"
+		v.Example = "encryption_key_ref: env:STEWARD_MEMORY_KEY\n"
 	case "embedding":
 		v.Title = "Memory search"
 		v.Description = "Search memories and conversation with an explicit embedding model."
@@ -74,12 +74,12 @@ func description(id, root string) web.Capability {
 		v.Title = "MCP tools"
 		v.Description = "Connect allowlisted tools from isolated local stdio providers."
 		v.Help = "Use absolute executable and private state paths. Testing starts the configured providers in the existing kernel sandbox and checks tool discovery; it never invokes an advertised tool. Credentials in command arguments are not supported."
-		v.Example = fmt.Sprintf("- name: local_catalog\n  command: /absolute/path/to/mcp-server\n  args: []\n  directory: %s\n  tools: {lookup: read_only}\n", filepath.Join(parent, "collie-mcp"))
+		v.Example = fmt.Sprintf("- name: local_catalog\n  command: /absolute/path/to/mcp-server\n  args: []\n  directory: %s\n  tools: {lookup: read_only}\n", filepath.Join(parent, "steward-mcp"))
 	case "skills":
 		v.Title = "Skills"
 		v.Description = "Discover curated, versioned methods and their resources."
 		v.Help = "Prepare the catalog outside application data and execution workspaces. Testing validates the actual catalog and its bounded resources. An empty valid catalog is allowed."
-		v.Example = fmt.Sprintf("root: %s\nscope: agent\n", filepath.Join(parent, "collie-skills"))
+		v.Example = fmt.Sprintf("root: %s\nscope: agent\n", filepath.Join(parent, "steward-skills"))
 	case "execution":
 		v.Title = "Files and commands"
 		v.Description = "Read, edit, write and run commands in a private isolated workspace."
@@ -89,7 +89,7 @@ func description(id, root string) web.Capability {
 		v.Title = "Computer"
 		v.Description = "Use an explicitly provisioned macOS Guest for desktop and file tools."
 		v.Help = "Provision the Lume store and sealed base first; this page does not download or boot a VM. Testing checks the Lume version, sealed base and credential availability. Guest runtime checks still run on first use. Clear the local execution override before enabling Computer."
-		v.Example = "root: /absolute/private/computer-store\nendpoint: http://127.0.0.1:7777\ncompatibility:\n  provider_version: '0.6.1'\n  guest_build: YOUR_BUILD\n  driver_version: YOUR_DRIVER_VERSION\n  driver_sha256: YOUR_DRIVER_SHA256\n  driver_team: YOUR_DRIVER_TEAM\n  driver_bundle: com.trycua.driver\n  architecture: arm64\nguest:\n  user: lume\n  port: 22\n  password_ref: env:COLLIE_GUEST_PASSWORD\n  host_key_sha256: SHA256:YOUR_PINNED_HOST_KEY\nmanifest:\n  version: 1\n"
+		v.Example = "root: /absolute/private/computer-store\nendpoint: http://127.0.0.1:7777\ncompatibility:\n  provider_version: '0.6.1'\n  guest_build: YOUR_BUILD\n  driver_version: YOUR_DRIVER_VERSION\n  driver_sha256: YOUR_DRIVER_SHA256\n  driver_team: YOUR_DRIVER_TEAM\n  driver_bundle: com.trycua.driver\n  architecture: arm64\nguest:\n  user: lume\n  port: 22\n  password_ref: env:STEWARD_GUEST_PASSWORD\n  host_key_sha256: SHA256:YOUR_PINNED_HOST_KEY\nmanifest:\n  version: 1\n"
 	}
 	if id == "computer" {
 		raw := v.Example
