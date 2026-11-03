@@ -36,7 +36,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。 | 是 · 已完成 |
 | [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | 用户能登录、重新认证和退出 ChatGPT 账户，凭据可安全持久化。 | 否 · 部分完成 |
 | [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。 | 是 · 已完成 |
-| [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；人工参与及原话题交付按所属流程维护。 | 否 · 部分完成 |
+| [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI具名反馈与原话题交付已接通，Web/飞书结构化反馈待补。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
 | [F-007](features/tools-approvals.md#f-007) | 工具、审批与未知副作用处理 | 用户能确认具体外部动作；重复请求或重启不能盲目重复副作用。 | 是 · 已完成 |
@@ -52,7 +52,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
 | [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；任务与执行详情按可用宽度重排。 | 否 · 部分完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 用户阅读或编辑草稿时仍能接收已提交回复、审批与状态更新，保留草稿、附件和阅读位置。 | 是 · 已完成 |
-| [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 维护飞书身份、凭据与收发，交付关联原话题、适配渠道并去重，未知投递不盲目重发。 | 否 · 部分完成 |
+| [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 正常回复能产生适当的受控组件，失败可退回语义文本。 | 否 · 部分完成 |
 | [F-022](features/skills-experience.md#f-022) | 受版本控制的 Skill 读取 | Agent 可发现可用方法，再按需读取正文和资源。 | 是 · 已完成 |
 | [F-023](features/skills-experience.md#f-023) | 执行后的自动经验闭环 | 用户纠正、恢复失败或重复成功能进入候选、验证和晋升流程。 | 否 · 部分完成 |
@@ -60,7 +60,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-025](features/integrations.md#f-025) | 可认证的真实服务接入 | GitHub 精确 PR 监听可经 SecretStore PAT 认证读取；通用连接、授权动作及凭据生命周期仍有缺口。 | 否 · 部分完成 |
 | [F-026](features/coding.md#f-026) | 代码理解、修改与交付 | 委派仓库理解、修改和验证，按任务保留代码目录、修改集与远端交付证据。 | 否 · 部分完成 |
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
-| [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 支持健康检查、加密备份恢复、显式后台运行和尊重人工停机的独立巡检。 | 否 · 部分完成 |
+| [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 健康检查、加密恢复与 macOS 显式后台服务/独立巡检；持久人工停机和有限恢复已接通，平台 Live 与主动渠道告警待补。 | 否 · 部分完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 操作员能查看用量，并按明确价格元数据控制账户费用。 | 是 · 已完成 |
 | [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 六类能力以普通表单配置、验证和保存；高级 YAML 保留，重启边界与凭据引用不变。 | 是 · 已完成 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |

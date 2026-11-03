@@ -39,6 +39,20 @@ flowchart TD
 
 没有新持久化模型、迁移、Task 状态、模型工具或控制入口。页面继续沟通通过普通 Main 用户输入，不直接改变 Task。
 
+### 信息回答与成果审阅（F-004）
+
+当前消费者是 Main 的既有 Task 工具与本机所有者 CLI。`request_input` 和 `request_review` 是 Main-only `task_manage` 的严格 union 分支；后者必须包含 1–16 个现有作用域内的不可变 ArtifactRef。ToolInvocation、请求源去重、Main claim fencing 与 Task 接纳事务不另建管线。Task 仍只有原四种状态。
+
+schema v34 的私有 `task_feedback` 保存确切 Task/epoch、隐私 epoch、问题种类/正文、可定位的原用户消息、成果引用、七天有效期与回应消息。一次事务替代旧 pending 并保存新记录、原有工具回执和事件；成果经原 ArtifactStore 保留。源是 Reporter 运行时事件时，回溯真实用户消息，而不把事件 ID 冒充消息 ID。新请求也使旧的已回答记录失去接续因果效力。
+
+所有者 `task feedbacks` 仅读取当前可处理 pending，按不可变行顺序以不透明 feedback ref 分页，每页最多 50 条，并可按确切 TaskRef 筛选。过期、停止、旧 epoch 和隐私撤销在读谓词中排除；同一个只读事务复用 ArtifactStore 的访问与 Task 保护型到期规则，过滤缺失、删除和不可访问成果而不打开 blob。每页检查至多 50 个候选，过滤后仍按已检查位置推进游标；历史记录保留作审计，不作为待办回传。回答先载入不可变记录构造具名上下文，再在现有 Main submit 的同一事务中权威验证当前状态/隐私/成果可访问性，提交确定性 request key、Main input、Conversation intent、已回答状态和原有唤醒事件。任何失败全部回滚；相同重试回原 receipt，不同文本冲突。
+
+回答只是用户输入，接续仍由受信 Main 调用原 append。当前消费源是反馈时，Host 自动验证关联 Task 与反馈；显式 `feedbackRef` 在后到其他用户输入时仍保留原因果检查。已接受工具请求先复用原回执，不能因接续后 epoch 增加而破坏重放。暂停/取消/Forget/新 epoch/新审阅后拒绝旧因果。全新的普通用户消息保持既有 Main 判断与生命周期语义，Host 不通过自由文本证明授权。
+
+持久关联、幂等、原子 ingress 与失效检查是领域必需机制；单个当前待办与七天有效期是本轮默认政策。Tool schema 是受冻结保护的模型契约；CLI 的用户字段与现有 Task/Artifact refs 是窄输入输出，表、Run ID、claim、SQL 与通用工作流协议不开放。没有泛化人类工作流引擎、自动质量验收、Worker 直达用户或新的动作批准通道。
+
+新增 schema 前向迁移不改历史 Task/Run/snapshots。新 Main 冻结扩展后的工具定义；旧 Main 的精确工具定义不被替换，当前 registry 选择不兼容则 fail-closed，升级前用原二进制排空旧 Main。Web/飞书结构化待办与跨渠道接续仍待实现。
+
 ### Go 实现职责（F-040）
 
 Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Task 操作移到 task_changes.go；这些 helper 加入同一个事务，不独立提交。
@@ -47,13 +61,15 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 
 创建 Task → Root 执行 → 追加可在稳定边界 Steering；暂停/取消关闭旧 epoch → 继续建立新 Root → 结果交给 Main。once 成功结束 Task；ongoing 本轮完成后仍可保持 active。
 
-- **F-004**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通。 Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。
+- **F-004**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通；CLI 具名问题/成果反馈经 Main 接续。 Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。
 - **F-005**：Root 的非最终 assistant 文本在完整响应提交后的工具阶段边界写入进度；Activity 将最近摘要与当前执行事实、Child 数量组合，Web 和 TUI 复用同一投影。普通进度独立于主动通知与 Main 调度。
 
 ## 代码与依赖
 
 - [internal/task/task.go](../../internal/task/task.go)
 - [internal/agent/sqlite/tasks.go](../../internal/agent/sqlite/tasks.go)
+- [internal/agent/sqlite/task_feedback.go](../../internal/agent/sqlite/task_feedback.go)：具名待办、当前性与原子回应
+- [cmd/steward/task_feedback.go](../../cmd/steward/task_feedback.go)：所有者 CLI 入口
 - [internal/agent/sqlite/task_control.go](../../internal/agent/sqlite/task_control.go)
 - [internal/agent/sqlite/progress.go](../../internal/agent/sqlite/progress.go)：阶段摘要接纳与事务内持久化
 - [internal/task/sqlite/reader.go](../../internal/task/sqlite/reader.go)：任务列表、当前执行/Child 聚合与旧 Activity 投影
@@ -70,9 +86,9 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 
 继续使用 Task、Run、Instruction、epoch 和现有任务接纳事务，不增加 Ticket/Assignment 生命周期。关联和去重是机制，哪些事件可续跑、何时须澄清是受宿主约束的政策。明确关联的上下文可直达对应执行，来源消息不变成用户授权；新范围交 Main。先验证必要关联基数及活动/终态续跑边界，不预设任意多对多订阅平台或自动跨账号身份映射。
 
-#### 结构化待决定问题与交付验收
+#### Web/飞书结构化待办
 
-复用 Task、Main ingress、现有冻结 Approval 和 Artifact 归属，新增的待决定信息与成果审阅需具名数据语义；它们不替代 ToolInvocation 审批。持久关联、提交去重与过期检查属于机制，是否要求人工验收属于任务政策。交互记录、版本和接续协议待实现前设计，Worker 仍只向 Parent/Main 汇报，不获得用户消息发送能力；不重写现有 Task 状态机来表达所有展示阶段。
+CLI 的具名问题、确切成果与反馈接续已实现，机制见上文。后续 Web/飞书界面需复用同一记录和 Main ingress，并补通道身份校验、陈旧状态呈现与跨端提交；现有审批卡片不能被当作信息回答或成果审阅入口。
 
 ## 验证与交付
 

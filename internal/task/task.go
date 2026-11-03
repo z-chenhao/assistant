@@ -15,12 +15,12 @@ import (
 const SearchName = "builtin__task_search"
 const ManageName = "builtin__task_manage"
 const SearchSchema = `{"type":"object","properties":{"query":{"type":"string"},"scope":{"type":"string","enum":["active","recent","all"]},"status":{"type":"array","items":{"type":"string","enum":["active","paused","completed","cancelled"]}},"limit":{"type":"integer","minimum":1,"maximum":50}},"additionalProperties":false}`
-const ManageSchema = `{"oneOf":[{"type":"object","properties":{"operation":{"const":"create"},"task":{"type":"string"},"completionPolicy":{"type":"string","enum":["once","ongoing"],"description":"Defaults to once. Use ongoing for continuing work; ordinary Root completion keeps the Task active."},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","task"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"append"},"taskRef":{"type":"string"},"instruction":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","taskRef","instruction"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"pause"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"cancel"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"complete"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false}]}`
+const ManageSchema = `{"oneOf":[{"type":"object","properties":{"operation":{"const":"create"},"task":{"type":"string"},"completionPolicy":{"type":"string","enum":["once","ongoing"],"description":"Defaults to once. Use ongoing for continuing work; ordinary Root completion keeps the Task active."},"artifactRefs":{"type":"array","items":{"type":"string"}}},"required":["operation","task"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"append"},"taskRef":{"type":"string"},"instruction":{"type":"string"},"artifactRefs":{"type":"array","items":{"type":"string"}},"feedbackRef":{"type":"string","description":"When continuing from a saved feedback response, copy its feedback_ref and artifact_refs to feedbackRef and artifactRefs. Keeps the response tied to the exact Task epoch even if newer user input also arrived."}},"required":["operation","taskRef","instruction"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"pause"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"cancel"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"complete"},"taskRef":{"type":"string"}},"required":["operation","taskRef"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"request_input"},"taskRef":{"type":"string"},"prompt":{"type":"string"}},"required":["operation","taskRef","prompt"],"additionalProperties":false},{"type":"object","properties":{"operation":{"const":"request_review"},"taskRef":{"type":"string"},"prompt":{"type":"string"},"artifactRefs":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"string"}}},"required":["operation","taskRef","prompt","artifactRefs"],"additionalProperties":false}]}`
 
 func Definitions() []tool.Definition {
 	return []tool.Definition{
 		{Spec: tool.Spec{Name: SearchName, Version: 1, InputSchema: SearchSchema, ReplayPolicy: "safe", Permission: "read_only"}, Host: true},
-		{Spec: tool.Spec{Name: ManageName, Version: 1, Description: "Create or control a Task. Create defaults to once; ongoing keeps continuing work active after a Root returns. Append continues work with a new Root when needed. Complete ends only an active Task with a terminal current-epoch tree and no unresolved Tool effects; it never stops work.", InputSchema: ManageSchema, ReplayPolicy: "safe", Permission: "task_control"}, Host: true},
+		{Spec: tool.Spec{Name: ManageName, Version: 1, Description: "Create or control a Task. Create defaults to once; ongoing keeps continuing work active after a Root returns. Append continues work with a new Root when needed. Complete ends only an active Task with a terminal current-epoch tree and no unresolved Tool effects; it never stops work. Request_input saves a specific question; request_review saves a review tied to exact artifact references. Responses return through Main and never approve external actions.", InputSchema: ManageSchema, ReplayPolicy: "safe", Permission: "task_control"}, Host: true},
 	}
 }
 func Registry() *tool.Registry {
@@ -33,6 +33,8 @@ func Registry() *tool.Registry {
 
 type ManageRequest struct {
 	Operation        string   `json:"operation"`
+	Prompt           string   `json:"prompt,omitempty"`
+	FeedbackRef      string   `json:"feedbackRef,omitempty"`
 	Task             string   `json:"task,omitempty"`
 	TaskRef          string   `json:"taskRef,omitempty"`
 	Instruction      string   `json:"instruction,omitempty"`
@@ -46,9 +48,10 @@ type SearchRequest struct {
 	Limit  int      `json:"limit,omitempty"`
 }
 type Receipt struct {
-	TaskRef  string `json:"taskRef"`
-	Status   string `json:"status"`
-	Accepted bool   `json:"accepted"`
+	TaskRef     string `json:"taskRef"`
+	Status      string `json:"status"`
+	Accepted    bool   `json:"accepted"`
+	FeedbackRef string `json:"feedbackRef,omitempty"`
 }
 type Summary struct {
 	TaskRef         string `json:"taskRef"`
@@ -121,10 +124,25 @@ func ParseManage(raw string) (ManageRequest, error) {
 			return r, ErrInvalid
 		}
 	case "append":
+		allowed["feedbackRef"] = true
+		if _, present := fields["feedbackRef"]; present && (!strings.HasPrefix(r.FeedbackRef, "feedback:") || len(r.FeedbackRef) <= 9 || len(r.FeedbackRef) > 256 || strings.ContainsAny(r.FeedbackRef, "/\\ \r\n\x00")) {
+			return r, ErrInvalid
+		}
 		allowed["instruction"] = true
 		allowed["artifactRefs"] = true
 		if !validText(r.Instruction) {
 			return r, ErrInvalid
+		}
+	case "request_input", "request_review":
+		allowed["prompt"] = true
+		if !validText(r.Prompt) {
+			return r, ErrInvalid
+		}
+		if r.Operation == "request_review" {
+			allowed["artifactRefs"] = true
+			if len(r.ArtifactRefs) == 0 || len(r.ArtifactRefs) > 16 {
+				return r, ErrInvalid
+			}
 		}
 	case "pause", "cancel", "complete":
 	default:

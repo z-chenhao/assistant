@@ -15,6 +15,22 @@ from verify import STATE_SCHEMA_VERSION
 class CodeHarness(CapabilityHarness):
     def args(self, *args):
         return [str(self.binary), "-config", str(self.root / "config.yaml"), "-test-bridge", "codemode", *args]
+
+    def setup(self, model="fixture-model", metadata=None):
+        # These gates retain explicit cell sources/results and, for recovery,
+        # 100 accepted child calls plus eight exact approval notices. Select
+        # enough model capacity for that workload and the current Main catalog.
+        # Production budgets and independent small-window tests stay fixed.
+        if metadata is None:
+            metadata = {
+                'name': 'Code Mode workload', 'provider_kind': 'openai_compatible',
+                'endpoint': 'http://127.0.0.1:1/v1', 'wire_api': 'openai_completions',
+                'model_id': model, 'context_window': 16384, 'max_output_tokens': 1024,
+                'compatibility': {'tool_result_format': 'openai'},
+                'capabilities': {'text_input': True},
+            }
+        return super().setup(model=model, metadata=metadata)
+
 from verify_main import require
 
 

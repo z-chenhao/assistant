@@ -20,7 +20,7 @@ import (
 // Existing populated-version fixtures reconstruct their old schema before
 // reopening. Remove these new, empty indexes along with the later tables.
 const preGitHubTaskColumns = `task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,progress_summary,created_at,updated_at,completed_at,cancelled_at,version,completion_policy`
-const removeGitHubFixtureSchema = `DROP TABLE IF EXISTS github_task_followup; DROP TABLE IF EXISTS github_task_binding; ALTER TABLE task DROP COLUMN explicit_end_epoch; DROP TABLE IF EXISTS github_observation; DROP TABLE IF EXISTS github_watch;
+const removeGitHubFixtureSchema = `DROP TABLE IF EXISTS github_task_followup; DROP TABLE IF EXISTS github_task_binding; ALTER TABLE task DROP COLUMN explicit_end_epoch; DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; DROP TABLE IF EXISTS task_feedback; DROP TABLE IF EXISTS github_observation; DROP TABLE IF EXISTS github_watch;
  DROP TRIGGER run_desired_state; CREATE TRIGGER run_desired_state BEFORE UPDATE ON run WHEN NEW.desired_state NOT IN('running','task_paused','task_cancelled','memory_forgotten') OR (OLD.desired_state!='running' AND NEW.desired_state='running') BEGIN SELECT RAISE(ABORT,'invalid desired state'); END; `
 const removeInspectionFixtureSchema = removeGitHubFixtureSchema + `DROP TABLE IF EXISTS dispatch_observation; DROP INDEX IF EXISTS run_observation_root; DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
 
@@ -209,7 +209,7 @@ func TestInspectionIndexUpgradeRollbackAndFrozenData(t *testing.T) {
 	registry := tool.FixtureRegistry()
 	// Seed with current constructors, then remove the v32 delivery metadata
 	// so the queued Run represents an actual pre-protocol migration fixture.
-	if _, err = db.Exec(responsiveMainSQL + githubObservationsSQL + githubTaskContinuationSQL); err != nil {
+	if _, err = db.Exec(responsiveMainSQL + githubObservationsSQL + taskFeedbackSQL + feishuReplySourcesSQL + githubTaskContinuationSQL); err != nil {
 		t.Fatal(err)
 	}
 	actor := agent.Actor{Store: s.Runs(history, registry), Registry: registry, Ready: func(context.Context) bool { return true }}

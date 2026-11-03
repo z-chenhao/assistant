@@ -255,8 +255,9 @@ func (r *Runs) Report(ctx context.Context) error {
 	return err
 }
 
-// promoteFollowups drains every currently available update into one new Main,
-// only after the active Main has ended. No progress or Worker text enters the
+// promoteFollowups admits one compatible original-source group into a new Main,
+// only after the active Main has ended. Other groups remain durable pending work.
+// No progress or Worker text enters the
 // user Conversation; only Main's eventual answer uses the normal delivery path.
 func (r *Runs) promoteFollowups(ctx context.Context) error {
 	created := false
@@ -268,17 +269,19 @@ func (r *Runs) promoteFollowups(ctx context.Context) error {
 		if active > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) ORDER BY b.sequence`)
+		rows, err := tx.QueryContext(ctx, `SELECT b.sequence,b.message_json,u.task_id FROM main_inbox b JOIN task_update u USING(event_id) JOIN task t USING(task_id) WHERE b.run_id IS NULL AND b.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND u.task_epoch=t.task_epoch AND `+currentAutomationUpdate+` AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0) ORDER BY b.sequence`)
 		if err != nil {
 			return err
 		}
 		ids := []int64{}
 		messages := []agent.AgentMessage{}
+		taskIDs := []string{}
 		for rows.Next() {
 			var id int64
 			var raw string
+			var taskID string
 			var message agent.AgentMessage
-			if err = rows.Scan(&id, &raw); err != nil {
+			if err = rows.Scan(&id, &raw, &taskID); err != nil {
 				rows.Close()
 				return err
 			}
@@ -288,6 +291,7 @@ func (r *Runs) promoteFollowups(ctx context.Context) error {
 			}
 			ids = append(ids, id)
 			messages = append(messages, message)
+			taskIDs = append(taskIDs, taskID)
 		}
 		err = rows.Err()
 		rows.Close()
@@ -297,6 +301,25 @@ func (r *Runs) promoteFollowups(ctx context.Context) error {
 		if len(ids) == 0 {
 			return nil
 		}
+		// One semantic reply must not combine unrelated original IM topics.
+		// Leave the other groups in the same durable inbox for the next Main;
+		// the existing single-Main constraint and recovery scanner remain owners.
+		selected, err := taskReplyOrigin(ctx, tx, taskIDs[0])
+		if err != nil {
+			return err
+		}
+		groupIDs, groupMessages := []int64{}, []agent.AgentMessage{}
+		for i, taskID := range taskIDs {
+			origin, err := taskReplyOrigin(ctx, tx, taskID)
+			if err != nil {
+				return err
+			}
+			if origin == selected {
+				groupIDs = append(groupIDs, ids[i])
+				groupMessages = append(groupMessages, messages[i])
+			}
+		}
+		ids, messages = groupIDs, groupMessages
 		var agentID, profile string
 		var config int64
 		if err = tx.QueryRowContext(ctx, `SELECT agent_id,coalesce(active_model_profile_id,''),config_version FROM agent_config WHERE singleton=1 AND setup_status='ready'`).Scan(&agentID, &profile, &config); err != nil {
