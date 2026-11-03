@@ -240,7 +240,10 @@ semantic Judge, paid model call or clause-audit inventory runs in either workflo
 
 [Native packages](../../.github/workflows/release.yml) remains separate. Manual
 runs or explicit version tags build native archives and checksums on supported
-Linux/macOS architectures. Packages retain project and third-party notices, and draft creation rechecks archive checksums. Version tags create an unpublished draft release for
+Linux/macOS architectures. Linux packaging installs Bubblewrap for the same mandatory
+installation diagnostics used locally. Packages retain project and third-party notices;
+manual and tag runs download all archives and verify checksums before draft creation,
+which rechecks its own downloaded copies. Version tags create an unpublished draft release for
 human inspection. An ordinary PR neither deploys nor publishes a release.
 
 Real-account login, external-site compatibility, macOS Computer and real-model

@@ -16,6 +16,7 @@
 | P2 | README 仅有两条开发命令、旧仓库 URL；贡献入口只有链接，无首次贡献路径和 GitHub 问题模板。 | 补齐安装前提、使用方式、平台边界、命令和目录地图；加入贡献、支持、行为准则、治理、Issue 表单、CODEOWNERS、EditorConfig。保留旧 Go import 路径。 |
 | P2 | PR CI 显式检出 head，未验证 GitHub 合并结果；无独立持续依赖审计与 workflow lint。 | 改为默认合并结果 checkout，保留 `Ubuntu checks` 状态；NUL 分隔路径分类、actionlint、Dependabot 和独立依赖审计。 |
 | P2 | 原生平台检查主要发生在打包流程，draft 创建前未复验下载后的 checksum。 | 扩展回归增加 macOS CLI/startup/credential adapter/offline VM 契约；draft 创建复验 checksums，发布仍需显式授权。 |
+| P2 | 实际四平台构建暴露 Linux 打包缺少 Bubblewrap，两个 doctor 契约失败；Actions 日志报告 setup-node 的 Node 20 已弃用。 | Linux 打包补齐必要依赖；核对官方兼容性后固定 setup-node v7.1.0、upload-artifact v7.0.2、download-artifact v8.0.2 的完整 SHA。手动与 tag 构建均重新下载产物并验证 checksum。 |
 | P2 | 远端 33 个分支，22 个 head 与已合并 PR 精确相符；唯一开放 PR #113 仍采用已被 #116/#117 取代的 Collie 视觉。 | 保存完整 Git bundle；带 SHA lease 原子删除 22 个已合并分支。关闭 #113，并删除其被取代的主题分支；保留独有的旧实验工作供审核。 |
 | 权限限制 | 私密漏洞报告关闭，合并后自动删分支关闭；修改接口均返回 HTTP 403。 | 不声称已启用。SECURITY.md 明确报告入口不可用时不公开漏洞细节；需仓库管理员在 Settings 中启用这两项。 |
 
@@ -37,4 +38,5 @@ Go 领域、adapter、组合根和权威事务边界继续保留；不为目录�
 - HTML 图片检测回归先失败，修正后通过；正式静态图已从当前 atlas 导出。
 - Go 1.26.10 的 `make audit` 通过：无可达 Go 漏洞，四份 npm 锁文件均为 0 项；仅余 GO-2026-5932：`golang.org/x/crypto/openpgp` 不受维护；本项目未导入该包，使用的是 SSH 等其他包。没有为隐藏模块提示删除实际使用的密码库。
 - Go 1.26.10 下 `make test lint` 通过；包含 HTML 图片回归、正式首帧像素验证、工作流 actionlint 以及全部既有软件检查。
+- 首次远端 native packages 的 Linux amd64/arm64 在 doctor 检查失败，日志确认缺少 Bubblewrap；未放宽断言，已修正 runner 安装步骤。原始失败保留在 GitHub run `41631074356`，后续结果单独记录。
 - 后续安装/浏览器系统门禁及 GitHub CI 结果在完成后补充。原生 macOS/真实服务验证与本地 Linux 检查分开报告。
