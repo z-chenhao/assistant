@@ -5,5 +5,5 @@
   "type": "module",
   "engines": { "node": ">=22.19.0" },
   "scripts": { "test": "node --test test/*.test.mjs", "lint": "node --check bridge.mjs && node --check account.mjs" },
-  "dependencies": { "@earendil-works/pi-ai": "1.3.0" }
+  "dependencies": { "@earendil-works/pi-ai": "1.4.0" }
 }
