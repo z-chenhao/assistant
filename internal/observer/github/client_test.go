@@ -155,6 +155,39 @@ func TestReadRejectsPartialHistoryRedirectAndInvalidSource(t *testing.T) {
 	}
 }
 
+func TestReadReviewIdentityIncludesBodyBeyondDisplayLimit(t *testing.T) {
+	var revision atomic.Int64
+	client := peerClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if basePeer(t, r, w) {
+			return
+		}
+		switch r.URL.Path {
+		case "/repos/owner/repo/pulls/7/comments":
+			fmt.Fprint(w, `[]`)
+		case "/repos/owner/repo/pulls/7/reviews":
+			json.NewEncoder(w).Encode([]map[string]any{{"id": 500, "body": strings.Repeat("a", 16<<10) + fmt.Sprint(revision.Load()), "state": "COMMENTED", "submitted_at": "2026-11-01T00:00:00Z", "html_url": "https://github.com/owner/repo/pull/7#pullrequestreview-500", "user": map[string]any{"id": 2, "login": "reviewer"}}})
+		default:
+			fmt.Fprint(w, `{"check_runs":[]}`)
+		}
+	})
+	first, err := client.read(context.Background(), testConfig())
+	if err != nil || len(first.Events) != 1 {
+		t.Fatal(first, err)
+	}
+	repeated, err := client.read(context.Background(), testConfig())
+	if err != nil || repeated.Events[0].Key != first.Events[0].Key {
+		t.Fatal("identical long source changed identity", err)
+	}
+	revision.Store(1)
+	changed, err := client.read(context.Background(), testConfig())
+	if err != nil || len(changed.Events) != 1 {
+		t.Fatal(changed, err)
+	}
+	if first.Events[0].Body != changed.Events[0].Body || first.Events[0].UpdatedAt != changed.Events[0].UpdatedAt || first.Events[0].Key == changed.Events[0].Key {
+		t.Fatal("truncated review edit lost its source identity")
+	}
+}
+
 func TestConfigRejectsEndpointAndCredentialInjection(t *testing.T) {
 	for _, repository := range []string{"owner/repo?token=secret", "https://github.com/owner/repo", "owner/../other", "owner/repo\n", "owner/.."} {
 		cfg := testConfig()

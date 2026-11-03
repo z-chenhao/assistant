@@ -112,7 +112,7 @@ func (c Client) read(ctx context.Context, cfg Config) (Batch, error) {
 					return Batch{}, &Failure{"INVALID_RESPONSE"}
 				}
 				e := Observation{Kind: kind, SourceID: entry.ID, URL: entry.URL, Actor: entry.User.Login, Body: boundedText(entry.Body), State: entry.State, UpdatedAt: at.UTC()}
-				e.identify()
+				e.identify(entry.Body)
 				if err = batch.add(e); err != nil {
 					return Batch{}, err
 				}
@@ -155,7 +155,7 @@ func (c Client) read(ctx context.Context, cfg Config) (Batch, error) {
 				return Batch{}, &Failure{"INVALID_RESPONSE"}
 			}
 			e := Observation{Kind: "check_run", SourceID: entry.ID, URL: entry.URL, Body: boundedText(entry.Name), State: entry.Conclusion, HeadSHA: entry.HeadSHA, UpdatedAt: entry.Completed.UTC()}
-			e.identify()
+			e.identify(entry.Name)
 			if err = batch.add(e); err != nil {
 				return Batch{}, err
 			}

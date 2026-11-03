@@ -58,8 +58,14 @@ type Observation struct {
 	ReceivedAt *time.Time `json:"received_at,omitempty"`
 }
 
-func (o *Observation) identify() {
-	raw, _ := json.Marshal(o)
+func (o *Observation) identify(sourceBody string) {
+	// Reviews expose submitted_at, not an edit timestamp. Preserve the full
+	// source version in the key even when its displayed body is truncated.
+	bodyHash := sha256.Sum256([]byte(sourceBody))
+	raw, _ := json.Marshal(struct {
+		Observation
+		SourceBodyHash string `json:"source_body_hash"`
+	}{*o, hex.EncodeToString(bodyHash[:])})
 	hash := sha256.Sum256(raw)
 	o.Key = o.Kind + ":" + fmt.Sprint(o.SourceID) + ":" + hex.EncodeToString(hash[:])
 }
