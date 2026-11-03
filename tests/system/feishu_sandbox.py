@@ -20,6 +20,7 @@ class Sandbox:
         self.current_token = None if managed_auth else 'sandbox-access-token'
         self.token_expiry = 0
         self.messages = {}
+        self.sources = {}
         self.send_attempts = []
         self.uploads = []
         self.drop_response = False
@@ -84,8 +85,16 @@ class Sandbox:
                         outer.uploads.append(dict(name=fields['file'].get_filename(), sha256=hashlib.sha256(payload).hexdigest(), key=key))
                         result = dict(file_key=key)
                         kind, delay = 'upload', outer.upload_delay
-                    elif self.path == '/open-apis/im/v1/messages?receive_id_type=chat_id':
+                    elif self.path == '/open-apis/im/v1/messages?receive_id_type=chat_id' or self.path.startswith('/open-apis/im/v1/messages/') and self.path.endswith('/reply'):
                         message = json.loads(raw)
+                        if self.path.endswith('/reply'):
+                            from urllib.parse import unquote
+                            source = unquote(self.path.removeprefix('/open-apis/im/v1/messages/').removesuffix('/reply'))
+                            if source not in outer.sources or message.get('reply_in_thread') is not False or 'receive_id' in message:
+                                self.send_error(403)
+                                return
+                            message['receive_id'] = outer.sources[source]
+                            message['reply_to'] = source
                         outer.send_attempts.append(message)
                         if message['receive_id'] != 'bound-chat':
                             self.send_error(403)
@@ -159,3 +168,9 @@ class Sandbox:
     def evidence(self):
         with self.lock:
             return dict(messages=list(self.messages.values()), send_attempts=list(self.send_attempts), uploads=list(self.uploads), operations=[dict(op) for op in self.operations])
+
+    def register_source(self, source, destination):
+        with self.lock:
+            previous = self.sources.setdefault(source, destination)
+            if previous != destination:
+                raise RuntimeError('source changed chat identity')

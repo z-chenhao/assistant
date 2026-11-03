@@ -107,6 +107,30 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{Text: "Main accepted the work."}, nil
 	}
 	switch {
+	case strings.HasPrefix(user, "Question: "):
+		parts := strings.SplitN(strings.TrimPrefix(user, "Question: "), " | ", 2)
+		if len(parts) != 2 {
+			return llm.GenerationResult{Text: "Question needs TaskRef and prompt."}, nil
+		}
+		return call(task.ManageName, task.ManageRequest{Operation: "request_input", TaskRef: parts[0], Prompt: parts[1]}), nil
+	case strings.HasPrefix(user, "Review: "):
+		parts := strings.SplitN(strings.TrimPrefix(user, "Review: "), " | ", 3)
+		if len(parts) != 3 {
+			return llm.GenerationResult{Text: "Review needs TaskRef, ArtifactRef and prompt."}, nil
+		}
+		return call(task.ManageName, task.ManageRequest{Operation: "request_review", TaskRef: parts[0], ArtifactRefs: []string{parts[1]}, Prompt: parts[2]}), nil
+	case strings.HasPrefix(user, "Response to a saved Task question or artifact review."):
+		var response struct {
+			TaskRef      string   `json:"task_ref"`
+			FeedbackRef  string   `json:"feedback_ref"`
+			ArtifactRefs []string `json:"artifact_refs"`
+			Answer       string   `json:"answer"`
+		}
+		_, data, _ := strings.Cut(user, "\n")
+		if json.NewDecoder(strings.NewReader(data)).Decode(&response) != nil {
+			return llm.GenerationResult{}, llm.InvalidProviderResponse
+		}
+		return call(task.ManageName, task.ManageRequest{Operation: "append", TaskRef: response.TaskRef, FeedbackRef: response.FeedbackRef, Instruction: response.Answer, ArtifactRefs: response.ArtifactRefs}), nil
 	case strings.HasPrefix(user, "Ongoing: "):
 		return call(task.ManageName, task.ManageRequest{Operation: "create", Task: strings.TrimPrefix(user, "Ongoing: "), CompletionPolicy: "ongoing"}), nil
 	case strings.HasPrefix(user, "Delegate: "), strings.HasPrefix(user, "Duplicate: "):
