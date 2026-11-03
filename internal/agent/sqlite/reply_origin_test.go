@@ -185,14 +185,14 @@ func TestReplySourceMigrationRetainsOldFrozenRoutesAndRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustDrain(t, a)
-	if _, err := s.db.Exec(`DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; PRAGMA user_version=` + fmt.Sprint(len(migrations)-1)); err != nil {
+	if _, err := s.db.Exec(removeGitHubContinuationFixtureSchema + `DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; PRAGMA user_version=34`); err != nil {
 		t.Fatal(err)
 	}
-	broken := append(append([]string{}, migrations[:len(migrations)-1]...), feishuReplySourcesSQL+"; invalid SQL")
+	broken := append(append([]string{}, migrations[:34]...), feishuReplySourcesSQL+"; invalid SQL")
 	if err := migrate(ctx, s.db, broken); err == nil {
 		t.Fatal("broken migration accepted")
 	}
-	if scalar(t, s, `PRAGMA user_version`) != len(migrations)-1 || scalar(t, s, `SELECT count(*) FROM pragma_table_info('message_route') WHERE name='reply_source_id'`) != 0 {
+	if scalar(t, s, `PRAGMA user_version`) != 34 || scalar(t, s, `SELECT count(*) FROM pragma_table_info('message_route') WHERE name='reply_source_id'`) != 0 {
 		t.Fatal("partial migration committed")
 	}
 	if err := migrate(ctx, s.db, migrations); err != nil {

@@ -31,7 +31,7 @@
 | [tests/system/verify_capabilities.py](../../tests/system/verify_capabilities.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [internal/observer/github/client_test.go](../../internal/observer/github/client_test.go) | 实际 HTTP 协议 peer 驱动分页、认证头、自身份排除、评论更新身份、review/CI、恶意 Link/redirect、撤权及异常响应；不需要真实 PAT |
 | [internal/agent/sqlite/github_test.go](../../internal/agent/sqlite/github_test.go) | 真实 SQLite 去重、观察/Outbox 原子接受、故障边界、重启补读、repository ID pin、并发/停止/Forget fencing 与当前 epoch 读取 |
-| [internal/agent/sqlite/github_followup_test.go](../../internal/agent/sqlite/github_followup_test.go) | 真实 HTTP peer→SecretStore→观察→Main→同 Task append；重启/重复只接续一次，重复 Tool 参数复用回执，不同动作拒绝；自然完成与人工结束、解绑/监听停机/暂停/取消/Forget、晚模型与工具、unknown 和新用户优先 |
+| [internal/agent/sqlite/github_followup_test.go](../../internal/agent/sqlite/github_followup_test.go) | 真实 HTTP peer→SecretStore→观察→Main→同 Task append；重启/重复只接续一次，重复 Tool 参数复用回执，不同动作拒绝；自然完成与人工结束、解绑/监听停机/暂停/取消/Forget、晚模型与工具、unknown 和新用户优先；Store/App 移除或切换配置在 Actor 前撤销、重加不复活；旧 scope 调度不占用新 Main 或饿死普通 Worker；assigned 遇网络/歧义错误重启后只接续一次，明确身份/凭据拒绝撤销；GitHub 接续结果经真实 Feishu HTTP peer 回原 Task 消息 |
 | [cmd/steward/github_test.go](../../cmd/steward/github_test.go) | 真实 CLI 调度与重开 data root，在执行依赖不可用时保持状态/停止/恢复/配置移除可用，缺凭据失败可诊断 |
 
 - **F-025 剩余覆盖**：真实 PAT 权限、到期/更换与 GitHub 保留历史需 Live；OAuth、授权写动作、其他服务及对应入口仍未实现。

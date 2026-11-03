@@ -29,6 +29,11 @@ import (
 )
 
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {
+	// This is execution startup, including absent config. Read-only control
+	// composition must not revoke another running configuration's bindings.
+	if err := a.store.ConfigureGitHub(ctx, cfg.GitHub); err != nil {
+		return err
+	}
 	imageOCR := ocr.Discover(ctx)
 	registry, err := a.runtimeRegistry(ctx, cfg, fixture, secrets, imageOCR)
 	if err != nil {

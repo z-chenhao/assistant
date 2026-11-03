@@ -16,22 +16,26 @@ import (
 // Main lifecycle. No user message, Task, grant, or external effect is fabricated.
 func (r *Runs) recoverGitHubFollowups(ctx context.Context) error {
 	return r.write(ctx, func(tx *sql.Tx) error {
+		scope := r.host.currentGitHubScope()
 		if err := stopInvalidGitHubMains(ctx, tx); err != nil {
 			return err
+		}
+		if scope == "" {
+			return nil
 		}
 		var active bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM run WHERE kind='main' AND status IN('queued','running','waiting'))`).Scan(&active); err != nil || active {
 			return err
 		}
-		var scope, taskID, taskRef, goal, raw, agentID, profile string
+		var taskID, taskRef, goal, raw, agentID, profile string
 		var generation, epoch, privacy, sequence, configuration int64
 		err := tx.QueryRowContext(ctx, `SELECT b.scope,b.task_id,t.task_ref,t.anchor_task,b.generation,b.task_epoch,b.privacy_epoch,o.sequence,o.content_json,t.agent_id,coalesce(c.active_model_profile_id,''),c.config_version
  FROM github_task_binding b JOIN github_watch w USING(scope) JOIN task t USING(task_id) JOIN agent_config c ON c.agent_id=t.agent_id
  JOIN github_observation o ON o.scope=b.scope AND o.sequence>b.last_sequence AND o.intent_privacy_epoch=b.privacy_epoch
- WHERE b.enabled=1 AND w.enabled=1 AND w.failure_code='' AND w.intent_privacy_epoch=b.privacy_epoch AND b.privacy_epoch=`+githubEpoch+`
+ WHERE b.scope=? AND b.enabled=1 AND w.enabled=1 AND w.state='healthy' AND w.failure_code='' AND w.intent_privacy_epoch=b.privacy_epoch AND b.privacy_epoch=`+githubEpoch+`
  AND t.task_epoch=b.task_epoch AND t.status IN('active','completed') AND t.explicit_end_epoch<t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0)
  AND c.setup_status='ready' AND NOT EXISTS(SELECT 1 FROM github_task_followup f WHERE f.observation_sequence=o.sequence)
- ORDER BY o.sequence LIMIT 1`).Scan(&scope, &taskID, &taskRef, &goal, &generation, &epoch, &privacy, &sequence, &raw, &agentID, &profile, &configuration)
+ ORDER BY o.sequence LIMIT 1`, scope).Scan(&scope, &taskID, &taskRef, &goal, &generation, &epoch, &privacy, &sequence, &raw, &agentID, &profile, &configuration)
 		if err == sql.ErrNoRows {
 			return nil
 		}
@@ -94,16 +98,16 @@ func supersedeGitHubMain(ctx context.Context, tx *sql.Tx, agentID string) error 
 
 // checkGitHubAppend only constrains a Main with an explicit external causal
 // record. Ordinary user Main and all existing Worker protocols are unchanged.
-func checkGitHubAppend(ctx context.Context, tx *sql.Tx, runID string, q task.ManageRequest) (bool, error) {
-	var state, ref string
-	err := tx.QueryRowContext(ctx, `SELECT f.state,t.task_ref FROM github_task_followup f JOIN task t USING(task_id) WHERE f.run_id=?`, runID).Scan(&state, &ref)
+func (r *Runs) checkGitHubAppend(ctx context.Context, tx *sql.Tx, runID string, q task.ManageRequest) (bool, error) {
+	var state, ref, scope string
+	err := tx.QueryRowContext(ctx, `SELECT f.state,t.task_ref,f.scope FROM github_task_followup f JOIN task t USING(task_id) WHERE f.run_id=?`, runID).Scan(&state, &ref, &scope)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	if state != "assigned" || q.Operation != "append" || q.TaskRef != ref {
+	if scope != r.host.currentGitHubScope() || state != "assigned" || q.Operation != "append" || q.TaskRef != ref {
 		return false, nil
 	}
 	var valid, unknown bool

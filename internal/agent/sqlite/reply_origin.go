@@ -32,7 +32,8 @@ func runReplyOrigin(ctx context.Context, tx *sql.Tx, runID string) (replyOrigin,
 	if taskID.Valid {
 		return taskReplyOrigin(ctx, tx, taskID.String)
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT u.task_id FROM main_inbox b JOIN task_update u USING(event_id) WHERE b.run_id=?`, runID)
+	rows, err := tx.QueryContext(ctx, `SELECT u.task_id FROM main_inbox b JOIN task_update u USING(event_id) WHERE b.run_id=?
+ UNION SELECT task_id FROM github_task_followup WHERE run_id=?`, runID, runID)
 	if err != nil {
 		return replyOrigin{}, err
 	}

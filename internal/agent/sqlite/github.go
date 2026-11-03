@@ -70,8 +70,13 @@ func (s *Store) FinishGitHubPoll(ctx context.Context, cfg github.Config, ticket 
 			if _, e := tx.ExecContext(ctx, `UPDATE github_watch SET state='interrupted',failure_code=?,version=version+1 WHERE scope=?`, failure, cfg.Scope()); e != nil {
 				return e
 			}
-			if e := stopInvalidGitHubMains(ctx, tx); e != nil {
-				return e
+			// Poll health gates new admission. Only explicit identity/credential
+			// rejection revokes already accepted evidence; a network failure,
+			// ambiguous 403/429, 404 or redirect is not an owner revocation.
+			if failure == "REPOSITORY_IDENTITY_CHANGED" || failure == "CREDENTIAL_REJECTED" {
+				if e := revokeGitHubBinding(ctx, tx, cfg.Scope(), ""); e != nil {
+					return e
+				}
 			}
 			if failure != previousFailure {
 				return githubWake(ctx, tx, cfg.Scope(), "github.watch.interrupted", map[string]string{"code": failure})

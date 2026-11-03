@@ -15,11 +15,53 @@ import (
 // Ordinary Main/Worker claims retain exactly their existing fence semantics.
 const currentGitHubCause = `NOT EXISTS(SELECT 1 FROM github_task_followup f WHERE f.run_id=r.run_id AND NOT EXISTS(
  SELECT 1 FROM github_task_binding b JOIN github_watch w USING(scope) JOIN task t ON t.task_id=b.task_id
- WHERE b.scope=f.scope AND b.generation=f.generation AND b.enabled=1 AND w.enabled=1 AND w.failure_code=''
+ WHERE b.scope=f.scope AND b.generation=f.generation AND b.enabled=1 AND w.enabled=1
  AND f.state IN('assigned','continued') AND b.task_id=f.task_id AND b.task_epoch=t.task_epoch
  AND t.agent_id=r.agent_id AND t.conversation_id=r.conversation_id AND t.task_epoch=coalesce(f.continued_epoch,f.task_epoch) AND t.status IN('active','completed') AND t.explicit_end_epoch<t.task_epoch
  AND b.privacy_epoch=f.privacy_epoch AND b.privacy_epoch=` + githubEpoch + ` AND w.intent_privacy_epoch=b.privacy_epoch
  AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0)))`
+
+// Selection, active waiting, and claiming use the same local eligibility.
+// A retired process must not spin on another scope's queued Main.
+const configuredGitHubRun = `(r.kind!='main' OR NOT EXISTS(SELECT 1 FROM github_task_followup f WHERE f.run_id=r.run_id AND f.scope!=:github_scope))`
+
+func (r *Runs) githubScopeArgument() sql.NamedArg {
+	return sql.Named("github_scope", r.host.currentGitHubScope())
+}
+
+// ConfigureGitHub is trusted startup composition, including absent config. The
+// private scope starts denied; persisted bindings alone never enable recovery.
+// Removing/switching scope durably revokes generations before publishing Actor.
+func (s *Store) ConfigureGitHub(ctx context.Context, cfg *github.Config) error {
+	scope := ""
+	if cfg != nil {
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
+		scope = cfg.Scope()
+	}
+	err := s.Transaction(ctx, func(tx *sql.Tx) error {
+		return revokeOtherGitHubScopes(ctx, tx, scope)
+	})
+	if err == nil {
+		s.githubScope.Store(&scope)
+	}
+	return githubStorageError(err)
+}
+
+func (s *Store) currentGitHubScope() string {
+	if scope := s.githubScope.Load(); scope != nil {
+		return *scope
+	}
+	return ""
+}
+
+func revokeOtherGitHubScopes(ctx context.Context, tx *sql.Tx, scope string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE github_task_binding SET enabled=0,generation=generation+1,version=version+1 WHERE enabled=1 AND scope!=?`, scope); err != nil {
+		return err
+	}
+	return stopInvalidGitHubMains(ctx, tx)
+}
 
 func (s *Store) BindGitHubTask(ctx context.Context, cfg github.Config, q github.BindingRequest, enabled bool) error {
 	if cfg.Validate() != nil || q.Version < 0 || enabled && (!task.ValidRef(q.TaskRef) || q.TaskEpoch < 1) {
@@ -45,6 +87,11 @@ func (s *Store) BindGitHubTask(ctx context.Context, cfg github.Config, q github.
 			return agent.ErrConflict
 		}
 		if err != nil {
+			return err
+		}
+		// cfg is trusted owner composition. Reconcile other scopes only after
+		// the requested binding passes its checks, in the same commit.
+		if err = revokeOtherGitHubScopes(ctx, tx, cfg.Scope()); err != nil {
 			return err
 		}
 		if prior != 0 {
