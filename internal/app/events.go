@@ -62,6 +62,13 @@ func (a *App) WithEvents(ctx context.Context, cfg config.Config, run func(contex
 	workCtx, cancelWork := context.WithCancel(ctx)
 	a.runtimeDone = workCtx.Done()
 	defer cancelWork()
+	watchDone := make(chan struct{})
+	go func() {
+		defer close(watchDone)
+		if a.github != nil {
+			a.github.Run(workCtx)
+		}
+	}()
 	ctx, cancelInfra := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelInfra()
 	type connection struct {
@@ -200,6 +207,7 @@ func (a *App) WithEvents(ctx context.Context, cfg config.Config, run func(contex
 	err := run(workCtx)
 	a.telemetry.Logger.Info("shutdown stage", "stage", "ingress_closed")
 	cancelWork()
+	<-watchDone
 	cancelInfra()
 	infraErr := <-done
 	if errors.Is(err, context.Canceled) {
