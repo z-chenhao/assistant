@@ -157,20 +157,20 @@ func (s *Store) CodeReport(ctx context.Context, ref string, withDiff bool) (codi
 	var taskID string
 	err := s.db.QueryRowContext(ctx, `SELECT t.task_id,t.task_ref,e.directory,e.baseline_path,e.baseline_hash,e.status,e.error_code`+codeReportTask, ref).Scan(&taskID, &out.TaskRef, &out.Directory, &out.Baseline, &out.BaselineHash, &out.Status, &out.ErrorCode)
 	if err == sql.ErrNoRows {
-		return out, agent.ErrNotFound
+		return coding.Report{}, agent.ErrNotFound
 	}
 	if err != nil {
-		return out, agent.ErrStorage
+		return coding.Report{}, agent.ErrStorage
 	}
 	location := coding.Location(s.codeRoot, taskID)
 	if out.Directory != location.Directory || out.Baseline != location.Baseline {
-		return out, coding.ErrInvalid
+		return coding.Report{}, coding.ErrInvalid
 	}
 	out.Commands = []coding.Command{}
 	rows, err := s.db.QueryContext(ctx, `SELECT i.arguments_json,i.status,i.attempt_count,i.created_at,coalesce(i.result_json,'null'),coalesce(i.error_json,'null') FROM tool_invocation i JOIN run r USING(run_id) JOIN task_code_environment e USING(task_id) JOIN capability_snapshot c ON c.snapshot_id=r.capability_snapshot_id
  WHERE r.task_id=? AND EXISTS(SELECT 1 FROM json_each(c.tools_json) j WHERE json_extract(j.value,'$.name')=i.tool_name AND json_extract(j.value,'$.resource_hash')=e.scope_hash) AND i.tool_name='builtin__bash' ORDER BY i.created_at,i.invocation_id LIMIT 257`, taskID)
 	if err != nil {
-		return out, agent.ErrStorage
+		return coding.Report{}, agent.ErrStorage
 	}
 	total := 0
 	for rows.Next() {
@@ -178,7 +178,7 @@ func (s *Store) CodeReport(ctx context.Context, ref string, withDiff bool) (codi
 		var command coding.Command
 		if err = rows.Scan(&args, &command.Status, &command.Attempts, &command.AcceptedAt, &raw, &failure); err != nil {
 			rows.Close()
-			return out, agent.ErrStorage
+			return coding.Report{}, agent.ErrStorage
 		}
 		total += len(args) + len(raw) + len(failure)
 		if len(out.Commands) == 256 || total > 4<<20 {
@@ -190,7 +190,7 @@ func (s *Store) CodeReport(ctx context.Context, ref string, withDiff bool) (codi
 		}
 		if json.Unmarshal([]byte(args), &input) != nil {
 			rows.Close()
-			return out, agent.ErrStorage
+			return coding.Report{}, agent.ErrStorage
 		}
 		command.Command = input.Command
 		command.Result = json.RawMessage(raw)
@@ -200,15 +200,15 @@ func (s *Store) CodeReport(ctx context.Context, ref string, withDiff bool) (codi
 	err = rows.Err()
 	rows.Close()
 	if err != nil {
-		return out, agent.ErrStorage
+		return coding.Report{}, agent.ErrStorage
 	}
 	if withDiff {
 		if out.Status != "ready" {
-			return out, coding.ErrInvalid
+			return coding.Report{}, coding.ErrInvalid
 		}
 		diff, err := coding.Review(ctx, out.Workspace)
 		if err != nil {
-			return out, err
+			return coding.Report{}, err
 		}
 		out.Diff = &diff
 	}
@@ -262,5 +262,8 @@ func (s *Store) SaveCodeReport(ctx context.Context, ref string) (artifact.Descri
 		out, err = artifacts.DescribeTx(ctx, tx, scope, artifactRef, true)
 		return err
 	})
-	return out, err
+	if err != nil {
+		return artifact.Descriptor{}, err
+	}
+	return out, nil
 }
