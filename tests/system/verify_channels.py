@@ -392,6 +392,7 @@ def capability_settings(binary,evidence,report):
             item=skills/'research';item.mkdir();(item/'SKILL.md').write_text('---\nname: research\ndescription: Inspect sources before making claims.\n---\nRead the evidence.\n')
             provider=root/'provider';provider.mkdir(mode=0o700)
             vm=root/'computer';vm.mkdir(mode=0o700)
+            vm=vm.resolve()
             source=root/'base-source';source.mkdir(mode=0o700)
             for name in ('disk.img','nvram.bin'):(source/name).write_text('owned-'+name)
             (source/'config.json').write_text(json.dumps(dict(macAddress='02:00:00:00:00:01',machineIdentifier='fixture-base',cpuCount=4)))
