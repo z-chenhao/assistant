@@ -6,6 +6,21 @@ import (
 	"unicode/utf8"
 )
 
+func TestMemoryEvidenceReferenceIsOwnerOnly(t *testing.T) {
+	const valid = `{"ref":"memory:fact","offset":4,"limit":32,"links_offset":20}`
+	if q, err := ParseOwner(valid); err != nil || q.Ref != "memory:fact" || q.Offset != 4 || q.Limit != 32 || q.LinksOffset != 20 {
+		t.Fatal(q, err)
+	}
+	if _, err := Parse(valid); err == nil || ValidRef("memory:fact") {
+		t.Fatal("Main gained the owner-only evidence reference")
+	}
+	for _, raw := range []string{`{"ref":"memory:"}`, `{"ref":"memory:../fact"}`, `{"ref":"memory:fact","user_id":"forged"}`, `{"ref":"memory:fact","offset":null}`} {
+		if _, err := ParseOwner(raw); err == nil {
+			t.Fatal("invalid owner evidence request accepted", raw)
+		}
+	}
+}
+
 func TestEvidenceRequestAndUTF8Windows(t *testing.T) {
 	for _, raw := range []string{`{}`, `{"ref":"current","ref":"task:x"}`, `{"ref":"current","limit":null}`, `{"ref":"memory:x"}`, `{"ref":"task:a/b"}`, `{"ref":"current","scope":"all"}`, `{"ref":"current","limit":3}`, `{"ref":"current","offset":-1}`, `{"ref":"current"} {}`} {
 		if _, err := Parse(raw); err == nil {

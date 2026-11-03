@@ -34,9 +34,9 @@
 
 **需求**：每轮或按需检索可访问的 Memory 和原始 Conversation；从当前消息或任务沿明确引用查找关联工作、产物与原始证据，摘要不足时按需续读。
 
-**当前实现**：显式 embedding 配置下，全文与向量结果融合；召回结果按轮冻结并带来源。Main 的 `builtin__evidence_read` 和本机 `evidence read` 可从当前输入或确切 Conversation/Task/Artifact 引用读取单个对象、沿已保存的明确关联导航，并有界续读原文；不需要 embedding。结构化摘要的原文仍通过已有私有 Artifact 授权读取。
+**当前实现**：显式 embedding 配置下，全文与向量结果融合，召回结果按轮冻结并带来源。Main 的 `builtin__evidence_read` 和本机 `evidence read` 支持确切 Conversation、Task 和 Artifact 引用及有界续读。本机所有者还可精读当前 `memory:` 记录和可见 Conversation/Task 来源。精确读取无需 embedding。结构化摘要的原文仍通过已有私有 Artifact 授权读取。
 
-**边界与剩余工作**：导航只组合已保存的任务请求、任务交付和显式附件关系，不从文本相似性或普通提及推测关联；不递归展开，也不授予新的 Artifact grant。每跳及返回链接前校验作用域、Forget 和产物存活。Worker/Child 保持显式子任务边界，不获得 Main 的 Conversation 导航工具。本轮不新增 `memory:` 精读/解密及谱系导航，不返回内部 Run/工具轨迹；外部 PR 关联依赖 F-042 和 F-004。记忆召回未配置 embedding 时仍不可用；大规模 ANN 性能及真实模型导航质量未据此验证。
+**边界与剩余工作**：导航基于已保存的任务请求、交付、附件和 Memory 来源关系。每跳校验作用域、Forget 和对象可见性。Worker/Child 保持显式子任务边界。Main 的 Memory 原文解密需要独立的结果隐私设计，Memory 替代谱系与外部 PR 关联尚待接通。记忆召回仍需要 embedding。大规模 ANN 性能和真实模型导航质量另行验证。
 
 **验收目标**：可见范围、来源、时间、逐轮冻结与故障恢复正确，索引故障不产生不完整成功结果；能从当前消息找到正确关联任务、可访问产物并续读摘要外原文；无权、缺失、过期引用和循环关系有界返回，Forget 后旧引用不能重新引入撤销内容。
 
@@ -71,6 +71,8 @@ JSON
 ```
 
 响应包含 `ref/kind/occurred_at/text/offset/bytes/total_bytes/links`，以及存在后续时的 `next_offset`、`next_links_offset`。续读时保持返回的确切 `ref`，将对应的 next 值作为 `offset` 或 `links_offset` 再次请求；游标是该对象的字节位置/关系页位置，不是新的授权。`limit` 默认 4096 字节、允许 4–4096，自动保留 UTF-8 字符边界；每页最多 20 条链接。文本源始终保留原文，摘要外的内容可按这些界限继续读取。二进制产物仅返回元数据和关联，下载/媒体处理沿用 Artifact 入口。
+
+本机 CLI 可将已知的 `memory:REF` 作为 `ref`。密封记录使用配置的 `memory.encryption_key_ref` 读取现有 SecretStore 密钥，密钥缺失、错误或密文验证失败会返回不可用。仍可见的旧明文按原表示读取，命令保留其存储表示。使用同一 `ref` 和返回的 `next_offset` 续读，或用 `next_links_offset` 查下一页显式来源。已删除、被替代、越权和 Forget 之前的记录与未知引用返回相同的不可访问错误。来源仅列当前可见的持久 Conversation/Task 引用。
 
 消息的链接来自明确附件、由该输入创建/追加的任务或对应任务交付；任务可链接原始用户消息、授权附件和 Main 已交付的消息；产物可链接显式绑定它的任务。循环只表现为可选择的反向链接，不自动递归读取。缺失、跨作用域、删除/过期或 Forget 屏障之前的对象返回 `NOT_FOUND`，其引用也不会作为可用链接返回；正文内的普通文本仍是原始证据，不会被解析成授权链接。单次最多读取一页，关系位置超过一百万的继续请求不被接受。
 

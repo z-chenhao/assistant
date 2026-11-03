@@ -14,7 +14,7 @@ func runEvidence(ctx context.Context, application *app.App, in io.Reader, out io
 	if err != nil || len(raw) > 4096 {
 		return evidence.ErrInvalid
 	}
-	q, err := evidence.Parse(string(raw))
+	q, err := evidence.ParseOwner(string(raw))
 	if err != nil {
 		return err
 	}

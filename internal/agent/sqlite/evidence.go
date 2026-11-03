@@ -255,14 +255,7 @@ func (r *Runs) evidenceMessage(ctx context.Context, a evidenceAccess, id string)
 	if errors.Is(err, conversation.ErrConflict) {
 		// A newly accepted input may precede the recoverable history flush. Its
 		// immutable intent is the same original, never a synthetic replacement.
-		var raw string
-		err = r.host.db.QueryRowContext(ctx, `SELECT message_json FROM conversation_intent WHERE message_id=? AND json_extract(message_json,'$.conversation_id')=?`, id, a.conversation).Scan(&raw)
-		if err == sql.ErrNoRows {
-			return m, artifact.ErrNotFound
-		}
-		if err == nil {
-			err = json.Unmarshal([]byte(raw), &m)
-		}
+		m, err = r.evidenceIntent(ctx, a.conversation, id)
 	}
 	if err != nil {
 		return m, err
@@ -271,6 +264,18 @@ func (r *Runs) evidenceMessage(ctx context.Context, a evidenceAccess, id string)
 		return conversation.Message{}, artifact.ErrNotFound
 	}
 	return m, nil
+}
+
+func (r *Runs) evidenceIntent(ctx context.Context, conversationID, id string) (m conversation.Message, err error) {
+	var raw string
+	err = r.host.db.QueryRowContext(ctx, `SELECT message_json FROM conversation_intent WHERE message_id=? AND json_extract(message_json,'$.conversation_id')=?`, id, conversationID).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return m, artifact.ErrNotFound
+	}
+	if err == nil {
+		err = json.Unmarshal([]byte(raw), &m)
+	}
+	return
 }
 
 func (r *Runs) evidenceArtifact(ctx context.Context, a evidenceAccess, q evidence.Request, page *evidence.Page) error {

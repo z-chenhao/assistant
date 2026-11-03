@@ -61,7 +61,15 @@ Conversation 使用同会话的精确消息 ID 读取，尚未 Flush 的新输�
 
 Main 的 current 只选择 checkpoint.input_sequence 之前的已消费用户输入，不越过正在处理轮次的输入边界；本机 current 为最新已接受输入。WorkerTools/ChildTools 显式移除新工具，避免 Child 借共享 TaskID 导航父任务或完整 Conversation。没有迁移，也不修改既有工具 Spec 或冻结 capability；新 Main 冻结新增工具，旧 Run 的精确 catalog 仍可正常 Select，旧调用不获得新能力。
 
-尚未接通：memory: 记录的精读/解密与谱系来源导航、外部 PR 关联和模型能否有效选择导航路径的质量评测。现有私有摘要原文 Artifact 可以按已有 grant 精确读取，不额外开放其他 Run 的摘要。F-004/F-042 后续接入必须保留来源证据与授权的区别。
+### 本机 Memory 精读
+
+本机所有者可用现有 `evidence read` 精读一条确切的当前 Memory 记录。CLI 解析增补 `memory:`，Main 的 ToolSpec、解析和冻结 catalog 保持原契约。Main 的结果会进入持久 ToolInvocation、checkpoint 和 trace，解密接入需要独立的原文保留政策。
+
+宿主取得本机 UserID、当前 Agent、隐私 epoch 和 Forget 时间边界。Memory SQLite 沿用当前记录的用户/Agent scope、active 旧明文或密封记录、未删除及未替代判定，并限制记录时间晚于 Forget。SQL 行在 Vault 读取 SecretStore 前关闭。密封记录以既有 ID、用户和 scope 组成的 AAD 验证，失败时不返回记录。旧可见明文沿原表示读取。控制启动沿用数据根检查和 schema 打开方式，跳过保护迁移、Curator 与 embedding 初始化。原文只进入本机响应。
+
+来源读取最多 21 个持久类型匹配的候选，复用 20 条链接和 4 KiB UTF-8 正文预算。Conversation 元数据校验持久用户/Agent 归属与时间，若未 Flush 可检查已接纳的本机 intent，明确归属冲突直接省略。Task 链接复用已有 scope/Forget 判定。Run、私有反馈、隐藏谱系及正文提及不会产生链接。跨库和密钥操作在短 state 只读事务外完成。返回前重查当前 Memory 及存储表示，然后重查 owner、epoch 和时间边界；任一变更丢弃整页。该入口与存储衔接为内部实验实现，无新迁移或权限。
+
+尚未接通的范围包括 Main 的 Memory 原文、替代谱系、外部 PR 关联和真实模型导航质量。私有摘要原文仍由现有 Artifact grant 管理。F-004/F-042 后续接入必须保留来源证据与授权的区别。
 
 ## 验证与交付
 

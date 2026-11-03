@@ -59,6 +59,7 @@ type App struct {
 	computer            *macosvm.Provider
 	computerPreviewMu   sync.Mutex
 	memoryCurator       *memory.Curator
+	evidenceVault       *memory.Vault
 	memoryOnce          sync.Once
 	memoryCancel        context.CancelFunc
 	memoryDone          chan struct{}

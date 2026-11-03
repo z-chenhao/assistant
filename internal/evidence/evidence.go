@@ -26,19 +26,32 @@ type Request struct {
 }
 
 func Parse(raw string) (Request, error) {
+	return parse(raw, false)
+}
+
+// ParseOwner extends the local CLI vocabulary without changing the Main Tool.
+func ParseOwner(raw string) (Request, error) {
+	return parse(raw, true)
+}
+
+func parse(raw string, owner bool) (Request, error) {
 	var q Request
-	if !tool.Validate(Schema, raw) || json.Unmarshal([]byte(raw), &q) != nil || !ValidRef(q.Ref) {
+	if !tool.Validate(Schema, raw) || json.Unmarshal([]byte(raw), &q) != nil || !validRef(q.Ref, owner) {
 		return q, ErrInvalid
 	}
 	return q, nil
 }
 
 func ValidRef(ref string) bool {
+	return validRef(ref, false)
+}
+
+func validRef(ref string, owner bool) bool {
 	if ref == "current" {
 		return true
 	}
 	prefix, id, ok := strings.Cut(ref, ":")
-	return ok && (prefix == "conversation" || prefix == "task" || prefix == "artifact") && id != "" && len(ref) <= 256 && !strings.ContainsAny(id, "/\\\x00\r\n\t ")
+	return ok && (prefix == "conversation" || prefix == "task" || prefix == "artifact" || owner && prefix == "memory") && id != "" && len(ref) <= 256 && !strings.ContainsAny(id, "/\\\x00\r\n\t ")
 }
 
 func Definition() tool.Definition {
