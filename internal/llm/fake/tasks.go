@@ -118,7 +118,7 @@ func tasksReply(r llm.GenerationRequest) (llm.GenerationResult, error) {
 		if len(parts) != 3 {
 			return llm.GenerationResult{Text: "Review needs TaskRef, ArtifactRef and prompt."}, nil
 		}
-		return call(task.ManageName, task.ManageRequest{Operation: "request_review", TaskRef: parts[0], ArtifactRefs: []string{parts[1]}, Prompt: parts[2]}), nil
+		return call(task.ManageName, task.ManageRequest{Operation: "request_review", TaskRef: parts[0], ArtifactRefs: []string{parts[1]}, Prompt: strings.SplitN(parts[2], "\nArtifact reference (content not loaded):", 2)[0]}), nil
 	case strings.HasPrefix(user, "Response to a saved Task question or artifact review."):
 		var response struct {
 			TaskRef      string   `json:"task_ref"`

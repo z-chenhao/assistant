@@ -41,7 +41,7 @@ flowchart TD
 
 ### 信息回答与成果审阅（F-004）
 
-当前消费者是 Main 的既有 Task 工具与本机所有者 CLI。`request_input` 和 `request_review` 是 Main-only `task_manage` 的严格 union 分支；后者必须包含 1–16 个现有作用域内的不可变 ArtifactRef。ToolInvocation、请求源去重、Main claim fencing 与 Task 接纳事务不另建管线。Task 仍只有原四种状态。
+当前消费者是 Main 的既有 Task 工具、本机所有者 CLI 和已认证 Web。`request_input` 和 `request_review` 是 Main-only `task_manage` 的严格 union 分支；后者必须包含 1–16 个现有作用域内的不可变 ArtifactRef。ToolInvocation、请求源去重、Main claim fencing 与 Task 接纳事务不另建管线。Task 仍只有原四种状态。
 
 schema v34 的私有 `task_feedback` 保存确切 Task/epoch、隐私 epoch、问题种类/正文、可定位的原用户消息、成果引用、七天有效期与回应消息。一次事务替代旧 pending 并保存新记录、原有工具回执和事件；成果经原 ArtifactStore 保留。源是 Reporter 运行时事件时，回溯真实用户消息，而不把事件 ID 冒充消息 ID。新请求也使旧的已回答记录失去接续因果效力。
 
@@ -51,7 +51,7 @@ schema v34 的私有 `task_feedback` 保存确切 Task/epoch、隐私 epoch、�
 
 持久关联、幂等、原子 ingress 与失效检查是领域必需机制；单个当前待办与七天有效期是本轮默认政策。Tool schema 是受冻结保护的模型契约；CLI 的用户字段与现有 Task/Artifact refs 是窄输入输出，表、Run ID、claim、SQL 与通用工作流协议不开放。没有泛化人类工作流引擎、自动质量验收、Worker 直达用户或新的动作批准通道。
 
-新增 schema 前向迁移不改历史 Task/Run/snapshots。新 Main 冻结扩展后的工具定义；旧 Main 的精确工具定义不被替换，当前 registry 选择不兼容则 fail-closed，升级前用原二进制排空旧 Main。Web/飞书结构化待办与跨渠道接续仍待实现。
+新增 schema 前向迁移不改历史 Task/Run/snapshots。新 Main 冻结扩展后的工具定义；旧 Main 的精确工具定义不被替换，当前 registry 选择不兼容则 fail-closed，升级前用原二进制排空旧 Main。Web 已接通同一记录，渠道认证与草稿生命周期见 [渠道设计](channels.md)；飞书结构化待办与跨渠道接续仍待实现。
 
 ### Go 实现职责（F-040）
 
@@ -86,9 +86,9 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 
 继续使用 Task、Run、Instruction、epoch 和现有任务接纳事务，不增加 Ticket/Assignment 生命周期。关联和去重是机制，哪些事件可续跑、何时须澄清是受宿主约束的政策。明确关联的上下文可直达对应执行，来源消息不变成用户授权；新范围交 Main。先验证必要关联基数及活动/终态续跑边界，不预设任意多对多订阅平台或自动跨账号身份映射。
 
-#### Web/飞书结构化待办
+#### 飞书结构化待办
 
-CLI 的具名问题、确切成果与反馈接续已实现，机制见上文。后续 Web/飞书界面需复用同一记录和 Main ingress，并补通道身份校验、陈旧状态呈现与跨端提交；现有审批卡片不能被当作信息回答或成果审阅入口。
+CLI 与 Web 的具名问题、确切成果与反馈接续已实现，机制见上文。后续飞书界面需复用同一记录和 Main ingress，并补通道身份校验、陈旧状态呈现与跨端提交；现有审批卡片不能被当作信息回答或成果审阅入口。
 
 ## 验证与交付
 

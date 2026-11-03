@@ -28,6 +28,8 @@ type page struct {
 	Capability                                        *Capability
 	Trace                                             *traceView
 	Tasks                                             *taskView
+	Attention                                         *attentionView
+	FeedbackDraft                                     string
 	Schedule                                          *scheduleEditor
 	Settings                                          *settingsView
 	Accounts                                          []llm.AuthConnection
@@ -142,6 +144,8 @@ func conversationCursor(r *http.Request) (int64, error) {
 }
 func notice(code string) string {
 	switch code {
+	case "feedback-saved":
+		return "Your response was saved. Ghost will review it in the conversation."
 	case "schedule-saved":
 		return "Schedule saved. Future triggers use these settings."
 	case "language-saved":

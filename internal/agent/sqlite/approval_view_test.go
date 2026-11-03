@@ -21,6 +21,9 @@ func TestWebApprovalViewDoesNotRecoverOrWakeExpiredWork(t *testing.T) {
 	if err != nil || len(views) != 1 || views[0].Status != "expired" {
 		t.Fatal(views, err)
 	}
+	if pending, err := r.PendingApprovals(ctx); err != nil || len(pending) != 0 {
+		t.Fatal("expired action remained in attention", pending, err)
+	}
 	if scalar(t, s, `SELECT count(*) FROM approval WHERE status='pending'`) != 1 || scalar(t, s, `SELECT count(*) FROM event_outbox`) != events || scalar(t, s, `SELECT sum(attempt_count) FROM tool_invocation`) != 0 {
 		t.Fatal("browsing recovered or dispatched an action")
 	}

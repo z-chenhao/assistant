@@ -7,6 +7,8 @@ import "errors"
 type Feedback struct {
 	Ref             string   `json:"feedback_ref"`
 	TaskRef         string   `json:"task_ref"`
+	TaskTitle       string   `json:"task_title"`
+	SourceSequence  int64    `json:"source_sequence,omitempty"`
 	Kind            string   `json:"kind"`
 	Prompt          string   `json:"prompt"`
 	SourceMessageID string   `json:"source_message_id"`
