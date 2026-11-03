@@ -178,7 +178,7 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 - 既有 `verify_channels.py` 的 `feishu_auth_lifecycle`：无需浏览器，以真实CLI/Actor/Delivery和受控飞书HTTP peer验证配置检查、token拒绝后的持久安全重试、过期主动刷新、无效凭据的安全诊断与持久失败码、撤销绑定、凭据不落盘，以及已发生副作用但回执丢失后重启仍不重发。该场景接入现有channels门禁，不新增脚本或CI阶段。
 - 真实飞书自建应用、实际账户权限和公网回调配置需独立Live验证；软件peer不证明真实平台授权、模型效果或永久 exactly-once。
 
-Steward 重构检查补充：首页任务概览三种视图与真实 Tasks 一致；明暗切换、头像暂停、移动抽屉与键盘焦点恢复；发送、附件、审批冻结哈希、旧消息定位和 live 更新沿用本页原有场景。
+Steward 重构检查补充：Chat 的 Computer/Worker 只读详情与真实执行状态一致；明暗切换、头像暂停、移动抽屉与键盘焦点恢复；发送、附件、审批冻结哈希、旧消息定位和 live 更新沿用本页原有场景。
 
 界面语言的默认、持久化、认证/CSRF、实时片段及冻结审批内容回归由 `internal/interaction/web/locale_test.go` 覆盖；中英文与移动浏览器检查见[品牌测试方案](branding.md)。
 

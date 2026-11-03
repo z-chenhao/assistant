@@ -185,11 +185,11 @@ Keep controls and artifact links in the UI family even when they appear beside s
 
 ## Layout
 
-Desktop has one fixed 256px sidebar and a main workspace offset by its width. Collapsing it removes that offset. The sticky topbar is 72px high. The conversation's 840px border box includes 36px horizontal padding, yielding a 768px dialogue; the composer and work peek also cap at 768px. Standard workspace pages cap at 1040px, settings at 920px, with 40px workspace gutters.
+Desktop has one fixed 256px sidebar and a main workspace offset by its width. Collapsing it removes that offset. The Chat sticky header is 120px high with a centered two-row name/avatar; other pages use a 72px topbar. The conversation's 840px border box includes 36px horizontal padding, yielding a 768px dialogue; the composer also caps at 768px. Standard workspace pages cap at 1040px, settings at 920px, with 40px workspace gutters.
 
-At 760px and below, the sidebar becomes an on-demand 256px overlay with backdrop, the workspace fills the viewport, the topbar becomes 60px and gutters become 20px. The dialogue uses 20px horizontal padding; composer gutters become 12px with safe-area bottom support. Without JavaScript, mobile navigation remains available in normal flow. Task detail has a local 290px supporting column (250px below 1000px) and stacks below 800px; this is page content, not another application sidebar. Page headings and choice cards adapt below 700px. The document minimum width is 320px.
+At 760px and below, the sidebar becomes an on-demand 256px overlay with backdrop, the workspace fills the viewport, the Chat header becomes 116px (other topbars 60px) and gutters become 20px. The dialogue uses 20px horizontal padding; composer gutters become 12px with safe-area bottom support. Without JavaScript, mobile navigation remains available in normal flow. Task detail has a local 290px supporting column (250px below 1000px) and stacks below 800px; this is page content, not another application sidebar. Page headings and choice cards adapt below 700px. The document minimum width is 320px.
 
-The conversation footer is fixed for an active transcript with bottom clearance in the thread. On the welcome view it returns to normal flow below the greeting. The work peek expands inside main content and has a 320px scrollable body.
+The conversation footer is fixed for an active transcript with bottom clearance in the thread. On the welcome view it returns to normal flow below the greeting. Read-only Computer/Worker detail panes reserve 460px on desktop; mobile uses one modal sheet.
 
 ## Elevation & Depth
 
@@ -209,7 +209,7 @@ Sidebar links are 14px with 18px stroked icons, 42px minimum height and 9px corn
 
 ### Conversation and composer
 
-There is one ongoing conversation per Agent, with bounded earlier-message navigation. Initial canonical home navigation resumes the latest turn; explicit earlier-history pages, hash anchors and back/forward navigation keep their reading position. An open work peek suppresses automatic following of new messages. Assistant replies read as documents; user messages are right-aligned muted bubbles. The multiline composer retains actual attachment, task context and durable source-ID behavior. Readiness controls send availability. An uncertain acknowledgement retains the draft and attachment; the presentation must not turn uncertainty into a successful send or automatic resend. The composer border changes on focus, and its send control shows the existing 900ms waiting spinner.
+There is one ongoing conversation per Agent, with bounded earlier-message navigation. Initial canonical home navigation resumes the latest turn; explicit earlier-history pages, hash anchors and back/forward navigation keep their reading position. Assistant replies read as documents; user messages are right-aligned muted bubbles. The multiline composer retains actual attachment, task context and durable source-ID behavior. Readiness controls send availability. An uncertain acknowledgement retains the draft and attachment; the presentation must not turn uncertainty into a successful send or automatic resend. The composer border changes on focus, and its send control shows the existing 900ms waiting spinner.
 
 ### Tasks, results and approvals
 
