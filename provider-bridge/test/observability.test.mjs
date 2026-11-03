@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {wireObserver} from '../observability.mjs';
 
 test('wire observation is opt-in, sanitized, bounded and cannot fail transport',()=>{
@@ -10,6 +11,8 @@ test('wire observation is opt-in, sanitized, bounded and cannot fail transport',
  record('started','one',JSON.stringify({messages:[{role:'user',content:[{type:'text',text:'PRIVATE_KEY PRIVATE_ACCESS'},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+image}}]}],authorization:'PRIVATE_KEY',api_key:'PRIVATE_KEY'}));
  const raw=JSON.stringify(events);assert(!raw.includes('PRIVATE_KEY'));assert(!raw.includes('PRIVATE_ACCESS'));assert(!raw.includes(image));
  const payload=events[0].params;assert.equal(payload.body.messages[0].content[1].image_url.url.media_ref,'artifact:picture');assert.equal(payload.body_hash.length,64);
+ const sdk=JSON.parse(readFileSync(new URL('../node_modules/@earendil-works/pi-ai/package.json',import.meta.url),'utf8'));
+ assert.equal(payload.format,`steward-wire-v1/pi-ai-${sdk.version}`);
  record('started','huge',JSON.stringify({messages:[{content:'x'.repeat(300000)}]}));assert.equal(events[1].params.body,undefined);assert.match(events[1].params.omitted,/exceeds/);
  record('headers','one',null,200);assert.equal(events[2].params.http_status,200);
  assert.doesNotThrow(()=>wireObserver(request,()=>{throw Error('sink unavailable')})('started','one','{}'));
