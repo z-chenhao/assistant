@@ -398,8 +398,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                 require(pending['status']=='pending' and directory.is_dir()==published, 'wrong publication boundary')
                 child.send_signal(stop)
                 child.communicate(timeout=10)
-                require(child.returncode == -signal.SIGKILL if stop==signal.SIGKILL else child.returncode >= 0,
-                        'unexpected termination mode')
+                expected_exit = -signal.SIGKILL if stop == signal.SIGKILL else 0
+                require(child.returncode == expected_exit, f'{stop.name} returned {child.returncode}, expected {expected_exit}')
                 stopped = environment()
                 require(stopped['status']=='pending' and stopped['error_code']=='' and stopped['root_status']!='failed',
                         'interruption falsely failed Task preparation')
@@ -412,7 +412,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                 require((directory/'docs/notes.md').read_text()==(original if published else newer) and note.read_text()==newer,
                         'restart recopied a published receipt or altered the source')
                 require(not list(directory.parent.parent.glob('.prepare-*')), 'stale staging survived recovery')
-                results.append(dict(boundary=boundary, signal=stop.name, reused_published_snapshot=published))
+                results.append(dict(boundary=boundary, signal=stop.name, returncode=child.returncode,
+                                    reused_published_snapshot=published))
             return dict(name='task_code_publish_recovery', boundaries=results)
         scenario('task-code-recovery', task_code_recovery, kind='crashes')
         for kind, result in run_cases(cases, drive, scenario_jobs):
