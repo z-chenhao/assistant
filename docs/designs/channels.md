@@ -73,7 +73,21 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 - **F-017**：标准启动/TUI/CLI、输入与已交付回复投影已接通。 终端输出没有远端确认协议，不宣称屏幕显示 exactly-once。
 - **F-018**：分层 Models/Notifications、Tasks 列表/详情、优先待办/信息回答/成果审阅和独立 Trace 详情已接通，保留认证路由、前端嵌入与语义 fallback。 实时更新与开发区分别由 F-019、F-031 跟踪。
 - **F-019**：已提交会话、审批、全局状态、任务摘要和登录过程通过条件读取实时刷新；草稿、文件、焦点、选区和阅读位置独立保留。传输与模型 token streaming 分开；阶段摘要生产仍由 F-005 负责。
-- **F-020**：签名回调、p2p身份绑定、收发、本地回执、自建应用token自动维护与CLI诊断已实现；未知远端结果保持query-only，不靠刷新或重发推定成功。
+- **F-020**：签名回调、p2p 身份绑定、收发、本地回执、自建应用 token 自动维护与 CLI 诊断已实现；新消息来源随路由冻结，同步与 Task 结果引用原消息，IM 可提供预览和可信工作台成果链接；未知远端结果保持 query-only，不靠刷新或重发推定成功。
+
+### 飞书原消息与成果投影（F-020）
+
+`channel_source` 已保存受验证的来源消息、绑定及 Main request key。新迁移为不可变 `message_route` 增加 `reply_source_id`，由插入触发器要求该来源已经属于同一飞书绑定；旧路由保持空值，不将已接受动作从 send API 改成 reply API。入站接受与来源路由同事务，Main 最终交付只从已消费的 `input_sequence` 复制，迟到但未消费的输入不能重定向交付。
+
+Task 原来源复用 `task_request` 的 create 接纳记录及原消息路由，不另建 Task 关联或生命周期。不同原来源的 `main_inbox` 更新分别交给同一个 Main；未选组仍留在原持久 inbox，由既有调度/恢复扫描接续。只有 unambiguous 原来源可参与 Automatic 路由选择；显式通知偏好优先，目标为原绑定时才附原消息引用。单活动 Main、Task epoch、Forget、绑定撤权和 Delivery claim 仍沿用原权威检查；来源上下文不授予新动作权限。
+
+Feishu Adapter 对非空冻结来源调用官方 [回复消息 API](https://open.feishu.cn/document/server-docs/im-v1/message/reply)，路径转义后只到既有固定 Host；不带可由 callback 自选的接收者，`reply_in_thread=false` 保留个人消息的引用形式，不推广成群话题。其余路由继续使用原 send API。原消息目标加入回执 payload hash，失败不回退到新消息或别的受众。`uuid` 仅辅助平台短窗口去重，远端 ack 不确定依然 query-only；[官方 Channel SDK 的回复约定](https://github.com/larksuite/channel-sdk-python/blob/main/docs/reference.md) 同样区分原消息回复与显式新消息。
+
+可选 owner 配置 `feishu.workspace_url` 提供实际完整结果入口。这是已存在工作台的 origin，不是公开部署授权；严格拒绝 userinfo、路径、query、fragment 和非 loopback 明文 HTTP。普通 IM 结果采用 1200 字符的确定性预览，链接复用 `/?before=<sequence+1>#message-<sequence>`，保留分页后可定位的完整语义/附件。配置此入口时不将相同文件再上传到 IM；没有可信地址则保留全文和附件，不悄悄丢弃细节。审批继续完整显示动作。loopback 仅同机可达，远端可达性与身份验证由现有部署负责。
+
+共享 UISpec 仍保留完整内容；Feishu 的私有投影扩展另存精确卡片、原消息来源和附件政策，并随首次准备原子冻结。重启、修改 workspace 地址或调整摘要政策均复用同一保存投影。旧投影没有扩展字段时按原完整卡片呈现。投递仍只有原 DeliveryRequest 与分片回执，不新增一条 Web/IM 通知意图或第二投递管线。
+
+持久原消息、来源分组、投影冻结、权限和幂等属于领域必要机制；1200 字符、是否配置成果链接与现有通知偏好是可替换政策。实现和扩展字段保持内部实验性，不稳定通用跨渠道编排接口，不暴露 Worker 结果或内部 Run ID，不归并未知 PR 事件。GitHub 反馈接续仍由 F-042/F-004 完成；真实平台展示、权限与链接可达性需独立 Live 验证。
 
 ## 代码与依赖
 
@@ -93,9 +107,9 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 读取 F-004、既有 Approval、Task 和诊断的具名事实，组成当前工作台的只读优先视图；处理动作回到各自所属入口。来源与事项身份、权限及陈旧检查是机制，排序/折叠规则是展示政策。详细布局与聚合查询待真实事项接通后设计，暂不新增面板框架、内部流水线标签页或第二套事实源。
 
-### F-020 · 原消息关联与渠道适配交付
+### F-020 · 跨平台事件与成果组织
 
-关联事实来自 F-004，Main 仍负责最终语义交付；复用 DeliveryRequest/Outbox 和渠道回执。冻结目的地、权限、消息身份与幂等是机制，渠道篇幅/摘要和是否通知是政策。先接通 GitHub 与已绑定飞书的一个场景，内容投影和跨渠道意图去重待设计；保留 unknown，不承诺远端 exactly-once 或隐式目的地回退。
+原消息交付已接通的范围见上文。GitHub 评审/CI 经 F-042 进入 F-004 的 Task 接续后，仍需验证同一工作成果的跨平台关联与通知政策；不据个人 p2p 回复推定群话题、PR 结果组织或通用多渠道事件归并已经完成。继续保留 unknown，不承诺远端 exactly-once 或隐式目的地回退。
 
 ## 验证与交付
 
