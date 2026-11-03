@@ -213,7 +213,7 @@ There is one ongoing conversation per Agent, with bounded earlier-message naviga
 
 ### Tasks, results and approvals
 
-“Work & results” opens a native details peek. Opening it, choosing In progress / Needs you / Completed, or returning to a visible document while open requests a snapshot from `/api/updates?view=/tasks&task_view=…`. It inserts the existing Host-rendered `ongoing-work` region; it does not continuously subscribe or invent a separate task store. Closing aborts pending work. Loading, retry and the full task-workspace link remain available.
+Computer and Worker open mutually exclusive read-only detail panes beside Chat. Worker history includes ongoing and finished executions in execution order; Tasks remains the independent task list and detail workspace. Pane changes keep the composer and its attachment nodes mounted.
 
 Task lists/detail retain search, filters, pagination, progress, related updates, milestone history and real artifact links. Approval panels retain readable action fields, exact-action disclosure, frozen hash and task-scoped return links. Approval is a decision about the frozen action, not proof of external completion. Models/accounts, explicit model testing/selection, notification preferences and capability editors remain real settings pages; Developer remains a specialist inspection surface.
 

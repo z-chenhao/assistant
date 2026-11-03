@@ -4,6 +4,12 @@ import {t} from './i18n';
 // the conversation or its composer, and only one pane can be open at a time.
 const panels=new Map<HTMLDialogElement,()=>void>();
 const compact=matchMedia('(max-width:1000px)');
+let readingAnchor:{node:HTMLElement;top:number}|null=null;
+// Keep the same message anchor across open/switch/close. Reflow can otherwise
+// change which message crosses the header and produce a cumulative jump.
+window.addEventListener('wheel',()=>{readingAnchor=null},{passive:true});
+window.addEventListener('touchstart',()=>{readingAnchor=null},{passive:true});
+document.addEventListener('keydown',event=>{if(['PageUp','PageDown','Home','End','ArrowUp','ArrowDown'].includes(event.key))readingAnchor=null});
 export function connectWorkspacePanel(panel:HTMLDialogElement,onOpen:()=>void,onClose:()=>void){
  let opener:HTMLElement|null=null;
  const html=document.documentElement;
@@ -17,11 +23,13 @@ export function connectWorkspacePanel(panel:HTMLDialogElement,onOpen:()=>void,on
  }
  function layout(change:()=>void){
   const atBottom=innerHeight+scrollY>=document.documentElement.scrollHeight-64;
-  const anchor=Array.from(document.querySelectorAll<HTMLElement>('.message')).find(item=>item.getBoundingClientRect().bottom>120);
-  const before=anchor?.getBoundingClientRect().top;
+  const anchor=readingAnchor?.node.isConnected?readingAnchor:{node:Array.from(document.querySelectorAll<HTMLElement>('.message')).find(item=>item.getBoundingClientRect().bottom>120),top:0};
+  if(!readingAnchor&&anchor.node)anchor.top=anchor.node.getBoundingClientRect().top;
+  if(anchor.node)readingAnchor={node:anchor.node,top:anchor.top};
   change();
-  if(atBottom)window.scrollTo({top:document.documentElement.scrollHeight});
-  else if(anchor&&before!==undefined)window.scrollBy(0,anchor.getBoundingClientRect().top-before);
+  if(atBottom){readingAnchor=null;window.scrollTo({top:document.documentElement.scrollHeight})}
+  else if(anchor.node)window.scrollBy(0,anchor.node.getBoundingClientRect().top-anchor.top);
+  if(!Array.from(panels.keys()).some(item=>item.open))readingAnchor=null;
  }
  function close(restore=true){
   if(!panel.open)return;

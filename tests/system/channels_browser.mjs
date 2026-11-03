@@ -302,6 +302,8 @@ try{
   if(await page.locator('.workspace-panel[open]').count())throw Error('workspace pane stayed open');
   if(!await page.getByRole('button',{name:'Open Computer',exact:true}).evaluate(button=>document.activeElement===button))throw Error('pane did not restore trigger focus');
   await editor.focus();await checkDraft();
+  const afterPanels=await page.locator('[data-live-key="'+anchor.key+'"]').evaluate(node=>({top:node.getBoundingClientRect().top,scroll:scrollY}));
+  if(Math.abs(afterPanels.top-anchor.top)>2)throw Error('pane roundtrip moved anchor: '+JSON.stringify({before:anchor,after:afterPanels}));
   let attemptedSends=0;
   await page.route('**/message',async route=>{attemptedSends++;await route.abort('failed')});
   await page.getByRole('button',{name:'Send message',exact:true}).click();
@@ -312,7 +314,7 @@ try{
   await page.locator('.message.assistant').filter({hasText:'LIVE_REPLY_WHILE_TYPING'}).waitFor();
   await checkDraft();
   const top=await page.locator('[data-live-key="'+anchor.key+'"]').evaluate(node=>node.getBoundingClientRect().top);
-  if(Math.abs(top-anchor.top)>2)throw new Error('background update moved reading position');
+  if(Math.abs(top-anchor.top)>2)throw new Error('background update moved reading position: '+JSON.stringify({before:anchor.top,after:top}));
   await page.getByRole('button',{name:'Latest messages'}).waitFor();
   await page.waitForResponse(response=>response.url().includes('/api/updates?')&&response.status()===304);
   await checkDraft();

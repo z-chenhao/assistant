@@ -45,13 +45,13 @@ function regionPatcher(ids:readonly string[]){
 
 function viewportAnchor(){
  const focused=document.activeElement;
- if(focused instanceof HTMLElement&&focused!==document.body&&!focused.closest('#composer-root'))return {node:focused,top:focused.getBoundingClientRect().top};
+ if(focused instanceof HTMLElement&&focused!==document.body&&!focused.closest('#composer-root,.workspace-panel,.workspace-topbar'))return {node:focused,top:focused.getBoundingClientRect().top};
  const node=Array.from(document.querySelectorAll<HTMLElement>('[data-live-key]')).find(node=>{
   const box=node.getBoundingClientRect();return box.bottom>80&&box.top<innerHeight-200;
  });
  return node?{node,top:node.getBoundingClientRect().top}:null;
 }
-function atBottom(){return !document.querySelector('#work-peek[open]')&&scrollY+innerHeight>=document.documentElement.scrollHeight-100}
+function atBottom(){return scrollY+innerHeight>=document.documentElement.scrollHeight-100}
 function scrollToLatest(){window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})}
 
 export function startLiveUpdates(){

@@ -29,7 +29,7 @@
  --success:#d2d2d2;--success-surface:#303030;--warning:#c9c9c9;--warning-surface:#303030;
  --danger:#edb3b3;--danger-surface:#362727;--backdrop:#10101099;
 }
-*{box-sizing:border-box}html{overflow-anchor:none;scroll-padding-top:88px}
+*{box-sizing:border-box}html{overflow-anchor:none}
 body{margin:0;min-width:320px;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-underline-offset:4px}button,input,textarea,select{font:inherit}
 button,a,input,textarea,select,summary{outline-offset:4px;-webkit-tap-highlight-color:transparent}
