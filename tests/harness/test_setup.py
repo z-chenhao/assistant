@@ -62,7 +62,10 @@ class SetupTests(unittest.TestCase):
             self.server.server_close()
             thread.join()
         self.addCleanup(close)
-        self.env = dict(os.environ, npm_config_cache=str(self.base / 'cache'), npm_config_loglevel='silent',
+        # This fixture owns audit traffic to its local registry. Host npm
+        # preferences must not silently disable the behavior under test.
+        self.env = {key: value for key, value in os.environ.items() if key.lower() != 'npm_config_audit'}
+        self.env.update(npm_config_audit='true', npm_config_cache=str(self.base / 'cache'), npm_config_loglevel='silent',
                         npm_config_userconfig=str(self.base / 'user.npmrc'), npm_config_globalconfig=str(self.base / 'global.npmrc'),
                         npm_config_registry=f'http://127.0.0.1:{self.server.server_port}')
         # CI may itself be offline; each fixture explicitly tests its own mode.

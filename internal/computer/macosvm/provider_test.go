@@ -127,7 +127,7 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if f.clonePartial {
-			http.Error(w, "lost partial clone", 503)
+			http.Error(w, "lost partial clone", http.StatusServiceUnavailable)
 			return
 		}
 		config, err := nativeConfig(dir)
@@ -143,7 +143,7 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if f.cloneLost {
-			http.Error(w, "lost complete clone response", 503)
+			http.Error(w, "lost complete clone response", http.StatusServiceUnavailable)
 			return
 		}
 		w.Write([]byte(`{}`))
@@ -194,7 +194,7 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if f.ambiguous {
-			http.Error(w, "transport lost", 503)
+			http.Error(w, "transport lost", http.StatusServiceUnavailable)
 			return
 		}
 		lock, err := os.Open(filepath.Join(dir, "config.json"))
@@ -212,7 +212,7 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 	case "stop":
 		f.stops++
 		if f.locks[name] != nil {
-			http.Error(w, "native lock held", 409)
+			http.Error(w, "native lock held", http.StatusConflict)
 			return
 		}
 		probe, err := os.Open(filepath.Join(dir, "config.json"))
@@ -222,7 +222,7 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if unix.Flock(int(probe.Fd()), unix.LOCK_EX|unix.LOCK_NB) != nil {
 			probe.Close()
-			http.Error(w, "observer would be signaled", 409)
+			http.Error(w, "observer would be signaled", http.StatusConflict)
 			return
 		}
 		probe.Close()
@@ -236,7 +236,7 @@ func (f *lumeFixture) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if _, err := os.Stat(filepath.Join(dir, "sessions.json")); !os.IsNotExist(err) {
-			http.Error(w, "marker held", 409)
+			http.Error(w, "marker held", http.StatusConflict)
 			return
 		}
 		f.running[name] = false
@@ -542,7 +542,7 @@ func TestUnitSymlinkAndManifestRejection(t *testing.T) {
 	for _, path := range []string{"../personal", "/Users/lume/../secret", "/Users/lume/a\ncommand"} {
 		m := computer.RestorationManifest{Version: 1, Applications: []computer.ApplicationIntent{{BundleID: "com.apple.TextEdit", Documents: []string{path}}}}
 		if m.Validate() == nil {
-			t.Fatal(fmt.Sprintf("invalid intent accepted: %q", path))
+			t.Fatalf("invalid intent accepted: %q", path)
 		}
 	}
 }

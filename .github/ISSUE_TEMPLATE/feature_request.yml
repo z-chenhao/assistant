@@ -1,0 +1,22 @@
+name: Feature or engineering proposal
+description: Propose an observable improvement with its constraints.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and affected workflow
+      description: Explain who encounters the problem and what happens today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include compatibility, security or data migration implications.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and validation
+      description: What alternatives did you consider, and how would we verify the improvement?

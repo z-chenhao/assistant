@@ -22,6 +22,49 @@ func (fakeSecrets) Delete(context.Context, string) error      { return nil }
 type identityCore struct{ Core }
 
 func (identityCore) CheckChannel(context.Context, string, string, string) error { return nil }
+
+func TestEmbeddedAssetsKeepPublicRoutesAndRequestGuards(t *testing.T) {
+	s := &Server{Config: Config{TokenRef: "credential:test"}, Core: identityCore{}}
+	for _, tc := range []struct {
+		method, path, origin, host, contentType string
+		status                                  int
+	}{
+		{"GET", "/app.js", "", "", "text/javascript", 200},
+		{"GET", "/appearance.js", "", "", "text/javascript", 200},
+		{"GET", "/style.css", "", "", "text/css", 200},
+		{"GET", "/favicon.png", "", "", "image/png", 200},
+		{"GET", "/brand/ghost-charcoal.png", "", "", "image/png", 200},
+		{"GET", "/brand/SourceHanSansSC-common.woff2", "", "", "font/woff2", 200},
+		{"GET", "/licenses.txt", "", "", "text/plain; charset=utf-8", 200},
+		{"POST", "/style.css", "", "", "text/css", 200},
+		{"HEAD", "/style.css", "", "", "", 405},
+		{"GET", "/style.css", "", "evil.example:8080", "", 403},
+		{"POST", "/style.css", "http://evil.example", "", "", 403},
+		{"GET", "/brand/SourceHanSansSC-missing.woff2", "", "", "", 404},
+		{"GET", "/brand/SourceHanSansSC-../SourceHanSansSC-common.woff2", "", "", "", 404},
+		{"GET", "/brand/unknown.png", "", "", "", 401},
+	} {
+		t.Run(tc.method+tc.path+tc.origin+tc.host, func(t *testing.T) {
+			r := httptest.NewRequest(tc.method, "http://127.0.0.1:8080"+tc.path, nil)
+			if tc.host != "" {
+				r.Host = tc.host
+			}
+			r.Header.Set("Origin", tc.origin)
+			w := httptest.NewRecorder()
+			s.ServeHTTP(w, r)
+			if w.Code != tc.status {
+				t.Fatalf("status = %d, want %d", w.Code, tc.status)
+			}
+			if tc.contentType != "" && (w.Header().Get("Content-Type") != tc.contentType || w.Body.Len() == 0) {
+				t.Fatal("missing asset or changed media type", w.Header(), w.Body.Len())
+			}
+			if w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("X-Content-Type-Options") != "nosniff" || !strings.Contains(w.Header().Get("Content-Security-Policy"), "default-src 'none'") {
+				t.Fatal("asset request bypassed response guards", w.Header())
+			}
+		})
+	}
+}
+
 func TestAuthenticationCSRFRebindingSessionExpiryAndSafeErrors(t *testing.T) {
 	s := &Server{Config: Config{TokenRef: "credential:test"}, Secrets: fakeSecrets{}, Core: identityCore{}}
 	request := func(method, path, token, origin, host string) *httptest.ResponseRecorder {

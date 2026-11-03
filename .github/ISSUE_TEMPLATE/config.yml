@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security policy
+    url: https://github.com/z-chenhao/steward/security/policy
+    about: Read the private reporting instructions before sharing a vulnerability.
+  - name: Usage and support
+    url: https://github.com/z-chenhao/steward/blob/main/SUPPORT.md
+    about: Find the installation, operations and troubleshooting guides.

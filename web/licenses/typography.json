@@ -1,6 +1,6 @@
 {
   "date": "2026-11-02",
-  "scope": "Steward Web typography. macOS Chinese PingFang SC first; cross-platform fallback genuine Source Han Sans CN variable font. Source Serif 4 is active prose; Newsreader is a documented alternative, not loaded.",
+  "scope": "Current Steward fonts. Source Han ships disjoint unicode-range subsets with full original coverage.",
   "assets": [
     {
       "file": "InterVariable.woff2",
@@ -50,6 +50,15 @@
       "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/OFL.txt",
       "bytes": 4399,
       "sha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697"
+    },
+    {
+      "file": "Michroma-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/michroma/Michroma-Regular.ttf",
+      "retrieved": "2026-11-02",
+      "sha256": "b62301163788bc5b7f8fcac0b74b184e34e1827e577b499ecb724da065098f87",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "web/licenses/LICENSE-Michroma.txt",
+      "use": "Steward wordmark"
     }
   ]
 }

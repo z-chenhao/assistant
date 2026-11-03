@@ -117,7 +117,9 @@ func TestMessageAndAttachmentContractFixedDestinationAndNoRedirectCredentials(t 
 	leaked := false
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { leaked = true }))
 	defer target.Close()
-	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, 307) }))
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
 	defer redirect.Close()
 	c.Config.APIBase = redirect.URL
 	if _, e = c.Send(context.Background(), "bound-chat", "host-key", "text", map[string]string{"text": "safe"}); e == nil || leaked {

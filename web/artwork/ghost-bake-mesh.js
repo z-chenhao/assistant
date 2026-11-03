@@ -130,8 +130,8 @@ window.createStewardGhostMesh = async () => {
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.uniform1i(gl.getUniformLocation(program, name), unit);
   }
-  await texture('ghost-charcoal-v1.png', 0, 'charcoal');
-  await texture('ghost-ivory-v1.png', 1, 'ivory');
+  await texture('ghost-charcoal.png', 0, 'charcoal');
+  await texture('ghost-ivory.png', 1, 'ivory');
   const angleUniform = gl.getUniformLocation(program, 'angle');
   const styleUniform = gl.getUniformLocation(program, 'lightBody');
   const eyeUniform = gl.getUniformLocation(program, 'eyeOpen');

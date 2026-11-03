@@ -1,0 +1,43 @@
+name: Dependency audit
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * 1'
+  pull_request:
+    paths:
+      - go.mod
+      - go.sum
+      - '**/package.json'
+      - '**/package-lock.json'
+      - .github/workflows/security.yml
+permissions:
+  contents: read
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    name: Current dependency advisories
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Go reachable vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: npm locked dependency advisories
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          status=0
+          for package in provider-bridge runtime/javascript guest-browser web; do
+            npm audit --prefix "$package" --package-lock-only --audit-level=high || status=1
+          done
+          exit "$status"

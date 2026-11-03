@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run every race package; isolate Bridge and audit SQLite test partitions.
+"""Run every race package; isolate tight deadlines and audit SQLite partitions.
 
 SQLite tests own separate stores/temp roots. Separate processes also isolate
 test globals and environment. Every discovered root runs exactly once, with
@@ -15,12 +15,14 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import threading
 import time
 
 from runner import run_command, source_state
 
 BRIDGE = 'github.com/z-chenhao/assistant/internal/llm/bridge'
+RECORDER = 'github.com/z-chenhao/assistant/internal/observability/sqlite'
 SQLITE = 'github.com/z-chenhao/assistant/internal/agent/sqlite'
 RACE = ['go', 'test', '-race', '-count=1', '-timeout=15m']
 # One unchanged five-second context spans three approval/Drain phases. Give
@@ -28,20 +30,31 @@ RACE = ['go', 'test', '-race', '-count=1', '-timeout=15m']
 SERIAL_SQLITE = ['TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases']
 
 
+def show_failure(path, code):
+    # Keep the initiating failure visible in CI; cancelled siblings must not
+    # bury it in their partial Go JSON output. Full logs remain in artifacts.
+    if code not in (0, 130) and path.is_file():
+        print(path.read_text(errors='replace')[-8000:], file=sys.stderr, flush=True)
+
+
 def groups(packages, part=None):
     if (not packages or len(set(packages)) != len(packages) or
-            not {BRIDGE, SQLITE} <= set(packages) or
+            not {BRIDGE, RECORDER, SQLITE} <= set(packages) or
             any(not isinstance(p, str) or not p.startswith('github.com/z-chenhao/assistant/') or
                 any(c.isspace() for c in p) for p in packages)):
         raise ValueError('invalid or incomplete Go package inventory')
     if part == 'sqlite':
         return [('remainder', [SQLITE])]
+    # The recorder intentionally drops diagnostics after 100 ms. Its 60 ms
+    # lock-release contract needs CPU time, just like Bridge's RPC deadlines;
+    # do not overlap either package with the instrumented SQLite partitions.
+    isolated = [('bridge', [BRIDGE]), ('recorder', [RECORDER])]
     if part == 'packages':
-        others = [p for p in packages if p not in (BRIDGE, SQLITE)]
-        return [('bridge', [BRIDGE])] + ([('other-packages', others)] if others else [])
+        others = [p for p in packages if p not in (BRIDGE, RECORDER, SQLITE)]
+        return isolated + ([('other-packages', others)] if others else [])
     if part is not None:
         raise ValueError('unknown race part')
-    return [('bridge', [BRIDGE]), ('remainder', [p for p in packages if p != BRIDGE])]
+    return isolated + [('remainder', [p for p in packages if p not in (BRIDGE, RECORDER)])]
 
 
 def cpu_budget():
@@ -129,6 +142,7 @@ def run_remainder(selected, folder, stopped):
     row = dict(name='remainder', packages=selected, discovery=discovery,
                discovery_metrics=metrics, returncode=code, workers=[])
     if code:
+        show_failure(listing, code)
         return dict(row, wall_seconds=time.monotonic() - started)
     names = test_names(listing.read_text())
     if not set(SERIAL_SQLITE) <= set(names):
@@ -160,6 +174,7 @@ def run_remainder(selected, folder, stopped):
                     result.update(returncode=125, evidence_error=str(error))
         if result['returncode']:
             stopped.set()
+            show_failure(output, result['returncode'])
         print(f"[race] {name}: {result['wall_seconds']:.2f}s (exit {result['returncode']})", flush=True)
         return result
     workers = [drive(('sqlite-serial', RACE + ['-json', '-run', '^(' + '|'.join(SERIAL_SQLITE) + ')$', SQLITE],
@@ -188,7 +203,7 @@ def main(part=None):
     selected_packages = [p for _, selected in plan for p in selected]
     folder = Path('evidence/race')
     folder.mkdir(parents=True, exist_ok=True)
-    for name in ('bridge', 'remainder', 'sqlite-list', 'sqlite-serial', 'sqlite-1', 'sqlite-2', 'sqlite-3', 'other-packages'):
+    for name in ('bridge', 'recorder', 'remainder', 'sqlite-list', 'sqlite-serial', 'sqlite-1', 'sqlite-2', 'sqlite-3', 'other-packages'):
         (folder / (name + '.log')).unlink(missing_ok=True)
     (folder / 'inventory.json').unlink(missing_ok=True)
     stopped = threading.Event()
@@ -209,6 +224,7 @@ def main(part=None):
                 code = run_command(command, env, folder / (name + '.log'), stopped, metrics)
                 row = dict(name=name, packages=selected, command=command, returncode=code,
                            wall_seconds=time.monotonic() - started, **metrics)
+                show_failure(folder / (name + '.log'), code)
             rows.append(row)
             if row['returncode']:
                 passed = False

@@ -39,7 +39,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, e = h.Client.Verify(r.Context(), r.Header, raw, time.Now())
 	if e != nil {
-		http.Error(w, "Callback authentication failed", 401)
+		http.Error(w, "Callback authentication failed", http.StatusUnauthorized)
 		return
 	}
 	var event struct {

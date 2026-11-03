@@ -20,6 +20,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if self.path in ('/ghost-charcoal.png', '/ghost-ivory.png'):
+            body = (TOOLS / 'source' / self.path[1:]).read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         super().do_GET()
 
     def do_POST(self):

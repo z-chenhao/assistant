@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import signal
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -47,7 +48,7 @@ def state(h):
         },
         "conversation.db": {"history": "SELECT * FROM conversation_message ORDER BY sequence"},
     }.items():
-        with sqlite3.connect(root / filename) as db:
+        with closing(sqlite3.connect(root / filename)) as db, db:
             db.row_factory = sqlite3.Row
             for key, query in queries.items():
                 result[key] = [dict(r) for r in db.execute(query)]

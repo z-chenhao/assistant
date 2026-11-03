@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import signal
+from contextlib import closing
 import sqlite3
 import tempfile
 
@@ -14,7 +15,7 @@ from verify_main import MainHarness, require
 
 def state(h):
     value = h.state()
-    with sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db") as db:
+    with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
         db.row_factory = sqlite3.Row
         for key, query in {
             "tasks": "SELECT * FROM task ORDER BY created_at,task_id",

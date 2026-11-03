@@ -35,6 +35,7 @@ func OpenLocalBroker(ctx context.Context, root string) (*LocalBroker, error) {
 	}
 	b.lock = os.NewFile(uintptr(fd), "local startup lock")
 	if err := unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 		return fail(errors.New("Steward is already running for this data root"))
 	}
 	dir := filepath.Join(root, "broker")

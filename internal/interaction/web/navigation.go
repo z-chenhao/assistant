@@ -99,7 +99,7 @@ func legacyPageRedirect(w http.ResponseWriter, r *http.Request) bool {
 	if target == "" {
 		return false
 	}
-	http.Redirect(w, r, target, 303)
+	http.Redirect(w, r, target, http.StatusSeeOther)
 	return true
 }
 

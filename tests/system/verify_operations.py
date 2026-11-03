@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 import tempfile
 import time
@@ -31,7 +32,7 @@ def run(binary):
             h.setup()
             auth = h.command('model', 'login', 'STEWARD_AUTH_FIXTURE')
             require('credential_ref' not in auth, 'credential ref exposed on public login response')
-            with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+            with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
                 credential_before = db.execute('SELECT credential_ref FROM auth_connection WHERE connection_id=?', (auth['connection_id'],)).fetchone()[0]
             require(credential_before == 'env:STEWARD_AUTH_FIXTURE', 'credential ref did not use SecretStore')
             saved = h.save('operations.txt', 'text/plain', b'PRIVATE_ARTIFACT_29\n')
@@ -75,7 +76,7 @@ def run(binary):
             require(h.command('status')['agent_ingress_enabled'], 'restored profile lost readiness')
             require(h.output(ref) == b'PRIVATE_ARTIFACT_29\n', 'Artifact bytes/reference lost')
             require(readback(h)['memory'] == memory, 'encrypted Memory or receipt lost')
-            with sqlite3.connect(target / 'state.db') as db:
+            with closing(sqlite3.connect(target / 'state.db')) as db, db:
                 credential = db.execute('SELECT credential_ref FROM auth_connection WHERE connection_id=?', (auth['connection_id'],)).fetchone()[0]
             require(credential == credential_before, 'credential reference changed')
             current = h.command('approval', 'list')[-1]

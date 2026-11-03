@@ -306,8 +306,27 @@ func TestDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) {
 			}
 			cp := run.Checkpoint
 			cp.PendingTools = []agent.PendingToolBatch{{ExchangeID: exchange, Step: 0, Calls: calls}}
-			cp.Step, cp.Phase = 1, agent.ModelPhase
+			// Resume while awaiting the accepted outcome. ModelPhase may generate
+			// before the recovery goroutine finishes, as required for steering.
+			cp.Step, cp.Phase = 1, agent.SettlePhase
 			if err = r.Checkpoint(ctx, claim, run.Version, cp); err != nil {
+				t.Fatal(err)
+			}
+			// admitPolicy bypasses the loop's input consumption. Consume that
+			// original input before simulating a restart at the settle boundary.
+			run, err = r.Load(ctx, claim)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inputs, err := r.Steering(ctx, claim, run.Checkpoint.InputSequence)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, input := range inputs {
+				run.Checkpoint.InputSequence = input.Sequence
+				run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.AgentMessage{MessageID: input.Message.MessageID, Type: "user", Content: input.Message.Content})
+			}
+			if err = r.Checkpoint(ctx, claim, run.Version, run.Checkpoint); err != nil {
 				t.Fatal(err)
 			}
 			if err = r.Release(ctx, claim); err != nil {
@@ -317,6 +336,7 @@ func TestDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) {
 			p := &loopProvider{store: s, respond: func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 				last := request.Messages[len(request.Messages)-1]
 				if last.Origin != "runtime" || !strings.Contains(last.Text, "operation:0:0") || unknown && !strings.Contains(last.Text, "UNKNOWN_SIDE_EFFECT") || !unknown && !strings.Contains(last.Text, "durable result") {
+					t.Logf("unexpected recovery input: %+v", last)
 					return llm.GenerationResult{}, llm.InvalidProviderResponse
 				}
 				return llm.GenerationResult{Text: "outcome received"}, nil

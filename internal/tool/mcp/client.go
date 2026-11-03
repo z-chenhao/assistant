@@ -26,7 +26,7 @@ import (
 const protocol = "2025-03-26"
 const maxFrame = 1 << 20
 
-var invalid = errors.New("invalid or unavailable MCP server")
+var errInvalid = errors.New("invalid or unavailable MCP server")
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
 // Config is trusted process configuration, never model input. Only explicitly
@@ -42,11 +42,11 @@ type Config struct {
 
 func (c Config) Validate() error {
 	if !identifier.MatchString(c.Name) || strings.Contains(c.Name, "__") || !filepath.IsAbs(c.Command) || !filepath.IsAbs(c.Directory) || len(c.Tools) == 0 || len(c.Tools) > 128 || len(c.Args) > 32 {
-		return invalid
+		return errInvalid
 	}
 	for name, permission := range c.Tools {
 		if !identifier.MatchString(name) || strings.Contains(name, "__") || (permission != "read_only" && permission != "external_effect") {
-			return invalid
+			return errInvalid
 		}
 	}
 	return nil
@@ -68,12 +68,12 @@ type session struct {
 func start(ctx context.Context, c Config) (*session, error) {
 	dir, err := os.MkdirTemp(c.Directory, ".steward-mcp-")
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	cmd, err := sandbox.Command(ctx, c.Command, c.Args, nil, c.Directory, dir)
 	if err != nil {
 		os.RemoveAll(dir)
-		return nil, invalid
+		return nil, errInvalid
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
@@ -84,18 +84,18 @@ func start(ctx context.Context, c Config) (*session, error) {
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		os.RemoveAll(dir)
-		return nil, invalid
+		return nil, errInvalid
 	}
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		in.Close()
 		os.RemoveAll(dir)
-		return nil, invalid
+		return nil, errInvalid
 	}
 	if err = cmd.Start(); err != nil {
 		in.Close()
 		os.RemoveAll(dir)
-		return nil, invalid
+		return nil, errInvalid
 	}
 	s := &session{cmd: cmd, in: in, frames: bufio.NewScanner(out)}
 	// Closing the read side also bounds a misbehaving descendant retaining
@@ -110,11 +110,11 @@ func start(ctx context.Context, c Config) (*session, error) {
 	}
 	if s.call("initialize", map[string]any{"protocolVersion": protocol, "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "steward", "version": "1"}}, &init) != nil || init.Protocol != protocol || init.Capabilities.Tools == nil {
 		s.close()
-		return nil, invalid
+		return nil, errInvalid
 	}
 	if json.NewEncoder(in).Encode(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"}) != nil {
 		s.close()
-		return nil, invalid
+		return nil, errInvalid
 	}
 	return s, nil
 }
@@ -129,7 +129,7 @@ func (s *session) close() {
 func (s *session) call(method string, params any, result any) error {
 	s.id++
 	if json.NewEncoder(s.in).Encode(map[string]any{"jsonrpc": "2.0", "id": s.id, "method": method, "params": params}) != nil {
-		return invalid
+		return errInvalid
 	}
 	for n := 0; n < 256 && s.frames.Scan(); n++ {
 		var frame struct {
@@ -140,18 +140,18 @@ func (s *session) call(method string, params any, result any) error {
 			Error   json.RawMessage `json:"error"`
 		}
 		if json.Unmarshal(s.frames.Bytes(), &frame) != nil || frame.JSONRPC != "2.0" {
-			return invalid
+			return errInvalid
 		}
 		if len(frame.ID) == 0 && frame.Method != "" {
 			continue
 		}
 		var id int
 		if frame.Method != "" || json.Unmarshal(frame.ID, &id) != nil || id != s.id || len(frame.Error) > 0 || len(frame.Result) == 0 || json.Unmarshal(frame.Result, result) != nil {
-			return invalid
+			return errInvalid
 		}
 		return nil
 	}
-	return invalid
+	return errInvalid
 }
 func (s *session) list() ([]advertised, error) {
 	var all []advertised
@@ -167,16 +167,16 @@ func (s *session) list() ([]advertised, error) {
 			params["cursor"] = cursor
 		}
 		if s.call("tools/list", params, &response) != nil {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		for _, a := range response.Tools {
 			if !identifier.MatchString(a.Name) || seen[a.Name] || len(a.Description) > 4096 || len(a.InputSchema) > 65536 {
-				return nil, invalid
+				return nil, errInvalid
 			}
 			seen[a.Name] = true
 			all = append(all, a)
 			if len(all) > 256 {
-				return nil, invalid
+				return nil, errInvalid
 			}
 		}
 		if response.Next == "" {
@@ -184,11 +184,11 @@ func (s *session) list() ([]advertised, error) {
 			return all, nil
 		}
 		if response.Next == cursor {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		cursor = response.Next
 	}
-	return nil, invalid
+	return nil, errInvalid
 }
 func hash(v any) string {
 	b, _ := json.Marshal(v)
@@ -196,29 +196,92 @@ func hash(v any) string {
 	return hex.EncodeToString(h[:])
 }
 
+// invoke reopens the sandboxed peer and verifies the frozen tool before dispatch.
+// The boolean marks an ambiguous reply after dispatch, never permission to retry.
+func invoke(ctx context.Context, c Config, a advertised, args string) (tool.Result, bool) {
+	peer, err := start(ctx, c)
+	if err != nil {
+		return tool.Failure("PROVIDER_UNAVAILABLE"), false
+	}
+	defer peer.close()
+	current, err := peer.list()
+	if err != nil {
+		return tool.Failure("PROVIDER_UNAVAILABLE"), false
+	}
+	matched := false
+	for _, v := range current {
+		if v.Name == a.Name {
+			matched = hash(v) == hash(a)
+		}
+	}
+	if !matched {
+		return tool.Failure("NON_DETERMINISTIC_REPLAY"), false
+	}
+	var params any
+	if json.Unmarshal([]byte(args), &params) != nil {
+		return tool.Failure("INVALID_ARGUMENT"), false
+	}
+	return peer.callTool(a.Name, params)
+}
+
+// callTool preserves missing/null distinctions at the untrusted MCP boundary.
+func (s *session) callTool(name string, params any) (tool.Result, bool) {
+	// Pointers distinguish required empty values from missing/null
+	// values. A malformed reply after dispatch cannot prove an effect.
+	var reply *struct {
+		Content *[]struct {
+			Type string  `json:"type"`
+			Text *string `json:"text"`
+		} `json:"content"`
+		IsError json.RawMessage `json:"isError"`
+	}
+	if s.call("tools/call", map[string]any{"name": name, "arguments": params}, &reply) != nil || reply == nil || reply.Content == nil {
+		return tool.Failure("PROVIDER_UNAVAILABLE"), true
+	}
+	var isError bool
+	if len(reply.IsError) > 0 {
+		var flag *bool
+		if json.Unmarshal(reply.IsError, &flag) != nil || flag == nil {
+			return tool.Failure("PROVIDER_UNAVAILABLE"), true
+		}
+		isError = *flag
+	}
+	text := ""
+	for _, part := range *reply.Content {
+		if part.Type != "text" || part.Text == nil {
+			return tool.Failure("PROVIDER_UNAVAILABLE"), true
+		}
+		text += *part.Text
+	}
+	if isError {
+		return tool.Failure("INVALID_ARGUMENT"), false
+	}
+	return tool.Result{Text: text}, false
+}
+
 func Definitions(ctx context.Context, c Config) ([]tool.Definition, error) {
 	if c.Validate() != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	var err error
 	c.Directory, err = filepath.EvalSymlinks(c.Directory)
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	c.Command, err = filepath.EvalSymlinks(c.Command)
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	s, err := start(ctx, c)
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	defer s.close()
 	all, err := s.list()
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	var defs []tool.Definition
 	for _, a := range all {
@@ -233,86 +296,32 @@ func Definitions(ctx context.Context, c Config) ([]tool.Definition, error) {
 			Type string `json:"type"`
 		}
 		if json.Unmarshal(a.InputSchema, &input) != nil || input.Type != "object" {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		spec := tool.Spec{Name: "mcp__" + c.Name + "__" + a.Name, Description: a.Description, ResourceHash: hash(struct {
 			Config Config
 			Tool   advertised
 		}{c, a}), Version: 1, InputSchema: string(a.InputSchema), Permission: permission, ReplayPolicy: "safe", Risk: "low", Provider: "mcp:" + c.Name, TimeoutMS: 10000, OutputBytes: 65536, ConflictPolicy: "server-v1"}
-		run := func(ctx context.Context, args string) (tool.Result, bool) {
-			peer, err := start(ctx, c)
-			if err != nil {
-				return tool.Failure("PROVIDER_UNAVAILABLE"), false
-			}
-			defer peer.close()
-			current, err := peer.list()
-			if err != nil {
-				return tool.Failure("PROVIDER_UNAVAILABLE"), false
-			}
-			matched := false
-			for _, v := range current {
-				if v.Name == a.Name {
-					matched = hash(v) == hash(a)
-				}
-			}
-			if !matched {
-				return tool.Failure("NON_DETERMINISTIC_REPLAY"), false
-			}
-			var params any
-			if json.Unmarshal([]byte(args), &params) != nil {
-				return tool.Failure("INVALID_ARGUMENT"), false
-			}
-			// Pointers distinguish required empty values from missing/null
-			// values. A malformed reply after dispatch cannot prove an effect.
-			var reply *struct {
-				Content *[]struct {
-					Type string  `json:"type"`
-					Text *string `json:"text"`
-				} `json:"content"`
-				IsError json.RawMessage `json:"isError"`
-			}
-			if peer.call("tools/call", map[string]any{"name": a.Name, "arguments": params}, &reply) != nil || reply == nil || reply.Content == nil {
-				return tool.Failure("PROVIDER_UNAVAILABLE"), true
-			}
-			var isError bool
-			if len(reply.IsError) > 0 {
-				var flag *bool
-				if json.Unmarshal(reply.IsError, &flag) != nil || flag == nil {
-					return tool.Failure("PROVIDER_UNAVAILABLE"), true
-				}
-				isError = *flag
-			}
-			text := ""
-			for _, part := range *reply.Content {
-				if part.Type != "text" || part.Text == nil {
-					return tool.Failure("PROVIDER_UNAVAILABLE"), true
-				}
-				text += *part.Text
-			}
-			if isError {
-				return tool.Failure("INVALID_ARGUMENT"), false
-			}
-			return tool.Result{Text: text}, false
-		}
+
 		d := tool.Definition{Spec: spec, ConflictKeys: func(string) []string { return []string{"mcp:" + c.Name} }}
 		if permission == "read_only" {
-			d.Execute = func(ctx context.Context, args string) tool.Result { r, _ := run(ctx, args); return r }
+			d.Execute = func(ctx context.Context, args string) tool.Result { r, _ := invoke(ctx, c, a, args); return r }
 		} else {
 			d.Spec.ReplayPolicy = "never"
 			d.Spec.Risk = "high"
 			d.Spec.Description += " Host policy: external effect; exact frozen approval required. UNKNOWN_SIDE_EFFECT must not be retried; report uncertainty. No standard MCP receipt query is available."
 			d.Invoke = func(ctx context.Context, r tool.Request) tool.Outcome {
-				result, ambiguous := run(ctx, r.Arguments)
+				result, ambiguous := invoke(ctx, c, a, r.Arguments)
 				return tool.Outcome{Result: result, Ambiguous: ambiguous}
 			}
 		}
 		defs = append(defs, d)
 	}
 	if len(defs) != len(c.Tools) {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	if _, err = tool.NewRegistry(defs); err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	return defs, nil
 }

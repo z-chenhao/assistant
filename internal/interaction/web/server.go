@@ -34,6 +34,7 @@ type Config struct {
 func (c Config) Validate() error {
 	host, _, err := net.SplitHostPort(c.Listen)
 	if err != nil || (host != "127.0.0.1" && host != "::1") || c.TokenRef != "" && !interaction.ValidCredentialRef(c.TokenRef) {
+		//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 		return errors.New("Web requires a literal loopback listener and an optional valid credential reference")
 	}
 	return nil
@@ -232,47 +233,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	}
-	// Only shipped character subsets are public font assets; no filesystem fallback.
-	if strings.HasPrefix(r.URL.Path, "/brand/SourceHanSansSC-") && strings.HasSuffix(r.URL.Path, ".woff2") {
-		name := strings.TrimPrefix(r.URL.Path, "/brand/")
-		if strings.Contains(name, "/") {
-			fail(w, 404)
-			return
-		}
-		body, err := assets.ReadFile("assets/brand/" + name)
-		if err != nil {
-			fail(w, 404)
-			return
-		}
-		w.Header().Set("Content-Type", "font/woff2")
-		_, _ = w.Write(body)
-		return
-	}
-	if file, ok := map[string]struct{ path, contentType string }{
-		"/style.css":                         {"assets/style.css", "text/css"},
-		"/appearance.js":                     {"assets/appearance.js", "text/javascript"},
-		"/app.js":                            {"assets/client.js", "text/javascript"},
-		"/licenses.txt":                      {"assets/licenses.txt", "text/plain; charset=utf-8"},
-		"/brand/steward.svg":                 {"assets/brand/steward.svg", "image/svg+xml"},
-		"/brand/ghost-ivory-v1.png":          {"assets/brand/ghost-ivory-v1.png", "image/png"},
-		"/brand/ghost-charcoal-v1.png":       {"assets/brand/ghost-charcoal-v1.png", "image/png"},
-		"/brand/ghost-charcoal-96.webp":      {"assets/brand/ghost-charcoal-96.webp", "image/webp"},
-		"/brand/ghost-ivory-96.webp":         {"assets/brand/ghost-ivory-96.webp", "image/webp"},
-		"/brand/ghost-charcoal-256.webp":     {"assets/brand/ghost-charcoal-256.webp", "image/webp"},
-		"/brand/ghost-ivory-256.webp":        {"assets/brand/ghost-ivory-256.webp", "image/webp"},
-		"/brand/Michroma-Regular.ttf":        {"assets/brand/Michroma-Regular.ttf", "font/ttf"},
-		"/brand/JetBrainsMono-Regular.woff2": {"assets/brand/JetBrainsMono-Regular.woff2", "font/woff2"},
-		"/brand/SourceSerif4-Roman.woff2":    {"assets/brand/SourceSerif4-Roman.woff2", "font/woff2"},
-		"/brand/InterVariable.woff2":         {"assets/brand/InterVariable.woff2", "font/woff2"},
-		"/favicon.png":                       {"assets/brand/ghost-charcoal-v1.png", "image/png"},
-	}[r.URL.Path]; ok {
-		body, err := assets.ReadFile(file.path)
-		if err != nil {
-			fail(w, 500)
-			return
-		}
-		w.Header().Set("Content-Type", file.contentType)
-		_, _ = w.Write(body)
+	if serveAsset(w, r) {
 		return
 	}
 	if r.URL.Path == "/session" && r.Method == "POST" && s.Config.TokenRef != "" {
@@ -305,7 +266,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.sessionExpires = time.Now().Add(time.Hour)
 		s.mu.Unlock()
 		http.SetCookie(w, &http.Cookie{Name: "steward_session", Value: session, HttpOnly: true, SameSite: http.SameSiteStrictMode, Path: "/", MaxAge: 3600})
-		http.Redirect(w, r, safePageReturn(r.FormValue("next")), 303)
+		http.Redirect(w, r, safePageReturn(r.FormValue("next")), http.StatusSeeOther)
 		return
 	}
 	if !s.authorized(r) {

@@ -88,7 +88,8 @@ func TestContextLinksResetDependentOffsets(t *testing.T) {
 	if err != nil || next.Query.Step != 0 || next.Query.Item != 0 || next.Query.Offset != 0 || next.Query.JSON || next.Query.Section != "messages" || next.DiffAfter != 0 {
 		t.Fatal(next, err)
 	}
-	r = httptest.NewRequest("GET", diffLink(v, 0, 41), nil)
+	// Links issued by the retired diff renderer remain valid bookmarks.
+	r = httptest.NewRequest("GET", "/developer/observability/run?tab=context&ctx=1&step=0&section=response&item=41&after=40&format=json", nil)
 	parsed, err = tracePageQuery(r)
 	if parsed != nil {
 		next = parsed.FullContext

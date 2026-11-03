@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import signal
+from contextlib import closing
 import sqlite3
 import tempfile
 
@@ -35,7 +36,7 @@ def run(binary):
             plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': source}}])
             h.send(key, ('Delegate capabilities: ' if worker else 'Capabilities: ') + plan)
             h.command('chat', 'work', timeout=timeout)
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 db.row_factory = sqlite3.Row
                 rows = [dict(r) for r in db.execute('SELECT * FROM tool_invocation ORDER BY created_at,delivery_seq')]
             parents = [r for r in rows if r['tool_name'] == 'builtin__codemode_execute']
@@ -118,7 +119,7 @@ return {ref:saved.artifactRefs[0],queries,matches,absent,browse};
 
             p, nested = execute('store-failure', 'store("durable", {count: 7}); text(load("durable")); throw new Error("fixture");')
             require(p['status'] == 'failed', 'throw did not fail')
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 value = db.execute('SELECT value_json FROM code_store WHERE execution_id=? AND key=?', (p['invocation_id'], 'durable')).fetchone()
             require(json.loads(value[0]) == {'count': 7}, 'Store lost before throw')
             p, _ = execute('store-isolated', 'return load("durable") === undefined;')
@@ -138,7 +139,7 @@ return rejected;
             require(output == [{'type': 'return', 'value': True}], f'quota rejection changed after shrink/replay: {output}')
             require(len(nested) == 1 and nested[0]['status'] == 'succeeded' and nested[0]['attempt_count'] == 1
                     and json.loads(nested[0]['arguments_json']) == {'text': 'true'}, 'quota replay changed or repeated nested call')
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 values = db.execute('SELECT key,version,length(value_json) FROM code_store WHERE execution_id=? ORDER BY key', (p['invocation_id'],)).fetchall()
                 receipts = db.execute("SELECT call_key,request_hash,reply_json FROM code_store_call WHERE execution_id=? AND json_extract(reply_json,'$.error.code')='RESOURCE_LIMIT'", (p['invocation_id'],)).fetchall()
                 starts = db.execute("SELECT count(DISTINCT attempt_id) FROM code_event WHERE execution_id=? AND json_extract(message_json,'$.kind')='execution_started'", (p['invocation_id'],)).fetchone()[0]
@@ -176,7 +177,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             require(p['status'] == 'succeeded' and len(nested) == 1 and nested[0]['tool_name'] == 'builtin__agent_run', f'Agent Host bridge {p} {nested}')
             output = json.loads(json.loads(p['result_json'])['text'])[-1]['value']
             require(isinstance(output['text'], str) and output['refs'] == [], 'AgentResult contract')
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 child = db.execute('SELECT c.kind,c.worker_position,c.status,p.model_snapshot_id=c.model_snapshot_id FROM agent_invocation a JOIN run c ON c.run_id=a.child_run_id JOIN run p ON p.run_id=c.parent_run_id WHERE a.invocation_id=?', (nested[0]['invocation_id'],)).fetchone()
             require(child == ('worker', 'child', 'completed', 1), 'Child did not use inherited Worker/model')
             report['checks'].append({'name': 'agent-run-real-worker', 'output': output, 'child': child})
@@ -189,7 +190,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             a = pending[0]
             h.command('approval', 'deny', a['approval_id'], a['frozen_arguments_hash'])
             h.command('chat', 'work')
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 final = db.execute('SELECT result_json,status FROM tool_invocation WHERE invocation_id=?', (p['invocation_id'],)).fetchone()
             require(final[1] == 'succeeded' and json.loads(json.loads(final[0])['text']) == [{'type':'return','value':'APPROVAL_DENIED'}], f'approval rejection not caught: {final}')
             require(not (Path(h.env['STEWARD_DATA_ROOT']) / 'effect-ledger.db').exists(), 'denied effect reached Provider')
@@ -198,7 +199,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             p, nested = execute('parallel-child-batch', 'const rows = await Promise.allSettled(Array.from({length:3},()=>agent.run({task:"Capabilities: []"}))); return rows.map(row=>row.status);', worker=True)
             require(p['status'] == 'succeeded' and len(nested) == 3 and all(c['status'] == 'succeeded' for c in nested), 'parallel Child calls lost at suspension')
             require(json.loads(json.loads(p['result_json'])['text']) == [{'type':'return','value':['fulfilled']*3}], 'parallel Child aggregation changed declaration order')
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 first = db.execute("SELECT attempt_id,sequence,message_json FROM code_event WHERE execution_id=? AND json_extract(message_json,'$.kind') IN ('execution_suspended','execution_completed') ORDER BY rowid LIMIT 1", (p['invocation_id'],)).fetchone()
                 require(first is not None, 'batch emitted no authoritative outcome')
                 finished = {json.loads(r[0])['callId'] for r in db.execute("SELECT message_json FROM code_event WHERE execution_id=? AND attempt_id=? AND sequence<=? AND json_extract(message_json,'$.kind')='call_finished'", (p['invocation_id'],first[0],first[1]))}
@@ -214,7 +215,7 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             a = next(a for a in h.command('approval', 'list') if a['status'] == 'pending')
             h.command('approval', 'approve', a['approval_id'], a['frozen_arguments_hash'])
             h.command('chat', 'work')
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 final = db.execute('SELECT result_json,status FROM tool_invocation WHERE invocation_id=?', (p['invocation_id'],)).fetchone()
                 writes = db.execute('SELECT value_json FROM code_store WHERE execution_id=? AND key=?', (p['invocation_id'],'executions')).fetchone()[0]
                 status = db.execute('SELECT status FROM tool_invocation WHERE invocation_id=?', (nested[0]['invocation_id'],)).fetchone()[0]
@@ -236,21 +237,21 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
                 process = h.hold(boundary)
                 process.send_signal(signal.SIGKILL)
                 process.communicate(timeout=10)
-                with sqlite3.connect(db_path) as db:
+                with closing(sqlite3.connect(db_path)) as db, db:
                     before = db.execute('SELECT idempotency_key,status FROM tool_invocation WHERE invocation_id=?', (nested[0]['invocation_id'],)).fetchone()
                     calls_before = db.execute('SELECT count(*) FROM code_call WHERE execution_id=?', (p['invocation_id'],)).fetchone()[0]
                 require(calls_before == 1, 'nested effect ran before CodeCall acceptance committed')
                 h.command('chat', 'work')
-                with sqlite3.connect(db_path) as db:
+                with closing(sqlite3.connect(db_path)) as db, db:
                     after = db.execute('SELECT idempotency_key,status,attempt_count FROM tool_invocation WHERE invocation_id=?', (nested[0]['invocation_id'],)).fetchone()
                     parent_status = db.execute('SELECT status FROM tool_invocation WHERE invocation_id=?', (p['invocation_id'],)).fetchone()[0]
                     count = db.execute('SELECT count(*) FROM code_call WHERE execution_id=?', (p['invocation_id'],)).fetchone()[0]
-                with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'effect-ledger.db') as db:
+                with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'effect-ledger.db')) as db, db:
                     effects = db.execute('SELECT key,args FROM effects WHERE key=?', (before[0],)).fetchall()
                 require(parent_status == 'succeeded' and after[0] == before[0] and after[1] == 'succeeded' and count == 1 and len(effects) == 1, 'nested effect recovery duplicated/lost identity or outcome')
                 report['checks'].append({'name':'nested-effect-SIGKILL', 'boundary':boundary, 'before':before, 'after':after, 'effects':effects, 'code_calls':count})
 
-            with sqlite3.connect(db_path) as db:
+            with closing(sqlite3.connect(db_path)) as db, db:
                 report['events'] = [json.loads(r[0]) for r in db.execute('SELECT message_json FROM code_event ORDER BY execution_id,attempt_id,sequence')]
                 report['schema_version'] = db.execute('PRAGMA user_version').fetchone()[0]
             require(report['events'] and report['schema_version'] == STATE_SCHEMA_VERSION, 'durable events/migration missing')

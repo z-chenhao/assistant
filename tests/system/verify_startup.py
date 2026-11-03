@@ -18,7 +18,7 @@ import threading
 
 from terminal_driver import Terminal
 from fixture_pool import run as owned_run, run_cases
-from verify_local_provider import Endpoint
+from provider_endpoint import Endpoint
 from verify_main import MainHarness, assert_final, require
 from verify_tui import local_setup
 
@@ -68,6 +68,16 @@ def verify_install():
         installer = root / 'unpacked/steward/install.sh'
         prefix = root / 'prefix with spaces'
         install_log = run('sh', str(installer), '--prefix', str(prefix))
+        installed = prefix / 'lib/steward/current'
+        for name in ('LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md'):
+            require((installed/name).read_bytes() == (ROOT/name).read_bytes(), 'installation lost project notice: '+name)
+        require((installed/'licenses/web.txt').read_bytes() == (ROOT/'internal/interaction/web/assets/licenses.txt').read_bytes(),
+                'installation lost embedded Web notices')
+        modules = json.loads((installed/'licenses/go-modules.json').read_text())
+        require(any(m['module']=='modernc.org/sqlite' for m in modules), 'linked SQLite license absent')
+        require(all(m['files'] and all((installed/'licenses'/f).is_file() for f in m['files']) for m in modules),
+                'linked dependency notices missing from archive/install')
+        report['checks'].append('project, Web and linked Go notices survive source packaging and release installation')
         binary = prefix / 'bin/steward'
         folder = root / 'workspace'
         folder.mkdir()

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import signal
+from contextlib import closing
 import sqlite3
 import tempfile
 
@@ -23,7 +24,7 @@ class ToolHarness(MainHarness):
 def state(h):
     value = h.state()
     root = Path(h.env['STEWARD_DATA_ROOT'])
-    with sqlite3.connect(root / 'state.db') as db:
+    with closing(sqlite3.connect(root / 'state.db')) as db, db:
         db.row_factory = sqlite3.Row
         for name, query in {
             'approvals': 'SELECT * FROM approval ORDER BY created_at',
@@ -36,7 +37,7 @@ def state(h):
             value[name] = [dict(r) for r in db.execute(query)]
     value['effects'] = []
     if (root / 'effect-ledger.db').exists():
-        with sqlite3.connect(root / 'effect-ledger.db') as db:
+        with closing(sqlite3.connect(root / 'effect-ledger.db')) as db, db:
             db.row_factory = sqlite3.Row
             value['effects'] = [dict(r) for r in db.execute('SELECT * FROM effects ORDER BY key')]
     return value
@@ -178,7 +179,7 @@ def run(binary, scenario_jobs=1):
             ledger = Path(h.env['STEWARD_DATA_ROOT']) / 'effect-ledger.db'
             # Inject unusable external evidence without changing the frozen
             # ToolSpec, arguments, key or domain state. Restore it for reconciliation.
-            with sqlite3.connect(ledger) as db:
+            with closing(sqlite3.connect(ledger)) as db, db:
                 db.execute('UPDATE effects SET result=? WHERE key=?',
                            ('x' * (json.loads(inv['policy_json'])['output_bytes'] + 1), key))
             h.command('chat', 'work')
@@ -202,7 +203,7 @@ def run(binary, scenario_jobs=1):
             require(still_unknown['status'] == 'unknown' and still_unknown['attempt_count'] == 1 and
                     restarted['tasks'][0]['status'] == 'active' and len(restarted['updates']) == 1,
                     'restart lost or duplicated uncertainty')
-            with sqlite3.connect(ledger) as db:
+            with closing(sqlite3.connect(ledger)) as db, db:
                 db.execute('UPDATE effects SET result=? WHERE key=?', (receipt, key))
             settled = h.command('approval', 'reconcile')
             require(len(settled) == 1 and settled[0]['status'] == 'succeeded' and

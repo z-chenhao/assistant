@@ -37,7 +37,7 @@ type entry struct {
 	files map[string]string
 }
 
-var invalid = errors.New("invalid skill catalog")
+var errInvalid = errors.New("invalid skill catalog")
 
 // ErrCapacity rejects a new publication without advancing its candidate.
 var ErrCapacity = errors.New("skill catalog capacity exceeded")
@@ -49,16 +49,16 @@ const maxEntries = 128
 // candidate version. Readers share a consistent catalog with other readers.
 func openCatalog(c Config, write bool) (*os.Root, func(), error) {
 	if c.Validate() != nil {
-		return nil, nil, invalid
+		return nil, nil, errInvalid
 	}
 	root, err := os.OpenRoot(c.Root)
 	if err != nil {
-		return nil, nil, invalid
+		return nil, nil, errInvalid
 	}
 	dir, err := root.Open(".")
 	if err != nil {
 		root.Close()
-		return nil, nil, invalid
+		return nil, nil, errInvalid
 	}
 	mode := syscall.LOCK_SH
 	if write {
@@ -67,7 +67,7 @@ func openCatalog(c Config, write bool) (*os.Root, func(), error) {
 	if err = syscall.Flock(int(dir.Fd()), mode); err != nil {
 		dir.Close()
 		root.Close()
-		return nil, nil, invalid
+		return nil, nil, errInvalid
 	}
 	return root, func() {
 		dir.Close()
@@ -85,12 +85,12 @@ type metadata struct {
 func parseMetadata(name string, b []byte) (metadata, error) {
 	var front metadata
 	if len(b) > 65536 {
-		return front, invalid
+		return front, errInvalid
 	}
 	text := strings.TrimLeft(string(b), " \t\r\n")
 	opening, rest, ok := strings.Cut(text, "\n")
 	if !ok || strings.TrimRight(opening, " \t\r") != "---" {
-		return front, invalid
+		return front, errInvalid
 	}
 	header := ""
 	closed := false
@@ -106,11 +106,11 @@ func parseMetadata(name string, b []byte) (metadata, error) {
 		offset += len(line) + 1
 	}
 	if !closed || yaml.Unmarshal([]byte(header), &front) != nil || front.Name != name || front.Name == "" || front.Description == "" || len(front.Description) > 1024 {
-		return front, invalid
+		return front, errInvalid
 	}
 	for _, r := range front.Name {
 		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
-			return front, invalid
+			return front, errInvalid
 		}
 	}
 	return front, nil
@@ -118,7 +118,7 @@ func parseMetadata(name string, b []byte) (metadata, error) {
 
 func (c Config) Validate() error {
 	if !filepath.IsAbs(c.Root) || (c.Scope != "agent" && c.Scope != "workspace") {
-		return invalid
+		return errInvalid
 	}
 	return nil
 }
@@ -127,12 +127,12 @@ func sum(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:
 func readFile(root *os.Root, path string) ([]byte, error) {
 	f, err := root.Open(path)
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	defer f.Close()
 	b, err := io.ReadAll(io.LimitReader(f, 65537))
 	if err != nil || len(b) > 65536 {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	return b, nil
 }
@@ -140,7 +140,7 @@ func readFile(root *os.Root, path string) ([]byte, error) {
 func load(c Config) ([]entry, error) {
 	root, close, err := openCatalog(c, false)
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	defer close()
 	return loadRoot(root, c.Scope)
@@ -149,7 +149,7 @@ func load(c Config) ([]entry, error) {
 func loadRoot(root *os.Root, scope string) ([]entry, error) {
 	dir, err := root.Open(".")
 	if err != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	defer dir.Close()
 	var dirs []fs.DirEntry
@@ -160,7 +160,7 @@ func loadRoot(root *os.Root, scope string) ([]entry, error) {
 				continue
 			}
 			if !d.IsDir() || d.Type()&os.ModeSymlink != 0 || len(dirs) >= maxEntries {
-				return nil, invalid
+				return nil, errInvalid
 			}
 			dirs = append(dirs, d)
 		}
@@ -168,7 +168,7 @@ func loadRoot(root *os.Root, scope string) ([]entry, error) {
 			break
 		}
 		if err != nil {
-			return nil, invalid
+			return nil, errInvalid
 		}
 	}
 	var entries []entry
@@ -177,36 +177,36 @@ func loadRoot(root *os.Root, scope string) ([]entry, error) {
 		total := 0
 		err = fs.WalkDir(root.FS(), d.Name(), func(path string, v fs.DirEntry, walkErr error) error {
 			if walkErr != nil || v.Type()&os.ModeSymlink != 0 {
-				return invalid
+				return errInvalid
 			}
 			if v.IsDir() {
 				return nil
 			}
 			info, err := v.Info()
 			if err != nil || !info.Mode().IsRegular() || info.Size() > 65536 {
-				return invalid
+				return errInvalid
 			}
 			b, err := readFile(root, path)
 			if err != nil {
-				return invalid
+				return errInvalid
 			}
 			total += len(b)
 			if total > 1<<20 || len(e.files) >= 128 {
-				return invalid
+				return errInvalid
 			}
 			e.files[strings.TrimPrefix(path, d.Name()+"/")] = sum(b)
 			return nil
 		})
 		if err != nil {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		b, err := readFile(root, d.Name()+"/SKILL.md")
 		if err != nil {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		front, err := parseMetadata(d.Name(), b)
 		if err != nil {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		blob, _ := json.Marshal(e.files)
 		e.Summary = Summary{Name: front.Name, Description: front.Description, Scope: scope, Version: sum(blob)}
@@ -218,7 +218,7 @@ func loadRoot(root *os.Root, scope string) ([]entry, error) {
 
 func Definitions(c Config) ([]tool.Definition, error) {
 	if c.Validate() != nil {
-		return nil, invalid
+		return nil, errInvalid
 	}
 	entries, err := load(c)
 	if err != nil {

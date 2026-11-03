@@ -56,7 +56,7 @@ func (s Session) actor() agent.Actor {
 	return s.Actor
 }
 
-var cancelled = errors.New("setup cancelled")
+var errCancelled = errors.New("setup cancelled")
 
 // Run owns input and closes it on exit, including signal cancellation. The CLI
 // supplies stdin; tests supply a disposable pipe. Output stays on this terminal;
@@ -259,7 +259,7 @@ func (u *terminal) read(ctx context.Context, prompt string) (string, error) {
 func (u *terminal) ask(ctx context.Context, prompt string) (string, error) {
 	line, err := u.read(ctx, prompt+" (/cancel to cancel)> ")
 	if line == "/cancel" {
-		return "", cancelled
+		return "", errCancelled
 	}
 	return line, err
 }
@@ -267,7 +267,7 @@ func (u *terminal) report(err error) {
 	if err == nil || errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 		return
 	}
-	if errors.Is(err, cancelled) {
+	if errors.Is(err, errCancelled) {
 		u.print("Setup cancelled. Active model unchanged.")
 		return
 	}
@@ -439,7 +439,7 @@ func (u *terminal) selectModel(ctx context.Context, id string) error {
 		return err
 	}
 	if answer != "yes" {
-		return cancelled
+		return errCancelled
 	}
 	if err := u.Control.Select(ctx, id, p.Version, d.ConfigVersion); err != nil {
 		return err
@@ -502,7 +502,7 @@ func (u *terminal) setup(ctx context.Context) error {
 			return err
 		}
 	default:
-		return cancelled
+		return errCancelled
 	}
 	p.ModelID, err = u.chooseModel(ctx, catalog, p.ProviderKind == "openai_compatible")
 	if err != nil {

@@ -293,7 +293,7 @@ func (p *Provider) ensure(ctx context.Context, r computer.Request, saved *receip
 	if readJSON(filepath.Join(dir, "steward-instance.json"), &owner) != nil || owner != r.Instance {
 		return computer.Instance{}, computer.ErrStale
 	}
-	status, ip, err := p.state(ctx, r.Instance.NativeName)
+	status, _, err := p.state(ctx, r.Instance.NativeName)
 	if err != nil {
 		return computer.Instance{}, err
 	}
@@ -315,12 +315,13 @@ func (p *Provider) ensure(ctx context.Context, r computer.Request, saved *receip
 		p.boundary("before_run_request")
 		_, code, err := p.api(ctx, "POST", "/vms/"+r.Instance.NativeName+"/run", map[string]any{"noDisplay": true, "vnc": "disabled"})
 		if err != nil || code != 200 && code != 202 {
-			status, ip, err = p.state(ctx, r.Instance.NativeName)
+			status, _, err = p.state(ctx, r.Instance.NativeName)
 			if err != nil || status != "running" {
 				return computer.Instance{}, computer.ErrUnknown
 			}
 		}
 	}
+	var ip string
 	for {
 		status, ip, err = p.state(ctx, r.Instance.NativeName)
 		if err == nil && status == "running" && ip != "" {

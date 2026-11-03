@@ -29,3 +29,5 @@ F-041 覆盖项目身份和实际 Web 操作，不包含真实模型语义效果
 精修验证沿用渠道浏览器与 Web 模块测试：四项导航、切页后标题焦点、最新消息入口、动态 composer 留白、真实待审批计数到卡片、320/390px 布局、44px 手机控件、黑白完整帧播放与暂停。Source Han 子集逐包验证 SHA-256/cmap，全集覆盖保留30926字符；不以 macOS 苹方的截图冒充非 macOS 冷加载性能测量。
 
 全项目身份检查包括 CLI 帮助与 TUI、OAuth loopback 回调、固定工具命名空间、新执行身份提示、安装归档和链接。通过既有 provider-bridge、Go context/prompt、startup、Web、foundation 与 TUI 回归验证；提示字节哈希仅随已审查的身份文案改变而更新，冻结记录和 Child 作用域断言继续生效。
+
+品牌资源一致性：`make test-browser` 同时运行 `web/artwork/icons.mjs --check`，校验源/atlas 哈希及 README/favicon PNG 与正式首帧的像素一致性。Go Web 测试验证资源路由；文档检查覆盖 HTML picture/img 的本地资源引用。

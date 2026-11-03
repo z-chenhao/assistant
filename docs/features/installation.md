@@ -28,7 +28,7 @@
 
 ### Install
 
-From the repository checkout, install Go 1.26.2+ and Node.js 24.21.0, then run:
+From the repository checkout, install Go 1.26.10+ and Node.js 24.21.0, then run:
 
 ```sh
 ./install.sh

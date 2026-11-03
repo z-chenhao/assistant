@@ -98,8 +98,12 @@ func New(root string) (*Server, error) {
 	curve := elliptic.P256()
 	d.Mod(d, new(big.Int).Sub(curve.Params().N, big.NewInt(1)))
 	d.Add(d, big.NewInt(1))
-	x, y := curve.ScalarBaseMult(d.Bytes())
-	ecdsaSigner, err := ssh.NewSignerFromKey(&ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: curve, X: x, Y: y}, D: d})
+	key, err := ecdsa.ParseRawPrivateKey(curve, d.FillBytes(make([]byte, 32)))
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+	ecdsaSigner, err := ssh.NewSignerFromKey(key)
 	if err != nil {
 		s.Close()
 		return nil, err
@@ -280,7 +284,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/fixture/write" && r.Method == "POST" {
 		if len(s.locks) != 1 {
-			http.Error(w, "one running fixture required", 409)
+			http.Error(w, "one running fixture required", http.StatusConflict)
 			return
 		}
 		var input struct {
@@ -334,7 +338,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "DELETE" && len(parts) == 1 {
 		if s.locks[name] != nil {
-			http.Error(w, "fixture running", 409)
+			http.Error(w, "fixture running", http.StatusConflict)
 			return
 		}
 		if os.RemoveAll(dir) != nil {
@@ -363,7 +367,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB) != nil {
 			lock.Close()
-			http.Error(w, "fixture locked", 409)
+			http.Error(w, "fixture locked", http.StatusConflict)
 			return
 		}
 		s.runs++
@@ -374,11 +378,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"pending"}`))
 	case "stop":
 		if s.locks[name] != nil {
-			http.Error(w, "unsafe poweroff", 409)
+			http.Error(w, "unsafe poweroff", http.StatusConflict)
 			return
 		}
 		if _, err := os.Stat(filepath.Join(dir, "sessions.json")); !os.IsNotExist(err) {
-			http.Error(w, "fixture marker retained", 409)
+			http.Error(w, "fixture marker retained", http.StatusConflict)
 			return
 		}
 		s.stops++

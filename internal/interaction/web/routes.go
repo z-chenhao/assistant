@@ -130,32 +130,32 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 			}{true})
 			return nil
 		}
-		http.Redirect(w, r, safePageReturn(r.FormValue("return_to")), 303)
+		http.Redirect(w, r, safePageReturn(r.FormValue("return_to")), http.StatusSeeOther)
 		return nil
 	case "/model/add":
 		p, err := s.addModel(r)
 		if err != nil {
 			return err
 		}
-		http.Redirect(w, r, modelURL(p.ProfileID)+"?notice=added", 303)
+		http.Redirect(w, r, modelURL(p.ProfileID)+"?notice=added", http.StatusSeeOther)
 		return nil
 	case "/model/test":
 		if _, e := s.Control.Test(r.Context(), r.FormValue("profile")); e != nil {
 			return e
 		}
-		http.Redirect(w, r, modelURL(r.FormValue("profile"))+"?notice=tested", 303)
+		http.Redirect(w, r, modelURL(r.FormValue("profile"))+"?notice=tested", http.StatusSeeOther)
 		return nil
 	case "/model/select":
 		if err := s.selectModel(r); err != nil {
 			return err
 		}
-		http.Redirect(w, r, modelURL(r.FormValue("profile"))+"?notice=active", 303)
+		http.Redirect(w, r, modelURL(r.FormValue("profile"))+"?notice=active", http.StatusSeeOther)
 		return nil
 	case "/notification":
 		if err := s.preferNotification(r); err != nil {
 			return err
 		}
-		http.Redirect(w, r, "/settings/notifications?notice=saved", 303)
+		http.Redirect(w, r, "/settings/notifications?notice=saved", http.StatusSeeOther)
 		return nil
 	case "/auth/login":
 		if err := s.startLogin(r); err != nil {
@@ -192,6 +192,6 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 			target = modelURL(id)
 		}
 	}
-	http.Redirect(w, r, safePageReturn(target), 303)
+	http.Redirect(w, r, safePageReturn(target), http.StatusSeeOther)
 	return nil
 }

@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible problem in Steward.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, follow SECURITY.md. Do not include credentials,
+        authentication URLs or a real application data root.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Revision and environment
+      description: Commit/release, operating system and architecture, Go/Node/Python versions, and sanitized doctor output.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact command and a minimal disposable example.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Relevant errors, logs or screenshots; note whether the problem survives a restart.

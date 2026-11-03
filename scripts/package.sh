@@ -24,7 +24,7 @@ Type `/quit` or press Ctrl-C to stop. No daemon is installed.
 Your data stays in `~/.local/share/steward`; reinstalling keeps it.
 Use `sh install.sh --prefix /absolute/path` for another installation location.
 
-Documentation: https://github.com/z-chenhao/assistant/blob/main/docs/README.md
+Documentation: https://github.com/z-chenhao/steward/blob/main/docs/README.md
 EOF
 platform=$(go env GOOS)
 arch=$(go env GOARCH)

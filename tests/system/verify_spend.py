@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import signal
+from contextlib import closing
 import sqlite3
 import tempfile
 
@@ -21,7 +22,7 @@ FIXTURE = json.loads((Path(__file__).resolve().parents[2] / 'tests/fixtures/m4-s
 
 def state(h):
     value = child_state(h)
-    with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+    with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
         db.row_factory = sqlite3.Row
         for table in ('spend_snapshot', 'spend_reservation', 'spend_approval'):
             value[table] = [dict(row) for row in db.execute('SELECT * FROM ' + table + ' ORDER BY 1')]

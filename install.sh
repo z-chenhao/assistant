@@ -44,6 +44,7 @@ mkdir -p "$stage/bin" "$stage/provider-bridge" "$stage/runtime/javascript"
 if [ -f "$source_root/go.mod" ]; then
   command -v go >/dev/null || { echo 'Source installation needs Go (see go.mod), or use a prebuilt release.' >&2; exit 1; }
   command -v npm >/dev/null || { echo 'Source installation needs npm.' >&2; exit 1; }
+  command -v python3 >/dev/null || { echo 'Source installation needs Python 3 for dependency notices.' >&2; exit 1; }
   echo 'Building Steward…'
   (cd "$source_root" && go build -o "$stage/bin/steward" ./cmd/steward)
   cp "$source_root"/provider-bridge/*.mjs "$source_root"/provider-bridge/package*.json "$stage/provider-bridge/"
@@ -51,11 +52,14 @@ if [ -f "$source_root/go.mod" ]; then
   cp "$source_root"/runtime/javascript/package*.json "$stage/runtime/javascript/"
   (cd "$stage/provider-bridge" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
   (cd "$stage/runtime/javascript" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+  python3 "$source_root/scripts/licenses.py" "$stage/licenses"
 else
   cp "$source_root/bin/steward" "$stage/bin/steward"
   cp -R "$source_root/provider-bridge/." "$stage/provider-bridge/"
   cp -R "$source_root/runtime/javascript/." "$stage/runtime/javascript/"
+  cp -R "$source_root/licenses" "$stage/"
 fi
+cp "$source_root/LICENSE" "$source_root/NOTICE" "$source_root/THIRD_PARTY_NOTICES.md" "$stage/"
 "$stage/bin/steward" doctor
 release=$install_root/releases/$(date -u +%Y%m%dT%H%M%SZ)-$$
 mv "$stage" "$release"

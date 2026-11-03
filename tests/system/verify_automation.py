@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 import tempfile
 
@@ -27,7 +28,7 @@ class Harness(MainHarness):
 
     def evidence(self):
         value = self.state()
-        with sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+        with closing(sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
             db.row_factory = sqlite3.Row
             for table in ('automation', 'automation_fire', 'task', 'task_update', 'task_instruction', 'tool_invocation', 'main_inbox', 'memory_privacy'):
                 value[table] = [dict(row) for row in db.execute('SELECT * FROM ' + table)]
@@ -60,7 +61,7 @@ def first_fire_forget(h, *, persist_before_forget):
     forget = h.command('memory', 'manage', 'forget-health', text=json.dumps(dict(operation='forget', category='health')))
     require(forget.get('accepted') is True, 'Forget not accepted')
     h.command('memory', 'work')
-    with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'memory.db') as db:
+    with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'memory.db')) as db, db:
         db.row_factory = sqlite3.Row
         tombstones = [dict(row) for row in db.execute('SELECT memory_id,created_at,deleted_at FROM memory_record')]
     require(tombstones and all(row['deleted_at'] is not None for row in tombstones), 'health Memory not tombstoned')
@@ -101,7 +102,7 @@ def list_after_forget(h):
     forget = h.command('memory', 'manage', 'forget-health', text=json.dumps(dict(operation='forget', category='health')))
     require(forget.get('accepted') is True, 'Forget not accepted')
     h.command('memory', 'work')
-    with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'memory.db') as db:
+    with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'memory.db')) as db, db:
         db.row_factory = sqlite3.Row
         tombstones = [dict(row) for row in db.execute('SELECT memory_id,deleted_at FROM memory_record')]
     require(tombstones and all(row['deleted_at'] is not None for row in tombstones), 'health Memory not tombstoned')

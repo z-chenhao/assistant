@@ -237,6 +237,7 @@ func postedCapabilityForm(id string, values url.Values) (*capabilityForm, error)
 	case "mcp":
 		count, e := strconv.Atoi(get("provider_count"))
 		if e != nil || count < 1 || count > 32 {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return f, errors.New("Keep between one and 32 tool providers.")
 		}
 		for i := 0; i < count; i++ {
@@ -244,6 +245,7 @@ func postedCapabilityForm(id string, values url.Values) (*capabilityForm, error)
 			p := mcpProviderForm{Original: get(prefix + "original"), Name: get(prefix + "name"), Command: get(prefix + "command"), Directory: get(prefix + "directory"), Args: get(prefix + "args")}
 			toolCount, e := strconv.Atoi(get(prefix + "tool_count"))
 			if e != nil || toolCount < 1 || toolCount > 128 {
+				//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 				return f, errors.New("Keep between one and 128 allowed tools per provider.")
 			}
 			for j := 0; j < toolCount; j++ {
@@ -321,6 +323,7 @@ func setFormString(n *yaml.Node, value string, path ...string) error {
 func setFormInteger(n *yaml.Node, value string, min, max int, path ...string) error {
 	integer, err := strconv.Atoi(value)
 	if err != nil || integer < min || integer > max {
+		//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 		return errors.New("Enter a whole number within the range shown.")
 	}
 	return setFormNode(n, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.Itoa(integer)}, path...)
@@ -346,6 +349,7 @@ func credentialFormRef(value string, optional bool) error {
 		return nil
 	}
 	if !interaction.ValidCredentialRef(value) {
+		//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 		return errors.New("Enter a SecretStore or environment reference, never a secret value.")
 	}
 	return nil
@@ -354,10 +358,12 @@ func guidedCapabilityText(id, baseline string, f *capabilityForm) (string, error
 	base := Capability{ID: id, Text: baseline}
 	prepareCapabilityForm(&base)
 	if !base.Form.Available {
+		//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 		return baseline, errors.New("This document needs the Advanced YAML editor. Your original settings are preserved.")
 	}
 	n, err := capabilityNode(baseline, id == "mcp")
 	if err != nil {
+		//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 		return baseline, errors.New("This document needs the Advanced YAML editor. Your original settings are preserved.")
 	}
 	if !f.Enabled {
@@ -386,6 +392,7 @@ func guidedCapabilityText(id, baseline string, f *capabilityForm) (string, error
 		err = setFormInteger(n, c.Dimensions, 1, 4096, "dimensions")
 	case "skills":
 		if f.Skills.Scope != "agent" && f.Skills.Scope != "workspace" {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return baseline, errors.New("Choose Agent or Workspace for the skill scope.")
 		}
 		if err = setFormString(n, f.Skills.Root, "root"); err == nil {
@@ -412,6 +419,7 @@ func guidedCapabilityText(id, baseline string, f *capabilityForm) (string, error
 				node = original[index]
 			}
 			if len(lineValues(p.Args)) > 32 {
+				//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 				return baseline, errors.New("Use at most 32 arguments per provider, one per line.")
 			}
 			for _, field := range []struct{ key, value string }{{"name", p.Name}, {"command", p.Command}, {"directory", p.Directory}} {
@@ -426,10 +434,12 @@ func guidedCapabilityText(id, baseline string, f *capabilityForm) (string, error
 			names := map[string]bool{}
 			for _, tool := range p.Tools {
 				if tool.Name == "" || names[tool.Name] {
+					//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 					return baseline, errors.New("Give each allowed tool a unique name.")
 				}
 				names[tool.Name] = true
 				if tool.Permission != "read_only" && tool.Permission != "external_effect" {
+					//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 					return baseline, errors.New("Choose a permission for every allowed tool.")
 				}
 				if err = setFormString(tools, tool.Permission, tool.Name); err != nil {
@@ -457,34 +467,41 @@ func validateGuidedFields(id string, f *capabilityForm) error {
 	switch id {
 	case "skills":
 		if !abs(f.Skills.Root) {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return errors.New("Enter an absolute private directory path, not the filesystem root.")
 		}
 	case "execution":
 		if !abs(f.Execution.Root) {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return errors.New("Enter an absolute private directory path, not the filesystem root.")
 		}
 		for _, path := range lineValues(f.Execution.Toolchains) {
 			if !abs(path) {
+				//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 				return errors.New("Enter one absolute toolchain directory per line.")
 			}
 		}
 	case "embedding":
 		u, err := url.Parse(f.Embedding.Endpoint)
 		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || strings.TrimSpace(f.Embedding.Model) == "" {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return errors.New("Enter the embedding service URL and its exact model ID.")
 		}
 	case "mcp":
 		for _, p := range f.Providers {
 			if strings.TrimSpace(p.Name) == "" || !filepath.IsAbs(p.Command) || !abs(p.Directory) {
+				//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 				return errors.New("Name each provider and use absolute executable and private directory paths.")
 			}
 		}
 	case "computer":
 		c := f.Computer
 		if !abs(c.Root) || !filepath.IsAbs(c.Node) || !filepath.IsAbs(c.Script) {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return errors.New("Enter absolute paths for the Computer store, Node executable and sidecar script.")
 		}
 		if strings.TrimSpace(c.Endpoint) == "" || strings.TrimSpace(c.User) == "" || strings.TrimSpace(c.HostKey) == "" || strings.TrimSpace(c.GuestBuild) == "" || strings.TrimSpace(c.DriverVersion) == "" || strings.TrimSpace(c.DriverSHA256) == "" || strings.TrimSpace(c.DriverTeam) == "" {
+			//lint:ignore ST1005 This validation message is displayed verbatim in the form.
 			return errors.New("Complete the Computer connection, Guest access and sealed base compatibility fields.")
 		}
 	}
