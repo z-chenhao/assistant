@@ -62,6 +62,7 @@ lint: lint-actions
 	sh -n install.sh scripts/package.sh
 	@files="$$(gofmt -l cmd internal)"; if [ -n "$$files" ]; then echo "$$files"; exit 1; fi
 	go vet ./...
+	go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
 	go mod verify
 	npm run lint --prefix provider-bridge
 	npm run lint --prefix runtime/javascript

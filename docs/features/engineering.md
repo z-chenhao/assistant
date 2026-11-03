@@ -167,6 +167,9 @@ Go package tests currently mix unit and component integration checks; `go test
 run in PR CI. Extended system coverage and the full race inventory run separately
 on a weekly schedule or manual request. See [CI](../designs/engineering.md#ci-continuous-integration-and-delivery).
 
+`make lint` also runs pinned Staticcheck and actionlint. Compatibility exceptions
+must stay local to the relevant diagnostic; do not disable entire rule sets.
+
 <a id="contributing-runtime-and-delivery"></a>
 
 ### Runtime and delivery

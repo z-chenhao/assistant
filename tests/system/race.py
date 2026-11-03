@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import threading
 import time
 
@@ -27,6 +28,13 @@ RACE = ['go', 'test', '-race', '-count=1', '-timeout=15m']
 # One unchanged five-second context spans three approval/Drain phases. Give
 # this measured timing-sensitive contract the full CPU budget before overlap.
 SERIAL_SQLITE = ['TestChildApprovalIsPerInvocationAndWaitingTreeReleasesLeases']
+
+
+def show_failure(path, code):
+    # Keep the initiating failure visible in CI; cancelled siblings must not
+    # bury it in their partial Go JSON output. Full logs remain in artifacts.
+    if code not in (0, 130) and path.is_file():
+        print(path.read_text(errors='replace')[-8000:], file=sys.stderr, flush=True)
 
 
 def groups(packages, part=None):
@@ -134,6 +142,7 @@ def run_remainder(selected, folder, stopped):
     row = dict(name='remainder', packages=selected, discovery=discovery,
                discovery_metrics=metrics, returncode=code, workers=[])
     if code:
+        show_failure(listing, code)
         return dict(row, wall_seconds=time.monotonic() - started)
     names = test_names(listing.read_text())
     if not set(SERIAL_SQLITE) <= set(names):
@@ -165,6 +174,7 @@ def run_remainder(selected, folder, stopped):
                     result.update(returncode=125, evidence_error=str(error))
         if result['returncode']:
             stopped.set()
+            show_failure(output, result['returncode'])
         print(f"[race] {name}: {result['wall_seconds']:.2f}s (exit {result['returncode']})", flush=True)
         return result
     workers = [drive(('sqlite-serial', RACE + ['-json', '-run', '^(' + '|'.join(SERIAL_SQLITE) + ')$', SQLITE],
@@ -214,6 +224,7 @@ def main(part=None):
                 code = run_command(command, env, folder / (name + '.log'), stopped, metrics)
                 row = dict(name=name, packages=selected, command=command, returncode=code,
                            wall_seconds=time.monotonic() - started, **metrics)
+                show_failure(folder / (name + '.log'), code)
             rows.append(row)
             if row['returncode']:
                 passed = False

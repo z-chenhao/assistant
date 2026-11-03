@@ -21,7 +21,7 @@ Use Go 1.26.10+, Node 24.21.0 (`.node-version`), Python 3.10.12+, and a C compil
 
 ## Coding Style & Naming Conventions
 
-Format Go with `gofmt` (tabs); use lowercase package names and define interfaces in consuming packages. Keep adapters in named domain subpackages; avoid generic service/repository layers. Follow nearby JavaScript/TypeScript conventions: two-space indentation, camelCase functions, PascalCase React components, and kebab-case component filenames. Linting uses `go vet`, TypeScript, and Node syntax checks.
+Format Go with `gofmt` (tabs); use lowercase package names and define interfaces in consuming packages. Keep adapters in named domain subpackages; avoid generic service/repository layers. Follow nearby JavaScript/TypeScript conventions: two-space indentation, camelCase functions, PascalCase React components, and kebab-case component filenames. Linting uses `go vet`, pinned Staticcheck, TypeScript, and Node syntax checks. Keep compatibility exceptions narrow and documented at their source.
 
 ## Testing Guidelines
 

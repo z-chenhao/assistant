@@ -17,6 +17,7 @@
 | P2 | PR CI 显式检出 head，未验证 GitHub 合并结果；无独立持续依赖审计与 workflow lint。 | 改为默认合并结果 checkout，保留 `Ubuntu checks` 状态；NUL 分隔路径分类、actionlint、Dependabot 和独立依赖审计。 |
 | P2 | 原生平台检查主要发生在打包流程，draft 创建前未复验下载后的 checksum。 | 扩展回归增加 macOS CLI/startup/credential adapter/offline VM 契约；draft 创建复验 checksums，发布仍需显式授权。 |
 | P2 | 实际四平台构建暴露 Linux 打包缺少 Bubblewrap，两个 doctor 契约失败；Actions 日志报告 setup-node 的 Node 20 已弃用。 | Linux 打包补齐必要依赖；核对官方兼容性后固定 setup-node v7.1.0、upload-artifact v7.0.2、download-artifact v8.0.2 的完整 SHA。手动与 tag 构建均重新下载产物并验证 checksum。 |
+| P2 | race 的记录器短锁用例与 SQLite 压力分片竞争 CPU；首次 CI 仅输出分组失败，具体错误需下载 artifact。 | 在压力分片前独立执行 Bridge 和记录器；保持时限、断言与完整清单，失败摘要直接进入日志。将审查中已使用的固定版 Staticcheck 纳入常规 lint，保留逐行兼容例外。 |
 | P2 | 远端 33 个分支，22 个 head 与已合并 PR 精确相符；唯一开放 PR #113 仍采用已被 #116/#117 取代的 Collie 视觉。 | 保存完整 Git bundle；带 SHA lease 原子删除 22 个已合并分支。关闭 #113，并删除其被取代的主题分支；保留独有的旧实验工作供审核。 |
 | 权限限制 | 私密漏洞报告关闭，合并后自动删分支关闭；修改接口均返回 HTTP 403。 | 不声称已启用。SECURITY.md 明确报告入口不可用时不公开漏洞细节；需仓库管理员在 Settings 中启用这两项。 |
 
@@ -38,7 +39,14 @@ Go 领域、adapter、组合根和权威事务边界继续保留；不为目录�
 - HTML 图片检测回归先失败，修正后通过；正式静态图已从当前 atlas 导出。
 - Go 1.26.10 的 `make audit` 通过：无可达 Go 漏洞，四份 npm 锁文件均为 0 项；仅余 GO-2026-5932：`golang.org/x/crypto/openpgp` 不受维护；本项目未导入该包，使用的是 SSH 等其他包。没有为隐藏模块提示删除实际使用的密码库。
 - Go 1.26.10 下 `make test lint` 通过；包含 HTML 图片回归、正式首帧像素验证、工作流 actionlint 以及全部既有软件检查。
-- 首次远端 native packages 的 Linux amd64/arm64 在 doctor 检查失败，日志确认缺少 Bubblewrap；未放宽断言，已修正 runner 安装步骤。原始失败保留在 GitHub run `41631074356`，后续结果单独记录。
-- `482f71b` 的 PR 核心 CI、依赖审计、四平台原生打包/下载校验及 macOS 契约通过。扩展 run `41631568765` 在 capacity 报模型元数据持久化失败；race 的诊断短锁测试耗时 210 ms，超过原有 100 ms 写入预算，随后取消剩余分片。保留失败产物，不能用上一轮通过记录代替本次结果。
-- 原诊断短锁用例独立执行 `go test -race -count=30` 全部通过；race 入口将该包与 Bridge 一样放在压力分片之前独立执行，保留原时限和断言。容量场景使用仅增加脱敏错误诊断的临时 overlay 构建，本地连续三轮各 3,000 子任务通过；这属于定位证据，尚不等于远端问题已修复。
-- 后续安装/浏览器系统门禁及 GitHub CI 结果在完成后补充。原生 macOS/真实服务验证与本地 Linux 检查分开报告。
+- 首次 [native packages](https://github.com/z-chenhao/steward/actions/runs/41631074356) 的 Linux amd64/arm64 因缺少 Bubblewrap 失败。修正后 [四平台打包及下载校验](https://github.com/z-chenhao/steward/actions/runs/41631572727) 全部通过；Linux/macOS 分别携带 24/25 个实际链接 Go 模块的 notices，手动运行没有创建 release。
+- [核心 CI · 93ec10a](https://github.com/z-chenhao/steward/actions/runs/41634844523) 与 [依赖审计](https://github.com/z-chenhao/steward/actions/runs/41634844320) 通过。前一提交的核心 artifact 已逐项核对 startup、main、tasks、children、tools、code-recovery、local-provider、account、channels **9/9**；安装、浏览器、许可证保留及清理断言均通过。
+- [首次扩展运行](https://github.com/z-chenhao/steward/actions/runs/41631568765) 在 capacity 报模型元数据持久化失败；race 的诊断短锁测试耗时 210 ms，超过既有 100 ms 写入预算，随后取消其他分片。原用例独立 `go test -race -count=30` 通过。调整测试调度后，本地 `make test-race` 完整通过 **66 包、285 个 SQLite 顶层用例**，源码稳定、清单完整、进程组全部回收；没有扩大生产预算或放宽断言。
+- 容量定位使用临时诊断构建：本地常规 CPU 三轮、单核三轮，以及 [GitHub runner 三轮](https://github.com/z-chenhao/steward/actions/runs/41635203837) 均通过，共 **27,000 个子任务**。每轮仍为 2,994 完成、6 个预设业务失败，无遗留工作租约。诊断代码未进入交付分支；临时引用已在 Git bundle 备份后清理。
+- [修正后的完整扩展与 race 运行 · 93ec10a](https://github.com/z-chenhao/steward/actions/runs/41634836812) 保留其执行结果与原始 artifacts；[PR #118](https://github.com/z-chenhao/steward/pull/118) 记录最终验收结论与最新门禁。后续日志展示、静态检查入口及本报告的整理不改变产品代码，不能将不同提交的测试记录混为一次运行。
+
+## 尚未关闭的事项
+
+1. **容量失败的根因尚未确认。** 九轮诊断没有重现首次远端持久化错误；不能宣称已修复，也不据此删除有界写入和恢复保护。后续若再现，应保留具体失败位置、上下文状态及存储等待证据，再决定优化；生产时限或架构调整须另行确认。
+2. **管理员设置仍受权限限制。** 私密漏洞报告及合并后自动删除分支的写接口均返回 403，需管理员在仓库 Settings 启用；已有主分支保护保持。
+3. **真实集成验证仍有边界。** 原生 macOS 契约已运行，但真实 Keychain round-trip、Guest、个人账号和付费模型未做实机验收。9 个独有实验分支继续保留，直到能逐项证明已吸收或由维护者作出取舍。
