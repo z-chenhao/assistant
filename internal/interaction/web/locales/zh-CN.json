@@ -832,5 +832,6 @@
   "This answer is too long. Shorten it before sending.": "回答过长，请缩短后再发送。",
   "This answer is too long or invalid. Edit it before sending again.": "回答过长或无效，请修改后再发送。",
   "Your access changed. Sign in again before sending. Your draft is kept.": "访问权限已变更，请重新登录后再发送。草稿已保留。",
-  "The request changed while your response was being sent. Your draft is kept; check the conversation before retrying.": "发送回答时问题已变更。草稿已保留，请先核对对话后再决定是否重试。"
+  "The request changed while your response was being sent. Your draft is kept; check the conversation before retrying.": "发送回答时问题已变更。草稿已保留，请先核对对话后再决定是否重试。",
+  "More approvals in conversation": "在对话中查看更多审批"
 }

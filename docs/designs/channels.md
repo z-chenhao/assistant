@@ -46,7 +46,7 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 `attention.go` 为现有 SSR 与条件更新提供私有只读投影。具名问题/审阅读取 F-004 当前记录，不依赖 Task 是否 active；审批读取有界 `PendingApprovals`，保留既有历史 `ApprovalView`；Task 失败、unknown 和无结构化问题时的需要信息状态来自当前执行事实。同 Task 的结构化 input question 抑制 generic input 兜底，失败与 unknown 保持独立事实。模型不可用提供现有 Settings 修复入口，不猜测模型进度文本或建立新状态机。
 
-每个来源最多读取一页当前项，页面计数直接取已呈现记录，后续项使用 `+`/更多链接。不可用来源明确提示，不把未知当零；没有为总数扫描全部历史。问题引用、可访问成果名与真实源消息 sequence 来自原 Store，SQL、Run ID 和底层错误不进入用户流程。既有单侧栏、品牌、i18n 与原生控件样式保持。
+每个来源最多读取一页当前项，页面计数直接取已呈现记录，后续项使用 `+`/更多链接：问题继续原反馈游标，审批定位 Chat 中第一个未呈现的当前审批（包括没有 Task 的 Main 审批），任务继续其已有列表游标。不可用来源明确提示，不把未知当零；没有为总数扫描全部历史。问题引用、可访问成果名与真实源消息 sequence 来自原 Store，SQL、Run ID 和底层错误不进入用户流程。既有单侧栏、品牌、i18n 与原生控件样式保持。
 
 `POST /task/feedback` 在既有 loopback/token、同源与启用绑定校验后，调用同一反馈事务。问题是稳定 logical source，不同页面提交是 callback aliases；Web 的 channel_source 使用与 CLI 相同的 feedback request key。绑定/来源校验先于重复回执返回；首次 Web 接纳保存 `source:web` 与 message_route，首次 CLI 接纳仍保持原渠道。后到重试不改写已冻结路由。没有新 migration、工具 schema 或 Worker 控制入口。
 

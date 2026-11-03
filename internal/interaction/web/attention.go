@@ -25,12 +25,13 @@ type feedbackView struct {
 }
 type attentionIssue struct{ Key, Title, Description, URL, Action string }
 type attentionView struct {
-	Feedbacks         []feedbackView
-	Approvals         []approvalView
-	Issues            []attentionIssue
-	Count             int
-	More, Unavailable bool
-	Next              string
+	Feedbacks               []feedbackView
+	Approvals               []approvalView
+	Issues                  []attentionIssue
+	Count                   int
+	More, Unavailable       bool
+	Next                    string
+	ApprovalNext, TasksNext string
 }
 
 func (s *Server) loadAttention(ctx context.Context, p *page, ref, before string, approvals []interaction.Approval) {
@@ -86,6 +87,9 @@ func (s *Server) loadAttention(ctx context.Context, p *page, ref, before string,
 			}
 			if len(v.Approvals) == 50 {
 				v.More = true
+				// Chat renders current approvals even when they have no Task or
+				// their notification has left the latest conversation page.
+				v.ApprovalNext = (&url.URL{Path: "/", Fragment: "approval-" + a.ID}).String()
 				break
 			}
 			card := approvalFor(a)
@@ -100,7 +104,11 @@ func (s *Server) loadAttention(ctx context.Context, p *page, ref, before string,
 				for _, entry := range list.Items {
 					addAttentionIssue(v, entry)
 				}
-				v.More = v.More || list.Next != ""
+				if list.Next != "" {
+					v.More = true
+					q := url.Values{"view": {"attention"}, "cursor": {list.Next}}
+					v.TasksNext = "/tasks?" + q.Encode() + "#ongoing-work"
+				}
 			}
 		}
 		if !canSend(p.Status) {

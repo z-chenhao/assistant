@@ -1,7 +1,9 @@
 package web
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -12,6 +14,49 @@ import (
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/task"
 )
+
+type mainPendingSettings struct {
+	*attentionSettings
+	pending []interaction.Approval
+}
+
+func (f mainPendingSettings) PendingApprovals(context.Context) ([]interaction.Approval, error) {
+	return f.pending, nil
+}
+
+func TestAttentionOverflowMainApprovalsLocateActualChatAction(t *testing.T) {
+	f := mainPendingSettings{attentionSettings: &attentionSettings{}}
+	for i := 0; i < 51; i++ {
+		f.pending = append(f.pending, interaction.Approval{ID: fmt.Sprintf("main-%02d", i), Status: "pending", Tool: "builtin__bash", Arguments: `{"command":"echo reviewed"}`, Hash: strings.Repeat("a", 64)})
+	}
+	// No Task reader exists: these Main approvals can only be found in Chat.
+	s := &Server{Core: attentionCore{&updatesCore{allowed: true}}, Feedbacks: f}
+	p := page{Status: Status{Readiness: "ready"}}
+	s.loadAttention(context.Background(), &p, "", "", nil)
+	if p.Attention == nil || p.Attention.Count != 50 || len(p.Attention.Approvals) != 50 || !p.Attention.More || p.Attention.ApprovalNext != "/#approval-main-50" || p.Attention.TasksNext != "" || p.Attention.Next != "" {
+		t.Fatalf("Main approval overflow lost its destination: %+v", p.Attention)
+	}
+	var rendered bytes.Buffer
+	if err := localizedLayout("en").ExecuteTemplate(&rendered, "tasks-attention", p); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rendered.String(), `href="/#approval-main-50"`) || !strings.Contains(rendered.String(), ">50+</span>") {
+		t.Fatal("bounded count or actual Chat approval link omitted", rendered.String())
+	}
+	// The existing Chat projection renders out-of-window pending actions, so
+	// the destination is a real frozen approval even without a notification in
+	// the latest conversation page or an associated Task.
+	c := &updatesCore{allowed: true, approvals: f.pending}
+	chat := &Server{Core: c}
+	conversation := page{}
+	if err := chat.loadConversation(context.Background(), &conversation); err != nil {
+		t.Fatal(err)
+	}
+	rendered.Reset()
+	if err := localizedLayout("en").ExecuteTemplate(&rendered, "approvals", conversation); err != nil || !strings.Contains(rendered.String(), `id="approval-main-50"`) {
+		t.Fatal("Chat did not render destination approval", err, rendered.String())
+	}
+}
 
 type attentionSettings struct {
 	items  []task.Feedback
