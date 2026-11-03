@@ -30,6 +30,7 @@ const (
 	commandChannel
 	commandAutomation
 	commandOps
+	commandTask
 	commandGitHub
 	commandService
 )
@@ -46,6 +47,7 @@ type commandGrammar struct {
 // Arity includes the command and operation. The grammar is validated before
 // configuration/state is opened; handlers do not independently admit commands.
 var commandGrammars = map[string]commandGrammar{
+	"task":       {commandTask, map[string][]int{"feedbacks": {2, 3, 4}, "respond": {3}}},
 	"github":     {commandGitHub, map[string][]int{"status": {2}, "poll": {2}, "events": {2, 3}, "stop": {2}, "resume": {2}}},
 	"model":      {commandModel, map[string][]int{"add": {2, 4, 5}, "discover": {3, 4}, "list": {2}, "cancel": {2}, "accounts": {2}, "catalog": {2, 3}, "login": {2, 3}, "login-chatgpt": {2, 3}, "test": {3}, "refresh": {3}, "logout": {3}, "account-catalog": {3}, "account-add": {4}, "select": {5}}},
 	"chat":       {commandChat, map[string][]int{"send": {2, 3}, "send-parts": {2, 3}, "work": {2}, "history": {2}}},

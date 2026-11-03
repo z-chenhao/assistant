@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-004](../features/tasks.md#f-004) | 验证状态转换、同 Task 单活动 Root、取消传播、旧 owner fencing 与结果回传。 | 保护已接通的限定范围；Live/配置另行验证 |
 | [F-004](../features/tasks.md#f-004) | 同一工作从飞书关联到 PR，再由评审/CI 接续；验证关联持久、同 Task 单活动 Root、重复/迟到输入、歧义与超范围、暂停/取消/Forget 后到达的事件。系统走实际接纳和 Reporter/Main 链路；受控 peer 证明机制，真实跨渠道兼容另行 Live。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
-| [F-004](../features/tasks.md#f-004) | 缺信息、动作审批、成果审阅分别通过目标 UI/渠道进入 Main；验证精确关联、可访问成果、重启保留、双端/重复提交、陈旧修订、暂停/取消及失效审批。真实 SQLite、既有 Web/渠道系统入口与浏览器验证配合；新增交互链路待补，已有审批不算全部覆盖。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+| [F-004](../features/tasks.md#f-004) | 缺信息、动作审批、成果审阅分别通过目标 UI/渠道进入 Main；验证精确关联、可访问成果、重启保留、双端/重复提交、陈旧修订、暂停/取消及失效审批。真实 SQLite、既有 Web/渠道系统入口与浏览器验证配合；CLI 具名问题/成果入口已接通；已有审批不算全部覆盖。 | CLI 的 Actor/SQLite 与跨进程系统入口覆盖；Web/飞书结构化交互与真实模型质量仍待补 |
 | [F-005](../features/tasks.md#f-005) | 真实长任务产生阶段摘要，UI 能读到更新；普通进度不触发 Main 推理或通知。 | 通过实际 Root 循环、真实浏览器和 checkpoint 前后杀进程证明闭环；模型质量单独评测 |
 
 ## 层级与关键路径
@@ -31,6 +31,14 @@
 | --- | --- |
 | [tests/system/verify_tasks.py](../../tests/system/verify_tasks.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_task_control.py](../../tests/system/verify_task_control.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+
+### F-004 信息反馈验收路径
+
+- `internal/task/task_test.go`：新问题/审阅分支的严格 union、必填/越臂/重复/null 字段、成果数量与冻结旧 schema 拒绝；旧请求省略新字段时保留规范化身份。
+- `internal/agent/sqlite/task_feedback_test.go`：真实 Main Tool/Actor 保存问题，所有者并发八次回应只生成一条 Main input，Main 接续原 Task；不同重复冲突、源消息关联、原子失败回滚与重开读取。独立检查 supersede、到期、epoch、pause/cancel/Forget、当前反馈换目标/因果、已接纳反馈遇到后续停止、新普通输入继续与新审阅取代旧修订。成果引用沿真实 ArtifactStore 保留、作为回应附件进入 Main，始终不产生动作审批。
+- 同文件的读取 fixture 验证 52 个当前问题跨稳定游标完整读取，按 Task 筛选与读取前后事件数不变；历史和隐私撤销不占待办页；元数据 read fixture 覆盖缺失/删除/其他所有者/到期成果被过滤，受活动 Task 保护的原 TTL 到期成果仍可用，不读取 blob。它不替代实际写入口验证。
+- `verify_tasks.py` 的 feedback 场景通过现有脚本模型、实际 CLI、每次独立进程和 SQLite readback：记录问题 → 列表 → 回答/重试 → Main append → 原 Task 的新 Root；暂停后拒绝旧回答；真实上传成果经 Main 记录精确修订审阅、回应与接续不创建动作批准；回应提交前后 SIGKILL 后只接续一次。软件协议证据不证明真实模型能稳定识别何时提问或准确理解成果意见。
+- Web/飞书待办卡片、用户实际成果理解与真实模型质量仍为缺口；已有 Needs me/审批 UI 不算覆盖这些新交互。
 
 ### F-005 验收路径
 

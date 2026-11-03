@@ -36,7 +36,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。 | 是 · 已完成 |
 | [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | 用户能登录、重新认证和退出 ChatGPT 账户，凭据可安全持久化。 | 否 · 部分完成 |
 | [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。 | 是 · 已完成 |
-| [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 后台工作支持追加、暂停、继续、取消、结束、跨渠道接续及信息回答/成果审阅。 | 否 · 部分完成 |
+| [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 后台工作支持追加、暂停、继续、取消和结束；CLI 具名问题/确切成果反馈经 Main 接续，Web/飞书与跨渠道待补。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
 | [F-007](features/tools-approvals.md#f-007) | 工具、审批与未知副作用处理 | 用户能确认具体外部动作；重复请求或重启不能盲目重复副作用。 | 是 · 已完成 |
