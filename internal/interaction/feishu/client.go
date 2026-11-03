@@ -35,6 +35,7 @@ type Config struct {
 	AccessTokenRef       string `yaml:"access_token_ref"`
 	AppSecretRef         string `yaml:"app_secret_ref"`
 	APIBase              string `yaml:"api_base"`
+	WorkspaceURL         string `yaml:"workspace_url"`
 }
 
 func (c Config) Validate() error {
@@ -59,6 +60,12 @@ func (c Config) Validate() error {
 		if e != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "[::1]" && u.Hostname() != "::1") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
 			//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 			return errors.New("Feishu API must be official HTTPS or explicit loopback sandbox")
+		}
+	}
+	if c.WorkspaceURL != "" {
+		u, err := url.Parse(c.WorkspaceURL)
+		if err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(c.WorkspaceURL, "#") || u.Path != "" && u.Path != "/" || u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "127.0.0.1" || u.Hostname() == "::1")) {
+			return errors.New("feishu workspace_url requires an HTTPS or loopback HTTP origin without credentials, query or fragment")
 		}
 	}
 	return nil
@@ -165,6 +172,28 @@ func (c Client) Send(ctx context.Context, destination, key, kind string, content
 	if e != nil {
 		return "", e
 	}
+	if json.Unmarshal(data["message_id"], &id) != nil || id == "" {
+		return "", ErrProtocol
+	}
+	return id, nil
+}
+
+// Reply quotes only the Host-frozen source message. It never falls back to a
+// destination supplied by a callback or to a new send if the source is gone.
+func (c Client) Reply(ctx context.Context, source, key, kind string, content any) (string, error) {
+	if source == "" || len(source) > 256 || source == "." || source == ".." || strings.ContainsAny(source, "/\\\r\n\x00") {
+		return "", ErrProtocol
+	}
+	raw, err := json.Marshal(content)
+	if err != nil {
+		return "", ErrProtocol
+	}
+	payload, _ := json.Marshal(map[string]any{"uuid": key, "msg_type": kind, "content": string(raw), "reply_in_thread": false})
+	data, err := c.decodeResponse(c.request(ctx, "POST", "/im/v1/messages/"+url.PathEscape(source)+"/reply", "application/json", bytes.NewReader(payload)))
+	if err != nil {
+		return "", err
+	}
+	var id string
 	if json.Unmarshal(data["message_id"], &id) != nil || id == "" {
 		return "", ErrProtocol
 	}
