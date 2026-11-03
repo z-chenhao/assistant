@@ -85,5 +85,6 @@ func (s *Server) loadConversation(ctx context.Context, p *page) error {
 			p.Latest = max(p.Latest, m.Sequence)
 		}
 	}
+	s.loadAttention(ctx, p, "", "", approvals)
 	return nil
 }

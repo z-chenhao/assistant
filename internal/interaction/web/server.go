@@ -79,6 +79,7 @@ type Server struct {
 	Contexts       ContextReader
 	Traces         TraceReader
 	Tasks          TaskReader
+	Feedbacks      FeedbackSettings
 	Schedules      ScheduleSettings
 	Config         Config
 	Core           Core

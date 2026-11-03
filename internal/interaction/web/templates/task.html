@@ -2,6 +2,8 @@
 <section class="workspace-page task-page"><a class="back-link" href="/tasks">{{tr "← Tasks"}}</a>
  <div id="task-header">{{template "task-header" .}}</div>
  <div class="task-detail-grid"><div>
+  <div id="task-feedback">{{template "task-feedback" .}}</div>
+  <div id="task-feedback-status" class="feedback-status" role="status" aria-live="polite">{{if .FeedbackDraft}}<p>{{tr "Your response was not saved. Review the current request before trying again."}}</p><label for="feedback-kept-draft">{{tr "Your saved draft"}}</label><textarea id="feedback-kept-draft" readonly rows="3">{{.FeedbackDraft}}</textarea>{{end}}</div>
   <div id="task-decisions">{{template "task-decisions" .}}</div>
   {{with .Tasks.Detail}}<section class="task-objective"><h2>{{tr "Planned objective"}}</h2><div class="semantic">{{.GoalSummary}}</div></section>{{end}}
   <div id="task-progress">{{template "task-progress" .}}</div>

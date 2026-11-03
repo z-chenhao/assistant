@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/llm"
@@ -206,58 +207,78 @@ func TestReplySourceMigrationRetainsOldFrozenRoutesAndRollsBack(t *testing.T) {
 	}
 }
 
-func TestTaskFeedbackResponseKeepsCLIAndOriginalFeishuRoutesSeparate(t *testing.T) {
-	s, r, a, p := taskFixture(t)
-	ctx := context.Background()
-	b, err := s.BindChannel(ctx, "feishu", "tenant:app:owner", "chat", true, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
-		if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
-			return llm.GenerationResult{Text: "accepted result"}, nil
-		}
-		return calls(task.ManageName, `{"operation":"create","task":"Prepare the linked report","completionPolicy":"ongoing"}`), nil
-	}
-	if _, err := r.AcceptInbound(ctx, interaction.InboundEvent{Channel: b.Channel, Subject: b.Subject, Destination: b.Destination, EventID: "original-event", SourceID: "om_original", Content: conversation.Text("Prepare the linked report")}); err != nil {
-		t.Fatal(err)
-	}
-	mustDrain(t, a)
-	var ref string
-	if err := s.db.QueryRow(`SELECT task_ref FROM task`).Scan(&ref); err != nil {
-		t.Fatal(err)
-	}
-	f := requestFeedback(t, s, a, p, ref)
-	answer, err := r.RespondTaskFeedback(ctx, f.Ref, "Use the confirmed scope.")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
-		if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
-			return llm.GenerationResult{Text: "Main delivers the update"}, nil
-		}
-		return calls(task.ManageName, fmt.Sprintf(`{"operation":"append","taskRef":%q,"feedbackRef":%q,"instruction":"Use the confirmed scope."}`, ref, f.Ref)), nil
-	}
-	mustDrain(t, a)
-	if scalar(t, s, `SELECT count(*) FROM task_feedback WHERE status='answered' AND response_message_id=?`, answer.MessageID) != 1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 {
-		t.Fatal("feedback acceptance/continuation was lost in channel integration")
-	}
-	if scalar(t, s, `SELECT count(*) FROM delivery_request WHERE channel='feishu'`) != 3 || scalar(t, s, `SELECT count(*) FROM delivery_request WHERE channel='tui'`) != 2 {
-		t.Fatal("CLI response inherited a remote route or Task result lost its origin")
-	}
-	for _, request := range deliveryRows(t, s) {
-		if request.Channel == "feishu" {
-			source, err := s.DeliveryReplySource(ctx, request)
-			if err != nil || source != "om_original" {
-				t.Fatal("logical feedback key became a Feishu source", source, err)
+func TestTaskFeedbackResponseKeepsAnswerAndOriginalFeishuRoutesSeparate(t *testing.T) {
+	for _, channel := range []string{"cli", "web"} {
+		t.Run(channel, func(t *testing.T) {
+			s, r, a, p := taskFixture(t)
+			ctx := context.Background()
+			b, err := s.BindChannel(ctx, "feishu", "tenant:app:owner", "chat", true, 0)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
-	}
-	retry, err := r.RespondTaskFeedback(ctx, f.Ref, "Use the confirmed scope.")
-	if err != nil || retry != answer {
-		t.Fatal("accepted feedback retry changed its receipt", retry, err)
-	}
-	if scalar(t, s, `SELECT count(*) FROM delivery_request`) != 5 {
-		t.Fatal("feedback retry created another notification")
+			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+					return llm.GenerationResult{Text: "accepted result"}, nil
+				}
+				return calls(task.ManageName, `{"operation":"create","task":"Prepare the linked report","completionPolicy":"ongoing"}`), nil
+			}
+			if _, err := r.AcceptInbound(ctx, interaction.InboundEvent{Channel: b.Channel, Subject: b.Subject, Destination: b.Destination, EventID: "original-event", SourceID: "om_original", Content: conversation.Text("Prepare the linked report")}); err != nil {
+				t.Fatal(err)
+			}
+			mustDrain(t, a)
+			var ref string
+			if err := s.db.QueryRow(`SELECT task_ref FROM task`).Scan(&ref); err != nil {
+				t.Fatal(err)
+			}
+			f := requestFeedback(t, s, a, p, ref)
+			var answer agent.Receipt
+			if channel == "web" {
+				web, e := s.BindChannel(ctx, "web", "browser", "local", true, 0)
+				if e != nil {
+					t.Fatal(e)
+				}
+				answer, err = r.RespondTaskFeedbackInbound(ctx, interaction.InboundEvent{Channel: web.Channel, Subject: web.Subject, Destination: web.Destination, EventID: "answer-page", SourceID: "answer-page", Content: conversation.Text("Use the confirmed scope.")}, f.Ref, "Use the confirmed scope.")
+			} else {
+				answer, err = r.RespondTaskFeedback(ctx, f.Ref, "Use the confirmed scope.")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+					return llm.GenerationResult{Text: "Main delivers the update"}, nil
+				}
+				return calls(task.ManageName, fmt.Sprintf(`{"operation":"append","taskRef":%q,"feedbackRef":%q,"instruction":"Use the confirmed scope."}`, ref, f.Ref)), nil
+			}
+			mustDrain(t, a)
+			if scalar(t, s, `SELECT count(*) FROM task_feedback WHERE status='answered' AND response_message_id=?`, answer.MessageID) != 1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 1 {
+				t.Fatal("feedback acceptance/continuation was lost in channel integration")
+			}
+			tui, web := 2, 0
+			if channel == "web" {
+				tui, web = 1, 1
+			}
+			if scalar(t, s, `SELECT count(*) FROM delivery_request WHERE channel='feishu'`) != 3 || scalar(t, s, `SELECT count(*) FROM delivery_request WHERE channel='tui'`) != tui || scalar(t, s, `SELECT count(*) FROM delivery_request WHERE channel='web'`) != web {
+				t.Fatal("response inherited a remote route or Task result lost its origin")
+			}
+			if scalar(t, s, `SELECT count(*) FROM message_route m JOIN channel_binding b USING(binding_id) WHERE b.channel!='feishu' AND m.reply_source_id!=''`) != 0 {
+				t.Fatal("non-Feishu answer acquired a reply source")
+			}
+			for _, request := range deliveryRows(t, s) {
+				if request.Channel == "feishu" {
+					source, err := s.DeliveryReplySource(ctx, request)
+					if err != nil || source != "om_original" {
+						t.Fatal("logical feedback key became a Feishu source", source, err)
+					}
+				}
+			}
+			retry, err := r.RespondTaskFeedback(ctx, f.Ref, "Use the confirmed scope.")
+			if err != nil || retry != answer {
+				t.Fatal("accepted feedback retry changed its receipt", retry, err)
+			}
+			if scalar(t, s, `SELECT count(*) FROM delivery_request`) != 5 {
+				t.Fatal("feedback retry created another notification")
+			}
+		})
 	}
 }

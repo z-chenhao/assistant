@@ -108,7 +108,7 @@ func (s *Store) PreferChannel(ctx context.Context, channel, binding string, vers
 	})
 }
 
-func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundEvent, content string) (string, string, error) {
+func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundEvent, content, sourceKey string) (string, string, error) {
 	var binding string
 	if err := tx.QueryRowContext(ctx, `SELECT binding_id FROM channel_binding WHERE channel=? AND subject=? AND destination=? AND enabled=1`, e.Channel, e.Subject, e.Destination).Scan(&binding); err != nil {
 		return "", "", interaction.ErrUnauthorized
@@ -124,6 +124,9 @@ func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundE
 	}
 	keyParts, _ := encoded([]string{binding, e.SourceID})
 	key := "channel:" + digest(keyParts)
+	if sourceKey != "" {
+		key = sourceKey
+	}
 	var savedKey, savedHash string
 	sourceErr := tx.QueryRowContext(ctx, `SELECT request_key,content_hash FROM channel_source WHERE binding_id=? AND source_id=?`, binding, e.SourceID).Scan(&savedKey, &savedHash)
 	if sourceErr == nil && (savedKey != key || savedHash != hash) {

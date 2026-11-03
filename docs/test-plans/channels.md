@@ -19,6 +19,12 @@
 | [F-020](../features/channels.md#f-020) | 验证真实绑定、token 生命周期、通知偏好、撤销、重启与不确定投递；未知结果不盲目重发。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-020](../features/channels.md#f-020) | 签名回调→Actor→原消息同步/Task 异步交付→受控飞书 HTTP peer；验证精确原来源、单 Main 分组、可信全文/文件链接、通知偏好和完整语义，覆盖重复/重启/撤权/发送未知。 | 个人 p2p 入口已有回归；GitHub/PR 接续仍依赖 F-042/F-004，真实飞书展示、链接可达性与语义质量待 Live/效果验收 |
 
+### F-018/F-004 Web 待办覆盖
+
+`verify_channels.py --attention-only` 使用真实 Main Task 工具保存问题/审阅与失败执行，真实上传文件，再由认证 Web 与 Chromium 完成优先定位、已完成 Task 审阅、具体文件链接、回答/审阅及 Main 接续。`channels_browser.mjs` 的 attention 场景检查当前页数量与行数、长中文拒绝、native 输入/焦点/选区、Chat 草稿与附件、新标签页、中文窄宽、键盘提交、确认丢失后只读草稿、另一端使本地表单失效、断线陈旧页面被拒绝且保留意见。持久化 readback 证明三条反馈只产生三次接续、始终保留 Web 来源/路由、无审批替代，随后 CLI 同答重试仍返回原 receipt。
+
+`task_feedback_web_test.go` 以真实 SQLite/Actor 验证 CLI/Web 首次顺序、callback aliases、不同回答冲突、真实 Main 交付与绑定撤销先于去重；`attention_test.go` 验证转义、确切 Task/消息/文件定位和认证入口；51 个 Main 当前审批的有界投影保留50条并将更多入口指向Chat中第51条真实审批，而非无关Task列表。原冻结审批与对话 live 浏览器场景继续覆盖 approval-only 原定位。确定性模型证明协议和交互，真实模型何时提问及意见理解质量仍需外部评测。
+
 ## 层级与关键路径
 
 实际浏览器/PTY/签名回调分别驱动；输入草稿、附件与焦点必须在后台更新时保留。飞书失效 token、撤销绑定和发送结果未知单独验证；本地回执不冒充远端核实。
@@ -40,7 +46,7 @@
 
 原消息与成果投影回归入口：
 
-- [reply_origin_test.go](../../internal/agent/sqlite/reply_origin_test.go)：真实 SQLite 与 Actor 验证 create 来源、同步/Task 结果、显式偏好、旧路由不回填及失败迁移回滚；既有 Channel 回归继续覆盖 CAS、撤权、route/projection 冻结和回调去重。
+- [reply_origin_test.go](../../internal/agent/sqlite/reply_origin_test.go)：真实 SQLite 与 Actor 验证 create 来源、同步/Task 结果、显式偏好、旧路由不回填及失败迁移回滚；CLI/Web 反馈回复保留实际作答渠道，接续 Task 的异步结果仍回原飞书话题，同答 CLI 重试复用原 receipt 且不增加通知。既有 Channel 回归继续覆盖 CAS、撤权、route/projection 冻结和回调去重。
 - [projection_test.go](../../internal/interaction/feishu/projection_test.go)：真实 HTTP reply wire、原来源转义、无自选接收者、目标失效无 fallback、可信 origin 校验、摘要边界和审批全文。
 - `verify_channels.py` 的 `feishu_topic_delivery`：签名 callback→Main→Task→冻结 Delivery→HTTP peer，检查原消息回传、Conversation 分页锚点、完整 Artifact、单一简短通知、重启/重复回调、显式 TUI 偏好与 unknown 不重发。`feishu_auth_lifecycle` 和现有 multipart/租约场景同时覆盖 source reply；无 workspace 配置保留原全文/附件。
 
