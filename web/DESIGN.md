@@ -185,7 +185,7 @@ Keep controls and artifact links in the UI family even when they appear beside s
 
 ## Layout
 
-Desktop has one fixed 256px sidebar and a main workspace offset by its width. Collapsing it removes that offset. The Chat sticky header is 160px high with a centered two-row name/avatar; other pages use a 72px topbar. The conversation's 840px border box includes 36px horizontal padding, yielding a 768px dialogue; the composer also caps at 768px. Standard workspace pages cap at 1040px, settings at 920px, with 40px workspace gutters.
+Desktop has one fixed 256px sidebar and a main workspace offset by its width. Collapsing it removes that offset. The Chat sticky header is 160px high with a centered name/avatar with live status directly below; other pages use a 72px topbar. The conversation's 840px border box includes 36px horizontal padding, yielding a 768px dialogue; the composer also caps at 768px. Standard workspace pages cap at 1040px, settings at 920px, with 40px workspace gutters.
 
 At 760px and below, the sidebar becomes an on-demand 256px overlay with backdrop, the workspace fills the viewport, the Chat header becomes 168px (other topbars 60px) and gutters become 20px. The dialogue uses 20px horizontal padding; composer gutters become 12px with safe-area bottom support. Without JavaScript, mobile navigation remains available in normal flow. Task detail has a local 290px supporting column (250px below 1000px) and stacks when its content container is at most 760px wide; this is page content, not another application sidebar. Page headings and choice cards adapt below 700px. The document minimum width is 320px.
 

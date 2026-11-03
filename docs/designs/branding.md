@@ -8,7 +8,7 @@
 
 Go 继续提供认证、页面、原生表单与局部更新；React 只增强 Host-owned UISpec。`foundation.css` 定义 Demo 的配色和自托管字体；shell、workspace、conversation、observability、avatar 分别负责局部表现。`appearance.js` 为同源外部脚本，在 CSS 前应用本地明暗偏好，不放宽 CSP。
 
-单侧栏仅 Chat、Tasks、Settings、Developer。Chat 顶部居中两行显示名称和动态头像，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。
+单侧栏仅 Chat、Tasks、Settings、Developer。Chat 顶部居中显示名称和动态头像，真实就绪/工作状态在头像下方同轴居中，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。
 
 任务详情继续显示目标、审批、进展、关联交付、附件与历史；没有将技术执行细节挤入默认首页，也没有虚构多会话或文件索引。发送、附件、source_id、草稿、冻结审批哈希、分页及已有 live region ID 不变。
 
