@@ -22,7 +22,7 @@ func TestSchedulerScanCompilationDiagnostic(t *testing.T) {
 	const pairs = 16
 	var elapsed [2]time.Duration
 	for i := 0; i < pairs; i++ {
-		args := r.scheduleArgs()
+		args := append(r.scheduleArgs(), r.githubScopeArgument())
 		for j := 0; j < 2; j++ {
 			mode := (i + j) % 2 // Alternate order to limit warmup/order bias.
 			label := []string{"reused", "recompiled"}[mode]
@@ -34,12 +34,12 @@ func TestSchedulerScanCompilationDiagnostic(t *testing.T) {
 				if mode == 0 {
 					err = s.nextRun.QueryRowContext(ctx, args...).Scan(&id)
 					if err == nil {
-						err = s.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1))).Scan(&active)
+						err = s.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1)), r.githubScopeArgument()).Scan(&active)
 					}
 				} else {
 					err = s.db.QueryRowContext(ctx, nextRunSQL, args...).Scan(&id)
 					if err == nil {
-						err = s.db.QueryRowContext(ctx, activeRunSQL, sql.Named("now", int64(1<<63-1))).Scan(&active)
+						err = s.db.QueryRowContext(ctx, activeRunSQL, sql.Named("now", int64(1<<63-1)), r.githubScopeArgument()).Scan(&active)
 					}
 				}
 				elapsed[mode] += time.Since(start)

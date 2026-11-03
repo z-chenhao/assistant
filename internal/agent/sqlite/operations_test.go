@@ -37,13 +37,13 @@ func TestOperationsPriorSchemaRollbackAndActiveWorkUpgrade(t *testing.T) {
 	registry := tool.FixtureRegistry()
 	// Current constructors freeze tool delivery for new Runs. Seed the older
 	// fixture with them, then remove that metadata to represent pre-v32 work.
-	if _, e = db.Exec(responsiveMainSQL); e != nil {
+	if _, e = db.Exec(responsiveMainSQL + githubObservationsSQL + taskFeedbackSQL + feishuReplySourcesSQL + githubTaskContinuationSQL); e != nil {
 		t.Fatal(e)
 	}
 	r := s.Runs(h, registry)
 	a := agent.Actor{Store: r, Registry: registry, Ready: func(context.Context) bool { return true }}
 	receipt := mustSubmit(t, a, "before-upgrade", "PRIVATE_USER_TEXT_29")
-	if _, e = db.Exec(`DROP TRIGGER main_tool_protocol_retained; DROP TRIGGER main_tool_protocol_immutable; DROP TRIGGER main_tool_protocol_initial; DROP TABLE main_tool_protocol;`); e != nil {
+	if _, e = db.Exec(`DROP TRIGGER main_tool_protocol_retained; DROP TRIGGER main_tool_protocol_immutable; DROP TRIGGER main_tool_protocol_initial; DROP TABLE main_tool_protocol;` + removeGitHubFixtureSchema); e != nil {
 		t.Fatal(e)
 	}
 	var snapshot string
