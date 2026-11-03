@@ -42,7 +42,7 @@
 
 ### F-013 本地 OCR 增强回归
 
-- `internal/media/ocr/engine_test.go` 用测试图片的真实字形像素驱动已安装 Tesseract，在内核沙箱中验证文字和原图词框，检查引擎/语言资源漂移、损坏图片与取消。缺少依赖时组件测试明确 skip；维护中的 CI 安装 Tesseract/英文/简体语言包，系统入口要求真实 OCR 成功。
+- `internal/media/ocr/engine_test.go` 用测试图片的真实字形像素驱动已安装 Tesseract，在内核沙箱中验证文字和原图词框，检查引擎/语言资源漂移、损坏图片与取消。取消场景使用别名临时路径，验证实际沙箱作业启动、取消回收及目录清理。缺少依赖时组件测试明确 skip；维护中的 CI 安装 Tesseract/英文/简体语言包，系统入口要求真实 OCR 成功。
 - `internal/media/ocr/document_test.go` 验证不合法 TSV、框越界、非有限分数、词数上限及 UTF-8 预览截断。固定图片是确定性软件回归素材，不是模型 golden case，也不证明普遍识别质量。
 - `internal/agent/sqlite/image_ocr_test.go` 经真实 Registry/SQLite/Executor 和 Node Code Mode 验证默认角色边界、授权引用、持久化调用参数不可替换、完整输出与原图关联、preview 上限、不自动发布、错误归一化、跨 claim 重放不再调用 OCR。
 - 既有 `verify_local_provider.py` 从 CLI 上传同一实际 PNG，正常选择纯文本模型，由协议 peer 请求 OCR；读取真实 Tesseract 的 Tool 结果，检查 Pi HTTP 没有图片像素且含识别文字。结果提交后、下一轮模型响应前 SIGKILL，恢复必须保留 invocation/attempt、Artifact 与 generation/hash，不重复识别。沿用已有 gate，不新增脚本或 CI 评测阶段。

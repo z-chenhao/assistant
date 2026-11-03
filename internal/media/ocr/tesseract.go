@@ -27,7 +27,17 @@ func (e *Engine) Extract(ctx context.Context, kind string, data []byte) (Documen
 		return Document{}, err
 	}
 	width, height := img.Bounds().Dx(), img.Bounds().Dy()
-	root, err := os.MkdirTemp("", "steward-ocr-")
+	// Seatbelt matches the canonical filesystem path. The system temp
+	// directory can be an alias such as /var on macOS.
+	temp, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		return Document{}, ErrUnavailable
+	}
+	temp, err = filepath.EvalSymlinks(temp)
+	if err != nil {
+		return Document{}, ErrUnavailable
+	}
+	root, err := os.MkdirTemp(temp, "steward-ocr-")
 	if err != nil {
 		return Document{}, ErrUnavailable
 	}

@@ -74,7 +74,7 @@ brew install tesseract tesseract-lang
 steward doctor
 ```
 
-繁体中文在 Debian/Ubuntu 另装 `tesseract-ocr-chi-tra`。自定义语言目录可在启动前设置绝对路径 `TESSDATA_PREFIX`。只使用已安装的 eng/chi_sim/chi_tra；缺少某语言包不会推定能够识别该语言。Doctor 报告依赖与语言包，缺少 OCR 不阻止普通对话，调用会明确失败 `PROVIDER_UNAVAILABLE`。Linux 还需要启用非特权 user namespaces；macOS 使用 Seatbelt。没有无沙箱执行回退。
+繁体中文在 Debian/Ubuntu 另装 `tesseract-ocr-chi-tra`。自定义语言目录可在启动前设置绝对路径 `TESSDATA_PREFIX`。只使用已安装的 eng/chi_sim/chi_tra；缺少某语言包不会推定能够识别该语言。Doctor 报告依赖与语言包，缺少 OCR 不阻止普通对话，调用会明确失败 `PROVIDER_UNAVAILABLE`。Linux 还需要启用非特权 user namespaces；macOS 使用 Seatbelt，作业位于规范化的私有系统临时目录，支持系统临时路径别名。没有无沙箱执行回退。
 
 结果标记 `method: "ocr"`，包含 `source_ref`、原图尺寸、文字、词框与 `document_ref`。坐标以原图左上角为原点，单位为像素；`confidence` 是 0–100 引擎分数，不是正确率概率。模型预览最多 2048 字节文字、16 个词框，完整 JSON 可用 Artifact 工具按范围读取。识别最多保留 4096 个词和 128 KiB 文字，截断会标记 `truncated`；空白图可成功返回空文字。
 

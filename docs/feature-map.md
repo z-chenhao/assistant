@@ -45,7 +45,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-010](features/memory-context.md#f-010) | 按作用域召回记忆与对话 | Main/本机沿显式消息、Task、授权产物续读，本机另可精读当前 Memory 和可见来源。Main Memory 精读与外部关联待接通。 | 否 · 部分完成 |
 | [F-011](features/memory-context.md#f-011) | 长期上下文压缩 | 长对话保留目标、决策、约束和待办，省略内容可追溯。 | 否 · 部分完成 |
 | [F-012](features/artifacts-media.md#f-012) | 可重新打开的文件产物 | 用户能上传、保存、搜索、下载交付物，引用具有访问边界。 | 是 · 已完成 |
-| [F-013](features/artifacts-media.md#f-013) | 用户图片视觉输入与本地 OCR | 视觉模型收到授权图片；纯文本模型可通过本地 OCR 读取图片文字。 | 是 · 已完成 |
+| [F-013](features/artifacts-media.md#f-013) | 用户图片视觉输入与本地 OCR | 视觉模型收到授权图片；纯文本模型可通过 Linux/macOS 本地沙箱 OCR 读取图片文字。 | 是 · 已完成 |
 | [F-014](features/artifacts-media.md#f-014) | 音视频与文档内容处理 | 用户交付音视频或文档后，Agent 能获取适合任务的内容和来源。 | 否 · 部分完成 |
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
@@ -58,7 +58,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-023](features/skills-experience.md#f-023) | 执行后的自动经验闭环 | 用户纠正、恢复失败或重复成功能进入候选、验证和晋升流程。 | 否 · 部分完成 |
 | [F-024](features/integrations.md#f-024) | 受限本地 MCP 工具接入 | 操作员可把允许的本地 stdio 工具加入 Agent 工作面。 | 是 · 已完成 |
 | [F-025](features/integrations.md#f-025) | 可认证的真实服务接入 | GitHub 精确 PR 监听可经 SecretStore PAT 认证读取；通用连接、授权动作及凭据生命周期仍有缺口。 | 否 · 部分完成 |
-| [F-026](features/coding.md#f-026) | 代码理解、修改与交付 | 本地显式仓库源、Task 私有工作副本、修改集和历史验证 Artifact 已接通，远端 PR 交付证据待补。 | 否 · 部分完成 |
+| [F-026](features/coding.md#f-026) | 代码理解、修改与交付 | Linux/macOS 本地显式仓库源、Task 私有工作副本、修改集和历史验证 Artifact 已接通，远端 PR 交付证据待补。 | 否 · 部分完成 |
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 健康检查、加密恢复与 macOS 显式后台服务/独立巡检；持久人工停机和有限恢复已接通，平台 Live 与主动渠道告警待补。 | 否 · 部分完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 操作员能查看用量，并按明确价格元数据控制账户费用。 | 是 · 已完成 |
