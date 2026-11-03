@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-024](../features/integrations.md#f-024) | 真实协议验证发现/调用、漂移拒绝、取消回收与外部效果审批。 | 保护已接通的限定范围；Live/配置另行验证 |
 | [F-025](../features/integrations.md#f-025) | 在明确服务上完成真实读取/授权动作/失效恢复；无凭据泄漏，审批及 unknown 语义保持一致。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
-| [F-042](../features/integrations.md#f-042) | 受控来源重复/乱序投递、断线补读、重启、来源撤权与自身消息回流；事件只接受一次、可追溯消费位置与缺口，停止监听后不新增工作，故障投影真实。组件使用真实持久化与协议 peer，系统走来源到 Actor 的入口；真实 GitHub 权限与补读范围需 Live。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+| [F-042](../features/integrations.md#f-042) | 受控来源重复/乱序、补读、重启、撤权、自身回流、stop/Forget fencing 与真实故障状态；完整扫描后才提交事件和成功边界。 | 已接通监听→SQLite→CLI；Main/Task/飞书接续、真实 GitHub 权限及历史保留边界需后续入口与 Live 验证 |
 
 ## 层级与关键路径
 
@@ -29,8 +29,12 @@
 | 入口 | 覆盖用途与限制 |
 | --- | --- |
 | [tests/system/verify_capabilities.py](../../tests/system/verify_capabilities.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [internal/observer/github/client_test.go](../../internal/observer/github/client_test.go) | 实际 HTTP 协议 peer 驱动分页、认证头、自身份排除、评论更新身份、review/CI、恶意 Link/redirect、撤权及异常响应；不需要真实 PAT |
+| [internal/agent/sqlite/github_test.go](../../internal/agent/sqlite/github_test.go) | 真实 SQLite 去重、观察/Outbox 原子接受、故障边界、重启补读、repository ID pin、并发/停止/Forget fencing 与当前 epoch 读取 |
+| [cmd/steward/github_test.go](../../cmd/steward/github_test.go) | 真实 CLI 调度与重开 data root，在执行依赖不可用时保持状态/停止/恢复/配置移除可用，缺凭据失败可诊断 |
 
-- **F-025 剩余覆盖**：按首个真实用户场景选择接入方式与服务，补连接、凭据生命周期、能力探测和可信结果核实。
+- **F-025 剩余覆盖**：真实 PAT 权限、到期/更换与 GitHub 保留历史需 Live；OAuth、授权写动作、其他服务及对应入口仍未实现。
+- **F-042 剩余覆盖**：来源→Main/Task→飞书的关联消费尚未实现；不把本轮持久观察当作该闭环完成。真实来源删除、旧 head、中间修改与平台历史保留不由协议 peer 证明。
 
 ## 详细测试入口与证明边界
 
@@ -69,8 +73,9 @@ duplicate-input state equality. The same five-round capability gate includes
 every variant. Its deterministic scripted model does not establish live-model
 reasoning quality; see [release evidence and remaining obligations](product.md).
 
-No new tables or domain states are needed: schema v12 already freezes arbitrary
-ToolSpecs, Skill set hashes, policy and invocation outcomes. Empty/prior schema
+The local MCP path needs no new domain states: schema v12 already freezes arbitrary
+ToolSpecs, Skill set hashes, policy and invocation outcomes. GitHub observation
+adds schema v33 watch/observation records separately and does not extend ToolSpecs. Empty/prior schema
 migration tests remain in the existing SQLite gate. Old capabilities without
 these optional fields keep their old tools; enabling an adapter never expands an
 already frozen Run. Changing a configured scope fails old-Run selection closed.

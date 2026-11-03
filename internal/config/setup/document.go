@@ -25,6 +25,9 @@ func (m *Manager) bootstrap() []byte {
 	if m.active.Feishu != nil {
 		v["feishu"] = m.active.Feishu
 	}
+	if m.active.GitHub != nil {
+		v["github"] = m.active.GitHub
+	}
 	for _, id := range kinds {
 		if id == "computer" {
 			continue
