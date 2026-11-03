@@ -31,7 +31,7 @@
 | --- | --- |
 | [tests/system/verify_memory_maintenance.py](../../tests/system/verify_memory_maintenance.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_recall.py](../../tests/system/verify_recall.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
-| [internal/agent/sqlite/evidence_test.go](../../internal/agent/sqlite/evidence_test.go) | 共享 Actor/Provider/Tool 管线形成 current 消息→真实 Task→已授权附件链，UTF-8 原文续读、单跳循环、关系分页、SQLite 重开、读取回执重放、无新增 grant、隐藏/跨域/过期引用及 Forget 竞态 |
+| [internal/agent/sqlite/evidence_test.go](../../internal/agent/sqlite/evidence_test.go) | 共享 Actor/Provider/Tool 管线形成 current 消息→真实 Task→已授权附件链，UTF-8 原文续读、单跳循环、关系分页、SQLite 重开、读取回执重放、无新增 grant、隐藏/跨域/过期引用及 Forget 竞态；另一 Store 持有 WAL writer 时，本机读取与已完成 Accept/Prepare/Start 的 Main handler 均能在 500 ms 内读取原文 |
 | [internal/evidence/evidence_test.go](../../internal/evidence/evidence_test.go) | 严格 schema、重复/null/伪造作用域拒绝、UTF-8 有界字节窗口与可前进游标 |
 | [cmd/steward/evidence_test.go](../../cmd/steward/evidence_test.go) | 真实 CLI 保存产物后，反复重开精确续读原文；执行依赖故障仍保持只读入口可用，非法/缺失引用不输出部分内容 |
 | [internal/agent/child_test.go](../../internal/agent/child_test.go) | Main Conversation 导航不进入 Worker/Child 的冻结工作面；旧 catalog Select 不自动追加新工具由 evidence 存储回归验证 |

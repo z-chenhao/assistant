@@ -301,6 +301,50 @@ func TestEvidenceLinksBoundedPagesAndOldCatalogSelection(t *testing.T) {
 	}
 }
 
+func TestEvidenceAdmittedMainReadDoesNotReserveWriter(t *testing.T) {
+	ctx := context.Background()
+	calls := []llm.ToolCall{{ID: "read", Name: evidence.ToolName, Arguments: `{"ref":"conversation:writer-original"}`}}
+	s, r, c, _, exchange := admitPolicy(t, []tool.Definition{evidence.Definition()}, calls)
+	defer r.Release(ctx, c)
+	if err := r.history.Append(ctx, []conversation.Message{{MessageID: "writer-original", ConversationID: idAgent(t, s), Role: "user", Content: conversation.Text("read this original"), Source: "cli", CreatedAt: time.Now().UTC()}}); err != nil {
+		t.Fatal(err)
+	}
+	ts := r.ToolStore(c).(*tools)
+	invs, err := ts.Accept(ctx, exchange, calls, r.registry.Describe())
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv, err := ts.Prepare(ctx, invs[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = ts.Start(ctx, inv.ID); err != nil {
+		t.Fatal(err)
+	}
+	// Admission and Start need writes; the already-admitted handler only reads.
+	// Hold a separate pool's WAL writer after those necessary writes finish.
+	writerStore, err := Open(ctx, filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writerStore.Close()
+	writer, err := writerStore.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Rollback()
+	readCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	out, err := ts.ExecuteBuiltin(readCtx, inv)
+	if err != nil || out.Error != nil {
+		t.Fatal("already-admitted Main evidence read contended for WAL writer", out, err)
+	}
+	var page evidence.Page
+	if err = json.Unmarshal([]byte(out.Text), &page); err != nil || page.Text != "read this original" {
+		t.Fatal("admitted Main did not read the original evidence", page, err)
+	}
+}
+
 func TestEvidenceInvalidTypedReferenceReturnsInvalidArgument(t *testing.T) {
 	ctx := context.Background()
 	calls := []llm.ToolCall{{ID: "invalid", Name: evidence.ToolName, Arguments: `{"ref":"memory:unsupported"}`}}

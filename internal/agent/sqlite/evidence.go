@@ -106,7 +106,7 @@ func (t *tools) readLinkedEvidence(ctx context.Context, inv tool.Invocation) (to
 	var q evidence.Request
 	denied := false
 	invalid := false
-	err := t.runs.write(ctx, func(tx *sql.Tx) error {
+	err := t.runs.evidenceReadTx(ctx, func(tx *sql.Tx) error {
 		kind, name, args, err := t.acceptedBuiltin(ctx, tx, inv)
 		if errors.Is(err, tool.ErrApprovalDenied) || err == nil && (kind != "main" || name != evidence.ToolName) {
 			denied = true
