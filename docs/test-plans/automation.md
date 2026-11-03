@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-015](../features/automation.md#f-015) | 验证时区、重复触发、修改/取消竞态、停机补偿及重启不重复工作。 | 保护已接通的限定范围；Live/配置另行验证 |
 | [F-016](../features/automation.md#f-016) | 验证跨入、持续在内、跨出再跨入、旧 fire 及缺失观察值的行为。 | 保护已接通的限定范围；Live/配置另行验证 |
-| [F-045](../features/automation.md#f-045) | 合成候选事件验证关闭/观察/自动、命中/未命中、规则版本变更、撤权、重复接纳和崩溃恢复；观察仅记录判断，不创建执行 Task，仍有准确用量与读取范围。真实模型的误接单、漏接单及通知噪音需独立效果评测，机制测试不能代替。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+| [F-045](../features/automation.md#f-045) | 确切 PR 类型筛选验证关闭/观察/自动、命中/未命中、代次变更、撤权、重复接纳和重启。观察仅记录判断，无模型调用、执行 Task 或外部动作。 | 首条确定性规则已接通；其他来源、语义误接单/漏接单及通知噪音需独立评测 |
 
 ## 层级与关键路径
 
@@ -29,6 +29,9 @@
 | 入口 | 覆盖用途与限制 |
 | --- | --- |
 | [tests/system/verify_automation.py](../../tests/system/verify_automation.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [internal/agent/sqlite/github_rule_test.go](../../internal/agent/sqlite/github_rule_test.go) | 真实 Store 轮询事务和 Actor 验证同候选三模式、显式自动同 Task、CAS、旧代迟到与去重、重启、历史 Task/作用域/Forget、分页与 schema 37 迁移 |
+| [internal/agent/sqlite/github_followup_test.go](../../internal/agent/sqlite/github_followup_test.go) | 规则修订及已有授权撤销后拒绝迟到模型和 Tool，保留现有 Task 状态和未知副作用约束 |
+| [cmd/steward/github_test.go](../../cmd/steward/github_test.go) | 真实 CLI 与受控 GitHub HTTP peer 验证绑定观察、认证轮询、持久决策、分页及故障时关闭 |
 
 现有入口仍需在后续相关实现变更时按风险运行；需求范围变化时同步扩展场景。
 

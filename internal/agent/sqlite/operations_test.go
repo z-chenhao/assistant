@@ -37,7 +37,7 @@ func TestOperationsPriorSchemaRollbackAndActiveWorkUpgrade(t *testing.T) {
 	registry := tool.FixtureRegistry()
 	// Current constructors freeze tool delivery for new Runs. Seed the older
 	// fixture with them, then remove that metadata to represent pre-v32 work.
-	if _, e = db.Exec(responsiveMainSQL + githubObservationsSQL + taskFeedbackSQL + feishuReplySourcesSQL + githubTaskContinuationSQL); e != nil {
+	if _, e = db.Exec(responsiveMainSQL + githubObservationsSQL + taskFeedbackSQL + feishuReplySourcesSQL + githubTaskContinuationSQL + githubRuleObservationSQL); e != nil {
 		t.Fatal(e)
 	}
 	r := s.Runs(h, registry)

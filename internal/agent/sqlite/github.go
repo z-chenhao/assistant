@@ -33,7 +33,9 @@ func (s *Store) BeginGitHubPoll(ctx context.Context, cfg github.Config) (ticket 
 			return e
 		}
 		var enabled, valid bool
-		if e := tx.QueryRowContext(ctx, `SELECT enabled,intent_privacy_epoch=`+githubEpoch+`,version,intent_privacy_epoch FROM github_watch WHERE scope=?`, cfg.Scope()).Scan(&enabled, &valid, &ticket.Version, &ticket.Epoch); e != nil {
+		if e := tx.QueryRowContext(ctx, `SELECT enabled,intent_privacy_epoch=`+githubEpoch+`,version,intent_privacy_epoch,
+ coalesce((SELECT generation FROM github_task_binding b WHERE b.scope=w.scope AND b.enabled=1),0)
+ FROM github_watch w WHERE scope=?`, cfg.Scope()).Scan(&enabled, &valid, &ticket.Version, &ticket.Epoch, &ticket.BindingGeneration); e != nil {
 			return e
 		}
 		if !enabled || !valid {
@@ -90,7 +92,7 @@ func (s *Store) FinishGitHubPoll(ctx context.Context, cfg github.Config, ticket 
 			if e != nil {
 				return e
 			}
-			result, e := tx.ExecContext(ctx, `INSERT INTO github_observation(scope,event_key,kind,source_id,content_json,received_at,intent_privacy_epoch) VALUES(?,?,?,?,?,?,?) ON CONFLICT(scope,event_key) DO NOTHING`, cfg.Scope(), observation.Key, observation.Kind, observation.SourceID, string(raw), now, ticket.Epoch)
+			result, e := tx.ExecContext(ctx, `INSERT INTO github_observation(scope,event_key,kind,source_id,content_json,received_at,intent_privacy_epoch,binding_generation) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(scope,event_key) DO NOTHING`, cfg.Scope(), observation.Key, observation.Kind, observation.SourceID, string(raw), now, ticket.Epoch, ticket.BindingGeneration)
 			if e != nil {
 				return e
 			}
@@ -99,6 +101,15 @@ func (s *Store) FinishGitHubPoll(ctx context.Context, cfg github.Config, ticket 
 				return e
 			}
 			if count != 0 {
+				if ticket.BindingGeneration != 0 {
+					sequence, e := result.LastInsertId()
+					if e != nil {
+						return e
+					}
+					if e = recordGitHubRuleDecision(ctx, tx, cfg.Scope(), ticket, sequence, observation.Kind); e != nil {
+						return e
+					}
+				}
 				if e = githubWake(ctx, tx, cfg.Scope(), "github.observation.received", map[string]string{"event_key": observation.Key, "kind": observation.Kind}); e != nil {
 					return e
 				}

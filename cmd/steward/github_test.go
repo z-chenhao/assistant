@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -76,12 +77,13 @@ func TestGitHubCLISuccessfulPollPersistsDedupAndFailureBoundary(t *testing.T) {
 	prior := http.DefaultTransport
 	http.DefaultTransport = githubPeerTransport{u, prior}
 	defer func() { http.DefaultTransport = prior }()
-	invoke := func(op string) ([]byte, error) {
+	invokeInput := func(input string, args ...string) ([]byte, error) {
 		t.Helper()
 		var out, errOut bytes.Buffer
-		err := run(context.Background(), []string{"-config", config, "github", op}, strings.NewReader(""), &out, &errOut)
+		err := run(context.Background(), append([]string{"-config", config, "github"}, args...), strings.NewReader(input), &out, &errOut)
 		return out.Bytes(), err
 	}
+	invoke := func(op string) ([]byte, error) { return invokeInput("", op) }
 	events := func(want int) {
 		t.Helper()
 		raw, err := invoke("events")
@@ -107,7 +109,7 @@ func TestGitHubCLISuccessfulPollPersistsDedupAndFailureBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	events(2)
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(root, "data", "state.db")+"?mode=ro")
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(root, "data", "state.db")+"?mode=rw")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +119,55 @@ func TestGitHubCLISuccessfulPollPersistsDedupAndFailureBoundary(t *testing.T) {
 		if err = db.QueryRow("SELECT count(*) FROM " + table).Scan(&n); err != nil || n != 0 {
 			t.Fatal("observation created unauthorized work", table, n, err)
 		}
+	}
+
+	// Seed one existing owner Task. Rule binding, authenticated observation,
+	// decision readback and close then use the real CLI and state adapter.
+	if _, err = db.Exec(`INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version)
+ SELECT 'fixture-task','task:cli-rule',agent_id,agent_id,'Review PR','Review this exact PR','[]','active',1,1,1,1 FROM agent_config`); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := invokeInput(`{"task_ref":"task:cli-rule","task_epoch":1,"version":0,"mode":"observe","event_kind":"review_comment"}`, "bind")
+	var binding github.TaskBinding
+	if err != nil || json.Unmarshal(raw, &binding) != nil || binding.Mode != "observe" || binding.TaskGoal != "Review this exact PR" || binding.Scope != "owner/repo#7" {
+		t.Fatal("observe binding was not projected", string(raw), err)
+	}
+	revision.Store(2)
+	for range 2 {
+		if _, err = invoke("poll"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err = invoke("decisions")
+	var decisions []github.RuleDecision
+	if err != nil || json.Unmarshal(raw, &decisions) != nil || len(decisions) != 1 ||
+		!decisions[0].Matched || decisions[0].Mode != "observe" || decisions[0].TaskRef != "task:cli-rule" ||
+		strings.Contains(string(raw), "requested change") {
+		t.Fatal("decision query did not return one scoped receipt", string(raw), err)
+	}
+	raw, err = invokeInput("", "decisions", strconv.FormatInt(decisions[0].Sequence, 10))
+	if err != nil || strings.TrimSpace(string(raw)) != "[]" {
+		t.Fatal("decision cursor did not advance", string(raw), err)
+	}
+	fail.Store(true)
+	if _, err = invoke("poll"); err == nil {
+		t.Fatal("test peer did not interrupt the watch")
+	}
+	raw, err = invokeInput(fmt.Sprintf(`{"version":%d}`, binding.Version), "unbind")
+	if err != nil || json.Unmarshal(raw, &binding) != nil || binding.Mode != "off" || binding.State != "stopped" {
+		t.Fatal("interrupted watch blocked turning the rule off", string(raw), err)
+	}
+	fail.Store(false)
+	revision.Store(3)
+	if _, err = invoke("poll"); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err = db.QueryRow(`SELECT count(*) FROM github_rule_decision`).Scan(&count); err != nil || count != 1 {
+		t.Fatal("disabled rule recorded a decision", count, err)
+	}
+	if err = db.QueryRow(`SELECT count(*) FROM run`).Scan(&count); err != nil || count != 0 {
+		t.Fatal("observation mode created execution", count, err)
 	}
 }
 

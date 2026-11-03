@@ -42,7 +42,7 @@ func runGitHub(ctx context.Context, application *app.App, flags *flag.FlagSet, i
 		if err := application.SetGitHubWatch(ctx, flags.Arg(1) == "resume"); err != nil {
 			return err
 		}
-	case "events":
+	case "events", "decisions":
 		var before int64
 		if flags.NArg() == 3 {
 			var err error
@@ -50,6 +50,13 @@ func runGitHub(ctx context.Context, application *app.App, flags *flag.FlagSet, i
 			if err != nil || before < 1 {
 				return errors.New("invalid GitHub observation cursor")
 			}
+		}
+		if flags.Arg(1) == "decisions" {
+			decisions, err := application.GitHubRuleDecisions(ctx, before)
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(decisions)
 		}
 		events, err := application.GitHubObservations(ctx, before)
 		if err != nil {
