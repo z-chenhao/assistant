@@ -9,6 +9,19 @@ from check_docs import ROOT, broken_links, unindexed_docs
 
 
 class ProjectLayoutTests(unittest.TestCase):
+    def test_picture_sources_and_html_images_are_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'README.md').write_text('''# Artwork
+<picture><source media="(prefers-color-scheme: dark)" srcset="missing-dark.png">
+<img src="missing-light.png" alt="Ghost"></picture>
+<img src="https://example.test/image.png">
+`<img src="example.png">`
+''')
+            self.assertEqual(list(broken_links(root)), [
+                'README.md: missing missing-dark.png',
+                'README.md: missing missing-light.png'])
+
     def test_frontend_build_tracks_ui_sources_but_not_documentation(self):
         # Exercise Tailwind itself: docs must not change CSS, UI classes must.
         for directory, suffix, should_pass in ((ROOT / 'web', '.md', True),

@@ -17,9 +17,8 @@ var publicAssets = map[string]struct{ path, contentType string }{
 	"/appearance.js":                     {"assets/appearance.js", "text/javascript"},
 	"/app.js":                            {"assets/client.js", "text/javascript"},
 	"/licenses.txt":                      {"assets/licenses.txt", "text/plain; charset=utf-8"},
-	"/brand/steward.svg":                 {"assets/brand/steward.svg", "image/svg+xml"},
-	"/brand/ghost-ivory-v1.png":          {"assets/brand/ghost-ivory-v1.png", "image/png"},
-	"/brand/ghost-charcoal-v1.png":       {"assets/brand/ghost-charcoal-v1.png", "image/png"},
+	"/brand/ghost-ivory.png":             {"assets/brand/ghost-ivory.png", "image/png"},
+	"/brand/ghost-charcoal.png":          {"assets/brand/ghost-charcoal.png", "image/png"},
 	"/brand/ghost-charcoal-96.webp":      {"assets/brand/ghost-charcoal-96.webp", "image/webp"},
 	"/brand/ghost-ivory-96.webp":         {"assets/brand/ghost-ivory-96.webp", "image/webp"},
 	"/brand/ghost-charcoal-256.webp":     {"assets/brand/ghost-charcoal-256.webp", "image/webp"},
@@ -28,7 +27,7 @@ var publicAssets = map[string]struct{ path, contentType string }{
 	"/brand/JetBrainsMono-Regular.woff2": {"assets/brand/JetBrainsMono-Regular.woff2", "font/woff2"},
 	"/brand/SourceSerif4-Roman.woff2":    {"assets/brand/SourceSerif4-Roman.woff2", "font/woff2"},
 	"/brand/InterVariable.woff2":         {"assets/brand/InterVariable.woff2", "font/woff2"},
-	"/favicon.png":                       {"assets/brand/ghost-charcoal-v1.png", "image/png"},
+	"/favicon.png":                       {"assets/brand/ghost-charcoal.png", "image/png"},
 }
 
 // serveAsset runs after request guards and before workspace authentication.

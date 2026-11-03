@@ -6,7 +6,7 @@
 
 产品逻辑与测试分属明确模块。Makefile 和现有 system runner 提供本地入口，CI 自动执行这些入口；发布流水线独立准备原生包和草稿发布。
 
-最近一次[全仓工程审查](../engineering-review-2026-11-03.md)记录了调用关系、历史依据、分批重构和验证限制。Web 的固定资源目录归 `assets.go`，MCP 注册与调用分别维护；系统测试共用的模型 HTTP peer 归 `tests/system/provider_endpoint.py`，不再由渠道 gate 反向导入模型 gate。
+最近一次[全仓工程审查](../reviews/2026-11-03-engineering.md)记录了调用关系、历史依据、分批重构和验证限制。Web 的固定资源目录归 `assets.go`，MCP 注册与调用分别维护；系统测试共用的模型 HTTP peer 归 `tests/system/provider_endpoint.py`，不再由渠道 gate 反向导入模型 gate。
 
 调度器在单条 SQL 内物化一次活跃租约集合，供各额度维度复用，避免查询计划按 Agent 反复扫描历史 Run。该集合仅属于当前语句的数据库快照，保留既有 claim 事务、fencing、公平排序与额度配置。
 
@@ -202,6 +202,8 @@ required status name is preserved. One checkout and dependency setup serve:
 2. `make test-e2e`: nine deterministic product flows through actual CLI/UI,
    stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
 
+PR checks use GitHub’s proposed merge commit, so the checked code includes the current base. Artifact names identify that checked commit.
+
 Documentation-only PRs run the local link/index check without installing Go,
 Node or Chromium. The `Ubuntu checks` job still executes and reports a status;
 there is no workflow-level path filter that leaves branch protection pending.
@@ -224,7 +226,7 @@ selector, secondary required gate, benchmark comparator or cross-job build bundl
 
 [Extended regression](../../.github/workflows/regression.yml) runs weekly and via
 manual dispatch. It executes all retained deterministic system gates, then the
-complete Go race inventory. It uploads failures as well as passing results and
+complete Go race inventory. A separate macOS job checks native CLI/startup, the credential adapter and offline VM contracts; actual Keychain/Guest integration remains explicit live validation. It uploads failures as well as passing results and
 has a 60-minute outer limit. A failure remains a defect to investigate; it cannot
 be waived into a release pass. Run it before releases and broad protocol/state
 changes, or use the corresponding focused gates during development.
@@ -238,7 +240,7 @@ semantic Judge, paid model call or clause-audit inventory runs in either workflo
 
 [Native packages](../../.github/workflows/release.yml) remains separate. Manual
 runs or explicit version tags build native archives and checksums on supported
-Linux/macOS architectures. Version tags create an unpublished draft release for
+Linux/macOS architectures. Packages retain project and third-party notices, and draft creation rechecks archive checksums. Version tags create an unpublished draft release for
 human inspection. An ordinary PR neither deploys nor publishes a release.
 
 Real-account login, external-site compatibility, macOS Computer and real-model
@@ -264,10 +266,17 @@ The full Golden Case benchmark, real-model evaluation runners, scores and
 historical clause-audit ledgers are maintained outside the product checkout.
 They are not PR prerequisites. See [evaluation boundaries](../test-plans/product.md#testing-agent-evaluation).
 
+## Dependency and repository maintenance
+
+`make lint` includes SHA-pinned workflow validation with actionlint v1.7.12. The independent dependency-audit workflow uses govulncheck v1.9.0 and npm lockfile audits, and runs weekly/manually/on dependency PRs. Dependabot proposes updates without automatic merging. Go 1.26.10 is the current minimum patched toolchain; the application module import path remains compatible.
+
+The root README covers onboarding and directory responsibilities. GOVERNANCE/CONTRIBUTING/SECURITY own collaboration and reporting policies. Current artwork sources are separate from embedded runtime assets; static brand images derive from the production atlas. Historical reconstruction briefs are removed instead of being maintained as competing design authorities.
+
 ## Changelog
 
 | 日期 | 决策 | 理由与影响 |
 | --- | --- | --- |
+| 2026-11-03 | 补齐开源治理、合并结果 CI、依赖审计、macOS 原生契约和许可随包交付。 | 用户授权 Apache-2.0 与 GitHub 治理；保留 Ubuntu checks 必需状态、显式发布边界和冻结运行时接口。 |
 | 2026-11-03 | 调度额度查询复用单次活跃租约集合；Python 系统测试显式关闭 SQLite 连接。 | 三批容量运行暴露历史扫描成本，执行计划及等价测量支持局部 SQL 优化；连接回归确认上下文管理器不负责关闭。保留 schema、事务语义及所有安全断言。 |
 | 2026-11-03 | 局部拆分 Web 资源处理与 MCP 调用；共享模型 HTTP fixture 独立于系统 gate。 | 保留认证顺序、错误/副作用判定、公开路由和冻结协议，解除测试模块循环依赖；同步修正当前目录示例，详细证据见审查记录。 |
 | 2026-10-28 | F-040：Computer 与运维查询归所属模块，App 返回领域类型并隐藏具体执行访问器。 | 选择明确领域子包而非通用 repository 层；通过绑定 claim 的 Host 保留原子事务，不改变存储协议。 |

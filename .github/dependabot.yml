@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      compatible-go-updates:
+        patterns: ['*']
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directories:
+      - /provider-bridge
+      - /runtime/javascript
+      - /guest-browser
+      - /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      compatible-npm-updates:
+        patterns: ['*']
+        update-types: [minor, patch]

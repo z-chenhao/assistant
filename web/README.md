@@ -1,11 +1,42 @@
 # Steward Web
 
-[Web feature and usage](../docs/features/channels.md) ·
-[Frontend architecture and provenance](../docs/designs/channels.md#web-components-steward-web-components) ·
-[Browser checks and build](../docs/test-plans/channels.md#web-components-build-and-verify)
+Go owns authenticated HTML, forms, routes and live updates. `web/src/` contains
+CSS and the React/JavaScript enhancements. `internal/interaction/web/assets/`
+contains the shipped fonts, artwork and generated bundles embedded by Go.
 
-This file is a navigation entry. Component and artwork license notices remain in web/licenses.
+```sh
+npm ci --prefix web --ignore-scripts
+npm run build --prefix web
+npm run check --prefix web
+npm run lint --prefix web
+```
 
-The product is Steward and the agent is Ghost. The CLI is `steward`, environment variables use `STEWARD_*`, and the Go module matches the repository: `github.com/z-chenhao/assistant`. [Visual rules](DESIGN.md) · [Reconstruction scope](BRIEF.md).
+Edit sources, then commit the generated bundles with them. CI rejects stale
+outputs. `src/foundation.css` owns shared tokens/fonts; the other CSS modules own
+their respective views. Current design and behavior live in the
+[brand design](../docs/designs/branding.md) and
+[channel design](../docs/designs/channels.md), not separate reconstruction briefs.
 
-Ghost atlas sources are in `web/artwork/` (build-only). From the repository root, run `python3 web/artwork/bake-server.py`, open `http://127.0.0.1:8789/bake.html`, then run `python3 web/artwork/encode-frames.py` with `cwebp` installed. The product only serves the resulting PNG/WebP assets; it never loads the build mesh or server.
+## Artwork sources and derived files
+
+`artwork/manifest.json` records the two source cutouts and four active animation
+atlases. Both themes and both frame sizes are used dynamically; they are not
+retired variants. Sources under `artwork/source/` are not embedded or served.
+
+After changing a production atlas, export README/favicon images from its first
+frame with the pinned Chromium installed by `make setup`:
+
+```sh
+node web/artwork/icons.mjs
+node web/artwork/icons.mjs --check
+```
+
+To rebuild animation frames, run `python3 web/artwork/bake-server.py`, open
+`http://127.0.0.1:8789/bake.html` locally, then run
+`python3 web/artwork/encode-frames.py` (requires `cwebp`). Inspect the result,
+update the atlas hashes in the manifest, and export the static icons. This
+optional artwork pipeline is not needed for ordinary builds.
+
+[License notices](licenses/) preserve incorporated components and fonts.
+The Go module remains `github.com/z-chenhao/assistant` for import compatibility;
+the canonical repository is [z-chenhao/steward](https://github.com/z-chenhao/steward).

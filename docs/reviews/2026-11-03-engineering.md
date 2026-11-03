@@ -1,6 +1,6 @@
 # 全仓工程审查与重构记录
 
-[工程方案](designs/engineering.md) · [测试总方案](test-plans/product.md)
+[工程方案](../designs/engineering.md) · [测试总方案](../test-plans/product.md)
 
 审查基线：`ffab679`，工作区初始干净；日期：2026-11-03。覆盖 Go 核心与适配器、Web、Provider Bridge、CodeMode、系统测试、构建配置及 Agent 指令。检查结合调用关系、116 条可用 Git 提交、实际测试与覆盖率；不把静态未引用直接判定为可删除。
 

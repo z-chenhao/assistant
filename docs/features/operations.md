@@ -255,10 +255,9 @@ Keep credentials out of issues, logs, prompts, YAML and artifacts. Configuration
 uses SecretStore references. Never upload a real data root or authentication URL
 as a bug reproduction.
 
-For a suspected vulnerability, use GitHub private vulnerability reporting when
-available, or contact the repository maintainers privately before opening a public
-issue. Include the affected revision, a minimal disposable reproduction, impact
-and observed behavior. Do not exercise the issue against another person's data.
+For vulnerability reporting, supported fixes and current dependency checks, follow
+[SECURITY.md](../../SECURITY.md). Do not put vulnerability details in a public
+issue when requesting a private reporting channel.
 
 The [technical baseline](../designs/product-overview.md#contract-0-文档效力与实现规则) defines approval, capability,
 credential and replay boundaries. [Operations](#) describes

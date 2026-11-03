@@ -1,4 +1,16 @@
-.PHONY: setup install run build test test-go test-node test-browser test-infra test-e2e test-full test-race lint
+.PHONY: help setup install run build test test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
+
+.DEFAULT_GOAL := setup
+
+help:
+	@echo 'make setup       Install locked development dependencies'
+	@echo 'make build/run   Build / start Steward'
+	@echo 'make test lint   Run software tests and local quality checks'
+	@echo 'make test-e2e    Run core flows (set E2E_EVIDENCE to a fresh path)'
+	@echo 'make test-full   Run all deterministic system flows'
+	@echo 'make test-race   Run the complete Go race inventory'
+	@echo 'make audit       Check current Go/npm vulnerability advisories (network required)'
+	@echo 'See CONTRIBUTING.md for prerequisites and focused checks.'
 
 # Operations live in scripts; software tests live in tests. Model evals are external.
 setup:
@@ -27,6 +39,7 @@ test-node:
 
 test-browser:
 	npm test --prefix guest-browser
+	node web/artwork/icons.mjs --check
 
 export PYTHONPATH := $(CURDIR)/tests/system:$(CURDIR)/scripts:$(PYTHONPATH)
 
@@ -44,7 +57,7 @@ test-full: build
 test-race:
 	python3 tests/system/race.py
 
-lint:
+lint: lint-actions
 	python3 scripts/check_docs.py
 	sh -n install.sh scripts/package.sh
 	@files="$$(gofmt -l cmd internal)"; if [ -n "$$files" ]; then echo "$$files"; exit 1; fi
@@ -54,3 +67,15 @@ lint:
 	npm run lint --prefix runtime/javascript
 	npm run lint --prefix guest-browser
 	npm run lint --prefix web
+
+# Tool versions are explicit and do not alter the application's go.mod.
+lint-actions:
+	go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+
+# Advisory availability is separate from deterministic software regressions.
+audit:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+	npm audit --prefix provider-bridge --package-lock-only --audit-level=high
+	npm audit --prefix runtime/javascript --package-lock-only --audit-level=high
+	npm audit --prefix guest-browser --package-lock-only --audit-level=high
+	npm audit --prefix web --package-lock-only --audit-level=high

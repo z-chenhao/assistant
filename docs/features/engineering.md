@@ -64,6 +64,7 @@ make test lint
 make test-e2e E2E_EVIDENCE=evidence/my-change
 make test-full E2E_EVIDENCE=evidence/full-check
 make test-race
+make audit  # Current network advisory checks, separate from deterministic tests
 ```
 
 The system runner refuses to overwrite a previous summary. Select a fresh
@@ -75,7 +76,7 @@ software inventory. Results are ignored local outputs, not committed audit ledge
 
 ## Contributing to Steward
 
-Start with [AGENTS.md](../../AGENTS.md), the code being changed and its nearby tests.
+Start with [CONTRIBUTING.md](../../CONTRIBUTING.md), [AGENTS.md](../../AGENTS.md), the code being changed and its nearby tests.
 Use the [testing guide](../test-plans/product.md) for test ownership and commands, and the
 [feature designs and runtime contracts](../designs/product-overview.md#contract-0-文档效力与实现规则) for product protocols and invariants.
 
@@ -83,7 +84,7 @@ Use the [testing guide](../test-plans/product.md) for test ownership and command
 
 ### Development
 
-Use Go 1.26.2+, Node 24.21.0, Python 3.10.12+ and a C compiler. On Linux,
+Use Go 1.26.10+, Node 24.21.0, Python 3.10.12+ and a C compiler. On Linux,
 coding isolation requires Bubblewrap and user namespaces. Install dependencies:
 
 ```sh
@@ -180,3 +181,5 @@ Keep PRs focused. Describe the user behavior or engineering problem, resulting
 change and relevant validation. CI success is software regression evidence;
 it does not certify real-model quality, real-account login or release acceptance.
 Creating a version tag or publishing a release requires an explicit request.
+
+开源治理：项目采用 [Apache-2.0](../../LICENSE)，协作与分支策略见 [GOVERNANCE.md](../../GOVERNANCE.md)。README 提供首次安装和开发路径；GitHub Issue 表单与 CODEOWNERS 提供问题描述和评审入口。Dependabot 定期提出依赖 PR，仍需审核冻结能力兼容性、构建产物和第三方许可。原生安装包保留项目、Go 链接依赖及 Web 授权说明。

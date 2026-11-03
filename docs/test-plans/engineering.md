@@ -31,3 +31,5 @@ F-039：`internal/agent/sqlite/foundation_test.go` 验证流暂停时状态查�
 | 能力组装 | `app/runtime_test.go` 验证失败不发布部分 registry、修复后可重试；core 工具/CodeMode/Child 场景验证冻结能力与真实调用路径。 |
 
 跨模块变更运行既有 `make test lint` 和相关 core system gates；Computer/Task claim 与取消相关场景运行定向 race。环境导致的未执行、失败和跳过独立报告，不以编译成功代替行为验证。不为拆文件新增测试框架。
+
+开源治理验收：`make lint` 检查 GitHub workflow；HTML 图片链接回归防止 README 引用失效，正式 Ghost 图标通过真实 Chromium 首帧像素核对；startup gate 实际打包、解压、安装并核对项目/Web/Go notices。`make audit` 记录当前漏洞库结果，网络失败与漏洞发现均不能记为通过。远端分支清理需要保存原 SHA、合并 PR、Git bundle 和带 lease 的删除记录；管理权限不足应明确报告。

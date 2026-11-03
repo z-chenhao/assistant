@@ -33,7 +33,7 @@ func TestEmbeddedAssetsKeepPublicRoutesAndRequestGuards(t *testing.T) {
 		{"GET", "/appearance.js", "", "", "text/javascript", 200},
 		{"GET", "/style.css", "", "", "text/css", 200},
 		{"GET", "/favicon.png", "", "", "image/png", 200},
-		{"GET", "/brand/steward.svg", "", "", "image/svg+xml", 200},
+		{"GET", "/brand/ghost-charcoal.png", "", "", "image/png", 200},
 		{"GET", "/brand/SourceHanSansSC-common.woff2", "", "", "font/woff2", 200},
 		{"GET", "/licenses.txt", "", "", "text/plain; charset=utf-8", 200},
 		{"POST", "/style.css", "", "", "text/css", 200},

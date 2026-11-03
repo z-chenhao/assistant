@@ -14,7 +14,9 @@ Go 继续提供认证、页面、原生表单与局部更新；React 只增强 H
 
 ## 资源与动效
 
-Michroma 字标、Inter UI、Source Serif 4 回复、Source Han Sans SC 中文回退和 JetBrains Mono 代码字体在 `/brand/` 同源提供，OFL 通知在 `/licenses.txt`。使用 Demo 已确认的黑白幽灵 PNG，身体、手臂、五官离线烘焙为完整无损 WebP 帧；运行时 Canvas2D 播放，身体不做整体缩放，不加载 WebGL。轻微整体现浮动与固定影子保留；暂停、reduced-motion、隐藏或离屏停止当前挥手。资源来源和完整生成提示保存在 `web/licenses/steward-artwork.md` 及相邻 provenance JSON。
+Michroma 字标、Inter UI、Source Serif 4 回复、Source Han Sans SC 中文回退和 JetBrains Mono 代码字体在 `/brand/` 同源提供，OFL 通知在 `/licenses.txt`。使用 Demo 已确认的黑白幽灵 PNG，身体、手臂、五官离线烘焙为完整无损 WebP 帧；运行时 Canvas2D 播放，身体不做整体缩放，不加载 WebGL。轻微整体现浮动与固定影子保留；暂停、reduced-motion、隐藏或离屏停止当前挥手。资源来源和完整生成提示保存在 `web/licenses/steward-artwork.md` 与 `web/artwork/manifest.json`。
+
+README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通过 `node web/artwork/icons.mjs` 导出；`--check` 比较解码像素，防止手绘替代图漂移。两份无五官 PNG 是动画烘焙输入，位于 `web/artwork/source/`，不进入 Go embed 或公开路由。两种主题、两种帧尺寸均有运行时消费者，继续保留。已删除简化 SVG、未选用提示记录及重复的 Web 重建 brief/design；当前 CSS 和本方案是维护入口。
 
 ## 身份与边界
 
@@ -24,7 +26,7 @@ Michroma 字标、Inter UI、Source Serif 4 回复、Source Han Sans SC 中文�
 | --- | --- |
 | 产品 / Agent | Steward / Ghost |
 | 字标 / 标语 | Steward / Your personal AI steward. |
-| Go 模块 | `github.com/z-chenhao/assistant`（与仓库地址一致） |
+| Go 模块 | `github.com/z-chenhao/assistant`（保留既有 import 路径；仓库现为 `z-chenhao/steward`） |
 | 命令入口 / 构建输出 | `cmd/steward` / `bin/steward` |
 | 环境变量 / 默认数据根 | `STEWARD_*` / `~/.local/share/steward` |
 | 安装目录 / 归档 | `lib/steward` / `steward-<platform>-<arch>.tar.gz` |

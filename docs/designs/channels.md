@@ -312,7 +312,7 @@ dynamic component import, remote asset or browser credential input.
 
 ### 2026-11-02 · Steward Web 表现层
 
-共享样式和导航以已确认 Demo 为准；模型/账户、通知、能力配置及执行检查保留原生路线。Chat 的 Computer/Worker 详情复用认证与既有只读数据，无新增写入协议。侧栏、主题与头像偏好仅存在浏览器。具体令牌与组件见 `web/DESIGN.md`，兼容取舍见[品牌设计](branding.md)。
+共享样式和导航以已确认 Demo 为准；模型/账户、通知、能力配置及执行检查保留原生路线。Chat 的 Computer/Worker 详情复用认证与既有只读数据，无新增写入协议。侧栏、主题与头像偏好仅存在浏览器。具体令牌与组件见 `web/src/foundation.css` 和 `web/README.md`，兼容取舍见[品牌设计](branding.md)。
 
 
 ### 2026-11-02 · 四入口与只读 Computer 工作区

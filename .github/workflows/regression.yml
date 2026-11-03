@@ -9,6 +9,22 @@ concurrency:
   group: extended-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  native:
+    name: macOS native contracts
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - name: CLI, startup, credential adapter and offline VM contracts
+        run: go test -count=1 ./cmd/steward ./internal/startup ./internal/llm/secret ./internal/computer/macosvm/...
   regression:
     name: Full deterministic regression and race checks
     runs-on: ubuntu-24.04

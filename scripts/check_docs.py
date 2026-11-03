@@ -2,6 +2,7 @@
 """Check local Markdown destinations and documentation reachability offline."""
 from pathlib import Path
 import html
+from html.parser import HTMLParser
 import re
 import sys
 from urllib.parse import unquote, urlsplit
@@ -52,6 +53,23 @@ def without_code_spans(text):
     return re.sub(r'(`+)(?!`)(.*?)(?<!`)\1(?!`)', '', text, flags=re.S)
 
 
+class HTMLDestinations(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag == 'a' and values.get('href'):
+            self.links.append(values['href'])
+        if tag == 'img' and values.get('src'):
+            self.links.append(values['src'])
+        if tag in ('img', 'source') and values.get('srcset'):
+            # Data URLs contain commas but do not refer to repository files.
+            if not values['srcset'].lstrip().startswith('data:'):
+                self.links.extend(part.split()[0] for part in values['srcset'].split(',') if part.strip())
+
+
 def destinations(path, root):
     text = without_code_spans(prose(path))
     references = {}
@@ -66,12 +84,17 @@ def destinations(path, root):
 
     text = re.sub(r'^ {0,3}\[([^\]\n]+)\]:[ \t]*(<[^>\n]+>|[^\s]+)'
                   r'(?:[ \t]+["\'][^\n]*?["\'])?[ \t]*$', definition, text, flags=re.M)
+    labels = []
     for match in re.finditer(r'(?<!\\)!?\[([^\]\n]*)\](?:'
                              r'\((<[^>\n]+>|[^\s)]+)(?:\s+["\'][^\n]*?["\'])?\)'
                              r'|\[([^\]\n]*)\])?', text):
         label = match[2] or references.get(reference_key(match[3] or match[1]))
         if label is None:
             continue
+        labels.append(label)
+    markup = HTMLDestinations()
+    markup.feed(text)
+    for label in labels + markup.links:
         label = label.strip('<>')
         url = urlsplit(label)
         if url.scheme or url.netloc:

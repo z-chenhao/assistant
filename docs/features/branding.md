@@ -20,6 +20,8 @@ Steward 是拥有对话、工具、记忆与委派任务的私人助手。产品
 - 实际发送、附件、审批、冻结哈希、任务接续、分页与实时更新维持既有执行链路。未确认发送保留草稿与附件，不自动重发。
 - 品牌贯穿 Web、终端、授权页、安装器与打包说明。命令为 `steward`，环境变量使用 `STEWARD_*`，默认数据根为 `~/.local/share/steward`，模块为 `github.com/z-chenhao/assistant`。不提供其他品牌的命令、路径、协议或配置别名。
 
+当前 README 与 favicon 使用与 Web 正式头像同源的静态首帧；生成方式和资源边界见技术方案。
+
 ## 如何使用
 
 构建后运行 `bin/steward web serve`（需 Web 配置）或正常启动应用。默认数据根为 `~/.local/share/steward`。在首页对话并审阅具体审批；Tasks 可查看摘要、历史、关联消息与成果，Settings 管理模型、账户、通知和能力，Developer 查看真实执行与冻结上下文。Chat 右上角 Computer/Worker 展开即时查询的只读详情；已完成的 Worker 不等同于最终用户交付或文件成果。
