@@ -21,6 +21,21 @@ def events(names):
 
 
 class SQLiteRaceInventoryTests(unittest.TestCase):
+    def test_deadline_packages_are_isolated_without_losing_or_repeating_inventory(self):
+        extra = 'github.com/z-chenhao/assistant/new/pkg'
+        packages = [race.SQLITE, extra, race.RECORDER, race.BRIDGE]
+        for ordered in (packages, list(reversed(packages))):
+            complete = race.groups(ordered)
+            self.assertEqual(complete[:2], [('bridge', [race.BRIDGE]), ('recorder', [race.RECORDER])])
+            self.assertEqual(Counter(p for _, group in complete for p in group), Counter(packages))
+            partial = race.groups(ordered, 'packages') + race.groups(ordered, 'sqlite')
+            self.assertEqual(Counter(p for _, group in partial for p in group), Counter(packages))
+            for name, group in complete[2:]:
+                self.assertFalse({race.BRIDGE, race.RECORDER} & set(group))
+        for missing in (race.BRIDGE, race.RECORDER, race.SQLITE):
+            with self.subTest(missing=missing), self.assertRaises(ValueError):
+                race.groups([p for p in packages if p != missing])
+
     def test_discovery_includes_examples_and_fuzz_seeds_but_not_benchmarks(self):
         listing = 'TestA\nExampleB\nFuzzC\nBenchmarkD\nok\t' + race.SQLITE + '\t0.01s\n'
         self.assertEqual(race.test_names(listing), ['TestA', 'ExampleB', 'FuzzC'])

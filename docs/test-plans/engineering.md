@@ -18,6 +18,8 @@ F-039：`internal/agent/sqlite/foundation_test.go` 验证流暂停时状态查�
 
 调度查询优化复用 `internal/agent/sqlite/scheduler_test.go` 的默认容量、跨进程额度、过期所有权和公平性回归，以及 capacity/scheduling system gates。容量 gate 在同一持久化目录执行三批各 1,000 个 Child，记录逐批耗时并检查唯一身份、既有并发上限、预设业务失败和租约回收；不新增不稳定的绝对时间断言。
 
+Race 入口在 SQLite 分片之前分别运行 Bridge 与诊断记录器包，避免压力分片挤占 RPC / 100 ms 诊断写入契约的 CPU 时间。测试断言、生产时限与 `-race -count=1 -timeout=15m` 保持；harness 核对完整入口和两个分组入口都覆盖全部包且无遗漏或重复。
+
 ## Go 模块化重构验收（F-040）
 
 | 范围 | 必须保持的行为 / 已有入口 |
