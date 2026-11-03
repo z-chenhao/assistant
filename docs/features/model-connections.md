@@ -177,6 +177,11 @@ llm:
   provider_bridge_version: pi-ai-1.3.0-v1
 ```
 
+`pi-ai-1.3.0-v1` remains the configuration identifier for the compatible Bridge
+protocol; it is not the currently installed Pi SDK version. Keep existing
+configuration unchanged. The SDK is pinned in `provider-bridge/package.json`,
+and wire observations identify that version separately.
+
 Use an isolated `STEWARD_DATA_ROOT` while evaluating the CLI. The Bridge is optional;
 unconfigured startup still provides setup/diagnostics without a provider.
 
