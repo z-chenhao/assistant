@@ -8,5 +8,5 @@
     "test": "node --test test/*.test.mjs",
     "lint": "node --check src/sidecar.mjs && node --check src/worker.mjs && node --check src/prelude.mjs && node --check src/vendor/vm.mjs && node --check src/vendor/prelude.mjs"
   },
-  "dependencies": {"quickjs-wasi": "3.6.2"}
+  "dependencies": {"quickjs-wasi": "3.6.3"}
 }

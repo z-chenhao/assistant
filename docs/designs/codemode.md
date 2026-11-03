@@ -328,6 +328,11 @@ The registry includes installed Runtime/Prelude hashes in its ResourceHash, so
 Run creation freezes them before any cell starts. Recovery rejects drift.
 No heap or stack is serialized.
 
+Dependency-only updates to QuickJS also change the installed runtime hash. Finish
+active or suspended Code Mode work before replacing the installed runtime;
+unfinished executions keep their original fingerprint and cannot resume under
+different bytes. Do not rewrite saved fingerprints to bypass this check.
+
 The trusted Prelude captures the caller's source position. Node derives each
 nested key from the parent Provider call, source hash, position and dynamic
 ordinal at that position. Scripts never see or supply keys. Atomic admission
