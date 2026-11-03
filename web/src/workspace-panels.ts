@@ -50,6 +50,6 @@ export function connectWorkspacePanel(panel:HTMLDialogElement,onOpen:()=>void,on
  panel.addEventListener('cancel',event=>{event.preventDefault();layout(()=>close())});
  panel.addEventListener('close',()=>{if(!panel.open)sync()});
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&panel.open&&!compact.matches){event.preventDefault();layout(()=>close())}});
- compact.addEventListener('change',()=>{if(panel.open){const focus=document.activeElement as HTMLElement|null;panel.close();if(compact.matches)panel.showModal();else panel.show();focus?.focus({preventScroll:true})}});
- expand?.addEventListener('click',()=>layout(()=>{const large=panel.classList.toggle('is-expanded');expand.setAttribute('aria-pressed',String(large));expand.setAttribute('aria-label',t(large?'Reduce computer view':'Expand computer view'));sync()}));
+ compact.addEventListener('change',()=>{if(panel.open){const focus=document.activeElement as HTMLElement|null;panel.close();if(compact.matches||panel.classList.contains('is-expanded'))panel.showModal();else panel.show();focus?.focus({preventScroll:true})}});
+ expand?.addEventListener('click',()=>layout(()=>{const large=panel.classList.toggle('is-expanded');expand.setAttribute('aria-pressed',String(large));expand.setAttribute('aria-label',t(large?'Reduce computer view':'Expand computer view'));panel.close();if(compact.matches||large)panel.showModal();else panel.show();sync();expand.focus({preventScroll:true})}));
 }

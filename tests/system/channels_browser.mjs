@@ -297,6 +297,11 @@ try{
   await page.getByRole('button',{name:'Open Computer',exact:true}).click();
   await page.locator('#computer-panel[open]').waitFor();
   if(await page.locator('#worker-panel[open]').count())throw Error('two workspace panes opened');
+  await page.getByRole('button',{name:'Expand computer view',exact:true}).click();
+  if(!await page.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('expanded Computer did not protect focus');
+  await checkDraft(false);
+  await page.getByRole('button',{name:'Reduce computer view',exact:true}).click();
+  if(await page.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('reduced desktop pane kept conversation inert');
   await checkDraft(false);
   await page.getByRole('button',{name:'Close computer view',exact:true}).click();
   if(await page.locator('.workspace-panel[open]').count())throw Error('workspace pane stayed open');
