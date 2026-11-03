@@ -28,6 +28,8 @@ version: 1
 # Omit when using computer: all four tools then share that Guest.
 # execution:
 #   root: /absolute/private/execution-workspace
+#   # Opt in to per-Task working copies of this local repository.
+#   repository_source: /absolute/local/repository
 #   toolchain_roots: [/absolute/read-only/compiler-install]
 
 app:

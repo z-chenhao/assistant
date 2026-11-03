@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -224,5 +225,37 @@ func TestJavaScriptRuntimeRequiresTrustedAbsolutePaths(t *testing.T) {
 		if _, err := Load(path, func(string) (string, bool) { return "", false }); err == nil {
 			t.Fatal("accepted untrusted runtime config", yaml)
 		}
+	}
+}
+
+func TestTaskCodeStorageRemainsOutsideExecutionAndSourceScopes(t *testing.T) {
+	base := t.TempDir()
+	data := filepath.Join(base, "data")
+	storage := data + ".task-code"
+	workspace := filepath.Join(base, "work")
+	source := filepath.Join(base, "repo")
+	for _, c := range []struct {
+		name, root, source, toolchain string
+		valid                         bool
+	}{
+		{"separate", workspace, source, "", true},
+		{"shared-source", workspace, workspace, "", false},
+		{"protected-source", workspace, data, "", false},
+		{"reserved-main-without-source", storage, "", "", false},
+		{"reserved-toolchain", workspace, source, storage, false},
+		{"source-as-toolchain", workspace, source, source, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			body := fmt.Sprintf("version: 1\napp:\n  data_root: %q\nexecution:\n  root: %q\n", data, c.root)
+			if c.source != "" {
+				body += fmt.Sprintf("  repository_source: %q\n", c.source)
+			}
+			if c.toolchain != "" {
+				body += fmt.Sprintf("  toolchain_roots: [%q]\n", c.toolchain)
+			}
+			if _, err := Decode([]byte(body), noEnv); (err == nil) != c.valid {
+				t.Fatal(err)
+			}
+		})
 	}
 }

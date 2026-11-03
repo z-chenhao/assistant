@@ -275,18 +275,52 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	if cfg.Skills != nil && cfg.Skills.Validate() != nil {
 		return Config{}, errors.New("invalid Skills configuration")
 	}
+	codeStorage := canonicalScopePath(cfg.App.DataRoot) + ".task-code"
+	if cfg.Computer != nil && overlaps(codeStorage, cfg.Computer.Root) || cfg.Skills != nil && overlaps(codeStorage, cfg.Skills.Root) {
+		return Config{}, errors.New("task code storage must be separate from Computer and Skills")
+	}
+	for _, server := range cfg.MCP {
+		if overlaps(codeStorage, server.Directory) || overlaps(codeStorage, server.Command) {
+			return Config{}, errors.New("task code storage cannot overlap MCP provider")
+		}
+	}
 	if cfg.Execution != nil {
+		for _, root := range append([]string{cfg.Execution.Root}, cfg.Execution.ToolchainRoots...) {
+			if overlaps(codeStorage, root) {
+				return Config{}, errors.New("execution scope cannot expose Task code storage")
+			}
+		}
 		for _, root := range cfg.Execution.ToolchainRoots {
 			if overlaps(root, cfg.Execution.Root) {
 				return Config{}, errors.New("execution workspace must be separate from read-only toolchains")
 			}
 		}
 		roots := append([]string{cfg.Execution.Root}, cfg.Execution.ToolchainRoots...)
-		if cfg.Execution.RepositorySource != "" {
-			if overlaps(cfg.Execution.RepositorySource, cfg.Execution.Root) {
-				return Config{}, errors.New("repository source must be separate from execution workspace")
+		if source := cfg.Execution.RepositorySource; source != "" {
+			if cfg.Computer != nil || overlaps(source, cfg.Execution.Root) {
+				return Config{}, errors.New("repository source requires a separate native execution workspace")
 			}
-			roots = append(roots, cfg.Execution.RepositorySource)
+			storage := codeStorage
+			if overlaps(storage, source) {
+				return Config{}, errors.New("repository source cannot overlap Task code storage")
+			}
+			for _, root := range roots {
+				if overlaps(source, root) {
+					return Config{}, errors.New("task code storage, source and execution scopes must be separate")
+				}
+			}
+			for _, root := range []string{"/usr", "/bin", "/System", "/Library/Developer", "/Applications/Xcode.app/Contents/Developer", "/etc/alternatives", "/dev", "/proc"} {
+				if overlaps(storage, root) {
+					return Config{}, errors.New("task code storage must be outside system sandbox roots")
+				}
+			}
+			for _, root := range []string{source, storage} {
+				if cfg.JavaScript != nil && (overlaps(root, cfg.JavaScript.Script) || overlaps(root, cfg.JavaScript.Command)) ||
+					cfg.LLM.ProviderBridgeScript != "" && overlaps(root, cfg.LLM.ProviderBridgeScript) {
+					return Config{}, errors.New("task code source and storage must be separate from trusted runtimes")
+				}
+			}
+			roots = append(roots, source, storage)
 		}
 		if cfg.Execution.Validate() != nil {
 			return Config{}, errors.New("invalid execution workspace")
@@ -346,28 +380,30 @@ func (c Config) ValidateSourcePath(path string) error {
 func overlaps(a, b string) bool {
 	// A new data directory may not exist yet. Resolve its closest existing
 	// ancestor too, otherwise /alias/new-data can evade /real/provider scope.
-	canonical := func(path string) string {
-		original := path
-		tail := []string{}
-		for {
-			if p, e := filepath.EvalSymlinks(path); e == nil {
-				return filepath.Join(append([]string{p}, tail...)...)
-			}
-			parent := filepath.Dir(path)
-			if parent == path {
-				return filepath.Clean(original)
-			}
-			tail = append([]string{filepath.Base(path)}, tail...)
-			path = parent
-		}
-	}
-	a = canonical(a)
-	b = canonical(b)
+
+	a = canonicalScopePath(a)
+	b = canonicalScopePath(b)
 	within := func(parent, child string) bool {
 		relative, err := filepath.Rel(parent, child)
 		return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 	}
 	return within(a, b) || within(b, a)
+}
+
+func canonicalScopePath(path string) string {
+	original := path
+	tail := []string{}
+	for {
+		if p, e := filepath.EvalSymlinks(path); e == nil {
+			return filepath.Join(append([]string{p}, tail...)...)
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return filepath.Clean(original)
+		}
+		tail = append([]string{filepath.Base(path)}, tail...)
+		path = parent
+	}
 }
 
 func (c Config) LogLevel() slog.Level {

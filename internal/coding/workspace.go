@@ -8,13 +8,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/computer/sandbox"
@@ -52,7 +50,7 @@ func Tree(ctx context.Context, source, destination string) (string, error) {
 }
 
 func scanTree(ctx context.Context, source, destination string, inventory func([]manifestFile)) (string, error) {
-	root, err := os.OpenRoot(source)
+	root, err := openDirectory(source)
 	if err != nil {
 		return "", ErrInvalid
 	}
@@ -60,66 +58,67 @@ func scanTree(ctx context.Context, source, destination string, inventory func([]
 	var entries []manifestFile
 	visited := 0
 	total := int64(0)
-	var walk func(string) error
-	walk = func(dir string) error {
+	var walk func(*os.File, string) error
+	walk = func(directory *os.File, dir string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		f, err := root.Open(dir)
-		if err != nil {
-			return ErrInvalid
-		}
-		children, err := f.ReadDir(-1)
-		f.Close()
-		if err != nil {
+		children, err := directory.ReadDir(maxFiles + 2)
+		if err != nil && err != io.EOF || len(children) > maxFiles+1 {
 			return ErrInvalid
 		}
 		sort.Slice(children, func(i, j int) bool { return children[i].Name() < children[j].Name() })
 		for _, child := range children {
-			if strings.ContainsAny(child.Name(), "\r\n\x00") {
-				return ErrInvalid
+			if err := ctx.Err(); err != nil {
+				return err
 			}
-			if child.Name() == ".git" {
+			name := child.Name()
+			if strings.EqualFold(name, ".git") {
 				continue
 			}
+			if strings.ContainsAny(name, "\r\n\x00") {
+				return ErrInvalid
+			}
 			visited++
-			if visited > maxFiles {
+			relative := filepath.Join(dir, name)
+			if visited > maxFiles || len(relative) > 1024 {
 				return ErrInvalid
 			}
-			name := filepath.Join(dir, child.Name())
-			if len(name) > 1024 {
+			parent := int(directory.Fd())
+			var expected unix.Stat_t
+			if err := unix.Fstatat(parent, name, &expected, unix.AT_SYMLINK_NOFOLLOW); err != nil {
 				return ErrInvalid
 			}
-			info, err := root.Lstat(name)
+			flags := unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC | unix.O_NONBLOCK
+			isDir := expected.Mode&unix.S_IFMT == unix.S_IFDIR
+			if isDir {
+				flags |= unix.O_DIRECTORY
+			} else if expected.Mode&unix.S_IFMT != unix.S_IFREG || expected.Nlink != 1 || expected.Size > 8<<20 {
+				return ErrInvalid
+			}
+			fd, err := unix.Openat(parent, name, flags, 0)
 			if err != nil {
 				return ErrInvalid
 			}
-			if info.IsDir() {
+			file := os.NewFile(uintptr(fd), relative)
+			var actual unix.Stat_t
+			if err := unix.Fstat(fd, &actual); err != nil || actual.Dev != expected.Dev || actual.Ino != expected.Ino || actual.Mode&unix.S_IFMT != expected.Mode&unix.S_IFMT || !isDir && actual.Nlink != 1 {
+				file.Close()
+				return ErrInvalid
+			}
+			if isDir {
 				if destination != "" {
-					if err := os.MkdirAll(filepath.Join(destination, name), 0700); err != nil {
+					if err := os.Mkdir(filepath.Join(destination, relative), 0700); err != nil {
+						file.Close()
 						return ErrInvalid
 					}
 				}
-				if err := walk(name); err != nil {
+				err = walk(file, relative)
+				file.Close()
+				if err != nil {
 					return err
 				}
 				continue
-			}
-			if !info.Mode().IsRegular() || info.Size() > 8<<20 || len(entries) >= maxFiles {
-				return ErrInvalid
-			}
-			file, err := root.OpenFile(name, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
-			if err != nil {
-				return ErrInvalid
-			}
-			stat, err := file.Stat()
-			if err != nil || !stat.Mode().IsRegular() {
-				file.Close()
-				return ErrInvalid
-			}
-			if native, ok := stat.Sys().(*syscall.Stat_t); !ok || native.Nlink != 1 {
-				file.Close()
-				return ErrInvalid
 			}
 			data, err := io.ReadAll(io.LimitReader(file, (8<<20)+1))
 			file.Close()
@@ -131,13 +130,13 @@ func scanTree(ctx context.Context, source, destination string, inventory func([]
 				return ErrInvalid
 			}
 			mode := uint32(0600)
-			if stat.Mode()&0111 != 0 {
+			if actual.Mode&0111 != 0 {
 				mode = 0700
 			}
 			sum := sha256.Sum256(data)
-			entries = append(entries, manifestFile{Name: filepath.ToSlash(name), Hash: hex.EncodeToString(sum[:]), Mode: mode})
+			entries = append(entries, manifestFile{Name: filepath.ToSlash(relative), Hash: hex.EncodeToString(sum[:]), Mode: mode})
 			if destination != "" {
-				path := filepath.Join(destination, name)
+				path := filepath.Join(destination, relative)
 				if err := os.WriteFile(path, data, os.FileMode(mode)); err != nil {
 					return ErrInvalid
 				}
@@ -165,7 +164,7 @@ func scanTree(ctx context.Context, source, destination string, inventory func([]
 		}
 		return nil
 	}
-	if err := walk("."); err != nil {
+	if err := walk(root, "."); err != nil {
 		return "", err
 	}
 	raw, _ := json.Marshal(entries)
@@ -174,6 +173,38 @@ func scanTree(ctx context.Context, source, destination string, inventory func([]
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// Open each component relative to its already opened parent. A directory
+// replaced with a symlink cannot redirect the next lookup, even within source.
+func openDirectory(path string) (*os.File, error) {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return nil, ErrInvalid
+	}
+	const flags = unix.O_RDONLY | unix.O_DIRECTORY | unix.O_NOFOLLOW | unix.O_CLOEXEC
+	fd, err := unix.Open("/", flags, 0)
+	if err != nil {
+		return nil, err
+	}
+	if path == "/" {
+		return os.NewFile(uintptr(fd), path), nil
+	}
+	for _, component := range strings.Split(strings.TrimPrefix(path, "/"), "/") {
+		next, err := unix.Openat(fd, component, flags, 0)
+		unix.Close(fd)
+		if err != nil {
+			return nil, err
+		}
+		fd = next
+	}
+	return os.NewFile(uintptr(fd), path), nil
+}
+
+// Location is derived from the canonical installation data directory and Task.
+func Location(root, taskID string) Workspace {
+	hash := sha256.Sum256([]byte(taskID))
+	base := filepath.Join(root, hex.EncodeToString(hash[:16]))
+	return Workspace{Directory: filepath.Join(base, "work"), Baseline: filepath.Join(base, "baseline")}
 }
 
 func private(path string) error {
@@ -209,17 +240,17 @@ func lock(ctx context.Context, path string) (*os.File, error) {
 // Prepare publishes both baseline and working copy together in an immutable
 // Task location. A crash before rename leaves no admitted workspace; after it,
 // the receipt is sufficient to recover the same directory without reading source.
-func Prepare(ctx context.Context, root, source, taskID, scope string) (Workspace, error) {
-	hash := sha256.Sum256([]byte(taskID))
-	name := hex.EncodeToString(hash[:16])
-	if err := os.MkdirAll(root, 0700); err != nil {
+func Prepare(ctx context.Context, root, source, taskID, scope string, boundary func(string)) (Workspace, error) {
+	out := Location(root, taskID)
+	base := filepath.Dir(out.Directory)
+	name := filepath.Base(base)
+	parent, err := openDirectory(filepath.Dir(root))
+	if err != nil {
 		return Workspace{}, ErrInvalid
 	}
-	if err := private(root); err != nil {
-		return Workspace{}, err
-	}
-	root = filepath.Join(root, ".tasks")
-	if err := os.MkdirAll(root, 0700); err != nil {
+	err = unix.Mkdirat(int(parent.Fd()), filepath.Base(root), 0700)
+	parent.Close()
+	if err != nil && err != unix.EEXIST {
 		return Workspace{}, ErrInvalid
 	}
 	if err := private(root); err != nil {
@@ -230,13 +261,12 @@ func Prepare(ctx context.Context, root, source, taskID, scope string) (Workspace
 		return Workspace{}, err
 	}
 	defer guard.Close()
-	base := filepath.Join(root, name)
-	out := Workspace{Directory: filepath.Join(base, "work"), Baseline: filepath.Join(base, "baseline"), Status: "ready"}
+	out.Status = "ready"
 	read := func() error {
 		if err := private(base); err != nil {
 			return err
 		}
-		f, err := os.OpenFile(filepath.Join(base, "receipt.json"), os.O_RDONLY|unix.O_NOFOLLOW, 0)
+		f, err := os.OpenFile(filepath.Join(base, "receipt.json"), os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 		if err != nil {
 			return ErrInvalid
 		}
@@ -313,6 +343,9 @@ func Prepare(ctx context.Context, root, source, taskID, scope string) (Workspace
 	if err != nil {
 		return Workspace{}, ErrInvalid
 	}
+	if boundary != nil {
+		boundary("before_task_code_publish")
+	}
 	if err := ctx.Err(); err != nil {
 		return Workspace{}, err
 	}
@@ -328,19 +361,25 @@ func Prepare(ctx context.Context, root, source, taskID, scope string) (Workspace
 	if err != nil {
 		return Workspace{}, ErrInvalid
 	}
+	if boundary != nil {
+		boundary("after_task_code_publish")
+	}
 	out.BaselineHash = baseline
 	return out, nil
 }
 
 type Diff struct {
-	Patch             string       `json:"patch"`
-	Changed           bool         `json:"changed"`
-	ExecutableChanges []ModeChange `json:"executable_changes"`
+	Patch   string       `json:"patch"`
+	Changed bool         `json:"changed"`
+	Files   []FileChange `json:"files"`
 }
-type ModeChange struct {
-	Path   string `json:"path"`
-	Before bool   `json:"before_executable"`
-	After  bool   `json:"after_executable"`
+type FileChange struct {
+	Path             string `json:"path"`
+	Kind             string `json:"kind"`
+	BeforeSHA256     string `json:"before_sha256,omitempty"`
+	AfterSHA256      string `json:"after_sha256,omitempty"`
+	BeforeExecutable bool   `json:"before_executable"`
+	AfterExecutable  bool   `json:"after_executable"`
 }
 
 func Validate(ctx context.Context, w Workspace) error {
@@ -357,20 +396,12 @@ func Validate(ctx context.Context, w Workspace) error {
 // Review rejects unsafe work-tree entries before a fixed read-only recursive
 // diff in the existing kernel sandbox. It never executes repository commands.
 func Review(ctx context.Context, w Workspace) (Diff, error) {
-	fd, err := unix.Open(w.Directory, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	guard, err := openDirectory(w.Directory)
 	if err != nil {
 		return Diff{}, ErrInvalid
 	}
-	guard := os.NewFile(uintptr(fd), "code review lock")
 	defer guard.Close()
-	if unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB) != nil {
-		return Diff{}, ErrInvalid
-	}
-	var before, after []manifestFile
-	if actual, err := scanTree(ctx, w.Baseline, "", func(entries []manifestFile) { before = entries }); err != nil || actual != w.BaselineHash {
-		return Diff{}, ErrInvalid
-	}
-	if _, err := scanTree(ctx, w.Directory, "", func(entries []manifestFile) { after = entries }); err != nil {
+	if unix.Flock(int(guard.Fd()), unix.LOCK_EX|unix.LOCK_NB) != nil {
 		return Diff{}, ErrInvalid
 	}
 	temp, err := os.MkdirTemp("", "steward-code-review-")
@@ -378,54 +409,58 @@ func Review(ctx context.Context, w Workspace) (Diff, error) {
 		return Diff{}, ErrInvalid
 	}
 	defer os.RemoveAll(temp)
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	cmd, err := sandbox.Command(ctx, "/usr/bin/diff", []string{"-ruN", "-x", ".git", w.Baseline, w.Directory}, []string{w.Baseline, w.Directory}, temp, temp)
+	temp, err = filepath.EvalSymlinks(temp)
 	if err != nil {
 		return Diff{}, ErrInvalid
 	}
+	left, right := filepath.Join(temp, "a"), filepath.Join(temp, "b")
+	if os.Mkdir(left, 0700) != nil || os.Mkdir(right, 0700) != nil {
+		return Diff{}, ErrInvalid
+	}
+	var before, after []manifestFile
+	if actual, err := scanTree(ctx, w.Baseline, left, func(entries []manifestFile) { before = entries }); err != nil || actual != w.BaselineHash {
+		return Diff{}, ErrInvalid
+	}
+	if _, err := scanTree(ctx, w.Directory, right, func(entries []manifestFile) { after = entries }); err != nil {
+		return Diff{}, ErrInvalid
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	cmd, err := sandbox.Command(ctx, "/usr/bin/diff", []string{"-ruN", "a", "b"}, nil, temp, temp)
+	if err != nil {
+		return Diff{}, ErrInvalid
+	}
+	cmd.Dir = temp
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + temp, "LANG=C.UTF-8"}
 	output := sandbox.NewOutput(8 << 20)
-	cmd.Stdout = output
-	cmd.Stderr = io.Discard
+	cmd.Stdout, cmd.Stderr = output, io.Discard
 	started, err := sandbox.Run(cmd, unix.SIGTERM)
-	if !started || output.Overflow() || ctx.Err() != nil {
+	if !started || output.Overflow() || ctx.Err() != nil || err != nil && cmd.ProcessState.ExitCode() != 1 {
 		return Diff{}, ErrInvalid
 	}
-	code := cmd.ProcessState.ExitCode()
-	if err != nil && code != 1 {
-		return Diff{}, ErrInvalid
-	}
-	lines := strings.Split(string(output.Bytes()), "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(line, "diff ") || strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") || strings.HasPrefix(line, "Binary files ") || strings.HasPrefix(line, "Only in ") {
-			line = strings.ReplaceAll(line, w.Baseline+"/", "a/")
-			line = strings.ReplaceAll(line, w.Directory+"/", "b/")
-			line = strings.ReplaceAll(line, w.Baseline, "a")
-			line = strings.ReplaceAll(line, w.Directory, "b")
-			lines[i] = line
-		}
-	}
-	patch := strings.Join(lines, "\n")
-	if code == 1 && patch == "" {
-		return Diff{}, fmt.Errorf("%w: missing diff output", ErrInvalid)
-	}
-	modes := map[string]ModeChange{}
+	files := map[string]FileChange{}
 	for _, entry := range before {
-		modes[entry.Name] = ModeChange{Path: entry.Name, Before: entry.Mode&0100 != 0}
+		files[entry.Name] = FileChange{Path: entry.Name, BeforeSHA256: entry.Hash, BeforeExecutable: entry.Mode&0100 != 0}
 	}
 	for _, entry := range after {
-		change := modes[entry.Name]
-		change.Path = entry.Name
-		change.After = entry.Mode&0100 != 0
-		modes[entry.Name] = change
+		change := files[entry.Name]
+		change.Path, change.AfterSHA256, change.AfterExecutable = entry.Name, entry.Hash, entry.Mode&0100 != 0
+		files[entry.Name] = change
 	}
-	changes := []ModeChange{}
-	for _, change := range modes {
-		if change.Before != change.After {
-			changes = append(changes, change)
+	changes := []FileChange{}
+	for _, change := range files {
+		switch {
+		case change.BeforeSHA256 == "":
+			change.Kind = "added"
+		case change.AfterSHA256 == "":
+			change.Kind = "deleted"
+		case change.BeforeSHA256 != change.AfterSHA256 || change.BeforeExecutable != change.AfterExecutable:
+			change.Kind = "modified"
+		default:
+			continue
 		}
+		changes = append(changes, change)
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
-	return Diff{Patch: patch, Changed: code == 1 || len(changes) > 0, ExecutableChanges: changes}, nil
+	return Diff{Patch: string(output.Bytes()), Changed: len(changes) > 0, Files: changes}, nil
 }

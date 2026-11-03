@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/coding"
 	"github.com/z-chenhao/assistant/internal/computer/environment"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
@@ -96,6 +97,9 @@ func (t *tools) executeEnvironment(ctx context.Context, inv tool.Invocation) (re
 				}
 				if err == nil {
 					if scope != environment.ResourceHash(cfg) || status != "ready" {
+						return tool.Failure("PERMISSION_DENIED"), nil
+					}
+					if directory != coding.Location(t.runs.host.codeRoot, taskID).Directory {
 						return tool.Failure("PERMISSION_DENIED"), nil
 					}
 					info, err := os.Lstat(directory)
