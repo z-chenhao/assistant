@@ -31,7 +31,10 @@ frozen snapshots, so changing them needs explicit compatibility review.
 
 The maintained [engineering workflow](docs/features/engineering.md#contributing-working-on-a-change)
 covers proportional checks, offline setup/cache recovery and release boundaries.
-The [Feature Map rules](docs/feature-map.md#文档维护规则) define documentation ownership.
+The [documentation policy](docs/README.md#强制维护规则) defines content ownership:
+update current topics in place and keep review logs and execution results in PRs,
+Git history or CI artifacts. The [Feature Map rules](docs/feature-map.md#文档维护规则)
+define requirement status and acceptance maintenance.
 
 Dependency update PRs are proposals, not automatic approvals. Inspect runtime
 fingerprints, lockfiles, licenses and vulnerabilities; regenerate frontend outputs

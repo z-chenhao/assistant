@@ -2,7 +2,7 @@
 
 [功能与需求](../features/tools-approvals.md) · [测试方案](../test-plans/tools-approvals.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -33,11 +33,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/tools-approvals.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/tools-approvals.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-6-tooling-与-javascript-code-mode"></a>
 
@@ -227,31 +227,15 @@ This is not an exactly-once guarantee for external systems. Providers with no
 idempotency or authoritative query can leave an outcome unknown indefinitely.
 Do not retry such an action manually without resolving the original outcome.
 
-## Changelog
+## 当前命名与升级约束
 
-2026-10-28：按用户确认的命名规则统一为 `builtin__<tool_name>` 与 `mcp__<server_name>__<tool_name>`。更新直接调用、Code Mode 发现、Computer 桥接、角色裁剪和提示文案；JavaScript prelude 升至 v3。state schema 28 仅更新 Child 权限与 Code Mode 终态守卫，保留历史迁移、冻结快照、请求、审批与 hash 的原始字节。旧名不作为运行时别名，含旧名的冻结 Run 明确失败 `MODEL_INCOMPATIBLE`；升级前完成 Main 与未决外部效果核实，暂停的 Worker Task 可在升级后由新 Main append 创建新 Root。所有共享 data root 的进程需统一升级。
+工具使用 `builtin__<tool_name>` 与 `mcp__<server_name>__<tool_name>`，直接调用、Code Mode 发现、Computer 桥接、角色裁剪和提示使用同一命名。JavaScript prelude v3 与 state schema 28 的 Child 权限和 Code Mode 终态守卫保留历史迁移、冻结快照、请求、审批及 hash 的原始字节。
 
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | 现状建档 | 维持一条 ToolInvocation 管线和冻结动作审批；不把观测回放按钮或批量授权当作副作用重试入口。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史决策与演进记录
-
-以下正文保留原决定、理由、兼容影响和当时证明范围，不作为当前完成声明。原记录中旧目录布局与旧验证命令属于历史上下文；现行入口以功能说明、当前架构及产品测试方案为准。
+旧名不是运行时别名；含旧名的冻结 Run 明确失败为 `MODEL_INCOMPATIBLE`。升级前须完成 Main 与未决外部效果核实，暂停的 Worker Task 可在升级后由新 Main append 创建新 Root；共享 data root 的所有进程须统一升级。只有一条 ToolInvocation 管线，观测回放和批量授权不能成为副作用重试入口。
 
 <a id="decision-005-005--consolidated-model-visible-tools"></a>
 
 ## 005 — Consolidated model-visible Tools
-
-Status: accepted for the user-requested retired task #192 Tool consolidation.
 
 Artifact exposes exactly `builtin__artifact_manage` and
 `builtin__artifact_search`. Manage keeps strict operation-specific fields for
@@ -305,6 +289,6 @@ before the result limit, foreign scope denial, publication, replay reuse and
 unconfigured Memory without mutation. Maintained CLI harnesses inspect actual
 production HTTP projection, nested Code Mode calls, real CUA/Child behavior,
 Artifact kill/restart recovery, configured Memory and channel delivery. See the
-retired task #192 entries in [testing guide](../test-plans/product.md) for commands and evidence ownership.
+[testing guide](../test-plans/product.md) for commands and evidence ownership.
 
-2026-10-28：默认 read/bash/edit/write 属于统一 Host 工具目录。只有受信任 environment builtin 可以采用 external_effect / high / never 的 Host 执行；任意外部 Provider 不能借此跳过审批。原生与 Code Mode 的具体动作仍各自批准，未知效果不重发。旧 Workspace 无别名，schema 29 不重写旧请求；[迁移与环境边界](coding.md#默认设置与迁移)。
+默认 read/bash/edit/write 属于统一 Host 工具目录。只有受信任 environment builtin 可以采用 external_effect / high / never 的 Host 执行；任意外部 Provider 不能借此跳过审批。原生与 Code Mode 的具体动作仍各自批准，未知效果不重发。旧 Workspace 无别名，schema 29 不重写旧请求；[迁移与环境边界](coding.md#默认设置与迁移)。

@@ -2,7 +2,7 @@
 
 [功能与需求](../features/codemode.md) · [测试方案](../test-plans/codemode.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -37,11 +37,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/codemode.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/codemode.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-62-code-mode"></a>
 
@@ -265,7 +265,7 @@ type ExecutionOutcome struct {
 
 <a id="codemode-javascript-code-mode-runtime-steward-19--steward-20"></a>
 
-## JavaScript Code Mode runtime (retired task #19 / retired task #20)
+## JavaScript Code Mode runtime
 
 The configured `builtin__codemode_execute` Tool runs one fresh QuickJS VM per
 invocation through the normal Agent Loop and ToolExecutor. Its `source` argument
@@ -383,24 +383,3 @@ dispatch audits, reattached identities, quotas, final aggregation, memory
 metrics and cleanup. The normal CLI harness covers unawaited work, Store
 isolation, approval rejection and crashes before/after effects. Both harnesses are available through the system runner; repetition is explicit. Fake-clock tests advance approval by six hours
 and prove the disposed VM is not retained.
-
-## Changelog
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-039：VM 重建/挂起协调移入 CodeMode，SQLite 继续负责权威事实与事务。 | 替代把所有编排放进数据库适配器；不引入第二 scheduler、执行管线或运行时 wire 版本。 |
-| 2026-10-28 | 现状建档 | 使用标准 JavaScript 表达顺序与并发；固定源与冻结能力恢复，不增加 Workflow DSL 或第二套执行引擎。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史实现进度快照
-
-以下是早期阶段记录，保留当时边界，不描述当前完成状态；当前需求状态以 Feature Map 为准。
-
-retired task #19 实现进度：真实 Node/Pi QuickJS 执行、统一嵌套 ToolInvocation、同步持久 Store、发现/角色隔离和 Fake Computer Facade 的运行与证据入口见 `docs/designs/codemode.md`。当前每次 Start 独占 Sidecar/Worker；固定源码全量 Durable Replay、专用 Claim/Wake 与 37+8 kill/restart 验收仍由 retired task #20/21 完成，不据此宣称 M5 完成。

@@ -2,7 +2,7 @@
 
 [功能与需求](../features/skills-experience.md) · [测试方案](../test-plans/skills-experience.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -33,11 +33,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/skills-experience.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/skills-experience.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-7-skill-系统"></a>
 
@@ -128,16 +128,6 @@ context-budget assertions run unchanged before that selection.
 
 新 Run 的 Capability Snapshot 保存 Skill 索引与版本元数据，并在 system 的 `skill_index` 分区说明匹配任务后使用 skill view 读取正文。正文仍按需作为 Tool 结果提供，不预载全部 Skill；Skill 无法扩大角色权限。已有 skill list/view 模型接口保持不变，恢复 Run 不用新索引覆盖冻结索引。
 
-## Changelog
+## 当前设计取舍
 
-2026-10-28：F-022 Skill 索引接入统一初始上下文，使用冻结的 Host prompt metadata，补匹配、版本与相对资源读取规则。保留按需读取和经验审核生命周期，不增加普通 Agent 的 Skill 管理权限。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | 现状建档 | Skill 是方法库，Memory 是用户事实，两者分开。自动经验处理不意味着把 Skill 写权限授予普通 Main/Worker。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
+Skill 是方法库，Memory 是用户事实，两者分开。初始 Skill 索引使用冻结的 Host prompt metadata；内容按需读取，保留匹配、版本及相对资源约束。经验审核生命周期不授予普通 Main/Worker Skill 管理或写入权限。

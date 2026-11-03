@@ -2,7 +2,7 @@
 
 [功能与需求](../features/model-connections.md) · [测试方案](../test-plans/model-connections.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -34,11 +34,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/model-connections.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/model-connections.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-5-模型与-agent-决策"></a>
 
@@ -178,7 +178,7 @@ auth_connection_id: null
 
 第二条路径采用 Pi 当前 OpenAI Provider 的 “Sign in with ChatGPT” 语义，而不是 legacy `openai-codex` Provider：
 
-- Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不作为当前 M1/retired task #8 里程碑阻塞条件，不得记为已交付或已测试（2026-10-16 用户批准方案 A，见 [ADR 001](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow)）。
+- Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不包含在当前浏览器登录的完成范围内，不得记为已交付或已测试（见[账户认证设计](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow)）。
 - 登录完成后创建 `AuthConnection{provider: openai, auth_kind: chatgpt_oauth}`，刷新凭据进入 SecretStore；`state.db` 只保存 credential ref、账号/Workspace 的脱敏显示信息、过期状态和版本。
 - `AuthConnection.status = connected | refreshing | reauth_required | logged_out`。状态迁移由 Auth 层持久化；模型和 Run 只引用 Connection ID，不能读取 CredentialRef。
 - Access token 到期前由 Provider Auth 层自动刷新；同一 Credential 使用单飞锁，避免多个并发 Run 同时刷新。刷新失败或服务返回确定的授权失效时，连接进入 `reauth_required`，停止接收新 Run 并提示用户重新登录。
@@ -378,53 +378,33 @@ session IDs. the system runner covers ack-only/pre-ack/late/completion races, ma
 Generate/Continue calls against actual Node/HTTP, dispatch ordering, failed cleanup,
 and the full 30-second trickling-body deadline (not a shortened test-only timer).
 
-## Changelog
+## 当前设计取舍
 
-2026-10-28：F-013 在 Web 本地/账户模型候选中增加显式图片输入声明，并展示已验证/未验证/纯文本状态；沿用既有行为 Probe 和冻结 ModelSnapshot，不基于勾选或 catalog 直接启用视觉。
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | 现状建档 | 沿用单一活动模型与冻结快照；账户凭据由 SecretStore 持有。保留现有账户认证 ADR；跨平台后端缺口不通过把 Token 写进配置或数据库绕过。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [001-current-openai-account-auth.md](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史决策与演进记录
-
-以下正文保留原决定、理由、兼容影响和当时证明范围，不作为当前完成声明。原记录中旧目录布局与旧验证命令属于历史上下文；现行入口以功能说明、当前架构及产品测试方案为准。
+模型使用单一活动配置与冻结快照，账户凭据由 SecretStore 持有；平台后端缺口不能通过将 Token 写入配置或数据库绕过。图片输入须通过实际行为 Probe 与冻结 ModelSnapshot，不因配置勾选或 catalog 声明直接启用视觉。
 
 <a id="decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow"></a>
 
 ## ADR 001: Current OpenAI account authentication and deferred device flow
-
-Status: accepted by 朱晨浩 on 2026-10-16 in retired task #8, comment
-`01a1431f-37d1-7369-9c29-fba77578c4a5` (方案 A). Implementation remains subject
-to independent review and human merge.
 
 <a id="decision-001-decision-and-evidence"></a>
 
 ### Decision and evidence
 
 Use the current OpenAI public-client subscription protocol in the Provider
-Bridge. Retain Pi AI 1.3.0 for Responses generation. Its bundled login hardcodes
-port 1455, checks ID-token presence rather than verified identity, and its OpenAI
-catalog is static. Calling it unchanged cannot satisfy §5.4. Implement the
-documented current OAuth protocol inside the existing Bridge, with random-port
+Bridge. Use the locked Pi AI SDK for Responses generation; the installed version is
+defined in [package.json](../../provider-bridge/package.json). Account login and
+catalog discovery are owned by the Bridge so they can satisfy §5.4 independently
+of the SDK's bundled login. Implement the documented OAuth protocol there, with random-port
 loopback, expiring one-use state, PKCE S256, verified ID-token identity and a
 dynamic account-specific catalog. Go does not implement provider-private wire
 details. No additional production dependency is required.
 
 Device Authorization is deferred until a supported **current-provider** grant
 is established. It remains an explicit future requirement and is excluded from
-this slice's completion gate. It must not be reported as tested or delivered.
+the implemented browser-login scope. It must not be reported as tested or delivered.
 Do not substitute the legacy `openai-codex` provider or Platform API keys.
 
-Authoritative protocol references, inspected 2026-10-16:
+Protocol references:
 
 - [Registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 - [Accounts and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
@@ -511,12 +491,12 @@ needed. Peers and immutable snapshots retain protocol v1 compatibility.
 
 ### Verification and remaining requirements
 
-`make test`, `make test-race`, `make lint` and `make verify` include deterministic
+`make test`, `make test-race`, `make lint` and the account system gate cover deterministic
 OAuth/ID-token fixtures, actual Pi Responses, CLI/storage readback, single-flight
 refresh, failure injection, secret scans and kill/restart. The account harness
-owns launch, doctor, drive, evidence and cleanup. Required auth cases repeat five
-times in `make verify`. No online account is needed in CI.
+owns launch, doctor, drive, evidence and cleanup. `make test-e2e` includes the account gate; focused repetition uses the existing
+system runner's `--gate account --repeat N`. No online account is needed in CI.
 
 Unexecuted real login/Keychain/provider Live Shadow is **inconclusive**. Device
-Authorization is **deferred**, not passed. Main/Conversation Golden Cases belong
-to retired task #9/10; this slice does not establish full M1 or release completion.
+Authorization is **deferred**, not passed. Main/Conversation coverage belongs to its own [test plan](../test-plans/conversation.md);
+account checks alone do not establish release readiness.

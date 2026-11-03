@@ -2,7 +2,7 @@
 
 [功能与需求](../features/computer-use.md) · [测试方案](../test-plans/computer-use.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -37,11 +37,11 @@ Computer 生命周期持久化位于 `internal/computer/sqlite`。Agent 仅提�
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/computer-use.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/computer-use.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-9-computerinstance-与恢复"></a>
 
@@ -82,12 +82,12 @@ Computer 生命周期持久化位于 `internal/computer/sqlite`。Agent 仅提�
 - 用户不感知 Instance 的启动、暂停、迁移或恢复状态。
 - 用户只看到 Agent 空闲/忙碌和持续进行中的工作。
 
-retired task #24 的本地切片在同一已接受 Code Mode ToolInvocation 内执行生命周期策略：
+本地 Computer 实现在同一已接受 Code Mode ToolInvocation 内执行生命周期策略：
 首次 `cua.getState()` 获取逻辑 Computer，已接受嵌套调用全部结束后优雅关机、
 提交 Durable Checkpoint、销毁 Instance。Computer 元数据、冻结操作和 Outbox
 同处 `state.db`，使用 Run/Code claim 与 instance epoch fencing。Guest 的签名、
 权限、登录及 Driver 连接和三文件原子恢复由 `computer/macosvm` 负责。
-retired task #25 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
+Computer Use 在相同嵌套 ToolInvocation 中提供 Surface Inventory、Handle、Action、
 DesktopLease、Observation 和受控文件传输；来源局部失败进入 Inventory errors。
 受控审批/资源暂停保留物理 Lease，活动 claim 崩溃仍重建 Instance 并拒绝旧 Handle。
 配置、恢复和故障处理见 [Computer 运维](#) 与 [Computer Use](../features/computer-use.md)。
@@ -297,7 +297,7 @@ waitForChange(options?: {
 
 - Runtime 负责等待 Driver 事件或执行有界轮询，模型不指定 `poll_interval`，也不能用 Sleep 制造大量空转。
 - 成功时返回变化后的最新 AX Observation；超时返回结构化 `WAIT_TIMEOUT`，并携带最后一次 Observation 摘要。
-  retired task #25 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
+  Computer Use 以受 Host 限制的 1–10,000 ms deadline 执行有界轮询；详情只保留安全摘要。
 - 模型在拿到新 Observation 后自行判断文本、元素或窗口条件；Browser 的 DOM Locator、URL 和导航同步由 `playwright` Capability 提供。
 - 只有实际场景证明 `waitForChange()` 往返成本不可接受时，才增加声明式语义条件，避免一期维护复杂且 Provider 难以一致实现的等待 DSL。
 
@@ -477,7 +477,7 @@ scoped registration.
 
 ## Durable logical Computer
 
-retired task #24 adds the Lume lifecycle behind the existing Code Mode ToolExecutor and
+The Lume lifecycle operates behind the existing Code Mode ToolExecutor and
 Security boundary. `cua.getState()` lazily obtains the configured logical
 Computer. Its ID persists in `state.db`; replacement instances get increasing
 epochs. The accepted Code Mode invocation owns its lifecycle plan and cleanup.
@@ -494,7 +494,7 @@ even after supersession. The cancelled Task, Run and Code execution stay termina
 only Computer lifecycle progress is reconciled. No schema or frozen-request
 format changes; unknown effects still fail closed.
 
-retired task #25 adds live inventory, leased App/Window/Tab bindings, AX and screenshot
+Computer Use provides live inventory, leased App/Window/Tab bindings, AX and screenshot
 revisions, input, bounded waits, scoped Artifact transfers and the delayed
 Playwright Capability. See [Computer Use](../features/computer-use.md) for the facade,
 conservative action approvals, Guest browser provisioning and verification.
@@ -575,25 +575,7 @@ Preserve the owned store for diagnosis; use authoritative state to resolve an
 uncertain operation. Configuration/signature/integrity refusals expose safe
 standard Tool errors, without raw paths, SSH diagnostics or credentials.
 
-## Changelog
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
-| 2026-10-28 | 现状建档 | 保持宿主与 Guest 隔离、观察引用随状态失效、桌面互斥与统一副作用恢复；Fake 测试不能代替真实 macOS 兼容性证据。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-2026-10-28：F-026 原生文件/命令工具复用 Computer 生命周期与 execution claim，不需要生成 JavaScript。直接调用结束前 checkpoint/dispose，嵌套调用随 cell 排空；四工具与桌面浏览器共享 Guest。schema 29 扩展原生终态清理，不重写冻结请求；详见[执行环境方案](coding.md)。
-
-
-### Web 只读预览 · 2026-11-02
+## Web 只读预览
 
 私有 operator 预览读取现有 ready instance，不调用 Ensure/Restore 或发送输入。macosvm 使用 get_desktop_state 与独立 steward-web-preview Driver session，关闭 accessibility tree；不接触模型持有的 handles、AX revision、截图 revision 或持久化 UseState。Host 读取实例，截帧，再复核 ready phase/ComputerID/epoch/native identity；发生切换或取消就丢弃该帧。并发预览串行且有请求期限；不在网络操作期间持有数据库事务。仅通过已认证 Web 连接返回 PNG，private/no-store，不写 Artifact 或新增回放事实。
 

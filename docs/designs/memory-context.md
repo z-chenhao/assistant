@@ -2,7 +2,7 @@
 
 [功能与需求](../features/memory-context.md) · [测试方案](../test-plans/memory-context.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -57,11 +57,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/memory-context.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/memory-context.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-10-conversation-上下文与-compaction"></a>
 
@@ -100,7 +100,7 @@ context_tokens > context_window * threshold_percentage
 - 每一轮同时执行 `Memory 召回` 与 `Conversation 召回`。
 - 两路召回并行、分别排序，再在统一上下文预算下合并。
 - 本轮召回结果冻结，避免 Agent Loop 中途改变上下文。
-- 用户于 2026-10-18 确认：Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/features/memory-context.md`。
+- Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/features/memory-context.md`。
 - 撤销点之后接受的新输入归属新的排队 Main，保留不可变回执；旧 Main owner join 或租约失效并完成 stop settlement 后，才允许调度或 Claim 后继 Run。同内容的新显式 remember 保留独立的新来源与时间戳，不能因去重而继续指向撤销点之前的证据。
 - System Prompt、人格、规则和 Core Memory 尽量保持静态。
 - 动态召回内容放在 Prompt 后部，以减少对 Prompt Cache 的破坏。
@@ -223,7 +223,7 @@ author_role?
 
 #### 11.6 Memory 写入与维护
 
-retired task #23 实现与配置：`docs/features/memory-context.md`。可信本地 Experience Reviewer 使用 `skill manage` 完成候选、验证、晋升与退役；普通 Main/Worker 不获得 Skill 修改能力。
+实现与配置：`docs/features/memory-context.md`。可信本地 Experience Reviewer 使用 `skill manage` 完成候选、验证、晋升与退役；普通 Main/Worker 不获得 Skill 修改能力。
 
 显式管理工具：
 
@@ -255,7 +255,7 @@ forget
 
 <a id="recall-durable-context-recall-steward-22"></a>
 
-## Durable context recall (retired task #22)
+## Durable context recall
 
 Main, Root and Child use the same read-only `builtin__memory_search` Tool and
 ToolInvocation executor. The Host supplies the local user and Run's Agent identity.
@@ -429,38 +429,19 @@ Runs use the current assembly while preserving Task epochs and role reductions.
 - 需要总结时，该轮只提供专用总结 system prompt、序列化证据和保留任务事实，不声明 Tools。结果提交后推进同一个 Run 的 step，更新 `working_state`，继续业务推理；已接受结果在故障恢复时复用。
 - `summary_bytes` 是摘要目标；模型结果上限为 `max(4096, summary_bytes × 4)`，最多 64 KiB。被截断、空白、超限或要求调用工具的摘要不能成为工作状态。语义质量不由确定性测试证明。
 
-## Changelog
+## 当前设计取舍与兼容约束
 
-2026-10-28：F-013 将消息投影从 Run 类型文件拆至 `agent/messages.go`，用冻结 policy 标记接通用户图片，保留旧 Run 请求表示及 Child 策略继承；不将 base64 写入工作状态、归档或 Conversation。具体图像限制见 [文件方案](artifacts-media.md)。
+内置角色、能力指导和摘要指令通过 `go:embed` 嵌入 Markdown 产品资产，保留单二进制部署和显式升级；Go 负责装配与权限判断。图片投影由 `agent/messages.go` 与冻结 policy 管理，不把 Base64 写入工作状态、归档或 Conversation，具体限制见 [文件方案](artifacts-media.md)。
 
-2026-10-28：F-005 为新 Root 在执行原则后冻结独立的阶段进度约定，完整工具轮的简短 assistant 文本用于只读进度展示。Child 不继承，旧 Run 不重写；不新增工具、额外模型轮次或上下文格式。接纳与持久化边界见 [后台任务方案](tasks.md)。
+新 Root 在执行原则后冻结独立的阶段进度约定，以完整工具轮的简短 assistant 文本生成只读进度，不新增工具或额外模型轮次。Child 不继承该约定，旧 Run 不重写；接纳边界见 [任务方案](tasks.md)。
 
-2026-10-28：将内置角色、能力指导与摘要指令迁入嵌入式 Markdown 产品资产，便于独立审阅和迭代；保留 Go 中的装配与权限判断。相较运行时加载外部文件，`go:embed` 保持单二进制部署和显式升级；本次完整消息与摘要请求逐字节不变，不引入 schema、配置或冻结请求迁移。
+工作摘要采用 Root 可见业务输出和 Host 未知效果，不汇总整棵树的私有轨迹；新 Run 使用同模型、关闭工具的摘要轮次。state schema 27 校验 context version 与工作状态边界，旧 checkpoint、已接受请求及 hash 保持原值，新 context version 不回填旧 Run；共享数据根的进程须统一升级。
 
-2026-10-28：F-003/F-004/F-006/F-011/F-022 上下文治理。借鉴 Pi 的分区装配和工作摘要；保留 Steward 的 Main/Worker、Task epoch、显式交接、冻结能力、费用与重放边界。相较汇总整棵树，改用 Root 可见业务输出和 Host 未知效果；相较纯摘录，新 Run 使用同模型的工具关闭摘要轮次。state schema 27 校验 context version 和工作状态边界；旧 checkpoint 及已接受请求保持原实现与 hash，新 context version 不回填旧 Run，所有进程需统一升级。
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-039：同作用域复用仅在内存的索引，增量补充向量并在隐私边界清除。 | 相较逐次重建减少重复本地模型调用；内存中明文寿命延长到作用域切换/Forget/关闭，仍不落盘，进程内隐私互斥。 |
-| 2026-10-28 | 现状建档 | 沿用分库、证据来源和冻结召回；语义能力不足需单独补齐，不把摘录当成完整语义摘要。Forget 保留原始审计，但阻止旧上下文继续执行。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [003-memory-forget-revokes-unfinished-context.md](#decision-003-forget-revokes-unfinished-context) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史决策与演进记录
-
-以下正文保留原决定、理由、兼容影响和当时证明范围，不作为当前完成声明。原记录中旧目录布局与旧验证命令属于历史上下文；现行入口以功能说明、当前架构及产品测试方案为准。
+召回索引在同一作用域内仅驻留内存，增量补充向量，减少重复本地模型调用。明文驻留至作用域切换、Forget 或关闭，隐私互斥边界内清除，不落盘。Forget 保留原始审计，同时阻止旧上下文继续执行。
 
 <a id="decision-003-forget-revokes-unfinished-context"></a>
 
 ## Forget revokes unfinished context
-
-Accepted for retired task #23 on 2026-10-18 by the project owner: “选择 A：Forget 应覆盖未完成 Run；审计记录可以保留，但被忘记内容不得继续进入模型上下文”.
 
 A durable Forget intent is a privacy barrier. It takes precedence over reusing
 frozen recall, compacted context and completed recall calls in unfinished work.
@@ -468,7 +449,7 @@ The Host retains immutable requests/results as audit evidence. It never changes
 a frozen request, snapshot, CodeCall argument hash or internal call key to remove
 content in place.
 
-The initial implementation invalidates all unfinished Runs in the same Agent
+The implementation invalidates all unfinished Runs in the same Agent
 scope. Semantic dependencies can exist in copied Tool results, Child results and
 summaries; checking only the latest `run_recall` row would miss them. A monotonically
 increasing privacy epoch is committed with the accepted mutation. Business writes,
@@ -523,7 +504,7 @@ Conversation schema 3 retains derived summaries separately from original message
 Memory schema 2 adds evidence, idempotent receipts and suppression records.
 
 Verification lives in `tests/system/verify_memory_maintenance.py`, repeated five times
-by `make verify`, plus epoch/dispatch, migration, Curator, context and lifecycle
+by the maintained memory system gates, plus epoch/dispatch, migration, Curator, context and lifecycle
 regressions. The harness kills the owner before model dispatch and after Memory
 commit, then verifies stored state and fresh model requests. It does not establish
 semantic model quality or selective dependency tracking.

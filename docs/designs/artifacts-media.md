@@ -2,7 +2,7 @@
 
 [功能与需求](../features/artifacts-media.md) · [测试方案](../test-plans/artifacts-media.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -86,7 +86,7 @@ sequenceDiagram
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-43-artifact-协议"></a>
 
@@ -96,7 +96,7 @@ sequenceDiagram
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。
-- retired task #192 将模型可见 Artifact 工具收敛为 `builtin__artifact_manage/search`，经过同一个 ToolInvocation/Executor。`manage` 使用严格的 `operation: save | read | describe | publish` 联合 Schema；`search` 无 query 时浏览，有 query 时按名称或 MIME 子串筛选，按可访问结果取最近 1–50 条。`manage` 整体使用 `artifact_write`，只允许本地不可变新产物、读取和显式最终输出选择，不允许外部发送、上传或删除；`search` 使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](../features/artifacts-media.md)。
+- 模型可见 Artifact 工具为 `builtin__artifact_manage/search`，经过同一个 ToolInvocation/Executor。`manage` 使用严格的 `operation: save | read | describe | publish` 联合 Schema；`search` 无 query 时浏览，有 query 时按名称或 MIME 子串筛选，按可访问结果取最近 1–50 条。`manage` 整体使用 `artifact_write`，只允许本地不可变新产物、读取和显式最终输出选择，不允许外部发送、上传或删除；`search` 使用 `read_only`。单用户安装的 principal 绑定 data root 与 OS 用户，模型不能选择 user/Agent/Task/Run 作用域。详见 [Artifact 实现与运维](../features/artifacts-media.md)。
 
 <a id="artifacts-tool-contract"></a>
 
@@ -181,20 +181,10 @@ pin content. These audit references are durable; retention does not silently
 release them. Future history pruning must release its references in the same
 transaction before storage can be reclaimed. After Task protection ends, effective expiry rejects content reads.
 
-## Changelog
+## 当前设计取舍与兼容约束
 
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
+图像和文件以引用持久化，像素仅在授权 dispatch 时加载，不把 Base64 写入对话或恢复记录。用户图片使用冻结 context policy，旧 Run 保留旧表示，Child 权限不扩大。
 
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
+OCR 与原生环境工具共用 sandbox 的进程组、取消、等待和有界输出；原生工具使用 SIGTERM 清理，OCR 使用 SIGKILL，启动前后失败与未知效果仍须区分。`builtin__image_ocr` 共用授权读图及单图校验，由 Tesseract 处理原图；冻结引擎与语言身份，依赖变化须重启并新建 Run，既有快照不自动获得工具。
 
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-013 增强中的结构收敛 | 发现 OCR 与原生环境工具重复维护进程组、取消、等待和输出捕获，将其归入现有 sandbox 模块；图像解码与授权读取也由各自单一入口复用。 | 修复流复制绕过输出上限的问题，并移除环境工具中同类实现。保持原生工具 SIGTERM 清理、OCR SIGKILL、启动前/后失败区别、审批和 unknown 重放规则；不引入通用 Provider 框架。 | F-013 / F-026 |
-| 2026-10-28 | F-013 增强：本地 OCR | 明确区分像素输入与文字识别，新增默认 `builtin__image_ocr`，共用授权读图与单图校验，Tesseract 处理原图。 | 比较 Codex 的视觉专用 view_image 后保留 Artifact 语义；无需另一模型、外部服务、DB 迁移或新评测平台。冻结引擎/语言身份，依赖变更需重启并创建新 Run；既有快照不获得新工具。 | F-013 |
-| 2026-10-28 | F-013：用户图片进入视觉输入 | 从 Run 类型/生成存储文件拆出统一消息投影与授权图像 resolver，缩图过程分职责；复用既有 Probe 与 Bridge。 | 采用冻结 context policy 标记保留旧引用表示，不改已有请求或扩大 Child 权限；相比把 base64 放入历史或增加专用看图工具，保持引用持久化和统一执行路径。无需 schema 迁移，升级进程统一版本。 | F-013 |
-| 2026-10-28 | F-039：流读取/校验移出 SQLite，保留短事务配额及结果接纳；活跃对象由文件锁保护。 | 避免长流阻塞 lease 和结果接纳；增加文件所有权协议，需停止旧版本后升级，禁止不同回收协议混跑。 |
-| 2026-10-28 | 现状建档 | 保留引用式持久化，避免把 Base64 写入对话与恢复记录；用户输入与工具图片分开追踪，不能用运输证据代替模型理解。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
+Artifact 流读取与校验在 SQLite 事务外完成；配额与结果接纳保留短事务，文件锁保护活跃对象。升级文件回收协议前须停止旧进程，不允许不同回收协议混跑。

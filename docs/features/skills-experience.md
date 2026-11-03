@@ -51,7 +51,7 @@ Agent 可发现可用方法，再按需读取正文和资源。
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 The Experience Reviewer is a trusted local control workflow. Ordinary Main and
 Worker Skill capabilities remain list/view. `skill manage` reads a JSON operation:

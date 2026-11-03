@@ -4,7 +4,7 @@
 
 ## 范围与证据
 
-本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导本次已通过或真实模型效果已达标。
+本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导特定版本已通过或真实模型效果已达标。
 
 以功能文档中的需求为验收源；配置依赖、待实现分支、平台限制和未验证项单独报告。具体命令及 core/extended 编排以 [Testing](product.md) 和 [runner](../../tests/system/runner.py) 为准。
 
@@ -27,10 +27,10 @@
 
 ## 已有检查与缺失覆盖
 
-| 入口 | 已有证据用途 | 执行记录 |
-| --- | --- | --- |
-| [tests/system/verify_tasks.py](../../tests/system/verify_tasks.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本轮及后续结果存于对应 evidence |
-| [tests/system/verify_task_control.py](../../tests/system/verify_task_control.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本轮及后续结果存于对应 evidence |
+| 入口 | 覆盖用途与限制 |
+| --- | --- |
+| [tests/system/verify_tasks.py](../../tests/system/verify_tasks.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [tests/system/verify_task_control.py](../../tests/system/verify_task_control.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
 ### F-005 验收路径
 
@@ -38,11 +38,11 @@
 - 现有 Child 审批和费用授权组件检查验证 Activity 不把等待授权错误显示为工作完成；既有 Task control 检查继续覆盖 pause/cancel 的 epoch fencing。
 - `verify_tasks.py`：实际 CLI/Actor 在进度事务提交前后 SIGKILL，恢复后保留摘要，完成的模型调用不重发；只生成原有最终 Root update 和 Main follow-up。现有 PTY `/status` 仍从同一 Activity 投影读取。
 - `verify_channels.py` 的真实 Chromium live 场景：Root 先写一条摘要并等待冻结审批，进度页可见；拒绝后进入下一阶段并结束 ongoing 的本轮，摘要和阶段自动更新；随后取消，页面不增加任务控制按钮，Conversation 草稿及附件保留。
-- 上述使用显式脚本模型检查软件协议。真实模型是否在适当阶段稳定生成有用摘要属于外部 Agent eval，本轮不声称通过该质量验收。
+- 上述使用显式脚本模型检查软件协议。真实模型是否在适当阶段稳定生成有用摘要属于外部 Agent eval，确定性回归不能证明该质量验收通过。
 
 ## 详细测试入口与证明边界
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="task-control-model-counterexample-and-implementation-evidence"></a>
 

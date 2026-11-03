@@ -118,13 +118,13 @@ Task 详情只展示该任务已由 Main 交付的内容，不将 Worker 结果�
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="channels-web-feishu-and-safe-delivery"></a>
 
 ## Web, Feishu and safe delivery
 
-retired task #28 adds authenticated interaction and rendering to the existing
+Authenticated interaction and rendering use the existing
 `InboundEvent -> Actor -> Main/Worker -> ToolInvocation -> Conversation ->
 DeliveryRequest/Outbox -> Adapter` path. There is one Conversation per Agent.
 No channel creates its own reasoning loop, Task state machine or approval store.

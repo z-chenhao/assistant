@@ -88,11 +88,11 @@ OCR 能提供截图中的文字证据，不能证明布局、颜色、图表关�
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="artifacts-artifact-storage-and-operations-steward-14"></a>
 
-## Artifact storage and operations (retired task #14)
+## Artifact storage and operations
 
 Artifacts reopen through opaque `artifact:` references. Only the Store resolves
 references to storage keys. Files live beneath `app.data_root/artifacts`;
