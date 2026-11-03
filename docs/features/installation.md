@@ -78,7 +78,9 @@ After selection, type your message. `/models` lists profiles, `/setup` repairs a
 connection, and `/quit` or Ctrl-C closes the foreground application. Within a
 setup prompt, `/cancel` returns to conversation before `/quit`; Ctrl-C exits
 directly. No daemon is
-installed. Existing Task and Run recovery uses the same durable state on restart.
+installed automatically. macOS users can explicitly install and start the
+[background Web service](operations.md#macos-后台运行与独立巡检); it remains active
+after closing the browser. Existing Task and Run recovery uses the same durable state on restart.
 
 ChatGPT credentials require the native macOS Keychain build. On other platforms,
 use an unauthenticated local endpoint or an explicit API-key environment reference.

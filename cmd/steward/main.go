@@ -48,6 +48,9 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
+	if command.kind == commandService {
+		return runService(ctx, options, out)
+	}
 	input, err := readModelInput(command, flags, in)
 	if err != nil {
 		return err
