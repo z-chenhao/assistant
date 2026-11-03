@@ -38,7 +38,9 @@ From the repository checkout, install Go 1.26.10+ and Node.js 24.21.0, then run:
 No browser download, YAML editing, broker installation or frontend build
 is needed for terminal conversation. Built-in file/command tools additionally
 use system Python 3 and bash, with bubblewrap/user namespaces on Linux or
-Seatbelt on macOS; doctor checks their presence. No Host execution fallback exists.
+Seatbelt on macOS. On macOS, the selected Xcode or Command Line Tools provides
+the interpreter under a supported system Developer directory. Doctor checks
+these dependencies. No Host execution fallback exists.
 On Ubuntu, install `python3 bash bubblewrap` using the system package manager and
 ensure unprivileged user namespaces are available.
 Image OCR additionally uses local Tesseract and supported language data. The

@@ -22,10 +22,11 @@ type Local struct{ Config Config }
 // Check is a read-only dependency check. Namespace availability is proved when
 // dispatching; a binary being installed does not imply permission to run it.
 func Check() error {
-	for _, path := range []string{"/usr/bin/python3", "/bin/bash"} {
-		if _, err := os.Stat(path); err != nil {
-			return err
-		}
+	if _, err := os.Stat("/bin/bash"); err != nil {
+		return err
+	}
+	if _, err := sandbox.Python3(context.Background()); err != nil {
+		return err
 	}
 	return sandbox.Check()
 }
@@ -51,11 +52,7 @@ func (l Local) Execute(ctx context.Context, name, args string) tool.Result {
 	if err != nil {
 		return tool.Failure("INVALID_ARGUMENT")
 	}
-	interpreter, err := filepath.EvalSymlinks("/usr/bin/python3")
-	if err != nil {
-		return tool.Failure("PROVIDER_UNAVAILABLE")
-	}
-	cmd, err := sandbox.Command(ctx, interpreter, []string{"-I", "-c", Source}, l.Config.ToolchainRoots, root, root)
+	cmd, err := sandbox.PythonCommand(ctx, []string{"-I", "-c", Source}, l.Config.ToolchainRoots, root)
 	if err != nil {
 		return tool.Failure("PROVIDER_UNAVAILABLE")
 	}

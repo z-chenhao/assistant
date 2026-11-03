@@ -4,9 +4,20 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 func Check() error { _, err := exec.LookPath("bwrap"); return err }
+
+func Python3(context.Context) (string, error) { return filepath.EvalSymlinks("/usr/bin/python3") }
+
+func PythonCommand(ctx context.Context, args []string, readRoots []string, root string) (*exec.Cmd, error) {
+	interpreter, err := Python3(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return Command(ctx, interpreter, args, readRoots, root, root)
+}
 
 func Command(ctx context.Context, executable string, args []string, readRoots []string, writeRoot, workingDir string) (*exec.Cmd, error) {
 	bin, err := exec.LookPath("bwrap")

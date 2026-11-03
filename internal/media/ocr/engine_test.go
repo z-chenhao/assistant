@@ -106,15 +106,23 @@ wait
 	if err := os.WriteFile(executable, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
-	e.executable = executable
+	// Discover records canonical executable paths in the frozen identity.
+	canonical, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.executable = canonical
 	e.version = "ocr-cancel-test\n"
-	var err error
-	e.binaryHash, err = fileHash(executable)
+	e.binaryHash, err = fileHash(canonical)
 	if err != nil {
 		t.Fatal(err)
 	}
 	jobs := t.TempDir()
-	t.Setenv("TMPDIR", jobs)
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(jobs, alias); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", alias)
 	pixels, err := os.ReadFile("testdata/text.png")
 	if err != nil {
 		t.Fatal(err)
