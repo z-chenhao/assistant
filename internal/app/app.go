@@ -36,6 +36,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/memory"
 	memorysqlite "github.com/z-chenhao/assistant/internal/memory/sqlite"
 	"github.com/z-chenhao/assistant/internal/observability"
+	"github.com/z-chenhao/assistant/internal/observer/github"
 	"github.com/z-chenhao/assistant/internal/operations"
 	"github.com/z-chenhao/assistant/internal/recall/embedding"
 	"github.com/z-chenhao/assistant/internal/skill"
@@ -54,6 +55,7 @@ type App struct {
 	runtimeDone         <-chan struct{}
 	rootLock            *os.File
 	feishu              *feishu.Client
+	github              *github.Service
 	computer            *macosvm.Provider
 	computerPreviewMu   sync.Mutex
 	memoryCurator       *memory.Curator
@@ -202,6 +204,9 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		a.feishu = feishu.NewClient(*cfg.Feishu, secrets)
 	}
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
+	if cfg.GitHub != nil {
+		a.github = &github.Service{Config: *cfg.GitHub, Store: store, Client: github.Client{Secrets: secrets}}
+	}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
 		path, err := os.Executable()
