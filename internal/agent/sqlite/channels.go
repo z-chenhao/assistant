@@ -108,7 +108,7 @@ func (s *Store) PreferChannel(ctx context.Context, channel, binding string, vers
 	})
 }
 
-func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundEvent, content string) (string, string, error) {
+func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundEvent, content, sourceKey string) (string, string, error) {
 	var binding string
 	if err := tx.QueryRowContext(ctx, `SELECT binding_id FROM channel_binding WHERE channel=? AND subject=? AND destination=? AND enabled=1`, e.Channel, e.Subject, e.Destination).Scan(&binding); err != nil {
 		return "", "", interaction.ErrUnauthorized
@@ -124,6 +124,9 @@ func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundE
 	}
 	keyParts, _ := encoded([]string{binding, e.SourceID})
 	key := "channel:" + digest(keyParts)
+	if sourceKey != "" {
+		key = sourceKey
+	}
 	var savedKey, savedHash string
 	sourceErr := tx.QueryRowContext(ctx, `SELECT request_key,content_hash FROM channel_source WHERE binding_id=? AND source_id=?`, binding, e.SourceID).Scan(&savedKey, &savedHash)
 	if sourceErr == nil && (savedKey != key || savedHash != hash) {
@@ -147,12 +150,16 @@ func acceptChannelSource(ctx context.Context, tx *sql.Tx, e interaction.InboundE
 // Freeze the reply route together with the semantic intent. Later preference
 // changes and callbacks cannot redirect an already accepted message.
 func freezeMessageRoute(ctx context.Context, tx *sql.Tx, messageID, runID string) error {
-	var binding string
-	err := tx.QueryRowContext(ctx, `SELECT coalesce(m.binding_id,'') FROM main_input i LEFT JOIN message_route m USING(message_id) WHERE i.run_id=? ORDER BY i.sequence DESC LIMIT 1`, runID).Scan(&binding)
+	var binding, source string
+	err := tx.QueryRowContext(ctx, `SELECT coalesce(m.binding_id,''),coalesce(m.reply_source_id,'') FROM main_input i LEFT JOIN message_route m USING(message_id) JOIN run r ON r.run_id=i.run_id WHERE i.run_id=? AND i.sequence<=json_extract(r.checkpoint_json,'$.input_sequence') ORDER BY i.sequence DESC LIMIT 1`, runID).Scan(&binding, &source)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 	if err == sql.ErrNoRows {
+		origin, e := runReplyOrigin(ctx, tx, runID)
+		if e != nil {
+			return e
+		}
 		var channel string
 		var preferred sql.NullString
 		if err = tx.QueryRowContext(ctx, `SELECT channel,binding_id FROM channel_preference WHERE singleton=1`).Scan(&channel, &preferred); err != nil {
@@ -160,18 +167,35 @@ func freezeMessageRoute(ctx context.Context, tx *sql.Tx, messageID, runID string
 		}
 		if preferred.Valid {
 			binding = preferred.String
+			if binding == origin.binding {
+				source = origin.source
+			}
 		} else if channel == "auto" {
-			err = tx.QueryRowContext(ctx, `SELECT binding_id FROM channel_binding WHERE channel='feishu' AND enabled=1 ORDER BY binding_id LIMIT 1`).Scan(&binding)
-			if err != nil && err != sql.ErrNoRows {
-				return err
+			if origin.binding != "" {
+				binding, source = origin.binding, origin.source
+			} else {
+				err = tx.QueryRowContext(ctx, `SELECT binding_id FROM channel_binding WHERE channel='feishu' AND enabled=1 ORDER BY binding_id LIMIT 1`).Scan(&binding)
+				if err != nil && err != sql.ErrNoRows {
+					return err
+				}
 			}
 		}
 	}
 	if binding == "" {
 		return nil
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO message_route(message_id,binding_id) SELECT ?,? WHERE NOT EXISTS(SELECT 1 FROM message_route WHERE message_id=?)`, messageID, binding, messageID)
+	_, err = tx.ExecContext(ctx, `INSERT INTO message_route(message_id,binding_id,reply_source_id) SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM message_route WHERE message_id=?)`, messageID, binding, source, messageID)
 	return err
+}
+
+func (s *Store) DeliveryReplySource(ctx context.Context, request delivery.Request) (string, error) {
+	b, err := s.DeliveryBinding(ctx, request)
+	if err != nil {
+		return "", err
+	}
+	var source string
+	err = s.db.QueryRowContext(ctx, `SELECT reply_source_id FROM message_route WHERE message_id=? AND binding_id=?`, request.MessageID, b.ID).Scan(&source)
+	return source, err
 }
 func applyMessageRoute(ctx context.Context, tx *sql.Tx, r *delivery.Request) error {
 	err := tx.QueryRowContext(ctx, `SELECT b.channel,b.destination FROM message_route m JOIN channel_binding b USING(binding_id) WHERE m.message_id=?`, r.MessageID).Scan(&r.Channel, &r.DestinationRef)

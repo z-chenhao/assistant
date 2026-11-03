@@ -51,6 +51,10 @@ func tasksQuery(r *http.Request) (task.ListQuery, error) {
 			q.Query = values[0]
 		case "cursor":
 			q.Cursor = values[0]
+		case "feedback_before":
+			if len(values[0]) > 256 {
+				return q, task.ErrInvalid
+			}
 		default:
 			return q, task.ErrInvalid
 		}
@@ -97,6 +101,9 @@ func (s *Server) loadTasks(ctx context.Context, r *http.Request, p *page) error 
 				}
 			}
 		}
+		if err == nil {
+			s.loadAttention(ctx, p, "", r.URL.Query().Get("feedback_before"), nil)
+		}
 		return err
 	}
 	ref := strings.TrimPrefix(r.URL.Path, "/tasks/")
@@ -140,5 +147,6 @@ func (s *Server) loadTasks(ctx context.Context, r *http.Request, p *page) error 
 		}
 		v.Messages = append(v.Messages, shown)
 	}
+	s.loadAttention(ctx, p, ref, "", nil)
 	return nil
 }

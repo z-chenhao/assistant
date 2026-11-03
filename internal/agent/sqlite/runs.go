@@ -25,6 +25,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/memory"
 	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
 	sqlitedriver "modernc.org/sqlite"
@@ -103,7 +104,7 @@ func (r *Runs) write(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err == nil {
 		return nil
 	}
-	for _, known := range []error{artifact.ErrNotFound, artifact.ErrIntegrity, artifact.ErrInvalid, artifact.ErrLimit, artifact.ErrConflict, interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
+	for _, known := range []error{task.ErrFeedbackStale, task.ErrNotFound, artifact.ErrNotFound, artifact.ErrIntegrity, artifact.ErrInvalid, artifact.ErrLimit, artifact.ErrConflict, interaction.ErrUnauthorized, automation.ErrInvalid, computer.ErrInvalid, computer.ErrStale, computer.ErrBusy, computer.ErrCompatibility, agent.ErrResourceLimit, agent.ErrBusy, agent.ErrClaimLost, agent.ErrConflict, agent.ErrSetup, conversation.ErrConflict, conversation.ErrInvalid, delivery.ErrConflict, delivery.ErrStorage, llm.ModelIncompatible, llm.ContextLengthExceeded, tool.ErrResource, tool.ErrReplay, tool.ErrApprovalDenied} {
 		if errors.Is(err, known) {
 			return known
 		}
@@ -116,7 +117,7 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 		return agent.ErrClaimLost
 	}
 	var valid int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND coalesce((SELECT epoch FROM run_memory_epoch WHERE run_id=r.run_id),0)=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=r.agent_id),0) AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active'))`, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND coalesce((SELECT epoch FROM run_memory_epoch WHERE run_id=r.run_id),0)=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=r.agent_id),0) AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active')) AND `+currentGitHubCause, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
 		return agent.ErrStorage
 	}
 	if valid != 1 {
@@ -126,17 +127,17 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 }
 
 func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.ContentPart) (agent.Receipt, error) {
-	return r.submit(ctx, key, parts, nil)
+	return r.submit(ctx, key, parts, nil, "")
 }
 
 func (r *Runs) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
 	if err := e.Validate(); err != nil {
 		return agent.Receipt{}, err
 	}
-	return r.submit(ctx, "", e.Content, &e)
+	return r.submit(ctx, "", e.Content, &e, "")
 }
 
-func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent) (agent.Receipt, error) {
+func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent, feedbackRef string) (agent.Receipt, error) {
 	parts, err := conversation.Normalize(parts)
 	if err != nil {
 		return agent.Receipt{}, err
@@ -156,7 +157,11 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		}
 		var bindingID string
 		if inbound != nil {
-			bindingID, key, err = acceptChannelSource(ctx, tx, *inbound, content)
+			sourceKey := ""
+			if feedbackRef != "" {
+				sourceKey = key
+			}
+			bindingID, key, err = acceptChannelSource(ctx, tx, *inbound, content, sourceKey)
 			if err != nil {
 				return err
 			}
@@ -178,8 +183,16 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		if err != sql.ErrNoRows {
 			return err
 		}
+		if feedbackRef != "" {
+			if err := r.host.requireCurrentFeedback(ctx, tx, feedbackRef, "", false); err != nil {
+				return err
+			}
+		}
 		if profile == "" || status != "ready" {
 			return agent.ErrSetup
+		}
+		if err = supersedeGitHubMain(ctx, tx, agentID); err != nil {
+			return err
 		}
 		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND desired_state='running' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
 		if err == sql.ErrNoRows {
@@ -217,8 +230,18 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		if _, err = tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, receipt.MessageID, raw); err != nil {
 			return err
 		}
+		if feedbackRef != "" {
+			if _, err = tx.ExecContext(ctx, `UPDATE task_feedback SET status='answered',response_message_id=? WHERE feedback_ref=? AND status='pending'`, receipt.MessageID, feedbackRef); err != nil {
+				return err
+			}
+			r.host.boundary("before_task_feedback_response_commit")
+		}
 		if bindingID != "" {
-			if _, err = tx.ExecContext(ctx, `INSERT INTO message_route VALUES(?,?)`, receipt.MessageID, bindingID); err != nil {
+			source := ""
+			if inbound.Channel == "feishu" {
+				source = inbound.SourceID
+			}
+			if _, err = tx.ExecContext(ctx, `INSERT INTO message_route(message_id,binding_id,reply_source_id) VALUES(?,?,?)`, receipt.MessageID, bindingID, source); err != nil {
 				return err
 			}
 		}
@@ -229,6 +252,9 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 	})
 	if inbound != nil && err == nil {
 		r.host.boundary("after_channel_input_commit")
+	}
+	if feedbackRef != "" && err == nil {
+		r.host.boundary("after_task_feedback_response_commit")
 	}
 	return receipt, err
 }
@@ -245,6 +271,9 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 // Recover scans authoritative intents without acquiring execution ownership.
 // Production startup uses the same idempotent scan as every Actor drain.
 func (r *Runs) Recover(ctx context.Context) error {
+	if err := r.write(ctx, func(tx *sql.Tx) error { return stopInvalidGitHubMains(ctx, tx) }); err != nil {
+		return err
+	}
 	now := time.Now()
 	if r.automationClock != nil {
 		now = r.automationClock()
@@ -273,7 +302,7 @@ func (r *Runs) Recover(ctx context.Context) error {
 	if err := r.promoteFollowups(ctx); err != nil {
 		return err
 	}
-	return nil
+	return r.recoverGitHubFollowups(ctx)
 }
 
 func (r *Runs) scheduledResult(ctx context.Context, id string, err error) (string, error) {
@@ -281,7 +310,7 @@ func (r *Runs) scheduledResult(ctx context.Context, id string, err error) (strin
 		var active int
 		// Stopping owners must join or expire before Drain can finish. They are
 		// never candidates for business claims, but still require recovery work.
-		if err = r.host.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1))).Scan(&active); err != nil {
+		if err = r.host.activeRun.QueryRowContext(ctx, sql.Named("now", int64(1<<63-1)), r.githubScopeArgument()).Scan(&active); err != nil {
 			return "", agent.ErrStorage
 		}
 		if active > 0 {
@@ -312,7 +341,7 @@ func (r *Runs) Claim(ctx context.Context, id string) (agent.RunClaim, error) {
 		if err := r.claimCapacity(ctx, tx, id); err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND `+mainPredecessorsJoined+` AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id)
+		res, err := tx.ExecContext(ctx, `UPDATE run_claim SET token=?,epoch=epoch+1,expires_at=?,version=version+1 WHERE run_id=? AND (token IS NULL OR expires_at<=?) AND EXISTS(SELECT 1 FROM run r WHERE run_id=? AND status IN ('queued','running','waiting') AND desired_state='running' AND `+mainPredecessorsJoined+` AND `+configuredGitHubRun+` AND (kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.task_epoch=r.task_epoch AND t.status='active')))`, c.token, now+leaseDuration.Microseconds(), id, now, id, r.githubScopeArgument())
 		if err != nil {
 			return err
 		}

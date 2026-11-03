@@ -71,13 +71,18 @@ class MainHarness:
             time.sleep(0.025)
         raise RuntimeError("state boundary not reached: " + description)
 
-    def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work")):
+    def hold(self, boundary, extra_flags=(), timeout=15, command=("chat", "work"), input_text=None):
         started = time.monotonic()
         start = self.processes.start if self.processes is not None else subprocess.Popen
         child = start(self.args("-test-main-hold", boundary, *extra_flags, *command),
+                                 stdin=subprocess.PIPE if input_text is not None else None,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env=self.env, cwd=self.root)
         self.children.append(child)
+        if input_text is not None:
+            child.stdin.write(input_text)
+            child.stdin.close()
+            child.stdin = None
         self.hold_observation = dict(boundary=boundary, timeout_seconds=timeout,
                                      pid=child.pid, reached=False)
         output, errors, pending = bytearray(), bytearray(), bytearray()

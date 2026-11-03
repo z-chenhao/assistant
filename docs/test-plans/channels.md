@@ -17,7 +17,13 @@
 | [F-018](../features/channels.md#f-018) | 真实浏览器组合待回答/审批/审阅/故障与普通工作，验证顺序、计数到明细、权限、重复/已解决/过期事项；后台更新、断线与旧页面下保护草稿/附件/焦点/位置。沿用现有渠道浏览器入口；F-004 未完成前仅能验证已有事项，不能据渲染器宣称闭环完成。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
 | [F-019](../features/channels.md#f-019) | 长任务与输入草稿并行时，回复/进度更新可见，焦点、草稿及附件不被覆盖。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-020](../features/channels.md#f-020) | 验证真实绑定、token 生命周期、通知偏好、撤销、重启与不确定投递；未知结果不盲目重发。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
-| [F-020](../features/channels.md#f-020) | 受控 GitHub/飞书 peer 验证原话题、成果链接、渠道内容与接收者；覆盖重复报告、投递重试/重启、绑定撤销、失效目的地及发送未知。核对唯一通知意图与回执，不用重发消除 unknown；真实渠道展示与可达性需 Live，语义简洁度另行评估。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+| [F-020](../features/channels.md#f-020) | 签名回调→Actor→原消息同步/Task 异步交付→受控飞书 HTTP peer；验证精确原来源、单 Main 分组、可信全文/文件链接、通知偏好和完整语义，覆盖重复/重启/撤权/发送未知。 | 个人 p2p 入口已有回归；显式 GitHub PR 接续由 F-042/F-004 驱动，并经真实 Feishu HTTP peer 验证原话题，真实飞书展示、链接可达性与语义质量待 Live/效果验收 |
+
+### F-018/F-004 Web 待办覆盖
+
+`verify_channels.py --attention-only` 使用真实 Main Task 工具保存问题/审阅与失败执行，真实上传文件，再由认证 Web 与 Chromium 完成优先定位、已完成 Task 审阅、具体文件链接、回答/审阅及 Main 接续。`channels_browser.mjs` 的 attention 场景检查当前页数量与行数、长中文拒绝、native 输入/焦点/选区、Chat 草稿与附件、新标签页、中文窄宽、键盘提交、确认丢失后只读草稿、另一端使本地表单失效、断线陈旧页面被拒绝且保留意见。持久化 readback 证明三条反馈只产生三次接续、始终保留 Web 来源/路由、无审批替代，随后 CLI 同答重试仍返回原 receipt。
+
+`task_feedback_web_test.go` 以真实 SQLite/Actor 验证 CLI/Web 首次顺序、callback aliases、不同回答冲突、真实 Main 交付与绑定撤销先于去重；`attention_test.go` 验证转义、确切 Task/消息/文件定位和认证入口；51 个 Main 当前审批的有界投影保留50条并将更多入口指向Chat中第51条真实审批，而非无关Task列表。原冻结审批与对话 live 浏览器场景继续覆盖 approval-only 原定位。确定性模型证明协议和交互，真实模型何时提问及意见理解质量仍需外部评测。
 
 ## 层级与关键路径
 
@@ -36,7 +42,15 @@
 | [tests/system/verify_delivery.py](../../tests/system/verify_delivery.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
 - **F-019**：通过具名投影与真实浏览器覆盖；不以软件回归证明真实模型质量或外部账户可用性。
-- **F-020 剩余覆盖**：补凭据刷新/失效诊断体验；不确定远端投递目前只能依赖已保存本地回执，可信远端核实能力仍待定义。
+- **F-020 剩余覆盖**：显式 GitHub PR 以外的跨平台事件接续与成果组织；真实账户的原消息回复/卡片展示、工作台链接可达性和客户端登录。loopback 只能证明同机访问。不确定投递继续只查询本地回执，可信远端核实能力仍待定义。
+
+原消息与成果投影回归入口：
+
+- [reply_origin_test.go](../../internal/agent/sqlite/reply_origin_test.go)：真实 SQLite 与 Actor 验证 create 来源、同步/Task 结果、显式偏好、旧路由不回填及失败迁移回滚；CLI/Web 反馈回复保留实际作答渠道，接续 Task 的异步结果仍回原飞书话题，同答 CLI 重试复用原 receipt 且不增加通知。既有 Channel 回归继续覆盖 CAS、撤权、route/projection 冻结和回调去重。
+- [projection_test.go](../../internal/interaction/feishu/projection_test.go)：真实 HTTP reply wire、原来源转义、无自选接收者、目标失效无 fallback、可信 origin 校验、摘要边界和审批全文。
+- `verify_channels.py` 的 `feishu_topic_delivery`：签名 callback→Main→Task→冻结 Delivery→HTTP peer，检查原消息回传、Conversation 分页锚点、完整 Artifact、单一简短通知、重启/重复回调、显式 TUI 偏好与 unknown 不重发。`feishu_auth_lifecycle` 和现有 multipart/租约场景同时覆盖 source reply；无 workspace 配置保留原全文/附件。
+
+聚焦验证可复用已有函数：`PYTHONPATH=tests/system python3 -c 'from pathlib import Path; from verify_channels import feishu_topic_delivery; feishu_topic_delivery(Path("bin/steward").resolve(), {"checks": [], "scenarios": {}})'`。跨模块变更仍运行 `make test lint` 和相关 channels 系统门禁。合成模型证明机械链路，不证明摘要的真实模型质量或远端平台可达性。
 
 ## 详细测试入口与证明边界
 

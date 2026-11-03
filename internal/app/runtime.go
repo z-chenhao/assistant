@@ -14,6 +14,7 @@ import (
 	computerfake "github.com/z-chenhao/assistant/internal/computer/fake"
 	"github.com/z-chenhao/assistant/internal/computer/macosvm"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/evidence"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 	"github.com/z-chenhao/assistant/internal/memory"
@@ -29,6 +30,11 @@ import (
 )
 
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {
+	// This is execution startup, including absent config. Read-only control
+	// composition must not revoke another running configuration's bindings.
+	if err := a.store.ConfigureGitHub(ctx, cfg.GitHub); err != nil {
+		return err
+	}
 	imageOCR := ocr.Discover(ctx)
 	registry, err := a.runtimeRegistry(ctx, cfg, fixture, secrets, imageOCR)
 	if err != nil {
@@ -183,6 +189,7 @@ func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Defi
 		searchMemory.Spec.Description += " Not configured: requires an explicit embedding provider; calls fail with PROVIDER_UNAVAILABLE until configured."
 	}
 	defs = append(defs, searchMemory)
+	defs = append(defs, evidence.Definition())
 
 	if cfg.JavaScript != nil {
 		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}

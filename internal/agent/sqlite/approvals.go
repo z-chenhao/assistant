@@ -60,12 +60,30 @@ func (r *Runs) Approvals(ctx context.Context) ([]interaction.Approval, error) {
 // ApprovalView is the pure Web projection. Expiry is shown without recovering
 // Runs, enqueueing events, or changing a decision from a browsing request.
 func (r *Runs) ApprovalView(ctx context.Context) ([]interaction.Approval, error) {
-	rows, err := r.host.db.QueryContext(ctx, `SELECT approval_id,tool_name,arguments_json,frozen_arguments_hash,status,expires_at FROM (
+	return r.approvalView(ctx, false)
+}
+
+// PendingApprovals is bounded for the attention surface; history inspection
+// retains the existing ApprovalView contract.
+func (r *Runs) PendingApprovals(ctx context.Context) ([]interaction.Approval, error) {
+	return r.approvalView(ctx, true)
+}
+
+func (r *Runs) approvalView(ctx context.Context, pendingOnly bool) ([]interaction.Approval, error) {
+	query := `SELECT approval_id,tool_name,arguments_json,frozen_arguments_hash,status,expires_at FROM (
  SELECT a.approval_id,i.tool_name,i.arguments_json,a.frozen_arguments_hash,
  CASE WHEN a.status IN ('pending','approved') AND a.expires_at<=? AND i.status IN ('queued','waiting') AND i.attempt_count=0 THEN 'expired' ELSE a.status END status,
  a.expires_at,a.created_at FROM approval a JOIN tool_invocation i USING(invocation_id) WHERE a.scope=(SELECT agent_id FROM agent_config WHERE singleton=1)
  UNION ALL SELECT approval_id,'account_spend',arguments_json,frozen_hash,status,0,created_at FROM spend_approval WHERE scope=(SELECT agent_id FROM agent_config WHERE singleton=1)
- ) ORDER BY created_at,approval_id`, r.approvalTime().UnixMicro())
+ )`
+	if pendingOnly {
+		query += " WHERE status='pending'"
+	}
+	query += " ORDER BY created_at,approval_id"
+	if pendingOnly {
+		query += " LIMIT 51"
+	}
+	rows, err := r.host.db.QueryContext(ctx, query, r.approvalTime().UnixMicro())
 	if err != nil {
 		return nil, agent.ErrStorage
 	}
@@ -104,7 +122,7 @@ func (r *Runs) DecideInbound(ctx context.Context, e interaction.InboundEvent, id
 	}
 	return r.write(ctx, func(tx *sql.Tx) error {
 		content, _ := encoded(e.Content)
-		if _, _, err := acceptChannelSource(ctx, tx, e, content); err != nil {
+		if _, _, err := acceptChannelSource(ctx, tx, e, content, ""); err != nil {
 			return err
 		}
 		var principal string

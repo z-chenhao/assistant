@@ -16,6 +16,7 @@ type taskChange struct {
 	scope                   artifact.Scope
 	agentID, conversationID string
 	reference, id           string
+	feedbackRef             string
 	status, receiptStatus   string
 	epoch, version, at      int64
 	artifactsJSON           string
@@ -61,6 +62,9 @@ func (t *tools) changeManagedTask(ctx context.Context, tx *sql.Tx, change *taskC
 			return tool.Failure("PERMISSION_DENIED"), nil
 		}
 	}
+	if change.request.Operation == "request_input" || change.request.Operation == "request_review" {
+		return t.requestTaskFeedback(ctx, tx, change)
+	}
 	if change.request.Operation == "complete" {
 		// Complete is a control action, not a stop/drain request.
 		// Include orphaned invocations on terminal Runs: an unknown
@@ -74,7 +78,7 @@ func (t *tools) changeManagedTask(ctx context.Context, tx *sql.Tx, change *taskC
 		if !task.CanComplete(task.Status(change.status), pending) {
 			return tool.Failure("INVALID_ARGUMENT"), nil
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE task SET status='completed',completed_at=?,updated_at=?,version=version+1 WHERE task_id=? AND status='active' AND task_epoch=? AND version=?`, change.at, change.at, change.id, change.epoch, change.version)
+		res, err := tx.ExecContext(ctx, `UPDATE task SET status='completed',explicit_end_epoch=task_epoch,completed_at=?,updated_at=?,version=version+1 WHERE task_id=? AND status='active' AND task_epoch=? AND version=?`, change.at, change.at, change.id, change.epoch, change.version)
 		if err != nil {
 			return tool.Result{}, err
 		}
@@ -82,6 +86,9 @@ func (t *tools) changeManagedTask(ctx context.Context, tx *sql.Tx, change *taskC
 			return tool.Result{}, agent.ErrConflict
 		}
 		change.receiptStatus = "completed"
+		if err = revokeGitHubBinding(ctx, tx, "", change.id); err != nil {
+			return tool.Result{}, err
+		}
 	} else if change.request.Operation == "pause" || change.request.Operation == "cancel" {
 		change.receiptStatus = "paused"
 		if change.request.Operation == "cancel" {

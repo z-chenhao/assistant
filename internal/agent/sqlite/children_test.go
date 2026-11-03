@@ -498,6 +498,12 @@ func TestChildMigrationPreservesExistingRootWithoutGrantingDelegation(t *testing
 		t.Fatal(err)
 	}
 	for _, table := range []string{"auth_connection", "model_profile", "model_snapshot", "agent_config", "capability_snapshot", "task"} {
+		if table == "task" {
+			if _, err = db.Exec(`INSERT INTO task (` + preGitHubTaskColumns + `) SELECT ` + preGitHubTaskColumns + ` FROM prior.task`); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
 		if table == "model_profile" {
 			if _, err = db.Exec(`INSERT INTO model_profile SELECT profile_id,name,provider_kind,endpoint,wire_api,model_id,auth_connection_id,reasoning_effort,context_window,max_output_tokens,generation_defaults_json,compatibility_json,capabilities_json,status,verified_at,created_at,updated_at,1 FROM prior.model_profile`); err != nil {
 				t.Fatal(err)

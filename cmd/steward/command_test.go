@@ -21,6 +21,8 @@ func TestCommandGrammarRejectsBeforeOpeningApplicationState(t *testing.T) {
 		{"channel", "check", "unexpected"},
 		{"delivery", "unknown"},
 		{"chat", "send", "one", "two"},
+		{"task", "respond"},
+		{"task", "feedbacks", "task:one", "cursor", "extra"},
 		{"start"},
 	} {
 		var out, errOut bytes.Buffer
@@ -45,6 +47,8 @@ func TestCommandSelectionKeepsControlAndExecutionKindsDistinct(t *testing.T) {
 		{[]string{"chat", "send-parts", "request-key"}, commandChat},
 		{[]string{"automation", "work"}, commandAutomation},
 		{[]string{"channel", "status"}, commandChannel},
+		{[]string{"task", "feedbacks"}, commandTask},
+		{[]string{"task", "respond", "feedback:one"}, commandTask},
 		{[]string{"channel", "check"}, commandChannel},
 		{[]string{"ops", "backup", "archive", "credential:key"}, commandOps},
 	} {

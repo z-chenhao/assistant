@@ -15,6 +15,7 @@ import (
 
 type DeliveryStore interface {
 	DeliveryBinding(context.Context, delivery.Request) (interaction.Binding, error)
+	DeliveryReplySource(context.Context, delivery.Request) (string, error)
 	SaveProjection(context.Context, string, string, int, any) (json.RawMessage, error)
 	ChannelReceipt(context.Context, string, int, string) (string, error)
 	AcceptChannelReceipt(context.Context, string, int, string, string) error
@@ -47,13 +48,27 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 	if _, err := delivery.Compose(e.Request, e.Message); err != nil || e.Request.Channel != "feishu" {
 		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
 	}
-	spec := ui.Compose(e)
-	raw, err := a.Store.SaveProjection(ctx, e.Request.DeliveryID, ui.Hash(e.Message), ui.Version, spec)
+	source, err := a.Store.DeliveryReplySource(ctx, e.Request)
+	if err != nil {
+		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+	}
+	candidate := composeProjection(e, a.Client.Config.WorkspaceURL, source)
+	raw, err := a.Store.SaveProjection(ctx, e.Request.DeliveryID, ui.Hash(e.Message), ui.Version, candidate)
 	if err != nil {
 		return fail
 	}
+	var spec projection
 	if json.Unmarshal(raw, &spec) != nil {
-		spec = ui.Spec{SchemaVersion: ui.Version, Fallback: ui.Compose(e).Fallback}
+		return fail
+	}
+	card, includeArtifacts := ui.Card(spec.Spec), true
+	if spec.Transport != nil {
+		if spec.Transport.Version != 1 || spec.Transport.ReplySource != source || spec.Transport.Card == nil {
+			return fail
+		}
+		card, includeArtifacts = spec.Transport.Card, spec.Transport.IncludeArtifacts
+	} else if source != "" {
+		return fail
 	}
 	// Each part has a durable receipt under the original DeliveryRequest. Crash
 	// before/after an upload may leave an orphan resource, never a repeated notice.
@@ -61,9 +76,9 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 		kind    string
 		content any
 		ref     string
-	}{{kind: "interactive", content: ui.Card(spec)}}
+	}{{kind: "interactive", content: card}}
 	for _, p := range e.Message.Content {
-		if p.ArtifactRef != "" {
+		if includeArtifacts && p.ArtifactRef != "" {
 			parts = append(parts, struct {
 				kind    string
 				content any
@@ -73,6 +88,9 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 	}
 	for i, p := range parts {
 		hash := ui.Hash([]any{e.Request.DestinationRef, p.kind, p.content, p.ref})
+		if source != "" {
+			hash = ui.Hash([]any{e.Request.DestinationRef, source, p.kind, p.content, p.ref})
+		}
 		remote, err := a.Store.ChannelReceipt(ctx, e.Request.DeliveryID, i, hash)
 		if err != nil {
 			return fail
@@ -100,7 +118,11 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 			}
 			content = map[string]string{"file_key": key}
 		}
-		remote, err = a.Client.Send(ctx, e.Request.DestinationRef, keyFor(e.Request.DeliveryID, i), p.kind, content)
+		if source != "" {
+			remote, err = a.Client.Reply(ctx, source, keyFor(e.Request.DeliveryID, i), p.kind, content)
+		} else {
+			remote, err = a.Client.Send(ctx, e.Request.DestinationRef, keyFor(e.Request.DeliveryID, i), p.kind, content)
+		}
 		if err != nil {
 			return credentialObservation(err)
 		}

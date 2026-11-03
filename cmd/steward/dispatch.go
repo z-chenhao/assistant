@@ -36,6 +36,12 @@ func dispatchCommand(ctx context.Context, application *app.App, cfg config.Confi
 			return err
 		}
 		return json.NewEncoder(out).Encode(value)
+	case commandEvidence:
+		return runEvidence(ctx, application, in, out)
+	case commandTask:
+		return runTask(ctx, application, flags, in, out)
+	case commandGitHub:
+		return runGitHub(ctx, application, flags, in, out)
 	case commandWeb:
 		return runWeb(ctx, application, cfg, out, foreground)
 	case commandChannel:

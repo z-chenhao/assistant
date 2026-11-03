@@ -20,12 +20,12 @@
 
 **需求**：用户能把耗时工作交给后台，通过对话及明确关联的渠道事件接续、暂停、继续、取消或结束；缺失信息或成果待审阅时，用户能定位问题或产物，回答或反馈后继续原任务。
 
-**当前实现**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通；已有 needs_input、冻结审批、Needs me 与关联交付记录。
+**当前实现**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通；已有 needs_input、冻结审批、Needs me 与关联交付记录。Main 可保存关联原 Task/源消息的信息问题或绑定确切 ArtifactRef 的成果审阅；所有者从 CLI 或 Web Task 详情回答，回答持久进入 Main 后由既有 Task 工具接续。
 
-**边界与剩余工作**：Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。跨渠道事件接续与结构化人工参与尚未形成闭环，具体要求如下：
+**边界与剩余工作**：Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。GitHub 精确 PR 可由本机显式关联到已有 Task，经 Main 接续；结构化人工参与和渠道交付按对应入口维护，具体要求如下：
 
-- **渠道关联与接续**：依赖 F-042 和实际服务接入，以显式消息/PR 引用与已保存关联定位原 Task。话题相似不足以自动关联，歧义与超范围工作交 Main；接收上下文不授予新权限。暂停、取消和 Forget 后的意图不能被自动反馈恢复。
-- **信息回答与成果审阅**：问题关联原 Task/消息，成果关联明确产物或修订，反馈经 Main 接续。信息回答、具体动作审批和成果审阅分别表达，不能相互替代；不强制所有任务等待人工验收，不从自由文本猜测阻塞，不引入通用人类工作流引擎。
+- **渠道关联与接续**：F-042 的 `github bind` 将确切 PR 与当前 Task/epoch 关联，绑定后新观察交 Main 决定是否追加同一 Task；无新 Task、相似匹配或第三方动作授权。歧义、超范围和 unknown 交 Main 解释/询问；暂停、取消、人工 complete、Forget、解绑与监听停止不会被旧反馈恢复。once Root 自然完成仍允许已授权的同一关联接续；人工 complete 的当前代次需要用户显式 append 后才能重新关联。原话题交付由 F-020 维护。
+- **信息回答与成果审阅**：CLI 与 Web 已接通问题/成果的具名待办、分页、提交去重和陈旧反馈拒绝；飞书结构化卡片尚未接入。问题关联原 Task/消息，成果关联明确产物或修订，反馈经 Main 接续。信息回答、具体动作审批和成果审阅分别表达，不能相互替代；不强制所有任务等待人工验收，不从自由文本猜测阻塞，不引入通用人类工作流引擎。
 
 **验收目标**：
 
@@ -54,6 +54,23 @@ Web 的 Tasks 和终端 `/status` 可查看总体状态与 Child 聚合。新建
 Task 列表默认 Open（active/paused），还可查看 Needs me、Finished（completed/cancelled）或 All tasks，按标题/目标搜索并翻页，不限于最近 20 项。Needs me 是当前执行需要处理的展示筛选，不是第五种 Task 状态。
 
 点击任务进入独立详情，查看完整目标、当前阶段、Child 聚合、待处理审批、最近 10 条关联 Main 交付和可访问附件；指令/里程碑按游标读取更早历史。Open original request 返回最初的对话消息；Continue in conversation 带可见任务上下文进入 Main，用户可移除。页面没有绕过 Main 的暂停/取消/重试按钮，也不把 Worker 原始结果当交付。
+
+### 回答已保存的问题与审阅成果
+
+Main 可通过 `task_manage` 的 `request_input` 记录具体问题，通过 `request_review` 记录至多 16 个确切 ArtifactRef 的成果审阅。它们是独立信息记录，不改变 Task 状态，不自动暂停执行，也不代表所有任务必须等待验收。Worker 仍只向 Main 汇报；用户可在对话中要求 Ghost 记录需要确认的问题。
+
+Web 从 Tasks 首部的待办进入原 Task 详情回答/审阅，相关文件和源消息均有明确链接；过期或另一端处理后的本地草稿保留为不可提交参考。Web 与 CLI 使用同一回答记录，首次接纳的渠道决定该条输入的回复路由。
+
+所有者运行 `steward task feedbacks` 查看当前可处理待办，可加 `TASK_REF` 筛选。每页至多 50 条；响应的 `next` 非空时用 `steward task feedbacks "" BEFORE` 继续全局读取，或用 `steward task feedbacks TASK_REF BEFORE` 读取该任务下一页。已回答、替代、过期、停止、旧 epoch 或 Forget 前的问题不会进入列表。记录包含具体问题、原 Task、可用时的源消息 ID、成果引用与到期时间；用既有 `artifact describe/open` 检查确切成果。
+
+```sh
+printf '%s' '使用上一完整季度的数据。' | steward task respond feedback:OPAQUE_REF
+steward chat work  # 未运行前台工作服务时，显式处理已接纳的回答
+```
+
+回答文本上限 16 KiB。重复提交同一记录与完全相同文本返回原接纳回执，不同的第二次回答得到冲突。回答与 Main 输入原子保存，回应本身不创建 Worker，也不批准外部动作。Main 若据此追加工作，保留 `feedbackRef` 因果；宿主重检确切 Task、epoch 和隐私边界。新的普通用户输入仍由 Main 理解其意图，宿主不推断自然语言授权。
+
+每个 Task 只保留一个当前待办，新问题/审阅替代旧待办；默认七天到期。暂停、取消、Forget、新一轮工作或更新的成果审阅会使旧反馈失效；即使旧回答已入队，后续处理也不能借其恢复旧工作。用户需要通过新的普通对话明确继续。待办属于非阻塞信息，不替代审批，也不将“认可成果”转换成具体动作授权。
 
 ## 详细操作参考
 

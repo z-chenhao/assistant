@@ -10,6 +10,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/computer"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
@@ -416,6 +417,17 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 			rejection = "NOT_FOUND"
 		} else if !tool.Validate(d.Spec.InputSchema, inv.Call.Arguments) {
 			rejection = "INVALID_ARGUMENT"
+		}
+		// Computer bridge declarations are read_only, but their accepted
+		// per-action policy can be high risk. Honor that frozen action policy.
+		if rejection == "" && (p.Risk == "high" || d.Spec.Permission != "read_only" && d.Spec.Permission != "artifact_write" && inv.Call.Name != task.ManageName) {
+			var external bool
+			if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM github_task_followup WHERE run_id=?)`, t.claim.RunID()).Scan(&external); err != nil {
+				return err
+			}
+			if external {
+				rejection = "PERMISSION_DENIED"
+			}
 		}
 		if rejection != "" {
 			// A rejection still uses the single accepted invocation lifecycle.
