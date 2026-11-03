@@ -44,6 +44,7 @@ func parseOptions(args []string, errOut io.Writer) (commandOptions, error) {
 	})
 	flags.Usage = func() {
 		fmt.Fprintln(errOut, "GitHub Task association: github binding; github bind reads {task_ref,task_epoch,version}; github unbind reads {version}. Only future observations can continue the explicitly bound Task through Main; stop/manual completion revoke the association.")
+		fmt.Fprintln(errOut, "Evidence: evidence read accepts JSON {ref: current|conversation:REF|task:REF|artifact:REF, offset?, limit?, links_offset?} on stdin. Reads one authorized object with bounded explicit links; see docs/features/memory-context.md.")
 		fmt.Fprintln(errOut, "GitHub observations: github status|poll|events [BEFORE_SEQUENCE]|stop|resume. Configure one exact repository/PR and a SecretStore credential_ref; reception does not authorize work. See docs/features/integrations.md.")
 		fmt.Fprintln(errOut, "Steward: run steward (or steward start) for guided setup and chat. Run doctor to check the installation. Ctrl-C or /quit stops Steward.\nstart manages a private local broker; -config or STEWARD_NATS_URL uses your configured broker instead.")
 		fmt.Fprintln(errOut, "Operations: ops health|report|broker|upgrade-broker; ops trace RUN_ID; ops retry-event EVENT_ID ATTEMPTS; ops backup ARCHIVE KEY_REF; ops restore ARCHIVE KEY_REF; ops activate source-retired-and-outcomes-reconciled. See docs/features/operations.md.")
