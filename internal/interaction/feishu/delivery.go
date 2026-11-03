@@ -166,7 +166,7 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 	return delivery.Observation{Outcome: delivery.Delivered}
 }
 
-var errQuestionClosed = errors.New("Feishu Task question is no longer actionable")
+var errQuestionClosed = errors.New("feishu task question is no longer actionable")
 
 func credentialObservation(err error) delivery.Observation {
 	if errors.Is(err, errQuestionClosed) {
