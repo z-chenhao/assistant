@@ -92,7 +92,7 @@ steward -config /absolute/config.yaml github bind <<'JSON'
 JSON
 ```
 
-绑定不回放已经收下的历史观察。后续新版本按持久身份只接纳一次，经现有单 Main/Actor 读取 JSON 证据框，判断是否需要 `task_manage append` 继续同一 Task。同一观察只接受一次不同的追加动作；相同来源与相同参数重复请求复用原回执。歧义、超范围、未知副作用或不需继续时，Main 应解释/询问用户，不建立新工作或猜测外部授权。source Main 可读已有授权数据和保存本地产物，不能直接发外部动作、创建 Automation 或写长期 Memory；真正工作交既有 Task Worker 和审批管线。
+绑定不回放已经收下的历史观察。上述旧格式绑定明确启用所有新观察。可先按一种事件类型观察匹配结果，再显式启用规则内的自动接续，见 [F-045 规则用法](automation.md#f-045)。接纳的新版本经现有单 Main/Actor 读取 JSON 证据框，判断是否需要 `task_manage append` 继续同一 Task。同一观察只接受一次不同的追加动作；相同来源与相同参数重复请求复用原回执。歧义、超范围、未知副作用或不需继续时，Main 应解释/询问用户，不建立新工作或猜测外部授权。source Main 可读已有授权数据和保存本地产物，不能直接发外部动作、创建 Automation 或写长期 Memory；真正工作交既有 Task Worker 和审批管线。
 
 ```sh
 steward -config /absolute/config.yaml github unbind <<'JSON'

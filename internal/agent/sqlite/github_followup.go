@@ -33,6 +33,9 @@ func (r *Runs) recoverGitHubFollowups(ctx context.Context) error {
  FROM github_task_binding b JOIN github_watch w USING(scope) JOIN task t USING(task_id) JOIN agent_config c ON c.agent_id=t.agent_id
  JOIN github_observation o ON o.scope=b.scope AND o.sequence>b.last_sequence AND o.intent_privacy_epoch=b.privacy_epoch
  WHERE b.scope=? AND b.enabled=1 AND w.enabled=1 AND w.state='healthy' AND w.failure_code='' AND w.intent_privacy_epoch=b.privacy_epoch AND b.privacy_epoch=`+githubEpoch+`
+ AND b.rule_mode='automatic' AND (o.binding_generation=b.generation OR (o.binding_generation IS NULL AND b.rule_event_kind=''))
+ AND (b.rule_event_kind='' OR EXISTS(SELECT 1 FROM github_rule_decision d
+ WHERE d.observation_sequence=o.sequence AND d.task_id=b.task_id AND d.mode='automatic' AND d.event_kind=b.rule_event_kind AND d.matched=1))
  AND t.task_epoch=b.task_epoch AND t.status IN('active','completed') AND t.explicit_end_epoch<t.task_epoch AND t.created_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=t.agent_id),0)
  AND c.setup_status='ready' AND NOT EXISTS(SELECT 1 FROM github_task_followup f WHERE f.observation_sequence=o.sequence)
  ORDER BY o.sequence LIMIT 1`, scope).Scan(&scope, &taskID, &taskRef, &goal, &generation, &epoch, &privacy, &sequence, &raw, &agentID, &profile, &configuration)

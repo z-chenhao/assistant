@@ -87,8 +87,9 @@ func (b *Batch) add(e Observation) error {
 }
 
 type Ticket struct {
-	Version int64
-	Epoch   int64
+	Version           int64
+	Epoch             int64
+	BindingGeneration int64
 }
 
 type Status struct {

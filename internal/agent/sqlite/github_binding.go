@@ -15,7 +15,7 @@ import (
 // Ordinary Main/Worker claims retain exactly their existing fence semantics.
 const currentGitHubCause = `NOT EXISTS(SELECT 1 FROM github_task_followup f WHERE f.run_id=r.run_id AND NOT EXISTS(
  SELECT 1 FROM github_task_binding b JOIN github_watch w USING(scope) JOIN task t ON t.task_id=b.task_id
- WHERE b.scope=f.scope AND b.generation=f.generation AND b.enabled=1 AND w.enabled=1
+ WHERE b.scope=f.scope AND b.generation=f.generation AND b.enabled=1 AND b.rule_mode='automatic' AND w.enabled=1
  AND f.state IN('assigned','continued') AND b.task_id=f.task_id AND b.task_epoch=t.task_epoch
  AND t.agent_id=r.agent_id AND t.conversation_id=r.conversation_id AND t.task_epoch=coalesce(f.continued_epoch,f.task_epoch) AND t.status IN('active','completed') AND t.explicit_end_epoch<t.task_epoch
  AND b.privacy_epoch=f.privacy_epoch AND b.privacy_epoch=` + githubEpoch + ` AND w.intent_privacy_epoch=b.privacy_epoch
@@ -64,8 +64,12 @@ func revokeOtherGitHubScopes(ctx context.Context, tx *sql.Tx, scope string) erro
 }
 
 func (s *Store) BindGitHubTask(ctx context.Context, cfg github.Config, q github.BindingRequest, enabled bool) error {
-	if cfg.Validate() != nil || q.Version < 0 || enabled && (!task.ValidRef(q.TaskRef) || q.TaskEpoch < 1) {
+	if cfg.Validate() != nil || q.Version < 0 || enabled && (!task.ValidRef(q.TaskRef) || q.TaskEpoch < 1 || !q.ValidRule()) {
 		return task.ErrInvalid
+	}
+	mode := q.Mode
+	if mode == "" {
+		mode = "automatic"
 	}
 	err := s.Transaction(ctx, func(tx *sql.Tx) error {
 		var prior int64
@@ -99,9 +103,9 @@ func (s *Store) BindGitHubTask(ctx context.Context, cfg github.Config, q github.
 				return err
 			}
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO github_task_binding(scope,task_id,task_epoch,privacy_epoch,enabled,generation,last_sequence,version)
- VALUES(?,?,?,`+githubEpoch+`,1,1,(SELECT coalesce(max(sequence),0) FROM github_observation WHERE scope=?),1)
- ON CONFLICT(scope) DO UPDATE SET task_id=excluded.task_id,task_epoch=excluded.task_epoch,privacy_epoch=excluded.privacy_epoch,enabled=1,generation=github_task_binding.generation+1,last_sequence=excluded.last_sequence,version=github_task_binding.version+1`, cfg.Scope(), id, q.TaskEpoch, cfg.Scope())
+		_, err = tx.ExecContext(ctx, `INSERT INTO github_task_binding(scope,task_id,task_epoch,privacy_epoch,enabled,generation,last_sequence,version,rule_mode,rule_event_kind)
+ VALUES(?,?,?,`+githubEpoch+`,1,1,(SELECT coalesce(max(sequence),0) FROM github_observation WHERE scope=?),1,?,?)
+ ON CONFLICT(scope) DO UPDATE SET task_id=excluded.task_id,task_epoch=excluded.task_epoch,privacy_epoch=excluded.privacy_epoch,enabled=1,generation=github_task_binding.generation+1,last_sequence=excluded.last_sequence,version=github_task_binding.version+1,rule_mode=excluded.rule_mode,rule_event_kind=excluded.rule_event_kind`, cfg.Scope(), id, q.TaskEpoch, cfg.Scope(), mode, q.EventKind)
 		if err != nil {
 			return err
 		}
@@ -141,15 +145,18 @@ func stopInvalidGitHubMains(ctx context.Context, tx *sql.Tx) error {
 
 func (s *Store) GitHubTaskBinding(ctx context.Context, cfg github.Config) (v github.TaskBinding, err error) {
 	v.State = "unbound"
+	v.Mode = "off"
+	v.Scope = cfg.Scope()
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return v, githubStorageError(err)
 	}
 	defer tx.Rollback()
 	var enabled, current bool
-	err = tx.QueryRowContext(ctx, `SELECT t.task_ref,b.task_epoch,b.version,b.enabled,b.last_sequence,
+	var mode, goal string
+	err = tx.QueryRowContext(ctx, `SELECT t.task_ref,b.task_epoch,b.version,b.enabled,b.last_sequence,b.generation,b.rule_mode,b.rule_event_kind,t.anchor_task,
  b.enabled=1 AND w.enabled=1 AND w.failure_code='' AND b.task_epoch=t.task_epoch AND t.status IN('active','completed') AND t.explicit_end_epoch<t.task_epoch AND b.privacy_epoch=`+githubEpoch+` AND w.intent_privacy_epoch=b.privacy_epoch
- FROM github_task_binding b JOIN task t USING(task_id) JOIN github_watch w USING(scope) WHERE b.scope=?`, cfg.Scope()).Scan(&v.TaskRef, &v.TaskEpoch, &v.Version, &enabled, &v.LastSequence, &current)
+ FROM github_task_binding b JOIN task t USING(task_id) JOIN github_watch w USING(scope) WHERE b.scope=?`, cfg.Scope()).Scan(&v.TaskRef, &v.TaskEpoch, &v.Version, &enabled, &v.LastSequence, &v.Generation, &mode, &v.EventKind, &goal, &current)
 	if err == sql.ErrNoRows {
 		return v, nil
 	}
@@ -159,6 +166,7 @@ func (s *Store) GitHubTaskBinding(ctx context.Context, cfg github.Config) (v git
 	v.State = "stopped"
 	if enabled {
 		v.State = "stale"
+		v.Mode = mode
 	}
 	if current {
 		v.State = "bound"
@@ -171,7 +179,11 @@ func (s *Store) GitHubTaskBinding(ctx context.Context, cfg github.Config) (v git
 	if !privacy {
 		v.TaskRef = ""
 		v.TaskEpoch = 0
+		v.EventKind = ""
+		v.Mode = "off"
 		v.State = "privacy_stopped"
+	} else {
+		v.TaskGoal = githubContextPreview(goal)
 	}
 	return v, nil
 }

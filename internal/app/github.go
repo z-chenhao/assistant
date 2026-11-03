@@ -47,7 +47,14 @@ func (a *App) BindGitHubTask(ctx context.Context, q github.BindingRequest, enabl
 
 func (a *App) GitHubTaskBinding(ctx context.Context) (github.TaskBinding, error) {
 	if a.github == nil {
-		return github.TaskBinding{State: "not_configured"}, nil
+		return github.TaskBinding{State: "not_configured", Mode: "off"}, nil
 	}
 	return a.store.GitHubTaskBinding(ctx, a.github.Config)
+}
+
+func (a *App) GitHubRuleDecisions(ctx context.Context, before int64) ([]github.RuleDecision, error) {
+	if a.github == nil {
+		return nil, errors.New("github configuration is required")
+	}
+	return a.store.GitHubRuleDecisions(ctx, a.github.Config, before)
 }

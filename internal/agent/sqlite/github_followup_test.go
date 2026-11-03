@@ -205,12 +205,19 @@ func TestGitHubHTTPObservationContinuesSameOnceTaskThroughMainAndRestart(t *test
 }
 
 func TestGitHubCausalMainRejectsLateModelAndToolAfterRevocation(t *testing.T) {
-	for _, boundary := range []string{"model", "tool"} {
+	for _, boundary := range []string{"model", "tool", "model_after_rule_change", "tool_after_rule_change"} {
 		t.Run(boundary, func(t *testing.T) {
 			ctx := context.Background()
 			s, r, _, p, cfg, ref := continuationFixture(t, "once")
 			watchBatch(t, s, cfg, "")
-			bindTask(t, s, cfg, ref)
+			ruleChange := strings.HasSuffix(boundary, "_after_rule_change")
+			if ruleChange {
+				if err := s.BindGitHubTask(ctx, cfg, github.BindingRequest{TaskRef: ref, TaskEpoch: 1, Mode: "automatic", EventKind: "review_comment"}, true); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				bindTask(t, s, cfg, ref)
+			}
 			watchBatch(t, s, cfg, "review-late")
 			if err := r.recoverGitHubFollowups(ctx); err != nil {
 				t.Fatal(err)
@@ -236,16 +243,25 @@ func TestGitHubCausalMainRejectsLateModelAndToolAfterRevocation(t *testing.T) {
 				t.Fatal(err)
 			}
 			var response llm.GenerationResult
-			if boundary == "tool" {
+			if strings.HasPrefix(boundary, "tool") {
 				response, err = p.Generate(ctx, generation.Request, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
 			}
-			if err = s.SetGitHubWatch(ctx, cfg, false); err != nil {
+			if ruleChange {
+				current, e := s.GitHubTaskBinding(ctx, cfg)
+				if e != nil {
+					t.Fatal(e)
+				}
+				err = s.BindGitHubTask(ctx, cfg, github.BindingRequest{TaskRef: ref, TaskEpoch: 1, Version: current.Version, Mode: "observe", EventKind: "review"}, true)
+			} else {
+				err = s.SetGitHubWatch(ctx, cfg, false)
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
-			if boundary == "model" {
+			if strings.HasPrefix(boundary, "model") {
 				_, err = p.Generate(ctx, generation.Request, nil)
 			} else {
 				_, err = (tool.Executor{Registry: r.registry, Store: r.ToolStore(c), Concurrency: 1}).Execute(ctx, generation.Request.GenerationID, response.ToolCalls)
@@ -449,7 +465,9 @@ func TestGitHubObservationDoesNotRetryUnknownTaskEffect(t *testing.T) {
 		t.Fatal(err)
 	}
 	watchBatch(t, s, cfg, "")
-	bindTask(t, s, cfg, ref)
+	if err = s.BindGitHubTask(context.Background(), cfg, github.BindingRequest{TaskRef: ref, TaskEpoch: 1, Mode: "automatic", EventKind: "review_comment"}, true); err != nil {
+		t.Fatal(err)
+	}
 	watchBatch(t, s, cfg, "retry-request")
 	mustDrain(t, a)
 	if dispatched.Load() != 1 || scalar(t, s, `SELECT count(*) FROM task_instruction`) != 0 || scalar(t, s, `SELECT count(*) FROM run WHERE worker_position='root'`) != 1 {

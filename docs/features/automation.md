@@ -46,11 +46,24 @@
 
 **需求**：用户可以先审阅助手依据环境变化本来会开展的工作，纠正规则，再显式启用规则范围内的自动工作。
 
-**当前实现**：已有按时间触发和阈值监控；尚无环境候选事件的主动规则研判、观察记录及启用闭环。
+**当前实现**：本机所有者可对已认证的确切 GitHub PR 和一项既有 Task 设置首条规则。规则按一种结构化事件类型筛选。观察模式保存每次命中或未命中的理由及当时的 Task、规则代次，自动模式只将新一代命中的观察交给 Main 判断是否在原 Task 范围内接续。
 
-**边界与剩余工作**：提供关闭、观察、自动三种模式；观察不创建执行 Task，但可能读取授权资料、调用模型并产生费用，应明确告知。规则保存版本、来源范围和工作范围，记录命中原因；先验证一条实际规则，不建设通用编排器。自动开展工作不替代具体动作审批。
+**边界与剩余工作**：这条规则只比较已授权轮询返回的事件类型。观察模式无需调用模型或付模型费用，也不创建 Main 或 Task。自动模式随后使用既有模型和审批管线。其他来源、语义判断与 Web 编辑尚未提供。
 
 **验收目标**：同一候选事件在三种模式下产生对应结果；观察可审阅且不执行工作，只有明确启用的匹配规则可自动接单；重复事件、规则修改、关闭、撤权和重启不恢复过期授权。
+
+先配置并成功轮询确切 GitHub PR。用 `github binding` 查关联版本和当前模式，选定已有 Task 及其当前 epoch。首次关联版本为 0。下面的命令观察行内评论。参见 [GitHub 监听说明](integrations.md#f-042)。
+
+```sh
+steward -config /absolute/config.yaml github bind <<'JSON'
+{"task_ref":"task:opaque-ref","task_epoch":1,"version":0,"mode":"observe","event_kind":"review_comment"}
+JSON
+steward -config /absolute/config.yaml github decisions
+```
+
+`event_kind` 可选 `review_comment`（行内评论）、`review`（已提交评审）或 `check_run`（当前 PR head 的已完成 CI 检查，含成功或失败）。每页最多 50 条，下一页用 `github decisions BEFORE_SEQUENCE` 传上一页最末的 `observation_sequence`。记录展示匹配依据、原事件标识和当时的 Task，不重复保存评论正文。历史记录仅供查阅，不能拿来接单。
+
+调整筛选或切换到 `automatic` 时重新读取版本和 Task epoch，再以新值提交 `github bind`。绑定输出展示确切仓库/PR、原 Task 目标预览、规则代次和模式；`state` 另行反映绑定是否可用于新工作。未绑定默认为 `off`。用 `github unbind` 和当前 `version` 关闭，监听故障时也可关闭。已接纳 Root 仍由原 Task 生命周期管理。旧格式 `github bind` 继续显式授权同一 Task 处理所有新观察。
 
 ## 如何使用
 
