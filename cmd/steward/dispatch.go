@@ -23,6 +23,8 @@ func dispatchCommand(ctx context.Context, application *app.App, cfg config.Confi
 		application.StartMemory(ctx)
 	}
 	switch command.kind {
+	case commandEvidence:
+		return runEvidence(ctx, application, in, out)
 	case commandTask:
 		return runTask(ctx, application, flags, in, out)
 	case commandGitHub:

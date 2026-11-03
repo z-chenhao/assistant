@@ -29,7 +29,7 @@ flowchart TD
 观察或显式记忆请求 → 保存事件 → Curator 提取归并 → 后续轮次召回 → 压缩 → 冻结模型请求。Forget 先建立隐私屏障，再异步维护记录。
 
 - **F-009**：remember/forget、隐私屏障、后台维护已实现；提取与稳定性判定采用规则，归并主要按指纹。 补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
-- **F-010**：显式 embedding 配置下，全文与向量结果融合；召回结果按轮冻结并带来源。 未配置 embedding 时不可用；不宣称大规模 ANN 性能或中文语义质量已验证。
+- **F-010**：显式 embedding 配置下，全文与向量结果融合；召回结果按轮冻结并带来源。新的 Main 与本机所有者可经只读 evidence 入口逐跳读取明确关联的 Conversation、Task 与授权 Artifact，按正文/链接游标续读；它独立于 embedding，不将精确引用导航混同语义搜索。
 - **F-011**：新 Run 已接通结构化模型摘要、工作状态、私有原文 Artifact 和逐轮冻结；目标与未知操作保留原文。真实模型的约束保留质量仍需离线验证；不得改写原文或旧 Run 的冻结请求。
 
 ## 代码与依赖
@@ -47,13 +47,21 @@ flowchart TD
 - [internal/agent/sqlite/context.go](../../internal/agent/sqlite/context.go)
 - [internal/agent/sqlite/handoff.go](../../internal/agent/sqlite/handoff.go)
 
-## 待实现方案
-
-以下方案尚未实现。接口、持久化结构、迁移与精确时序须在实现前确定；当前执行仍遵循已有运行时契约。验收范围见功能说明及并列测试方案。
-
 ### F-010 · 关联证据导航与按需续读
 
-按现有 TaskRef、ArtifactRef、Conversation 来源和 F-004 明确关联逐步展开，先补缺失的读取路径。引用解析、权限校验和续读位置是机制，摘要/内联预算是政策。按需召回保留来源并按轮冻结，不自动遍历全量历史，不把引用本身当成访问授权。具体工具 schema 与跨对象索引待真实消费者验证，暂不承诺稳定图查询 API。
+当前消费者是 Main 与本机用户，入口为 `builtin__evidence_read` 与 `evidence read`。`internal/evidence` 定义内部实验性窄请求/投影；Host 从受信 Run 或本机身份取得作用域，不接受调用者的 Agent/Run/所有者字段。精确解析、权限/隐私裁决和续读是领域必需机制；4 KiB 正文、20 条关系与单跳展开是当前预算政策。避免建立图数据库、全局对象索引或通用 Source/Repository 接口。
+
+Conversation 使用同会话的精确消息 ID 读取，尚未 Flush 的新输入可读其不可变 conversation_intent；不调用 Flush，不改写原文。Task 返回不可变原始目标；其链接组合现有 task_request、task_instruction、task_update、main_inbox/main_reply 和显式 ArtifactRefs。消息→任务、任务→原话/交付、产物→任务均基于真实持久关联；正文、文件内容、相似度和 Worker 私有轨迹不建立链接。SQL 按当前对象读取关系页，不在 Go 中自动遍历全量历史。
+
+每次读取先捕获隐私 epoch、Forget 时间边界及受信 Main claim。消息、Task 和 Artifact 必须晚于该边界，链接在返回前逐一经过相同 scope/privacy/live 过滤。Artifact 只使用现有 Scope/Describe/Open 授权，验证哈希及文件读取在事务外，返回前重检 epoch/claim 与产物存活；不加 pin/grant，不将 task_ref 转成新的访问权限。跨库读取同样在最后重检隐私边界，拒绝 Forget 期间已读取的迟到结果。不可访问对象和未知对象不区分存在性。
+
+证据读取与每跳校验使用本功能私有的 ReadOnly deferred state transaction，避免沿用写入池默认的 BEGIN IMMEDIATE；它们不预留 WAL writer，也不在文件或跨库读取期间保持 state snapshot。受信 ToolInvocation 的既有接纳/结果提交仍沿用原写事务，读路径不建立额外 Repository 层或新的状态管线。
+
+原文按字节 offset 读取，UTF-8 范围向前收敛到完整字符，返回能继续前进的 next_offset；二进制不转 Base64。链接单次读取最多 21 个候选，显示至多 20 个已授权链接，用 next_links_offset 继续候选页；失效/隐藏项被省略，因此页可少于 20 项。关系是动态当前视图，跨次新增关联可能改变页位置；不承诺跨调用的图快照。具体 Tool 调用的已接受结果继续由原 ToolInvocation 管线冻结和重放，恢复不会重新执行一次已经成功的读取。
+
+Main 的 current 只选择 checkpoint.input_sequence 之前的已消费用户输入，不越过正在处理轮次的输入边界；本机 current 为最新已接受输入。WorkerTools/ChildTools 显式移除新工具，避免 Child 借共享 TaskID 导航父任务或完整 Conversation。没有迁移，也不修改既有工具 Spec 或冻结 capability；新 Main 冻结新增工具，旧 Run 的精确 catalog 仍可正常 Select，旧调用不获得新能力。
+
+尚未接通：memory: 记录的精读/解密与谱系来源导航、外部 PR 关联和模型能否有效选择导航路径的质量评测。现有私有摘要原文 Artifact 可以按已有 grant 精确读取，不额外开放其他 Run 的摘要。F-004/F-042 后续接入必须保留来源证据与授权的区别。
 
 ## 验证与交付
 

@@ -47,6 +47,16 @@ func capabilitiesReply(request llm.GenerationRequest) llm.GenerationResult {
 		if lastMessage.Role == "tool" {
 			return llm.GenerationResult{Text: "Observed Task result: " + lastMessage.Text}
 		}
+		for _, m := range request.Messages[start+1:] {
+			if contextSummary(m).TaskUpdate {
+				return llm.GenerationResult{Text: "Observed Worker update: Task update retained in working context."}
+			}
+			for _, id := range contextReceipts(m) {
+				if id == "delegate" {
+					return llm.GenerationResult{Text: "Observed Task result: completed delegation receipt retained in working context."}
+				}
+			}
+		}
 		raw, _ := json.Marshal(map[string]string{"operation": "create", "task": "Capabilities fixture\nCapabilities: " + strings.TrimPrefix(source, "Delegate capabilities: ")})
 		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "delegate", Name: "builtin__task_manage", Arguments: string(raw)}}}
 	}
