@@ -11,6 +11,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/artifact"
 	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
@@ -54,7 +55,7 @@ func (t *tools) requestTaskFeedback(ctx context.Context, tx *sql.Tx, change *tas
 	return tool.Result{}, nil
 }
 
-const feedbackColumns = `f.feedback_ref,t.task_ref,f.kind,f.prompt,f.source_message_id,f.artifact_refs,
+const feedbackColumns = `f.feedback_ref,t.task_ref,t.title,f.kind,f.prompt,f.source_message_id,coalesce((SELECT sequence FROM conversation_intent WHERE message_id=f.source_message_id),0),f.artifact_refs,
  CASE WHEN f.status='pending' AND (f.expires_at<=? OR f.task_epoch!=t.task_epoch OR t.status NOT IN ('active','completed') OR f.privacy_epoch!=coalesce(p.epoch,0) OR t.created_at<=coalesce(p.updated_at,0)) THEN 'expired' ELSE f.status END,
  f.created_at,f.expires_at`
 
@@ -62,7 +63,7 @@ func scanFeedback(row interface{ Scan(...any) error }) (task.Feedback, error) {
 	var out task.Feedback
 	var refs string
 	var created, expires int64
-	err := row.Scan(&out.Ref, &out.TaskRef, &out.Kind, &out.Prompt, &out.SourceMessageID, &refs, &out.Status, &created, &expires)
+	err := row.Scan(&out.Ref, &out.TaskRef, &out.TaskTitle, &out.Kind, &out.Prompt, &out.SourceMessageID, &out.SourceSequence, &refs, &out.Status, &created, &expires)
 	if err != nil {
 		return out, err
 	}
@@ -133,6 +134,19 @@ func (s *Store) TaskFeedbacks(ctx context.Context, taskRef, before string) (task
 // submit transaction validates and consumes the request atomically with its
 // conversation intent. It never appends work or changes an Approval.
 func (r *Runs) RespondTaskFeedback(ctx context.Context, ref, answer string) (agent.Receipt, error) {
+	return r.respondTaskFeedback(ctx, ref, answer, nil)
+}
+
+// RespondTaskFeedbackInbound accepts a bound Web response through the same
+// feedback identity as the owner CLI. The first accepted source keeps its route.
+func (r *Runs) RespondTaskFeedbackInbound(ctx context.Context, e interaction.InboundEvent, ref, answer string) (agent.Receipt, error) {
+	if e.Channel != "web" || e.Validate() != nil {
+		return agent.Receipt{}, interaction.ErrUnauthorized
+	}
+	return r.respondTaskFeedback(ctx, ref, answer, &e)
+}
+
+func (r *Runs) respondTaskFeedback(ctx context.Context, ref, answer string, inbound *interaction.InboundEvent) (agent.Receipt, error) {
 	if !task.ValidFeedbackAnswer(answer) {
 		return agent.Receipt{}, conversation.ErrInvalid
 	}
@@ -169,7 +183,13 @@ func (r *Runs) RespondTaskFeedback(ctx context.Context, ref, answer string) (age
 	for _, artifactRef := range f.ArtifactRefs {
 		parts = append(parts, conversation.ContentPart{Type: "file", ArtifactRef: artifactRef})
 	}
-	return r.submit(ctx, "task-feedback:"+ref, parts, nil, ref)
+	if inbound != nil {
+		// The question is the logical source; page submissions are callback
+		// aliases. This preserves cross-page retries without extra source rows.
+		inbound.SourceID = "task-feedback:" + ref
+		inbound.Content = parts
+	}
+	return r.submit(ctx, "task-feedback:"+ref, parts, inbound, ref)
 }
 
 // requireCurrentFeedback joins ingress and later Main Task admission so a

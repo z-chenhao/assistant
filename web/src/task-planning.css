@@ -47,3 +47,19 @@
 .schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="clock"]{display:none}
 @media(max-width:700px){.schedule-editor .actions{align-items:stretch;flex-direction:column}.schedule-editor input,.schedule-editor select{font-size:16px}}
 .schedule-editor textarea{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground)}
+
+.needs-attention:has(.attention-heading){margin-bottom:36px}
+.attention-heading h2{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.attention-heading .status-pill{font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+.attention-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 0;border-bottom:1px solid var(--border)}
+.attention-row>div{min-width:0;max-width:70ch}.attention-row h3{margin:0 0 6px;font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.attention-row p{margin:0;color:var(--muted-foreground);font-size:14px;line-height:1.6}.attention-row>.button{flex-shrink:0}
+.attention-row .attachment-list{margin-top:12px}
+.task-feedback-request{padding:0 0 28px;margin:0 0 28px;border-bottom:1px solid var(--border);scroll-margin-top:100px}
+.task-feedback-request:focus-visible{outline:2px solid var(--foreground);outline-offset:8px}
+.task-feedback-request h2{margin:0 0 14px}.feedback-prompt{white-space:pre-wrap;overflow-wrap:anywhere;max-width:70ch;line-height:1.7;margin:0 0 16px}
+.task-feedback-form>label,.feedback-status>label{display:block;font-size:14px;font-weight:500;margin:20px 0 8px}
+.task-feedback-form textarea,.feedback-status textarea{width:100%;min-height:100px;resize:vertical;padding:12px;font:16px/1.6 var(--font-ui);border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground)}
+.task-feedback-form textarea:focus-visible,.feedback-status textarea:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}
+.task-feedback-form .field-help{margin:10px 0 18px;max-width:70ch}.feedback-status:not(:empty){margin:20px 0 28px}.feedback-status textarea[readonly]{min-height:80px}
+@media(max-width:700px){.attention-row{align-items:flex-start;flex-direction:column;gap:14px}.attention-row>.button{align-self:flex-start}.task-feedback-form button{min-height:44px}}

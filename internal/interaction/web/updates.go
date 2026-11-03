@@ -23,8 +23,10 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 		fragments["conversation-attention"] = "attention-summary"
 	case p.Tab == "/tasks":
 		fragments["ongoing-work"] = "tasks-list"
+		fragments["tasks-attention"] = "tasks-attention"
 	case strings.HasPrefix(p.Tab, "/tasks/"):
 		fragments["task-header"] = "task-header"
+		fragments["task-feedback"] = "task-feedback"
 		fragments["task-progress"] = "task-progress"
 		fragments["task-decisions"] = "task-decisions"
 		fragments["task-messages"] = "task-messages"
@@ -53,7 +55,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 		u := *r.URL
 		u.Path = p.Tab
 		q := url.Values{}
-		for _, key := range []string{"q", "cursor", "history"} {
+		for _, key := range []string{"q", "cursor", "history", "feedback_before"} {
 			if value := r.URL.Query().Get(key); value != "" {
 				q.Set(key, value)
 			}

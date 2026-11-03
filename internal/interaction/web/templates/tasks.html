@@ -1,6 +1,7 @@
 {{define "tasks-page"}}
 <section class="workspace-page tasks-page">
 <div class="page-heading"><div><h1>{{tr "Tasks"}}</h1><p>{{tr "See what Ghost is working toward and how each task is set up."}}</p></div><div class="actions"><a class="button secondary" href="/tasks/schedules/new">{{tr "Create schedule"}}</a><a class="text-link" href="/">{{tr "Tell Ghost what to do"}}</a></div></div>
+<section id="needs-attention" class="needs-attention" aria-label="{{tr "Needs your attention"}}"><div id="tasks-attention">{{template "tasks-attention" .}}</div></section>
 <nav class="section-tabs" aria-label="{{tr "Task views"}}">{{range taskViews}}<a href="{{taskListURL $.Tasks "view" .Value}}" {{if eq $.Tasks.Query.View .Value}}aria-current="page"{{end}}>{{tr .Label}}</a>{{end}}</nav>
 <form class="search-form" method="get" action="/tasks"><input type="hidden" name="view" value="{{.Tasks.Query.View}}"><label class="sr-only" for="task-search">{{tr "Find a task"}}</label><input id="task-search" type="search" name="q" value="{{.Tasks.Query.Query}}" placeholder="{{tr "Find a task by title or goal"}}"><button class="secondary">{{tr "Search"}}</button></form>
 <div id="ongoing-work">{{template "tasks-list" .}}</div></section>

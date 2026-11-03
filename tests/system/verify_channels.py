@@ -196,8 +196,51 @@ def feishu_auth_lifecycle(binary, report):
             h.cleanup()
 
 
+def attention_workspace(binary, evidence, report):
+    """Actual Main/Task feedback -> authenticated Web -> persisted route/dedup."""
+    with tempfile.TemporaryDirectory(prefix='steward-web-attention-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform, fixture='tasks')
+        try:
+            h.setup()
+            h.send('question-task', 'Ongoing: Prepare the quarterly report'); h.command('chat', 'work')
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+                ref = db.execute('SELECT task_ref FROM task').fetchone()[0]
+            h.send('question', f'Question: {ref} | Which quarter should the report cover?'); h.command('chat', 'work')
+            h.send('review-task', 'Delegate: Review the product research'); h.command('chat', 'work')
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+                review_ref = db.execute('SELECT task_ref FROM task WHERE task_ref!=?', (ref,)).fetchone()[0]
+            artifact = h.command('artifact', 'save', 'research-notes.txt', 'text/plain', text='Research revision A: sources and findings.')
+            parts = [dict(type='text', text=f'Review: {review_ref} | {artifact["artifact_ref"]} | Is this research ready to use?'), dict(type='file', artifact_ref=artifact['artifact_ref'])]
+            h.command('chat', 'send-parts', 'review', text=json.dumps(parts)); h.command('chat', 'work')
+            h.send('failed-task', 'Delegate: Fail worker: Examine unavailable source'); h.command('chat', 'work')
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db:
+                failed_ref=db.execute("SELECT task_ref FROM task WHERE anchor_task LIKE 'Fail worker:%'").fetchone()[0]
+            h.send('failed-question',f'Question: {failed_ref} | Which source should this work use?');h.command('chat','work')
+            initial_delivery_count=len(h.rows()['deliveries'])
+            h.start(); h.browser(evidence.parent/'attention-ui', 'attention')
+            state = h.wait(lambda state: len([run for run in state['runs'] if run['kind']=='worker']) == 6 and all(run['status'] in ('completed','failed','cancelled') for run in state['runs']) and len(state['deliveries'])==initial_delivery_count+6 and all(delivery['status']=='sent' for delivery in state['deliveries']), 'three feedback continuations and Main follow-up deliveries')
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
+                db.row_factory=sqlite3.Row; db.execute('BEGIN')
+                rows=[dict(row) for row in db.execute('SELECT f.feedback_ref,f.kind,f.status,f.response_message_id,t.task_ref FROM task_feedback f JOIN task t USING(task_id) ORDER BY f.rowid')]
+                require(len(rows)==3 and all(row['status']=='answered' for row in rows), 'feedback was not answered once')
+                require(db.execute("SELECT count(*) FROM task_instruction").fetchone()[0]==3, 'feedback/stale retry duplicated continuation')
+                require(db.execute("SELECT count(*) FROM approval").fetchone()[0]==0, 'review became action approval')
+                for row in rows:
+                    message=db.execute("SELECT json_extract(message_json,'$.source') FROM main_input WHERE message_id=?",(row['response_message_id'],)).fetchone()[0]
+                    require(message=='web' and db.execute('SELECT count(*) FROM message_route WHERE message_id=?',(row['response_message_id'],)).fetchone()[0]==1, 'Web feedback lost authenticated route')
+            for row in rows:
+                answer=('Use Q3.' if row['task_ref']==ref else 'External response.') if row['kind']=='input' else 'Clarify the introduction.'
+                receipt=h.command('task','respond',row['feedback_ref'],text=answer)
+                require(receipt['message_id']==row['response_message_id'], 'CLI retry did not retain Web receipt')
+            require(h.rows()==state, 'cross-CLI retries changed work or delivery')
+            report['scenarios']['attention']=dict(feedbacks=rows,state=state,artifact=artifact)
+            report['checks'].append('Web attention: current question, completed-Task exact artifact review, failed Task, honest count; bound Web replies, keyboard/Chinese/mobile, lost acknowledgement and stale duplicate preserve drafts; cross-CLI retries retain route and one continuation')
+        finally: h.cleanup()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
+    attention_workspace(binary,evidence,report)
     feishu_auth_lifecycle(binary,report)
     with tempfile.TemporaryDirectory(prefix='steward-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
@@ -311,7 +354,7 @@ def capability_settings(binary,evidence,report):
     """Owner UI -> real config/probes -> restart, retaining frozen Run records."""
     from verify_recall import Embeddings
     with tempfile.TemporaryDirectory(prefix='steward-capability-settings-') as temp, Sandbox() as platform:
-        root=Path(temp);h=ChannelHarness(binary,root,platform,'terminal-input')
+        root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
         peer=Embeddings()
         try:
             skills=root/'skills';skills.mkdir(mode=0o700)
@@ -883,13 +926,16 @@ if __name__=='__main__':
     action=parser.add_mutually_exclusive_group()
     action.add_argument('--delivery-lease-only',action='store_true')
     action.add_argument('--ui-components-only',action='store_true')
+    action.add_argument('--attention-only',action='store_true')
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only and not args.ui_components_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.attention_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        if args.ui_components_only:
+        if args.attention_only:
+            attention_workspace(args.binary.resolve(),args.evidence.resolve(),report)
+        elif args.ui_components_only:
             early_composer(args.binary.resolve(),args.evidence.resolve(),report)
             native_components(args.binary.resolve(),args.evidence.resolve(),report)
         else:

@@ -154,7 +154,11 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		}
 		var bindingID string
 		if inbound != nil {
-			bindingID, key, err = acceptChannelSource(ctx, tx, *inbound, content)
+			sourceKey := ""
+			if feedbackRef != "" {
+				sourceKey = key
+			}
+			bindingID, key, err = acceptChannelSource(ctx, tx, *inbound, content, sourceKey)
 			if err != nil {
 				return err
 			}

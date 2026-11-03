@@ -5,10 +5,21 @@ import {enhanceProjections,releaseProjections} from './projections';
 const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
 function viewRegions(view:string):string[]|null {
  if(view==='/')return ['workspace-status','conversation-attention','conversation-messages','conversation-approvals'];
- if(view==='/tasks')return ['workspace-status','ongoing-work'];
- if(view.startsWith('/tasks/'))return ['workspace-status','task-header','task-progress','task-decisions','task-messages','task-milestones'];
+ if(view==='/tasks')return ['workspace-status','tasks-attention','ongoing-work'];
+ if(view.startsWith('/tasks/'))return ['workspace-status','task-header','task-feedback','task-progress','task-decisions','task-messages','task-milestones'];
  if(view.startsWith('/settings/'))return ['workspace-status','signin-status'];
  return null;
+}
+
+function keepFeedbackDraft(form:HTMLFormElement,message:string){
+ const answer=form.querySelector<HTMLTextAreaElement>('[name=answer]');
+ const status=document.getElementById('task-feedback-status');
+ if(!answer?.value.trim()||!status||form.dataset.feedbackDraftKept)return;
+ form.dataset.feedbackDraftKept='true';
+ status.replaceChildren(document.createTextNode(t(message)));
+ const details=document.createElement('details'),label=document.createElement('summary'),saved=document.createElement('textarea');
+ details.open=true;label.textContent=t('Your saved draft');saved.readOnly=true;saved.rows=3;saved.value=answer.value;saved.setAttribute('aria-label',t('Your saved draft'));
+ details.append(label,saved);status.append(details);
 }
 
 // Cache Host markup, not React's enhanced DOM. Stable keyed islands retain
@@ -33,11 +44,28 @@ function regionPatcher(ids:readonly string[]){
    Array.from(parsed.content.children).forEach((incoming,i)=>{
     const key=(incoming as HTMLElement).dataset.liveKey??`position:${i}`;
     const old=keyed.get(key),raw=incoming.outerHTML;
-    const child=old&&originals.get(old)===raw?old:incoming;
+    let child=old&&originals.get(old)===raw?old:incoming;
+    if(id==='task-feedback'&&old){
+     const native=old.querySelector<HTMLFormElement>('form[action="/task/feedback"]');
+     if(native&&incoming.querySelector('form[action="/task/feedback"]')){
+      child=old;
+      const button=native.querySelector<HTMLButtonElement>('button[type=submit]');
+      const next=incoming.querySelector<HTMLButtonElement>('button[type=submit]');
+      if(button&&next&&!native.dataset.submitting)button.disabled=next.disabled;
+      const hint=native.querySelector<HTMLElement>('[data-feedback-model-needed]'),nextHint=incoming.querySelector<HTMLElement>('[data-feedback-model-needed]');
+      if(hint&&nextHint)hint.hidden=nextHint.hidden;
+     }
+    }
     retained.add(child);originals.set(child,raw);
     if(region.children[i]!==child)region.insertBefore(child,region.children[i]??null);
    });
-   for(const child of previous){if(!retained.has(child)){releaseProjections(child as HTMLElement);child.remove()}}
+   for(const child of previous){if(!retained.has(child)){
+    if(id==='task-feedback'){
+     const form=child.querySelector<HTMLFormElement>('form[action="/task/feedback"]');
+     if(form&&!form.dataset.feedbackAccepted)keepFeedbackDraft(form,form.dataset.submitting?'The request changed while your response was being sent. Your draft is kept; check the conversation before retrying.':'This question or review changed. Your draft is kept for reference and has not been submitted.');
+    }
+    releaseProjections(child as HTMLElement);child.remove()
+   }}
   }
   markup.set(id,html);enhanceProjections(region);
  };
@@ -104,7 +132,7 @@ export function startLiveUpdates(){
   const timeout=setTimeout(()=>controller.abort(),10000);
   try{
    const query=new URLSearchParams({view});if(before)query.set('before',String(before));
-   if(view==='/tasks'||view.startsWith('/tasks/')){const pageQuery=new URLSearchParams(location.search);for(const key of ['q','cursor','history']){const value=pageQuery.get(key);if(value)query.set(key,value)}const taskView=pageQuery.get('view');if(taskView)query.set('task_view',taskView)}
+   if(view==='/tasks'||view.startsWith('/tasks/')){const pageQuery=new URLSearchParams(location.search);for(const key of ['q','cursor','history','feedback_before']){const value=pageQuery.get(key);if(value)query.set(key,value)}const taskView=pageQuery.get('view');if(taskView)query.set('task_view',taskView)}
    const response=await fetch('/api/updates?'+query,{credentials:'same-origin',cache:'no-store',signal:controller.signal,headers:etag?{'If-None-Match':etag}:{}});
    if(current!==generation)return;
    if(response.status===401||response.status===403){accessLost();return}
@@ -172,6 +200,49 @@ export function startLiveUpdates(){
    finally{
     clearTimeout(timeout);delete form.dataset.submitting;for(const button of buttons)button.disabled=false;
     void refresh();
+   }
+  })();
+ });
+ // Saved questions and result reviews use the same committed refresh stream.
+ // The form's native input survives unchanged keyed updates; an uncertain POST
+ // is read back, never resubmitted automatically.
+ document.addEventListener('submit',event=>{
+  const form=event.target;
+  if(!(form instanceof HTMLFormElement)||form.getAttribute('action')!=='/task/feedback')return;
+  event.preventDefault();
+  const status=document.getElementById('task-feedback-status');
+  if(stopped||form.dataset.submitting)return;
+  const answer=form.querySelector<HTMLTextAreaElement>('[name=answer]');
+  const button=form.querySelector<HTMLButtonElement>('button[type=submit]');
+  if(!answer||!button)return;
+  if(new TextEncoder().encode(answer.value).length>16384){
+   const message=t('This answer is too long. Shorten it before sending.');
+   answer.setCustomValidity(message);answer.addEventListener('input',()=>answer.setCustomValidity(''),{once:true});answer.reportValidity();
+   if(status)status.textContent=message;return;
+  }
+  if(!form.reportValidity())return;
+  const data=new URLSearchParams();
+  for(const [key,value] of new FormData(form)){if(typeof value==='string')data.append(key,value)}
+  form.dataset.submitting='true';button.disabled=true;
+  if(status)status.textContent=t('Sending your response…');
+  void(async()=>{
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+   let message='Your response was not confirmed. Checking the current request. Your draft is kept.';
+   try{
+    const response=await fetch('/task/feedback',{method:'POST',body:data,credentials:'same-origin',headers:{Accept:'application/json'},signal:controller.signal});
+    if(!response.ok){
+     if(response.status===400)message='This answer is too long or invalid. Edit it before sending again.';
+     if(response.status===409)message='This question or review changed. Your draft is kept for reference and has not been submitted.';
+     if(response.status===401||response.status===403)message='Your access changed. Sign in again before sending. Your draft is kept.';
+     throw new Error('response rejected');
+    }
+    if((await response.json()).accepted!==true)throw new Error('response not confirmed');
+    form.dataset.feedbackAccepted='true';
+    if(status){status.textContent=t('Your response was saved. Ghost will review it in the conversation.');status.tabIndex=-1;status.focus({preventScroll:true})}
+   }catch{
+    delete form.dataset.feedbackDraftKept;keepFeedbackDraft(form,message);
+   }finally{
+    clearTimeout(timeout);delete form.dataset.submitting;button.disabled=false;void refresh();
    }
   })();
  });

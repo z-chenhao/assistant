@@ -42,11 +42,21 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 旧 `/settings` → Models、`/progress` → Tasks；旧 Trace query/冻结上下文链接保留全部选择参数并跳转到规范详情路径。已知子页未登录返回 401 登录表单，成功后仅返回校验过的本地页面；API 认证响应不变。共享认证、CSRF、binding、CSP 和 no-store 继续先于业务处理，无 schema 迁移。
 
+### Web 待办投影与反馈来源（F-018/F-004）
+
+`attention.go` 为现有 SSR 与条件更新提供私有只读投影。具名问题/审阅读取 F-004 当前记录，不依赖 Task 是否 active；审批读取有界 `PendingApprovals`，保留既有历史 `ApprovalView`；Task 失败、unknown 和无结构化问题时的需要信息状态来自当前执行事实。同 Task 的结构化 input question 抑制 generic input 兜底，失败与 unknown 保持独立事实。模型不可用提供现有 Settings 修复入口，不猜测模型进度文本或建立新状态机。
+
+每个来源最多读取一页当前项，页面计数直接取已呈现记录，后续项使用 `+`/更多链接。不可用来源明确提示，不把未知当零；没有为总数扫描全部历史。问题引用、可访问成果名与真实源消息 sequence 来自原 Store，SQL、Run ID 和底层错误不进入用户流程。既有单侧栏、品牌、i18n 与原生控件样式保持。
+
+`POST /task/feedback` 在既有 loopback/token、同源与启用绑定校验后，调用同一反馈事务。问题是稳定 logical source，不同页面提交是 callback aliases；Web 的 channel_source 使用与 CLI 相同的 feedback request key。绑定/来源校验先于重复回执返回；首次 Web 接纳保存 `source:web` 与 message_route，首次 CLI 接纳仍保持原渠道。后到重试不改写已冻结路由。没有新 migration、工具 schema 或 Worker 控制入口。
+
+原生表单与异步增强都只提交用户动作一次。400 无效输入、409 陈旧/冲突、权限变化与未知确认分别呈现；UTF-8 字节限制在浏览器先检查，服务端仍为权威。失去当前性的表单移出操作区和计数前保留其本地非空草稿为只读参考，不将其转移到新问题或自动提交。同一问题普通更新保留 native textarea、选区与焦点。Chat 的泛待办以明确标注的新标签页打开，保留不能序列化的原 native 附件状态；仅审批仍使用原定位。
+
 ### Web 实时投影与界面生命周期（F-019）
 
 `GET /api/updates?view=/|/tasks|/tasks/{taskRef}|/settings/...&before=...` 返回当前视图的具名 HTML 区域与 `latest` sequence；`before` 仅用于 Conversation 的排他历史游标。状态与内容由现有 Core 查询取得，复用 SSR 的 UISpec 验证、转义、语义 fallback 和审批投影。完整页面与后台读取共用 `loadConversation` 和具名模板；没有新 Agent Loop、模型请求、领域写入口、事件表或迁移。
 
-每次请求先执行已有认证与渠道绑定检查，再判断 `If-None-Match`；未变化返回 304。响应不含 composer、source_id、原始 Run/Tool trace 或模型凭据。历史页保留原游标，同时读取最新头部 sequence 提示新消息，不悄悄跳回最新窗口。不同区域读取的是各自已提交投影，不宣称跨数据库的原子快照；下次读取收敛，审批提交始终重新校验冻结哈希与权限。
+每次请求先执行已有认证与渠道绑定检查，再判断 `If-None-Match`；未变化返回 304。响应不含 composer、原始 Run/Tool trace 或模型凭据；反馈表单的 source_id 固定为非秘密的题目身份，普通状态读取不会更换其提交身份。历史页保留原游标，同时读取最新头部 sequence 提示新消息，不悄悄跳回最新窗口。不同区域读取的是各自已提交投影，不宣称跨数据库的原子快照；下次读取收敛，审批提交始终重新校验冻结哈希与权限。
 
 浏览器每秒读取一次，单一调度链与请求取消防止过时响应覆盖新视图；单次 10 秒 deadline，网络失败最多退避到 30 秒。隐藏/离开页面时取消读取，返回时立即刷新。401/403 停止轮询并保留当前页面，另页登录和显式重试不会重建输入节点。设置表单不参与后台替换，避免覆盖用户填写或悄悄更换模型。
 
@@ -61,7 +71,7 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 验证身份 → 规范输入与附件 → 接受并去重 → Actor 执行 → 冻结回复目标 → 适配呈现并发送。Web 通过带 ETag 的条件读取更新独立页面区域，输入状态保留在原节点。
 
 - **F-017**：标准启动/TUI/CLI、输入与已交付回复投影已接通。 终端输出没有远端确认协议，不宣称屏幕显示 exactly-once。
-- **F-018**：分层 Models/Notifications、Tasks 列表/详情和独立 Trace 详情已接通，保留认证路由、前端嵌入与语义 fallback。 实时更新与开发区分别由 F-019、F-031 跟踪。
+- **F-018**：分层 Models/Notifications、Tasks 列表/详情、优先待办/信息回答/成果审阅和独立 Trace 详情已接通，保留认证路由、前端嵌入与语义 fallback。 实时更新与开发区分别由 F-019、F-031 跟踪。
 - **F-019**：已提交会话、审批、全局状态、任务摘要和登录过程通过条件读取实时刷新；草稿、文件、焦点、选区和阅读位置独立保留。传输与模型 token streaming 分开；阶段摘要生产仍由 F-005 负责。
 - **F-020**：签名回调、p2p身份绑定、收发、本地回执、自建应用token自动维护与CLI诊断已实现；未知远端结果保持query-only，不靠刷新或重发推定成功。
 

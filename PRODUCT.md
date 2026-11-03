@@ -43,6 +43,6 @@ Steward 是产品品牌，Ghost 是当前 Agent 的显示名称。持续对话�
 
 本机 Web 省略 token_ref 时直接进入，配置 token_ref 时保留口令模式；实际监听、peer 与同源校验以及渠道绑定和动作审批继续生效。Chat 右上角 Computer / Worker 改为纵向上下排列。
 
-待确认入口统一放在 Chat 右上角 Computer / Worker 下方；仍按真实待审批数出现、点击定位原审批，不在左上角重复展示。
+待办入口统一放在 Chat 右上角 Computer / Worker 下方，覆盖当前问题、成果审阅、审批和可处理故障；数量来自当前呈现页，有后续项时明确显示更多。只有审批时定位原审批，其他待办在标注的新标签页打开以保留对话的原生草稿/附件。Tasks 首部优先显示真实当前待办，回答与审阅经 Main 接续，不替代动作审批或直接控制 Task。
 
 Web task intent: the owner primarily uses Tasks to understand upcoming Agent work and its configuration, and wants to edit scheduling instructions/rules manually. Capability setup should use friendly forms by default, with advanced configuration available when needed. Preserve the distinction between saved scheduling intent, dispatched Tasks, frozen actions and delivered results.

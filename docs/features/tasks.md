@@ -20,12 +20,12 @@
 
 **需求**：用户能把耗时工作交给后台，通过对话及明确关联的渠道事件接续、暂停、继续、取消或结束；缺失信息或成果待审阅时，用户能定位问题或产物，回答或反馈后继续原任务。
 
-**当前实现**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通；已有 needs_input、冻结审批、Needs me 与关联交付记录。Main 可保存关联原 Task/源消息的信息问题或绑定确切 ArtifactRef 的成果审阅；所有者从 CLI 回答，回答持久进入 Main 后由既有 Task 工具接续。
+**当前实现**：Task create/append/pause/cancel/complete、once/ongoing 和 Root 恢复已接通；已有 needs_input、冻结审批、Needs me 与关联交付记录。Main 可保存关联原 Task/源消息的信息问题或绑定确切 ArtifactRef 的成果审阅；所有者从 CLI 或 Web Task 详情回答，回答持久进入 Main 后由既有 Task 工具接续。
 
-**边界与剩余工作**：Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。跨渠道事件接续及 Web/飞书的结构化人工参与尚未形成闭环，具体要求如下：
+**边界与剩余工作**：Run 失败不新增 failed Task 状态；继续通常建立新 Root，不复活旧 Run。跨渠道事件接续及飞书的结构化人工参与尚未形成闭环，具体要求如下：
 
 - **渠道关联与接续**：依赖 F-042 和实际服务接入，以显式消息/PR 引用与已保存关联定位原 Task。话题相似不足以自动关联，歧义与超范围工作交 Main；接收上下文不授予新权限。暂停、取消和 Forget 后的意图不能被自动反馈恢复。
-- **信息回答与成果审阅**：CLI 已接通问题/成果的具名待办、分页、提交去重和陈旧反馈拒绝；Web Needs me 与飞书卡片尚未接入这些待办。问题关联原 Task/消息，成果关联明确产物或修订，反馈经 Main 接续。信息回答、具体动作审批和成果审阅分别表达，不能相互替代；不强制所有任务等待人工验收，不从自由文本猜测阻塞，不引入通用人类工作流引擎。
+- **信息回答与成果审阅**：CLI 与 Web 已接通问题/成果的具名待办、分页、提交去重和陈旧反馈拒绝；飞书结构化卡片尚未接入。问题关联原 Task/消息，成果关联明确产物或修订，反馈经 Main 接续。信息回答、具体动作审批和成果审阅分别表达，不能相互替代；不强制所有任务等待人工验收，不从自由文本猜测阻塞，不引入通用人类工作流引擎。
 
 **验收目标**：
 
@@ -58,6 +58,8 @@ Task 列表默认 Open（active/paused），还可查看 Needs me、Finished（c
 ### 回答已保存的问题与审阅成果
 
 Main 可通过 `task_manage` 的 `request_input` 记录具体问题，通过 `request_review` 记录至多 16 个确切 ArtifactRef 的成果审阅。它们是独立信息记录，不改变 Task 状态，不自动暂停执行，也不代表所有任务必须等待验收。Worker 仍只向 Main 汇报；用户可在对话中要求 Ghost 记录需要确认的问题。
+
+Web 从 Tasks 首部的待办进入原 Task 详情回答/审阅，相关文件和源消息均有明确链接；过期或另一端处理后的本地草稿保留为不可提交参考。Web 与 CLI 使用同一回答记录，首次接纳的渠道决定该条输入的回复路由。
 
 所有者运行 `steward task feedbacks` 查看当前可处理待办，可加 `TASK_REF` 筛选。每页至多 50 条；响应的 `next` 非空时用 `steward task feedbacks "" BEFORE` 继续全局读取，或用 `steward task feedbacks TASK_REF BEFORE` 读取该任务下一页。已回答、替代、过期、停止、旧 epoch 或 Forget 前的问题不会进入列表。记录包含具体问题、原 Task、可用时的源消息 ID、成果引用与到期时间；用既有 `artifact describe/open` 检查确切成果。
 
