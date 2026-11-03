@@ -6,6 +6,18 @@
 
 ## 当前架构
 
+### macOS 用户级后台生命周期
+
+`internal/operations/service` 管理每个规范化 data root 的两个私有 LaunchAgents：主进程运行既有 Web/Actor/Delivery 生命周期，独立巡检通过 `StartInterval=60` 运行；主进程没有无条件 `KeepAlive`。安装只是显式部署机制，启用和恢复策略由持久 `enabled` 意图决定。设计依据是 [Apple 的用户 Agent 与定时任务协议](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html)。
+
+控制操作使用独立短期 flock；主进程从接纳到关闭始终持有另一 OS 生存期锁，因此不使用 PID 存活推断，也不受 PID 复用影响。设置和固定码心跳分别原子替换、fsync；停止先提交 `enabled=false` 再 bootout，已排队的启动和巡检重新检查该意图。启动在控制锁之外等待接纳，运行中的服务每五秒检查停止意图并生成 readiness 心跳。重启/登录仅恢复仍启用的服务；缺少/不兼容设置 fail closed。
+
+巡检不打开 domain 数据库、不接管 claim，也不驱动 Actor。存活进程的未配置、凭据/供应商和基础设施失效只显示健康码，继续由现有可恢复初始化处理；失去心跳时显示 stale，不杀死仍持锁进程。仅退出进程可触发 launchctl kickstart，不使用 `-k`；每分钟至多一次，三次连续恢复且未观测到 ready 后停止重启，显式 start 才重置。恢复次数在外部调用前提交，以限制巡检崩溃或调用结果不确定时的重复调度。配置/启动失败不自动重启。原始配置、供应商错误、prompt、credential 不写入心跳或通知；本地 notice 按固定状态码去重，保存最新提示与单调序号，不建立新的渠道投递协议。
+
+机制复杂度中，持久人工意图、互斥锁、原子落盘、独立巡检与有限恢复属于进程生命周期要求；60 秒间隔、三次上限和 loopback 默认端口是当前可逆政策。实现和版本化服务元数据保持私有，不稳定通用 Service/Watchdog 插件接口，不建立第二 Agent Loop，不泛化为云部署或语义自治恢复。安装保存显式配置路径和 PATH，不拷贝 shell 凭据；Keychain 继续由 SecretStore 在运行时解析。普通安装仍不自动部署服务，升级服务需先停止并重新安装，以免把新版本发布当作启用授权。
+
+现有 SQLite schema、审批哈希、冻结快照和 durable replay 不变。后台入口复用 `OpenRuntime`、`WithEvents`、`ServeWeb` 与既有恢复扫描；关闭浏览器不拥有服务 ctx，SIGTERM 排空仍沿既有边界，unknown 副作用继续 query-only。LaunchAgent 文件使用 XML 转义后的 argv 数组，不经过 shell；服务元数据和 jobs 使用 0600。真实 macOS 登录/Keychain/升级行为仍需隔离账户验收，协议替身只证明可控外部边界。
+
 本地诊断读取持久状态与日志；维护锁序列化备份/恢复。模型请求在 admission 事务中处理费用预留，最终 usage 与结果一起接受。
 
 ```mermaid

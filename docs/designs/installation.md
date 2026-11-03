@@ -25,6 +25,6 @@ flowchart TD
 
 打包使用 `scripts/package.sh` 生成 `steward-<platform>-<arch>.tar.gz` 与校验文件；归档包含运行时与当前说明。源码安装依赖 Go/npm，原生包保留显式 Node 前提。发布需要独立授权。
 
-前台启动持有数据根锁，自有 broker 使用随机 loopback 端口。退出先关闭 App，再关闭 broker。显式配置和 `STEWARD_NATS_URL` 可以选择外部 broker；不引入守护进程管理器、第二 Agent loop 或默认模型。
+前台启动持有数据根锁，自有 broker 使用随机 loopback 端口。退出先关闭 App，再关闭 broker。显式配置和 `STEWARD_NATS_URL` 可以选择外部 broker。普通安装不部署后台服务；macOS 可通过独立、显式的 `service install/start` 启用用户 LaunchAgents，生命周期与停止意图见 [运维方案](operations.md#macos-用户级后台生命周期)。仍不引入第二 Agent loop 或默认模型。
 
 不提供其他品牌的启动器、配置和数据发现回退，也不改写已冻结执行或主动清除应用数据。运行时审批、重放、取消和未知外部效果语义维持不变。
