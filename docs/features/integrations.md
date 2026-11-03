@@ -48,7 +48,7 @@
 
 **当前实现**：显式配置一个 GitHub.com 仓库/PR 后，前台 Web/TUI/Automation 运行时持续读取 review comments、已提交 reviews 与当前 PR head 的已完成 check-runs。完整分页扫描后，将来源版本身份、观察内容、健康及补读成功时间原子保存到 `state.db`，通过 `github status/events` 查看；重复和乱序不重复保存同一来源版本，自身份的评论/评审不回流。
 
-**边界与剩余工作**：当前观察仅供本机只读诊断，不触发 Main、创建/接续 Task 或发送飞书通知，也不会将评审内容冒充用户授权。Main/Task/飞书关联消费仍未实现。补读重扫 GitHub 仍保留的当前资源；不保证已删除评论、扫描间消失的中间修改、旧 head 的 CI 或普通 issue comments/legacy commit statuses。每类至多扫描 20 页、每页 100 项；总规范化内容至多 8 MiB，超过界限显示 `HISTORY_LIMIT` 并保留原成功边界，不能称为完整审计流。
+**边界与剩余工作**：未绑定的观察只供本机诊断；本机所有者可将当前精确 PR 显式关联到已有 Task，只有绑定后新观察才交 Main 作为不可信外部证据，再由 Main 判断是否在原目标内追加工作。事件不能创建新 Task 或扩大权限；原渠道/话题交付仍由 F-020 维护。补读重扫 GitHub 仍保留的当前资源；不保证已删除评论、扫描间消失的中间修改、旧 head 的 CI 或普通 issue comments/legacy commit statuses。每类至多扫描 20 页、每页 100 项；总规范化内容至多 8 MiB，超过界限显示 `HISTORY_LIMIT` 并保留原成功边界，不能称为完整审计流。
 
 **验收目标**：重复接收不重复接单；断连、重启、乱序和来源权限撤销后按明确边界恢复或停止；监听中断不展示为正常。接收信息不授予任务执行或外部动作权限。
 
@@ -80,6 +80,27 @@ steward -config /absolute/config.yaml github resume
 `poll` 执行一次真实只读扫描并返回状态；失败返回非零，同时保留安全诊断。`events` 按 sequence 倒序最多 100 项，下一页传本页最小 sequence；正文最长 16 KiB，截断时明确提示沿来源 URL 读取全文。`status` 区分 `never_checked/checking/healthy/interrupted/stale/stopped/privacy_stopped/not_configured`；超过两倍轮询间隔的旧成功/进行中扫描显示 `stale`，不冒充仍正常监听。CLI 控制可在模型或执行依赖不可用时使用。
 
 `stop` 持久停止并 fencing 在途扫描，普通 `poll` 和重启不能恢复。Forget 同样停止原授权 epoch 的接收，并隐藏旧 epoch 观察；明确 `resume` 才更新接收意图。历史相同 event_key 不会因 resume 重新入库或暴露，只有此后尚未保存的来源版本进入当前观察。它不恢复 Task 或外部副作用。仓库名称对应的不可变 repository ID 改变时 fail closed，不把新仓库当原来源。
+
+### 将 PR 后续反馈关联到已有任务
+
+先配置/成功 `github poll`，确认确切仓库及 PR；再由本机所有者选择已存在、当前隐私作用域内的 Task。`task_epoch` 是所选 Task 当前执行代次，`version` 是 `github binding` 返回的关联版本（首次为 0）。关联只允许 active 或自然完成的 once Task；暂停、取消和用户显式 complete 的当前代次不能绑定。
+
+```sh
+steward -config /absolute/config.yaml github binding
+steward -config /absolute/config.yaml github bind <<'JSON'
+{"task_ref":"task:opaque-ref","task_epoch":1,"version":0}
+JSON
+```
+
+绑定不回放已经收下的历史观察。后续新版本按持久身份只接纳一次，经现有单 Main/Actor 读取 JSON 证据框，判断是否需要 `task_manage append` 继续同一 Task。同一观察只接受一次不同的追加动作；相同来源与相同参数重复请求复用原回执。歧义、超范围、未知副作用或不需继续时，Main 应解释/询问用户，不建立新工作或猜测外部授权。source Main 可读已有授权数据和保存本地产物，不能直接发外部动作、创建 Automation 或写长期 Memory；真正工作交既有 Task Worker 和审批管线。
+
+```sh
+steward -config /absolute/config.yaml github unbind <<'JSON'
+{"version":2}
+JSON
+```
+
+使用实际 `github binding` 版本，不固定复用示例值。unbind、监听 stop、Task pause/cancel、用户显式 complete、Forget 和来源撤权会使待处理/正在推理的旧因果失效；恢复监听或普通重启不重新授权已停止的绑定。新用户输入优先建立自身的 Main，保留不可变接收回执，不被旧观察吞并。once Root 自然结束并非人工停止，原绑定可接续；人工 complete 则需要用户明确 append 进入新代次后再重新绑定。未知效果不会因为收到评审而重试。
 
 远程 OAuth MCP、邮件/日历等不能当成现成产品开关。真实账户权限及 GitHub 保留历史的补读范围仍需独立验证。
 

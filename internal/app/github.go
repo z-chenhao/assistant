@@ -34,3 +34,20 @@ func (a *App) GitHubObservations(ctx context.Context, before int64) ([]github.Ob
 	}
 	return a.store.GitHubObservations(ctx, a.github.Config, before)
 }
+
+func (a *App) BindGitHubTask(ctx context.Context, q github.BindingRequest, enabled bool) (github.TaskBinding, error) {
+	if a.github == nil {
+		return github.TaskBinding{}, errors.New("github configuration is required")
+	}
+	if err := a.store.BindGitHubTask(ctx, a.github.Config, q, enabled); err != nil {
+		return github.TaskBinding{}, err
+	}
+	return a.store.GitHubTaskBinding(ctx, a.github.Config)
+}
+
+func (a *App) GitHubTaskBinding(ctx context.Context) (github.TaskBinding, error) {
+	if a.github == nil {
+		return github.TaskBinding{State: "not_configured"}, nil
+	}
+	return a.store.GitHubTaskBinding(ctx, a.github.Config)
+}

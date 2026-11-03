@@ -477,6 +477,12 @@ func TestSchedulerMigrationV13PreservesFrozenTreeAndRollsBack(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, table := range []string{"model_snapshot", "agent_config", "capability_snapshot", "task"} {
+				if table == "task" {
+					if _, err = db.Exec(`INSERT INTO task (` + preGitHubTaskColumns + `) SELECT ` + preGitHubTaskColumns + ` FROM prior.task`); err != nil {
+						t.Fatal(err)
+					}
+					continue
+				}
 				if _, err := db.Exec(`INSERT INTO ` + table + ` SELECT * FROM prior.` + table); err != nil {
 					t.Fatal(table, err)
 				}

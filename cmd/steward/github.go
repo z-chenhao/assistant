@@ -9,10 +9,31 @@ import (
 	"strconv"
 
 	"github.com/z-chenhao/assistant/internal/app"
+	"github.com/z-chenhao/assistant/internal/observer/github"
 )
 
-func runGitHub(ctx context.Context, application *app.App, flags *flag.FlagSet, out io.Writer) error {
+func runGitHub(ctx context.Context, application *app.App, flags *flag.FlagSet, in io.Reader, out io.Writer) error {
 	switch flags.Arg(1) {
+	case "bind", "unbind":
+		raw, err := io.ReadAll(io.LimitReader(in, 4097))
+		if err != nil || len(raw) > 4096 {
+			return errors.New("invalid GitHub task binding request")
+		}
+		q, err := github.ParseBinding(string(raw), flags.Arg(1) == "bind")
+		if err != nil {
+			return err
+		}
+		binding, err := application.BindGitHubTask(ctx, q, flags.Arg(1) == "bind")
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(binding)
+	case "binding":
+		binding, err := application.GitHubTaskBinding(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(out).Encode(binding)
 	case "poll":
 		if err := application.PollGitHub(ctx); err != nil {
 			return err

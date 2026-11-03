@@ -143,6 +143,9 @@ func TestGitHubCLIControlPersistsWithoutExecutionReadiness(t *testing.T) {
 		}
 	}
 	status("never_checked")
+	if raw, err := invoke("binding"); err != nil || !strings.Contains(string(raw), `"state":"unbound"`) {
+		t.Fatal("binding control depended on execution runtime", string(raw), err)
+	}
 	if _, err := invoke("poll"); err == nil || !strings.Contains(err.Error(), "CREDENTIAL_MISSING") {
 		t.Fatal("missing credential accepted", err)
 	}

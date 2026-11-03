@@ -125,7 +125,10 @@ var responsiveMainSQL string
 //go:embed migrations/033_github_observations.sql
 var githubObservationsSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL}
+//go:embed migrations/036_github_task_continuation.sql
+var githubTaskContinuationSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, githubTaskContinuationSQL}
 
 type Store struct {
 	inspector  *inspectionsqlite.Inspector

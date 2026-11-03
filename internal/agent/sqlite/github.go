@@ -70,6 +70,9 @@ func (s *Store) FinishGitHubPoll(ctx context.Context, cfg github.Config, ticket 
 			if _, e := tx.ExecContext(ctx, `UPDATE github_watch SET state='interrupted',failure_code=?,version=version+1 WHERE scope=?`, failure, cfg.Scope()); e != nil {
 				return e
 			}
+			if e := stopInvalidGitHubMains(ctx, tx); e != nil {
+				return e
+			}
 			if failure != previousFailure {
 				return githubWake(ctx, tx, cfg.Scope(), "github.watch.interrupted", map[string]string{"code": failure})
 			}
@@ -122,6 +125,9 @@ func (s *Store) SetGitHubWatch(ctx context.Context, cfg github.Config, enabled b
 		return err
 	}
 	err := s.Transaction(ctx, func(tx *sql.Tx) error {
+		if err := revokeGitHubBinding(ctx, tx, cfg.Scope(), ""); err != nil {
+			return err
+		}
 		state := "stopped"
 		if enabled {
 			state = "never_checked"

@@ -267,10 +267,21 @@ func (t *tools) executeTask(ctx context.Context, inv tool.Invocation) (tool.Resu
 			return err
 		}
 		if source == "" {
-			return agent.ErrConflict
+			err = tx.QueryRowContext(ctx, `SELECT request_id FROM github_task_followup WHERE run_id=? AND state IN('assigned','continued')`, t.claim.RunID()).Scan(&source)
+			if err != nil {
+				return agent.ErrConflict
+			}
 		}
 		err = tx.QueryRowContext(ctx, `SELECT receipt_json FROM task_request WHERE source_message_id=? AND request_hash=?`, source, hash).Scan(&receipt)
 		if err == sql.ErrNoRows {
+			allowed, err := checkGitHubAppend(ctx, tx, t.claim.RunID(), request)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				result = tool.Failure("PERMISSION_DENIED")
+				return nil
+			}
 			var agentID, conv string
 			if err = tx.QueryRowContext(ctx, `SELECT agent_id,conversation_id FROM run WHERE run_id=?`, t.claim.RunID()).Scan(&agentID, &conv); err != nil {
 				return err
@@ -292,6 +303,11 @@ func (t *tools) executeTask(ctx context.Context, inv tool.Invocation) (tool.Resu
 				}
 			}
 			ref, taskID, receiptStatus, epoch = change.reference, change.id, change.receiptStatus, change.epoch
+			if request.Operation == "append" {
+				if err = acceptGitHubAppend(ctx, tx, t.claim.RunID(), taskID, epoch); err != nil {
+					return err
+				}
+			}
 
 			receipt, _ = encoded(task.Receipt{TaskRef: ref, Status: receiptStatus, Accepted: true})
 			if _, err = tx.ExecContext(ctx, `INSERT INTO task_request VALUES(?,?,?,?)`, source, hash, receipt, inv.ID); err != nil {

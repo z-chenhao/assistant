@@ -113,7 +113,7 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 		return agent.ErrClaimLost
 	}
 	var valid int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND coalesce((SELECT epoch FROM run_memory_epoch WHERE run_id=r.run_id),0)=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=r.agent_id),0) AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active'))`, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM run_claim c JOIN run r USING(run_id) WHERE c.run_id=? AND c.token=? AND c.epoch=? AND c.expires_at>? AND r.status='running' AND coalesce((SELECT epoch FROM run_memory_epoch WHERE run_id=r.run_id),0)=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=r.agent_id),0) AND (r.kind='main' OR EXISTS(SELECT 1 FROM task t WHERE t.task_id=r.task_id AND t.agent_id=r.agent_id AND t.task_epoch=r.task_epoch AND t.status='active')) AND `+currentGitHubCause, owner.id, owner.token, owner.epoch, time.Now().UnixMicro()).Scan(&valid); err != nil {
 		return agent.ErrStorage
 	}
 	if valid != 1 {
@@ -177,6 +177,9 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		}
 		if profile == "" || status != "ready" {
 			return agent.ErrSetup
+		}
+		if err = supersedeGitHubMain(ctx, tx, agentID); err != nil {
+			return err
 		}
 		err = tx.QueryRowContext(ctx, `SELECT run_id FROM run WHERE agent_id=? AND kind='main' AND desired_state='running' AND status IN ('queued','running','waiting')`, agentID).Scan(&receipt.RunID)
 		if err == sql.ErrNoRows {
@@ -242,6 +245,9 @@ func (r *Runs) Next(ctx context.Context) (string, error) {
 // Recover scans authoritative intents without acquiring execution ownership.
 // Production startup uses the same idempotent scan as every Actor drain.
 func (r *Runs) Recover(ctx context.Context) error {
+	if err := r.write(ctx, func(tx *sql.Tx) error { return stopInvalidGitHubMains(ctx, tx) }); err != nil {
+		return err
+	}
 	now := time.Now()
 	if r.automationClock != nil {
 		now = r.automationClock()
@@ -270,7 +276,7 @@ func (r *Runs) Recover(ctx context.Context) error {
 	if err := r.promoteFollowups(ctx); err != nil {
 		return err
 	}
-	return nil
+	return r.recoverGitHubFollowups(ctx)
 }
 
 func (r *Runs) scheduledResult(ctx context.Context, id string, err error) (string, error) {
