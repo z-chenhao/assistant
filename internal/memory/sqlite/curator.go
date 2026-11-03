@@ -224,7 +224,7 @@ func (s *Store) encryptedIndex(ctx context.Context, scope recall.Scope) (*sql.DB
 	if !ok || !local.Local() {
 		return nil, recall.ErrUnavailable
 	}
-	rows, e := s.db.QueryContext(ctx, `SELECT m.memory_id,m.user_id,m.scope_type,m.scope_id,m.content,m.created_at,m.tier FROM memory_record m LEFT JOIN recall_document d ON d.ref='memory:'||m.memory_id WHERE m.user_id=? AND ((m.scope_type='user' AND m.scope_id=?) OR (m.scope_type='agent' AND m.scope_id=?)) AND m.deleted_at IS NULL AND (d.active=1 OR m.content LIKE 'sealed:v1:%') AND NOT EXISTS(SELECT 1 FROM memory_record n WHERE n.supersedes_memory_id=m.memory_id) ORDER BY m.memory_id`, scope.UserID, scope.UserID, scope.AgentID)
+	rows, e := s.db.QueryContext(ctx, `SELECT m.memory_id,m.user_id,m.scope_type,m.scope_id,m.content,m.created_at,m.tier`+currentMemoryRows+` ORDER BY m.memory_id`, scope.UserID, scope.UserID, scope.AgentID)
 	if e != nil {
 		return nil, recall.ErrUnavailable
 	}

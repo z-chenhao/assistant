@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-009](../features/memory-context.md#f-009) | 验证同义事实归并、明确纠正替代、证据不足保留低置信、遗忘后不可继续使用旧上下文。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-010](../features/memory-context.md#f-010) | 验证可见范围、来源、时间、冻结恢复及索引故障不产生不完整成功结果。 | 保护已接通的限定范围；Live/配置另行验证 |
-| [F-010](../features/memory-context.md#f-010) | 消息→任务→产物/原文的真实引用链，验证正确定位、摘要外分页续读、来源、预算及每跳/链接权限；覆盖缺失/过期/循环、跨作用域、Forget 与恢复。 | Main Tool 与本机入口已接通；memory: 精读、外部关联与真实模型导航质量仍待补 |
+| [F-010](../features/memory-context.md#f-010) | 消息→任务→产物/原文的真实引用链，验证正确定位、摘要外分页续读、来源、预算及每跳/链接权限；覆盖缺失/过期/循环、跨作用域、Forget 与恢复。 | Main Tool 与本机入口已接通，本机支持 Memory 原文和可见来源。Main Memory 原文、外部关联和真实模型导航质量仍待补 |
 | [F-011](../features/memory-context.md#f-011) | 用长对话验证关键事实与待办保留、来源可定位及模型窗口约束。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 
 ## 层级与关键路径
@@ -33,12 +33,13 @@
 | [tests/system/verify_recall.py](../../tests/system/verify_recall.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [internal/agent/sqlite/evidence_test.go](../../internal/agent/sqlite/evidence_test.go) | 共享 Actor/Provider/Tool 管线形成 current 消息→真实 Task→已授权附件链，UTF-8 原文续读、单跳循环、关系分页、SQLite 重开、读取回执重放、无新增 grant、隐藏/跨域/过期引用及 Forget 竞态；另一 Store 持有 WAL writer 时，本机读取与已完成 Accept/Prepare/Start 的 Main handler 均能在 500 ms 内读取原文 |
 | [internal/evidence/evidence_test.go](../../internal/evidence/evidence_test.go) | 严格 schema、重复/null/伪造作用域拒绝、UTF-8 有界字节窗口与可前进游标 |
-| [cmd/steward/evidence_test.go](../../cmd/steward/evidence_test.go) | 真实 CLI 保存产物后，反复重开精确续读原文；执行依赖故障仍保持只读入口可用，非法/缺失引用不输出部分内容 |
+| [internal/agent/sqlite/evidence_memory_test.go](../../internal/agent/sqlite/evidence_memory_test.go) | Owner 精读覆盖跨用户/Agent、删除/替代、持有 WAL writer、未 Flush intent、同 ConversationID 的外用户归属、可见来源分页。阻塞 SecretStore 期间提交 Forget、纠正或 tombstone，迟到结果整页拒绝 |
+| [cmd/steward/evidence_test.go](../../cmd/steward/evidence_test.go) | 真实 CLI 重开续读产物和密封 Memory，覆盖无 embedding、执行依赖故障、来源校验、坏密文/缺钥/坏钥、旧明文表示和原文落盘边界 |
 | [internal/agent/child_test.go](../../internal/agent/child_test.go) | Main Conversation 导航不进入 Worker/Child 的冻结工作面；旧 catalog Select 不自动追加新工具由 evidence 存储回归验证 |
 | [internal/llm/fake/context_test.go](../../internal/llm/fake/context_test.go) | 确定性 Delegate fixture 消费摘要保留的已接纳回执与 Host Task update，再次摘要仍保留进度；旧摘要位于新显式输入之前时不抑制新请求，仅验证测试协议而不代表模型语义质量 |
 
 - **F-009 剩余覆盖**：补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
-- **F-010 剩余覆盖**：memory: 精读/解密与谱系、外部 PR 关联尚未接通；实际模型自主导航路径的质量需外部效果评测，确定性工具调用链只证明机制。
+- **F-010 剩余覆盖**：Main 的 Memory 精读/解密、替代谱系及外部 PR 关联尚待接通。实际模型自主导航路径的质量需外部效果评测。
 - **F-011 剩余覆盖**：用外部模型评测验证长对话中的目标、约束、决策和待办保留质量；软件测试只证明上下文选择、冻结、隔离与恢复。
 
 ## 详细测试入口与证明边界

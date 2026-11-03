@@ -279,6 +279,28 @@ func (s *Store) Get(ctx context.Context, id, messageID string) (conversation.Mes
 	return messages[0], nil
 }
 
+// EvidenceSourceVisible checks an exact source without reading its content.
+// A missing message permits the Host to check an accepted local intent.
+// An existing foreign ownership binding denies that fallback.
+func (s *Store) EvidenceSourceVisible(ctx context.Context, scope recall.Scope, id, messageID string, floor int64) (bool, error) {
+	var owner sql.NullBool
+	var created sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT
+ (SELECT user_id=? AND agent_id=? FROM conversation_scope WHERE conversation_id=?),
+ (SELECT created_at FROM conversation_message WHERE conversation_id=? AND message_id=?)`,
+		scope.UserID, scope.AgentID, id, id, messageID).Scan(&owner, &created)
+	if err != nil {
+		return false, conversation.ErrStorage
+	}
+	if owner.Valid && !owner.Bool {
+		return false, nil
+	}
+	if !created.Valid {
+		return false, conversation.ErrConflict
+	}
+	return owner.Bool && created.Int64 > floor, nil
+}
+
 func (s *Store) Page(ctx context.Context, id string, before int64) (conversation.Page, error) {
 	if before < 0 {
 		return conversation.Page{}, conversation.ErrInvalid
