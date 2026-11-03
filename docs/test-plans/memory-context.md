@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-009](../features/memory-context.md#f-009) | 验证同义事实归并、明确纠正替代、证据不足保留低置信、遗忘后不可继续使用旧上下文。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 | [F-010](../features/memory-context.md#f-010) | 验证可见范围、来源、时间、冻结恢复及索引故障不产生不完整成功结果。 | 保护已接通的限定范围；Live/配置另行验证 |
-| [F-010](../features/memory-context.md#f-010) | 合成消息→任务→产物/原文的引用链，验证正确定位、摘要外分页续读、来源、预算和每跳权限；覆盖缺失/陈旧/循环引用、跨作用域、Forget 与恢复。沿用真实 store/recall/context 检查和目标工具入口；真实模型能否有效导航另做效果评测。 | 未实现；目标入口回归及相应 Live/效果评测待补 |
+| [F-010](../features/memory-context.md#f-010) | 消息→任务→产物/原文的真实引用链，验证正确定位、摘要外分页续读、来源、预算及每跳/链接权限；覆盖缺失/过期/循环、跨作用域、Forget 与恢复。 | Main Tool 与本机入口已接通；memory: 精读、外部关联与真实模型导航质量仍待补 |
 | [F-011](../features/memory-context.md#f-011) | 用长对话验证关键事实与待办保留、来源可定位及模型窗口约束。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
 
 ## 层级与关键路径
@@ -31,8 +31,13 @@
 | --- | --- |
 | [tests/system/verify_memory_maintenance.py](../../tests/system/verify_memory_maintenance.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_recall.py](../../tests/system/verify_recall.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [internal/agent/sqlite/evidence_test.go](../../internal/agent/sqlite/evidence_test.go) | 共享 Actor/Provider/Tool 管线形成 current 消息→真实 Task→已授权附件链，UTF-8 原文续读、单跳循环、关系分页、SQLite 重开、读取回执重放、无新增 grant、隐藏/跨域/过期引用及 Forget 竞态 |
+| [internal/evidence/evidence_test.go](../../internal/evidence/evidence_test.go) | 严格 schema、重复/null/伪造作用域拒绝、UTF-8 有界字节窗口与可前进游标 |
+| [cmd/steward/evidence_test.go](../../cmd/steward/evidence_test.go) | 真实 CLI 保存产物后，反复重开精确续读原文；执行依赖故障仍保持只读入口可用，非法/缺失引用不输出部分内容 |
+| [internal/agent/child_test.go](../../internal/agent/child_test.go) | Main Conversation 导航不进入 Worker/Child 的冻结工作面；旧 catalog Select 不自动追加新工具由 evidence 存储回归验证 |
 
 - **F-009 剩余覆盖**：补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
+- **F-010 剩余覆盖**：memory: 精读/解密与谱系、外部 PR 关联尚未接通；实际模型自主导航路径的质量需外部效果评测，确定性工具调用链只证明机制。
 - **F-011 剩余覆盖**：用外部模型评测验证长对话中的目标、约束、决策和待办保留质量；软件测试只证明上下文选择、冻结、隔离与恢复。
 
 ## 详细测试入口与证明边界

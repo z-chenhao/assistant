@@ -15,6 +15,7 @@ const (
 	AgentBuiltin        BuiltinFamily = "agent"
 	MemoryWriteBuiltin  BuiltinFamily = "memory_write"
 	MemorySearchBuiltin BuiltinFamily = "memory_search"
+	EvidenceBuiltin     BuiltinFamily = "evidence"
 )
 
 type builtinPolicy struct {
@@ -44,6 +45,7 @@ var builtinCatalog = map[string]builtinPolicy{
 	"builtin__agent_run":          {AgentBuiltin, "spawn_agents", false},
 	"builtin__memory_manage":      {MemoryWriteBuiltin, "memory_control", false},
 	"builtin__memory_search":      {MemorySearchBuiltin, "read_only", false},
+	"builtin__evidence_read":      {EvidenceBuiltin, "read_only", false},
 }
 
 func HostFamily(name string) (BuiltinFamily, bool) {
