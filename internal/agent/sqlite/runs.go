@@ -215,7 +215,11 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 			return err
 		}
 		if bindingID != "" {
-			if _, err = tx.ExecContext(ctx, `INSERT INTO message_route VALUES(?,?)`, receipt.MessageID, bindingID); err != nil {
+			source := ""
+			if inbound.Channel == "feishu" {
+				source = inbound.SourceID
+			}
+			if _, err = tx.ExecContext(ctx, `INSERT INTO message_route(message_id,binding_id,reply_source_id) VALUES(?,?,?)`, receipt.MessageID, bindingID, source); err != nil {
 				return err
 			}
 		}

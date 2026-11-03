@@ -37,6 +37,7 @@ TOKEN = 'sandbox-web-owner-token-at-least-24-bytes'
 class ChannelHarness(MainHarness):
     def __init__(self, binary, root, platform, fixture='main'):
         self.production_events = False
+        self.platform = platform
         super().__init__(binary, root, fixture)
         self.config = root / 'config.yaml'
         self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:STEWARD_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:STEWARD_FEISHU_VERIFY\n  encrypt_key_ref: env:STEWARD_FEISHU_ENCRYPT\n  access_token_ref: env:STEWARD_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
@@ -83,6 +84,7 @@ class ChannelHarness(MainHarness):
         except ValueError: return raw.decode()
 
     def callback(self, source, text, event=None, sender='owner', destination='bound-chat', expected=200, signature=True, kind='text'):
+        self.platform.register_source(source, destination)
         content=dict(text=text) if kind=='text' else dict(file_key='file-key',file_name='received.txt')
         value=dict(schema='2.0',header=dict(event_id=event or source,event_type='im.message.receive_v1',token='sandbox-verify-token',app_id='sandbox-app',tenant_key='sandbox-tenant'),event=dict(sender=dict(sender_type='user',sender_id=dict(open_id=sender)),message=dict(message_id=source,chat_id=destination,chat_type='p2p',message_type=kind,content=json.dumps(content))))
         raw=json.dumps(value,separators=(',',':')).encode();timestamp=str(int(time.time()));nonce='sandbox-nonce'
@@ -196,9 +198,81 @@ def feishu_auth_lifecycle(binary, report):
             h.cleanup()
 
 
+def feishu_topic_delivery(binary, report):
+    """Signed source -> real Actor -> frozen reply -> actual HTTP peer."""
+    from urllib.parse import urlsplit
+    with tempfile.TemporaryDirectory(prefix='steward-feishu-topics-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform, 'tasks')
+        try:
+            h.config.write_text(h.config.read_text() + '  workspace_url: https://owner-workspace.example.test\n')
+            h.setup(); h.start()
+            h.callback('task-origin', 'Delegate: Review the bounded repository result.')
+            state = h.wait(lambda s: len(s['deliveries']) == 2 and all(d['status'] == 'sent' for d in s['deliveries']), 'synchronous acceptance and asynchronous original-topic delivery')
+            messages = platform.evidence()['messages']
+            require(len(messages) == 2 and all(m.get('reply_to') == 'task-origin' for m in messages), 'background result lost its original message')
+            for message in messages:
+                card = json.loads(message['content'])
+                link = card['elements'][1]['actions'][0]['url']
+                parsed = urlsplit(link)
+                require(parsed.netloc == 'owner-workspace.example.test' and not parsed.username and parsed.fragment.startswith('message-'), 'result link escaped its configured workspace')
+                page = h.http(parsed.path + '?' + parsed.query)
+                require('id="' + parsed.fragment + '"' in page, 'result link cannot locate the full semantic reply')
+            h.stop(kill=True); h.start()
+            h.callback('task-origin', 'Delegate: Review the bounded repository result.', event='task-origin-retry')
+            require(len(h.rows()['deliveries']) == 2 and len(platform.evidence()['messages']) == 2, 'recovery created a duplicate notification intent')
+            h.stop()
+            # Explicit owner preference wins over origin; no automatic extra IM.
+            preference = h.command('channel', 'manage', text='{"op":"preference"}')
+            h.command('channel', 'manage', text=json.dumps(dict(op='prefer', channel='tui', version=preference['version'])))
+            h.start()
+            h.callback('task-explicit-tui', 'Delegate: Keep this asynchronous result in the terminal.')
+            state = h.wait(lambda s: len(s['deliveries']) == 4 and all(d['status'] == 'sent' for d in s['deliveries']), 'explicit preference for background result')
+            require(sum(d['channel'] == 'tui' for d in state['deliveries']) == 1, 'background result ignored explicit notification preference')
+            require(len(platform.evidence()['messages']) == 3, 'one Task result created multiple channel notifications')
+            h.stop()
+            # A source reply accepted remotely but losing its response stays
+            # query-only across process/credential/configuration changes.
+            h.start()
+            with platform.lock:
+                platform.drop_response = True
+            h.callback('topic-uncertain', 'A bounded result whose reply acknowledgement is lost.')
+            h.wait(lambda s: any(d['status'] == 'unknown' for d in s['deliveries']), 'source reply uncertain outcome')
+            h.stop(kill=True)
+            attempts = len(platform.evidence()['send_attempts'])
+            h.config.write_text(h.config.read_text().replace('https://owner-workspace.example.test', 'https://changed-workspace.example.test'))
+            with platform.lock:
+                platform.drop_response = False
+            h.command('delivery', 'work')
+            require(len(platform.evidence()['send_attempts']) == attempts, 'unknown source reply was resent')
+            require(any(d['status'] == 'unknown' for d in h.rows()['deliveries']), 'unknown reply was erased without authoritative evidence')
+            report['scenarios']['feishu-topic-delivery'] = dict(state=h.rows(), platform=platform.evidence(), original_source='task-origin', full_result_links=True, explicit_preference=True, query_only_unknown=True)
+            report['checks'].append('Feishu original-message synchronous/Task follow-up replies, trusted full-result links, callback/restart notification dedup, explicit preference and query-only unknown recovery')
+        finally:
+            h.cleanup()
+    with tempfile.TemporaryDirectory(prefix='steward-feishu-linked-file-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform, 'artifacts')
+        try:
+            h.config.write_text(h.config.read_text() + '  workspace_url: http://127.0.0.1:8787\n')
+            h.setup(); h.start()
+            content = 'Complete source evidence with citations and the final checklist.\n'
+            h.callback('linked-artifact', json.dumps(dict(name='evidence.txt', mediaType='text/plain', text=content)))
+            h.wait(lambda s: len(s['deliveries']) == 1 and s['deliveries'][0]['status'] == 'sent', 'linked artifact notification')
+            remote = platform.evidence()
+            require(len(remote['messages']) == 1 and not remote['uploads'], 'linked details were mechanically copied to IM')
+            conversation = h.http('/api/conversation')
+            refs = [p['artifact_ref'] for m in conversation if m['role'] == 'assistant' for p in m['content'] if p.get('artifact_ref')]
+            require(len(refs) == 1 and h.http('/artifact?' + urlencode(dict(ref=refs[0]))) == content, 'linked complete artifact was lost')
+            report['scenarios']['feishu-linked-artifact'] = dict(platform=remote, artifact_ref=refs[0], full_content_sha256=hashlib.sha256(content.encode()).hexdigest())
+            report['checks'].append('Linked IM result is one notice without repeated file upload; complete authenticated Artifact remains available in the workspace')
+            h.stop()
+        finally:
+            h.cleanup()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
     feishu_auth_lifecycle(binary,report)
+    feishu_topic_delivery(binary,report)
     with tempfile.TemporaryDirectory(prefix='steward-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
