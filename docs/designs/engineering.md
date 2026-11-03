@@ -6,7 +6,7 @@
 
 产品逻辑与测试分属明确模块。Makefile 和现有 system runner 提供本地入口，CI 自动执行这些入口；发布流水线独立准备原生包和草稿发布。
 
-最近一次[全仓工程审查](../reviews/2026-11-03-engineering.md)记录了调用关系、历史依据、分批重构和验证限制。Web 的固定资源目录归 `assets.go`，MCP 注册与调用分别维护；系统测试共用的模型 HTTP peer 归 `tests/system/provider_endpoint.py`，不再由渠道 gate 反向导入模型 gate。
+Web 的固定资源目录归 `assets.go`，MCP 注册与调用分别维护；系统测试共用的模型 HTTP peer 归 `tests/system/provider_endpoint.py`，不再由渠道 gate 反向导入模型 gate。
 
 调度器在单条 SQL 内物化一次活跃租约集合，供各额度维度复用，避免查询计划按 Agent 反复扫描历史 Run。该集合仅属于当前语句的数据库快照，保留既有 claim 事务、fencing、公平排序与额度配置。
 
@@ -48,19 +48,18 @@ flowchart TD
 
 迁移：不增加 schema 版本，不重写历史数据或已冻结请求。Artifact staging 文件名继续沿用生成的平面 key；文件锁需要支持 advisory flock 的本地文件系统，存储根的 OS 账户仍为信任边界。升级须先停止旧版本进程，再启动新版本；旧回收器不识别新 staging 锁，禁止混跑旧、新二进制操作同一 data root。
 
-### Go 工程审查与模块边界（F-040）
+### Go 模块边界（F-040）
 
-以下是以合并后的 PR #95 为基线的审查结果，优先级针对工程维护成本。函数长度只作为定位线索，判断依据是职责混合、依赖方向与状态流的可理解性。
+按领域职责和依赖方向组织实现，函数长度只作为检查线索，不为缩短文件拆开权威事务。
 
-| 优先级 / 发现 | 具体问题与影响 | 本轮处理 |
-| --- | --- | --- |
-| P2 · 领域持久化依赖反向集中 | `agent/sqlite/computer.go` 把 Computer 生命周期 SQL 与私有 `codeBridge` 绑定，增加 Computer 变化牵动 Agent 适配器的范围。 | `computer/sqlite` 持有生命周期和 status；Run 适配器只绑定同一事务内的 claim 检查与事件写入。 |
-| P2 · 只读查询与接口类型泄漏 | 运维报表与 DTO、额度 DTO、审批别名、ToolOutcome 位于 SQLite 包，App 的对外方法把实现包变成调用方的依赖。 | `operations` 定义报表、`operations/sqlite` 查询；其余 DTO 归 `agent`、`interaction`、`tool`，删除无意义的审批类型别名。 |
-| P2 · CLI 入口职责混合 | `cmd/steward.run` 约 380 行，混合语法判断、模型输入、配置、离线备份、初始化、测试屏障和分发；大量并行布尔变量掩盖互斥命令。 | 用单一语法表选择命令种类；按 options、command、model_input、operations、test_options、dispatch 分阶段；`run` 只保留进程生命周期组装。 |
-| P2 · Web 操作分发承载业务动作 | 约 200 行 POST 方法混合 JSON/form/multipart、模型选择与账户 goroutine 状态，审查权限/关闭行为时难以追踪。 | 单一认证/CSRF 边界保持不变，路由调用有名的消息、附件、模型、账户与通知处理函数。 |
-| P2 · Task 事务闭包包含多种职责 | 约 235 行 executeTask 混合 frozen-call 验证、两层 replay receipt、创建和已有 Task 状态变化，依赖大量捕获变量。 | 接纳与 replay 留在 executeTask，具体创建/控制在命名事务内 helper；`taskChange` 明确保存当前行、请求与变更状态。 |
-| P2 · 注册与实例组装混在一起 | `app.prepareRuntime` 一边发现/校验能力，一边配置 provider、Runs 与测试注入，阅读失败路径要跨越整个函数。 | builtinDefinitions、runtimeRegistry、prepareRuntime 分别建立能力、校验 registry、组装实例；成功后一次发布。 |
-| P3 · 不必要的具体类型出口 | App 的公共 Runs 方法允许调用者直接依赖 SQLite 执行实现，当前项目没有这样的外部消费者。 | 改为包内 runtimeRuns；外部使用 Actor 或所属控制接口。 |
+| 所属模块 | 当前职责与边界 |
+| --- | --- |
+| `computer/sqlite` | Computer 生命周期与 status；Run 适配器只绑定同一事务的 claim 检查与事件写入。 |
+| `operations` / `operations/sqlite` | 领域报表类型与只读查询分开；额度、审批、ToolOutcome 类型归所属领域。 |
+| `cmd/steward` | 单一语法表选择命令；options、command、model_input、operations、test_options、dispatch 分阶段，`run` 组装进程生命周期。 |
+| Web handlers | 单一认证/CSRF 边界之后，消息、附件、模型、账户、通知由命名函数处理。 |
+| Task 接纳 | executeTask 负责接纳与 replay；创建和控制使用事务内 helper，`taskChange` 保存当前行、请求及变更。 |
+| App 组合根 | builtinDefinitions 建立能力，runtimeRegistry 校验，prepareRuntime 组装并在成功后一次发布；私有 runtimeRuns 不作为外部 SQLite 访问入口。 |
 
 ```mermaid
 flowchart TD
@@ -80,7 +79,7 @@ flowchart TD
 
 Computer 的 Begin 拆为已接纳计划读取、当前实例决策和原子计划写入；Task helper 不调用 BeginTx/Commit，继续与 receipt/epoch/Root 一次提交。JSON canonical encoding、冻结请求、SQL/schema 与模型可见工具定义不变，内部类型改名不改变序列化。
 
-保留的边界：Run、Tool、Task 的多表变更仍集中在权威事务适配器，不能为了减少文件长度而独立提交。`agent/sqlite` 因此仍不是一个很小的包；这部分是事务一致性边界，不宣称本轮已把全部 SQL 移出。Provider 协议、沙箱与系统验证脚本不因 Go 拆包而重设计。本轮未建立通用 service/repository/ports 框架。
+保留的边界：Run、Tool、Task 的多表变更仍集中在权威事务适配器，不能为了减少文件长度而独立提交。`agent/sqlite` 因此仍不是一个很小的包；这部分是事务一致性边界。Provider 协议、沙箱与系统验证脚本不因 Go 拆包而重设计。不建立通用 service/repository/ports 框架替代领域职责。
 
 ## 当前流程
 
@@ -88,7 +87,7 @@ Computer 的 Begin 拆为已接纳计划读取、当前实例决策和原子计�
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-14-技术选型"></a>
 
@@ -274,18 +273,3 @@ They are not PR prerequisites. See [evaluation boundaries](../test-plans/product
 `make lint` includes SHA-pinned workflow validation with actionlint v1.7.12. The independent dependency-audit workflow uses govulncheck v1.9.0 and npm lockfile audits, and runs weekly/manually/on dependency PRs. Dependabot proposes updates without automatic merging. Go 1.26.10 is the current minimum patched toolchain; the application module import path remains compatible.
 
 The root README covers onboarding and directory responsibilities. GOVERNANCE/CONTRIBUTING/SECURITY own collaboration and reporting policies. Current artwork sources are separate from embedded runtime assets; static brand images derive from the production atlas. Historical reconstruction briefs are removed instead of being maintained as competing design authorities.
-
-## Changelog
-
-| 日期 | 决策 | 理由与影响 |
-| --- | --- | --- |
-| 2026-11-03 | 补齐开源治理、合并结果 CI、依赖审计、macOS 原生契约和许可随包交付。 | 用户授权 Apache-2.0 与 GitHub 治理；保留 Ubuntu checks 必需状态、显式发布边界和冻结运行时接口。 |
-| 2026-11-03 | 调度额度查询复用单次活跃租约集合；Python 系统测试显式关闭 SQLite 连接。 | 三批容量运行暴露历史扫描成本，执行计划及等价测量支持局部 SQL 优化；连接回归确认上下文管理器不负责关闭。保留 schema、事务语义及所有安全断言。 |
-| 2026-11-03 | 局部拆分 Web 资源处理与 MCP 调用；共享模型 HTTP fixture 独立于系统 gate。 | 保留认证顺序、错误/副作用判定、公开路由和冻结协议，解除测试模块循环依赖；同步修正当前目录示例，详细证据见审查记录。 |
-| 2026-10-28 | F-040：Computer 与运维查询归所属模块，App 返回领域类型并隐藏具体执行访问器。 | 选择明确领域子包而非通用 repository 层；通过绑定 claim 的 Host 保留原子事务，不改变存储协议。 |
-| 2026-10-28 | F-040：CLI 使用统一语法表和分阶段处理；Web 动作、Task 变更、能力注册分职责。 | 相较仅按行数切文件，命名函数对应可审查步骤；复用原入口和回归，保持原有参数、权限、关闭与 replay 行为。 |
-| 2026-10-28 | F-039：终态 Run 失败与基础设施错误分开；UI 先开放，依赖准备只缓存成功。 | 保留控制面以修复故障；不使用跳过失效能力的降级注册，避免静默更改冻结能力。 |
-| 2026-10-28 | F-039：Task 规则、CodeMode 协调从 SQLite 适配器移回所属模块；统一 Host 目录与显式 Artifact 分发。 | 保持一个事务权威和一条工具管线，避免以通用 service/ports 层替代现有领域。 |
-| 2026-10-28 | F-039：流式预览不逐片落库，生命周期 trace 保留有界写入与诊断。 | 避免每个 token 竞争权威 writer；完整请求/结果仍持久，丢失的临时预览不能作为执行失败或重试依据。 |
-| 2026-10-28 | F-039：命名状态类型、Bridge 转换函数和分类错误。 | 保持线协议、快照与数据库兼容；只解包内部 cause，避免日志/界面泄露私人内容。 |
-| 2026-10-28 | 把贡献流程、工程组织与 CI 说明归入同一功能及方案。 | 不维护额外 CONTRIBUTING/CI 正文；保留软件测试与独立模型评测边界。 |

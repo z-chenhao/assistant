@@ -2,7 +2,7 @@
 
 [功能说明](../features/branding.md) · [测试方案](../test-plans/branding.md) · [主索引](../feature-map.md)
 
-核对日期：2026-11-03。Steward 是产品品牌，Ghost 是当前 Agent 的名称。当前代码与自托管资源共同定义品牌实现。
+Steward 是产品品牌，Ghost 是当前 Agent 的名称。当前代码与自托管资源共同定义品牌实现。
 
 ## 当前架构与流程
 
@@ -16,7 +16,7 @@ Go 继续提供认证、页面、原生表单与局部更新；React 只增强 H
 
 Michroma 字标、Inter UI、Source Serif 4 回复、Source Han Sans SC 中文回退和 JetBrains Mono 代码字体在 `/brand/` 同源提供，OFL 通知在 `/licenses.txt`。使用 Demo 已确认的黑白幽灵 PNG，身体、手臂、五官离线烘焙为完整无损 WebP 帧；运行时 Canvas2D 播放，身体不做整体缩放，不加载 WebGL。轻微整体现浮动与固定影子保留；暂停、reduced-motion、隐藏或离屏停止当前挥手。资源来源和完整生成提示保存在 `web/licenses/steward-artwork.md` 与 `web/artwork/manifest.json`。
 
-README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通过 `node web/artwork/icons.mjs` 导出；`--check` 比较解码像素，防止手绘替代图漂移。两份无五官 PNG 是动画烘焙输入，位于 `web/artwork/source/`，不进入 Go embed 或公开路由。两种主题、两种帧尺寸均有运行时消费者，继续保留。已删除简化 SVG、未选用提示记录及重复的 Web 重建 brief/design；当前 CSS 和本方案是维护入口。
+README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通过 `node web/artwork/icons.mjs` 导出；`--check` 比较解码像素，防止手绘替代图漂移。两份无五官 PNG 是动画烘焙输入，位于 `web/artwork/source/`，不进入 Go embed 或公开路由。两种主题、两种帧尺寸均有运行时消费者，继续保留。品牌维护入口为当前 CSS、本方案及正式资源清单。
 
 ## 身份与边界
 
@@ -34,14 +34,8 @@ README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通
 
 身份文本属于产品策略；冻结快照、审批、持久化、重放和工具权限仍是执行机制，语义不因命名而改变。新的执行使用 Ghost 身份提示；已有冻结记录不被重新解释或改写。品牌资源和 Web 控件仍为私有实现，没有新增公共设计 API、第二执行链路或通用品牌配置系统。
 
-本次是开发阶段的破坏性身份重置：只接受当前命令、环境变量、默认路径与命名空间，不提供旧配置发现、迁移工具、凭据读取回退或资源别名。不会主动删除应用数据或扩大凭据权限。选择直接统一身份，放弃兼容层，以免在没有实际消费者时长期维护两套概念。
+当前身份边界：只接受当前命令、环境变量、默认路径与命名空间，不提供旧配置发现、迁移工具、凭据读取回退或资源别名。不会主动删除应用数据或扩大凭据权限。选择直接统一身份，放弃兼容层，以免在没有实际消费者时长期维护两套概念。
 
-## Changelog
-
-| 日期 | 关联需求 | 决策 | 依据及取舍 |
-| --- | --- | --- | --- |
-| 2026-11-03 | F-041 | 全项目统一 Steward / Ghost；移除不使用的品牌图片、字体和资源路由；新提示同步身份 | 所有者确认没有现有用户并要求彻底清理。命名同步到 CLI、配置、安装、内部协议与测试；不增加兼容或迁移分支。 |
-
-### 2026-11-02 · 界面语言
+## 界面语言
 
 使用现有原生设置流程新增 `/settings/preferences` 与认证后的 `POST /settings/language`。只接收 `en`、`zh-CN`，以路径 `/`、SameSite Strict、有效期一年的 `steward-language` 浏览器 Cookie 持久化。未设置或无效时一律英文；不使用 Accept-Language。服务端预编译两份不可变模板，显式 `tr` 仅作用于应用自有界面文案；客户端从同一私有 JSON 文案表读取。没有运行时 DOM 扫描或外部翻译服务。实时片段和日期展示随语言变化；正文、标识、字段值、冻结哈希及机器协议不变。此方案优先支持无 JS 的原生切换，未引入通用翻译平台或账户级语言同步。

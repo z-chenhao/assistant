@@ -36,7 +36,7 @@ Worker 在 Code Mode 中可调用 `agent.run({task, artifactRefs})`，返回 `{t
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="children-configuration-and-upgrade"></a>
 
@@ -63,7 +63,7 @@ Agent Tool do not gain it on upgrade. Existing Root counters initialize from
 stored Runs/invocations. Downgrades fail closed; back up the data root before
 upgrading. No credentials or external account are needed for deterministic CI.
 
-retired task #18 adds fair queues and the larger Direct Tool batch scenario described
+Fair queues and the larger Direct Tool batch scenario are described
 below. M5 adds CodeCall and JavaScript `agent.run()`
 using this same admission and ToolInvocation path. This slice does not claim
 M4 completion, JavaScript execution, general Durable Replay or full GC-16/17/18/20

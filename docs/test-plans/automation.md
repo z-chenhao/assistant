@@ -4,7 +4,7 @@
 
 ## 范围与证据
 
-本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导本次已通过或真实模型效果已达标。
+本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导特定版本已通过或真实模型效果已达标。
 
 以功能文档中的需求为验收源；配置依赖、待实现分支、平台限制和未验证项单独报告。具体命令及 core/extended 编排以 [Testing](product.md) 和 [runner](../../tests/system/runner.py) 为准。
 
@@ -26,15 +26,15 @@
 
 ## 已有检查与缺失覆盖
 
-| 入口 | 已有证据用途 | 本次执行状态 |
-| --- | --- | --- |
-| [tests/system/verify_automation.py](../../tests/system/verify_automation.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
+| 入口 | 覆盖用途与限制 |
+| --- | --- |
+| [tests/system/verify_automation.py](../../tests/system/verify_automation.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
 现有入口仍需在后续相关实现变更时按风险运行；需求范围变化时同步扩展场景。
 
 ## 详细测试入口与证明边界
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="automation-verification"></a>
 
@@ -65,4 +65,4 @@ and [operations](../features/operations.md) for those implementations and their 
 
 `automation_owner_test.go` 覆盖真实 SQLite 的创建／修改／停用、版本冲突、重复收据、相同 key 的载荷漂移、所有者与撤销意图边界、未接单 fire 失效及已接单指令／快照不变。`schedules_test.go` 覆盖六类友好频率、阈值空值／0、日期时区、DST 空缺／重复、已有精确时刻往返及超限中文草稿保留；真实 HTTP 适配测试验证创建与纳秒级单次编辑重复 POST、原始时刻证明篡改拒绝。
 
-维护中的 `channels_browser.mjs` schedule 场景验证原生表单创建、修改、停用／恢复、两页冲突保留输入、重复请求与漂移拒绝、保存未来安排不派发 Task、无效时间反馈和320px布局。不新增 runner 或 CI gate。既有 automation 系统入口继续保护 CLI/Main、调度与重启恢复；结果留在本次 evidence。
+维护中的 `channels_browser.mjs` schedule 场景验证原生表单创建、修改、停用／恢复、两页冲突保留输入、重复请求与漂移拒绝、保存未来安排不派发 Task、无效时间反馈和320px布局。不新增 runner 或 CI gate。既有 automation 系统入口继续保护 CLI/Main、调度与重启恢复；结果留在对应运行的 evidence。

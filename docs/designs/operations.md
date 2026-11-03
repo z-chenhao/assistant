@@ -2,7 +2,7 @@
 
 [功能与需求](../features/operations.md) · [测试方案](../test-plans/operations.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -46,33 +46,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/operations.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
-
-## Changelog
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。移除已退役的独立容量采样命令，保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
-| 2026-10-28 | 现状建档 | 保持运维诊断与用户对话分离；凭据独立备份管理。费用授权与 Tool 审批分别处理。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [002-account-monetary-authorization.md](#decision-002-account-monetary-authorization) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史决策与演进记录
-
-以下正文保留原决定、理由、兼容影响和当时证明范围，不作为当前完成声明。原记录中旧目录布局与旧验证命令属于历史上下文；现行入口以功能说明、当前架构及产品测试方案为准。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/operations.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 <a id="decision-002-account-monetary-authorization"></a>
 
 ## Account monetary authorization
-
-Accepted for retired task #18 on 2026-10-17 by the project owner. Baseline §6.6.6 is
-normative. This resolves the previously unspecified price/limit policy.
 
 Use an explicitly configured account monetary boundary and provider/model price
 version. Token counts remain accounting and safety observations. They never

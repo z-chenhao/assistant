@@ -4,7 +4,7 @@
 
 ## 范围与证据
 
-本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导本次已通过或真实模型效果已达标。
+本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导特定版本已通过或真实模型效果已达标。
 
 以功能文档中的需求为验收源；配置依赖、待实现分支、平台限制和未验证项单独报告。具体命令及 core/extended 编排以 [Testing](product.md) 和 [runner](../../tests/system/runner.py) 为准。
 
@@ -29,18 +29,18 @@
 
 ## 已有检查与缺失覆盖
 
-| 入口 | 已有证据用途 | 本次执行状态 |
-| --- | --- | --- |
-| [tests/system/verify_channels.py](../../tests/system/verify_channels.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
-| [tests/system/verify_tui.py](../../tests/system/verify_tui.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
-| [tests/system/verify_delivery.py](../../tests/system/verify_delivery.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 | 本次未执行 |
+| 入口 | 覆盖用途与限制 |
+| --- | --- |
+| [tests/system/verify_channels.py](../../tests/system/verify_channels.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [tests/system/verify_tui.py](../../tests/system/verify_tui.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [tests/system/verify_delivery.py](../../tests/system/verify_delivery.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
 - **F-019**：通过具名投影与真实浏览器覆盖；不以软件回归证明真实模型质量或外部账户可用性。
 - **F-020 剩余覆盖**：补凭据刷新/失效诊断体验；不确定远端投递目前只能依赖已保存本地回执，可信远端核实能力仍待定义。
 
 ## 详细测试入口与证明边界
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="channels-verification-and-evidence"></a>
 
@@ -168,7 +168,7 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 - 读取边界：真实 SQLite 验证跨 20 条限制、同时间稳定游标、scope 拒绝、归属校验与只读池；Web 审批过期投影不写库/事件，原运行时恢复仍落库。Trace 详情不能依赖全局列表成功。
 - 模块测试：notification 持久化选择、候选 proof version、登录本地返回、Host 审批单卡片/用户文本不改写、任务消息通过既有 ingress；`make test lint` 检查所有包及嵌入资源一致。
 
-系统断言采用受控模型/HTTP 响应，证明产品链路与回归，不证明真实模型质量或真实账户可用性。执行结果与截图留在本次 evidence，不把测试计划写成执行报告。
+系统断言采用受控模型/HTTP 响应，证明产品链路与回归，不证明真实模型质量或真实账户可用性。执行结果与截图留在对应运行的 evidence，不把测试计划写成执行报告。
 
 
 ## F-020 自建应用凭据与失效诊断

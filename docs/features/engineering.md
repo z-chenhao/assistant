@@ -16,7 +16,7 @@
 
 ### F-039 · 运行时工程基础重构
 
-对整体代码审查暴露的九类问题做同一批次重构。目标是让后续 Observability、Evals 与其他功能有可理解、可恢复的工程基础。
+运行时需要清晰的故障隔离、恢复和模块边界，为 Observability、Evals 与其他功能提供可维护的工程基础。
 
 | 需求 | 当前行为与验收 |
 | --- | --- |
@@ -30,7 +30,7 @@
 | 轨迹成本 | 流式文本预览不逐片写入状态库；生命周期轨迹写入失败可诊断，最终模型结果仍持久化。 |
 | 可读性与错误 | Run 角色/状态/阶段使用内部类型；Bridge 转换分成有名函数；内部错误保留原始 cause，展示文本不泄露 SQL/供应商内容。 |
 
-本批次不新增模型可见协议、不切换旧 Run 的冻结快照，也不宣称实现完整 Observability 产品。内存索引仍采用精确向量检索，Main 初始化仍按既有冻结历史边界恢复上下文；这不是大规模 ANN 或新的上下文裁剪策略。
+这些内部机制保留模型可见协议及旧 Run 的冻结快照；Observability 的功能范围由所属文档维护。内存索引仍采用精确向量检索，Main 初始化仍按既有冻结历史边界恢复上下文；这不是大规模 ANN 或新的上下文裁剪策略。
 
 使用方式：正常启动 Web；依赖不可用时可继续进入 Settings/Progress，修复配置对应的本地依赖后等待运行时恢复。会话页面通过 Earlier messages 查看上一页；`GET /api/conversation?before=<sequence>` 返回至多 100 条消息，有更早数据时响应头 `X-Steward-Before` 提供下一页游标。CLI 显式历史保持完整保留记录。
 
@@ -39,13 +39,13 @@
 
 ### F-040 · Go 模块边界与可读性
 
-本轮从 Go 工程结构审查出发，减少跨领域的适配器依赖与入口内的多阶段控制流，使开发者能在所属模块中找到职责清楚的实现。
+Go 工程结构减少跨领域的适配器依赖与入口内的多阶段控制流，使开发者能在所属模块中找到职责清楚的实现。
 
 验收范围：Computer 生命周期持久化归 `computer/sqlite`，只读运维查询归 `operations/sqlite`；运维、额度、审批和工具结果类型由所属模块定义；CLI 的语法验证、输入解码、离线运维、测试注入和执行分发分别维护；Web 的消息、附件、模型、账户、通知操作各有命名处理函数；Task 接纳/重放与事务内具体操作分开；能力注册与 Runtime 实例组装分开。
 
 正常使用方式不变。开发时从所属包进入，跨领域的原子变更继续由原 Host 事务接纳。Computer 适配器通过 `ExecutionHost` 加入既有 fenced transaction，不打开第二个数据库连接或自行调度。App 不再导出执行用的 SQLite Runs 访问器，也不向 CLI 返回 SQLite 自有的展示类型。
 
-本轮保持 CLI 命令参数、JSON 字段、HTTP 路由、审批/重放语义、schema 及冻结指纹一致。无需迁移。审查发现、包依赖图和保留的边界详见并列技术方案；测试方案列出已有集成回归如何覆盖拆出的模块。
+内部职责拆分须保持 CLI 命令参数、JSON 字段、HTTP 路由、审批/重放语义、schema 及冻结指纹一致。模块依赖与边界详见并列技术方案；测试方案列出已有集成回归如何覆盖拆出的模块。
 
 ## 如何使用
 
@@ -53,7 +53,7 @@
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="ci-local-use"></a>
 
@@ -125,9 +125,9 @@ status and a link to its feature document. Feature documents explain behavior,
 requirements, acceptance and current usage, then link a technical design and a
 parallel test plan. Keep simple test plans small by referencing existing checks.
 
-Keep architecture and flow sections current. Append architecture/flow decisions,
-alternatives, reasons and compatibility effects to the design's changelog;
-do not leave obsolete diagrams in the current design or invent historical dates.
+Follow the [documentation policy](../README.md#强制维护规则). Update architecture,
+flows, active decisions, reasons and compatibility effects in place. Keep
+obsolete diagrams, dated reviews and append-only histories out of `docs/`.
 Clearly distinguish implemented behavior, accepted plans and open proposals.
 Test plans map requirement IDs to observable scenarios, existing entry points
 and coverage gaps. Execution reports remain separate from plans.
@@ -136,7 +136,7 @@ Update the index, feature usage, design and test plan with the implementation.
 Do not mark a requirement complete merely because a schema, renderer, fixture
 or test file exists. See the [maintenance rules](../feature-map.md#文档维护规则)
 and templates for the exact structure. Cross-feature protocols live in the runtime contracts and owning designs;
-historical decisions remain in their design changelogs.
+decision history and execution evidence remain in PRs, Git history or CI artifacts.
 
 <a id="contributing-working-on-a-change"></a>
 

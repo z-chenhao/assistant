@@ -2,7 +2,7 @@
 
 [功能与需求](../features/delegation.md) · [测试方案](../test-plans/delegation.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-28。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -31,11 +31,11 @@ flowchart TD
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/delegation.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/delegation.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-38-mainroot-worker-与-child-的-prompt-组装"></a>
 
@@ -386,7 +386,7 @@ runtime/javascript/
 
 ## Direct Child delegation
 
-retired task #17 adds `builtin__agent_run` v1 to new Worker capabilities. A Root or
+The shared registry exposes `builtin__agent_run` v1 to new Worker capabilities. A Root or
 Child can delegate explicit work to one general Worker. Main continues to use
 Task tools. Every Child executes the same `RunAgentLoop` kernel.
 
@@ -457,7 +457,7 @@ ancestors. A later append creates a new Root; it never revives old Runs.
 
 <a id="children-fair-scheduling-and-batch-evidence-steward-18"></a>
 
-### Fair scheduling and batch evidence (retired task #18)
+### Fair scheduling and batch evidence
 
 `scheduler.child_concurrency` defaults to 16 active Child leases per Root tree.
 Global, local-user, Agent and frozen provider account/endpoint limits default to
@@ -577,26 +577,6 @@ rejection, denial, cancellation, and separately approved Child effect recovery
 across SIGKILL. It also proves all unknown configuration/usage states. It is selected through the system runner; repetition is explicit. This Direct Tool slice makes no full M4 milestone,
 semantic Golden Case or M5 JavaScript/Durable Replay claim.
 
-## Changelog
+## 当前设计取舍
 
-2026-10-28：F-004/F-006 上下文交接只选择旧 Root 业务结果和顶层可见输出，排除 Child 原始模型轨迹和嵌套未输出结果；未知外部效果以不含 Child 参数的 Host 状态保留。Task 正文与附件合并为受保护输入，Child 继承冻结共享规则和 context version。相比全树历史聚合，明确保留显式父子结果边界；Task 生命周期和 AgentResult 协议不变。
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | 现状建档 | 保留通用 Worker 和最小 task/artifactRefs 接口；不增加子 Agent 选择器、共享可变上下文或同级消息。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史实现进度快照
-
-以下是早期阶段记录，保留当时边界，不描述当前完成状态；当前需求状态以 Feature Map 为准。
-
-retired task #17 Direct Tool 实现说明：`builtin__agent_run` 已通过同一 ToolInvocation/Worker Loop 接通原子 Child admission、冻结快照继承、递归结果与审批/停止恢复。操作、迁移与证据入口见 `docs/designs/delegation.md`。公平 Child 调度的后续进度见下文；M5 JavaScript/CodeCall 仍待后续 slice 完成，不据此宣称 M4 或 Durable Replay 已完成。
-
-retired task #18 实现进度：Direct Tool 路径已增加持久化公平调度、默认 16/硬上限 32 的 Child 并发、Worker turn 熔断、树/Task/账户用量聚合和 100 项批处理验证。账户支出授权采用显式货币策略与冻结的 Provider/模型价格版本；无定价或无账户额度时显示 unpriced/unconfigured，不猜测价格。Root 合并可恢复货币审批，Child 高风险 Tool 仍需独立审批。迁移、配置、剩余边界与验证入口见 `docs/designs/delegation.md`。
+Worker 使用最小 task/artifactRefs 接口，不共享可变运行上下文或同级消息。上下文交接只选择旧 Root 业务结果与顶层可见输出，排除 Child 原始模型轨迹及嵌套未输出结果；未知外部效果通过不含 Child 参数的 Host 状态保留。Task 正文与附件属于受保护输入，Child 继承冻结共享规则和 context version。

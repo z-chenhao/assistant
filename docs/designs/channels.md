@@ -2,7 +2,7 @@
 
 [功能与需求](../features/channels.md) · [测试方案](../test-plans/channels.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-29。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -89,11 +89,11 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 ## 验证与交付
 
-验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/channels.md) 维护。本次建档未执行本功能的回归或 Live 验证，不以架构图替代运行证据。
+验收场景、已有入口和剩余覆盖统一在 [测试方案](../test-plans/channels.md) 维护。实际执行结果以对应版本的 PR 或 CI 证据为准；架构说明不证明回归或 Live 验证通过。
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="channels-deduplication-restart-and-uncertainty"></a>
 
@@ -167,7 +167,7 @@ pause that consumes the original lease cannot authorize even a fast send.
 
 <a id="delivery-recoverable-semantic-delivery-steward-15"></a>
 
-## Recoverable semantic delivery (retired task #15)
+## Recoverable semantic delivery
 
 Main replies reach the local terminal through a durable Delivery Outbox. The
 Conversation stores semantic content; `state.db` stores delivery intent,
@@ -282,40 +282,22 @@ Empty or failed renders use authoritative semantic text from the Host, never a
 replacement fallback supplied inside a projection. There is no HTML evaluator,
 dynamic component import, remote asset or browser credential input.
 
-## Changelog
+## 当前 Web 交互取舍
 
-2026-10-29：F-018/F-019 按用户任务重构整个 Web 信息架构。比较继续在 Settings/Trace 单页堆叠控件与按流程拆页，选择稳定子路由与共享 SSR 呈现；完整 Context 并入 Generation，保留深链接。独立 task 只读查询、纯 Web 审批读取和原生表单生命周期减少界面与执行的耦合；不新增控制管线、Task 状态、依赖、脚本、CI gate 或数据迁移。旧 HTML 地址仅跳转，原 API 与冻结执行语义不变。
+页面按用户任务使用稳定子路由与共享 SSR；完整 Context 归入 Generation 并保留深链接。Task 查询与审批投影只读，保持渠道共用对话、审批、执行和已提交结果，不引入渠道专属 Agent Loop。
 
+输入区保留原生表单及文件选择器 DOM，避免脚本加载替换节点丢失附件。独立区域条件读取复用现有查询与 SSR，让输入、渲染、更新各自管理生命周期；updates 只读接口与可选 JSON 审批回执保持原接口默认行为及冻结执行语义。
 
-2026-10-29：输入区保留原生表单与文件选择器 DOM，只复用共享控件样式；修复脚本加载期间打开文件选择器后附件丢失的问题。真实浏览器延迟 bundle 后跨加载完成图片选择并核对实际 Pi HTTP pixels。
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
-| 2026-10-28 | F-039：Web 故障隔离与分页纯查询；交付按 ID 定位。 | 控制面可用于修复运行依赖，避免读请求产生运行副作用或随历史无限增长；API 数组形状保留，超过 100 条需跟随游标。 |
-| 2026-10-28 | 现状建档 | 渠道共享对话、审批与执行，不引入渠道专属 Agent Loop。Web 实时化需保留提交后的权威结果；飞书 unknown 不通过重复发送消除。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [跨功能契约](product-overview.md#contract-0-文档效力与实现规则) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-2026-10-28：F-019 将五秒条件整页 reload 替换为独立区域条件读取。比较整页轮询、事件推送与已提交投影读取；选择复用现有查询和 SSR，保持输入/渲染/更新生命周期各自内聚。接口新增只读 updates 与可选 JSON 审批回执，原接口默认行为和领域协议不变；无需数据迁移。真实浏览器验证草稿/附件/焦点/选区/阅读位置、状态与审批、断网和会话恢复。
-
-
-### 2026-10-30 · F-020 飞书凭据自动维护
+## F-020 飞书凭据自动维护
 
 选择在既有飞书模块集中 token 生命周期与CLI诊断，应用层只注入一个共享客户端；未采用逐请求换 token、凭据落入领域数据库或鉴权失败即在发送客户端内部重发。新增可选 `app_secret_ref`、`channel status/check` 与两个安全投递错误码；外部 token 配置继续可用，不需数据迁移。不改变审批、通知目的地、冻结动作、回执或未知副作用规则；没有修改Web页面。
 
-### 2026-11-02 · Steward Web 表现层
+## Steward Web 表现层
 
 共享样式和导航以已确认 Demo 为准；模型/账户、通知、能力配置及执行检查保留原生路线。Chat 的 Computer/Worker 详情复用认证与既有只读数据，无新增写入协议。侧栏、主题与头像偏好仅存在浏览器。具体令牌与组件见 `web/src/foundation.css` 和 `web/README.md`，兼容取舍见[品牌设计](branding.md)。
 
 
-### 2026-11-02 · 四入口与只读 Computer 工作区
+## 四入口与只读 Computer 工作区
 
 具体用户是所有者的持续对话和委派任务工作流。沿用认证路由、source ID、冻结审批、任务/执行只读查询与 live 区域。新增私有表现片段呈现真实待审批数量；Chat 的 Worker 查询展示有界的所有执行记录（包括旧 epoch），按实际执行时间倒排并保留后端状态；Task 列表不查询 Conversation，Inspector 故障只降低执行详情可用性。
 
@@ -325,13 +307,13 @@ Computer 查看独立于 Agent 执行机制：只读 HTTP 端点复用现有 Bro
 
 Chat 顶部居中两行显示名称与动态头像。Computer 与 Worker 为互斥详情面板，保留持续对话、草稿、附件和阅读锚点；Tasks 保留独立列表和详情。Worker 的当前运行查询独立于历史上限，避免长期运行记录被较新的终态记录挤掉；历史最多 50 条，更多记录回 Developer，不泛化查询协议。
 
-### 2026-11-03 · 本机 Web 直接访问
+## 本机 Web 直接访问
 
 当前用户需求是本机访问省去 workspace token 输入。`web.listen` 仍必须是明确的 `127.0.0.1` 或 `::1`；省略 `token_ref` 时直接信任 loopback TCP peer，不读取 SecretStore、不建立登录会话。配置 `token_ref` 则继续使用原有 Bearer/session 机制，保持已有安装和自动化客户端兼容，不增加新的 auth 枚举或用户系统。
 
 免 token 模式同时校验实际监听地址、直连 peer、字面 Host、Origin 与 Fetch Metadata，拒绝跨站及不同本地 origin；不信任转发头。渠道绑定、冻结动作审批、只读 Computer 边界与 CSP 不变。此模式信任可连接本机端口的本地进程，不提供 OS 用户间隔离；不开放公网访问。未选择隐藏页面表单但继续强制 SecretStore 口令，避免把登录复杂度留在配置里。
 
-### 2026-11-03 · 工作区布局与键盘定位
+## 工作区布局与键盘定位
 
 当前所有者在桌面、平板和窄屏上阅读持续对话、任务及执行证据。Task 和 Developer 的双列布局使用各自内容容器的 760px 断点，避免仅按视口判断而忽略固定导航的占宽。Chat 在 1280px 以下复用已有 modal 面板，宽屏继续并列显示；选择保守的单一阈值，暂不引入依据侧栏状态切换的额外面板模式。
 

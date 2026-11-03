@@ -62,7 +62,7 @@ Task 列表默认 Open（active/paused），还可查看 Needs me、Finished（c
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="tasks-task-delegation-and-root-recovery"></a>
 

@@ -25,8 +25,15 @@ CI changes must preserve this check name. A green build does not authorize a rel
 Delete a topic branch after its PR has merged and the branch has no newer commits
 or other open PRs. Squash merges need the PR's recorded head and merge commit as
 evidence; ancestry of the topic head alone is insufficient. Close superseded PRs
-with a clear replacement recorded in the review/maintenance record. Do not delete
-unmerged work merely because it is old, conflicting or has failing checks.
+with a clear replacement recorded in the PR. Do not delete unmerged work merely
+because it is old, conflicting or has failing checks.
+
+The owner may explicitly retire unmerged branches. Before deletion, record exact
+heads and open PRs, preserve the commits in a Git bundle, and verify that bundle
+can be cloned independently and passes `git fsck`. Retain the bundle and ref
+manifest outside tracked documentation. Delete only the authorized refs using
+exact-head leases; if a head changes or an active PR needs the branch, review it
+again. Retirement does not imply the commits were merged.
 
 ## Releases and maintenance
 

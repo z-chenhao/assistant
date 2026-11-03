@@ -23,14 +23,8 @@ flowchart TD
 
 源码入口是 `cmd/steward`，二进制及启动器名称是 `steward`，受管版本存放于 `lib/steward/releases/`，数据独立位于 `~/.local/share/steward` 或显式 `STEWARD_DATA_ROOT`。安装到暂存目录后执行 Doctor，再原子切换受管启动器。安装器拒绝覆盖非受管目录或已有其他启动器。
 
-打包使用 `scripts/package.sh` 生成 `steward-<platform>-<arch>.tar.gz` 与校验文件；归档包含运行时与当前说明。源码安装依赖 Go/npm，原生包保留显式 Node 前提。发布需要独立授权，本次清理不发布版本。
+打包使用 `scripts/package.sh` 生成 `steward-<platform>-<arch>.tar.gz` 与校验文件；归档包含运行时与当前说明。源码安装依赖 Go/npm，原生包保留显式 Node 前提。发布需要独立授权。
 
 前台启动持有数据根锁，自有 broker 使用随机 loopback 端口。退出先关闭 App，再关闭 broker。显式配置和 `STEWARD_NATS_URL` 可以选择外部 broker；不引入守护进程管理器、第二 Agent loop 或默认模型。
 
 不提供其他品牌的启动器、配置和数据发现回退，也不改写已冻结执行或主动清除应用数据。运行时审批、重放、取消和未知外部效果语义维持不变。
-
-## Changelog
-
-| 日期 | 决策 | 理由与影响 |
-| --- | --- | --- |
-| 2026-11-03 | 安装入口、归档、配置与数据命名统一为 Steward；模块使用当前仓库路径 | 开发阶段无现有发布用户，采用单一身份，避免兼容分支；测试使用隔离数据根。 |

@@ -2,7 +2,7 @@
 
 [功能与需求](../features/tasks.md) · [测试方案](../test-plans/tasks.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-29。本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -78,7 +78,7 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-3-taskrun-与并发模型"></a>
 
@@ -200,7 +200,7 @@ builtin__task_manage
 - 两者复用统一的 `ToolSpec → ToolInvocation → ToolExecutor` 管线；Task Tool 是 Main 的控制面能力，Root/Child Worker 默认不可见。
 - `task_search` 返回内部 `TaskRef`、标题、目标摘要、状态、最近进度和更新时间，不返回 Root Run ID、Run 树或内部轨迹。唯一高置信匹配可继续；多个合理候选必须由 Main 向用户澄清。
 - `task_manage(create)` 原子创建 Task、保存 Task Anchor、创建首个 Root Worker Run 并发布 `run_ready`；它只返回接收凭证，不等待任务完成。
-- `task_manage(create).completionPolicy` 只允许 `once|ongoing`，省略等同 `once`；仅 create 接受此字段。普通 Root 成功不结束 ongoing Task，也不自动调度下一轮；后续 append 沿用同一策略并按既有规则创建新 Root。策略创建后不可改写。retired task #225 的批准、升级边界与显式完成合同见 `docs/designs/tasks.md`。
+- `task_manage(create).completionPolicy` 只允许 `once|ongoing`，省略等同 `once`；仅 create 接受此字段。普通 Root 成功不结束 ongoing Task，也不自动调度下一轮；后续 append 沿用同一策略并按既有规则创建新 Root。策略创建后不可改写。升级边界与显式完成契约见[完成策略](#decision-006-006--explicit-task-completion-policy)。
 - `task_manage(complete)` 仅接受 `active` Task，且当前 epoch 没有非终态 Root/Child Run，也没有 queued/running/waiting/unknown ToolInvocation。存在未完成工作或未确认副作用、或 Task 为 paused/completed/cancelled 时返回不可重试的 `INVALID_ARGUMENT`，不取消、不排空、不等待。Host 在同一事务内校验 Main owner、Task version/epoch，保存 `completed`、`completed_at` 和普通幂等 receipt；不递增 epoch、不修改 completion policy、不生成 Worker TaskUpdate 或 Main Follow-up。重复来源/调用复用原 receipt；新的 complete 来源不能再次完成 completed Task。后续 append 沿既有规则重新激活并创建新 Root。
 - `task_manage(append)` 追加持久化 `TaskInstruction`，不覆盖原 Task Anchor。Task 为 `active` 且存在活动 Root 时，在稳定边界向该 Root 注入指令；Task 不是 `active`，或没有活动 Root 时，Host 将其置为 `active`、递增 `task_epoch` 并创建新的 Root Worker Run。
 - `append` 同时承担“追加要求”和“重新激活”语义。用户只说“继续”“接着做”或“恢复这个工作”时，Main 也可以把该自然语言原样保存为 `TaskInstruction`；这条明确的用户指令就是重新激活的授权，不需要再构造 `resume` 操作。
@@ -516,37 +516,15 @@ limited semantic recall; multilingual semantic quality is unverified. Search
 uses only the calling Agent/Conversation scope. Returned summaries are bounded
 independently of the retained anchors, so all 50 rows fit the Tool result limit.
 
-## Changelog
+## 当前任务查询与进度取舍
 
-2026-10-29：F-005/F-018 新增任务列表/详情，比较扩展原 20 条 Activity 与独立用户查询模块后，选择 task/sqlite 只读池并让 Activity 复用事实/阶段。稳定分页避免实时活动更新时间造成跨页遗漏；详情只关联 Main 用户交付，避免暴露 Worker 结果或新控制管线。schema、Task 生命周期与冻结执行不变。
+任务列表和详情使用 `task/sqlite` 只读池，Activity 复用任务事实与阶段。稳定分页避免活动更新时间导致跨页遗漏，详情只关联 Main 的用户交付，不暴露 Worker 私有结果或增加控制管线。
 
-
-2026-10-28：测试入口随当前 Makefile/runner 对齐。旧说明中的 make verify、Delivery/security 分片与自动五轮是历史调度；当前默认单次，重复次数通过 runner --repeat 显式指定。保留机制验收要求。
-
-2026-10-28：按统一文档结构迁入本功能的协议与历史决策，更新引用并移除旧文件；此为文档归属调整，不改变运行时协议。
-
-本节追加记录每次架构/流程取舍。旧图不保留在正文；历史正式决定保留在本节。首次记录为现状建档，不推断历史决策日期。
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | F-005：阶段摘要生产与职责拆分 | 复用 Root 工具轮的显式 assistant 进度句，与 checkpoint 原子持久化；进度写入和只读 Activity 分文件。 | 比较新增 progress 工具、额外总结模型调用和工具日志拼接后，采用无新工具/无额外推理的语义更新；保护旧冻结 Run、Child 隔离和通知边界，无 schema 迁移。 | F-005 |
-| 2026-10-28 | F-040：按职责拆分 Go 实现。 | 保持原协议、路由、schema 与原子事务边界；详见工程方案。 |
-| 2026-10-28 | 现状建档 | 沿用 once/ongoing 的显式完成策略及独立进度投影。补进度时不能用低层工具日志机械生成摘要，也不能恢复已结束的旧 Run。 | 明确当前边界与待补齐链路；本次仅建立文档，未修改运行时。 | [006-explicit-task-completion-policy.md](#decision-006-006--explicit-task-completion-policy) |
-
-后续记录需包含实际比较过的选项、采用理由、兼容/迁移影响和相关需求或 PR；未决建议不能写成已实施决策。
-
-### 历史决策与演进记录
-
-以下正文保留原决定、理由、兼容影响和当时证明范围，不作为当前完成声明。原记录中旧目录布局与旧验证命令属于历史上下文；现行入口以功能说明、当前架构及产品测试方案为准。
+阶段摘要复用 Root 工具轮的显式 assistant 进度句，与 checkpoint 原子持久化，不增加 progress 工具、额外总结模型调用或工具日志拼接。旧冻结 Run、Child 隔离和通知边界保持有效；不能为显示进度恢复已结束的 Run。
 
 <a id="decision-006-006--explicit-task-completion-policy"></a>
 
 ## 006 — Explicit Task completion policy
-
-Status: create policy accepted by the authenticated owner in retired task #225, comment
-`01a16954-32dd-7a14-a571-cd8ba4d33ed3`. retired task #226 implements this finite contract.
-Explicit completion accepted by the same owner on retired task #226, comment
-`01a16b9e-d2ab-7398-b474-cd47164d4022`; it resolves the interface conflict.
 
 <a id="decision-006-decision-and-boundary"></a>
 
@@ -631,12 +609,3 @@ all rejected state classes, complete/append races, owner fencing, invocation rep
 and SIGKILL before/after the completion transaction, without synthetic follow-ups.
 These deterministic contracts remain covered by package tests and the Task
 system gate. Model-quality evaluation is maintained outside this repository.
-
-### 历史用例报告范围
-
-以下为迁移前的场景片段说明，仅保留历史范围；当前产品系统入口与独立效果评测边界以测试方案为准。
-
-`evidence/task-cases.json`
-contains 24 locked `m2-v2` GC-02/04/08/18 Task fragments across wording, noise and
-key order variants, including GC-04 pause/continuation and GC-08 cancel/continuation.
-SC-01/04/05/10/12 receive applicable contracts.

@@ -12,7 +12,7 @@ SQLite 是权威状态；Outbox 与 JetStream 传递唤醒。每个 claim/epoch 
 
 ## 协议、实现与配置约束
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="contract-12-eventqueue"></a>
 
@@ -276,9 +276,3 @@ App 关闭完成后再停止本地 Broker。入口由原 `cmd/personal-agent` �
 - `ConversationStore.Append/List`、`MemoryStore.Search/Apply`、`DeliveryService.Enqueue`。
 
 接口由使用方包定义；不要先建立通用 Repository/Service 基类，也不要为了未来云端拆分引入远程 RPC。
-
-## Changelog
-
-| 日期 | 决策 | 理由与影响 |
-| --- | --- | --- |
-| 2026-10-28 | 将跨模块契约与各功能局部协议分开归属在 designs 内。 | 保留数据、权限与恢复语义及原编号，未变更模型可见协议或数据库。 |

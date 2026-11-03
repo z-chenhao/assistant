@@ -5,10 +5,65 @@ import tempfile
 import subprocess
 import unittest
 
-from check_docs import ROOT, broken_links, unindexed_docs
+from check_docs import ROOT, broken_links, documentation_policy_errors, unindexed_docs
 
 
 class ProjectLayoutTests(unittest.TestCase):
+    def test_documentation_policy_rejects_logs_but_preserves_current_contracts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'docs/designs').mkdir(parents=True)
+            current = root / 'docs/designs/protocol.md'
+            current.write_text('''# Current protocol
+## MCP 2025-03-26 compatibility
+MCP `2025-03-26` remains a supported wire format.
+## Compatibility with old snapshots
+Schema 28 does not rewrite frozen requests.
+```md
+## Changelog
+## 2026-11-03 Review
+```
+''')
+            self.assertEqual(list(documentation_policy_errors(root)), [])
+            (root / 'docs/reviews').mkdir()
+            (root / 'docs/reviews/2026-11-03-review.md').write_text('# Review\n')
+            current.write_text(current.read_text() + '\nChangeLog\n---------\n')
+            errors = list(documentation_policy_errors(root))
+            self.assertEqual(len(errors), 3, errors)
+            self.assertTrue(any('no review or archive directories' in e for e in errors))
+            self.assertTrue(any('stable topic filename' in e for e in errors))
+            self.assertTrue(any("log heading 'ChangeLog'" in e for e in errors))
+
+    def test_dated_topic_filenames_cannot_hide_in_an_allowed_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = root / 'docs/designs'
+            directory.mkdir(parents=True)
+            for filename in ('2026-11-03-review.md', '2026_11_03_review.md',
+                             'review_2026-11-03.md'):
+                with self.subTest(filename=filename):
+                    path = directory / filename
+                    path.write_text('# Review\n')
+                    self.assertEqual(list(documentation_policy_errors(root)), [
+                        f'docs/designs/{filename}: use a stable topic filename, not a date'])
+                    path.unlink()
+
+    def test_checker_cli_enforces_current_documentation_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'scripts').mkdir()
+            shutil.copy2(ROOT / 'scripts/check_docs.py', root / 'scripts/check_docs.py')
+            (root / 'docs/designs').mkdir(parents=True)
+            (root / 'README.md').write_text('[Design](docs/designs/current.md)')
+            doc = root / 'docs/designs/current.md'
+            for heading in ('Changelog', '2026-11-03 Review', '历史实现进度快照'):
+                with self.subTest(heading=heading):
+                    doc.write_text(f'# Current design\n\n## {heading}\n')
+                    result = subprocess.run([sys.executable, str(root / 'scripts/check_docs.py')],
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn('log heading', result.stderr)
+
     def test_picture_sources_and_html_images_are_checked(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

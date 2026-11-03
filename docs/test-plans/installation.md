@@ -8,4 +8,4 @@ F-037：从真实安装入口完成源码/原生包安装、其他工作目录�
 
 ## 已有入口
 
-[startup 系统测试](../../tests/system/verify_startup.py) 和 [启动组件测试](../../internal/startup/local_test.go)。本次只迁移文档，未重跑应用功能验证。
+[startup 系统测试](../../tests/system/verify_startup.py) 和 [启动组件测试](../../internal/startup/local_test.go)。实际运行结果以 PR 或 CI 证据为准。

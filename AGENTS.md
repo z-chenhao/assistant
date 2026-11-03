@@ -31,10 +31,10 @@ Close Python SQLite connections explicitly with `contextlib.closing`; the connec
 
 ## Commit & Pull Request Guidelines
 
-Recent history favors imperative subjects with `feat:`, `refactor:`, or `chore:` prefixes and optional scopes, e.g. `feat(web): improve task navigation`. Keep changes focused. Follow the PR template: describe behavior, link an existing issue, provide exact validation commands/evidence, and identify residual risks. Update the [Feature Map](docs/feature-map.md), owning feature, design, and test plan when behavior changes.
+Recent history favors imperative subjects with `feat:`, `refactor:`, or `chore:` prefixes and optional scopes, e.g. `feat(web): improve task navigation`. Keep changes focused. Follow the PR template: describe behavior, link an existing issue, provide exact validation commands/evidence, and identify residual risks. Update the [Feature Map](docs/feature-map.md), owning feature, design, and test plan when behavior changes. Follow the [documentation policy](docs/README.md#强制维护规则): update current topics in place; keep dated reviews, development logs, append-only changelogs and execution results in PRs, Git history or CI artifacts, not `docs/`.
 
 ## Security & Agent Instructions
 
 Follow the [contribution workflow](docs/features/engineering.md) and [runtime contracts](docs/designs/runtime-contracts.md). See [governance](GOVERNANCE.md) for branch and release ownership. Preserve approval, frozen-snapshot, and durable-replay guarantees. Store credentials only in SecretStore. Tests must use disposable `STEWARD_DATA_ROOT` directories. Publishing releases requires explicit authorization.
 
-Keep the README and favicon derived from the current Ghost atlas; `web/artwork/source/` contains build inputs, not public assets. Preserve third-party notices in native packages. Delete remote branches only after checking their exact head against merged PR evidence; retain unmerged work for review.
+Keep the README and favicon derived from the current Ghost atlas; `web/artwork/source/` contains build inputs, not public assets. Preserve third-party notices in native packages. Before deleting remote branches, check exact heads and open PRs. Normally require merged PR evidence. The owner may explicitly retire unmerged work after a verified restorable backup; never infer that authorization from age or failing checks. Use exact-head leases for deletion. See governance for the full rule.

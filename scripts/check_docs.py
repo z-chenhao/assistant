@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check local Markdown destinations and documentation reachability offline."""
+"""Check local Markdown links, reachability and current-document policy offline."""
 from pathlib import Path
 import html
 from html.parser import HTMLParser
@@ -175,12 +175,40 @@ def unindexed_docs(root=ROOT):
             yield f'{path.relative_to(root)}: unreachable from README.md; update the documentation index'
 
 
+def documentation_policy_errors(root=ROOT):
+    """Catch log-shaped docs; accuracy and current design rationale need review."""
+    root = root.resolve()
+    date = r'(?<!\d)\d{4}[-_]\d{2}[-_]\d{2}(?!\d)'
+    for path in sorted((root / 'docs').rglob('*.md')):
+        relative = path.relative_to(root / 'docs')
+        parts = relative.parts
+        if not (relative.as_posix() in ('README.md', 'feature-map.md') or
+                len(parts) == 2 and parts[0] in ('features', 'designs', 'test-plans')):
+            yield f'{path.relative_to(root)}: use the topic layout in docs/README.md; no review or archive directories'
+        if re.search(date, relative.as_posix()):
+            yield f'{path.relative_to(root)}: use a stable topic filename, not a date'
+        lines = prose(path).splitlines()
+        for index, line in enumerate(lines):
+            heading = re.match(r' {0,3}#{1,6}\s+(.+?)\s*#*\s*$', line)
+            if heading:
+                title = heading[1]
+            elif (index + 1 < len(lines) and line.strip()
+                  and re.fullmatch(r' {0,3}(?:=+|-+)\s*', lines[index + 1])):
+                title = line.strip()
+            else:
+                continue
+            if (re.match(date, title) or
+                    re.search(r'\bchange\s*log\b|开发日志|审查记录|历史决策与演进记录|历史实现进度快照', title, re.I)):
+                yield f'{path.relative_to(root)}: keep the current topic instead of log heading {title!r}'
+
+
 def main():
-    errors = [*broken_links(), *unindexed_docs()]
+    errors = [*broken_links(), *unindexed_docs(), *documentation_policy_errors()]
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
     print('Local documentation links and index: OK')
+    print('Current documentation policy: OK')
     return 0
 
 

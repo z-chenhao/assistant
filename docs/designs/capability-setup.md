@@ -2,7 +2,7 @@
 
 [功能与需求](../features/capability-setup.md) · [测试方案](../test-plans/capability-setup.md) · [主索引](../feature-map.md)
 
-最近核对：2026-10-29。实现级协议服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
+实现级协议服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
 ## 当前架构
 
@@ -51,15 +51,7 @@ Computer `Provider.Probe` 与实际执行的 lock 路径共用 checkHost，校�
 
 验收场景和证明范围见 [测试方案](../test-plans/capability-setup.md)。系统测试复用现有 channels gate 和 owned peers，不将界面截图或受控模型回复当作真实模型质量分数。
 
-## Changelog
-
-| 日期 | 类型 | 决策与理由 | 取舍及影响 | 关联 |
-| --- | --- | --- | --- | --- |
-| 2026-10-28 | 现状建档 / 未来方向 | 保留配置和冻结快照为权威；新增设置属于 owner 控制面。 | 当时尚无统一能力页；未更改运行时。 | F-030 |
-| 2026-10-29 | F-030 实现 / 模块拆分 | 选择 config/setup 集中配置生命周期，复用领域适配器；未把诊断塞入 App 或建第二套工具注册。 | Web 仅消费接口，Computer 共用 Host 检查；无新依赖或 schema。 | F-030 |
-| 2026-10-29 | 候选证明 / 明确重启 | 选择先测试再保存、短期内存证明和文件版本检查，避免保存即热改 Registry。 | 用户需重启；新 Run 使用新快照，旧 Run 不自动升级；测试不是迁移。 | F-030 |
-
-## 2026-11-03 · 表单优先的能力配置
+## 表单优先的能力配置
 
 当前用户是需要连接六种既有能力的所有者；首选显式标注的普通字段、选择器、每行一项的路径／参数、MCP provider 与允许工具行。Web 私有表单类型只覆盖实际领域字段，YAML AST 对这些字段定点修改，保留未展示的高级配置；别名或无法无损映射的结构回退到 Advanced YAML，不能静默重解释。Computer 的兼容／Driver 和运行时字段分组折叠，首次配置时展开。
 

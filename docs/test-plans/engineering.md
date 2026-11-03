@@ -8,7 +8,7 @@ F-038：固定依赖和构建入口可用；文档改动只运行适用检查；
 
 ## 已有入口
 
-[工程辅助回归](../../tests/harness/test_project_layout.py)、[Makefile](../../Makefile)、[PR CI](../../.github/workflows/ci.yml) 与 [扩展回归](../../.github/workflows/regression.yml)。运行方式及边界见产品测试方案。本次文档迁移不宣称这些流水线已重新执行。
+[工程辅助回归](../../tests/harness/test_project_layout.py)、[Makefile](../../Makefile)、[PR CI](../../.github/workflows/ci.yml) 与 [扩展回归](../../.github/workflows/regression.yml)。运行方式及边界见产品测试方案。实际运行结果以对应 PR 或 CI 证据为准。
 
 ## 工程基础重构回归
 
@@ -34,6 +34,12 @@ Race 入口在 SQLite 分片之前分别运行 Bridge 与诊断记录器包，�
 
 跨模块变更运行既有 `make test lint` 和相关 core system gates；Computer/Task claim 与取消相关场景运行定向 race。环境导致的未执行、失败和跳过独立报告，不以编译成功代替行为验证。不为拆文件新增测试框架。
 
-开源治理验收：`make lint` 检查 GitHub workflow；HTML 图片链接回归防止 README 引用失效，正式 Ghost 图标通过真实 Chromium 首帧像素核对；startup gate 实际打包、解压、安装并核对项目/Web/Go notices。`make audit` 记录当前漏洞库结果，网络失败与漏洞发现均不能记为通过。远端分支清理需要保存原 SHA、合并 PR、Git bundle 和带 lease 的删除记录；管理权限不足应明确报告。
+开源治理验收：`make lint` 检查 GitHub workflow；HTML 图片链接回归防止 README 引用失效，正式 Ghost 图标通过真实 Chromium 首帧像素核对；startup gate 实际打包、解压、安装并核对项目/Web/Go notices。`make audit` 记录当前漏洞库结果，网络失败与漏洞发现均不能记为通过。远端分支清理需要保存原 SHA、合并证据或所有者明确退役授权、经独立恢复验证的 Git bundle 和带 lease 的删除记录；管理权限不足应明确报告。
 
 手动执行 native packages 需实际通过四个平台的启动契约、安装诊断、打包和重新下载后的 checksum 校验；Linux runner 必须安装 Bubblewrap，不能跳过 doctor 的缺失依赖断言。Actions 更新固定完整提交，并核对官方输入/输出兼容性；手动分支构建仍不得创建或发布 release。
+
+## 当前验证限制
+
+容量门禁的模型元数据持久化偶发失败根因尚未确认，追踪证据见 [PR #118](https://github.com/z-chenhao/steward/pull/118)。后续通过不等于该问题已修复；再次出现时保留具体失败位置、上下文及存储等待证据，不放宽生产时限、写入或恢复保护。
+
+文档检查复用 `scripts/check_docs.py`：页面需可从 README 导航到达，本地链接有效，且遵循当前主题布局、稳定文件名和非日志式章节规则。对应 harness 覆盖违规文档的 CLI 失败与真实协议日期、代码示例的合法使用。内容准确性和有效约束仍须人工审查。

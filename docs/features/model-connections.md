@@ -51,7 +51,7 @@ CLI 可运行 `steward model list` 查看配置，使用 `steward model test PRO
 
 ## 操作说明与配置细节
 
-迁入内容按职责归属在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
+本功能协议在此维护。既有编号用于追溯协议，不代表所有设计目标均已实现；完成状态以需求主索引为准。
 
 <a id="provider-bridge-chatgpt-account-lifecycle"></a>
 
