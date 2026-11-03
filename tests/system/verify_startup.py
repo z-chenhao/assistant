@@ -18,7 +18,7 @@ import threading
 
 from terminal_driver import Terminal
 from fixture_pool import run as owned_run, run_cases
-from verify_local_provider import Endpoint
+from provider_endpoint import Endpoint
 from verify_main import MainHarness, assert_final, require
 from verify_tui import local_setup
 

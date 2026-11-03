@@ -84,7 +84,7 @@ func (s *Server) acceptFormMessage(w http.ResponseWriter, r *http.Request) error
 		jsonResult(w, map[string]any{"accepted": true, "location": target})
 		return nil
 	}
-	http.Redirect(w, r, target, 303)
+	http.Redirect(w, r, target, http.StatusSeeOther)
 	return nil
 }
 func (s *Server) uploadArtifact(w http.ResponseWriter, r *http.Request) error {

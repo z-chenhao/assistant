@@ -12,14 +12,19 @@ import (
 )
 
 var (
-	ErrElement       = errors.New("stale Computer element")
-	ErrInvalid       = errors.New("invalid Computer request")
-	ErrUnavailable   = errors.New("Computer provider unavailable")
-	ErrBusy          = errors.New("Computer is in use")
-	ErrStale         = errors.New("stale Computer epoch or owner")
-	ErrIntegrity     = errors.New("Computer checkpoint integrity failure")
+	ErrElement = errors.New("stale Computer element")
+	ErrInvalid = errors.New("invalid Computer request")
+	//lint:ignore ST1005 Computer is the domain name in this existing public error text.
+	ErrUnavailable = errors.New("Computer provider unavailable")
+	//lint:ignore ST1005 Computer is the domain name in this existing public error text.
+	ErrBusy  = errors.New("Computer is in use")
+	ErrStale = errors.New("stale Computer epoch or owner")
+	//lint:ignore ST1005 Computer is the domain name in this existing public error text.
+	ErrIntegrity = errors.New("Computer checkpoint integrity failure")
+	//lint:ignore ST1005 Computer is the domain name in this existing public error text.
 	ErrCompatibility = errors.New("Computer compatibility snapshot changed")
-	ErrUnknown       = errors.New("Computer operation outcome unknown")
+	//lint:ignore ST1005 Computer is the domain name in this existing public error text.
+	ErrUnknown = errors.New("Computer operation outcome unknown")
 )
 
 // Compatibility is frozen by the Host. It contains no credential or transport

@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import signal
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -38,7 +39,7 @@ class ArtifactHarness(ToolHarness):
 
     def state(self):
         value = super().state()
-        with sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+        with closing(sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
             db.row_factory = sqlite3.Row
             for table in ('artifact', 'artifact_reference', 'artifact_publication', 'task_update', 'task'):
                 value[table] = [dict(r) for r in db.execute('SELECT * FROM ' + table)]
@@ -291,7 +292,7 @@ def run(binary, scenario_jobs=1):
                 child.send_signal(signal.SIGKILL); child.communicate(timeout=10)
                 data_root = Path(h.env['STEWARD_DATA_ROOT'])
                 # Avoid App startup recovery while observing the crash residue.
-                with sqlite3.connect(data_root / 'state.db') as db:
+                with closing(sqlite3.connect(data_root / 'state.db')) as db, db:
                     before_rows = db.execute('SELECT artifact_ref FROM artifact').fetchall()
                 before_objects = sorted(p.name for p in (data_root / 'artifacts').iterdir())
                 h.command('chat', 'work')

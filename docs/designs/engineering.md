@@ -6,6 +6,10 @@
 
 产品逻辑与测试分属明确模块。Makefile 和现有 system runner 提供本地入口，CI 自动执行这些入口；发布流水线独立准备原生包和草稿发布。
 
+最近一次[全仓工程审查](../engineering-review-2026-11-03.md)记录了调用关系、历史依据、分批重构和验证限制。Web 的固定资源目录归 `assets.go`，MCP 注册与调用分别维护；系统测试共用的模型 HTTP peer 归 `tests/system/provider_endpoint.py`，不再由渠道 gate 反向导入模型 gate。
+
+调度器在单条 SQL 内物化一次活跃租约集合，供各额度维度复用，避免查询计划按 Agent 反复扫描历史 Run。该集合仅属于当前语句的数据库快照，保留既有 claim 事务、fencing、公平排序与额度配置。
+
 ```mermaid
 flowchart TD
     S["源码与固定依赖"] --> M["Makefile / system runner"]
@@ -128,10 +132,10 @@ internal/
   memory/
   context/
   llm/
-  secret/
+    bridge/
+    secret/
   skill/
   tool/
-  security/
   computer/
   artifact/
   delivery/
@@ -146,11 +150,12 @@ runtime/
 ```text
 memory/sqlite
 conversation/sqlite
-llm/providerbridge
-secret/keyring
+llm/bridge
+llm/secret
 event/nats
-computer/lume
-computer/cua
+computer/macosvm
+computer/environment
+computer/sqlite
 interaction/feishu
 tool/mcp
 ```
@@ -166,10 +171,10 @@ tool/mcp
 - `memory`：长期记忆、召回与 Memory Curator。
 - `context`：为每次 Turn 组装、裁剪、冻结和压缩上下文，不拥有来源数据。
 - `llm`：管理 ModelProfile/ModelSnapshot、Provider Bridge、模型目录、能力 Probe 与固定主模型调用；一期不做动态模型路由。
-- `secret`：封装 OS Credential Store 与测试用内存实现；只返回受控 Credential，不把 Secret 暴露给领域存储或模型。
+- `llm/secret`：封装 OS Credential Store；`llm/memory` 提供测试用内存实现。只返回受控 Credential，不把 Secret 暴露给领域存储或模型。
 - `skill`：Skill 的发现、读取、候选、审核和生命周期。
 - `tool`：工具注册、发现、ToolInvocation 与调用；包括 AgentToolExecutor、Computer Tool Executor、Code Mode 的内部 CodeExecutionState/CodeCall Ledger 和 Sidecar 桥接。
-- `security`：在产生副作用前执行风险识别、授权与确认裁决。
+- `tool` 与 `agent/sqlite` 共同落实副作用前的授权、冻结审批与执行权检查；当前没有独立的 `security` 包。
 - `computer`：管理逻辑 Computer、运行 Instance、Checkpoint、恢复和并发仲裁。
 - `artifact`：管理产物生命周期及 `artifact_ref`。
 - `delivery`：管理 `DeliveryRequest`、Outbox 和渠道发送。
@@ -263,6 +268,8 @@ They are not PR prerequisites. See [evaluation boundaries](../test-plans/product
 
 | 日期 | 决策 | 理由与影响 |
 | --- | --- | --- |
+| 2026-11-03 | 调度额度查询复用单次活跃租约集合；Python 系统测试显式关闭 SQLite 连接。 | 三批容量运行暴露历史扫描成本，执行计划及等价测量支持局部 SQL 优化；连接回归确认上下文管理器不负责关闭。保留 schema、事务语义及所有安全断言。 |
+| 2026-11-03 | 局部拆分 Web 资源处理与 MCP 调用；共享模型 HTTP fixture 独立于系统 gate。 | 保留认证顺序、错误/副作用判定、公开路由和冻结协议，解除测试模块循环依赖；同步修正当前目录示例，详细证据见审查记录。 |
 | 2026-10-28 | F-040：Computer 与运维查询归所属模块，App 返回领域类型并隐藏具体执行访问器。 | 选择明确领域子包而非通用 repository 层；通过绑定 claim 的 Host 保留原子事务，不改变存储协议。 |
 | 2026-10-28 | F-040：CLI 使用统一语法表和分阶段处理；Web 动作、Task 变更、能力注册分职责。 | 相较仅按行数切文件，命名函数对应可审查步骤；复用原入口和回归，保持原有参数、权限、关闭与 replay 行为。 |
 | 2026-10-28 | F-039：终态 Run 失败与基础设施错误分开；UI 先开放，依赖准备只缓存成功。 | 保留控制面以修复故障；不使用跳过失效能力的降级注册，避免静默更改冻结能力。 |

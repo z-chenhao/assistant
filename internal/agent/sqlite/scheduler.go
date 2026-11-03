@@ -50,7 +50,10 @@ const runnable = mainPredecessorsJoined + ` AND NOT EXISTS(SELECT 1 FROM spend_a
 
 // Provider identity is the frozen account or endpoint, not the mutable profile.
 const providerKey = `s.provider_kind||':'||coalesce(s.auth_connection_id,s.endpoint_hash,'local')`
-const schedulerCTE = `WITH live AS (
+
+// Reuse one statement-local lease snapshot for every quota. Inlining the
+// correlated counts makes SQLite revisit historical Runs for each candidate.
+const schedulerCTE = `WITH live AS MATERIALIZED (
  SELECT w.run_id,w.root_run_id,w.worker_position,w.agent_id,ws.provider_kind||':'||coalesce(ws.auth_connection_id,ws.endpoint_hash,'local') AS provider_key
  FROM run w JOIN run_claim wc USING(run_id) JOIN model_snapshot ws ON ws.snapshot_id=w.model_snapshot_id
  WHERE w.kind='worker' AND wc.token IS NOT NULL AND wc.expires_at>:now

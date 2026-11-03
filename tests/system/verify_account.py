@@ -14,6 +14,7 @@ import select
 import shutil
 import signal
 import socketserver
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -125,7 +126,7 @@ def verify(binary, bridge):
                 run("chat", "work")
                 history = run("chat", "history")
                 require([m["role"] for m in history] == ["user", "assistant"] and history[-1]["content"][0]["text"] == "PROBE_RESULT_OK", "account Main/Direct Tool continuation failed")
-                with sqlite3.connect(root / "data/state.db") as main_db:
+                with closing(sqlite3.connect(root / "data/state.db")) as main_db, main_db:
                     require(main_db.execute("SELECT count(*) FROM run WHERE status='completed'").fetchone()[0] == 1, "account Main not complete")
                     require(main_db.execute("SELECT count(*) FROM tool_invocation WHERE status='succeeded'").fetchone()[0] == 1, "account Direct Tool not persisted")
                 report["main_history"] = history
@@ -202,7 +203,7 @@ def verify(binary, bridge):
 
                 dbpath = root / "data/state.db"
                 def readback(query, *params):
-                    with sqlite3.connect(dbpath) as db:
+                    with closing(sqlite3.connect(dbpath)) as db, db:
                         return db.execute(query, params).fetchall()
 
                 stable_device = readback("SELECT device_id FROM installation_auth")[0][0]

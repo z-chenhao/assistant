@@ -36,7 +36,9 @@ func TestEmbeddingRedirectAndConfigDrift(t *testing.T) {
 	calls := 0
 	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++ }))
 	defer destination.Close()
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, destination.URL, 307) }))
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, destination.URL, http.StatusTemporaryRedirect)
+	}))
 	defer s.Close()
 	c := Client{Config: Config{Provider: "openai_compatible", Endpoint: s.URL, Model: "test", Dimensions: 2}}
 	if _, e := c.Embed(context.Background(), "tea"); e == nil || calls != 0 {

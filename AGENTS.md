@@ -26,6 +26,8 @@ Format Go with `gofmt` (tabs); use lowercase package names and define interfaces
 
 Use Go `testing` (`*_test.go`), Node `node:test` (`*.test.mjs`), and Python `unittest` (`test_*.py`). Run focused checks first, then `make test lint` and relevant system gates for cross-module changes. Coverage follows observable scenarios, without a mandated percentage. Exercise real stores/protocols for persistence changes and failure/restart/race paths for replay or concurrency. Report skipped and unrun checks explicitly. See the [testing guide](docs/test-plans/product.md).
 
+Close Python SQLite connections explicitly with `contextlib.closing`; the connection context manager only commits or rolls back transactions. Use a read transaction when a predicate needs a consistent snapshot across tables.
+
 ## Commit & Pull Request Guidelines
 
 Recent history favors imperative subjects with `feat:`, `refactor:`, or `chore:` prefixes and optional scopes, e.g. `feat(web): improve task navigation`. Keep changes focused. Follow the PR template: describe behavior, link an existing issue, provide exact validation commands/evidence, and identify residual risks. Update the [Feature Map](docs/feature-map.md), owning feature, design, and test plan when behavior changes.

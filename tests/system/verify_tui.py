@@ -12,6 +12,7 @@ import re
 import select
 import signal
 import socketserver
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -21,7 +22,7 @@ from http.server import ThreadingHTTPServer
 
 from terminal_driver import Terminal
 from verify_account import Secrets, account_config
-from verify_local_provider import Endpoint
+from provider_endpoint import Endpoint
 from verify_main import MainHarness, assert_final, require
 from event_broker import Broker
 
@@ -163,7 +164,7 @@ def verify(binary, bridge):
                 t.expect("Setup cancelled."); t.expect("You> ")
                 t.send("no implicit provider"); t.expect("Use /setup to repair"); t.expect("You> ")
                 require(h.command("status")["readiness"] == "setup_required", "cancel enabled ingress")
-                with sqlite3.connect(folder / "data/state.db") as db:
+                with closing(sqlite3.connect(folder / "data/state.db")) as db, db:
                     require(db.execute("SELECT count(*) FROM run").fetchone()[0] == 0, "cancel created a Run")
                 require(t.stop(signal.SIGTERM) == 0, "idle prompt shutdown failed")
                 report["cancel"] = t.transcript()

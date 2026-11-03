@@ -100,13 +100,13 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 				// A completed probe can be unavailable with no Go error. Detail
 				// reports that stored result and only a ready proof enables Save;
 				// redirecting does not assert that the connection succeeded.
-				http.Redirect(w, r, location, 303)
+				http.Redirect(w, r, location, http.StatusSeeOther)
 				return nil
 			}
 		case "save":
 			err = s.Capabilities.Save(r.Context(), id, r.FormValue("revision"), text)
 			if err == nil {
-				http.Redirect(w, r, location, 303)
+				http.Redirect(w, r, location, http.StatusSeeOther)
 				return nil
 			}
 		default:

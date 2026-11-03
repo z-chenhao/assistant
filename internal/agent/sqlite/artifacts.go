@@ -117,7 +117,7 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 	}
 	store := r.host.Artifacts()
 	if len(result.ImageRefs) > 0 {
-		if len(result.ImageRefs) > 8 || imageRefsIncluded(result.ImageRefs, result.ArtifactRefs) == false {
+		if len(result.ImageRefs) > 8 || !imageRefsIncluded(result.ImageRefs, result.ArtifactRefs) {
 			return tool.Failure("PERMISSION_DENIED"), nil
 		}
 		for _, ref := range result.ImageRefs {

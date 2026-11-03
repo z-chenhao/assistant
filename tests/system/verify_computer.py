@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import selectors
 import shutil
+from contextlib import closing
 import sqlite3
 import subprocess
 import sys
@@ -29,7 +30,7 @@ class ComputerHarness(CapabilityHarness):
                 '-test-bridge', 'computer', *args]
 
     def guest_command(self, live_root, command):
-        with sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+        with closing(sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
             instance = json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
         from lume_live import Live
         return Live(live_root, 'product', instance['native_name']).guest(command)
@@ -41,7 +42,7 @@ class ComputerHarness(CapabilityHarness):
         child = self.hold(boundary, extra_flags=('-test-main-release', str(release)), timeout=30)
         held = self.command('computer', 'status')
         state = Path(self.env['STEWARD_DATA_ROOT']) / 'state.db'
-        with sqlite3.connect(state) as db:
+        with closing(sqlite3.connect(state)) as db, db:
             task_id, ref = db.execute("SELECT task_id,task_ref FROM task WHERE status='active'").fetchone()
         self.send('cancel-' + boundary, 'Capabilities: ' + json.dumps([
             {'name': 'builtin__task_manage', 'arguments': {'operation': 'cancel', 'taskRef': ref}}]))
@@ -50,7 +51,7 @@ class ComputerHarness(CapabilityHarness):
         self.children.append(control)
 
         def stopped(_):
-            with sqlite3.connect(state) as db:
+            with closing(sqlite3.connect(state)) as db, db:
                 return db.execute('SELECT status FROM task WHERE task_id=?', (task_id,)).fetchone()[0]
 
         self.wait_state(lambda status: status == 'cancelled', 'Main cancelled Computer Task', reader=stopped, timeout=15)
@@ -63,7 +64,7 @@ class ComputerHarness(CapabilityHarness):
                 'after_cancel': self.command('computer', 'status')}
 
     def cancelled_state(self, task_id):
-        with sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+        with closing(sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
             task = db.execute('SELECT status,task_epoch FROM task WHERE task_id=?', (task_id,)).fetchone()
             runs = db.execute('SELECT run_id,status,desired_state FROM run WHERE task_id=? ORDER BY run_id', (task_id,)).fetchall()
             codes = db.execute('SELECT s.execution_id,s.state,s.desired_state,s.claim_token IS NULL FROM code_execution_state s JOIN tool_invocation i ON i.invocation_id=s.execution_id JOIN run r USING(run_id) WHERE r.task_id=? ORDER BY s.execution_id', (task_id,)).fetchall()
@@ -152,7 +153,7 @@ def run(binary):
                 opened = subprocess.run(h.args('artifact', 'open', artifact['artifact_ref']), env=h.env,
                                         capture_output=True, text=True, timeout=20)
                 require(opened.returncode == 0 and opened.stdout == 'stable Artifact across VM instances', 'Artifact bytes/identity lost')
-                with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+                with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
                     phases = db.execute('SELECT kind,status FROM computer_operation ORDER BY rowid').fetchall()
                     nested = db.execute("SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__computer_discover' AND parent_invocation_id IS NOT NULL AND status='succeeded'").fetchone()[0]
                     require(nested >= 1, 'Computer bypassed ToolInvocation')
@@ -189,7 +190,7 @@ def run(binary):
             fresh = h.command('computer', 'status')
             require(fresh['computer_id'] == recovered['computer_id'] and fresh['instance_epoch'] == recovered['instance_epoch'] + 1,
                     'fresh cell cannot restore after interrupted disposal')
-            with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+            with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
                 results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at").fetchall()
                 require(len(results) == 5 and all(row[0] == 'succeeded' for row in results),
                         'resumed or fresh cell failed after disposal')
@@ -213,7 +214,7 @@ def run(binary):
                         'fresh invocation lost cancelled Computer identity/epoch')
                 require(restored['phase'] == 'checkpointed', 'fresh invocation failed after Task cancellation')
                 require(h.cancelled_state(cancelled['task_id']) == terminal, 'recovery changed cancelled terminal state')
-                with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+                with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
                     status = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at DESC LIMIT 1").fetchone()[0]
                     require(status == 'succeeded', 'fresh cell failed after cancellation')
                     if boundary == 'computer_after_destroy':
@@ -266,7 +267,7 @@ def run_live(binary, live_root, config_path):
     plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': 'return await cua.getState();'}}])
 
     def guest(command):
-        with sqlite3.connect(root / 'data/state.db') as db:
+        with closing(sqlite3.connect(root / 'data/state.db')) as db, db:
             instance = json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
         result = subprocess.run([shutil.which('python3'), str(script), '--root', str(live_root),
                                  '--profile', 'product', '--vm', instance['native_name'], 'guest', command],
@@ -275,7 +276,7 @@ def run_live(binary, live_root, config_path):
         return result.stdout
 
     def hardware_identity():
-        with sqlite3.connect(root / 'data/state.db') as db:
+        with closing(sqlite3.connect(root / 'data/state.db')) as db, db:
             instance = json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
         cfg = json.loads((live_root / 'product/vms' / instance['native_name'] / 'config.json').read_text())
         return {key: cfg[key] for key in ('macAddress', 'machineIdentifier')}
@@ -398,7 +399,7 @@ def run_live(binary, live_root, config_path):
         final = h.command('computer', 'status')
         require(final['phase'] == 'checkpointed' and not list((live_root / 'product/vms').glob('steward-*')),
                 'fresh native cell retained resources')
-        with sqlite3.connect(root / 'data/state.db') as db:
+        with closing(sqlite3.connect(root / 'data/state.db')) as db, db:
             results = db.execute("SELECT status FROM tool_invocation WHERE tool_name='builtin__codemode_execute' ORDER BY created_at DESC LIMIT 2").fetchall()
             require(len(results) == 2 and all(r[0] == 'succeeded' for r in results), 'native resumed/fresh Tool result failed')
         report['checks'].append({'action': 'fresh-cell-after-disposal-recovery', 'state': final, 'guest': reopened,

@@ -222,7 +222,7 @@ func TestEmbeddingProbeFailureRecoveryAndRevisionFencing(t *testing.T) {
 			os.WriteFile(m.path, append(m.bootstrap(), []byte("# external edit\n")...), 0600)
 		}
 		if fail.Load() {
-			http.Error(w, "SHOULD_NOT_LEAK", 503)
+			http.Error(w, "SHOULD_NOT_LEAK", http.StatusServiceUnavailable)
 			return
 		}
 		fmt.Fprint(w, `{"model":"fixture","data":[{"index":0,"embedding":[1,0.5]}]}`)

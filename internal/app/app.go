@@ -139,6 +139,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, errors.New("restored data root is fenced; retire source and reconcile external outcomes, then use ops activate")
 	}
 	if cfg.Memory != nil && (!cfg.Memory.Valid() || cfg.Embedding != nil && !cfg.Embedding.Local()) {
+		//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 		return nil, errors.New("Memory maintenance requires an encryption key reference and local embedding")
 	}
 	t, err := observability.OpenWithLimits(cfg.App.DataRoot, cfg.LogLevel(), cfg.App.LogMaxBytes, cfg.App.LogBackups)

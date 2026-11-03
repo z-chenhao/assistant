@@ -39,9 +39,11 @@ type Config struct {
 
 func (c Config) Validate() error {
 	if c.AppID == "" || c.TenantKey == "" || !interaction.ValidCredentialRef(c.VerificationTokenRef) || !interaction.ValidCredentialRef(c.EncryptKeyRef) {
+		//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 		return errors.New("Feishu requires app, tenant and credential references")
 	}
 	if (c.AccessTokenRef == "") == (c.AppSecretRef == "") {
+		//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 		return errors.New("Feishu requires exactly one of access_token_ref or app_secret_ref")
 	}
 	ref := c.AccessTokenRef
@@ -49,11 +51,13 @@ func (c Config) Validate() error {
 		ref = c.AppSecretRef
 	}
 	if !interaction.ValidCredentialRef(ref) {
+		//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 		return errors.New("Feishu requires a credential reference")
 	}
 	if c.APIBase != "" && c.APIBase != "https://open.feishu.cn" {
 		u, e := url.Parse(c.APIBase)
 		if e != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "[::1]" && u.Hostname() != "::1") || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+			//lint:ignore ST1005 Preserve the existing user-facing diagnostic text.
 			return errors.New("Feishu API must be official HTTPS or explicit loopback sandbox")
 		}
 	}

@@ -213,9 +213,8 @@ func TestStreamPreviewAvoidsDurableWriterAndReportsTraceLoss(t *testing.T) {
 
 func TestStateErrorKeepsPrivateCauseAndStableClassification(t *testing.T) {
 	_, r, _, _, _ := loopFixture(t)
-	var err error
 	// A direct failing transaction isolates adapter classification from validation.
-	err = r.write(context.Background(), func(tx *sql.Tx) error { _, e := tx.Exec(`INSERT INTO missing_private_table VALUES(1)`); return e })
+	err := r.write(context.Background(), func(tx *sql.Tx) error { _, e := tx.Exec(`INSERT INTO missing_private_table VALUES(1)`); return e })
 	var operation *agent.OperationError
 	if !errors.Is(err, agent.ErrStorage) || !errors.As(err, &operation) || operation.Cause == nil {
 		t.Fatal("storage cause lost", err)

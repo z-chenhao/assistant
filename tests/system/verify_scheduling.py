@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 import subprocess
 import sys
@@ -18,7 +19,7 @@ from verify_main import require
 
 def state(h):
     value = child_state(h)
-    with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db') as db:
+    with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db, db:
         db.row_factory = sqlite3.Row
         for name, query in {
             'scheduler': 'SELECT * FROM scheduler_tree ORDER BY root_run_id',

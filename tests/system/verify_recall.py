@@ -139,12 +139,12 @@ class Harness(MainHarness):
         result = self.state()
         result['agent_id'] = self.command('status')['agent_id']
         root = Path(self.env['STEWARD_DATA_ROOT'])
-        with sqlite3.connect(root / 'state.db') as db:
+        with closing(sqlite3.connect(root / 'state.db')) as db, db:
             db.row_factory = sqlite3.Row
             result['recall'] = [dict(r) for r in db.execute('SELECT * FROM run_recall ORDER BY run_id,step_index')]
             result['children'] = [dict(r) for r in db.execute("SELECT run_id,parent_run_id,worker_position,checkpoint_json FROM run WHERE kind='worker' ORDER BY created_at")]
         for name in ('memory', 'conversation'):
-            with sqlite3.connect(root / (name + '.db')) as db:
+            with closing(sqlite3.connect(root / (name + '.db'))) as db, db:
                 db.row_factory = sqlite3.Row
                 result[name + '_index'] = [dict(r) for r in db.execute('SELECT * FROM recall_document ORDER BY ref')]
                 result[name + '_schema'] = db.execute('PRAGMA user_version').fetchone()[0]
@@ -157,7 +157,7 @@ class Harness(MainHarness):
         """Launch fixture only. Production mutations are tested via Memory.Apply."""
         agent = self.command('status')['agent_id']
         root = Path(self.env['STEWARD_DATA_ROOT'])
-        with sqlite3.connect(root / 'memory.db') as db:
+        with closing(sqlite3.connect(root / 'memory.db')) as db, db:
             for id_, user, agent_, text in [
                     ('lexical', 'local', agent, 'tea preference from explicit evidence'),
                     ('semantic', 'local', agent, 'chai without sugar'),
@@ -170,7 +170,7 @@ class Harness(MainHarness):
                             json.dumps([dict(source_type='conversation', source_ref='conversation:original')]), 1000000))
                 db.execute('INSERT INTO recall_document(ref,user_id,agent_id,content,occurred_at,author_role,core,active) VALUES(?,?,?,?,?,?,?,?)',
                            ('memory:' + id_, user, agent_, text, 1000000, '', 0, 1))
-        with sqlite3.connect(root / 'conversation.db') as db:
+        with closing(sqlite3.connect(root / 'conversation.db')) as db, db:
             for id_, user, owner, text in [('original', 'local', agent, 'chai was my original preference'),
                                           ('foreign', 'bob', agent, 'tea FOREIGN_CONVERSATION_MARKER')]:
                 conversation_id = agent if legacy and id_ == 'original' else id_
@@ -188,7 +188,7 @@ class Harness(MainHarness):
         raw = json.dumps(parts, ensure_ascii=False)
         text = '\n'.join(p['text'] for p in parts)
         require(len(text.encode('utf-8')) == 80001, 'multipart fixture size drift')
-        with sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'conversation.db') as db:
+        with closing(sqlite3.connect(Path(self.env['STEWARD_DATA_ROOT']) / 'conversation.db')) as db, db:
             db.execute('INSERT INTO conversation_scope SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM conversation_scope WHERE conversation_id=?)',
                        (agent, 'local', agent, agent))
             db.execute('INSERT INTO conversation_message VALUES(?,?,(SELECT coalesce(max(sequence),0)+1 FROM conversation_message WHERE conversation_id=?),?,?,?,?,?)',
@@ -378,7 +378,7 @@ def run(binary, failure_evidence=None):
                     require(len(before['recall']) == 1 and not before['generations'], 'wrong kill boundary')
                     # Change corpus after the turn was frozen; restart must reuse it.
                     frozen = before['recall'][0]
-                    with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'memory.db') as db:
+                    with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'memory.db')) as db, db:
                         db.execute('INSERT INTO memory_record(memory_id,user_id,scope_type,scope_id,tier,content,source_refs,created_at) VALUES(?,?,?,?,?,?,?,?)',
                                    ('after-freeze', 'local', 'agent', agent, 'recall',
                                     'tea NEW_AFTER_FREEZE', '[{"source_type":"conversation","source_ref":"conversation:original"}]', 2000000))
@@ -396,7 +396,7 @@ def run(binary, failure_evidence=None):
                             document['content'] == joined_text, 'multipart document missing or pending')
                     chunks = [r['input'] for r in embeddings.requests if len(r['input'].encode('utf-8')) > 4096]
                     require(len(chunks) == 2 and ''.join(chunks) == joined_text, 'multipart truncated or reindexed')
-                    with sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'conversation.db') as db:
+                    with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'conversation.db')) as db, db:
                         stored = db.execute("SELECT content_json FROM conversation_message WHERE message_id='multipart'").fetchone()[0]
                     require(stored == original_json and value['conversation_schema'] == 3, 'migration rewrote original')
                     require(len(value['generations']) == 9 and len(value['runs']) == 4, 'multipart blocked later model admission')

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import shutil
 import signal
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -16,7 +17,7 @@ from verify_main import require
 
 
 def read(db_path, query, args=()):
-    with sqlite3.connect(db_path) as db:
+    with closing(sqlite3.connect(db_path)) as db, db:
         db.row_factory = sqlite3.Row
         return [dict(r) for r in db.execute(query, args)]
 

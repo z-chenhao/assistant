@@ -213,13 +213,3 @@ func contextLink(v *contextView, field string, value any) string {
 	q.Set("ctx", "1")
 	return tracePath(v.Query.RunID) + "?" + q.Encode()
 }
-
-func diffLink(v *contextView, step int64, item int) string {
-	copy := *v
-	copy.Query.Step = step
-	copy.Query.Item = item
-	copy.Query.Offset = 0
-	copy.Query.After = item / observability.ContextPage * observability.ContextPage
-	copy.DiffAfter = 0
-	return contextLink(&copy, "item", int64(item))
-}

@@ -5,7 +5,7 @@ Peers are deterministic protocol Fakes. --live-config selects real Lume/Guest
 boundaries with the same drive; no online accounts or websites are required.
 """
 import argparse
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager, nullcontext, closing
 import hashlib
 import json
 from pathlib import Path
@@ -109,7 +109,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                 (root/'config.yaml').write_text(json.dumps(config))
             artifact = h.command('artifact', 'save', 'private-fixture.txt', 'text/plain', text='private fixture bytes')
             def rows():
-                with sqlite3.connect(state) as db:
+                with closing(sqlite3.connect(state)) as db, db:
                     db.row_factory = sqlite3.Row
                     return [dict(r) for r in db.execute('SELECT * FROM tool_invocation ORDER BY created_at,rowid')]
 
@@ -127,7 +127,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                         release=root/'release-live-install'
                         release.unlink(missing_ok=True)
                         worker=h.hold('computer_ready',extra_flags=('-test-main-release',str(release)),timeout=240)
-                        with sqlite3.connect(state) as db:
+                        with closing(sqlite3.connect(state)) as db, db:
                             instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
                         from lume_live import Live
                         live=Live(live_root,'product',instance['native_name'])
@@ -141,7 +141,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                         release=root/'release-browser-doctor'
                         release.unlink(missing_ok=True)
                         worker=h.hold('computer_ready',extra_flags=('-test-main-release',str(release)),timeout=240)
-                        with sqlite3.connect(state) as db: instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
+                        with closing(sqlite3.connect(state)) as db, db: instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
                         from lume_live import Live
                         live=Live(live_root,'product',instance['native_name'])
                         target=live_root/'fixtures/steward25-browser-doctor.sh'
@@ -157,7 +157,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                         release=root/'release-browser-provision'
                         release.unlink(missing_ok=True)
                         worker=h.hold('computer_ready',extra_flags=('-test-main-release',str(release)),timeout=240)
-                        with sqlite3.connect(state) as db: instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
+                        with closing(sqlite3.connect(state)) as db, db: instance=json.loads(db.execute('SELECT instance_json FROM computer').fetchone()[0])
                         from lume_live import Live
                         live=Live(live_root,'product',instance['native_name'])
                         sources={'steward25-package.json':'guest-browser/package.json','steward25-package-lock.json':'guest-browser/package-lock.json','steward25-transfer.py':'internal/computer/macosvm/transfer.py','steward25-site.mjs':'tests/fixtures/computer-use-v1/site.mjs','steward25-provision.sh':'tests/fixtures/computer-use-v1/provision_browser.sh'}
@@ -176,7 +176,7 @@ def run(binary, live_config=None, live_root=None, work_root=None, native_only=Fa
                     if not pending: break
                     for a in pending:
                         before = rows()
-                        with sqlite3.connect(state) as db:
+                        with closing(sqlite3.connect(state)) as db, db:
                             target_id = db.execute('SELECT invocation_id FROM approval WHERE approval_id=?', (a['approval_id'],)).fetchone()[0]
                         target = next(i for i in before if i['invocation_id'] == target_id)
                         require(target['attempt_count'] == 0, 'effect dispatched before approval')
@@ -340,7 +340,7 @@ return {expired,pointer};
             require(output[-1]['value'] == 'APPROVAL_DENIED', 'denied input dispatched')
             output, _ = execute('guest-path-traversal-rejected', '''try{await cua.files.exportArtifact({path:"../private"});}catch(e){return e.code;}''')
             require(output[-1]['value'] == 'PERMISSION_DENIED', 'path traversal accepted')
-            with sqlite3.connect(state) as db:
+            with closing(sqlite3.connect(state)) as db, db:
                 requests=[json.loads(row[0]) for row in db.execute('SELECT request_json FROM model_generation')]
                 selected={ref for req in requests for message in req['messages'] for ref in message.get('image_refs',[])}
                 require(selected=={image_ref},'unselected observation entered model image context')

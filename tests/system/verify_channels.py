@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import selectors
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -89,8 +90,11 @@ class ChannelHarness(MainHarness):
         return self.http('/feishu/callback',raw,auth=False,headers={'X-Lark-Request-Timestamp':timestamp,'X-Lark-Request-Nonce':nonce,'X-Lark-Signature':digest if signature else 'forged'},expected=expected)
 
     def rows(self):
-        with sqlite3.connect(self.root/'data/state.db') as db:
+        with closing(sqlite3.connect(self.root/'data/state.db')) as db, db:
             db.row_factory=sqlite3.Row
+            # Observe deliveries and Runs in one snapshot; a reply may be
+            # enqueued between these reads while its Run becomes terminal.
+            db.execute('BEGIN')
             return {name:[dict(r) for r in db.execute(query)] for name,query in dict(
                 inputs='SELECT request_key,message_id,run_id FROM main_input ORDER BY sequence',
                 callbacks='SELECT * FROM channel_callback ORDER BY event_id',
@@ -170,7 +174,7 @@ def feishu_auth_lifecycle(binary, report):
             h.start()
             h.callback('managed-invalid-secret', 'This notification must fail before transport.')
             h.wait(lambda s: any(d['status'] == 'failed' for d in s['deliveries']), 'permanent credential failure has a durable diagnostic')
-            with sqlite3.connect(h.root / 'data/state.db') as db:
+            with closing(sqlite3.connect(h.root / 'data/state.db')) as db, db:
                 require(db.execute("SELECT last_error FROM delivery_request WHERE status='failed'").fetchone() == ('credentials_rejected',), 'credential failure code was not preserved')
             h.stop()
             with platform.lock:
@@ -285,7 +289,7 @@ def run(binary,evidence):
             require(len(effects)==1 and effects[0]['attempt_count']==1,'duplicate approved effect')
             frozen=json.loads(effects[0]['arguments_json'])
             require(frozen['target']=='alex.chen@example.test' and '2026-10-20 11:00' in frozen['text'],'wrong final recipient or date')
-            with sqlite3.connect(h.root/'data/effect-ledger.db') as db:
+            with closing(sqlite3.connect(h.root/'data/effect-ledger.db')) as db, db:
                 ledger=[dict(zip(('key','args','result'),r)) for r in db.execute('SELECT * FROM effects')]
             require(len(ledger)==1 and json.loads(ledger[0]['args'])==frozen,'external ledger disagrees with approved action')
             report['scenarios']['approval-restart']=dict(state=state,platform=platform.evidence(),effect_ledger=ledger)
@@ -333,7 +337,7 @@ def capability_settings(binary,evidence,report):
             h.http('/api/message',dict(source_id='capability-baseline',content=[dict(type='text',text='Owner configuration baseline.')]))
             h.wait(lambda state:state['deliveries'] and all(d['status']=='sent' for d in state['deliveries']),'baseline before configuration')
             def snapshots():
-                with sqlite3.connect(root/'data/state.db') as db:return dict((r[0],r[1:]) for r in db.execute('SELECT snapshot_id,tool_specs_hash,tools_json FROM capability_snapshot'))
+                with closing(sqlite3.connect(root/'data/state.db')) as db, db:return dict((r[0],r[1:]) for r in db.execute('SELECT snapshot_id,tool_specs_hash,tools_json FROM capability_snapshot'))
             frozen=snapshots();original=h.config.read_bytes()
             h.http('/settings/capabilities',auth=False,expected=401)
             h.http('/settings/capabilities/unknown',expected=404)
@@ -360,7 +364,7 @@ def capability_settings(binary,evidence,report):
             try:
                 h.wait(lambda state:len(state['deliveries'])==2 and all(d['status']=='sent' for d in state['deliveries']),'new request after restart')
             except RuntimeError as error:
-                with sqlite3.connect(root/'data/state.db') as db:
+                with closing(sqlite3.connect(root/'data/state.db')) as db, db:
                     diagnostic=db.execute("SELECT status,json_extract(checkpoint_json,'$.phase'),json_extract(checkpoint_json,'$.error') FROM run ORDER BY created_at").fetchall()
                 raise RuntimeError(str(error)+'; '+json.dumps(diagnostic)) from error
             after=snapshots();require(all(after.get(k)==v for k,v in frozen.items()),'restart rewrote old snapshots')
@@ -375,7 +379,7 @@ def capability_settings(binary,evidence,report):
 def native_trace_inspection(binary,evidence,report):
     """Actual Pi/HTTP retries, durable result reuse, and the tracing UI."""
     from http.server import ThreadingHTTPServer
-    from verify_local_provider import Endpoint
+    from provider_endpoint import Endpoint
     class TraceEndpoint(Endpoint):
         def do_POST(self):
             time.sleep(.04)
@@ -402,7 +406,7 @@ def native_trace_inspection(binary,evidence,report):
             h.wait(lambda state:any(r['worker_position']=='root' for r in state['runs']) and all(r['status'] in ('completed','failed','cancelled') for r in state['runs']) and all(d['status']=='sent' for d in state['deliveries']),'native trace completion')
             capture_state={}
             def captured(_):
-                with sqlite3.connect(h.root/'data/state.db') as db:
+                with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                     runs={r[0] for r in db.execute('SELECT run_id FROM run')}
                     physical=[r for r in server.requests if r.get('session') in runs and r['method']=='POST']
                     capture_state.update(physical=len(physical),phases=db.execute('SELECT phase,count(*) FROM dispatch_observation GROUP BY phase').fetchall(),generations=db.execute('SELECT status,count(*) FROM model_generation GROUP BY status').fetchall())
@@ -411,7 +415,7 @@ def native_trace_inspection(binary,evidence,report):
                 h.wait_state(captured,'all terminal HTTP observations persisted',timeout=10)
             except RuntimeError as error:
                 raise RuntimeError(str(error)+'; '+json.dumps(capture_state)) from error
-            with sqlite3.connect(h.root/'data/state.db') as db:
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                 generation,main=db.execute('SELECT generation_id,run_id FROM model_generation ORDER BY created_at LIMIT 1').fetchone()
                 before=[r['body'] for r in server.requests if r.get('session')==main and r['method']=='POST'][:2]
                 require(len(before)==2 and before[0]==before[1],'actual HTTP retry was not exercised')
@@ -428,7 +432,7 @@ def native_trace_inspection(binary,evidence,report):
             require(h.http('/api/developer/observations?'+urlencode(dict(run=main)))==tree,'completed trace changed across restart')
             h.env['STEWARD_NATIVE_TRACE_FACTS']=json.dumps(facts)
             h.browser(evidence.parent/'trace-ui','native-trace')
-            with sqlite3.connect(h.root/'data/state.db') as db:
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                 after={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in facts['counts']}
             require(after==facts['counts'],'browsing tracing mutated execution or observations')
             report['scenarios']['native-traces']=dict(read_only=True,actual_attempts=2,restart=True)
@@ -455,7 +459,7 @@ def inspection_relationships(binary, evidence, report):
             h.http('/api/message',dict(source_id='inspect-tree',content=[dict(type='text',text=plan([
                 dict(name='builtin__task_manage',arguments=dict(operation='create',task=root))]))]))
             def first_accepted(_):
-                with sqlite3.connect(h.root/'data/state.db') as db:
+                with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                     return db.execute("SELECT count(*) FROM model_generation WHERE status='completed'").fetchone()[0]==1
             h.wait_state(first_accepted,'accepted model result before checkpoint',timeout=10)
             h.stop(kill=True);h.start()
@@ -468,7 +472,8 @@ def inspection_relationships(binary, evidence, report):
             h.wait(lambda s:all(r['status'] in ('completed','failed','cancelled') for r in s['runs'])
                    and all(d['status']=='sent' for d in s['deliveries']), 'completed long context turn')
             def facts():
-                with sqlite3.connect(h.root/'data/state.db') as db:
+                with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
+                    db.execute('BEGIN')
                     return dict(runs=[dict(zip(('id','role','parent','root'),row)) for row in db.execute(
                         "SELECT run_id,CASE WHEN kind='main' THEN 'main' ELSE worker_position END,coalesce(parent_run_id,''),coalesce(root_run_id,'') FROM run ORDER BY created_at,run_id")],
                         task=db.execute('SELECT task_ref FROM task').fetchone()[0],
@@ -489,7 +494,7 @@ def inspection_relationships(binary, evidence, report):
                 ids.extend(r['run_id'] for r in page['items']);cursor=page.get('next','')
                 if not cursor:break
             require(len(ids)==len(set(ids))==len(original['runs']) and set(ids)=={r['id'] for r in original['runs']},'inspection pagination omitted or duplicated an execution')
-            with sqlite3.connect(h.root/'data/state.db') as db:
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                 first=db.execute('SELECT generation_id FROM model_generation WHERE run_id=? ORDER BY step_index LIMIT 1',(original['main'],)).fetchone()[0]
             audited=[json.loads(line) for line in (h.root/'data/fake-provider-calls.jsonl').read_text().splitlines()]
             require(sum(row['generation_id']==first for row in audited)==1,'accepted model result dispatched twice after recovery')
@@ -532,7 +537,7 @@ def inspect_frozen_context(h):
     h.http('/api/developer/rounds?run=missing',auth=False,expected=401)
     h.http('/api/developer/context?run=missing&step=0',expected=404)
     h.http('/api/developer/context?run=missing&step=-1',expected=400)
-    with sqlite3.connect(h.root/'data/state.db') as db:
+    with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
         frozen=db.execute('SELECT run_id,step_index,request_json,result_json,status FROM model_generation ORDER BY run_id,step_index').fetchall()
         for run in {row[0] for row in frozen}:
             rounds=h.http('/api/developer/rounds?'+urlencode(dict(run=run)))
@@ -617,7 +622,7 @@ def native_components(binary, evidence, report):
                 dict(schema_version=1,fallback='Untrusted projection fallback',components=[]),
                 dict(schema_version=99,fallback='Untrusted projection fallback',components=[]),
             ]
-            with sqlite3.connect(h.root/'data/state.db') as db:
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                 for message,spec in zip(messages,specs):
                     canonical=json.dumps(message,sort_keys=True,separators=(',',':'),ensure_ascii=False).replace('&','\\u0026').replace('<','\\u003c').replace('>','\\u003e')
                     identity=hashlib.sha256(canonical.encode()).hexdigest()
@@ -663,14 +668,14 @@ def delivery_leases(binary, report):
                 require(platform.send_started.wait(10), 'slow delivery did not reach platform')
                 competitor = None
                 if name == 'slow-send':
-                    with sqlite3.connect(h.root/'data/state.db') as db:
+                    with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                         # Renewal leaves updated_at/version unchanged. Derive
                         # the original expiry even if a heartbeat already ran.
                         initial_expiry, token = db.execute('SELECT d.updated_at+5000000,o.claim_token FROM delivery_outbox o JOIN delivery_request d USING(delivery_id)').fetchone()
                     h.wait(lambda _: time.time() > initial_expiry/1_000_000 + .1, 'past original claim expiry')
                     require(platform.evidence()['operations'][0]['finished_at'] is None, 'slow send finished before competing scan')
                     h.command('delivery', 'work')
-                    with sqlite3.connect(h.root/'data/state.db') as db:
+                    with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                         expiry, current = db.execute('SELECT claim_expires_at,claim_token FROM delivery_outbox').fetchone()
                     require(current == token and expiry > initial_expiry, 'competing consumer took a live renewed claim')
                     competitor = dict(same_owner=True, initial_expiry=initial_expiry, renewed_expiry=expiry)
@@ -697,7 +702,7 @@ def delivery_leases(binary, report):
             h.setup(); h.start()
             h.callback('lost-claim', 'Keep ingress alive if this transport loses its claim.')
             require(platform.send_started.wait(10), 'lost-claim send did not reach platform')
-            with sqlite3.connect(h.root/'data/state.db') as db:
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                 db.execute('UPDATE delivery_outbox SET claim_expires_at=0')
             h.command('delivery', 'work')
             h.wait(lambda s: s['deliveries'][0]['status'] == 'unknown', 'competing recovery query')
@@ -788,7 +793,7 @@ def extra_scenarios(binary,report):
                     h.wait(lambda s:len(s['runs'])>=3 and all(r['status']=='completed' for r in s['runs']),'Task completion')
                     h.http('/api/message',dict(source_id='wedding-update',content=[dict(type='text',text='Continue: wedding | Guests confirmed: 128. Preserve the checklist and ask before contacting the hotel.')]))
                     h.wait(lambda s:len([r for r in s['runs'] if r['kind']=='worker'])==2 and all(r['status']=='completed' for r in s['runs']) and len(s['deliveries'])==4 and all(d['status']=='sent' for d in s['deliveries']),'Task continuation')
-                    with sqlite3.connect(h.root/'data/state.db') as db:
+                    with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                         tasks=list(db.execute('SELECT task_id,anchor_task,task_epoch FROM task'))
                         instructions=list(db.execute('SELECT instruction FROM task_instruction'))
                     require(len(platform.evidence()['messages'])==3,'wedding notices did not use bound/default Feishu')
@@ -804,7 +809,7 @@ def extra_scenarios(binary,report):
                         h.wait(lambda s:len([r for r in s['runs'] if r['kind']=='worker' and r['status']=='completed'])==i-15 and len(s['deliveries'])==expected and all(d['status']=='sent' for d in s['deliveries']),'quiet threshold day')
                         require(len(platform.evidence()['messages'])==expected,'threshold notification storm')
                         h.stop()
-                    with sqlite3.connect(h.root/'data/state.db') as db:
+                    with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
                         require(db.execute("SELECT count(*) FROM task WHERE status='active'").fetchone()[0]==1,'ongoing monitor completed')
                     h.start();history=h.http('/api/conversation')
                 report['scenarios'][case]=dict(status='passed',state=h.rows(),conversation=history,platform=platform.evidence())

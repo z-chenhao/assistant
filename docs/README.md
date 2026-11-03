@@ -7,3 +7,4 @@
 - [跨功能运行时契约](designs/runtime-contracts.md)
 - [产品测试方案](test-plans/product.md)
 - [文档结构与维护规则](feature-map.md#文档维护规则)
+- [2026-11-03 工程审查与重构记录](engineering-review-2026-11-03.md)

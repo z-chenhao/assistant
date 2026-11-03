@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 import tempfile
 
@@ -18,7 +19,7 @@ from verify_tasks import state as task_state
 
 def state(h):
     value = task_state(h)
-    with sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db") as db:
+    with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
         db.row_factory = sqlite3.Row
         for name, query in {
             "child_links": "SELECT * FROM agent_invocation ORDER BY invocation_id",

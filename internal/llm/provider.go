@@ -180,4 +180,5 @@ type ModelProbe interface {
 	Run(context.Context, Profile) (ProbeResult, error)
 }
 
+//lint:ignore ST1005 Preserve the exported sentinel diagnostic text.
 var ErrNoBridge = errors.New("Provider Bridge is not configured; use explicit test injection for M0 fixtures")

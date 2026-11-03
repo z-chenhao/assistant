@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import selectors
 import signal
+from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
@@ -192,7 +193,7 @@ class MainHarness:
 
     def state(self):
         result = {}
-        with sqlite3.connect(Path(self.env["STEWARD_DATA_ROOT"]) / "state.db") as db:
+        with closing(sqlite3.connect(Path(self.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
             db.row_factory = sqlite3.Row
             for name, query in {
                 "runs": "SELECT run_id,kind,task_id,parent_run_id,root_run_id,task_epoch,depth,status,desired_state,model_snapshot_id,capability_snapshot_id,checkpoint_json,error_code,version FROM run ORDER BY created_at",
@@ -225,7 +226,7 @@ class MainHarness:
         path = Path(self.env['STEWARD_DATA_ROOT']) / 'state.db'
         if not path.exists():
             return {'database': 'not created'}
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             db.row_factory = sqlite3.Row
             queries = {
                 'runs': 'SELECT run_id,kind,depth,status,desired_state,wait_reason,error_code FROM run ORDER BY created_at DESC LIMIT 40',
@@ -365,7 +366,7 @@ def run(binary):
                     h.send("late", "late crash steering")
                 frozen = None
                 if boundary == "after_compaction_commit":
-                    with sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db") as db:
+                    with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
                         frozen = db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone()
                         require(frozen is not None and db.execute("SELECT count(*) FROM model_generation").fetchone()[0] == 0,
                                 "kill did not separate compaction and generation admission")
@@ -385,7 +386,7 @@ def run(binary):
                     if t["invocation_id"] in accepted_tools:
                         require(t == accepted_tools[t["invocation_id"]], "completed Tool replayed")
                 if frozen is not None:
-                    with sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db") as db:
+                    with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
                         require(db.execute("SELECT input_hash,messages_json FROM context_compaction WHERE step_index=0").fetchone() == frozen,
                                 "steering changed the frozen pre-admission context")
                 return {"boundary": boundary, "signal": "SIGKILL", "before": before, "after": after}
@@ -400,7 +401,7 @@ def run(binary):
             new_profile = h.setup("second-model")
             child.send_signal(signal.SIGTERM)
             child.communicate(timeout=15)
-            with sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db") as db:
+            with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
                 require(db.execute("SELECT status FROM run").fetchone()[0] == "running", "shutdown cancelled/lost business work")
             h.command("chat", "work")
             state = h.state()

@@ -78,16 +78,16 @@ func content(name, description, procedure string) []byte {
 }
 func Publish(ctx context.Context, c Config, id, name, description, procedure string) error {
 	if c.Validate() != nil || ctx.Err() != nil {
-		return invalid
+		return errInvalid
 	}
 	want := content(name, description, procedure)
 	front, e := parseMetadata(name, want)
 	if e != nil || front.Name != name || front.Description != description {
-		return invalid
+		return errInvalid
 	}
 	root, close, e := openCatalog(c, true)
 	if e != nil {
-		return invalid
+		return errInvalid
 	}
 	defer close()
 	entries, e := loadRoot(root, c.Scope)
@@ -98,63 +98,63 @@ func Publish(ctx context.Context, c Config, id, name, description, procedure str
 		if string(existing) == string(want) {
 			return nil
 		}
-		return invalid
+		return errInvalid
 	}
 	if len(entries) >= maxEntries {
 		return ErrCapacity
 	}
 	if _, e = root.Lstat(name); !os.IsNotExist(e) {
-		return invalid
+		return errInvalid
 	}
 	staging := ".steward-pending-" + id
 	if e = root.Mkdir(staging, 0700); e != nil && !os.IsExist(e) {
-		return invalid
+		return errInvalid
 	}
 	// A recoverable stage owns only SKILL.md. Reject unexpected resources or
 	// links instead of publishing a directory the bounded reader cannot load.
 	info, e := root.Lstat(staging)
 	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return invalid
+		return errInvalid
 	}
 	staged, e := root.Open(staging)
 	if e != nil {
-		return invalid
+		return errInvalid
 	}
 	files, readErr := staged.ReadDir(2)
 	staged.Close()
 	if readErr != nil && readErr != io.EOF || len(files) > 1 {
-		return invalid
+		return errInvalid
 	}
 	if len(files) == 1 {
 		if files[0].Name() != "SKILL.md" || !files[0].Type().IsRegular() {
-			return invalid
+			return errInvalid
 		}
 		if e = root.Remove(staging + "/SKILL.md"); e != nil {
-			return invalid
+			return errInvalid
 		}
 	}
 	if e = root.WriteFile(staging+"/SKILL.md", want, 0600); e != nil {
-		return invalid
+		return errInvalid
 	}
 	if e = root.Rename(staging, name); e != nil {
-		return invalid
+		return errInvalid
 	}
 	return nil
 }
 func Retire(c Config, id, name, description, procedure string) error {
 	root, close, e := openCatalog(c, true)
 	if e != nil {
-		return invalid
+		return errInvalid
 	}
 	defer close()
 	if old, e := readFile(root, name+"/SKILL.md"); e == nil {
 		if string(old) != string(content(name, description, procedure)) {
-			return invalid
+			return errInvalid
 		}
 		return root.Rename(name, ".steward-retired-"+id)
 	}
 	if old, e := readFile(root, ".steward-retired-"+id+"/SKILL.md"); e == nil && string(old) == string(content(name, description, procedure)) {
 		return nil
 	}
-	return invalid
+	return errInvalid
 }

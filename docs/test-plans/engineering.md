@@ -14,6 +14,10 @@ F-038：固定依赖和构建入口可用；文档改动只运行适用检查；
 
 F-039：`internal/agent/sqlite/foundation_test.go` 验证流暂停时状态查询与跨进程回收、Web Run 失败后的下一条请求、流式预览无逐片状态写入、trace 写失败诊断和内部错误 cause。`internal/app/runtime_test.go` 验证实际能力依赖修复后可重试且只发布成功 registry。Task/CodeMode 相关既有暂停、Child、重放、未知副作用和 SIGKILL 测试必须继续通过；使用 race 检查受影响并发边界。
 
+[渠道观察器回归](../../tests/harness/test_channels.py) 使用真实 SQLite WAL 连接，在两次查询之间提交 Run 完成和新投递，验证等待条件使用一致快照，并验证成功、查询异常均关闭连接。系统测试中的连接关闭继续保留事务提交/回滚语义。
+
+调度查询优化复用 `internal/agent/sqlite/scheduler_test.go` 的默认容量、跨进程额度、过期所有权和公平性回归，以及 capacity/scheduling system gates。容量 gate 在同一持久化目录执行三批各 1,000 个 Child，记录逐批耗时并检查唯一身份、既有并发上限、预设业务失败和租约回收；不新增不稳定的绝对时间断言。
+
 ## Go 模块化重构验收（F-040）
 
 | 范围 | 必须保持的行为 / 已有入口 |

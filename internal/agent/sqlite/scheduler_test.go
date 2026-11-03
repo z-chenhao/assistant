@@ -192,9 +192,9 @@ func TestSchedulerFairSecondTaskAndDurableTicket(t *testing.T) {
 		t.Fatal(err)
 	}
 	if id != second {
-		turn, err := r2.Claim(ctx, id)
-		if err != nil {
-			t.Fatal(err)
+		turn, claimErr := r2.Claim(ctx, id)
+		if claimErr != nil {
+			t.Fatal(claimErr)
 		}
 		if err := r2.Release(ctx, turn); err != nil {
 			t.Fatal(err)

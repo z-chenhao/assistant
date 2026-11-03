@@ -39,7 +39,6 @@ func newLayout(language string) *template.Template {
 		"contextSections": func() []string { return []string{"messages", "tools", "response", "provenance", "recall"} },
 		"contextURL":      contextURL,
 		"contextLink":     contextLink,
-		"diffLink":        diffLink,
 		"partEnd":         func(v *contextView) int { return v.Query.Offset + len(v.Frozen.Content) },
 	}).ParseFS(templates, "templates/*.html"))
 
