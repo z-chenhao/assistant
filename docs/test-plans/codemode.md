@@ -57,6 +57,16 @@ Computer fallback. The configured production [Computer](../designs/computer-use.
 [Computer Use](../features/computer-use.md) adapters have separate harnesses and provisioning
 requirements.
 
+The Code Mode and 100-child recovery gates select a 16,384-token fixture context
+window and keep the 1,024-token output limit. Their Main receives the current
+Tool catalog and explicit cell sources/results; recovery also retains eight
+approval notices before final delivery. An 8K window cannot always retain the
+protected input plus the minimum summary reserve. This workload-specific
+profile does not change production budgeting or the independent small-window
+compaction and rejection checks. The 37
+completed / 8 waiting / 55 remaining calls, exact approvals, dispatch counts,
+kill/restart variants and cancellation assertions remain unchanged.
+
 The report includes exact explicit outputs, nested invocation identities,
 source/Store/event readback, a real Child Worker result with inherited frozen
 model identity, approval rejection without Provider dispatch, schema version,
