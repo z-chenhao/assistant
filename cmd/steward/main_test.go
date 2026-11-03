@@ -17,7 +17,7 @@ func TestControlDiagnosticsSurviveUnavailableExecutionRuntime(t *testing.T) {
 	if err := os.WriteFile(cfg, []byte("version: 1\njavascript:\n  command: /missing/node\n  script: /missing/sidecar.mjs\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	for _, command := range [][]string{{"status"}, {"ops", "health"}, {"model", "list"}} {
+	for _, command := range [][]string{{"status"}, {"ops", "health"}, {"model", "list"}, {"task", "feedbacks"}} {
 		var out, errOut bytes.Buffer
 		if err := run(context.Background(), append([]string{"-config", cfg}, command...), strings.NewReader(""), &out, &errOut); err != nil {
 			t.Fatal("control command depended on execution runtime", command, err)

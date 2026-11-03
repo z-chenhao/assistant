@@ -32,9 +32,9 @@
 
 **需求**：用户能连接实际数据源与服务，支撑研究、日程、监控等具体工作。
 
-**当前实现**：已有本地 MCP 与配置型 Guest 浏览器基础；未形成统一远程认证连接及具体业务连接器体系。
+**当前实现**：已有本地 MCP 与配置型 Guest 浏览器基础；GitHub 精确 PR 监听可从 SecretStore 解析 PAT，经 `/user` 验证身份后读取评审及当前提交的 CI。凭据失效、来源失效、限流与协议错误通过安全状态码诊断；替换同一 SecretStore 引用中的 PAT 后下轮重试，无需将密钥复制到状态库。
 
-**边界与剩余工作**：按首个真实用户场景选择接入方式与服务，补连接、凭据生命周期、能力探测和可信结果核实。
+**边界与剩余工作**：此接入只读 GitHub.com 的一个明确 PR，不提供 Agent 服务工具、远程 OAuth MCP、自动签发/刷新 PAT 或授权写动作；统一连接与其他服务仍待实现。真实账户权限、PAT 到期恢复及实际平台结果需 Live 验证。
 
 **验收目标**：在明确服务上完成真实读取/授权动作/失效恢复；无凭据泄漏，审批及 unknown 语义保持一致。
 
@@ -46,9 +46,9 @@
 
 **需求**：用户授权监听实际工作来源后，外部评审、CI 等变化能可靠进入助手，断连恢复后仍能追溯接收与处理情况。
 
-**当前实现**：已有受限 MCP、飞书消息入口和内部事件唤醒；尚无上述环境事件监听与消费恢复闭环。F-025 的工具连接不等于持续监听。
+**当前实现**：显式配置一个 GitHub.com 仓库/PR 后，前台 Web/TUI/Automation 运行时持续读取 review comments、已提交 reviews 与当前 PR head 的已完成 check-runs。完整分页扫描后，将来源版本身份、观察内容、健康及补读成功时间原子保存到 `state.db`，通过 `github status/events` 查看；重复和乱序不重复保存同一来源版本，自身份的评论/评审不回流。
 
-**边界与剩余工作**：首个闭环建议选择一个 GitHub 仓库的评审评论和 CI 结果，并衔接已绑定飞书；具体接入方式待实现设计。仅接收显式授权范围，保存稳定来源身份、事件去重依据与补读位置；自身输出不循环触发，来源失效可见。凭据继续由 SecretStore 管理。
+**边界与剩余工作**：当前观察仅供本机只读诊断，不触发 Main、创建/接续 Task 或发送飞书通知，也不会将评审内容冒充用户授权。Main/Task/飞书关联消费仍未实现。补读重扫 GitHub 仍保留的当前资源；不保证已删除评论、扫描间消失的中间修改、旧 head 的 CI 或普通 issue comments/legacy commit statuses。每类至多扫描 20 页、每页 100 项；总规范化内容至多 8 MiB，超过界限显示 `HISTORY_LIMIT` 并保留原成功边界，不能称为完整审计流。
 
 **验收目标**：重复接收不重复接单；断连、重启、乱序和来源权限撤销后按明确边界恢复或停止；监听中断不展示为正常。接收信息不授予任务执行或外部动作权限。
 
@@ -56,7 +56,32 @@
 
 当前在配置中指定本地 MCP 可执行文件、独立目录和允许的工具及权限。启动时纳入冻结注册表，Agent 通过同一工具发现和执行入口使用。
 
-远程 OAuth MCP、邮件/日历等不能当成现成产品开关。真实服务优先级及连接方式在 F-025 实施前按用户场景确定。
+GitHub 监听使用以下显式配置；不要把 PAT 字面量写入 YAML。PAT 需要所选仓库的 Pull requests 和 Checks 读取权限，并能通过 `/user` 返回当前用户身份；SecretStore 支持操作系统凭据引用或显式环境引用。配置示例同 [config.example.yaml](../../config.example.yaml)。
+
+```yaml
+github:
+  repository: owner/repository
+  pull_number: 123
+  credential_ref: env:STEWARD_GITHUB_TOKEN
+  poll_seconds: 60
+```
+
+启动既有 `web serve`、TUI 或 `automation work` 的生产运行时即持续监听；不要求模型已就绪。`poll_seconds` 默认 60 秒，允许 5–3600 秒。配置变更在重启后生效；移除配置即不启动监听，当前命令不再展示旧范围为活动来源。仅配置 SecretStore 引用，不会自动选择模型。
+
+```sh
+steward -config /absolute/config.yaml github status
+steward -config /absolute/config.yaml github poll
+steward -config /absolute/config.yaml github events
+steward -config /absolute/config.yaml github events 101
+steward -config /absolute/config.yaml github stop
+steward -config /absolute/config.yaml github resume
+```
+
+`poll` 执行一次真实只读扫描并返回状态；失败返回非零，同时保留安全诊断。`events` 按 sequence 倒序最多 100 项，下一页传本页最小 sequence；正文最长 16 KiB，截断时明确提示沿来源 URL 读取全文。`status` 区分 `never_checked/checking/healthy/interrupted/stale/stopped/privacy_stopped/not_configured`；超过两倍轮询间隔的旧成功/进行中扫描显示 `stale`，不冒充仍正常监听。CLI 控制可在模型或执行依赖不可用时使用。
+
+`stop` 持久停止并 fencing 在途扫描，普通 `poll` 和重启不能恢复。Forget 同样停止原授权 epoch 的接收，并隐藏旧 epoch 观察；明确 `resume` 才更新接收意图。历史相同 event_key 不会因 resume 重新入库或暴露，只有此后尚未保存的来源版本进入当前观察。它不恢复 Task 或外部副作用。仓库名称对应的不可变 repository ID 改变时 fail closed，不把新仓库当原来源。
+
+远程 OAuth MCP、邮件/日历等不能当成现成产品开关。真实账户权限及 GitHub 保留历史的补读范围仍需独立验证。
 
 ## 详细操作参考
 

@@ -22,6 +22,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/interaction/feishu"
 	"github.com/z-chenhao/assistant/internal/interaction/web"
 	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/observer/github"
 	"github.com/z-chenhao/assistant/internal/recall/embedding"
 	"github.com/z-chenhao/assistant/internal/skill"
 	"github.com/z-chenhao/assistant/internal/tool/mcp"
@@ -32,6 +33,7 @@ type Config struct {
 	SourcePath string                `yaml:"-" json:"-"`
 	Web        *web.Config           `yaml:"web"`
 	Feishu     *feishu.Config        `yaml:"feishu"`
+	GitHub     *github.Config        `yaml:"github"`
 	Computer   *macosvm.Config       `yaml:"computer"`
 	Context    contextbuilder.Policy `yaml:"context"`
 	Memory     *memory.Config        `yaml:"memory"`
@@ -209,6 +211,11 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if cfg.Feishu != nil {
 		if err := cfg.Feishu.Validate(); err != nil {
+			return Config{}, err
+		}
+	}
+	if cfg.GitHub != nil {
+		if err := cfg.GitHub.Validate(); err != nil {
 			return Config{}, err
 		}
 	}

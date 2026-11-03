@@ -16,6 +16,7 @@ type taskChange struct {
 	scope                   artifact.Scope
 	agentID, conversationID string
 	reference, id           string
+	feedbackRef             string
 	status, receiptStatus   string
 	epoch, version, at      int64
 	artifactsJSON           string
@@ -60,6 +61,9 @@ func (t *tools) changeManagedTask(ctx context.Context, tx *sql.Tx, change *taskC
 		if revoked {
 			return tool.Failure("PERMISSION_DENIED"), nil
 		}
+	}
+	if change.request.Operation == "request_input" || change.request.Operation == "request_review" {
+		return t.requestTaskFeedback(ctx, tx, change)
 	}
 	if change.request.Operation == "complete" {
 		// Complete is a control action, not a stop/drain request.

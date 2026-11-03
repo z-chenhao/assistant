@@ -19,7 +19,7 @@ import (
 
 // Existing populated-version fixtures reconstruct their old schema before
 // reopening. Remove these new, empty indexes along with the later tables.
-const removeInspectionFixtureSchema = `DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; DROP TABLE IF EXISTS dispatch_observation; DROP INDEX IF EXISTS run_observation_root; DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
+const removeInspectionFixtureSchema = `DROP TRIGGER message_reply_source; ALTER TABLE message_route DROP COLUMN reply_source_id; DROP TABLE IF EXISTS task_feedback; DROP TABLE IF EXISTS github_observation; DROP TABLE IF EXISTS github_watch; DROP TABLE IF EXISTS dispatch_observation; DROP INDEX IF EXISTS run_observation_root; DROP INDEX run_inspection_created; DROP INDEX run_inspection_status; DROP INDEX run_inspection_task; DROP INDEX task_request_reference; `
 
 func TestInspectionUsesRealMainTaskRootChildCausality(t *testing.T) {
 	ctx := context.Background()
