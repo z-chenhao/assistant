@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
+	"github.com/z-chenhao/assistant/internal/evidence"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
 )
@@ -56,6 +57,8 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		Refs      []string `json:"artifactRefs"`
 		Delegate  bool     `json:"delegate"`
 		Draft     bool     `json:"draft"`
+		Offset    int64    `json:"offset"`
+		Limit     int      `json:"limit"`
 	}
 	user, _, _ = strings.Cut(user, "\nExplicit artifact references: ")
 	// Decode the plan, not the Host's human-readable media hint suffix.
@@ -91,6 +94,8 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		return call("mcp__fixture__large", map[string]any{})
 	case "read":
 		return call(artifacttools.Manage, map[string]any{"operation": "read", "artifactRef": request.Ref})
+	case "evidence":
+		return call(evidence.ToolName, evidence.Request{Ref: request.Ref, Offset: request.Offset, Limit: request.Limit})
 	case "publish":
 		return call(artifacttools.Manage, map[string]any{"operation": "publish", "artifactRefs": request.Refs})
 	case "list":

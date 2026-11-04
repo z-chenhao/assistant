@@ -13,6 +13,7 @@ type Policy struct {
 	// Host-frozen projection opt-in. Missing on older Runs means reference-only
 	// user images, preserving their accepted request bytes and replay hashes.
 	UserImages   bool    `yaml:"-" json:"user_images,omitempty"`
+	DOCXText     bool    `yaml:"-" json:"docx_text,omitempty"`
 	Threshold    float64 `yaml:"threshold_percentage" json:"threshold_percentage"`
 	Recent       int     `yaml:"recent_messages" json:"recent_messages"`
 	SummaryBytes int     `yaml:"summary_bytes" json:"summary_bytes"`

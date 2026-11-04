@@ -46,13 +46,15 @@
 
 **需求**：用户交付音视频或文档后，Agent 能获取适合任务的内容和来源。
 
-**当前实现**：附件运输与保存已有；消息投影主要提供引用，未形成统一解析/转写链路。
+**当前实现**：上传普通 DOCX 并随消息提交原文件引用后，Main 可显式调用 `builtin__evidence_read({ref,offset,limit})`。正文段落与表格单元格按文件顺序返回。每页保留原 Artifact ref，原文件可继续打开。页面的 `representation: "docx_text"` 表示偏移与总长度按提取后的 UTF-8 文本字节计；用 `next_offset` 继续。
 
-**边界与剩余工作**：按实际用户场景明确支持格式，补解析、转写或媒体工具及错误反馈；不以合成文件证明理解质量。
+**边界与剩余工作**：仅接受标准 DOCX MIME 和指向标准主文档部件的包。损坏或不支持的包返回 `INVALID_ARGUMENT`，超出预算返回 `RESOURCE_LIMIT`。正文读取无须 Office 或网络。音视频转写、其他文档格式、复杂版面与嵌入内容仍待验证或实现。
 
 **验收目标**：逐格式验证可获取的内容、原始文件关联、失败反馈和实际任务输出；质量由独立评测衡量。
 
 ## 如何使用
+
+CLI 可用 DOCX MIME 保存文件，再用 `chat send-parts` 的 `file` ContentPart 随消息提供引用。操作者也可将 `{"ref":"artifact:...","limit":4096}` 通过 stdin 交给 `steward evidence read` 检查文档文字。
 
 Web 的附件选择器可随文字提交文件。CLI 用 `steward artifact save NAME MEDIA_TYPE` 从 stdin 保存，随后用 `steward artifact describe REF` 或 `steward artifact open REF` 检查和读取。
 

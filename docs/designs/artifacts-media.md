@@ -17,7 +17,8 @@ flowchart TD
     I --> B["Bridge → 冻结视觉模型的图片输入"]
     A --> O["显式 image_ocr → 本地沙箱 Tesseract"]
     O --> T["文字预览 + 完整 JSON Artifact → Tool context"]
-    C -.-> P["音视频 / 文档解析：待补齐"]
+    A --> D["显式 evidence_read → DOCX 正文分页"]
+    C -.-> P["音视频 / 其他文档解析：待补齐"]
 ```
 
 ### 用户图片输入与职责边界（F-013）
@@ -41,6 +42,13 @@ Settings 的图片复选框只是候选声明；既有 Host 蓝色方块 Probe �
 - 通过共享 Executor/Code Mode/OutputStore 处理期限、并发、取消、错误和重放。已完成调用不重新识别；未完成的只读调用可按原冻结身份重试。OCR 不自动 publish，不写长期 Memory，不修改 system prompt，也不切换模型。返回的文字是低信任证据，空结果不证明图片没有文字或无需视觉分析。
 - 比较 [Codex view_image](https://github.com/openai/codex/blob/ce2d47bdc4dd2513d5b3567090593b07b0fdfa0a/codex-rs/core/src/tools/handlers/view_image.rs#L99)：它要求视觉模型并返回 InputImage，本链路没有 OCR 回退。借鉴统一媒体处理，保留 Steward 的 Artifact 引用和独立 OCR 语义。本增强不新增 feature 编号，也不把 OCR 质量评测放入 CI。
 
+### DOCX 正文证据（F-014）
+
+- 用户提供 DOCX Artifact ref 后，Main 与本地操作者可沿用证据读取。工具定义、输入 schema、角色、审批与授权均沿用现有入口。新 Run 在 `run_context_policy` 冻结 `docx_text:true`；缺失字段时沿用原二进制元数据结果，已提交调用照常复用。统一停止旧进程后再升级。
+- Host 按标准 DOCX MIME 选取私有解析器。读取同一授权 fd 并校验哈希，在 SQLite 事务外提取；返回前重检源文件存活、授权、claim 和隐私。结果是低信任 Tool 回执文本，正文和 ZIP 字节不另存为派生产物。没有 schema migration 或新 Tool。
+- ZIP 只打开三个固定部件。根关系必须唯一选择内部 `word/document.xml`，且内容类型声明为普通 Word 主文档。拒绝歧义部件、重定向或声明型 XML 实体，正常 XML 字符转义可以解码。只提取正文普通段落、直接表格单元格及超链接标签；换行分段或分行，Tab 分单元格。布局、样式、修订、嵌套表格、页眉页脚、绘图与其他嵌入内容不参与正文投影。解析器不加载关系目标、运行宏或渲染 Office。
+- ZIP 限 8 MiB、512 个条目、声明解压总量 32 MiB；主文档 XML 限 2 MiB，两个包描述 XML 各 64 KiB。实际打开的部件校验长度和 CRC，XML 限 64 层、每部件 200,000 个 token，完整提取文字限 256 KiB。页长 4–4096 字节，`docx_text` 表示按提取文本而非压缩包分页。每次请求从同一不可变源重新提取，省去另存全文或缓存的授权与清理协议。
+
 ### 短事务与文件所有权（F-039）
 
 ```mermaid
@@ -63,7 +71,7 @@ sequenceDiagram
 
 - **F-012**：Artifact 存储、哈希校验、发布选择、Task 引用与渠道文件入口已实现。 保存文件不等于理解内容；发布仅选择当前 Run 最终输出，不授予外部发送权限。
 - **F-013**：新 Run 将显式用户图片投影为 ImageRefs。Host 在 dispatch 时以当前 claim/隐私 fence 和 Run grant 读取、验证及缩图，通过既有 Bridge 送给冻结的视觉模型；文本模型保留引用并显式说明无像素，可另经默认本地 OCR 工具读取文字。
-- **F-014**：附件运输与保存已有；消息投影主要提供引用，未形成统一解析/转写链路。 按实际用户场景明确支持格式，补解析、转写或媒体工具及错误反馈；不以合成文件证明理解质量。
+- **F-014**：授权 DOCX 证据读取提供段落和普通表格文字，保留原文件引用。音视频、其他文档格式和复杂版面仍待覆盖。
 
 ## 代码与依赖
 
@@ -73,6 +81,7 @@ sequenceDiagram
 - [internal/agent/messages.go](../../internal/agent/messages.go)
 - [internal/agent/sqlite/images.go](../../internal/agent/sqlite/images.go)
 - [internal/agent/sqlite/image_ocr.go](../../internal/agent/sqlite/image_ocr.go)
+- [internal/media/docx/text.go](../../internal/media/docx/text.go)
 - [internal/media/image.go](../../internal/media/image.go)
 - [internal/media/ocr/engine.go](../../internal/media/ocr/engine.go)
 - [internal/computer/sandbox/process.go](../../internal/computer/sandbox/process.go)
