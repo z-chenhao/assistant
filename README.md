@@ -46,8 +46,9 @@ cd steward
 
 First launch in a terminal guides model setup. Choose a provider, probe it and
 confirm the model before starting work. `/setup` repairs a connection, `/models`
-lists profiles and `/quit` exits. ChatGPT sign-in requires the native macOS
-Keychain build; other platforms can use a local endpoint or an explicit API-key
+lists profiles and `/quit` exits. ChatGPT sign-in uses native cgo builds with macOS
+Keychain or Linux libsecret and an unlocked Secret Service keyring. Other builds
+can use a local endpoint or an explicit API-key
 environment reference. Never paste credentials into YAML or issues.
 
 The installer creates a versioned runtime under `~/.local/lib/steward` and a

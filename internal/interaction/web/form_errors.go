@@ -74,6 +74,9 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 	if errors.Is(cause, llm.AuthRequired) {
 		p.Error = "This provider needs authentication. Reconnect the account and verify the model."
 	}
+	if errors.Is(cause, llm.ErrSecretStore) || errors.Is(cause, llm.ErrSecretCleanup) {
+		p.Error = credentialStoreHelp
+	}
 	if errors.Is(cause, llm.ModelIncompatible) {
 		p.Error = "The model did not pass compatibility checks. Check the selected model and its declared capabilities."
 	}

@@ -42,6 +42,8 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
+func NativeBackend() (string, bool) { return "macOS Keychain", true }
+
 func get(ctx context.Context, ref string) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, llm.ErrSecretStore

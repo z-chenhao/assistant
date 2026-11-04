@@ -69,6 +69,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 	default:
 		s.mu.Lock()
 		p.Auth = s.auth
+		p.AuthError = s.authError
 		p.AccountID = s.accountID
 		s.mu.Unlock()
 		p.Settings = &settingsView{}

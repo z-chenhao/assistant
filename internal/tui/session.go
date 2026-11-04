@@ -412,6 +412,7 @@ func (u *terminal) command(ctx context.Context, line string) error {
 	case len(args) == 2 && args[0] == "/select":
 		return u.selectModel(ctx, args[1])
 	case len(args) <= 2 && args[0] == "/login":
+		u.print("Credentials use macOS Keychain or Linux Secret Service. Unlock your login keyring before signing in; Linux requires libsecret and a Secret Service keyring.")
 		id := ""
 		if len(args) == 2 {
 			id = args[1]
@@ -494,6 +495,7 @@ func (u *terminal) setup(ctx context.Context) error {
 			u.print("Catalog unavailable. Enter a model ID manually; Probe is still required.")
 		}
 	case "2":
+		u.print("Credentials use macOS Keychain or Linux Secret Service. Unlock your login keyring before signing in; Linux requires libsecret and a Secret Service keyring.")
 		p.ProviderKind, p.WireAPI = "openai_account", "openai_responses"
 		id, err := u.ask(ctx, "Account ID [blank for new ChatGPT login]")
 		if err != nil {

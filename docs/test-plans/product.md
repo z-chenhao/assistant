@@ -144,6 +144,11 @@ launcher failure, missing reports or source/binary drift reject success. Local
 loopback peers, disposable databases and pinned runtimes make the checks account-free.
 Test output stays in ignored `evidence/`; credentials and personal data stay out.
 
+Ubuntu checks additionally runs the account harness with `--native-secret-service`.
+It owns a private session bus and disposable Linux keyring; the ordinary `account`
+gate keeps its independent in-memory SecretStore. Commands and proof limits are
+in the [model connection test plan](model-connections.md#linux-原生账户回归).
+
 <a id="testing-system-coverage"></a>
 
 ### System coverage

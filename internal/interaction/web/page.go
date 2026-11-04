@@ -49,6 +49,7 @@ type page struct {
 	Profiles                                          []llm.Profile
 	SourceID                                          string
 	Auth                                              llm.AuthState
+	AuthError                                         string
 	AccountID                                         string
 	Draft                                             string
 	DraftTask                                         *taskContext
@@ -81,6 +82,7 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	}
 	s.mu.Lock()
 	p.Auth = s.auth
+	p.AuthError = s.authError
 	p.AccountID = s.accountID
 	s.mu.Unlock()
 	switch p.View {

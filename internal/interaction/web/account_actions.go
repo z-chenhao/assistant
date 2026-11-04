@@ -2,10 +2,13 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/z-chenhao/assistant/internal/llm"
 )
+
+const credentialStoreHelp = "The credential store is unavailable. Unlock your login keyring and try again. On Linux, install libsecret and a Secret Service keyring."
 
 func (s *Server) startLogin(r *http.Request) error {
 	if s.Accounts == nil {
@@ -23,6 +26,7 @@ func (s *Server) startLogin(r *http.Request) error {
 	ctx, cancel := context.WithCancel(lifetime)
 	s.authCancel = cancel
 	s.auth = llm.AuthState{Status: "pending", Events: []llm.AuthEvent{}}
+	s.authError = ""
 	s.accountID = ""
 	done := make(chan struct{})
 	s.authDone = done
@@ -40,6 +44,9 @@ func (s *Server) startLogin(r *http.Request) error {
 		s.auth.Status = "connected"
 		if e != nil {
 			s.auth.Status = "reauth_required"
+			if errors.Is(e, llm.ErrSecretStore) || errors.Is(e, llm.ErrSecretCleanup) {
+				s.authError = credentialStoreHelp
+			}
 		}
 		s.accountID = a.ConnectionID
 	}()
