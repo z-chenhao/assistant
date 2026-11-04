@@ -207,7 +207,8 @@ func (l *agentLoop) modelTurn(r Run) (bool, error) {
 			}
 			l.publish(start)
 		}
-		callCtx, cancel := context.WithTimeout(l.execution, 45*time.Second)
+		// Give the Bridge's 180-second generation budget time to report its outcome.
+		callCtx, cancel := context.WithTimeout(l.execution, 195*time.Second)
 		stopDiscard := l.discardOnCancel(callCtx)
 		generate := l.options.Provider.Generate
 		if cp.Step > 0 {

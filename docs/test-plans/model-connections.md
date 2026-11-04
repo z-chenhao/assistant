@@ -84,3 +84,5 @@ python3 tests/system/verify_account.py --binary bin/steward --native-secret-serv
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+Node Bridge 的 `independent generation deadlines abort the right phase` 回归并行覆盖 30 秒无响应头、HTTP 200 或 HTTP 400 后 90 秒无响应数据、持续流动到 180 秒总上限，以及收到 HTTP 200 后静默 32 秒仍能完成。检查对应的诊断阶段、错误或完成结果。Go Loop 回归验证实际派发的 context 为 Bridge 总预算和清理留足时间。

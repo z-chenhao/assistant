@@ -202,8 +202,9 @@ inbox, independently of model readiness. Reading semantic history alone does not
 imply a message was accepted by the channel.
 
 SIGINT/SIGTERM stops admission to the current executor and waits for its current
-model/Tool step to reach a durable boundary. Model calls have a 45-second Host
-deadline; the Node Bridge also owns its existing stream deadline. The executor
+model/Tool step to reach a durable boundary. Model calls have a 195-second Host
+deadline. The Node Bridge enforces a 180-second generation budget and separate
+header and stream inactivity limits. The executor
 releases the claim while retaining the nonterminal Run state, without cancelling business work. Run `chat work` again to
 continue. SIGKILL leaves the lease to expire; a newly started `chat work` waits
 and reclaims automatically. No broker is needed for this bounded CLI drain:
@@ -212,6 +213,8 @@ state is authoritative, and Outbox notifications remain available to the relay.
 ## Prompt 与工作状态装配
 
 初始上下文统一由 [agent/context.go](../../internal/agent/context.go) 根据 Main/Root/Child 位置和冻结 Tool specs 生成。共享安全与证据原则、角色职责、执行状态、能力操作规则及有来源的项目/Skill 资源分区保存；没有把个人助手改成 coding agent，也没有给 Main 增加 Child 创建能力。
+
+新 Main 依次保存 `main_role`、`safety`、`execution` 和可用的 `capabilities`。Bridge 保持该顺序，将各段合为一条系统消息。已冻结的请求按其原顺序回放。
 
 Main 的原始 Conversation 仍保存用户语义历史。新 Main 额外交接最近 Main 的工作状态、获准读取的摘要原文和顶层工具回执；未知效果是独立 Host 事实。来源在 [sqlite/handoff.go](../../internal/agent/sqlite/handoff.go) 选择，接受 Forget 前的执行内容被排除。
 

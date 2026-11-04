@@ -17,6 +17,9 @@ const hash = endpoint => createHash('sha256').update(JSON.stringify({ endpoint }
 const active = new Map();
 let initialized = false;
 const accountAuth = new AccountAuth();
+const responseHeadersMs = 30_000;
+const responseIdleMs = 90_000;
+const generationDeadlineMs = 180_000;
 
 function endpoint(value) {
   const u = new URL(value);
@@ -26,7 +29,7 @@ function endpoint(value) {
 
 // Pi's SDK requires a nonempty constructor key. The transport owns Authorization:
 // the SDK-only placeholder is always removed before any network request.
-function transport(connection, signal, state, observe=()=>{}) {
+function transport(connection, signal, state, observe=()=>{}, generation) {
   const base = endpoint(connection.endpoint);
   return async (input, init = {}) => {
     const u = new URL(typeof input === 'string' ? input : input.url ?? input.toString());
@@ -42,11 +45,16 @@ function transport(connection, signal, state, observe=()=>{}) {
       if(requestSignal.aborted)fail('GENERATION_CANCELLED');
       try {
         observe('started',attemptID,init.body);
-        response = await fetch(u, { ...init, headers, signal:requestSignal, redirect: 'manual' });
+        const headerTimer=generation && setTimeout(()=>generation.expire('header_timeout',attemptID),responseHeadersMs);
+        try {
+          response = await fetch(u, { ...init, headers, signal:requestSignal, redirect: 'manual' });
+        } finally {
+          clearTimeout(headerTimer);
+        }
         observe('headers',attemptID,null,response.status);
       } catch (error) {
-        observe('error',attemptID,null,0,signal.aborted?'GENERATION_CANCELLED':'PROVIDER_UNAVAILABLE');
-        if (signal.aborted) fail('GENERATION_CANCELLED');
+        observe('error',attemptID,null,0,state.code ?? (signal.aborted?'GENERATION_CANCELLED':'PROVIDER_UNAVAILABLE'));
+        if (signal.aborted) fail(state.code ?? 'GENERATION_CANCELLED');
         if (attempt < 2 && ['ECONNRESET','ECONNREFUSED','EPIPE','ETIMEDOUT','EAI_AGAIN','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET'].includes(error.cause?.code)) { await delay(50 * 2 ** attempt, undefined, { signal }); continue; }
         state.code = 'PROVIDER_UNAVAILABLE'; fail(state.code);
       }
@@ -56,30 +64,49 @@ function transport(connection, signal, state, observe=()=>{}) {
       if ([429, 502, 503, 504].includes(response.status) && attempt < 2) {
         await response.body?.cancel(); await delay(50 * 2 ** attempt, undefined, { signal }); continue;
       }
+      let idleTimer;
+      const clearIdleTimer=()=>clearTimeout(idleTimer);
+      const resetIdleTimer=()=>{
+        if(!generation)return;
+        clearIdleTimer();
+        idleTimer=setTimeout(()=>generation.expire('stream_idle_timeout',attemptID),responseIdleMs);
+      };
+      let received=0;
+      const recordBodyData=value=>{
+        if(!value.byteLength)return;
+        if(received===0)observe('first_body',attemptID);
+        received+=value.byteLength;
+        resetIdleTimer();
+      };
+      if(generation)generation.clearIdle=clearIdleTimer;
       if (!response.ok) {
         // Inspect only a bounded, allowlisted machine code; never expose the body.
         let machineCode;
         if ([400,422].includes(response.status) && response.body) {
-          const reader=response.body.getReader(); let size=0; const chunks=[];
-          try { for (;;) {const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>8192)break;chunks.push(value);} if(size<=8192)machineCode=JSON.parse(Buffer.concat(chunks).toString('utf8'))?.error?.code; } catch {} finally {await reader.cancel();}
+          const reader=response.body.getReader(); const chunks=[];
+          resetIdleTimer();
+          try { for (;;) {const {value,done}=await reader.read();if(done)break;recordBodyData(value);if(received>8192)break;chunks.push(value);} if(received<=8192)machineCode=JSON.parse(Buffer.concat(chunks).toString('utf8'))?.error?.code; } catch {} finally {clearIdleTimer();await reader.cancel();}
         } else await response.body?.cancel();
+        if (signal.aborted) fail(state.code ?? 'GENERATION_CANCELLED');
         state.code = ({401:'AUTH_REQUIRED',403:'AUTH_REQUIRED',404:'MODEL_NOT_FOUND',413:'CONTEXT_LENGTH_EXCEEDED',429:'RATE_LIMITED',500:'PROVIDER_UNAVAILABLE',502:'PROVIDER_UNAVAILABLE',503:'PROVIDER_UNAVAILABLE',504:'PROVIDER_UNAVAILABLE'})[response.status] ?? 'MODEL_INCOMPATIBLE';
         if (machineCode === 'context_length_exceeded') state.code='CONTEXT_LENGTH_EXCEEDED';
         fail(state.code);
       }
       // Bound raw SSE before Pi can accumulate a partial JSON/tool argument buffer.
-      const reader=response.body.getReader(); let received=0;
+      const reader=response.body.getReader();
+      if(generation)generation.attempt=attemptID;
+      resetIdleTimer();
       return new Response(new ReadableStream({
         async pull(controller) {
           try {
             const {value,done}=await reader.read();
-            if(done){controller.close();return;}
-            received+=value.byteLength;
-            if(received>4<<20){state.code='INVALID_PROVIDER_RESPONSE';await reader.cancel();controller.error(new Error(state.code));return;}
+            if(done){clearIdleTimer();controller.close();return;}
+            recordBodyData(value);
+            if(received>4<<20){clearIdleTimer();state.code='INVALID_PROVIDER_RESPONSE';await reader.cancel();controller.error(new Error(state.code));return;}
             controller.enqueue(value);
-          } catch {state.code ??= 'INVALID_PROVIDER_RESPONSE';controller.error(new Error(state.code));}
+          } catch {clearIdleTimer();state.code ??= 'INVALID_PROVIDER_RESPONSE';controller.error(new Error(state.code));}
         },
-        cancel(reason){return reader.cancel(reason);}
+        cancel(reason){clearIdleTimer();return reader.cancel(reason);}
       }),{status:response.status,headers:response.headers});
     }
   };
@@ -162,8 +189,30 @@ async function generate(r, job, send) {
   const event = (kind, rest = {}) => { if (!job.cancelled) { send({jsonrpc:'2.0',method:'generation.event',params:{generation_id:r.generation_id,sequence:sequence+1,kind,...rest}}); sequence++; } };
   const s = r.model_snapshot;
   const state = {};
-  // The SDK timer ends at response headers. This deadline owns the entire generation.
-  const deadline = setTimeout(()=>{state.code='PROVIDER_UNAVAILABLE';job.controller.abort();},30000);
+  const observe = wireObserver(r,send);
+  const generation = {
+    attempt: undefined,
+    expire(phase, attempt) {
+      if(job.controller.signal.aborted)return;
+      observe(phase,attempt);
+      state.code='PROVIDER_UNAVAILABLE';
+      job.controller.abort();
+    },
+  };
+  // This bound includes account catalog lookup, fetch attempts and the entire stream.
+  const deadline = setTimeout(()=>generation.expire('generation_deadline','generation'),generationDeadlineMs);
+  let outputObserved = false;
+  const firstOutput = phase => {
+    if(outputObserved)return;
+    outputObserved = true;
+    observe(phase,generation.attempt);
+  };
+  let terminalObserved = false;
+  const observeTerminal = () => {
+    if(terminalObserved)return;
+    terminalObserved = true;
+    observe('stream_terminal',generation.attempt);
+  };
   try {
     const isAccount=s.provider_kind==='openai_account';
     if (isAccount) {
@@ -176,19 +225,21 @@ async function generate(r, job, send) {
     const model = {id:s.model_id,name:s.model_id,api:'openai-completions',provider:'steward-local',baseUrl:r.connection.endpoint,reasoning:false,input:s.capabilities?.image_input?['text','image']:['text'],contextWindow:s.context_window,maxTokens:s.max_output_tokens,cost:{input:0,output:0,cacheRead:0,cacheWrite:0},compat:{supportsStore:false,supportsDeveloperRole:false,supportsReasoningEffort:false,supportsUsageInStreaming:false,supportsStrictMode:false,maxTokensField:'max_tokens',sendSessionAffinityHeaders:true,sessionAffinityFormat:'openai',supportsLongCacheRetention:false}};
     // Optional compatibility and sampling stay conservative until individually probed.
     if(isAccount) {model.api='openai-responses';model.provider='openai';model.baseUrl=API;model.compat={supportsDeveloperRole:false,supportsStrictMode:false,supportsMaxOutputTokens:false};}
-    const guardedFetch=transport(r.connection,job.controller.signal,state,wireObserver(r,send));
+    const guardedFetch=transport(r.connection,job.controller.signal,state,observe,generation);
     const fetcher=isAccount ? async(input,init)=>{
       const body=JSON.parse(init.body);
       if(body.tools?.length) body.tools=[{type:'namespace',name:'steward',description:'Steward tools',tools:body.tools}];
       return guardedFetch(input,{...init,body:JSON.stringify(body)});
     } : guardedFetch;
-    const events = (isAccount ? accountStream : stream)(model, normalizeContext(context(r, model)), { apiKey:r.connection.access_token || r.connection.api_key || 'sdk-constructor-only', cacheRetention:isAccount?'none':undefined, fetch:fetcher, signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, timeoutMs:30000, onProviderStreamEvent:e=>{
+    const events = (isAccount ? accountStream : stream)(model, normalizeContext(context(r, model)), { apiKey:r.connection.access_token || r.connection.api_key || 'sdk-constructor-only', cacheRetention:isAccount?'none':undefined, fetch:fetcher, signal:job.controller.signal, sessionId:r.session_id, maxTokens:s.max_output_tokens, maxRetries:0, onProviderStreamEvent:e=>{
+      const choice = Array.isArray(e?.choices) ? e.choices[0] : undefined;
+      if(isAccount ? ['response.completed','response.incomplete','response.failed','error'].includes(e.type) : choice?.finish_reason) observeTerminal();
       if(isAccount && e.type==='response.completed') {
         state.completedSeen=true;
         if(e.response?.usage){const u=e.response.usage;if(!Number.isSafeInteger(u.input_tokens)||!Number.isSafeInteger(u.output_tokens)||u.input_tokens<0||u.output_tokens<0)fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}
       }
       if(isAccount && ['response.incomplete','response.failed','error'].includes(e.type)) state.code=e.response?.error?.code==='invalid_api_key'?'AUTH_REQUIRED':'INVALID_PROVIDER_RESPONSE';
-      if(!isAccount && e.usage) {if(!Number.isSafeInteger(e.usage.prompt_tokens) || !Number.isSafeInteger(e.usage.completion_tokens) || e.usage.prompt_tokens<0 || e.usage.completion_tokens<0) fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}} });
+      if(!isAccount && e?.usage) {if(!Number.isSafeInteger(e.usage.prompt_tokens) || !Number.isSafeInteger(e.usage.completion_tokens) || e.usage.prompt_tokens<0 || e.usage.completion_tokens<0) fail('INVALID_PROVIDER_RESPONSE');state.usageSeen=true;}} });
     let terminal = false;
     let count = 0, bytes = 0, tools = 0;
     for await (const e of events) {
@@ -197,16 +248,19 @@ async function generate(r, job, send) {
       if (e.type === 'text_delta') {
         bytes += Buffer.byteLength(e.delta);
         if (bytes > 1 << 20) fail('INVALID_PROVIDER_RESPONSE');
+        if(e.delta)firstOutput('first_text');
         event('text_delta',{text:e.delta});
       } else if (e.type === 'toolcall_end') {
         // Pi substitutes {} on parse failure; its diagnostic includes unsafe raw input.
         if(e.toolCall.argumentsError !== undefined || e.toolCall.arguments === null || typeof e.toolCall.arguments !== 'object' || Array.isArray(e.toolCall.arguments)) fail('INVALID_PROVIDER_RESPONSE');
         const argumentsJSON=JSON.stringify(e.toolCall.arguments);
         if(++tools>32 || Buffer.byteLength(argumentsJSON)>65536) fail('INVALID_PROVIDER_RESPONSE');
+        firstOutput('first_tool_call');
         event('tool_call',{tool_call:{id:e.toolCall.id,name:e.toolCall.name,arguments:argumentsJSON}});
       }
       else if (e.type === 'done') {
         if(isAccount && !state.completedSeen) fail(state.code ?? 'INVALID_PROVIDER_RESPONSE');
+        if(!isAccount)observeTerminal();
         terminal = true;
         const u = e.message.usage;
         event('completed',{...(state.usageSeen ? {usage:{input_tokens:u.input,output_tokens:u.output,cache_read_tokens:u.cacheRead,cache_write_tokens:u.cacheWrite}} : {}),latency_ms:Math.ceil(performance.now()-started)});
@@ -220,6 +274,7 @@ async function generate(r, job, send) {
     event('error',{error_code:state.code ?? safe(e)});
   } finally {
     clearTimeout(deadline);
+    generation.clearIdle?.();
     job.controller.abort();
     active.delete(r.generation_id);
     r.connection = undefined;

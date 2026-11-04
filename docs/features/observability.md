@@ -74,7 +74,7 @@ Developer 的 Database 页面提供独立的[只读元数据检查](database.md)
 
 1. 按角色、状态和 UTC 创建时间筛选 Trace；起点包含、终点不包含。点击 Session 查看同一 Conversation 的相关 Trace。
 2. 点击 Main 或 Root，进入独立 `/developer/observability/{run}` 详情。左侧 **Trace tree** 的每个节点与时间线条对齐，右侧为 **Observation details**；返回 Traces 保留列表条件。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
-3. Generation 的 Overview 展示有界消息和响应；**Context** 是完整 messages / tools / response / provenance / recall 的唯一阅读器，支持 JSON、来源与长正文连续读取；**Requests** 查看最终 HTTP 请求；存在前一轮时才显示 **Compare**。技术字段收进 **Technical metadata** 折叠区。HTTP 节点只提供 Overview / Requests；其他类型只显示适用内容。
+3. Generation 的 Overview 展示有界消息、响应和模型请求时间线。时间线显示响应头、首段响应数据、首段可见文本或首个工具调用、响应流终止事件，并区分等待响应头超时、响应流空闲和整轮超时。**Context** 是完整 messages / tools / response / provenance / recall 的阅读器，支持 JSON、来源与长正文连续读取。**Requests** 查看最终 HTTP 请求。存在前一轮时显示 **Compare**。HTTP 节点提供 Overview / Requests。
 4. 选择 Tool、Retriever、等待或 HTTP 节点，核对各自保存的数据和时间语义。API/Page 不提供重试、重放、审批或取消动作；无 JavaScript 时原生导航、筛选和分页仍然可用。
 5. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Tasks 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
 

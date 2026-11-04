@@ -21,13 +21,17 @@ import (
 )
 
 type loopProvider struct {
-	store    *Store
-	mu       sync.Mutex
-	requests []llm.GenerationRequest
-	respond  func(llm.GenerationRequest) (llm.GenerationResult, error)
+	store      *Store
+	mu         sync.Mutex
+	requests   []llm.GenerationRequest
+	respond    func(llm.GenerationRequest) (llm.GenerationResult, error)
+	onGenerate func(context.Context)
 }
 
 func (p *loopProvider) Generate(ctx context.Context, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (llm.GenerationResult, error) {
+	if p.onGenerate != nil {
+		p.onGenerate(ctx)
+	}
 	p.mu.Lock()
 	p.requests = append(p.requests, r)
 	p.mu.Unlock()
@@ -118,6 +122,24 @@ func scalar(t *testing.T, s *Store, query string, args ...any) int {
 		t.Fatal(err)
 	}
 	return n
+}
+
+func TestLoopHostLeavesRoomForBridgeGenerationAndCleanup(t *testing.T) {
+	_, _, _, actor, provider := loopFixture(t)
+	provider.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
+		return llm.GenerationResult{Text: "done"}, nil
+	}
+	var budget time.Duration
+	provider.onGenerate = func(ctx context.Context) {
+		if deadline, ok := ctx.Deadline(); ok {
+			budget = time.Until(deadline)
+		}
+	}
+	mustSubmit(t, actor, "provider-budget", "check the generation deadline")
+	mustDrain(t, actor)
+	if budget < 185*time.Second {
+		t.Fatalf("generation budget %v cannot cover the Bridge's 180-second deadline and cleanup", budget)
+	}
 }
 
 func TestLoopConcurrentIngressOneMainAndIdempotentConversation(t *testing.T) {

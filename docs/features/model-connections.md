@@ -249,14 +249,15 @@ and sends a Bearer header only when the user supplied an actual key.
 
 The transport retries connection failures or HTTP 429/502/503/504 at most twice,
 with 50/100 ms delays, before a response stream is accepted. It does not retry
-partial streams, malformed events, auth errors, or model incompatibility. Requests
-use a 30-second absolute Bridge deadline across fetch, retries, and response-body
-consumption, independently of the SDK header timeout. A deadline aborts HTTP and
-returns PROVIDER_UNAVAILABLE, with no completed result or stream retry. The Host
-Probe uses a separate 25-second deadline per capability check and independent
-one-second cleanup contexts. Its fixed stage diagnostics distinguish a deadline
-from expected cancellation. This leaves cleanup headroom before the unchanged
-30-second generation bound. Direct Cancel/Dispose RPCs retain their five-second
+partial streams, malformed events, auth errors, or model incompatibility.
+Each generation HTTP attempt has 30 seconds to receive headers. After headers,
+90 seconds without response-body data ends the stream. The Bridge also applies a
+180-second absolute deadline that includes account catalog lookup, attempts and
+stream consumption. The Host allows 195 seconds for the generation RPC.
+A Bridge timeout aborts HTTP and returns PROVIDER_UNAVAILABLE. The generation's
+Overview distinguishes the three timeout phases. The Host Probe has its own
+25-second deadline per capability check and independent one-second cleanup
+contexts. Direct Cancel/Dispose RPCs have a five-second
 bound. The error body is discarded,
 except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
 context-length classification. SDK console sinks are disabled because malformed

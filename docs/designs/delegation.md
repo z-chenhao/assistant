@@ -483,7 +483,7 @@ It is frozen in `run_tree` at Root creation, including for descendants. Exceedin
 it fails that Worker with `RESOURCE_LIMIT`; the Parent can aggregate other items.
 Depth, descendant and tree Tool-call ceilings retain their existing defaults.
 There is no cumulative business-failure cutoff or tree token/cost/time cutoff.
-Model calls retain a 45-second timeout and Tools retain their frozen timeout.
+Model calls have a 195-second Host budget and Tools use their frozen timeout.
 These are per-operation watchdogs, not a total Task duration limit.
 
 Provider usage acceptance also updates a durable infrastructure-error streak.

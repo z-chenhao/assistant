@@ -212,7 +212,7 @@ func TestGitHubRuleMigrationPreservesLegacyBindingAndPendingObservation(t *testi
 	a.Store = upgraded.Runs(r.history, r.registry)
 	p.store = upgraded
 	mustDrain(t, a)
-	if scalar(t, upgraded, `PRAGMA user_version`) != 41 ||
+	if scalar(t, upgraded, `PRAGMA user_version`) != SchemaVersion() ||
 		scalar(t, upgraded, `SELECT count(*) FROM github_task_followup WHERE state='continued'`) != 1 ||
 		scalar(t, upgraded, `SELECT count(*) FROM github_rule_decision`) != 0 {
 		t.Fatal("migration lost existing automatic behavior or inferred a new rule")

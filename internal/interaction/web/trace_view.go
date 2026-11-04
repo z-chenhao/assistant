@@ -26,6 +26,21 @@ func duration(start int64, end *int64) string {
 	return (time.Duration(max(0, *end-start)) * time.Microsecond).Round(time.Millisecond).String()
 }
 func observedAt(at int64) string { return time.UnixMicro(at).UTC().Format("15:04:05.000") }
+
+func providerTimingLabel(phase string) string {
+	return map[string]string{
+		"started":             "HTTP request sent",
+		"headers":             "Response headers received",
+		"error":               "HTTP request failed",
+		"first_body":          "First response data",
+		"first_text":          "First visible text",
+		"first_tool_call":     "First model tool call",
+		"stream_terminal":     "Provider stream terminal event",
+		"header_timeout":      "Response headers timed out",
+		"stream_idle_timeout": "Response stream idle timeout",
+		"generation_deadline": "Generation time limit reached",
+	}[phase]
+}
 func elapsed(created, ended string) string {
 	if ended == "" {
 		return "in progress"

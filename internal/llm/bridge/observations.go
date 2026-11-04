@@ -31,7 +31,13 @@ func (s *eventStream) observe(raw json.RawMessage) {
 			return
 		}
 	}
-	if d.Phase != "started" && d.Phase != "headers" && d.Phase != "error" {
+	switch d.Phase {
+	case "started", "headers", "error":
+	case "first_body", "first_text", "first_tool_call", "stream_terminal", "header_timeout", "stream_idle_timeout", "generation_deadline":
+		if d.Body != nil || d.HTTPStatus != 0 || d.Error != "" || d.Omitted != "" || d.BodyHash != "" {
+			return
+		}
+	default:
 		return
 	}
 	if d.HTTPStatus < 0 || d.HTTPStatus > 599 || d.Body != nil && !json.Valid(d.Body) {
