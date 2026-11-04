@@ -11,6 +11,9 @@ import (
 
 func (s *Server) showMessage(ctx context.Context, m conversation.Message, approvals map[string]interaction.Approval) (shownMessage, error) {
 	out := shownMessage{Role: m.Role, Sequence: m.Sequence}
+	if m.Source == "main" && m.Role == "assistant" && m.SourceEventID != "" && m.MessageID == "reply:"+m.SourceEventID {
+		out.ReplyKey = replyKey(m.SourceEventID)
+	}
 	// Match Host-authored notification identity, never strip arbitrary user text
 	// by regex or rewrite the durable Conversation/frozen delivery projection.
 	if m.Source == "security" {

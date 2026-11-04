@@ -4,6 +4,7 @@ import {enhanceProjections,releaseProjections} from './projections';
 import {captureRichFormDrafts} from './rich-forms';
 
 const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
+const replyFrame=z.object({key:z.string().regex(/^[a-f0-9]{32}$/),state:z.enum(['draft','discarded','committed']),text:z.string().optional(),reset:z.boolean().optional()});
 function viewRegions(view:string):string[]|null {
  if(view==='/')return ['workspace-status','conversation-attention','conversation-messages','conversation-approvals'];
  if(view==='/tasks')return ['workspace-status','tasks-attention','ongoing-work'];
@@ -91,12 +92,44 @@ export function startLiveUpdates(){
  const patch=regionPatcher(regions);
  const feedback=document.getElementById('live-update-status');
  const jump=document.querySelector<HTMLButtonElement>('#new-messages');
+ const draft=document.querySelector<HTMLElement>('#conversation-draft');
+ const draftText=document.createTextNode('');
+ draft?.querySelector('[data-draft-text]')?.append(draftText);
  let before=Number(main.dataset.liveBefore??0),latest=Number(main.dataset.liveLatest??0);
  let etag='',timer=0,generation=0,delay=1000,stopped=false,follow=false,pendingTarget='';
  let request:AbortController|null=null;
+ let replies:EventSource|null=null,draftKey='',committing=false;
+ const clearDraft=()=>{draftKey='';committing=false;draftText.data='';if(draft)draft.hidden=true};
+ const stopReplies=()=>{replies?.close();replies=null;clearDraft()};
+ const hasReply=(key:string)=>!!key&&!!document.querySelector(`[data-reply-key="${key}"]`);
+ const startReplies=()=>{
+  if(!draft||replies||stopped||before!==0||document.visibilityState!=='visible'||typeof EventSource==='undefined')return;
+  const source=new EventSource('/api/conversation/stream');replies=source;
+  source.addEventListener('reply',(event:MessageEvent<string>)=>{
+   if(source!==replies)return;
+   let data:unknown;
+   try{data=JSON.parse(event.data)}catch{return}
+   const parsed=replyFrame.safeParse(data);
+   if(!parsed.success)return;
+   const {key,state,text,reset}=parsed.data;
+   if(state==='discarded'){clearDraft();return}
+   if(state==='committed'){
+    if(draftKey!==key||hasReply(key))clearDraft();else committing=true;
+   }else if(reset||draftKey!==key){
+    clearDraft();draftKey=key;
+   }
+   if(text&&draftKey===key&&!hasReply(key)){
+    const bottom=atBottom();
+    draftText.appendData(text);draft.hidden=false;
+    if(bottom)scrollToLatest();else showJump();
+   }
+   if(state==='committed')void refresh();
+  });
+  source.onerror=()=>{if(source===replies){clearDraft();if(source.readyState===EventSource.CLOSED)replies=null}};
+ };
  const say=(text:string)=>{if(feedback&&feedback.textContent!==t(text))feedback.textContent=t(text)};
  const accessLost=()=>{
-  stopped=true;say('Updates paused. Your draft is kept. ');
+  stopped=true;stopReplies();say('Updates paused. Your draft is kept. ');
   if(!feedback)return;
   const signin=document.createElement('a');signin.href='/';signin.target='_blank';signin.rel='noreferrer';signin.textContent=t('Sign in');
   const retry=document.createElement('button');retry.type='button';retry.textContent=t('Retry updates');
@@ -104,7 +137,7 @@ export function startLiveUpdates(){
   feedback.append(signin,document.createTextNode(' · '),retry);
  };
  const showJump=()=>{if(jump)jump.hidden=false};
- const pause=()=>{generation++;clearTimeout(timer);request?.abort();request=null};
+ const pause=()=>{generation++;clearTimeout(timer);request?.abort();request=null;stopReplies()};
  const focusApproval=(id:string)=>{
   const target=document.getElementById(id);
   if(!target)return false;
@@ -129,6 +162,7 @@ export function startLiveUpdates(){
 
  async function refresh(){
   if(stopped||document.visibilityState!=='visible')return;
+  startReplies();
   clearTimeout(timer);request?.abort();
   const current=++generation,controller=new AbortController();request=controller;
   const timeout=setTimeout(()=>controller.abort(),10000);
@@ -152,6 +186,7 @@ export function startLiveUpdates(){
     if(!Array.from(parsed.content.querySelectorAll<HTMLElement>('[data-live-key]')).some(node=>node.dataset.liveKey===anchor.node.dataset.liveKey))deferMessages=true;
    }
    for(const id of regions){if(id!=='conversation-messages'||!deferMessages||follow)patch(id,value.regions[id])}
+   if(hasReply(draftKey)||committing&&deferMessages&&!follow)clearDraft();
    const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
    const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;
    if(send&&form&&!form.dataset.submitting&&readiness){send.disabled=readiness!=='true';const hint=document.querySelector<HTMLElement>('#composer-feedback');if(hint?.dataset.modelNeeded&&readiness==='true'){hint.textContent=t('');delete hint.dataset.modelNeeded}}
@@ -252,7 +287,11 @@ export function startLiveUpdates(){
  window.addEventListener('pagehide',pause);
  window.addEventListener('pageshow',event=>{if(event.persisted)void refresh()});
  if(before)showJump();
- return {start:()=>{
+ return {messageAccepted:(target:URL)=>{
+  before=0;etag='';follow=true;pendingTarget='';
+  if(location.href!==target.href)history.replaceState(null,'',target);
+  void refresh();
+ },start:()=>{
   // The canonical home resumes the latest turn; explicit history links keep their anchor.
   const navigation=performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming|undefined;
   if(view==='/'&&before===0&&!location.hash&&navigation?.type!=='back_forward')scrollToLatest();

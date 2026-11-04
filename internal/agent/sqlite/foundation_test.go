@@ -211,6 +211,124 @@ func TestStreamPreviewAvoidsDurableWriterAndReportsTraceLoss(t *testing.T) {
 	}
 }
 
+func TestMainPreviewIsDiscardedBeforeToolsAndCommittedAfterConversation(t *testing.T) {
+	s, _, history, a, p := loopFixture(t)
+	ctx := context.Background()
+	diagnostics, err := s.Diagnostics(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Provider = streamingProvider{p}
+	var discarded, committed string
+	toolStarted := false
+	a.Sink = func(e agent.Event) {
+		switch e.Kind {
+		case "message_discarded":
+			discarded = e.GenerationID
+		case "tool_execution_start":
+			toolStarted = true
+			if discarded == "" {
+				t.Error("tool started with the model preamble still active")
+			}
+		case "reply_committed":
+			committed = e.GenerationID
+			messages, err := history.List(ctx, diagnostics.AgentID)
+			if err != nil || len(messages) != 2 || messages[1].MessageID != "reply:"+committed {
+				t.Error("commit signal preceded the durable reply", messages, err)
+			}
+		}
+	}
+	mustSubmit(t, a, "stream-with-tool", "hi")
+	mustDrain(t, a)
+	if !toolStarted || committed == "" || committed == discarded {
+		t.Fatal("preamble and final reply did not have distinct stream dispositions", toolStarted, discarded, committed)
+	}
+}
+
+type cancellationPreviewProvider struct {
+	*loopProvider
+	release <-chan struct{}
+}
+
+func (p cancellationPreviewProvider) Generate(ctx context.Context, _ llm.GenerationRequest, sink func(llm.GenerationEvent)) (llm.GenerationResult, error) {
+	sink(llm.GenerationEvent{Kind: "text_delta", Text: "before cancel"})
+	<-ctx.Done()
+	<-p.release
+	sink(llm.GenerationEvent{Kind: "text_delta", Text: "late after cancel"})
+	return llm.GenerationResult{}, llm.GenerationCancelled
+}
+
+func TestMainPreviewDiscardsBeforeProviderCancellationJoins(t *testing.T) {
+	s, runs, history, a, p := loopFixture(t)
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	receipt := mustSubmit(t, a, "cancel-preview", "hi")
+	claim, err := runs.Claim(ctx, receipt.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.Initialize(ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	execution, cancel := context.WithCancel(ctx)
+	defer cancel()
+	release := make(chan struct{})
+	releaseProvider := sync.OnceFunc(func() { close(release) })
+	events := make(chan agent.Event, 8)
+	done := make(chan error, 1)
+	go func() {
+		err := agent.RunAgentLoop(ctx, claim, agent.LoopOptions{
+			Store: runs, Provider: cancellationPreviewProvider{p, release}, Execution: execution,
+			Sink: func(e agent.Event) {
+				if e.Kind == "message_update" || e.Kind == "message_discarded" || e.Kind == "reply_committed" {
+					events <- e
+				}
+			},
+		})
+		close(events)
+		done <- err
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		releaseProvider()
+		<-done
+	}()
+	next := func() agent.Event {
+		t.Helper()
+		select {
+		case e := <-events:
+			return e
+		case <-ctx.Done():
+			t.Fatal("preview lifecycle did not advance")
+			return agent.Event{}
+		}
+	}
+	first := next()
+	if first.Kind != "message_update" || first.Text != "before cancel" || first.GenerationID == "" {
+		t.Fatal(first)
+	}
+	cancel()
+	if e := next(); e.Kind != "message_discarded" || e.GenerationID != first.GenerationID {
+		t.Fatal(e)
+	}
+	releaseProvider()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if e, ok := <-events; ok {
+		t.Fatal("cancelled generation emitted another preview event", e)
+	}
+	diagnostics, err := s.Diagnostics(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages, err := history.List(ctx, diagnostics.AgentID)
+	if err != nil || len(messages) != 1 || messages[0].MessageID != receipt.MessageID {
+		t.Fatal("cancelled text entered the conversation", messages, err)
+	}
+}
+
 func TestStateErrorKeepsPrivateCauseAndStableClassification(t *testing.T) {
 	_, r, _, _, _ := loopFixture(t)
 	// A direct failing transaction isolates adapter classification from validation.

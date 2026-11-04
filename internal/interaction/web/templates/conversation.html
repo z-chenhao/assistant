@@ -2,6 +2,7 @@
 {{template "computer-panel" .}}{{template "worker-panel" .}}
 <section class="thread">
  <div id="conversation-messages">{{template "conversation" .}}</div>
+ <article id="conversation-draft" class="reply-draft" aria-label="{{tr "Draft reply from Ghost"}}" aria-busy="true" hidden><div class="reply-draft-label">{{tr "Draft reply"}}</div><div class="semantic" data-draft-text></div></article>
  <div id="conversation-approvals">{{template "approvals" .}}</div>
 </section>
 <footer class="conversation-footer"><div id="composer-root" data-source-id="{{.SourceID}}">
@@ -21,7 +22,7 @@
 {{define "conversation"}}
 {{if not (canSend .Status)}}<div class="setup-callout" data-live-key="setup">{{if eq .Status.Readiness "setup_required"}}<h1>{{tr "Let's connect your model."}}</h1><p>{{tr "Choose a provider and verify a model to start working with Steward."}}</p>{{else}}<h1>{{tr "Steward needs attention"}}</h1><p>{{tr "Your draft is kept. Check the model connection and workspace setup before sending new work."}}</p>{{end}}<a class="button" href="/settings/models">{{tr "Set up Steward →"}}</a></div>{{end}}
 {{if .Before}}<a data-live-key="earlier" class="back-link" href="/?before={{.Before}}">{{tr "Earlier messages"}}</a>{{end}}
-{{range .Messages}}<article class="message {{.Role}}" id="message-{{.Sequence}}" data-live-key="message:{{.Sequence}}"><span class="sr-only">{{if eq .Role "user"}}{{tr "You"}}{{else}}Ghost{{end}}</span>{{if .Approval}}{{template "approval-card" .Approval}}{{else}}<div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div>{{end}}</article>
+{{range .Messages}}<article class="message {{.Role}}" id="message-{{.Sequence}}" data-live-key="message:{{.Sequence}}"{{if .ReplyKey}} data-reply-key="{{.ReplyKey}}"{{end}}><span class="sr-only">{{if eq .Role "user"}}{{tr "You"}}{{else}}Ghost{{end}}</span>{{if .Approval}}{{template "approval-card" .Approval}}{{else}}<div data-ui-spec="{{.Projection.Spec}}" data-ui-fallback="{{.Projection.Fallback}}">{{.Projection.HTML}}</div>{{end}}</article>
 {{else}}{{if canSend .Status}}<div class="welcome" data-live-key="welcome"><h1>{{tr "What would you like to work on?"}}</h1><p>{{tr "Research, build, or keep a longer task moving. We can start here."}}</p></div>{{end}}{{end}}
 {{end}}
 {{define "approvals"}}{{range .Approvals}}<div data-live-key="approval:{{.ID}}">{{template "approval-card" .}}</div>{{end}}{{end}}
