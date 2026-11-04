@@ -19,6 +19,7 @@ import (
 	configsetup "github.com/z-chenhao/assistant/internal/config/setup"
 	"github.com/z-chenhao/assistant/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/assistant/internal/conversation/sqlite"
+	databasesqlite "github.com/z-chenhao/assistant/internal/database/sqlite"
 	"github.com/z-chenhao/assistant/internal/delivery"
 	deliveryfake "github.com/z-chenhao/assistant/internal/delivery/fake"
 	deliveryterminal "github.com/z-chenhao/assistant/internal/delivery/terminal"
@@ -72,6 +73,7 @@ type App struct {
 	accounts            *account.Manager
 	history             *conversationsqlite.Store
 	memory              *memorysqlite.Store
+	databaseReader      *databasesqlite.Reader
 	terminalInbox       *deliveryterminal.Adapter
 	deliveryPolicy      delivery.Policy
 	deliveryFake        *deliveryfake.Adapter
@@ -179,6 +181,11 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	}
 	a.terminalInbox = store.TerminalInbox()
 	a.memory, err = memorysqlite.Open(ctx, cfg.App.DataRoot)
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
+	a.databaseReader, err = databasesqlite.Open(cfg.App.DataRoot)
 	if err != nil {
 		a.Close()
 		return nil, err
@@ -355,6 +362,9 @@ func (a *App) Close() error {
 	}
 	a.computerPreviewMu.Unlock()
 	err := a.store.Close()
+	if a.databaseReader != nil {
+		err = errors.Join(err, a.databaseReader.Close())
+	}
 	err = errors.Join(err, a.history.Close())
 	if a.memory != nil {
 		err = errors.Join(err, a.memory.Close())
