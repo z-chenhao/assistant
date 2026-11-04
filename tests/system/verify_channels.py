@@ -593,6 +593,27 @@ def feishu_artifact_reviews(binary, report):
             h.cleanup()
 
 
+def live_updates(binary,evidence,report):
+    """Drive the existing long-text UI scenario without summarizing its markers."""
+    with tempfile.TemporaryDirectory(prefix='steward-channel-live-') as temp, Sandbox() as platform:
+        h=ChannelHarness(binary,Path(temp),platform,'capabilities')
+        try:
+            # This scrolling/UI scenario needs literal tool-result text. The
+            # scripted summarizer preserves receipts, not semantic source text.
+            h.setup(metadata=dict(name='Live UI workload',provider_kind='openai_compatible',
+                                  endpoint='http://127.0.0.1:1/v1',wire_api='openai_completions',
+                                  model_id='fixture-model',context_window=32768,max_output_tokens=1024,
+                                  compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True)))
+            h.start()
+            h.browser(evidence.parent/'channels-live-ui','live')
+            state=h.rows()
+            require(any(a['status']=='denied' for a in state['approvals']), 'live UI did not persist exact approval rejection')
+            require(not (h.root/'data.computer/unapproved.txt').exists(), 'rejected live action executed')
+            report['scenarios']['live-updates']=state
+            report['checks'].append('Live Web: committed replies/approvals/progress update while draft, file, focus, selection, scroll and request identity survive; network/session recovery without reload')
+        finally:h.cleanup()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
     attention_workspace(binary,evidence,report)
@@ -650,19 +671,7 @@ def run(binary,evidence):
             h.stop()
         finally:h.cleanup()
 
-    # F-019: keep a real browser draft and attachment across committed replies,
-    # approval decisions, Task status, network loss and session rotation.
-    with tempfile.TemporaryDirectory(prefix='steward-channel-live-') as temp, Sandbox() as platform:
-        h=ChannelHarness(binary,Path(temp),platform,'capabilities')
-        try:
-            h.setup();h.start()
-            h.browser(evidence.parent/'channels-live-ui','live')
-            state=h.rows()
-            require(any(a['status']=='denied' for a in state['approvals']), 'live UI did not persist exact approval rejection')
-            require(not (h.root/'data.computer/unapproved.txt').exists(), 'rejected live action executed')
-            report['scenarios']['live-updates']=state
-            report['checks'].append('Live Web: committed replies/approvals/progress update while draft, file, focus, selection, scroll and request identity survive; network/session recovery without reload')
-        finally:h.cleanup()
+    live_updates(binary,evidence,report)
 
     inspection_relationships(binary,evidence,report)
 
