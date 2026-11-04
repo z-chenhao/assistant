@@ -353,6 +353,10 @@ func (r *Runs) Trace(ctx context.Context, c agent.RunClaim, e agent.Event) (agen
 		// held tool cannot monopolize SQLite and prevent concurrent ingress.
 		r.host.boundary("after_tool_execution_start")
 	}
+	if err == nil && e.Kind == "turn_end" {
+		// The Loop has committed the complete tool batch or reply checkpoint.
+		r.host.boundary("after_turn_end")
+	}
 	return e, err
 }
 
