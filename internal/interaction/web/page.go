@@ -135,6 +135,14 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 func (s *Server) render(w http.ResponseWriter, r *http.Request, p page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	p.Language = requestLanguage(r)
+	// The autosave navigation carries the intended value. Read the browser's
+	// cookie back before presenting success (cookies may be blocked).
+	if p.Path == "/settings/preferences" && p.Notice == "Language saved." {
+		if expected := r.URL.Query().Get("language"); expected != "" && expected != p.Language {
+			p.Notice = ""
+			p.Error = "Language could not be retained. Check your browser cookie settings."
+		}
+	}
 	w.Header().Set("Content-Language", p.Language)
 	_ = localizedLayout(p.Language).Execute(w, p)
 }

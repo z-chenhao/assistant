@@ -299,7 +299,7 @@ New database files use mode 0600 in the private data root.
 
 正式 Web 采用确认的 Steward 单侧栏黑白 Demo：对话、任务、审批、成果、模型/账户、通知、能力与 Developer 继续使用既有实现；Chat 右上角按需读取真实 Worker 执行及 Computer 只读画面。没有引入多会话或独立文件库。品牌与兼容范围见[品牌功能](branding.md)。
 
-Web 默认英文；Settings → Preferences → Language 选择简体中文后点击 Save。语言标签、问号说明、选择器与保存操作在同一行。刷新、跨页和实时界面片段使用已选语言，原始对话和交付内容不变。见[品牌与界面语言](branding.md)。
+Web 默认英文；Settings → Preferences → Language 确认简体中文后自动保存。设置组左侧为语言名称及问号，右侧为当前值与应用内列表；无脚本时保留原生选择器和保存按钮。刷新、跨页和实时界面片段使用已选语言，原始对话和交付内容不变。见[品牌与界面语言](branding.md)。
 
 
 ### Steward 工作区精修

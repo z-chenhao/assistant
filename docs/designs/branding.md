@@ -40,8 +40,12 @@ README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通
 
 使用现有原生设置流程新增 `/settings/preferences` 与认证后的 `POST /settings/language`。只接收 `en`、`zh-CN`，以路径 `/`、SameSite Strict、有效期一年的 `steward-language` 浏览器 Cookie 持久化。未设置或无效时一律英文；不使用 Accept-Language。服务端预编译两份不可变模板，显式 `tr` 仅作用于应用自有界面文案；客户端从同一私有 JSON 文案表读取。没有运行时 DOM 扫描或外部翻译服务。实时片段和日期展示随语言变化；正文、标识、字段值、冻结哈希及机器协议不变。此方案优先支持无 JS 的原生切换，未引入通用翻译平台或账户级语言同步。
 
-Preferences 使用局部 `.preference-row` 栅格将 Language 标签与帮助、原生 select、Save 放在同行；移除可见大标题及 panel，保留读屏 h1 与当前导航标签。移动选择器为 16px，交互目标至少 44px 高；使用既有颜色和字体，不修改其他表单密度。
+Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织单层圆角设置组，左侧名称／帮助，右侧语言触发器；保留读屏 h1 和当前导航标签。默认窄屏同行，长内容或放大时按根目录 DESIGN.md 有序换行。颜色、字体来自既有 token，触摸操作高度至少 44px。列表只显示真实语言与当前项勾号，无自动保存说明或正常界面的 Save。样式限定本项，不修改相邻表单密度。
 
-帮助默认提供原生 `details/summary`；`settings.ts` 就绪后替换为具有 `aria-describedby` 的按钮与纯文本 tooltip。悬停或聚焦显示，点击固定显示／关闭，移入提示仍可阅读，Escape 关闭直到再次进入或激活，点击外部关闭。无 JS 时保留可展开说明与原生保存，降级帮助不提供 Escape 关闭。提示相对设置行定位并限制在可用宽度内。
+`preferences.ts` 渐进增强原生 form/select，初始化完成后隐藏原生控件与保存按钮；原生 select 仍是唯一提交值源。支持 Popover API 时使用顶层非模态 combobox/listbox，焦点留在触发器，活动项与选中项可区分；定位随滚动／resize／visual viewport 更新，空间不足翻转或内部滚动。缺少浮层能力时仍通过原生 select 的 change 自动保存；缺少脚本／fetch 或初始化失败时保留原生选择与显式保存。方向键浏览不提交，确认不同值才提交；Escape、Tab、外部操作取消浏览，Tab 不抢焦点。
 
-语言表单以 `data-preserve-submit-label` 保持紧凑的 Save 文案；现有提交保护仍禁用按钮、设置 `aria-busy`、阻止重复提交并在 BFcache `pageshow` 恢复。成功和错误使用现有服务端反馈，选择器改值不自动保存。提示按钮显式声明 `type="button"`，不参与提交。
+同一 POST `/settings/language` 在显式 `Accept: application/json` 时返回包含已设置语言的 JSON 200；非法值返回 JSON 400 且不设置 Cookie。认证和同源／CSRF 仍在既有路由边界执行。普通原生表单沿用 303。增强端每页只允许一笔请求，无队列：忙碌时保留焦点并锁定选择，明确拒绝回到此前值，400 可显式重试；认证拒绝提供重新打开设置入口。15 秒超时、网络中断、5xx、错误类型或不匹配响应均视为结果未确认，先 GET 核对，不自动重发。
+
+成功导航携带目标语言与焦点 fragment，服务端在 GET 读回 Cookie 后才显示成功；不一致则提示检查浏览器 Cookie 设置。整页使用服务端翻译，不扫描改写 DOM。成功／错误反馈显示在语言组内。普通进入页面不抢焦点；pagehide 使旧响应失效，BFcache 返回通过 GET 重新核对，不重放写入。
+
+帮助默认提供原生 details/summary；`settings.ts` 就绪后替换为具有 aria-describedby 的按钮与文本 tooltip。悬停或聚焦显示，点击固定显示／关闭，移入仍可阅读；Escape 关闭直到再次进入或激活，外部操作关闭。帮助与语言列表互斥。无 JS 时保留原生展开，不提供 Escape 关闭。相邻设置继续沿用原有原生提交保护。

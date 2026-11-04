@@ -1,4 +1,5 @@
 import {t} from './i18n';
+import {enhanceLanguagePreference} from './preferences';
 
 // The fallback is a native disclosure. Enhance only after the whole help is ready.
 function enhancePreferenceHelp(){
@@ -8,7 +9,8 @@ function enhancePreferenceHelp(){
   const fallback=help.querySelector<HTMLDetailsElement>('[data-help-fallback]');
   if(!trigger||!tooltip||!fallback)continue;
   let hovered=false,pinned=false,dismissed=false;
-  const render=()=>{tooltip.hidden=dismissed||!(hovered||pinned||document.activeElement===trigger)};
+  const render=()=>{tooltip.hidden=dismissed||!(hovered||pinned||document.activeElement===trigger);if(!tooltip.hidden)document.dispatchEvent(new Event('preference-help-open'))};
+  document.addEventListener('preference-picker-open',()=>{pinned=false;dismissed=true;render()});
   help.addEventListener('pointerenter',event=>{if(event.pointerType==='touch')return;hovered=true;dismissed=false;render()});
   help.addEventListener('pointerleave',()=>{hovered=false;render()});
   trigger.addEventListener('focus',()=>{dismissed=false;render()});
@@ -26,9 +28,11 @@ function enhancePreferenceHelp(){
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
  enhancePreferenceHelp();
+ enhanceLanguagePreference();
  const forms=document.querySelectorAll<HTMLFormElement>('.settings-page form');
  const reset=new Map<HTMLFormElement,()=>void>();
  for(const form of forms){form.addEventListener('submit',event=>{
+  if(form.dataset.autosaveReady)return;
   if(form.dataset.submitting){event.preventDefault();return}
   const buttons=Array.from(form.querySelectorAll<HTMLButtonElement>('button[type=submit],button:not([type])'));
   const labels=buttons.map(button=>button.textContent??'');

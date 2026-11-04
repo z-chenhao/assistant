@@ -9,20 +9,35 @@
 .database-filter{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}.database-filter label{flex:1;min-width:220px}.database-table{width:100%;min-width:720px;border-collapse:collapse;font-size:13px}.database-table th,.database-table td{padding:18px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}.database-table th{color:var(--muted-foreground);font-size:12px}.database-record-ref{display:block;max-width:250px;overflow-wrap:anywhere}.database-table time{display:block;min-width:125px;font-size:12px}.database-fields{display:grid;grid-template-columns:minmax(90px,auto) minmax(100px,1fr);gap:8px 14px;margin:12px 0}.database-fields dt{color:var(--muted-foreground)}.database-fields dd{margin:0;overflow-wrap:anywhere;max-width:420px}.database-links{list-style:none;padding:0;margin:10px 0;max-width:370px}.database-links li{margin:8px 0}.database-links a{display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}.database-links code{font-size:11px}.database-table .technical-details{margin:0}
 .settings-page{max-width:920px}.form-panel{max-width:680px}.settings-footer{font-size:11px;color:var(--muted-foreground);margin:28px 0 0}
 /* Preferences share the tab strip's density; other settings keep their forms. */
-.settings-page:has(.preference-row)>.section-tabs{margin-bottom:16px}
-.preference-row{position:relative;display:grid;grid-template-columns:max-content minmax(0,160px) max-content;align-items:center;gap:12px;max-width:400px;padding:8px 0}
-.preference-name{display:flex;align-items:center;gap:4px;white-space:nowrap}
-.preference-row :is(button,select,summary){outline-offset:1px}
-.preference-name label{margin:0;font-size:14px;font-weight:500;color:var(--foreground)}
-.preference-row select{margin:0;min-height:34px;padding:5px 8px;border-radius:7px;font-size:14px}
-.preference-row .preference-save{min-height:34px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border-color:var(--border);border-radius:7px;white-space:nowrap}
-.preference-row .preference-save:hover{background:var(--hover)}
+.settings-page:has(.preference-group)>.section-tabs{margin-bottom:24px}
+.preference-group{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px}
+.preference-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:12px 16px}
+.preference-name{display:flex;align-items:center;gap:4px;min-height:36px;white-space:nowrap}
+.preference-name label{margin:0;font-size:14px;font-weight:550;color:var(--foreground)}
+.preference-controls{display:flex;flex:1 1 112px;align-items:center;gap:8px;max-width:168px;min-width:112px;margin-left:auto}
+.preference-controls:has(.preference-save:not([hidden])){flex-basis:168px;max-width:220px}
+.preference-controls select{margin:0;min-height:36px;padding:5px 8px;border-radius:7px;font-size:14px}
+.preference-group :is(button,select,summary){outline-offset:2px}
+.preference-group .preference-save{min-height:36px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:7px;white-space:nowrap}
 .preference-help{display:inline-flex}
-.preference-help-trigger,.preference-help summary{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:34px;min-height:34px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;list-style:none}
+.preference-help-trigger,.preference-help summary{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:36px;min-height:36px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;list-style:none}
 .preference-help summary::-webkit-details-marker{display:none}
-.preference-help-trigger:hover,.preference-help summary:hover{background:var(--hover);color:var(--foreground)}
-.preference-tooltip{position:absolute;z-index:20;top:calc(100% - 8px);left:0;display:block;width:min(280px,100%);padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
-@media(max-width:760px){.preference-row{gap:4px}.preference-row select{min-height:44px;font-size:16px}.preference-row .preference-save{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}}
+.preference-help-trigger:hover,.preference-help summary:hover,.preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
+.preference-tooltip{position:absolute;z-index:20;top:calc(100% - 8px);left:12px;display:block;width:min(280px,calc(100% - 24px));padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+.preference-group .preference-picker-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:36px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--background);color:var(--foreground);font-weight:400;white-space:nowrap}
+.preference-picker-trigger>.icon{width:16px;height:16px;color:var(--muted-foreground)}
+.preference-picker-trigger:hover{background:var(--hover)}
+.preference-picker-trigger[aria-disabled=true]{color:var(--muted-foreground);cursor:wait}
+.preference-picker{position:fixed;inset:auto;margin:0;padding:4px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--foreground);box-shadow:0 8px 20px color-mix(in srgb,var(--backdrop) 35%,transparent);overflow:auto;overscroll-behavior:contain;font:14px/1.6 var(--font-ui)}
+.preference-picker [role=option]{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;padding:7px 10px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.preference-picker [role=option]>.icon{visibility:hidden;flex-shrink:0}
+.preference-picker [aria-selected=true]{background:var(--muted)}
+.preference-picker [aria-selected=true]>.icon{visibility:visible}
+.preference-picker [role=option]:hover{background:var(--hover)}
+.preference-picker[data-keyboard] [data-active]{outline:2px solid var(--focus);outline-offset:-2px}
+.preference-feedback{padding:0 16px 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
+.preference-feedback :is(button,a){min-height:36px;padding:3px 6px;background:transparent;border:0;color:var(--foreground);font-size:13px;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-controls :is(select,.preference-picker-trigger){min-height:44px;font-size:16px;padding-inline:8px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}.preference-picker [role=option]{min-height:44px;font-size:16px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
 .current-model{border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;padding:24px 0;background:transparent}.current-model h2{font-size:22px;font-weight:550;margin:14px 0 6px}.current-model .text-link{display:inline-block;margin-top:8px}
 .current-model .model-endpoint{font-size:13px;color:var(--muted-foreground)}
 .list-heading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}.list-heading h2{margin:0}.list-heading span{font-size:12px;color:var(--muted-foreground)}

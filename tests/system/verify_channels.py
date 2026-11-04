@@ -148,7 +148,7 @@ def preference_settings(binary, evidence, report):
             output = evidence.parent / 'preferences-ui'
             h.browser(output, 'preferences')
             report['scenarios']['preferences'] = json.loads((output / 'preferences-browser.json').read_text())
-            report['checks'].append('Preferences: bilingual compact layout, hover/keyboard/touch help, native save, restoration, no-JS fallback and neighboring settings')
+            report['checks'].append('Preferences: bilingual grouped dropdown, keyboard/touch and help, single-flight autosave, rejection/retry, unknown-result and cookie readback, timeout, restoration, native fallbacks and neighboring settings')
         finally:
             h.cleanup()
 
