@@ -24,6 +24,13 @@ func dispatchCommand(ctx context.Context, application *app.App, cfg config.Confi
 	}
 	switch command.kind {
 	case commandCoding:
+		if flags.Arg(1) == "report-pr" {
+			value, err := application.SaveCodePRReport(ctx, flags.Arg(2), flags.Arg(3))
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(out).Encode(value)
+		}
 		if flags.Arg(1) == "report" {
 			value, err := application.SaveCodeReport(ctx, flags.Arg(2))
 			if err != nil {

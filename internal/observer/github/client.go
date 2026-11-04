@@ -19,6 +19,9 @@ const pageSize = 100
 
 var shaPattern = regexp.MustCompile(`^[a-fA-F0-9]{40,64}$`)
 
+// ValidHeadSHA applies the exact-head format accepted by the PR reader.
+func ValidHeadSHA(value string) bool { return shaPattern.MatchString(value) }
+
 type reader struct {
 	client http.Client
 	token  string
@@ -69,7 +72,7 @@ func (c Client) read(ctx context.Context, cfg Config) (Batch, error) {
 	if err = r.get(ctx, path+"/pulls/"+fmt.Sprint(cfg.PullNumber), &pr); err != nil {
 		return batch, err
 	}
-	if pr.Number != cfg.PullNumber || pr.Base.Repo.ID <= 0 || !strings.EqualFold(pr.Base.Repo.FullName, cfg.Repository) || !shaPattern.MatchString(pr.Head.SHA) {
+	if pr.Number != cfg.PullNumber || pr.Base.Repo.ID <= 0 || !strings.EqualFold(pr.Base.Repo.FullName, cfg.Repository) || !ValidHeadSHA(pr.Head.SHA) {
 		return batch, &Failure{"INVALID_RESPONSE"}
 	}
 	batch.RepositoryID, batch.HeadSHA = pr.Base.Repo.ID, pr.Head.SHA

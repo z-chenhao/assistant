@@ -290,3 +290,48 @@ func TestTaskCodeFrozenScopeMismatchFailsOnlyAcceptedWorker(t *testing.T) {
 		t.Fatal("scope drift did not report a committed isolated failure")
 	}
 }
+
+func TestCodePRHandoffFencesWatchRefreshAndForgetAtArtifactCommit(t *testing.T) {
+	for _, boundary := range []string{"refresh", "forget"} {
+		t.Run(boundary, func(t *testing.T) {
+			ctx := context.Background()
+			s, r, a, p, _ := codeFixture(t)
+			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				if isRoot(req) || isFollowup(req) || req.Messages[len(req.Messages)-1].Role == "tool" {
+					return llm.GenerationResult{Text: "prepared"}, nil
+				}
+				return calls(task.ManageName, `{"operation":"create","task":"review local code"}`), nil
+			}
+			mustSubmit(t, a, "code", "prepare code")
+			mustDrain(t, a)
+			var ref string
+			if err := s.db.QueryRow(`SELECT task_ref FROM task`).Scan(&ref); err != nil {
+				t.Fatal(err)
+			}
+			cfg := githubConfig()
+			watchBatch(t, s, cfg, "")
+			bindTask(t, s, cfg, ref)
+			agentID := idAgent(t, s)
+			checked := false
+			s.MainBoundary = func(point string) {
+				if point != "before_code_report_commit" {
+					return
+				}
+				checked = true
+				if boundary == "refresh" {
+					watchBatch(t, s, cfg, "") // same head, new durable version
+				} else if err := r.write(ctx, func(tx *sql.Tx) error { return r.revokeMemory(ctx, tx, agentID) }); err != nil {
+					t.Fatal(err)
+				}
+			}
+			result, err := s.SaveCodePRReport(ctx, ref, cfg, githubBatch().HeadSHA)
+			want := agent.ErrConflict
+			if boundary == "forget" {
+				want = agent.ErrNotFound
+			}
+			if !checked || !errors.Is(err, want) || result.Ref != "" || scalar(t, s, `SELECT count(*) FROM artifact`) != 0 {
+				t.Fatal("report crossed an invalidated binding", checked, result, err)
+			}
+		})
+	}
+}
