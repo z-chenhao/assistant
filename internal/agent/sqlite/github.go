@@ -106,7 +106,7 @@ func (s *Store) FinishGitHubPoll(ctx context.Context, cfg github.Config, ticket 
 					if e != nil {
 						return e
 					}
-					if e = recordGitHubRuleDecision(ctx, tx, cfg.Scope(), ticket, sequence, observation.Kind); e != nil {
+					if e = recordGitHubRuleDecision(ctx, tx, cfg.Scope(), ticket, sequence, observation); e != nil {
 						return e
 					}
 				}

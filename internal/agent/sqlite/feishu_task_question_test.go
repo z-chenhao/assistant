@@ -163,7 +163,7 @@ func TestFeishuTaskFeedbackCardLifecycleFences(t *testing.T) {
 			if mode == "legacy_question_after_receipt" {
 				// Emulate a 039 database with a question, its frozen projection,
 				// and its receipt already persisted before the additive migration.
-				if _, err := s.db.Exec(`ALTER TABLE feishu_task_question DROP COLUMN review_url; PRAGMA user_version=39`); err != nil {
+				if _, err := s.db.Exec(removeGitHubFailedCheckFixtureSchema + `ALTER TABLE feishu_task_question DROP COLUMN review_url; PRAGMA user_version=39`); err != nil {
 					t.Fatal(err)
 				}
 				root := filepath.Dir(s.path)
