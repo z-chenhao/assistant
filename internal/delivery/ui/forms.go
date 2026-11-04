@@ -50,6 +50,10 @@ func Answer(c Component, values map[string]string) ([]conversation.ContentPart, 
 	size := len(parts[0].Text)
 	for _, f := range c.Fields {
 		v, ok := values[f.Name]
+		// Native HTML form encoding uses CRLF; JavaScript textarea values use
+		// LF. Normalize before validation and hashing so cross-mode retries
+		// represent the same accepted answer.
+		v = strings.ReplaceAll(strings.ReplaceAll(v, "\r\n", "\n"), "\r", "\n")
 		if !ok || strings.TrimSpace(v) == "" || len(v) > 4096 || !utf8.ValidString(v) || strings.ContainsRune(v, 0) {
 			return nil, conversation.ErrInvalid
 		}

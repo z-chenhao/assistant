@@ -1041,6 +1041,9 @@ def rich_replies(binary, evidence, report):
             with ThreadPoolExecutor(max_workers=6) as pool:
                 receipts = list(pool.map(retry, range(6)))
             require(len({v['message_id'] for v in receipts}) == 1, 'form retries created different inputs')
+            native_retry = dict(message_id=message['message_id'],form_id=forms[1]['form_id'],**{'field.notes':'Native browser answer\nSecond line'})
+            native_receipt = h.http('/ui/form',urlencode(native_retry).encode(),headers=headers)
+            require(native_receipt['accepted'], 'native multiline answer conflicted with a JavaScript-style retry')
             changed = dict(data, **{'field.city': 'Changed after acceptance'})
             h.http('/ui/form', urlencode(changed).encode(), headers=headers, expected=409)
             forged = dict(data, message_id=history[0]['message_id'])

@@ -584,7 +584,7 @@ try{
    await form.getByLabel('Travel notes',{exact:true}).fill('中'.repeat(1400));
    await form.getByRole('button',{name:'Send response',exact:true}).click();
    if(await plain.locator('details.rich-answer-form textarea[readonly]').inputValue()!=='中'.repeat(1400))throw Error('native validation failure lost the answer draft');
-   await form.getByLabel('Travel notes',{exact:true}).fill('Native browser answer');
+   await form.getByLabel('Travel notes',{exact:true}).fill('Native browser answer\nSecond line');
    await form.getByRole('button',{name:'Send response',exact:true}).click();
    await plain.waitForURL('**/?notice=feedback-saved');
    if(await plain.locator(`form[data-form-id="${secondID}"]`).getAttribute('data-submitted')!=='true')throw Error('native form acceptance not restored');

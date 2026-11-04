@@ -92,6 +92,11 @@ func TestFormAnswersBindToFieldsAndRestoreWithoutApprovingActions(t *testing.T) 
 	if err != nil || !reflect.DeepEqual(a, b) || len(a) != 3 || a[1].Text != "City: 上海\n" {
 		t.Fatal(a, b, err)
 	}
+	lf, _ := Answer(c, map[string]string{"city": "上海\n浦东", "date": "Tomorrow"})
+	crlf, _ := Answer(c, map[string]string{"city": "上海\r\n浦东", "date": "Tomorrow"})
+	if !reflect.DeepEqual(lf, crlf) {
+		t.Fatal("native and JavaScript line endings changed answer identity")
+	}
 	if err = Restore(&c, a); err != nil || !c.Submitted || c.Fields[0].Value != "上海" {
 		t.Fatal(c, err)
 	}

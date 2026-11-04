@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-021](../features/intelligent-ui.md#f-021) | 普通 Main 回复经 Bridge/Delivery 生成表格、进度与表单；用户消息不变成组件，单元格文字转义。 | `verify_channels.py --rich-replies-only` 不注入投影或历史行 |
 | F-021 | 相同表单并发重试与重启只接纳一次，修改已接受回答、跨消息表单与额外字段被拒绝；回答不创建审批。 | 同一系统场景读回真实输入、回执和冻结投影 |
-| F-021 | 无 JavaScript 原生提交；Unicode 字节上限、失败发送保留答案、失去回执后恢复已保存状态、其他表单草稿与普通输入框不丢失。 | Chromium `rich-replies` 阶段，同时保留桌面/移动端截图 |
+| F-021 | 无 JavaScript 原生提交、多行回答跨提交方式重试去重；Unicode 字节上限、失败发送保留答案、失去回执后恢复已保存状态、其他表单草稿与普通输入框不丢失。 | Chromium `rich-replies` 阶段，同时保留桌面/移动端截图 |
 | F-021 | 未知版本/组件、越界表格、重复字段、伪造审批/Artifact/Host 身份均降级；授权、CSRF 与字段集合验证保持原边界。 | UI、HTTP 与真实 SQLite 组件回归 |
 
 ## 层级与关键路径
