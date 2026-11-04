@@ -400,7 +400,17 @@ def run(binary):
         def steering(h):
             old_profile = h.setup()
             first = h.send("first", "original")
-            child = h.hold("after_generation_commit")
+            # Hold after the native tool batch is checkpointed. Holding the
+            # generation instead lets the 200 ms responsive-tool window race
+            # steering, legitimately changing model rounds and reply counts.
+            child = h.hold("after_turn_end")
+            before = h.state()
+            checkpoint = json.loads(before["runs"][0]["checkpoint_json"])
+            require(checkpoint["phase"] == "model" and checkpoint["step"] == 1 and
+                    not checkpoint.get("pending_tools"), "steering did not hold the native tool boundary")
+            require(len(before["generations"]) == 1 and len(before["tools"]) == 2 and
+                    all(t["status"] == "succeeded" for t in before["tools"]) and
+                    not before["deliveries"], "steering boundary has incomplete tools or a stale reply")
             for key, text in (("second", "steer one"), ("third", "steer two")):
                 require(h.send(key, text)["run_id"] == first["run_id"], "steering spawned Main")
             new_profile = h.setup("second-model")
