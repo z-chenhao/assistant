@@ -107,6 +107,8 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		return s.acceptJSONMessage(w, r)
 	case "/message":
 		return s.acceptFormMessage(w, r)
+	case "/ui/form":
+		return s.respondUIForm(w, r)
 	case "/upload":
 		return s.uploadArtifact(w, r)
 	}

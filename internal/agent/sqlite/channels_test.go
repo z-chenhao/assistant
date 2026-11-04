@@ -24,6 +24,34 @@ import (
 // the forward migration test is exercising a mislabeled current schema.
 const removeChannelFixtureSchema = removeInspectionFixtureSchema + `DROP INDEX event_outbox_live; ALTER TABLE event_outbox DROP COLUMN dead_at; ALTER TABLE event_outbox DROP COLUMN failure_code; ALTER TABLE event_outbox DROP COLUMN failure_count; DROP TABLE channel_resource; DROP TABLE channel_receipt; DROP TABLE delivery_projection; DROP TABLE channel_preference; DROP TABLE message_route; DROP TABLE channel_callback; DROP TABLE channel_source; DROP TABLE channel_binding; `
 
+func TestChannelSourceContentRecoversOnlyTheBoundAcceptedInput(t *testing.T) {
+	s, r, _, _, _ := loopFixture(t)
+	ctx := context.Background()
+	b, err := s.BindChannel(ctx, "web", "browser", "local", true, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := interaction.InboundEvent{Channel: "web", Subject: "browser", Destination: "local", EventID: "ui-form:one", SourceID: "ui-form:one", Content: conversation.Text("Saved answers")}
+	if _, err = r.AcceptInbound(ctx, e); err != nil {
+		t.Fatal(err)
+	}
+	content, found, err := s.ChannelSourceContent(ctx, "web", "browser", "local", e.SourceID)
+	if err != nil || !found || !reflect.DeepEqual(content, e.Content) {
+		t.Fatal(content, found, err)
+	}
+	for _, q := range [][4]string{{"web", "other", "local", e.SourceID}, {"web", "browser", "other", e.SourceID}, {"web", "browser", "local", "missing"}, {"feishu", "browser", "local", e.SourceID}} {
+		if _, found, err = s.ChannelSourceContent(ctx, q[0], q[1], q[2], q[3]); err != nil || found {
+			t.Fatal("foreign or missing source exposed", q, found, err)
+		}
+	}
+	if _, err = s.BindChannel(ctx, "web", "browser", "local", false, b.Version); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err = s.ChannelSourceContent(ctx, "web", "browser", "local", e.SourceID); err != nil || found {
+		t.Fatal("revoked source exposed", found, err)
+	}
+}
+
 func TestChannelConcurrentCallbackAndSourceDedupSharedConversation(t *testing.T) {
 	s, r, h, a, _ := loopFixture(t)
 	ctx := context.Background()

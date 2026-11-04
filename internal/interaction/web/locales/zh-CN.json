@@ -1,4 +1,10 @@
 {
+  "Send response": "发送回答",
+  "This form is temporarily unavailable. Your conversation is kept.": "此表单暂时不可用，对话仍然保留。",
+  "Your answers go to Ghost. External actions still require their own approval.": "回答将发送给 Ghost，外部操作仍须单独批准。",
+  "This field is too long. Shorten it before sending.": "此项回答过长，请缩短后再发送。",
+  "Your response was not confirmed. Your answers are kept. Check the conversation before changing or retrying them.": "尚未确认回答是否已保存，填写内容仍然保留。请先检查对话，再修改或重试。",
+  "Your unsent answers": "尚未发送的回答",
   "Preferences": "偏好设置",
   "Language": "语言",
   "Choose the language used throughout your workspace.": "选择整个工作空间使用的界面语言。",

@@ -31,3 +31,5 @@
 }
 
 .message,.approval{scroll-margin-top:176px}
+.rich-answer-form{margin:16px 0;padding:20px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:14px}
+.rich-answer-form fieldset{min-width:0;margin:0;padding:0;border:0;display:grid;gap:14px}.rich-answer-form label{display:grid;gap:7px}.rich-answer-form textarea{width:100%;max-width:100%;min-height:70px;resize:vertical;font:inherit}.rich-answer-form button{justify-self:start}.rich-answer-form fieldset:disabled textarea{opacity:.8}.rich-answer-form details{margin-top:12px}.rich-answer-form .field-help{margin-top:12px}

@@ -16,7 +16,7 @@ const component=z.discriminatedUnion('type',[
   z.object({type:z.literal('progress'),text:text.default(''),status:z.string().optional()}),
   z.object({type:z.literal('table'),columns:TableProps.shape.columns,rows:TableProps.shape.rows}),
   z.object({type:z.literal('confirmation'),text:text.default(''),approval_id:z.string().min(1),frozen_arguments_hash:z.string().length(64)}),
-  z.object({type:z.literal('form'),fields:z.array(z.object({name:z.string().min(1),label:z.string().min(1),value:z.string()})).min(1).max(16)}),
+  z.object({type:z.literal('form'),text:text.default(''),fields:z.array(z.object({name:z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/),label:z.string().min(1).max(256),value:z.string().max(4096)})).min(1).max(16),message_id:z.string().optional(),form_id:z.string().length(64).optional(),submitted:z.boolean().optional(),disabled:z.boolean().optional()}),
 ]);
 const projection=z.object({schema_version:z.literal(1),fallback:z.string(),components:z.array(component).max(128)});
 type UIComponent=z.infer<typeof component>;
@@ -31,10 +31,10 @@ function NativeComponent({value:c}:{value:UIComponent}) {
   switch(c.type){
     case 'markdown':return <div className="semantic">{c.text}</div>;
     case 'artifact':return <Card className="artifact-card"><CardContent><a className="artifact" href={'/artifact?ref='+encodeURIComponent(c.artifact_ref)}>↓ {c.text} {t('attachment')}</a></CardContent></Card>;
-    case 'progress':return <p className="progress">{t(c.status??'')} · {c.text}</p>;
+    case 'progress':return <p className="progress">{c.status??''} · {c.text}</p>;
     case 'table':return <DataTable props={{title:t('Comparison'),columns:c.columns,rows:c.rows,source:t('From this conversation')}}/>;
     case 'confirmation':return <Card className="approval"><CardContent><p className="semantic">{c.text}</p><form action="/approval" method="post"><input type="hidden" name="approval_id" value={c.approval_id}/><input type="hidden" name="hash" value={c.frozen_arguments_hash}/><Button name="decision" value="approved">{t('Approve')}</Button><Button variant="secondary" name="decision" value="denied">{t('Decline')}</Button></form></CardContent></Card>;
-    case 'form':return <dl>{c.fields.map(f=><div key={f.name}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>;
+    case 'form':return c.form_id&&c.message_id?<form method="post" action="/ui/form" className="rich-answer-form" data-form-id={c.form_id} data-submitted={String(!!c.submitted)}><p className="semantic">{c.text}</p><input type="hidden" name="message_id" value={c.message_id}/><input type="hidden" name="form_id" value={c.form_id}/><fieldset disabled={!!c.submitted||!!c.disabled}>{c.fields.map(f=><div className="rich-field" key={f.name}><label htmlFor={c.form_id+'-'+f.name}>{f.label}</label><textarea id={c.form_id+'-'+f.name} name={'field.'+f.name} required maxLength={4096} rows={2} defaultValue={f.value}/></div>)}<Button type="submit">{t('Send response')}</Button></fieldset><p className="field-help" role="status" aria-live="polite">{t(c.submitted?'Your response was saved. Ghost will review it in the conversation.':c.disabled?'This form is temporarily unavailable. Your conversation is kept.':'Your answers go to Ghost. External actions still require their own approval.')}</p></form>:<dl>{c.fields.map(f=><div key={f.name}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>;
   }
 }
 

@@ -701,6 +701,7 @@ def run(binary,evidence):
     dependency_recovery(binary,report)
     extra_scenarios(binary,report)
     native_components(binary, evidence, report)
+    rich_replies(binary, evidence, report)
     delivery_leases(binary, report)
     account_presentation(binary,report)
     native_trace_inspection(binary,evidence,report)
@@ -987,6 +988,83 @@ def dependency_recovery(binary, report):
             require(before == after, 'GET mutated authoritative state')
             report['scenarios']['dependency-repair'] = dict(status='passed', state=after)
             report['checks'].append('Unavailable optional dependency keeps control pages usable; in-process repair opens ingress; GET leaves settled state unchanged')
+            h.stop()
+        finally:
+            h.cleanup()
+
+
+def rich_replies(binary, evidence, report):
+    """Generate real replies through Main/Bridge/Delivery, then answer in Web.
+
+    No projection or Conversation rows are inserted by this scenario.
+    """
+    with tempfile.TemporaryDirectory(prefix='steward-rich-replies-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            # The scripted provider echoes the structured result through two
+            # tool calls before replying; budget that actual frozen exchange.
+            h.setup(metadata=dict(name='Rich reply fixture', provider_kind='openai_compatible',
+                                  endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                  model_id='fixture-model', context_window=32768, max_output_tokens=4096,
+                                  generation_defaults={}, compatibility=dict(tool_result_format='openai'),
+                                  capabilities=dict(text_input=True)))
+            h.start()
+            result = dict(schema_version=1,
+                          fallback='Compare A and B. A contains literal markup; B has value 42. Two sources reviewed. Which city and date? Add any travel notes.',
+                          components=[
+                              dict(type='table', columns=['Option', 'Result'], rows=[['A', '<img src=x onerror=alert(1)>'], ['B', '42']]),
+                              dict(type='progress', status='In progress', text='Two sources reviewed.'),
+                              dict(type='form', text='Where and when should we travel?', fields=[dict(name='city', label='Destination', value=''), dict(name='date', label='Travel date', value='')]),
+                              dict(type='form', text='What else should we know?', fields=[dict(name='notes', label='Travel notes', value='')]),
+                          ])
+            source = 'Compare these options and ask for the trip details.\n```steward-result\n' + json.dumps(result, ensure_ascii=False) + '\n```'
+            h.http('/api/message', dict(source_id='rich-reply-request', content=[dict(type='text', text=source)]))
+            initial = h.wait(lambda s: len(s['deliveries']) == 1 and s['deliveries'][0]['status'] == 'sent', 'normal Main rich reply delivered')
+            history = h.http('/api/conversation')
+            message = next(m for m in history if m['role'] == 'assistant')
+            projection = json.loads(initial['projections'][0]['spec_json'])
+            (evidence.parent / 'rich-generation.json').write_text(json.dumps(dict(history=history, projection=projection, failure_state=h.failure_state()), ensure_ascii=False, indent=2) + '\n')
+            kinds = [c['type'] for c in projection['components']]
+            require(kinds == ['markdown', 'table', 'progress', 'form', 'form'], f'ordinary reply did not generate controlled components: {kinds!r}')
+            forms = [c for c in projection['components'] if c['type'] == 'form']
+            require(all(c['message_id'] == message['message_id'] and len(c['form_id']) == 64 for c in forms), 'forms not bound to the actual reply')
+            h.browser(evidence.parent / 'channels-ui', 'rich-replies')
+            settled = h.wait(lambda s: len(s['inputs']) == 3 and len(s['deliveries']) == 3 and
+                             all(d['status'] == 'sent' for d in s['deliveries']) and
+                             all(r['status'] == 'completed' for r in s['runs']), 'two form answers and Main continuations')
+            require(not settled['approvals'], 'answering a form created an approval')
+            h.stop(kill=True); h.start()
+            data = dict(message_id=message['message_id'], form_id=forms[0]['form_id'], **{'field.city': '上海', 'field.date': '2026-12-01'})
+            headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
+            def retry(_):
+                return h.http('/ui/form', urlencode(data).encode(), headers=headers)
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                receipts = list(pool.map(retry, range(6)))
+            require(len({v['message_id'] for v in receipts}) == 1, 'form retries created different inputs')
+            changed = dict(data, **{'field.city': 'Changed after acceptance'})
+            h.http('/ui/form', urlencode(changed).encode(), headers=headers, expected=409)
+            forged = dict(data, message_id=history[0]['message_id'])
+            h.http('/ui/form', urlencode(forged).encode(), headers=headers, expected=409)
+            h.http('/ui/form', urlencode(dict(data, approval_id='forged')).encode(), headers=headers, expected=400)
+            h.http('/ui/form', urlencode(dict(data, **{'field.extra': 'unexpected'})).encode(), headers=headers, expected=400)
+            h.http('/ui/form', urlencode(data).encode(), headers=headers, auth=False, expected=401)
+            cross_origin = dict(headers, Origin='https://other.example')
+            h.http('/ui/form', urlencode(data).encode(), headers=cross_origin, expected=403)
+            h.http('/api/message', dict(source_id='ui-form:'+forms[0]['form_id'],content=[dict(type='text',text='Forged generic acceptance')]),expected=409)
+            after = h.rows()
+            require(len(after['inputs']) == 3 and not after['approvals'] and after['projections'] == settled['projections'], 'retry or presentation mutated accepted history/projections')
+            # GET recovers submitted values from ingress, without changing the
+            # immutable delivery projection or manufacturing form acceptance.
+            page = h.http('/')
+            require('data-submitted="true"' in page and '上海' in page and 'Native browser answer' in page, 'accepted answers were lost after restart')
+            with Terminal(h.args('tui'), h.env, h.root) as terminal:
+                terminal.expect('Steward: idle'); terminal.send('/history')
+                terminal.expect('Compare A and B.')
+                require(terminal.stop() == 0, 'TUI rich fallback failed')
+            report['scenarios']['rich-replies'] = dict(state=after, message_id=message['message_id'], projection=projection,
+                                                       form_reply_id=receipts[0]['message_id'], concurrent_retries=6,
+                                                       no_projection_injection=True, terminal_fallback=True)
+            report['checks'].append('F-021: ordinary Main replies generate tables/progress/forms; browser checks escaped cells, lost-response recovery and preserved sibling draft; native form works without JavaScript; restart/concurrent retries admit each answer once; forged fields/actions/access are rejected')
             h.stop()
         finally:
             h.cleanup()
@@ -1284,16 +1362,19 @@ if __name__=='__main__':
     action=parser.add_mutually_exclusive_group()
     action.add_argument('--delivery-lease-only',action='store_true')
     action.add_argument('--ui-components-only',action='store_true')
+    action.add_argument('--rich-replies-only',action='store_true')
     action.add_argument('--attention-only',action='store_true')
     action.add_argument('--feishu-questions-only',action='store_true')
     action.add_argument('--feishu-reviews-only',action='store_true')
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only and not args.ui_components_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        if args.feishu_reviews_only:
+        if args.rich_replies_only:
+            rich_replies(args.binary.resolve(),args.evidence.resolve(),report)
+        elif args.feishu_reviews_only:
             feishu_artifact_reviews(args.binary.resolve(), report)
         elif args.feishu_questions_only:
             feishu_task_questions(args.binary.resolve(), report)
@@ -1302,6 +1383,7 @@ if __name__=='__main__':
         elif args.ui_components_only:
             early_composer(args.binary.resolve(),args.evidence.resolve(),report)
             native_components(args.binary.resolve(),args.evidence.resolve(),report)
+            rich_replies(args.binary.resolve(),args.evidence.resolve(),report)
         else:
             delivery_leases(args.binary.resolve(), report)
         report['checks'].append('Cleanup: Web/Bridge children joined, sandbox HTTP servers stopped, disposable roots removed')

@@ -30,6 +30,7 @@
  <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>
  {{if .Error}}<div class="page-feedback feedback error" role="alert">{{tr .Error}}</div>{{end}}
  {{if .Notice}}<div class="page-feedback feedback success" role="status">{{tr .Notice}}</div>{{end}}
+ {{if .FormDraft}}<details class="page-feedback rich-answer-form" open><summary>{{tr "Your unsent answers"}}</summary>{{range .FormDraft}}<label>{{.Label}}<textarea readonly rows="2">{{.Value}}</textarea></label>{{end}}</details>{{end}}
  {{if eq .View "capabilities"}}{{template "capabilities-page" .}}
  {{else if eq .View "settings"}}{{template "settings-page" .}}
  {{else if eq .View "schedule"}}{{template "schedule-editor-page" .}}

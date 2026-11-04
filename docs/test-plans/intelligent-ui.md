@@ -12,11 +12,14 @@
 
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
-| [F-021](../features/intelligent-ui.md#f-021) | 真实回复生成表格等组件，确认保持冻结审批；未知组件/坏数据 fallback；表单可交互时验证提交去重。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| [F-021](../features/intelligent-ui.md#f-021) | 普通 Main 回复经 Bridge/Delivery 生成表格、进度与表单；用户消息不变成组件，单元格文字转义。 | `verify_channels.py --rich-replies-only` 不注入投影或历史行 |
+| F-021 | 相同表单并发重试与重启只接纳一次，修改已接受回答、跨消息表单与额外字段被拒绝；回答不创建审批。 | 同一系统场景读回真实输入、回执和冻结投影 |
+| F-021 | 无 JavaScript 原生提交；Unicode 字节上限、失败发送保留答案、失去回执后恢复已保存状态、其他表单草稿与普通输入框不丢失。 | Chromium `rich-replies` 阶段，同时保留桌面/移动端截图 |
+| F-021 | 未知版本/组件、越界表格、重复字段、伪造审批/Artifact/Host 身份均降级；授权、CSRF 与字段集合验证保持原边界。 | UI、HTTP 与真实 SQLite 组件回归 |
 
 ## 层级与关键路径
 
-必须通过正常回复生成端到端组件，不能直接往数据库注入 UISpec 冒充生成链。分别检查 Web 表格、审批冻结参数、未知组件 fallback 与未来表单提交幂等。
+必须通过正常回复生成端到端组件，不能直接往数据库注入 UISpec 冒充生成链。普通文字请求经显式脚本 Provider 的真实工具续轮生成结构化最终回复，再从 Web 交互和 SQLite 读回证明接纳与恢复。脚本 Provider 仅证明软件协议，不证明真实模型会选择合适组件或理解表格内容。
 
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
@@ -26,9 +29,23 @@
 
 | 入口 | 覆盖用途与限制 |
 | --- | --- |
-| [tests/system/verify_channels.py](../../tests/system/verify_channels.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [tests/system/verify_channels.py](../../tests/system/verify_channels.py) | `--rich-replies-only` 验证生成至提交闭环；`--ui-components-only` 同时覆盖既有渲染降级、普通草稿和本场景；`channels` core gate 包含本场景 |
+| [tests/system/channels_browser.mjs](../../tests/system/channels_browser.mjs) | 实际浏览器执行填表、Unicode 越界、失败/不确定提交、同消息另一表单草稿、重载、原生无脚本提交和移动端布局 |
+| [internal/delivery/ui/compose_test.go](../../internal/delivery/ui/compose_test.go) | 生成映射、恶意组件、用户文本保持原样、稳定且独立的表单身份、字段顺序及恢复 |
+| [internal/interaction/web/ui_forms_test.go](../../internal/interaction/web/ui_forms_test.go) | 现有认证、CSRF、撤销绑定、原生 POST、重复身份和额外动作字段 |
+| [internal/agent/sqlite/channels_test.go](../../internal/agent/sqlite/channels_test.go) | 真实接纳记录的来源读取与绑定隔离，既有并发输入和审批去重 |
 
-- **F-021 剩余覆盖**：补结构化结果到表格/进度/表单的生成映射；交互表单需定义提交与恢复语义。
+既有 `native_components` 的直接投影夹具只证明渲染与降级，不作为生成端完成的依据。真实账户、模型组件选择和语义质量仍需独立评测；不以合成数据或脚本 Provider 宣称通过。
+
+相关验证入口：
+
+```sh
+go test ./internal/delivery/ui ./internal/interaction/web ./internal/tui
+go test -race ./internal/agent/sqlite -run 'TestChannelSourceContent|TestChannelConcurrentCallback'
+python3 tests/system/verify_channels.py --binary bin/steward --rich-replies-only --evidence evidence/my-rich-reply/report.json
+make test lint
+make test-e2e E2E_EVIDENCE=evidence/my-core-run
+```
 
 ## 执行与完成判定
 

@@ -77,6 +77,24 @@ func (s *Store) CheckChannel(ctx context.Context, channel, subject, destination 
 	return nil
 }
 
+// ChannelSourceContent reads one accepted input under the current channel
+// binding. Presentation may recover an answer, but cannot invent acceptance.
+func (s *Store) ChannelSourceContent(ctx context.Context, channel, subject, destination, source string) ([]conversation.ContentPart, bool, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT i.message_json FROM channel_binding b JOIN channel_source s USING(binding_id) JOIN main_input i ON i.request_key=s.request_key WHERE b.channel=? AND b.subject=? AND b.destination=? AND b.enabled=1 AND s.source_id=?`, channel, subject, destination, source).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, agent.ErrStorage
+	}
+	var m conversation.Message
+	if json.Unmarshal([]byte(raw), &m) != nil || m.Role != "user" {
+		return nil, false, agent.ErrStorage
+	}
+	return m.Content, true, nil
+}
+
 type ChannelPreference = interaction.Preference
 
 func (s *Store) ChannelPreference(ctx context.Context) (p ChannelPreference, err error) {

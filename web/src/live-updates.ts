@@ -1,6 +1,7 @@
 import {t} from './i18n';
 import {z} from 'zod';
 import {enhanceProjections,releaseProjections} from './projections';
+import {captureRichFormDrafts} from './rich-forms';
 
 const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
 function viewRegions(view:string):string[]|null {
@@ -35,6 +36,7 @@ function regionPatcher(ids:readonly string[]){
   const region=document.getElementById(id);
   if(!region||markup.get(id)===html)return;
   const parsed=document.createElement('template');parsed.innerHTML=html;
+  const restoreDrafts=captureRichFormDrafts(region);
   if(id==='workspace-status'||id==='signin-status'){
    releaseProjections(region);region.replaceChildren(parsed.content);
   }else{
@@ -67,7 +69,7 @@ function regionPatcher(ids:readonly string[]){
     releaseProjections(child as HTMLElement);child.remove()
    }}
   }
-  markup.set(id,html);enhanceProjections(region);
+  markup.set(id,html);enhanceProjections(region);restoreDrafts();
  };
 }
 

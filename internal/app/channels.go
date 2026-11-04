@@ -6,11 +6,13 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/artifact"
 	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/interaction/feishu"
 	"github.com/z-chenhao/assistant/internal/interaction/web"
@@ -26,6 +28,12 @@ func (a *App) CheckChannel(ctx context.Context, c, s, d string) error {
 	return a.store.CheckChannel(ctx, c, s, d)
 }
 func (a *App) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
+	if e.Channel == "web" && (strings.HasPrefix(e.SourceID, "ui-form:") || strings.HasPrefix(e.EventID, "ui-form:")) {
+		return agent.Receipt{}, conversation.ErrInvalid
+	}
+	return a.acceptInbound(ctx, e)
+}
+func (a *App) acceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
 	if !a.Actor(nil).Ready(ctx) {
 		return agent.Receipt{}, agent.ErrSetup
 	}
@@ -46,7 +54,38 @@ func (a *App) ImportChannelArtifact(ctx context.Context, e interaction.InboundEv
 	return a.store.ImportChannelArtifact(ctx, e, key, input, src)
 }
 func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.RawMessage, error) {
-	return a.store.WebProjection(ctx, m)
+	raw, err := a.store.WebProjection(ctx, m)
+	if err != nil {
+		return nil, err
+	}
+	var spec ui.Spec
+	if json.Unmarshal(raw, &spec) != nil || spec.SchemaVersion != ui.Version {
+		return raw, nil
+	}
+	changed := false
+	for i := range spec.Components {
+		c := &spec.Components[i]
+		if c.Type != "form" || c.FormID == "" || c.MessageID != m.MessageID {
+			continue
+		}
+		changed = true
+		content, found, err := a.store.ChannelSourceContent(ctx, "web", web.Subject, web.Destination, "ui-form:"+c.FormID)
+		if err != nil {
+			c.Disabled = true
+			continue
+		}
+		if found {
+			if ui.Restore(c, content) != nil {
+				c.Disabled = true
+			}
+		} else if !a.Actor(nil).Ready(ctx) {
+			c.Disabled = true
+		}
+	}
+	if !changed {
+		return raw, nil
+	}
+	return json.Marshal(spec)
 }
 func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Config) error {
 	s := web.Server{Workers: a.store.Inspector(), Computer: a, Capabilities: a.capabilitySettings, Config: cfg, Core: a, Tasks: a.store.TaskReader(), Feedbacks: a, Schedules: a, Inspector: a.store.Inspector(), Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}

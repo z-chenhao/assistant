@@ -6,31 +6,53 @@
 
 ## 当前架构
 
-Main 保存渠道无关内容；Delivery Composer 产生 UISpec；Web 和飞书仅使用固定组件渲染。当前缺少普通结构化结果的组件选择与映射。
+Main 保存渠道无关的文字及可选声明式结果块；Delivery Composer 校验结构化数据并产生 UISpec，Web 和飞书仅使用固定组件渲染。表单回答复用现有渠道输入接纳和 Main 调度，不增加任务生命周期、模型路由或审批机制。
 
 ```mermaid
 flowchart TD
     M["Main 语义内容"] --> C["Delivery Composer"]
     C --> T["文本 / 附件：已接通"]
     A["待审批动作"] --> K["确认组件：已接通"]
-    C -.-> R["表格 / 进度 / 交互表单：待补生成端"]
+    C --> R["表格 / 进度 / 交互表单"]
     T --> V["受控 Web / 飞书呈现"]
     K --> V
-    R -.-> V
+    R --> V
+    V --> F["Web 校验原消息与表单字段"]
+    F --> I["渠道输入去重 → Main"]
+    I --> M
 ```
 
-## 当前流程与目标差异
+## 生成与降级
 
 读取权威语义内容 → 生成 UISpec → 校验版本/组件 → 渲染；未知或失败退回权威文本。新增交互必须有真实提交和去重路径。
 
-- **F-021**：组件 Schema 与渲染器已实现，审批有生成路径；普通 Compose 只产生 markdown/Artifact，form 当前为只读字段展示。 补结构化结果到表格/进度/表单的生成映射；交互表单需定义提交与恢复语义。
+Main 的冻结角色指令说明 `steward-result` JSON 围栏格式：`schema_version: 1`、完整的 `fallback` 文字及 `components`。生成端只接受 `markdown`、`table`、`progress`、`form`；不接受 HTML、脚本、动作 URL、审批身份、Artifact 授权或 Host 表单身份。用户消息不被解释为组件。
+
+每块最多 16 个组件，每条回复最多 4 份表单；表单最多 16 个具名、必填文本字段。表格最多 12 列、200 行，列名至多 200 字节，单元格至多 2000 字节；所有列数必须匹配。输入文字块沿用 64 KiB 上限，UISpec 继续保持至多 128 个组件。未知版本、未知字段、坏组件或越界结果整体回退到该块的文字替代；无法读取替代内容时保留原文。渲染端仍使用固定转义模板及 React 组件，不解释模型代码。
+
+`progress` 是模型对已知事实的文字摘要，不能修改 Task 状态、自动推送通知或声明外部动作完成。审批身份只能由原审批流程产生，模型结果块中的伪造确认组件直接降级。
+
+## 表单提交、恢复与兼容
+
+Composer 以原消息身份、组件位置及定义生成稳定的表单标识，只在 Host 投影中附加。Web 提交只携带消息身份、表单身份和字段值；服务端从当前 Conversation 的确切 assistant 消息和权威投影读取问题与字段定义，不接受客户端提供的问题、标签、目标 Run、审批或幂等键。
+
+提交重新验证 Web 绑定、模型就绪状态、字段名称集合、非空值、UTF-8 及长度。回答保存为有序的普通文字 ContentPart，保留字段边界并直接向用户展示问题和答案。`ui-form:` 来源命名空间由该入口保留，通用消息接口不能伪造表单已接受状态。稳定来源键经既有 `channel_source`、`channel_callback` 与 Main 输入在同一事务中接纳：相同回答返回同一回执，修改后重试返回冲突。
+
+GET 仅从已接受的输入读取回答，复制投影后附加已提交状态与原值，不改写冻结的 Delivery 投影、Conversation 或接纳记录。页面更新保留其他表单的草稿和焦点；发送结果不明时保留填写内容，不生成新来源身份。原生 HTML 表单支持无 JavaScript 提交；失败页面显示可复制的草稿。飞书与 TUI 使用可读替代内容，不增加渠道回调动作。
+
+没有数据库迁移、公开 Tool 或任意表单动作。UISpec v1 新字段可选；已有冻结投影保持原表示，旧只读表单不被当作交互表单。新 Main 获得结果格式指引，已接受 Run 的冻结上下文不被热替换。
 
 ## 代码与依赖
 
 - [internal/delivery/ui/spec.go](../../internal/delivery/ui/spec.go)
+- [internal/delivery/ui/compose.go](../../internal/delivery/ui/compose.go)
+- [internal/delivery/ui/forms.go](../../internal/delivery/ui/forms.go)
+- [internal/app/ui_forms.go](../../internal/app/ui_forms.go)
+- [internal/interaction/web/ui_forms.go](../../internal/interaction/web/ui_forms.go)
 - [internal/interaction/web/page.go](../../internal/interaction/web/page.go)
 - [web/src/main.tsx](../../web/src/main.tsx)
 - [web/src/components/data-table.tsx](../../web/src/components/data-table.tsx)
+- [web/src/rich-forms.ts](../../web/src/rich-forms.ts)
 
 ## 验证与交付
 
