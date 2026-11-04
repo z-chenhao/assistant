@@ -66,6 +66,8 @@
 
 **验收目标**：受控中断恢复后，UI 不把复用结果显示成新外部调用；未知结果、缺失 usage 和未 dispatch 等待如实展示。
 
+Developer 的 Database 页面提供独立的[只读元数据检查](database.md)，可从执行记录跳转本页的 Observability；两者沿用同一工作台权限。
+
 ## 如何使用
 
 登录现有 Web，点击侧栏 **Developer · Traces**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。

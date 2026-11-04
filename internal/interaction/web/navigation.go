@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/z-chenhao/assistant/internal/database"
 	"github.com/z-chenhao/assistant/internal/observability"
 	"github.com/z-chenhao/assistant/internal/task"
 )
@@ -36,6 +37,8 @@ func pageRoute(path string) (tab, view, title string) {
 		return "/settings", "settings", "Model details"
 	case path == "/developer/observability":
 		return "/developer/observability", "traces", "Traces"
+	case path == "/developer/database":
+		return "/developer/database", "database", "Database"
 	case strings.HasPrefix(path, "/developer/observability/") && pageLeaf(strings.TrimPrefix(path, "/developer/observability/")) || path == "/developer/context":
 		return "/developer/observability", "trace", "Trace details"
 	}
@@ -54,11 +57,11 @@ func safePageReturn(raw string) string {
 func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {
 	code := 503
 	message := "This page is temporarily unavailable. Your work has not been changed."
-	if errors.Is(err, errPageNotFound) || errors.Is(err, task.ErrNotFound) || errors.Is(err, observability.ErrNotFound) {
+	if errors.Is(err, errPageNotFound) || errors.Is(err, task.ErrNotFound) || errors.Is(err, observability.ErrNotFound) || errors.Is(err, database.ErrNotFound) {
 		code = 404
 		message = "This item could not be found in your workspace."
 	}
-	if errors.Is(err, task.ErrInvalid) || errors.Is(err, observability.ErrInvalid) {
+	if errors.Is(err, task.ErrInvalid) || errors.Is(err, observability.ErrInvalid) || errors.Is(err, database.ErrInvalid) {
 		code = 400
 		message = "This page link is invalid. Return to the list and choose an item."
 	}
