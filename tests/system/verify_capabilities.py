@@ -140,8 +140,8 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             folder = root / name
             folder.mkdir()
             metadata = None
-            if name == 'task-code-environments':
-                # Keep the five accepted calls, exact approvals, and their
+            if name in ('task-code-environments', 'task-code-recovery'):
+                # Keep coding calls/approvals and repeated publication recovery
                 # receipts inside the profile's protected-context budget.
                 metadata = dict(name='Task coding workload', provider_kind='openai_compatible',
                                 endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
