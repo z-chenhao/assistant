@@ -25,7 +25,7 @@ F-041 覆盖项目身份和实际 Web 操作，不包含真实模型语义效果
 
 界面语言回归：`go test ./internal/interaction/web` 的 locale 测试覆盖浏览器中文仍默认英文、显式中文及切回英文、无效选择不改 Cookie、现有认证/CSRF 边界、实时片段语言与 ETag，以及用户内容、原始参数和审批冻结标识不变。静态界面文案必须有中文条目；真实浏览器核对保存/刷新/跨页、动态控件和移动排版。
 
-`tests/system/channels_preferences.mjs` 由现有 channels 驱动的 preferences 阶段执行。可用 `python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/preferences/report.json --preferences-only` 单独运行；重跑使用新的 evidence 目录。覆盖 1400/390/320px × 中英文 × 明暗主题的闭合和展开、值宽度、44px 触摸目标、右缘对齐及无布局偏移；检查键盘浏览／确认／取消、帮助与列表互斥、触摸、定位翻转和缩放。真实 POST 验证保存、Cookie 读回、刷新及跨页；受控故障验证单请求锁、明确拒绝与重试、认证拒绝、断网、15 秒超时、错误确认、响应损坏但 Cookie 已应用和 Cookie 未保留时不假报成功。回归返回、确定性的 persisted pageshow、无 JS／初始化失败／无 Popover 的原生路径，以及相邻设置和通知表单。CSS 200% 缩放不替代 Owner 在 Mac mini 上的原生缩放与 VoiceOver 实测。JSON／原生响应、非法值、Cookie 属性、认证与 CSRF 由 locale 测试补充。
+`tests/system/channels_preferences.mjs` 由现有 channels 驱动的 preferences 阶段执行。可用 `python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/preferences/report.json --preferences-only` 单独运行；重跑使用新的 evidence 目录。覆盖 1400/390/320px × 中英文 × 明暗主题的闭合和展开、值宽度、44px 触摸目标、右缘对齐及无布局偏移；检查键盘浏览／确认／取消、帮助与列表互斥、触摸、定位翻转和缩放。鼠标帮助使用未聚焦、未点击的 1px 连续移动路径，逐点确认提示可见并记录坐标；覆盖全部布局组合、保存拒绝反馈出现和窄容器自然换行，避免直接跳到提示掩盖触发器间隙。真实 POST 验证保存、Cookie 读回、刷新及跨页；受控故障验证单请求锁、明确拒绝与重试、认证拒绝、断网、15 秒超时、错误确认、响应损坏但 Cookie 已应用和 Cookie 未保留时不假报成功。回归返回、确定性的 persisted pageshow、无 JS／初始化失败／无 Popover 的原生路径，以及相邻设置和通知表单。CSS 200% 缩放不替代 Owner 在 Mac mini 上的原生缩放与 VoiceOver 实测。JSON／原生响应、非法值、Cookie 属性、认证与 CSRF 由 locale 测试补充。
 
 
 精修验证沿用渠道浏览器与 Web 模块测试：四项导航、切页后标题焦点、最新消息入口、动态 composer 留白、真实待审批计数到卡片、320/390px 布局、44px 手机控件、黑白完整帧播放与暂停。Source Han 子集逐包验证 SHA-256/cmap，全集覆盖保留30926字符；不以 macOS 苹方的截图冒充非 macOS 冷加载性能测量。

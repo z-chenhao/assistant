@@ -8,6 +8,29 @@ export async function preferences(page,context,browser,url,evidence){
  const option=(p,value)=>p.locator(`[data-language-option="${value}"]`);
  const help=p=>p.locator('[data-help-trigger]');
  const check=async(condition,message)=>{if(!await condition)throw Error(message)};
+ const hoverPaths=[];
+ const hoverHelp=async(p,state)=>{
+  // Keep focus elsewhere: focus/pinning must not conceal a broken hover path.
+  await p.locator('.section-tabs [aria-current=page]').focus();
+  await p.mouse.move(p.viewportSize().width-2,p.viewportSize().height-2);
+  await help(p).hover();const tip=p.getByRole('tooltip');await tip.waitFor();
+  const control=await help(p).boundingBox(),tooltip=await tip.boundingBox();
+  if(tooltip.x<0||tooltip.x+tooltip.width>p.viewportSize().width+1)throw Error('help outside viewport');
+  const trace=[];
+  for(let y=control.y+control.height/2;y<=tooltip.y+12;y+=1){
+   await p.mouse.move(control.x+control.width/2,y);
+   const visible=await tip.isVisible();trace.push({y,visible});
+   if(!visible){
+    await writeFile(evidence+'/preferences-hover-failure.json',JSON.stringify({state,control,tooltip,trace},null,2));
+    throw Error('help disappeared along continuous pointer path: '+JSON.stringify({state,y,control,tooltip}));
+   }
+  }
+  await check(p.locator('[data-preference-help]').evaluate(n=>n.matches(':hover')),'tooltip did not retain hover');
+  await p.screenshot({path:evidence+'/preferences-hover-'+state+'.png',fullPage:true});
+  hoverPaths.push({state,viewport:p.viewportSize(),control,tooltip,gap:tooltip.y-control.y-control.height,trace});
+  await p.mouse.move(p.viewportSize().width-2,p.viewportSize().height-2);
+  await tip.waitFor({state:'hidden'});
+ };
  const ready=async p=>{await trigger(p).waitFor();await check(trigger(p).getAttribute('aria-disabled').then(v=>v!=='true'),'selector remained busy')};
  const choose=async(p,value)=>{
   const prior=await p.locator('#interface-language').inputValue();
@@ -61,6 +84,7 @@ export async function preferences(page,context,browser,url,evidence){
    await page.screenshot({path:`${evidence}/preferences-${language}-${theme}-${width}-open.png`,fullPage:true});
    await page.keyboard.press('Escape');await check(popup(page).isHidden(),'Escape did not close');
    matrix.push({language,theme,width,...geometry,popup:box});
+   await hoverHelp(page,`${language}-${theme}-${width}`);
   }
  }
  await choose(page,'en');await page.goto(url+'/settings/preferences');await ready(page);
@@ -103,6 +127,7 @@ export async function preferences(page,context,browser,url,evidence){
  await trigger(page).click();await option(page,'zh-CN').click();
  await page.locator('[data-language-feedback][role=alert]').waitFor();
  await check(page.locator('#interface-language').inputValue().then(v=>v==='en'),'rejection did not restore confirmed value');
+ await hoverHelp(page,'rejected-feedback');
  await page.screenshot({path:evidence+'/preferences-rejected.png',fullPage:true});
  await page.unroute('**/settings/language');await page.locator('[data-language-retry]').click();
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();await ready(page);
@@ -140,6 +165,11 @@ export async function preferences(page,context,browser,url,evidence){
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();await ready(page);
  await check(page.locator('[data-language-feedback]').innerText().then(v=>v.includes('cookie settings')),'readback falsely confirmed blocked cookie');
  await page.unroute('**/settings/language');
+ await page.setViewportSize({width:320,height:844});
+ await page.locator('.preference-group').evaluate(n=>n.style.width='210px');
+ await check(page.locator('.preference-controls').evaluate(n=>n.getBoundingClientRect().top>document.querySelector('.preference-name').getBoundingClientRect().bottom),'test did not produce a wrapped row');
+ await hoverHelp(page,'wrapped-feedback');
+ await page.locator('.preference-group').evaluate(n=>n.style.width='');
  await page.goto(url+'/settings/models');await page.goBack();await ready(page);
  const countBeforeReturn=posts;
  await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
@@ -190,5 +220,5 @@ export async function preferences(page,context,browser,url,evidence){
    await page.locator('select[name=target]').selectOption('auto:');await page.getByRole('button',{name:'Save notification channel',exact:true}).click();
   }
  }
- await writeFile(evidence+'/preferences-browser.json',JSON.stringify({matrix,keyboard:true,touch:true,autosave:true,singleFlight:true,rejectedRetry:true,unknownAppliedReadback:true,network:true,timeout:true,authRejection:true,mismatchedAck:true,blockedCookieReadback:true,bfcache:true,fallbacks:true,flipped:true,cssZoom:2,neighborSections:true},null,2));
+ await writeFile(evidence+'/preferences-browser.json',JSON.stringify({matrix,hoverPaths,keyboard:true,touch:true,autosave:true,singleFlight:true,rejectedRetry:true,unknownAppliedReadback:true,network:true,timeout:true,authRejection:true,mismatchedAck:true,blockedCookieReadback:true,bfcache:true,fallbacks:true,flipped:true,cssZoom:2,neighborSections:true},null,2));
 }

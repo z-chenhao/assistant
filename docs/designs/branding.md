@@ -48,4 +48,4 @@ Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织单层�
 
 成功导航携带目标语言与焦点 fragment，服务端在 GET 读回 Cookie 后才显示成功；不一致则提示检查浏览器 Cookie 设置。整页使用服务端翻译，不扫描改写 DOM。成功／错误反馈显示在语言组内。普通进入页面不抢焦点；pagehide 使旧响应失效，BFcache 返回通过 GET 重新核对，不重放写入。
 
-帮助默认提供原生 details/summary；`settings.ts` 就绪后替换为具有 aria-describedby 的按钮与文本 tooltip。悬停或聚焦显示，点击固定显示／关闭，移入仍可阅读；Escape 关闭直到再次进入或激活，外部操作关闭。帮助与语言列表互斥。无 JS 时保留原生展开，不提供 Escape 关闭。相邻设置继续沿用原有原生提交保护。
+帮助默认提供原生 details/summary；`settings.ts` 就绪后替换为具有 aria-describedby 的按钮与文本 tooltip。提示锚定名称／问号所在行，并与触发器底边重叠 1px，形成连续可悬停区域；表单反馈或控件换行不改变这一关系，提示宽度限制在视口内。悬停或聚焦显示，点击固定显示／关闭，移入仍可阅读；Escape 关闭直到再次进入或激活，外部操作关闭。帮助与语言列表互斥。无 JS 时保留原生展开，不提供 Escape 关闭。相邻设置继续沿用原有原生提交保护。
