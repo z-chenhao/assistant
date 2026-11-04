@@ -110,7 +110,7 @@ func put(ctx context.Context, ref string, value []byte) error {
 	if !validServiceRef(ref) || len(value) == 0 || len(value) > maxSecretBytes {
 		return llm.ErrSecretStore
 	}
-	ctx, token, done, err := serviceContext(ctx)
+	_, token, done, err := serviceContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,10 @@ func put(ctx context.Context, ref string, value []byte) error {
 		C.memset(data, 0, C.size_t(len(encoded)))
 		C.free(data)
 	}()
-	if C.steward_secret_put(key, (*C.char)(data), token) == 0 || ctx.Err() != nil {
+	// Preserve a positive native acknowledgement even if the caller cancels
+	// just afterward. The account Manager can then clean up a known stored item
+	// if its metadata commit fails, rather than treating it as never written.
+	if C.steward_secret_put(key, (*C.char)(data), token) == 0 {
 		return llm.ErrSecretStore
 	}
 	return nil
@@ -136,14 +139,14 @@ func remove(ctx context.Context, ref string) error {
 	if !validServiceRef(ref) {
 		return llm.ErrSecretStore
 	}
-	ctx, token, done, err := serviceContext(ctx)
+	_, token, done, err := serviceContext(ctx)
 	if err != nil {
 		return err
 	}
 	defer done()
 	key := C.CString(ref)
 	defer C.free(unsafe.Pointer(key))
-	if C.steward_secret_remove(key, token) == 0 || ctx.Err() != nil {
+	if C.steward_secret_remove(key, token) == 0 {
 		return llm.ErrSecretStore
 	}
 	return nil
