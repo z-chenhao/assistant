@@ -32,7 +32,7 @@ func TestLanguageDefaultsToEnglishAndPersistsExplicitChoice(t *testing.T) {
 	for _, language := range []string{"", "en", "invalid"} {
 		w := httptest.NewRecorder()
 		s.ServeHTTP(w, languageRequest("GET", "/settings/preferences", language, ""))
-		if w.Code != 200 || !strings.Contains(w.Body.String(), `<html lang="en">`) || !strings.Contains(w.Body.String(), "Interface language") {
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `<html lang="en">`) || !strings.Contains(w.Body.String(), `<label for="interface-language">Language</label>`) {
 			t.Fatal("default must be English, independent of browser language", w.Code, w.Body.String())
 		}
 	}
@@ -45,7 +45,7 @@ func TestLanguageDefaultsToEnglishAndPersistsExplicitChoice(t *testing.T) {
 	location := w.Header().Get("Location")
 	w = httptest.NewRecorder()
 	s.ServeHTTP(w, languageRequest("GET", location, "zh-CN", ""))
-	if w.Code != 200 || w.Header().Get("Content-Language") != "zh-CN" || !strings.Contains(w.Body.String(), `<html lang="zh-CN">`) || !strings.Contains(w.Body.String(), "语言已保存。") || !strings.Contains(w.Body.String(), "保存语言") {
+	if w.Code != 200 || w.Header().Get("Content-Language") != "zh-CN" || !strings.Contains(w.Body.String(), `<html lang="zh-CN">`) || !strings.Contains(w.Body.String(), "语言已保存。") || !strings.Contains(w.Body.String(), `type="submit">保存</button>`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()

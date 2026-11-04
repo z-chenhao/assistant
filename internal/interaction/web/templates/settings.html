@@ -13,7 +13,18 @@
 {{define "settings-tabs"}} <nav class="section-tabs" aria-label="{{tr "Settings sections"}}"><a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{tr "Preferences"}}</a><a href="/settings/models" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{tr "Models"}}</a><a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{tr "Notifications"}}</a><a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>{{tr "Capabilities"}}</a></nav>{{end}}
 
 {{define "preferences"}}
-<div class="page-heading"><div><h1>{{tr "Preferences"}}</h1><p>{{tr "Choose the language used throughout your workspace."}}</p></div></div>
-<section class="panel form-panel"><h2>{{tr "Language"}}</h2>
-<form method="post" action="/settings/language"><label for="interface-language">{{tr "Interface language"}}<select id="interface-language" name="language"><option value="en" lang="en" {{if ne .Language "zh-CN"}}selected{{end}}>English</option><option value="zh-CN" lang="zh-CN" {{if eq .Language "zh-CN"}}selected{{end}}>简体中文</option></select></label><p class="field-help">{{tr "This preference applies to this browser. Your messages, replies and files keep their original language."}}</p><button>{{tr "Save language"}}</button></form></section>
+<h1 class="sr-only">{{tr "Preferences"}}</h1>
+<form class="preference-row" method="post" action="/settings/language" data-preserve-submit-label>
+ <div class="preference-name"><label for="interface-language">{{tr "Language"}}</label>
+  <div class="preference-help" data-preference-help>
+   <details data-help-fallback><summary aria-label="{{tr "About interface language"}}">{{template "icon-help"}}</summary><span class="preference-tooltip">{{template "language-help"}}</span></details>
+   <button type="button" class="preference-help-trigger" aria-label="{{tr "About interface language"}}" aria-describedby="language-help" data-help-trigger hidden>{{template "icon-help"}}</button>
+   <span id="language-help" class="preference-tooltip" role="tooltip" data-help-tooltip hidden>{{template "language-help"}}</span>
+  </div>
+ </div>
+ <select id="interface-language" name="language"><option value="en" lang="en" {{if ne .Language "zh-CN"}}selected{{end}}>English</option><option value="zh-CN" lang="zh-CN" {{if eq .Language "zh-CN"}}selected{{end}}>简体中文</option></select>
+ <button class="preference-save" type="submit">{{tr "Save"}}</button>
+</form>
 {{end}}
+
+{{define "language-help"}}{{tr "Choose the language used throughout your workspace."}} {{tr "This preference applies to this browser. Your messages, replies and files keep their original language."}}{{end}}

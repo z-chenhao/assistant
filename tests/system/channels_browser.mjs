@@ -1,6 +1,7 @@
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
 import {capabilitySetup} from './channels_capabilities.mjs';
 import {databaseInspection} from './channels_database.mjs';
+import {preferences} from './channels_preferences.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 const [url,evidence,phase='conversation']=process.argv.slice(2);
@@ -39,7 +40,9 @@ try{
  if(await avatar.getAttribute('data-frame')!=='0')throw Error('paused avatar retained a moving pose');
  if(await avatar.locator('.ghost-art').evaluate(node=>getComputedStyle(node).animationPlayState)!=='paused')throw Error('pause did not stop ghost drift');
  await page.locator('[data-avatar-pause]').click();
- if(phase==='database'){
+ if(phase==='preferences'){
+  await preferences(page,context,browser,url,evidence);
+ }else if(phase==='database'){
   await databaseInspection(page,context,browser,url,evidence);
  }else if(phase==='attention'){
   const composer=page.locator('#composer-root textarea');

@@ -39,3 +39,9 @@ README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通
 ## 界面语言
 
 使用现有原生设置流程新增 `/settings/preferences` 与认证后的 `POST /settings/language`。只接收 `en`、`zh-CN`，以路径 `/`、SameSite Strict、有效期一年的 `steward-language` 浏览器 Cookie 持久化。未设置或无效时一律英文；不使用 Accept-Language。服务端预编译两份不可变模板，显式 `tr` 仅作用于应用自有界面文案；客户端从同一私有 JSON 文案表读取。没有运行时 DOM 扫描或外部翻译服务。实时片段和日期展示随语言变化；正文、标识、字段值、冻结哈希及机器协议不变。此方案优先支持无 JS 的原生切换，未引入通用翻译平台或账户级语言同步。
+
+Preferences 使用局部 `.preference-row` 栅格将 Language 标签与帮助、原生 select、Save 放在同行；移除可见大标题及 panel，保留读屏 h1 与当前导航标签。移动选择器为 16px，交互目标至少 44px 高；使用既有颜色和字体，不修改其他表单密度。
+
+帮助默认提供原生 `details/summary`；`settings.ts` 就绪后替换为具有 `aria-describedby` 的按钮与纯文本 tooltip。悬停或聚焦显示，点击固定显示／关闭，移入提示仍可阅读，Escape 关闭直到再次进入或激活，点击外部关闭。无 JS 时保留可展开说明与原生保存，降级帮助不提供 Escape 关闭。提示相对设置行定位并限制在可用宽度内。
+
+语言表单以 `data-preserve-submit-label` 保持紧凑的 Save 文案；现有提交保护仍禁用按钮、设置 `aria-busy`、阻止重复提交并在 BFcache `pageshow` 恢复。成功和错误使用现有服务端反馈，选择器改值不自动保存。提示按钮显式声明 `type="button"`，不参与提交。

@@ -8,6 +8,21 @@
 .section-tabs.compact{gap:16px;margin:12px 0 18px}.section-tabs.compact a{font-size:12px;padding:6px 0 9px}
 .database-filter{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}.database-filter label{flex:1;min-width:220px}.database-table{width:100%;min-width:720px;border-collapse:collapse;font-size:13px}.database-table th,.database-table td{padding:18px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}.database-table th{color:var(--muted-foreground);font-size:12px}.database-record-ref{display:block;max-width:250px;overflow-wrap:anywhere}.database-table time{display:block;min-width:125px;font-size:12px}.database-fields{display:grid;grid-template-columns:minmax(90px,auto) minmax(100px,1fr);gap:8px 14px;margin:12px 0}.database-fields dt{color:var(--muted-foreground)}.database-fields dd{margin:0;overflow-wrap:anywhere;max-width:420px}.database-links{list-style:none;padding:0;margin:10px 0;max-width:370px}.database-links li{margin:8px 0}.database-links a{display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}.database-links code{font-size:11px}.database-table .technical-details{margin:0}
 .settings-page{max-width:920px}.form-panel{max-width:680px}.settings-footer{font-size:11px;color:var(--muted-foreground);margin:28px 0 0}
+/* Preferences share the tab strip's density; other settings keep their forms. */
+.settings-page:has(.preference-row)>.section-tabs{margin-bottom:16px}
+.preference-row{position:relative;display:grid;grid-template-columns:max-content minmax(0,160px) max-content;align-items:center;gap:12px;max-width:400px;padding:8px 0}
+.preference-name{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.preference-row :is(button,select,summary){outline-offset:1px}
+.preference-name label{margin:0;font-size:14px;font-weight:500;color:var(--foreground)}
+.preference-row select{margin:0;min-height:34px;padding:5px 8px;border-radius:7px;font-size:14px}
+.preference-row .preference-save{min-height:34px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border-color:var(--border);border-radius:7px;white-space:nowrap}
+.preference-row .preference-save:hover{background:var(--hover)}
+.preference-help{display:inline-flex}
+.preference-help-trigger,.preference-help summary{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:34px;min-height:34px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;list-style:none}
+.preference-help summary::-webkit-details-marker{display:none}
+.preference-help-trigger:hover,.preference-help summary:hover{background:var(--hover);color:var(--foreground)}
+.preference-tooltip{position:absolute;z-index:20;top:calc(100% - 8px);left:0;display:block;width:min(280px,100%);padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:760px){.preference-row{gap:4px}.preference-row select{min-height:44px;font-size:16px}.preference-row .preference-save{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}}
 .current-model{border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;padding:24px 0;background:transparent}.current-model h2{font-size:22px;font-weight:550;margin:14px 0 6px}.current-model .text-link{display:inline-block;margin-top:8px}
 .current-model .model-endpoint{font-size:13px;color:var(--muted-foreground)}
 .list-heading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}.list-heading h2{margin:0}.list-heading span{font-size:12px;color:var(--muted-foreground)}
