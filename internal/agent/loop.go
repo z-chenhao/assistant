@@ -46,6 +46,7 @@ func ContinueAgentLoop(ctx context.Context, claim RunClaim, options LoopOptions)
 	}
 	l := agentLoop{claim: claim, options: options, work: work, execution: execution, jobs: map[string]*toolJob{}}
 	defer l.joinTools(true)
+	defer l.discardPreview()
 	return l.run(ctx)
 }
 
@@ -59,6 +60,7 @@ type agentLoop struct {
 	work      context.Context
 	execution context.Context
 	jobs      map[string]*toolJob
+	preview   Event // Main generation whose temporary text may still become a reply.
 }
 
 func (l *agentLoop) run(ctx context.Context) error {
@@ -185,6 +187,12 @@ func (l *agentLoop) modelTurn(r Run) (bool, error) {
 		return false, l.fail(r, generation.ErrorCode)
 	}
 	result := generation.Result
+	keepPreview := false
+	defer func() {
+		if !keepPreview {
+			l.discardPreview()
+		}
+	}()
 	if result != nil {
 		l.emit(r, "generation_reused", "", "")
 	}
@@ -192,23 +200,33 @@ func (l *agentLoop) modelTurn(r Run) (bool, error) {
 		visible := generation.Compaction == nil
 		if visible {
 			l.emit(r, "turn_start", "", "")
-			l.emit(r, "message_start", "", "")
+			start := l.event(r, "message_start", "", "")
+			start.GenerationID = generation.Request.GenerationID
+			if r.Kind == MainRole {
+				l.preview = start
+			}
+			l.publish(start)
 		}
 		callCtx, cancel := context.WithTimeout(l.execution, 45*time.Second)
+		stopDiscard := l.discardOnCancel(callCtx)
 		generate := l.options.Provider.Generate
 		if cp.Step > 0 {
 			generate = l.options.Provider.Continue
 		}
 		value, callErr := generate(callCtx, generation.Request, func(e llm.GenerationEvent) {
-			if visible && e.Kind == "text_delta" {
-				l.emit(r, "message_update", e.Text, "")
+			if visible && e.Kind == "text_delta" && e.Text != "" && callCtx.Err() == nil {
+				update := l.event(r, "message_update", e.Text, "")
+				update.GenerationID = generation.Request.GenerationID
+				l.publish(update)
 			}
 		})
+		stopDiscard()
 		cancel()
 		if l.execution.Err() != nil {
 			return false, l.execution.Err()
 		}
 		if callErr != nil {
+			l.discardPreview()
 			// Storage/claim rejection is infrastructure, not a failed model.
 			if errors.Is(callErr, ErrClaimLost) || errors.Is(callErr, ErrStorage) || errors.Is(callErr, llm.ErrStorage) {
 				return false, callErr
@@ -270,7 +288,10 @@ func (l *agentLoop) modelTurn(r Run) (bool, error) {
 	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
 		return false, err
 	}
-	l.emit(r, "message_end", "", "")
+	end := l.event(r, "message_end", "", "")
+	end.GenerationID = cp.ExchangeID
+	l.publish(end)
+	keepPreview = cp.Phase == ReplyPhase
 	return false, nil
 }
 
@@ -341,6 +362,7 @@ func (l *agentLoop) replyTurn(r Run) (bool, error) {
 		return false, err
 	}
 	if !ready {
+		l.discardPreview()
 		// A completed generation may have been overtaken by user steering.
 		// Keep it as model context, then inject separate user messages.
 		cp.Step++
@@ -355,6 +377,7 @@ func (l *agentLoop) replyTurn(r Run) (bool, error) {
 	if err = l.options.Store.DeliverReply(l.work, l.claim, r); err != nil {
 		return false, err
 	}
+	l.finishPreview("reply_committed")
 	l.emit(r, "turn_end", "", "")
 	return false, nil
 }
@@ -376,10 +399,50 @@ func (l *agentLoop) settleTurn(r Run) (bool, error) {
 	return false, nil
 }
 
-func (l agentLoop) emit(r Run, kind, text, call string) {
+func (l *agentLoop) emit(r Run, kind, text, call string) {
+	l.publish(l.event(r, kind, text, call))
+}
+
+func (l *agentLoop) event(r Run, kind, text, call string) Event {
+	return Event{Kind: kind, RunID: r.ID, RunKind: string(r.Kind), AgentID: r.AgentID, Step: r.Checkpoint.Step, OccurredAt: time.Now().UTC(), Text: text, ToolCallID: call}
+}
+
+func (l *agentLoop) publish(e Event) {
 	if l.options.Sink != nil {
-		l.options.Sink(Event{Kind: kind, RunID: r.ID, AgentID: r.AgentID, Step: r.Checkpoint.Step, OccurredAt: time.Now().UTC(), Text: text, ToolCallID: call})
+		l.options.Sink(e)
 	}
+}
+
+// Withdraw the draft at cancellation even if the provider is still cleaning up.
+func (l *agentLoop) discardOnCancel(ctx context.Context) func() {
+	e := l.preview
+	if e.GenerationID == "" || l.options.Sink == nil {
+		return func() {}
+	}
+	done := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		e.Kind, e.OccurredAt = "message_discarded", time.Now().UTC()
+		l.publish(e)
+		close(done)
+	})
+	return func() {
+		if !stop() {
+			<-done
+			l.preview = Event{}
+		}
+	}
+}
+
+func (l *agentLoop) discardPreview() { l.finishPreview("message_discarded") }
+
+func (l *agentLoop) finishPreview(kind string) {
+	if l.preview.GenerationID == "" {
+		return
+	}
+	e := l.preview
+	l.preview = Event{}
+	e.Kind, e.OccurredAt = kind, time.Now().UTC()
+	l.publish(e)
 }
 
 func (l *agentLoop) wait(r Run, reason string) error {

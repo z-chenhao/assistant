@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -581,6 +582,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		return llm.GenerationResult{}, err
 	}
 	result = llm.GenerationResult{ToolCalls: []llm.ToolCall{}}
+	var generatedText strings.Builder
 	var authTick <-chan time.Time
 	if connection.Guard != nil {
 		ticker := time.NewTicker(200 * time.Millisecond)
@@ -636,10 +638,11 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		result.Clipped = result.Clipped || d.clipped
 		switch e.Kind {
 		case "text_delta":
-			result.Text += e.Text
+			generatedText.WriteString(e.Text)
 		case "tool_call":
 			result.ToolCalls = append(result.ToolCalls, *e.ToolCall)
 		case "completed":
+			result.Text = generatedText.String()
 			result.Usage = e.Usage
 			if r.Snapshot.ProviderKind == "openai_account" {
 				completed = &e

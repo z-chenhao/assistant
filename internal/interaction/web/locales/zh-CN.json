@@ -78,6 +78,8 @@
   "Steward needs attention": "Steward 需要检查",
   "Your draft is kept. Check the model connection and workspace setup before sending new work.": "草稿已保留。发送新任务前，请检查模型连接和工作空间配置。",
   "Set up Steward →": "配置 Steward →",
+  "Draft reply": "回复草稿",
+  "Draft reply from Ghost": "Ghost 的回复草稿",
   "Earlier messages": "更早的消息",
   "You": "你",
   "What would you like to work on?": "今天想一起做些什么？",

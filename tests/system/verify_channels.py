@@ -628,6 +628,45 @@ def live_updates(binary,evidence,report):
         finally:h.cleanup()
 
 
+def streaming_replies(binary, evidence, report):
+    """A real model HTTP stream gated by observations in Chromium."""
+    from http.server import ThreadingHTTPServer
+    from provider_endpoint import Endpoint
+    with tempfile.TemporaryDirectory(prefix='steward-streaming-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+        h = ChannelHarness(binary, Path(temp), platform, '')
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Endpoint)
+        server.requests, server.mode, server.stream_gates = [], 'success', h.root
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            h.config.write_text(h.config.read_text() + 'llm:\n  provider_bridge_command: node\n  provider_bridge_script: ' +
+                                json.dumps(str(ROOT/'provider-bridge/bridge.mjs')) +
+                                '\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: ' + json.dumps(broker.url) + '\n')
+            h.setup(metadata=dict(name='Streaming HTTP fixture', provider_kind='openai_compatible',
+                endpoint=f'http://127.0.0.1:{server.server_port}/v1', wire_api='openai_completions', model_id='fixture-model',
+                context_window=8192, max_output_tokens=1024, compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
+            server.mode = 'web-stream'
+            h.env['STEWARD_STREAM_GATES'] = str(h.root)
+            h.start()
+            h.wait_state(lambda status: status['readiness']=='ready', 'stream runtime readiness', lambda _:h.http('/api/status'))
+            h.http('/api/conversation/stream', auth=False, expected=401)
+            h.browser(evidence.parent/'channels-streaming', 'streaming')
+            h.wait(lambda state: sorted(r['status'] for r in state['runs']) == ['completed', 'failed'], 'committed and failed stream outcomes')
+            messages = h.http('/api/conversation')
+            replies = [m for m in messages if m['message_id'].startswith('reply:')]
+            expected = 'First chunk <img src=x onerror=unsafe()>\nSecond chunk 中文.\nFinal tail.'
+            require(len(replies)==1 and replies[0]['content'][0]['text'].partition('\n```steward-result\n')[0]==expected and
+                    'Interrupted draft only.' not in json.dumps(messages), 'preview changed durable reply history')
+            report['scenarios']['streaming-replies'] = dict(durable_replies=1, failure_discarded=True, late_subscriber=True,
+                                                           reconnected=True, commit_tail=True)
+            report['checks'].append('Real Pi HTTP chunks reach Web before completion, reconnect restores exact text, the unread commit tail survives until one final projection, and an interrupted stream leaves no reply')
+        finally:
+            for gate in ('second', 'finish', 'fail'):
+                (h.root/gate).touch()
+            h.cleanup()
+            server.shutdown();server.server_close();thread.join()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
     database_inspection(binary,evidence,report)
@@ -689,6 +728,7 @@ def run(binary,evidence):
         finally:h.cleanup()
 
     live_updates(binary,evidence,report)
+    streaming_replies(binary,evidence,report)
 
     inspection_relationships(binary,evidence,report)
 

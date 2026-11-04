@@ -136,6 +136,25 @@ class Endpoint(BaseHTTPRequestHandler):
             elif self.server.mode == "partial":
                 chunk({"content": "partial"})
                 return
+            elif self.server.mode == "web-stream":
+                def await_browser(name):
+                    deadline = time.monotonic() + 15
+                    while not (self.server.stream_gates / name).exists():
+                        require(time.monotonic() < deadline, 'browser did not observe stream before releasing ' + name)
+                        time.sleep(.02)
+
+                if "STREAM_FAILURE" in text:
+                    chunk({"content": "Interrupted draft only."})
+                    await_browser('fail')
+                    return
+                require("STREAM_SUCCESS" in text, 'unexpected streaming test input')
+                chunk({"content": "First chunk <img src=x onerror=unsafe()>"})
+                await_browser('second')
+                chunk({"content": "\nSecond chunk 中文."})
+                await_browser('finish')
+                chunk({"content": "\nFinal tail.\n```stew"})
+                chunk({"content": 'ard-result\n{"schema_version":1,"fallback":"Rich fallback.","components":[{"type":"table","columns":["Status"],"rows":[["Done"]]}]}\n```'})
+                chunk({}, "stop")
             elif body.get("tools") and not any(m["role"] == "tool" for m in body["messages"]):
                 if self.server.mode == "no-tools":
                     chunk({"content": "I cannot call tools"})

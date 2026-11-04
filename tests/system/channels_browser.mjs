@@ -12,6 +12,20 @@ const browser=await chromium.launch(options);
 let page;
 try{
  const context=await browser.newContext({viewport:{width:1400,height:980},deviceScaleFactor:1});
+ if(phase==='streaming'){
+  await context.addInitScript(()=>{
+   const NativeEventSource=window.EventSource;
+   window.EventSource=class extends NativeEventSource {
+    constructor(url,options){
+     super(url,options);
+     if(url==='/api/conversation/stream')window.dropReplyStream=()=>{
+      this.close();
+      this.dispatchEvent(new Event('error'));
+     };
+    }
+   };
+  });
+ }
  page=await context.newPage();
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const remote=[];page.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});
@@ -353,6 +367,60 @@ try{
   await page.getByRole('button',{name:'Send message',exact:true}).click();
   const expected=process.env.STEWARD_TEST_VISION==='yes'?'USER_IMAGE_PIXELS_RECEIVED':'USER_IMAGE_REFERENCE_ONLY';
   await page.locator('.message.assistant').filter({hasText:expected}).waitFor();
+ }
+ if(phase==='streaming'){
+  page.setDefaultTimeout(8000);
+  const editor=page.getByLabel('Message Ghost',{exact:true});
+  const send=page.getByRole('button',{name:'Send message',exact:true});
+  const draft=page.locator('#conversation-draft');
+  const committed=page.locator('#conversation-messages .message.assistant');
+  const first='First chunk <img src=x onerror=unsafe()>',second='Second chunk 中文.';
+  const release=name=>writeFile(process.env.STEWARD_STREAM_GATES+'/'+name,'');
+  const source=page.locator('.composer input[name=source_id]');
+  const before=await source.inputValue();
+  const editorNode=await editor.elementHandle();
+  let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++});
+  await editor.fill('STREAM_SUCCESS');await send.click();
+  await draft.filter({hasText:first}).waitFor();
+  if(await committed.count()||await draft.locator('img').count()||before===await source.inputValue())throw Error('draft was committed, interpreted as HTML, or did not rotate the accepted request identity');
+  const durable=await (await context.request.get(url+'/api/conversation')).json();
+  if(durable.some(message=>message.role==='assistant'))throw Error('preview was persisted before the provider completed');
+  await editor.fill('Keep typing while Ghost writes.');
+  await editor.focus();await editor.evaluate(node=>node.setSelectionRange(5,11));
+  await page.getByLabel('Attach a file').setInputFiles({name:'stream-kept.txt',mimeType:'text/plain',buffer:Buffer.from('keep')});
+  const late=await context.newPage();
+  try{
+   await late.goto(url);
+   await late.locator('#conversation-draft').filter({hasText:first}).waitFor({timeout:8000});
+  }finally{await late.close();await page.bringToFront()}
+  await page.evaluate(()=>window.dropReplyStream());
+  await draft.waitFor({state:'hidden'});
+  await release('second');
+  const draftText=draft.locator('[data-draft-text]');
+  await draftText.filter({hasText:second}).waitFor();
+  if(await draftText.textContent()!==first+'\n'+second)throw Error('reconnect lost, repeated or exposed streamed text');
+  await page.screenshot({path:evidence+'/streaming-draft.png'});
+  let resumeProjection;
+  const projectionGate=new Promise(resolve=>{resumeProjection=resolve});
+  await page.route('**/api/updates?**',async route=>{await projectionGate;await route.continue().catch(()=>{})});
+  try{
+   await release('finish');
+   await draftText.filter({hasText:'Final tail.'}).waitFor();
+   if(await draftText.textContent()!==first+'\n'+second+'\nFinal tail.\n'||await committed.count())throw Error('commit lost or repeated text before the final projection');
+  }finally{resumeProjection()}
+  await page.unroute('**/api/updates?**');
+  await committed.getByRole('table').getByText('Done',{exact:true}).waitFor();
+  await draft.waitFor({state:'hidden'});
+  if(await committed.count()!==1||!await editorNode.evaluate(node=>node===document.activeElement&&node.value==='Keep typing while Ghost writes.'&&node.selectionStart===5&&node.selectionEnd===11))throw Error('commit duplicated reply or disturbed the draft editor');
+  if(await page.getByLabel('Attach a file').evaluate(node=>node.files[0]?.name)!=='stream-kept.txt')throw Error('streaming lost the attachment');
+  await page.getByLabel('Attach a file').setInputFiles([]);
+  await editor.fill('STREAM_FAILURE');await send.click();
+  await draft.filter({hasText:'Interrupted draft only.'}).waitFor();
+  await release('fail');await draft.waitFor({state:'hidden'});
+  await committed.filter({hasText:'The request could not be completed. Please retry explicitly.'}).waitFor();
+  const count=await page.locator('#conversation-messages [data-reply-key]').count();
+  if(count!==1||await committed.filter({hasText:'Interrupted draft only.'}).count()||navigations!==0)throw Error('failed stream changed committed replies or navigated: '+JSON.stringify({count,navigations}));
+  await writeFile(evidence+'/stream-contract.json',JSON.stringify({previewBeforeCompletion:true,lateSubscriber:true,reconnected:true,commitTail:true,committedOnce:true,failedDiscarded:true,navigations}));
  }
  if(phase==='live'){
   page.setDefaultTimeout(10000);

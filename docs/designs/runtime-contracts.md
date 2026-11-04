@@ -263,7 +263,7 @@ App 关闭完成后再停止本地 Broker。入口由原 `cmd/personal-agent` �
 - `ModelProfileService.Add/Test/Select/List`：用户控制面；只允许 `ready` Profile 成为 Active。
 - `ProviderAuth.Start/Continue/Refresh/Logout/Status`：浏览器、Device Code 与 token refresh 统一为 UI-neutral 事件。
 - `ModelCatalog.List/Refresh` 与 `ModelProbe.Run`：目录发现和能力验证分离，目录声明不能代替 Probe。
-- `LLMProvider.Generate/Continue/Cancel`：必须接收不可变 ModelSnapshot，流式事件规范化为 Agent Loop 事件；Provider 专属消息不进入领域层。
+- `LLMProvider.Generate/Continue/Cancel`：必须接收不可变 ModelSnapshot，流式事件规范化为 Agent Loop 事件；Provider 专属消息不进入领域层。文本增量是临时预览，不参与回放；只有完整且通过当前执行权校验的结果可进入 Checkpoint、工具执行或正式回复。
 - `SecretStore.Get/Put/Delete`：OS Credential Store 实现与测试 Fake；领域表只保存 `credential_ref`。
 - `RunStore.Claim/Checkpoint/Wait/Complete/Fail`：所有写入验证 claim token 与 epoch。
 - `TaskService.Search/Manage`：唯一的 Task 控制面。

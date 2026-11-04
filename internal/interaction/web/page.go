@@ -16,6 +16,7 @@ import (
 type shownMessage struct {
 	Role       string
 	Sequence   int64
+	ReplyKey   string
 	Projection shownProjection
 	Approval   *approvalView
 }
