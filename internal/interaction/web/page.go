@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/llm"
 )
@@ -30,6 +31,7 @@ type page struct {
 	Tasks                                             *taskView
 	Attention                                         *attentionView
 	FeedbackDraft                                     string
+	FormDraft                                         []ui.Field
 	Schedule                                          *scheduleEditor
 	Settings                                          *settingsView
 	Accounts                                          []llm.AuthConnection

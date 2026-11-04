@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
 )
@@ -319,7 +321,13 @@ func (u *terminal) history(ctx context.Context) error {
 		}
 		for _, p := range m.Content {
 			if p.Type == "text" {
-				u.print(m.Role + ": " + p.Text)
+				text := p.Text
+				if m.Role == "assistant" {
+					part := m
+					part.Content = []conversation.ContentPart{p}
+					text = ui.Compose(delivery.Envelope{Message: part}).Fallback
+				}
+				u.print(m.Role + ": " + text)
 			} else if p.ArtifactRef != "" {
 				u.print(m.Role + " attachment: " + p.ArtifactRef)
 			} else {

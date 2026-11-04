@@ -549,6 +549,50 @@ try{
   await page.setViewportSize({width:1400,height:980});
   await page.goto(url);
  }
+ if(phase==='rich-replies'){
+  await page.locator('[data-renderer="native"] .answer-table').waitFor();
+  if(await page.locator('.answer-table tbody tr').count()!==2||await page.locator('.answer-table img,.answer-table script').count())throw Error('generated table lost data or interpreted markup');
+  if(!(await page.locator('.answer-table').innerText()).includes('<img src=x onerror='))throw Error('generated table changed literal cells');
+  const forms=page.locator('.message.assistant form[action="/ui/form"]');
+  if(await forms.count()!==2)throw Error('ordinary reply did not produce interactive forms');
+  const firstID=await forms.nth(0).getAttribute('data-form-id'),secondID=await forms.nth(1).getAttribute('data-form-id');
+  const first=page.locator(`form[data-form-id="${firstID}"]`),second=page.locator(`form[data-form-id="${secondID}"]`);
+  await page.getByLabel('Message Ghost',{exact:true}).fill('Keep the ordinary conversation draft.');
+  await second.getByLabel('Travel notes',{exact:true}).fill('Keep this sibling draft.');
+  await first.getByLabel('Destination',{exact:true}).fill('中'.repeat(1400));
+  await first.getByLabel('Travel date',{exact:true}).fill('2026-12-01');
+  await first.getByRole('button',{name:'Send response',exact:true}).click();
+  if(!(await first.getByLabel('Destination',{exact:true}).evaluate(field=>field.validationMessage)).includes('too long'))throw Error('Unicode field byte limit was not enforced');
+  await first.getByLabel('Destination',{exact:true}).fill('上海');
+  let calls=0;
+  await page.route('**/ui/form',async route=>{calls++;if(calls>1)await route.fetch();await route.abort('failed')});
+  await first.getByRole('button',{name:'Send response',exact:true}).click();
+  await first.getByRole('status').filter({hasText:'not confirmed'}).waitFor();
+  if(await first.getByLabel('Destination',{exact:true}).inputValue()!=='上海'||await first.getByRole('button',{name:'Send response',exact:true}).isDisabled())throw Error('failed POST lost answers or cannot retry');
+  await first.getByRole('button',{name:'Send response',exact:true}).click();
+  await page.locator(`form[data-form-id="${firstID}"][data-submitted="true"]`).waitFor();
+  await page.unroute('**/ui/form');
+  if(calls!==2||await second.getByLabel('Travel notes',{exact:true}).inputValue()!=='Keep this sibling draft.')throw Error('saved form replacement lost sibling answers or duplicated POST');
+  if(await page.getByLabel('Message Ghost',{exact:true}).inputValue()!=='Keep the ordinary conversation draft.')throw Error('form interaction changed conversation draft');
+  await page.reload();
+  await page.locator(`form[data-form-id="${firstID}"][data-submitted="true"]`).waitFor();
+  if(await first.getByLabel('Destination',{exact:true}).inputValue()!=='上海'||!await first.getByLabel('Destination',{exact:true}).isDisabled())throw Error('reload did not recover accepted answers');
+  const native=await browser.newContext({javaScriptEnabled:false});
+  try{
+   await native.addCookies(await context.cookies());const plain=await native.newPage();await plain.goto(url);
+   const form=plain.locator(`form[data-form-id="${secondID}"]`);
+   await form.getByLabel('Travel notes',{exact:true}).fill('中'.repeat(1400));
+   await form.getByRole('button',{name:'Send response',exact:true}).click();
+   if(await plain.locator('details.rich-answer-form textarea[readonly]').inputValue()!=='中'.repeat(1400))throw Error('native validation failure lost the answer draft');
+   await form.getByLabel('Travel notes',{exact:true}).fill('Native browser answer\nSecond line');
+   await form.getByRole('button',{name:'Send response',exact:true}).click();
+   await plain.waitForURL('**/?notice=feedback-saved');
+   if(await plain.locator(`form[data-form-id="${secondID}"]`).getAttribute('data-submitted')!=='true')throw Error('native form acceptance not restored');
+   await plain.screenshot({path:evidence+'/rich-replies-no-script.png',fullPage:true});
+  }finally{await native.close()}
+  await page.reload();
+  await page.locator(`form[data-form-id="${secondID}"][data-submitted="true"]`).waitFor();
+ }
  if(phase==='components'){
   await page.locator('[data-renderer="native"] .answer-table').waitFor();
   if(await page.locator('.answer-table tbody tr').count()!==2)throw new Error('native table lost rows');

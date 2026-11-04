@@ -34,6 +34,8 @@ F-004/F-042 的精确 PR 关联接续使用 [github_followup_test.go](../../inte
 | [tests/system/verify_tasks.py](../../tests/system/verify_tasks.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_task_control.py](../../tests/system/verify_task_control.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
+`verify_tasks.py` 按持久化的上下文准备记录区分普通生成与摘要生成：两者必须使用同一 Run 的冻结模型；普通请求的工具名称及 schema 对照 Capability Snapshot，并保持逐轮一致；只有标记为 `summary_request`、具有摘要计划且上下文与准备记录一致的请求才能不声明工具。`test_model_task_control.py` 的负例继续拒绝摘要获得工具、未标记的无工具请求、模型/schema 漂移和准备上下文漂移。
+
 ### F-004 信息反馈验收路径
 
 - `internal/task/task_test.go`：新问题/审阅分支的严格 union、必填/越臂/重复/null 字段、成果数量与冻结旧 schema 拒绝；旧请求省略新字段时保留规范化身份。

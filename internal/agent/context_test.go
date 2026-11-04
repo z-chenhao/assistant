@@ -26,7 +26,7 @@ func TestContextPromptBytes(t *testing.T) {
 		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:frozen", Text: "research"}}},
 		{Name: "builtin__computer_observe", Internal: true},
 	}
-	for _, tc := range []struct{ position, hash string }{{"main", "8c30e36cec292f610049e28519bcb0e9190fce7fd2387d21540cf08897966537"}, {"root", "cbc6daf863c55ebc97e55dd2c0c0e5f1152e88aed5d59c16a0901ff478c5488c"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
+	for _, tc := range []struct{ position, hash string }{{"main", "a96ecbb01c80175ecce2dee89fabb5645eb97977e9a0d0d10618f06f0fb7c043"}, {"root", "cbc6daf863c55ebc97e55dd2c0c0e5f1152e88aed5d59c16a0901ff478c5488c"}, {"child", "3762481eac19a8c1e740ed840b2f524808cf0231e3a0a8b2ec595bd9d1a49057"}} {
 		t.Run(tc.position, func(t *testing.T) {
 			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}), false)
 			if err != nil {

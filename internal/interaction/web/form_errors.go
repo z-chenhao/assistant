@@ -4,9 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 
 	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
@@ -14,7 +17,7 @@ import (
 
 func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error) {
 	if r.Header.Get("Accept") == "application/json" {
-		if r.URL.Path == "/task/feedback" {
+		if r.URL.Path == "/task/feedback" || r.URL.Path == "/ui/form" {
 			code, kind := 503, "unconfirmed"
 			switch {
 			case errors.Is(cause, task.ErrInvalid), errors.Is(cause, conversation.ErrInvalid):
@@ -96,6 +99,35 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 		p.Draft = r.FormValue("text")
 		p.SourceID = r.FormValue("source_id")
 	}
+	if r.URL.Path == "/ui/form" {
+		labels := map[string]string{}
+		for _, m := range p.Messages {
+			if c, err := ui.Form([]byte(m.Projection.Spec), r.PostForm.Get("message_id"), r.PostForm.Get("form_id")); err == nil {
+				for _, f := range c.Fields {
+					labels[f.Name] = f.Label
+				}
+			}
+		}
+		keys := make([]string, 0, len(r.PostForm))
+		for key := range r.PostForm {
+			if strings.HasPrefix(key, "field.") {
+				keys = append(keys, key)
+			}
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			value := r.PostForm.Get(key)
+			if len(p.FormDraft) == 16 || len(value) > 16<<10 {
+				continue
+			}
+			name := strings.TrimPrefix(key, "field.")
+			label := labels[name]
+			if label == "" {
+				label = name
+			}
+			p.FormDraft = append(p.FormDraft, ui.Field{Name: name, Label: label, Value: value})
+		}
+	}
 	if p.Settings != nil && p.Settings.Section == "new" {
 		p.Settings.Model = r.FormValue("model")
 		p.Settings.Name = r.FormValue("name")
@@ -106,7 +138,7 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	status := 409
-	if r.URL.Path == "/task/feedback" && (errors.Is(cause, task.ErrInvalid) || errors.Is(cause, conversation.ErrInvalid)) {
+	if (r.URL.Path == "/task/feedback" || r.URL.Path == "/ui/form") && (errors.Is(cause, task.ErrInvalid) || errors.Is(cause, conversation.ErrInvalid)) {
 		status = 400
 	}
 	w.WriteHeader(status)

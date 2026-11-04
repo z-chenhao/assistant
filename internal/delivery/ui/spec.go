@@ -31,6 +31,10 @@ type Component struct {
 	ApprovalID  string     `json:"approval_id,omitempty"`
 	Hash        string     `json:"frozen_arguments_hash,omitempty"`
 	Fields      []Field    `json:"fields,omitempty"`
+	MessageID   string     `json:"message_id,omitempty"`
+	FormID      string     `json:"form_id,omitempty"`
+	Submitted   bool       `json:"submitted,omitempty"`
+	Disabled    bool       `json:"disabled,omitempty"`
 }
 type Spec struct {
 	SchemaVersion int         `json:"schema_version"`
@@ -45,10 +49,23 @@ func Hash(v any) string {
 }
 func Compose(e delivery.Envelope) Spec {
 	s := Spec{SchemaVersion: Version, Components: []Component{}}
+	forms := 0
 	for _, p := range e.Message.Content {
 		if p.Type == "text" {
-			s.Components = append(s.Components, Component{Type: "markdown", Text: p.Text})
-			s.Fallback += p.Text + "\n"
+			parts, fallback := composeText(e.Message, p.Text, len(s.Components))
+			count := 0
+			for _, c := range parts {
+				if c.Type == "form" {
+					count++
+				}
+			}
+			if forms+count > 4 || len(s.Components)+len(parts) > 128 {
+				parts = []Component{{Type: "markdown", Text: fallback}}
+			} else {
+				forms += count
+			}
+			s.Components = append(s.Components, parts...)
+			s.Fallback += fallback + "\n"
 		} else if p.ArtifactRef != "" {
 			s.Components = append(s.Components, Component{Type: "artifact", Text: p.Type, ArtifactRef: p.ArtifactRef})
 			s.Fallback += p.Type + ": " + p.ArtifactRef + "\n"
@@ -75,19 +92,23 @@ func valid(c Component) bool {
 				return false
 			}
 		}
+		for _, column := range c.Columns {
+			if len(column) > 8192 {
+				return false
+			}
+		}
+		for _, row := range c.Rows {
+			for _, cell := range row {
+				if len(cell) > 8192 {
+					return false
+				}
+			}
+		}
 		return true
 	case "confirmation":
 		return c.ApprovalID != "" && len(c.Hash) == 64
 	case "form":
-		if len(c.Fields) == 0 || len(c.Fields) > 16 {
-			return false
-		}
-		for _, f := range c.Fields {
-			if f.Name == "" || f.Label == "" {
-				return false
-			}
-		}
-		return true
+		return validFields(c.Fields) && (c.FormID == "" || c.MessageID != "" && len(c.FormID) == 64)
 	}
 	return false
 }
@@ -108,7 +129,11 @@ func HTML(raw json.RawMessage, fallback string) template.HTML {
 			continue
 		}
 		var b bytes.Buffer
-		if component.Execute(&b, c) != nil {
+		renderer := component
+		if c.Type == "form" && c.FormID != "" {
+			renderer = formComponent
+		}
+		if renderer.Execute(&b, c) != nil {
 			out.WriteString(template.HTMLEscapeString(fallback))
 		} else {
 			out.Write(b.Bytes())
@@ -142,6 +167,9 @@ func Card(s Spec) map[string]any {
 			case "confirmation":
 				parts = append(parts, c.Text+"\nApproval: "+c.ApprovalID+"\nHash: "+c.Hash+"\nReply /approve ID HASH or /deny ID HASH")
 			case "form":
+				if c.Text != "" {
+					parts = append(parts, c.Text)
+				}
 				for _, f := range c.Fields {
 					parts = append(parts, f.Label+": "+f.Value)
 				}
