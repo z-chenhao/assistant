@@ -28,6 +28,7 @@ type page struct {
 	Capabilities                                      []Capability
 	Capability                                        *Capability
 	Trace                                             *traceView
+	Database                                          *databaseView
 	Tasks                                             *taskView
 	Attention                                         *attentionView
 	FeedbackDraft                                     string
@@ -86,6 +87,8 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	p.AccountID = s.accountID
 	s.mu.Unlock()
 	switch p.View {
+	case "database":
+		p.Database, err = s.loadDatabase(ctx, r)
 	case "schedule":
 		err = s.loadSchedule(ctx, r, &p)
 	case "capabilities":

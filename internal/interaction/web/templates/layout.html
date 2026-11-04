@@ -18,7 +18,7 @@
   <a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>{{tr "Chat"}}</span></a>
   <a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>{{tr "Tasks"}}</span></a>
   <a href="/settings/models" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Settings"}}</span></a>
-  <a href="/developer/observability" {{if eq .Tab "/developer/observability"}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>{{tr "Developer"}}</span></a>
+  <a href="/developer/observability" {{if or (eq .Tab "/developer/observability") (eq .Tab "/developer/database")}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>{{tr "Developer"}}</span></a>
  </nav>
  <div class="sidebar-footer">
   <div><p>{{tr "Your personal AI steward."}}</p><button type="button" class="appearance-toggle" data-theme-toggle aria-label="{{tr "Switch appearance"}}">{{template "icon-appearance"}}</button></div>
@@ -36,6 +36,7 @@
  {{else if eq .View "schedule"}}{{template "schedule-editor-page" .}}
  {{else if eq .View "tasks"}}{{template "tasks-page" .}}
  {{else if eq .View "task"}}{{template "task-page" .}}
+ {{else if eq .View "database"}}{{template "database-page" .}}
  {{else if or (eq .View "traces") (eq .View "trace")}}{{template "observability-page" .}}
  {{else if eq .View "error"}}<section class="workspace-page"><h1>{{tr "We couldn't open this page"}}</h1><p>{{tr "Use the navigation to return to your workspace."}}</p><a class="button secondary" href="{{if .Path}}{{.Path}}{{else}}/{{end}}">{{tr "Try again"}}</a></section>
  {{else}}{{template "conversation-page" .}}{{end}}

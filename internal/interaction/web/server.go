@@ -76,6 +76,7 @@ type Server struct {
 	Capabilities   CapabilitySettings
 	Workers        WorkerReader
 	Inspector      ExecutionReader
+	Database       DatabaseReader
 	Contexts       ContextReader
 	Traces         TraceReader
 	Tasks          TaskReader
