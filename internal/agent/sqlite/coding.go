@@ -227,11 +227,18 @@ func (s *Store) CodeReport(ctx context.Context, ref string, withDiff bool) (codi
 // SaveCodeReport stages the bounded snapshot outside SQL and rechecks Task and
 // privacy scope in the existing Artifact commit transaction.
 func (s *Store) SaveCodeReport(ctx context.Context, ref string) (artifact.Descriptor, error) {
+	return s.saveCodeReport(ctx, ref, nil)
+}
+
+func (s *Store) saveCodeReport(ctx context.Context, ref string, handoff *codePRHandoff) (artifact.Descriptor, error) {
 	report, err := s.CodeReport(ctx, ref, true)
 	if err != nil {
 		return artifact.Descriptor{}, err
 	}
 	report.Directory = ""
+	if handoff != nil {
+		report.PR = &handoff.binding.observation
+	}
 	raw, err := json.Marshal(report)
 	if err != nil {
 		return artifact.Descriptor{}, err
@@ -245,6 +252,7 @@ func (s *Store) SaveCodeReport(ctx context.Context, ref string) (artifact.Descri
 		return artifact.Descriptor{}, err
 	}
 	defer staged.Close()
+	s.boundary("before_code_report_commit")
 	var out artifact.Descriptor
 	err = s.Transaction(ctx, func(tx *sql.Tx) error {
 		scope := artifact.Scope{UserID: artifact.LocalUser, Owner: true}
@@ -254,6 +262,15 @@ func (s *Store) SaveCodeReport(ctx context.Context, ref string) (artifact.Descri
 		}
 		if err != nil {
 			return agent.ErrStorage
+		}
+		if handoff != nil {
+			current, err := readCodePRBinding(ctx, tx.QueryRowContext, ref, handoff.cfg, handoff.expected)
+			if err != nil {
+				return err
+			}
+			if current != handoff.binding || current.taskID != scope.TaskID {
+				return agent.ErrConflict
+			}
 		}
 		artifactRef, err := artifacts.CommitTx(ctx, tx, scope, staged, "")
 		if err != nil {

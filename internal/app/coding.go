@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/artifact"
 	"github.com/z-chenhao/assistant/internal/coding"
 )
@@ -13,4 +14,11 @@ func (a *App) CodeReport(ctx context.Context, ref string, withDiff bool) (coding
 
 func (a *App) SaveCodeReport(ctx context.Context, ref string) (artifact.Descriptor, error) {
 	return a.store.SaveCodeReport(ctx, ref)
+}
+
+func (a *App) SaveCodePRReport(ctx context.Context, ref, head string) (artifact.Descriptor, error) {
+	if a.github == nil {
+		return artifact.Descriptor{}, agent.ErrConflict
+	}
+	return a.store.SaveCodePRReport(ctx, ref, a.github.Config, head)
 }

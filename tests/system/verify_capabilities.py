@@ -2,6 +2,7 @@
 """M3 stdio MCP, progressive Skills and actual controlled coding CLI proof."""
 import argparse
 from contextlib import closing
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -364,6 +365,40 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                 require('directory' not in review and review['diff']['changed'] and 'USER_UNCOMMITTED_SENTINEL' in review['diff']['patch'], 'review Artifact lost the imported dirty baseline or exposed host paths')
                 require(str(workspaces) not in review['diff']['patch'] and 'b/task-result.txt' in review['diff']['patch'], 'patch headers were not repository relative')
                 reports.append(dict(task_ref=w['task_ref'], artifact=artifact, command_exit_codes=[c['exit_code'] for c in commands]))
+            # Use a normalized successful observer snapshot without configuring
+            # any real token or reaching GitHub. Bind via the actual owner CLI.
+            config = h.root / 'config.yaml'
+            config.write_text(config.read_text() + '\ngithub:\n  repository: fixture/repo\n  pull_number: 7\n  credential_ref: env:STEWARD_SYNTHETIC_HANDOFF_TOKEN\n')
+            head, observed = 'a'*40, time.time_ns() // 1000
+            with closing(sqlite3.connect(h.root/'data/state.db')) as db, db:
+                db.execute("""INSERT INTO github_watch(scope,repository,pull_number,repository_id,enabled,intent_privacy_epoch,state,head_sha,last_success_at,version)
+                            VALUES('fixture/repo#7','fixture/repo',7,99,1,0,'healthy',?,?,1)""", (head, observed))
+            first = reports[0]['task_ref']
+            binding = h.command('github', 'bind', text=json.dumps(dict(task_ref=first, task_epoch=1, version=0, mode='observe', event_kind='review')))
+            watch = h.command('github', 'status')
+            artifact = h.command('coding', 'report-pr', first, head)
+            handoff = h.command('artifact', 'open', artifact['artifact_ref'])
+            association = handoff.pop('pr_association')
+            ordinary = h.command('artifact', 'open', reports[0]['artifact']['artifact_ref'])
+            require('pr_association' not in ordinary and handoff['task_ref']==ordinary['task_ref'] and
+                    handoff['baseline_sha256']==ordinary['baseline_sha256'] and handoff['commands']==ordinary['commands'] and
+                    handoff['diff']['files']==ordinary['diff']['files'] and 'b/task-result.txt' in handoff['diff']['patch'],
+                    'handoff changed local report evidence')
+            observed_at = datetime.fromisoformat(association['observed_at'].replace('Z', '+00:00'))
+            require(association['kind']=='owner_requested_association' and association['repository']=='fixture/repo' and
+                    association['repository_id']==99 and association['pull_number']==7 and association['head_sha']==head and
+                    round(observed_at.timestamp()*1_000_000)==observed,
+                    'report mislabeled persisted PR identity or observation time')
+            require(h.command('github', 'status')==watch and h.command('github', 'binding')==binding,
+                    'report changed watcher or association')
+            for ref, expected in ((first, 'b'*40), (reports[1]['task_ref'], head)):
+                rejected = h.command('coding', 'report-pr', ref, expected, ok=False)
+                require(rejected.returncode!=0 and not rejected.stdout, 'wrong Task or expected head accepted')
+            h.command('github', 'unbind', text=json.dumps(dict(version=binding['version'])))
+            rejected = h.command('coding', 'report-pr', first, head, ok=False)
+            require(rejected.returncode!=0 and not rejected.stdout, 'revoked binding accepted')
+            require(h.command('artifact', 'open', artifact['artifact_ref'])['pr_association']==association,
+                    'existing historical report changed after unbind')
             require(tree(source)==original and not (source/'hook-ran').exists(), 'source dirty files or Git hooks changed')
             (source/'.git').rename(source/'.git-disabled')
             try:
@@ -373,7 +408,7 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
                 (source/'.git-disabled').rename(source/'.git')
             value=environments()
             require(sum(w['status']=='failed' and w['error_code']=='CODE_PREPARATION_FAILED' for w in value)==1 and sum(w['status']=='ready' for w in value)==2, 'preparation failure affected another Task')
-            return dict(name='task_code_environment_scope_diff_and_evidence', reports=reports, preparation_failure='isolated', source_preserved=True)
+            return dict(name='task_code_environment_scope_diff_and_evidence', reports=reports, pr_handoff=artifact, preparation_failure='isolated', source_preserved=True)
         scenario('task-code-environments', task_code_environments)
 
         def task_code_recovery(h):

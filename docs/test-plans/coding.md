@@ -33,3 +33,5 @@ macOS 本机 Seatbelt 回归运行真实四工具和 Task 目录/恢复场景，
 本地 Task 目录通过 `verify_capabilities.py --scenario task-code-environments` 驱动真实 CLI、Task、四工具、审批和 Artifact。该工作负载使用 16K 测试模型窗口以保留五项调用和确切回执，独立的小窗口裁决不变。`--scenario task-code-recovery` 在发布前 SIGTERM 与 SIGKILL，并在发布后 SIGKILL。重启比较持久 Task 位置和源脏内容，证明未发布可重备，已发布不重新导入。两个场景进入既有 Ubuntu checks，使用同一证据上传与失败门禁。
 
 Go 回归验证 Main/Task 沙箱访问边界、Child 继承同一 Task、精确审批、准备失败隔离、链接及无效 UTF-8 文件名拒绝、非 UTF-8 补丁省略且保留原字节摘要、空文件和正文相对补丁、报告 Task 归属及 Forget 屏障。真实远端 PR 和模型判断仍需单独验收。
+
+`task-code-environments` 在实际 Task 工作副本生成后注入规范化的成功 watch fixture，经所有者 CLI 绑定 observe 模式，验证 `report-pr` 保存仓库 ID、确切 head、观察时间和原本地证据。错误 Task、错误 head 与撤销绑定必须拒绝，原报告和已保存的历史关联可继续打开。SQLite 测试在报告完成 staging 后注入同 head 刷新或 Forget，确认提交不留下 Artifact。真实远端发布与修订等价性不由此场景证明。
