@@ -41,6 +41,9 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 		return err
 	}
 	runs := a.store.Runs(a.history, registry)
+	if cfg.Feishu != nil {
+		runs.ConfigureFeishuReviewWorkspace(cfg.Feishu.WorkspaceURL)
+	}
 	runs.ConfigureLocalEnvironment(cfg.ExecutionConfig())
 	runs.ConfigureImageOCR(imageOCR)
 	if cfg.Computer != nil {

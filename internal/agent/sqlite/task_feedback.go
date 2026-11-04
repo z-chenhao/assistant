@@ -51,10 +51,8 @@ func (t *tools) requestTaskFeedback(ctx context.Context, tx *sql.Tx, change *tas
 			return tool.Result{}, err
 		}
 	}
-	if kind == "input" {
-		if err := saveFeishuTaskQuestion(ctx, tx, change, source); err != nil {
-			return tool.Result{}, err
-		}
+	if err := t.runs.saveFeishuTaskFeedbackCard(ctx, tx, change, kind, source); err != nil {
+		return tool.Result{}, err
 	}
 	change.receiptStatus = change.status
 	return tool.Result{}, nil

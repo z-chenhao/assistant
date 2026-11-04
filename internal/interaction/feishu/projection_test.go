@@ -111,8 +111,8 @@ func (s *projectionStore) DeliveryBinding(context.Context, delivery.Request) (in
 func (s *projectionStore) DeliveryReplySource(context.Context, delivery.Request) (string, error) {
 	return s.source, nil
 }
-func (s *projectionStore) FeishuTaskQuestion(context.Context, string) (string, bool, error) {
-	return "", false, nil
+func (s *projectionStore) FeishuTaskFeedbackCard(context.Context, string) (string, string, bool, error) {
+	return "", "", false, nil
 }
 func (s *projectionStore) SaveProjection(_ context.Context, _ string, _ string, _ int, spec any) (json.RawMessage, error) {
 	if s.raw == nil {

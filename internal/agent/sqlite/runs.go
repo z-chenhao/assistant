@@ -33,6 +33,7 @@ import (
 )
 
 type Runs struct {
+	feishuReviewWorkspace string
 	imageOCR              ImageOCR
 	environmentExecute    func(context.Context, string, string) tool.Result
 	localEnvironment      *environment.Config
@@ -160,7 +161,7 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 			sourceKey := ""
 			if feedbackRef != "" {
 				if inbound.Channel == "feishu" {
-					if err := requireFeishuTaskQuestion(ctx, tx, *inbound, feedbackRef); err != nil {
+					if err := r.host.requireFeishuTaskFeedbackCard(ctx, tx, *inbound, feedbackRef); err != nil {
 						return err
 					}
 				} else {

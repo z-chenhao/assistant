@@ -98,6 +98,18 @@ class ChannelHarness(MainHarness):
             'X-Lark-Request-Nonce': nonce, 'X-Lark-Signature': digest if signature else 'forged',
         }, expected=expected)
 
+    def card_feedback(self, ref, card_id, answer, event, *, chat='bound-chat', owner='owner',
+                      name='steward_task_question_submit', signature=True):
+        return self.signed_callback(dict(
+            schema='2.0',
+            header=dict(event_id=event, event_type='card.action.trigger', token='sandbox-verify-token',
+                        app_id='sandbox-app', tenant_key='sandbox-tenant'),
+            event=dict(host='im_message', operator=dict(tenant_key='sandbox-tenant', open_id=owner),
+                       context=dict(open_message_id=card_id, open_chat_id=chat),
+                       action=dict(tag='button', name=name, value=dict(feedback_ref=ref),
+                                   form_value=dict(answer=answer)))),
+            signature=signature, expected=200 if signature else 401)
+
     def rows(self):
         with closing(sqlite3.connect(self.root/'data/state.db')) as db, db:
             db.row_factory=sqlite3.Row
@@ -345,16 +357,8 @@ def feishu_task_questions(binary, report):
                 return next((q for q in question_rows() if q['prompt'] == prompt), {})
             return wait(selected, lambda q: q.get('delivery_status') == status, f'{source} card {status}')
 
-        def action(q, card_id, answer, event, *, chat='bound-chat', owner='owner', name='steward_task_question_submit', signature=True):
-            return h.signed_callback(dict(
-                schema='2.0',
-                header=dict(event_id=event, event_type='card.action.trigger', token='sandbox-verify-token',
-                            app_id='sandbox-app', tenant_key='sandbox-tenant'),
-                event=dict(host='im_message', operator=dict(tenant_key='sandbox-tenant', open_id=owner),
-                           context=dict(open_message_id=card_id, open_chat_id=chat),
-                           action=dict(tag='button', name=name, value=dict(feedback_ref=q['feedback_ref']),
-                                       form_value=dict(answer=answer)))),
-                signature=signature, expected=200 if signature else 401)
+        def action(q, card_id, answer, event, **kwargs):
+            return h.card_feedback(q['feedback_ref'], card_id, answer, event, **kwargs)
 
         def web_retry(q, answer):
             return h.http('/task/feedback', urlencode(dict(feedback_ref=q['feedback_ref'], answer=answer,
@@ -410,7 +414,7 @@ def feishu_task_questions(binary, report):
             require(h.command('task', 'respond', q['feedback_ref'], text=answer)['message_id'] == accepted and
                     web_retry(q, answer)['message_id'] == accepted, 'cross-channel retry changed the original receipt')
             require(action(q, card_id, 'Different answer', 'conflict')['toast'] ==
-                    dict(type='error', content='This question changed or already has a different answer. Check Tasks.'),
+                    dict(type='error', content='This request changed or already has a different response. Check Tasks.'),
                     'different answer was accepted or reported as uncertain')
             require(rows('SELECT count(*) AS n FROM main_input')[0]['n'] == 3 and
                     len(platform.evidence()['messages']) == len(outbound), 'retry created extra input or delivery')
@@ -478,12 +482,124 @@ def feishu_task_questions(binary, report):
             h.cleanup()
 
 
+def feishu_artifact_reviews(binary, report):
+    """Authenticated Workspace link and the exact review revision round trip."""
+    from urllib.parse import urlsplit
+    with tempfile.TemporaryDirectory(prefix='steward-feishu-reviews-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform, 'tasks')
+
+        def rows(query, args=()):
+            with closing(sqlite3.connect(h.root / 'data/state.db')) as db, db:
+                db.row_factory = sqlite3.Row
+                return [dict(row) for row in db.execute(query, args)]
+
+        def review(prompt):
+            found = rows("""SELECT f.feedback_ref, f.artifact_refs, f.response_message_id, q.review_url, c.remote_id
+                FROM task_feedback f LEFT JOIN feishu_task_question q USING(feedback_ref)
+                LEFT JOIN delivery_request d ON d.message_id=q.message_id
+                LEFT JOIN channel_receipt c ON c.delivery_id=d.delivery_id AND c.part=0 WHERE f.prompt=?""", (prompt,))
+            return found[0] if found else {}
+
+        def wait_review(prompt, predicate):
+            return h.wait_state(predicate, 'saved review and expected delivery state', lambda _: review(prompt), timeout=20)
+
+        try:
+            h.setup(metadata=dict(name='Feishu review workload', provider_kind='openai_compatible',
+                                  endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                  model_id='fixture-model', context_window=32768, max_output_tokens=1024,
+                                  compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
+            h.start()
+            h.callback('om_review_task', 'Ongoing: Prepare the review report')
+            h.wait(lambda s: len(s['deliveries']) == 2 and all(d['status'] == 'sent' for d in s['deliveries']), 'review Task delivered')
+            task_ref = rows('SELECT task_ref FROM task')[0]['task_ref']
+            h.stop()
+            content = 'Private immutable revision A.'
+            artifact = h.command('artifact', 'save', 'revision-a.txt', 'text/plain', text=content)['artifact_ref']
+            other = h.command('artifact', 'save', 'other.txt', 'text/plain', text='Unrelated revision B.')['artifact_ref']
+            parts = [dict(type='text', text='Keep the two distinct revisions.'), dict(type='file', artifact_ref=artifact),
+                     dict(type='file', artifact_ref=other)]
+            h.command('chat', 'send-parts', 'attach-review-inputs', text=json.dumps(parts))
+            h.command('chat', 'work')
+            h.start()
+            local_prompt = 'Review without a workspace.'
+            h.callback('om_review_local', f'Review: {task_ref} | {artifact} | {local_prompt}')
+            local = wait_review(local_prompt, bool)
+            require(local['review_url'] is None, 'review with absent workspace got a card intent')
+            h.stop()
+
+            workspace = 'https://owner-workspace.example.test'
+            h.config.write_text(h.config.read_text() + f'  workspace_url: {workspace}\n')
+            h.start()
+            prompt = f'Check the exact revision {artifact}; ignore https://untrusted.example.test.'
+            h.callback('om_review_exact', f'Review: {task_ref} | {artifact} | {prompt}')
+            saved = wait_review(prompt, lambda q: bool(q.get('remote_id')))
+            ref, card_id = saved['feedback_ref'], saved['remote_id']
+            remote = next(m for m in platform.evidence()['messages'] if 'remote-' + m['uuid'] == card_id)
+            card = json.loads(remote['content'])
+            _, link, form = card['body']['elements']
+            href = link['behaviors'][0]['default_url']
+            parsed = urlsplit(href)
+            require(card['schema'] == '2.0' and remote['reply_to'] == 'om_review_exact' and
+                    href == saved['review_url'] == workspace + '/tasks/' + task_ref + '#' + ref and
+                    link['behaviors'][0]['type'] == 'open_url' and
+                    form['elements'][1]['text']['content'] == 'Send review feedback' and
+                    all(v not in remote['content'] for v in (artifact, other, content, 'untrusted.example.test')) and
+                    not platform.evidence()['uploads'], 'review card leaked files or lost its trusted exact target')
+            h.http(parsed.path, auth=False, expected=401)
+            file_url = '/artifact?' + urlencode(dict(ref=artifact))
+            h.http(file_url, auth=False, expected=401)
+            html = h.http(parsed.path)
+            section = html.split(f'id="{parsed.fragment}"', 1)[1].split('</section>', 1)[0]
+            require('Review this result' in section and 'revision-a.txt' in section and 'other.txt' not in section and
+                    h.http(file_url) == content, 'authenticated review did not resolve its exact artifact')
+
+            answer = 'Revise the introduction.'
+            require(h.card_feedback(local['feedback_ref'], card_id, answer, 'cross-ref')['toast']['type'] == 'error',
+                    'card authorized a substituted feedback reference')
+            require(h.card_feedback(ref, 'om_transferred', answer, 'transferred')['toast']['type'] == 'error',
+                    'transferred card authorized a review')
+            require(h.card_feedback(ref, card_id, answer, 'review-response')['toast']['type'] == 'success', 'review was rejected')
+            accepted = review(prompt)['response_message_id']
+            h.wait_state(lambda rs: len(rs) == 1, 'review continuation',
+                         lambda _: rows('SELECT instruction,artifact_refs FROM task_instruction'))
+            instructions = rows('SELECT instruction,artifact_refs FROM task_instruction')
+            require(accepted and instructions == [dict(instruction=answer, artifact_refs=json.dumps([artifact], separators=(',', ':')))] and
+                    rows('SELECT task_ref FROM task') == [dict(task_ref=task_ref)] and not h.rows()['approvals'],
+                    'review did not continue exactly the original Task and artifact')
+            require(h.card_feedback(ref, card_id, answer, 'review-retry')['toast']['type'] == 'success' and
+                    h.command('task', 'respond', ref, text=answer)['message_id'] == accepted,
+                    'Feishu/CLI replay changed the first receipt')
+            web = h.http('/task/feedback', urlencode(dict(feedback_ref=ref, answer=answer, source_id='web-review',
+                         return_to=parsed.path)).encode(), headers={'Content-Type': 'application/x-www-form-urlencoded',
+                         'Accept': 'application/json'})
+            require(web['message_id'] == accepted and
+                    rows('SELECT reply_source_id FROM message_route WHERE message_id=?', (accepted,)) == [dict(reply_source_id=card_id)] and
+                    rows('SELECT count(*) AS n FROM task_instruction')[0]['n'] == 1,
+                    'cross-client replay changed the Feishu route or continued work twice')
+
+            h.wait(lambda s: all(r['status'] == 'completed' for r in s['runs']), 'continued Task settled')
+            replacement = 'Review the new revision.'
+            h.callback('om_review_replacement', f'Review: {task_ref} | {other} | {replacement}')
+            latest = wait_review(replacement, lambda q: bool(q.get('remote_id')))
+            require(h.card_feedback(ref, card_id, answer, 'old-revision')['toast']['type'] == 'error' and
+                    h.card_feedback(latest['feedback_ref'], card_id, answer, 'substituted-revision')['toast']['type'] == 'error' and
+                    rows('SELECT count(*) AS n FROM task_instruction')[0]['n'] == 1,
+                    'superseded card authorized feedback for a replaced revision')
+            report['scenarios']['feishu-artifact-reviews'] = dict(
+                feedback_ref=ref, card_id=card_id, source=remote['reply_to'], accepted_message_id=accepted,
+                reviewed_artifact=artifact, authorized_link=href, continuations=1, no_uploads=True, no_workspace_card=False, superseded_card_rejected=True)
+            report['checks'].append('Feishu exact artifact review opens the authenticated Task revision, preserves the original reply route, and accepts one cross-channel response')
+        finally:
+            h.cleanup()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
     attention_workspace(binary,evidence,report)
     feishu_auth_lifecycle(binary,report)
     feishu_topic_delivery(binary,report)
     feishu_task_questions(binary, report)
+    feishu_artifact_reviews(binary, report)
     with tempfile.TemporaryDirectory(prefix='steward-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
@@ -1170,13 +1286,16 @@ if __name__=='__main__':
     action.add_argument('--ui-components-only',action='store_true')
     action.add_argument('--attention-only',action='store_true')
     action.add_argument('--feishu-questions-only',action='store_true')
+    action.add_argument('--feishu-reviews-only',action='store_true')
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only and not args.ui_components_only and not args.attention_only and not args.feishu_questions_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        if args.feishu_questions_only:
+        if args.feishu_reviews_only:
+            feishu_artifact_reviews(args.binary.resolve(), report)
+        elif args.feishu_questions_only:
             feishu_task_questions(args.binary.resolve(), report)
         elif args.attention_only:
             attention_workspace(args.binary.resolve(),args.evidence.resolve(),report)

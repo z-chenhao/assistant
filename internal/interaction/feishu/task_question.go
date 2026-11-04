@@ -16,16 +16,23 @@ import (
 
 const taskQuestionSubmit = "steward_task_question_submit"
 
-func taskQuestionCard(ref, text string) map[string]any {
+func taskFeedbackCard(ref, text, reviewURL string) map[string]any {
 	plain := func(text string) map[string]string { return map[string]string{"tag": "plain_text", "content": text} }
-	return map[string]any{"schema": "2.0", "body": map[string]any{"elements": []any{
-		map[string]any{"tag": "div", "text": plain(text)},
-		map[string]any{"tag": "form", "name": "steward_task_question", "elements": []any{
-			map[string]any{"tag": "input", "name": "answer", "required": true, "placeholder": plain("Your answer")},
-			map[string]any{"tag": "button", "name": taskQuestionSubmit, "type": "primary", "text": plain("Send answer"), "form_action_type": "submit",
-				"behaviors": []any{map[string]any{"type": "callback", "value": map[string]string{"feedback_ref": ref}}}},
-		}},
-	}}}
+	placeholder, submit := "Your answer", "Send answer"
+	elements := []any{map[string]any{"tag": "div", "text": plain(text)}}
+	if reviewURL != "" {
+		placeholder, submit = "Your review feedback", "Send review feedback"
+		elements = append(elements, map[string]any{"tag": "button", "type": "default", "text": plain("Open result in Steward"),
+			"behaviors": []any{map[string]string{"type": "open_url", "default_url": reviewURL}}})
+	}
+	// Both forms retain the published submit name. The receipt identifies the
+	// persisted feedback kind, so callback data never selects the review role.
+	elements = append(elements, map[string]any{"tag": "form", "name": "steward_task_question", "elements": []any{
+		map[string]any{"tag": "input", "name": "answer", "required": true, "placeholder": plain(placeholder)},
+		map[string]any{"tag": "button", "name": taskQuestionSubmit, "type": "primary", "text": plain(submit), "form_action_type": "submit",
+			"behaviors": []any{map[string]any{"type": "callback", "value": map[string]string{"feedback_ref": ref}}}},
+	}})
+	return map[string]any{"schema": "2.0", "body": map[string]any{"elements": elements}}
 }
 
 func (h Handler) taskQuestionAction(w http.ResponseWriter, r *http.Request, eventID string, raw []byte) {
@@ -56,18 +63,18 @@ func (h Handler) taskQuestionAction(w http.ResponseWriter, r *http.Request, even
 		} `json:"event"`
 	}
 	if json.Unmarshal(raw, &event) != nil {
-		toast("error", "This question could not be opened.")
+		toast("error", "This feedback request could not be opened.")
 		return
 	}
 	e := event.Event
 	ref, answer := e.Action.Value.Ref, e.Action.Form.Answer
 	if e.Host != "im_message" || e.Operator.Tenant != h.Client.Config.TenantKey || e.Operator.OpenID == "" ||
 		e.Action.Tag != "button" || e.Action.Name != taskQuestionSubmit || !strings.HasPrefix(ref, "feedback:") || len(ref) > 256 {
-		toast("error", "This question could not be opened.")
+		toast("error", "This feedback request could not be opened.")
 		return
 	}
 	if !task.ValidFeedbackAnswer(answer) {
-		toast("error", "Enter a valid answer before submitting.")
+		toast("error", "Enter valid feedback before submitting.")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2500*time.Millisecond)
@@ -80,12 +87,12 @@ func (h Handler) taskQuestionAction(w http.ResponseWriter, r *http.Request, even
 		if h.Wake != nil {
 			h.Wake()
 		}
-		toast("success", "Answer saved. Ghost will review it.")
+		toast("success", "Feedback saved. Ghost will review it.")
 	case errors.Is(err, interaction.ErrUnauthorized), errors.Is(err, task.ErrNotFound):
-		toast("error", "This question could not be opened.")
+		toast("error", "This feedback request could not be opened.")
 	case errors.Is(err, task.ErrFeedbackStale), errors.Is(err, conversation.ErrConflict), errors.Is(err, agent.ErrConflict):
-		toast("error", "This question changed or already has a different answer. Check Tasks.")
+		toast("error", "This request changed or already has a different response. Check Tasks.")
 	default:
-		toast("error", "The answer could not be confirmed. Check Tasks before trying again.")
+		toast("error", "The response could not be confirmed. Check Tasks before trying again.")
 	}
 }
