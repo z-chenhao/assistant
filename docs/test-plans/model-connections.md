@@ -30,7 +30,7 @@
 | [tests/system/verify_local_provider.py](../../tests/system/verify_local_provider.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_account.py](../../tests/system/verify_account.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
-- **F-002 剩余覆盖**：补齐支持平台的凭据后端及相应设置反馈；不能把环境变量 API Key 视为 OAuth 凭据写入实现。
+- **F-002 原生覆盖**：Linux 使用独立会话 D-Bus、临时带密码 GNOME 钥匙串和真实 SecretStore；供应商仍是受控 OAuth/Responses peer。macOS 使用下文可选的所有者 Keychain 往返检查。真实 OpenAI 账号授权、桌面解锁交互及各发行版集成需单独 Live 验证。
 
 ## 详细测试入口与证明边界
 
@@ -56,10 +56,28 @@ For optional owned native Keychain read/update/delete verification on macOS:
 STEWARD_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTrip -v -timeout 30s
 ```
 
-CI uses deterministic Fakes/environment references and requires no OS credential
-store or real model account. Real Qwen/vLLM/SGLang/LM Studio compatibility remains
+The ordinary account gate uses its owned in-memory SecretStore. Ubuntu checks
+also runs `verify_account.py --native-secret-service` with an isolated native
+Linux Secret Service; neither path requires a real model account. Real
+Qwen/vLLM/SGLang/LM Studio compatibility remains
 release-time Live Shadow evidence. Deterministic software conformance runs in the [system suite](product.md);
 provider contracts alone do not establish semantic product scores.
+
+### Linux 原生账户回归
+
+安装测试依赖 `libsecret-1-0 libsecret-tools gnome-keyring dbus libglib2.0-bin` 后运行：
+
+```sh
+python3 tests/system/verify_account.py --binary bin/steward --native-secret-service --evidence evidence/native-account.json
+```
+
+该入口自行创建私有 D-Bus 和临时 XDG 数据/运行目录，启动带合成密码的前台 GNOME Keyring，移除桌面显示环境；不连接、锁定或删除用户当前会话的钥匙串。`secret-tool` 只用于独立检查和测试过期时间控制，不是生产 SecretStore 依赖。临时密码和 OAuth 合成凭据只经 stdin/内存传输，结束后回收进程和私有文件。CI 通过既有可取消的 entrypoint/process_step 执行并保留同一证据格式。
+
+- 原生组件：二进制值跨进程读回、替换、删除及重复删除；无效输入、取消和不可用会话失败关闭；暂停私有钥匙串进程使请求在途等待，确认读操作按期限取消并可恢复；锁定后读、写、删除均有界失败且不暴露诊断；重启钥匙串并用原密码解锁后原值仍在。
+- 账户入口：真实 CLI → Go Manager → Node/Pi → 受控 OAuth/Responses peer，经生产原生 SecretStore 登录、验证/选择、Main 对话和重启；并发刷新只旋转一次，401 失效、跨进程退出、SIGKILL 后清理和原账户重新认证保持既有语义。
+- 隔离/泄漏：不同账户分别保存；access/refresh/ID token 不进入 SQLite/WAL、日志、普通 CLI 输出或 trace。Web 异步存储失败给出中英文修复提示，重试不保留上次无关错误，也不展示原生诊断。
+
+此证据证明软件与原生存储链路；不证明真实 OpenAI 账户授权、供应商可用性或 macOS 当前机器的 Keychain 访问。Linux 禁用 cgo、不支持平台、缺库和无会话的部署不提供原生凭据写入；环境 API Key 不算 OAuth 写入回退。
 
 ## 执行与完成判定
 

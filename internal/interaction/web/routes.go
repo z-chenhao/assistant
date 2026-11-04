@@ -80,7 +80,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		jsonResult(w, struct {
 			llm.AuthState
 			AccountID string `json:"account_id,omitempty"`
-		}{s.auth, s.accountID})
+			Error     string `json:"error,omitempty"`
+		}{s.auth, s.accountID, s.authError})
 	case "/artifact":
 		ref := r.URL.Query().Get("ref")
 		d, e := s.Core.DescribeArtifact(r.Context(), ref)
@@ -175,6 +176,7 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		s.mu.Lock()
 		if s.accountID == r.FormValue("account") {
 			s.auth = llm.AuthState{}
+			s.authError = ""
 			s.accountID = ""
 		}
 		s.mu.Unlock()

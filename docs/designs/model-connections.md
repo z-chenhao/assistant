@@ -22,13 +22,14 @@ flowchart TD
 新增连接或登录 → 能力测试 → 显式选择 → 新建 Run 冻结快照 → Bridge 发起推理。失败回到可修复设置，不自动切换账户或模型。
 
 - **F-001**：CLI/TUI/Web 有连接、Test、Select 入口，Run 冻结模型快照。 无活动模型时保持 setup_required；不隐式选取收费或 Fake 模型。
-- **F-002**：账户生命周期和 macOS Keychain 已实现；非 macOS 原生凭据写入返回错误。 补齐支持平台的凭据后端及相应设置反馈；不能把环境变量 API Key 视为 OAuth 凭据写入实现。
+- **F-002**：同一账户生命周期使用 macOS Keychain 或 Linux Secret Service 原生凭据。Linux 动态加载 libsecret，缺少可选库不阻止其他模型启动；库、会话或钥匙串不可用时原生凭据操作失败关闭。平台与 Live 验证边界见功能和测试方案。
 
 ## 代码与依赖
 
 - [cmd/steward/models.go](../../cmd/steward/models.go)
 - [internal/llm/control.go](../../internal/llm/control.go)
 - [internal/llm/account/manager.go](../../internal/llm/account/manager.go)
+- [internal/llm/secret/service_linux.go](../../internal/llm/secret/service_linux.go) 与 [libsecret 适配](../../internal/llm/secret/service_linux.c)
 - [internal/llm/secret/unsupported.go](../../internal/llm/secret/unsupported.go)
 - [provider-bridge/bridge.mjs](../../provider-bridge/bridge.mjs)
 
@@ -380,7 +381,7 @@ and the full 30-second trickling-body deadline (not a shortened test-only timer)
 
 ## 当前设计取舍
 
-模型使用单一活动配置与冻结快照，账户凭据由 SecretStore 持有；平台后端缺口不能通过将 Token 写入配置或数据库绕过。图片输入须通过实际行为 Probe 与冻结 ModelSnapshot，不因配置勾选或 catalog 声明直接启用视觉。
+模型使用单一活动配置与冻结快照，账户凭据由 SecretStore 持有；平台依赖不可用不能通过将 Token 写入配置或数据库绕过。图片输入须通过实际行为 Probe 与冻结 ModelSnapshot，不因配置勾选或 catalog 声明直接启用视觉。
 
 <a id="decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow"></a>
 
@@ -413,6 +414,16 @@ Protocol references:
 - [Preview wire restrictions](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
 
 <a id="decision-001-boundary-and-invariants"></a>
+
+### 原生 Linux 凭据（F-002）
+
+Linux cgo 构建在 SecretStore 内动态加载系统 `libsecret-1.so.0`（0.20+），不新增 Go/npm 依赖，不调用外部命令传送凭据。libsecret 负责 Secret Service 会话、传输加密和系统解锁提示；Steward 不实现第二套 OAuth 或私有钥匙串协议。默认 collection 由登录会话提供，后端不自动创建服务进程或保存解锁密码。
+
+每项使用 `ai.steward.Credential` schema、`service=steward` 和原有 opaque credential ref 隔离。值保存为带版本前缀的 base64，以无损承载二进制字节；这只是系统钥匙串内的编码，不是自建加密存储。单项最多 256 KiB，引用禁止 NUL/换行和环境引用。读取与错误不暴露系统路径、服务诊断或值。
+
+同步调用使用 GCancellable，遵守调用者期限及 30 秒上限；取消监听退出后再释放原生对象。libsecret 的清理结果可能在取消解锁后没有错误，因此删除后额外进行包含锁定项的仅元数据搜索。只有确认原项不存在才成功；清理失败继续沿既有 `credential cleanup failed` 恢复路径处理，不能误报退出完成。
+
+动态符号与 schema 在进程内初始化一次。库缺失时普通本地模型可启动，`doctor` 只检查后端库，不触发解锁；修复库后重启。Web 异步登录和同步退出、CLI/TUI 显示固定的修复提示，底层错误不进入页面或 API。macOS Keychain、显式 `env:` API Key 和不支持平台的失败行为保留原路径。没有 SQLite 迁移、新的模型工具、账户路由或凭据文件导入。
 
 ### Boundary and invariants
 
@@ -451,12 +462,12 @@ never backed by a real login; it has no validated registration and cannot become
 ready by being imported. Create a new verified account connection for such a
 record; do not attach a new identity to a historical snapshot.
 
-The existing Keychain/SQLite boundary cannot perform one distributed commit.
+The existing OS SecretStore/SQLite boundary cannot perform one distributed commit.
 Persist `refreshing` before rotation; persist the new SecretStore value before
 committing connected metadata. A crash between those writes requires re-login,
 even if rotation succeeded. Failed initial registration cleans the newly owned
 secret; a process death before metadata insertion can still leave an orphaned
-Keychain item, as with existing API-key registration. No automatic credential
+OS credential item, as with existing API-key registration. No automatic credential
 enumeration or cross-account deletion is introduced.
 
 Provider network destinations are fixed. Only the local fixture substitutes

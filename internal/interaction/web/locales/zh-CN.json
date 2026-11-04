@@ -839,5 +839,7 @@
   "This answer is too long or invalid. Edit it before sending again.": "回答过长或无效，请修改后再发送。",
   "Your access changed. Sign in again before sending. Your draft is kept.": "访问权限已变更，请重新登录后再发送。草稿已保留。",
   "The request changed while your response was being sent. Your draft is kept; check the conversation before retrying.": "发送回答时问题已变更。草稿已保留，请先核对对话后再决定是否重试。",
-  "More approvals in conversation": "在对话中查看更多审批"
+  "More approvals in conversation": "在对话中查看更多审批",
+  "The credential store is unavailable. Unlock your login keyring and try again. On Linux, install libsecret and a Secret Service keyring.": "凭据存储不可用。请解锁登录钥匙串后重试。Linux 需要安装 libsecret 和提供 Secret Service 的钥匙串。",
+  "Credentials use macOS Keychain or Linux Secret Service. On Linux, install libsecret and unlock your login keyring before signing in.": "凭据保存在 macOS Keychain 或 Linux Secret Service 中。Linux 请先安装 libsecret 并解锁登录钥匙串，再进行登录。"
 }

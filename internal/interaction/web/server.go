@@ -96,6 +96,7 @@ type Server struct {
 	session        string
 	sessionExpires time.Time
 	auth           llm.AuthState
+	authError      string
 	accountID      string
 	authCancel     context.CancelFunc
 	authDone       chan struct{}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -24,18 +25,21 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 	case "login-chatgpt":
 		connection, err := application.Accounts().Login(ctx, flags.Arg(2), func(event llm.AuthEvent) { _ = json.NewEncoder(out).Encode(event) })
 		if err != nil {
+			credentialHelp(errOut, err)
 			return err
 		}
 		return json.NewEncoder(out).Encode(connection)
 	case "refresh":
 		connection, _, err := application.Accounts().Ensure(ctx, flags.Arg(2))
 		if err != nil {
+			credentialHelp(errOut, err)
 			return err
 		}
 		return json.NewEncoder(out).Encode(connection)
 	case "logout":
 		revoked, err := application.Accounts().Logout(ctx, flags.Arg(2))
 		if err != nil {
+			credentialHelp(errOut, err)
 			return err
 		}
 		return json.NewEncoder(out).Encode(map[string]any{"status": "logged_out", "remote_revocation_confirmed": revoked})
@@ -145,4 +149,10 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 		return err
 	}
 	return json.NewEncoder(out).Encode(profile)
+}
+
+func credentialHelp(out io.Writer, err error) {
+	if errors.Is(err, llm.ErrSecretStore) || errors.Is(err, llm.ErrSecretCleanup) {
+		fmt.Fprintln(out, "Unlock your login keyring and retry. Linux requires libsecret-1-0 and a Secret Service keyring in your login session; macOS requires the native Keychain build. Run steward doctor; see docs/features/model-connections.md.")
+	}
 }

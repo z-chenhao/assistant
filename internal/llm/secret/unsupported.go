@@ -1,4 +1,4 @@
-//go:build !darwin || !cgo
+//go:build (!darwin && !linux) || !cgo
 
 package secret
 
@@ -11,3 +11,5 @@ import (
 func get(context.Context, string) ([]byte, error) { return nil, llm.ErrSecretStore }
 func put(context.Context, string, []byte) error   { return llm.ErrSecretStore }
 func remove(context.Context, string) error        { return llm.ErrSecretStore }
+
+func NativeBackend() (string, bool) { return "OS credential store (native cgo build required)", false }

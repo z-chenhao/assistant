@@ -200,6 +200,11 @@ required status name is preserved. One checkout and dependency setup serve:
    freshness/types, the real Chromium contract and retained infrastructure tests.
 2. `make test-e2e`: nine deterministic product flows through actual CLI/UI,
    stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
+3. Task coding isolation and publication recovery retain their dedicated checks.
+4. Native Linux account credentials: the existing account harness uses a private
+   D-Bus and disposable password-protected GNOME Keyring, with real libsecret
+   storage and a controlled OAuth/Responses peer. An entrypoint wrapper unwinds
+   owned service processes on cancellation; no real account or user keyring is used.
 
 PR checks use GitHub’s proposed merge commit, so the checked code includes the current base. Artifact names identify that checked commit.
 

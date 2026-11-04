@@ -12,6 +12,7 @@ import (
 
 	"github.com/z-chenhao/assistant/internal/computer/environment"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/llm/secret"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 )
 
@@ -81,6 +82,12 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 		fmt.Fprintln(out, "OK   image OCR: local Tesseract; languages="+strings.Join(imageOCR.Languages(), ","))
 	} else {
 		fmt.Fprintln(out, "SKIP image OCR: install Tesseract, eng/chi_sim/chi_tra language data and the kernel sandbox; see docs/features/artifacts-media.md")
+	}
+	backend, available := secret.NativeBackend()
+	if available {
+		fmt.Fprintln(out, "OK   credential backend library:", backend, "(login keyring access is checked when used)")
+	} else {
+		fmt.Fprintln(out, "SKIP native credentials:", backend, "unavailable; on Linux install libsecret-1-0 and use a login session keyring; see docs/features/model-connections.md")
 	}
 	if failed {
 		return errors.New("installation incomplete; check Node 24.21.0 and execution dependencies (Python 3, bash, bubblewrap on Linux), then rerun ./install.sh (see docs/features/installation.md)")

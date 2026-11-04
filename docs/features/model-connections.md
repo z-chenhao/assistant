@@ -32,9 +32,9 @@
 
 **需求**：用户能登录、重新认证和退出 ChatGPT 账户，凭据可安全持久化。
 
-**当前实现**：账户生命周期和 macOS Keychain 已实现；非 macOS 原生凭据写入返回错误。
+**当前实现**：账户生命周期复用同一 Manager、Provider Bridge 和冻结模型路径；macOS 使用 Keychain，Linux 通过 libsecret 使用登录会话的 Secret Service。原生后端支持跨进程保存、读取、更新与删除，刷新与退出继续使用既有跨进程锁和恢复裁决。CLI/TUI/Web 提供凭据设置与故障反馈。
 
-**边界与剩余工作**：补齐支持平台的凭据后端及相应设置反馈；不能把环境变量 API Key 视为 OAuth 凭据写入实现。
+**边界**：原生凭据需要启用 cgo 的 macOS/Linux 构建；Linux 还需要 libsecret、会话 D-Bus 和已解锁的 Secret Service 钥匙串。缺少依赖、锁定、拒绝解锁或会话不可用会失败关闭，不写入配置、SQLite 或明文文件，不退回环境变量保存 OAuth。其他平台与禁用 cgo 的构建不提供原生凭据写入。真实 OpenAI 账号授权与 macOS Keychain Live 验收单独记录，不以受控供应商证明真实账号可用性。
 
 **验收目标**：在每个声明支持的平台完成登录、刷新、退出、进程中断恢复和凭据隔离验证。
 
@@ -42,7 +42,7 @@
 
 标准安装后运行 `steward`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。连接视觉模型时显式勾选 **Enable image input (verified when tested)**，通过图片 Probe 后再选择；模型卡显示已验证图片输入或 Text only。图片发送规则见 [F-013](artifacts-media.md#f-013)。
 
-CLI 可运行 `steward model list` 查看配置，使用 `steward model test PROFILE_ID` 测试。ChatGPT 当前完整凭据路径依赖 macOS 与 cgo；Linux 可使用明确配置的本地端点或环境变量 API Key，不能据此宣称 OAuth 已跨平台可用。
+CLI 可运行 `steward model list` 查看配置，使用 `steward model test PROFILE_ID` 测试。ChatGPT 凭据使用 macOS Keychain 或 Linux Secret Service；原生构建需要 cgo。Linux 的准备步骤见下文。明确配置的环境变量 API Key 仍只用于兼容端点，不充当 OAuth 凭据后端。
 
 ## 详细操作参考
 
@@ -57,10 +57,29 @@ CLI 可运行 `steward model list` 查看配置，使用 `steward model test PRO
 
 ### ChatGPT account lifecycle
 
-Use the same explicit Bridge configuration shown below. On macOS with cgo,
-OAuth credentials use Steward's own Keychain service. Other platforms fail closed
-without a writable OS SecretStore; environment API keys cannot authenticate this
-entry point. No Codex credential file is read or written.
+Use the same explicit Bridge configuration shown below. Native cgo builds use
+Steward's own macOS Keychain service or Linux Secret Service via libsecret.
+Environment API keys cannot authenticate this entry point. No Codex credential
+file is read or written.
+
+On Debian/Ubuntu Linux, install the optional native credential dependencies:
+
+```sh
+sudo apt-get install libsecret-1-0 gnome-keyring dbus-user-session
+steward doctor
+```
+
+Use your desktop login session's D-Bus and unlock its login keyring before
+signing in. A compatible Secret Service provider may replace GNOME Keyring.
+Headless installations need an explicitly managed session bus and keyring;
+Steward does not start or unlock a keyring with a saved password. `doctor` checks
+the backend library without retrieving credentials or contacting the keyring.
+Actual read/write access is checked when used. Missing/locked/unavailable stores
+return a sanitized credential-store error and never fall back to plaintext.
+The Linux backend bounds each operation to 30 seconds or the caller's earlier
+deadline. Install/repair missing libraries, restart Steward, unlock the keyring,
+and retry. Ordinary unauthenticated local models remain available without this
+optional dependency.
 
 ```sh
 bin/steward -config local.yaml model login-chatgpt

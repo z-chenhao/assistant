@@ -58,6 +58,9 @@ jobs:
         run: |
           python3 tests/system/process_step.py --name task-code-environments --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario task-code-environments --evidence evidence/task-code-environments.json
           exec python3 tests/system/process_step.py --name task-code-recovery --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario task-code-recovery --evidence evidence/task-code-recovery.json
+      - name: Native Linux account credentials
+        if: steps.scope.outputs.docs_only != 'true'
+        run: exec python3 tests/system/process_step.py --name native-account --phase test -- python3 tests/system/entrypoint.py tests/system/verify_account.py --binary bin/steward --native-secret-service --evidence evidence/native-account.json
       - name: Retain results, including failures
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
