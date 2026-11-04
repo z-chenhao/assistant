@@ -87,9 +87,16 @@ class ChannelHarness(MainHarness):
         self.platform.register_source(source, destination)
         content=dict(text=text) if kind=='text' else dict(file_key='file-key',file_name='received.txt')
         value=dict(schema='2.0',header=dict(event_id=event or source,event_type='im.message.receive_v1',token='sandbox-verify-token',app_id='sandbox-app',tenant_key='sandbox-tenant'),event=dict(sender=dict(sender_type='user',sender_id=dict(open_id=sender)),message=dict(message_id=source,chat_id=destination,chat_type='p2p',message_type=kind,content=json.dumps(content))))
-        raw=json.dumps(value,separators=(',',':')).encode();timestamp=str(int(time.time()));nonce='sandbox-nonce'
-        digest=hashlib.sha256(timestamp.encode()+nonce.encode()+b'sandbox-encrypt-key'+raw).hexdigest()
-        return self.http('/feishu/callback',raw,auth=False,headers={'X-Lark-Request-Timestamp':timestamp,'X-Lark-Request-Nonce':nonce,'X-Lark-Signature':digest if signature else 'forged'},expected=expected)
+        return self.signed_callback(value, expected, signature)
+
+    def signed_callback(self, value, expected=200, signature=True):
+        raw = json.dumps(value, separators=(',', ':')).encode()
+        timestamp, nonce = str(int(time.time())), 'sandbox-nonce'
+        digest = hashlib.sha256(timestamp.encode() + nonce.encode() + b'sandbox-encrypt-key' + raw).hexdigest()
+        return self.http('/feishu/callback', raw, auth=False, headers={
+            'Content-Type': 'application/json', 'X-Lark-Request-Timestamp': timestamp,
+            'X-Lark-Request-Nonce': nonce, 'X-Lark-Signature': digest if signature else 'forged',
+        }, expected=expected)
 
     def rows(self):
         with closing(sqlite3.connect(self.root/'data/state.db')) as db, db:
@@ -311,11 +318,172 @@ def feishu_topic_delivery(binary, report):
             h.cleanup()
 
 
+def feishu_task_questions(binary, report):
+    """Signed Card 2.0 input, real reply receipt, and the existing Main path."""
+    with tempfile.TemporaryDirectory(prefix='steward-feishu-questions-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform, 'tasks')
+        state = h.root / 'data/state.db'
+
+        def rows(query, args=()):
+            with closing(sqlite3.connect(state)) as db, db:
+                db.row_factory = sqlite3.Row
+                return [dict(row) for row in db.execute(query, args)]
+
+        def wait(read, predicate, description):
+            return h.wait_state(predicate, description, lambda _: read(), timeout=20)
+
+        def question_rows():
+            return rows("""SELECT f.feedback_ref, f.prompt, f.status, f.response_message_id,
+                q.binding_version, d.delivery_id, d.version AS delivery_version, d.status AS delivery_status, c.remote_id
+                FROM task_feedback f LEFT JOIN feishu_task_question q USING(feedback_ref)
+                LEFT JOIN delivery_request d ON d.message_id=q.message_id
+                LEFT JOIN channel_receipt c ON c.delivery_id=d.delivery_id AND c.part=0 ORDER BY f.rowid""")
+
+        def new_question(source, prompt, status='sent'):
+            h.callback(source, f'Question: {ref} | {prompt}')
+            def selected():
+                return next((q for q in question_rows() if q['prompt'] == prompt), {})
+            return wait(selected, lambda q: q.get('delivery_status') == status, f'{source} card {status}')
+
+        def action(q, card_id, answer, event, *, chat='bound-chat', owner='owner', name='steward_task_question_submit', signature=True):
+            return h.signed_callback(dict(
+                schema='2.0',
+                header=dict(event_id=event, event_type='card.action.trigger', token='sandbox-verify-token',
+                            app_id='sandbox-app', tenant_key='sandbox-tenant'),
+                event=dict(host='im_message', operator=dict(tenant_key='sandbox-tenant', open_id=owner),
+                           context=dict(open_message_id=card_id, open_chat_id=chat),
+                           action=dict(tag='button', name=name, value=dict(feedback_ref=q['feedback_ref']),
+                                       form_value=dict(answer=answer)))),
+                signature=signature, expected=200 if signature else 401)
+
+        def web_retry(q, answer):
+            return h.http('/task/feedback', urlencode(dict(feedback_ref=q['feedback_ref'], answer=answer,
+                          source_id='web-' + q['feedback_ref'], return_to='/tasks')).encode(),
+                          headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+
+        try:
+            h.setup(metadata=dict(name='Feishu question workload', provider_kind='openai_compatible',
+                                  endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                  model_id='fixture-model', context_window=32768, max_output_tokens=1024,
+                                  compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
+            h.start()
+            h.callback('om_task_origin', 'Ongoing: Prepare the quarterly report')
+            h.wait(lambda s: len(s['deliveries']) == 2 and all(d['status'] == 'sent' for d in s['deliveries']), 'original Task delivered')
+            ref = rows('SELECT task_ref FROM task')[0]['task_ref']
+            q = new_question('om_question_source', 'Which quarter should the report cover?')
+            card_id = q['remote_id']
+            remote = next(m for m in platform.evidence()['messages'] if 'remote-' + m['uuid'] == card_id)
+            card = json.loads(remote['content'])
+            text, form = card['body']['elements']
+            submit = form['elements'][1]
+            require(card['schema'] == '2.0' and remote['reply_to'] == 'om_question_source' and
+                    text['text']['tag'] == 'plain_text' and q['prompt'] in text['text']['content'] and
+                    form['tag'] == 'form' and submit['form_action_type'] == 'submit' and
+                    submit['behaviors'][0]['value'] == dict(feedback_ref=q['feedback_ref']),
+                    'card does not bind the exact question and original reply route')
+
+            answer = 'Cover Q3.'
+            action(q, card_id, answer, 'unsigned', signature=False)
+            invalid = [('wrong-owner', dict(owner='different-owner')), ('wrong-chat', dict(chat='other-chat')),
+                       ('approval-action', dict(name='approve'))]
+            for key, kwargs in invalid:
+                require(action(q, card_id, answer, key, **kwargs)['toast']['type'] == 'error', key + ' accepted')
+            require(action(q, 'om_forwarded_copy', answer, 'forwarded')['toast']['type'] == 'error', 'copied card accepted')
+            require(rows("SELECT count(*) AS n FROM main_input")[0]['n'] == 2, 'invalid callbacks admitted Main input')
+            require(action(q, card_id, answer, 'valid-answer')['toast']['type'] == 'success', 'valid answer rejected')
+            accepted = rows('SELECT response_message_id FROM task_feedback WHERE feedback_ref=?', (q['feedback_ref'],))[0]['response_message_id']
+            require(accepted, 'success toast preceded durable acceptance')
+            h.wait(lambda s: len(s['runs']) >= 6 and all(r['status'] == 'completed' for r in s['runs']) and
+                   len(s['deliveries']) >= 6 and all(d['status'] == 'sent' for d in s['deliveries']), 'Main continuation and delivery')
+            require(rows('SELECT count(*) AS n FROM task_instruction')[0]['n'] == 1 and
+                    rows('SELECT task_ref FROM task') == [dict(task_ref=ref)] and not h.rows()['approvals'],
+                    'answer did not continue one existing Task independently of approvals')
+            require(rows("""SELECT json_extract(i.message_json,'$.source') AS source, m.reply_source_id
+                         FROM main_input i JOIN message_route m USING(message_id) WHERE message_id=?""", (accepted,)) ==
+                    [dict(source='feishu', reply_source_id=card_id)], 'answer did not retain the real card route')
+            outbound = platform.evidence()['messages']
+            require(sum(m.get('reply_to') == card_id for m in outbound) == 1 and
+                    sum(m.get('reply_to') == 'om_task_origin' for m in outbound) == 3,
+                    'answer reply or asynchronous continuation lost its Feishu topic')
+            for key in ('valid-answer', 'answer-new-event'):
+                require(action(q, card_id, answer, key)['toast']['type'] == 'success', 'same card answer did not replay')
+            require(h.command('task', 'respond', q['feedback_ref'], text=answer)['message_id'] == accepted and
+                    web_retry(q, answer)['message_id'] == accepted, 'cross-channel retry changed the original receipt')
+            require(action(q, card_id, 'Different answer', 'conflict')['toast'] ==
+                    dict(type='error', content='This question changed or already has a different answer. Check Tasks.'),
+                    'different answer was accepted or reported as uncertain')
+            require(rows('SELECT count(*) AS n FROM main_input')[0]['n'] == 3 and
+                    len(platform.evidence()['messages']) == len(outbound), 'retry created extra input or delivery')
+
+            # A fresh question cannot inherit another card's receipt.
+            newer = new_question('om_new_question', 'Which region should the report cover?')
+            require(action(newer, card_id, 'EU', 'substitute')['toast']['type'] == 'error', 'another card authorized the question')
+            require(action(q, card_id, answer, 'old-question')['toast']['type'] == 'error', 'superseded card accepted')
+            def bind(enabled, version):
+                return h.command('channel', 'manage', text=json.dumps(dict(op='bind', channel='feishu',
+                                 subject='sandbox-tenant:sandbox-app:owner', destination='bound-chat', enabled=enabled, version=version)))
+            bind(False, 1)
+            bind(True, 2)
+            require(action(newer, newer['remote_id'], 'EU', 'old-binding')['toast']['type'] == 'error', 're-enabled binding revived old card')
+
+            preference = h.command('channel', 'manage', text='{"op":"preference"}')
+            h.command('channel', 'manage', text=json.dumps(dict(op='prefer', channel='tui', version=preference['version'])))
+            h.callback('om_tui_preference', f'Question: {ref} | Prefer the terminal.')
+            local = wait(question_rows, lambda qs: qs[-1]['prompt'] == 'Prefer the terminal.', 'local question')[-1]
+            require(local['binding_version'] is None, 'explicit preference created a Feishu card')
+            preference = h.command('channel', 'manage', text='{"op":"preference"}')
+            h.command('channel', 'manage', text=json.dumps(dict(op='prefer', channel='auto', version=preference['version'])))
+            h.stop()
+            h.send('cli-question', f'Question: {ref} | This is a local question.')
+            h.command('chat', 'work')
+            require(question_rows()[-1]['binding_version'] is None, 'CLI question fell back to Feishu')
+            h.start()
+
+            with platform.lock:
+                platform.drop_response = True
+            uncertain = new_question('om_uncertain_question', 'Which notes should I use?', 'unknown')
+            require(uncertain['remote_id'] is None, 'ambiguous send acquired a receipt')
+            unknown_card = next(m for m in platform.evidence()['messages'] if m.get('reply_to') == 'om_uncertain_question'
+                                and json.loads(m['content']).get('schema') == '2.0')
+            require(action(uncertain, 'remote-' + unknown_card['uuid'], 'Use these notes', 'unconfirmed-card')['toast']['type'] == 'error',
+                    'card without authoritative receipt accepted')
+            h.stop(kill=True)
+            attempts = sum(m['uuid'] == unknown_card['uuid'] for m in platform.evidence()['send_attempts'])
+            with platform.lock:
+                platform.drop_response = False
+            bind(False, 3)
+            wake_at = rows('SELECT next_wake_at FROM delivery_outbox WHERE delivery_id=?', (uncertain['delivery_id'],))[0]['next_wake_at']
+            time.sleep(max(0, (wake_at - time.time_ns() // 1000) / 1_000_000) + .02)
+            h.command('delivery', 'work')
+            recovered = next(q for q in question_rows() if q['feedback_ref'] == uncertain['feedback_ref'])
+            require(recovered['delivery_version'] > uncertain['delivery_version'] and recovered['delivery_status'] == 'unknown' and
+                    sum(m['uuid'] == unknown_card['uuid'] for m in platform.evidence()['send_attempts']) == attempts == 1,
+                    'recovery did not query, repeated the send or erased uncertainty after revocation')
+            bind(True, 4)
+
+            h.start()
+            stopped = new_question('om_stop_question', 'Should the report include a summary?')
+            h.callback('om_pause', 'Pause: Prepare the quarterly report')
+            wait(lambda: rows('SELECT status FROM task'), lambda ts: ts[0]['status'] == 'paused', 'Task paused')
+            require(action(stopped, stopped['remote_id'], 'Yes', 'stopped-card')['toast']['type'] == 'error', 'paused card accepted')
+            require(rows('SELECT count(*) AS n FROM task_instruction')[0]['n'] == 1 and
+                    rows("SELECT count(*) AS n FROM task_feedback WHERE status='answered'")[0]['n'] == 1,
+                    'stale or ambiguous callback created work')
+            report['scenarios']['feishu-task-questions'] = dict(
+                feedback_ref=q['feedback_ref'], card_id=card_id, accepted_message_id=accepted,
+                original_question_topic=remote['reply_to'], unknown_card_attempts=attempts,
+                answered=1, continuations=1, final_task_status='paused')
+            report['checks'].append('Feishu Task question Card 2.0, signed owner/context/receipt checks, three-channel dedup, original reply routing, stale/reenrolled/ambiguous rejection and query-only restart')
+        finally:
+            h.cleanup()
+
+
 def run(binary,evidence):
     report=dict(checks=[],scenarios={})
     attention_workspace(binary,evidence,report)
     feishu_auth_lifecycle(binary,report)
     feishu_topic_delivery(binary,report)
+    feishu_task_questions(binary, report)
     with tempfile.TemporaryDirectory(prefix='steward-channels-') as temp, Sandbox() as platform:
         h=ChannelHarness(binary,Path(temp),platform)
         try:
@@ -1001,13 +1169,16 @@ if __name__=='__main__':
     action.add_argument('--delivery-lease-only',action='store_true')
     action.add_argument('--ui-components-only',action='store_true')
     action.add_argument('--attention-only',action='store_true')
+    action.add_argument('--feishu-questions-only',action='store_true')
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only and not args.ui_components_only and not args.attention_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.attention_only and not args.feishu_questions_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        if args.attention_only:
+        if args.feishu_questions_only:
+            feishu_task_questions(args.binary.resolve(), report)
+        elif args.attention_only:
             attention_workspace(args.binary.resolve(),args.evidence.resolve(),report)
         elif args.ui_components_only:
             early_composer(args.binary.resolve(),args.evidence.resolve(),report)

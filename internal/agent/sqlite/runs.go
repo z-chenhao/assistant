@@ -159,9 +159,21 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		if inbound != nil {
 			sourceKey := ""
 			if feedbackRef != "" {
-				sourceKey = key
+				if inbound.Channel == "feishu" {
+					if err := requireFeishuTaskQuestion(ctx, tx, *inbound, feedbackRef); err != nil {
+						return err
+					}
+				} else {
+					sourceKey = key
+				}
 			}
-			bindingID, key, err = acceptChannelSource(ctx, tx, *inbound, content, sourceKey)
+			var channelKey string
+			bindingID, channelKey, err = acceptChannelSource(ctx, tx, *inbound, content, sourceKey)
+			// Feedback keeps one Main key across channels. Feishu retains a
+			// separate source ledger entry for its real card message ID.
+			if feedbackRef == "" {
+				key = channelKey
+			}
 			if err != nil {
 				return err
 			}

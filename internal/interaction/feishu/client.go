@@ -113,6 +113,10 @@ func (c Client) http() *http.Client {
 	return &client
 }
 func (c Client) request(ctx context.Context, method, path, kind string, body io.Reader) (*http.Response, error) {
+	return c.requestAuthorized(ctx, method, path, kind, body, nil)
+}
+
+func (c Client) requestAuthorized(ctx context.Context, method, path, kind string, body io.Reader, authorize func(context.Context) error) (*http.Response, error) {
 	token, e := c.accessToken(ctx)
 	if e != nil {
 		return nil, e
@@ -125,6 +129,11 @@ func (c Client) request(ctx context.Context, method, path, kind string, body io.
 	req.Header.Set("Authorization", "Bearer "+string(token))
 	if kind != "" {
 		req.Header.Set("Content-Type", kind)
+	}
+	if authorize != nil {
+		if err := authorize(ctx); err != nil {
+			return nil, err
+		}
 	}
 	resp, e := c.http().Do(req)
 	if e != nil {
@@ -181,6 +190,10 @@ func (c Client) Send(ctx context.Context, destination, key, kind string, content
 // Reply quotes only the Host-frozen source message. It never falls back to a
 // destination supplied by a callback or to a new send if the source is gone.
 func (c Client) Reply(ctx context.Context, source, key, kind string, content any) (string, error) {
+	return c.reply(ctx, source, key, kind, content, nil)
+}
+
+func (c Client) reply(ctx context.Context, source, key, kind string, content any, authorize func(context.Context) error) (string, error) {
 	if source == "" || len(source) > 256 || source == "." || source == ".." || strings.ContainsAny(source, "/\\\r\n\x00") {
 		return "", ErrProtocol
 	}
@@ -189,7 +202,7 @@ func (c Client) Reply(ctx context.Context, source, key, kind string, content any
 		return "", ErrProtocol
 	}
 	payload, _ := json.Marshal(map[string]any{"uuid": key, "msg_type": kind, "content": string(raw), "reply_in_thread": false})
-	data, err := c.decodeResponse(c.request(ctx, "POST", "/im/v1/messages/"+url.PathEscape(source)+"/reply", "application/json", bytes.NewReader(payload)))
+	data, err := c.decodeResponse(c.requestAuthorized(ctx, "POST", "/im/v1/messages/"+url.PathEscape(source)+"/reply", "application/json", bytes.NewReader(payload), authorize))
 	if err != nil {
 		return "", err
 	}

@@ -17,6 +17,7 @@ import (
 
 type Core interface {
 	AcceptInbound(context.Context, interaction.InboundEvent) (agent.Receipt, error)
+	RespondTaskFeedbackInbound(context.Context, interaction.InboundEvent, string, string) (agent.Receipt, error)
 	CheckChannel(context.Context, string, string, string) error
 	DecideInbound(context.Context, interaction.InboundEvent, string, string, string) error
 	ImportChannelArtifact(context.Context, interaction.InboundEvent, string, artifact.Input, io.Reader) (string, error)
@@ -73,6 +74,10 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if event.Type == "url_verification" {
 		_ = json.NewEncoder(w).Encode(map[string]string{"challenge": event.Challenge})
+		return
+	}
+	if event.Schema == "2.0" && event.Header.Type == "card.action.trigger" {
+		h.taskQuestionAction(w, r, event.Header.EventID, raw)
 		return
 	}
 	if event.Schema != "2.0" || event.Header.Type != "im.message.receive_v1" || event.Event.Sender.Type != "user" || event.Event.Message.ChatType != "p2p" || event.Event.Sender.ID.OpenID == "" {

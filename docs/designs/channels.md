@@ -89,6 +89,18 @@ Feishu Adapter 对非空冻结来源调用官方 [回复消息 API](https://open
 
 持久原消息、来源分组、投影冻结、权限和幂等属于领域必要机制；1200 字符、是否配置成果链接与现有通知偏好是可替换政策。实现和扩展字段保持内部实验性，不稳定通用跨渠道编排接口，不暴露 Worker 结果或内部 Run ID，不归并未知 PR 事件。GitHub 反馈接续仍由 F-042/F-004 完成；真实平台展示、权限与链接可达性需独立 Live 验证。
 
+<a id="feishu-task-question-design"></a>
+
+### 飞书任务问题卡（F-004/F-020）
+
+迁移 039 在 `state.db` 增加私有 `feishu_task_question`，记录问题、不可变通知路由与绑定版本。Main 保存 `request_input` 时，只有确切的原用户 Main 输入具有已认证 Feishu 路由、当前绑定可用，且通知偏好为 Automatic 或指定该绑定，才同时提交一条 `needs_input` 通知。普通本地问题与成果审阅继续沿用原 TaskFeedback。迁移保留历史问题和路由，仅新符合条件的问题产生卡片。
+
+Feishu adapter 复用 DeliveryRequest、原消息 reply API、冻结 projection 和分片 0 的远端消息回执。问题是纯文本，表单只收一条答案。准备网络发送时检查当前请求，在可能阻塞的凭据获取完成后再次检查绑定版本、Task/隐私 epoch、到期和人工结束。已经发出的请求可能晚于撤销返回，随后对该卡的回应由存储拒绝。缺少已保存的权威回执时，未知发送维持 query-only。
+
+新版签名卡片回调以应用、租户、操作人、会话及实际卡片消息 ID 确立身份。Main 提交事务将其与已冻结的原投递、回执及当前绑定版本比较，通过后才接纳 callback/source 或复用旧回执。撤销后重绑增加版本，旧卡失效。Feishu 保留真实卡片 ID 给同步回复，平台 source ledger 与 CLI/Web/Feishu 共享的 TaskFeedback 幂等键分开。首次回答、Main input、原路由和已回答状态同事务提交，后续 Task 异步结果仍走原 Task 话题。 [飞书签名校验](https://open.feishu.cn/document/event-subscription-guide/callback-subscription/receive-and-handle-callbacks) · [飞书新版卡片表单与回调](https://open.feishu.cn/document/uAjLw4CM/ukzMukzMukzM/feishu-cards/card-json-v2-components/interactive-components/image-picker)
+
+确切通知关联、权限复检和单一接纳事务是领域必需。纯文本问题、个人渠道及单字段表单是当前产品范围。实现保持在私有 Feishu adapter 和既有 TaskFeedback 写入口，复用已有投递 outbox。飞书成果审阅需要明确的授权文件入口，留在后续验证范围。
+
 ## 代码与依赖
 
 - [internal/tui/session.go](../../internal/tui/session.go)

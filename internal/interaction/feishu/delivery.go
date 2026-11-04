@@ -16,6 +16,7 @@ import (
 type DeliveryStore interface {
 	DeliveryBinding(context.Context, delivery.Request) (interaction.Binding, error)
 	DeliveryReplySource(context.Context, delivery.Request) (string, error)
+	FeishuTaskQuestion(context.Context, string) (string, bool, error)
 	SaveProjection(context.Context, string, string, int, any) (json.RawMessage, error)
 	ChannelReceipt(context.Context, string, int, string) (string, error)
 	AcceptChannelReceipt(context.Context, string, int, string, string) error
@@ -41,18 +42,35 @@ func (a Adapter) Send(ctx context.Context, e delivery.Envelope) delivery.Observa
 }
 func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) delivery.Observation {
 	fail := delivery.Observation{Outcome: delivery.Unknown}
+	question, pending, err := a.Store.FeishuTaskQuestion(ctx, e.Request.MessageID)
+	if err != nil {
+		return fail
+	}
+	rejected := delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+	if question != "" && !send {
+		// Revocation blocks a new send. It is not evidence that an earlier,
+		// unconfirmed send had no remote effect.
+		rejected = fail
+	}
 	binding, bindingErr := a.Store.DeliveryBinding(ctx, e.Request)
 	if bindingErr != nil || !strings.HasPrefix(binding.Subject, a.Client.Subject("")) {
-		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+		return rejected
 	}
 	if _, err := delivery.Compose(e.Request, e.Message); err != nil || e.Request.Channel != "feishu" {
-		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+		return rejected
 	}
 	source, err := a.Store.DeliveryReplySource(ctx, e.Request)
 	if err != nil {
-		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+		return rejected
 	}
 	candidate := composeProjection(e, a.Client.Config.WorkspaceURL, source)
+	if question != "" {
+		if source == "" || e.Request.Intent != "needs_input" || len(e.Message.Content) != 1 || e.Message.Content[0].Type != "text" {
+			return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+		}
+		candidate.Transport.Card = taskQuestionCard(question, e.Message.Content[0].Text)
+		candidate.Transport.IncludeArtifacts = false
+	}
 	raw, err := a.Store.SaveProjection(ctx, e.Request.DeliveryID, ui.Hash(e.Message), ui.Version, candidate)
 	if err != nil {
 		return fail
@@ -118,8 +136,23 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 			}
 			content = map[string]string{"file_key": key}
 		}
+		var authorize func(context.Context) error
+		if question != "" {
+			if !pending {
+				return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+			}
+			// A slow credential refresh must finish before the final admission
+			// check. Only a new card send needs this; receipt recovery stays read-only.
+			authorize = func(ctx context.Context) error {
+				_, current, err := a.Store.FeishuTaskQuestion(ctx, e.Request.MessageID)
+				if err == nil && !current {
+					err = errQuestionClosed
+				}
+				return err
+			}
+		}
 		if source != "" {
-			remote, err = a.Client.Reply(ctx, source, keyFor(e.Request.DeliveryID, i), p.kind, content)
+			remote, err = a.Client.reply(ctx, source, keyFor(e.Request.DeliveryID, i), p.kind, content, authorize)
 		} else {
 			remote, err = a.Client.Send(ctx, e.Request.DestinationRef, keyFor(e.Request.DeliveryID, i), p.kind, content)
 		}
@@ -133,7 +166,12 @@ func (a Adapter) deliver(ctx context.Context, e delivery.Envelope, send bool) de
 	return delivery.Observation{Outcome: delivery.Delivered}
 }
 
+var errQuestionClosed = errors.New("feishu task question is no longer actionable")
+
 func credentialObservation(err error) delivery.Observation {
+	if errors.Is(err, errQuestionClosed) {
+		return delivery.Observation{Outcome: delivery.Failed, Code: "rejected"}
+	}
 	if errors.Is(err, ErrCredentialsRejected) {
 		return delivery.Observation{Outcome: delivery.Failed, Code: "credentials_rejected"}
 	}
