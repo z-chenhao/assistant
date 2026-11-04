@@ -69,7 +69,13 @@ Main 的 current 只选择 checkpoint.input_sequence 之前的已消费用户输
 
 来源读取最多 21 个持久类型匹配的候选，复用 20 条链接和 4 KiB UTF-8 正文预算。Conversation 元数据校验持久用户/Agent 归属与时间，若未 Flush 可检查已接纳的本机 intent，明确归属冲突直接省略。Task 链接复用已有 scope/Forget 判定。Run、私有反馈、隐藏谱系及正文提及不会产生链接。跨库和密钥操作在短 state 只读事务外完成。返回前重查当前 Memory 及存储表示，然后重查 owner、epoch 和时间边界；任一变更丢弃整页。该入口与存储衔接为内部实验实现，无新迁移或权限。
 
-尚未接通的范围包括 Main 的 Memory 原文、替代谱系、外部 PR 关联和真实模型导航质量。私有摘要原文仍由现有 Artifact grant 管理。F-004/F-042 后续接入必须保留来源证据与授权的区别。
+### 本机 GitHub 接续证据
+
+本机所有者可从现有 Task 追溯实际交给 Main 的确切 GitHub 观察版本，并从观察回到原 Task。确切 PR 来自控制启动时已验证的配置。只读查询复用 `github_task_followup`，校验观察、绑定与 Task 的持久 scope、generation、隐私 epoch 和时间边界。当前代中已接纳的较早 Task epoch 可保留，未接纳项需对应当前 Task epoch。观察模式决策、未关联的普通轮询观察、已忽略和旧代记录均不建立链接。当前绑定失效或凭据/仓库身份被明确拒绝时隐藏关联，网络中断仍可读取已保存的证据。
+
+CLI 使用内部实验性 `github:SEQUENCE` 精确引用和现有正文/链接预算。正反向共用同一查询条件，返回前在短 state 只读快照中复核。第三方正文和状态仅作证据。接续关系与可见性是必要机制，单 PR 和仅本机 CLI 是当前范围。该读取直接组合现有持久记录，避免添加图索引、外部 API 读取或第二套授权流程。
+
+尚未接通的范围包括 Main 的 Memory 原文、替代谱系、Main 的 GitHub 导航、其他外部来源和真实模型导航质量。私有摘要原文仍由现有 Artifact grant 管理。
 
 ## 验证与交付
 

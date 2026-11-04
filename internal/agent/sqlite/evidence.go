@@ -22,6 +22,7 @@ import (
 type evidenceAccess struct {
 	scope        artifact.Scope
 	conversation string
+	githubScope  string
 	epoch, floor int64
 	claim        agent.RunClaim
 }
@@ -148,12 +149,19 @@ func (t *tools) readLinkedEvidence(ctx context.Context, inv tool.Invocation) (to
 }
 
 func (r *Runs) readEvidence(ctx context.Context, q evidence.Request, c agent.RunClaim) (page evidence.Page, err error) {
+	return r.readScopedEvidence(ctx, q, c, "")
+}
+
+func (r *Runs) readScopedEvidence(ctx context.Context, q evidence.Request, c agent.RunClaim, githubScope string) (page evidence.Page, err error) {
 	var access evidenceAccess
 	err = r.evidenceReadTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		access, err = r.evidenceAccess(ctx, tx, c)
 		if err != nil {
 			return err
+		}
+		if c == nil {
+			access.githubScope = githubScope
 		}
 		if q.Ref == "current" {
 			var id string
@@ -215,6 +223,8 @@ func (r *Runs) readEvidence(ctx context.Context, q evidence.Request, c agent.Run
 		}
 	case strings.HasPrefix(q.Ref, "artifact:"):
 		err = r.evidenceArtifact(ctx, access, q, &page)
+	case strings.HasPrefix(q.Ref, "github:"):
+		err = r.readGitHubObservation(ctx, access, q, &page)
 	default:
 		err = evidence.ErrInvalid
 	}
@@ -236,7 +246,7 @@ func (r *Runs) readEvidence(ctx context.Context, q evidence.Request, c agent.Run
 			_, err := r.host.Artifacts().DescribeTx(ctx, tx, access.scope, q.Ref, true)
 			return err
 		}
-		return nil
+		return r.recheckGitHubEvidence(ctx, tx, access, &page)
 	})
 	if err != nil {
 		return evidence.Page{}, err

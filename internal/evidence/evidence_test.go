@@ -21,6 +21,21 @@ func TestMemoryEvidenceReferenceIsOwnerOnly(t *testing.T) {
 	}
 }
 
+func TestGitHubEvidenceReferenceIsCanonicalAndOwnerOnly(t *testing.T) {
+	const valid = `{"ref":"github:42"}`
+	if _, err := ParseOwner(valid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(valid); err == nil || ValidRef("github:42") {
+		t.Fatal("GitHub evidence escaped owner-only parsing")
+	}
+	for _, raw := range []string{`{"ref":"github:0"}`, `{"ref":"github:042"}`, `{"ref":"github:+42"}`, `{"ref":"github:-42"}`, `{"ref":"github:9223372036854775808"}`} {
+		if _, err := ParseOwner(raw); err == nil {
+			t.Fatal("noncanonical observation reference", raw)
+		}
+	}
+}
+
 func TestEvidenceRequestAndUTF8Windows(t *testing.T) {
 	for _, raw := range []string{`{}`, `{"ref":"current","ref":"task:x"}`, `{"ref":"current","limit":null}`, `{"ref":"memory:x"}`, `{"ref":"task:a/b"}`, `{"ref":"current","scope":"all"}`, `{"ref":"current","limit":3}`, `{"ref":"current","offset":-1}`, `{"ref":"current"} {}`} {
 		if _, err := Parse(raw); err == nil {

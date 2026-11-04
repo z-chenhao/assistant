@@ -7,6 +7,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/config"
 	"github.com/z-chenhao/assistant/internal/evidence"
 	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/observer/github"
 )
 
 // Evidence control uses the normal data-root startup checks without attaching
@@ -31,6 +32,13 @@ func (a *App) ReadEvidence(ctx context.Context, q evidence.Request) (evidence.Pa
 			return evidence.Page{}, evidence.ErrInvalid
 		}
 		return a.runtimeRuns().ReadMemoryEvidence(ctx, q, a.memory, *a.evidenceVault)
+	}
+	if a.evidenceVault != nil && (strings.HasPrefix(q.Ref, "task:") || strings.HasPrefix(q.Ref, "github:")) {
+		var cfg *github.Config
+		if a.github != nil {
+			cfg = &a.github.Config
+		}
+		return a.runtimeRuns().ReadGitHubLinkedEvidence(ctx, q, cfg)
 	}
 	return a.runtimeRuns().ReadEvidence(ctx, q)
 }

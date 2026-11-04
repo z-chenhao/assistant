@@ -32,6 +32,11 @@ func (r *Runs) evidenceLinks(ctx context.Context, a evidenceAccess, q evidence.R
  UNION SELECT 'conversation:'||q.source_message_id,'original_message' FROM task_request q WHERE json_extract(q.receipt_json,'$.taskRef')=? AND q.source_message_id!=''
  UNION SELECT 'conversation:'||m.message_id,'delivery' FROM task_update u JOIN task t USING(task_id) JOIN main_inbox b USING(event_id) JOIN main_reply m ON m.run_id=b.run_id WHERE t.task_ref=?`
 		args = []any{q.Ref, q.Ref, q.Ref, q.Ref, q.Ref}
+		if a.githubScope != "" {
+			query += ` UNION SELECT 'github:'||o.sequence,'github_observation'` + githubEvidenceRows + ` AND t.task_ref=?`
+			args = append(args, a.githubEvidenceArgs()...)
+			args = append(args, q.Ref)
+		}
 	case "artifact":
 		query = `SELECT t.task_ref ref,'associated_task' relation FROM task t WHERE t.agent_id=? AND (t.task_id=(SELECT task_id FROM artifact WHERE artifact_ref=?) OR EXISTS(SELECT 1 FROM artifact_reference ar WHERE ar.artifact_ref=? AND ar.holder_kind='task' AND ar.holder_id=t.task_id))`
 		args = []any{a.scope.AgentID, q.Ref, q.Ref}
@@ -71,6 +76,11 @@ func (r *Runs) evidenceLinks(ctx context.Context, a evidenceAccess, q evidence.R
 		candidates = candidates[:20]
 	}
 	for _, link := range candidates {
+		if a.githubScope != "" && link.Relation == "github_observation" {
+			// The final state snapshot rechecks these associations together.
+			page.Links = append(page.Links, link)
+			continue
+		}
 		if !evidence.ValidRef(link.Ref) {
 			continue
 		}
