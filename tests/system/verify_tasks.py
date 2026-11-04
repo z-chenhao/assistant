@@ -28,17 +28,50 @@ def state(h):
             "task_invocations": "SELECT * FROM task_invocation ORDER BY invocation_id",
             "worker_results": "SELECT * FROM worker_result ORDER BY created_at,exchange_id",
             "task_events": "SELECT event_id,type,payload_json,published_at FROM event_outbox WHERE type LIKE '%task%' ORDER BY occurred_at,event_id",
+            "compactions": "SELECT run_id,step_index,messages_json,provenance_json FROM context_compaction ORDER BY run_id,step_index",
         }.items():
             value[key] = [dict(row) for row in db.execute(query)]
     return value
+
+
+def frozen_generation_contracts(value):
+    runs = {r['run_id']: r for r in value['runs']}
+    snapshots = {s['snapshot_id'] for s in value['snapshots']}
+    caps = {c['snapshot_id']: c for c in value['capabilities']}
+    preparations = {(p['run_id'], p['step_index']): p for p in value['compactions']}
+    models, schemas = {}, {}
+    if not all(r['model_snapshot_id'] in snapshots and r['capability_snapshot_id'] in caps for r in runs.values()):
+        return False
+    for generation in value['generations']:
+        request = json.loads(generation['request_json'])
+        run = runs.get(request['run_id'])
+        if not run or generation['run_id'] != run['run_id'] or request['model_snapshot']['snapshot_id'] != run['model_snapshot_id']:
+            return False
+        if models.setdefault(run['run_id'], request['model_snapshot']) != request['model_snapshot']:
+            return False
+        prepared = preparations.get((run['run_id'], generation['step_index']))
+        if prepared and json.loads(prepared['messages_json']) != request['messages']:
+            return False
+        provenance = json.loads(prepared['provenance_json']) if prepared else {}
+        tools = request.get('tools', [])
+        if provenance.get('stage') == 'summary_request' and provenance.get('compaction'):
+            # The same frozen model summarizes without declaring executable
+            # tools. This is not a change to the Run's ordinary tool schema.
+            if tools:
+                return False
+            continue
+        frozen = json.loads(caps[run['capability_snapshot_id']]['tools_json'])
+        if [(t['name'], t['input_schema']) for t in tools] != [(t['name'], t['input_schema']) for t in frozen if not t.get('internal')]:
+            return False
+        if schemas.setdefault(run['run_id'], tools) != tools:
+            return False
+    return True
 
 
 def assertions(value, tasks, roots, updates):
     workers = [r for r in value["runs"] if r["kind"] == "worker"]
     replies = [m for m in value["conversation"] if m["role"] == "assistant"]
     requests = [json.loads(g["request_json"]) for g in value["generations"]]
-    run_map = {r["run_id"]: r for r in value["runs"]}
-    snapshots = {s["snapshot_id"] for s in value["snapshots"]}
     caps = {c["snapshot_id"]: c for c in value["capabilities"]}
     return {
         "task_count": len(value["tasks"]) == tasks,
@@ -50,10 +83,7 @@ def assertions(value, tasks, roots, updates):
         "runtime_origin_and_named_details": all(json.loads(b["message_json"])["origin"] == "runtime" and set(json.loads(b["message_json"])["details"]) <= {"task_ref", "kind", "artifact_refs"} for b in value["inbox"]),
         "runtime_never_system": all(m["role"] != "system" for req in requests for m in req["messages"] if m.get("origin") == "runtime"),
         "worker_not_in_conversation": all(m["role"] in ("user", "assistant") and m["source"] != "runtime" for m in value["conversation"]),
-        "frozen_snapshots_and_schemas": all(r["model_snapshot_id"] in snapshots and r["capability_snapshot_id"] in caps for r in value["runs"]) and all(
-            req["model_snapshot"]["snapshot_id"] == run_map[req["run_id"]]["model_snapshot_id"] and all(
-                req["model_snapshot"] == other["model_snapshot"] and req.get("tools") == other.get("tools")
-                for other in requests if other["run_id"] == req["run_id"]) for req in requests),
+        "frozen_snapshots_and_schemas": frozen_generation_contracts(value),
         "one_durable_delivery_per_main_reply": len(value["deliveries"]) == len(replies) == len({d["message_id"] for d in value["deliveries"]}),
         "atomic_provider_acceptance": len(value["usage"]) == len({g["generation_id"] for g in value["generations"] if g["error_code"] != "GENERATION_CANCELLED"}) and {u["generation_id"] for u in value["usage"]} == {g["generation_id"] for g in value["generations"] if g["error_code"] != "GENERATION_CANCELLED"},
         "ordered_semantic_history": [m["sequence"] for m in value["conversation"]] == list(range(1, len(value["conversation"]) + 1)),

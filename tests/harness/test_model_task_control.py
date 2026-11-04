@@ -1,6 +1,45 @@
 import unittest
+import copy
+import json
 
 import model_task_control as model
+from verify_tasks import frozen_generation_contracts
+
+
+class FrozenTaskGenerationTests(unittest.TestCase):
+    def fixture(self):
+        tools = [dict(name='fixture', input_schema='{}', description='Frozen tool')]
+        messages = [dict(role='user', text='Source')]
+        requests = [dict(run_id='run', model_snapshot=dict(snapshot_id='model', model_id='frozen'), messages=messages, tools=tools),
+                    dict(run_id='run', model_snapshot=dict(snapshot_id='model', model_id='frozen'), messages=messages),
+                    dict(run_id='run', model_snapshot=dict(snapshot_id='model', model_id='frozen'), messages=messages, tools=tools)]
+        return dict(runs=[dict(run_id='run',model_snapshot_id='model',capability_snapshot_id='caps')],
+                    snapshots=[dict(snapshot_id='model')],
+                    capabilities=[dict(snapshot_id='caps',tools_json=json.dumps(tools))],
+                    generations=[dict(run_id='run',step_index=i,request_json=json.dumps(r)) for i,r in enumerate(requests)],
+                    compactions=[dict(run_id='run',step_index=1,messages_json=json.dumps(messages),
+                                      provenance_json=json.dumps(dict(stage='summary_request',compaction=dict(history_artifact='artifact:original'))))])
+
+    def test_summary_uses_the_frozen_model_without_granting_tools(self):
+        value = self.fixture()
+        self.assertTrue(frozen_generation_contracts(value))
+        for changed in ('summary_tools', 'unmarked_summary', 'ordinary_schema', 'model', 'prepared_messages'):
+            with self.subTest(changed=changed):
+                broken = copy.deepcopy(value)
+                index = 1 if changed == 'summary_tools' else 2
+                request = json.loads(broken['generations'][index]['request_json'])
+                if changed == 'summary_tools':
+                    request['tools'] = [dict(name='forged',input_schema='{}')]
+                elif changed == 'unmarked_summary':
+                    broken['compactions'] = []
+                elif changed == 'ordinary_schema':
+                    request['tools'][0]['input_schema'] = '{"forged":true}'
+                elif changed == 'model':
+                    request['model_snapshot']['model_id'] = 'switched'
+                else:
+                    broken['compactions'][0]['messages_json'] = '[]'
+                broken['generations'][index]['request_json'] = json.dumps(request)
+                self.assertFalse(frozen_generation_contracts(broken))
 
 
 class TaskControlModelTests(unittest.TestCase):
