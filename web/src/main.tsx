@@ -18,7 +18,7 @@ enhanceWorkers();
 const live=startLiveUpdates();
 enhanceProjections();
 enhanceRichForms();
-enhanceComposer();
+enhanceComposer(live?.messageAccepted);
 live?.start();
 
 enhanceObservability();

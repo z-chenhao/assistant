@@ -135,7 +135,12 @@ func (s *eventStream) accept(e llm.GenerationEvent) {
 			d.clipped = true
 		}
 		d.event.Text = strings.Clone(e.Text[:n])
-		s.remaining -= n
+		if d.clipped {
+			// Once cut, the result must stay a prefix of the original text.
+			s.remaining = 0
+		} else {
+			s.remaining -= n
+		}
 	case "tool_call":
 		if e.ToolCall == nil || e.ToolCall.ID == "" || e.ToolCall.Name == "" || s.toolCalls >= 32 || len(e.ToolCall.Arguments) > MaxOutputBytes {
 			s.reject(llm.InvalidProviderResponse)

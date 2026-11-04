@@ -81,7 +81,7 @@ func (s *Server) acceptFormMessage(w http.ResponseWriter, r *http.Request) error
 		s.Wake()
 	}
 	if r.Header.Get("Accept") == "application/json" {
-		jsonResult(w, map[string]any{"accepted": true, "location": target})
+		jsonResult(w, map[string]any{"accepted": true, "location": target, "next_source_id": sourceID()})
 		return nil
 	}
 	http.Redirect(w, r, target, http.StatusSeeOther)

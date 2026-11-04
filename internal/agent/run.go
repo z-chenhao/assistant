@@ -96,6 +96,7 @@ type Generation struct {
 	ErrorCode  string
 }
 type Event struct {
+	GenerationID string    `json:"-"` // Correlates live message events; not part of the persisted trace.
 	InvocationID string    `json:"invocation_id,omitempty"`
 	RunKind      string    `json:"run_kind"`
 	TaskID       string    `json:"task_id,omitempty"`

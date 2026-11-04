@@ -91,6 +91,7 @@ type Server struct {
 	AccountCatalog func(context.Context, string) ([]llm.CatalogModel, error)
 	Callback       http.Handler
 	Wake           func()
+	replies        replyPreview
 	mu             sync.Mutex
 	requests       sync.WaitGroup
 	stopping       bool
