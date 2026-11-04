@@ -5,6 +5,7 @@ package evidence
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -50,8 +51,23 @@ func validRef(ref string, owner bool) bool {
 	if ref == "current" {
 		return true
 	}
+	if owner {
+		if _, ok := GitHubSequence(ref); ok {
+			return true
+		}
+	}
 	prefix, id, ok := strings.Cut(ref, ":")
 	return ok && (prefix == "conversation" || prefix == "task" || prefix == "artifact" || owner && prefix == "memory") && id != "" && len(ref) <= 256 && !strings.ContainsAny(id, "/\\\x00\r\n\t ")
+}
+
+// GitHubSequence accepts only the canonical local observation reference.
+func GitHubSequence(ref string) (int64, bool) {
+	id, ok := strings.CutPrefix(ref, "github:")
+	if !ok || len(id) == 0 || len(id) > 19 || id[0] < '1' || id[0] > '9' {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(id, 10, 64)
+	return n, err == nil
 }
 
 func Definition() tool.Definition {
