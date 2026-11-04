@@ -103,9 +103,9 @@ func (s *Store) BindGitHubTask(ctx context.Context, cfg github.Config, q github.
 				return err
 			}
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO github_task_binding(scope,task_id,task_epoch,privacy_epoch,enabled,generation,last_sequence,version,rule_mode,rule_event_kind)
- VALUES(?,?,?,`+githubEpoch+`,1,1,(SELECT coalesce(max(sequence),0) FROM github_observation WHERE scope=?),1,?,?)
- ON CONFLICT(scope) DO UPDATE SET task_id=excluded.task_id,task_epoch=excluded.task_epoch,privacy_epoch=excluded.privacy_epoch,enabled=1,generation=github_task_binding.generation+1,last_sequence=excluded.last_sequence,version=github_task_binding.version+1,rule_mode=excluded.rule_mode,rule_event_kind=excluded.rule_event_kind`, cfg.Scope(), id, q.TaskEpoch, cfg.Scope(), mode, q.EventKind)
+		_, err = tx.ExecContext(ctx, `INSERT INTO github_task_binding(scope,task_id,task_epoch,privacy_epoch,enabled,generation,last_sequence,version,rule_mode,rule_event_kind,rule_check_conclusion)
+ VALUES(?,?,?,`+githubEpoch+`,1,1,(SELECT coalesce(max(sequence),0) FROM github_observation WHERE scope=?),1,?,?,?)
+ ON CONFLICT(scope) DO UPDATE SET task_id=excluded.task_id,task_epoch=excluded.task_epoch,privacy_epoch=excluded.privacy_epoch,enabled=1,generation=github_task_binding.generation+1,last_sequence=excluded.last_sequence,version=github_task_binding.version+1,rule_mode=excluded.rule_mode,rule_event_kind=excluded.rule_event_kind,rule_check_conclusion=excluded.rule_check_conclusion`, cfg.Scope(), id, q.TaskEpoch, cfg.Scope(), mode, q.EventKind, q.CheckConclusion)
 		if err != nil {
 			return err
 		}
@@ -154,9 +154,9 @@ func (s *Store) GitHubTaskBinding(ctx context.Context, cfg github.Config) (v git
 	defer tx.Rollback()
 	var enabled, current bool
 	var mode, goal string
-	err = tx.QueryRowContext(ctx, `SELECT t.task_ref,b.task_epoch,b.version,b.enabled,b.last_sequence,b.generation,b.rule_mode,b.rule_event_kind,t.anchor_task,
+	err = tx.QueryRowContext(ctx, `SELECT t.task_ref,b.task_epoch,b.version,b.enabled,b.last_sequence,b.generation,b.rule_mode,b.rule_event_kind,b.rule_check_conclusion,t.anchor_task,
  b.enabled=1 AND w.enabled=1 AND w.failure_code='' AND b.task_epoch=t.task_epoch AND t.status IN('active','completed') AND t.explicit_end_epoch<t.task_epoch AND b.privacy_epoch=`+githubEpoch+` AND w.intent_privacy_epoch=b.privacy_epoch
- FROM github_task_binding b JOIN task t USING(task_id) JOIN github_watch w USING(scope) WHERE b.scope=?`, cfg.Scope()).Scan(&v.TaskRef, &v.TaskEpoch, &v.Version, &enabled, &v.LastSequence, &v.Generation, &mode, &v.EventKind, &goal, &current)
+ FROM github_task_binding b JOIN task t USING(task_id) JOIN github_watch w USING(scope) WHERE b.scope=?`, cfg.Scope()).Scan(&v.TaskRef, &v.TaskEpoch, &v.Version, &enabled, &v.LastSequence, &v.Generation, &mode, &v.EventKind, &v.CheckConclusion, &goal, &current)
 	if err == sql.ErrNoRows {
 		return v, nil
 	}
@@ -180,6 +180,7 @@ func (s *Store) GitHubTaskBinding(ctx context.Context, cfg github.Config) (v git
 		v.TaskRef = ""
 		v.TaskEpoch = 0
 		v.EventKind = ""
+		v.CheckConclusion = ""
 		v.Mode = "off"
 		v.State = "privacy_stopped"
 	} else {

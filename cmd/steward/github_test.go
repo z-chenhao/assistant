@@ -45,6 +45,7 @@ func TestGitHubCLISuccessfulPollPersistsDedupAndFailureBoundary(t *testing.T) {
 	}
 	var fail atomic.Bool
 	var revision atomic.Int64
+	var checkRevision atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" || r.Header.Get("Authorization") != "Bearer synthetic-observer-token" {
 			t.Error("wrong authentication boundary")
@@ -63,7 +64,16 @@ func TestGitHubCLISuccessfulPollPersistsDedupAndFailureBoundary(t *testing.T) {
 			}
 			fmt.Fprint(w, `[]`)
 		case "/repos/owner/repo/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs":
-			fmt.Fprint(w, `{"check_runs":[]}`)
+			revision := checkRevision.Load()
+			if revision == 0 {
+				fmt.Fprint(w, `{"check_runs":[]}`)
+				return
+			}
+			conclusion := "success"
+			if revision == 2 {
+				conclusion = "failure"
+			}
+			fmt.Fprintf(w, `{"check_runs":[{"id":7,"name":"ci","status":"completed","conclusion":%q,"head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","completed_at":"2026-11-01T00:00:00Z","html_url":"https://github.com/owner/repo/runs/7"}]}`, conclusion)
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
 			http.NotFound(w, r)
@@ -165,6 +175,35 @@ func TestGitHubCLISuccessfulPollPersistsDedupAndFailureBoundary(t *testing.T) {
 	var count int
 	if err = db.QueryRow(`SELECT count(*) FROM github_rule_decision`).Scan(&count); err != nil || count != 1 {
 		t.Fatal("disabled rule recorded a decision", count, err)
+	}
+	for _, fields := range []string{
+		`"check_conclusion":"failure"`,
+		`"mode":"observe","event_kind":"review","check_conclusion":"failure"`,
+		`"mode":"observe","event_kind":"check_run","check_conclusion":"success"`,
+		`"mode":"observe","event_kind":"check_run","check_conclusion":null`,
+	} {
+		input := fmt.Sprintf(`{"task_ref":"task:cli-rule","task_epoch":1,"version":%d,%s}`, binding.Version, fields)
+		if raw, err = invokeInput(input, "bind"); err == nil || len(raw) != 0 {
+			t.Fatal("invalid check rule accepted", fields, err)
+		}
+	}
+	input := fmt.Sprintf(`{"task_ref":"task:cli-rule","task_epoch":1,"version":%d,"mode":"observe","event_kind":"check_run","check_conclusion":"failure"}`, binding.Version)
+	raw, err = invokeInput(input, "bind")
+	if err != nil || json.Unmarshal(raw, &binding) != nil || binding.CheckConclusion != "failure" {
+		t.Fatal("CLI lost the configured check selector", string(raw), err)
+	}
+	for _, revision := range []int64{1, 2, 2} {
+		checkRevision.Store(revision)
+		if _, err = invoke("poll"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err = invoke("decisions")
+	if err != nil || json.Unmarshal(raw, &decisions) != nil || len(decisions) != 3 ||
+		!decisions[0].Matched || decisions[0].ExpectedCheckConclusion != "failure" || decisions[0].ActualCheckConclusion != "failure" ||
+		decisions[1].Matched || decisions[1].ActualCheckConclusion != "success" ||
+		decisions[1].Reason != "check_conclusion_mismatch" || decisions[2].ActualCheckConclusion != "" {
+		t.Fatal("CLI did not retain both exact check versions or duplicated a decision", string(raw), err)
 	}
 	if err = db.QueryRow(`SELECT count(*) FROM run`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("observation mode created execution", count, err)

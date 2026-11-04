@@ -186,6 +186,7 @@ func TestGitHubRuleMigrationPreservesLegacyBindingAndPendingObservation(t *testi
 	bindTask(t, s, cfg, ref)
 	watchBatch(t, s, cfg, "already-observed")
 	if _, err := s.db.Exec(`DROP TABLE feishu_task_question; DROP TABLE github_rule_decision;
+ ALTER TABLE github_task_binding DROP COLUMN rule_check_conclusion;
  ALTER TABLE github_task_binding DROP COLUMN rule_event_kind;
  ALTER TABLE github_task_binding DROP COLUMN rule_mode;
  ALTER TABLE github_observation DROP COLUMN binding_generation;
@@ -211,7 +212,7 @@ func TestGitHubRuleMigrationPreservesLegacyBindingAndPendingObservation(t *testi
 	a.Store = upgraded.Runs(r.history, r.registry)
 	p.store = upgraded
 	mustDrain(t, a)
-	if scalar(t, upgraded, `PRAGMA user_version`) != 40 ||
+	if scalar(t, upgraded, `PRAGMA user_version`) != 41 ||
 		scalar(t, upgraded, `SELECT count(*) FROM github_task_followup WHERE state='continued'`) != 1 ||
 		scalar(t, upgraded, `SELECT count(*) FROM github_rule_decision`) != 0 {
 		t.Fatal("migration lost existing automatic behavior or inferred a new rule")
