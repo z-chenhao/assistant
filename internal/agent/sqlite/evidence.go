@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	artifactsqlite "github.com/z-chenhao/assistant/internal/artifact/sqlite"
 	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/evidence"
+	"github.com/z-chenhao/assistant/internal/media/docx"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
 
@@ -23,6 +25,7 @@ type evidenceAccess struct {
 	scope        artifact.Scope
 	conversation string
 	githubScope  string
+	docxText     bool
 	epoch, floor int64
 	claim        agent.RunClaim
 }
@@ -43,6 +46,7 @@ func (r *Runs) evidenceAccess(ctx context.Context, tx *sql.Tx, c agent.RunClaim)
 	a.claim = c
 	if c == nil {
 		a.scope.Owner = true
+		a.docxText = true
 		err = tx.QueryRowContext(ctx, `SELECT agent_id FROM agent_config WHERE singleton=1`).Scan(&a.scope.AgentID)
 		a.conversation = a.scope.AgentID
 	} else {
@@ -50,7 +54,8 @@ func (r *Runs) evidenceAccess(ctx context.Context, tx *sql.Tx, c agent.RunClaim)
 			return
 		}
 		var kind string
-		err = tx.QueryRowContext(ctx, `SELECT kind,agent_id,conversation_id FROM run WHERE run_id=?`, c.RunID()).Scan(&kind, &a.scope.AgentID, &a.conversation)
+		err = tx.QueryRowContext(ctx, `SELECT kind,agent_id,conversation_id,coalesce((SELECT json_extract(policy_json,'$.docx_text') FROM run_context_policy WHERE run_id=run.run_id),0)
+		 FROM run WHERE run_id=?`, c.RunID()).Scan(&kind, &a.scope.AgentID, &a.conversation, &a.docxText)
 		if err == nil && kind != "main" {
 			err = artifact.ErrNotFound
 		}
@@ -297,6 +302,12 @@ func (r *Runs) evidenceArtifact(ctx context.Context, a evidenceAccess, q evidenc
 		if err == nil && d.CreatedAt.UnixMicro() <= a.floor {
 			err = artifact.ErrNotFound
 		}
+		if err == nil && a.docxText && d.ByteSize > docx.MaxArchiveBytes {
+			media, _, _ := mime.ParseMediaType(d.MediaType)
+			if media == docx.MediaType {
+				err = fmt.Errorf("%w: %s", artifact.ErrLimit, docx.ErrLimit)
+			}
+		}
 		return a.scope, err
 	}
 	var opened *artifactsqlite.Opened
@@ -326,6 +337,19 @@ func (r *Runs) evidenceArtifact(ctx context.Context, a evidenceAccess, q evidenc
 	page.Offset = q.Offset
 	page.TotalBytes = d.ByteSize
 	media, _, _ := mime.ParseMediaType(d.MediaType)
+	if a.docxText && media == docx.MediaType {
+		text, err := docx.Text(ctx, f)
+		switch {
+		case errors.Is(err, docx.ErrInvalid):
+			return fmt.Errorf("%w: %s", evidence.ErrInvalid, err)
+		case errors.Is(err, docx.ErrLimit):
+			return fmt.Errorf("%w: %s", artifact.ErrLimit, err)
+		case err != nil:
+			return err
+		}
+		page.Representation = "docx_text"
+		return evidence.Window(page, text, q)
+	}
 	if !strings.HasPrefix(media, "text/") && media != "application/json" && !strings.HasSuffix(media, "+json") {
 		if q.Offset != 0 {
 			return evidence.ErrInvalid

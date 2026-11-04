@@ -7,6 +7,7 @@ prove OCR, visa advice, model reasoning or the complete multimodal product case.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from contextlib import closing
 import sqlite3
 import subprocess
 import tempfile
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fixture_pool import run_cases
 
@@ -134,7 +136,7 @@ def run_recovery(binary, scenario_jobs=1):
     return report
 
 
-def run(binary, scenario_jobs=1):
+def run(binary, scenario_jobs=1, docx_only=False):
     repo = Path(__file__).resolve().parents[2]
     fixture = json.loads((repo / 'tests/fixtures/m3-artifact-v1.json').read_text())
     lock = json.loads((repo / 'tests/fixtures/m3-artifact-v1.lock.json').read_text())
@@ -146,14 +148,115 @@ def run(binary, scenario_jobs=1):
     with tempfile.TemporaryDirectory(prefix='steward-artifacts-') as temp:
         root = Path(temp)
 
-        def scenario(name, action):
+        def scenario(name, action, metadata=None):
             folder = root / name; folder.mkdir()
             h = ArtifactHarness(binary, folder, fixture='artifacts')
             try:
-                h.setup()
+                h.setup(metadata=metadata)
                 return action(h)
             finally:
                 h.cleanup()
+
+        def docx_evidence(h):
+            (h.root / 'tool-config.yaml').write_text('version: 1\nmemory:\n  encryption_key_ref: env:DOCX_FIXTURE_KEY\n')
+            h.env['DOCX_FIXTURE_KEY'] = 'S' * 32
+            media = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            main = 'word/document.xml'
+            start = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+            paragraph = '<w:p><w:r><w:t>{}</w:t></w:r></w:p>'
+            body = (start + paragraph.format('ABC🧭 &amp; notes') + '<w:tbl><w:tr><w:tc>' +
+                    paragraph.format('甲') + '</w:tc><w:tc>' + paragraph.format('β') +
+                    '</w:tc></w:tr></w:tbl>' + paragraph.format('end') + '</w:body></w:document>')
+
+            def package(document):
+                buf = BytesIO()
+                with ZipFile(buf, 'w', compression=ZIP_DEFLATED) as archive:
+                    archive.writestr('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                                     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+                                     f'Target="{main}"/></Relationships>')
+                    archive.writestr('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                                     f'<Override PartName="/{main}" ContentType="{media}.main+xml"/></Types>')
+                    archive.writestr(main, document)
+                return buf.getvalue()
+
+            data = package(body)
+            ref = h.save('brief.docx', media, data)['artifact_ref']
+
+            def actor_read(key, target, offset=0, attach=True, legacy=False):
+                args = dict(operation='evidence', artifactRef=target, offset=offset, limit=6)
+                parts = [{'type': 'text', 'text': json.dumps(args)}]
+                if attach:
+                    parts.append({'type': 'file', 'artifact_ref': target})
+                receipt = h.command('chat', 'send-parts', key, text=json.dumps(parts))
+                dbpath = Path(h.env['STEWARD_DATA_ROOT']) / 'state.db'
+                if legacy:
+                    # Seed the policy an already accepted pre-feature Run
+                    # would have. Restore the guard before Actor resumes.
+                    with closing(sqlite3.connect(dbpath)) as db, db:
+                        db.execute('BEGIN IMMEDIATE')
+                        trigger, = db.execute("SELECT sql FROM sqlite_schema WHERE name='context_policy_immutable'").fetchone()
+                        db.execute('DROP TRIGGER context_policy_immutable')
+                        db.execute("UPDATE run_context_policy SET policy_json=json_remove(policy_json,'$.docx_text') WHERE run_id=?",
+                                   (receipt['run_id'],))
+                        db.execute(trigger)
+                h.command('chat', 'work')
+                with closing(sqlite3.connect(dbpath)) as db, db:
+                    rows = db.execute('SELECT tool_name,result_json FROM tool_invocation WHERE run_id=?',
+                                      (receipt['run_id'],)).fetchall()
+                    status = db.execute('SELECT status,error_code FROM run WHERE run_id=?', (receipt['run_id'],)).fetchone()
+                require(len(rows) == 1 and rows[0][0] == 'builtin__evidence_read',
+                        f'{key}: missing explicit evidence receipt, tools={[row[0] for row in rows]}, run={status}')
+                result = json.loads(rows[0][1])
+                return result['error'] if result.get('error') else json.loads(result['text'])
+
+            require(actor_read('no-grant', ref, attach=False)['code'] == 'NOT_FOUND',
+                    'unattached DOCX received implicit access')
+            old = actor_read('legacy', ref, legacy=True)
+            require(old['ref'] == ref and 'text' not in old and 'representation' not in old and
+                    old['total_bytes'] == len(data), 'pre-feature Run changed frozen binary behavior')
+            offset, pages = 0, []
+            while True:
+                page = actor_read(f'page-{offset}', ref, offset)
+                require(page['ref'] == ref and page['kind'] == 'artifact' and page['representation'] == 'docx_text' and
+                        page['offset'] == offset and 0 < page['bytes'] == len(page['text'].encode()) <= 6,
+                        'wrong DOCX source, representation or UTF-8 byte range')
+                pages.append(page['text'])
+                if 'next_offset' not in page:
+                    break
+                require(page['next_offset'] == offset + page['bytes'], 'pagination did not advance')
+                offset = page['next_offset']
+            expected = 'ABC🧭 & notes\n甲\tβ\nend'
+            require(''.join(pages) == expected and page['total_bytes'] == len(expected.encode()),
+                    'DOCX body or table sequence changed')
+            owner = h.command('evidence', 'read', text=json.dumps(dict(ref=ref)))
+            require(owner['text'] == expected and owner['representation'] == 'docx_text' and h.output(ref) == data,
+                    'owner read or original bytes changed')
+
+            for name, blob, error in (
+                ('corrupt', b'broken zip', 'INVALID_ARGUMENT'),
+                ('over-limit', package(start + ' ' * (2 << 20)), 'RESOURCE_LIMIT'),
+            ):
+                bad = h.save(name + '.docx', media, blob)['artifact_ref']
+                result = actor_read(name, bad)
+                require(result['code'] == error, 'wrong DOCX failure code')
+            value = h.state()
+            require(len(value['artifact']) == len(value['objects']) == 3 and not value['artifact_publication'],
+                    'document read wrote or published a derivative')
+            h.command('memory', 'manage', 'forget-docx', text=json.dumps(dict(operation='forget', category='all')))
+            hidden = h.command('evidence', 'read', text=json.dumps(dict(ref=ref)), ok=False)
+            require(hidden.returncode != 0 and not hidden.stdout and 'NOT_FOUND' in hidden.stderr,
+                    'DOCX text remained visible through evidence after Forget')
+            return {'name': 'docx_evidence', 'source': ref, 'pages': len(pages), 'source_preserved': True,
+                    'legacy_metadata_only': True, 'scope_and_forget': True, 'errors': ['INVALID_ARGUMENT', 'RESOURCE_LIMIT']}
+        # The multi-page workload keeps prior receipts and the frozen catalog.
+        docx_model = dict(name='DOCX fixture', provider_kind='openai_compatible',
+                          endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                          model_id='fixture-model', context_window=16384, max_output_tokens=1024,
+                          compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True))
+        report['checks'].append(scenario('docx-evidence', docx_evidence, docx_model))
+        if docx_only:
+            report['cleanup'] = 'all child processes joined; isolated roots removed'
+            return report
 
         def lifecycle(h):
             data = bytes(range(256)) * 2048
@@ -321,10 +424,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument('--recovery-only', action='store_true', help='drive both binary Query receipt recovery paths')
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument('--recovery-only', action='store_true', help='drive both binary Query receipt recovery paths')
+    scope.add_argument('--docx-only', action='store_true', help='verify authorized DOCX evidence through CLI and Actor')
     parser.add_argument("--scenario-jobs", type=int, choices=[1,2,4], default=int(os.environ.get("STEWARD_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args(); args.evidence.unlink(missing_ok=True)
-    report = run_recovery(args.binary.resolve(), args.scenario_jobs) if args.recovery_only else run(args.binary.resolve(), args.scenario_jobs)
+    report = (run_recovery(args.binary.resolve(), args.scenario_jobs) if args.recovery_only else
+              run(args.binary.resolve(), args.scenario_jobs, args.docx_only))
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print('Artifact contracts/recovery verified:', args.evidence)

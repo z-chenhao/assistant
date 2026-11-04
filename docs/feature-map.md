@@ -46,7 +46,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-011](features/memory-context.md#f-011) | 长期上下文压缩 | 长对话保留目标、决策、约束和待办，省略内容可追溯。 | 否 · 部分完成 |
 | [F-012](features/artifacts-media.md#f-012) | 可重新打开的文件产物 | 用户能上传、保存、搜索、下载交付物，引用具有访问边界。 | 是 · 已完成 |
 | [F-013](features/artifacts-media.md#f-013) | 用户图片视觉输入与本地 OCR | 视觉模型收到授权图片；纯文本模型可通过 Linux/macOS 本地沙箱 OCR 读取图片文字。 | 是 · 已完成 |
-| [F-014](features/artifacts-media.md#f-014) | 音视频与文档内容处理 | 用户交付音视频或文档后，Agent 能获取适合任务的内容和来源。 | 否 · 部分完成 |
+| [F-014](features/artifacts-media.md#f-014) | 音视频与文档内容处理 | 已支持授权 DOCX 正文与普通表格分页读取，保留原文件引用。音视频、其他格式与复杂版面仍待覆盖。 | 否 · 部分完成 |
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |

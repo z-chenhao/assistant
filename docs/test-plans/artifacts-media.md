@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [F-012](../features/artifacts-media.md#f-012) | 验证读回字节与哈希、作用域、保留期、并发保存、删除和重启恢复。 | 保护已接通的限定范围；Live/配置另行验证 |
 | [F-013](../features/artifacts-media.md#f-013) | 通过真实消息入口上传图片，在最终供应商请求中验证图片存在，并验证无权限/不支持模型的行为。 | 实际浏览器/CLI → Artifact → Pi → HTTP，区分视觉与纯文本 |
-| [F-014](../features/artifacts-media.md#f-014) | 逐格式验证可获取的内容、原始文件关联、失败反馈和实际任务输出；质量由独立评测衡量。 | 必须通过目标入口补齐闭环；不能只直接调用底层方法 |
+| [F-014](../features/artifacts-media.md#f-014) | 逐格式验证可获取的内容、原始文件关联、失败反馈和实际任务输出；质量由独立评测衡量。 | DOCX 已有真实上传和 Agent 读取路径，其他格式逐项验收 |
 
 ## 层级与关键路径
 
@@ -48,7 +48,11 @@
 - 既有 `verify_local_provider.py` 从 CLI 上传同一实际 PNG，正常选择纯文本模型，由协议 peer 请求 OCR；读取真实 Tesseract 的 Tool 结果，检查 Pi HTTP 没有图片像素且含识别文字。结果提交后、下一轮模型响应前 SIGKILL，恢复必须保留 invocation/attempt、Artifact 与 generation/hash，不重复识别。沿用已有 gate，不新增脚本或 CI 评测阶段。
 - 软件回归证明支持的格式、处理链路和失败边界。多语种准确率、低分辨率/手写/复杂版面质量、真实 DeepSeek 选择工具与答案效果属于独立 Live/eval；不能由受控 HTTP peer 通过推定。
 
-- **F-014 剩余覆盖**：按实际用户场景明确支持格式，补解析、转写或媒体工具及错误反馈；不以合成文件证明理解质量。
+### F-014 DOCX 正文回归
+
+- `internal/media/docx/text_test.go` 验证实际 ZIP/XML 的段落与表格顺序、XML 转义、忽略其他部件、根关系/主部件歧义、坏 XML、深度和数据量上限。
+- `tests/system/verify_artifacts.py --docx-only` 用 CLI 保存真实最小 DOCX，随消息提交原 ref，经 Actor 和冻结的证据工具分页读取。校验原始字节、精确来源、UTF-8 边界、无授权和 Forget、旧 Run 只见元数据，以及坏包和超限失败。完整 Artifact 套件也包含该场景。
+- 音视频、其他文档格式与复杂版面的处理仍需各自入口验证。合成素材只验证软件路径。
 
 ## 详细测试入口与证明边界
 

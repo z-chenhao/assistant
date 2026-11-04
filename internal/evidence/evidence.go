@@ -81,6 +81,7 @@ type Link struct {
 type Page struct {
 	Ref             string    `json:"ref"`
 	Kind            string    `json:"kind"`
+	Representation  string    `json:"representation,omitempty"`
 	Title           string    `json:"title,omitempty"`
 	Author          string    `json:"author,omitempty"`
 	OccurredAt      time.Time `json:"occurred_at"`
