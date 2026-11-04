@@ -72,7 +72,7 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
 
-HTTP 诊断写入以真实 SQLite 锁验证：60ms 的短业务写锁释放后保存记录；持续锁定时在预算内放弃，调用方不等待诊断锁。`go test -race ./internal/observability/sqlite -run TestRecorder` 覆盖两条边界。原 native Pi/HTTP 回归保留完整 attempts/headers 数量断言，失败输出已接收请求数、诊断阶段和 generation 状态计数。
+HTTP 诊断写入以真实 SQLite 锁验证：短业务写锁释放后保存记录，测试为 CI 调度留出余量。持续锁定场景通过实际邮箱验证生产写入时限和调用方的非阻塞行为。`go test -race ./internal/observability/sqlite -run TestRecorder` 覆盖两条边界。原 native Pi/HTTP 回归保留完整 attempts/headers 数量断言，失败输出已接收请求数、诊断阶段和 generation 状态计数。
 
 生产 Bridge + HTTP peer 的 channels 回归核对 Generation Overview 的时间点顺序，覆盖 503 后重试、200、首段数据、首个工具调用和终止事件。Web 回归验证收到 200 后仍能显示空闲超时。旧数据没有流诊断时只展示已采集的阶段。
 
