@@ -41,7 +41,7 @@ flowchart TD
 
 ### 信息回答与成果审阅（F-004）
 
-当前消费者是 Main 的既有 Task 工具、本机所有者 CLI、已认证 Web 及个人飞书问题卡。`request_input` 和 `request_review` 是 Main-only `task_manage` 的严格 union 分支；后者必须包含 1–16 个现有作用域内的不可变 ArtifactRef。ToolInvocation、请求源去重、Main claim fencing 与 Task 接纳事务不另建管线。Task 仍只有原四种状态。
+当前消费者是 Main 的既有 Task 工具、本机所有者 CLI、已认证 Web 及个人飞书反馈卡。`request_input` 和 `request_review` 是 Main-only `task_manage` 的严格 union 分支；后者必须包含 1–16 个现有作用域内的不可变 ArtifactRef。ToolInvocation、请求源去重、Main claim fencing 与 Task 接纳事务不另建管线。Task 仍只有原四种状态。
 
 schema v34 的私有 `task_feedback` 保存确切 Task/epoch、隐私 epoch、问题种类/正文、可定位的原用户消息、成果引用、七天有效期与回应消息。一次事务替代旧 pending 并保存新记录、原有工具回执和事件；成果经原 ArtifactStore 保留。源是 Reporter 运行时事件时，回溯真实用户消息，而不把事件 ID 冒充消息 ID。新请求也使旧的已回答记录失去接续因果效力。
 
@@ -51,7 +51,7 @@ schema v34 的私有 `task_feedback` 保存确切 Task/epoch、隐私 epoch、�
 
 持久关联、幂等、原子 ingress 与失效检查是领域必需机制；单个当前待办与七天有效期是本轮默认政策。Tool schema 是受冻结保护的模型契约；CLI 的用户字段与现有 Task/Artifact refs 是窄输入输出，表、Run ID、claim、SQL 与通用工作流协议不开放。没有泛化人类工作流引擎、自动质量验收、Worker 直达用户或新的动作批准通道。
 
-新增 schema 前向迁移不改历史 Task/Run/snapshots。新 Main 冻结扩展后的工具定义；旧 Main 的精确工具定义不被替换，当前 registry 选择不兼容则 fail-closed，升级前用原二进制排空旧 Main。Web 和个人飞书问题卡复用同一记录与 ingress。飞书的精确投递回执和绑定版本检查加入回答事务，渠道设计见[飞书任务问题卡](channels.md#feishu-task-question-design)。
+新增 schema 前向迁移不改历史 Task/Run/snapshots。新 Main 冻结扩展后的工具定义；旧 Main 的精确工具定义不被替换，当前 registry 选择不兼容则 fail-closed，升级前用原二进制排空旧 Main。Web 和个人飞书反馈卡复用同一记录与 ingress。飞书的精确投递回执和绑定版本检查加入回答事务，渠道设计见[飞书任务反馈卡](channels.md#feishu-task-question-design)。
 
 ### Go 实现职责（F-040）
 
@@ -88,7 +88,7 @@ Task 的 frozen-call / receipt 接纳保留在 executeTask，创建与已有 Tas
 
 #### 飞书结构化待办
 
-CLI 与 Web 已提供具名问题和确切成果审阅。个人飞书支持具名问题，确切成果审阅留待飞书客户端与授权文件入口验证。各入口复用 Main ingress，审批沿用独立的冻结动作与决策协议。
+CLI 与 Web 已提供具名问题和确切成果审阅。个人飞书支持具名问题与有可信工作台入口的确切成果审阅，文件权限仍由 Web 验证。各入口复用 Main ingress，审批沿用独立的冻结动作与决策协议。
 
 ## 验证与交付
 
