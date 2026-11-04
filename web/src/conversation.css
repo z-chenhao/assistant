@@ -2,9 +2,10 @@
 .welcome{text-align:center;padding-top:8vh}.welcome h1{font-family:var(--font-display);font-size:36px;line-height:1.35;letter-spacing:-.02em;margin-bottom:12px;font-weight:400;text-wrap:balance}.welcome p{color:var(--muted-foreground);font-size:16px;line-height:1.75;margin:auto;max-width:500px}
 .workspace-main:has(.welcome) .thread{padding-bottom:0}.workspace-main:has(.welcome) .conversation-footer{position:relative;left:auto;padding:28px 32px 64px;background:none}
 .setup-callout{padding:28px;border:1px solid var(--border);border-radius:var(--radius);margin:4vh 0 32px}.setup-callout h1{font-size:26px}.setup-callout p{color:var(--muted-foreground);margin:14px 0 24px}
-.message{padding:18px 0;font-size:16px;line-height:1.75;min-width:0;scroll-margin-top:88px}.message:target{background:var(--muted);outline:8px solid var(--muted);border-radius:8px}
+.message,.reply-draft{padding:18px 0;font-size:16px;line-height:1.75;min-width:0;scroll-margin-top:88px}.message:target{background:var(--muted);outline:8px solid var(--muted);border-radius:8px}
 .message.user{margin:18px 0 20px auto;padding:13px 19px;background:var(--muted);border-radius:22px;width:fit-content;max-width:85%}
-.message.assistant .semantic,.task-delivery .semantic{font-family:var(--font-display);font-size:16px;line-height:1.75;font-optical-sizing:auto}
+.message.assistant .semantic,.reply-draft .semantic,.task-delivery .semantic{font-family:var(--font-display);font-size:16px;line-height:1.75;font-optical-sizing:auto}
+.reply-draft-label{color:var(--muted-foreground);font-size:12px;margin-bottom:4px}
 .semantic{white-space:pre-wrap;overflow-wrap:anywhere}.artifact-card{margin:16px 0}.artifact-card>div{padding:16px}.artifact{display:block;font-family:var(--font-ui);font-size:14px;text-decoration:none}.artifact:hover{text-decoration:underline}
 .panel.approval,.approval{background:var(--card);border-color:var(--border);margin:18px 0;line-height:1.65}.approval h2{font-size:17px}.approval-action{font-size:13px;margin:12px 0 20px;color:var(--foreground)!important;font-weight:500}
 .approval-fields{display:grid;gap:12px;margin:0}.approval-fields>div{min-width:0}.approval-fields dt{font-size:12px;color:var(--muted-foreground);text-transform:capitalize;margin-bottom:3px}.approval-fields dd{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}.approval form{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.approval .technical-details{margin:18px 0}.approval .technical-details pre{background:var(--background)}

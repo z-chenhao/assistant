@@ -167,10 +167,10 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 		}
 	}()
 	emit := func(e Event) {
-		if e.Kind == "message_update" {
+		if e.Kind == "message_update" || e.Kind == "message_discarded" || e.Kind == "reply_committed" {
 			// Preview chunks are ephemeral. The accepted GenerationResult and
 			// checkpoint retain the complete text under the ordinary fence.
-			if a.Sink != nil {
+			if a.Sink != nil && (e.Kind != "message_update" || execution.Err() == nil) {
 				a.Sink(e)
 			}
 			return

@@ -47,6 +47,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		s.inspectionAPI(w, r, true)
 	case "/api/updates":
 		s.updates(w, r)
+	case "/api/conversation/stream":
+		s.streamReplies(w, r)
 	case "/api/conversation":
 		before, e := conversationCursor(r)
 		if e != nil {

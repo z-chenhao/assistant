@@ -16,7 +16,9 @@ func TestMailboxClipsBeforeRetainingPayload(t *testing.T) {
 		s.accept(llm.GenerationEvent{GenerationID: "generation", Sequence: i, Kind: "text_delta", Text: text,
 			ToolCall: &llm.ToolCall{Arguments: text}, ErrorCode: text})
 	}
-	s.accept(llm.GenerationEvent{GenerationID: "generation", Sequence: 129, Kind: "completed", Text: text})
+	// The remaining byte cannot be filled by later ASCII after a clipped rune.
+	s.accept(llm.GenerationEvent{GenerationID: "generation", Sequence: 129, Kind: "text_delta", Text: "x"})
+	s.accept(llm.GenerationEvent{GenerationID: "generation", Sequence: 130, Kind: "completed", Text: text})
 	bytes, count, completions := 0, 0, 0
 	clipped := false
 	for len(s.events) != 0 {
@@ -31,7 +33,7 @@ func TestMailboxClipsBeforeRetainingPayload(t *testing.T) {
 			completions++
 		}
 	}
-	if count != 129 || completions != 1 || bytes != 4095 || !clipped {
+	if count != 130 || completions != 1 || bytes != 4095 || !clipped {
 		t.Fatal("mailbox retained output beyond the UTF-8 byte budget or lost events", count, completions, bytes, clipped)
 	}
 }

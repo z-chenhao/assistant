@@ -2,7 +2,7 @@ import {t} from './i18n';
 import {buttonVariants,textareaStyle} from './components/ui/styles';
 import {cn} from './lib/utils';
 
-export function enhanceComposer(){
+export function enhanceComposer(messageAccepted?: (target:URL)=>void){
  const root=document.querySelector<HTMLElement>('#composer-root');
  if(!root?.dataset.sourceId)return;
  const form=root.querySelector<HTMLFormElement>('form');
@@ -11,6 +11,7 @@ export function enhanceComposer(){
  const file=root.querySelector<HTMLInputElement>('input[type=file]');
  const remove=root.querySelector<HTMLButtonElement>('[data-remove-file]');
  const status=root.querySelector<HTMLElement>('.attachment-status');
+ const source=form?.querySelector<HTMLInputElement>('input[name=source_id]');
  if(text)text.className=cn(textareaStyle,text.className);
  if(submit)submit.className=cn(buttonVariants({size:'icon'}),submit.className);
  // Native nodes survive enhancement, including a picker opened while JS loads.
@@ -18,10 +19,12 @@ export function enhanceComposer(){
  file?.addEventListener('change',showFile);remove?.addEventListener('click',()=>{if(file)file.value='';showFile()});showFile();
  root.querySelector('[data-clear-task]')?.addEventListener('click',()=>{root.querySelector('.task-context-chip')?.remove();const url=new URL(location.href);url.searchParams.delete('task');history.replaceState(null,'',url)});
  let pending=false;
- form?.addEventListener('submit',event=>{
+ if(!form||!source||!text)return;
+ form.addEventListener('submit',event=>{
   event.preventDefault();if(pending||submit?.disabled)return;
   pending=true;form.dataset.submitting='true';if(submit)submit.disabled=true;
   const feedback=root.querySelector<HTMLElement>('#composer-feedback');
+  const submittedText=text.value,submittedFile=file?.files?.[0];
   if(feedback)feedback.textContent=t('Sending…');
   void(async()=>{
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
@@ -30,9 +33,15 @@ export function enhanceComposer(){
     if(!response.ok)throw Error('send not confirmed');
     const result=await response.json();if(result.accepted!==true||typeof result.location!=='string')throw Error('invalid acknowledgement');
     const target=new URL(result.location,location.origin);if(target.origin!==location.origin||target.pathname!=='/')throw Error('invalid destination');
-    location.assign(target);
-   }catch{if(feedback)feedback.textContent=t('Send was not confirmed. Your draft and attachment are kept. Check the conversation before sending again.');pending=false;delete form.dataset.submitting;if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
-   finally{clearTimeout(timeout)}
+    if(!messageAccepted||typeof result.next_source_id!=='string'||!/^[a-f0-9]{32}$/.test(result.next_source_id)){location.assign(target);return}
+    source.value=root.dataset.sourceId=result.next_source_id;
+    if(text.value===submittedText)text.value='';
+    if(file&&file.files?.[0]===submittedFile){file.value='';showFile()}
+    if(feedback)feedback.textContent='';
+    if(!form.querySelector('[name=task_ref]'))target.searchParams.delete('task');
+    messageAccepted(target);
+   }catch{if(feedback)feedback.textContent=t('Send was not confirmed. Your draft and attachment are kept. Check the conversation before sending again.')}
+   finally{clearTimeout(timeout);pending=false;delete form.dataset.submitting;if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
   })();
  });
 }

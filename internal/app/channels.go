@@ -99,7 +99,7 @@ func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Confi
 	// The server owns ingress only. A single foreground lifecycle coordinates
 	// Actor draining, Automation, delivery recovery and orderly shutdown.
 	return web.Run(ctx, &s, listener, func(ctx context.Context) error {
-		err := a.Actor(nil).Drain(ctx)
+		err := a.Actor(s.ObserveReply).Drain(ctx)
 		if errors.Is(err, agent.ErrSetup) {
 			return nil
 		}
