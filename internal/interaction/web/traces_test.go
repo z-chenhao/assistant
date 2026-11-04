@@ -29,6 +29,11 @@ func (traceReader) Observations(_ context.Context, q observability.ObservationQu
 	}
 	if q.Selected == gen.ID {
 		tree.Selected = gen
+		tree.ProviderTimings = []observability.ProviderTiming{
+			{Attempt: "fixture", Phase: "headers", At: end - 700000, HTTPStatus: 200},
+			{Attempt: "fixture", Phase: "first_body", At: end - 600000},
+			{Attempt: "fixture", Phase: "stream_idle_timeout", At: end},
+		}
 	}
 	return tree, nil
 }
@@ -59,7 +64,7 @@ func TestTraceWorkbenchAuthenticatedCompleteEscapedAndValidated(t *testing.T) {
 		}
 	}
 	w := request("/developer/observability/root-public?obs=generation:g", true)
-	for _, text := range []string{"Trace tree", "Timeline", "Observation details", "Saved system prompt", "Private &lt;img", "Accepted &lt;script&gt;", "</html>"} {
+	for _, text := range []string{"Trace tree", "Timeline", "Observation details", "Saved system prompt", "Private &lt;img", "Accepted &lt;script&gt;", "Response headers received · HTTP 200", "First response data", "Response stream idle timeout", "</html>"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing complete rendered view", text, w.Body.String())
 		}

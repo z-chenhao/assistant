@@ -150,7 +150,7 @@ func TestGitHubFailedCheckMigrationRetainsQueuedTypeOnlyDecision(t *testing.T) {
 	a.Store = upgraded.Runs(r.history, r.registry)
 	p.store = upgraded
 	mustDrain(t, a)
-	if scalar(t, upgraded, `PRAGMA user_version`) != 41 ||
+	if scalar(t, upgraded, `PRAGMA user_version`) != SchemaVersion() ||
 		scalar(t, upgraded, `SELECT count(*) FROM github_task_followup WHERE state='continued'`) != 1 {
 		t.Fatal("old queued type-only match did not continue after upgrade")
 	}

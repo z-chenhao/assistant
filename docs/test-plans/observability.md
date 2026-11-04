@@ -74,6 +74,8 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 
 HTTP 诊断写入以真实 SQLite 锁验证：60ms 的短业务写锁释放后保存记录；持续锁定时在预算内放弃，调用方不等待诊断锁。`go test -race ./internal/observability/sqlite -run TestRecorder` 覆盖两条边界。原 native Pi/HTTP 回归保留完整 attempts/headers 数量断言，失败输出已接收请求数、诊断阶段和 generation 状态计数。
 
+生产 Bridge + HTTP peer 的 channels 回归核对 Generation Overview 的时间点顺序，覆盖 503 后重试、200、首段数据、首个工具调用和终止事件。Web 回归验证收到 200 后仍能显示空闲超时。旧数据没有流诊断时只展示已采集的阶段。
+
 ## 页面重构验收
 
 真实 channels 浏览器 action 从列表进入独立 Trace 详情，验证树/时间线对齐导航、节点类型 Tab、折叠 metadata、完整 Context/JSON/来源与相邻 Compare 前后内容，返回列表和旧 deep link 保留参数；长 UTF-8 正文、桌面/移动端、无 JavaScript 与原 API 的读取边界继续覆盖。`TestTraceDetailDoesNotDependOnGlobalList` 明确让全局列表失败而详情成功，防止拆页后仍耦合列表查询。沿用同一 SQLite/HTTP peer 证据，不引入第二套执行或评测系统。

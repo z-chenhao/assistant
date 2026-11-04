@@ -33,9 +33,9 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 | ID / 详情 | 需求 | 简要描述 | 是否完成 / 状态 |
 | --- | --- | --- | --- |
-| [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。 | 是 · 已完成 |
+| [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
 | [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | macOS Keychain 与 Linux Secret Service 原生保存账户凭据，支持登录、刷新、重新认证、退出和中断恢复。 | 是 · 已完成 |
-| [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。 | 是 · 已完成 |
+| [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main 的系统提示以 Ghost 角色说明开头。 | 是 · 已完成 |
 | [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI/Web 与个人飞书具名问题、确切成果审阅接通，真实渠道与模型质量待验证。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
@@ -66,7 +66,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |
-| [F-036](features/observability.md#f-036) | 调用、等待、恢复与用量时间线 | 开发者能看出何时执行、等待审批或 Child、失败、重新尝试、重放或复用结果，并查看已有用量。 | 是 · 已完成 |
+| [F-036](features/observability.md#f-036) | 调用、等待、恢复与用量时间线 | 开发者能检查执行、等待、恢复、用量和模型流时间点，并区分各阶段超时。 | 是 · 已完成 |
 | [F-032](features/evals.md#f-032) | Web Evals 入口 | 后续可从 Developer 查看评测结果，并关联对应执行。 | 否 · 待定义 |
 | [F-033](features/database.md#f-033) | Web Database 检查入口 | Developer 中只读浏览执行、消息、记忆与文件元数据，支持分页、确切引用、作用域内关联和审计状态。 | 是 · 已完成 |
 | [F-037](features/installation.md#f-037) | 安装、首次启动与显式部署 | 安装、检查、前台启动及自定义部署，并保持持久数据。 | 是 · 已完成 |

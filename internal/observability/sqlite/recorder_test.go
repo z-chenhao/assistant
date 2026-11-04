@@ -63,6 +63,39 @@ func TestRecorderToleratesShortWriterContention(t *testing.T) {
 	}
 }
 
+func TestProviderTimingsMigrationKeepsRecordedHTTPAttempt(t *testing.T) {
+	r, db := recorderFixture(t)
+	const body = `{"model":"fixture"}`
+	if _, err := db.Exec(`INSERT INTO dispatch_observation VALUES
+		('generation','attempt','started',1,'v1',?,'hash','',0,''),
+		('generation','attempt','headers',2,'v1',NULL,'','',200,'')`, body); err != nil {
+		t.Fatal(err)
+	}
+	migration, err := os.ReadFile(filepath.Join("..", "..", "agent", "sqlite", "migrations", "042_provider_timings.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(string(migration)); err != nil {
+		t.Fatal(err)
+	}
+	r.Record(llm.GenerationRequest{GenerationID: "generation", OwnerToken: "owner"}, llm.Dispatch{
+		GenerationID: "generation", Attempt: "attempt", Phase: "first_body", At: 3, Format: "v1",
+	})
+	if err := r.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var savedBody string
+	var status, milestones int
+	err = db.QueryRow(`SELECT
+		(SELECT body_json FROM dispatch_observation WHERE phase='started'),
+		(SELECT http_status FROM dispatch_observation WHERE phase='headers'),
+		(SELECT count(*) FROM dispatch_observation WHERE phase='first_body' AND attempt='attempt' AND occurred_at=3)`).
+		Scan(&savedBody, &status, &milestones)
+	if err != nil || savedBody != body || status != 200 || milestones != 1 {
+		t.Fatalf("upgrade lost HTTP evidence or rejected the new milestone: body=%q status=%d milestones=%d error=%v", savedBody, status, milestones, err)
+	}
+}
+
 func TestRecorderDropsPersistentContentionWithoutBlockingCaller(t *testing.T) {
 	r, db := recorderFixture(t)
 	tx, err := db.Begin()
