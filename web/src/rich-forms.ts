@@ -20,13 +20,20 @@ export function enhanceRichForms(){
   if(status)status.textContent=t('Sending your response…');
   void(async()=>{
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+   let failure='Your response was not confirmed. Your answers are kept. Check the conversation before changing or retrying them.';
    try{
     const response=await fetch('/ui/form',{method:'POST',body:data,credentials:'same-origin',signal:controller.signal,headers:{Accept:'application/json'}});
-    if(!response.ok||!(await response.json()).accepted)throw new Error('response unconfirmed');
+    if(!response.ok){
+     if(response.status===400)failure='This answer is too long or invalid. Edit it before sending again.';
+     else if(response.status===409)failure='Your response was not saved. Review the current request before trying again.';
+     else if(response.status===401||response.status===403)failure='Your access changed. Sign in again before sending. Your draft is kept.';
+     throw new Error('response rejected');
+    }
+    if((await response.json()).accepted!==true)throw new Error('response unconfirmed');
     form.dataset.submitted='true';delete form.dataset.dirty;
     if(status)status.textContent=t('Your response was saved. Ghost will review it in the conversation.');
    }catch{
-    if(status)status.textContent=t('Your response was not confirmed. Your answers are kept. Check the conversation before changing or retrying them.');
+    if(status)status.textContent=t(failure);
    }finally{
     clearTimeout(timer);delete form.dataset.submitting;
     if(group)group.disabled=form.dataset.submitted==='true';
