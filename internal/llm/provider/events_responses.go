@@ -58,14 +58,20 @@ func (s *streamState) consumeResponses(api API, v map[string]any) error {
 				}
 			}
 		}
-	case "response.completed":
+	case "response.completed", "response.incomplete":
 		s.terminal = true
 		response := record(v["response"])
+		if kind == "response.incomplete" {
+			if str(record(response["incomplete_details"])["reason"]) != "max_output_tokens" {
+				return ErrInvalidResponse
+			}
+			s.message.StopReason = "length"
+		}
 		s.message.ResponseID = str(response["id"])
 		if err := s.usage(record(response["usage"]), api); err != nil {
 			return err
 		}
-	case "response.incomplete", "response.failed", "error":
+	case "response.failed", "error":
 		return ErrInvalidResponse
 	}
 

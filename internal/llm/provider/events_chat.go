@@ -1,6 +1,9 @@
 package provider
 
 func (s *streamState) consumeChat(api API, v map[string]any) error {
+	if s.message.ResponseID == "" {
+		s.message.ResponseID = str(v["id"])
+	}
 	if err := s.usage(record(v["usage"]), api); err != nil {
 		return err
 	}
@@ -19,6 +22,9 @@ func (s *streamState) consumeChat(api API, v map[string]any) error {
 				s.text(str(p["text"]), false)
 			} else if p["type"] == "thinking" {
 				s.text(str(p["thinking"]), true)
+				for _, chunk := range list(p["thinking"]) {
+					s.text(str(record(chunk)["text"]), true)
+				}
 			}
 		}
 	}

@@ -49,8 +49,10 @@ func BuildRequest(m Model, in Context, o Options) (Request, error) {
 	p := map[string]any{"model": m.ID, "stream": true}
 	b := requestBuilder{model: m, context: c, original: in, options: o, base: base, headers: h, maxTokens: max, key: key, payload: p, url: u}
 	switch m.API {
-	case OpenAICompletions, MistralConversations:
+	case OpenAICompletions:
 		b.chat()
+	case MistralConversations:
+		b.mistral()
 	case OpenAIResponses, AzureResponses, CodexResponses:
 		b.responses()
 	case AnthropicMessages:

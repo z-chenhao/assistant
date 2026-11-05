@@ -909,6 +909,8 @@ try{
   if(await page.locator('.message .intelligent-widget').count()!==2)throw Error('custom UI widgets missing');
   const widget=page.frameLocator('iframe[title="Calculator"]');
   await widget.locator('#security').getByText('blocked:2',{exact:true}).waitFor();
+  const direct=await context.newPage();
+  try{const response=await direct.goto(url+await page.locator('iframe[title="Calculator"]').getAttribute('src'));if(!response.headers()['content-type']?.startsWith('text/plain')||await direct.locator('script').count())throw Error('Standalone Widget URL executed generated code')}finally{await direct.close();await page.bringToFront()}
   await widget.locator('#n').fill('25');await widget.getByRole('button',{name:'Compute',exact:true}).click();
   await widget.locator('#answer').getByText('50',{exact:true}).waitFor();
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
@@ -922,6 +924,10 @@ try{
   await calculator.getByRole('textbox',{name:'Message to Ghost'}).waitFor();
   if(await page.locator('.message.user').count()!==before)throw Error('widget auto-sent a message');
   if(await calculator.getByRole('textbox',{name:'Message to Ghost'}).inputValue()!=='Discuss the computed result: 50')throw Error('selected state missing from follow-up');
+  await calculator.getByRole('textbox',{name:'Message to Ghost'}).fill('Draft written by user.');
+  await widget.getByRole('button',{name:'Discuss this result'}).click();
+  if(await calculator.getByRole('textbox',{name:'Message to Ghost'}).inputValue()!=='Draft written by user.')throw Error('Widget replaced the Host-owned draft');
+  await calculator.getByRole('textbox',{name:'Message to Ghost'}).fill('Discuss the computed result: 50');
   let lost=false;const sources=[];
   await page.route('**/api/message',async route=>{
    const input=route.request().postDataJSON();
@@ -930,15 +936,20 @@ try{
   });
   await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).click();
   await calculator.getByRole('alert').waitFor();
+  await widget.getByRole('button',{name:'Discuss this result'}).click();
   await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).click();
   await calculator.getByRole('textbox',{name:'Message to Ghost'}).waitFor({state:'detached'});
   if(sources.length!==2||sources[0]!==sources[1])throw Error('Widget retry changed its source identity');
   await page.unroute('**/api/message');
   await page.getByText('Discuss the computed result: 50',{exact:true}).waitFor();
   await page.reload();await page.frameLocator('iframe[title="Calculator"]').locator('#answer').waitFor();
-  await page.setViewportSize({width:390,height:844});await page.screenshot({path:evidence+'/intelligent-ui-mobile.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await calculator.evaluate(node=>node.scrollIntoView({block:'center'}));
+  await page.screenshot({path:evidence+'/intelligent-ui-widget-mobile.png'});
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2))throw Error('widget overflowed mobile viewport');
   await page.setViewportSize({width:1400,height:980});
+  await calculator.evaluate(node=>node.scrollIntoView({block:'center'}));
+  await page.screenshot({path:evidence+'/intelligent-ui-widget-desktop.png'});
   const plain=await browser.newContext({javaScriptEnabled:false});try{await plain.addCookies(await context.cookies());const text=await plain.newPage();await text.goto(url);if(!await text.getByText('The calculator doubles its input. No network or Host access.',{exact:true}).count())throw Error('no-script text alternative missing')}finally{await plain.close()}
  }
  if(phase==='rich-replies'){

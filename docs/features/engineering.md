@@ -163,7 +163,7 @@ decision history and execution evidence remain in PRs, Git history or CI artifac
 | Release | Extended regression, race checks, native packages and relevant live compatibility checks |
 
 Go package tests currently mix unit and component integration checks; `go test
-./...` is not called a pure UT suite. The nine deterministic core system gates
+./...` is not called a pure UT suite. The ten deterministic core system gates
 run in PR CI. Extended system coverage and the full race inventory run separately
 on a weekly schedule or manual request. See [CI](../designs/engineering.md#ci-continuous-integration-and-delivery).
 

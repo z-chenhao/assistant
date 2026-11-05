@@ -273,6 +273,10 @@ func (c *Client) websocket(ctx context.Context, m Model, wire Request, o Options
 			delete(entry.previousBody, "stream")
 			entry.previousItems = responseItems
 			entry.responseID = state.message.ResponseID
+			if str(v["type"]) != "response.completed" {
+				// An incomplete response has no complete replay baseline.
+				entry.previousBody, entry.previousItems, entry.responseID = nil, nil, ""
+			}
 			failed = false
 			return state.message, true, nil
 		}

@@ -220,6 +220,12 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 		fail(err)
 		return
 	}
+	// The Host result contract cannot represent truncation. Preserve the SDK's
+	// partial-output support while refusing to accept it as completed work here.
+	if result.StopReason == "length" {
+		fail(provider.ErrInvalidResponse)
+		return
+	}
 	data := map[string]any{"latency_ms": time.Since(started).Milliseconds()}
 	if result.Usage.Known {
 		data["usage"] = llm.TokenUsage{InputTokens: result.Usage.Input, OutputTokens: result.Usage.Output, CacheReadTokens: result.Usage.CacheRead, CacheWriteTokens: result.Usage.CacheWrite}

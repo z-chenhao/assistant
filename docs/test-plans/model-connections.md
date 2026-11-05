@@ -109,3 +109,9 @@ the owned OAuth peer, including PKCE, JWT rejection, refresh rotation, revocatio
 and identity binding. The Go Host final-acceptance tests use that native model
 bridge protocol; account configuration fixtures explicitly select a loopback
 transport and do not change production endpoints.
+
+## 原生协议回放边界
+
+`TestMistralNativeFieldsAndToolReplay` 使用受控 HTTP peer 检查 Mistral 原生字段、九位工具调用身份与结果关联、thinking 回放及输入不可变；`TestResponsesTokenLimitKeepsPartialOutput` 验证底层协议保留 Responses 的 max_output_tokens 截断文本和用量；Host 适配器因无法表达截断状态而拒绝其作为完成结果。`TestWebsocketDoesNotResumeIncompleteResponse` 防止截断响应复用不完整的缓存基线。真实供应商兼容性另行验证。
+
+`TestExplicitCloudEndpointsArePreserved` 验证 Bedrock、Vertex 和 Azure 的显式 HTTPS/HTTP 端点不会被区域或环境变量替换；默认端点仍按区域或 Azure 环境配置解析。

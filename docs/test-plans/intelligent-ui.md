@@ -49,7 +49,7 @@ make test-e2e E2E_EVIDENCE=evidence/my-core-run
 
 ## 生成式 Widget 与单条 Prompt
 
-`verify_intelligent_ui.py` 使用实际 Go 模型 HTTP peer、Actor、QuickJS、内建 Skill、持久 UI 工具和真实 Chromium。检查原生表格、计算器、主题、展开、移动端、无脚本替代和异常降级；父 DOM、存储与 fetch 被阻止；Widget 提问必须通过 Host 按钮发送，重启不重复生成。该场景不注入投影或 Conversation 行。
+`verify_intelligent_ui.py` 使用实际 Go 模型 HTTP peer、Actor、QuickJS、内建 Skill、持久 UI 工具和真实 Chromium。检查原生表格、计算器、主题、展开、移动端、无脚本替代和异常降级；父 DOM、存储与 fetch 被阻止，CSS 闭合标签不能在初始化前捕获禁用构造器，独立浏览器导航仅得纯文本；Widget 提问必须通过 Host 按钮发送，后续 Widget 消息不覆盖宿主草稿或重置不确定发送的来源键，重启不重复生成。该场景不注入投影或 Conversation 行。
 
 `TestMainUIWidgetUsesCodeModeAndDurableReply` 验证 Main 权限、Worker 排除、真实嵌套调用与持久绑定。`TestAgentStartsWithOneFrozenSystemMessage` 验证 Agent 内已经是一条 system，分段元数据不进入模型；拆分消息明确拒绝。工具 Schema 和原生表单校验继续由 Go 测试覆盖。
 

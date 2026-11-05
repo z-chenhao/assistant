@@ -123,6 +123,45 @@ func TestWebsocketCachedContinuationAndClose(t *testing.T) {
 	}
 	client.CloseSession("session")
 }
+
+func TestWebsocketDoesNotResumeIncompleteResponse(t *testing.T) {
+	observed := make(chan map[string]any, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn := websocketUpgrade(t, w, r)
+		if conn == nil {
+			return
+		}
+		defer conn.Close()
+		for range 2 {
+			request, err := readClientFrame(conn)
+			if err != nil {
+				return
+			}
+			observed <- request
+			serverFrame(conn, map[string]any{"type": "response.output_text.delta", "delta": "Partial"})
+			serverFrame(conn, map[string]any{"type": "response.incomplete", "response": map[string]any{"id": "partial", "incomplete_details": map[string]any{"reason": "max_output_tokens"}}})
+		}
+	}))
+	defer server.Close()
+	client := &Client{}
+	defer client.Close()
+	model := Model{ID: "m", API: OpenAIResponses, BaseURL: server.URL}
+	input := Context{Messages: []Message{{Role: "user", Content: []Content{Text("hi")}}}}
+	options := Options{SessionID: "partial", Transport: "websocket-cached", Timeout: 2 * time.Second}
+	result, err := client.Complete(context.Background(), model, input, options)
+	if err != nil || result.StopReason != "length" {
+		t.Fatal(result, err)
+	}
+	<-observed
+	input.Messages = append(input.Messages, Message{Role: "assistant", Content: result.Content}, Message{Role: "user", Content: []Content{Text("continue")}})
+	if _, err := client.Complete(context.Background(), model, input, options); err != nil {
+		t.Fatal(err)
+	}
+	second := <-observed
+	if second["previous_response_id"] != nil || len(list(second["input"])) != 3 {
+		t.Fatal("partial response reused an incomplete cache baseline", second)
+	}
+}
 func TestWebsocketCancellationAndFallback(t *testing.T) {
 	started := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

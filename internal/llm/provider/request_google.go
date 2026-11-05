@@ -74,12 +74,13 @@ func (b *requestBuilder) google() {
 			location = "us-central1"
 		}
 		if project != "" {
-			host := "https://" + location + "-aiplatform.googleapis.com/v1"
-			if location == "global" {
-				host = "https://aiplatform.googleapis.com/v1"
-			}
-			if strings.Contains(base, "localhost") || strings.Contains(base, "127.0.0.1") {
-				host = base
+			host := base
+			endpoint, _ := url.Parse(base)
+			if endpoint != nil && endpoint.Scheme == "https" && (endpoint.Hostname() == "aiplatform.googleapis.com" || strings.HasSuffix(endpoint.Hostname(), "-aiplatform.googleapis.com")) && (endpoint.Path == "" || endpoint.Path == "/v1") {
+				host = "https://" + location + "-aiplatform.googleapis.com/v1"
+				if location == "global" {
+					host = "https://aiplatform.googleapis.com/v1"
+				}
 			}
 			base = host + "/projects/" + url.PathEscape(project) + "/locations/" + url.PathEscape(location) + "/publishers/google"
 		}

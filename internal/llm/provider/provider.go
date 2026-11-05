@@ -82,13 +82,21 @@ func resolveModel(m Model, o Options) Model {
 			m.BaseURL = strings.ReplaceAll(m.BaseURL, "{"+name+"}", url.PathEscape(value))
 		}
 	}
-	if m.API == BedrockConverse && o.AWS.Region != "" && !strings.HasPrefix(m.BaseURL, "http://") {
-		m.BaseURL = "https://bedrock-runtime." + o.AWS.Region + ".amazonaws.com"
+	if m.API == BedrockConverse && o.AWS.Region != "" {
+		endpoint, _ := url.Parse(m.BaseURL)
+		standard := endpoint != nil && endpoint.Scheme == "https" && strings.HasPrefix(endpoint.Hostname(), "bedrock-runtime.") && (strings.HasSuffix(endpoint.Hostname(), ".amazonaws.com") || strings.HasSuffix(endpoint.Hostname(), ".amazonaws.com.cn"))
+		if m.BaseURL == "" || standard {
+			suffix := ".amazonaws.com"
+			if strings.HasPrefix(o.AWS.Region, "cn-") {
+				suffix += ".cn"
+			}
+			m.BaseURL = "https://bedrock-runtime." + o.AWS.Region + suffix
+		}
 	}
 	if m.API == GoogleVertex && m.BaseURL == "" {
 		m.BaseURL = "https://aiplatform.googleapis.com/v1"
 	}
-	if m.API == AzureResponses && o.Env["AZURE_OPENAI_ENDPOINT"] != "" {
+	if m.API == AzureResponses && m.BaseURL == "" && o.Env["AZURE_OPENAI_ENDPOINT"] != "" {
 		base := strings.TrimRight(o.Env["AZURE_OPENAI_ENDPOINT"], "/")
 		if !strings.HasSuffix(base, "/openai/v1") {
 			base += "/openai/v1"

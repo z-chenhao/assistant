@@ -38,11 +38,11 @@ state schema 43 的 `ui_widget` 以工具 invocation 为唯一身份保存不可
 
 ## Web 隔离与交互
 
-自定义答案用 `sandbox="allow-scripts"` iframe，拒绝 same-origin、弹窗、顶层导航和表单提交权限。Widget URL 本身也带 CSP sandbox，即使直接打开仍是隔离文档。CSP 禁止外部资源、fetch/XHR/WebSocket、子框架与表单动作；摄像头、麦克风、定位与剪贴板权限关闭。父页面只允许同源 frame URL。
+自定义答案用 `sandbox="allow-scripts"` iframe，拒绝 same-origin、弹窗、顶层导航和表单提交权限。HTML 响应本身也带 CSP sandbox；浏览器直接打开 Widget URL 时仅返回纯文本替代。宿主初始化早于所有生成的 CSS/HTML，闭合标签也不能提前捕获 WebRTC/Worker 构造器。CSP 禁止外部资源、fetch/XHR/WebSocket、子框架与表单动作；摄像头、麦克风、定位与剪贴板权限关闭。父页面只允许同源 frame URL。
 
 宿主只接受来源为该 iframe Window、opaque origin 和固定协议标识的消息。高度有界，主题由 Host 设置，异常与超时显示文字替代。渲染代码与消息代码不具有父 DOM、存储或凭据访问权。
 
-`steward.sendPrompt({text})` 只能提出有界文字，出现在 Host 自己的可编辑草稿中；用户按 Send to Ghost 后才通过普通消息接纳入口发送。重试沿用来源键；选项与滑块默认本地运行，不能自动授权工具或传回整个沙箱状态。原生表单继续按确切消息、冻结字段和回答去重，支持无 JavaScript 提交。
+`steward.sendPrompt({text})` 只能提出有界文字，出现在 Host 自己的可编辑草稿中；用户按 Send to Ghost 后才通过普通消息接纳入口发送。已有草稿与发送不确定状态不会被后续 Widget 消息覆盖；重试沿用来源键。选项与滑块默认本地运行，不能自动授权工具或传回整个沙箱状态。原生表单继续按确切消息、冻结字段和回答去重，支持无 JavaScript 提交。
 
 ## 升级与完成判定
 

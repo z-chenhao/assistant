@@ -128,7 +128,7 @@ func (s *streamState) finish() error {
 		return ErrInvalidResponse
 	}
 	for _, v := range s.message.Content {
-		if v.Type == "toolCall" {
+		if v.Type == "toolCall" && s.message.StopReason == "stop" {
 			s.message.StopReason = "toolUse"
 		}
 	}

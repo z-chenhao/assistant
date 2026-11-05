@@ -79,9 +79,6 @@ func (b *requestBuilder) chat() {
 	base := b.base
 	max := b.maxTokens
 	p := b.payload
-	if m.API == MistralConversations && !strings.HasSuffix(base, "/v1") {
-		base += "/v1"
-	}
 	u, _ := url.Parse(base + "/chat/completions")
 	p["messages"] = chatMessages(m, c)
 	p[stringCompat(m, "maxTokensField", "max_completion_tokens")] = max

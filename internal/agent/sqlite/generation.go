@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/delivery"
 	deliverysqlite "github.com/z-chenhao/assistant/internal/delivery/sqlite"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
 
 func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) (agent.Generation, error) {
@@ -167,7 +168,11 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 		}
 		seen := map[string]bool{}
 		for _, call := range result.ToolCalls {
-			if call.ID == "" || len(call.ID) > 256 || call.Name == "" || seen[call.ID] || len(call.Arguments) > 16<<10 || !json.Valid([]byte(call.Arguments)) {
+			argumentLimit := 16 << 10
+			if call.Name == codemode.ToolName {
+				argumentLimit = 64 << 10 // Match the native bridge's bounded script envelope.
+			}
+			if call.ID == "" || len(call.ID) > 256 || call.Name == "" || seen[call.ID] || len(call.Arguments) > argumentLimit || !json.Valid([]byte(call.Arguments)) {
 				return llm.InvalidProviderResponse
 			}
 			seen[call.ID] = true

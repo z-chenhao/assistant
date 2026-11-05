@@ -30,6 +30,26 @@ func realCodeRuntime(t *testing.T) *codemode.Sidecar {
 	return &codemode.Sidecar{Command: node, Script: script}
 }
 
+func TestCodeModeAcceptsLargeBoundedSource(t *testing.T) {
+	s, r, a, p := childFixture(t, codemode.Definition())
+	input := modelInput()
+	input.Name, input.ContextWindow = "Large bounded script", 32768
+	activateLoop(t, s, input)
+	r.ConfigureJavaScript(realCodeRuntime(t))
+	args, _ := json.Marshal(map[string]string{"source": strings.Repeat(" ", 20<<10) + "return 'bounded result';"})
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			return llm.GenerationResult{Text: "Large script completed."}, nil
+		}
+		return calls(codemode.ToolName, string(args)), nil
+	}
+	mustSubmit(t, a, "large-source", "Execute the bounded script")
+	mustDrain(t, a)
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__codemode_execute' AND status='succeeded' AND attempt_count=1`) != 1 {
+		t.Fatal("a script within the declared envelope was rejected")
+	}
+}
+
 // Hold execution slots through the real store, without timing-dependent sleeps.
 // Wrappers must start even when a Tool owns the only slot, and must not prevent
 // the next Tool from acquiring that slot once it is released.
