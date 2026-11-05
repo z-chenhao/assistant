@@ -46,3 +46,5 @@ Linux 验证了内核沙箱与受控 Lume 协议、tiny sealed base 和真实 No
 
 
 `TestCapabilityStatusDistinguishesConfigurationFromConnectionProof` 以表驱动验证关闭、自动／自定义启用、准备中、不支持、不可用、已保存待重启及未保存候选；各状态分别使用有／无连接检查证明和中英文渲染，防止再次把默认启用误写成未验证，或用启用文案掩盖异常。
+
+维护中的 capability-setup 浏览器场景还验证：普通表单测试成功后编辑字段，旧连接提示隐藏并显示未保存；高级 YAML 编辑后旧提示隐藏且保存禁用；重新测试恢复当前候选反馈。保存与失败后的修复仍走真实配置管理器及 owned peers，不以隐藏提示代替服务端验证。

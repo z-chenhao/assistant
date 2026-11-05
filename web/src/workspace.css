@@ -15,6 +15,7 @@
 .setting-label,.setting-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}.setting-controls select{width:auto;max-width:100%;margin:0}.setting-controls button{flex-shrink:0}
 .setting-action{min-height:34px;padding:6px 10px;font-size:13px}.models-heading a{margin-inline-start:auto}
 .models-heading .setting-name{font-size:var(--text-section);line-height:1.5}.model-connect{max-width:560px}.model-connect>h1{font-size:var(--text-page);line-height:1.35;margin-bottom:var(--section-space)}.model-provider-panel{padding:12px 0;font-size:14px}.model-provider-panel>form{max-width:420px}
+.model-resources{container-type:inline-size}
 .resource-provider{padding:10px 0;border-bottom:1px solid var(--border)}
 .resource-summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px var(--control-gap);min-height:40px;padding:6px 8px;list-style:none}
 .resource-summary::-webkit-details-marker{display:none}
@@ -35,6 +36,9 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .model-resources #signin-status:has([data-signin-pending])~.resource-provider .provider-account-actions{display:none}
 @media(max-width:760px){
  .resource-summary,.resource-model-label{min-height:44px}
+}
+/* Two navigation rails can leave a narrow column on a wide viewport. */
+@container(max-width:520px){
  .resource-model{margin-inline-start:8px;grid-template-columns:repeat(2,minmax(0,1fr));padding-bottom:6px}
  .resource-model>details,.resource-model-label{grid-column:1/-1}
  .model-connection,.model-use{min-height:44px}

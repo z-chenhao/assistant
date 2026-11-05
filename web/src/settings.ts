@@ -65,7 +65,7 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
  enhancePreferenceHelp();
- enhanceLanguagePreference();
+ try{enhanceLanguagePreference()}finally{document.querySelector('[data-language-preference]')?.setAttribute('data-language-ready','')}
  enhanceSettingsControls();
  if(location.hash===signInOpenedHash){
   const signIn=document.querySelector<HTMLElement>('#signin-status');

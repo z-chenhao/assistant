@@ -24,7 +24,7 @@ export function enhanceBrandMotion(){
   const setting=motion.closest<HTMLElement>('[data-avatar-setting]');
   const note=setting?.querySelector<HTMLElement>('[data-reduced-motion-note]');
   const sync=()=>{motion.checked=!StewardGhost.isPaused&&!reduced.matches;motion.disabled=reduced.matches;if(note)note.hidden=!reduced.matches};
-  if(setting)setting.hidden=false;
+  if(setting)setting.removeAttribute('data-client-pending');
   sync();motion.addEventListener('change',()=>{StewardGhost.pause(!motion.checked);sync()});
   reduced.addEventListener('change',sync);
  }

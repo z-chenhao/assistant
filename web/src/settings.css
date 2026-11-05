@@ -4,6 +4,12 @@
 .settings-search{display:flex;align-items:center;gap:7px;background:var(--muted);border-radius:999px;padding:0 12px;margin-bottom:16px;color:var(--muted-foreground)}
 .settings-search input{border:0;background:transparent;padding:8px 0;margin:0;font-size:13px;min-height:34px}
 .settings-search:focus-within{outline:2px solid var(--focus);outline-offset:2px}.settings-search input:focus{outline:0}
+/* Reserve client-only rows before enhancement. No-script pages retain their
+   native forms and omit settings that require local browser scripting. */
+html:not(.js) [data-client-pending]{display:none}
+.js [data-client-pending]{visibility:hidden}
+.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden;flex-basis:112px;max-width:168px}
+.js [data-language-preference]:not([data-language-ready]) .preference-save{display:none}
 .settings-nav-heading{font-size:12px;color:var(--muted-foreground);margin:0 8px 6px}
 .settings-no-results{font-size:13px;color:var(--muted-foreground);padding:8px}
 .settings-topbar{display:none}
@@ -30,7 +36,7 @@
 .setting-row:last-child{border-bottom:0}
 .setting-row label,.setting-copy label{margin:0;color:var(--foreground);font-size:14px;font-weight:500}
 .setting-copy{min-width:0}.setting-copy p{font-size:12px;line-height:1.5;margin:2px 0 0;color:var(--muted-foreground)}
-.setting-row>select{flex-shrink:0;max-width:58%}
+.setting-row>select:not([multiple]):not([size]){flex-shrink:0;max-width:58%}
 .settings-page button,.settings-page .button{border-radius:999px;min-height:36px;padding:7px 14px;font-size:13px}
 .settings-page .secondary{background:var(--muted);border-color:transparent}.settings-page .secondary:hover{background:var(--hover)}
 .settings-page .danger-text{color:var(--danger);background:var(--danger-surface)}

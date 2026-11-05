@@ -8,7 +8,7 @@
  {{if .ParentMemory}}<a class="back-link" href="/settings/capabilities/memory">{{tr "← Memory"}}</a>{{else}}<a class="back-link" href="/settings/capabilities">{{tr "← All capabilities"}}</a>{{end}}
  <div class="page-heading"><div><h1>{{tr .Title}}</h1><p>{{tr .Description}}</p></div>{{template "capability-status" .}}</div>
  {{if and .PendingRestart (not .Candidate)}}<p class="feedback" role="status">{{tr "Changes saved. Restart Steward to apply."}}</p>{{end}}
- {{if and (eq .State "unavailable") .Message}}<p class="feedback error" role="status">{{tr .Message}}</p>{{else if and .Verified (or .Candidate .Checked .Advanced (not .PendingRestart))}}<p class="feedback success" role="status">{{tr "Connection available."}}</p>{{end}}
+ {{if and (eq .State "unavailable") .Message}}<p class="feedback error" role="status" data-capability-feedback>{{tr .Message}}</p>{{else if and .Verified (or .Candidate .Checked .Advanced (not .PendingRestart))}}<p class="feedback success" role="status" data-capability-feedback>{{tr "Connection available."}}</p>{{end}}
  {{if .Form.Available}}<h2 class="settings-section-title">{{tr "Configuration"}}</h2><section class="panel form-panel">{{template "capability-guided-form" .}}</section>{{end}}
  <details class="technical-details capability-advanced form-panel" {{if or .Advanced (not .Form.Available)}}open{{end}}><summary>{{tr "Advanced"}}</summary>
  {{if eq .ID "memory"}}<p><a href="/settings/capabilities/embedding">{{tr "Semantic search"}}</a></p>{{end}}
@@ -36,7 +36,7 @@
 <form class="capability-guided" action="/capability/configure" method="post" data-capability-form>
  <input type="hidden" name="editor" value="guided"><input type="hidden" name="capability" value="{{.ID}}"><input type="hidden" name="revision" value="{{.Revision}}"><input type="hidden" name="configuration" value="{{.Text}}">
  {{with .Form}}
- {{if .Error}}<p class="feedback error" role="alert">{{tr .Error}}</p>{{end}}
+ {{if .Error}}<p class="feedback error" role="alert" data-capability-feedback>{{tr .Error}}</p>{{end}}
  {{if or (eq $.ID "memory") (eq $.ID "embedding") (eq $.ID "skills") (eq $.ID "computer")}}
  <div class="setting-row"><label for="capability-mode">{{tr "Configuration mode"}}</label><select id="capability-mode" name="mode" data-capability-mode><option value="automatic" {{if eq .Mode "automatic"}}selected{{end}}>{{tr "Automatic (recommended)"}}</option><option value="custom" {{if eq .Mode "custom"}}selected{{end}}>{{tr "Custom"}}</option>{{if ne $.ID "embedding"}}<option value="off" {{if eq .Mode "off"}}selected{{end}}>{{tr "Off"}}</option>{{end}}</select></div>
  {{else}}

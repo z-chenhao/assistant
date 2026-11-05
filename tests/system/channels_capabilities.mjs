@@ -31,6 +31,82 @@ async function navigationViewports(page,evidence){
  await writeFile(evidence+'/navigation-viewports.json',JSON.stringify(measurements,null,2));
 }
 
+// Real navigation, native form writes and delayed bundle delivery. Check
+// relationships before/after enhancement rather than platform-specific pixels.
+export async function pageTransitions(page,context,url,evidence){
+ const measurements={resources:[],collapse:[],loading:[]};
+ const settle=async()=>{await page.evaluate(()=>document.fonts.ready);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))};
+ for(const language of ['en','zh-CN']){
+  await context.request.post(url+'/settings/language',{form:{language}});
+  for(const theme of ['light','dark']){
+   await page.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
+   for(const width of [1400,1024,820,800,780,761,760,390,320]){
+    await page.setViewportSize({width,height:844});await page.goto(url+'/settings/setup');await settle();
+    const geometry=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+     title:document.querySelector('.settings-page h1').getBoundingClientRect().toJSON(),
+     bounds:[...document.querySelectorAll('.resource-model .resource-name,.model-connection,.model-use,.model-consent')].map(node=>node.getBoundingClientRect().toJSON()),
+     nameLines:[...document.querySelectorAll('.resource-model .resource-name')].map(node=>{const range=document.createRange();range.selectNodeContents(node);return range.getClientRects().length})}));
+    if(geometry.scrollWidth>width||geometry.title.width<2||geometry.bounds.some(r=>r.left<0||r.right>width+1)||geometry.nameLines.some(lines=>lines>1))throw Error('Resources title, model name or controls overflowed: '+JSON.stringify({language,theme,...geometry}));
+    measurements.resources.push({language,theme,...geometry});
+    if(width===761||width===390)await page.screenshot({path:`${evidence}/resources-${language}-${theme}-${width}.png`,fullPage:true});
+   }
+  }
+ }
+ await context.request.post(url+'/settings/language',{form:{language:'en'}});
+ await page.setViewportSize({width:1400,height:980});await page.goto(url+'/settings/preferences');
+ const heading=await page.locator('.settings-page h1').boundingBox();
+ for(const path of ['/settings/notifications','/settings/setup','/settings/capabilities']){
+  await page.goto(url+path);const next=await page.locator('.settings-page h1').boundingBox();
+  if(!next||Math.abs(next.x-heading.x)>1||Math.abs(next.y-heading.y)>1||Math.abs(next.height-heading.height)>1)throw Error('same-level Settings titles changed alignment: '+path);
+ }
+ // Collapse once, then cross every module and reload. The shared preference
+ // must be respected even when the destination has two navigation rails.
+ await page.locator('.brand-row [data-sidebar-toggle]').click();
+ for(const path of ['/settings/preferences','/settings/setup','/developer/observability','/developer/database','/tasks','/']){
+  await page.goto(url+path);await page.reload();
+  const state=await page.evaluate(()=>({path:location.pathname,main:document.querySelector('main').getBoundingClientRect().x,sidebar:getComputedStyle(document.querySelector('.app-sidebar')).display}));
+  if(state.main!==0||state.sidebar!=='none'||!await page.locator('.sidebar-open').isVisible())throw Error('collapsed navigation reset: '+JSON.stringify(state));
+  measurements.collapse.push(state);
+ }
+ for(const [width,path,collapsed,theme] of [[390,'/settings/preferences',false,'light'],[320,'/settings/preferences',false,'dark'],[1400,'/settings/preferences',false,'light'],[1400,'/',true,'dark'],[390,'/tasks',false,'dark']]){
+  await page.setViewportSize({width,height:980});
+  await page.evaluate(({collapsed,theme})=>{localStorage.setItem('steward-sidebar',collapsed?'collapsed':'open');localStorage.setItem('steward-theme',theme)},{collapsed,theme});
+  let release;const held=new Promise(resolve=>{release=resolve});
+  await page.route('**/app.js',async route=>{await held;await route.continue()});
+  try{
+   await page.goto(url+path,{waitUntil:'commit'});await page.locator('main').waitFor();
+   await page.waitForFunction(()=>document.querySelector('link[rel=stylesheet]')?.sheet);await settle();
+   const geometry=()=>{
+    const selectors=['.workspace-main','.page-heading','.settings-group','.settings-footer','[data-appearance-setting]','[data-avatar-setting]',...Array.from({length:4},(_,i)=>`.settings-navigation a:nth-child(${i+1})`)];
+    return {dark:document.documentElement.classList.contains('dark'),boxes:Object.fromEntries(selectors.map(selector=>{const node=document.querySelector(selector);return [selector,node?.getBoundingClientRect().toJSON()??null]}))};
+   };
+   const before=await page.evaluate(geometry);
+   if(before.dark!==(theme==='dark')||before.boxes['.workspace-main'].y!==0||collapsed&&before.boxes['.workspace-main'].x!==0)throw Error('first paint used the wrong theme/navigation');
+   await page.screenshot({path:`${evidence}/loading-${width}-${path.split('/').filter(Boolean).join('-')}-before.png`});
+   release();await page.waitForLoadState('load');await settle();const after=await page.evaluate(geometry);
+   for(const [selector,rect] of Object.entries(before.boxes))if(rect){
+    const next=after.boxes[selector];
+    if(!next||['x','y','width','height'].some(key=>Math.abs(rect[key]-next[key])>1))throw Error('bundle initialization moved '+selector+': '+JSON.stringify({width,path,before:rect,after:next}));
+   }
+   measurements.loading.push({width,path,theme,collapsed,before,after});
+   await page.screenshot({path:`${evidence}/loading-${width}-${path.split('/').filter(Boolean).join('-')}-after.png`});
+  }finally{release();await page.unroute('**/app.js')}
+ }
+ // A failed bundle download must reveal the no-script form/navigation fallback.
+ await page.route('**/app.js',route=>route.abort());await page.goto(url+'/settings/preferences');await page.unroute('**/app.js');
+ if(!await page.locator('.app-sidebar').isVisible()||!await page.locator('.preference-save').isVisible()||!await page.locator('#interface-language').isVisible())throw Error('bundle failure left native navigation or form inaccessible');
+ await page.setViewportSize({width:1400,height:980});await page.goto(url+'/settings/notifications');
+ const target=page.locator('#notification-target');await target.selectOption('tui:');
+ await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.getByRole('button',{name:'Save notification channel',exact:true}).click()]);
+ await page.locator('.page-feedback.success').waitFor();await target.selectOption('auto:');
+ if(!await page.locator('.page-feedback.success').isHidden()||!await page.locator('[data-notification-draft]').isVisible())throw Error('editing retained stale saved feedback');
+ await page.reload();if(await target.inputValue()!=='tui:'||await page.locator('[data-notification-draft]').isVisible())throw Error('notification draft was saved without submission or persisted after reload');
+ await target.selectOption('auto:');await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.getByRole('button',{name:'Save notification channel',exact:true}).click()]);
+ await page.reload();if(await target.inputValue()!=='auto:')throw Error('explicit notification save was lost');
+ await page.screenshot({path:evidence+'/notifications-saved.png'});
+ await writeFile(evidence+'/page-transitions.json',JSON.stringify({...measurements,notificationDraft:true,bundleFailureFallback:true},null,2));
+}
+
 export async function capabilityDefaults(page,context,url,evidence){
  await page.goto(url+'/');
  await page.evaluate(()=>document.fonts.ready);
@@ -196,6 +272,8 @@ export async function capabilitySetup(page,context,url,evidence){
  await guidedTest();await page.getByRole('status').filter({hasText:'Connection available.'}).waitFor();
  await page.screenshot({path:evidence+'/memory-guided-tested.png',fullPage:true});
  await guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_MISSING_SETUP_KEY');
+ if(await page.getByText('Connection available.',{exact:true}).isVisible()||!await guided().getByText('Unsaved changes.',{exact:true}).isVisible())throw Error('edited capability retained a stale connection proof');
+ await page.screenshot({path:evidence+'/memory-guided-edited.png',fullPage:true});
  await guided().getByRole('button',{name:'Save',exact:true}).click();
  await page.getByRole('status').filter({hasText:'Memory key unavailable'}).waitFor();
  if(await guided().locator('input[name="revision"]').inputValue()!==initialRevision)throw Error('save reused a check for different fields');
@@ -212,6 +290,9 @@ export async function capabilitySetup(page,context,url,evidence){
  await test('encryption_key_ref: env:STEWARD_SETUP_MEMORY_KEY\n');
  await page.getByRole('status').filter({hasText:'Connection available.'}).waitFor();
  await page.reload();if(!await page.locator('#capability-configuration').inputValue().then(v=>v.includes('STEWARD_SETUP_MEMORY_KEY')))throw Error('PRG lost tested draft');
+ await page.locator('#capability-configuration').fill('encryption_key_ref: env:STEWARD_MISSING_SETUP_KEY\n');
+ if(await page.getByText('Connection available.',{exact:true}).isVisible()||!await page.getByRole('button',{name:'Save verified configuration',exact:true}).isDisabled())throw Error('edited Advanced YAML retained proof or enabled Save');
+ await test('encryption_key_ref: env:STEWARD_SETUP_MEMORY_KEY\n');await page.getByText('Connection available.',{exact:true}).waitFor();
  await save();await page.getByRole('status').filter({hasText:'Changes saved. Restart Steward to apply.'}).waitFor();
  await page.screenshot({path:evidence+'/memory-saved.png',fullPage:true});
  await open('embedding');

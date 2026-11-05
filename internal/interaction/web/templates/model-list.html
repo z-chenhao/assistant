@@ -1,6 +1,6 @@
 {{define "model-list"}}
 <section class="model-resources" aria-labelledby="resource-models">
- <h1 class="sr-only">{{tr "Resources"}}</h1>
+ <div class="page-heading"><div><h1>{{tr "Resources"}}</h1></div></div>
  <div class="setting-row models-heading">
   <div><h2 class="setting-name" id="resource-models">{{tr "Models"}}</h2>{{if not .Status.ActiveModelProfileID}}<p class="setting-description">{{tr "No model selected"}}</p>{{end}}</div>
   <a class="button secondary setting-action" href="/settings/models/new">{{tr "Connect a model"}}</a>

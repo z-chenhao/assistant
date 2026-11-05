@@ -28,7 +28,7 @@ export function enhanceShell(){
  const mobile=matchMedia('(max-width: 760px)');
  let collapsed=false;
  try{collapsed=localStorage.getItem('steward-sidebar')==='collapsed'}catch{}
- html.classList.toggle('sidebar-collapsed',collapsed&&!document.body.classList.contains('has-section-navigation'));
+ html.classList.toggle('sidebar-collapsed',collapsed&&!mobile.matches);
  const toggles=document.querySelectorAll<HTMLButtonElement>('[data-sidebar-toggle]');
  const sidebar=document.getElementById('workspace-navigation');
  const update=()=>{
