@@ -78,8 +78,9 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 			if ui.Restore(c, content) != nil {
 				c.Disabled = true
 			}
-		} else if !a.Actor(nil).Ready(ctx) {
-			c.Disabled = true
+		} else {
+			d, err := a.Diagnostics(ctx)
+			c.Disabled = err != nil || !d.AgentIngressEnabled
 		}
 	}
 	if !changed {

@@ -36,7 +36,9 @@
 
 **需求**：用户能登录本地 Web，使用 Conversation、Tasks、Settings、附件和审批，优先定位待回答、批准、审阅或修复的事项，并找到相应任务与下一步。
 
-**当前实现**：独立 Conversation、Tasks 列表/详情、分层 Settings 和 Developer Trace 列表/详情已接通，Tasks 提供 Needs me 筛选，并在列表首部优先展示具名问题、确切成果审阅、冻结审批与当前可处理故障。模型配置按来源 → 保存 → 验证 → 显式选择推进；通知设置独立，认证、附件、冻结审批、原生表单和语义 fallback 保留。
+**当前实现**：独立 Conversation、Tasks 列表/详情、分层 Settings 和 Developer Trace 列表/详情已接通，Tasks 提供 Needs me 筛选，并在列表首部优先展示具名问题、确切成果审阅、冻结审批与当前可处理故障。Chat 的 Set up Steward 进入 Resources，直接查看和管理当前与已保存的模型。模型配置按来源 → 保存 → 验证 → 显式选择推进；通知设置独立，认证、附件、冻结审批、原生表单和语义 fallback 保留。
+
+Web 消息输入框支持 Enter 发送、Shift + Enter 换行；输入法选词时的 Enter 不发送。发送按钮使用 `#D97757` 橙色，明暗主题一致。模型未就绪或正在提交时禁止重复发送；无 JavaScript 时仍可点击按钮提交。
 
 **边界**：待办来自 F-004 的当前记录、冻结审批和 Task 执行事实；已完成 Task 的当前成果审阅也会显示。复用现有导航，依据权威状态展示等待谁、需要什么，不从模型进度文本推测；普通健康状态保持安静，计数与明细一致。处理动作经现有 Main、审批或设置入口，不绕过任务控制。实时区域刷新见 F-019，开发区由 F-031 跟踪。
 
@@ -299,7 +301,7 @@ New database files use mode 0600 in the private data root.
 
 正式 Web 采用Steward 黑白界面：对话、任务、审批、成果、模型/账户、通知、能力与 Developer 继续使用既有实现；Chat 右上角按需读取真实 Worker 执行及 Computer 只读画面。没有引入多会话或独立文件库。品牌与兼容范围见[品牌功能](branding.md)。
 
-Web 默认英文；Settings → Preferences → Interface language 可以保存简体中文。刷新、跨页和实时界面片段使用已选语言，原始对话和交付内容不变。见[品牌与界面语言](branding.md)。
+Web 默认英文；Settings → Preferences → Language 确认简体中文后自动保存。设置组左侧为语言名称及问号，右侧为当前值与应用内列表；无脚本时保留原生选择器和保存按钮。刷新、跨页和实时界面片段使用已选语言，原始对话和交付内容不变。见[品牌与界面语言](branding.md)。
 
 
 ### Steward 工作区精修

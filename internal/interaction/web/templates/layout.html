@@ -28,10 +28,10 @@
  {{else if or (eq .Tab "/developer/observability") (eq .Tab "/developer/database")}}<aside class="section-sidebar" aria-label="{{tr "Developer navigation"}}">{{template "developer-navigation" .}}</aside>{{end}}
 </div>
 <main class="workspace-main" id="workspace-main" data-live-view="{{.Live}}" data-live-before="{{.Cursor}}" data-live-latest="{{.Latest}}">
- {{if eq .Tab "/settings"}}<header class="workspace-topbar settings-topbar"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button><span>{{tr "Settings"}}</span><a href="/" class="settings-exit" aria-label="{{tr "Back to chat"}}">×</a></header>{{else if eq .Tab "/"}}<header class="workspace-topbar chat-topbar"><div class="topbar-start"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button></div><div class="chat-identity"><span class="agent-name">Ghost</span>{{template "agent-avatar"}}<div id="workspace-status" class="chat-status">{{template "status" .}}</div></div><div class="topbar-actions"><button class="button secondary" type="button" data-panel-open="computer-panel" aria-label="{{tr "Open Computer"}}" aria-controls="computer-panel" aria-expanded="false">{{template "icon-computer"}}<span>Computer</span></button><button class="button secondary worker-trigger" type="button" data-panel-open="worker-panel" aria-label="{{tr "Worker progress"}}" aria-controls="worker-panel" aria-expanded="false">{{template "icon-progress"}}<span data-worker-current>Worker</span></button><div id="conversation-attention" class="conversation-attention">{{template "attention-summary" .}}</div></div></header>{{else}} <header class="workspace-topbar"><div class="topbar-start"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button><nav class="breadcrumbs" aria-label="{{tr "Breadcrumb"}}"><a href="/">{{tr "Workspace"}}</a><span>/</span>{{if eq .Tab "/settings"}}<a href="/settings/models">{{tr "Settings"}}</a><span>/</span>{{end}}{{if eq .View "task"}}<a href="/tasks">{{tr "Tasks"}}</a><span>/</span>{{end}}{{if eq .View "trace"}}<a href="{{traceListURL .Trace}}">{{tr "Traces"}}</a><span>/</span>{{end}}<span>{{tr .Title}}</span></nav></div><div class="topbar-actions"><div id="workspace-status">{{template "status" .}}</div></div></header>{{end}}
+ {{if eq .Tab "/settings"}}<header class="workspace-topbar settings-topbar"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button><span>{{tr "Settings"}}</span><a href="/" class="settings-exit" aria-label="{{tr "Back to chat"}}">×</a></header>{{else if eq .Tab "/"}}<header class="workspace-topbar chat-topbar"><div class="topbar-start"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button></div><div class="chat-identity"><span class="agent-name">Ghost</span>{{template "agent-avatar"}}<div id="workspace-status" class="chat-status">{{template "status" .}}</div></div><div class="topbar-actions"><button class="button secondary" type="button" data-panel-open="computer-panel" aria-label="{{tr "Open Computer"}}" aria-controls="computer-panel" aria-expanded="false">{{template "icon-computer"}}<span>Computer</span></button><button class="button secondary worker-trigger" type="button" data-panel-open="worker-panel" aria-label="{{tr "Worker progress"}}" aria-controls="worker-panel" aria-expanded="false">{{template "icon-progress"}}<span data-worker-current>Worker</span></button><div id="conversation-attention" class="conversation-attention">{{template "attention-summary" .}}</div></div></header>{{else}} <header class="workspace-topbar"><div class="topbar-start"><button type="button" class="sidebar-toggle sidebar-open" data-sidebar-toggle aria-label="{{tr "Open navigation"}}" aria-controls="workspace-navigation" aria-expanded="false">{{template "icon-sidebar"}}</button>{{template "workspace-breadcrumb" .}}</div><div class="topbar-actions"><div id="workspace-status">{{template "status" .}}</div></div></header>{{end}}
  <div id="live-update-status" class="connection-feedback" role="status" aria-live="polite"></div>
- {{if .Error}}<div class="page-feedback feedback error" role="alert">{{tr .Error}}</div>{{end}}
- {{if .Notice}}<div class="page-feedback feedback success" role="status">{{tr .Notice}}</div>{{end}}
+ {{if .Error}}{{if not (and .Settings (eq .Settings.Section "preferences"))}}<div class="page-feedback feedback error" role="alert">{{tr .Error}}</div>{{end}}{{end}}
+ {{if and .Notice (ne .Notice "Language saved.")}}<div class="{{if and .Settings .Settings.TargetModel}}sr-only{{else}}page-feedback feedback success{{end}}" role="status">{{tr .Notice}}</div>{{end}}
  {{if .FormDraft}}<details class="page-feedback rich-answer-form" open><summary>{{tr "Your unsent answers"}}</summary>{{range .FormDraft}}<label>{{.Label}}<textarea readonly rows="2">{{.Value}}</textarea></label>{{end}}</details>{{end}}
  {{if eq .View "capabilities"}}{{template "capabilities-page" .}}
  {{else if eq .View "settings"}}{{template "settings-page" .}}
@@ -47,8 +47,8 @@
 </body></html>
 
 {{define "status"}}<span hidden data-can-send="{{canSend .Status}}"></span>
-{{if eq .Status.Readiness "setup_required"}}<a class="status-pill warning" href="/settings/models">{{tr "Setup required"}}</a>
-{{else if eq .Status.Readiness "degraded"}}<a class="status-pill warning degraded" href="/settings/models">{{tr "Model needs attention"}}</a>
+{{if eq .Status.Readiness "setup_required"}}{{if eq .Tab "/"}}<span class="status-pill warning">{{tr "Setup required"}}</span>{{else}}<a class="status-pill warning" href="/settings/setup">{{tr "Setup required"}}</a>{{end}}
+{{else if eq .Status.Readiness "degraded"}}{{if eq .Tab "/"}}<span class="status-pill warning degraded">{{tr "Setup needs attention"}}</span>{{else}}<a class="status-pill warning degraded" href="/settings/setup">{{tr "Setup needs attention"}}</a>{{end}}
 {{else if eq .Status.Status "busy"}}<span class="status-pill working">{{tr "Working"}}</span>
 {{else if eq .Status.Status "idle"}}<span class="status-pill ready">{{tr "Ready"}}</span>
 {{else}}<span class="status-pill">{{tr "Status unavailable"}}</span>{{end}}
@@ -56,3 +56,12 @@
 
 {{define "brand"}}<a class="brand" href="/" aria-label="{{tr "Steward home"}}">Steward</a>{{end}}
 {{define "agent-avatar"}}<span class="avatar-slot" aria-hidden="true"><span class="avatar-fallback"></span></span>{{end}}
+
+{{define "workspace-breadcrumb"}}
+<nav class="breadcrumbs" aria-label="{{tr "Breadcrumb"}}">
+ <a href="/">{{tr "Workspace"}}</a>
+ {{if eq .Tab "/settings"}}<span aria-hidden="true">/</span><a href="/settings/setup">{{tr "Settings"}}</a>
+ {{else if or (eq .View "task") (eq .View "schedule")}}<span aria-hidden="true">/</span><a href="/tasks">{{tr "Tasks"}}</a>
+ {{else if or (eq .View "traces") (eq .View "trace") (eq .View "database")}}<span aria-hidden="true">/</span><span>{{tr "Developer"}}</span>{{end}}
+</nav>
+{{end}}

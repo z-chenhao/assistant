@@ -79,25 +79,24 @@ export async function capabilityDefaults(page,context,url,evidence){
   await p.waitForFunction(()=>{const input=document.querySelector('[data-avatar-motion]');return !input.disabled&&!input.checked});
   if(await p.evaluate(()=>localStorage.getItem('steward-avatar-motion'))!=='paused')throw Error('system motion changes overwrote the saved user preference');
  }finally{await quiet.close()}
- // Use the actual dropdown, search/filter, keyboard selection and native submit.
- await page.locator('#interface-language').click();
- const popup=page.locator('.settings-select-menu:visible');
- await popup.getByRole('searchbox').fill('简体');
- if(await popup.getByRole('option').count()!==1)throw Error('language search did not filter');
+ // Preserve upstream language autosave while exercising searchable options.
+ const language=page.locator('[data-language-trigger]');
+ const languagePopup=page.locator('[data-language-popup]');
+ await language.click();await languagePopup.getByRole('searchbox').fill('简体');
+ if(await languagePopup.getByRole('option').count()!==1)throw Error('language search did not filter');
  await page.screenshot({path:evidence+'/language-dropdown.png',fullPage:true});
- await popup.getByRole('searchbox').press('ArrowDown');await page.keyboard.press('Enter');
- if(await page.locator('#interface-language').inputValue()!=='zh-CN')throw Error('keyboard selection lost language value');
- await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save language',exact:true}).click()]);
- await page.locator('[data-settings-search]:not([hidden])').waitFor();
+ await languagePopup.getByRole('searchbox').press('ArrowDown');await page.keyboard.press('Enter');
+ await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();
  await page.goto(url+'/settings/preferences');await page.locator('[data-settings-search]:not([hidden])').waitFor();
  await page.screenshot({path:evidence+'/preferences.png',fullPage:true});
- await page.locator('#interface-language').press('Enter');await popup.getByRole('searchbox').fill('zz-no-result');
- await popup.getByText('无结果。',{exact:true}).waitFor();await page.keyboard.press('Escape');
- if(!await page.locator('#interface-language').evaluate(node=>node===document.activeElement)||await popup.count())throw Error('Escape lost dropdown focus');
- await page.locator('#interface-language').press('Enter');await popup.getByRole('searchbox').press('Tab');
- if(!await page.locator('#interface-theme').evaluate(node=>node===document.activeElement)||await popup.count())throw Error('Tab did not continue to the next setting');
- await page.locator('#interface-language').click();await page.getByRole('heading',{level:1}).click();
- if(await popup.count())throw Error('outside click kept dropdown open');
+ await language.press('Enter');await languagePopup.getByRole('searchbox').fill('zz-no-result');
+ await languagePopup.getByText('无结果。',{exact:true}).waitFor();await page.keyboard.press('Escape');
+ if(!await language.evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Escape lost dropdown focus');
+ await language.press('Enter');await language.press('Tab');
+ if(!await page.locator('#interface-theme').evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Tab did not continue to the next setting');
+ await language.click();await page.getByRole('heading',{level:1}).click();
+ if(await languagePopup.isVisible())throw Error('outside click kept dropdown open');
+ const popup=page.locator('.settings-select-menu:visible');
  const navSearch=page.getByRole('searchbox',{name:'搜索设置',exact:true});await navSearch.fill('通知');
  if(await page.locator('.settings-navigation a:visible').count()!==1)throw Error('settings navigation filter did not match');
  await navSearch.fill('zz-no-result');await page.getByText('未找到设置。',{exact:true}).waitFor();await navSearch.press('Escape');
@@ -140,7 +139,7 @@ export async function capabilityDefaults(page,context,url,evidence){
  const plain=await page.context().browser().newContext({javaScriptEnabled:false,viewport:{width:390,height:844}});
  try{
   await plain.addCookies(await context.cookies());const p=await plain.newPage();await p.goto(url+'/settings/preferences');
-  await p.locator('#interface-language').selectOption('en');await p.getByRole('button',{name:'保存语言',exact:true}).click();
+  await p.locator('#interface-language').selectOption('en');await p.getByRole('button',{name:'保存',exact:true}).click();
   if(await p.locator('html').getAttribute('lang')!=='en')throw Error('native language fallback did not save');
   await p.screenshot({path:evidence+'/settings-no-script.png',fullPage:true});
  }finally{await plain.close()}
@@ -283,8 +282,8 @@ export async function capabilitySetup(page,context,url,evidence){
 }
 
 export async function settingsAccount(page,context,url,evidence){
- await page.goto(url+'/settings/models');
- await page.getByRole('link',{name:'Manage model →',exact:true}).click();
+ await page.goto(url+'/settings/setup');
+ await page.locator('details.resource-account').first().locator('summary').click();
  let posts=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/auth/logout'&&request.method()==='POST')posts++});
  const logout=page.getByRole('button',{name:'Sign out of provider',exact:true});
  await logout.click();

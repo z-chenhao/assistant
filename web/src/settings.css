@@ -8,7 +8,7 @@
 .settings-no-results{font-size:13px;color:var(--muted-foreground);padding:8px}
 .settings-topbar{display:none}
 .settings-workspace .settings-page{max-width:var(--settings-width);padding:40px 24px 64px;margin:0 auto}
-.settings-page h1{font-size:24px;font-weight:600;line-height:1.4;margin:0}
+.settings-page h1{font-size:var(--text-page);font-weight:600;line-height:1.4;margin:0}
 .settings-page .page-heading{margin-bottom:36px;gap:16px;align-items:flex-start}
 .settings-page .page-heading p{font-size:13px;line-height:1.6;margin-top:6px}
 .settings-page .settings-section-title{font-size:14px;font-weight:600;margin:0 0 14px}
@@ -105,3 +105,10 @@
 .settings-exit{font-size:24px;text-decoration:none;width:40px;text-align:center;color:var(--muted-foreground)}
 
 .setting-row>.setting-switch{margin:0}
+
+.settings-group .preference-group{border:0;border-radius:0;margin:0;background:transparent}
+.settings-group .preference-row{padding-inline:0}
+.settings-group .preference-feedback{padding-inline:0}
+.settings-page .preference-picker-trigger{border-radius:999px}
+.preference-picker [data-language-search]{margin:0 0 4px;padding:8px 10px;border:0;border-radius:8px;font-size:14px}
+@media(max-width:760px){.preference-picker [data-language-search]{font-size:16px}}

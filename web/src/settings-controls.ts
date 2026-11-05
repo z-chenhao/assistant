@@ -27,11 +27,8 @@ export function enhanceSettingsControls(){
   theme.addEventListener('change',()=>{try{if(theme.value==='system')localStorage.removeItem('steward-theme');else localStorage.setItem('steward-theme',theme.value)}catch{};document.documentElement.classList.toggle('dark',theme.value==='dark'||theme.value==='system'&&media.matches)});
   media.addEventListener('change',sync);window.addEventListener('storage',sync);
  }
- const language=page.querySelector<HTMLSelectElement>('#interface-language');
- const save=page.querySelector<HTMLButtonElement>('[data-language-save]');
- if(language&&save){save.hidden=true;language.addEventListener('change',()=>{save.hidden=language.value===Array.from(language.options).find(option=>option.defaultSelected)?.value})}
  let closeCurrent:(()=>void)|undefined;
- page.querySelectorAll<HTMLSelectElement>('select').forEach((select,index)=>{
+ page.querySelectorAll<HTMLSelectElement>('select:not([data-language-preference] select)').forEach((select,index)=>{
   const wrapper=document.createElement('span');wrapper.className='settings-select-control';select.before(wrapper);wrapper.append(select);
   const menu=document.createElement('div');menu.className='settings-select-menu';menu.hidden=true;menu.id=`settings-select-${index}`;
   const input=document.createElement('input');input.type='search';input.placeholder=t('Search options');input.setAttribute('aria-label',t('Search options'));input.autocomplete='off';

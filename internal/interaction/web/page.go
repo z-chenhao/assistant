@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/interaction"
@@ -48,10 +49,10 @@ type page struct {
 	Approvals                                         []approvalView
 	PendingCount                                      int
 	FirstPending                                      string
-	Profiles                                          []llm.Profile
 	SourceID                                          string
 	Auth                                              llm.AuthState
 	AuthError                                         string
+	AuthOnResources                                   bool
 	AccountID                                         string
 	Draft                                             string
 	DraftTask                                         *taskContext
@@ -82,11 +83,6 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	if err != nil {
 		return p, err
 	}
-	s.mu.Lock()
-	p.Auth = s.auth
-	p.AuthError = s.authError
-	p.AccountID = s.accountID
-	s.mu.Unlock()
 	switch p.View {
 	case "database":
 		p.Database, err = s.loadDatabase(ctx, r)
@@ -95,6 +91,7 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	case "capabilities":
 		err = s.loadCapabilities(ctx, r, &p)
 	case "settings":
+		s.loadSignIn(&p, r.URL.Path)
 		err = s.loadSettings(ctx, r, &p)
 	case "tasks", "task":
 		err = s.loadTasks(ctx, r, &p)
@@ -131,11 +128,23 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 		s.pageError(w, r, err)
 		return
 	}
+	if p.Settings != nil && p.Settings.Section == "resources" && strings.HasPrefix(r.URL.Path, "/settings/models/") {
+		http.Redirect(w, r, resourceModelURL(p.Settings.TargetModel, r.URL.Query().Get("notice")), http.StatusSeeOther)
+		return
+	}
 	s.render(w, r, p)
 }
 func (s *Server) render(w http.ResponseWriter, r *http.Request, p page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	p.Language = requestLanguage(r)
+	// The autosave navigation carries the intended value. Read the browser's
+	// cookie back before presenting success (cookies may be blocked).
+	if p.Path == "/settings/preferences" && p.Notice == "Language saved." {
+		if expected := r.URL.Query().Get("language"); expected != "" && expected != p.Language {
+			p.Notice = ""
+			p.Error = "Language could not be retained. Check your browser cookie settings."
+		}
+	}
 	w.Header().Set("Content-Language", p.Language)
 	_ = localizedLayout(p.Language).Execute(w, p)
 }

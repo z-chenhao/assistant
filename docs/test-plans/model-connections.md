@@ -30,7 +30,10 @@
 | [tests/system/verify_local_provider.py](../../tests/system/verify_local_provider.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_account.py](../../tests/system/verify_account.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
+- **F-002 文件覆盖**：测试验证目录和文件权限、重新打开、轮换、删除和拒绝符号链接。
 - **F-002 原生覆盖**：Linux 使用独立会话 D-Bus、临时带密码 GNOME 钥匙串和真实 SecretStore；供应商仍是受控 OAuth/Responses peer。macOS 使用下文可选的所有者 Keychain 往返检查。真实 OpenAI 账号授权、桌面解锁交互及各发行版集成需单独 Live 验证。
+- **Web 登录未回调**：`verify_channels.py` 的 `account_presentation` 用浏览器验证单击直达受控授权页。自动打开后只显示一行等待状态和取消操作，弹窗被拦截时显示手动入口。未发送回调时验证页面可取消、没有写入账号、工作区仍需设置，随后重新发起并以受控 OAuth peer 完成授权与模型验证和选择。现有 `channels` CI 门禁还验证 Resources 默认收起模型，可展开连接标识，测试和切换完成后原位替换为对应状态。重新授权后测试可恢复既有当前模型。受控 SecretStore 验证重启、页面加载和轮询期间无模型凭据读取，显式加载模型目录时才读取。无有效 Probe 时先验证，已有 Probe 时可直接切换，账户模型按账户分组，重连与取消回到 Resources，登录状态只显示在发起页面。
+- **Google 登录 Live 验收**：用获准的测试账号从 Web 的 Connect a model 发起 ChatGPT 登录，选择 Google，验证授权页正常完成、返回 Steward 后可选择模型。若授权页报错且重试无效，记录阶段、时间、公开错误文案以及本地状态，并确认可回到 Steward 取消和重新发起。证据只保留脱敏内容。
 
 ## 详细测试入口与证明边界
 

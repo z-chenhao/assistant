@@ -12,7 +12,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 
 F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
 
-F-041：产品品牌统一为 Steward，Agent 名为 Ghost。侧栏仅保留模块导航，外观和头像动效统一在 Preferences 调整。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
+F-041：产品品牌统一为 Steward，Agent 名为 Ghost。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
 
 F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant access token，新增 CLI `channel status/check`；收发共用并发缓存，凭据拒绝有安全诊断，未知投递在重启后仍只查询。完成范围与真实平台验证边界见功能文档。
 
@@ -34,7 +34,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | ID / 详情 | 需求 | 简要描述 | 是否完成 / 状态 |
 | --- | --- | --- | --- |
 | [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
-| [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | macOS Keychain 与 Linux Secret Service 原生保存账户凭据，支持登录、刷新、重新认证、退出和中断恢复。 | 是 · 已完成 |
+| [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | ChatGPT 账户凭据默认保存在 Steward 私有文件中，可显式使用系统凭据库，支持登录、按需刷新、重新认证、退出和中断恢复，后台状态检查只读配置与账户元数据。 | 是 · 已完成 |
 | [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main 的系统提示以 Ghost 角色说明开头。 | 是 · 已完成 |
 | [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI/Web 与个人飞书具名问题、确切成果审阅接通，真实渠道与模型质量待验证。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
@@ -50,7 +50,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 两级导航工作台，一级四入口常驻、Settings 固定左下；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；任务与执行详情按可用宽度重排；优先定位问题、成果审阅、审批及当前故障。 | 是 · 已完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Enter 发送、Shift + Enter 换行及橙色发送按钮；Resources 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 模型生成时，Web 逐段显示 Main 回复；完成后展示正式消息。审批、状态更新和输入保留仍独立工作。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、具名问题及成果审阅卡、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 普通 Main 回复生成受控表格、进度和 Web 表单；回答可恢复、并发重试去重，其他渠道与坏数据保留文字替代。 | 是 · 已完成 |
@@ -62,7 +62,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 健康检查、加密恢复与 macOS 显式后台服务/独立巡检；持久人工停机和有限恢复已接通，平台 Live 与主动渠道告警待补。 | 否 · 部分完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 操作员能查看用量，并按明确价格元数据控制账户费用。 | 是 · 已完成 |
-| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 默认准备本地记忆、搜索、Skills 与按需 macOS 桌面；Settings 采用统一导航与紧凑控件，Memory 与检索合并入口，原生首启待验收。 | 是 · 已完成 |
+| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 六类能力以普通表单配置、验证和保存；高级 YAML 保留，重启边界与凭据引用不变。 | 是 · 已完成 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |
@@ -73,7 +73,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证及可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |
 | [F-040](features/engineering.md#f-040) | Go 模块边界与可读性重构 | 领域持有适配器和接口类型，入口分阶段，长事务函数分职责，保持现有协议。 | 是 · 已完成 |
-| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、黑白头像与统一中英文界面，保留真实执行与审批语义。 | 是 · 已完成 |
+| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存与可访问帮助，保留真实执行与审批语义。 | 是 · 已完成 |
 | [F-042](features/integrations.md#f-042) | 可靠的环境事件监听 | 精确 PR 评审/CI 持久接收，可显式关联原 Task 经 Main 接续；其他来源、平台历史与原话题交付边界保留。 | 否 · 部分完成 |
 | [F-045](features/automation.md#f-045) | 主动规则的观察与启用 | 确切 GitHub PR 可按事件类型或 CI 失败观察，再显式启用 Main 接续原 Task。其他来源与语义规则待验证。 | 否 · 部分完成 |
 

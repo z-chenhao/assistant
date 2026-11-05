@@ -5,7 +5,7 @@
 
 {{define "database-page"}}
 <section class="workspace-page database-page">
- <div class="page-heading"><div><h1>{{tr "Database"}}</h1><p>{{tr "Inspect stored metadata and follow its relationships."}}</p></div></div>
+ <h1 class="sr-only">{{tr "Database"}}</h1>
  {{with .Database}}
  <nav class="section-tabs compact" aria-label="{{tr "Record collections"}}">{{range databaseCollections}}<a href="{{databaseURL . "" ""}}" {{if eq $.Database.Query.Collection .}}aria-current="page"{{end}}>{{tr (databaseLabel .)}}</a>{{end}}</nav>
  <form class="database-filter" method="get" action="/developer/database"><input type="hidden" name="collection" value="{{.Query.Collection}}"><label for="database-reference">{{tr "Exact record reference"}}<input id="database-reference" name="ref" value="{{.Query.Ref}}" maxlength="256" placeholder="{{tr "Leave blank to browse records"}}"></label><button>{{tr "Find record"}}</button><a href="{{databaseURL .Query.Collection "" ""}}">{{tr "Reset"}}</a></form>

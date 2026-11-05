@@ -27,6 +27,7 @@ Conversation, tasks, tool calls and approvals share a durable execution core.
   notifications and optional Feishu or macOS Computer integrations.
 
 See the [Feature Map](docs/feature-map.md) for implemented behavior and limitations.
+Web settings layout and controls follow [design.md](design.md).
 Steward is under active development. Deterministic tests validate software
 mechanisms; they do not certify model quality or every external provider.
 

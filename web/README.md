@@ -13,7 +13,7 @@ npm run lint --prefix web
 
 Edit sources, then commit the generated bundles with them. CI rejects stale
 outputs. `src/foundation.css` owns shared tokens/fonts; the other CSS modules own
-their respective views. Shared UI rules live in [design.md](../design.md). Feature behavior and implementation live in the
+their respective views. Setting layout and controls follow [design.md](../design.md). Current design and behavior live in the
 [brand design](../docs/designs/branding.md) and
 [channel design](../docs/designs/channels.md), not separate reconstruction briefs.
 

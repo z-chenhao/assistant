@@ -91,6 +91,9 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 	} else {
 		fmt.Fprintln(out, "SKIP image OCR: install Tesseract, eng/chi_sim/chi_tra language data and the kernel sandbox; see docs/features/artifacts-media.md")
 	}
+	if cfg.LLM.AccountSecretStore != "native" {
+		fmt.Fprintln(out, "OK   ChatGPT credential storage: private files under the Steward data root")
+	}
 	backend, available := secret.NativeBackend()
 	if available {
 		fmt.Fprintln(out, "OK   credential backend library:", backend, "(login keyring access is checked when used)")

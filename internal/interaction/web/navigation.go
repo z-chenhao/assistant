@@ -27,10 +27,10 @@ func pageRoute(path string) (tab, view, title string) {
 		return "/settings", "capabilities", "Capability settings"
 	case path == "/settings/preferences":
 		return "/settings", "settings", "Preferences"
+	case path == "/settings/setup" || path == "/settings" || path == "/settings/models":
+		return "/settings", "settings", "Resources"
 	case path == "/settings/notifications":
 		return "/settings", "settings", "Notifications"
-	case path == "/settings" || path == "/settings/models":
-		return "/settings", "settings", "Models"
 	case path == "/settings/models/new":
 		return "/settings", "settings", "Connect a model"
 	case strings.HasPrefix(path, "/settings/models/") && pageLeaf(strings.TrimPrefix(path, "/settings/models/")):
@@ -75,8 +75,8 @@ func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {
 func legacyPageRedirect(w http.ResponseWriter, r *http.Request) bool {
 	target := ""
 	switch r.URL.Path {
-	case "/settings":
-		target = "/settings/models"
+	case "/settings", "/settings/models":
+		target = "/settings/setup"
 	case "/progress":
 		target = "/tasks"
 	case "/developer/context":

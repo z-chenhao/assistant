@@ -1,6 +1,64 @@
+---
+name: Steward
+description: "Steward Web 的视觉与交互规范"
+colors:
+  light-background: "#f9f9f9"
+  light-surface: "#fcfcfc"
+  light-text: "#212121"
+  light-muted-text: "#666666"
+  light-divider: "#dfdfdf"
+  light-control-border: "#858585"
+  light-focus: "#767676"
+  dark-background: "#212121"
+  dark-surface: "#282828"
+  dark-text: "#ededed"
+  dark-muted-text: "#afafaf"
+  dark-divider: "#3e3e3e"
+  dark-control-border: "#777777"
+  dark-focus: "#9f9f9f"
+typography:
+  page-title:
+    fontFamily: "Inter, PingFang SC, Source Han Sans SC, Microsoft YaHei, sans-serif"
+    fontSize: "1.375rem"
+    fontWeight: 600
+    lineHeight: 1.35
+  section-title:
+    fontSize: "1rem"
+    fontWeight: 600
+    lineHeight: 1.5
+  ui:
+    fontSize: "0.875rem"
+    lineHeight: 1.6
+  metadata:
+    fontSize: "0.8125rem"
+    lineHeight: 1.65
+  reply:
+    fontFamily: "Source Serif 4, Georgia, PingFang SC, Source Han Sans SC, Microsoft YaHei, sans-serif"
+    fontSize: "16px"
+    lineHeight: 1.75
+rounded:
+  button: "9px"
+  surface: "12px"
+spacing:
+  workspace-gutter: "40px"
+  compact-gutter: "20px"
+  section: "20px"
+  compact-section: "16px"
+  action-gap: "10px"
+---
+
 # Steward 界面设计规范
 
 本文件是产品界面设计的统一入口，适用于 Chat、Task、Dev、Settings 及未来新增页面。修改页面结构、导航或公共控件时遵守本规范；具体功能行为与限制见 [Feature Map](docs/feature-map.md)，实现边界见[渠道方案](docs/designs/channels.md)，品牌资源见[品牌方案](docs/designs/branding.md)。
+
+## Colors
+
+浅色与深色共用相同的语义。主操作使用高对比填充，普通操作使用透明底和细边框。状态同时使用文字，颜色提供辅助识别。内容分隔线、输入边界与键盘焦点各自使用对应的颜色。实际色值维护在 [共享样式](web/src/foundation.css)。
+
+## Typography
+
+操作页依次使用页面标题、区块标题、常规界面和辅助文字四档。在根字号为 16px 时分别为 **22、16、14 和 13px**。表单标签、状态、帮助文案应按角色选档。窄屏普通文本输入和下拉控件使用 16px。Chat 欢迎语和回复采用阅读排版。字标使用 Michroma，代码使用 JetBrains Mono。
+
 
 ## 设计原则
 
@@ -33,7 +91,7 @@
 
 | 模块 | 当前二级分类 |
 | --- | --- |
-| Settings | Preferences、Notifications、Models、Capabilities |
+| Settings | Preferences、Notifications、Resources、Capabilities |
 | Dev | Traces、Database |
 | Task | 当前没有独立分类，不展开空二级栏 |
 
@@ -62,7 +120,12 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 - 普通布尔偏好使用有名称的开关。涉及模型提供方授权等明确同意时，保留原有确认控件。
 - 主操作使用实色按钮，次操作使用低强调按钮；危险操作使用危险色，并清楚说明作用范围。
 - 退出账户等有影响的操作使用确认对话框，默认聚焦取消。取消和 Escape 不提交请求，确认只提交一次。
-- 本地外观与动效偏好立即应用并保存在当前浏览器；语言通过原生表单保存。能力配置由服务端校验最终候选后保存。
+- 本地外观与动效偏好立即应用并保存在当前浏览器；语言确认不同值后自动保存，失败保留原生表单路径。能力配置由服务端校验最终候选后保存。
+
+### 状态与账户操作
+
+标题旁展示必要状态。Resources 的模型列表默认收起配置，当前模型及连接状态在行内标明。展开一行即可查看连接标识。行尾保留连接和选用两个位置，未验证时显示「测试连接」，通过后显示「连接已验证」。候选模型的主操作「用于新工作」在选用后变为「当前模型」。切换会复用有效验证，缺少验证时先测试。「测试连接」使用次要按钮。已有有效验证的当前模型可从连接位置选择「恢复使用当前模型」。共享账户作为分组标题，模型直接列在对应账户下，直连模型独立分组。账户操作单独展开，重连和退出在同一操作行。登录进度归发起页面，首次渲染与实时更新采用同一规则。授权窗口成功打开后，原页面保留简短的等待状态和取消入口。弹窗被拦截时，原页面提供手动继续链接。
+
 
 ## 文案、状态与动效
 

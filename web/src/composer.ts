@@ -20,6 +20,12 @@ export function enhanceComposer(messageAccepted?: (target:URL)=>void){
  root.querySelector('[data-clear-task]')?.addEventListener('click',()=>{root.querySelector('.task-context-chip')?.remove();const url=new URL(location.href);url.searchParams.delete('task');history.replaceState(null,'',url)});
  let pending=false;
  if(!form||!source||!text)return;
+ text.addEventListener('keydown',event=>{
+  if(event.key!=='Enter'||event.shiftKey||event.isComposing||event.keyCode===229)return;
+  event.preventDefault();
+  if(event.repeat||pending||submit?.disabled)return;
+  form.requestSubmit(submit??undefined);
+ });
  form.addEventListener('submit',event=>{
   event.preventDefault();if(pending||submit?.disabled)return;
   pending=true;form.dataset.submitting='true';if(submit)submit.disabled=true;
