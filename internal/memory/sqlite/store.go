@@ -21,6 +21,7 @@ import (
 type Store struct {
 	db           *sql.DB
 	engine       recall.Embedding
+	localSearch  bool
 	vault        memory.Vault
 	searchGate   chan struct{}
 	working      *sql.DB // Plaintext exists only in process memory.
@@ -105,7 +106,17 @@ func (s *Store) Configure(ctx context.Context, e recall.Embedding) error {
 		return err
 	}
 	s.engine = e
+	s.localSearch = false
 	return nil
+}
+
+func (s *Store) ConfigureLocal() { s.localSearch = true }
+
+func (s *Store) searchIndex(ctx context.Context, db *sql.DB, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
+	if s.localSearch {
+		return sqliteindex.SearchLocal(ctx, db, scope, q, "memory")
+	}
+	return sqliteindex.Search(ctx, db, scope, q, s.engine, "memory")
 }
 func (s *Store) Close() error {
 	s.searchGate <- struct{}{}

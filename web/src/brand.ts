@@ -1,4 +1,3 @@
-import {t} from './i18n';
 import {StewardGhost} from './avatar.js';
 
 export function enhanceBrandMotion(){
@@ -19,7 +18,14 @@ export function enhanceBrandMotion(){
   const avatar=target?.closest<HTMLButtonElement>('.steward-avatar');
   if(avatar)void StewardGhost.react(avatar);
  });
- const pause=document.querySelector<HTMLButtonElement>('[data-avatar-pause]');
- const sync=()=>{if(pause){pause.setAttribute('aria-pressed',String(StewardGhost.isPaused));pause.textContent=StewardGhost.isPaused?t('Resume avatar motion'):t('Pause avatar motion')}};
- sync();pause?.addEventListener('click',()=>{StewardGhost.pause(!StewardGhost.isPaused);sync()});
+ const motion=document.querySelector<HTMLInputElement>('[data-avatar-motion]');
+ if(motion){
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  const setting=motion.closest<HTMLElement>('[data-avatar-setting]');
+  const note=setting?.querySelector<HTMLElement>('[data-reduced-motion-note]');
+  const sync=()=>{motion.checked=!StewardGhost.isPaused&&!reduced.matches;motion.disabled=reduced.matches;if(note)note.hidden=!reduced.matches};
+  if(setting)setting.hidden=false;
+  sync();motion.addEventListener('change',()=>{StewardGhost.pause(!motion.checked);sync()});
+  reduced.addEventListener('change',sync);
+ }
 }

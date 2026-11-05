@@ -22,6 +22,7 @@ import (
 // Config refers only to an explicitly provisioned, private Lume store. Endpoint
 // and SSH material remain Host configuration; none enters a restoration manifest.
 type Config struct {
+	Managed       bool                         `yaml:"managed,omitempty" json:"managed,omitempty"`
 	Browser       *BrowserConfig               `yaml:"browser" json:"browser,omitempty"`
 	Root          string                       `yaml:"root" json:"root"`
 	Endpoint      string                       `yaml:"endpoint" json:"endpoint"`
@@ -31,6 +32,12 @@ type Config struct {
 }
 
 func (c Config) Validate() error {
+	if c.Managed {
+		if !filepath.IsAbs(c.Root) || c.Root == "/" || !reflect.DeepEqual(c, DefaultConfig(c.Root)) {
+			return computer.ErrInvalid
+		}
+		return nil
+	}
 	u, err := url.Parse(c.Endpoint)
 	if err != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" || net.ParseIP(u.Hostname()) == nil || !net.ParseIP(u.Hostname()).IsLoopback() || u.Port() == "" || !filepath.IsAbs(c.Root) || filepath.Clean(c.Root) != c.Root {
 		return computer.ErrInvalid
@@ -55,6 +62,7 @@ type Guest interface {
 }
 
 type Provider struct {
+	managed  *managedRuntime
 	config   Config
 	client   *http.Client
 	guest    Guest
@@ -64,6 +72,9 @@ type Provider struct {
 }
 
 func New(c Config, guest Guest) (*Provider, error) {
+	if c.Managed {
+		return newManaged(c, guest)
+	}
 	if c.Validate() != nil || guest == nil || privateRoot(c.Root) != nil {
 		return nil, computer.ErrInvalid
 	}
@@ -89,7 +100,14 @@ func (p *Provider) boundary(point string) {
 	}
 }
 
-func (p *Provider) Close() { p.client.CloseIdleConnections() }
+func (p *Provider) Close() {
+	if p.managed != nil {
+		p.managed.close()
+	}
+	if p.client != nil {
+		p.client.CloseIdleConnections()
+	}
+}
 
 func (p *Provider) api(ctx context.Context, method, path string, input any) ([]byte, int, error) {
 	var body io.Reader
@@ -118,6 +136,9 @@ func (p *Provider) api(ctx context.Context, method, path string, input any) ([]b
 }
 
 func (p *Provider) lock(ctx context.Context, r computer.Request) (*os.File, error) {
+	if err := p.Prepare(ctx); err != nil {
+		return nil, err
+	}
 	if !identifier.MatchString(r.Instance.ComputerID) || !identifier.MatchString(r.Instance.NativeName) || !identifier.MatchString(r.OperationID) || r.Instance.Epoch < 1 || r.Fence == nil || !reflect.DeepEqual(r.Compatibility, p.config.Compatibility) || r.Manifest.Validate() != nil {
 		return nil, computer.ErrInvalid
 	}

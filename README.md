@@ -117,7 +117,7 @@ the canonical repository URL is `https://github.com/z-chenhao/steward`.
 - [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md) · [Project governance](GOVERNANCE.md)
 - [Security and private reporting](SECURITY.md)
-- [Documentation index](docs/README.md) · [Architecture](docs/designs/product-overview.md)
+- [Documentation index](docs/README.md) · [Architecture](docs/designs/product-overview.md) · [UI design](design.md)
 
 ## License
 

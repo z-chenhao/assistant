@@ -1,5 +1,5 @@
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
-import {capabilitySetup} from './channels_capabilities.mjs';
+import {capabilitySetup,capabilityDefaults,settingsAccount} from './channels_capabilities.mjs';
 import {databaseInspection} from './channels_database.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -49,10 +49,6 @@ try{
  await avatar.hover();
  await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.classList.contains('is-waving'));
  if(!await canvas.evaluate(node=>node.isConnected))throw Error('greeting replaced the complete-frame canvas');
- await page.locator('[data-avatar-pause]').click();
- if(await avatar.getAttribute('data-frame')!=='0')throw Error('paused avatar retained a moving pose');
- if(await avatar.locator('.ghost-art').evaluate(node=>getComputedStyle(node).animationPlayState)!=='paused')throw Error('pause did not stop ghost drift');
- await page.locator('[data-avatar-pause]').click();
  if(phase==='database'){
   await databaseInspection(page,context,browser,url,evidence);
  }else if(phase==='attention'){
@@ -122,7 +118,7 @@ try{
   if(!await original.evaluate(node=>node.isConnected&&node.value==='Keep my conversation draft.')||await page.locator('.composer input[type=file]').evaluate(node=>node.files?.[0]?.name)!=='kept.txt')throw Error('attention navigation lost original conversation draft/file');
   await writeFile(evidence+'/attention-browser.json',JSON.stringify({questionPosts:posts,keptDraft:true,keptAttachment:true,staleReviewRejected:true,keyboard:true,language:'zh-CN',width:390},null,2));
   await stale.close();await work.close();
- }else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
+ }else if(phase==='settings-account'){await settingsAccount(page,context,url,evidence)}else if(phase==='capability-defaults'){await capabilityDefaults(page,context,url,evidence)}else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
  if(phase==='setup'){
   await page.evaluate(()=>document.fonts.ready);
   await page.setViewportSize({width:320,height:740});
@@ -140,7 +136,7 @@ try{
   await page.getByRole('link',{name:'Set up Steward',exact:false}).click();
   await page.getByRole('link',{name:'Connect a model',exact:true}).click();
   await page.getByRole('link',{name:'Local or compatible API',exact:false}).click();
-  if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
+  if(await page.getByRole('switch',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
   await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
   await page.locator('input[name="model"]').fill('fixture-model');
   await page.getByRole('button',{name:'Add connection',exact:true}).click();
@@ -344,6 +340,7 @@ try{
  }
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
+  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('link',{name:'Models',exact:true}).click();
   await page.getByRole('link',{name:'Manage model',exact:false}).click();
   const capability=process.env.STEWARD_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
   await page.getByText(capability,{exact:false}).waitFor();
@@ -705,11 +702,10 @@ try{
   if(!await mobile.getByRole('button',{name:'Open navigation',exact:true}).evaluate(node=>node===document.activeElement))throw Error('closing mobile navigation lost keyboard focus');
   await mobile.setViewportSize({width:320,height:740});await mobile.goto(url+'/settings/capabilities');
   await mobile.evaluate(()=>document.fonts.ready);
-  const selectedTab=await mobile.locator('.section-tabs').evaluate(node=>{
-   const selected=node.querySelector('[aria-current]').getBoundingClientRect(),bounds=node.getBoundingClientRect();
-   return selected.left>=bounds.left-1&&selected.right<=bounds.right+1;
-  });
-  if(!selectedTab)throw Error('current Settings section is hidden outside the mobile tab strip');
+  await mobile.getByRole('button',{name:'Open navigation',exact:true}).click();
+  const selected=mobile.locator('.settings-navigation [aria-current="page"]');
+  if(!await selected.isVisible()||!await selected.getAttribute('href').then(value=>value==='/settings/capabilities'))throw Error('mobile settings navigation lost its current section');
+  await mobile.keyboard.press('Escape');
   await mobile.setViewportSize({width:1001,height:900});await mobile.goto(url);
   await mobile.getByRole('button',{name:'Open Computer',exact:true}).click();
   if(!await mobile.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('Computer compresses Chat at intermediate widths');

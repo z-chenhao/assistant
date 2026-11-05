@@ -220,3 +220,21 @@ Chat / Worker：`workers_test.go` 验证认证与绑定撤销、只读字段和�
 待确认入口沿用 live 浏览器场景：真实审批到来时，入口按 Computer → Worker → 待确认排列，点击聚焦原审批；冻结 hash、未发草稿和附件仍保留，解决后入口消失。顶栏预留三行，计数变化不改变对话偏移。
 
 布局与焦点回归沿用同一个 `channels_browser.mjs`：inspection 在 851／900px 断言详情完整堆叠，Enter 选择 Generation 后焦点仍位于对应树行；live 在 820／900px 验证任务正文与进度值没有压缩为零宽；共用移动检查通过键盘打开／关闭导航、320px 当前设置标签露出及 1001px Computer modal。原有草稿、附件、审批、滚动、会话恢复与无 JavaScript 检查继续执行。人工补充检查明暗主题、模型／通知／六类能力详情、长内容和宽屏恢复；模拟视口不等同于物理触摸或屏幕阅读器验证。
+
+
+### 设置页视觉与控件回归
+
+channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 SecretStore 和 Chromium 验证分类搜索／空结果／Escape、语言下拉搜索／方向键／Enter、点击外部与 Escape 关闭、外观保存与刷新、默认 Memory 单入口、自动／自定义字段切换、390px 导航及无 JS 语言保存。输出偏好、下拉、通知、模型输入、能力和明暗／移动端截图。`account_presentation` 经原有真实 Manager/Bridge 和自有 OAuth fixture 验证账户退出确认：取消和 Escape 零 POST、取消焦点归还、确认一次 POST；原有凭据扫描与重启校验保留。
+
+
+两级导航回归复用 `default_capability_settings`：从 Chat 点击左下 Settings，断言一级入口次序／位置不变、二级栏位于一级与内容之间；切换 Dev → Database 复用同一二级栏，Tasks 不创建空分类；显式折叠后可原页展开。390px 抽屉同时保留两级选中态且不越界，Tab 在整个抽屉内循环，Escape 归还焦点；保留无 JS 表单验证。完整 channels gate 继续覆盖 Developer、数据库导航、320px 布局与聊天面板。
+
+
+侧栏清理与个人偏好：默认设置场景验证一级栏没有宣传语或重复偏好按钮；在 Preferences 开关头像动效，验证返回 Chat、刷新后的持久化和系统 reduced-motion 优先。原头像完整帧与问候检查继续在维护中的浏览器驱动运行。公共设计规范入口为 [design.md](../../design.md)。
+
+
+### 设计规范的自动回归
+
+`channels_capabilities.mjs` 的同一默认设置场景在 320、390、760、761、1024、1400px 运行导航检查：一级／二级的空间关系、正文避让、底部 Settings、两级选中态、侧栏仅有折叠控制、Escape 焦点和 inert 恢复。输出 `navigation-viewports.json`；失败消息包含当次宽度和几何信息，不以完整 HTML 或像素快照锁死实现。系统 reduced-motion 从开启到关闭反复切换后，用户保存的头像暂停选择仍需保留。
+
+[PR CI](../../.github/workflows/ci.yml) → `make test-e2e` → [core](../../tests/system/runner.py) → `channels` → `default_capability_settings` 是现有执行链；原有 `make test lint` 检查构建资源一致性。无需另建相同 job。公共规则与人工视觉评审边界见 [design.md](../../design.md#自动回归与评审分工)。

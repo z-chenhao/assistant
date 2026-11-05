@@ -130,6 +130,9 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 }
 
 func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore, deferred bool) (*App, error) {
+	if err := cfg.ValidateDefaults(); err != nil {
+		return nil, err
+	}
 	lock, err := maintenance.Lock(cfg.App.DataRoot, false)
 	if err != nil {
 		return nil, err
@@ -173,6 +176,8 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	}
 	store.Artifacts().Policy = cfg.Artifact
 	a := &App{capabilitySettings: configsetup.New(cfg, secrets), rootLock: lock, store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
+	cfg = a.capabilitySettings.PrepareDefaults(ctx)
+	a.skillConfig = cfg.Skills
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()
@@ -206,6 +211,10 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 			a.Close()
 			return nil, err
 		}
+	}
+	if cfg.Automatic("embedding") {
+		a.memory.ConfigureLocal()
+		a.history.ConfigureLocal()
 	}
 	a.deliveryPolicy = cfg.Delivery
 	if cfg.Feishu != nil {

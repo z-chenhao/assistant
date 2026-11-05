@@ -753,7 +753,7 @@ def run(binary,evidence):
     native_components(binary, evidence, report)
     rich_replies(binary, evidence, report)
     delivery_leases(binary, report)
-    account_presentation(binary,report)
+    account_presentation(binary,evidence,report)
     native_trace_inspection(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
@@ -856,8 +856,46 @@ def database_inspection(binary, evidence, report):
             h.cleanup()
 
 
+def default_capability_settings(binary,evidence,report):
+    """Real startup defaults with an explicitly injected, owned binary SecretStore."""
+    class MemorySecrets(socketserver.StreamRequestHandler):
+        def handle(self):
+            value=json.loads(self.rfile.readline(131072))
+            with self.server.lock:
+                op,ref=value['op'],value['ref']
+                if op=='put':self.server.values[ref]=value['value']
+                elif op=='delete':self.server.values.pop(ref,None)
+                result=self.server.values.get(ref)
+            self.wfile.write((json.dumps(dict(ok=op!='get' or result is not None,value=result))+'\n').encode())
+    with tempfile.TemporaryDirectory(prefix='steward-default-settings-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+        root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
+        h.production_events=True
+        h.env.update(STEWARD_NATS_URL=broker.url,STEWARD_NATS_STREAM_PREFIX='default_memory_ui')
+        socket=root/'secrets.sock'
+        server=socketserver.ThreadingUnixStreamServer(str(socket),MemorySecrets)
+        server.values={'env:'+name:base64.b64encode(h.env[name].encode()).decode() for name in ('STEWARD_WEB_TEST_TOKEN','STEWARD_FEISHU_VERIFY','STEWARD_FEISHU_ENCRYPT','STEWARD_FEISHU_ACCESS')}
+        server.lock=threading.Lock();server.daemon_threads=True;os.chmod(socket,0o600)
+        thread=threading.Thread(target=server.serve_forever);thread.start()
+        original=h.args;h.args=lambda *args:original('-test-secret-store',str(socket),*args)
+        try:
+            with h.config.open('a') as out:out.write('defaults: {memory: true, search: true, skills: true, computer: true}\n')
+            h.setup();h.start()
+            h.browser(evidence.parent/'default-settings-ui','capability-defaults')
+            key_ref=json.loads((root/'data/default-memory.json').read_text())['ref']
+            require(len(base64.b64decode(server.values[key_ref]))==32,'default Memory did not create its key')
+            h.stop();h.start()
+            require(json.loads((root/'data/default-memory.json').read_text())['ref']==key_ref,'restart replaced the default key')
+            require('Enabled (default)' in h.http('/settings/capabilities/memory'),'default Memory lost its enabled status')
+            require(not (root/'data.desktop').exists(),'browsing settings prepared a desktop')
+            report['checks'].append('Default Memory and local search start together; one enabled Memory entry, concise Preferences layout, Chinese/mobile, stable SecretStore key and no desktop download')
+            h.stop()
+        finally:
+            h.cleanup();server.shutdown();server.server_close();thread.join(10)
+
+
 def capability_settings(binary,evidence,report):
     """Owner UI -> real config/probes -> restart, retaining frozen Run records."""
+    default_capability_settings(binary,evidence,report)
     from verify_recall import Embeddings
     with tempfile.TemporaryDirectory(prefix='steward-capability-settings-') as temp, Sandbox() as platform:
         root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
@@ -1455,7 +1493,7 @@ def extra_scenarios(binary,report):
     report['checks'].append('Task continuation across Feishu/Web; real zoned scheduling to default Feishu with only two threshold notices')
 
 
-def account_presentation(binary,report):
+def account_presentation(binary,evidence,report):
     # Reuse the account harness' owned OAuth network substitution and SecretStore.
     # The production Bridge/Manager is real; no login token or auth URL is evidence.
     from verify_account import account_config, Secrets
@@ -1499,14 +1537,14 @@ def account_presentation(binary,report):
                 require(h.http('/api/status')['readiness']=='ready','Web account profile unavailable')
                 h.stop();h.start()
                 require('ChatGPT account' in h.http('/settings/models/new?provider=chatgpt'),'restart hid connected account')
-                h.http('/auth/logout',urlencode(dict(account=aid)).encode(),headers=form)
+                h.browser(evidence.parent/'account-settings-ui','settings-account')
                 require(h.command('model','accounts')[0]['status']=='logged_out','Web logout missed existing lifecycle')
                 with server.lock:
                     sensitive=list(server.sensitive)
                 for path in (root/'data').rglob('*'):
                     if path.is_file():require(all(value not in path.read_bytes() for value in sensitive),'credential persisted outside SecretStore')
                 report['scenarios']['account-auth']=dict(status='connected_then_logged_out',event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
-                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; ephemeral URL, hidden-model rejection, actual Probe/Select, restart picker, logout and credential scan verified')
+                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; ephemeral URL, hidden-model rejection, actual Probe/Select, restart picker, sign-out confirmation cancel/Escape/single submit and credential scan verified')
                 h.stop()
             finally:
                 h.cleanup();server.shutdown();server.server_close();thread.join(timeout=10)

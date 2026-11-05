@@ -1,6 +1,5 @@
 {{define "settings-page"}}
 <section class="workspace-page settings-page">
- {{template "settings-tabs" .}}
  {{if eq .Settings.Section "preferences"}}{{template "preferences" .}}
  {{else if eq .Settings.Section "notifications"}}{{template "notifications" .}}
  {{else if eq .Settings.Section "new"}}{{template "model-new" .}}
@@ -10,10 +9,28 @@
 </section>
 {{end}}
 
-{{define "settings-tabs"}} <nav class="section-tabs" aria-label="{{tr "Settings sections"}}"><a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{tr "Preferences"}}</a><a href="/settings/models" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{tr "Models"}}</a><a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{tr "Notifications"}}</a><a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>{{tr "Capabilities"}}</a></nav>{{end}}
+{{define "settings-navigation"}}
+ <div class="section-navigation-heading"><span>{{tr "Settings"}}</span></div>
+ <div class="settings-search" hidden data-settings-search><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" aria-label="{{tr "Search settings"}}" placeholder="{{tr "Search"}}" autocomplete="off"></div>
+ <p class="settings-nav-heading">{{tr "Personal"}}</p>
+ <nav class="section-navigation settings-navigation" aria-label="{{tr "Settings sections"}}">
+  <a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Preferences"}}</span></a>
+  <a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{template "icon-notification"}}<span>{{tr "Notifications"}}</span></a>
+  <a href="/settings/models" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{template "icon-connection"}}<span>{{tr "Models"}}</span></a>
+  <a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>{{template "icon-computer"}}<span>{{tr "Capabilities"}}</span></a>
+ </nav>
+ <p class="settings-no-results" role="status" hidden>{{tr "No settings found."}}</p>
+
+{{end}}
 
 {{define "preferences"}}
-<div class="page-heading"><div><h1>{{tr "Preferences"}}</h1><p>{{tr "Choose the language used throughout your workspace."}}</p></div></div>
-<section class="panel form-panel"><h2>{{tr "Language"}}</h2>
-<form method="post" action="/settings/language"><label for="interface-language">{{tr "Interface language"}}<select id="interface-language" name="language"><option value="en" lang="en" {{if ne .Language "zh-CN"}}selected{{end}}>English</option><option value="zh-CN" lang="zh-CN" {{if eq .Language "zh-CN"}}selected{{end}}>简体中文</option></select></label><p class="field-help">{{tr "This preference applies to this browser. Your messages, replies and files keep their original language."}}</p><button>{{tr "Save language"}}</button></form></section>
+<div class="page-heading"><div><h1>{{tr "Preferences"}}</h1></div></div>
+<h2 class="settings-section-title">{{tr "General"}}</h2>
+<section class="panel form-panel settings-group">
+<form method="post" action="/settings/language">
+ <div class="setting-row"><div class="setting-copy"><label for="interface-language">{{tr "Language"}}</label><p>{{tr "Interface language"}}</p></div><div class="settings-row-controls"><select id="interface-language" name="language" data-select-search><option value="en" lang="en" {{if ne .Language "zh-CN"}}selected{{end}}>English</option><option value="zh-CN" lang="zh-CN" {{if eq .Language "zh-CN"}}selected{{end}}>简体中文</option></select><button class="secondary" data-language-save>{{tr "Save language"}}</button></div></div>
+</form>
+<div class="setting-row" data-appearance-setting hidden><div class="setting-copy"><label for="interface-theme">{{tr "Appearance"}}</label></div><select id="interface-theme"><option value="system">{{tr "System"}}</option><option value="light">{{tr "Light"}}</option><option value="dark">{{tr "Dark"}}</option></select></div>
+<div class="setting-row" data-avatar-setting hidden><div class="setting-copy"><label for="avatar-motion">{{tr "Avatar motion"}}</label><p data-reduced-motion-note hidden>{{tr "Follows your system’s reduced motion preference."}}</p></div><div class="setting-switch"><input id="avatar-motion" type="checkbox" role="switch" data-avatar-motion></div></div>
+</section>
 {{end}}

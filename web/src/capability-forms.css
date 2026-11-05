@@ -1,5 +1,5 @@
 /* Native owner settings share the existing monochrome control vocabulary. */
-.capability-guided{max-width:760px;margin:28px 0 36px}
+.capability-guided{margin:0}
 .capability-guided fieldset{min-width:0;border:0;border-top:1px solid var(--border);padding:22px 0 4px;margin:28px 0 0}
 .capability-guided legend{max-width:100%;overflow-wrap:anywhere;padding:0 12px 0 0;font-size:17px;font-weight:550;color:var(--foreground)}
 .capability-guided input,.capability-guided textarea{caret-color:var(--foreground)}

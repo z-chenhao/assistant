@@ -4,7 +4,7 @@
 
 完成状态描述当前实现范围，不代表真实模型、线上账户或所有平台已验收；证明范围和未验证项见所属测试方案。
 
-[产品架构总览](designs/product-overview.md) · [文档维护规则](#文档维护规则) · [功能模板](features/_template.md) · [技术方案模板](designs/_template.md) · [测试方案模板](test-plans/_template.md)
+[界面设计规范](../design.md) · [产品架构总览](designs/product-overview.md) · [文档维护规则](#文档维护规则) · [功能模板](features/_template.md) · [技术方案模板](designs/_template.md) · [测试方案模板](test-plans/_template.md)
 
 F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让纯文本模型可显式读取图片文字；F-005 提供阶段进度；F-019 流式呈现 Main 回复草稿并在提交后切换到正式消息。软件回归与模型语义质量的证明范围分别见对应测试方案。
 
@@ -12,7 +12,7 @@ F-031 提供 Developer → Observability 执行检查入口：按角色、状态
 
 F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
 
-F-041：产品品牌统一为 Steward，Agent 名为 Ghost。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
+F-041：产品品牌统一为 Steward，Agent 名为 Ghost。侧栏仅保留模块导航，外观和头像动效统一在 Preferences 调整。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
 
 F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant access token，新增 CLI `channel status/check`；收发共用并发缓存，凭据拒绝有安全诊断，未知投递在重启后仍只查询。完成范围与真实平台验证边界见功能文档。
 
@@ -50,7 +50,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；任务与执行详情按可用宽度重排；优先定位问题、成果审阅、审批及当前故障。 | 是 · 已完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 两级导航工作台，一级四入口常驻、Settings 固定左下；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；任务与执行详情按可用宽度重排；优先定位问题、成果审阅、审批及当前故障。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 模型生成时，Web 逐段显示 Main 回复；完成后展示正式消息。审批、状态更新和输入保留仍独立工作。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、具名问题及成果审阅卡、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 普通 Main 回复生成受控表格、进度和 Web 表单；回答可恢复、并发重试去重，其他渠道与坏数据保留文字替代。 | 是 · 已完成 |
@@ -62,7 +62,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 健康检查、加密恢复与 macOS 显式后台服务/独立巡检；持久人工停机和有限恢复已接通，平台 Live 与主动渠道告警待补。 | 否 · 部分完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 操作员能查看用量，并按明确价格元数据控制账户费用。 | 是 · 已完成 |
-| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 六类能力以普通表单配置、验证和保存；高级 YAML 保留，重启边界与凭据引用不变。 | 是 · 已完成 |
+| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 默认准备本地记忆、搜索、Skills 与按需 macOS 桌面；Settings 采用统一导航与紧凑控件，Memory 与检索合并入口，原生首启待验收。 | 是 · 已完成 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |

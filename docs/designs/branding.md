@@ -8,9 +8,11 @@ Steward 是产品品牌，Ghost 是当前 Agent 的名称。当前代码与自�
 
 Go 继续提供认证、页面、原生表单与局部更新；React 只增强 Host-owned UISpec。`foundation.css` 定义 Demo 的配色和自托管字体；shell、workspace、conversation、observability、avatar 分别负责局部表现。`appearance.js` 为同源外部脚本，在 CSS 前应用本地明暗偏好，不放宽 CSP。
 
-单侧栏仅 Chat、Tasks、Settings、Developer。Chat 顶部居中显示名称和动态头像，真实就绪/工作状态在头像下方同轴居中，以绿/蓝/琥珀/红/灰小圆点区分就绪、工作、需配置、模型异常与未知，保留明确文字和明暗主题对比，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。
+一级侧栏上方为 Chat、Tasks、Developer，Settings 固定左下；Settings 与 Developer 在旁边展开内部分类，共用二级导航规范。Chat 顶部居中显示名称和动态头像，真实就绪/工作状态在头像下方同轴居中，以绿/蓝/琥珀/红/灰小圆点区分就绪、工作、需配置、模型异常与未知，保留明确文字和明暗主题对比，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。
 
 任务详情继续显示目标、审批、进展、关联交付、附件与历史；没有将技术执行细节挤入默认首页，也没有虚构多会话或文件索引。发送、附件、source_id、草稿、冻结审批哈希、分页及已有 live region ID 不变。
+
+公共界面规则以 [design.md](../../design.md) 为准；本页维护品牌资产、动效实现与资源边界。
 
 ## 资源与动效
 

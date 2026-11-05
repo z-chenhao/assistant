@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrElement = errors.New("stale Computer element")
-	ErrInvalid = errors.New("invalid Computer request")
+	ErrPreparing = errors.New("computer default is preparing")
+	ErrElement   = errors.New("stale Computer element")
+	ErrInvalid   = errors.New("invalid Computer request")
 	//lint:ignore ST1005 Computer is the domain name in this existing public error text.
 	ErrUnavailable = errors.New("Computer provider unavailable")
 	//lint:ignore ST1005 Computer is the domain name in this existing public error text.

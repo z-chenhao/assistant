@@ -17,6 +17,10 @@ type CapabilitySettings interface {
 	Save(context.Context, string, string, string) error
 }
 type Capability struct {
+	Automatic                                                                   bool
+	ParentMemory                                                                bool
+	Checked                                                                     bool
+	DefaultKeyRef                                                               string
 	ID, Title, Description, State, Revision, Text, Example, Help, Message, Path string
 	Configured, Active, PendingRestart, Verified, Candidate                     bool
 	TestedAt                                                                    time.Time
@@ -39,10 +43,19 @@ func (s *Server) loadCapabilities(ctx context.Context, r *http.Request, p *page)
 	var err error
 	if r.URL.Path == "/settings/capabilities" {
 		p.Capabilities, err = s.Capabilities.List(ctx)
+		visible := p.Capabilities[:0]
+		for _, v := range p.Capabilities {
+			if v.ID != "embedding" {
+				visible = append(visible, v)
+			}
+		}
+		p.Capabilities = visible
 		return err
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/settings/capabilities/")
 	v, err := s.Capabilities.Detail(ctx, id)
+	v.ParentMemory = id == "embedding"
+	v.Checked = r.URL.Query().Get("checked") == "1"
 	prepareCapabilityForm(&v)
 	v.Advanced = r.URL.Query().Get("editor") == "advanced"
 	p.Capability = &v
@@ -87,16 +100,39 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 		}
 	}
 	status := http.StatusConflict
+	var probeMessage string
 	location := capabilityURL(id)
 	if guided == nil {
 		location += "?editor=advanced"
 	}
 	if err == nil {
 		switch r.FormValue("action") {
+		case "apply":
+			if guided == nil {
+				err = ErrCapabilityInvalid
+				break
+			}
+			var checked Capability
+			checked, err = s.Capabilities.Test(r.Context(), id, r.FormValue("revision"), text)
+			if err == nil && !checked.Verified {
+				probeMessage = checked.Message
+				err = ErrCapabilityUnavailable
+				status = http.StatusUnprocessableEntity
+			}
+			if err == nil {
+				err = s.Capabilities.Save(r.Context(), id, r.FormValue("revision"), text)
+			}
+			if err == nil {
+				http.Redirect(w, r, location, http.StatusSeeOther)
+				return nil
+			}
 		case "test":
 			_, e := s.Capabilities.Test(r.Context(), id, r.FormValue("revision"), text)
 			err = e
 			if e == nil {
+				if guided != nil {
+					location += "?checked=1"
+				}
 				// A completed probe can be unavailable with no Go error. Detail
 				// reports that stored result and only a ready proof enables Save;
 				// redirecting does not assert that the connection succeeded.
@@ -119,6 +155,9 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 		p.Capability.Verified = false
 		p.Capability.State = "unavailable"
 		p.Capability.Message = ""
+		if probeMessage != "" {
+			p.Capability.Message = probeMessage
+		}
 		p.Capability.TestedAt = time.Time{}
 		p.Capability.Candidate = true
 		p.Capability.Text = text
@@ -132,6 +171,9 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 			}
 		}
 		p.Error = ErrCapabilityUnavailable.Error()
+		if probeMessage != "" {
+			p.Error = ""
+		}
 		for _, known := range []error{ErrCapabilityConflict, ErrCapabilityInvalid, ErrCapabilityUnverified, ErrCapabilityMigration} {
 			if errors.Is(err, known) {
 				p.Error = known.Error()

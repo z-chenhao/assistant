@@ -176,7 +176,9 @@ fingerprint. The transport resolves only the explicit SecretStore reference,
 uses password authentication in memory, pins Ed25519, and never consults Host
 SSH keys or ssh-agent. The existing pinned `x/crypto` module supplies SSH.
 Never put the password itself in YAML, SQLite, command arguments or evidence.
-The public seed's test login is suitable only for the isolated L2 fixture.
+Custom production configuration must use private credentials. Automatic
+preparation uses the public seed login only in its verified staging Guest and
+replaces it before publishing the base.
 
 Prepare the base before opening the configured application:
 

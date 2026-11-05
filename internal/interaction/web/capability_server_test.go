@@ -13,8 +13,71 @@ import (
 	"github.com/z-chenhao/assistant/internal/config"
 	"github.com/z-chenhao/assistant/internal/config/setup"
 	"github.com/z-chenhao/assistant/internal/interaction/web"
+	secretmemory "github.com/z-chenhao/assistant/internal/llm/memory"
 	"github.com/z-chenhao/assistant/internal/llm/secret"
 )
+
+func TestDefaultMemoryHasOneEnabledEntryAndPreferenceLayout(t *testing.T) {
+	s, _, root := capabilityFixture(t)
+	cfg, err := config.Load("", os.LookupEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Defaults = &config.Defaults{Memory: true, Search: true, Skills: true}
+	m := setup.New(cfg, secretmemory.New())
+	m.PrepareDefaults(context.Background())
+	s.Capabilities = m
+	response := capabilityRequest(s, "GET", "/settings/capabilities", nil)
+	body := response.Body.String()
+	if response.Code != 200 || strings.Count(body, `class="object-row"`) != 5 || !strings.Contains(body, "Enabled (default)") || strings.Contains(body, `href="/settings/capabilities/embedding"`) || strings.Contains(body, "Not verified") {
+		t.Fatal(response.Code, body)
+	}
+	response = capabilityRequest(s, "GET", "/settings/capabilities/memory", nil)
+	body = response.Body.String()
+	if !strings.Contains(body, `class="panel form-panel"`) || !strings.Contains(body, `value="apply">Save</button>`) || !strings.Contains(body, `href="/settings/capabilities/embedding"`) || strings.Contains(body, "Successful candidate tests expire") {
+		t.Fatal(body)
+	}
+	v, _ := m.Detail(context.Background(), "memory")
+	values := url.Values{"editor": {"guided"}, "capability": {"memory"}, "revision": {v.Revision}, "configuration": {v.Text}, "mode": {"off"}, "action": {"apply"}}
+	response = capabilityRequest(s, "POST", "/capability/configure", values)
+	if response.Code != 303 {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	loaded, err := config.Load("", os.LookupEnv)
+	if err != nil || loaded.Defaults.Memory || loaded.Defaults.Search || loaded.Embedding != nil {
+		t.Fatal(loaded.Defaults, err)
+	}
+	if _, err = os.Stat(filepath.Join(root, "default-memory.json")); err != nil {
+		t.Fatal("disabling memory removed its key reference", err)
+	}
+}
+
+func TestPreferenceStyleSaveChecksBeforePersisting(t *testing.T) {
+	s, m, root := capabilityFixture(t)
+	t.Setenv("STEWARD_APPLY_KEY", strings.Repeat("a", 32))
+	v, _ := m.Detail(context.Background(), "memory")
+	values := url.Values{"editor": {"guided"}, "capability": {"memory"}, "revision": {v.Revision}, "mode": {"custom"}, "key_ref": {"env:STEWARD_APPLY_MISSING"}, "action": {"apply"}}
+	response := capabilityRequest(s, "POST", "/capability/configure", values)
+	if response.Code != 422 || !strings.Contains(response.Body.String(), "Memory key unavailable") {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "config.yaml")); !os.IsNotExist(err) {
+		t.Fatal("failed connection saved configuration", err)
+	}
+	values.Set("key_ref", "env:STEWARD_APPLY_KEY")
+	response = capabilityRequest(s, "POST", "/capability/configure", values)
+	if response.Code != 303 {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	loaded, err := config.Load("", os.LookupEnv)
+	if err != nil || loaded.Memory == nil || !loaded.Defaults.Search {
+		t.Fatal(loaded.Memory, err)
+	}
+	response = capabilityRequest(s, "POST", "/capability/configure", values)
+	if response.Code != 409 {
+		t.Fatal("stale form overwrote configuration", response.Code)
+	}
+}
 
 type capabilityCore struct{ web.Core }
 

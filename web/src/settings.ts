@@ -1,10 +1,13 @@
 import {t} from './i18n';
+import {confirmSettingsAction,enhanceSettingsControls} from './settings-controls';
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
+ enhanceSettingsControls();
  const forms=document.querySelectorAll<HTMLFormElement>('.settings-page form');
  const reset=new Map<HTMLFormElement,()=>void>();
  for(const form of forms){form.addEventListener('submit',event=>{
   if(form.dataset.submitting){event.preventDefault();return}
+  if(confirmSettingsAction(form,(event as SubmitEvent).submitter)){event.preventDefault();return}
   const buttons=Array.from(form.querySelectorAll<HTMLButtonElement>('button[type=submit],button:not([type])'));
   const labels=buttons.map(button=>button.textContent??'');
   const disabled=buttons.map(button=>button.disabled);

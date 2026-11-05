@@ -57,6 +57,12 @@ type Service struct {
 	Conversation ConversationProvider
 }
 
+// EmptyMemory keeps local conversation search available while the default
+// credential store is locked. Settings reports Memory as unavailable.
+type EmptyMemory struct{}
+
+func (EmptyMemory) Search(context.Context, Scope, Query) ([]Hit, error) { return []Hit{}, nil }
+
 func (s Service) Search(ctx context.Context, scope Scope, q Query, budget int) ([]Hit, error) {
 	if !q.Valid() || scope.UserID == "" || scope.AgentID == "" || budget < 0 {
 		return nil, ErrInvalid
