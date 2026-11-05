@@ -28,6 +28,7 @@ import (
 	codefixture "github.com/z-chenhao/assistant/internal/tool/codemode/fixture"
 	toolfake "github.com/z-chenhao/assistant/internal/tool/fake"
 	"github.com/z-chenhao/assistant/internal/tool/mcp"
+	"github.com/z-chenhao/assistant/internal/webaccess"
 )
 
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {
@@ -42,6 +43,7 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 		return err
 	}
 	runs := a.store.Runs(a.history, registry)
+	runs.ConfigureWebAccess(cfg.WebAccess, a.provider)
 	if cfg.Feishu != nil {
 		runs.ConfigureFeishuReviewWorkspace(cfg.Feishu.WorkspaceURL)
 	}
@@ -108,6 +110,18 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 	defs, err := builtinDefinitions(cfg, secrets)
 	if err != nil {
 		return nil, err
+	}
+	// Legacy deterministic peers own fixed catalogs and small model windows.
+	// Keep new network capabilities out of those fixtures; Web Access has real
+	// Code Mode/SQLite and protocol-peer coverage without enabling live I/O.
+	if fixture != "" {
+		kept := defs[:0]
+		for _, d := range defs {
+			if d.Spec.Name != webaccess.SearchName && d.Spec.Name != webaccess.FetchName {
+				kept = append(kept, d)
+			}
+		}
+		defs = kept
 	}
 	for _, server := range cfg.MCP {
 		more, e := mcp.Definitions(ctx, server)
@@ -193,6 +207,7 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 
 func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Definition, error) {
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	defs = append(defs, webaccess.Definitions(cfg.WebAccess)...)
 	defs = append(defs, tool.SearchDefinition())
 	defs = append(defs, automation.Definitions()...)
 	manageMemory := memory.Definition()

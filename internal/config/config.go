@@ -26,10 +26,12 @@ import (
 	"github.com/z-chenhao/assistant/internal/recall/embedding"
 	"github.com/z-chenhao/assistant/internal/skill"
 	"github.com/z-chenhao/assistant/internal/tool/mcp"
+	"github.com/z-chenhao/assistant/internal/webaccess"
 	"go.yaml.in/yaml/v3"
 )
 
 type Config struct {
+	WebAccess  webaccess.Config      `yaml:"web_access"`
 	Defaults   *Defaults             `yaml:"defaults,omitempty"`
 	SourcePath string                `yaml:"-" json:"-"`
 	Web        *web.Config           `yaml:"web"`

@@ -24,6 +24,7 @@ func (s *streamState) consumeResponses(api API, v map[string]any) error {
 		s.args(key, str(v["delta"]))
 	case "response.output_item.done":
 		item := record(v["item"])
+		s.webSearchItem(item)
 		if item["type"] == "function_call" {
 			p := s.tool(key, str(item["call_id"]), str(item["name"]), str(item["namespace"]))
 			if p.arguments.Len() == 0 {
@@ -61,6 +62,9 @@ func (s *streamState) consumeResponses(api API, v map[string]any) error {
 	case "response.completed", "response.incomplete":
 		s.terminal = true
 		response := record(v["response"])
+		for _, item := range list(response["output"]) {
+			s.webSearchItem(record(item))
+		}
 		if kind == "response.incomplete" {
 			if str(record(response["incomplete_details"])["reason"]) != "max_output_tokens" {
 				return ErrInvalidResponse
@@ -76,4 +80,28 @@ func (s *streamState) consumeResponses(api API, v map[string]any) error {
 	}
 
 	return nil
+}
+
+func (s *streamState) webSearchItem(item map[string]any) {
+	if item["type"] != "web_search_call" || item["status"] != "completed" {
+		return
+	}
+	s.message.WebSearchPerformed = true
+	for _, raw := range list(record(item["action"])["sources"]) {
+		v := record(raw)
+		u := str(v["url"])
+		if u == "" || len(u) > 4096 || len(str(v["title"])) > 1024 {
+			continue
+		}
+		seen := false
+		for _, old := range s.message.WebSources {
+			if old.URL == u {
+				seen = true
+				break
+			}
+		}
+		if !seen && len(s.message.WebSources) < 20 {
+			s.message.WebSources = append(s.message.WebSources, WebSource{URL: u, Title: str(v["title"])})
+		}
+	}
 }

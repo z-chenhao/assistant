@@ -101,6 +101,7 @@ type Message struct {
 }
 
 type Context struct {
+	WebSearch    bool      `json:"webSearch,omitempty"`
 	SystemPrompt string    `json:"systemPrompt,omitempty"`
 	Messages     []Message `json:"messages"`
 	Tools        []Tool    `json:"tools,omitempty"`
@@ -119,16 +120,23 @@ type Usage struct {
 }
 
 type AssistantMessage struct {
-	Role         string    `json:"role"`
-	Content      []Content `json:"content"`
-	API          API       `json:"api"`
-	Provider     string    `json:"provider"`
-	Model        string    `json:"model"`
-	Usage        Usage     `json:"usage"`
-	StopReason   string    `json:"stopReason"`
-	ErrorMessage string    `json:"errorMessage,omitempty"`
-	ResponseID   string    `json:"responseId,omitempty"`
-	Timestamp    int64     `json:"timestamp"`
+	WebSearchPerformed bool        `json:"webSearchPerformed,omitempty"`
+	WebSources         []WebSource `json:"webSources,omitempty"`
+	Role               string      `json:"role"`
+	Content            []Content   `json:"content"`
+	API                API         `json:"api"`
+	Provider           string      `json:"provider"`
+	Model              string      `json:"model"`
+	Usage              Usage       `json:"usage"`
+	StopReason         string      `json:"stopReason"`
+	ErrorMessage       string      `json:"errorMessage,omitempty"`
+	ResponseID         string      `json:"responseId,omitempty"`
+	Timestamp          int64       `json:"timestamp"`
+}
+
+type WebSource struct {
+	URL   string `json:"url"`
+	Title string `json:"title,omitempty"`
 }
 
 type Event struct {

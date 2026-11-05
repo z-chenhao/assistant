@@ -126,7 +126,7 @@ func (r *Runs) taskHandoff(ctx context.Context, tx *sql.Tx, taskID string, epoch
  WHERE r.task_id=? AND r.task_epoch<? AND r.worker_position='root'
  UNION ALL
  SELECT json_extract(g.result_json,'$.text'),r.task_epoch,g.completed_at,g.generation_id FROM model_generation g JOIN run r USING(run_id)
- WHERE r.task_id=? AND r.task_epoch<? AND r.worker_position='root' AND g.status='completed'
+ WHERE r.task_id=? AND r.task_epoch<? AND r.worker_position='root' AND g.status='completed' AND g.step_index>=0
  AND coalesce(json_array_length(g.result_json,'$.tool_calls'),0)=0 AND length(trim(coalesce(json_extract(g.result_json,'$.text'),'')))>0
  AND NOT EXISTS(SELECT 1 FROM worker_result w WHERE w.run_id=r.run_id)
  AND NOT EXISTS(SELECT 1 FROM context_compaction cc WHERE cc.run_id=g.run_id AND cc.step_index=g.step_index AND json_extract(cc.provenance_json,'$.stage')='summary_request')

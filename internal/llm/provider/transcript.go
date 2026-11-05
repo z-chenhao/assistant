@@ -9,7 +9,7 @@ import (
 // Normalize folds system updates and tool changes for providers without
 // in-place declarations. The source transcript remains owned by the caller.
 func Normalize(in Context) Context {
-	out := Context{SystemPrompt: in.SystemPrompt}
+	out := Context{SystemPrompt: in.SystemPrompt, WebSearch: in.WebSearch}
 	tools := map[string]Tool{}
 	order := []string{}
 	seen := map[string]bool{}

@@ -1,4 +1,9 @@
 version: 1
+# Public web search uses the frozen Steward OpenAI account when supported.
+# Explicitly permit sending queries to Exa's keyless, rate-limited hosted MCP
+# when native search is unsupported or temporarily unavailable. Default: false.
+# web_access:
+#   exa_fallback: true
 # Optional exact-PR GitHub observation (read-only PAT from SecretStore).
 # Reception is separate from Task continuation and does not authorize work.
 # github:

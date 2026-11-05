@@ -18,6 +18,7 @@ const (
 	MemorySearchBuiltin BuiltinFamily = "memory_search"
 	EvidenceBuiltin     BuiltinFamily = "evidence"
 	SearchBuiltin       BuiltinFamily = "tool_search"
+	WebAccessBuiltin    BuiltinFamily = "web_access"
 )
 
 type builtinPolicy struct {
@@ -29,6 +30,8 @@ type builtinPolicy struct {
 // This is the single trusted name/policy catalog used for validation and Host
 // dispatch. A provider cannot register an arbitrary Host name or permission.
 var builtinCatalog = map[string]builtinPolicy{
+	"builtin__web_search":          {WebAccessBuiltin, "read_only", false},
+	"builtin__web_fetch":           {WebAccessBuiltin, "read_only", false},
 	"builtin__intelligent_ui_show": {UIBuiltin, "ui_present", false},
 	"builtin__tool_search":         {SearchBuiltin, "read_only", false},
 	"builtin__read":                {EnvironmentBuiltin, "read_only", false},

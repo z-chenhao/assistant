@@ -149,6 +149,19 @@ func (s *eventStream) accept(e llm.GenerationEvent) {
 		s.toolCalls++
 		d.event.ToolCall = e.ToolCall
 	case "completed":
+		if e.WebSearch != nil {
+			if len(e.WebSearch.Sources) > 20 {
+				s.reject(llm.InvalidProviderResponse)
+				return
+			}
+			for _, source := range e.WebSearch.Sources {
+				if len(source.URL) > 4096 || len(source.Title) > 1024 {
+					s.reject(llm.InvalidProviderResponse)
+					return
+				}
+			}
+			d.event.WebSearch = e.WebSearch
+		}
 		if e.Usage != nil {
 			if e.Usage.InputTokens < 0 || e.Usage.OutputTokens < 0 || e.Usage.CacheReadTokens < 0 || e.Usage.CacheWriteTokens < 0 {
 				s.reject(llm.InvalidProviderResponse)

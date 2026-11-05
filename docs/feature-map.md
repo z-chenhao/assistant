@@ -27,7 +27,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 完成状态只属于本行需求，不自动扩展为整个模块、全部平台或所有业务场景完成。配置依赖、刻意限制、待实现内容和未验证项应分别说明。
 
-当前共 43 项需求，30 项已完成、12 项部分完成、0 项未实现、1 项待定义。此汇总随下表一起维护。
+当前共 67 项需求，30 项已完成、14 项部分完成、9 项未实现、14 项待定义。此汇总随下表一起维护。
 
 ## 需求索引
 
@@ -76,6 +76,30 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存与可访问帮助；模型同意常驻、Trace 状态可读，跨页复用 Select／Switch、字号与窄屏触控规则，通过复用门禁、首屏／状态 UT 和跨页／Task 浏览器回归约束；折叠偏好与慢加载布局稳定，编辑后清除过期连接／保存反馈，保留真实执行与审批语义。 | 是 · 已完成 |
 | [F-042](features/integrations.md#f-042) | 可靠的环境事件监听 | 精确 PR 评审/CI 持久接收，可显式关联原 Task 经 Main 接续；其他来源、平台历史与原话题交付边界保留。 | 否 · 部分完成 |
 | [F-045](features/automation.md#f-045) | 主动规则的观察与启用 | 确切 GitHub PR 可按事件类型或 CI 失败观察，再显式启用 Main 接续原 Task。其他来源与语义规则待验证。 | 否 · 部分完成 |
+| [F-046](features/integrations.md#f-046) | Tavily 搜索与网页正文 | 搜索原文、读取指定公开 URL 并保留来源、时间和提取失败边界；不将搜索摘要当全文。 | 否 · 未实现 |
+| [F-047](features/integrations.md#f-047) | GitHub Connector | 在明确仓库读取 issue/PR/diff/CI 并完成授权协作动作；与既有精确 PR 监听和代码交付分别验收。 | 否 · 未实现 |
+| [F-048](features/integrations.md#f-048) | 能力候选：macOS 本机文件与运行状态 | 在选定目录和具名服务内读取资料、检查环境和准备可审查的维护动作。 | 否 · 待定义 |
+| [F-049](features/integrations.md#f-049) | 能力候选：SSH 远端设备与服务 | 逐台绑定账户、host key 和允许范围，读取远端状态并在明确授权下维护，不扩大 Guest SSH 权限。 | 否 · 待定义 |
+| [F-050](features/integrations.md#f-050) | 能力候选：用户选择的 Chrome 页面与会话 | 接续选定的宿主浏览器页面和网页工作，保留登录态边界与陈旧页面／提交结果核实。 | 否 · 待定义 |
+| [F-051](features/integrations.md#f-051) | 能力候选：ChatGPT 选定历史与附件导入 | 从用户提供的选定对话／导出找回旧资料，保留角色、来源和附件缺失；不将模型登录当成历史授权。 | 否 · 待定义 |
+| [F-052](features/integrations.md#f-052) | 能力候选：Codex 选定工程会话导入 | 只读接入选定工程会话与产物引用，区分旧执行报告和当前事实，不修改 Codex 状态库。 | 否 · 待定义 |
+| [F-053](features/integrations.md#f-053) | 能力候选：Pi 选定会话导入 | 导入选定会话及分支，接续既有主题，不迁移历史审批、认证或自动执行旧命令。 | 否 · 待定义 |
+| [F-054](features/integrations.md#f-054) | 能力候选：图片生成与编辑服务 | 用明确图片服务完成生成／参考图编辑并保存版本关联；静态图与实际动画分别验收。 | 否 · 待定义 |
+| [F-055](features/integrations.md#f-055) | Google Maps Connector | 解析用户给定地点及海外步行／公交路线，核实地点、入口与时区，不冒充完成预约或购票。 | 否 · 未实现 |
+| [F-056](features/integrations.md#f-056) | 高德地图 Connector | 提供国内 POI、路线、天气及唤端链接，明确坐标和时效；唤起 App 不等于完成交易。 | 否 · 未实现 |
+| [F-057](features/integrations.md#f-057) | Apple Health／HealthKit Connector 候选 | 确认数据来源后评估经授权的原生设备端集成；XML 文件导入不算 connector 接通。 | 否 · 待定义 |
+| [F-058](features/integrations.md#f-058) | 飞书云文档与知识库 | 在明确资源范围内找资料、读取正文和形成／授权更新草稿；用户文档权限独立于机器人消息。 | 否 · 未实现 |
+| [F-059](features/integrations.md#f-059) | Gmail Connector | 按用户条件查邮件／附件并先形成本地回复草稿；远端草稿、发送和受限授权分别处理。 | 否 · 未实现 |
+| [F-060](features/integrations.md#f-060) | Jellyfin 家庭媒体库 | 查询指定服务器的可见媒体和播放相关状态，区分库中存在与客户端实际可播。 | 否 · 未实现 |
+| [F-061](features/integrations.md#f-061) | AWS 资源与费用只读接入 | 在指定账户／区域读取资源和可用费用数据，不包含创建实例、升级计划或付费承诺。 | 否 · 未实现 |
+| [F-062](features/integrations.md#f-062) | Google Calendar 候选 | 确认用户日历后定义忙闲、日程及授权创建，区分外部事件与 Steward 自动化。 | 否 · 待定义 |
+| [F-063](features/integrations.md#f-063) | Apple Calendar／Reminders 候选 | 确认实际使用后定义 EventKit 本机组件及日历／清单权限，不复制内部 Task 权威状态。 | 否 · 待定义 |
+| [F-064](features/integrations.md#f-064) | Google Drive 选定资料候选 | 先确认资料是否在 Drive，再定义选定文件读取／导出／保存，不承诺全盘搜索及全部原生编辑。 | 否 · 待定义 |
+| [F-065](features/integrations.md#f-065) | X 帖子与讨论只读接入 | 在搜索／网页不足时读取确切帖子及可取得讨论，独立核验主张，不接私信、发帖或交易。 | 否 · 未实现 |
+| [F-066](features/integrations.md#f-066) | YouTube 视频资料候选 | 确认视频委托需求后定义元数据及可授权取得的字幕，不能把元数据读取称为已看完视频。 | 否 · 待定义 |
+| [F-067](features/integrations.md#f-067) | Exa MCP 搜索候选 | 验证免密钥的官方托管搜索、免费限流与来源结果；严格过滤不得静默降级，远端协议及质量待验证。 | 否 · 部分完成 |
+| [F-068](features/integrations.md#f-068) | SearXNG 自托管搜索候选 | 连接明确实例的 JSON 搜索接口，保留上游失败与部分结果边界；实例、部署及维护责任待确认。 | 否 · 待定义 |
+| [F-069](features/integrations.md#f-069) | Web Access Connector | 统一搜索、公开网页读取和续读；依据冻结账户／端点的已验证能力选原生搜索或允许后备，保留来源、预算和失败语义。 | 否 · 部分完成 |
 
 ## 实施优先级与依赖
 
@@ -85,6 +109,45 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 优先级针对尚未实现的范围，不是交付日期。首个目标闭环为：已绑定飞书发起仓库工作 → F-025/F-026 提供实际服务与代码环境并形成可审查交付 → F-042 接收关联 PR 的评审/CI → F-004 接续同一 Task → F-020 回原话题交付。F-003 为耗时工作期间的对话响应提供基础。
 
 执行复用现有 Task、Run、ToolInvocation、Main 交付与权限/隐私边界。来源事件和订阅上下文不授予新权限，暂停/取消/Forget 不由自动事件恢复，主动接单不替代具体动作审批。接口与迁移在相应功能实现前设计，不建立第二套任务生命周期、通用 Source/工作流平台、云端拆分或语义 Watchdog 自治修复。
+
+<a id="personal-connector-priorities"></a>
+
+### 个人 Connector 优先级
+
+本规划按[明确外部系统的集成边界](features/integrations.md#术语与登记边界)登记 connector，按工具、模型能力或一次性导入登记的 F-048–F-054 不参与以下排序。当前共有 **16 个新增外部系统／服务 connector 条目**，另有 **7 个非 connector 能力候选**；**F-069 Web Access Connector** 组合搜索与网页访问，不重复计为新的外部系统。既有飞书消息集成 F-020 不重复计数。
+
+以下顺序以 **ChatGPT 日常问题** 为主要依据，Codex 工程任务单独评估。优先已明确且重复委托、能补足实时／个人事实并减少截图与复制的接入，同时考虑已有工具覆盖和开发／授权成本。依据见[委托模式与证据边界](features/integrations.md#选择依据与证据边界)。这是定性建议，不是全量频次统计；旅途中连续提问不能直接视为全年频次，书签也不能证明资料来源。
+
+顺序表示在前提成立时的建议开发顺序，不是服务授权或交付日期。标为待定义、或尚未确认实际数据来源的项先做需求／接入条件验证；不能仅因排位靠前就直接开发。公共检索服务与个人业务系统分别注明，具体供应商也需验证。
+
+| 顺序 | 阶段 | 接入能力／外部系统 | 对应 ChatGPT 日常问题与接入收益 |
+| --- | --- | --- | --- |
+| 1 | P0 | [F-069 · Web Access Connector](features/integrations.md#f-069) | 统一入口先验证当前 Steward ChatGPT／Codex 账户原生搜索，再接一个允许的后备；保持主模型与冻结权限 |
+| 2 | P0 后备候选 | [F-067 · Exa MCP](features/integrations.md#f-067) | 随 F-069 验证免密钥独立搜索，只有显式允许才参与后备；免费限流与过滤保证需核实 |
+| 3 | P0 | [F-056 · 高德](features/integrations.md#f-056) | 国内天气／穿衣／散步及地点路线；考虑平时国内生活先接，地域排序属于产品判断，不能当作已证明的使用频次 |
+| 4 | P0 | [F-055 · Google Maps](features/integrations.md#f-055) | 海外餐厅链接、车站入口、酒店／车站间路线有直接委托证据；补旅行时的地点事实 |
+| 5 | P1 | [F-059 · Gmail](features/integrations.md#f-059) | 订单解释、账户事项和个人资料找回可能减少截图／复制；这是对来源的推断，先验证资料确实在 Gmail，首版只读 |
+| 6 | P1 | [F-057 · Apple Health／HealthKit 候选](features/integrations.md#f-057) | 睡眠／活动等回顾需求重复，数据价值高；先确认实际来源，确为 HealthKit 且设备端方案可行后再进入开发 |
+| 7 | P1 | [F-058 · 飞书云文档](features/integrations.md#f-058) | 技术资料、面试材料和方案整理可减少重复粘贴；先确认资料存于飞书及资源授权，不能只凭已有消息渠道推断 |
+| 8 | P1 可选扩展 | [F-068 · SearXNG](features/integrations.md#f-068) | 有明确实例时验证自托管路径，评估维护和上游覆盖；不自动选公共实例或部署服务 |
+| 9 | P1 可选扩展 | [F-046 · Tavily](features/integrations.md#f-046) | 保留为正式 API／免费额度候选，不能仅凭功能声明优于已在 Pi 使用的方案；与前两项比较后选择 |
+| 10 | P2 | [F-060 · Jellyfin](features/integrations.md#f-060) | 家庭媒体服务／播放问题有明确场景，但专用媒体库查询的覆盖面较窄 |
+| 11 | P2 | [F-062 · Google Calendar 候选](features/integrations.md#f-062) | 有计划与提醒场景，尚未确认由该日历承载；不能把聊天提醒需求直接变成日历开发任务 |
+| 12 | P2 | [F-063 · Apple Calendar／Reminders 候选](features/integrations.md#f-063) | 与上项是待确认的来源选择，先验证实际使用及与 Steward 自动化的分工 |
+| 13 | P2 | [F-064 · Google Drive 候选](features/integrations.md#f-064) | 有附件／资料需求，但尚无充分证据指向 Drive；先确定文件实际存放位置 |
+| 14 | P2 | [F-065 · X](features/integrations.md#f-065) | 帖子核验需求明确，先由搜索／网页覆盖；直连只有在结构化上下文或覆盖产生增量时再开发 |
+| 15 | P2 | [F-047 · GitHub](features/integrations.md#f-047) | 在 ChatGPT 日常问题榜靠后；工程协作需求主要来自 Codex，仍保留独立工程路线的高优先级 |
+| 16 | P2 | [F-061 · AWS](features/integrations.md#f-061) | 云账户／费用任务主要见于 Codex，不能据此占据日常个人助手首批开发资源 |
+| 17 | P2 | [F-066 · YouTube 候选](features/integrations.md#f-066) | 只有消费入口信号，尚未证明经常委托视频分析及可取得字幕范围 |
+
+首批交付是 **F-069 Web Access Connector＋高德＋Google Maps**。Web Access 按当前冻结账户／端点的已验证搜索能力选路，先验证你在 Pi 使用过的 ChatGPT／Codex 托管搜索模式，再用 F-067 Exa 提供一个显式允许的后备。F-068 SearXNG 与 F-046 Tavily 是后续可选适配器，不要求首版全部实现。既有主模型不会因搜索失败自动切换，原生能力也不凭模型名猜测。具体边界见[Web Access 方案](designs/integrations.md#f-069--web-access-的最小组合方案)和 [Pi 参考取舍](designs/integrations.md#pi-web-access-的参考边界)。第二批在确认真实资料来源后选择 Gmail、健康数据或飞书文档；GitHub 的工程优先级仍独立维护。
+
+
+F-020 继续维护既有飞书消息连接，机器人身份不代表已具备个人云文档或日历权限。F-025 持有认证集成共性缺口，F-042/F-045 持有事件和主动接续；新增 connector 独立验收，不把全部目录变成某个既有编号完成的附加门槛。
+
+本机、SSH、浏览器是执行能力；ChatGPT/Codex/Pi 选定历史属于导入；图片生成属于模型能力。F-048–F-054 仅保留为非 connector 的待定义候选，需结合原能力归属另行确认，不按本榜推动实现，也不把定性习惯分析直接扩成新开发任务。
+
+读取、写入、事件订阅及结果核实按所连系统分别定义；不是每个 connector 都需要监听或写操作。架构边界见[集成技术方案](designs/integrations.md#个人-connector-待实现方案)，验收见[集成测试方案](test-plans/integrations.md#个人-connector-验收计划)。上述需求尚未实施，登记不启用或授权任何 connector。
 
 ## 文档组织
 

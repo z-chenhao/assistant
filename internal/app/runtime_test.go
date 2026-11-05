@@ -80,7 +80,7 @@ func TestCoreExecutionAndSkillDiscoveryAreAvailableWithoutOptionalConfig(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"builtin__read", "builtin__bash", "builtin__edit", "builtin__write", "builtin__skill_list", "builtin__skill_view", "builtin__image_ocr"} {
+	for _, name := range []string{"builtin__read", "builtin__bash", "builtin__edit", "builtin__write", "builtin__skill_list", "builtin__skill_view", "builtin__image_ocr", "builtin__web_search", "builtin__web_fetch"} {
 		if _, ok := registry.Resolve(name); !ok {
 			t.Fatal("missing core tool", name)
 		}
