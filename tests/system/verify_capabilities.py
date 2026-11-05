@@ -337,13 +337,14 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             config = h.root / 'config.yaml'
             config.write_text(config.read_text().replace(
                 '    tools: {read: read_only, send: external_effect}\n',
-                '    description: Find catalog records\n    tools: ' + json.dumps(permissions) + '\n'))
+                '    description: Find catalog records namespacediscoverytoken\n    tools: ' + json.dumps(permissions) + '\n'))
             read = call(h, 'catalog-code', 'mcp__fixture__read', {'text': 'Code Mode receipt'})
             require(content(read)['text'] == 'Code Mode receipt', 'script tool unavailable')
             initial = json.loads(h.state()['generations'][0]['request_json'])
             require(not any(t['name'].startswith('mcp__') and t['name'] != 'mcp__fixture__echo' for t in initial['tools']) and
                     'SCHEMA500_BODY_MARKER' not in json.dumps(initial) and
-                    'Find catalog records' in json.dumps(initial), 'MCP catalog entered native tool declarations')
+                    'Find catalog records' not in json.dumps(initial) and
+                    '<mcp_servers>' not in json.dumps(initial), 'MCP catalog entered model context or native tool declarations')
             searched = call(h, 'catalog-search', 'builtin__tool_search', {'query': 'lookup catalog record'})
             matches = json.loads(content(searched)['text'])
             require(len(matches['tools']) == 8 and matches['loaded'] == [], 'metadata discovery activated native tools')
@@ -354,19 +355,22 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             require(content(forged)['error']['code'] == 'NOT_FOUND' and forged['attempt_count'] == 0,
                     'direct MCP bypassed Code Mode')
             source = ("const found = await searchTools('lookup catalog record'); "
+                      "const namespace = await searchTools('namespacediscoverytoken'); "
                       "if (ALL_TOOLS.some(t => t.name === 'builtin__tool_search')) throw Error('hidden or model-only tool leaked'); "
-                      "return {found: found.length, count: ALL_TOOLS.filter(t=>t.name.startsWith('mcp__fixture__') && t.name !== 'mcp__fixture__echo').length, "
+                      "return {found: found.length, namespace: namespace.length, count: ALL_TOOLS.filter(t=>t.name.startsWith('mcp__fixture__') && t.name !== 'mcp__fixture__echo').length, "
                       "receipt: await tools.mcp__fixture__lookup_002({text:'Worker receipt'})};")
             call(h, 'catalog-worker', 'builtin__codemode_execute', {'source': source}, worker=True)
             value = h.state()
             wrapper = next(t for t in reversed(value['tools']) if t['tool_name'] == 'builtin__codemode_execute')
             require(wrapper['status'] == 'succeeded', 'Worker Code Mode failed: ' + str(wrapper))
             output = json.loads(content(wrapper)['text'])[-1]['value']
-            require(output['found'] == 8 and output['count'] == 500 and output['receipt'] == 'Worker receipt',
+            require(output['found'] == 8 and output['namespace'] == 8 and output['count'] == 500 and output['receipt'] == 'Worker receipt',
                     'Code Mode discovery or invocation differed: ' + str(output))
             workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
-            require(all('SCHEMA500_BODY_MARKER' not in g['request_json'] for g in value['generations'] if g['run_id'] in workers),
-                    'Worker received all MCP schemas through the model request')
+            require(all('SCHEMA500_BODY_MARKER' not in g['request_json'] and
+                        'Find catalog records' not in g['request_json'] and
+                        '<mcp_servers>' not in g['request_json'] for g in value['generations'] if g['run_id'] in workers),
+                    'Worker received MCP schemas or directory through the model request')
             return dict(name='500_tools_Code_Mode_only', initial_mcp_declarations=0,
                         matched_mcp_declarations=0, script_mcp_capabilities=output['count'], state=h.state())
         scenario('tool-loading', tool_loading)

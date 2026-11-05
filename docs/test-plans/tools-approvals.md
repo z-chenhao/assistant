@@ -86,6 +86,6 @@ CLI capabilities 的 `tool-loading` 场景在真实 stdio MCP 的 500 工具目�
 
 `TestProductionToolSurfaceUsesOnlyCodeMode` 调用实际生产 registry 组装，检查全部已注册 builtin 的调用约束，避免仅在测试里重建相同标记。Main 与 Worker 即使收到包含全部工具名的伪造 loaded checkpoint，也只能声明 Code Mode；缺少 JavaScript 运行时不得回退为原生工具。该测试随 `make test` 在每次代码 PR 中运行。
 
-真实 Main/Worker 组件场景验证模型只声明 Code Mode、Main 脚本能创建 Task、Worker 脚本只能看到自身冻结权限，以及伪造顶层普通工具调用在 schema 校验前被拒绝。真实 500 工具 stdio 场景检查无原生 MCP 声明、脚本搜索默认 8 条、全部 500 个允许工具可通过 Code Mode 发现且直接绕过失败。原生模型系统回归检查实际 HTTP tools 数组仅含 Code Mode，并从数据库独立核对被隐藏的角色权限仍存在。旧冻结面和加载 checkpoint 的回归用于证明恢复兼容，不代表新增暴露模式。
+真实 Main/Worker 组件场景验证模型只声明 Code Mode、Main 脚本能创建 Task、Worker 脚本只能看到自身冻结权限，以及伪造顶层普通工具调用在 schema 校验前被拒绝。真实 500 工具 stdio 场景检查无原生 MCP 声明、脚本搜索默认 8 条、服务描述可作为独立搜索入口、全部 500 个允许工具可通过 Code Mode 发现且直接绕过失败；Main 与 Worker 的实际请求均不含 MCP Server 目录或其描述。`TestAgentStartsWithOneFrozenSystemMessage` 与完整消息字节快照同时覆盖 Main、Root、Child 的无目录系统上下文。原生模型系统回归检查实际 HTTP tools 数组仅含 Code Mode，并从数据库独立核对被隐藏的角色权限仍存在。旧冻结面和加载 checkpoint 的回归用于证明恢复兼容，不代表新增暴露模式。
 
 PR 的 `Ubuntu checks` 显式运行 capabilities 的 `tool-loading` 与 `main-business` 两个场景，使用真实 MCP/QuickJS/SQLite 验证目录规模、具体动作审批与慢工具挂起期间的 Main 响应，并保留失败证据。完整回归仍覆盖相同场景；不需要真实模型账号。

@@ -214,7 +214,7 @@ state is authoritative, and Outbox notifications remain available to the relay.
 
 初始上下文统一由 [agent/context.go](../../internal/agent/context.go) 根据 Main/Root/Child 位置和冻结 Tool specs 生成。共享安全与证据原则、角色职责、执行状态、能力操作规则分区保存；项目指令按需读取，Skill 目录按需搜索；没有把个人助手改成 coding agent，也没有给 Main 增加 Child 创建能力。
 
-新 Main 在 Agent 内把 `main_role`、`safety`、`execution` 和可用的能力/资源索引拼成一条 system message。Host 保留有类型的分段快照，Provider 只映射完整文本；新请求不在 Bridge 中合并。
+新 Main 在 Agent 内把 `main_role`、`safety`、`execution` 和按冻结能力选择的指导拼成一条 system message。Host 保留有类型的分段快照，Provider 只映射完整文本；新请求不在 Bridge 中合并。
 
 Main 的原始 Conversation 仍保存用户语义历史。新 Main 额外交接最近 Main 的工作状态、获准读取的摘要原文和顶层工具回执；未知效果是独立 Host 事实。来源在 [sqlite/handoff.go](../../internal/agent/sqlite/handoff.go) 选择，接受 Forget 前的执行内容被排除。
 
@@ -228,4 +228,4 @@ Actor 与智能循环分工，Main、Root 和 Child 共用同一内核。上下�
 
 ## 单条系统上下文
 
-Main 的 role、Safety、执行规则与能力导航按固定顺序在 `agent.InitialContext` 内拼成一段文字，只产生一条 system message。MCP 服务导航按冻结能力追加到同一文本。Skill 不预载目录；Agent 通过 skill_list 搜索，再按名称使用 skill_view 读取。版本、来源与目录摘要留在 Host 冻结元数据中。Host 在消息的 `system_sections` 中保留分段快照供 Child 继承与审阅，Provider 投影不携带该字段。新 Bridge 不拼接多条 system；拆分输入明确拒绝。旧多段执行须在升级前结束或取消后创建新 Run，不重写历史消息或已接受请求。最终回复无需 JSON 围栏；UI 由 Main 专用工具与 Skill 产生。
+Main、Root Worker 与 Child Worker 统一按 role → safety → `<execution_rules>` → `<capability_guidance>` 的顺序在 `agent.InitialContext` 内拼成一段文字，只产生一条 system message。Root 的精简身份归入 role，阶段进度要求归入执行规则；Child 只继承 Parent 冻结的共享 Worker 角色与执行规则，不带 Root 身份或阶段进度要求。MCP 服务目录不预载到 system；Server 名称、描述与完整工具目录保留在角色冻结能力中，通过 Code Mode 按需检索。Skill 不预载目录；Agent 通过 skill_list 搜索，再按名称使用 skill_view 读取。版本、来源与目录摘要留在 Host 冻结元数据中。Host 在消息的 `system_sections` 中保留分段快照供 Child 继承与审阅，Provider 投影不携带该字段。新 Bridge 不拼接多条 system；拆分输入明确拒绝。旧多段执行须在升级前结束或取消后创建新 Run，不重写历史消息或已接受请求。最终回复无需 JSON 围栏；UI 由 Main 专用工具与 Skill 产生。

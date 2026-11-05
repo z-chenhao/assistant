@@ -47,7 +47,7 @@ flowchart TD
 
 新 Main 使用 `agent.MainTools` 的角色策略，持有 Task、Automation、Memory、Evidence、Artifact、OCR、Skill 和明确配置的 MCP 权限。Main 与 Worker 的新生产快照将普通工具标记为 `codemode_only`，模型只声明 `builtin__codemode_execute`；该标记是 Host 冻结调用约束，不是用户可选模式。Main 通过脚本执行聚焦操作，复杂工作仍创建 Task；每个实际外部写入继续经过具体动作审批。
 
-Main 和 Worker 均获得冻结 Skill 摘要，按需读取正文和资源；方法不能扩大工具权限。多步、耗时、批量、编码及浏览器/桌面工作由 Main 通过 `builtin__task_manage` 创建或接续 Task。`builtin__read/bash/edit/write` 及三个内部 Computer bridge 不进入新 Main 的冻结能力；Main 的 Code Mode 入口仅能调用 Main 自身的冻结目录。Root 从完整 Registry 独立派生执行能力，Child 再按父级冻结能力裁剪。`builtin__agent_run` 仍仅用于 Worker 内部拆分；`automation_observe` 仍仅用于相应监测 Root。
+Main 和 Worker 的 Skill 目录由 Host 冻结，Agent 通过 skill_list 按需搜索，再读取正文和资源；方法不能扩大工具权限。多步、耗时、批量、编码及浏览器/桌面工作由 Main 通过 `builtin__task_manage` 创建或接续 Task。`builtin__read/bash/edit/write` 及三个内部 Computer bridge 不进入新 Main 的冻结能力；Main 的 Code Mode 入口仅能调用 Main 自身的冻结目录。Root 从完整 Registry 独立派生执行能力，Child 再按父级冻结能力裁剪。`builtin__agent_run` 仍仅用于 Worker 内部拆分；`automation_observe` 仍仅用于相应监测 Root。
 
 未知 builtin、内部桥接及非业务权限的 MCP 注册不会向 Main 授权；MCP 以 Host 配置权限为准，Provider hints 不授予权限。隐藏工具的直接调用在参数校验前返回 `NOT_FOUND`，不启动 Provider、Sidecar、Computer 或审批；Main Code Mode 不因此取得 Worker 的 CUA、文件、命令或 Child 权限。所有实际执行继续使用同一 ToolExecutor、审批及恢复管线。
 
@@ -59,7 +59,7 @@ Steward 固定采用类似 Pi 1.5.0 `codemode.mode: "only"` 的模型工具面�
 
 MCP 配置只有进程、描述和 `tools` 权限允许列表；移除 `exposure`、`tool_exposure` 及别名。单工具不能通过配置绕过 Code Mode。完整授权目录保存在冻结能力里，`ProviderTools` 无条件排除 `codemode_only` 工具，即使 checkpoint 声称已经加载；顶层伪造普通工具调用也在参数校验、审批与派发前返回 `NOT_FOUND`。
 
-脚本通过 `ALL_TOOLS`、`searchTools`、`describeTool`、`describeNamespace` 发现并调用工具。搜索复用 BM25 排序，默认 8 条、最多 128 条，不激活任何原生模型声明。模型上下文仅保留简短路由摘要，500 个 MCP 工具的 Schema 不会全量进入请求。内建 `builtin__tool_search` 仅为旧冻结调用契约保留，新生产 Run 不向模型或脚本提供该工具，脚本使用 discovery helpers。
+脚本通过 `ALL_TOOLS`、`searchTools`、`describeTool`、`describeNamespace` 发现并调用工具。搜索复用 BM25 排序，默认 8 条、最多 128 条，不激活任何原生模型声明。system 不注入 MCP Server 名称、描述、调用入口或工具目录；服务名称和描述仍参与脚本搜索，500 个 MCP 工具的 Schema 不会全量进入请求。内建 `builtin__tool_search` 仅为旧冻结调用契约保留，新生产 Run 不向模型或脚本提供该工具，脚本使用 discovery helpers。
 
 `codemode_only` 是冻结约束；Registry 按历史快照恢复该字段。旧 `exposure` 与 `loaded_tools` 仍可读取以恢复旧 Run，不改写历史请求、审批或回执；这些兼容值不再是可选配置。没有 Code Mode 运行时的自定义生产配置不会回退到原生工具执行；标准安装自动配置运行时。显式测试 peer 可继续构造历史工具面，用于兼容性与底层执行器回归。
 

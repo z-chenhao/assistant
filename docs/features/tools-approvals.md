@@ -26,7 +26,7 @@
 
 ## 如何使用
 
-MCP 只配置 `tools` 权限允许列表，不再配置 `exposure` 或 `tool_exposure`。所有工具经 Code Mode 调用；使用 `searchTools` / `describeTool` 查找并读取所需参数，默认最多 8 个搜索结果，不会把目录 Schema 加入下一轮模型声明。删除旧配置中的模式字段后再加载；校验会拒绝过时字段，避免静默改变工具可见性。配置示例见[集成方案](../designs/integrations.md#mcp-工具暴露)。
+MCP 只配置 `tools` 权限允许列表，不再配置 `exposure` 或 `tool_exposure`。所有工具经 Code Mode 调用；system 不预载 MCP Server 目录，使用 `searchTools` 按工具或服务的名称、用途检索，再用 `describeTool` 读取所需参数，默认最多 8 个搜索结果，不会把目录 Schema 加入下一轮模型声明。删除旧配置中的模式字段后再加载；校验会拒绝过时字段，避免静默改变工具可见性。配置示例见[集成方案](../designs/integrations.md#mcp-工具暴露)。
 
 工具名使用 `builtin__task_search`、`builtin__artifact_manage` 这类完整 snake_case 名称；MCP 使用 `mcp__browser_use__click_button`，保留 server 与工具名内部的单下划线。旧名称不作别名，升级前需完成旧 Main 和未决外部效果核实；具体兼容边界见[命名规范与升级说明](../designs/tools-approvals.md#contract-61-工具命名规范)。
 

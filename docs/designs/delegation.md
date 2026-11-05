@@ -41,7 +41,7 @@ flowchart TD
 
 #### 3.8 Main、Root Worker 与 Child 的 Prompt 组装
 
-Prompt 使用可组合片段，不为三种 Run 维护三份彼此分叉的完整 System Prompt：
+Prompt 使用可组合片段，不为三种 Run 维护三份彼此分叉的完整 System Prompt。三者统一按 role → safety → `<execution_rules>` → `<capability_guidance>` 拼成一条 system message；Root 身份属于 role，阶段进度要求属于 execution。Child 继承 Parent 冻结的共享 Worker 角色、安全与执行规则，Host 保存的 Child 专用文本排除 Root 身份及进度要求：
 
 | Prompt 片段 | Main Run | Root Worker Run | Child Worker Run |
 |---|---:|---:|---:|

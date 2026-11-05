@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/prompt"
 	"github.com/z-chenhao/assistant/internal/skill"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
@@ -57,7 +58,11 @@ func TestSkillsUseSearchWithoutPromptCatalog(t *testing.T) {
 }
 
 func TestAgentStartsWithOneFrozenSystemMessage(t *testing.T) {
-	specs := []tool.Spec{{Name: "builtin__codemode_execute"}, {Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "frozen", Text: "[]"}}}}
+	specs := []tool.Spec{
+		{Name: "builtin__codemode_execute"},
+		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "frozen", Text: "[]"}}},
+		{Name: "mcp__catalog__lookup", Provider: "mcp:catalog", NamespaceDescription: "MCP_SERVER_DIRECTORY_MARKER", Exposure: tool.CodeMode, CodeModeOnly: true},
+	}
 	for _, position := range []string{"main", "root", "child"} {
 		t.Run(position, func(t *testing.T) {
 			messages := InitialContext(ContextOptions{Position: position, Tools: specs, Task: "Task"})
@@ -73,6 +78,27 @@ func TestAgentStartsWithOneFrozenSystemMessage(t *testing.T) {
 			if count != 1 {
 				t.Fatal("multiple system messages", count)
 			}
+			role := "worker_role"
+			if position == "main" {
+				role = "main_role"
+			}
+			sections := messages[0].SystemSections
+			want := []string{role, "safety", "execution", "capabilities"}
+			if len(sections) != len(want) {
+				t.Fatal("unexpected system sections", sections)
+			}
+			for i, kind := range want {
+				if sections[i].Kind != kind {
+					t.Fatal("system section order differs", position, i, sections[i].Kind, kind)
+				}
+			}
+			if position == "root" {
+				if !strings.Contains(sections[0].Text, prompt.Identity()) || !strings.Contains(sections[0].Text, prompt.Worker()) || !strings.Contains(sections[2].Text, prompt.Progress()) || !sections[2].Progress {
+					t.Fatal("Root identity or progress moved out of its section")
+				}
+			} else if sections[2].Progress || strings.Contains(sections[2].Text, prompt.Progress()) {
+				t.Fatal("Root-only progress leaked to another role")
+			}
 			if _, ok := FrozenSystemSections(messages); !ok {
 				t.Fatal("frozen sections are inconsistent")
 			}
@@ -81,8 +107,10 @@ func TestAgentStartsWithOneFrozenSystemMessage(t *testing.T) {
 				t.Fatal(err)
 			}
 			raw, _ := json.Marshal(wire)
-			if strings.Contains(string(raw), "system_sections") || strings.Contains(wire[0].Text, "steward-result") || strings.Contains(wire[0].Text, "response_format") {
-				t.Fatal("Host metadata or output protocol leaked", string(raw))
+			for _, marker := range []string{"system_sections", "child_text", `"progress":`, "steward-result", "response_format", "<mcp_servers>", "mcp__catalog__lookup", "MCP_SERVER_DIRECTORY_MARKER"} {
+				if strings.Contains(string(raw), marker) || strings.Contains(wire[0].Text, marker) {
+					t.Fatal("Host metadata, MCP directory or output protocol leaked", marker, string(raw))
+				}
 			}
 		})
 	}
