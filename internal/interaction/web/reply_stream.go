@@ -26,12 +26,10 @@ type replyPreview struct {
 	key        string
 	state      string
 	text       strings.Builder
-	pending    string
 	cut        bool
 }
 
 const previewLimit = 64 << 10
-const resultMarker = "```steward-result"
 
 func replyKey(generation string) string {
 	sum := sha256.Sum256([]byte(generation))
@@ -51,7 +49,7 @@ func (s *Server) ObserveReply(e agent.Event) {
 	case "message_start":
 		p.generation, p.key, p.state = e.GenerationID, replyKey(e.GenerationID), "draft"
 		p.text.Reset()
-		p.pending, p.cut = "", false
+		p.cut = false
 		p.revision++
 	case "message_update":
 		if p.state != "draft" || p.generation != e.GenerationID || !p.appendText(e.Text) {
@@ -64,14 +62,11 @@ func (s *Server) ObserveReply(e agent.Event) {
 		p.state = "discarded"
 		if e.Kind == "reply_committed" {
 			p.state = "committed"
-			// A partial marker at end of input is ordinary text.
-			if !p.cut && p.text.Len()+len(p.pending) <= previewLimit {
-				p.text.WriteString(p.pending)
-			}
+
 		} else {
 			p.text.Reset()
 		}
-		p.pending, p.cut = "", false
+		p.cut = false
 		p.revision++
 	default:
 		return
@@ -86,21 +81,7 @@ func (p *replyPreview) appendText(delta string) bool {
 	if delta == "" || p.cut {
 		return false
 	}
-	text := p.pending + delta
-	p.pending = ""
-	if at := strings.Index(text, resultMarker); at >= 0 {
-		// The final renderer owns rich result fences and form admission. A
-		// preview stops at the first possible fence, including split markers.
-		text, p.cut = text[:at], true
-	} else {
-		for n := min(len(text), len(resultMarker)-1); n > 0; n-- {
-			if strings.HasSuffix(text, resultMarker[:n]) {
-				p.pending = strings.Clone(text[len(text)-n:])
-				text = text[:len(text)-n]
-				break
-			}
-		}
-	}
+	text := delta
 	if remaining := previewLimit - p.text.Len(); len(text) > remaining {
 		for remaining > 0 && !utf8.RuneStart(text[remaining]) {
 			remaining--

@@ -11,11 +11,15 @@ import (
 	"github.com/z-chenhao/assistant/internal/app"
 	"github.com/z-chenhao/assistant/internal/automation"
 	computerfixture "github.com/z-chenhao/assistant/internal/computer/macosvm/fixture"
+	nativefixture "github.com/z-chenhao/assistant/internal/llm/bridge/fixture"
 	"github.com/z-chenhao/assistant/internal/llm/fake"
 	mcpfake "github.com/z-chenhao/assistant/internal/tool/mcp/fake"
 )
 
 func runTestPeer(ctx context.Context, args []string, in io.Reader, out io.Writer) (bool, error) {
+	if len(args) == 2 && args[0] == "-test-native-model-bridge" {
+		return true, nativefixture.Serve(ctx, in, out, args[1])
+	}
 	if len(args) == 2 && args[0] == "-test-computer-server" {
 		return true, computerfixture.Serve(ctx, args[1], out)
 	}

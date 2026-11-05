@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { request } from 'node:http';
 import { AccountAuth,accountCatalog,API } from '../account.mjs';
 import { startFixture } from './account-fixture.mjs';
+import { nativeFixture } from './native-fixture.mjs';
 
 async function fixture(t,options={}){
   const peer=await startFixture();const auth=new AccountAuth({fetch:peer.fetch,...options});
@@ -68,7 +69,7 @@ test('malformed catalog is a protocol error rather than authorization loss',asyn
   }
 });
 
-test('account Pi continuation replays the fixed steward namespace on the wire',{timeout:10000},async t=>{
+test('native Go account continuation replays the fixed steward namespace on the wire',{timeout:10000},async t=>{
   const f=await fixture(t);const credential=await f.complete(await f.start());
   const network=globalThis.fetch;
   let captured;
@@ -81,7 +82,7 @@ test('account Pi continuation replays the fixed steward namespace on the wire',{
     return f.peer.fetch(input,init);
   };
   try {
-    const {handle}=await import('../bridge.mjs');
+    const {handle}=await nativeFixture(t,globalThis.fetch);
     await handle({jsonrpc:'2.0',id:1,method:'bridge.initialize',params:{protocol_version:1}},()=>{});
     let id=1;
     const run=async(method,r)=>{

@@ -59,3 +59,37 @@ func TestEvidenceConversationNavigationRemainsMainOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestMainToolsAllowConfiguredBusinessAndExcludeWorkerExecution(t *testing.T) {
+	allowed := []tool.Spec{
+		{Name: "builtin__codemode_execute", Permission: "read_only"},
+		{Name: "builtin__task_manage", Permission: "task_control"},
+		{Name: "builtin__evidence_read", Permission: "read_only"},
+		{Name: "builtin__artifact_manage", Permission: "artifact_write"},
+		{Name: "builtin__skill_list", Permission: "read_only"},
+		{Name: "builtin__skill_view", Permission: "read_only"},
+		{Name: "mcp__calendar__lookup", Permission: "read_only"},
+		{Name: "mcp__calendar__create", Permission: "external_effect"},
+	}
+	specs := append([]tool.Spec{}, allowed...)
+	for _, name := range []string{
+		"builtin__read", "builtin__bash", "builtin__edit", "builtin__write",
+		"builtin__computer_discover", "builtin__computer_bind", "builtin__computer_invoke",
+		RunToolName, "builtin__automation_observe", "builtin__new_control",
+	} {
+		for _, permission := range []string{"read_only", "external_effect"} {
+			specs = append(specs, tool.Spec{Name: name, Permission: permission})
+		}
+	}
+	for _, permission := range []string{"task_control", "spawn_agents", "artifact_write", ""} {
+		specs = append(specs, tool.Spec{Name: "mcp__calendar__unexpected", Permission: permission})
+	}
+	specs = append(specs, tool.Spec{Name: "mcp__private__bridge", Permission: "read_only", Internal: true})
+	specs = append(specs, tool.Spec{Name: "builtin__memory_search", Permission: "read_only", Internal: true})
+	if got := MainTools(specs); !reflect.DeepEqual(got, allowed) {
+		t.Fatalf("Main business policy or Worker execution boundary changed: %+v", got)
+	}
+	if got := MainTools(nil); len(got) != 0 {
+		t.Fatal("Main introduced a capability", got)
+	}
+}

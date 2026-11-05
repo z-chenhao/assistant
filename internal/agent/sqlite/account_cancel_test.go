@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -61,11 +60,8 @@ func TestAccountCancellationAtFinalAcceptance(t *testing.T) {
 						}
 						return err
 					})
-					script, err := filepath.Abs("../../../provider-bridge/test/account-completion.mjs")
-					if err != nil {
-						t.Fatal(err)
-					}
-					client, err := bridge.OpenLocal(ctx, "node", script, m.Resolver(nil), observer)
+					command, script := nativeModelPeer(t)
+					client, err := bridge.OpenLocal(ctx, command, script, m.Resolver(nil), observer)
 					if err != nil {
 						t.Fatal(err)
 					}

@@ -818,13 +818,40 @@ func TestTaskAppendAfterCompactionBeforeGenerationAdmission(t *testing.T) {
 
 func TestOldMainCapabilitySnapshotSurvivesTaskRegistryUpgrade(t *testing.T) {
 	s, r, _, a, p := loopFixture(t)
-	receipt := mustSubmit(t, a, "old-main", "old frozen echo view")
+	old, _ := a.Registry.Resolve("builtin__artifact_search")
+	old.Spec.Name = "builtin__skill_view"
+	var err error
+	a.Registry, err = tool.NewRegistry([]tool.Definition{old})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.registry = a.Registry
+	freezeLegacyMain(t, r)
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role != "tool" {
+			for _, spec := range req.Tools {
+				if spec.Name == "builtin__skill_view" {
+					return calls(spec.Name, `{"text":"legacy Skill evidence"}`), nil
+				}
+			}
+		}
+		return llm.GenerationResult{Text: "done"}, nil
+	}
+	receipt := mustSubmit(t, a, "old-main", "old frozen Skill view")
 	// Models and old capability bytes remain unchanged as the Host gains new
 	// registered tools. New Run creation alone gets the larger role view.
-	a.Registry = taskFixtureRegistry(t)
+	definitions := []tool.Definition{old}
+	for _, spec := range taskFixtureRegistry(t).Describe() {
+		d, _ := taskFixtureRegistry(t).Resolve(spec.Name)
+		definitions = append(definitions, d)
+	}
+	a.Registry, err = tool.NewRegistry(definitions)
+	if err != nil {
+		t.Fatal(err)
+	}
 	r.registry = a.Registry
 	mustDrain(t, a)
-	if len(p.requests) == 0 || len(p.requests[0].Tools) != 1 || p.requests[0].Tools[0].Name != "mcp__fixture__echo" {
+	if len(p.requests) == 0 || len(p.requests[0].Tools) != 1 || p.requests[0].Tools[0].Name != "builtin__skill_view" {
 		t.Fatal("old Run changed tools")
 	}
 	mustSubmit(t, a, "new-main", "new available Task view")
@@ -836,7 +863,7 @@ func TestOldMainCapabilitySnapshotSurvivesTaskRegistryUpgrade(t *testing.T) {
 	if err := s.db.QueryRow(`SELECT max(json_array_length(tools_json)) FROM capability_snapshot`).Scan(&newCount); err != nil {
 		t.Fatal(err)
 	}
-	if oldCount != 1 || newCount != 3 {
+	if oldCount != 1 || newCount != 4 {
 		t.Fatal("capability freeze changed", oldCount, newCount)
 	}
 }

@@ -95,7 +95,7 @@ func (t *tools) executeCode(ctx context.Context, inv tool.Invocation) (result to
 	}
 	inner := []tool.Spec{}
 	for _, s := range b.req.Tools {
-		if s.Name != codemode.ToolName {
+		if s.Name != codemode.ToolName && s.ScriptCallable() {
 			inner = append(inner, s)
 		}
 	}
@@ -395,6 +395,13 @@ func (b *codeBridge) store(ctx context.Context, method, callKey string, raw json
 	return reply, err
 }
 func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
+	// Frozen trees without the search capability retain the previous discovery
+	// semantics during source replay. New Runs share Pi-style ranked discovery.
+	progressive := false
+	if b.registry != nil {
+		d, ok := b.registry.Resolve(tool.SearchName)
+		progressive = ok && d.Spec.Exposure == tool.ModelOnly
+	}
 	type description struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -433,16 +440,23 @@ func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
 			}
 		}
 		items := []description{}
+		namespaceDescription := ""
 		for _, s := range b.req.Tools {
 			if codemode.ComputerBridge(s.Name) {
 				continue
 			}
 			if codemode.NamespaceMatches(s.Name, name) {
 				items = append(items, description{s.Name, s.Description, ""})
+				if namespaceDescription == "" {
+					namespaceDescription = s.NamespaceDescription
+				}
 			}
 		}
 		if len(items) > 0 {
-			return codemode.Reply{Value: map[string]any{"name": name, "tools": items}}
+			if !progressive {
+				return codemode.Reply{Value: map[string]any{"name": name, "tools": items}}
+			}
+			return codemode.Reply{Value: map[string]any{"name": name, "description": namespaceDescription, "tools": items}}
 		}
 	case "searchTools":
 		var args []json.RawMessage
@@ -457,25 +471,43 @@ func (b *codeBridge) discover(m codemode.Message) codemode.Reply {
 			Limit     int    `json:"limit"`
 			Namespace string `json:"namespace"`
 		}{Limit: 20}
+		if progressive {
+			options.Limit = tool.DefaultSearchLimit
+		}
 		if len(args) > 1 && json.Unmarshal(args[1], &options) != nil {
 			return denied("INVALID_ARGUMENT")
 		}
-		if options.Limit < 1 || options.Limit > 100 {
+		maxLimit := 100
+		if progressive {
+			maxLimit = tool.MaxSearchLimit
+		}
+		if options.Limit < 1 || options.Limit > maxLimit {
 			return denied("INVALID_ARGUMENT")
 		}
-		items := []description{}
+		candidates := []tool.Spec{}
+		legacy := []description{}
 		for _, s := range b.req.Tools {
 			if codemode.ComputerBridge(s.Name) {
 				continue
 			}
-			if strings.Contains(strings.ToLower(s.Name+" "+s.Description), strings.ToLower(query)) && (options.Namespace == "" || codemode.NamespaceMatches(s.Name, options.Namespace)) {
-				items = append(items, description{s.Name, s.Description, ""})
-				if len(items) >= options.Limit {
-					break
+			if s.ScriptCallable() && (options.Namespace == "" || codemode.NamespaceMatches(s.Name, options.Namespace)) {
+				if !progressive {
+					if strings.Contains(strings.ToLower(s.Name+" "+s.Description), strings.ToLower(query)) {
+						legacy = append(legacy, description{s.Name, s.Description, ""})
+						if len(legacy) >= options.Limit {
+							break
+						}
+					}
+					continue
 				}
+				s.Exposure = tool.Deferred // Search scripts without changing declarations.
+				candidates = append(candidates, s)
 			}
 		}
-		return codemode.Reply{Value: items}
+		if !progressive {
+			return codemode.Reply{Value: legacy}
+		}
+		return codemode.Reply{Value: tool.SearchTools(candidates, nil, query, options.Limit).Tools}
 	}
 	return codemode.Reply{}
 }

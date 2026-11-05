@@ -1,0 +1,7 @@
+{
+  "title": "Explore a local calculation",
+  "fallback": "This illustrative calculator doubles the entered value. Start at 21 to obtain 42; replace the formula and assumptions for the actual question.",
+  "html": "<section data-intelligent-ui-widget><label>Input <input type=\"number\" data-input value=\"21\"></label><button data-compute>Calculate</button><output data-result aria-live=\"polite\">42</output><button data-reset>Reset</button><button data-discuss>Discuss these assumptions</button></section>",
+  "css": "section{display:grid;gap:12px}button,input{padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--muted);color:var(--foreground)}output{font-size:24px;font-weight:600;color:var(--brand)}",
+  "javascript": "const root=document.querySelector(\"[data-intelligent-ui-widget]\");const input=root.querySelector(\"[data-input]\"),output=root.querySelector(\"[data-result]\");root.querySelector(\"[data-compute]\").addEventListener(\"click\",()=>{const n=Number(input.value);output.textContent=input.value.trim()&&Number.isFinite(n)?String(n*2):\"Enter a finite number\"});root.querySelector(\"[data-reset]\").addEventListener(\"click\",()=>{input.value=\"21\";output.textContent=\"42\"});root.querySelector(\"[data-discuss]\").addEventListener(\"click\",()=>steward.sendPrompt({text:\"Discuss this calculation: input \"+input.value+\", output \"+output.textContent}));"
+}

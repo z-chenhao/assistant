@@ -33,7 +33,7 @@ func TestPublishedMetadataRoundTripsThroughCatalog(t *testing.T) {
 				if err = json.Unmarshal([]byte(defs[0].Execute(ctx, `{}`).Text), &summaries); err != nil || len(summaries) != 1 || summaries[0].Name != name || summaries[0].Description != description {
 					t.Fatal("metadata did not round-trip", summaries, err)
 				}
-				raw, _ := json.Marshal(map[string]string{"name": name, "version": summaries[0].Version})
+				raw, _ := json.Marshal(map[string]string{"name": name})
 				view := defs[1].Execute(ctx, string(raw))
 				if view.Error != nil || !strings.HasSuffix(view.Text, procedure+"\n") {
 					t.Fatal("body changed", view)

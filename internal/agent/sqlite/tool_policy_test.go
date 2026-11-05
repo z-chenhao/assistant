@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/tool"
 	toolfake "github.com/z-chenhao/assistant/internal/tool/fake"
@@ -23,6 +24,12 @@ import (
 // admitPolicy drives the persisted provider exchange and real ToolStore; it
 // deliberately leaves the loop at its Tool boundary for transition tests.
 func admitPolicy(t *testing.T, defs []tool.Definition, calls []llm.ToolCall) (*Store, *Runs, agent.RunClaim, tool.Executor, string) {
+	return admitPolicyRun(t, defs, calls, false)
+}
+func admitLegacyMainPolicy(t *testing.T, defs []tool.Definition, calls []llm.ToolCall) (*Store, *Runs, agent.RunClaim, tool.Executor, string) {
+	return admitPolicyRun(t, defs, calls, true)
+}
+func admitPolicyRun(t *testing.T, defs []tool.Definition, calls []llm.ToolCall, legacy bool) (*Store, *Runs, agent.RunClaim, tool.Executor, string) {
 	t.Helper()
 	ctx := context.Background()
 	s, r, _, a, p := loopFixture(t)
@@ -35,11 +42,14 @@ func admitPolicy(t *testing.T, defs []tool.Definition, calls []llm.ToolCall) (*S
 	p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{ToolCalls: calls}, nil
 	}
-	receipt, err := a.Submit(ctx, "policy", "do the requested work")
-	if err != nil {
-		t.Fatal(err)
+	var runID string
+	if legacy {
+		freezeLegacyMain(t, r)
+		runID = mustSubmit(t, a, "policy", "do the requested work").RunID
+	} else {
+		runID = admitToolRun(t, s, r, a, registry.Describe(), nil)
 	}
-	claim, err := r.Claim(ctx, receipt.RunID)
+	claim, err := r.Claim(ctx, runID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,6 +68,92 @@ func admitPolicy(t *testing.T, defs []tool.Definition, calls []llm.ToolCall) (*S
 		t.Fatal(err)
 	}
 	return s, r, claim, tool.Executor{Registry: registry, Store: r.ToolStore(claim), Concurrency: 16}, generation.Request.GenerationID
+}
+
+// Persist a pre-role-reduction Main before ingress. Recovery must honor its
+// original frozen tools; production creation always uses agent.MainTools.
+func freezeLegacyMain(t *testing.T, r *Runs) {
+	t.Helper()
+	ctx := context.Background()
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		var agentID, profile string
+		var config, version int64
+		if err := tx.QueryRowContext(ctx, `SELECT a.agent_id,a.active_model_profile_id,a.config_version,p.version FROM agent_config a JOIN model_profile p ON p.profile_id=a.active_model_profile_id WHERE a.singleton=1`).Scan(&agentID, &profile, &config, &version); err != nil {
+			return err
+		}
+		model, err := r.host.Models().FreezeProfile(ctx, tx, profile, version)
+		if err != nil {
+			return err
+		}
+		if err := r.freezeSpend(ctx, tx, model); err != nil {
+			return err
+		}
+		id, capID := newID(), newID()
+		specs := r.registry.Describe()
+		raw, _ := encoded(specs)
+		now := time.Now().UnixMicro()
+		if _, err := tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,'legacy',?,0,?,?,2)`, capID, config, digest(raw), agentID, raw, now); err != nil {
+			return err
+		}
+		cp, _ := encoded(agent.Checkpoint{ContextVersion: 2, Phase: "model", Messages: agent.InitialContext(agent.ContextOptions{Position: "main", Tools: specs})})
+		if _, err := tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,kind,status,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,'main','queued',?,?,?,(SELECT coalesce(max(sequence),0) FROM conversation_intent),?,?,1)`, id, agentID, agentID, capID, model.SnapshotID, cp, now, now); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO main_tool_protocol(run_id) VALUES(?); INSERT INTO run_claim VALUES(?,0,NULL,0,1)`, id, id); err != nil {
+			return err
+		}
+		if err := r.freezeContext(ctx, tx, id); err != nil {
+			return err
+		}
+		return runEvent(ctx, tx, id, "run_ready", 1)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Execution contracts run in a real task-scoped Root. Main-only contracts use
+// ordinary ingress. Neither path widens Main or edits a frozen capability.
+func admitToolRun(t *testing.T, s *Store, r *Runs, a agent.Actor, specs []tool.Spec, refs []string) string {
+	t.Helper()
+	ctx := context.Background()
+	if len(agent.MainTools(specs)) == len(specs) {
+		parts := conversation.Text("do the requested work")
+		for _, ref := range refs {
+			parts = append(parts, conversation.ContentPart{Type: "file", ArtifactRef: ref})
+		}
+		receipt, err := r.Submit(ctx, "policy", parts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return receipt.RunID
+	}
+	taskID := newID()
+	owner := artifactOwner(t, s)
+	raw, _ := encoded(refs)
+	if refs == nil {
+		raw = "[]"
+	}
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version) SELECT ?,?,agent_id,agent_id,'Tool execution','do the requested work',?,'active',1,1,1,1 FROM agent_config WHERE singleton=1`, taskID, "task:"+taskID, raw)
+		if err != nil {
+			return err
+		}
+		for _, ref := range refs {
+			if err := s.Artifacts().PinTx(ctx, tx, owner, ref, "task", taskID); err != nil {
+				return err
+			}
+		}
+		return r.createRoot(ctx, tx, taskID)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runID string
+	if err := s.db.QueryRow(`SELECT run_id FROM run WHERE task_id=?`, taskID).Scan(&runID); err != nil {
+		t.Fatal(err)
+	}
+	return runID
 }
 func effectDef(t *testing.T, policy string) tool.Definition {
 	return toolfake.Definition(t.TempDir(), policy, nil)

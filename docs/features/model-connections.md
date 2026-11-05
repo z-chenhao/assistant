@@ -112,7 +112,7 @@ replacement. Logout retains this non-secret mapping and history for later login.
 inference. `account-add` uses conservative text/token defaults when the catalog
 omits optional metadata. Existing Test/Select still require streaming, actual
 Tool Call/Result continuation, cancellation and clipping before activation.
-Requests use Pi's current `openai-responses` transport to the fixed public API,
+Requests use Steward's native Go `openai-responses` transport to the fixed public API,
 with `store=false`, `stream=true` and namespace-wrapped function tools. Unsupported
 sampling, reasoning and modalities stay disabled; `response.completed` is required.
 
@@ -156,7 +156,7 @@ creates no credential file. The account harness and Node/Go security cases are s
 observations, not tokens or authorization URLs.
 
 `go test ./internal/agent/sqlite -run TestAccountFinalAcceptance -v` drives the
-real Go → Node → Pi completion path, pauses before usage persistence, then mutates
+real Host → isolated Go bridge completion path, pauses before usage persistence, then mutates
 auth through a second Host/DB handle. It covers logout, reauthorization, auth loss,
 same-identity refresh and storage failure. Node contracts also capture the actual
 Tool continuation wire and require the fixed `steward` namespace on replay.
@@ -185,21 +185,31 @@ eligibility or real service availability.
 
 ### Connect a local model
 
-Install Node 24.21.0 and run `npm ci --prefix provider-bridge --ignore-scripts`.
-Add this explicit configuration, using the absolute repository path:
+Build Steward with `make build`. Default startup uses the binary's native Go
+model bridge. An explicit configuration can use the same private RPC:
 
 ```yaml
 version: 1
 llm:
-  provider_bridge_command: node
-  provider_bridge_script: /absolute/path/to/steward/provider-bridge/bridge.mjs
-  provider_bridge_version: pi-ai-1.3.0-v1
+  provider_bridge_command: /absolute/path/to/steward/bin/steward
+  provider_bridge_script: -model-bridge
+  provider_bridge_version: steward-go-v1
 ```
 
-`pi-ai-1.3.0-v1` remains the configuration identifier for the compatible Bridge
-protocol; it is not the currently installed Pi SDK version. Keep existing
-configuration unchanged. The SDK is pinned in `provider-bridge/package.json`,
-and wire observations identify that version separately.
+The implementation lives in `internal/llm/provider` and `internal/llm/bridge`.
+It is an internal part of Steward, with no standalone SDK module or publishing
+contract. It references Pi AI 1.5.0 protocols and catalog data; it does not load
+any Pi SDK. The previous `pi-ai-1.3.0-v1` external RPC configuration remains
+accepted; the bundled Node entry only forwards streams to the native binary.
+Wire observations use `steward-wire-v1/go-ai-v1`.
+
+The reference inventory includes 42 provider catalogs, ten chat protocols,
+four classifier protocols and one image protocol. Internal protocol fixtures
+exercise these encoders and decoders. This does not certify live services or
+complete feature parity. The product's current connection controls still expose
+OpenAI-compatible chat and public OpenAI account Responses. Additional provider
+login flows, cloud credential chains and product configuration controls remain
+to be integrated before claiming all providers are usable through Steward.
 
 Use an isolated `STEWARD_DATA_ROOT` while evaluating the CLI. The Bridge is optional;
 unconfigured startup still provides setup/diagnostics without a provider.
@@ -239,13 +249,12 @@ Privacy: model requests, conversation content, and Tool schemas go only to the
 configured endpoint. `localhost` resolves from the Go Host network namespace,
 not the Computer Guest. This notice is also printed before CLI activation.
 The Host retrieves only the referenced API key for each catalog/generation call
-and sends it in a private, transient connection RPC envelope. The Node process
+and sends it in a private, transient connection RPC envelope. The Go bridge process
 inherits PATH only, receives no domain DB paths or Tool/Computer handles, and
 keeps no credential file. This is a logical process boundary, not an OS sandbox.
 There is no provider fallback. All redirects are rejected, including same-origin
-redirects, so Authorization cannot be forwarded. The SDK constructor requires a
-nonempty key; a transport wrapper always deletes its placeholder Authorization
-and sends a Bearer header only when the user supplied an actual key.
+redirects, so Authorization cannot be forwarded. A Bearer header is sent only
+when the user supplied an actual key; no placeholder credential is created.
 
 The transport retries connection failures or HTTP 429/502/503/504 at most twice,
 with 50/100 ms delays, before a response stream is accepted. It does not retry
@@ -260,12 +269,11 @@ Overview distinguishes the three timeout phases. The Host Probe has its own
 contexts. Direct Cancel/Dispose RPCs have a five-second
 bound. The error body is discarded,
 except for an allowlisted machine code read from at most 8 KiB for HTTP 400/422
-context-length classification. SDK console sinks are disabled because malformed
-SSE parsing can otherwise print provider chunks. Raw response streams are limited
-to 4 MiB before SDK parsing, and normalized Tool Calls retain the Host bounds
-of 32 calls and 64 KiB of arguments. Pi argument parse errors and non-object
-arguments fail with INVALID_PROVIDER_RESPONSE before any Tool Call is forwarded.
-Pi raw parse diagnostics are never exposed. An explicit empty object remains valid.
+context-length classification. Raw response streams are limited to 4 MiB before
+protocol parsing; normalized Tool Calls retain the Host bounds of 32 calls and
+64 KiB of arguments. Malformed or non-object arguments fail with
+INVALID_PROVIDER_RESPONSE before any Tool Call is forwarded. Raw provider parse
+diagnostics are never exposed. An explicit empty object remains valid.
 Provider errors contain stable codes only; Host Probe errors add fixed stage
 labels and timeout durations without provider text.
 

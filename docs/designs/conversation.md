@@ -48,7 +48,7 @@ flowchart TD
 
 schema 32 增加私有 main_tool_protocol 记录，在创建新 Main 的事务中冻结 version=1；已有 Run 不回填。记录不可更新/删除，checkpoint 继续使用 context version 2；新字段记录交付关系，不序列化堆栈或工具进程。升级前备份，旧二进制因 schema 版本拒绝打开新库；旧 Run 和 Worker 继续使用原同步交付语义。模型工具名称、输入 schema 和 Task/Child 协议未变化。
 
-不暴露通用 job/session、跨 Worker 消息或独立取消 API；既有 Task 仍是耗时工作的显式委派边界。选择私有交付状态而非第二个 Main、自动升级 Task 或单纯提示词约束，保留用户输入顺序和可恢复调用身份。
+不暴露通用 job/session、跨 Worker 消息或独立取消 API；既有 Task 是全部业务执行的显式委派边界；新 Main 的固定工具面见[统一工具方案](tools-approvals.md)。选择私有交付状态而非第二个 Main、自动升级 Task 或单纯提示词约束，保留用户输入顺序和可恢复调用身份。
 
 ## 验证与交付
 
@@ -212,9 +212,9 @@ state is authoritative, and Outbox notifications remain available to the relay.
 
 ## Prompt 与工作状态装配
 
-初始上下文统一由 [agent/context.go](../../internal/agent/context.go) 根据 Main/Root/Child 位置和冻结 Tool specs 生成。共享安全与证据原则、角色职责、执行状态、能力操作规则及有来源的项目/Skill 资源分区保存；没有把个人助手改成 coding agent，也没有给 Main 增加 Child 创建能力。
+初始上下文统一由 [agent/context.go](../../internal/agent/context.go) 根据 Main/Root/Child 位置和冻结 Tool specs 生成。共享安全与证据原则、角色职责、执行状态、能力操作规则分区保存；项目指令按需读取，Skill 目录按需搜索；没有把个人助手改成 coding agent，也没有给 Main 增加 Child 创建能力。
 
-新 Main 依次保存 `main_role`、`safety`、`execution` 和可用的 `capabilities`。Bridge 保持该顺序，将各段合为一条系统消息。已冻结的请求按其原顺序回放。
+新 Main 在 Agent 内把 `main_role`、`safety`、`execution` 和可用的能力/资源索引拼成一条 system message。Host 保留有类型的分段快照，Provider 只映射完整文本；新请求不在 Bridge 中合并。
 
 Main 的原始 Conversation 仍保存用户语义历史。新 Main 额外交接最近 Main 的工作状态、获准读取的摘要原文和顶层工具回执；未知效果是独立 Host 事实。来源在 [sqlite/handoff.go](../../internal/agent/sqlite/handoff.go) 选择，接受 Forget 前的执行内容被排除。
 
@@ -225,3 +225,7 @@ Main 的原始 Conversation 仍保存用户语义历史。新 Main 额外交接�
 Actor 与智能循环分工，Main、Root 和 Child 共用同一内核。上下文摘要使用同一 Loop 内关闭工具的模型步骤，不建立另一条推理管线；旧 Run 保留冻结请求，新 checkpoint 使用 context version 2。摘要的真实语义质量需单独验证。
 
 持续响应保留唯一 Main 与统一 ToolExecutor，将慢调用的持久执行和结果交付分开。输入到来时可提交 pending 回执，最终结果以低权限运行时证据接续。私有 checkpoint 交付关系避免引入第二 Main 或隐式 Task；schema 32 只为新 Main 冻结协议，旧 Run 不升级，unknown 不重试。200 ms 同步窗口与 50 ms 扫描是默认政策，不是模型 SLA。
+
+## 单条系统上下文
+
+Main 的 role、Safety、执行规则与能力导航按固定顺序在 `agent.InitialContext` 内拼成一段文字，只产生一条 system message。MCP 服务导航按冻结能力追加到同一文本。Skill 不预载目录；Agent 通过 skill_list 搜索，再按名称使用 skill_view 读取。版本、来源与目录摘要留在 Host 冻结元数据中。Host 在消息的 `system_sections` 中保留分段快照供 Child 继承与审阅，Provider 投影不携带该字段。新 Bridge 不拼接多条 system；拆分输入明确拒绝。旧多段执行须在升级前结束或取消后创建新 Run，不重写历史消息或已接受请求。最终回复无需 JSON 围栏；UI 由 Main 专用工具与 Skill 产生。

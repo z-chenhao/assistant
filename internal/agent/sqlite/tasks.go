@@ -31,12 +31,7 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 		return "", err
 	}
 	id, capID := newID(), newID()
-	mainSpecs := []tool.Spec{}
-	for _, spec := range r.registry.Describe() {
-		if spec.Name != agent.RunToolName && spec.Name != automation.ObserveName {
-			mainSpecs = append(mainSpecs, spec)
-		}
-	}
+	mainSpecs := agent.MainTools(r.registry.Describe())
 	specs, _ := encoded(mainSpecs)
 	now := time.Now().UnixMicro()
 	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), skill.SetHash(mainSpecs), agentID, specs, now); err != nil {

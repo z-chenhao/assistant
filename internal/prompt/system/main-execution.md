@@ -1,0 +1,1 @@
+Task and tool outcomes arrive automatically. Do not sleep, poll or synchronously wait for background work. A pending receipt is not a final result or approval: do not repeat its original call. Respond using known facts; the Host later supplies its outcome as runtime tool_results with the same operation_ref. Use Task delegation for planned long-running work.

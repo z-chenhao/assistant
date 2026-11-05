@@ -58,8 +58,8 @@ type Client struct {
 	closeDone        chan struct{}
 	disposedSessions map[string]bool
 	next             atomic.Uint64
-	resolver         Resolver
-	observer         Observer
+	resolver         llm.ConnectionResolver
+	observer         llm.GenerationObserver
 	dispatchObserver func(llm.GenerationRequest, llm.Dispatch)
 }
 
@@ -439,7 +439,7 @@ func (c *Client) Continue(ctx context.Context, r llm.GenerationRequest, sink fun
 func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRequest, sink func(llm.GenerationEvent)) (result llm.GenerationResult, err error) {
 	started := time.Now()
 	r.Finalize = nil // only this registration may install the Host commit gate
-	var connection Connection
+	var connection llm.Connection
 	var completed *llm.GenerationEvent
 	var stream *eventStream
 	var retire func()
@@ -487,7 +487,7 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		connection = resolved
 		params = struct {
 			llm.GenerationRequest
-			Connection Connection              `json:"connection"`
+			Connection llm.Connection          `json:"connection"`
 			Images     map[string]imagePayload `json:"images,omitempty"`
 			Observe    bool                    `json:"observe,omitempty"`
 		}{r, connection, images, observe}

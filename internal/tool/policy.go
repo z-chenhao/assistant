@@ -42,7 +42,7 @@ func (s Spec) Policy() Policy {
 	if p.Replay == "" {
 		p.Replay = "never"
 	}
-	if s.Permission == "read_only" || s.Permission == "task_control" || s.Permission == "artifact_write" {
+	if s.Permission == "read_only" || s.Permission == "task_control" || s.Permission == "artifact_write" || s.Permission == "ui_present" {
 		if p.Risk == "" {
 			p.Risk = "low"
 		}

@@ -406,7 +406,7 @@ try{
    if(await draftText.textContent()!==first+'\n'+second+'\nFinal tail.\n'||await committed.count())throw Error('commit lost or repeated text before the final projection');
   }finally{resumeProjection()}
   await page.unroute('**/api/updates?**');
-  await committed.getByRole('table').getByText('Done',{exact:true}).waitFor();
+  await committed.filter({hasText:'Final tail.'}).waitFor();
   await draft.waitFor({state:'hidden'});
   if(await committed.count()!==1||!await editorNode.evaluate(node=>node===document.activeElement&&node.value==='Keep typing while Ghost writes.'&&node.selectionStart===5&&node.selectionEnd===11))throw Error('commit duplicated reply or disturbed the draft editor');
   if(await page.getByLabel('Attach a file').evaluate(node=>node.files[0]?.name)!=='stream-kept.txt')throw Error('streaming lost the attachment');
@@ -506,8 +506,11 @@ try{
   const frozen=await approval.locator('input[name="hash"]').inputValue();
   const progress=await context.newPage();
   try{
-   await progress.goto(url+'/tasks?view=all');await progress.locator('[data-live-key^="task:"]').waitFor();
-   const tasks=await (await context.request.get(url+'/api/progress')).json();const ref=tasks[0].taskRef;
+   await progress.goto(url+'/tasks?view=all');
+   const tasks=await (await context.request.get(url+'/api/progress')).json();
+   const matches=tasks.filter(item=>item.title.startsWith('Compare release options,'));
+   if(matches.length!==1)throw Error('expected the exact ongoing approval Task');
+   const ref=matches[0].taskRef;
    const ongoing=progress.locator('[data-live-key="task:'+ref+'"]');
    await ongoing.filter({hasText:'Waiting for your approval'}).waitFor();
    const detail=await context.newPage();
@@ -619,6 +622,44 @@ try{
   await page.screenshot({path:evidence+'/schedule-mobile.png',fullPage:true});
   await page.setViewportSize({width:1400,height:980});
   await page.goto(url);
+ }
+
+ if(phase==='intelligent-ui'){
+  await page.getByRole('columnheader',{name:'Option',exact:true}).waitFor();
+  if(await page.locator('.message .intelligent-widget').count()!==2)throw Error('custom UI widgets missing');
+  const widget=page.frameLocator('iframe[title="Calculator"]');
+  await widget.locator('#security').getByText('blocked:2',{exact:true}).waitFor();
+  await widget.locator('#n').fill('25');await widget.getByRole('button',{name:'Compute',exact:true}).click();
+  await widget.locator('#answer').getByText('50',{exact:true}).waitFor();
+  await page.evaluate(()=>document.documentElement.classList.add('dark'));
+  await widget.locator('html[data-widget-theme="dark"]').waitFor();
+  const calculator=page.locator('.intelligent-widget').filter({has:page.locator('iframe[title="Calculator"]')});
+  await calculator.getByRole('button',{name:'Expand',exact:true}).click();
+  await page.locator('.widget-expanded').waitFor();await calculator.getByRole('button',{name:'Close expanded view'}).click();
+  await page.getByText('The interactive view is unavailable. The text version is preserved.').waitFor();
+  const before=await page.locator('.message.user').count();
+  await widget.getByRole('button',{name:'Discuss this result'}).click();
+  await calculator.getByRole('textbox',{name:'Message to Ghost'}).waitFor();
+  if(await page.locator('.message.user').count()!==before)throw Error('widget auto-sent a message');
+  if(await calculator.getByRole('textbox',{name:'Message to Ghost'}).inputValue()!=='Discuss the computed result: 50')throw Error('selected state missing from follow-up');
+  let lost=false;const sources=[];
+  await page.route('**/api/message',async route=>{
+   const input=route.request().postDataJSON();
+   if(input.source_id?.startsWith('ui-widget:')){sources.push(input.source_id);if(!lost){lost=true;await route.fetch();await route.abort('failed');return}}
+   await route.continue();
+  });
+  await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).click();
+  await calculator.getByRole('alert').waitFor();
+  await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).click();
+  await calculator.getByRole('textbox',{name:'Message to Ghost'}).waitFor({state:'detached'});
+  if(sources.length!==2||sources[0]!==sources[1])throw Error('Widget retry changed its source identity');
+  await page.unroute('**/api/message');
+  await page.getByText('Discuss the computed result: 50',{exact:true}).waitFor();
+  await page.reload();await page.frameLocator('iframe[title="Calculator"]').locator('#answer').waitFor();
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:evidence+'/intelligent-ui-mobile.png',fullPage:true});
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2))throw Error('widget overflowed mobile viewport');
+  await page.setViewportSize({width:1400,height:980});
+  const plain=await browser.newContext({javaScriptEnabled:false});try{await plain.addCookies(await context.cookies());const text=await plain.newPage();await text.goto(url);if(!await text.getByText('The calculator doubles its input. No network or Host access.',{exact:true}).count())throw Error('no-script text alternative missing')}finally{await plain.close()}
  }
  if(phase==='rich-replies'){
   await page.locator('[data-renderer="native"] .answer-table').waitFor();

@@ -38,13 +38,18 @@ func TestDoctorReportsMissingInstallationWithoutCreatingState(t *testing.T) {
 	if err := os.WriteFile(command, []byte("#!/bin/sh\nprintf 'v24.21.0\\n'\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	cfg.LLM.ProviderBridgeCommand, cfg.JavaScript.Command = command, command
+	cfg.JavaScript.Command = command
 	var out bytes.Buffer
-	if err := doctor(context.Background(), cfg, &out); err == nil || !strings.Contains(out.String(), "FAIL model bridge: installed source") {
+	if err := doctor(context.Background(), cfg, &out); err == nil || !strings.Contains(out.String(), "FAIL model bridge: native Go protocol") {
 		t.Fatal("doctor accepted missing installation", out.String(), err)
 	}
-	for _, path := range []string{cfg.LLM.ProviderBridgeScript, cfg.JavaScript.Script,
-		filepath.Join(home, "provider-bridge/node_modules/@earendil-works/pi-ai/package.json"),
+	if err := os.MkdirAll(filepath.Dir(cfg.LLM.ProviderBridgeCommand), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg.LLM.ProviderBridgeCommand, []byte("#!/bin/sh\nprintf 'steward-go-v1\\n'\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{cfg.JavaScript.Script,
 		filepath.Join(home, "runtime/javascript/node_modules/quickjs-wasi/package.json")} {
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatal(err)
@@ -59,7 +64,7 @@ func TestDoctorReportsMissingInstallationWithoutCreatingState(t *testing.T) {
 	}
 	// A configured deployment keeps its own trusted runtime paths.
 	configureRuntime(&cfg, "/different-install")
-	if cfg.LLM.ProviderBridgeCommand != command || cfg.JavaScript.Command != command {
+	if cfg.LLM.ProviderBridgeCommand != filepath.Join(home, "bin", "steward") || cfg.JavaScript.Command != command {
 		t.Fatal("startup replaced configured runtime")
 	}
 }

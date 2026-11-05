@@ -40,7 +40,9 @@ func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	endpoint := server.URL + "/v1"
-	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (Connection, error) { return Connection{Endpoint: endpoint}, nil }, nil)
+	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (llm.Connection, error) {
+		return llm.Connection{Endpoint: endpoint}, nil
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +68,7 @@ func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
 	if err != llm.ProviderUnavailable || result.Text != "" {
 		t.Fatal("partial crash published completion", result, err)
 	}
-	models, err := client.CatalogAt(ctx, Connection{Endpoint: endpoint})
+	models, err := client.CatalogAt(ctx, llm.Connection{Endpoint: endpoint})
 	if err != nil || len(models) != 1 || models[0].ModelID != "fixture-model" {
 		t.Fatal("same Bridge restart", models, err)
 	}
@@ -91,7 +93,9 @@ func TestActualPiDisposeSettlesMatchingGenerateAndContinue(t *testing.T) {
 	defer server.Close()
 	script, _ := filepath.Abs("../../../provider-bridge/bridge.mjs")
 	endpoint := server.URL + "/v1"
-	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (Connection, error) { return Connection{Endpoint: endpoint}, nil }, nil)
+	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (llm.Connection, error) {
+		return llm.Connection{Endpoint: endpoint}, nil
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

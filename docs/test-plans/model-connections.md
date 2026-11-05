@@ -43,10 +43,10 @@
 `make test` runs Go tests and Node contracts against an owned HTTP endpoint through
 actual subprocesses. the system runner drives the CLI, reads SQLite independently,
 and writes `evidence/local-provider.json` and `evidence/pi-bridge.tap`. The harness
-owns launch (ephemeral HTTP port and data root), doctor (binary, Node, installed Pi),
+owns launch (ephemeral HTTP port and data root), doctor (binary, native model bridge, installed QuickJS),
 drive (discover/add/test/select/status, keyed/manual/failure variants), evidence
 (usage, failures, snapshot IDs), and cleanup (reap children, close endpoint, delete
-state). Go's actual Pi crash test kills the exact Node child after a text delta,
+state). Go's native bridge crash test kills the exact bridge child after a text delta,
 rejects partial output, restarts the same Bridge, and reads the catalog back.
 Security/cancellation contracts use the current Go/Node and system regression entry points.
 
@@ -74,7 +74,7 @@ python3 tests/system/verify_account.py --binary bin/steward --native-secret-serv
 该入口自行创建私有 D-Bus 和临时 XDG 数据/运行目录，启动带合成密码的前台 GNOME Keyring，移除桌面显示环境；不连接、锁定或删除用户当前会话的钥匙串。`secret-tool` 只用于独立检查和测试过期时间控制，不是生产 SecretStore 依赖。临时密码和 OAuth 合成凭据只经 stdin/内存传输，结束后回收进程和私有文件。CI 通过既有可取消的 entrypoint/process_step 执行并保留同一证据格式。
 
 - 原生组件：二进制值跨进程读回、替换、删除及重复删除；无效输入、取消和不可用会话失败关闭；暂停私有钥匙串进程使请求在途等待，确认读操作按期限取消并可恢复；锁定后读、写、删除均有界失败且不暴露诊断；重启钥匙串并用原密码解锁后原值仍在。
-- 账户入口：真实 CLI → Go Manager → Node/Pi → 受控 OAuth/Responses peer，经生产原生 SecretStore 登录、验证/选择、Main 对话和重启；并发刷新只旋转一次，401 失效、跨进程退出、SIGKILL 后清理和原账户重新认证保持既有语义。
+- 账户入口：真实 CLI → Go Manager → isolated Go Bridge → 受控 OAuth/Responses peer，经生产原生 SecretStore 登录、验证/选择、Main 对话和重启；并发刷新只旋转一次，401 失效、跨进程退出、SIGKILL 后清理和原账户重新认证保持既有语义。
 - 隔离/泄漏：不同账户分别保存；access/refresh/ID token 不进入 SQLite/WAL、日志、普通 CLI 输出或 trace。Web 异步存储失败给出中英文修复提示，重试不保留上次无关错误，也不展示原生诊断。
 
 此证据证明软件与原生存储链路；不证明真实 OpenAI 账户授权、供应商可用性或 macOS 当前机器的 Keychain 访问。Linux 禁用 cgo、不支持平台、缺库和无会话的部署不提供原生凭据写入；环境 API Key 不算 OAuth 写入回退。
@@ -85,4 +85,24 @@ python3 tests/system/verify_account.py --binary bin/steward --native-secret-serv
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
 
-Node Bridge 的 `independent generation deadlines abort the right phase` 回归并行覆盖 30 秒无响应头、HTTP 200 或 HTTP 400 后 90 秒无响应数据、持续流动到 180 秒总上限，以及收到 HTTP 200 后静默 32 秒仍能完成。检查对应的诊断阶段、错误或完成结果。Go Loop 回归验证实际派发的 context 为 Bridge 总预算和清理留足时间。
+Native Go Bridge 的 `independent generation deadlines abort the right phase` 回归并行覆盖 30 秒无响应头、HTTP 200 或 HTTP 400 后 90 秒无响应数据、持续流动到 180 秒总上限，以及收到 HTTP 200 后静默 32 秒仍能完成。检查对应的诊断阶段、错误或完成结果。Go Loop 回归验证实际派发的 context 为 Bridge 总预算和清理留足时间。
+
+### Internal Go protocol reference coverage
+
+`TestModelDependencyBoundaries` 保护 Go 模型实现的依赖方向，随 `make test` 在 PR 中运行；具体规则见[工程回归](engineering.md#工程基础重构回归)。
+
+`go test ./internal/llm/provider` covers all ten chat wire families with an owned HTTP
+peer, streaming tool arguments, usage and terminal handling; four classifier
+protocols (including llama.cpp logit readout escalation), OpenRouter images,
+Responses fetch/cancel, AWS EventStream CRC checks and provider credential names.
+WebSocket checks cover a real HTTP Upgrade, masked client frames, cached input
+continuation, cancellation and SSE fallback before output. Catalog tests check
+42 providers separately from protocol execution. None of these fixtures proves
+live service availability, cloud credential discovery or unimplemented provider
+login flows. Product tests continue to cover the two current connection paths.
+
+`provider-bridge/test/native-account.test.mjs` drives the real Go subprocess against
+the owned OAuth peer, including PKCE, JWT rejection, refresh rotation, revocation
+and identity binding. The Go Host final-acceptance tests use that native model
+bridge protocol; account configuration fixtures explicitly select a loopback
+transport and do not change production endpoints.

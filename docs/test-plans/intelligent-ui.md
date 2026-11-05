@@ -12,14 +12,14 @@
 
 | 需求 | 需要验证的可观察行为 | 当前重点 |
 | --- | --- | --- |
-| [F-021](../features/intelligent-ui.md#f-021) | 普通 Main 回复经 Bridge/Delivery 生成表格、进度与表单；用户消息不变成组件，单元格文字转义。 | `verify_channels.py --rich-replies-only` 不注入投影或历史行 |
+| [F-021](../features/intelligent-ui.md#f-021) | Main 读取 Skill 后经 Code Mode/UI 工具/Delivery 生成表格、进度与表单；用户消息不变成组件，单元格文字转义。 | `verify_channels.py --rich-replies-only` 不注入投影或历史行 |
 | F-021 | 相同表单并发重试与重启只接纳一次，修改已接受回答、跨消息表单与额外字段被拒绝；回答不创建审批。 | 同一系统场景读回真实输入、回执和冻结投影 |
 | F-021 | 无 JavaScript 原生提交、多行回答跨提交方式重试去重；Unicode 字节上限、失败发送保留答案、失去回执后恢复已保存状态、其他表单草稿与普通输入框不丢失。 | Chromium `rich-replies` 阶段，同时保留桌面/移动端截图 |
-| F-021 | 未知版本/组件、越界表格、重复字段、伪造审批/Artifact/Host 身份均降级；授权、CSRF 与字段集合验证保持原边界。 | UI、HTTP 与真实 SQLite 组件回归 |
+| F-021 | 工具拒绝越界或伪造字段，未知投影与渲染失败保留文字替代；授权、CSRF 与字段集合验证保持原边界。 | UI、HTTP 与真实 SQLite 组件回归 |
 
 ## 层级与关键路径
 
-必须通过正常回复生成端到端组件，不能直接往数据库注入 UISpec 冒充生成链。普通文字请求经显式脚本 Provider 的真实工具续轮生成结构化最终回复，再从 Web 交互和 SQLite 读回证明接纳与恢复。脚本 Provider 仅证明软件协议，不证明真实模型会选择合适组件或理解表格内容。
+必须通过正常回复生成端到端组件，不能直接往数据库注入 UISpec 冒充生成链。普通文字请求经显式脚本 Provider 的真实工具续轮提交展示产物，再从 Web 交互和 SQLite 读回证明接纳与恢复。脚本 Provider 仅证明软件协议，不证明真实模型会选择合适组件或理解表格内容。
 
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
@@ -45,6 +45,16 @@ go test -race ./internal/agent/sqlite -run 'TestChannelSourceContent|TestChannel
 python3 tests/system/verify_channels.py --binary bin/steward --rich-replies-only --evidence evidence/my-rich-reply/report.json
 make test lint
 make test-e2e E2E_EVIDENCE=evidence/my-core-run
+```
+
+## 生成式 Widget 与单条 Prompt
+
+`verify_intelligent_ui.py` 使用实际 Go 模型 HTTP peer、Actor、QuickJS、内建 Skill、持久 UI 工具和真实 Chromium。检查原生表格、计算器、主题、展开、移动端、无脚本替代和异常降级；父 DOM、存储与 fetch 被阻止；Widget 提问必须通过 Host 按钮发送，重启不重复生成。该场景不注入投影或 Conversation 行。
+
+`TestMainUIWidgetUsesCodeModeAndDurableReply` 验证 Main 权限、Worker 排除、真实嵌套调用与持久绑定。`TestAgentStartsWithOneFrozenSystemMessage` 验证 Agent 内已经是一条 system，分段元数据不进入模型；拆分消息明确拒绝。工具 Schema 和原生表单校验继续由 Go 测试覆盖。
+
+```sh
+python3 tests/system/verify_intelligent_ui.py --binary bin/steward --evidence evidence/my-intelligent-ui/report.json
 ```
 
 ## 执行与完成判定

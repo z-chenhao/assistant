@@ -1,1 +1,1 @@
-Artifacts: use scoped read/search to reopen evidence and large results. Preserve references needed for continuation; publish selects final output.
+Artifacts: reopen scoped evidence and large results when inspection or continuation needs them.

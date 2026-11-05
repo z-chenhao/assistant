@@ -4,7 +4,7 @@
 
 ## 功能说明
 
-Agent 默认能够在专属隔离环境里读取、新建、精确修改文件，运行命令、验证工作并生成可审查的 Artifact。四工具属于文件/执行层，Task、Memory、Artifact 等项目能力继续保留。
+Worker 默认能够在专属隔离环境里读取、新建、精确修改文件，运行命令、验证工作并生成可审查的 Artifact。Main 将文件和命令工作委派给 Task，通过证据与 Artifact 核对结果并交付。
 
 ## 需求与验收
 
@@ -14,9 +14,9 @@ Agent 默认能够在专属隔离环境里读取、新建、精确修改文件�
 
 **需求**：用户能委派仓库理解、修改和验证，每项代码任务保留明确工作目录、修改集、真实验证证据与远端交付关联，结果可供审查。
 
-**当前实现**：默认 `builtin__read/bash/edit/write` 支持新建文件、连续修改脏文件、精确内容哈希校验、通用命令、限量输出和文件 Artifact。Main/Worker 共用统一审批与重放；配置 Computer 时与桌面浏览器共用 Guest。
+**当前实现**：Worker 的默认 `builtin__read/bash/edit/write` 支持新建文件、连续修改脏文件、精确内容哈希校验、通用命令、限量输出和文件 Artifact。新 Main 不获得这四个工具；Worker 继续使用统一审批与重放，配置 Computer 时与桌面浏览器共用 Guest。
 
-**本地代码任务**：安装所有者设置 `execution.repository_source` 指向适合交给 Agent 的实际本地仓库，配合原有私有 `execution.root` 使用原生离线执行。Task 首次准备时保存独立工作副本和冻结导入基线，包含源目录的未提交和未跟踪文件。准备不会打开 Git 元数据，源目录保留原样。Root 和 Child 使用该 Task 的工作副本，普通 Main 继续使用 `execution.root`。显式更改源或执行配置不会重绑旧 Run。
+**本地代码任务**：安装所有者设置 `execution.repository_source` 指向适合交给 Agent 的实际本地仓库，配合原有私有 `execution.root` 使用原生离线执行。Task 首次准备时保存独立工作副本和冻结导入基线，包含源目录的未提交和未跟踪文件。准备不会打开 Git 元数据，源目录保留原样。Root 和 Child 使用该 Task 的工作副本；Main 通过 Task 与 Artifact 查看结果，不直接进入工作区。显式更改源或执行配置不会重绑旧 Run。
 
 使用 `steward coding inspect TASK_REF` 查看状态和历史命令回执，`steward coding diff TASK_REF` 查看相对导入基线的文件变化与文本补丁，`steward coding report TASK_REF` 将快照保存为关联原 Task 的 Artifact。报告中的命令时间、尝试次数和结果来自实际已接受调用。检查命令退出码和超时字段，命令历史不代表验证了当前文件快照。若 diff 输出含无效 UTF-8，报告会标明补丁不可用，并保留文件变化和原字节摘要。
 
@@ -28,7 +28,7 @@ Agent 默认能够在专属隔离环境里读取、新建、精确修改文件�
 
 ## 如何使用
 
-四工具默认存在。默认目录是数据目录旁的 `<app.data_root>.computer`，首次调用创建；自定义只需设置执行范围：
+四工具默认向 Worker 提供。默认目录是数据目录旁的 `<app.data_root>.computer`，首次调用创建；自定义只需设置执行范围：
 
 ```yaml
 execution:

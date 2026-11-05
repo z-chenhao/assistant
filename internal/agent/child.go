@@ -34,11 +34,41 @@ func ParseAgentRun(args string) (AgentRunRequest, error) {
 	return req, nil
 }
 
+// MainTools exposes control, evidence, Skills and configured business MCP tools.
+// Native workspace and Computer execution remain Worker capabilities.
+// Main Code Mode can call only its own frozen control and business capabilities.
+// MCP permissions come from Host configuration; provider hints grant no access.
+// Root Workers derive their capabilities independently from the full registry.
+func MainTools(specs []tool.Spec) []tool.Spec {
+	out := []tool.Spec{}
+	for _, s := range specs {
+		if s.Internal || s.Exposure == tool.Hidden {
+			continue
+		}
+		if strings.HasPrefix(s.Name, "mcp__") && (s.Permission == "read_only" || s.Permission == "external_effect") {
+			out = append(out, s)
+			continue
+		}
+		switch s.Name {
+		case "builtin__intelligent_ui_show", "builtin__codemode_execute", tool.SearchName, "builtin__task_search", "builtin__task_manage",
+			"builtin__automation_manage", "builtin__memory_manage",
+			"builtin__memory_search", "builtin__evidence_read",
+			"builtin__artifact_search", "builtin__artifact_manage",
+			"builtin__skill_list", "builtin__skill_view", "builtin__image_ocr":
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // WorkerTools is the fixed role reduction. New control permissions fail closed.
 // This derives from frozen specs, never from the live registry or Task input.
 func WorkerTools(specs []tool.Spec) []tool.Spec {
 	out := []tool.Spec{}
 	for _, s := range specs {
+		if s.Exposure == tool.Hidden {
+			continue
+		}
 		if strings.HasPrefix(s.Name, "builtin__task_") || s.Name == "builtin__evidence_read" {
 			continue
 		}

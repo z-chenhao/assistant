@@ -43,6 +43,26 @@ flowchart TD
 
 ### 6. Tooling 与 JavaScript Code Mode
 
+#### Main 与 Worker 工具边界
+
+新 Main 使用 `agent.MainTools` 的角色策略，持有 Task、Automation、Memory、Evidence、Artifact、OCR、Skill 和明确配置的 MCP 权限。Main 与 Worker 的新生产快照将普通工具标记为 `codemode_only`，模型只声明 `builtin__codemode_execute`；该标记是 Host 冻结调用约束，不是用户可选模式。Main 通过脚本执行聚焦操作，复杂工作仍创建 Task；每个实际外部写入继续经过具体动作审批。
+
+Main 和 Worker 均获得冻结 Skill 摘要，按需读取正文和资源；方法不能扩大工具权限。多步、耗时、批量、编码及浏览器/桌面工作由 Main 通过 `builtin__task_manage` 创建或接续 Task。`builtin__read/bash/edit/write` 及三个内部 Computer bridge 不进入新 Main 的冻结能力；Main 的 Code Mode 入口仅能调用 Main 自身的冻结目录。Root 从完整 Registry 独立派生执行能力，Child 再按父级冻结能力裁剪。`builtin__agent_run` 仍仅用于 Worker 内部拆分；`automation_observe` 仍仅用于相应监测 Root。
+
+未知 builtin、内部桥接及非业务权限的 MCP 注册不会向 Main 授权；MCP 以 Host 配置权限为准，Provider hints 不授予权限。隐藏工具的直接调用在参数校验前返回 `NOT_FOUND`，不启动 Provider、Sidecar、Computer 或审批；Main Code Mode 不因此取得 Worker 的 CUA、文件、命令或 Child 权限。所有实际执行继续使用同一 ToolExecutor、审批及恢复管线。
+
+角色裁剪只发生在新 Run 创建时，不重写旧 Capability Snapshot、模型请求、参数或回执。旧 Main 保持原工具面；需要新策略时开启新 Main。升级本身不扩展或撤销已冻结的权限，也不重新派发原动作。历史渐进发现的 `builtin__tool_search` 和可选 checkpoint 加载状态继续支持旧 Run 恢复；新 Run 使用脚本发现，不加载普通工具的模型声明。旧工具 Schema、模型请求和已接受回执不改写。
+
+#### MCP 渐进暴露与动态声明
+
+Steward 固定采用类似 Pi 1.5.0 `codemode.mode: "only"` 的模型工具面，不提供模式选择。Pi 本身默认是 `on`，保留 read/bash/edit/write 等直接声明；不能把 Pi 的 MCP 默认 `codemode` 与全局 `only` 混为一谈。
+
+MCP 配置只有进程、描述和 `tools` 权限允许列表；移除 `exposure`、`tool_exposure` 及别名。单工具不能通过配置绕过 Code Mode。完整授权目录保存在冻结能力里，`ProviderTools` 无条件排除 `codemode_only` 工具，即使 checkpoint 声称已经加载；顶层伪造普通工具调用也在参数校验、审批与派发前返回 `NOT_FOUND`。
+
+脚本通过 `ALL_TOOLS`、`searchTools`、`describeTool`、`describeNamespace` 发现并调用工具。搜索复用 BM25 排序，默认 8 条、最多 128 条，不激活任何原生模型声明。模型上下文仅保留简短路由摘要，500 个 MCP 工具的 Schema 不会全量进入请求。内建 `builtin__tool_search` 仅为旧冻结调用契约保留，新生产 Run 不向模型或脚本提供该工具，脚本使用 discovery helpers。
+
+`codemode_only` 是冻结约束；Registry 按历史快照恢复该字段。旧 `exposure` 与 `loaded_tools` 仍可读取以恢复旧 Run，不改写历史请求、审批或回执；这些兼容值不再是可选配置。没有 Code Mode 运行时的自定义生产配置不会回退到原生工具执行；标准安装自动配置运行时。显式测试 peer 可继续构造历史工具面，用于兼容性与底层执行器回归。
+
 <a id="contract-61-工具命名规范"></a>
 
 #### 6.1 工具命名规范
@@ -69,7 +89,7 @@ builtin__task_manage
 
 `__` 仅用于来源/服务器的结构分界；名字内部保留单下划线。因此 `task_search` 是完整的 builtin 工具名，`browser_use` 和 `click_button` 分别是完整的 MCP server 名与工具名。MCP 配置拒绝名字内部的 `__`，防止分界歧义。Code Mode 的 `describeNamespace("task")` / `describeNamespace("builtin__task")` 按 `task_` 前缀发现内置工具；`browser_use` / `mcp__browser_use` 精确匹配 MCP server。
 
-生产 Registry 不注册演示 echo 工具；`mcp__fixture__echo` 仅在显式 `-test-bridge` 中存在，返回模型数据，不发送用户消息。用户交付继续由 Main 的最终 AssistantMessage → DeliveryRequest/Outbox → Delivery Composer → UISpec 完成，Web 复用 OpenIntelligentUI 原生表格；Worker 没有用户发送能力。此次不新增第二个发送入口或模型 UI 代码。
+生产 Registry 不注册演示 echo 工具；`mcp__fixture__echo` 仅在显式 `-test-bridge` 中存在，返回模型数据，不发送用户消息。用户交付继续由 Main 的最终 AssistantMessage → DeliveryRequest/Outbox → Delivery Composer → UISpec 完成，Web 复用 OpenIntelligentUI 原生表格；Worker 没有用户发送能力。Main 的 intelligent_ui_show 保存呈现产物，经原回复/交付事务绑定；自定义 UI 只在 Web 隔离框架执行。
 
 <a id="contract-63-toolexecutor"></a>
 
@@ -134,7 +154,7 @@ Pi 的参考边界必须保持明确：普通 Pi 使用 `tool_execution_start/up
 
 | Tool | Input | Output | Permission | Replay | Limits |
 | --- | --- | --- | --- | --- | --- |
-| `mcp__fixture__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Main only in this slice | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
+| `mcp__fixture__echo` v1 | `{ "text": string }`, no extra fields | The same text | `read_only`, Worker only under an explicit test bridge | `safe` | 4096 input bytes; 10-second deadline; 16 KiB result |
 
 This echo capability exists only under an explicit test bridge. Production does
 not register it. It returns data to the model, never a user message. Main final
@@ -248,8 +268,7 @@ keys, approval boundaries and Child reductions use the existing pipeline.
 The former echo builtin only returned model data. Remove it from production;
 explicit offline bridges use `mcp__fixture__echo`. Do not reinterpret a pure Tool
 as sending a message. User output stays Main AssistantMessage → Delivery/Outbox →
-Composer/UISpec, including the existing OpenIntelligentUI native table. No new
-send Tool, Worker delivery permission or arbitrary generated UI is introduced.
+Composer/UISpec, including the existing OpenIntelligentUI native table and Main-owned UI artifact references. Worker delivery permission is unchanged; custom Widget code runs only in the Web sandbox.
 
 Memory search and Main-only manage remain discoverable without configuration.
 Their descriptions identify required configuration; calls return
@@ -292,3 +311,7 @@ Artifact kill/restart recovery, configured Memory and channel delivery. See the
 [testing guide](../test-plans/product.md) for commands and evidence ownership.
 
 默认 read/bash/edit/write 属于统一 Host 工具目录。只有受信任 environment builtin 可以采用 external_effect / high / never 的 Host 执行；任意外部 Provider 不能借此跳过审批。原生与 Code Mode 的具体动作仍各自批准，未知效果不重发。旧 Workspace 无别名，schema 29 不重写旧请求；[迁移与环境边界](coding.md#默认设置与迁移)。
+
+## Main 展示工具
+
+`builtin__intelligent_ui_show` 使用 Host 专属 `ui_present` 权限，通过 Code Mode 接纳、记录和幂等保存本地展示产物。Worker 裁剪该权限；模型参数不能提供审批、消息或表单身份。Tool 回执表示 staged，具体回复绑定后才进入 Delivery。交互、安全与恢复契约见 [Intelligent UI](intelligent-ui.md)。

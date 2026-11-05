@@ -335,6 +335,9 @@ func (l *agentLoop) finishTools(r Run, results []tool.Result) (bool, error) {
 		}
 	}
 	for i, result := range results {
+		if err := applyToolLoads(&cp, r.Tools, cp.Result.ToolCalls[i].Name, result); err != nil {
+			return false, err
+		}
 		parts := conversation.Text(result.ModelText())
 		for _, ref := range result.ImageRefs {
 			parts = append(parts, conversation.ContentPart{Type: "image", ArtifactRef: ref})

@@ -18,13 +18,15 @@
 
 **需求**：用户能确认具体外部动作；重复请求或重启不能盲目重复副作用。
 
-**当前实现**：Direct Tools、嵌套工具、Child 与 Computer 共用 Executor；调用与审批持久化，unknown 走核实路径。
+**当前实现**：新生产 Run 的模型工具入口统一为 `builtin__codemode_execute`。Main 与 Worker 在脚本中使用各自冻结的工具目录；具体调用继续共用 ToolExecutor、精确审批和 unknown 恢复。Main 可执行受限控制、Skill 读取及已配置 MCP；文件、命令、Computer 和 Child 仍按 Worker 角色授权。
 
 **边界与剩余工作**：审批只约束具体冻结动作；无法可信核实的 unknown 必须保留，不承诺外部 exactly-once。
 
 **验收目标**：验证拒绝/过期/失效审批不 dispatch、取消 fencing、崩溃窗口及 query-only 恢复。
 
 ## 如何使用
+
+MCP 只配置 `tools` 权限允许列表，不再配置 `exposure` 或 `tool_exposure`。所有工具经 Code Mode 调用；使用 `searchTools` / `describeTool` 查找并读取所需参数，默认最多 8 个搜索结果，不会把目录 Schema 加入下一轮模型声明。删除旧配置中的模式字段后再加载；校验会拒绝过时字段，避免静默改变工具可见性。配置示例见[集成方案](../designs/integrations.md#mcp-工具暴露)。
 
 工具名使用 `builtin__task_search`、`builtin__artifact_manage` 这类完整 snake_case 名称；MCP 使用 `mcp__browser_use__click_button`，保留 server 与工具名内部的单下划线。旧名称不作别名，升级前需完成旧 Main 和未决外部效果核实；具体兼容边界见[命名规范与升级说明](../designs/tools-approvals.md#contract-61-工具命名规范)。
 

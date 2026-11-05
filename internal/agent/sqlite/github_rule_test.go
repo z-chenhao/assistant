@@ -185,7 +185,7 @@ func TestGitHubRuleMigrationPreservesLegacyBindingAndPendingObservation(t *testi
 	watchBatch(t, s, cfg, "")
 	bindTask(t, s, cfg, ref)
 	watchBatch(t, s, cfg, "already-observed")
-	if _, err := s.db.Exec(`DROP TABLE feishu_task_question; DROP TABLE github_rule_decision;
+	if _, err := s.db.Exec(`DROP TABLE IF EXISTS ui_widget; DROP TABLE feishu_task_question; DROP TABLE github_rule_decision;
  ALTER TABLE github_task_binding DROP COLUMN rule_check_conclusion;
  ALTER TABLE github_task_binding DROP COLUMN rule_event_kind;
  ALTER TABLE github_task_binding DROP COLUMN rule_mode;

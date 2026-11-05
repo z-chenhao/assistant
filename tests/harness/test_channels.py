@@ -26,7 +26,7 @@ class ChannelSnapshotTests(unittest.TestCase):
                 'delivery_request': 'delivery_id,message_id,channel,destination_ref,status,attempt_count,version,created_at',
                 'channel_receipt': 'delivery_id,part',
                 'approval': 'approval_id,frozen_arguments_hash,status,created_at',
-                'tool_invocation': 'tool_name,arguments_json,status,attempt_count,created_at',
+                'tool_invocation': 'tool_name,arguments_json,status,attempt_count,created_at,error_json',
                 'run': 'run_id,kind,worker_position,status,created_at',
                 'channel_resource': 'id',
                 'delivery_projection': 'id',

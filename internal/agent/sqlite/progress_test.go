@@ -200,13 +200,22 @@ func TestProgressExcludesChildrenLegacyAndInvalidProse(t *testing.T) {
 					t.Fatal(err)
 				}
 				cp := run.Checkpoint
-				messages := []agent.AgentMessage{}
-				for _, m := range cp.Messages {
-					if m.Source == nil || m.Source.Kind != "progress_guidance" {
-						messages = append(messages, m)
+				for i := range cp.Messages {
+					if cp.Messages[i].Type != "system" {
+						continue
 					}
+					sections := []agent.SystemSection{}
+					texts := []string{}
+					for _, section := range cp.Messages[i].SystemSections {
+						if section.Kind != "progress_guidance" {
+							sections = append(sections, section)
+							texts = append(texts, section.Text)
+						}
+					}
+					cp.Messages[i].SystemSections = sections
+					cp.Messages[i].Content[0].Text = strings.Join(texts, "\n\n")
 				}
-				cp.Messages = messages
+
 				if err := r.Checkpoint(ctx, claim, run.Version, cp); err != nil {
 					t.Fatal(err)
 				}

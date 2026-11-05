@@ -97,6 +97,8 @@ def prepare(binary, root, mode='edit', metadata=None):
               'skills:\n  root: ' + json.dumps(str(root / 'skills')) + '\n  scope: workspace\n' +
               'execution:\n  root: ' + json.dumps(str(repo)) + '\n  toolchain_roots: [' +
               json.dumps(str(Path(shutil.which('go')).resolve().parent.parent)) + ']\n')
+    from codemode_peer import runtime_yaml
+    config += runtime_yaml()
     (root / 'config.yaml').write_text(config)
     h = CapabilityHarness(binary, root, fixture='capabilities')
     if os.environ.get('STEWARD_CAPABILITY_DIAGNOSTICS'):
@@ -105,17 +107,21 @@ def prepare(binary, root, mode='edit', metadata=None):
     return h
 
 
-def call(h, key, name, arguments, worker=False, approve=True):
+def call(h, key, name, arguments, worker=False, approve=True, recall_barrier=False):
     plan = json.dumps([{'name': name, 'arguments': arguments}])
-    h.send(key, ('Delegate capabilities: ' if worker else 'Capabilities: ') + plan)
-    h.command('chat', 'work')
+    receipt = h.send(key, ('Delegate capabilities: ' if worker else 'Capabilities: ') + plan)
+    if recall_barrier:
+        from verify_recall import drain_with_publication_barrier
+        drain_with_publication_barrier(h, receipt['run_id'], prefix=key + '-')
+    else:
+        h.command('chat', 'work')
     pending = [a for a in h.command('approval', 'list') if a['status'] == 'pending']
     if pending:
         require(len(pending) == 1, 'unexpected pending approvals')
         a = pending[0]
         before = h.state()
-        require(all(t['attempt_count'] == 0 for t in before['tools'] if t['status'] == 'waiting'),
-                'dispatch before exact approval')
+        target = [t for t in before['tools'] if t['status'] == 'waiting' and t['tool_name'] == a['tool'] and t['arguments_json'] == a['arguments']]
+        require(len(target) == 1 and target[0]['attempt_count'] == 0, 'dispatch before exact approval')
         h.command('approval', 'approve' if approve else 'deny', a['approval_id'], a['frozen_arguments_hash'])
         h.command('chat', 'work')
     return h.state()['tools'][-1]
@@ -140,10 +146,10 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             folder = root / name
             folder.mkdir()
             metadata = None
-            if name in ('task-code-environments', 'task-code-recovery'):
+            if name in ('task-code-environments', 'task-code-recovery', 'tool-loading', 'main-business', 'discovery'):
                 # Keep coding calls/approvals and repeated publication recovery
                 # receipts inside the profile's protected-context budget.
-                metadata = dict(name='Task coding workload', provider_kind='openai_compatible',
+                metadata = dict(name='Capability workload', provider_kind='openai_compatible',
                                 endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
                                 model_id='fixture-model', context_window=16384, max_output_tokens=1024,
                                 compatibility={'tool_result_format': 'openai'}, capabilities={'text_input': True})
@@ -226,13 +232,13 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         scenario('audit', audit)
 
         def discovery(h):
-            listed = content(call(h, 'skills', 'builtin__skill_list', {}, worker=True))
+            listed = content(call(h, 'skills', 'builtin__skill_list', {'query':'review'}, worker=True))
             summaries = json.loads(listed['text'])
             require(len(summaries) == 1 and 'PRIVATE_BODY_MARKER' not in listed['text'], 'Skill list exposed body')
-            viewed = content(call(h, 'view', 'builtin__skill_view', {'name': 'review', 'version': summaries[0]['version']}))
+            viewed = content(call(h, 'view', 'builtin__skill_view', {'name': 'review'}, worker=True))
             require('PRIVATE_BODY_MARKER' in viewed['text'], 'Skill view missing actual body')
             asset = content(call(h, 'asset', 'builtin__skill_view',
-                                 {'name': 'review', 'version': summaries[0]['version'], 'path': 'assets/opaque.bin'}))
+                                 {'name': 'review', 'path': 'assets/opaque.bin'}, worker=True))
             opened = fixture_run(h.args('artifact', 'open', asset['artifact_refs'][0]), capture_output=True,
                                     env=h.env, cwd=h.root, timeout=20)
             require(opened.returncode == 0 and opened.stdout == b'\x00\xffSKILL_ASSET',
@@ -253,12 +259,117 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
             h.command('chat', 'work')
             require(len((h.root / 'provider/mcp-effects.jsonl').read_text().splitlines()) == 1, 'unknown MCP automatically retried')
             value = h.state()
-            require(all(c['skill_set_hash'] != hashlib.sha256(b'[]').hexdigest() for c in value['capabilities']), 'Skill set not frozen')
-            serialized = json.dumps(value['generations'][0])
-            require('Inspect code and preserve user files.' in serialized and 'PRIVATE_BODY_MARKER' not in serialized,
+            empty_skills = hashlib.sha256(b'[]').hexdigest()
+            require(all(c['skill_set_hash'] != empty_skills for c in value['capabilities']), 'Main or Worker Skill set not frozen')
+            main_request = json.loads(value['generations'][0]['request_json'])
+            require({'builtin__skill_list', 'builtin__skill_view'} <= {t['name'] for t in main_request['tools']} and
+                    'Inspect code and preserve user files.' not in json.dumps(main_request) and
+                    'PRIVATE_BODY_MARKER' not in json.dumps(main_request), 'Main Skill disclosure is not progressive')
+            workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
+            serialized = json.dumps(next(g for g in value['generations'] if g['run_id'] in workers))
+            require('Inspect code and preserve user files.' not in serialized and 'PRIVATE_BODY_MARKER' not in serialized,
                     'startup Skill disclosure is not progressive')
             return {'name': 'MCP_transport_Skill_scope_role_denial_unknown', 'state': value}
         scenario('discovery', discovery)
+
+        def main_business(h):
+            provider = h.root / 'provider'
+            read = call(h, 'main-read', 'mcp__fixture__read', {'text': 'direct Main lookup'})
+            require(content(read)['text'] == 'direct Main lookup', 'Main lookup lost its result')
+            listed = content(call(h, 'main-skill-list', 'builtin__skill_list', {'query':'review'}))
+            summary = json.loads(listed['text'])[0]
+            viewed = content(call(h, 'main-skill-view', 'builtin__skill_view',
+                                  {'name': summary['name']}))
+            require('PRIVATE_BODY_MARKER' in viewed['text'], 'Main cannot read the selected Skill')
+            denied = call(h, 'main-deny', 'mcp__fixture__send', {'text': 'denied'}, approve=False)
+            require(denied['attempt_count'] == 0 and content(denied)['error']['code'] == 'APPROVAL_DENIED' and
+                    not (provider / 'mcp-effects.jsonl').exists(), 'denied Main write dispatched')
+            approved = call(h, 'main-approve', 'mcp__fixture__send', {'text': 'approved once'})
+            require(approved['status'] == 'succeeded' and approved['attempt_count'] == 1 and
+                    len((provider / 'mcp-effects.jsonl').read_text().splitlines()) == 1,
+                    'approved Main write missing or repeated')
+            (provider / 'hold-barrier').touch()
+            receipt = h.send('main-slow', 'Capabilities: ' + json.dumps([
+                {'name': 'mcp__fixture__read', 'arguments': {'text': 'slow Main result', 'behavior': 'hold'}}]))
+            start = h.processes.start if h.processes is not None else subprocess.Popen
+            child = start(h.args('chat', 'work'), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, env=h.env, cwd=h.root)
+            h.children.append(child)
+            try:
+                h.wait_state(lambda _: (provider / 'hold-accepted').exists(), 'real MCP accepted slow call', timeout=5)
+                started = time.monotonic()
+                steering = h.send('main-ping', 'Responsive MCP ping')
+                require(steering['run_id'] == receipt['run_id'], 'slow call split the active Main')
+                before = h.wait_state(lambda state: any('RESPONSIVE_MCP_PONG' in json.dumps(message)
+                                      for message in state['conversation']), 'Main reply while MCP held', timeout=5)
+                latency = time.monotonic() - started
+                held = [t for t in before['tools'] if json.loads(t['arguments_json']).get('behavior') == 'hold']
+                require(len(held) == 1 and held[0]['status'] == 'running' and held[0]['attempt_count'] == 1 and
+                        not (provider / 'hold-release').exists(), 'reply waited for or repeated slow MCP')
+            finally:
+                (provider / 'hold-release').touch()
+                stdout, stderr = child.communicate(timeout=20)
+            require(child.returncode == 0, 'Main Code Mode work failed: ' + stderr + stdout)
+            h.command('chat', 'work')
+            after = h.state()
+            held = [t for t in after['tools'] if json.loads(t['arguments_json']).get('behavior') == 'hold']
+            require(len(held) == 1 and held[0]['status'] == 'succeeded' and held[0]['attempt_count'] == 1 and
+                    'slow Main result' in json.dumps(after['conversation']), 'slow MCP completion lost or repeated')
+            require(all(r['kind'] == 'main' for r in after['runs']), 'Main-scoped Code Mode unexpectedly delegated simple business or Skill inspection')
+            require(len((provider / 'mcp-effects.jsonl').read_text().splitlines()) == 1, 'Main write replayed')
+            return dict(name='Main_business_Skills_exact_approval_responsive_MCP',
+                        response_seconds=latency, reply_before_tool_release=True, state=after)
+        scenario('main-business', main_business)
+
+        def tool_loading(h):
+            schema = dict(type='object', properties={'text': {'type': 'string'}}, required=['text'], additionalProperties=False)
+            catalog = [dict(name='read', description='Read fixture data', inputSchema=schema),
+                       dict(name='send', description='Send fixture data', inputSchema=schema)]
+            permissions = dict(read='read_only', send='external_effect')
+            for index in range(498):
+                name = 'lookup_%03d' % index
+                catalog.append(dict(name=name, description='Lookup a catalog record', inputSchema=dict(
+                    type='object', properties={'text': {'type': 'string', 'description': 'SCHEMA500_BODY_MARKER'}},
+                    required=['text'], additionalProperties=False)))
+                permissions[name] = 'read_only'
+            provider = h.root / 'provider'
+            (provider / 'mcp-tools.json').write_text(json.dumps(dict(tools=catalog)))
+            config = h.root / 'config.yaml'
+            config.write_text(config.read_text().replace(
+                '    tools: {read: read_only, send: external_effect}\n',
+                '    description: Find catalog records\n    tools: ' + json.dumps(permissions) + '\n'))
+            read = call(h, 'catalog-code', 'mcp__fixture__read', {'text': 'Code Mode receipt'})
+            require(content(read)['text'] == 'Code Mode receipt', 'script tool unavailable')
+            initial = json.loads(h.state()['generations'][0]['request_json'])
+            require(not any(t['name'].startswith('mcp__') and t['name'] != 'mcp__fixture__echo' for t in initial['tools']) and
+                    'SCHEMA500_BODY_MARKER' not in json.dumps(initial) and
+                    'Find catalog records' in json.dumps(initial), 'MCP catalog entered native tool declarations')
+            searched = call(h, 'catalog-search', 'builtin__tool_search', {'query': 'lookup catalog record'})
+            matches = json.loads(content(searched)['text'])
+            require(len(matches['tools']) == 8 and matches['loaded'] == [], 'metadata discovery activated native tools')
+            h.send('catalog-forged', 'Direct Capabilities: ' + json.dumps([
+                {'name': 'mcp__fixture__lookup_003', 'arguments': {'text': 'must not run'}}]))
+            h.command('chat', 'work')
+            forged = h.state()['tools'][-1]
+            require(content(forged)['error']['code'] == 'NOT_FOUND' and forged['attempt_count'] == 0,
+                    'direct MCP bypassed Code Mode')
+            source = ("const found = await searchTools('lookup catalog record'); "
+                      "if (ALL_TOOLS.some(t => t.name === 'builtin__tool_search')) throw Error('hidden or model-only tool leaked'); "
+                      "return {found: found.length, count: ALL_TOOLS.filter(t=>t.name.startsWith('mcp__fixture__') && t.name !== 'mcp__fixture__echo').length, "
+                      "receipt: await tools.mcp__fixture__lookup_002({text:'Worker receipt'})};")
+            call(h, 'catalog-worker', 'builtin__codemode_execute', {'source': source}, worker=True)
+            value = h.state()
+            wrapper = next(t for t in reversed(value['tools']) if t['tool_name'] == 'builtin__codemode_execute')
+            require(wrapper['status'] == 'succeeded', 'Worker Code Mode failed: ' + str(wrapper))
+            output = json.loads(content(wrapper)['text'])[-1]['value']
+            require(output['found'] == 8 and output['count'] == 500 and output['receipt'] == 'Worker receipt',
+                    'Code Mode discovery or invocation differed: ' + str(output))
+            workers = {r['run_id'] for r in value['runs'] if r['kind'] == 'worker'}
+            require(all('SCHEMA500_BODY_MARKER' not in g['request_json'] for g in value['generations'] if g['run_id'] in workers),
+                    'Worker received all MCP schemas through the model request')
+            return dict(name='500_tools_Code_Mode_only', initial_mcp_declarations=0,
+                        matched_mcp_declarations=0, script_mcp_capabilities=output['count'], state=h.state())
+        scenario('tool-loading', tool_loading)
 
         def malformed_mcp(h):
             provider = h.root / 'provider'
@@ -454,7 +565,9 @@ def run(binary, selected=None, fixture_context=None, scenario_jobs=1):
         for kind, result in run_cases(cases, drive, scenario_jobs):
             report[kind].append(result)
         if not selected:
-            expected = {'real_red_edit_green_with_Worker_approval',
+            expected = {'500_tool_progressive_exposure_Main_search_Worker_codemode',
+                        'Main_business_Skills_exact_approval_responsive_MCP',
+                        'real_red_edit_green_with_Worker_approval',
                         'continuous_dirty_edits_create_and_stale_hash_refusal',
                         'reads_automatic_mutations_require_exact_approval',
                         'MCP_transport_Skill_scope_role_denial_unknown',
@@ -474,7 +587,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'mcp-reply', 'crash', 'task-code-environments', 'task-code-recovery'],
+    parser.add_argument('--scenario', choices=['coding', 'dirty-index', 'audit', 'quotes', 'discovery', 'main-business', 'tool-loading', 'mcp-reply', 'crash', 'task-code-environments', 'task-code-recovery'],
                         help='Run one maintained scenario; omit for the complete gate')
     parser.add_argument("--scenario-jobs",type=int,choices=[1,2,4],default=int(os.environ.get("STEWARD_VERIFY_CASE_JOBS","1")))
     args = parser.parse_args()

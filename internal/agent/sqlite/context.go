@@ -99,7 +99,7 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 	if e != nil {
 		return workingPreparation{}, e
 	}
-	tools := contextbuilder.Size(agent.ProviderTools(run.Tools))
+	tools := contextbuilder.Size(agent.ProviderTools(run.Tools, run.Checkpoint.LoadedTools))
 	budget := contextbuilder.BudgetFor(run.Snapshot.ContextWindow, run.Snapshot.MaxOutputTokens, tools, p, run.Checkpoint.ContextRetries > 0)
 	required := []llm.Message{}
 	for _, m := range in {

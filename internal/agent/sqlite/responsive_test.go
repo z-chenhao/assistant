@@ -15,19 +15,23 @@ import (
 )
 
 func TestMainRespondsBeforeSlowToolFinishes(t *testing.T) {
-	testMainRespondsBeforeSlowToolFinishes(t, false)
+	testMainRespondsBeforeSlowToolFinishes(t, false, "")
 }
 
 func TestMainTaskControlRespondsWithFullToolCapacity(t *testing.T) {
-	testMainRespondsBeforeSlowToolFinishes(t, true)
+	testMainRespondsBeforeSlowToolFinishes(t, true, task.SearchName)
 }
 
-func testMainRespondsBeforeSlowToolFinishes(t *testing.T, saturated bool) {
+func TestMainToolSearchRespondsWithFullToolCapacity(t *testing.T) {
+	testMainRespondsBeforeSlowToolFinishes(t, true, tool.SearchName)
+}
+
+func testMainRespondsBeforeSlowToolFinishes(t *testing.T, saturated bool, control string) {
 	t.Helper()
 	s, _, h, a, p := loopFixture(t)
 	started, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once
-	definition, _ := a.Registry.Resolve("mcp__fixture__echo")
+	definition, _ := a.Registry.Resolve("builtin__artifact_search")
 	definition.Execute = func(ctx context.Context, _ string) tool.Result {
 		once.Do(func() { close(started) })
 		select {
@@ -40,6 +44,9 @@ func testMainRespondsBeforeSlowToolFinishes(t *testing.T, saturated bool) {
 	definitions := []tool.Definition{definition}
 	if saturated {
 		definitions = append(definitions, task.Definitions()...)
+		if control == tool.SearchName {
+			definitions = append(definitions, tool.SearchDefinition())
+		}
 	}
 	registry, err := tool.NewRegistry(definitions)
 	if err != nil {
@@ -58,7 +65,11 @@ func testMainRespondsBeforeSlowToolFinishes(t *testing.T, saturated bool) {
 			return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "slow", Name: definition.Spec.Name, Arguments: `{"text":"long"}`}}}, nil
 		case last.Role == "user" && last.Origin != "runtime" && last.Text == "ping":
 			if saturated {
-				return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "search", Name: task.SearchName, Arguments: `{}`}}}, nil
+				args := `{}`
+				if control == tool.SearchName {
+					args = `{"query":"record"}`
+				}
+				return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "search", Name: control, Arguments: args}}}, nil
 			}
 			return llm.GenerationResult{Text: "pong"}, nil
 		case last.Role == "tool" && last.ToolCallID == "search":
@@ -190,7 +201,7 @@ func TestMainPendingApprovalAcceptsSteeringWithoutDispatch(t *testing.T) {
 func TestMainSpendWaitDrainsAcceptedSlowTool(t *testing.T) {
 	s, _, h, a, p := loopFixture(t)
 	started, release, cancelled := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	definition, _ := a.Registry.Resolve("mcp__fixture__echo")
+	definition, _ := a.Registry.Resolve("builtin__artifact_search")
 	definition.Execute = func(ctx context.Context, _ string) tool.Result {
 		close(started)
 		select {
@@ -276,7 +287,7 @@ func TestMainSpendWaitDrainsAcceptedSlowTool(t *testing.T) {
 	}
 }
 
-func TestDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) {
+func TestLegacyMainDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) {
 	for _, unknown := range []bool{false, true} {
 		name := "completed"
 		if unknown {
@@ -290,7 +301,7 @@ func TestDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) {
 				definition = effectDef(t, "never")
 				calls = effectCall(`{"target":"fixture","text":"uncertain","behavior":"unknown"}`)
 			}
-			s, r, claim, executor, exchange := admitPolicy(t, []tool.Definition{definition}, calls)
+			s, r, claim, executor, exchange := admitLegacyMainPolicy(t, []tool.Definition{definition}, calls)
 			if unknown {
 				if _, err := executor.Execute(ctx, exchange, calls); err != tool.ErrSuspended {
 					t.Fatal(err)
@@ -354,7 +365,7 @@ func TestDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) {
 	}
 }
 
-func TestMainSpendDenialRecoversAcceptedUnknownTool(t *testing.T) {
+func TestLegacyMainSpendDenialRecoversAcceptedUnknownTool(t *testing.T) {
 	ctx := context.Background()
 	s, _, h, a, p := loopFixture(t)
 	registry, err := tool.NewRegistry([]tool.Definition{effectDef(t, "never")})
@@ -368,6 +379,7 @@ func TestMainSpendDenialRecoversAcceptedUnknownTool(t *testing.T) {
 	p.respond = func(llm.GenerationRequest) (llm.GenerationResult, error) {
 		return llm.GenerationResult{ToolCalls: calls, Usage: &llm.TokenUsage{InputTokens: 2000}}, nil
 	}
+	freezeLegacyMain(t, r)
 	receipt := mustSubmit(t, a, "priced-recovery", "long work")
 	claim, err := r.Claim(ctx, receipt.RunID)
 	if err != nil {

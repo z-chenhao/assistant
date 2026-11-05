@@ -19,6 +19,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
+	case "/ui/widget":
+		s.widget(w, r)
 	case "/api/developer/database":
 		s.databaseAPI(w, r)
 	case "/api/workers":

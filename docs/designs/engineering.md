@@ -97,7 +97,7 @@ Computer 的 Begin 拆为已接纳计划读取、当前实例决策和原子计�
 |---|---|
 | 核心后端 | Go |
 | 部署形态 | 一期模块化单体，未来可拆服务 |
-| 模型 Provider | 独立 Node.js Model Provider Bridge：复用 Pi AI 行为；支持本地 OpenAI-compatible 与 OpenAI Sign in with ChatGPT |
+| 模型 Provider | 独立 Go Model Provider Bridge；协议实现归 `llm/provider`，RPC 归 `llm/bridge`；Pi AI 仅作协议参考，不依赖其 SDK |
 | Code Mode | 独立 Node.js JavaScript 沙箱 |
 | Agent Tool | `builtin__agent_run`、Code Mode `agent.run()` 与 `tools.*`、`cua.*` 共用 ToolInvocation 管线；复用 QuickJS 和父 ToolInvocation 的内部恢复协议 |
 | 本地隔离环境 | Lume macOS VM + Guest 内 Cua Driver |
@@ -132,6 +132,9 @@ internal/
   context/
   llm/
     bridge/
+    provider/
+    account/
+    sqlite/
     secret/
   skill/
   tool/
@@ -198,13 +201,22 @@ required status name is preserved. One checkout and dependency setup serve:
 
 1. `make test lint`: Go unit/component checks, Node runtime contracts, frontend
    freshness/types, the real Chromium contract and retained infrastructure tests.
-2. `make test-e2e`: nine deterministic product flows through actual CLI/UI,
+2. `make test-e2e`: ten deterministic product flows through actual CLI/UI,
    stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
 3. Task coding isolation and publication recovery retain their dedicated checks.
-4. Native Linux account credentials: the existing account harness uses a private
+4. Code Mode discovery and Main responsiveness: the maintained capabilities
+   scenarios check 500 MCP tools without native declarations, direct-call rejection,
+   exact approval and a Main reply while a real MCP call remains held.
+5. Native Linux account credentials: the existing account harness uses a private
    D-Bus and disposable password-protected GNOME Keyring, with real libsecret
    storage and a controlled OAuth/Responses peer. An entrypoint wrapper unwinds
    owned service processes on cancellation; no real account or user keyring is used.
+
+The Go checks also exercise production tool composition, including a forged
+loaded-tool checkpoint and no native fallback without a JavaScript runtime.
+The model dependency test uses Go's transitive dependency graph: shared contracts
+cannot depend on adapters, provider protocols cannot depend on domain state,
+and account/storage cannot depend on the RPC transport.
 
 PR checks use GitHub’s proposed merge commit, so the checked code includes the current base. Artifact names identify that checked commit.
 

@@ -98,3 +98,5 @@ error, never a raw exception or inherited credential.
 ## 工程基础重构回归
 
 F-008/F-039：现有真实 Sidecar、挂起/恢复、Child、事件落库失败、旧 owner fencing 和 SIGKILL 重放测试覆盖提取后的协调器；相同 source/runtime/prelude/ToolSpec fingerprint 必须复用既存结果，unknown 外部作用不重新派发。Provider Bridge 既有 Node 协议测试覆盖拆分的上下文转换函数。
+
+统一 Code Mode 与 500 工具目录的配置、Main/Worker 脚本发现、未声明调用拒绝及历史冻结面恢复覆盖，统一见[工具与审批测试方案](tools-approvals.md#渐进工具发现与-500-工具目录)。CLI capabilities 的 `tool-loading` 已纳入完整门禁，读取同一角色冻结目录。

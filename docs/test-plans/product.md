@@ -161,6 +161,7 @@ in the [model connection test plan](model-connections.md#linux-原生账户回�
 | `children` | Recursive delegation, frozen capabilities, parent-only results and approvals |
 | `tools` | Frozen approved actions, invocation persistence and unknown side effects |
 | `code-recovery` | Actual Go/QuickJS interruption, 37 completed/8 waiting calls, no repeated completed work |
+| `intelligent-ui` | Main-only UI tool via Code Mode, frozen Skill, native and sandboxed widgets, explicit follow-up and restart |
 | `local-provider` | Discover/probe/select, transport and image projection with an owned HTTP peer |
 | `account` | Deterministic auth/callback/refresh/logout contracts and secret handling |
 | `channels` | Real Web/browser and channel delivery behavior |

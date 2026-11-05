@@ -20,7 +20,7 @@
 
 **需求**：操作员可把允许的本地 stdio 工具加入 Agent 工作面。
 
-**当前实现**：启动服务器、tools/list、tools/call、schema 指纹与工具允许列表已实现。
+**当前实现**：启动服务器、tools/list、tools/call、schema 指纹与工具允许列表已实现。统一经 Code Mode 调用，不提供 exposure 或单工具模式；脚本渐进发现，500 工具目录不预载全部 Schema。Main 和 Worker 均按自己的冻结权限执行。
 
 **边界与剩余工作**：当前子进程受限、无继承凭据/网络；这不是通用远程认证 MCP 客户端。
 

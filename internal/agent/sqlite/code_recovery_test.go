@@ -235,13 +235,14 @@ func TestHoursLongApprovalHoldsNoJavaScriptRuntime(t *testing.T) {
 	r.ConfigureApprovalTTL(12 * time.Hour)
 	clock := time.Now()
 	r.approvalClock = func() time.Time { return clock }
-	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+	execute := func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "observed"}, nil
 		}
 		raw, _ := json.Marshal(map[string]string{"source": `return await tools.mcp__fixture__send({target:"clock",text:"six hours"});`})
 		return calls(codemode.ToolName, string(raw)), nil
 	}
+	p.respond = delegateToolWork(execute)
 	mustSubmit(t, a, "long-approval", "execute")
 	mustDrain(t, a)
 	clock = clock.Add(6 * time.Hour)
@@ -270,13 +271,14 @@ func TestHoursLongApprovalHoldsNoJavaScriptRuntime(t *testing.T) {
 func TestCodeReplayStoreObservationsAndWritesAreNotRepeated(t *testing.T) {
 	s, r, a, p := childFixture(t, codemode.Definition())
 	r.ConfigureJavaScript(realCodeRuntime(t))
-	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+	execute := func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "observed"}, nil
 		}
 		raw, _ := json.Marshal(map[string]string{"source": `store("count",(load("count")||0)+1); await tools.mcp__fixture__echo({text:String(load("count"))}); return load("count");`})
 		return calls(codemode.ToolName, string(raw)), nil
 	}
+	p.respond = delegateToolWork(execute)
 	mustSubmit(t, a, "store-replay", "execute")
 	mustDrain(t, a)
 	if scalar(t, s, `SELECT count(*) FROM code_store WHERE value_json='1' AND version=1`) != 1 {
@@ -342,7 +344,7 @@ func TestCodeReplayStoreQuotaRejectionSurvivesShrink(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s, r, a, p := childFixture(t, codemode.Definition())
 			r.ConfigureJavaScript(realCodeRuntime(t))
-			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+			execute := func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 				if req.Messages[len(req.Messages)-1].Role == "tool" {
 					return llm.GenerationResult{Text: "observed"}, nil
 				}
@@ -354,6 +356,7 @@ store("k0", null);
 ` + tc.suspend + `return rejected;`})
 				return calls(codemode.ToolName, string(raw)), nil
 			}
+			p.respond = delegateToolWork(execute)
 			mustSubmit(t, a, "quota-replay", "execute")
 			mustDrain(t, a)
 			var raw, status string

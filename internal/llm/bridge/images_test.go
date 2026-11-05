@@ -92,7 +92,9 @@ func TestExplicitScopedImageIsSentToActualPiAndSanitizedObservation(t *testing.T
 	defer server.Close()
 	endpoint := server.URL + "/v1"
 	script, _ := filepath.Abs("../../../provider-bridge/bridge.mjs")
-	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (Connection, error) { return Connection{Endpoint: endpoint}, nil }, func(_ context.Context, r llm.GenerationRequest, _ Connection, _ llm.GenerationResult, _ time.Duration, _ error) error {
+	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (llm.Connection, error) {
+		return llm.Connection{Endpoint: endpoint}, nil
+	}, func(_ context.Context, r llm.GenerationRequest, _ llm.Connection, _ llm.GenerationResult, _ time.Duration, _ error) error {
 		raw, _ := json.Marshal(r)
 		if strings.Contains(string(raw), "base64") || strings.Contains(string(raw), "media_type") {
 			t.Error("binary entered persisted request")

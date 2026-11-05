@@ -43,6 +43,11 @@ def collect(destination):
     goroot = Path(subprocess.check_output(['go', 'env', 'GOROOT'], cwd=ROOT, text=True).strip())
     shutil.copyfile(goroot / 'LICENSE', destination / 'go-toolchain.txt')
     shutil.copyfile(ROOT / 'internal/interaction/web/assets/licenses.txt', destination / 'web.txt')
+    catalog_notices = destination / 'model-catalog'
+    catalog_notices.mkdir(exist_ok=True)
+    shutil.copyfile(ROOT / 'internal/llm/provider/LICENSE', catalog_notices / 'LICENSE')
+    (catalog_notices / 'catalog').mkdir(exist_ok=True)
+    shutil.copyfile(ROOT / 'internal/llm/provider/catalog/NOTICE.md', catalog_notices / 'catalog/NOTICE.md')
     (destination / 'go-modules.json').write_text(json.dumps([modules[k] for k in sorted(modules)], indent=2) + '\n')
     print(f'Collected notices for {len(modules)} linked Go modules, the Go toolchain and Web assets')
 

@@ -73,6 +73,8 @@ def verify_install():
             require((installed/name).read_bytes() == (ROOT/name).read_bytes(), 'installation lost project notice: '+name)
         require((installed/'licenses/web.txt').read_bytes() == (ROOT/'internal/interaction/web/assets/licenses.txt').read_bytes(),
                 'installation lost embedded Web notices')
+        require((installed/'licenses/model-catalog/LICENSE').read_bytes() == (ROOT/'internal/llm/provider/LICENSE').read_bytes(), 'model catalog license missing')
+        require((installed/'licenses/model-catalog/catalog/NOTICE.md').read_bytes() == (ROOT/'internal/llm/provider/catalog/NOTICE.md').read_bytes(), 'model catalog provenance missing')
         modules = json.loads((installed/'licenses/go-modules.json').read_text())
         require(any(m['module']=='modernc.org/sqlite' for m in modules), 'linked SQLite license absent')
         require(all(m['files'] and all((installed/'licenses'/f).is_file() for f in m['files']) for m in modules),
@@ -121,7 +123,7 @@ def verify_install():
                 terminal.expect('You> ')
                 before = h.state()
                 assert_final(before, 1)
-                require(len(before['tools']) == 1, 'startup bypassed the shared Tool executor')
+                require(len(before['tools']) == 2 and {t['tool_name'] for t in before['tools']} == {'builtin__codemode_execute','builtin__artifact_search'} and all(t['attempt_count'] == 1 for t in before['tools']), 'startup bypassed Code Mode or the nested Tool executor')
                 require(terminal.stop(signal.SIGKILL) == -signal.SIGKILL, 'missing crash evidence')
                 report['first_launch'] = terminal.transcript()
             with Terminal(h.args(), h.env, folder) as terminal:

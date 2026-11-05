@@ -2,26 +2,12 @@ package bridge
 
 import (
 	"context"
-	"time"
 
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
-// Connection is an ephemeral Host-to-Bridge Secret RPC envelope. Never persist it.
-type Connection struct {
-	Endpoint     string                      `json:"endpoint"`
-	APIKey       string                      `json:"api_key,omitempty"`
-	AccessToken  string                      `json:"access_token,omitempty"`
-	ConnectionID string                      `json:"connection_id,omitempty"`
-	AuthVersion  int64                       `json:"-"`
-	AuthEpoch    int64                       `json:"-"`
-	Guard        func(context.Context) error `json:"-"`
-}
-type Resolver func(context.Context, llm.Snapshot) (Connection, error)
-type Observer func(context.Context, llm.GenerationRequest, Connection, llm.GenerationResult, time.Duration, error) error
-
 // OpenObserved installs Host acceptance for an explicitly injected fixture.
-func OpenObserved(ctx context.Context, path string, observer Observer, args ...string) (*Client, error) {
+func OpenObserved(ctx context.Context, path string, observer llm.GenerationObserver, args ...string) (*Client, error) {
 	c, err := Open(ctx, path, args...)
 	if err != nil {
 		return nil, err
@@ -31,7 +17,7 @@ func OpenObserved(ctx context.Context, path string, observer Observer, args ...s
 }
 
 // OpenLocal installs trusted resolution before any request can use the client.
-func OpenLocal(ctx context.Context, path, script string, resolver Resolver, observer Observer) (*Client, error) {
+func OpenLocal(ctx context.Context, path, script string, resolver llm.ConnectionResolver, observer llm.GenerationObserver) (*Client, error) {
 	c, err := Open(ctx, path, script)
 	if err != nil {
 		return nil, err
@@ -55,10 +41,10 @@ func (c *Client) CatalogForProfile(ctx context.Context, p llm.Profile) ([]llm.Ca
 	return c.CatalogAt(ctx, connection)
 }
 
-func (c *Client) CatalogAt(ctx context.Context, connection Connection) ([]llm.CatalogModel, error) {
+func (c *Client) CatalogAt(ctx context.Context, connection llm.Connection) ([]llm.CatalogModel, error) {
 	var models []llm.CatalogModel
 	err := c.call(ctx, "models.list", struct {
-		Connection Connection `json:"connection"`
+		Connection llm.Connection `json:"connection"`
 	}{connection}, &models)
 	return models, err
 }

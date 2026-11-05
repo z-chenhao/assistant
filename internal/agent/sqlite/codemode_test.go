@@ -91,7 +91,7 @@ func TestCodeModeRealRuntimeNestedToolAndStore(t *testing.T) {
 	s, r, a, p := childFixture(t, codemode.Definition())
 	r.ConfigureJavaScript(realCodeRuntime(t))
 	r.ConfigureToolLimits(ToolLimits{Global: 1, Agent: 1, Run: 1, Provider: 1, Tool: 1})
-	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+	execute := func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "observed"}, nil
 		}
@@ -99,6 +99,7 @@ func TestCodeModeRealRuntimeNestedToolAndStore(t *testing.T) {
 		args, _ := json.Marshal(map[string]string{"source": source})
 		return calls(codemode.ToolName, string(args)), nil
 	}
+	p.respond = delegateToolWork(execute)
 	mustSubmit(t, a, "code", "execute")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -109,7 +110,7 @@ func TestCodeModeRealRuntimeNestedToolAndStore(t *testing.T) {
 		`SELECT count(*) FROM code_execution`:                                                             1,
 		`SELECT count(*) FROM code_call`:                                                                  1,
 		`SELECT count(*) FROM code_store WHERE json_extract(value_json,'$.n')=5`:                          1,
-		`SELECT count(*) FROM tool_invocation WHERE status='succeeded' AND attempt_count=1`:               2,
+		`SELECT count(*) FROM tool_invocation WHERE status='succeeded' AND attempt_count=1`:               3,
 		`SELECT count(*) FROM tool_invocation WHERE parent_invocation_id IS NOT NULL`:                     1,
 		`SELECT count(*) FROM code_event WHERE json_extract(message_json,'$.kind')='execution_completed'`: 1,
 	} {
@@ -193,13 +194,14 @@ func TestCodeModeStoreAndEventCommitFailuresDoNotLeakSuccess(t *testing.T) {
 			if _, err := s.db.Exec(trigger); err != nil {
 				t.Fatal(err)
 			}
-			p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+			execute := func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 				if req.Messages[len(req.Messages)-1].Role == "tool" {
 					return llm.GenerationResult{Text: "observed error"}, nil
 				}
 				args, _ := json.Marshal(map[string]string{"source": source})
 				return calls(codemode.ToolName, string(args)), nil
 			}
+			p.respond = delegateToolWork(execute)
 			mustSubmit(t, a, boundary, "execute")
 			mustDrain(t, a)
 			if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__codemode_execute' AND status='failed'`) != 1 {

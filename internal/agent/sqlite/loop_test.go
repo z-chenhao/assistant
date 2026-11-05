@@ -83,7 +83,13 @@ func loopFixture(t *testing.T) (*Store, *Runs, *conversationsqlite.Store, agent.
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = h.Close() })
-	registry := tool.FixtureRegistry()
+	// Main exercises a read-only evidence fixture, never a business/MCP capability.
+	definition, _ := tool.FixtureRegistry().Resolve("mcp__fixture__echo")
+	definition.Spec.Name = "builtin__artifact_search"
+	registry, err := tool.NewRegistry([]tool.Definition{definition})
+	if err != nil {
+		t.Fatal(err)
+	}
 	r := s.Runs(h, registry)
 	p := &loopProvider{store: s, respond: func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 		last := request.Messages[len(request.Messages)-1]
@@ -96,7 +102,7 @@ func loopFixture(t *testing.T) (*Store, *Runs, *conversationsqlite.Store, agent.
 		args, _ := json.Marshal(struct {
 			Text string `json:"text"`
 		}{last.Text})
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "same-id", Name: "mcp__fixture__echo", Arguments: string(args)}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "same-id", Name: "builtin__artifact_search", Arguments: string(args)}}}, nil
 	}}
 	a := agent.Actor{Store: r, Provider: p, Registry: registry, Ready: func(context.Context) bool { return true }}
 	return s, r, h, a, p
@@ -398,7 +404,7 @@ func TestLoopToolRejectionPersistsAndDoesNotExposeHostData(t *testing.T) {
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: last.Text}, nil
 		}
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "mcp__fixture__echo", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent_run", Arguments: `{"task":"forbidden"}`}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "bad", Name: "builtin__artifact_search", Arguments: `{"text":false}`}, {ID: "unknown", Name: "builtin__agent_run", Arguments: `{"task":"forbidden"}`}}}, nil
 	}
 	mustSubmit(t, a, "one", "try invalid calls")
 	mustDrain(t, a)
@@ -634,7 +640,7 @@ func TestLoopToolResultsPersistImmediatelyAndInjectInDeclarationOrder(t *testing
 	ctx := context.Background()
 	slow, fast, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	defer close(release)
-	registry, err := tool.NewRegistry([]tool.Definition{{Spec: tool.Spec{Name: "test__pure__echo", Version: 1, InputSchema: `{"type":"object"}`, ReplayPolicy: "safe", Permission: "read_only"}, Execute: func(ctx context.Context, args string) tool.Result {
+	registry, err := tool.NewRegistry([]tool.Definition{{Spec: tool.Spec{Name: "builtin__artifact_search", Version: 1, InputSchema: `{"type":"object"}`, ReplayPolicy: "safe", Permission: "read_only"}, Execute: func(ctx context.Context, args string) tool.Result {
 		if args == `{"order":1}` {
 			close(slow)
 			<-release
@@ -654,7 +660,7 @@ func TestLoopToolResultsPersistImmediatelyAndInjectInDeclarationOrder(t *testing
 		if last.Role == "tool" {
 			return llm.GenerationResult{Text: "done"}, nil
 		}
-		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "a", Name: "test__pure__echo", Arguments: `{"order":1}`}, {ID: "b", Name: "test__pure__echo", Arguments: `{"order":2}`}}}, nil
+		return llm.GenerationResult{ToolCalls: []llm.ToolCall{{ID: "a", Name: "builtin__artifact_search", Arguments: `{"order":1}`}, {ID: "b", Name: "builtin__artifact_search", Arguments: `{"order":2}`}}}, nil
 	}
 	mustSubmit(t, a, "one", "run tools")
 	done := make(chan error, 1)

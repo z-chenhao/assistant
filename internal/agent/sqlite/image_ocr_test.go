@@ -90,11 +90,21 @@ func admitImageOCR(t *testing.T, engine *imageOCRFixture, granted, code bool) (*
 	if granted {
 		parts = append(parts, conversation.ContentPart{Type: "image", ArtifactRef: ref})
 	}
-	receipt, err := r.Submit(ctx, "ocr", parts)
-	if err != nil {
-		t.Fatal(err)
+	var runID string
+	if code {
+		var refs []string
+		if granted {
+			refs = []string{ref}
+		}
+		runID = admitToolRun(t, s, r, a, registry.Describe(), refs)
+	} else {
+		receipt, err := r.Submit(ctx, "ocr", parts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		runID = receipt.RunID
 	}
-	claim, err := r.Claim(ctx, receipt.RunID)
+	claim, err := r.Claim(ctx, runID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +150,7 @@ func TestImageOCRSharedDirectCodeModeAndDurableReplay(t *testing.T) {
 			if preview.SourceRef != ref || preview.DocumentRef == "" || !preview.Truncated || len(preview.Words) != 16 || len(result.ArtifactRefs) != 2 || len(result.ImageRefs) != 0 {
 				t.Fatal("wrong OCR envelope", result)
 			}
-			scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: claim.RunID()}
+			scope := toolRunScope(t, s, claim.RunID())
 			var full ocr.Document
 			if err = json.Unmarshal([]byte(readArtifact(t, s, scope, preview.DocumentRef)), &full); err != nil {
 				t.Fatal(err)

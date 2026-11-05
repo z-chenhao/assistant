@@ -102,15 +102,15 @@ const descriptor = await tools.builtin__artifact_manage({operation:"describe",ar
 await tools.builtin__artifact_manage({operation:"publish",artifactRefs:[ref]});
 const errors=[];
 for(const [name,args] of [["builtin__memory_search",{query:"tea"}],["builtin__memory_manage",{operation:"remember",content:"I prefer tea"}]]) {
- try { await tools[name](args); } catch(e) { errors.push(e.code); }
+ try { await tools[name](args); } catch(e) { errors.push(e.code || e.name); }
 }
 return {ref,found,read,descriptor,errors,tools:ALL_TOOLS.filter(t=>t.name.startsWith("builtin__artifact_")||t.name.startsWith("builtin__memory_")),declaration:await describeTool("builtin__artifact_manage"),cua:await describeNamespace("cua")};
 ''')
             require(p['status'] == 'succeeded', 'Artifact/Memory cell failed: ' + str(p))
             output = json.loads(json.loads(p['result_json'])['text'])[-1]['value']
             require(output['found'][0]['artifact_ref'] == output['ref'] and output['read']['text'] == 'inspectable' and output['descriptor']['name'] == 'surface.md', 'Artifact managed bytes/search differ')
-            require(output['errors'] == ['PROVIDER_UNAVAILABLE'] * 2, 'unconfigured Memory cell falsely succeeded')
-            require(sorted(t['name'] for t in output['tools']) == ['builtin__artifact_manage','builtin__artifact_search','builtin__memory_manage','builtin__memory_search'], 'Code Mode surface drift')
+            require(output['errors'] == ['PROVIDER_UNAVAILABLE', 'TypeError'], 'unconfigured Memory cell falsely succeeded')
+            require(sorted(t['name'] for t in output['tools']) == ['builtin__artifact_manage','builtin__artifact_search','builtin__memory_search'], 'Code Mode surface drift')
             require('"publish"' in output['declaration']['declaration'] and output['cua']['name'] == 'cua', 'progressive Tool/CUA documentation missing')
             require(all(i['tool_name'] in ('builtin__artifact_manage','builtin__artifact_search','builtin__memory_manage','builtin__memory_search') for i in nested), 'parallel execution pipeline appeared')
             report['checks'].append({'name':'artifact-memory-surface-and-readback','output':output,'nested':nested})
@@ -179,10 +179,14 @@ return {computer: state.computerId, rejected, privateBridge: !ALL_TOOLS.some(t=>
             require(output[-1]['value'] == {'computer': 'fixture-computer', 'rejected': True, 'privateBridge': True}, 'Surface persisted or inventory wrong')
             report['checks'].append({'name': 'cua-discover-bind-invoke', 'nested': [i['tool_name'] for i in nested], 'output': output})
 
-            p, _ = execute('main-exposure', 'return {agent: typeof agent, visible: ALL_TOOLS.some(t=>t.name === "builtin__agent_run"), tools: await searchTools("echo")};')
-            output = json.loads(json.loads(p['result_json'])['text'])[-1]['value']
-            require(output['agent'] == 'undefined' and output['visible'] is False and output['tools'][0]['name'] == 'mcp__fixture__echo', 'Main gained agent or discovery failed')
-            report['checks'].append({'name': 'main-exposure-and-discovery', 'output': output})
+            plan = json.dumps([{'name': 'builtin__codemode_execute', 'arguments': {'source': 'return "MAIN_MUST_NOT_EXECUTE";'}}])
+            h.send('main-exposure', 'Direct Capabilities: ' + plan)
+            h.command('chat', 'work')
+            with closing(sqlite3.connect(db_path)) as db:
+                denied = db.execute("SELECT i.invocation_id,i.status,i.result_json FROM tool_invocation i JOIN run r USING(run_id) WHERE r.kind='main' AND i.tool_name='builtin__codemode_execute' ORDER BY i.created_at DESC LIMIT 1").fetchone()
+                require(denied and denied[1] == 'failed' and json.loads(denied[2])['error']['code'] == 'NOT_FOUND', 'Main obtained Code Mode')
+                require(db.execute('SELECT count(*) FROM code_execution WHERE execution_id=?', (denied[0],)).fetchone()[0] == 0, 'Main started a JavaScript runtime')
+            report['checks'].append({'name': 'main-excludes-codemode', 'invocation': denied[0]})
 
             p, nested = execute('worker-exposure', 'return {agent: typeof agent.run, ns: await describeNamespace("agent")};', worker=True)
             require(p['status'] == 'succeeded', f'worker cell {p}')

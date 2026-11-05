@@ -17,25 +17,25 @@ import (
 
 func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 	ctx := context.Background()
-	s, r, _, a, p := loopFixture(t)
 	spec := tool.Spec{Name: "builtin__bash", Version: 1, Permission: "external_effect", Risk: "high", ReplayPolicy: "never", TimeoutMS: 10000, OutputBytes: 16384, Provider: "fixture", ConflictPolicy: "none", InputSchema: `{"type":"object","properties":{"command":{"type":"string"}},"required":["command"],"additionalProperties":false}`}
-	registry, e := tool.NewRegistry([]tool.Definition{{Spec: spec, Invoke: func(context.Context, tool.Request) tool.Outcome {
+	definition := tool.Definition{Spec: spec, Invoke: func(context.Context, tool.Request) tool.Outcome {
 		return tool.Outcome{Result: tool.Result{Text: `{"exit_code":0,"timed_out":false,"command":"go test -race ./...","truncated":false}`}}
-	}}})
-	if e != nil {
-		t.Fatal(e)
-	}
-	r.registry, a.Registry = registry, registry
-	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+	}}
+	s, r, a, p := childFixture(t, definition)
+	execute := func(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "Verified correction"}, nil
 		}
 		return calls(spec.Name, `{"command":"go test -race ./..."}`), nil
 	}
+	p.respond = delegateToolWork(execute)
 	one := mustSubmit(t, a, "experience-1", "Verify the corrected method")
 	mustDrain(t, a)
 	approvePolicy(t, s, r)
 	mustDrain(t, a)
+	if err := s.db.QueryRow(`SELECT run_id FROM run WHERE kind='worker' ORDER BY created_at LIMIT 1`).Scan(&one.RunID); err != nil {
+		t.Fatal(err)
+	}
 	two := mustSubmit(t, a, "experience-2", "Independently repeat the corrected method")
 	mustDrain(t, a)
 	views, err := r.Approvals(ctx)
@@ -54,6 +54,9 @@ func TestExperienceRequiresIndependentVerifiedRunsAndCAS(t *testing.T) {
 		}
 	}
 	mustDrain(t, a)
+	if err := s.db.QueryRow(`SELECT run_id FROM run WHERE kind='worker' ORDER BY created_at DESC LIMIT 1`).Scan(&two.RunID); err != nil {
+		t.Fatal(err)
+	}
 	c := skill.Config{Root: t.TempDir(), Scope: "agent"}
 	q := skill.ReviewRequest{Operation: "propose", Name: "verified---tests", Description: "Review code --- safely.", Procedure: "1. Read AGENTS.md and reproduce the failure.\n2. Make the smallest correction.\n3. Run go test -race ./... and inspect the result.", Reason: "success", SourceRefs: []string{"run:" + one.RunID}}
 	value, e := r.ReviewExperience(ctx, c, q)
@@ -137,7 +140,7 @@ WHEN NEW.status='promoted' BEGIN SELECT RAISE(ABORT,'injected status commit fail
 		t.Fatal(e)
 	}
 	var summaries []skill.Summary
-	if json.Unmarshal([]byte(defs[0].Execute(ctx, `{}`).Text), &summaries) != nil || len(summaries) != 128 || summaries[127].Name != q.Name || summaries[127].Description != q.Description {
+	if json.Unmarshal([]byte(defs[0].Execute(ctx, `{"limit":128}`).Text), &summaries) != nil || len(summaries) != 128 || summaries[127].Name != q.Name || summaries[127].Description != q.Description {
 		t.Fatal(summaries)
 	}
 	for _, d := range defs {
@@ -150,7 +153,7 @@ WHEN NEW.status='promoted' BEGIN SELECT RAISE(ABORT,'injected status commit fail
 		t.Fatal(value, e)
 	}
 	defs, e = skill.Definitions(c)
-	if e != nil || json.Unmarshal([]byte(defs[0].Execute(ctx, `{}`).Text), &summaries) != nil || len(summaries) != 127 {
+	if e != nil || json.Unmarshal([]byte(defs[0].Execute(ctx, `{"limit":128}`).Text), &summaries) != nil || len(summaries) != 127 {
 		t.Fatal(defs, e)
 	}
 }

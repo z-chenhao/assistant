@@ -243,6 +243,20 @@ func (s *Store) SaveProjection(ctx context.Context, id, hash string, version int
 		if err != sql.ErrNoRows {
 			return err
 		}
+		if candidate, ok := spec.(ui.Spec); ok {
+			var message string
+			if err = tx.QueryRowContext(ctx, `SELECT message_id FROM delivery_request WHERE delivery_id=?`, id).Scan(&message); err != nil {
+				return err
+			}
+			candidate, err = appendWidgets(ctx, tx, message, candidate)
+			if err != nil {
+				return err
+			}
+			raw, err = encoded(candidate)
+			if err != nil {
+				return err
+			}
+		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO delivery_projection VALUES(?,?,?,?)`, id, hash, version, raw)
 		return err
 	})
@@ -314,7 +328,11 @@ func (s *Store) WebProjection(ctx context.Context, m conversation.Message) (json
 	var raw, hash string
 	err := s.db.QueryRowContext(ctx, `SELECT p.spec_json,p.envelope_hash FROM delivery_projection p JOIN delivery_request d USING(delivery_id) WHERE d.message_id=?`, m.MessageID).Scan(&raw, &hash)
 	if err == sql.ErrNoRows {
-		return json.Marshal(ui.Compose(delivery.Envelope{Message: m}))
+		spec, e := appendWidgets(ctx, s.db, m.MessageID, ui.Compose(delivery.Envelope{Message: m}))
+		if e != nil {
+			return nil, e
+		}
+		return json.Marshal(spec)
 	}
 	if err != nil {
 		return nil, delivery.ErrStorage

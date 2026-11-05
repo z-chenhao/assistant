@@ -22,6 +22,8 @@ type Field struct {
 	Value string `json:"value"`
 }
 type Component struct {
+	Title       string     `json:"title,omitempty"`
+	WidgetRef   string     `json:"widget_ref,omitempty"`
 	Type        string     `json:"type"`
 	Text        string     `json:"text,omitempty"`
 	ArtifactRef string     `json:"artifact_ref,omitempty"`
@@ -79,6 +81,8 @@ func valid(c Component) bool {
 		return false
 	}
 	switch c.Type {
+	case "widget":
+		return strings.HasPrefix(c.WidgetRef, "ui:") && len(c.WidgetRef) < 256 && !strings.ContainsAny(c.WidgetRef, "/\\ \r\n") && c.ApprovalID == ""
 	case "markdown", "progress":
 		return c.ArtifactRef == "" && c.ApprovalID == ""
 	case "artifact":
@@ -113,7 +117,7 @@ func valid(c Component) bool {
 	return false
 }
 
-var component = template.Must(template.New("component").Parse(`{{if eq .Type "markdown"}}<div class="semantic">{{.Text}}</div>{{else if eq .Type "artifact"}}<a class="artifact" href="/artifact?ref={{.ArtifactRef}}">↓ {{.Text}} attachment</a>{{else if eq .Type "progress"}}<p class="progress">{{.Status}} · {{.Text}}</p>{{else if eq .Type "table"}}<table><thead><tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr></thead><tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody></table>{{else if eq .Type "confirmation"}}<section class="approval"><p class="semantic">{{.Text}}</p><form action="/approval" method="post"><input type="hidden" name="approval_id" value="{{.ApprovalID}}"><input type="hidden" name="hash" value="{{.Hash}}"><button name="decision" value="approved">Approve</button><button class="secondary" name="decision" value="denied">Decline</button></form></section>{{else if eq .Type "form"}}<dl>{{range .Fields}}<dt>{{.Label}}</dt><dd>{{.Value}}</dd>{{end}}</dl>{{end}}`))
+var component = template.Must(template.New("component").Parse(`{{if eq .Type "widget"}}<section class="intelligent-widget"><h3>{{.Title}}</h3><p class="semantic">{{.Text}}</p></section>{{else if eq .Type "markdown"}}<div class="semantic">{{.Text}}</div>{{else if eq .Type "artifact"}}<a class="artifact" href="/artifact?ref={{.ArtifactRef}}">↓ {{.Text}} attachment</a>{{else if eq .Type "progress"}}<p class="progress">{{.Status}} · {{.Text}}</p>{{else if eq .Type "table"}}<table><thead><tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr></thead><tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody></table>{{else if eq .Type "confirmation"}}<section class="approval"><p class="semantic">{{.Text}}</p><form action="/approval" method="post"><input type="hidden" name="approval_id" value="{{.ApprovalID}}"><input type="hidden" name="hash" value="{{.Hash}}"><button name="decision" value="approved">Approve</button><button class="secondary" name="decision" value="denied">Decline</button></form></section>{{else if eq .Type "form"}}<dl>{{range .Fields}}<dt>{{.Label}}</dt><dd>{{.Value}}</dd>{{end}}</dl>{{end}}`))
 
 // HTML's only trusted source is this fixed escaped template. A component failure
 // degrades locally. Unknown versions and malformed projections retain semantics.

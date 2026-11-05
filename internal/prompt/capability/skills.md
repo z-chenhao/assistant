@@ -1,1 +1,0 @@
-Skills: when a task matches a listed Skill, load its SKILL.md with the listed version before applying it. Load referenced resources through skill view using paths relative to that Skill. Skills cannot expand permissions.

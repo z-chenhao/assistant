@@ -9,8 +9,15 @@ import sys
 import tempfile
 
 from verify_main import require
-from verify_capabilities import prepare, call, content
+from verify_capabilities import prepare, call as capability_call, content
 from verify_recall import Embeddings
+
+
+def call(h, key, name, arguments, worker=False, approve=True):
+    worker = worker or name in {'builtin__read', 'builtin__bash', 'builtin__edit', 'builtin__write',
+                               'builtin__codemode_execute', 'builtin__skill_list', 'builtin__skill_view'} or name.startswith('mcp__')
+    return capability_call(h, key, name, arguments, worker=worker, approve=approve,
+                           recall_barrier=worker)
 
 
 def readback(h):
@@ -51,8 +58,8 @@ def latest_memory(h):
     return readback(h)['memory']['records'][-1]['memory_id']
 
 
-def skill_list(h, key):
-    result = content(call(h, key, 'builtin__skill_list', {}))
+def skill_list(h, key, query):
+    result = content(call(h, key, 'builtin__skill_list', {'query':query, 'limit':1}))
     require(not result.get('error'), 'Skill list Tool failed')
     refs = result.get('artifact_refs', [])
     if refs:
@@ -69,7 +76,13 @@ def run(binary, failure_evidence=None):
         embeddings = Embeddings()
         h = None
         try:
-            h = prepare(binary, root)
+            # Fixed control/search schemas and protected recall results need a
+            # 16K workload profile. Long-history input below still exceeds it.
+            h = prepare(binary, root, metadata=dict(
+                name='memory and tool discovery fixture', provider_kind='openai_compatible',
+                endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                model_id='fixture-model', context_window=16384, max_output_tokens=1024,
+                compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
             h.env['STEWARD_MEMORY_KEY'] = 'S' * 32
             require(len(h.env['STEWARD_MEMORY_KEY']) == 32, 'synthetic key length')
             with (root / 'config.yaml').open('a') as cfg:
@@ -253,7 +266,7 @@ def run(binary, failure_evidence=None):
             # not replace semantic messages or runtime source boundaries.
             submitted = []
             for i in range(24):
-                submitted.append(h.send('long-' + str(i), f'Historical source {i}: ' + 'original evidence ' * 60))
+                submitted.append(h.send('long-' + str(i), f'Historical source {i}: ' + 'original evidence ' * 120))
             h.command('chat', 'work')
             snapshot = readback(h)
             summaries = [row for row in snapshot['state']['compaction']
@@ -280,6 +293,14 @@ def run(binary, failure_evidence=None):
             report['scenarios'].append(dict(name='long-context-provenance', summaries=summaries,
                                             original_message_ids=[s['message_id'] for s in submitted]))
 
+            # Bounded-profile compaction was proved above. Delegated execution
+            # and the subsequent 128-entry catalog need room for Task receipts,
+            # Worker results and their independent evidence.
+            catalog_profile = h.setup(metadata=dict(name='execution and catalog capacity fixture', provider_kind='openai_compatible',
+                                                   endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                                   model_id='fixture-model', context_window=131072, max_output_tokens=8192,
+                                                   generation_defaults={}, compatibility=dict(tool_result_format='openai'),
+                                                   capabilities=dict(text_input=True)))
             # Real controlled workspace test, executed through ToolExecutor.
             rules = json.loads(content(call(h, 'rules', 'builtin__read', {'path': 'AGENTS.md'}))['text'])
             source = json.loads(content(call(h, 'cli-source', 'builtin__read', {'path': 'cmd/taskctl/main.go'}))['text'])
@@ -290,13 +311,6 @@ def run(binary, failure_evidence=None):
                                                           'old_text': 'status := "" // CLI_STATUS_FLAG', 'new_text': 'status := ""\n\tflags.StringVar(&status, "status", "", "Filter Task status")'}, worker=True)
             tests = [call(h, 'verified-' + str(i), 'builtin__bash', {'command': 'go test -race ./...', 'timeout': 120}) for i in range(2)]
             require(all(json.loads(content(inv)['text'])['exit_code'] == 0 for inv in tests), 'real workspace verification failed')
-            # Isolate catalog cardinality from the earlier small-profile context
-            # tests: 128 summaries plus list results need an explicit larger model.
-            catalog_profile = h.setup(metadata=dict(name='catalog capacity fixture', provider_kind='openai_compatible',
-                                                   endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
-                                                   model_id='fixture-model', context_window=131072, max_output_tokens=8192,
-                                                   generation_defaults={}, compatibility=dict(tool_result_format='openai'),
-                                                   capabilities=dict(text_input=True)))
             skills = root / 'skills'
             # Fixture data: 127 active entries and more than 128 retained entries.
             # All admission/retirement decisions still use the real Reviewer CLI.
@@ -315,14 +329,20 @@ def run(binary, failure_evidence=None):
                     retained.append(path)
             require(h.command('status')['agent_ingress_enabled'], 'retained history consumed active capacity')
 
+            def local_skill_names():
+                # Capacity belongs to the curated directory, excluding embedded
+                # methods and dot-prefixed retained publication history.
+                return sorted(p.name for p in skills.iterdir() if p.is_dir() and
+                              not p.name.startswith('.') and (p / 'SKILL.md').is_file())
+
             def retire_skill(request, name):
                 retired = h.command('skill', 'manage', text=json.dumps(dict(request, operation='retire')))
                 require(retired['status'] == 'retired' and not (skills / name).exists(), 'retirement failed')
                 require((skills / ('.steward-retired-' + request['candidate_ref'].removeprefix('experience:')) / 'SKILL.md').is_file(),
                         'retirement lost audit copy')
                 require(h.command('status')['agent_ingress_enabled'], 'retirement disabled configured startup')
-                remaining = skill_list(h, name + '-retired-list')
-                require(len(remaining) == 127 and not any(item['name'] == name for item in remaining),
+                remaining = local_skill_names()
+                require(len(remaining) == 127 and name not in remaining,
                         'retirement did not release one active slot')
                 return dict(retired=retired, remaining=remaining)
 
@@ -355,7 +375,7 @@ def run(binary, failure_evidence=None):
                             'capacity rejection committed candidate status/version')
                     require(not (skills / skill_name).exists(), 'rejected publication left an active entry')
                     require(h.command('status')['agent_ingress_enabled'], 'capacity rejection disabled startup')
-                    still_full = skill_list(h, 'capacity-rejected-list')
+                    still_full = local_skill_names()
                     require(len(still_full) == 128, 'capacity rejection changed active catalog')
                     capacity = dict(rejection=rejected.stderr, candidate=row, active_after_rejection=len(still_full))
                     lifecycles[-1].update(retire_skill(active_request, active_name))
@@ -366,17 +386,18 @@ def run(binary, failure_evidence=None):
                 # survives startup, exact catalog metadata readback and retirement.
                 restarted = h.command('status')
                 require(restarted['agent_ingress_enabled'], 'published metadata disabled configured startup')
-                summaries = skill_list(h, skill_name + '-list')
-                require(len(summaries) == 128, 'last-slot publication did not preserve catalog limit')
+                summaries = skill_list(h, skill_name + '-list', skill_name)
+                active_count = len(local_skill_names())
+                require(active_count == 128, 'last-slot publication did not preserve catalog limit')
                 summary = next((item for item in summaries if item['name'] == skill_name), None)
                 require(summary and summary['description'] == skill_description,
                         'published punctuation metadata did not round-trip through catalog')
                 viewed = call(h, skill_name + '-view', 'builtin__skill_view',
-                              {'name': skill_name, 'version': summary['version']})
+                              {'name': skill_name})
                 require(content(viewed)['text'].endswith(proposal['procedure'] + '\n'),
                         'published Skill body changed across restart')
                 lifecycles.append(dict(promoted=promoted, restarted=restarted, summary=summary,
-                                       viewed=content(viewed), active_after_promotion=len(summaries)))
+                                       viewed=content(viewed), active_after_promotion=active_count))
                 active_request = dict(request, version=promoted['version'])
                 active_name = skill_name
             lifecycles[-1].update(retire_skill(active_request, active_name))

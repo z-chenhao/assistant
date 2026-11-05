@@ -130,7 +130,7 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]
 			summarizing := len(request.Messages) > 0 && request.Messages[0].Text == prompt.SummarySystem()
-			if summarizing || (fixture == "local" || fixture == "agenda" || fixture == "research" || fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && hasTool(request.Tools, "mcp__fixture__echo") {
+			if summarizing || (fixture == "local" || fixture == "agenda" || fixture == "research" || fixture == "monitor" || fixture == "wedding" || fixture == "meeting" || fixture == "automation" || fixture == "computer" || fixture == "recall" || fixture == "core" || fixture == "codemode" || fixture == "children" || fixture == "capabilities" || fixture == "artifacts" || fixture == "tasks" || fixture == "approval" || fixture == "approval-never") && (hasTool(request.Tools, "mcp__fixture__echo") || hasTool(request.Tools, "builtin__artifact_search")) {
 				// Hold an actual accepted Worker generation while keeping the RPC
 				// peer responsive to cancellation. A new Root gets the appended
 				// instruction as its last message and can finish normally.
@@ -193,7 +193,7 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "completed", Usage: usage})
 				break
 			}
-			if fixture == "terminal-input" && hasTool(request.Tools, "mcp__fixture__echo") {
+			if fixture == "terminal-input" && (hasTool(request.Tools, "mcp__fixture__echo") || hasTool(request.Tools, "builtin__artifact_search")) {
 				// A short model reply isolates the terminal byte boundary from
 				// the separate Tool argument/output limits. Probe still runs below.
 				e.Text = "Input received."
@@ -203,17 +203,8 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 2, Kind: "completed"})
 				break
 			}
-			if (fixture == "main" || fixture == "golden") && hasTool(request.Tools, "mcp__fixture__echo") {
-				if fixture == "golden" {
-					for i := len(request.Messages) - 1; i >= 0; i-- {
-						m := request.Messages[i]
-						if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Retrieved durable context") {
-							continue
-						}
-						last = m
-						break
-					}
-				}
+			if (fixture == "main" || fixture == "golden") && (hasTool(request.Tools, "mcp__fixture__echo") || hasTool(request.Tools, "builtin__artifact_search")) {
+				last = mainFixtureMessage(request.Messages)
 				// Same call IDs on distinct exchanges deliberately exercise the
 				// (run, exchange, call) association, never global call-ID dedup.
 				sequence := int64(1)
@@ -228,17 +219,23 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 					sequence++
 				} else if last.Role == "user" {
 					for _, id := range []string{"echo-a", "echo-b"} {
-						args, _ := json.Marshal(struct {
-							Text string `json:"text"`
-						}{last.Text})
-						call := llm.ToolCall{ID: id, Name: "mcp__fixture__echo", Arguments: string(args)}
+						args := []byte(`{}`)
+						call := llm.ToolCall{ID: id, Name: "builtin__artifact_search", Arguments: string(args)}
 						if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "tool_call", ToolCall: &call}); err != nil {
 							return err
 						}
 						sequence++
 					}
 				} else if last.Role == "tool" {
-					text := "Processed: " + last.Text
+					user := ""
+					for i := len(request.Messages) - 1; i >= 0; i-- {
+						m := request.Messages[i]
+						if m.Role == "user" && m.Origin == "" {
+							user = m.Text
+							break
+						}
+					}
+					text := "Processed: " + user
 					if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: sequence, Kind: "text_delta", Text: text}); err != nil {
 						return err
 					}

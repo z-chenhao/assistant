@@ -1,4 +1,5 @@
 import {t} from './i18n';
+import {IntelligentWidget} from './widgets';
 import {Component,type ReactNode} from 'react';
 import {flushSync} from 'react-dom';
 import {createRoot,type Root} from 'react-dom/client';
@@ -7,14 +8,15 @@ import {Button} from './components/ui/button';
 import {Card, CardContent} from './components/ui/card';
 import {DataTable, TableProps} from './components/data-table';
 
-// This renderer consumes the existing Host-owned UISpec v1. No model code,
-// HTML interpreter, visualization router, provider or credential path is added.
+// Host-owned native components and opaque-origin UI artifacts share the
+// conversation renderer; no model provider or credentials run in the browser.
 const text=z.string().max(128*1024);
 const component=z.discriminatedUnion('type',[
+  z.object({type:z.literal('widget'),title:z.string().max(200),text:text,widget_ref:z.string().regex(/^ui:[^/\\\\\s\0]+$/)}),
   z.object({type:z.literal('markdown'),text:text.default('')}),
   z.object({type:z.literal('artifact'),text:text.default(''),artifact_ref:z.string().regex(/^artifact:[^/\\\s\0]*$/)}),
   z.object({type:z.literal('progress'),text:text.default(''),status:z.string().optional()}),
-  z.object({type:z.literal('table'),columns:TableProps.shape.columns,rows:TableProps.shape.rows}),
+  z.object({type:z.literal('table'),title:z.string().max(200).optional(),columns:TableProps.shape.columns,rows:TableProps.shape.rows}),
   z.object({type:z.literal('confirmation'),text:text.default(''),approval_id:z.string().min(1),frozen_arguments_hash:z.string().length(64)}),
   z.object({type:z.literal('form'),text:text.default(''),fields:z.array(z.object({name:z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/),label:z.string().min(1).max(256),value:z.string().max(4096)})).min(1).max(16),message_id:z.string().optional(),form_id:z.string().length(64).optional(),submitted:z.boolean().optional(),disabled:z.boolean().optional()}),
 ]);
@@ -29,10 +31,11 @@ class RenderBoundary extends Component<{children:ReactNode;fallback:string},{fai
 
 function NativeComponent({value:c}:{value:UIComponent}) {
   switch(c.type){
+    case 'widget':return <IntelligentWidget title={c.title} reference={c.widget_ref} fallback={c.text}/>;
     case 'markdown':return <div className="semantic">{c.text}</div>;
     case 'artifact':return <Card className="artifact-card"><CardContent><a className="artifact" href={'/artifact?ref='+encodeURIComponent(c.artifact_ref)}>↓ {c.text} {t('attachment')}</a></CardContent></Card>;
     case 'progress':return <p className="progress">{c.status??''} · {c.text}</p>;
-    case 'table':return <DataTable props={{title:t('Comparison'),columns:c.columns,rows:c.rows,source:t('From this conversation')}}/>;
+    case 'table':return <DataTable props={{title:c.title??t('Comparison'),columns:c.columns,rows:c.rows,source:t('From this conversation')}}/>;
     case 'confirmation':return <Card className="approval"><CardContent><p className="semantic">{c.text}</p><form action="/approval" method="post"><input type="hidden" name="approval_id" value={c.approval_id}/><input type="hidden" name="hash" value={c.frozen_arguments_hash}/><Button name="decision" value="approved">{t('Approve')}</Button><Button variant="secondary" name="decision" value="denied">{t('Decline')}</Button></form></CardContent></Card>;
     case 'form':return c.form_id&&c.message_id?<form method="post" action="/ui/form" className="rich-answer-form" data-form-id={c.form_id} data-submitted={String(!!c.submitted)}><p className="semantic">{c.text}</p><input type="hidden" name="message_id" value={c.message_id}/><input type="hidden" name="form_id" value={c.form_id}/><fieldset disabled={!!c.submitted||!!c.disabled}>{c.fields.map(f=><div className="rich-field" key={f.name}><label htmlFor={c.form_id+'-'+f.name}>{f.label}</label><textarea id={c.form_id+'-'+f.name} name={'field.'+f.name} required maxLength={4096} rows={2} defaultValue={f.value}/></div>)}<Button type="submit">{t('Send response')}</Button></fieldset><p className="field-help" role="status" aria-live="polite">{t(c.submitted?'Your response was saved. Ghost will review it in the conversation.':c.disabled?'This form is temporarily unavailable. Your conversation is kept.':'Your answers go to Ghost. External actions still require their own approval.')}</p></form>:<dl>{c.fields.map(f=><div key={f.name}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>;
   }

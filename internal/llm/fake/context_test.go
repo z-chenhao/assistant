@@ -9,6 +9,34 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
+func TestMainFixtureContextDoesNotRepeatCompletedCalls(t *testing.T) {
+	input := llm.Message{Role: "user", Text: "Continue the plan"}
+	receipt := llm.Message{Role: "tool", ToolCallID: "echo-b", Text: "completed"}
+	retrieval := llm.Message{Role: "user", Origin: "runtime", Text: "Retrieved durable context: evidence"}
+	if got := mainFixtureMessage([]llm.Message{input, receipt, retrieval}); got.Role != "tool" {
+		t.Fatal("retrieval repeated completed calls", got)
+	}
+	request, _, err := contextbuilder.SummaryRequest([]llm.Message{receipt}, nil, 6000, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary := contextReply(llm.GenerationRequest{Messages: request})
+	state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
+		Summary string `json:"summary"`
+	}{summary.Text})
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := append([]llm.Message{input}, wire...)
+	if got := mainFixtureMessage(messages); got.Role != "tool" {
+		t.Fatal("compaction repeated completed calls", got)
+	}
+	if got := mainFixtureMessage(append(messages, input)); got.Role != "user" || got.Origin != "" {
+		t.Fatal("old receipt consumed fresh input", got)
+	}
+}
+
 func TestDelegateKeepsCompletedReceiptAcrossSummary(t *testing.T) {
 	testDelegateSummary(t, []llm.Message{{Role: "tool", ToolCallID: "delegate", Text: `{"task_ref":"task:accepted"}`}}, "Observed Task result:")
 }
@@ -20,6 +48,15 @@ func TestDelegateKeepsTaskUpdateAcrossSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	testDelegateSummary(t, wire, "Observed Worker update:")
+}
+
+func TestDelegateKeepsUnknownEffectAcrossSummary(t *testing.T) {
+	state := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "needs_input", "text": "UNKNOWN_SIDE_EFFECT"})
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testDelegateSummary(t, wire, "Observed Worker update: UNKNOWN_SIDE_EFFECT")
 }
 
 func testDelegateSummary(t *testing.T, sources []llm.Message, observed string) {
@@ -93,5 +130,40 @@ func TestArtifactReadKeepsCompletedReceiptAcrossSummary(t *testing.T) {
 	result := artifactsReply(request)
 	if len(result.ToolCalls) != 0 || result.Text == "" {
 		t.Fatal("compaction repeated the completed read", result)
+	}
+}
+
+func TestAutomaticDelegationKeepsTaskUpdateAcrossSummary(t *testing.T) {
+	update := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "completed"})
+	sources, err := agent.ProviderMessages([]agent.AgentMessage{update}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := llm.Message{Role: "user", Text: `Capabilities: [{"name":"builtin__read","arguments":{"path":"AGENTS.md"}}]`}
+	tools := []llm.ToolSpec{{Name: "builtin__task_manage"}}
+	for round := 0; round < 2; round++ {
+		messages, _, err := contextbuilder.SummaryRequest(sources, nil, 6000, 2048)
+		if err != nil {
+			t.Fatal(err)
+		}
+		summary := contextReply(llm.GenerationRequest{Messages: messages})
+		state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
+			Summary string `json:"summary"`
+		}{summary.Text})
+		wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := llm.GenerationRequest{Tools: tools, Messages: append([]llm.Message{input}, wire...)}
+		result := capabilitiesReply(request)
+		if len(result.ToolCalls) != 0 || !strings.HasPrefix(result.Text, "Observed Worker update:") {
+			t.Fatal("compacted automatic delegation repeated Task create", round, result)
+		}
+		request.Messages = append(request.Messages, input)
+		result = capabilitiesReply(request)
+		if len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != "builtin__task_manage" {
+			t.Fatal("old Worker update suppressed new request", result)
+		}
+		sources = wire
 	}
 }

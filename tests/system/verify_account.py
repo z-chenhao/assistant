@@ -25,6 +25,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+from codemode_peer import runtime_yaml
 
 
 def require(ok, message):
@@ -195,12 +196,14 @@ class Secrets(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps({"ok": op != "get" or value is not None, "value": value}) + "\n").encode())
 
 
-def account_config(root, bridge, endpoint):
-    """Owned fetch substitution shared by CLI and terminal acceptance."""
+def account_config(root, bridge, endpoint, binary=None):
+    """Route the native Go bridge to the explicitly owned loopback peer."""
+    binary = Path(binary or bridge.parent.parent / 'bin/steward').resolve()
     wrapper = root / "bridge.mjs"
-    wrapper.write_text("const network=globalThis.fetch;globalThis.fetch=(u,i)=>{const url=new URL(typeof u==='string'?u:u.url??u.toString());if(!['https://auth.openai.com','https://api.openai.com'].includes(url.origin))throw new Error('forbidden fixture network');return network(" + json.dumps(endpoint) + "+url.pathname+url.search,i)};process.argv[1]=" + json.dumps(str(bridge)) + ";await import(" + json.dumps(bridge.as_uri()) + ");\n")
+    wrapper.write_text("import {spawn} from 'node:child_process';const child=spawn(" + json.dumps(str(binary)) + ",[\"-test-native-model-bridge\"," + json.dumps(endpoint) + "],{stdio:['pipe','pipe','inherit']});process.stdin.pipe(child.stdin);child.stdout.pipe(process.stdout);child.stdin.on('error',()=>{});for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{child.stdin.end();child.kill(signal)});child.on('error',()=>{process.exitCode=1});child.on('exit',code=>{process.exitCode=code??1});\n")
     cfg = root / "config.yaml"
     cfg.write_text(f"version: 1\napp:\n  data_root: {root / 'data'}\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: {wrapper}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+    cfg.write_text(cfg.read_text()+runtime_yaml())
     return cfg
 
 
@@ -222,7 +225,7 @@ def verify(binary, bridge, native_env=None):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                cfg = account_config(root, bridge, endpoint)
+                cfg = account_config(root, bridge, endpoint, binary)
                 env = {k: v for k, v in os.environ.items() if not k.startswith("STEWARD_")}
                 args = [str(binary), "-config", str(cfg)]
                 if native_env is None:
@@ -286,7 +289,8 @@ def verify(binary, bridge, native_env=None):
                 require([m["role"] for m in history] == ["user", "assistant"] and history[-1]["content"][0]["text"] == "PROBE_RESULT_OK", "account Main/Direct Tool continuation failed")
                 with closing(sqlite3.connect(root / "data/state.db")) as main_db, main_db:
                     require(main_db.execute("SELECT count(*) FROM run WHERE status='completed'").fetchone()[0] == 1, "account Main not complete")
-                    require(main_db.execute("SELECT count(*) FROM tool_invocation WHERE status='succeeded'").fetchone()[0] == 1, "account Direct Tool not persisted")
+                    require(main_db.execute("SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__artifact_search' AND status='succeeded'").fetchone()[0] == 1, "account nested business tool not persisted")
+                    require(main_db.execute("SELECT count(*) FROM tool_invocation WHERE tool_name='builtin__codemode_execute' AND status='succeeded'").fetchone()[0] == 1, "account model bypassed Code Mode")
                 report["main_history"] = history
                 report["checks"].append("actual account CLI Main Actor/Loop/Direct Tool/Conversation and frozen current Responses snapshot")
 
