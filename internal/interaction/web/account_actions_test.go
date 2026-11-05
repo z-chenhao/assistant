@@ -61,7 +61,7 @@ func TestAccountStoreFailureExplainsRepairWithoutExposingBackendDetails(t *testi
 			t.Fatal(err)
 		}
 		text := out.String()
-		if !strings.Contains(text, "libsecret") || strings.Contains(text, "private-") || strings.Contains(text, "Account connected.") {
+		if !strings.Contains(text, translate(language, credentialStoreHelp)) || strings.Contains(text, "private-") || strings.Contains(text, "Account connected.") {
 			t.Fatal("credential repair UI missing or exposed private data")
 		}
 	}

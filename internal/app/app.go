@@ -215,7 +215,11 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	if cfg.GitHub != nil {
 		a.github = &github.Service{Config: *cfg.GitHub, Store: store, Client: github.Client{Secrets: secrets}}
 	}
-	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
+	accountSecrets := secrets
+	if _, production := secrets.(secret.Store); production && cfg.LLM.AccountSecretStore != "native" {
+		accountSecrets = secret.AccountFiles{DataRoot: cfg.App.DataRoot}
+	}
+	a.accounts = &account.Manager{Store: store.Models(), Secrets: accountSecrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {
@@ -329,7 +333,13 @@ func (a *App) providerDiagnostics(ctx context.Context) (agent.Diagnostics, error
 	if err != nil {
 		return d, err
 	}
-	return agent.EffectiveReadiness(ctx, d, a.control, a.provider), nil
+	return agent.EffectiveReadiness(ctx, d, modelAvailability(a.control.Configured), a.provider), nil
+}
+
+type modelAvailability func(context.Context, string) bool
+
+func (check modelAvailability) Available(ctx context.Context, id string) bool {
+	return check(ctx, id)
 }
 
 func (a *App) Models() *llmsqlite.Store   { return a.store.Models() }
@@ -407,7 +417,8 @@ func (a *App) Actor(sink agent.EventSink) agent.Actor {
 				return false
 			}
 			d, err := a.Diagnostics(ctx)
-			return err == nil && d.AgentIngressEnabled
+			return err == nil && d.AgentIngressEnabled && d.ActiveModelProfileID != nil &&
+				a.control.Available(ctx, *d.ActiveModelProfileID)
 		}}
 }
 func (a *App) History(ctx context.Context) ([]conversation.Message, error) {

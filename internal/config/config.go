@@ -78,6 +78,7 @@ type LLM struct {
 	ProviderBridgeCommand string `yaml:"provider_bridge_command"`
 	ProviderBridgeScript  string `yaml:"provider_bridge_script"`
 	ProviderBridgeVersion string `yaml:"provider_bridge_version"`
+	AccountSecretStore    string `yaml:"account_secret_store"`
 }
 
 type App struct {
@@ -176,6 +177,11 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	}
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
 		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	}
+	switch cfg.LLM.AccountSecretStore {
+	case "", "file", "native":
+	default:
+		return Config{}, errors.New("llm.account_secret_store must be file or native")
 	}
 	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
 		return Config{}, errors.New("javascript requires an absolute command and script")

@@ -141,24 +141,26 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		}
 		http.Redirect(w, r, safePageReturn(r.FormValue("return_to")), http.StatusSeeOther)
 		return nil
+	case "/model/catalog":
+		return s.showAccountCatalog(w, r)
 	case "/model/add":
 		p, err := s.addModel(r)
 		if err != nil {
 			return err
 		}
-		http.Redirect(w, r, modelURL(p.ProfileID)+"?notice=added", http.StatusSeeOther)
+		http.Redirect(w, r, resourceModelURL(p.ProfileID, "added"), http.StatusSeeOther)
 		return nil
 	case "/model/test":
-		if _, e := s.Control.Test(r.Context(), r.FormValue("profile")); e != nil {
+		if e := s.testModel(r); e != nil {
 			return e
 		}
-		http.Redirect(w, r, modelURL(r.FormValue("profile"))+"?notice=tested", http.StatusSeeOther)
+		http.Redirect(w, r, resourceModelURL(r.FormValue("profile"), "tested"), http.StatusSeeOther)
 		return nil
 	case "/model/select":
 		if err := s.selectModel(r); err != nil {
 			return err
 		}
-		http.Redirect(w, r, modelURL(r.FormValue("profile"))+"?notice=active", http.StatusSeeOther)
+		http.Redirect(w, r, resourceModelURL(r.FormValue("profile"), "active"), http.StatusSeeOther)
 		return nil
 	case "/notification":
 		if err := s.preferNotification(r); err != nil {
@@ -180,6 +182,7 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		s.mu.Lock()
 		if s.accountID == r.FormValue("account") {
 			s.auth = llm.AuthState{}
+			s.authOnResources = false
 			s.authError = ""
 			s.accountID = ""
 		}
@@ -197,10 +200,7 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 	}
 	target := "/"
 	if strings.HasPrefix(r.URL.Path, "/auth/") {
-		target = "/settings/models/new?provider=chatgpt"
-		if id := r.FormValue("profile"); id != "" {
-			target = modelURL(id)
-		}
+		target = accountReturn(r)
 	}
 	http.Redirect(w, r, safePageReturn(target), http.StatusSeeOther)
 	return nil

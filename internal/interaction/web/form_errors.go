@@ -45,7 +45,7 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 		path, query = u.Path, u.Query()
 	case "/message":
 		query.Set("task", r.FormValue("task_ref"))
-	case "/model/add":
+	case "/model/add", "/model/catalog":
 		path = "/settings/models/new"
 		query.Set("provider", "compatible")
 		if r.FormValue("account") != "" {
@@ -53,12 +53,13 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 			query.Set("account", r.FormValue("account"))
 		}
 	case "/model/test", "/model/select":
-		path = modelURL(r.FormValue("profile"))
+		path = "/settings/setup"
+		query = resourceModelQuery(r.FormValue("profile"), "")
 	case "/notification":
 		path = "/settings/notifications"
 	case "/auth/login", "/auth/logout", "/auth/cancel":
-		path = "/settings/models/new"
-		query.Set("provider", "chatgpt")
+		target, _ := url.Parse(accountReturn(r))
+		path, query = target.Path, target.Query()
 	}
 	next := r.Clone(r.Context())
 	u := *r.URL

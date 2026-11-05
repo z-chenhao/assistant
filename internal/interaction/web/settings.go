@@ -12,23 +12,41 @@ import (
 )
 
 type settingsView struct {
-	Verified              map[string]bool
 	TargetUnavailable     bool
 	Section               string
 	Provider              string
-	Profile               *llm.Profile
+	TargetModel           string
+	DirectModels          []modelResource
 	Account               *llm.AuthConnection
 	Catalog               []llm.CatalogModel
+	CatalogLoaded         bool
 	CatalogError          bool
-	Related               []llm.Profile
+	AccountModels         map[string][]modelResource
 	Target                string
 	Model, Endpoint, Name string
 	ImageInput            bool
 }
 
-func modelURL(id string) string { return "/settings/models/" + url.PathEscape(id) }
+type modelResource struct {
+	llm.Profile
+	Current, Verified, Open, CanTest bool
+	ConfigVersion                    int64
+}
+
+func resourceModelQuery(id, notice string) url.Values {
+	query := url.Values{"model": {id}}
+	if notice != "" {
+		query.Set("notice", notice)
+	}
+	return query
+}
+
+func resourceModelURL(id, notice string) string {
+	return "/settings/setup?" + resourceModelQuery(id, notice).Encode() + "#model-" + url.PathEscape(id)
+}
+
 func (s *Server) loadSettings(ctx context.Context, r *http.Request, p *page) error {
-	v := &settingsView{Verified: map[string]bool{}, Section: "models", Provider: r.URL.Query().Get("provider"), Endpoint: "http://127.0.0.1:8000/v1"}
+	v := &settingsView{Section: "resources", Provider: r.URL.Query().Get("provider"), Endpoint: "http://127.0.0.1:8000/v1"}
 	p.Settings = v
 	if r.URL.Path == "/settings/preferences" {
 		v.Section = "preferences"
@@ -62,76 +80,97 @@ func (s *Server) loadSettings(ctx context.Context, r *http.Request, p *page) err
 		}
 		return nil
 	}
-	var err error
-	p.Profiles, err = s.Models.ListProfiles(ctx)
-	if err != nil {
-		return err
-	}
-	for _, profile := range p.Profiles {
-		v.Verified[profile.ProfileID] = s.profileVerified(ctx, profile)
-	}
 	if r.URL.Path == "/settings/models/new" {
 		v.Section = "new"
-		if v.Provider != "" && v.Provider != "compatible" && v.Provider != "chatgpt" {
+		if v.Provider == "" {
+			v.Provider = "chatgpt"
+		}
+		if v.Provider != "compatible" && v.Provider != "chatgpt" {
 			return llm.ErrConflict
 		}
-	} else if strings.HasPrefix(r.URL.Path, "/settings/models/") {
-		v.Section = "model"
-		id := strings.TrimPrefix(r.URL.Path, "/settings/models/")
-		for i := range p.Profiles {
-			if p.Profiles[i].ProfileID == id {
-				v.Profile = &p.Profiles[i]
-				break
-			}
-		}
-		if v.Profile == nil {
-			return errPageNotFound
+		if v.Provider == "compatible" {
+			return nil
 		}
 	}
-	// Flash text cannot claim stale verification or activation after the profile,
-	// credentials or bridge have changed since the redirect.
-	if r.URL.Query().Get("notice") == "tested" && (v.Profile == nil || !v.Verified[v.Profile.ProfileID]) {
-		p.Notice = ""
-	}
-	if r.URL.Query().Get("notice") == "active" && (v.Profile == nil || v.Profile.ProfileID != activeProfile(p.Status)) {
-		p.Notice = ""
-	}
-	// Account lifecycle data is only needed inside the add/detail workflow.
-	if (v.Section == "new" && v.Provider == "chatgpt" || v.Profile != nil && v.Profile.AuthConnectionID != "") && s.Accounts != nil {
+	if s.Accounts != nil {
+		var err error
 		p.Accounts, err = s.Accounts.Store.Accounts(ctx)
 		if err != nil {
 			return err
 		}
-		account := r.URL.Query().Get("account")
-		if v.Profile != nil {
-			account = v.Profile.AuthConnectionID
+	}
+	if v.Section == "resources" {
+		return s.loadResourceModels(ctx, r, p)
+	}
+
+	account := r.URL.Query().Get("account")
+	if account == "" {
+		account = p.AccountID
+	}
+	for i := range p.Accounts {
+		if p.Accounts[i].ConnectionID == account {
+			v.Account = &p.Accounts[i]
+			break
 		}
-		if account == "" {
-			account = p.AccountID
+	}
+	if account != "" && v.Account == nil {
+		return errPageNotFound
+	}
+	if v.Account == nil && len(p.Accounts) == 1 {
+		v.Account = &p.Accounts[0]
+	}
+	return nil
+}
+
+func (s *Server) loadResourceModels(ctx context.Context, r *http.Request, p *page) error {
+	profiles, err := s.Models.ListProfiles(ctx)
+	if err != nil {
+		return err
+	}
+	v := p.Settings
+	v.AccountModels = make(map[string][]modelResource, len(p.Accounts))
+	connectedAccounts := make(map[string]bool, len(p.Accounts))
+	for _, account := range p.Accounts {
+		v.AccountModels[account.ConnectionID] = nil
+		connectedAccounts[account.ConnectionID] = account.Status == "connected"
+	}
+	requested := r.URL.Query().Get("model")
+	notice := r.URL.Query().Get("notice")
+	if strings.HasPrefix(r.URL.Path, "/settings/models/") {
+		requested = strings.TrimPrefix(r.URL.Path, "/settings/models/")
+	}
+	for _, profile := range profiles {
+		current := profile.ProfileID == activeProfile(p.Status)
+		verified := s.profileVerified(ctx, profile)
+		row := modelResource{
+			Profile:       profile,
+			Current:       current,
+			Verified:      verified,
+			Open:          profile.ProfileID == requested && notice != "active",
+			ConfigVersion: p.Status.ConfigVersion,
+			CanTest:       profile.ProviderKind != "openai_account" || connectedAccounts[profile.AuthConnectionID],
 		}
-		for i := range p.Accounts {
-			if p.Accounts[i].ConnectionID == account {
-				v.Account = &p.Accounts[i]
-				break
-			}
-		}
-		if account != "" && v.Account == nil {
-			return errPageNotFound
-		}
-		if v.Account == nil && len(p.Accounts) == 1 {
-			v.Account = &p.Accounts[0]
-		}
-		if v.Account != nil {
-			for _, profile := range p.Profiles {
-				if profile.AuthConnectionID == v.Account.ConnectionID {
-					v.Related = append(v.Related, profile)
+		if row.ProfileID == requested {
+			v.TargetModel = row.ProfileID
+			switch notice {
+			case "tested":
+				if !row.Verified {
+					p.Notice = ""
+				}
+			case "active":
+				if !row.Current {
+					p.Notice = ""
 				}
 			}
-			if v.Section == "new" && v.Account.Status == "connected" && s.AccountCatalog != nil {
-				v.Catalog, err = s.AccountCatalog(ctx, v.Account.ConnectionID)
-				v.CatalogError = err != nil
-			}
 		}
+		if models, known := v.AccountModels[profile.AuthConnectionID]; known {
+			v.AccountModels[profile.AuthConnectionID] = append(models, row)
+		} else {
+			v.DirectModels = append(v.DirectModels, row)
+		}
+	}
+	if requested != "" && v.TargetModel == "" {
+		return errPageNotFound
 	}
 	return nil
 }
@@ -152,7 +191,8 @@ func (s *Server) profileVerified(ctx context.Context, p llm.Profile) bool {
 	version := int64(0)
 	if p.AuthConnectionID != "" {
 		a, e := s.Control.Store.Auth(ctx, p.AuthConnectionID)
-		if e != nil || a.Status != "connected" || a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now()) {
+		if e != nil || a.Status != "connected" ||
+			a.AuthKind != "chatgpt_oauth" && a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now()) {
 			return false
 		}
 		version = a.Version

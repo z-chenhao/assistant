@@ -1,11 +1,51 @@
-{{define "model-detail"}}
-{{with .Settings.Profile}}
-<div class="page-heading"><div><a class="back-link" href="/settings/models">{{tr "← Models"}}</a><h1>{{.Name}}</h1><p>{{tr (providerName .ProviderKind)}} · {{.ModelID}}</p></div><span class="status-pill" data-status="{{if index $.Settings.Verified .ProfileID}}ready{{else}}{{.Status}}{{end}}">{{if index $.Settings.Verified .ProfileID}}{{tr "Connection verified"}}{{else}}{{tr .Status}}{{end}}</span></div>
-<section class="panel"><h2>{{if eq .ProfileID (activeProfile $.Status)}}{{tr "Current model"}}{{else}}{{tr "Connection & capabilities"}}{{end}}</h2><dl class="facts"><div><dt>{{tr "Source"}}</dt><dd>{{if .Endpoint}}{{.Endpoint}}{{else}}{{tr "ChatGPT account"}}{{end}}</dd></div><div><dt>{{tr "Image handling"}}</dt><dd>{{if .Capabilities.ImageInput}}{{if index $.Settings.Verified .ProfileID}}{{tr "Image input verified"}}{{else}}{{tr "Image input requested; test connection"}}{{end}}{{else}}{{tr "Text only · attachments by reference · local OCR when available"}}{{end}}</dd></div><div><dt>{{tr "Context / maximum output"}}</dt><dd>{{.ContextWindow}} / {{.MaxOutputTokens}} {{tr "tokens"}}</dd></div></dl>
-<form method="post" action="/model/test"><input name="profile" type="hidden" value="{{.ProfileID}}"><button class="secondary">{{tr "Test connection"}}</button></form></section>
-{{if and (eq .ProfileID (activeProfile $.Status)) (eq .Status "ready") (canSend $.Status)}}<section class="panel model-ready"><h2>{{tr "Ready for new work"}}</h2><p>{{tr "Work already in progress keeps its frozen model and capabilities."}}</p><a class="button" href="/">{{tr "Start a conversation →"}}</a></section>
-{{else if index $.Settings.Verified .ProfileID}}<section class="panel"><h2>{{tr "Use this model"}}</h2><p>{{tr "New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration."}}</p><form method="post" action="/model/select"><input name="profile" type="hidden" value="{{.ProfileID}}"><input name="profile_version" type="hidden" value="{{.Version}}"><input name="config_version" type="hidden" value="{{$.Status.ConfigVersion}}"><label class="check"><input name="consent" type="checkbox" value="yes" required>{{tr "Use this provider for new work"}}</label><button>{{tr "Select model"}}</button></form></section>
-{{else}}<p class="field-help">{{tr "Verify this connection before selecting it for new work."}}</p>{{end}}
-{{end}}
-{{with .Settings.Account}}<section class="panel"><h2>{{tr "Provider account"}}</h2><p>{{.AccountLabel}} · {{tr .Status}}</p><p>{{tr "These account actions affect all"}} {{len $.Settings.Related}} {{tr "saved models using this account."}}</p><div id="signin-status">{{template "signin" $}}</div><div class="actions"><form method="post" action="/auth/login"><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="profile" value="{{$.Settings.Profile.ProfileID}}"><button class="secondary">{{tr "Reconnect account"}}</button></form><form method="post" action="/auth/logout"><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="profile" value="{{$.Settings.Profile.ProfileID}}"><button class="secondary danger-text">{{tr "Sign out of provider"}}</button></form></div></section>{{end}}
+{{define "model-resource"}}
+<div class="resource-model" id="model-{{.ProfileID}}">
+ {{if or (ne .Name .ModelID) .Endpoint}}
+ <details name="resource-model" {{if .Open}}open{{end}}>
+  <summary class="resource-summary"><span class="resource-name">{{.Name}}</span></summary>
+  <div class="resource-body">
+   <dl class="facts">
+    {{if ne .Name .ModelID}}<div><dt>{{tr "Model ID"}}</dt><dd>{{.ModelID}}</dd></div>{{end}}
+    {{if .Endpoint}}<div><dt>{{tr "Endpoint URL"}}</dt><dd>{{.Endpoint}}</dd></div>{{end}}
+   </dl>
+  </div>
+ </details>
+ {{else}}
+ <div class="resource-model-label"><span class="resource-name">{{.Name}}</span></div>
+ {{end}}
+ <div class="model-connection">
+  {{$restore := and .Current (ne .Status "ready")}}
+  {{if and .Verified (not $restore)}}
+   <span class="status-pill" data-status="ready">{{tr "Connection verified"}}</span>
+  {{else if .CanTest}}
+   <form method="post" action="/model/test">
+    <input name="profile" type="hidden" value="{{.ProfileID}}">
+    {{if .Current}}
+     <input name="restore_current" type="hidden" value="yes">
+     <input name="profile_version" type="hidden" value="{{.Version}}">
+     <input name="config_version" type="hidden" value="{{.ConfigVersion}}">
+    {{end}}
+    {{if .Verified}}<button class="secondary setting-action" data-model-restore>{{tr "Resume current model"}}</button>
+    {{else}}<button class="secondary setting-action">{{tr "Test connection"}}</button>{{end}}
+   </form>
+  {{else}}
+   <span class="status-pill warning">{{tr "Sign-in required"}}</span>
+  {{end}}
+ </div>
+ <div class="model-use">
+  {{if .Current}}
+   <span class="status-pill selected">{{tr "Current model"}}</span>
+  {{else if .CanTest}}
+   <form class="model-selection" method="post" action="/model/select" {{if not .Verified}}data-model-verify{{end}}>
+    <input name="profile" type="hidden" value="{{.ProfileID}}">
+    <input name="profile_version" type="hidden" value="{{.Version}}">
+    <input name="config_version" type="hidden" value="{{.ConfigVersion}}">
+    <span class="setting-help">
+     <span><button class="setting-action" name="consent" value="yes" aria-describedby="model-consent-{{.ProfileID}}">{{tr "Use for new work"}}</button></span>
+     <span id="model-consent-{{.ProfileID}}" role="tooltip">{{tr "New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration."}}</span>
+    </span>
+   </form>
+  {{end}}
+ </div>
+</div>
 {{end}}

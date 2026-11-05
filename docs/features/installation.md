@@ -84,11 +84,10 @@ installed automatically. macOS users can explicitly install and start the
 [background Web service](operations.md#macos-后台运行与独立巡检); it remains active
 after closing the browser. Existing Task and Run recovery uses the same durable state on restart.
 
-ChatGPT credentials require a native cgo build: macOS uses Keychain; Linux uses
-libsecret and an unlocked Secret Service keyring in the login session. On
-Debian/Ubuntu, install `libsecret-1-0 gnome-keyring dbus-user-session`. Without
-these optional dependencies, use a local endpoint or an explicit API-key
-environment reference.
+ChatGPT credentials default to private files in the Steward data root. The optional
+native backend uses Keychain on macOS or libsecret and an unlocked Secret Service
+keyring on Linux. On Debian/Ubuntu, its optional packages are
+`libsecret-1-0 gnome-keyring dbus-user-session`.
 Never put credentials in configuration files. See [provider setup](model-connections.md)
 for authentication requirements and model privacy details.
 

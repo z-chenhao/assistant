@@ -61,6 +61,10 @@ func (c Control) Test(ctx context.Context, id string) (ProbeRecord, error) {
 }
 
 func (c Control) TestWithProgress(ctx context.Context, id string, progress func(ProbeStage)) (ProbeRecord, error) {
+	return c.testWithProgress(ctx, id, 0, progress)
+}
+
+func (c Control) testWithProgress(ctx context.Context, id string, expectedVersion int64, progress func(ProbeStage)) (ProbeRecord, error) {
 	if c.BridgeError != nil {
 		return ProbeRecord{}, c.BridgeError
 	}
@@ -70,6 +74,9 @@ func (c Control) TestWithProgress(ctx context.Context, id string, progress func(
 	p, err := c.Store.Profile(ctx, id)
 	if err != nil {
 		return ProbeRecord{}, err
+	}
+	if expectedVersion != 0 && p.Version != expectedVersion {
+		return ProbeRecord{}, ErrConflict
 	}
 	if p.ReasoningEffort != "" {
 		return ProbeRecord{}, ModelIncompatible
@@ -138,8 +145,11 @@ func (c Control) Select(ctx context.Context, id string, profileVersion, configVe
 		return err
 	}
 	r, err := c.Store.Probe(ctx, id)
-	if err != nil {
+	if errors.Is(err, ErrNotFound) {
 		return ErrUnverified
+	}
+	if err != nil {
+		return err
 	}
 	if r.ProfileVersion != p.Version || r.AuthVersion != version || r.BridgeIdentity != c.BridgeIdentity || r.Result.ValidateCapabilities(p.Capabilities) != nil {
 		return ErrUnverified
@@ -147,9 +157,49 @@ func (c Control) Select(ctx context.Context, id string, profileVersion, configVe
 	return c.Store.Select(ctx, id, profileVersion, configVersion, c.BridgeIdentity)
 }
 
-// Available validates frozen Probe provenance and credentials on every startup.
+// SelectWithProbe checks capabilities if the requested profile has no current
+// proof. Both passes use the versions the user saw before consenting.
+func (c Control) SelectWithProbe(ctx context.Context, id string, profileVersion, configVersion int64) error {
+	err := c.Select(ctx, id, profileVersion, configVersion)
+	if !errors.Is(err, ErrUnverified) {
+		return err
+	}
+	if _, err = c.testWithProgress(ctx, id, profileVersion, nil); err != nil {
+		return err
+	}
+	return c.Select(ctx, id, profileVersion, configVersion)
+}
+
+// Available validates frozen Probe provenance and credentials before work.
 // A saved Fake result is unusable without the same explicit test injection.
 func (c Control) Available(ctx context.Context, id string) bool {
+	return c.available(ctx, id, c.CheckAuth)
+}
+
+// Configured checks persisted readiness without reading or refreshing a secret.
+func (c Control) Configured(ctx context.Context, id string) bool {
+	return c.available(ctx, id, c.configuredAuth)
+}
+
+func (c Control) configuredAuth(ctx context.Context, p Profile) (int64, error) {
+	if p.AuthConnectionID == "" {
+		return 0, nil
+	}
+	a, err := c.Store.Auth(ctx, p.AuthConnectionID)
+	if err != nil {
+		return 0, err
+	}
+	if a.Status != "connected" {
+		return 0, AuthRequired
+	}
+	// OAuth can refresh an expired token when the user actually needs it.
+	if a.AuthKind != "chatgpt_oauth" && a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now()) {
+		return 0, AuthRequired
+	}
+	return a.Version, nil
+}
+
+func (c Control) available(ctx context.Context, id string, checkAuth func(context.Context, Profile) (int64, error)) bool {
 	if c.Probe == nil || c.BridgeIdentity == "" {
 		return false
 	}
@@ -157,7 +207,7 @@ func (c Control) Available(ctx context.Context, id string) bool {
 	if err != nil || p.Status != "ready" || p.VerifiedAt == nil || p.ValidateActivation() != nil {
 		return false
 	}
-	version, err := c.CheckAuth(ctx, p)
+	version, err := checkAuth(ctx, p)
 	if err != nil {
 		return false
 	}
