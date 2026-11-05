@@ -156,7 +156,7 @@ registry, frozen policy and invocation lifecycle.
 
 ## 个人 Connector 待实现方案
 
-F-046–F-069 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Connector；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。这些是需求和实施约束，尚未新增适配器、网络访问、配置、OAuth、数据库迁移或公开接口。现有运行架构仍是本文前述的受限本地 MCP、具名 GitHub PR 观察和既有 Guest 能力。
+F-046–F-069 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Connector；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已在既有执行框架内增加公开读取、当前账户原生搜索和可选 Exa 后备，详见下方实现方案；其他服务仍是需求与实施约束，未新增其适配器、OAuth 或公开接口。已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
 
 ### 具体要求与现有消费者
 
@@ -197,7 +197,7 @@ F-046–F-069 的具体范围及分类见[术语与登记边界](../features/int
 | F-064 Google Drive | 确认资料存储→选择文件→读取／保存 | 来源未确认；`drive.file` 不支持任意全盘搜索，原生编辑按实际文件类型另行验收 |
 | F-065 X | 网页覆盖不足的确切帖子→结构化上下文→核验 | 首先复用搜索／Chrome；直连 API 账户、用量成本和媒体覆盖需核实，不接写操作 |
 | F-066 YouTube | 确认视频任务→读取元数据／授权转录→时间戳引用 | 委托需求待确认；官方字幕下载要求视频编辑权限，不能承诺任意公开视频转录 |
-| F-067 Exa MCP | 固定公开服务→免密钥查询→来源结果 | 远端传输与实际工具需验证；免费限流、过滤能力、schema 变化和正文完整性不能假设 |
+| F-067 Exa MCP | F-069 已接固定公开服务→免密钥查询→来源结果 | 现有窄搜索适配保持实验性；免费限流、过滤能力、schema 变化和正文完整性不能假设 |
 | F-068 SearXNG | 选定实例→JSON 搜索→来源结果 | 实例与上游未定，接口格式／部分结果、服务端点范围及认证重定向需验证 |
 
 ### F-069 · Web Access 的最小组合方案

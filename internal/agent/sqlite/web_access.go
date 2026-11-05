@@ -74,10 +74,11 @@ func (t *tools) executeWebAccess(ctx context.Context, inv tool.Invocation) (tool
 		return tool.Result{Output: &tool.BinaryOutput{Name: "web-page.txt", MediaType: "text/plain", Reader: io.NopCloser(strings.NewReader(full)), ResultJSON: func(ref string) string {
 			b, _ := json.Marshal(struct {
 				webaccess.Page
-				Artifact string `json:"artifact_ref"`
-				Bytes    int    `json:"total_bytes"`
-				More     bool   `json:"has_more"`
-			}{page, ref, len(full), len(full) > len(page.Text)})
+				Artifact   string `json:"artifact_ref"`
+				Bytes      int    `json:"total_bytes"`
+				NextOffset int    `json:"next_offset"`
+				More       bool   `json:"has_more"`
+			}{page, ref, len(full), len(page.Text), len(full) > len(page.Text)})
 			return string(b)
 		}}}, nil
 	}

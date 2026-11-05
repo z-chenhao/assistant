@@ -177,12 +177,13 @@ func TestWebAccessPageArtifactContinuationAndReplay(t *testing.T) {
 		t.Fatal(results, err)
 	}
 	var envelope struct {
-		Artifact string `json:"artifact_ref"`
-		More     bool   `json:"has_more"`
-		Text     string `json:"text"`
-		Bytes    int    `json:"total_bytes"`
+		Artifact   string `json:"artifact_ref"`
+		More       bool   `json:"has_more"`
+		Text       string `json:"text"`
+		Bytes      int    `json:"total_bytes"`
+		NextOffset int    `json:"next_offset"`
 	}
-	if json.Unmarshal([]byte(results[0].Text), &envelope) != nil || !envelope.More || envelope.Bytes != len(full) || len(envelope.Text) > 4096 || envelope.Artifact != results[0].ArtifactRefs[0] {
+	if json.Unmarshal([]byte(results[0].Text), &envelope) != nil || !envelope.More || envelope.Bytes != len(full) || len(envelope.Text) > 4096 || envelope.NextOffset != len(envelope.Text) || envelope.Text+full[envelope.NextOffset:] != full || envelope.Artifact != results[0].ArtifactRefs[0] {
 		t.Fatal(results)
 	}
 	again, err := e.Execute(ctx, exchange, calls)
