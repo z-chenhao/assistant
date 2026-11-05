@@ -35,6 +35,9 @@ var browserSource string
 var transferSource string
 
 func (p *Provider) useGuest(ctx context.Context, i computer.Instance) (SSHGuest, string, error) {
+	if err := p.Prepare(ctx); err != nil {
+		return SSHGuest{}, "", err
+	}
 	g, ok := p.guest.(SSHGuest)
 	if !ok {
 		return SSHGuest{}, "", computer.ErrUnavailable

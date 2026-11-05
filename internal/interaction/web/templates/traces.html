@@ -1,6 +1,5 @@
 {{define "observability-page"}}
 <section class="observability" id="observability-page">
-{{template "developer-tabs" .}}
 {{with .Trace}}
 {{if .Tree}}
 <a class="back-link" href="{{traceListURL .}}">{{tr "← Traces"}}</a>

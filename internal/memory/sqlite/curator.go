@@ -206,13 +206,13 @@ func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) 
 			s.clearWorking()
 		}
 		s.unlockSearch()
-		return sqliteindex.Search(ctx, s.db, scope, q, s.engine, "memory")
+		return s.searchIndex(ctx, s.db, scope, q)
 	}
 	working, err := s.encryptedIndex(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	return sqliteindex.Search(ctx, working, scope, q, s.engine, "memory")
+	return s.searchIndex(ctx, working, scope, q)
 }
 
 func (s *Store) encryptedIndex(ctx context.Context, scope recall.Scope) (*sql.DB, error) {
@@ -221,7 +221,7 @@ func (s *Store) encryptedIndex(ctx context.Context, scope recall.Scope) (*sql.DB
 	}
 	defer s.unlockSearch()
 	local, ok := s.engine.(interface{ Local() bool })
-	if !ok || !local.Local() {
+	if !s.localSearch && (!ok || !local.Local()) {
 		return nil, recall.ErrUnavailable
 	}
 	rows, e := s.db.QueryContext(ctx, `SELECT m.memory_id,m.user_id,m.scope_type,m.scope_id,m.content,m.created_at,m.tier`+currentMemoryRows+` ORDER BY m.memory_id`, scope.UserID, scope.UserID, scope.AgentID)
@@ -258,8 +258,10 @@ func (s *Store) encryptedIndex(ctx context.Context, scope recall.Scope) (*sql.DB
 	if err := s.syncWorking(ctx, scope, docs); err != nil {
 		return nil, err
 	}
-	if err := sqliteindex.Bind(ctx, s.working, s.engine); err != nil {
-		return nil, err
+	if !s.localSearch {
+		if err := sqliteindex.Bind(ctx, s.working, s.engine); err != nil {
+			return nil, err
+		}
 	}
 	return s.working, nil
 }

@@ -16,6 +16,9 @@ import (
 )
 
 func (m *Manager) probe(ctx context.Context, c config.Config, id string) (string, string) {
+	if c.Automatic(id) {
+		return "ready", "Steward will manage this capability automatically. Save and restart to apply the default."
+	}
 	if id == "execution" && c.Computer != nil {
 		return "unavailable", "File tools use Computer. Configure and test that backend instead."
 	}

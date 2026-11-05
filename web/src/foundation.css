@@ -19,7 +19,7 @@
  --status-ready:#2f7d53;--status-working:#3a70a5;--status-attention:#9b6b21;
  --success:#414141;--success-surface:#eee;--warning:#505050;--warning-surface:#eee;
  --danger:#8e3838;--danger-surface:#f6eded;--backdrop:#21212166;
- --sidebar-width:256px;--workspace-gutter:40px;--radius:12px;
+ --sidebar-width:224px;--section-sidebar-width:216px;--workspace-gutter:40px;--radius:12px;
  --text-page:1.375rem;--text-section:1rem;--text-ui:.875rem;--text-meta:.8125rem;
  --section-space:20px;--control-gap:10px;
  font-family:var(--font-ui);font-synthesis:none;text-rendering:optimizeLegibility;

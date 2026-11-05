@@ -17,6 +17,8 @@ export function enhanceLanguagePreference(){
  const refresh=form.querySelector<HTMLAnchorElement>('[data-language-refresh]');
  const options=Array.from(form.querySelectorAll<HTMLElement>('[data-language-option]'));
  if(!select||!trigger||!value||!popup||!label||!fallbackSave||!feedback||!message||!retry||!refresh||options.length!==select.options.length)return;
+ const search=form.querySelector<HTMLInputElement>('[data-language-search]');
+ const empty=form.querySelector<HTMLElement>('[data-language-empty]');
  const custom=typeof popup.showPopover==='function'&&typeof popup.hidePopover==='function';
  let confirmed=select.value,desired=confirmed,active=0,opened=false;
  let state:'idle'|'saving'|'unknown'='idle';
@@ -55,6 +57,7 @@ export function enhanceLanguagePreference(){
  const open=()=>{
   if(!custom||state!=='idle')return;
   document.dispatchEvent(new Event('preference-picker-open'));
+  if(search)search.value='';for(const option of options)option.hidden=false;if(empty)empty.hidden=true;
   popup.showPopover();opened=true;trigger.setAttribute('aria-expanded','true');
   position();markActive(Math.max(0,options.findIndex(option=>option.dataset.languageOption===select.value)));
  };
@@ -105,8 +108,16 @@ export function enhanceLanguagePreference(){
    window.clearTimeout(timeout);
   }
  };
+ const visible=()=>options.map((option,index)=>({option,index})).filter(({option})=>!option.hidden);
+ const move=(key:string)=>{
+  const available=visible();if(!available.length)return;
+  const current=available.findIndex(({index})=>index===active);
+  const next=key==='Home'?0:key==='End'?available.length-1:(current+(key==='ArrowUp'?-1:1)+available.length)%available.length;
+  markActive(available[next].index);
+ };
  const choose=()=>{
   if(state!=='idle')return;
+  if(options[active].hidden)return;
   select.value=options[active].dataset.languageOption??confirmed;
   close(true);sync();void save();
  };
@@ -121,7 +132,20 @@ export function enhanceLanguagePreference(){
   popup.dataset.keyboard='true';
   if(!opened){open();if(key==='Home')markActive(0);else if(key==='End')markActive(options.length-1);return}
   if(key==='Enter'||key===' '){choose();return}
-  markActive(key==='Home'?0:key==='End'?options.length-1:active+(key==='ArrowUp'?-1:1));
+  move(key);
+ });
+ search?.addEventListener('input',()=>{
+  const query=search.value.trim().toLocaleLowerCase();
+  options.forEach(option=>{option.hidden=!(option.textContent??'').toLocaleLowerCase().includes(query)});
+  const available=visible();if(empty)empty.hidden=available.length>0;
+  if(available.length)markActive(available[0].index);else{trigger.removeAttribute('aria-activedescendant');options.forEach(option=>delete option.dataset.active)}
+  position();
+ });
+ search?.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true)}
+  else if(event.key==='Tab')close();
+  else if(event.key==='Enter'){event.preventDefault();if(visible().length)choose()}
+  else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();popup.dataset.keyboard='true';move(event.key)}
  });
  options.forEach((option,i)=>{
   option.addEventListener('pointerdown',event=>event.preventDefault());

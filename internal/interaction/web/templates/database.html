@@ -1,8 +1,10 @@
-{{define "developer-tabs"}}<nav class="section-tabs" aria-label="{{tr "Developer sections"}}"><a href="/developer/observability" {{if ne .View "database"}}aria-current="page"{{end}}>{{tr "Traces"}}</a><a href="/developer/database" {{if eq .View "database"}}aria-current="page"{{end}}>{{tr "Database"}}</a></nav>{{end}}
+{{define "developer-navigation"}}
+<div class="section-navigation-heading"><span>{{tr "Developer"}}</span></div>
+<nav class="section-navigation" aria-label="{{tr "Developer sections"}}"><a href="/developer/observability" {{if ne .View "database"}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>{{tr "Traces"}}</span></a><a href="/developer/database" {{if eq .View "database"}}aria-current="page"{{end}}>{{template "icon-connection"}}<span>{{tr "Database"}}</span></a></nav>
+{{end}}
 
 {{define "database-page"}}
 <section class="workspace-page database-page">
- {{template "developer-tabs" .}}
  <h1 class="sr-only">{{tr "Database"}}</h1>
  {{with .Database}}
  <nav class="section-tabs compact" aria-label="{{tr "Record collections"}}">{{range databaseCollections}}<a href="{{databaseURL . "" ""}}" {{if eq $.Database.Query.Collection .}}aria-current="page"{{end}}>{{tr (databaseLabel .)}}</a>{{end}}</nav>

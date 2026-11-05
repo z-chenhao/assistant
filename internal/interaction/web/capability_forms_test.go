@@ -6,6 +6,25 @@ import (
 	"testing"
 )
 
+func TestAutomaticCapabilityFormModes(t *testing.T) {
+	for _, id := range []string{"memory", "embedding", "skills", "computer"} {
+		v := Capability{ID: id, Text: "mode: automatic\n"}
+		prepareCapabilityForm(&v)
+		if v.Form.Mode != "automatic" || !v.Form.Available {
+			t.Fatal(id, v.Form)
+		}
+		text, err := guidedCapabilityText(id, v.Text, v.Form)
+		if err != nil || text != v.Text {
+			t.Fatal(id, text, err)
+		}
+		v.Form.Mode = "off"
+		text, err = guidedCapabilityText(id, v.Text, v.Form)
+		if err != nil || text != "" {
+			t.Fatal(id, text, err)
+		}
+	}
+}
+
 func TestGuidedCapabilityCodecsKeepAdvancedSettings(t *testing.T) {
 	cases := []struct {
 		id, text, key, value string

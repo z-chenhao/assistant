@@ -4,6 +4,11 @@
 
 本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
+## 默认本地搜索
+
+安装版由能力设置服务准备 SecretStore 密钥，默认以 `SearchLocal` 查询 Memory 与 Conversation 的 SQLite 文本索引，不依赖外部 embedding。该路径不写向量配置，后续可添加自定义 embedding。加密记忆通过现有 scoped 内存工作索引检索；凭据不可用时不向 Main 自动装配无法解密的记忆，Conversation-only 资源身份与完整本地搜索分开冻结。显式部署仍可保持旧的未配置行为。默认资源的持久引用、开关与迁移边界见 [能力设置方案](capability-setup.md#自动默认资源)。
+
+
 ## 当前架构
 
 Conversation 与 Memory 分库。Curator 串行处理持久 Mutation；Recall 并行查询两路证据；Context builder 在模型 admission 前压缩，按轮冻结。

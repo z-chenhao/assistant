@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"sort"
 	"time"
 
@@ -193,6 +194,38 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 	return out, err
 }
 func (t *tools) Start(ctx context.Context, id string) error {
+	if p, ok := t.runs.computerProvider.(interface{ Prepare(context.Context) error }); ok {
+		var name string
+		if err := t.runs.write(ctx, func(tx *sql.Tx) error {
+			if err := t.fence(ctx, tx); err != nil {
+				return err
+			}
+			inv, policy, err := t.load(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			if policy.Risk == "high" {
+				var approved bool
+				if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM approval a JOIN tool_invocation i USING(invocation_id) JOIN run r USING(run_id) WHERE a.invocation_id=? AND a.status='approved' AND a.expires_at>? AND a.scope=r.agent_id AND a.frozen_arguments_hash=i.request_hash)`, id, t.runs.approvalTime().UnixMicro()).Scan(&approved); err != nil {
+					return err
+				}
+				if !approved {
+					return tool.ErrApprovalDenied
+				}
+			}
+			name = inv.Call.Name
+			return nil
+		}); err != nil {
+			return err
+		}
+		family, _ := tool.HostFamily(name)
+		definition, registered := t.runs.registry.Resolve(name)
+		if registered && definition.Host && (family == tool.ComputerBuiltin || family == tool.EnvironmentBuiltin) {
+			if err := p.Prepare(ctx); errors.Is(err, computer.ErrPreparing) {
+				return tool.ErrResource
+			}
+		}
+	}
 	return t.runs.write(ctx, func(tx *sql.Tx) error {
 		if err := t.fence(ctx, tx); err != nil {
 			return err

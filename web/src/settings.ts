@@ -1,4 +1,5 @@
 import {t} from './i18n';
+import {confirmSettingsAction,enhanceSettingsControls} from './settings-controls';
 import {enhanceLanguagePreference} from './preferences';
 
 // The fallback is a native disclosure. Enhance only after the whole help is ready.
@@ -65,6 +66,7 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
 export function enhanceSettings(){
  enhancePreferenceHelp();
  enhanceLanguagePreference();
+ enhanceSettingsControls();
  if(location.hash===signInOpenedHash){
   const signIn=document.querySelector<HTMLElement>('#signin-status');
   if(signIn?.querySelector('[data-signin-pending]'))signIn.dataset.authWindowOpened='';
@@ -84,6 +86,7 @@ export function enhanceSettings(){
  for(const form of forms){form.addEventListener('submit',event=>{
   if(event.defaultPrevented||form.dataset.autosaveReady)return;
   if(form.dataset.submitting){event.preventDefault();return}
+  if(confirmSettingsAction(form,(event as SubmitEvent).submitter)){event.preventDefault();return}
   if(form.hasAttribute('data-open-signin')){
    const popup=window.open('about:blank','_blank');
    if(popup){

@@ -21,8 +21,9 @@ import (
 )
 
 type Store struct {
-	db     *sql.DB
-	engine recall.Embedding
+	db          *sql.DB
+	engine      recall.Embedding
+	localSearch bool
 }
 
 const SchemaVersion = 3
@@ -239,9 +240,14 @@ func (s *Store) Configure(ctx context.Context, e recall.Embedding) error {
 		return err
 	}
 	s.engine = e
+	s.localSearch = false
 	return nil
 }
+func (s *Store) ConfigureLocal() { s.localSearch = true }
 func (s *Store) Search(ctx context.Context, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
+	if s.localSearch {
+		return sqliteindex.SearchLocal(ctx, s.db, scope, q, "conversation")
+	}
 	return sqliteindex.Search(ctx, s.db, scope, q, s.engine, "conversation")
 }
 

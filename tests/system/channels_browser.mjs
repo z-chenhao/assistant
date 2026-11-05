@@ -1,5 +1,5 @@
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
-import {capabilitySetup} from './channels_capabilities.mjs';
+import {capabilitySetup,capabilityDefaults,settingsAccount} from './channels_capabilities.mjs';
 import {databaseInspection} from './channels_database.mjs';
 import {preferences} from './channels_preferences.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
@@ -64,10 +64,6 @@ try{
  if(!await canvas.evaluate(node=>node.isConnected))throw Error('greeting replaced the complete-frame canvas');
  await page.getByRole('link',{name:'Steward home',exact:true}).hover();
  await assertAvatarSize('after hover');
- await page.locator('[data-avatar-pause]').click();
- if(await avatar.getAttribute('data-frame')!=='0')throw Error('paused avatar retained a moving pose');
- if(await avatar.locator('.ghost-art').evaluate(node=>getComputedStyle(node).animationPlayState)!=='paused')throw Error('pause did not stop ghost drift');
- await page.locator('[data-avatar-pause]').click();
  if(phase==='preferences'){
   await preferences(page,context,browser,url,evidence);
  }else if(phase==='account-signin'||phase==='account-reconnect'){
@@ -90,7 +86,10 @@ try{
    if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Resources overflowed the narrow layout');
    await page.setViewportSize({width:1400,height:980});
    if(await page.locator('#signin-status').innerText())throw Error('another page’s sign-in appeared in Resources');
-   await page.locator('.workspace-topbar [data-theme-toggle]').click();
+   await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link',{name:'Settings',exact:true}).click();
+   await page.locator('#interface-theme').selectOption('dark');
+   await page.goto(url+'/settings/setup');
+   await account.locator('.resource-account > summary').click();
    await page.waitForFunction(()=>document.documentElement.classList.contains('dark'));
    const reconnect=account.getByRole('button',{name:'Reconnect account',exact:true});
    const signOut=account.getByRole('button',{name:'Sign out of provider',exact:true});
@@ -198,7 +197,7 @@ try{
   if(!await original.evaluate(node=>node.isConnected&&node.value==='Keep my conversation draft.')||await page.locator('.composer input[type=file]').evaluate(node=>node.files?.[0]?.name)!=='kept.txt')throw Error('attention navigation lost original conversation draft/file');
   await writeFile(evidence+'/attention-browser.json',JSON.stringify({questionPosts:posts,keptDraft:true,keptAttachment:true,staleReviewRejected:true,keyboard:true,language:'zh-CN',width:390},null,2));
   await stale.close();await work.close();
- }else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
+ }else if(phase==='capability-defaults'){await capabilityDefaults(page,context,url,evidence)}else if(phase==='settings-account'){await settingsAccount(page,context,url,evidence)}else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
  if(phase==='setup'){
   await page.evaluate(()=>document.fonts.ready);
   await page.setViewportSize({width:320,height:740});
@@ -217,10 +216,10 @@ try{
   const preferenceRow=page.locator('form[action="/settings/language"]');
   const help=preferenceRow.getByRole('button',{name:'About interface language'});
   const tooltip=preferenceRow.locator('[role=tooltip]');
-  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()!==1||await page.locator('h1:not(.sr-only)').count()||await tooltip.isVisible())throw Error('Preferences loses its semantic title, duplicates it visually or shows help by default');
+  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()!==1||await page.locator('h1:not(.sr-only)').count()!==1||await tooltip.isVisible())throw Error('Preferences loses its semantic title, duplicates it visually or shows help by default');
   await help.hover();
   if(!await tooltip.isVisible())throw Error('language help is unavailable on hover');
-  await page.locator('.section-tabs').hover();
+  await page.locator('.section-navigation').hover();
   await help.focus();
   if(!await tooltip.isVisible())throw Error('language help is unavailable from the keyboard');
   const row=await preferenceRow.boundingBox();
@@ -283,8 +282,8 @@ try{
   await page.screenshot({path:evidence+'/model-detail-wide.png',fullPage:true});
   await page.setViewportSize({width:320,height:740});
   const mobileHeader=await page.locator('.workspace-topbar').evaluate(topbar=>{
-   const crumb=topbar.querySelector('.breadcrumbs').lastElementChild.getBoundingClientRect();
-   const status=topbar.querySelector('#workspace-status').getBoundingClientRect();
+   const crumb=topbar.querySelector('span').getBoundingClientRect();
+   const status=topbar.querySelector('.settings-exit').getBoundingClientRect();
    return {overlap:crumb.right>status.left,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   if(mobileHeader.overlap||mobileHeader.overflow)throw Error('expanded model overlapped or overflowed the narrow layout');
@@ -545,6 +544,7 @@ try{
  }
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
+  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('link',{name:'Resources',exact:true}).click();
   await page.locator('.resource-model').filter({has:page.getByText('Current model',{exact:true})}).getByText('Connection verified',{exact:true}).waitFor();
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
@@ -910,11 +910,10 @@ try{
   if(!await mobile.getByRole('button',{name:'Open navigation',exact:true}).evaluate(node=>node===document.activeElement))throw Error('closing mobile navigation lost keyboard focus');
   await mobile.setViewportSize({width:320,height:740});await mobile.goto(url+'/settings/capabilities');
   await mobile.evaluate(()=>document.fonts.ready);
-  const selectedTab=await mobile.locator('.section-tabs').evaluate(node=>{
-   const selected=node.querySelector('[aria-current]').getBoundingClientRect(),bounds=node.getBoundingClientRect();
-   return selected.left>=bounds.left-1&&selected.right<=bounds.right+1;
-  });
-  if(!selectedTab)throw Error('current Settings section is hidden outside the mobile tab strip');
+  await mobile.getByRole('button',{name:'Open navigation',exact:true}).click();
+  const selected=mobile.locator('.settings-navigation [aria-current="page"]');
+  if(!await selected.isVisible()||!await selected.getAttribute('href').then(value=>value==='/settings/capabilities'))throw Error('mobile settings navigation lost its current section');
+  await mobile.keyboard.press('Escape');
   await mobile.setViewportSize({width:1001,height:900});await mobile.goto(url);
   await mobile.getByRole('button',{name:'Open Computer',exact:true}).click();
   if(!await mobile.locator('#computer-panel').evaluate(panel=>panel.matches(':modal')))throw Error('Computer compresses Chat at intermediate widths');

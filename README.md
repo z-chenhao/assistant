@@ -27,7 +27,7 @@ Conversation, tasks, tool calls and approvals share a durable execution core.
   notifications and optional Feishu or macOS Computer integrations.
 
 See the [Feature Map](docs/feature-map.md) for implemented behavior and limitations.
-Web settings layout and controls follow [DESIGN.md](DESIGN.md).
+Web settings layout and controls follow [design.md](design.md).
 Steward is under active development. Deterministic tests validate software
 mechanisms; they do not certify model quality or every external provider.
 
@@ -118,7 +118,7 @@ the canonical repository URL is `https://github.com/z-chenhao/steward`.
 - [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md) · [Project governance](GOVERNANCE.md)
 - [Security and private reporting](SECURITY.md)
-- [Documentation index](docs/README.md) · [Architecture](docs/designs/product-overview.md)
+- [Documentation index](docs/README.md) · [Architecture](docs/designs/product-overview.md) · [UI design](design.md)
 
 ## License
 

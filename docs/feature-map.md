@@ -4,7 +4,7 @@
 
 完成状态描述当前实现范围，不代表真实模型、线上账户或所有平台已验收；证明范围和未验证项见所属测试方案。
 
-[产品架构总览](designs/product-overview.md) · [文档维护规则](#文档维护规则) · [功能模板](features/_template.md) · [技术方案模板](designs/_template.md) · [测试方案模板](test-plans/_template.md)
+[界面设计规范](../design.md) · [产品架构总览](designs/product-overview.md) · [文档维护规则](#文档维护规则) · [功能模板](features/_template.md) · [技术方案模板](designs/_template.md) · [测试方案模板](test-plans/_template.md)
 
 F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让纯文本模型可显式读取图片文字；F-005 提供阶段进度；F-019 流式呈现 Main 回复草稿并在提交后切换到正式消息。软件回归与模型语义质量的证明范围分别见对应测试方案。
 

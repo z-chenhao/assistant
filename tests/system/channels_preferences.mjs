@@ -11,7 +11,7 @@ export async function preferences(page,context,browser,url,evidence){
  const hoverPaths=[];
  const hoverHelp=async(p,state)=>{
   // Keep focus elsewhere: focus/pinning must not conceal a broken hover path.
-  await p.locator('.section-tabs [aria-current=page]').focus();
+  await p.locator('#interface-theme').focus();
   await p.mouse.move(p.viewportSize().width-2,p.viewportSize().height-2);
   await help(p).hover();const tip=p.getByRole('tooltip');await tip.waitFor();
   const control=await help(p).boundingBox(),tooltip=await tip.boundingBox();
@@ -51,10 +51,11 @@ export async function preferences(page,context,browser,url,evidence){
    ctx.font=`${style.fontSize} ${style.fontFamily}`;
    return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,bounds,
     valueFits:ctx.measureText(button.querySelector('span').textContent).width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)+24<=button.clientWidth,
+    pageTitles:[...document.querySelectorAll('.settings-page h1')].filter(n=>!n.classList.contains('sr-only')).length,
     visibleHeadings:[...document.querySelectorAll('.settings-page h1,.settings-page h2')].filter(n=>!n.classList.contains('sr-only')).length,
     unwantedCopy:/选择后自动保存并刷新页面|Saves automatically and reloads this page/.test(document.querySelector('.settings-page').textContent)};
   });
-  if(result.scrollWidth>result.viewport||result.visibleHeadings||!result.valueFits||result.unwantedCopy)throw Error('layout/copy: '+JSON.stringify(result));
+  if(result.scrollWidth>result.viewport||result.pageTitles!==1||!result.valueFits||result.unwantedCopy)throw Error('layout/copy: '+JSON.stringify(result));
   if(Math.max(...result.bounds.map(r=>r.center))-Math.min(...result.bounds.map(r=>r.center))>1)throw Error('default preference row wrapped');
   for(let i=1;i<result.bounds.length;i++)if(result.bounds[i].x<result.bounds[i-1].right-1)throw Error('controls overlap');
   await check(p.locator('.preference-save').isHidden(),'Save visible in enhanced UI');
@@ -212,7 +213,7 @@ export async function preferences(page,context,browser,url,evidence){
  await page.setViewportSize({width:320,height:600});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await popupBounds(page);await page.keyboard.press('Escape');
  for(const section of ['setup','notifications','capabilities']){
   await page.goto(url+'/settings/'+section);
-  await check(page.locator('.section-tabs [aria-current=page]').getAttribute('href').then(v=>v==='/settings/'+section),'neighbor selection lost');
+  await check(page.locator('.settings-navigation [aria-current=page]').getAttribute('href').then(v=>v==='/settings/'+section),'neighbor selection lost');
   await check(page.locator('[data-language-preference]').count().then(v=>v===0),'preference leaked to neighbor');
   if(section==='notifications'){
    await page.locator('select[name=target]').selectOption('tui:');await page.getByRole('button',{name:'Save notification channel',exact:true}).click();await page.reload();

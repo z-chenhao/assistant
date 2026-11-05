@@ -66,8 +66,12 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 		v := memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}
 		runs.ConfigureMemory(a.memory, v)
 	}
-	if cfg.Embedding != nil {
-		runs.ConfigureRecall(recall.Service{Memory: a.memory, Conversation: a.history})
+	if cfg.Embedding != nil || cfg.Automatic("embedding") {
+		var memories recall.MemoryProvider = a.memory
+		if cfg.Defaults != nil && cfg.Memory == nil {
+			memories = recall.EmptyMemory{}
+		}
+		runs.ConfigureRecall(recall.Service{Memory: memories, Conversation: a.history})
 	}
 	if cfg.JavaScript != nil {
 		var runtime codemode.JavaScriptRuntime = &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}
@@ -187,8 +191,14 @@ func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Defi
 	if cfg.Embedding != nil {
 		recallIdentity = (embedding.Client{Config: *cfg.Embedding, Secrets: secrets}).Identity()
 	}
+	if cfg.Automatic("embedding") {
+		recallIdentity = "recall:local-text-v1"
+		if cfg.Memory == nil {
+			recallIdentity = "recall:local-conversation-v1"
+		}
+	}
 	searchMemory := recall.Definition(recallIdentity)
-	if cfg.Embedding == nil {
+	if cfg.Embedding == nil && !cfg.Automatic("embedding") {
 		searchMemory.Spec.Description += " Not configured: requires an explicit embedding provider; calls fail with PROVIDER_UNAVAILABLE until configured."
 	}
 	defs = append(defs, searchMemory)

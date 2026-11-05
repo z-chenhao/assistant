@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/z-chenhao/assistant/internal/computer/macosvm"
 	"github.com/z-chenhao/assistant/internal/config"
 	"github.com/z-chenhao/assistant/internal/interaction/web"
 	"github.com/z-chenhao/assistant/internal/llm"
@@ -32,6 +33,7 @@ type Manager struct {
 	secrets  llm.SecretStore
 	proofs   map[string]proof
 	seenFile bool
+	states   map[string]string
 }
 
 func New(active config.Config, secrets llm.SecretStore) *Manager {
@@ -59,7 +61,24 @@ func (m *Manager) view(c config.Config, id, revision string) web.Capability {
 	v.Configured = resource(c, id) != nil
 	v.Active = resource(m.active, id) != nil
 	v.PendingRestart = v.Text != encode(resource(m.active, id))
-	if v.Configured {
+	v.Automatic = c.Automatic(id)
+	if c.Automatic(id) {
+		if id == "memory" {
+			v.DefaultKeyRef = savedMemoryRef(m.active.App.DataRoot)
+		}
+		v.State = "automatic"
+		if !v.PendingRestart && m.states[id] != "" {
+			v.State = m.states[id]
+		}
+		v.Message = "Steward manages the default. You can choose custom settings or turn it off."
+		if id == "computer" {
+			v.State, v.Message = macosvm.ManagedState(m.active.App.DataRoot + ".desktop")
+		}
+		if id == "memory" && v.State == "unavailable" {
+			v.Message = "Unlock your system credential store and restart Steward to prepare Memory. Your existing key is never replaced."
+		}
+	}
+	if v.Configured && !c.Automatic(id) {
 		v.State = "configured"
 	}
 	if id == "execution" && c.Computer != nil {
@@ -67,7 +86,7 @@ func (m *Manager) view(c config.Config, id, revision string) web.Capability {
 		v.Message = "Files and commands use the Computer workspace. Open Computer to verify its connection."
 	}
 	if p, ok := m.proofs[id]; ok && p.revision == revision && p.text == v.Text && time.Since(p.at) <= 5*time.Minute {
-		if v.Configured {
+		if v.Configured && !c.Automatic(id) {
 			v.State = p.state
 		}
 		v.Message = p.message
@@ -186,6 +205,18 @@ func (m *Manager) Save(ctx context.Context, id, revision, text string) error {
 	}
 	if old.Memory == nil {
 		old.Memory = m.active.Memory
+	}
+	if old.Memory == nil {
+		if ref := savedMemoryRef(m.active.App.DataRoot); ref != "" {
+			old.Memory = &memory.Config{EncryptionKeyRef: ref}
+		}
+	}
+	if c.Automatic("memory") && old.Memory != nil {
+		ref := savedMemoryRef(m.active.App.DataRoot)
+		if ref == "" {
+			return web.ErrCapabilityMigration
+		}
+		c.Memory = &memory.Config{EncryptionKeyRef: ref}
 	}
 	if old.Memory != nil && c.Memory != nil && old.Memory.EncryptionKeyRef != c.Memory.EncryptionKeyRef {
 		a, ea := (memory.Vault{Secrets: m.secrets, Ref: old.Memory.EncryptionKeyRef}).Digest(ctx, "configuration key identity")

@@ -2,6 +2,14 @@
 
 [功能与验收目标](../features/capability-setup.md) · [技术方案](../designs/capability-setup.md) · [主索引](../feature-map.md) · [统一测试入口](product.md)
 
+## 自动默认资源验收
+
+- `internal/config/setup/defaults_test.go`：并发启动复用同一密钥；密钥缺失不替换；自动、关闭、重新启用跨重启保存；自定义错误密钥不能覆盖默认加密身份。
+- `internal/interaction/web/capability_forms_test.go`：四类自动能力的普通表单往返与关闭；原高级字段保留用例继续运行。
+- `internal/memory/sqlite/local_test.go`：无 embedding 服务的中文加密记忆搜索、重启、scope、明文不落盘和遗忘。
+- 原生 SecretStore 的实际解锁与 macOS 首次下载/启动需使用真实登录会话验收；Linux 的内存凭据 fixture 不能替代这项证据。
+
+
 ## 范围与证据
 
 证明 F-030 的真实 Settings → 测试 → 保存 → 明确重启 → 新 Run 闭环。诊断与软件回归不认证外部模型语义质量、真实账户授权或 native macOS Guest 兼容。
@@ -10,7 +18,7 @@
 
 | 场景 | 可观察行为 | 验证入口 |
 | --- | --- | --- |
-| 六类配置 | 列表/详情、真实未配置状态、失败后修正成功、候选刷新仍可保存 | channels 的 capability-settings 场景 |
+| 五个主入口／六类资源 | 默认 Memory 已启用、检索收进高级设置；普通 Save 校验失败不落盘、修正后成功，关闭记忆同时关闭检索 | channels 的 capability-settings 场景 |
 | 提交安全 | 未认证 401、伪造 Origin 403、未知详情 404、超限 413、未验证 Save 409 且文件不变 | 真实 HTTP + 浏览器 |
 | 证明约束 | 精确候选、完整源文件版本、过期证明拒绝，探测中外部变更丢弃结果 | config/setup 组件测试 |
 | 文件保护 | 0600、保留注释/其他 section、并发 Manager 至多一个成功、拒绝 symlink/删除源、无残留临时文件 | config/setup + discovery |
@@ -32,4 +40,9 @@
 
 Linux 验证了内核沙箱与受控 Lume 协议、tiny sealed base 和真实 Node runtime。Computer 诊断不启动 Guest，因此不以这份证据声称验证了 macOS/arm64 的实际桌面操作；该边界由 [Computer 测试方案](computer-use.md) 保持。真实外部 MCP/embedding 服务可通过同一 owner 入口按实际凭据测试，未配置时不自动补齐服务或选择默认模型。
 
-普通表单补充：`capability_forms_test.go` 与 `capability_server_test.go` 验证六类往返、未展示字段保留、别名回退、MCP 顺序／权限、明文凭据拒绝、版本冲突、精确候选证明与转义。维护中的 channels_capabilities 浏览器场景覆盖主要记忆表单的失败／成功／修改后重测／保存，MCP 原生增删行、无 JavaScript 普通及高级表单。真实工作区／Computer 诊断若因本机环境不可用而失败，必须记录未完成范围并保持 Save 禁用，不能用 UI 成功状态替代。
+普通表单补充：`capability_forms_test.go` 与 `capability_server_test.go` 验证六类往返、未展示字段保留、别名回退、MCP 顺序／权限、明文凭据拒绝、版本冲突、精确候选证明与转义。维护中的 channels_capabilities 浏览器场景覆盖默认记忆、中文／移动端、Preferences 布局、单次 Save 的失败／成功／修改后重新校验／保存，MCP 原生增删行、无 JavaScript 普通及高级表单。真实工作区／Computer 诊断若因本机环境不可用而失败，必须记录未完成范围并拒绝无效保存，不能用 UI 成功状态替代。
+
+状态与保存回归：`TestDefaultMemoryHasOneEnabledEntryAndPreferenceLayout` 和 `TestPreferenceStyleSaveChecksBeforePersisting` 验证默认启用、一处 Memory 入口、联合关闭、密钥保留、无效连接拒绝与版本冲突。channels 的 `default_capability_settings` 使用显式隔离 SecretStore 启动真实应用，验证默认密钥跨进程重用并输出新设置页截图。
+
+
+`TestCapabilityStatusDistinguishesConfigurationFromConnectionProof` 以表驱动验证关闭、自动／自定义启用、准备中、不支持、不可用、已保存待重启及未保存候选；各状态分别使用有／无连接检查证明和中英文渲染，防止再次把默认启用误写成未验证，或用启用文案掩盖异常。

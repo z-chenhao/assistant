@@ -34,6 +34,9 @@ func fixture(t *testing.T) (string, []byte) {
 func TestEncryptedOfflineRoundtripAndFailClosed(t *testing.T) {
 	ctx := context.Background()
 	root, key := fixture(t)
+	if err := os.WriteFile(filepath.Join(root, "default-memory.json"), []byte(`{"ref":"credential:default-memory"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	max := app.SchemaVersions()
 	archive := filepath.Join(t.TempDir(), "backup.steward")
 	lock, e := maintenance.Lock(root, false)

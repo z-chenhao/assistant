@@ -872,8 +872,46 @@ def database_inspection(binary, evidence, report):
             h.cleanup()
 
 
+def default_capability_settings(binary,evidence,report):
+    """Real startup defaults with an explicitly injected, owned binary SecretStore."""
+    class MemorySecrets(socketserver.StreamRequestHandler):
+        def handle(self):
+            value=json.loads(self.rfile.readline(131072))
+            with self.server.lock:
+                op,ref=value['op'],value['ref']
+                if op=='put':self.server.values[ref]=value['value']
+                elif op=='delete':self.server.values.pop(ref,None)
+                result=self.server.values.get(ref)
+            self.wfile.write((json.dumps(dict(ok=op!='get' or result is not None,value=result))+'\n').encode())
+    with tempfile.TemporaryDirectory(prefix='steward-default-settings-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+        root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
+        h.production_events=True
+        h.env.update(STEWARD_NATS_URL=broker.url,STEWARD_NATS_STREAM_PREFIX='default_memory_ui')
+        socket=root/'secrets.sock'
+        server=socketserver.ThreadingUnixStreamServer(str(socket),MemorySecrets)
+        server.values={'env:'+name:base64.b64encode(h.env[name].encode()).decode() for name in ('STEWARD_WEB_TEST_TOKEN','STEWARD_FEISHU_VERIFY','STEWARD_FEISHU_ENCRYPT','STEWARD_FEISHU_ACCESS')}
+        server.lock=threading.Lock();server.daemon_threads=True;os.chmod(socket,0o600)
+        thread=threading.Thread(target=server.serve_forever);thread.start()
+        original=h.args;h.args=lambda *args:original('-test-secret-store',str(socket),*args)
+        try:
+            with h.config.open('a') as out:out.write('defaults: {memory: true, search: true, skills: true, computer: true}\n')
+            h.setup();h.start()
+            h.browser(evidence.parent/'default-settings-ui','capability-defaults')
+            key_ref=json.loads((root/'data/default-memory.json').read_text())['ref']
+            require(len(base64.b64decode(server.values[key_ref]))==32,'default Memory did not create its key')
+            h.stop();h.start()
+            require(json.loads((root/'data/default-memory.json').read_text())['ref']==key_ref,'restart replaced the default key')
+            require('Enabled (default)' in h.http('/settings/capabilities/memory'),'default Memory lost its enabled status')
+            require(not (root/'data.desktop').exists(),'browsing settings prepared a desktop')
+            report['checks'].append('Default Memory and local search start together; one enabled Memory entry, concise Preferences layout, Chinese/mobile, stable SecretStore key and no desktop download')
+            h.stop()
+        finally:
+            h.cleanup();server.shutdown();server.server_close();thread.join(10)
+
+
 def capability_settings(binary,evidence,report):
     """Owner UI -> real config/probes -> restart, retaining frozen Run records."""
+    default_capability_settings(binary,evidence,report)
     from verify_recall import Embeddings
     with tempfile.TemporaryDirectory(prefix='steward-capability-settings-') as temp, Sandbox() as platform:
         root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
@@ -1594,13 +1632,13 @@ def account_presentation(binary, browser_evidence, report):
                 restored_page = h.http(resources)
                 require('Connection verified' in restored_page and 'Test connection' not in restored_page and 'Use for new work' not in restored_page,
                         'restored model still exposes replaced actions')
-                h.http('/auth/logout', urlencode(dict(account=aid)).encode(), headers=form)
+                h.browser(browser_evidence/'signout','settings-account')
                 with server.lock:
                     sensitive=list(server.sensitive)
                 for path in (root/'data').rglob('*'):
                     if path.is_file():require(all(value not in path.read_bytes() for value in sensitive),'credential persisted outside SecretStore')
                 report['scenarios']['account-auth']=dict(status='connected_then_logged_out',abandoned_login_recovered=True,event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
-                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; direct popup and manual fallback, cancel without callback, fresh authorization on retry, hidden-model rejection, actual Probe/Select, reconnect page and live update scoping, restart picker, logout and credential scan verified')
+                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; direct popup and manual fallback, cancel without callback, fresh authorization on retry, hidden-model rejection, actual Probe/Select, reconnect page and live update scoping, restart picker, sign-out confirmation and credential scan verified')
                 h.stop()
             finally:
                 h.cleanup();server.shutdown();server.server_close();thread.join(timeout=10)

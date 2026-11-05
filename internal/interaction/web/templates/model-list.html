@@ -16,7 +16,7 @@
     <p class="field-help">{{tr "Account changes affect every model that uses the account."}}</p>
     <div class="actions provider-account-actions">
      <form method="post" action="/auth/login" data-open-signin><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="return_to" value="/settings/setup"><button class="secondary setting-action">{{tr "Reconnect account"}}</button></form>
-     {{if ne .Status "logged_out"}}<form method="post" action="/auth/logout"><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="return_to" value="/settings/setup"><button class="secondary setting-action danger-text">{{tr "Sign out of provider"}}</button></form>{{end}}
+     {{if ne .Status "logged_out"}}<form method="post" action="/auth/logout" data-settings-confirm="{{tr "Sign out of provider"}}" data-confirm-description="{{tr "Signing out disconnects all saved models using this account."}}"><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="return_to" value="/settings/setup"><button class="secondary setting-action danger-text">{{tr "Sign out of provider"}}</button></form>{{end}}
     </div>
    </div>
   </details>

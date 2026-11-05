@@ -4,9 +4,16 @@
 
 [需求主索引](../feature-map.md) · [技术方案](../designs/capability-setup.md) · [测试方案](../test-plans/capability-setup.md)
 
+## 默认能力与设置
+
+正常安装启动无需先填写能力配置。Memory 自动生成 256 位密钥并保存在系统 SecretStore；搜索默认使用本地全文检索；Skills 自动准备私有空目录。Computer 在 Apple silicon Mac 首次使用时自动下载固定版本的 Lume 和 macOS 镜像、校验并准备私有 Guest。其他平台显示不支持自动 macOS 桌面，本地文件与命令仍可用。
+
+Settings / Capabilities 提供“自动（推荐）／自定义／关闭”。自定义资源优先；关闭保留已有数据。保存后重启，新 Run 使用新配置；正在执行和恢复的 Run 继续校验原冻结能力。显式 `-config` 部署保留现有配置语义，可通过 `defaults` 选择自动资源。
+
+
 ## 功能说明
 
-Settings → Capabilities 汇总 Memory、Memory search（embedding）、MCP tools、Skills、Files and commands、Computer 六类能力。列表区分未配置、已配置但未验证、连接验证成功、需要修复，以及保存后需要重启的变更。文件工具由 Computer 承担时显示 Uses Computer，不误报为工具缺失。
+Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and commands、Computer 五个入口。Memory 包含存储与检索，可选语义检索放在 Memory 的高级设置中。默认开启显示“已启用（默认）”，自定义配置显示“已启用”；准备中、异常和重启后生效单独呈现，连接检查证明不作为启用状态。页面与 Preferences 共用左侧导航、居中窄列、紧凑分组行和可搜索下拉，配置后直接保存。
 
 ## 需求与验收
 
@@ -16,9 +23,9 @@ Settings → Capabilities 汇总 Memory、Memory search（embedding）、MCP too
 
 **需求**：用户能在设置中看见记忆、embedding、MCP、Skills、代码工作区及 Computer 是否已连接，并完成配置验证。
 
-**当前实现**：六类能力均可从真实 Web 设置入口查看、编辑、测试和保存。默认使用六类能力的普通表单，完整 YAML 放在高级入口；只修改当前能力配置，保留未展示字段。保存要求五分钟内成功验证的同一候选配置及未变化的源文件。新配置经明确重启后供新 Run 使用，运行中的配置和旧快照不会热改。
+**当前实现**：底层保留六类资源的独立验证与迁移边界，用户只需在五个主入口配置。普通 Save 自动执行有界检查并保存；自定义连接可单独检查。YAML、来源路径、检查时间和详细说明放在高级设置。关闭 Memory 同时关闭检索并清除自定义 embedding 连接，保留数据和密钥引用；重新启用恢复默认本地检索。保存仍绑定成功验证的精确候选和未变化的源文件。新配置经明确重启后供新 Run 使用，运行中的配置和旧快照不会热改。
 
-**边界**：模型与通知继续使用各自设置页；不增加模型可见的能力发现 API。外部模型服务、Skill catalog、MCP 可执行程序、macOS/Lume 及 sealed base 仍需用户显式准备。诊断验证连接与资源边界，不评价模型质量，不代替 Guest 首次运行时的身份检查，也不代办账户授权或数据迁移。
+**边界**：模型与通知继续使用各自设置页；不增加模型可见的能力发现 API。自定义语义检索、Skill catalog、MCP 和 Computer 连接仍可由用户提供；自动资源走默认准备流程。诊断验证连接与资源边界，不评价模型质量，不代替 Guest 首次运行时的身份检查，也不代办账户授权或数据迁移。
 
 **验收**：未配置 → 编辑 → 失败可修复 → 成功测试 → 保存待重启 → 重启加载 → 新 Run 使用新能力；旧能力快照保持不变。关闭 JavaScript 后仍可完成表单操作，窄屏无横向溢出。
 
