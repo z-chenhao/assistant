@@ -212,7 +212,7 @@ func backgroundHealth(ctx context.Context, application *app.App) string {
 	case agent.Ready:
 		return "ready"
 	default:
-		if d.ActiveModelProfileID != nil && !application.ModelControl().Available(ctx, *d.ActiveModelProfileID) {
+		if d.ActiveModelProfileID != nil && !application.ModelControl().Configured(ctx, *d.ActiveModelProfileID) {
 			return "credential_or_provider_unavailable"
 		}
 		return "dependency_unavailable"

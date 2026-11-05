@@ -111,9 +111,6 @@ func (s *Server) loadAttention(ctx context.Context, p *page, ref, before string,
 				}
 			}
 		}
-		if !canSend(p.Status) {
-			v.Issues = append(v.Issues, attentionIssue{Key: "model", Title: "Check your model connection", Description: "New work needs a ready model. Your existing tasks and drafts are kept.", URL: "/settings/models", Action: "Open model settings"})
-		}
 	}
 	v.Count = len(v.Feedbacks) + len(v.Approvals) + len(v.Issues)
 }

@@ -1,6 +1,5 @@
 {{define "schedule-editor-page"}}
 <section class="workspace-page schedule-editor-page">
- <a class="back-link" href="/tasks">{{tr "← Tasks"}}</a>
  {{with .Schedule}}
  <div class="page-heading"><div><h1>{{if .Ref}}{{tr "Edit schedule"}}{{else}}{{tr "Create schedule"}}{{end}}</h1><p>{{tr "Set the instructions and when Ghost should receive them."}}</p></div></div>
  <form class="schedule-editor" method="post" action="/schedule/configure">

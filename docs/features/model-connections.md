@@ -24,6 +24,8 @@
 
 **边界与剩余工作**：无活动模型时保持 setup_required；不隐式选取收费或 Fake 模型。
 
+在 Web 的 Chat 点 Set up Steward，进入 Resources，展开已保存模型可查看连接标识。连接未验证时可在行尾测试，通过后显示验证状态。当前模型的连接操作也可在重新授权后恢复原有选用。候选模型可直接点击行尾的「用于新工作」确认切换。没有有效验证结果时，Steward 会先测试连接，通过后才切换。账户模型列在对应账户下，直连模型单独分组。展开账户标题可重连或退出，影响该账户下的所有模型。Connect a model 通过连接方式下拉菜单切换配置。已连接账户可点击 Load models 获取模型列表。查看设置或等待状态更新时无需读取模型凭据。ChatGPT 登录按钮直接打开浏览器授权页，弹窗不可用时可从等待页手动继续。
+
 **验收目标**：连接、测试、选择、工具续轮和重启均沿真实 Provider Bridge 验证。
 
 <a id="f-002"></a>
@@ -32,9 +34,9 @@
 
 **需求**：用户能登录、重新认证和退出 ChatGPT 账户，凭据可安全持久化。
 
-**当前实现**：账户生命周期复用同一 Manager、Provider Bridge 和冻结模型路径；macOS 使用 Keychain，Linux 通过 libsecret 使用登录会话的 Secret Service。原生后端支持跨进程保存、读取、更新与删除，刷新与退出继续使用既有跨进程锁和恢复裁决。CLI/TUI/Web 提供凭据设置与故障反馈。
+**当前实现**：账户生命周期复用同一 Manager、Provider Bridge 和冻结模型路径；默认在 Steward 数据根下使用 `account-secrets/` 私有文件。显式配置 `llm.account_secret_store: native` 时，macOS 使用 Keychain，Linux 使用 Secret Service。两个后端均支持跨进程保存、读取、更新与删除，刷新与退出继续使用既有跨进程锁和恢复裁决。CLI/TUI/Web 提供凭据设置与故障反馈。
 
-**边界**：原生凭据需要启用 cgo 的 macOS/Linux 构建；Linux 还需要 libsecret、会话 D-Bus 和已解锁的 Secret Service 钥匙串。缺少依赖、锁定、拒绝解锁或会话不可用会失败关闭，不写入配置、SQLite 或明文文件，不退回环境变量保存 OAuth。其他平台与禁用 cgo 的构建不提供原生凭据写入。真实 OpenAI 账号授权与 macOS Keychain Live 验收单独记录，不以受控供应商证明真实账号可用性。
+**边界**：默认文件后端使用 `0700` 目录和 `0600` 文件。OAuth 凭据由文件权限保护，同一用户下有访问权限的进程也能读取。原生后端需要 cgo，Linux 另需 libsecret、会话 D-Bus 和已解锁的 Secret Service。切换后端后，使用 Resources 中现有账户的「重新连接」保存新凭据，沿用已保存模型。项目备份排除凭据文件。
 
 **验收目标**：在每个声明支持的平台完成登录、刷新、退出、进程中断恢复和凭据隔离验证。
 
@@ -42,7 +44,7 @@
 
 标准安装后运行 `steward`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。连接视觉模型时显式勾选 **Enable image input (verified when tested)**，通过图片 Probe 后再选择；模型卡显示已验证图片输入或 Text only。图片发送规则见 [F-013](artifacts-media.md#f-013)。
 
-CLI 可运行 `steward model list` 查看配置，使用 `steward model test PROFILE_ID` 测试。ChatGPT 凭据使用 macOS Keychain 或 Linux Secret Service；原生构建需要 cgo。Linux 的准备步骤见下文。明确配置的环境变量 API Key 仍只用于兼容端点，不充当 OAuth 凭据后端。
+CLI 可运行 `steward model list` 查看配置，使用 `steward model test PROFILE_ID` 测试。ChatGPT 凭据默认使用私有文件。原生后端的准备步骤见下文。明确配置的环境变量 API Key 仍只用于兼容端点，不充当 OAuth 凭据后端。
 
 ## 详细操作参考
 
@@ -57,8 +59,9 @@ CLI 可运行 `steward model list` 查看配置，使用 `steward model test PRO
 
 ### ChatGPT account lifecycle
 
-Use the same explicit Bridge configuration shown below. Native cgo builds use
-Steward's own macOS Keychain service or Linux Secret Service via libsecret.
+Use the same explicit Bridge configuration shown below. ChatGPT credentials default
+to private files under the Steward data root. Set `llm.account_secret_store: native`
+to use macOS Keychain or Linux Secret Service via libsecret on native cgo builds.
 Environment API keys cannot authenticate this entry point. No Codex credential
 file is read or written.
 
@@ -149,11 +152,11 @@ observer Guard and persistence records `AUTH_REQUIRED` with no accepted result
 or token counts. Same-identity refresh preserves the epoch. HTTP history/cache
 deletion is not promised. Account requests disable provider cache retention.
 
-`tests/system/verify_account.py` drives this path with an owned local OAuth/Responses
-server and an explicit `-test-secret-store SOCKET` in-memory fixture. This flag
-is never inferred from configuration, saved metadata or missing Keychain. It
-creates no credential file. The account harness and Node/Go security cases are selected by the current Makefile and system runner. `evidence/account*.json` contains safe
-observations, not tokens or authorization URLs.
+`tests/system/verify_account.py` uses an isolated local OAuth/Responses server and
+the production file backend by default. Its optional native test uses a
+disposable Secret Service session. Web tests can inject a separate
+`-test-secret-store SOCKET` fixture. Reports record outcomes without credentials or
+private authorization URLs.
 
 `go test ./internal/agent/sqlite -run TestAccountFinalAcceptance -v` drives the
 real Go → Node → Pi completion path, pauses before usage persistence, then mutates

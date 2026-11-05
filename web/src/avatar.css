@@ -1,7 +1,8 @@
 /* Complete pre-rendered poses; fixed hitbox, independent composited whole-body drift. */
+.steward-avatar{width:44px;height:44px;min-width:44px}
 .steward-avatar,.steward-avatar:hover{
   --ghost-tone:charcoal;--ghost-atlas:url('/brand/ghost-charcoal-96.webp');--ghost-drift:2px;
-  width:44px;height:44px;min-width:44px;padding:0;position:relative;display:inline-block;vertical-align:middle;
+  padding:0;position:relative;display:inline-block;vertical-align:middle;
   background:transparent;color:var(--foreground);border:0;border-radius:0;overflow:visible;isolation:isolate;touch-action:manipulation;
 }
 .steward-avatar:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:10px}

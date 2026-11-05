@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/z-chenhao/assistant/internal/llm"
 	"net/http"
 	"net/url"
 	"strings"
@@ -67,15 +66,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 		copy.URL = &u
 		err = s.loadTasks(r.Context(), copy, &p)
 	default:
-		s.mu.Lock()
-		p.Auth = s.auth
-		p.AuthError = s.authError
-		p.AccountID = s.accountID
-		s.mu.Unlock()
-		p.Settings = &settingsView{}
-		if strings.HasPrefix(p.Tab, "/settings/models/") && p.Tab != "/settings/models/new" {
-			p.Settings.Profile = &llm.Profile{ProfileID: strings.TrimPrefix(p.Tab, "/settings/models/")}
-		}
+		s.loadSignIn(&p, p.Tab)
 	}
 
 	if err != nil {

@@ -48,14 +48,24 @@ func (m *Manager) Recover(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	files, checkExists := m.Secrets.(interface {
+		Exists(context.Context, string) (bool, error)
+	})
 	for _, a := range accounts {
-		if a.Status == "connected" {
+		if a.Status == "connected" && !checkExists {
 			continue
 		}
 		err = m.locked(ctx, a.ConnectionID, func() error {
 			current, err := m.Store.Auth(ctx, a.ConnectionID)
 			if err != nil {
 				return err
+			}
+			if current.Status == "connected" && checkExists {
+				exists, err := files.Exists(ctx, current.CredentialRef)
+				if err == nil && !exists {
+					return m.Store.AccountState(ctx, current, "reauth_required", nil)
+				}
+				return nil
 			}
 			if current.Status == "refreshing" {
 				err = m.lose(current)
@@ -281,6 +291,10 @@ func (m *Manager) Ensure(ctx context.Context, id string) (llm.AuthConnection, ll
 		}
 		c, err = m.read(ctx, a)
 		if err != nil {
+			// A caller can disappear during a local read, before token rotation.
+			if ctx.Err() != nil {
+				return llm.ProviderUnavailable
+			}
 			return m.lose(a)
 		}
 		if c.ExpiresAt.After(time.Now().Add(3 * time.Minute)) {
