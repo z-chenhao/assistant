@@ -644,6 +644,10 @@ func (c *Client) generate(ctx context.Context, method string, r llm.GenerationRe
 		case "completed":
 			result.Text = generatedText.String()
 			result.Usage = e.Usage
+			result.WebSearch = e.WebSearch
+			if r.WebSearch != nil && (result.WebSearch == nil || len(result.ToolCalls) != 0 || result.Clipped) {
+				return llm.GenerationResult{}, llm.InvalidProviderResponse
+			}
 			if r.Snapshot.ProviderKind == "openai_account" {
 				completed = &e
 			} else if sink != nil {

@@ -96,6 +96,13 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 		m.Compat["supportsMaxOutputTokens"] = false
 	}
 	in := provider.Context{}
+	if r.WebSearch != nil {
+		if !account || r.WebSearch.InvocationID == "" || strings.TrimSpace(r.WebSearch.Query) == "" || len(r.WebSearch.Query) > 4096 || len(r.Tools) != 0 || len(r.Messages) != 2 || r.Messages[1].Text != r.WebSearch.Query {
+			fail(provider.ErrIncompatible)
+			return
+		}
+		in.WebSearch = true
+	}
 	pending := map[string]string{}
 	systemSeen := false
 	for _, message := range r.Messages {
@@ -179,6 +186,9 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 		}
 		s.observe(r, obs)
 	}}
+	if r.WebSearch != nil {
+		o.MaxRetries = 0
+	}
 	toolCount, outputBytes := 0, 0
 	invalid := false
 	result, err := (&provider.Client{}).Stream(work, m, in, o, func(e provider.Event) {
@@ -227,6 +237,17 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 		return
 	}
 	data := map[string]any{"latency_ms": time.Since(started).Milliseconds()}
+	if r.WebSearch != nil {
+		if !result.WebSearchPerformed {
+			fail(provider.ErrInvalidResponse)
+			return
+		}
+		search := llm.WebSearchResult{Sources: []llm.WebSource{}}
+		for _, source := range result.WebSources {
+			search.Sources = append(search.Sources, llm.WebSource{URL: source.URL, Title: source.Title})
+		}
+		data["web_search"] = search
+	}
 	if result.Usage.Known {
 		data["usage"] = llm.TokenUsage{InputTokens: result.Usage.Input, OutputTokens: result.Usage.Output, CacheReadTokens: result.Usage.CacheRead, CacheWriteTokens: result.Usage.CacheWrite}
 	}

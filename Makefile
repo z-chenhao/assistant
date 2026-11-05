@@ -1,4 +1,4 @@
-.PHONY: help setup install run build test test-prompts test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
+.PHONY: help setup install run build test test-prompts test-web-access test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
 
 .DEFAULT_GOAL := setup
 
@@ -35,6 +35,10 @@ test-prompts:
 
 test-go:
 	go test ./...
+
+# Deterministic connector contracts; live network checks are explicitly opt-in.
+test-web-access:
+	go test -race ./internal/webaccess ./internal/llm/bridge ./internal/agent ./internal/agent/sqlite -run '(WebAccess|WebSearch|HostedSearch|SearchCompletion)' -count=1
 
 test-node:
 	npm run check --prefix web

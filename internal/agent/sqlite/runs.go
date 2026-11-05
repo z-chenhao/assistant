@@ -28,11 +28,15 @@ import (
 	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
+	"github.com/z-chenhao/assistant/internal/webaccess"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
 type Runs struct {
+	webAccess             webaccess.Config
+	webProvider           llm.LLMProvider
+	webFetch              func(context.Context, string) (webaccess.Page, error)
 	feishuReviewWorkspace string
 	imageOCR              ImageOCR
 	environmentExecute    func(context.Context, string, string) tool.Result

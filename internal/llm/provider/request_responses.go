@@ -178,6 +178,12 @@ func (b *requestBuilder) responses() {
 	if o.SessionID != "" {
 		p["prompt_cache_key"] = o.SessionID
 	}
+	if c.WebSearch {
+		p["tools"] = []any{map[string]any{"type": "web_search"}}
+		p["tool_choice"] = "required"
+		p["max_tool_calls"] = 1
+		p["include"] = []string{"web_search_call.action.sources"}
+	}
 
 	b.payload = p
 	b.url = u

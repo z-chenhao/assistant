@@ -151,6 +151,18 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	if err := fence(ctx, tx, &claim{id: runID, token: token, epoch: epoch}); err != nil {
 		return err
 	}
+	if request.WebSearch != nil {
+		var valid int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND run_id=? AND tool_name='builtin__web_search' AND status='running'`, request.WebSearch.InvocationID, runID).Scan(&valid); err != nil {
+			return agent.ErrStorage
+		}
+		if valid != 1 {
+			return agent.ErrClaimLost
+		}
+		if cause == nil && (result.WebSearch == nil || result.Clipped || len(result.ToolCalls) != 0) {
+			return llm.InvalidProviderResponse
+		}
+	}
 	raw, _ := encoded(request)
 	if hash != digest(raw) {
 		return agent.ErrConflict

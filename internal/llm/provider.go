@@ -73,6 +73,7 @@ type GenerationRequest struct {
 	Snapshot         Snapshot                              `json:"model_snapshot"`
 	Messages         []Message                             `json:"messages"`
 	Tools            []ToolSpec                            `json:"tools,omitempty"`
+	WebSearch        *WebSearchRequest                     `json:"web_search,omitempty"`
 
 	// AuthEpoch is captured by the Host resolver and passed only to final
 	// persistence. It is not part of the frozen snapshot or Bridge protocol.
@@ -92,21 +93,38 @@ type TokenUsage struct {
 	CacheWriteTokens int64 `json:"cache_write_tokens"`
 }
 
+// WebSearch is a private hosted-tool request, never a replacement model profile.
+type WebSearchRequest struct {
+	InvocationID string `json:"invocation_id"`
+	Query        string `json:"query"`
+}
+
+type WebSource struct {
+	URL   string `json:"url"`
+	Title string `json:"title,omitempty"`
+}
+
+type WebSearchResult struct {
+	Sources []WebSource `json:"sources"`
+}
+
 type GenerationEvent struct {
-	Usage        *TokenUsage `json:"usage,omitempty"`
-	GenerationID string      `json:"generation_id"`
-	Sequence     int64       `json:"sequence"`
-	Kind         string      `json:"kind"`
-	Text         string      `json:"text,omitempty"`
-	ToolCall     *ToolCall   `json:"tool_call,omitempty"`
-	ErrorCode    string      `json:"error_code,omitempty"`
+	WebSearch    *WebSearchResult `json:"web_search,omitempty"`
+	Usage        *TokenUsage      `json:"usage,omitempty"`
+	GenerationID string           `json:"generation_id"`
+	Sequence     int64            `json:"sequence"`
+	Kind         string           `json:"kind"`
+	Text         string           `json:"text,omitempty"`
+	ToolCall     *ToolCall        `json:"tool_call,omitempty"`
+	ErrorCode    string           `json:"error_code,omitempty"`
 }
 
 type GenerationResult struct {
-	Usage     *TokenUsage `json:"usage,omitempty"`
-	Text      string      `json:"text"`
-	ToolCalls []ToolCall  `json:"tool_calls"`
-	Clipped   bool        `json:"clipped"`
+	WebSearch *WebSearchResult `json:"web_search,omitempty"`
+	Usage     *TokenUsage      `json:"usage,omitempty"`
+	Text      string           `json:"text"`
+	ToolCalls []ToolCall       `json:"tool_calls"`
+	Clipped   bool             `json:"clipped"`
 }
 
 type LLMProvider interface {

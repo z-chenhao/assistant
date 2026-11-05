@@ -51,6 +51,15 @@ func TestChildFixedReductionDoesNotAddCapabilities(t *testing.T) {
 	}
 }
 
+func TestWebAccessRoleReductionUsesOnlyFrozenTools(t *testing.T) {
+	input := []tool.Spec{{Name: "builtin__web_search", Permission: "read_only", ResourceHash: "frozen"}, {Name: "builtin__web_fetch", Permission: "read_only", ResourceHash: "frozen"}}
+	for _, reduce := range []func([]tool.Spec) []tool.Spec{MainTools, WorkerTools, ChildTools} {
+		if !reflect.DeepEqual(reduce(input), input) || len(reduce(nil)) != 0 {
+			t.Fatal("web access widened or changed frozen tools")
+		}
+	}
+}
+
 func TestEvidenceConversationNavigationRemainsMainOnly(t *testing.T) {
 	input := []tool.Spec{{Name: "builtin__evidence_read", Permission: "read_only"}, {Name: "builtin__read", Permission: "read_only"}}
 	for _, reduced := range [][]tool.Spec{WorkerTools(input), ChildTools(input)} {
