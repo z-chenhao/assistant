@@ -33,7 +33,7 @@ export function enhanceSettingsControls(){
   const menu=document.createElement('div');menu.className='settings-select-menu';menu.hidden=true;menu.id=`settings-select-${index}`;
   const input=document.createElement('input');input.type='search';input.placeholder=t('Search options');input.setAttribute('aria-label',t('Search options'));input.autocomplete='off';
   const list=document.createElement('div');list.className='settings-select-options';list.role='listbox';list.id=menu.id+'-options';
-  const label=select.labels?.[0]?.textContent?.trim()||t('Options');list.setAttribute('aria-label',label);input.setAttribute('aria-controls',list.id);
+  list.setAttribute('aria-label',t('Options'));input.setAttribute('aria-controls',list.id);
   const empty=document.createElement('p');empty.className='settings-select-empty';empty.textContent=t('No results.');empty.role='status';empty.hidden=true;
   menu.append(input,list,empty);document.body.append(menu);
   select.setAttribute('aria-haspopup','listbox');select.setAttribute('aria-expanded','false');select.setAttribute('aria-controls',list.id);

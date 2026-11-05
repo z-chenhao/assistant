@@ -282,8 +282,8 @@ try{
   await page.screenshot({path:evidence+'/model-detail-wide.png',fullPage:true});
   await page.setViewportSize({width:320,height:740});
   const mobileHeader=await page.locator('.workspace-topbar').evaluate(topbar=>{
-   const crumb=topbar.querySelector('.breadcrumbs').lastElementChild.getBoundingClientRect();
-   const status=topbar.querySelector('#workspace-status').getBoundingClientRect();
+   const crumb=topbar.querySelector('span').getBoundingClientRect();
+   const status=topbar.querySelector('.settings-exit').getBoundingClientRect();
    return {overlap:crumb.right>status.left,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   if(mobileHeader.overlap||mobileHeader.overflow)throw Error('expanded model overlapped or overflowed the narrow layout');
