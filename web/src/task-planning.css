@@ -1,5 +1,5 @@
 /* Objective and execution policy lead; activity and deliveries support them. */
-.task-objective,.task-configuration,.task-instructions,.task-current-progress,.task-results{margin:0 0 28px;padding:0 0 28px;border-bottom:1px solid var(--border);min-width:0}
+.task-objective,.task-configuration,.task-instructions,.task-current-progress,.task-results{margin:0 0 var(--section-space);padding:0 0 var(--section-space);border-bottom:1px solid var(--border);min-width:0}
 .task-objective .semantic{font-size:16px;line-height:1.75;max-width:72ch}
 .task-rule-name{font-size:15px;font-weight:550;margin:0 0 8px}
 .task-rule-facts{display:grid;gap:12px;margin:20px 0}
@@ -14,9 +14,7 @@
 .task-objective-preview{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;color:var(--muted-foreground);max-width:72ch}
 .task-row .task-list-rule{font-size:12px;color:var(--muted-foreground);margin-top:12px}
 .task-list-rule time{display:inline;font:inherit;color:inherit;margin:0}
-.task-results h2{font-size:17px}
 @container task-layout (max-width:760px){.task-rule-facts>div{grid-template-columns:minmax(0,1fr);gap:4px}}
-@media(max-width:700px){.task-objective,.task-configuration,.task-instructions,.task-current-progress,.task-results{margin-bottom:24px;padding-bottom:24px}}
 
 .scheduled-work{margin:28px 0 36px}
 .scheduled-work-list{border-top:1px solid var(--border)}
@@ -30,11 +28,11 @@
 .scheduled-work-actions .text-link{min-height:44px;display:inline-flex;align-items:center}
 @media(max-width:700px){.scheduled-work-row{flex-direction:column;gap:12px}.scheduled-work-actions{justify-content:flex-start;max-width:100%;gap:12px}}
 
-.schedule-editor-page{max-width:920px}.schedule-editor{max-width:680px}
+.schedule-editor{max-width:680px}
 .schedule-editor>label,.schedule-editor>.schedule-field,.schedule-editor>[data-schedule-fields]{display:block;margin-bottom:20px}
 .schedule-editor>.schedule-field>label{margin-bottom:0}
 .schedule-editor textarea{display:block;width:100%;resize:vertical;min-height:130px;margin-top:8px;font:16px/1.6 var(--font-ui)}
-.schedule-editor .schedule-enabled{display:flex;align-items:center;gap:8px;margin:0}
+.schedule-editor .schedule-enabled{display:flex;align-items:center;flex-direction:row-reverse;justify-content:space-between;gap:8px;margin:0}
 .schedule-editor .schedule-enabled input{width:auto;margin:0}
 .schedule-editor>p.field-help{margin:8px 0 24px}.schedule-editor>.technical-details{margin:24px 0}
 .schedule-editor .technical-details>label{display:block;margin-top:16px}
@@ -45,8 +43,8 @@
 .schedule-editor:has([name="frequency"] option[value="monthly"]:checked) [data-schedule-fields="monthly"],
 .schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="custom"]{display:block}
 .schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="clock"]{display:none}
-@media(max-width:700px){.schedule-editor .actions{align-items:stretch;flex-direction:column}.schedule-editor input,.schedule-editor select{font-size:16px}}
-.schedule-editor textarea{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground)}
+@media(max-width:700px){.schedule-editor .actions{align-items:stretch;flex-direction:column}.schedule-editor input{font-size:16px}}
+.schedule-editor textarea{padding:12px;border:1px solid var(--control-border);border-radius:10px;background:var(--card);color:var(--foreground)}
 
 .needs-attention:has(.attention-heading){margin-bottom:36px}
 .attention-heading h2{display:flex;align-items:center;gap:10px;margin-bottom:8px}
@@ -59,7 +57,7 @@
 .task-feedback-request:focus-visible{outline:2px solid var(--foreground);outline-offset:8px}
 .task-feedback-request h2{margin:0 0 14px}.feedback-prompt{white-space:pre-wrap;overflow-wrap:anywhere;max-width:70ch;line-height:1.7;margin:0 0 16px}
 .task-feedback-form>label,.feedback-status>label{display:block;font-size:14px;font-weight:500;margin:20px 0 8px}
-.task-feedback-form textarea,.feedback-status textarea{width:100%;min-height:100px;resize:vertical;padding:12px;font:16px/1.6 var(--font-ui);border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground)}
+.task-feedback-form textarea,.feedback-status textarea{width:100%;min-height:100px;resize:vertical;padding:12px;font:16px/1.6 var(--font-ui);border:1px solid var(--control-border);border-radius:10px;background:var(--card);color:var(--foreground)}
 .task-feedback-form textarea:focus-visible,.feedback-status textarea:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}
 .task-feedback-form .field-help{margin:10px 0 18px;max-width:70ch}.feedback-status:not(:empty){margin:20px 0 28px}.feedback-status textarea[readonly]{min-height:80px}
 @media(max-width:700px){.attention-row{align-items:flex-start;flex-direction:column;gap:14px}.attention-row>.button{align-self:flex-start}.task-feedback-form button{min-height:44px}}

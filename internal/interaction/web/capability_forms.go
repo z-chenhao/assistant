@@ -17,6 +17,7 @@ import (
 // advanced configuration; the setup manager still validates the entire candidate
 // and owns verification, revision checks and persistence.
 type capabilityForm struct {
+	Mode               string
 	Available, Enabled bool
 	Error              string
 	Memory             memoryForm
@@ -134,9 +135,23 @@ func prepareCapabilityForm(v *Capability) {
 		v.Form = f
 		return
 	}
+	if formValue(n, "mode") == "automatic" {
+		f.Mode = "automatic"
+		f.Enabled = false
+	}
+	if f.Mode == "" {
+		if f.Enabled {
+			f.Mode = "custom"
+		} else {
+			f.Mode = "off"
+		}
+	}
 	switch v.ID {
 	case "memory":
 		f.Memory = memoryForm{formValue(n, "encryption_key_ref")}
+		if f.Mode == "automatic" && v.DefaultKeyRef != "" {
+			f.Memory.KeyRef = v.DefaultKeyRef
+		}
 	case "embedding":
 		f.Embedding = embeddingForm{formValue(n, "endpoint"), formValue(n, "model"), formValue(n, "dimensions"), formValue(n, "api_key_ref")}
 	case "skills":
@@ -222,6 +237,13 @@ func blankMCPProvider() mcpProviderForm {
 }
 func postedCapabilityForm(id string, values url.Values) (*capabilityForm, error) {
 	f := &capabilityForm{Available: true, Enabled: values.Get("enabled") == "yes"}
+	f.Mode = values.Get("mode")
+	if f.Mode != "" && f.Mode != "automatic" && f.Mode != "custom" && f.Mode != "off" {
+		return f, ErrCapabilityInvalid
+	}
+	if f.Mode != "" {
+		f.Enabled = f.Mode == "custom"
+	}
 	get := values.Get
 	switch id {
 	case "memory":
@@ -355,6 +377,15 @@ func credentialFormRef(value string, optional bool) error {
 	return nil
 }
 func guidedCapabilityText(id, baseline string, f *capabilityForm) (string, error) {
+	if f.Mode == "automatic" && (id == "memory" || id == "embedding" || id == "skills" || id == "computer") {
+		return "mode: automatic\n", nil
+	}
+	if f.Mode == "off" {
+		return "", nil
+	}
+	if strings.TrimSpace(baseline) == "mode: automatic" {
+		baseline = ""
+	}
 	base := Capability{ID: id, Text: baseline}
 	prepareCapabilityForm(&base)
 	if !base.Form.Available {

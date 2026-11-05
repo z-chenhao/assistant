@@ -150,6 +150,20 @@ class ChannelHarness(MainHarness):
         require(result.returncode==0,'browser drive failed: '+result.stderr)
 
 
+def preference_settings(binary, evidence, report):
+    with tempfile.TemporaryDirectory(prefix='steward-preferences-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.setup()
+            h.start()
+            output = evidence.parent / 'preferences-ui'
+            h.browser(output, 'preferences')
+            report['scenarios']['preferences'] = json.loads((output / 'preferences-browser.json').read_text())
+            report['checks'].append('Preferences: bilingual grouped dropdown, keyboard/touch and help, single-flight autosave, rejection/retry, unknown-result and cookie readback, timeout, restoration, native fallbacks and neighboring settings')
+        finally:
+            h.cleanup()
+
+
 def feishu_auth_lifecycle(binary, report):
     """Real CLI/Actor/Delivery against the HTTP peer; no browser or real account."""
     with tempfile.TemporaryDirectory(prefix='steward-feishu-auth-') as temp, Sandbox(managed_auth=True, token_ttl=2) as platform:
@@ -688,8 +702,10 @@ def run(binary,evidence):
             h.callback('unbound','bad',sender='other',expected=403)
             h.callback('recipient','bad',destination='other',expected=403)
             h.browser(evidence.parent/'channels-ui','setup')
+            h.browser(evidence.parent/'preferences-ui','preferences')
+            report['checks'].append('Preferences: grouped bilingual language list, accessible hover/keyboard/touch help, single-flight autosave, browser persistence, no-JS fallback and neighboring Resources/Notifications/Capabilities')
             h.wait(lambda s:any(d['status']=='sent' and d['channel']=='web' for d in s['deliveries']),'browser setup and first reply')
-            report['checks'].append('Launch/Doctor: real loopback Web setup and file attachment through browser; explicit model Fake; auth/CSRF/signature/identity/recipient rejection')
+            report['checks'].append('Launch/Doctor: browser language switch persists into Chat, followed by real loopback Web setup and file attachment; explicit model Fake; auth/CSRF/signature/identity/recipient rejection')
             # Duplicate callback IDs and new callback IDs carrying the same source
             # message are distinct retry patterns, both deduplicated durably.
             with ThreadPoolExecutor(max_workers=8) as pool:
@@ -770,10 +786,45 @@ def run(binary,evidence):
     native_components(binary, evidence, report)
     rich_replies(binary, evidence, report)
     delivery_leases(binary, report)
-    account_presentation(binary,report)
+    account_presentation(binary, evidence.parent/'account-ui', report)
     native_trace_inspection(binary,evidence,report)
+    page_transitions(binary,evidence,report)
+    task_control_components(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def page_transitions(binary, evidence, report):
+    with tempfile.TemporaryDirectory(prefix='steward-page-transitions-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.setup()
+            h.command('model', 'add', 'http://127.0.0.1:1/v1', 'candidate-model')
+            h.start()
+            output = evidence.parent / 'page-transitions-ui'
+            h.browser(output, 'page-transitions')
+            report['scenarios']['page-transitions'] = json.loads((output / 'page-transitions.json').read_text())
+            report['checks'].append('Page transitions: bilingual light/dark Resources sizing and titles, persisted collapse across modules, stable pre-bundle layout, failed-bundle native fallback and explicit notification save feedback')
+        finally:
+            h.cleanup()
+
+
+def task_control_components(binary, evidence, report):
+    # The CI channels gate owns this scenario; the browser driver is not an
+    # uncalled example. All schedule writes use a disposable data root.
+    with tempfile.TemporaryDirectory(prefix='steward-task-controls-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        h.now = '2026-10-15T12:00:00+08:00'
+        try:
+            h.setup()
+            h.start()
+            output = evidence.parent / 'task-controls-ui'
+            h.browser(output, 'schedule')
+            require(not h.rows()['runs'], 'schedule control checks unexpectedly started a Run')
+            report['scenarios']['task-controls'] = json.loads((output / 'schedule-browser.json').read_text())
+            report['checks'].append('Task shared Select/Switch: search and empty results, keyboard cancellation, dependent fields, single popup, manual save, persistence, stale drafts, touch, native fallback and no premature dispatch')
+        finally:
+            h.cleanup()
 
 
 def database_inspection(binary, evidence, report):
@@ -873,8 +924,46 @@ def database_inspection(binary, evidence, report):
             h.cleanup()
 
 
+def default_capability_settings(binary,evidence,report):
+    """Real startup defaults with an explicitly injected, owned binary SecretStore."""
+    class MemorySecrets(socketserver.StreamRequestHandler):
+        def handle(self):
+            value=json.loads(self.rfile.readline(131072))
+            with self.server.lock:
+                op,ref=value['op'],value['ref']
+                if op=='put':self.server.values[ref]=value['value']
+                elif op=='delete':self.server.values.pop(ref,None)
+                result=self.server.values.get(ref)
+            self.wfile.write((json.dumps(dict(ok=op!='get' or result is not None,value=result))+'\n').encode())
+    with tempfile.TemporaryDirectory(prefix='steward-default-settings-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+        root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
+        h.production_events=True
+        h.env.update(STEWARD_NATS_URL=broker.url,STEWARD_NATS_STREAM_PREFIX='default_memory_ui')
+        socket=root/'secrets.sock'
+        server=socketserver.ThreadingUnixStreamServer(str(socket),MemorySecrets)
+        server.values={'env:'+name:base64.b64encode(h.env[name].encode()).decode() for name in ('STEWARD_WEB_TEST_TOKEN','STEWARD_FEISHU_VERIFY','STEWARD_FEISHU_ENCRYPT','STEWARD_FEISHU_ACCESS')}
+        server.lock=threading.Lock();server.daemon_threads=True;os.chmod(socket,0o600)
+        thread=threading.Thread(target=server.serve_forever);thread.start()
+        original=h.args;h.args=lambda *args:original('-test-secret-store',str(socket),*args)
+        try:
+            with h.config.open('a') as out:out.write('defaults: {memory: true, search: true, skills: true, computer: true}\n')
+            h.setup();h.start()
+            h.browser(evidence.parent/'default-settings-ui','capability-defaults')
+            key_ref=json.loads((root/'data/default-memory.json').read_text())['ref']
+            require(len(base64.b64decode(server.values[key_ref]))==32,'default Memory did not create its key')
+            h.stop();h.start()
+            require(json.loads((root/'data/default-memory.json').read_text())['ref']==key_ref,'restart replaced the default key')
+            require('Enabled (default)' in h.http('/settings/capabilities/memory'),'default Memory lost its enabled status')
+            require(not (root/'data.desktop').exists(),'browsing settings prepared a desktop')
+            report['checks'].append('Default Memory and local search start together; one enabled Memory entry, concise Preferences layout, Chinese/mobile, stable SecretStore key and no desktop download')
+            h.stop()
+        finally:
+            h.cleanup();server.shutdown();server.server_close();thread.join(10)
+
+
 def capability_settings(binary,evidence,report):
     """Owner UI -> real config/probes -> restart, retaining frozen Run records."""
+    default_capability_settings(binary,evidence,report)
     from verify_recall import Embeddings
     with tempfile.TemporaryDirectory(prefix='steward-capability-settings-') as temp, Sandbox() as platform:
         root=Path(temp).resolve();h=ChannelHarness(binary,root,platform,'terminal-input')
@@ -1155,7 +1244,7 @@ def dependency_recovery(binary, report):
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
             h.start()
-            require('<h1>Models</h1>' in h.http('/settings/models'), 'dependency failure hid Settings')
+            require('href="/settings/models/new"' in h.http('/settings/setup'), 'dependency failure hid model settings in Resources')
             require('<h1>Tasks</h1>' in h.http('/tasks'), 'dependency failure hid Progress')
             require(h.http('/api/status')['readiness'] != 'ready', 'broken runtime admitted work')
             h.http('/api/message', dict(source_id='blocked', content=[dict(type='text', text='blocked')]), expected=409)
@@ -1491,7 +1580,7 @@ def extra_scenarios(binary,report):
     report['checks'].append('Task continuation across Feishu/Web; real zoned scheduling to default Feishu with only two threshold notices')
 
 
-def account_presentation(binary,report):
+def account_presentation(binary, browser_evidence, report):
     # Reuse the account harness' owned OAuth network substitution and SecretStore.
     # The production Bridge/Manager is real; no login token or auth URL is evidence.
     from verify_account import account_config, Secrets
@@ -1509,6 +1598,7 @@ def account_presentation(binary,report):
             server=socketserver.ThreadingUnixStreamServer(str(socket),Secrets)
             server.values={'credential:web-owner':base64.b64encode(TOKEN.encode()).decode()}
             server.lock=threading.Lock();server.sensitive=set();os.chmod(socket,0o600)
+            server.credential_reads = {}
             thread=threading.Thread(target=server.serve_forever);thread.start()
             h=object.__new__(ChannelHarness);MainHarness.__init__(h,binary,root,fixture='')
             h.env.update(STEWARD_NATS_URL=broker.url,STEWARD_NATS_STREAM_PREFIX='web_account')
@@ -1519,9 +1609,31 @@ def account_presentation(binary,report):
                 h.args=lambda *args:original('-test-secret-store',str(socket),*args)
                 h.env['STEWARD_WEB_TEST_TOKEN']=TOKEN;h.process=None;h.start()
                 form={'Content-Type':'application/x-www-form-urlencoded'}
-                h.http('/auth/login',b'',headers=form)
-                pending=h.wait_state(lambda s:any(e['kind']=='open_url' for e in s['events']),'UI-neutral account authorization event',lambda _:h.http('/api/auth'))
-                private_url=next(e['url'] for e in pending['events'] if e['kind']=='open_url')
+                def pending_login():
+                    pending = h.wait_state(
+                        lambda s: s['status'] == 'pending' and any(e['kind'] == 'open_url' for e in s['events']),
+                        'UI-neutral account authorization event', lambda _: h.http('/api/auth'),
+                    )
+                    return pending, next(e['url'] for e in pending['events'] if e['kind'] == 'open_url')
+
+                # The external browser can fail before it sends a callback.
+                h.browser(root/'browser', 'account-signin')
+                _, abandoned_url = pending_login()
+                require('Cancel sign-in' in h.http('/settings/models/new?provider=chatgpt'), 'pending login has no way to cancel')
+                h.http('/auth/cancel', b'', headers=form)
+                cancelled = h.wait_state(lambda s: s['status'] == 'reauth_required',
+                                         'cancelled Web login', lambda _: h.http('/api/auth'))
+                require(not cancelled.get('account_id') and not h.command('model', 'accounts'),
+                        'abandoned authorization created an account')
+                require(h.http('/api/status')['readiness'] == 'setup_required', 'abandoned authorization changed readiness')
+                retry_page = h.http('/settings/models/new?provider=chatgpt')
+                require('Sign-in was not completed.' in retry_page and 'action="/auth/login"' in retry_page,
+                        'cancelled authorization did not offer another login')
+                require(abandoned_url not in retry_page and 'Continue sign-in in your browser' not in retry_page,
+                        'cancelled authorization still offers the abandoned URL')
+                h.http('/auth/login', b'', headers=form)
+                pending, private_url = pending_login()
+                require(private_url != abandoned_url, 'retry reused the abandoned authorization')
                 request=Request(endpoint+'/fixture/authorize',data=json.dumps(dict(url=private_url)).encode(),headers={'Content-Type':'application/json'})
                 with urlopen(request,timeout=10) as response:callback=json.load(response)['callback']
                 with urlopen(callback,timeout=10) as response:require(response.status==200,'OAuth callback rejected')
@@ -1533,16 +1645,71 @@ def account_presentation(binary,report):
                 h.http('/model/test',urlencode(dict(profile=profile['profile_id'])).encode(),headers=form)
                 h.http('/model/select',urlencode(dict(profile=profile['profile_id'],profile_version=profile['version'],config_version=1,consent='yes')).encode(),headers=form)
                 require(h.http('/api/status')['readiness']=='ready','Web account profile unavailable')
+                detail = '/settings/models/' + profile['profile_id']
+                add_page = '/settings/models/new?provider=chatgpt'
+                require('Choose an account model' not in h.http(detail), 'add-model sign-in result appeared on existing model')
+                h.browser(browser_evidence, 'account-reconnect')
+                pending_login()
+                resources = '/settings/setup'
+                require('Waiting for sign-in' in h.http(resources) and 'Waiting for sign-in' not in h.http(add_page),
+                        'reconnect status was displayed outside the Resources account section')
+                for view, visible in ((resources, True), (detail, False), ('/settings/models/new', False)):
+                    updates = h.http('/api/updates?' + urlencode(dict(view=view)))
+                    require(('Waiting for sign-in' in updates['regions']['signin-status']) == visible,
+                            'live updates put reconnect status on the wrong page')
+                h.http('/auth/cancel', urlencode(dict(return_to=resources)).encode(), headers=form)
+                h.wait_state(lambda s:s['status']=='reauth_required', 'Resources reconnect cancels', lambda _:h.http('/api/auth'))
+                def account_credential_reads():
+                    with server.lock:
+                        return sum(count for ref, count in server.credential_reads.items() if ref != 'credential:web-owner')
+
+                reads_before = account_credential_reads()
                 h.stop();h.start()
-                require('ChatGPT account' in h.http('/settings/models/new?provider=chatgpt'),'restart hid connected account')
+                require('Load models' in h.http(add_page), 'connected account needs an explicit catalog action')
+                for _ in range(2):
+                    h.http(resources)
+                    h.http('/api/status')
+                    for view in ('/', resources, '/settings/models/new'):
+                        h.http('/api/updates?' + urlencode(dict(view=view)))
+                require(account_credential_reads() == reads_before,
+                        'startup, page load or polling read the account credential')
+                catalog_page = h.http('/model/catalog', urlencode(dict(account=aid)).encode(), headers=form)
+                require('Add account model' in catalog_page and 'fixture-account-model' in catalog_page
+                        and account_credential_reads() > reads_before,
+                        'explicit catalog load did not read credentials and render the picker')
                 h.http('/auth/logout',urlencode(dict(account=aid)).encode(),headers=form)
                 require(h.command('model','accounts')[0]['status']=='logged_out','Web logout missed existing lifecycle')
+                require('Sign-in required' in h.http(resources), 'signed-out model does not show its blocked connection')
+                h.http('/auth/login', urlencode(dict(account=aid, return_to=resources)).encode(), headers=form)
+                _, reconnect_url = pending_login()
+                request = Request(endpoint+'/fixture/authorize', data=json.dumps(dict(url=reconnect_url)).encode(),
+                                  headers={'Content-Type':'application/json'})
+                with urlopen(request, timeout=10) as response:
+                    callback = json.load(response)['callback']
+                with urlopen(callback, timeout=10) as response:
+                    require(response.status == 200, 'OAuth reconnect callback rejected')
+                h.wait_state(lambda s: s.get('account_id') == aid and s['status'] == 'connected',
+                             'Web account reconnect completes', lambda _: h.http('/api/auth'))
+                require('Test connection' in h.http(resources) and 'Use for new work' not in h.http(resources),
+                        'current model needs another selection after reconnect')
+                restored_profile = h.command('model','list')[0]
+                restore = dict(profile=profile['profile_id'], restore_current='yes',
+                               profile_version=restored_profile['version'],
+                               config_version=h.http('/api/status')['config_version'])
+                h.http('/model/test', urlencode(restore).encode(), headers=form)
+                restored = h.http('/api/status')
+                require(restored['readiness'] == 'ready' and restored['active_model_profile_id'] == profile['profile_id'],
+                        'testing did not restore the existing selection')
+                restored_page = h.http(resources)
+                require('Connection verified' in restored_page and 'Test connection' not in restored_page and 'Use for new work' not in restored_page,
+                        'restored model still exposes replaced actions')
+                h.browser(browser_evidence/'signout','settings-account')
                 with server.lock:
                     sensitive=list(server.sensitive)
                 for path in (root/'data').rglob('*'):
                     if path.is_file():require(all(value not in path.read_bytes() for value in sensitive),'credential persisted outside SecretStore')
-                report['scenarios']['account-auth']=dict(status='connected_then_logged_out',event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
-                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; ephemeral URL, hidden-model rejection, actual Probe/Select, restart picker, logout and credential scan verified')
+                report['scenarios']['account-auth']=dict(status='connected_then_logged_out',abandoned_login_recovered=True,event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
+                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; direct popup and manual fallback, cancel without callback, fresh authorization on retry, hidden-model rejection, actual Probe/Select, reconnect page and live update scoping, restart picker, sign-out confirmation and credential scan verified')
                 h.stop()
             finally:
                 h.cleanup();server.shutdown();server.server_close();thread.join(timeout=10)
@@ -1561,13 +1728,16 @@ if __name__=='__main__':
     action.add_argument('--attention-only',action='store_true')
     action.add_argument('--feishu-questions-only',action='store_true')
     action.add_argument('--feishu-reviews-only',action='store_true')
+    action.add_argument('--preferences-only',action='store_true')
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.database_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.database_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only and not args.preferences_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        if args.database_only:
+        if args.preferences_only:
+            preference_settings(args.binary.resolve(),args.evidence.resolve(),report)
+        elif args.database_only:
             database_inspection(args.binary.resolve(),args.evidence.resolve(),report)
         elif args.rich_replies_only:
             rich_replies(args.binary.resolve(),args.evidence.resolve(),report)

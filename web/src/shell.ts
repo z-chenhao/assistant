@@ -28,7 +28,7 @@ export function enhanceShell(){
  const mobile=matchMedia('(max-width: 760px)');
  let collapsed=false;
  try{collapsed=localStorage.getItem('steward-sidebar')==='collapsed'}catch{}
- html.classList.toggle('sidebar-collapsed',collapsed);
+ html.classList.toggle('sidebar-collapsed',collapsed&&!mobile.matches);
  const toggles=document.querySelectorAll<HTMLButtonElement>('[data-sidebar-toggle]');
  const sidebar=document.getElementById('workspace-navigation');
  const update=()=>{
@@ -53,7 +53,7 @@ export function enhanceShell(){
   if(!mobile.matches||!html.classList.contains('mobile-nav'))return;
   if(event.key==='Escape'){close();document.querySelector<HTMLButtonElement>('.sidebar-open')?.focus()}
   if(event.key==='Tab'&&sidebar){
-   const nodes=Array.from(sidebar.querySelectorAll<HTMLElement>('a,button'));const first=nodes[0],last=nodes.at(-1);
+   const nodes=Array.from(sidebar.querySelectorAll<HTMLElement>('a,button,input')).filter(node=>node.getClientRects().length>0);const first=nodes[0],last=nodes.at(-1);
    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
   }
@@ -62,8 +62,4 @@ export function enhanceShell(){
  revealCurrentTabs();
  void document.fonts.ready.then(()=>revealCurrentTabs());
  window.addEventListener('resize',()=>revealCurrentTabs());
- const themes=document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]');
- const syncTheme=()=>themes.forEach(button=>{button.setAttribute('aria-label',html.classList.contains('dark')?t('Switch to light appearance'):t('Switch to dark appearance'));button.setAttribute('aria-pressed',String(html.classList.contains('dark')))});
- syncTheme();themes.forEach(button=>button.addEventListener('click',()=>{html.classList.toggle('dark');try{localStorage.setItem('steward-theme',html.classList.contains('dark')?'dark':'light')}catch{};syncTheme()}));
-
 }

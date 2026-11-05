@@ -4,6 +4,12 @@ export async function databaseInspection(page,context,browser,url,evidence){
  await page.locator('aside').getByRole('link',{name:'Developer',exact:true}).click();
  await page.getByRole('navigation',{name:'Developer sections'}).getByRole('link',{name:'Database',exact:true}).click();
  await page.locator('.database-page').waitFor();
+ const filterOffset=await page.locator('.database-filter').evaluate(form=>{
+  const field=form.querySelector('input[name=ref]').getBoundingClientRect();
+  const action=form.querySelector('button').getBoundingClientRect();
+  return Math.abs(field.bottom-action.bottom);
+ });
+ if(filterOffset>1)throw Error('record reference and filter action sit on different baselines');
  const collections=page.getByRole('navigation',{name:'Record collections'});
  if(await collections.getByRole('link').count()!==4)throw Error('metadata collections missing');
  await collections.getByRole('link',{name:'Messages',exact:true}).click();
@@ -39,8 +45,9 @@ export async function databaseInspection(page,context,browser,url,evidence){
  if(geometry.content>geometry.width)throw Error('metadata table expanded the mobile page');
  await page.screenshot({path:evidence+'/database-mobile.png',fullPage:true});
  await page.goto(url+'/settings/preferences');
- await page.locator('#interface-language').selectOption('zh-CN');
- await page.getByRole('button',{name:'Save language',exact:true}).click();
+ await page.locator('[data-language-trigger]').click();
+ await page.locator('[data-language-option="zh-CN"]').click();
+ await page.locator('html[lang="zh-CN"]').waitFor();
  await page.goto(url+'/developer/database?collection=memories');
  if(await page.getByRole('heading',{name:'数据库',exact:true}).count()!==1)throw Error('Database page did not localize');
  const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:1200,height:850}});

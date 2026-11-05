@@ -72,37 +72,38 @@ type Models interface {
 	AddProfile(context.Context, llm.ProfileInput) (llm.Profile, error)
 }
 type Server struct {
-	Computer       ComputerReader
-	Capabilities   CapabilitySettings
-	Workers        WorkerReader
-	Inspector      ExecutionReader
-	Database       DatabaseReader
-	Contexts       ContextReader
-	Traces         TraceReader
-	Tasks          TaskReader
-	Feedbacks      FeedbackSettings
-	Schedules      ScheduleSettings
-	Config         Config
-	Core           Core
-	Models         Models
-	Control        llm.Control
-	Accounts       *account.Manager
-	Secrets        llm.SecretStore
-	AccountCatalog func(context.Context, string) ([]llm.CatalogModel, error)
-	Callback       http.Handler
-	Wake           func()
-	replies        replyPreview
-	mu             sync.Mutex
-	requests       sync.WaitGroup
-	stopping       bool
-	session        string
-	sessionExpires time.Time
-	auth           llm.AuthState
-	authError      string
-	accountID      string
-	authCancel     context.CancelFunc
-	authDone       chan struct{}
-	lifetime       context.Context
+	Computer        ComputerReader
+	Capabilities    CapabilitySettings
+	Workers         WorkerReader
+	Inspector       ExecutionReader
+	Database        DatabaseReader
+	Contexts        ContextReader
+	Traces          TraceReader
+	Tasks           TaskReader
+	Feedbacks       FeedbackSettings
+	Schedules       ScheduleSettings
+	Config          Config
+	Core            Core
+	Models          Models
+	Control         llm.Control
+	Accounts        *account.Manager
+	Secrets         llm.SecretStore
+	AccountCatalog  func(context.Context, string) ([]llm.CatalogModel, error)
+	Callback        http.Handler
+	Wake            func()
+	replies         replyPreview
+	mu              sync.Mutex
+	requests        sync.WaitGroup
+	stopping        bool
+	session         string
+	sessionExpires  time.Time
+	auth            llm.AuthState
+	authOnResources bool
+	authError       string
+	accountID       string
+	authCancel      context.CancelFunc
+	authDone        chan struct{}
+	lifetime        context.Context
 }
 
 func (s *Server) Serve(ctx context.Context, l net.Listener) error {

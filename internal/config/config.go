@@ -30,6 +30,7 @@ import (
 )
 
 type Config struct {
+	Defaults   *Defaults             `yaml:"defaults,omitempty"`
 	SourcePath string                `yaml:"-" json:"-"`
 	Web        *web.Config           `yaml:"web"`
 	Feishu     *feishu.Config        `yaml:"feishu"`
@@ -55,6 +56,33 @@ type Config struct {
 	LLM        LLM                   `yaml:"llm"`
 }
 
+// Defaults selects product-managed resources. Explicit resource sections win.
+// It is opt-in for operator configurations and enabled by the installed startup.
+type Defaults struct {
+	Memory   bool `yaml:"memory"`
+	Search   bool `yaml:"search"`
+	Skills   bool `yaml:"skills"`
+	Computer bool `yaml:"computer"`
+}
+
+func (c Config) Automatic(id string) bool {
+	if c.Defaults == nil {
+		return false
+	}
+	switch id {
+	case "memory":
+		return c.Defaults.Memory && c.Memory == nil
+	case "embedding":
+		return c.Defaults.Search && c.Embedding == nil
+	case "skills":
+		return c.Defaults.Skills && c.Skills == nil
+	case "computer":
+		localOverride := c.Execution != nil && (c.Execution.Root != c.App.DataRoot+".computer" || len(c.Execution.ToolchainRoots) > 0 || c.Execution.RepositorySource != "")
+		return c.Defaults.Computer && c.Computer == nil && !localOverride
+	}
+	return false
+}
+
 type JavaScript struct {
 	Command string `yaml:"command"`
 	Script  string `yaml:"script"`
@@ -78,6 +106,7 @@ type LLM struct {
 	ProviderBridgeCommand string `yaml:"provider_bridge_command"`
 	ProviderBridgeScript  string `yaml:"provider_bridge_script"`
 	ProviderBridgeVersion string `yaml:"provider_bridge_version"`
+	AccountSecretStore    string `yaml:"account_secret_store"`
 }
 
 type App struct {
@@ -178,6 +207,11 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	legacyBridge := filepath.IsAbs(cfg.LLM.ProviderBridgeScript) && cfg.LLM.ProviderBridgeVersion == "pi-ai-1.3.0-v1"
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && !nativeBridge && !legacyBridge {
 		return Config{}, errors.New("llm requires a native steward-go-v1 bridge or a supported external RPC bridge")
+	}
+	switch cfg.LLM.AccountSecretStore {
+	case "", "file", "native":
+	default:
+		return Config{}, errors.New("llm.account_secret_store must be file or native")
 	}
 	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
 		return Config{}, errors.New("javascript requires an absolute command and script")
@@ -351,13 +385,64 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 		return Config{}, errors.New("app.log_level must be debug, info, warn, or error")
 	}
 	cfg.App.DataRoot = filepath.Clean(cfg.App.DataRoot)
+	if err := cfg.ValidateDefaults(); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
+}
+
+func (c Config) defaultRoots() []string {
+	var roots []string
+	if c.Automatic("skills") {
+		roots = append(roots, c.App.DataRoot+".skills")
+	}
+	if c.Automatic("computer") {
+		roots = append(roots, c.App.DataRoot+".desktop")
+	}
+	return roots
+}
+
+func (c Config) ValidateDefaults() error {
+	if c.Automatic("memory") && c.Embedding != nil && !c.Embedding.Local() {
+		return errors.New("automatic encrypted Memory requires local search or a loopback embedding endpoint")
+	}
+	roots := []string{c.App.DataRoot}
+	if c.Execution != nil {
+		roots = append(roots, c.Execution.Root)
+		roots = append(roots, c.Execution.ToolchainRoots...)
+		if c.Execution.RepositorySource != "" {
+			roots = append(roots, c.Execution.RepositorySource)
+		}
+	}
+	if c.Computer != nil {
+		roots = append(roots, c.Computer.Root)
+	}
+	if c.Skills != nil {
+		roots = append(roots, c.Skills.Root)
+	}
+	for _, server := range c.MCP {
+		roots = append(roots, server.Directory, server.Command)
+	}
+	if c.JavaScript != nil {
+		roots = append(roots, c.JavaScript.Command, c.JavaScript.Script)
+	}
+	if c.LLM.ProviderBridgeScript != "" {
+		roots = append(roots, c.LLM.ProviderBridgeScript)
+	}
+	for _, managed := range c.defaultRoots() {
+		for _, root := range roots {
+			if overlaps(managed, root) {
+				return errors.New("automatic capability storage must be separate from configured workspaces and runtimes")
+			}
+		}
+	}
+	return nil
 }
 
 // ValidateSourcePath keeps owner configuration outside any model/provider
 // readable or writable resource, using the same canonical isolation rules.
 func (c Config) ValidateSourcePath(path string) error {
-	roots := []string{}
+	roots := c.defaultRoots()
 	if c.Execution != nil {
 		roots = append(roots, c.Execution.Root)
 		roots = append(roots, c.Execution.ToolchainRoots...)

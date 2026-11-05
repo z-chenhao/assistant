@@ -1,10 +1,12 @@
 import {build} from 'esbuild';
+import {assertSharedControls} from './controls-policy.mjs';
 import {execFileSync} from 'node:child_process';
 import {mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('.',import.meta.url));
+assertSharedControls(fileURLToPath(new URL('..',import.meta.url)));
 const notices=['ad-agent','OpenIntelligentUI'].map(name=>readFileSync(root+'licenses/'+name+'.txt','utf8')).join('\n');
 const js=await build({absWorkingDir:root,entryPoints:['src/main.tsx'],bundle:true,minify:true,write:false,
   format:'iife',target:['es2022'],outfile:'../internal/interaction/web/assets/client.js',

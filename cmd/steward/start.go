@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/z-chenhao/assistant/internal/computer/environment"
@@ -32,11 +33,18 @@ func runtimeHome() (string, error) {
 }
 
 func configureRuntime(cfg *config.Config, home string) {
+	if cfg.Defaults == nil {
+		cfg.Defaults = &config.Defaults{Memory: cfg.Embedding == nil || cfg.Embedding.Local(), Search: true, Skills: true, Computer: true}
+	}
 	if cfg.LLM.ProviderBridgeCommand == "" {
 		cfg.LLM = config.LLM{ProviderBridgeCommand: filepath.Join(home, "bin", "steward"), ProviderBridgeScript: "-model-bridge", ProviderBridgeVersion: bridge.Version}
 	}
 	if cfg.JavaScript == nil {
-		cfg.JavaScript = &config.JavaScript{Command: "node", Script: filepath.Join(home, "runtime", "javascript", "src", "sidecar.mjs")}
+		node, err := exec.LookPath("node")
+		if err != nil {
+			node = filepath.Join(home, "bin", "node")
+		}
+		cfg.JavaScript = &config.JavaScript{Command: node, Script: filepath.Join(home, "runtime", "javascript", "src", "sidecar.mjs")}
 	}
 }
 
@@ -85,7 +93,7 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 		_, err = os.Stat(filepath.Join(filepath.Dir(runtime.script), runtime.dependency))
 		check(runtime.name+": pinned dependencies", err)
 	}
-	if cfg.Computer == nil {
+	if cfg.Computer == nil && !(cfg.Automatic("computer") && runtime.GOOS == "darwin" && runtime.GOARCH == "arm64") {
 		check("file/command environment: system Python 3, bash and kernel sandbox", environment.Check())
 	} else {
 		fmt.Fprintln(out, "SKIP local execution: file/command tools use the configured Computer Guest")
@@ -95,6 +103,9 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 		fmt.Fprintln(out, "OK   image OCR: local Tesseract; languages="+strings.Join(imageOCR.Languages(), ","))
 	} else {
 		fmt.Fprintln(out, "SKIP image OCR: install Tesseract, eng/chi_sim/chi_tra language data and the kernel sandbox; see docs/features/artifacts-media.md")
+	}
+	if cfg.LLM.AccountSecretStore != "native" {
+		fmt.Fprintln(out, "OK   ChatGPT credential storage: private files under the Steward data root")
 	}
 	backend, available := secret.NativeBackend()
 	if available {

@@ -22,7 +22,7 @@ flowchart TD
 新增连接或登录 → 能力测试 → 显式选择 → 新建 Run 冻结快照 → Bridge 发起推理。失败回到可修复设置，不自动切换账户或模型。
 
 - **F-001**：CLI/TUI/Web 有连接、Test、Select 入口，Run 冻结模型快照。 无活动模型时保持 setup_required；不隐式选取收费或 Fake 模型。
-- **F-002**：同一账户生命周期使用 macOS Keychain 或 Linux Secret Service 原生凭据。Linux 动态加载 libsecret，缺少可选库不阻止其他模型启动；库、会话或钥匙串不可用时原生凭据操作失败关闭。平台与 Live 验证边界见功能和测试方案。
+- **F-002**：同一账户生命周期默认使用数据根下的私有文件。显式选择原生后端时，使用 macOS Keychain 或 Linux Secret Service。Linux 动态加载 libsecret，缺少可选库不阻止其他模型启动；库、会话或钥匙串不可用时原生凭据操作失败关闭。平台与 Live 验证边界见功能和测试方案。
 
 ## 代码与依赖
 
@@ -56,7 +56,7 @@ flowchart TD
 
 #### 5.1 首次启动设置流程
 
-TUI/Web 首次启动展示阻塞式 Setup Wizard，只提供两条等价的模型连接路径：
+TUI 首次启动展示 Setup Wizard。Web 首次设置时保留 Chat 和 Settings 导航，禁止发送，Set up Steward 进入 Resources。模型按共享账户或直连来源分组。模型行默认收起，展开可查看连接标识。连接位置在测试操作和验证状态之间切换，选用位置在切换操作和当前模型标记之间切换。从候选模型行尾确认切换时，Host 复用有效 Probe，缺少有效结果时先验证，随后按原模型版本和配置版本提交。当前模型的连接操作可在验证后恢复既有选用，提交时校验模型和配置版本。有效 Probe 可直接用于恢复。旧模型详情链接打开 Resources 中对应的行。账户操作从分组标题展开。资源视图复用已保存配置、账户状态和已有验证结果。页面加载、状态轮询和启动检查只读取这些信息。连接账户、主动加载模型目录、验证模型和实际执行时按需访问凭据。两条模型连接路径为：
 
 ```text
 Choose model connection
@@ -64,7 +64,7 @@ Choose model connection
   2. OpenAI — Sign in with ChatGPT
 ```
 
-统一步骤为：
+Web 的连接方式下拉在当前页切换服务端渲染的表单，无脚本时通过 GET 切换。显式点击 ChatGPT 登录时，浏览器尝试打开与工作台隔离的授权窗口，使用现有登录提交和状态接口获取授权地址。自动打开后，工作台用一行状态等待回调并提供取消操作。弹窗失败时，原生表单和等待页链接继续支持手动授权。两种入口共用以下步骤：
 
 1. 选择连接类型并完成 URL 配置或账号登录。
 2. 获取模型目录；目录不可发现时允许手动填写模型 ID。
@@ -180,9 +180,11 @@ auth_connection_id: null
 第二条路径采用 Pi 当前 OpenAI Provider 的 “Sign in with ChatGPT” 语义，而不是 legacy `openai-codex` Provider：
 
 - Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不包含在当前浏览器登录的完成范围内，不得记为已交付或已测试（见[账户认证设计](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow)）。
+- 登录中和失败反馈归发起页面。新增模型与 Resources 中的账户重连分别呈现各自的状态，直接打开授权窗口时隐藏继续登录链接，窗口被拦截时保留手动入口；原生页面和实时片段应用同一规则。
+- 默认文件后端只保存 ChatGPT OAuth 凭据。数据根下的 `account-secrets/` 目录使用 `0700`，单账户文件使用 `0600`，轮换时在同一目录写入并同步后原子替换。项目备份只包含白名单中的数据库和产物，凭据目录不进入归档。文件权限控制访问，文件内容没有单独加密。
 - 登录完成后创建 `AuthConnection{provider: openai, auth_kind: chatgpt_oauth}`，刷新凭据进入 SecretStore；`state.db` 只保存 credential ref、账号/Workspace 的脱敏显示信息、过期状态和版本。
 - `AuthConnection.status = connected | refreshing | reauth_required | logged_out`。状态迁移由 Auth 层持久化；模型和 Run 只引用 Connection ID，不能读取 CredentialRef。
-- Access token 到期前由 Provider Auth 层自动刷新；同一 Credential 使用单飞锁，避免多个并发 Run 同时刷新。刷新失败或服务返回确定的授权失效时，连接进入 `reauth_required`，停止接收新 Run 并提示用户重新登录。
+- 实际鉴权时，接近到期的 access token 由 Provider Auth 层按需刷新；同一 Credential 使用单飞锁，避免多个并发 Run 同时刷新。本地读取凭据期间取消或超时只结束当前检查。刷新失败或服务返回确定的授权失效时，连接进入 `reauth_required`，停止接收新 Run 并提示用户重新登录。
 - 安装级稳定 `device_id` 保存为非 Secret 配置，用于 Provider 登录连续性；不写入普通日志、Bug Report 或模型上下文。
 - 登录后从 OpenAI Provider 获取该账号当前可用的模型目录，只允许选择实际返回且适用于当前客户端的模型。模型上线、下线和账号权益由目录决定，不在代码中硬编码具体 Codex 型号。
 - ChatGPT 登录表示使用账号订阅权益；它与 OpenAI Platform API Key 是不同的认证和计费路径。MVP 的该入口不接受 API Key，也不把二者静默互相回退。
@@ -443,13 +445,13 @@ The only consumers are the existing CLI/settings control plane and trusted
 generation resolver. `account.Manager` owns lifecycle and uses a narrow private
 Store/Provider boundary. This is not a model Tool, public API, general OAuth
 framework or second generation pipeline. Credentials cross only the existing
-trusted Host/Bridge RPC and SecretStore boundaries; no credential file is used.
+trusted Host/Bridge RPC and SecretStore boundaries. The default file backend is private to the Host and stores a separate file per account.
 UI events never contain tokens. Private authorization URLs are shown only for
 the active interaction and must not be captured as logs or reports.
 
 Each AuthConnection owns one immutable account/client registration. SQLite keeps
 the issued public client ID and a hash of verified issuer/subject; labels are
-masked. Access, refresh and retained ID tokens stay in OS SecretStore. The
+masked. Access, refresh and retained ID tokens stay in the configured SecretStore. The
 installation device UUID is non-secret private configuration, excluded from
 diagnostics, events, traces, reports and prompts.
 

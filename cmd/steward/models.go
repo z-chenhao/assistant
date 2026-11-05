@@ -153,6 +153,6 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 
 func credentialHelp(out io.Writer, err error) {
 	if errors.Is(err, llm.ErrSecretStore) || errors.Is(err, llm.ErrSecretCleanup) {
-		fmt.Fprintln(out, "Unlock your login keyring and retry. Linux requires libsecret-1-0 and a Secret Service keyring in your login session; macOS requires the native Keychain build. Run steward doctor; see docs/features/model-connections.md.")
+		fmt.Fprintln(out, "Check your credential storage settings and retry. Run steward doctor; see docs/features/model-connections.md.")
 	}
 }

@@ -91,6 +91,35 @@ func (c unavailableAttentionCore) WebStatus(context.Context) (Status, error) {
 	return Status{Readiness: "setup_required"}, nil
 }
 
+type failedWorkReader struct{ workspaceReader }
+
+func (failedWorkReader) List(context.Context, task.ListQuery) (task.List, error) {
+	return task.List{Items: []task.Entry{{
+		Summary:  task.Summary{TaskRef: "task:visible", Title: "Open task", Status: "active"},
+		Progress: task.Progress{Root: "failed"},
+	}}}, nil
+}
+
+func TestAttentionKeepsWorkAndExcludesStartupConfiguration(t *testing.T) {
+	core := attentionCore{&updatesCore{allowed: true}}
+	s := &Server{Core: core, Feedbacks: &attentionSettings{}, Tasks: failedWorkReader{}}
+	for _, readiness := range []string{"setup_required", "degraded", "ready"} {
+		p := page{Status: Status{Readiness: readiness}}
+		s.loadAttention(context.Background(), &p, "", "", nil)
+		if p.Attention.Count != 1 || len(p.Attention.Issues) != 1 || p.Attention.Issues[0].Key != "task:visible" {
+			t.Fatalf("readiness %s altered work attention: %+v", readiness, p.Attention)
+		}
+		var rendered bytes.Buffer
+		if err := localizedLayout("zh-CN").ExecuteTemplate(&rendered, "tasks-attention", p); err != nil {
+			t.Fatal(err)
+		}
+		if body := rendered.String(); !strings.Contains(body, "<h3>Open task</h3>") ||
+			!strings.Contains(body, ">打开任务</a>") || strings.Contains(body, "Check your model connection") {
+			t.Fatalf("task title or action used the wrong language: %s", body)
+		}
+	}
+}
+
 func TestWebFeedbackDisabledAnswerHasModelRecoveryRoute(t *testing.T) {
 	f := &attentionSettings{items: []task.Feedback{{Ref: "feedback:one", TaskRef: "task:visible", Kind: "input", Prompt: "Which date?"}}}
 	s := &Server{Core: unavailableAttentionCore{attentionCore{&updatesCore{allowed: true}}}, Feedbacks: f, Tasks: workspaceReader{}}

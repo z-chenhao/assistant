@@ -85,7 +85,7 @@ func CheckVersions(ctx context.Context, root string, max map[string]int) error {
 }
 
 func allowed(path string) bool {
-	return path == "state.db" || path == "conversation.db" || path == "memory.db" || strings.HasPrefix(path, "artifacts/") && !strings.Contains(strings.TrimPrefix(path, "artifacts/"), "/") && len(strings.TrimPrefix(path, "artifacts/")) > 0
+	return path == "state.db" || path == "conversation.db" || path == "memory.db" || path == "default-memory.json" || strings.HasPrefix(path, "artifacts/") && !strings.Contains(strings.TrimPrefix(path, "artifacts/"), "/") && len(strings.TrimPrefix(path, "artifacts/")) > 0
 }
 func inspect(ctx context.Context, root string, max map[string]int, checkpoint bool) (Manifest, error) {
 	m := Manifest{Version: 1, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), Schemas: map[string]int{}}
@@ -135,6 +135,11 @@ func inspect(ctx context.Context, root string, max map[string]int, checkpoint bo
 		}
 	}
 	paths := []string{"state.db", "conversation.db", "memory.db"}
+	if _, err := os.Lstat(filepath.Join(root, "default-memory.json")); err == nil {
+		paths = append(paths, "default-memory.json")
+	} else if !os.IsNotExist(err) {
+		return m, ErrInvalid
+	}
 	info, e := os.Lstat(filepath.Join(root, "artifacts"))
 	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return m, ErrInvalid

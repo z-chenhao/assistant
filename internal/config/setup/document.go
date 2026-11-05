@@ -19,6 +19,9 @@ import (
 // configuration, and confines atomic replacement to the operator's source file.
 func (m *Manager) bootstrap() []byte {
 	v := map[string]any{"version": 1, "app": map[string]any{"data_root": m.active.App.DataRoot}}
+	if m.active.Defaults != nil {
+		v["defaults"] = m.active.Defaults
+	}
 	if m.active.Web != nil {
 		v["web"] = m.active.Web
 	}
@@ -32,7 +35,7 @@ func (m *Manager) bootstrap() []byte {
 		if id == "computer" {
 			continue
 		}
-		if value := resource(m.active, id); value != nil {
+		if value := resource(m.active, id); value != nil && !m.active.Automatic(id) {
 			v[id] = value
 		}
 	}
@@ -82,6 +85,10 @@ func (m *Manager) read() ([]byte, string, error) {
 func (m *Manager) decoded(raw []byte) (config.Config, error) {
 	// The running process owns environment precedence; settings do not change it.
 	c, e := config.Decode(raw, os.LookupEnv)
+	if c.Defaults == nil && m.active.Defaults != nil {
+		copy := *m.active.Defaults
+		c.Defaults = &copy
+	}
 	if e != nil || c.ValidateSourcePath(m.path) != nil {
 		return c, web.ErrCapabilityInvalid
 	}
@@ -143,6 +150,45 @@ func (m *Manager) candidate(id, revision, text string) ([]byte, config.Config, e
 		value = edit.Content[0]
 		if value.Tag == "!!null" {
 			value = nil
+		}
+	}
+	if id == "memory" || id == "embedding" || id == "skills" || id == "computer" {
+		automatic := value != nil && value.Kind == yaml.MappingNode && len(value.Content) == 2 && value.Content[0].Value == "mode" && value.Content[1].Value == "automatic"
+		var currentDefaults config.Defaults
+		currentConfig, err := m.decoded(raw)
+		if err != nil {
+			return nil, empty, err
+		}
+		if currentConfig.Defaults != nil {
+			currentDefaults = *currentConfig.Defaults
+		}
+		switch id {
+		case "memory":
+			currentDefaults.Memory = automatic
+			currentDefaults.Search = automatic || value != nil
+			if !currentDefaults.Search {
+				replace(n, "embedding", nil)
+			}
+		case "embedding":
+			currentDefaults.Search = automatic
+			if value == nil && resource(currentConfig, "memory") != nil {
+				currentDefaults.Search = true
+			}
+		case "skills":
+			currentDefaults.Skills = automatic
+		case "computer":
+			currentDefaults.Computer = automatic
+		}
+		defaults := &yaml.Node{}
+		if defaults.Encode(currentDefaults) != nil {
+			return nil, empty, web.ErrCapabilityInvalid
+		}
+		replace(n, "defaults", defaults)
+		if automatic {
+			value = nil
+			if id == "computer" {
+				replace(n, "execution", nil)
+			}
 		}
 	}
 	if id == "computer" && value != nil {

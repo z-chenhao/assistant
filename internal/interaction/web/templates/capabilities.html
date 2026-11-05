@@ -1,31 +1,34 @@
+{{define "capability-status"}}
+<span class="status-pill" data-status="{{.State}}">{{if and .PendingRestart (not .Candidate)}}{{tr "Restart required"}}{{else if eq .State "preparing"}}{{tr "Preparing"}}{{else if eq .State "unsupported"}}{{tr "Unavailable on this device"}}{{else if eq .State "unavailable"}}{{tr "Needs attention"}}{{else if .Configured}}{{if .Automatic}}{{tr "Enabled (default)"}}{{else}}{{tr "Enabled"}}{{end}}{{else}}{{tr "Off"}}{{end}}</span>
+{{end}}
+
 {{define "capabilities-page"}}
 <section class="workspace-page settings-page capabilities-page">
- {{template "settings-tabs" .}}
  {{with .Capability}}
- <a class="back-link" href="/settings/capabilities">{{tr "← All capabilities"}}</a>
- <div class="page-heading"><div><h1>{{tr .Title}}</h1><p>{{tr .Description}}</p></div><span class="status-pill" data-status="{{.State}}">{{if eq .State "managed"}}{{tr "Uses Computer"}}{{else if eq .State "ready"}}{{tr "Connection verified"}}{{else if eq .State "unavailable"}}{{tr "Needs attention"}}{{else if .Configured}}{{tr "Configured · not verified"}}{{else}}{{tr "Not configured"}}{{end}}</span></div>
- {{if and .PendingRestart (not .Candidate)}}<p class="feedback warning" role="status">{{tr "Saved settings differ from the running configuration. Restart Steward to load them. Existing work keeps its original capabilities and may need a new request if the connection changes."}}</p>{{end}}
- {{if .Candidate}}<p class="feedback" role="status">{{tr "Unsaved candidate. Test this configuration, then save it for the next restart."}}</p>{{end}}
- {{if .Message}}<p class="feedback {{if eq .State "unavailable"}}error{{else}}success{{end}}" role="status">{{tr .Message}}</p>{{end}}
- {{if not .TestedAt.IsZero}}<p class="muted">{{tr "Last tested"}} {{humanTime (.TestedAt.Format "2006-01-02T15:04:05Z07:00")}}{{tr ". Successful candidate tests expire after five minutes."}}</p>{{end}}
- {{if .Form.Available}}{{template "capability-guided-form" .}}{{else}}<p class="feedback warning" role="status">{{tr "This document needs the Advanced YAML editor. Your original settings are preserved."}}</p>{{end}}
- <details class="technical-details capability-advanced" {{if or .Advanced (not .Form.Available)}}open{{end}}><summary>{{tr "Advanced YAML"}}</summary>
- <p class="field-help">{{tr .Help}}</p>
- <p class="field-help">{{tr "Edit every supported setting here. Use one editor at a time; test the exact configuration before saving."}}</p>
- <details class="technical-details capability-example"><summary>{{tr "Configuration example"}}</summary><pre>{{.Example}}</pre></details>
+ {{if .ParentMemory}}<a class="back-link" href="/settings/capabilities/memory">{{tr "← Memory"}}</a>{{else}}<a class="back-link" href="/settings/capabilities">{{tr "← All capabilities"}}</a>{{end}}
+ <div class="page-heading"><div><h1>{{tr .Title}}</h1><p>{{tr .Description}}</p></div>{{template "capability-status" .}}</div>
+ {{if and .PendingRestart (not .Candidate)}}<p class="feedback" role="status">{{tr "Changes saved. Restart Steward to apply."}}</p>{{end}}
+ {{if and (eq .State "unavailable") .Message}}<p class="feedback error" role="status" data-capability-feedback>{{tr .Message}}</p>{{else if and .Verified (or .Candidate .Checked .Advanced (not .PendingRestart))}}<p class="feedback success" role="status" data-capability-feedback>{{tr "Connection available."}}</p>{{end}}
+ {{if .Form.Available}}<h2 class="settings-section-title">{{tr "Configuration"}}</h2><section class="panel form-panel">{{template "capability-guided-form" .}}</section>{{end}}
+ <details class="technical-details capability-advanced form-panel" {{if or .Advanced (not .Form.Available)}}open{{end}}><summary>{{tr "Advanced"}}</summary>
+ {{if eq .ID "memory"}}<p><a href="/settings/capabilities/embedding">{{tr "Semantic search"}}</a></p>{{end}}
+ <details class="technical-details"><summary>{{tr "Configuration help"}}</summary><p>{{tr .Help}}</p><pre>{{.Example}}</pre></details>
  <form class="capability-editor" action="/capability/configure" method="post" data-capability-form>
   <input type="hidden" name="editor" value="advanced"><input type="hidden" name="capability" value="{{.ID}}"><input type="hidden" name="revision" value="{{.Revision}}">
-  <label for="capability-configuration">{{tr .Title}} {{tr "configuration"}}<textarea id="capability-configuration" name="configuration" rows="10" maxlength="65536" spellcheck="false" aria-describedby="capability-edit-help">{{.Text}}</textarea></label>
-  <p id="capability-edit-help" class="field-help">{{tr "Use this capability's YAML fields only. Clear the field to disable it or restore its documented default. Store credentials in SecretStore and enter references only."}}</p>
+  <label for="capability-configuration">{{tr "YAML configuration"}}<textarea id="capability-configuration" name="configuration" rows="10" maxlength="65536" spellcheck="false">{{.Text}}</textarea></label>
   <div class="actions"><button name="action" value="test" class="secondary">{{tr "Test configuration"}}</button><button name="action" value="save" {{if not .Verified}}disabled{{end}}>{{tr "Save verified configuration"}}</button></div>
   <p class="capability-draft-status" role="status" data-capability-draft></p>
- </form></details>
- <details class="technical-details"><summary>{{tr "Configuration source and lifecycle"}}</summary><p>{{tr "File:"}} <code>{{.Path}}</code></p><p>{{if .Active}}{{tr "This capability was configured when the process started."}}{{else}}{{tr "This capability was not configured when the process started."}}{{end}} {{tr "Saving preserves other sections and never modifies an active Run. After restarting, new Runs use the loaded settings; incompatible old snapshots are rejected rather than silently upgraded."}}</p></details>
+ </form>
+ <details class="technical-details"><summary>{{tr "Connection details"}}</summary>
+ {{if and .Message (ne .State "unavailable")}}<p>{{tr .Message}}</p>{{end}}
+ <p>{{tr "File:"}} <code>{{.Path}}</code></p><p>{{if .Active}}{{tr "This capability was configured when the process started."}}{{else}}{{tr "This capability was not configured when the process started."}}{{end}}</p>
+ {{if not .TestedAt.IsZero}}<p>{{tr "Last tested"}} {{humanTime (.TestedAt.Format "2006-01-02T15:04:05Z07:00")}}</p>{{end}}
+ </details></details>
  {{else}}
- <div class="page-heading"><div><h1>{{tr "Capabilities"}}</h1><p>{{tr "Connect what Steward needs, and check that it works."}}</p></div></div>
- <p class="field-help">{{tr "Connections are optional and use your own services and local resources. Open a capability to configure and test it. Saved changes take effect after restarting Steward."}}</p>
- <div class="object-list">{{range .Capabilities}}<a class="object-row" href="{{capabilityURL .ID}}"><div><strong>{{tr .Title}}</strong><span>{{tr .Description}}</span>{{if .PendingRestart}}<span>{{tr "Restart required to load saved changes"}}</span>{{end}}</div><div class="row-badges"><span class="status-pill" data-status="{{.State}}">{{if eq .State "managed"}}{{tr "Uses Computer"}}{{else if eq .State "ready"}}{{tr "Verified"}}{{else if eq .State "unavailable"}}{{tr "Needs attention"}}{{else if .Configured}}{{tr "Not verified"}}{{else}}{{tr "Not configured"}}{{end}}</span><span aria-hidden="true">→</span></div></a>{{end}}</div>
+ <div class="page-heading"><div><h1>{{tr "Capabilities"}}</h1></div></div>
+ <h2 class="settings-section-title">{{tr "Tools"}}</h2><section class="panel form-panel settings-group"><div class="object-list">{{range .Capabilities}}<a class="object-row" href="{{capabilityURL .ID}}"><div><strong>{{tr .Title}}</strong><span>{{tr .Description}}</span></div><div class="row-badges">{{template "capability-status" .}}<span class="settings-chevron" aria-hidden="true">›</span></div></a>{{end}}</div></section>
  {{end}}
+ <p class="settings-footer"><a href="/licenses.txt">{{tr "Open source notices"}}</a></p>
 </section>
 {{end}}
 
@@ -33,33 +36,34 @@
 <form class="capability-guided" action="/capability/configure" method="post" data-capability-form>
  <input type="hidden" name="editor" value="guided"><input type="hidden" name="capability" value="{{.ID}}"><input type="hidden" name="revision" value="{{.Revision}}"><input type="hidden" name="configuration" value="{{.Text}}">
  {{with .Form}}
- {{if .Error}}<p class="feedback error" role="alert">{{tr .Error}}</p>{{end}}
- <label class="check capability-enable"><input type="checkbox" name="enabled" value="yes" {{if .Enabled}}checked{{end}}>{{if eq $.ID "execution"}}{{tr "Use a custom local workspace"}}{{else}}{{tr "Enable this capability"}}{{end}}</label>
- <p class="field-help">{{if eq $.ID "execution"}}{{tr "Leave this off to restore the default local workspace. Computer must be disabled to use local files and commands."}}{{else}}{{tr "Leave this off to disable the capability after saving and restarting."}}{{end}}</p>
+ {{if .Error}}<p class="feedback error" role="alert" data-capability-feedback>{{tr .Error}}</p>{{end}}
+ {{if or (eq $.ID "memory") (eq $.ID "embedding") (eq $.ID "skills") (eq $.ID "computer")}}
+ <div class="setting-row"><label for="capability-mode">{{tr "Configuration mode"}}</label><select id="capability-mode" name="mode" data-capability-mode><option value="automatic" {{if eq .Mode "automatic"}}selected{{end}}>{{tr "Automatic (recommended)"}}</option><option value="custom" {{if eq .Mode "custom"}}selected{{end}}>{{tr "Custom"}}</option>{{if ne $.ID "embedding"}}<option value="off" {{if eq .Mode "off"}}selected{{end}}>{{tr "Off"}}</option>{{end}}</select></div>
+ {{else}}
+ <label class="check capability-enable setting-switch"><input type="checkbox" role="switch" name="enabled" value="yes" {{if .Enabled}}checked{{end}}>{{if eq $.ID "execution"}}{{tr "Use a custom local workspace"}}{{else}}{{tr "Enable this capability"}}{{end}}</label>
+ {{end}}
  <div data-capability-fields>
  {{if eq $.ID "memory"}}
  <fieldset><legend>{{tr "Encryption"}}</legend>
  <label>{{tr "Encryption key reference"}}<input name="key_ref" value="{{.Memory.KeyRef}}" autocomplete="off" spellcheck="false" placeholder="env:STEWARD_MEMORY_KEY"></label>
- <p class="field-help">{{tr "Use a reference to an existing 32-byte key. Keep the same key for existing memories and backups."}}</p></fieldset>
+ </fieldset>
  {{else if eq $.ID "embedding"}}
  <fieldset><legend>{{tr "Embedding service"}}</legend>
- <p class="field-help">{{tr "Connect an OpenAI-compatible embedding service. Encrypted memory requires a loopback address."}}</p>
  <label>{{tr "Endpoint URL"}}<input type="url" name="endpoint" value="{{.Embedding.Endpoint}}" placeholder="http://127.0.0.1:11434/v1" spellcheck="false"></label>
  <div class="capability-field-pair"><label>{{tr "Model ID"}}<input name="model" value="{{.Embedding.Model}}" spellcheck="false"></label><label>{{tr "Vector dimensions"}}<input type="number" name="dimensions" min="1" max="4096" step="1" value="{{.Embedding.Dimensions}}"></label></div>
  <label>{{tr "API key reference (optional)"}}<input name="key_ref" value="{{.Embedding.KeyRef}}" autocomplete="off" spellcheck="false" placeholder="env:EMBEDDING_API_KEY"></label>
- <p class="field-help">{{tr "Match the dimensions to your model. Changing an existing index identity requires an offline rebuild."}}</p></fieldset>
+ </fieldset>
  {{else if eq $.ID "skills"}}
  <fieldset><legend>{{tr "Skill catalog"}}</legend>
  <label>{{tr "Catalog directory"}}<input name="root" value="{{.Skills.Root}}" spellcheck="false" placeholder="/absolute/private/skills"></label>
  <label>{{tr "Skill scope"}}<select name="scope"><option value="agent" {{if eq .Skills.Scope "agent"}}selected{{end}}>{{tr "Agent"}}</option><option value="workspace" {{if eq .Skills.Scope "workspace"}}selected{{end}}>{{tr "Workspace"}}</option></select></label>
- <p class="field-help">{{tr "Choose a prepared catalog outside application data and execution workspaces. Testing checks the catalog without publishing skills."}}</p></fieldset>
+ </fieldset>
  {{else if eq $.ID "execution"}}
  <fieldset><legend>{{tr "Local workspace"}}</legend>
  <label>{{tr "Workspace directory"}}<input name="root" value="{{.Execution.Root}}" spellcheck="false" placeholder="/absolute/private/workspace"></label>
  <label>{{tr "Read-only toolchain directories (optional)"}}<textarea name="toolchains" rows="3" spellcheck="false">{{.Execution.Toolchains}}</textarea></label>
- <p class="field-help">{{tr "Enter one absolute directory per line. Keep toolchains separate from the workspace, application data and skills."}}</p></fieldset>
+ </fieldset>
  {{else if eq $.ID "mcp"}}
- <p class="field-help">{{tr "Add local tool providers and explicitly allow each tool. Testing discovers tools; it does not invoke them."}}</p>
  <input type="hidden" name="provider_count" value="{{len .Providers}}">
  {{range $i,$provider:=.Providers}}<fieldset class="capability-provider"><legend>{{if .Name}}{{.Name}}{{else}}{{tr "New tool provider"}}{{end}}</legend>
  <input type="hidden" name="provider.{{$i}}.original" value="{{.Original}}">
@@ -67,15 +71,13 @@
  <label>{{tr "Executable path"}}<input name="provider.{{$i}}.command" value="{{.Command}}" spellcheck="false" placeholder="/absolute/path/to/mcp-server"></label>
  <label>{{tr "Private state directory"}}<input name="provider.{{$i}}.directory" value="{{.Directory}}" spellcheck="false" placeholder="/absolute/private/provider"></label>
  <label>{{tr "Command arguments (optional)"}}<textarea name="provider.{{$i}}.args" rows="3" spellcheck="false">{{.Args}}</textarea></label>
- <p class="field-help">{{tr "Enter one argument per line, without shell quoting. Never put credentials in arguments."}}</p>
- <h2>{{tr "Allowed tools"}}</h2><p class="field-help">{{tr "Use the exact tool names advertised by this provider. Tools that can change anything require external-effect permission."}}</p>
+ <h2>{{tr "Allowed tools"}}</h2>
  <input type="hidden" name="provider.{{$i}}.tool_count" value="{{len .Tools}}">
  {{range $j,$tool:=.Tools}}<div class="capability-tool-row"><label>{{tr "Tool name"}}<input name="provider.{{$i}}.tool.{{$j}}.name" value="{{.Name}}" spellcheck="false"></label><label>{{tr "Permission"}}<select name="provider.{{$i}}.tool.{{$j}}.permission"><option value="read_only" {{if eq .Permission "read_only"}}selected{{end}}>{{tr "Read only"}}</option><option value="external_effect" {{if eq .Permission "external_effect"}}selected{{end}}>{{tr "May make changes"}}</option></select></label><button type="submit" class="secondary" name="action" value="remove-tool-{{$i}}-{{$j}}" formnovalidate>{{tr "Remove tool"}}</button></div>{{end}}
  <div class="actions"><button type="submit" class="secondary" name="action" value="add-tool-{{$i}}" formnovalidate>{{tr "Add allowed tool"}}</button><button type="submit" class="secondary" name="action" value="remove-provider-{{$i}}" formnovalidate>{{tr "Remove provider"}}</button></div>
  </fieldset>{{end}}
  <button type="submit" class="secondary" name="action" value="add-provider" formnovalidate>{{tr "Add tool provider"}}</button>
  {{else if eq $.ID "computer"}}
- <p class="field-help">{{tr "Connect an already provisioned private macOS Guest. These settings never download, start or resume a VM."}}</p>
  <fieldset><legend>{{tr "Computer connection"}}</legend>
  <label>{{tr "Computer store directory"}}<input name="root" value="{{.Computer.Root}}" spellcheck="false" placeholder="/absolute/private/computer-store"></label>
  <label>{{tr "Lume endpoint"}}<input type="url" name="endpoint" value="{{.Computer.Endpoint}}" spellcheck="false" placeholder="http://127.0.0.1:7777"></label>
@@ -86,7 +88,6 @@
  <label>{{tr "Pinned SSH host key"}}<input name="host_key" value="{{.Computer.HostKey}}" spellcheck="false" placeholder="SHA256:…"></label>
  </fieldset>
  <details class="capability-options" {{if not $.Configured}}open{{end}}><summary>{{tr "Sealed base compatibility"}}</summary><fieldset><legend class="sr-only">{{tr "Sealed base compatibility"}}</legend>
- <p class="field-help">{{tr "Copy these values from the provisioned sealed base and installed Driver. They must match exactly."}}</p>
  <label>{{tr "Provider version"}}<input name="provider_version" value="{{.Computer.ProviderVersion}}" spellcheck="false"></label>
  <label>{{tr "Guest build"}}<input name="guest_build" value="{{.Computer.GuestBuild}}" spellcheck="false"></label>
  <label>{{tr "Driver version"}}<input name="driver_version" value="{{.Computer.DriverVersion}}" spellcheck="false"></label>
@@ -95,7 +96,6 @@
  <label>{{tr "Driver bundle"}}<input name="driver_bundle" value="{{.Computer.DriverBundle}}" spellcheck="false"></label>
  <label>{{tr "Architecture"}}<input name="architecture" value="{{.Computer.Architecture}}" spellcheck="false"></label>
  <label>{{tr "Restoration manifest version"}}<input type="number" name="manifest_version" min="1" max="1" step="1" value="{{.Computer.ManifestVersion}}"></label>
- <p class="field-help">{{tr "Version 1 is supported. Existing application and artifact restoration settings are retained; edit them in Advanced YAML."}}</p>
  </fieldset></details>
  <details class="capability-options" {{if not $.Configured}}open{{end}}><summary>{{tr "JavaScript runtime"}}</summary><fieldset><legend class="sr-only">{{tr "JavaScript runtime"}}</legend>
  <label>{{tr "Node executable path"}}<input name="node" value="{{.Computer.Node}}" spellcheck="false" placeholder="/absolute/path/to/node"></label>
@@ -104,8 +104,7 @@
  {{end}}
  </div>
  {{end}}
- <p class="field-help">{{tr "Other advanced settings are retained. Test first, then explicitly save these exact settings. Restart Steward to use saved changes."}}</p>
- <div class="actions capability-submit"><button name="action" value="test" class="secondary">{{tr "Test settings"}}</button><button name="action" value="save" {{if not .Verified}}disabled{{end}}>{{tr "Save tested settings"}}</button></div>
+ <div class="actions capability-submit"><button name="action" value="apply">{{tr "Save"}}</button><button name="action" value="test" class="secondary" data-capability-check {{if not .Form.Enabled}}hidden{{end}}>{{tr "Check connection"}}</button></div>
  <p class="capability-draft-status" role="status" data-capability-draft></p>
 </form>
 {{end}}

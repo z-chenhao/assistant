@@ -2,6 +2,13 @@
 
 [功能与验收目标](../features/computer-use.md) · [技术方案](../designs/computer-use.md) · [主索引](../feature-map.md) · [统一测试入口](product.md)
 
+## 自动桌面准备验收
+
+`internal/computer/macosvm/managed_test.go` 检查只读发现不下载、不支持的平台不写文件、拒绝路径穿越/链接压缩包、固定镜像磁盘损坏及不完整 manifest。`internal/agent/sqlite/default_computer_test.go` 通过真实 ToolInvocation/SQLite 验证准备时进入 resource 等待且未创建 Computer，准备完成后恢复同一个调用且只执行一次。
+
+Apple silicon 原生验收必须覆盖全新目录首次下载、Guest 私有密码与主机密钥重用、seed 正常关闭与 base 发布、下载中断、密码轮换中断、进程崩溃后恢复、磁盘空间不足、已准备环境重启及 Settings 自定义/关闭。当前 Linux 受控验证不能替代这些原生证据。
+
+
 ## 范围与证据
 
 本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导特定版本已通过或真实模型效果已达标。

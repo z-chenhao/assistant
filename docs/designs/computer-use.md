@@ -4,6 +4,17 @@
 
 本文的架构与流程描述当前有效实现；明确标记的待实现方案不表示已落地。实现级协议仍服从 [跨功能协议与约束](product-overview.md#contract-0-文档效力与实现规则)。
 
+## 自动桌面准备
+
+安装版的默认 Computer 在 Apple silicon Mac 按首次使用准备。`macosvm.DefaultConfig` 固定 Lume 0.6.1、`macos-tahoe-cua:26.5.2` 的 OCI manifest digest，以及既有 Guest build / Driver 签名和哈希。宿主使用独立的 `.desktop` 目录、私有 Lume 配置、loopback 服务、关闭的遥测与缓存；不操作用户原有 VM 目录。
+
+首次真实 Computer 或 Guest 文件工具调用在 `ToolStore.Start` 检查执行权和审批后启动共享准备。准备期间返回已有 `resource` 等待，原 ToolInvocation 尚未执行，不持有 VM 或工具槽；调度器重试同一调用。纯 JavaScript 不触发下载。准备的两小时总时限属于 Host 政策，应用退出会中止下载和所拥有的 Lume 服务。
+
+下载的 Lume 压缩包必须匹配固定 SHA-256，安全解包后原子发布。Lume 下载 seed 后，Host 从固定 digest 获取 OCI manifest，逐段核对磁盘和固件，校验 OCI 到 native VMConfig 的字段转换，成功才允许启动 seed。首次 SSH 公钥从该已校验 seed 取得并保存，随后固定验证；将公共 seed 登录替换为随机 SecretStore 凭据，秘密仅走标准输入。核对 Driver 并正常关闭后，在 staging 封存 base，再原子发布。之后复用既有 Computer ensure/checkpoint/restore/destroy 协议。
+
+Settings 读取只显示 `automatic / preparing / ready / unavailable / unsupported` 状态。手动自定义配置继续使用既有 provider；不支持 macOS 虚拟化的平台保留本地执行后端。原生下载、首次 Guest 密码轮换及异常退出恢复尚需 Apple silicon 端到端验收；受控测试不证明真实平台已可用。
+
+
 ## 当前架构
 
 逻辑 Computer 身份持久化，实例 epoch 随恢复变化；DesktopLease 约束冲突。Code Mode 的私有桥与默认 read/bash/edit/write 经统一工具执行器访问同一个 Lume/SSH Guest；原生工具也能直接调用。

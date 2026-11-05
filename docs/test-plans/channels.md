@@ -160,10 +160,12 @@ action also drives model setup, file upload and actual message submission.
 It deliberately holds the local JavaScript bundle while entering a draft and
 selecting an attachment through the usable server form, then releases it and
 checks text, file bytes, focus, selection and source identity before submitting.
-The composer retains the native form and input nodes and only applies shared
-control styles. The existing image scenario also holds the bundle while opening
+The composer retains the native form and input nodes, applies shared control
+styles and adds keyboard submission. The existing image scenario also holds the bundle while opening
 a native picker, completes selection after enhancement, then verifies scoped
 pixels at the actual Pi HTTP peer; text-only and recovery checks still apply.
+
+消息键盘回归使用同一浏览器驱动：Enter 经实际消息入口发送，Shift + Enter 产生换行且不提交；组合输入与兼容性键码 229 不提交，按键重复、按钮禁用和请求进行中不重复提交。检查明暗主题发送按钮背景均为 `#D97757`，失败仍保留草稿与附件；原有按钮与无 JavaScript 提交场景继续覆盖。合成组合事件验证处理逻辑，物理输入法候选确认仍需人工验证。
 
 ## 执行与完成判定
 
@@ -190,6 +192,7 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 沿用 `verify_channels.py` 和真实浏览器 action，不新增脚本或 CI gate：
 
 - 原生设置：模型来源 → 保存 → Verify → 明确授权 Select → Conversation；候选 probe 与活动状态分开；ChatGPT 登录、可见目录、重启和退出仍经真实 Manager/Bridge（外部 OAuth 为受控 peer）。通知保存后停留原页，重载仍选实际目的地。
+- 首次设置浏览器路径：在 Preferences 从中文切回英文，经 Chat 返回对话，确认英文保留且未就绪时无法发送，再通过 Set up Steward 连接、验证并显式选用模型。标题、提示密度、设置控件尺寸与登录步骤数量随界面改动在桌面和窄屏验收。
 - 原生输入：延迟脚本时编辑、选文件与打开 picker，增强后保持同一节点/文件；拒绝或丢失确认不自动重发并保留草稿和附件；任务上下文可移除而不丢输入。
 - Tasks：列表筛选、分页、详情目标/阶段、对应的冻结审批、已由 Main 交付的结果，以及带任务上下文回到 Main；不能用 Worker 结果替代 Main 交付。详情和 Conversation 保留同一审批 hash。
 - Developer：列表打开独立 Trace 详情，树与时间线对齐；节点类型决定可用 Tab；完整 Context/JSON/来源/长正文和 Diff 深链接可达，原生链接、移动端与无 JavaScript 路径继续可用。
@@ -197,6 +200,12 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 - 模块测试：notification 持久化选择、候选 proof version、登录本地返回、Host 审批单卡片/用户文本不改写、任务消息通过既有 ingress；`make test lint` 检查所有包及嵌入资源一致。
 
 系统断言采用受控模型/HTTP 响应，证明产品链路与回归，不证明真实模型质量或真实账户可用性。执行结果与截图留在对应运行的 evidence，不把测试计划写成执行报告。
+
+首次设置界面通过现有浏览器和 Web 组件场景检查以下路径。
+
+- 在没有模型且没有工作待办时，配置提示有可达入口，待办计数不包含配置项。已有工作待办在不同就绪状态下仍可见，系统操作按当前语言翻译，任务标题保留原文。
+- 检查 Preferences 与 Models 各有一个可见的页面标识，帮助可通过键盘访问。Chat 未就绪时保留一个清楚的设置入口。桌面与窄屏的视觉验收核对标题、输入区尺寸和提示密度。
+- 从 Chat 进入 Resources，直接看到模型状态和连接入口。连接、验证和选择模型期间均保持 Resources 标签选中。选择模型连接方式后在当前页显示对应配置。点击一次 ChatGPT 登录操作即发起授权，浏览器未打开时仍能手动继续。
 
 
 ## F-020 自建应用凭据与失效诊断
@@ -220,3 +229,21 @@ Chat / Worker：`workers_test.go` 验证认证与绑定撤销、只读字段和�
 待确认入口沿用 live 浏览器场景：真实审批到来时，入口按 Computer → Worker → 待确认排列，点击聚焦原审批；冻结 hash、未发草稿和附件仍保留，解决后入口消失。顶栏预留三行，计数变化不改变对话偏移。
 
 布局与焦点回归沿用同一个 `channels_browser.mjs`：inspection 在 851／900px 断言详情完整堆叠，Enter 选择 Generation 后焦点仍位于对应树行；live 在 820／900px 验证任务正文与进度值没有压缩为零宽；共用移动检查通过键盘打开／关闭导航、320px 当前设置标签露出及 1001px Computer modal。原有草稿、附件、审批、滚动、会话恢复与无 JavaScript 检查继续执行。人工补充检查明暗主题、模型／通知／六类能力详情、长内容和宽屏恢复；模拟视口不等同于物理触摸或屏幕阅读器验证。
+
+
+### 设置页视觉与控件回归
+
+channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 SecretStore 和 Chromium 验证分类搜索／空结果／Escape、语言下拉搜索／方向键／Enter、点击外部与 Escape 关闭、外观保存与刷新、默认 Memory 单入口、自动／自定义字段切换、390px 导航及无 JS 语言保存。输出偏好、下拉、通知、模型输入、能力和明暗／移动端截图。`account_presentation` 经原有真实 Manager/Bridge 和自有 OAuth fixture 验证账户退出确认：取消和 Escape 零 POST、取消焦点归还、确认一次 POST；原有凭据扫描与重启校验保留。
+
+
+两级导航回归复用 `default_capability_settings`：从 Chat 点击左下 Settings，断言一级入口次序／位置不变、二级栏位于一级与内容之间；切换 Dev → Database 复用同一二级栏，Tasks 不创建空分类；显式折叠后可原页展开。390px 抽屉同时保留两级选中态且不越界，Tab 在整个抽屉内循环，Escape 归还焦点；保留无 JS 表单验证。完整 channels gate 继续覆盖 Developer、数据库导航、320px 布局与聊天面板。
+
+
+侧栏清理与个人偏好：默认设置场景验证一级栏没有宣传语或重复偏好按钮；在 Preferences 开关头像动效，验证返回 Chat、刷新后的持久化和系统 reduced-motion 优先。原头像完整帧与问候检查继续在维护中的浏览器驱动运行。公共设计规范入口为 [design.md](../../design.md)。
+
+
+### 设计规范的自动回归
+
+`channels_capabilities.mjs` 的同一默认设置场景在 320、390、760、761、1024、1400px 运行导航检查：一级／二级的空间关系、正文避让、底部 Settings、两级选中态、侧栏仅有折叠控制、Escape 焦点和 inert 恢复。输出 `navigation-viewports.json`；失败消息包含当次宽度和几何信息，不以完整 HTML 或像素快照锁死实现。系统 reduced-motion 从开启到关闭反复切换后，用户保存的头像暂停选择仍需保留。
+
+[PR CI](../../.github/workflows/ci.yml) → `make test-e2e` → [core](../../tests/system/runner.py) → `channels` → `default_capability_settings` 是现有执行链；原有 `make test lint` 检查构建资源一致性。无需另建相同 job。公共规则与人工视觉评审边界见 [design.md](../../design.md#自动回归与评审分工)。

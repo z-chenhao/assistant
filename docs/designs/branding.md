@@ -6,11 +6,15 @@ Steward 是产品品牌，Ghost 是当前 Agent 的名称。当前代码与自�
 
 ## 当前架构与流程
 
-Go 继续提供认证、页面、原生表单与局部更新；React 只增强 Host-owned UISpec。`foundation.css` 定义 Demo 的配色和自托管字体；shell、workspace、conversation、observability、avatar 分别负责局部表现。`appearance.js` 为同源外部脚本，在 CSS 前应用本地明暗偏好，不放宽 CSP。
+Go 继续提供认证、页面、原生表单与局部更新；React 只增强 Host-owned UISpec。`foundation.css` 定义 Demo 的配色和自托管字体；shell、workspace、conversation、observability、avatar 分别负责局部表现。`appearance.js` 为同源外部脚本，在 CSS 前应用本地明暗、桌面折叠偏好和脚本可用标记，不依赖页面所属模块，不放宽 CSP。脚本专属搜索／设置行预留几何位置，语言控件增强完成或回退后再显示；bundle 下载失败恢复原生导航与表单。资源列表通过自身 inline-size 容器查询适配双侧栏后的可用宽度。通知编辑通过表单值快照区分未保存草稿与已保存反馈，提交仍由原服务端处理。
 
-单侧栏仅 Chat、Tasks、Settings、Developer。Chat 顶部居中显示名称和动态头像，真实就绪/工作状态在头像下方同轴居中，以绿/蓝/琥珀/红/灰小圆点区分就绪、工作、需配置、模型异常与未知，保留明确文字和明暗主题对比，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。
+一级侧栏保留 Chat、Tasks、Developer，Settings 固定左下；Settings 和 Developer 在旁边展开二级分类。Chat 顶部居中显示名称和动态头像，真实就绪/工作状态在头像下方同轴居中，以绿/蓝/琥珀/红/灰小圆点区分就绪、工作、需配置、模型异常与未知，保留明确文字和明暗主题对比，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。头像尺寸由所在位置决定，悬停只改变动画状态。
 
 任务详情继续显示目标、审批、进展、关联交付、附件与历史；没有将技术执行细节挤入默认首页，也没有虚构多会话或文件索引。发送、附件、source_id、草稿、冻结审批哈希、分页及已有 live region ID 不变。
+
+## Web 视觉层级
+
+跨页面的字号、对齐、信息层级与状态呈现以 [Web 设计规范](../../design.md) 为准。Go 模板提供语义结构，共享 CSS 实现视觉规则。`controls-policy.mjs` 在现有构建检查中约束下拉行为与开关皮肤归属，`select-state.ts` 提供可独立验证的过滤与键盘状态计算；真实焦点、触摸、提交和回退继续由渠道浏览器证明。跨页面单选下拉统一使用 `components/ui/select.ts`：普通表单保留原生 select 为提交值源，语言偏好只在共享控件外处理单请求自动保存、失败和 Cookie 读回；搜索、方向键、Escape、Tab、焦点、互斥浮层、视口定位及无脚本回退不再各自维护。`components/ui/controls.css` 统一胶囊选择器、选项与原生 switch 的视觉；普通布尔配置使用 switch，选择组与授权确认保留 checkbox。验收覆盖实际页面几何、键盘与窄屏，并审查截图中的层级与密度。操作页共用 760px 窄屏断点与 44px 触控高度；Trace 的区块标题、界面文字和辅助信息，以及能力表单分组标题复用共享字号。普通文本框使用控件边界色。模型同意说明作为候选行的常驻文字，并由选用按钮通过 aria-describedby 引用；不使用悬浮提示承载必读内容。Trace 树在节点名称下显示状态文字，装饰圆点不参与辅助技术朗读。Chat 橙色发送按钮仅在消息输入区覆盖单色主操作，例外以根设计规范为准。
 
 ## 资源与动效
 
@@ -39,3 +43,16 @@ README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通
 ## 界面语言
 
 使用现有原生设置流程新增 `/settings/preferences` 与认证后的 `POST /settings/language`。只接收 `en`、`zh-CN`，以路径 `/`、SameSite Strict、有效期一年的 `steward-language` 浏览器 Cookie 持久化。未设置或无效时一律英文；不使用 Accept-Language。服务端预编译两份不可变模板，显式 `tr` 仅作用于应用自有界面文案；客户端从同一私有 JSON 文案表读取。没有运行时 DOM 扫描或外部翻译服务。实时片段和日期展示随语言变化；正文、标识、字段值、冻结哈希及机器协议不变。此方案优先支持无 JS 的原生切换，未引入通用翻译平台或账户级语言同步。
+
+Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织单层圆角设置组，左侧名称／帮助，右侧语言触发器；保留读屏 h1 和当前导航标签。默认窄屏同行，长内容或放大时按根目录 design.md 有序换行。颜色、字体来自既有 token，触摸操作高度至少 44px。列表只显示真实语言与当前项勾号，无自动保存说明或正常界面的 Save。样式限定本项，不修改相邻表单密度。
+
+`preferences.ts` 渐进增强原生 form/select，初始化完成后隐藏原生控件与保存按钮；原生 select 仍是唯一提交值源。支持 Popover API 时使用顶层非模态 combobox/listbox，焦点留在触发器，活动项与选中项可区分；定位随滚动／resize／visual viewport 更新，空间不足翻转或内部滚动。缺少浮层能力时仍通过原生 select 的 change 自动保存；缺少脚本／fetch 或初始化失败时保留原生选择与显式保存。方向键浏览不提交，确认不同值才提交；Escape、Tab、外部操作取消浏览，Tab 不抢焦点。
+
+同一 POST `/settings/language` 在显式 `Accept: application/json` 时返回包含已设置语言的 JSON 200；非法值返回 JSON 400 且不设置 Cookie。认证和同源／CSRF 仍在既有路由边界执行。普通原生表单沿用 303。增强端每页只允许一笔请求，无队列：忙碌时保留焦点并锁定选择，明确拒绝回到此前值，400 可显式重试；认证拒绝提供重新打开设置入口。15 秒超时、网络中断、5xx、错误类型或不匹配响应均视为结果未确认，先 GET 核对，不自动重发。
+
+成功导航携带目标语言与焦点 fragment，服务端在 GET 读回 Cookie 后才显示成功；不一致则提示检查浏览器 Cookie 设置。整页使用服务端翻译，不扫描改写 DOM。成功／错误反馈显示在语言组内。普通进入页面不抢焦点；pagehide 使旧响应失效，BFcache 返回通过 GET 重新核对，不重放写入。
+
+帮助默认提供原生 details/summary；`settings.ts` 就绪后替换为具有 aria-describedby 的按钮与文本 tooltip。提示锚定名称／问号所在行，并与触发器底边重叠 1px，形成连续可悬停区域；表单反馈或控件换行不改变这一关系，提示宽度限制在视口内。悬停或聚焦显示，点击固定显示／关闭，移入仍可阅读；Escape 关闭直到再次进入或激活，外部操作关闭。帮助与语言列表互斥。无 JS 时保留原生展开，不提供 Escape 关闭。相邻设置继续沿用原有原生提交保护。
+
+
+公共导航与设置控件规则以根目录 [design.md](../../design.md) 为准。一级侧栏保留 Chat、Tasks、Developer，Settings 固定左下；外观与头像动效统一在 Preferences 调整。

@@ -11,9 +11,10 @@
 | [功能说明](feature-map.md#需求索引) `features/` | 用户行为、使用方法、安装与运维、当前限制和验收目标 |
 | [技术方案](designs/product-overview.md) `designs/` | 当前架构、流程、有效设计理由、兼容约束及明确标注的待实现方案 |
 | [测试方案](test-plans/product.md) `test-plans/` | 验收场景、测试入口、证明范围、覆盖缺口和必要的真实环境验证 |
+| [界面设计规范](../design.md) | 跨模块导航、设置控件、响应式布局与动效规则 |
 | [运行时契约](designs/runtime-contracts.md) | 跨功能的数据、权限、持久化与恢复语义 |
 
-Markdown 页面限于本页、`feature-map.md` 和上述三类目录的直属主题文件；不另设报告或归档层级。三类目录内的 `_template.md` 定义新主题的结构。贡献和治理入口位于仓库根目录的 [CONTRIBUTING.md](../CONTRIBUTING.md) 与 [GOVERNANCE.md](../GOVERNANCE.md)，不在 `docs/` 复制维护第二套规则。
+Markdown 页面限于本页、`feature-map.md` 和上述三类目录的直属主题文件；不另设报告或归档层级。三类目录内的 `_template.md` 定义新主题的结构。界面规范入口位于仓库根目录的 [design.md](../design.md)，功能方案链接到该规范，避免重复维护公共 UI 规则。贡献和治理入口位于仓库根目录的 [CONTRIBUTING.md](../CONTRIBUTING.md) 与 [GOVERNANCE.md](../GOVERNANCE.md)，不在 `docs/` 复制维护第二套规则。
 
 ## 强制维护规则
 

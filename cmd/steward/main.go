@@ -67,9 +67,8 @@ func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if err != nil {
 		return err
 	}
-	// Bundled defaults belong to the user startup/diagnostic path. Execution
-	// commands still require their explicit configuration; never attach a new
-	// provider bridge while reclaiming an existing Run.
+	// Installation defaults are applied by the normal startup/service path.
+	// Control and explicit drain commands do not discover a different runtime.
 	if (command.start || command.kind == commandDoctor || flags.Arg(0) == "status") && options.configPath == "" && options.testBridge == "" {
 		home, err := runtimeHome()
 		if err != nil {

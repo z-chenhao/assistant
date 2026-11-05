@@ -1,0 +1,33 @@
+/* Shared Select and Switch visuals. Pages own row/grid placement and saving. */
+.control-select{position:relative;display:inline-block;max-width:100%;min-width:0}
+.control-select::after{content:"";position:absolute;right:13px;top:calc(50% - 5px);width:7px;height:7px;border-right:1px solid var(--muted-foreground);border-bottom:1px solid var(--muted-foreground);transform:rotate(45deg);pointer-events:none}
+select:not([multiple]):not([size]),.control-select-trigger{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;width:100%;max-width:100%;min-height:36px;margin:0;padding:5px 32px 5px 12px;border:1px solid var(--control-border);border-radius:999px;background:var(--muted);color:var(--foreground);font:var(--text-ui)/1.6 var(--font-ui);font-weight:400;cursor:pointer;outline-offset:2px}
+.control-select select{appearance:none}
+button.control-select-trigger{padding-right:10px}
+.control-select-trigger:hover{background:var(--hover)}
+.control-select-trigger[aria-disabled=true],select:disabled{cursor:default;opacity:.55}
+.control-select-menu{position:fixed;inset:auto;z-index:60;margin:0;padding:6px;max-width:calc(100vw - 16px);overflow:auto;overscroll-behavior:contain;border:1px solid var(--border);border-radius:16px;background:var(--card);color:var(--foreground);box-shadow:0 8px 24px color-mix(in srgb,var(--backdrop) 35%,transparent);font:var(--text-ui)/1.6 var(--font-ui)}
+.control-select-menu .control-select-search{width:100%;min-height:36px;margin:0 0 4px;padding:8px 10px;border:0;border-radius:8px;background:transparent;font:inherit}
+.control-select-options{max-height:280px;overflow:auto;overscroll-behavior:contain}
+.control-select-menu [role=option]{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;padding:7px 10px;border-radius:10px;font-size:var(--text-ui);cursor:pointer}
+.control-select-menu [aria-selected=true]{background:var(--muted)}
+.control-select-menu [aria-selected=true]::after{content:"✓";margin-left:auto;color:var(--muted-foreground)}
+/* Supplied language markup uses the same checkmark as all generated options. */
+.control-select-menu [role=option]>.icon{display:none}
+.control-select-menu [role=option]:hover{background:var(--hover)}
+.control-select-menu[data-keyboard] [data-active]{outline:2px solid var(--focus);outline-offset:-2px}
+.control-select-empty{padding:12px 10px;margin:0;font-size:var(--text-meta);color:var(--muted-foreground)}
+.schedule-field>.control-select,.schedule-editor label>.control-select,.obs-filters label>.control-select{display:block;width:100%}
+.schedule-field>.control-select,.schedule-editor label>.control-select{margin-top:7px}
+.obs-filters label>.control-select{margin-top:5px}
+input[type=checkbox][role=switch]{appearance:none;position:relative;display:inline-block;flex-shrink:0;width:44px;min-width:44px;height:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:9px;background:transparent;cursor:pointer;vertical-align:middle}
+input[type=checkbox][role=switch]::before{content:"";position:absolute;left:6px;top:12px;width:32px;height:20px;border-radius:999px;background:var(--switch-off,#d5d5d5);transition:background .15s}
+input[type=checkbox][role=switch]::after{content:"";position:absolute;left:8px;top:14px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0002;transition:transform .15s}
+input[type=checkbox][role=switch]:checked::before{background:#3175ee}
+input[type=checkbox][role=switch]:checked::after{transform:translateX(12px)}
+input[type=checkbox][role=switch]:disabled{opacity:.55;cursor:default}
+:root.dark{--switch-off:#555}
+@media(max-width:760px){
+ select:not([multiple]):not([size]),.control-select-trigger{min-height:44px;font-size:1rem}
+ .control-select-menu .control-select-search,.control-select-menu [role=option]{min-height:44px;font-size:1rem}
+}

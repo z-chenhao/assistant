@@ -130,6 +130,9 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 }
 
 func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore, deferred bool) (*App, error) {
+	if err := cfg.ValidateDefaults(); err != nil {
+		return nil, err
+	}
 	lock, err := maintenance.Lock(cfg.App.DataRoot, false)
 	if err != nil {
 		return nil, err
@@ -173,6 +176,8 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	}
 	store.Artifacts().Policy = cfg.Artifact
 	a := &App{capabilitySettings: configsetup.New(cfg, secrets), rootLock: lock, store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
+	cfg = a.capabilitySettings.PrepareDefaults(ctx)
+	a.skillConfig = cfg.Skills
 	a.history, err = conversationsqlite.Open(ctx, cfg.App.DataRoot)
 	if err != nil {
 		_ = store.Close()
@@ -207,6 +212,10 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 			return nil, err
 		}
 	}
+	if cfg.Automatic("embedding") {
+		a.memory.ConfigureLocal()
+		a.history.ConfigureLocal()
+	}
 	a.deliveryPolicy = cfg.Delivery
 	if cfg.Feishu != nil {
 		a.feishu = feishu.NewClient(*cfg.Feishu, secrets)
@@ -215,7 +224,11 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 	if cfg.GitHub != nil {
 		a.github = &github.Service{Config: *cfg.GitHub, Store: store, Client: github.Client{Secrets: secrets}}
 	}
-	a.accounts = &account.Manager{Store: store.Models(), Secrets: secrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
+	accountSecrets := secrets
+	if _, production := secrets.(secret.Store); production && cfg.LLM.AccountSecretStore != "native" {
+		accountSecrets = secret.AccountFiles{DataRoot: cfg.App.DataRoot}
+	}
+	a.accounts = &account.Manager{Store: store.Models(), Secrets: accountSecrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {
@@ -329,7 +342,13 @@ func (a *App) providerDiagnostics(ctx context.Context) (agent.Diagnostics, error
 	if err != nil {
 		return d, err
 	}
-	return agent.EffectiveReadiness(ctx, d, a.control, a.provider), nil
+	return agent.EffectiveReadiness(ctx, d, modelAvailability(a.control.Configured), a.provider), nil
+}
+
+type modelAvailability func(context.Context, string) bool
+
+func (check modelAvailability) Available(ctx context.Context, id string) bool {
+	return check(ctx, id)
 }
 
 func (a *App) Models() *llmsqlite.Store   { return a.store.Models() }
@@ -407,7 +426,8 @@ func (a *App) Actor(sink agent.EventSink) agent.Actor {
 				return false
 			}
 			d, err := a.Diagnostics(ctx)
-			return err == nil && d.AgentIngressEnabled
+			return err == nil && d.AgentIngressEnabled && d.ActiveModelProfileID != nil &&
+				a.control.Available(ctx, *d.ActiveModelProfileID)
 		}}
 }
 func (a *App) History(ctx context.Context) ([]conversation.Message, error) {

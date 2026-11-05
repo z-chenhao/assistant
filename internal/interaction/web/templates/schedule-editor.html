@@ -1,12 +1,11 @@
 {{define "schedule-editor-page"}}
 <section class="workspace-page schedule-editor-page">
- <a class="back-link" href="/tasks">{{tr "← Tasks"}}</a>
  {{with .Schedule}}
  <div class="page-heading"><div><h1>{{if .Ref}}{{tr "Edit schedule"}}{{else}}{{tr "Create schedule"}}{{end}}</h1><p>{{tr "Set the instructions and when Ghost should receive them."}}</p></div></div>
  <form class="schedule-editor" method="post" action="/schedule/configure">
   <input type="hidden" name="ref" value="{{.Ref}}"><input type="hidden" name="version" value="{{.Version}}"><input type="hidden" name="source_id" value="{{.Key}}"><input type="hidden" name="original_spec" value="{{.OriginalSpec}}"><input type="hidden" name="original_timezone" value="{{.OriginalTimezone}}">
   <div class="schedule-field"><label for="schedule-instruction">{{tr "Instructions"}}</label><textarea id="schedule-instruction" name="instruction" rows="4" maxlength="8192" required>{{.Instruction}}</textarea></div>
-  <label class="schedule-enabled"><input type="checkbox" name="enabled" value="yes" {{if .Enabled}}checked{{end}}> {{tr "Schedule enabled"}}</label>
+  <label class="schedule-enabled setting-switch"><input type="checkbox" role="switch" name="enabled" value="yes" {{if .Enabled}}checked{{end}}> {{tr "Schedule enabled"}}</label>
   <p class="field-help">{{tr "Disabling stops future triggers. Work already admitted keeps its frozen instructions; this does not pause or cancel the linked task."}}</p>
   <div class="schedule-field"><label for="schedule-frequency">{{tr "Frequency"}}</label><select id="schedule-frequency" name="frequency"><option value="once" {{if eq .Frequency "once"}}selected{{end}}>{{tr "Once"}}</option><option value="daily" {{if eq .Frequency "daily"}}selected{{end}}>{{tr "Every day"}}</option><option value="weekdays" {{if eq .Frequency "weekdays"}}selected{{end}}>{{tr "Weekdays"}}</option><option value="weekly" {{if eq .Frequency "weekly"}}selected{{end}}>{{tr "Weekly"}}</option><option value="monthly" {{if eq .Frequency "monthly"}}selected{{end}}>{{tr "Monthly"}}</option><option value="custom" {{if eq .Frequency "custom"}}selected{{end}}>{{tr "Custom cron"}}</option></select></div>
   <div data-schedule-fields="once"><label>{{tr "Date"}}<input type="date" name="date" value="{{.Date}}"></label></div>

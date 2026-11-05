@@ -22,7 +22,6 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import urllib.request
 from codemode_peer import runtime_yaml
@@ -184,6 +183,8 @@ class Secrets(socketserver.StreamRequestHandler):
         r = json.loads(self.rfile.readline(131072))
         with self.server.lock:
             op, ref = r["op"], r["ref"]
+            if op == "get" and hasattr(self.server, "credential_reads"):
+                self.server.credential_reads[ref] = self.server.credential_reads.get(ref, 0) + 1
             if op == "put":
                 self.server.values[ref] = r["value"]
                 credential = json.loads(base64.b64decode(r["value"]))
@@ -194,6 +195,42 @@ class Secrets(socketserver.StreamRequestHandler):
                 self.server.values.pop(ref, None)
             value = self.server.values.get(ref)
         self.wfile.write((json.dumps({"ok": op != "get" or value is not None, "value": value}) + "\n").encode())
+
+
+class FileSecrets(MutableMapping):
+    """Inspect and expire synthetic tokens in the default production backend."""
+    def __init__(self, root, sensitive):
+        self.root = root
+        self.sensitive = sensitive
+
+    def __getitem__(self, ref):
+        path = self.root / ref.removeprefix('credential:')
+        try:
+            value = path.read_bytes()
+        except FileNotFoundError:
+            raise KeyError(ref) from None
+        require(path.stat().st_mode & 0o777 == 0o600 and self.root.stat().st_mode & 0o777 == 0o700,
+                'default credential store permissions are not private')
+        credential = json.loads(value)
+        for key in ('access_token', 'refresh_token', 'id_token'):
+            if credential.get(key):
+                self.sensitive.add(credential[key].encode())
+        return base64.b64encode(value).decode()
+
+    def __setitem__(self, ref, value):
+        (self.root / ref.removeprefix('credential:')).write_bytes(base64.b64decode(value))
+
+    def __delitem__(self, ref):
+        (self.root / ref.removeprefix('credential:')).unlink()
+
+    def __iter__(self):
+        for path in self.root.glob('*'):
+            ref = 'credential:' + path.name
+            self[ref]
+            yield ref
+
+    def __len__(self):
+        return sum(1 for _ in self)
 
 
 def account_config(root, bridge, endpoint, binary=None):
@@ -210,7 +247,7 @@ def account_config(root, bridge, endpoint, binary=None):
 def verify(binary, bridge, native_env=None):
     require(shutil.which("node"), "Node is missing")
     report = {"protocol": "current-openai-account", "live_shadow": "inconclusive", "device_authorization": "deferred_by_approval", "checks": []}
-    report['credential_backend'] = 'native-linux-secret-service' if native_env is not None else 'owned-memory-socket'
+    report['credential_backend'] = 'native-linux-secret-service' if native_env is not None else 'private-file'
     fixture = subprocess.Popen(["node", str(bridge.parent / "test/account-fixture.mjs")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     require(select.select([fixture.stdout], [], [], 10)[0], "fixture launch timed out")
     endpoint = fixture.stdout.readline().strip()
@@ -218,21 +255,17 @@ def verify(binary, bridge, native_env=None):
     try:
         with tempfile.TemporaryDirectory(prefix="ea-", dir="/tmp") as directory:
             root = Path(directory)
-            socket = root / "secrets.sock"
-            server = socketserver.ThreadingUnixStreamServer(str(socket), Secrets)
-            server.values, server.lock, server.sensitive = {}, threading.Lock(), set()
-            os.chmod(socket, 0o600)
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
+            sensitive = set()
             try:
                 cfg = account_config(root, bridge, endpoint, binary)
                 env = {k: v for k, v in os.environ.items() if not k.startswith("STEWARD_")}
                 args = [str(binary), "-config", str(cfg)]
-                if native_env is None:
-                    args += ['-test-secret-store', str(socket)]
-                else:
+                values = FileSecrets(root / 'data/account-secrets', sensitive)
+                if native_env is not None:
+                    with cfg.open('a') as config_file:
+                        config_file.write("  account_secret_store: native\n")
                     env = {k: v for k, v in native_env.items() if not k.startswith('STEWARD_')}
-                    server.values = NativeSecrets(root / 'data/state.db', env, server.sensitive)
+                    values = NativeSecrets(root / 'data/state.db', env, sensitive)
                 ordinary_output = []
 
                 def api(path, data=None):
@@ -243,8 +276,7 @@ def verify(binary, bridge, native_env=None):
                 def run(*command, ok=True, text=""):
                     p = subprocess.run(args + list(command), env=env, text=True, input=text, capture_output=True, timeout=25)
                     ordinary_output.append((p.stdout + p.stderr).encode())
-                    if native_env is not None:
-                        list(server.values)  # Register issued synthetic tokens for leak assertions.
+                    list(values)  # Register issued synthetic tokens for leak assertions.
                     require((p.returncode == 0) == ok, "CLI unexpected exit: " + " ".join(command[:2]) + " " + p.stderr[:100])
                     if not ok:
                         require("fixture-access-" not in p.stderr and "fixture-refresh-" not in p.stderr, "credential in error")
@@ -296,11 +328,10 @@ def verify(binary, bridge, native_env=None):
 
                 # Force near-expiry solely in the in-memory SecretStore, then race
                 # separate Host/Bridge processes against the rotating session.
-                ref = next(iter(server.values))
-                with server.lock:
-                    value = json.loads(base64.b64decode(server.values[ref]))
-                    value["expires_at"] = "2000-01-01T00:00:00Z"
-                    server.values[ref] = base64.b64encode(json.dumps(value).encode()).decode()
+                ref = next(iter(values))
+                value = json.loads(base64.b64decode(values[ref]))
+                value["expires_at"] = "2000-01-01T00:00:00Z"
+                values[ref] = base64.b64encode(json.dumps(value).encode()).decode()
                 before = api("/fixture/stats")["refreshes"]
                 racing = [subprocess.Popen(args + ["model", "refresh", aid], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for _ in range(6)]
                 children.extend(racing)
@@ -335,7 +366,7 @@ def verify(binary, bridge, native_env=None):
 
                 api("/fixture/control", {"mode": "auth-loss"})
                 run("model", "account-catalog", aid, ok=False)
-                require(run("model", "accounts")[0]["status"] == "reauth_required" and not server.values, "known auth loss retained credentials")
+                require(run("model", "accounts")[0]["status"] == "reauth_required" and not values, "known auth loss retained credentials")
                 require(run("status")["readiness"] == "degraded", "known auth loss retained readiness")
                 api("/fixture/control", {"mode": "success"})
                 login(aid)
@@ -371,9 +402,9 @@ def verify(binary, bridge, native_env=None):
                 stable_device = readback("SELECT device_id FROM installation_auth")[0][0]
                 # Kill after persisted refreshing, while the peer holds the request.
                 api("/fixture/control", {"mode": "hold-refresh"})
-                with server.lock:
-                    value = json.loads(base64.b64decode(server.values[ref]));value["expires_at"] = "2000-01-01T00:00:00Z"
-                    server.values[ref] = base64.b64encode(json.dumps(value).encode()).decode()
+                value = json.loads(base64.b64decode(values[ref]))
+                value["expires_at"] = "2000-01-01T00:00:00Z"
+                values[ref] = base64.b64encode(json.dumps(value).encode()).decode()
                 p = subprocess.Popen(args + ["model", "refresh", aid], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 children.append(p)
                 for _ in range(200):
@@ -386,22 +417,28 @@ def verify(binary, bridge, native_env=None):
                 status = run("status")
                 require(status["readiness"] == "degraded", "crash did not close ingress")
                 require(readback("SELECT status FROM auth_connection")[0][0] == "reauth_required", "interrupted rotation not recovered")
-                require(not server.values, "orphaned refreshing secret survived recovery")
+                require(not values, "orphaned refreshing secret survived recovery")
                 report["checks"].append("SIGKILL during token rotation -> restart, fail closed without replay, credential removal and degraded readiness")
 
                 api("/fixture/control", {"mode": "success"})
                 again = login(aid)
                 require(again["connection_id"] == aid, "reauthorization changed identity")
                 require(readback("SELECT device_id FROM installation_auth")[0][0] == stable_device, "installation identity changed")
+                if native_env is None:
+                    del values[ref]
+                    require(run("model", "accounts")[0]["status"] == "reauth_required",
+                            "account without a local credential was not prompted to reconnect")
+                    require(login(aid)["connection_id"] == aid, "reconnect changed account identity")
+                    reactivate()
+                    report["checks"].append("default private store reconnects an account without a local credential")
                 run("model", "logout", aid)
-                require(not server.values, "logout left credentials")
+                require(not values, "logout left credentials")
                 require(run("model", "accounts")[0]["status"] == "logged_out", "logout state missing")
                 run("model", "logout", aid)
                 run("model", "refresh", aid, ok=False)
                 report["checks"].append("same-account reauthorization, stable private installation identity, idempotent logout and blocked reuse")
 
-                with server.lock:
-                    credential_material = list(server.sensitive)
+                credential_material = list(sensitive)
                 private_markers = credential_material + [b"fixture-access-", b"fixture-refresh-", b"fixture-secret-marker", stable_device.encode()]
                 require(not any(secret in output for output in ordinary_output for secret in private_markers), "credential or private device identity in ordinary CLI output")
                 for path in (root / "data").rglob("*"):
@@ -423,7 +460,6 @@ def verify(binary, bridge, native_env=None):
                 for p in children:
                     if p.poll() is None:
                         p.kill();p.communicate(timeout=10)
-                server.shutdown();server.server_close();thread.join(timeout=5)
     finally:
         fixture.terminate();fixture.communicate(timeout=20)
     return report

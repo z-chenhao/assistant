@@ -11,6 +11,9 @@ public interface, configuration, migration or frozen-runtime implications.
 - Relevant unit, integration or system coverage:
 - Residual risk, missing checks or decisions:
 
+For UI changes, identify the applicable rules in `design.md`, the behavior
+covered by regression tests, and desktop/mobile screenshot evidence reviewed.
+
 ## Documentation and compatibility
 
 Link updated usage/design documentation where applicable. For dependency or

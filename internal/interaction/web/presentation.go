@@ -2,7 +2,6 @@ package web
 
 import (
 	"github.com/z-chenhao/assistant/internal/interaction"
-	"github.com/z-chenhao/assistant/internal/llm"
 	"strings"
 	"time"
 )
@@ -15,12 +14,6 @@ func activeProfile(s Status) string {
 }
 func canSend(s Status) bool {
 	return s.Readiness == "ready" || s.Readiness == "" && (s.Status == "idle" || s.Status == "busy")
-}
-func providerName(kind string) string {
-	if kind == "openai_account" {
-		return "ChatGPT"
-	}
-	return "Compatible API"
 }
 func bindingTarget(b interaction.Binding) string { return b.Channel + ":" + b.ID }
 func humanTime(raw string) string {
@@ -73,14 +66,4 @@ func tabLabel(name string) string {
 		return "Compare"
 	}
 	return name
-}
-
-func otherProfiles(profiles []llm.Profile, active string) []llm.Profile {
-	out := []llm.Profile{}
-	for _, p := range profiles {
-		if p.ProfileID != active {
-			out = append(out, p)
-		}
-	}
-	return out
 }

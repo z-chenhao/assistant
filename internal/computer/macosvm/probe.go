@@ -41,6 +41,10 @@ func (p *Provider) Probe(ctx context.Context) error {
 }
 
 func (p *Provider) checkHost(ctx context.Context) error {
+	return p.checkHostStore(ctx, filepath.Join(p.config.Root, "vms"))
+}
+
+func (p *Provider) checkHostStore(ctx context.Context, store string) error {
 	// A dedicated store is mandatory. Never enumerate or modify the user's
 	// default VM registry, even when a name happens to match.
 	raw, status, err := p.api(ctx, "GET", "/config", nil)
@@ -52,7 +56,7 @@ func (p *Provider) checkHost(ctx context.Context) error {
 			Path string `json:"path"`
 		} `json:"vmLocations"`
 	}
-	if err != nil || status != 200 || json.Unmarshal(raw, &config) != nil || config.TelemetryEnabled == nil || *config.TelemetryEnabled || config.CachingEnabled == nil || *config.CachingEnabled || len(config.VMLocations) != 1 || config.VMLocations[0].Path != filepath.Join(p.config.Root, "vms") {
+	if err != nil || status != 200 || json.Unmarshal(raw, &config) != nil || config.TelemetryEnabled == nil || *config.TelemetryEnabled || config.CachingEnabled == nil || *config.CachingEnabled || len(config.VMLocations) != 1 || config.VMLocations[0].Path != store {
 		return computer.ErrUnavailable
 	}
 	raw, status, err = p.api(ctx, "GET", "/host/status", nil)

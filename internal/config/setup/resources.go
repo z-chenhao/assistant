@@ -21,6 +21,9 @@ type computerSettings struct {
 var kinds = []string{"memory", "embedding", "mcp", "skills", "execution", "computer"}
 
 func resource(c config.Config, id string) any {
+	if c.Automatic(id) {
+		return map[string]string{"mode": "automatic"}
+	}
 	switch id {
 	case "memory":
 		if c.Memory != nil {
@@ -62,13 +65,13 @@ func description(id, root string) web.Capability {
 	switch id {
 	case "memory":
 		v.Title = "Memory"
-		v.Description = "Remember preferences and corrections across conversations."
-		v.Help = "Use an existing SecretStore reference to the same 32-byte encryption key. Keep this key for existing memories and backups. Secret values never belong in this editor."
+		v.Description = "Remember useful details across conversations."
+		v.Help = "Automatic mode creates a private encryption key in the system credential store. Custom mode uses your existing 32-byte key reference. Keep the original key for existing memories and backups."
 		v.Example = "encryption_key_ref: env:STEWARD_MEMORY_KEY\n"
 	case "embedding":
-		v.Title = "Memory search"
-		v.Description = "Search memories and conversation with an explicit embedding model."
-		v.Help = "Serve your chosen model separately. Encrypted memory requires a literal loopback endpoint. The test embeds a fixed diagnostic sentence, never your conversation. Changing an existing endpoint, model or dimensions requires an offline index rebuild; a successful connection test does not migrate stored vectors."
+		v.Title = "Semantic search"
+		v.Description = "Choose how Memory finds relevant information."
+		v.Help = "Automatic mode uses local text search without a service. Custom mode connects your embedding model; encrypted memory requires a literal loopback endpoint. Changing an existing vector identity requires an offline index rebuild."
 		v.Example = "provider: openai_compatible\nendpoint: http://127.0.0.1:11434/v1\nmodel: nomic-embed-text\ndimensions: 768\n"
 	case "mcp":
 		v.Title = "MCP tools"
@@ -87,8 +90,8 @@ func description(id, root string) web.Capability {
 		v.Example = fmt.Sprintf("root: %s\ntoolchain_roots: []\n", root+".computer")
 	case "computer":
 		v.Title = "Computer"
-		v.Description = "Use an explicitly provisioned macOS Guest for desktop and file tools."
-		v.Help = "Provision the Lume store and sealed base first; this page does not download or boot a VM. Testing checks the Lume version, sealed base and credential availability. Guest runtime checks still run on first use. Clear the local execution override before enabling Computer."
+		v.Description = "Use a private macOS desktop, prepared automatically on first use."
+		v.Help = "Automatic mode downloads and prepares a private macOS desktop on first use on Apple silicon. Custom mode connects your provisioned Lume store and sealed base. Custom testing checks the control plane without booting a VM."
 		v.Example = "root: /absolute/private/computer-store\nendpoint: http://127.0.0.1:7777\ncompatibility:\n  provider_version: '0.6.1'\n  guest_build: YOUR_BUILD\n  driver_version: YOUR_DRIVER_VERSION\n  driver_sha256: YOUR_DRIVER_SHA256\n  driver_team: YOUR_DRIVER_TEAM\n  driver_bundle: com.trycua.driver\n  architecture: arm64\nguest:\n  user: lume\n  port: 22\n  password_ref: env:STEWARD_GUEST_PASSWORD\n  host_key_sha256: SHA256:YOUR_PINNED_HOST_KEY\nmanifest:\n  version: 1\n"
 	}
 	if id == "computer" {

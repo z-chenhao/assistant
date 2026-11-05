@@ -7,8 +7,10 @@
 @import "./workspace.css";
 @import "./task-planning.css";
 @import "./capability-forms.css";
+@import "./settings.css";
 @import "./conversation.css";
 @import "./observability.css";
+@import "./components/ui/controls.css";
 @source "./";
 
 @import "./avatar.css";

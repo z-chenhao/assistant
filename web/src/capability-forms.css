@@ -1,9 +1,9 @@
 /* Native owner settings share the existing monochrome control vocabulary. */
-.capability-guided{max-width:760px;margin:28px 0 36px}
+.capability-guided{margin:0}
 .capability-guided fieldset{min-width:0;border:0;border-top:1px solid var(--border);padding:22px 0 4px;margin:28px 0 0}
-.capability-guided legend{max-width:100%;overflow-wrap:anywhere;padding:0 12px 0 0;font-size:17px;font-weight:550;color:var(--foreground)}
+.capability-guided legend{max-width:100%;overflow-wrap:anywhere;padding:0 12px 0 0;font-size:var(--text-section);line-height:1.5;font-weight:600;color:var(--foreground)}
 .capability-guided input,.capability-guided textarea{caret-color:var(--foreground)}
-.capability-guided textarea{display:block;width:100%;padding:10px 12px;margin-top:7px;min-height:94px;resize:vertical;border:1px solid var(--border);border-radius:10px;color:var(--foreground);background:var(--card);font:14px/1.6 var(--font-ui)}
+.capability-guided textarea{display:block;width:100%;padding:10px 12px;margin-top:7px;min-height:94px;resize:vertical;border:1px solid var(--control-border);border-radius:10px;color:var(--foreground);background:var(--card);font:var(--text-ui)/1.6 var(--font-ui)}
 .capability-enable{margin-bottom:8px;font-size:14px;font-weight:500}
 .capability-field-pair{display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr);gap:18px}
 .capability-tool-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:end;margin:16px 0}
@@ -12,6 +12,6 @@
 .capability-guided .field-help{max-width:68ch;font-size:13px}.capability-submit{margin-top:24px}
 .capability-draft-status{margin:12px 0 0;min-height:0;color:var(--muted-foreground);font-size:13px}.capability-draft-status:empty{display:none}
 .capability-advanced{padding-top:22px;border-top:1px solid var(--border)}.capability-advanced>summary{font-size:14px}
-@media(max-width:700px){.capability-field-pair,.capability-tool-row{grid-template-columns:minmax(0,1fr);gap:12px}.capability-guided input,.capability-guided select,.capability-guided textarea{font-size:16px}.capability-tool-row{padding-bottom:18px;border-bottom:1px solid var(--border)}.capability-tool-row button{justify-self:start}.capability-guided .actions{align-items:stretch;flex-direction:column}.capability-guided button{min-height:44px}}
+@media(max-width:760px){.capability-field-pair,.capability-tool-row{grid-template-columns:minmax(0,1fr);gap:12px}.capability-guided input,.capability-guided textarea{font-size:1rem}.capability-tool-row{padding-bottom:18px;border-bottom:1px solid var(--border)}.capability-tool-row button{justify-self:start}.capability-guided .actions{align-items:stretch;flex-direction:column}.capability-guided button{min-height:44px}}
 .capability-options{margin:24px 0;border-top:1px solid var(--border);padding-top:18px}.capability-options>summary{font-size:14px;font-weight:500;color:var(--foreground)}.capability-options>fieldset{border:0;margin:0;padding-top:20px}
-.capability-guided input:disabled,.capability-guided select:disabled,.capability-guided textarea:disabled{opacity:.55}
+.capability-guided input:disabled,.capability-guided textarea:disabled{opacity:.55}

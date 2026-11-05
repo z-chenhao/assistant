@@ -4,7 +4,7 @@
 
 完成状态描述当前实现范围，不代表真实模型、线上账户或所有平台已验收；证明范围和未验证项见所属测试方案。
 
-[产品架构总览](designs/product-overview.md) · [文档维护规则](#文档维护规则) · [功能模板](features/_template.md) · [技术方案模板](designs/_template.md) · [测试方案模板](test-plans/_template.md)
+[界面设计规范](../design.md) · [产品架构总览](designs/product-overview.md) · [文档维护规则](#文档维护规则) · [功能模板](features/_template.md) · [技术方案模板](designs/_template.md) · [测试方案模板](test-plans/_template.md)
 
 F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让纯文本模型可显式读取图片文字；F-005 提供阶段进度；F-019 流式呈现 Main 回复草稿并在提交后切换到正式消息。软件回归与模型语义质量的证明范围分别见对应测试方案。
 
@@ -34,8 +34,8 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | ID / 详情 | 需求 | 简要描述 | 是否完成 / 状态 |
 | --- | --- | --- | --- |
 | [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。模型协议由 Steward 内部 Go 适配层实现；生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
-| [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | macOS Keychain 与 Linux Secret Service 原生保存账户凭据，支持登录、刷新、重新认证、退出和中断恢复。 | 是 · 已完成 |
-| [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main 可直接调用已配置 MCP 和 Skill；复杂工作委派 Task Worker。 | 是 · 已完成 |
+| [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | ChatGPT 账户凭据默认保存在 Steward 私有文件中，可显式使用系统凭据库，支持登录、按需刷新、重新认证、退出和中断恢复，后台状态检查只读配置与账户元数据。 | 是 · 已完成 |
+| [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main 的系统提示以 Ghost 角色说明开头；可直接调用已配置 MCP 和 Skill；复杂工作委派 Task Worker。 | 是 · 已完成 |
 | [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI/Web 与个人飞书具名问题、确切成果审阅接通，真实渠道与模型质量待验证。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
@@ -50,7 +50,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；任务与执行详情按可用宽度重排；优先定位问题、成果审阅、审批及当前故障。 | 是 · 已完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Enter 发送、Shift + Enter 换行及橙色发送按钮；Resources 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 模型生成时，Web 逐段显示 Main 回复；完成后展示正式消息。审批、状态更新和输入保留仍独立工作。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、具名问题及成果审阅卡、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | Main 经 Code Mode 的 intelligent_ui_show 与内建 Skill 生成原生组件和隔离 HTML 交互；持久回复、显式回传与文字替代共用原交付链路。 | 是 · 已完成 |
@@ -73,7 +73,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证及可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |
 | [F-040](features/engineering.md#f-040) | Go 模块边界与可读性重构 | 领域持有适配器和接口类型；LLM 依赖方向与生产 Code Mode 装配有自动回归，目录规模及响应场景纳入 PR 门禁。 | 是 · 已完成 |
-| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、黑白头像与统一中英文界面，保留真实执行与审批语义。 | 是 · 已完成 |
+| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存与可访问帮助；模型同意常驻、Trace 状态可读，跨页复用 Select／Switch、字号与窄屏触控规则，通过复用门禁、首屏／状态 UT 和跨页／Task 浏览器回归约束；折叠偏好与慢加载布局稳定，编辑后清除过期连接／保存反馈，保留真实执行与审批语义。 | 是 · 已完成 |
 | [F-042](features/integrations.md#f-042) | 可靠的环境事件监听 | 精确 PR 评审/CI 持久接收，可显式关联原 Task 经 Main 接续；其他来源、平台历史与原话题交付边界保留。 | 否 · 部分完成 |
 | [F-045](features/automation.md#f-045) | 主动规则的观察与启用 | 确切 GitHub PR 可按事件类型或 CI 失败观察，再显式启用 Main 接续原 Task。其他来源与语义规则待验证。 | 否 · 部分完成 |
 
