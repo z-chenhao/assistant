@@ -63,4 +63,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--foreground)}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.danger-text{color:var(--danger)}
 .skip-link{position:fixed;top:-80px;left:20px;padding:10px 15px;background:var(--card);z-index:100}.skip-link:focus{top:12px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-@media(max-width:760px){:root{--workspace-gutter:20px;--section-space:16px}.row-heading{align-items:flex-start}input,select{font-size:1rem}}
+@media(max-width:760px){
+ :root{--workspace-gutter:20px;--section-space:16px}.row-heading{align-items:flex-start}input,select{font-size:1rem}
+ :is(.workspace-page,.observability) :is(button,.button,select,input:not([type=checkbox],[type=radio],[type=hidden],[type=file])){min-height:44px}
+ :where(.workspace-page,.observability) summary{min-height:44px;align-content:center}
+}

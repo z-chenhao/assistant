@@ -8,6 +8,19 @@ const [url,evidence,phase='conversation']=process.argv.slice(2);
 await mkdir(evidence,{recursive:true});
 const options={headless:true};
 if(process.env.STEWARD_BROWSER_EXECUTABLE)options.executablePath=process.env.STEWARD_BROWSER_EXECUTABLE;
+async function chooseSharedOption(page,control,label,value){
+ const original=await control.inputValue();
+ await control.click();
+ const list=page.locator('[id="'+await control.getAttribute('aria-controls')+'"]');
+ const popup=list.locator('xpath=..');
+ await popup.getByRole('searchbox').fill('zz-no-result');
+ if(await list.getByRole('option').count()||!await popup.getByRole('status').isVisible())throw Error('shared select lost its empty result state');
+ await page.keyboard.press('Escape');
+ if(await control.inputValue()!==original||!await control.evaluate(node=>node===document.activeElement))throw Error('shared select cancellation changed the value or lost focus');
+ await control.click();await popup.getByRole('searchbox').fill(label);
+ await popup.getByRole('searchbox').press('ArrowDown');await page.keyboard.press('Enter');
+ if(await control.inputValue()!==value||await popup.isVisible())throw Error('shared select did not confirm into the native form control');
+}
 const browser=await chromium.launch(options);
 let page;
 try{
@@ -222,6 +235,8 @@ try{
   await page.locator('.section-navigation').hover();
   await help.focus();
   if(!await tooltip.isVisible())throw Error('language help is unavailable from the keyboard');
+  await page.keyboard.press('Escape');
+  if(await tooltip.isVisible()||!await help.evaluate(node=>node===document.activeElement))throw Error('language help does not dismiss with Escape while preserving focus');
   const row=await preferenceRow.boundingBox();
   const control=await preferenceRow.locator('[data-language-trigger]').boundingBox();
   if(!row||!control||row.height>72||control.height>40||await preferenceRow.locator('.preference-save').isVisible())throw Error('language preference does not fit a compact autosave row');
@@ -269,7 +284,7 @@ try{
    await native.getByLabel('Endpoint URL').waitFor();
    if(await native.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('model connection overflows the narrow layout');
   }finally{await plain.close()}
-  if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
+  if(await page.getByRole('switch',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
   await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
   await page.locator('input[name="model"]').fill('fixture-model');
   await page.getByRole('button',{name:'Add connection',exact:true}).click();
@@ -277,6 +292,10 @@ try{
   await onResources('added');
   const firstModel=page.locator('.resource-model').filter({has:page.locator('summary').getByText('fixture-model',{exact:true})});
   await firstModel.getByRole('button',{name:'Test connection',exact:true}).waitFor();
+  const consent=firstModel.getByText('New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration.',{exact:true});
+  if(!await consent.isVisible()||await firstModel.locator('[role=tooltip]').count())throw Error('model consent is hidden before selection');
+  const useModel=firstModel.getByRole('button',{name:'Use for new work',exact:true});
+  if(await useModel.getAttribute('aria-describedby')!==await consent.getAttribute('id'))throw Error('model selection lost its accessible consent description');
   if(await firstModel.getByText(/^(Context \/ maximum output|Image handling)$/).count())throw Error('Resources shows read-only capability fields');
   const firstID=new URL(page.url()).searchParams.get('model');
   await page.screenshot({path:evidence+'/model-detail-wide.png',fullPage:true});
@@ -287,6 +306,7 @@ try{
    return {overlap:crumb.right>status.left,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   if(mobileHeader.overlap||mobileHeader.overflow)throw Error('expanded model overlapped or overflowed the narrow layout');
+  if(!await consent.isVisible())throw Error('model consent disappeared on a narrow screen');
   await page.screenshot({path:evidence+'/model-detail-mobile.png',fullPage:true});
   await page.setViewportSize({width:1400,height:980});
   await firstModel.locator('summary').click();
@@ -400,8 +420,18 @@ try{
   const facts=JSON.parse(process.env.STEWARD_NATIVE_TRACE_FACTS);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
+  await page.setViewportSize({width:720,height:980});
+  for(const control of await page.locator('.obs-filters select').all()){
+   if(!await control.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=16&&node.getBoundingClientRect().height>=44))throw Error('trace filters missed the compact input and touch rules');
+  }
+  await chooseSharedOption(page,page.getByLabel('Role',{exact:true}),'Root Worker','root');
+  await page.getByLabel('Role',{exact:true}).selectOption('');
+  await page.setViewportSize({width:1400,height:980});
   await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
   await page.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();
+  for(const status of await page.locator('.obs-tree .obs-node-status').all()){
+   if((await status.innerText()).replace('●','').trim()!==await status.getAttribute('data-status'))throw Error('trace tree does not expose each status as readable text');
+  }
   const gen=page.locator('.obs-tree [data-observation-id="generation:'+facts.generation+'"] a').first();
   await gen.click();
   await page.locator('.obs-selected-name').filter({hasText:'Generate response'}).waitFor();
@@ -772,12 +802,24 @@ try{
   await writeFile(evidence+'/live-contract.json',JSON.stringify({draft:true,attachment:true,focus:true,selection:true,scroll:true,conditional:true,reconnect:true,approval:true,progress:true,semanticStages:true,session:true,navigations},null,2));
  }
  if(phase==='schedule'){
-  const taskCount=(await (await context.request.get(url+'/api/progress')).json()).length;
+  let schedulePosts=0;page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/schedule/configure')schedulePosts++});
+  const initialTasks=await (await context.request.get(url+'/api/progress')).json();
+  if(!Array.isArray(initialTasks))throw Error('Task progress did not return a list');
+  const taskCount=initialTasks.length;
   await page.getByRole('link',{name:'Tasks',exact:true}).click();
   await page.getByRole('link',{name:'Create schedule',exact:true}).click();
   const editor=page.locator('form.schedule-editor');
   await page.getByLabel('Instructions',{exact:true}).fill('Review recurring subscriptions and VPS renewals; do not pay or renew automatically.');
-  await page.getByLabel('Frequency',{exact:true}).selectOption('weekdays');
+  await page.setViewportSize({width:720,height:980});
+  const frequency=page.getByLabel('Frequency',{exact:true});
+  await chooseSharedOption(page,frequency,'Weekly','weekly');
+  const weekday=page.locator('select[name=weekday]');await weekday.waitFor({state:'visible'});
+  await frequency.click();await weekday.focus();await weekday.press('Enter');
+  if(await page.getByRole('listbox').count()!==1)throw Error('Task selectors left competing popups open');
+  await page.keyboard.press('Escape');
+  await chooseSharedOption(page,frequency,'Weekdays','weekdays');
+  if(await weekday.isVisible()||schedulePosts!==0)throw Error('choosing a frequency submitted or failed to hide dependent fields');
+  await page.setViewportSize({width:1400,height:980});
   await page.getByLabel('Local time',{exact:true}).fill('07:40');
   await page.getByLabel('Time zone',{exact:true}).fill('Asia/Shanghai');
   const submitted=await editor.evaluate(form=>Object.fromEntries(new FormData(form)));
@@ -789,9 +831,13 @@ try{
   if(replay.status()!==303)throw Error('identical schedule retry did not return its durable receipt');
   const drift=await context.request.post(url+'/schedule/configure',{form:{...submitted,instruction:'Changed payload under the same request identity'},maxRedirects:0});
   if(drift.status()!==409)throw Error('schedule request-key drift was accepted');
-  await page.getByLabel('Schedule enabled',{exact:true}).uncheck();
+  const enabled=page.getByRole('switch',{name:'Schedule enabled',exact:true});
+  const beforeToggle=schedulePosts;await enabled.focus();await page.keyboard.press('Space');
+  if(await enabled.isChecked()||schedulePosts!==beforeToggle)throw Error('Task switch changed its manual-save semantics');
+  if(await enabled.evaluate(node=>node.getBoundingClientRect().height)<44)throw Error('Task switch lost its touch target');
   await page.getByRole('button',{name:'Save schedule',exact:true}).click();
   await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
+  await page.reload();
   if(await page.getByLabel('Schedule enabled',{exact:true}).isChecked())throw Error('schedule disable was not persisted');
   await page.getByLabel('Schedule enabled',{exact:true}).check();
   await page.getByRole('button',{name:'Save schedule',exact:true}).click();
@@ -822,6 +868,28 @@ try{
   await page.setViewportSize({width:320,height:740});
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('schedule editor overflowed compact viewport');
   await page.screenshot({path:evidence+'/schedule-mobile.png',fullPage:true});
+  await page.evaluate(()=>document.documentElement.classList.add('dark'));
+  await page.screenshot({path:evidence+'/schedule-mobile-dark.png',fullPage:true});
+  const touch=await browser.newContext({hasTouch:true,viewport:{width:320,height:740}});
+  try{
+   await touch.addCookies(await context.cookies());const p=await touch.newPage();await p.goto(editURL);
+   const toggle=p.getByRole('switch',{name:'Schedule enabled',exact:true}),was=await toggle.isChecked();
+   await p.getByLabel('Frequency',{exact:true}).tap();await p.getByRole('listbox').getByRole('option',{name:'Once',exact:true}).tap();
+   await p.getByLabel('Date',{exact:true}).waitFor({state:'visible'});
+   await toggle.tap();if(await toggle.isChecked()===was)throw Error('touch did not toggle the shared switch');
+   await p.reload();if(await toggle.isChecked()!==was||await p.getByLabel('Frequency',{exact:true}).inputValue()!=='weekdays')throw Error('touch bypassed explicit Task saving');
+  }finally{await touch.close()}
+  const native=await browser.newContext({javaScriptEnabled:false,viewport:{width:320,height:740}});
+  try{
+   await native.addCookies(await context.cookies());const p=await native.newPage();await p.goto(editURL);
+   await p.getByLabel('Frequency',{exact:true}).selectOption('weekly');await p.locator('select[name=weekday]').waitFor({state:'visible'});
+   await p.getByRole('switch',{name:'Schedule enabled',exact:true}).uncheck();
+   await p.getByRole('button',{name:'Save schedule',exact:true}).click();await p.reload();
+   if(await p.getByLabel('Frequency',{exact:true}).inputValue()!=='weekly'||await p.getByRole('switch',{name:'Schedule enabled',exact:true}).isChecked())throw Error('native Task controls did not persist');
+   await p.screenshot({path:evidence+'/schedule-native.png',fullPage:true});
+  }finally{await native.close()}
+  if((await (await context.request.get(url+'/api/progress')).json()).length!==taskCount)throw Error('control checks dispatched a Task');
+  await writeFile(evidence+'/schedule-browser.json',JSON.stringify({keyboard:true,search:true,emptyResults:true,dependentFields:true,singlePopup:true,switchManualSave:true,persistence:true,staleDraft:true,touch:true,nativeFallback:true,noPrematureDispatch:true,widths:[1400,720,320]},null,2));
   await page.setViewportSize({width:1400,height:980});
   await page.goto(url);
  }

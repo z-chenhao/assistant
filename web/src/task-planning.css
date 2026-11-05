@@ -32,7 +32,7 @@
 .schedule-editor>label,.schedule-editor>.schedule-field,.schedule-editor>[data-schedule-fields]{display:block;margin-bottom:20px}
 .schedule-editor>.schedule-field>label{margin-bottom:0}
 .schedule-editor textarea{display:block;width:100%;resize:vertical;min-height:130px;margin-top:8px;font:16px/1.6 var(--font-ui)}
-.schedule-editor .schedule-enabled{display:flex;align-items:center;gap:8px;margin:0}
+.schedule-editor .schedule-enabled{display:flex;align-items:center;flex-direction:row-reverse;justify-content:space-between;gap:8px;margin:0}
 .schedule-editor .schedule-enabled input{width:auto;margin:0}
 .schedule-editor>p.field-help{margin:8px 0 24px}.schedule-editor>.technical-details{margin:24px 0}
 .schedule-editor .technical-details>label{display:block;margin-top:16px}
@@ -43,7 +43,7 @@
 .schedule-editor:has([name="frequency"] option[value="monthly"]:checked) [data-schedule-fields="monthly"],
 .schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="custom"]{display:block}
 .schedule-editor:has([name="frequency"] option[value="custom"]:checked) [data-schedule-fields="clock"]{display:none}
-@media(max-width:700px){.schedule-editor .actions{align-items:stretch;flex-direction:column}.schedule-editor input,.schedule-editor select{font-size:16px}}
+@media(max-width:700px){.schedule-editor .actions{align-items:stretch;flex-direction:column}.schedule-editor input{font-size:16px}}
 .schedule-editor textarea{padding:12px;border:1px solid var(--control-border);border-radius:10px;background:var(--card);color:var(--foreground)}
 
 .needs-attention:has(.attention-heading){margin-bottom:36px}

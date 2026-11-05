@@ -11,14 +11,10 @@
 .detail-section{min-width:0;padding:var(--section-space) 0;border-top:1px solid var(--border)}
 .detail-section>:last-child,.detail-section .row-heading>label{margin-bottom:0}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;min-height:54px;padding:8px 0;border-bottom:1px solid var(--border);font-size:var(--text-ui)}
-.setting-row label{margin:0}.setting-name,.model-list-heading h2{font-size:14px;font-weight:600;margin:0}.setting-description{font-size:13px;color:var(--muted-foreground);margin:4px 0 0}
-.setting-label,.setting-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}.setting-controls select{width:auto;max-width:100%;margin:0;padding:7px 9px}.setting-controls button{flex-shrink:0}
+.setting-row label{margin:0}.setting-name,.model-list-heading h2{font-size:var(--text-ui);font-weight:600;margin:0}.setting-description{font-size:13px;color:var(--muted-foreground);margin:4px 0 0}
+.setting-label,.setting-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}.setting-controls select{width:auto;max-width:100%;margin:0}.setting-controls button{flex-shrink:0}
 .setting-action{min-height:34px;padding:6px 10px;font-size:13px}.models-heading a{margin-inline-start:auto}
-.setting-help{position:relative;display:inline-flex}.setting-help>button{width:24px;height:24px;min-height:0;padding:0;border-radius:50%;background:transparent;color:var(--muted-foreground);border-color:var(--border);font-size:12px}
-.setting-help>button:hover,.setting-help>button:focus-visible{background:var(--hover);color:var(--foreground)}
-.setting-help [role=tooltip]{position:absolute;z-index:8;top:100%;left:-88px;width:180px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:12px;visibility:hidden}
-.setting-help:hover [role=tooltip],.setting-help:focus-within [role=tooltip]{visibility:visible}
-.model-connect{max-width:560px}.model-provider-panel{padding:12px 0;font-size:14px}.model-provider-panel>form{max-width:420px}
+.models-heading .setting-name{font-size:var(--text-section);line-height:1.5}.model-connect{max-width:560px}.model-connect>h1{font-size:var(--text-page);line-height:1.35;margin-bottom:var(--section-space)}.model-provider-panel{padding:12px 0;font-size:14px}.model-provider-panel>form{max-width:420px}
 .resource-provider{padding:10px 0;border-bottom:1px solid var(--border)}
 .resource-summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px var(--control-gap);min-height:40px;padding:6px 8px;list-style:none}
 .resource-summary::-webkit-details-marker{display:none}
@@ -26,7 +22,8 @@
 details[open]>.resource-summary::before{transform:rotate(45deg)}
 .resource-summary:hover{background:var(--hover);border-radius:6px}
 .resource-name{flex:1;min-width:min(100%,7rem);overflow-wrap:anywhere;margin:0;font-size:var(--text-ui);font-weight:600}
-.direct-models-heading{padding:6px 8px;color:var(--muted-foreground)}
+.resource-summary h2.resource-name{font-size:var(--text-section);line-height:1.5}
+.direct-models-heading{font-size:var(--text-section);line-height:1.5;padding:6px 8px;color:var(--muted-foreground)}
 .resource-model{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,9.75rem);column-gap:var(--control-gap);align-items:start;margin-inline-start:20px;scroll-margin-top:90px}
 .resource-model .resource-name{font-weight:500}
 .resource-model-label{display:flex;align-items:center;min-height:40px;padding:6px 8px 6px 32px}
@@ -34,7 +31,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .model-connection form,.model-use form{margin:0}
 .resource-body{padding:4px 8px 14px 28px;min-width:0}
 .resource-body .facts{margin:0 0 12px;gap:8px}
-.model-selection .setting-help [role=tooltip]{left:auto;right:0;width:220px}
+.model-consent{grid-column:1/-1;margin:4px 8px 12px 32px}
 .model-resources #signin-status:has([data-signin-pending])~.resource-provider .provider-account-actions{display:none}
 @media(max-width:760px){
  .resource-summary,.resource-model-label{min-height:44px}
@@ -43,7 +40,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
  .model-connection,.model-use{min-height:44px}
  .model-connection button,.model-use button{max-width:100%}
 }
-@media(max-width:760px){.setting-action,.setting-controls select{min-height:44px}}
+@media(max-width:760px){.setting-action{min-height:44px}}
 /* Preferences share the tab strip's density; other settings keep their forms. */
 .settings-page:has(.preference-group)>.section-tabs{margin-bottom:24px}
 .preference-group{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px}
@@ -52,8 +49,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .preference-name label{margin:0;font-size:14px;font-weight:550;color:var(--foreground)}
 .preference-controls{display:flex;flex:1 1 112px;align-items:center;gap:8px;max-width:168px;min-width:112px;margin-left:auto}
 .preference-controls:has(.preference-save:not([hidden])){flex-basis:168px;max-width:220px}
-.preference-controls select{margin:0;min-height:36px;padding:5px 8px;border-radius:7px;font-size:14px}
-.preference-group :is(button,select,summary){outline-offset:2px}
+.preference-group :is(button,summary){outline-offset:2px}
 .preference-group .preference-save{min-height:36px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:7px;white-space:nowrap}
 .preference-help{display:inline-flex}
 .preference-help-trigger,.preference-help summary{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:36px;min-height:36px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;list-style:none}
@@ -61,20 +57,10 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .preference-help-trigger:hover,.preference-help summary:hover,.preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
 /* Keep the trigger-to-tooltip path connected even when the form gains feedback or wraps. */
 .preference-tooltip{position:absolute;z-index:20;top:calc(100% - 1px);left:0;display:block;width:min(280px,calc(100vw - 66px));padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
-.preference-group .preference-picker-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:36px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--background);color:var(--foreground);font-weight:400;white-space:nowrap}
-.preference-picker-trigger>.icon{width:16px;height:16px;color:var(--muted-foreground)}
-.preference-picker-trigger:hover{background:var(--hover)}
-.preference-picker-trigger[aria-disabled=true]{color:var(--muted-foreground);cursor:wait}
-.preference-picker{position:fixed;inset:auto;margin:0;padding:4px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--foreground);box-shadow:0 8px 20px color-mix(in srgb,var(--backdrop) 35%,transparent);overflow:auto;overscroll-behavior:contain;font:14px/1.6 var(--font-ui)}
-.preference-picker [role=option]{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;padding:7px 10px;border-radius:8px;cursor:pointer;white-space:nowrap}
-.preference-picker [role=option]>.icon{visibility:hidden;flex-shrink:0}
-.preference-picker [aria-selected=true]{background:var(--muted)}
-.preference-picker [aria-selected=true]>.icon{visibility:visible}
-.preference-picker [role=option]:hover{background:var(--hover)}
-.preference-picker[data-keyboard] [data-active]{outline:2px solid var(--focus);outline-offset:-2px}
+.preference-group .preference-picker-trigger{width:100%}
 .preference-feedback{padding:0 16px 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
 .preference-feedback :is(button,a){min-height:36px;padding:3px 6px;background:transparent;border:0;color:var(--foreground);font-size:13px;text-decoration:underline;text-underline-offset:3px}
-@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-controls :is(select,.preference-picker-trigger){min-height:44px;font-size:16px;padding-inline:8px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}.preference-picker [role=option]{min-height:44px;font-size:16px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
+@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
 .list-heading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}.list-heading h2{margin:0}.list-heading span{font-size:12px;color:var(--muted-foreground)}
 .object-list{border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;background:transparent}
 .object-list:has(>.empty-state){border:0}
@@ -108,7 +94,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .capability-editor textarea{display:block;width:100%;margin-top:8px;min-height:220px;padding:16px;border:1px solid var(--control-border);border-radius:12px;background:var(--card);color:var(--foreground);font:14px/1.7 var(--font-code);resize:vertical;tab-size:2}
 .capabilities-page .technical-details{max-width:760px}
 .capability-example{margin:24px 0 20px}.capability-example pre{max-height:240px;overflow:auto}
-@media(max-width:700px){.capability-editor textarea{font-size:16px;padding:12px}.capability-editor .actions{align-items:stretch;flex-direction:column}.capabilities-page .object-row .row-badges{max-width:42%}}
+@media(max-width:760px){.capability-editor textarea{font-size:16px;padding:12px}.capability-editor .actions{align-items:stretch;flex-direction:column}.capabilities-page .object-row .row-badges{max-width:42%}}
 .attention-mark,.object-row time,.panel time,.task-history time{font-size:12px}
 @media(max-width:760px){.section-tabs a,.work-peek-tabs button{min-height:44px;display:inline-flex;align-items:center}.back-link,.attachment-link{min-height:44px;display:inline-flex;align-items:center}}
 .computer-drawer{position:fixed;inset:0 0 0 auto;margin:0;height:100dvh;max-height:100dvh;width:460px;max-width:100vw;padding:0;border:0;border-left:1px solid var(--border);border-radius:0;background:var(--background);color:var(--foreground);overflow:auto}

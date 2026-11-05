@@ -8,8 +8,11 @@ contains the shipped fonts, artwork and generated bundles embedded by Go.
 npm ci --prefix web --ignore-scripts
 npm run build --prefix web
 npm run check --prefix web
+npm test --prefix web
 npm run lint --prefix web
 ```
+
+Shared Select/Switch behavior and skins live in `src/components/ui/`. The build/check command rejects page-owned popup implementations and control skins; `npm test` covers the ownership gate and pure selection state. Existing `make test` and the required CI job run both.
 
 Edit sources, then commit the generated bundles with them. CI rejects stale
 outputs. `src/foundation.css` owns shared tokens/fonts; the other CSS modules own

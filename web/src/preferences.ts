@@ -1,4 +1,5 @@
 import {t} from './i18n';
+import {enhanceSelect} from './components/ui/select';
 
 // One native value source, one in-flight write. Unknown results require a GET;
 // neither returning from BFCache nor a late response may replay the POST.
@@ -19,48 +20,14 @@ export function enhanceLanguagePreference(){
  if(!select||!trigger||!value||!popup||!label||!fallbackSave||!feedback||!message||!retry||!refresh||options.length!==select.options.length)return;
  const search=form.querySelector<HTMLInputElement>('[data-language-search]');
  const empty=form.querySelector<HTMLElement>('[data-language-empty]');
- const custom=typeof popup.showPopover==='function'&&typeof popup.hidePopover==='function';
- let confirmed=select.value,desired=confirmed,active=0,opened=false;
+ let confirmed=select.value,desired=confirmed;
  let state:'idle'|'saving'|'unknown'='idle';
  let generation=0;
  let controller:AbortController|undefined;
- const sync=()=>{
-  value.textContent=select.selectedOptions[0]?.textContent??'';
-  for(const option of options)option.setAttribute('aria-selected',String(option.dataset.languageOption===select.value));
- };
- const close=(focus=false)=>{
-  if(opened)popup.hidePopover();
-  opened=false;trigger.setAttribute('aria-expanded','false');trigger.removeAttribute('aria-activedescendant');
-  if(focus)trigger.focus();
- };
- const markActive=(index:number)=>{
-  active=(index+options.length)%options.length;
-  options.forEach((option,i)=>option.toggleAttribute('data-active',i===active));
-  trigger.setAttribute('aria-activedescendant',options[active].id);
-  options[active].scrollIntoView({block:'nearest'});
- };
- const position=()=>{
-  if(!opened)return;
-  const bounds=trigger.getBoundingClientRect();
-  const scale=popup.getBoundingClientRect().width/popup.offsetWidth||1;
-  const viewport=window.visualViewport;
-  const left=viewport?.offsetLeft??0,top=viewport?.offsetTop??0;
-  const right=left+(viewport?.width??innerWidth),bottom=top+(viewport?.height??innerHeight);
-  const width=Math.min(Math.max(bounds.width,168*scale),right-left-16*scale);
-  popup.style.width=width/scale+'px';
-  const below=Math.max(0,bottom-bounds.bottom-12*scale),above=Math.max(0,bounds.top-top-12*scale);
-  const up=below<Math.min(popup.scrollHeight*scale,140*scale)&&above>below;
-  popup.style.maxHeight=Math.max(0,up?above:below)/scale+'px';
-  popup.style.left=Math.max(left+8*scale,Math.min(bounds.right-width,right-width-8*scale))/scale+'px';
-  popup.style.top=(up?bounds.top-popup.getBoundingClientRect().height-4*scale:bounds.bottom+4*scale)/scale+'px';
- };
- const open=()=>{
-  if(!custom||state!=='idle')return;
-  document.dispatchEvent(new Event('preference-picker-open'));
-  if(search)search.value='';for(const option of options)option.hidden=false;if(empty)empty.hidden=true;
-  popup.showPopover();opened=true;trigger.setAttribute('aria-expanded','true');
-  position();markActive(Math.max(0,options.findIndex(option=>option.dataset.languageOption===select.value)));
- };
+ const picker=search&&empty?enhanceSelect(select,{trigger,popup,list:popup.querySelector<HTMLElement>('[role=listbox]')!,search,empty,value,options}):undefined;
+ const custom=!!picker;
+ const sync=()=>picker?.sync();
+ const close=(focus=false)=>picker?.close(focus);
  const report=(text:string,alert=false,action:'retry'|'refresh'|''='')=>{
   feedback.hidden=false;feedback.setAttribute('role',alert?'alert':'status');
   message.textContent=t(text);retry.hidden=action!=='retry';refresh.hidden=action!=='refresh';
@@ -108,56 +75,6 @@ export function enhanceLanguagePreference(){
    window.clearTimeout(timeout);
   }
  };
- const visible=()=>options.map((option,index)=>({option,index})).filter(({option})=>!option.hidden);
- const move=(key:string)=>{
-  const available=visible();if(!available.length)return;
-  const current=available.findIndex(({index})=>index===active);
-  const next=key==='Home'?0:key==='End'?available.length-1:(current+(key==='ArrowUp'?-1:1)+available.length)%available.length;
-  markActive(available[next].index);
- };
- const choose=()=>{
-  if(state!=='idle')return;
-  if(options[active].hidden)return;
-  select.value=options[active].dataset.languageOption??confirmed;
-  close(true);sync();void save();
- };
- trigger.addEventListener('click',()=>{if(state==='idle'){delete popup.dataset.keyboard;if(opened)close();else open()}});
- trigger.addEventListener('keydown',event=>{
-  const {key}=event;
-  if(key==='Escape'){event.preventDefault();close(true);return}
-  if(key==='Tab'){close();return}
-  if(!['ArrowDown','ArrowUp','Home','End','Enter',' '].includes(key))return;
-  event.preventDefault();
-  if(state!=='idle')return;
-  popup.dataset.keyboard='true';
-  if(!opened){open();if(key==='Home')markActive(0);else if(key==='End')markActive(options.length-1);return}
-  if(key==='Enter'||key===' '){choose();return}
-  move(key);
- });
- search?.addEventListener('input',()=>{
-  const query=search.value.trim().toLocaleLowerCase();
-  options.forEach(option=>{option.hidden=!(option.textContent??'').toLocaleLowerCase().includes(query)});
-  const available=visible();if(empty)empty.hidden=available.length>0;
-  if(available.length)markActive(available[0].index);else{trigger.removeAttribute('aria-activedescendant');options.forEach(option=>delete option.dataset.active)}
-  position();
- });
- search?.addEventListener('keydown',event=>{
-  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true)}
-  else if(event.key==='Tab')close();
-  else if(event.key==='Enter'){event.preventDefault();if(visible().length)choose()}
-  else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();popup.dataset.keyboard='true';move(event.key)}
- });
- options.forEach((option,i)=>{
-  option.addEventListener('pointerdown',event=>event.preventDefault());
-  option.addEventListener('click',()=>{active=i;choose()});
- });
- document.addEventListener('pointerdown',event=>{if(event.target instanceof Node&&!trigger.contains(event.target)&&!popup.contains(event.target))close()});
- document.addEventListener('focusin',event=>{if(event.target instanceof Node&&!trigger.contains(event.target)&&!popup.contains(event.target))close()});
- document.addEventListener('preference-help-open',()=>close());
- window.addEventListener('resize',position);
- window.addEventListener('scroll',position,true);
- window.visualViewport?.addEventListener('resize',position);
- window.visualViewport?.addEventListener('scroll',position);
  window.addEventListener('pagehide',()=>{generation++;controller?.abort();close()});
  window.addEventListener('pageshow',event=>{if(event.persisted){generation++;controller?.abort();close();location.replace('/settings/preferences')}});
  select.addEventListener('change',()=>{if(state==='idle')void save()});

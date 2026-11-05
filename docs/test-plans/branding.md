@@ -31,6 +31,14 @@ F-041 覆盖项目身份和实际 Web 操作，不包含真实模型语义效果
 `tests/system/channels_preferences.mjs` 由现有 channels 驱动的 preferences 阶段执行。可用 `python3 tests/system/verify_channels.py --binary bin/steward --evidence evidence/preferences/report.json --preferences-only` 单独运行；重跑使用新的 evidence 目录。覆盖 1400/390/320px × 中英文 × 明暗主题的闭合和展开、值宽度、44px 触摸目标、右缘对齐及无布局偏移；检查键盘浏览／确认／取消、帮助与列表互斥、触摸、定位翻转和缩放。鼠标帮助使用未聚焦、未点击的 1px 连续移动路径，逐点确认提示可见并记录坐标；覆盖全部布局组合、保存拒绝反馈出现和窄容器自然换行，避免直接跳到提示掩盖触发器间隙。真实 POST 验证保存、Cookie 读回、刷新及跨页；受控故障验证单请求锁、明确拒绝与重试、认证拒绝、断网、15 秒超时、错误确认、响应损坏但 Cookie 已应用和 Cookie 未保留时不假报成功。回归返回、确定性的 persisted pageshow、无 JS／初始化失败／无 Popover 的原生路径，以及相邻设置和通知表单。CSS 200% 缩放不替代 Owner 在 Mac mini 上的原生缩放与 VoiceOver 实测。JSON／原生响应、非法值、Cookie 属性、认证与 CSRF 由 locale 测试补充。
 
 
+公共控件复用门禁通过 `npm run check --prefix web` 在构建资源检查前执行，正反例与过滤／键盘状态 UT 通过 `npm test --prefix web` 执行；两者均属于现有 `make test`／`Ubuntu checks`。新页面私建下拉运行逻辑、模板选项列表或开关皮肤时应失败并报告文件位置，原生表单与容器布局应通过。
+
+Task 计划页由 `verify_channels.py` 的 `task_control_components` 实际调用现有 schedule 浏览器阶段，结果写入 `task-controls-ui/schedule-browser.json`。覆盖 1400／720／320px、搜索与空结果、多个选择器互斥、依赖字段、开关键盘和触摸、显式保存与刷新、原生提交、陈旧版本草稿，以及保存配置不提前派发任务。
+
+公共控件在 Preferences、能力配置、Task 计划及 Dev Trace 筛选中检查搜索／空结果、方向键／Home／End 浏览、确认、Escape／Tab 取消、跨控件互斥、44px 触控与无脚本原生提交。普通布尔开关保留原有 checked、disabled、表单值和保存时机；能力与模型声明、计划启用以及外观动效沿用现有真实浏览器场景。
+
+渠道浏览器的 setup 阶段检查模型同意说明在桌面与窄屏无需聚焦即可阅读、选用按钮保留关联描述，以及语言帮助的 Escape 关闭与焦点保持。native-trace 阶段检查 720px 筛选控件的 16px 字号与 44px 高度、树中每项状态的可读文字；capability-setup 阶段检查 720px 普通文本框与 Advanced YAML 字号、输入边界色和 320px 折叠入口的触控高度。
+
 精修验证沿用渠道浏览器与 Web 模块测试：四项导航、切页后标题焦点、最新消息入口、动态 composer 留白、真实待审批计数到卡片、320/390px 布局、44px 手机控件、黑白完整帧播放与暂停。Source Han 子集逐包验证 SHA-256/cmap，全集覆盖保留30926字符；不以 macOS 苹方的截图冒充非 macOS 冷加载性能测量。
 
 全项目身份检查包括 CLI 帮助与 TUI、OAuth loopback 回调、固定工具命名空间、新执行身份提示、安装归档和链接。通过既有 provider-bridge、Go context/prompt、startup、Web、foundation 与 TUI 回归验证；提示字节哈希仅随已审查的身份文案改变而更新，冻结记录和 Child 作用域断言继续生效。

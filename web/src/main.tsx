@@ -3,6 +3,7 @@ import {enhanceComputerView} from './computer';
 import {enhanceShell} from './shell';
 import {enhanceBrandMotion} from './brand';
 import {enhanceSettings} from './settings';
+import {enhanceSelectControls} from './components/ui/select';
 import {enhanceCapabilityForms} from './capability-forms';
 import {enhanceObservability} from './observability';
 import {enhanceComposer} from './composer';
@@ -24,6 +25,7 @@ live?.start();
 enhanceObservability();
 
 enhanceSettings();
+enhanceSelectControls();
 enhanceCapabilityForms();
 
 enhanceBrandMotion();

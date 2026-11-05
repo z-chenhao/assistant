@@ -10,6 +10,7 @@
 @import "./settings.css";
 @import "./conversation.css";
 @import "./observability.css";
+@import "./components/ui/controls.css";
 @source "./";
 
 @import "./avatar.css";
