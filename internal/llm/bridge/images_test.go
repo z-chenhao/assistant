@@ -13,7 +13,6 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -71,7 +70,7 @@ func TestImagePreviewBoundsAndEnvelopeSelection(t *testing.T) {
 	}
 }
 
-func TestExplicitScopedImageIsSentToActualPiAndSanitizedObservation(t *testing.T) {
+func TestExplicitScopedImageIsSentToNativeBridgeAndSanitizedObservation(t *testing.T) {
 	ctx := context.Background()
 	var pngBytes bytes.Buffer
 	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
@@ -91,8 +90,8 @@ func TestExplicitScopedImageIsSentToActualPiAndSanitizedObservation(t *testing.T
 	}))
 	defer server.Close()
 	endpoint := server.URL + "/v1"
-	script, _ := filepath.Abs("../../../provider-bridge/bridge.mjs")
-	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (llm.Connection, error) {
+	command, argument := nativeBridgeProcess(t)
+	client, err := OpenLocal(ctx, command, argument, func(context.Context, llm.Snapshot) (llm.Connection, error) {
 		return llm.Connection{Endpoint: endpoint}, nil
 	}, func(_ context.Context, r llm.GenerationRequest, _ llm.Connection, _ llm.GenerationResult, _ time.Duration, _ error) error {
 		raw, _ := json.Marshal(r)

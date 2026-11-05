@@ -51,6 +51,10 @@ drive (discover/add/test/select/status, keyed/manual/failure variants), evidence
 (usage, failures, snapshot IDs), and cleanup (reap children, close endpoint, delete
 state). Go's native bridge crash test kills the exact bridge child after a text delta,
 rejects partial output, restarts the same Bridge, and reads the catalog back.
+The Go component checks run the production RPC server in their own test-binary
+subprocess, so a clean checkout does not need a prebuilt `bin/steward` or Node
+to run these checks. The Node compatibility launcher remains covered by its
+package tests, whose pretest step builds the application binary.
 Security/cancellation contracts use the current Go/Node and system regression entry points.
 
 For optional owned native Keychain read/update/delete verification on macOS:
