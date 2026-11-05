@@ -217,19 +217,20 @@ try{
   const preferenceRow=page.locator('form[action="/settings/language"]');
   const help=preferenceRow.getByRole('button',{name:'About interface language'});
   const tooltip=preferenceRow.locator('[role=tooltip]');
-  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()||await tooltip.isVisible())throw Error('Preferences duplicates its title or shows help by default');
+  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()!==1||await page.locator('h1:not(.sr-only)').count()||await tooltip.isVisible())throw Error('Preferences loses its semantic title, duplicates it visually or shows help by default');
   await help.hover();
   if(!await tooltip.isVisible())throw Error('language help is unavailable on hover');
   await page.locator('.section-tabs').hover();
   await help.focus();
   if(!await tooltip.isVisible())throw Error('language help is unavailable from the keyboard');
   const row=await preferenceRow.boundingBox();
-  const save=await preferenceRow.getByRole('button',{name:'Save language',exact:true}).boundingBox();
-  if(!row||!save||row.height>72||save.height>40)throw Error('language preference does not fit a compact row');
-  await page.getByLabel('Interface language',{exact:true}).selectOption('zh-CN');
-  await page.getByRole('button',{name:'Save language',exact:true}).click();
-  await page.getByLabel('界面语言',{exact:true}).selectOption('en');
-  await page.getByRole('button',{name:'保存语言',exact:true}).click();
+  const control=await preferenceRow.locator('[data-language-trigger]').boundingBox();
+  if(!row||!control||row.height>72||control.height>40||await preferenceRow.locator('.preference-save').isVisible())throw Error('language preference does not fit a compact autosave row');
+  for(const language of ['zh-CN','en']){
+   await page.locator('[data-language-trigger]').click();
+   await page.locator(`[data-language-option="${language}"]`).click();
+   await page.locator(`html[lang="${language}"]`).waitFor();
+  }
   await workspaceNav.getByRole('link',{name:'Chat',exact:true}).click();
   await page.waitForURL(url+'/');
   if(await page.locator('html').getAttribute('lang')!=='en')throw Error('saved English preference did not carry into Chat');
