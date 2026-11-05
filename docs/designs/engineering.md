@@ -199,18 +199,23 @@ are test levels; using CI does not turn a unit test into an end-to-end test.
 [CI](../../.github/workflows/ci.yml) runs one `Ubuntu checks` job. The existing
 required status name is preserved. One checkout and dependency setup serve:
 
-1. `make test lint`: Go unit/component checks, Node runtime contracts, frontend
+1. `make test-prompts`: an early contract gate for Main/Root/Child section order,
+   single-message assembly, frozen shared-rule inheritance and Root progress.
+2. `make test lint`: Go unit/component checks, Node runtime contracts, frontend
    freshness/types, the real Chromium contract and retained infrastructure tests.
-2. `make test-e2e`: ten deterministic product flows through actual CLI/UI,
+3. `make test-e2e`: ten deterministic product flows through actual CLI/UI,
    stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
-3. Task coding isolation and publication recovery retain their dedicated checks.
-4. Code Mode discovery and Main responsiveness: the maintained capabilities
+4. Task coding isolation and publication recovery retain their dedicated checks.
+5. Code Mode discovery and Main responsiveness: the maintained capabilities
    scenarios check 500 MCP tools without native declarations, direct-call rejection,
    exact approval and a Main reply while a real MCP call remains held.
-5. Native Linux account credentials: the existing account harness uses a private
+6. Native Linux account credentials: the existing account harness uses a private
    D-Bus and disposable password-protected GNOME Keyring, with real libsecret
    storage and a controlled OAuth/Responses peer. An entrypoint wrapper unwinds
    owned service processes on cancellation; no real account or user keyring is used.
+
+The job has a 30-minute outer budget for setup and all checks. Individual test
+deadlines and assertions remain unchanged.
 
 The Go checks also exercise production tool composition, including a forged
 loaded-tool checkpoint and no native fallback without a JavaScript runtime.

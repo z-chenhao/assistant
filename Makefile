@@ -1,4 +1,4 @@
-.PHONY: help setup install run build test test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
+.PHONY: help setup install run build test test-prompts test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
 
 .DEFAULT_GOAL := setup
 
@@ -6,6 +6,7 @@ help:
 	@echo 'make setup       Install locked development dependencies'
 	@echo 'make build/run   Build / start Steward'
 	@echo 'make test lint   Run software tests and local quality checks'
+	@echo 'make test-prompts Check Agent prompt assembly and frozen Worker inheritance'
 	@echo 'make test-e2e    Run core flows (set E2E_EVIDENCE to a fresh path)'
 	@echo 'make test-full   Run all deterministic system flows'
 	@echo 'make test-race   Run the complete Go race inventory'
@@ -28,6 +29,9 @@ run: build
 # Go tests currently contain both unit and component integration tests.
 # Keep that explicit rather than relabeling the entire package suite as UT.
 test: test-go test-node test-browser test-infra
+
+test-prompts:
+	go test ./internal/agent ./internal/agent/sqlite -run '^Test(ContextPromptBytes|ContextRolesAndFrozenResources|AgentStartsWithOneFrozenSystemMessage|ChildInheritsOnlyFrozenSystemSections|SkillsUseSearchWithoutPromptCatalog|SplitSystemMessagesAreRejected|RootLoopPublishesStageUpdatesWithoutMainWork|Progress.*|ContextInspectionRealMainRootChildAndReplayPreservesSnapshots)$$' -count=1
 
 test-go:
 	go test ./...

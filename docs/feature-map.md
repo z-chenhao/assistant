@@ -35,7 +35,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | --- | --- | --- | --- |
 | [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。模型协议由 Steward 内部 Go 适配层实现；生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
 | [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | ChatGPT 账户凭据默认保存在 Steward 私有文件中，可显式使用系统凭据库，支持登录、按需刷新、重新认证、退出和中断恢复，后台状态检查只读配置与账户元数据。 | 是 · 已完成 |
-| [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main 的系统提示以 Ghost 角色说明开头；可直接调用已配置 MCP 和 Skill；复杂工作委派 Task Worker。 | 是 · 已完成 |
+| [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main/Worker 系统提示统一按角色、安全、执行规则和能力指导拼为一条；Main 可通过 Code Mode 调用 MCP 和 Skill，复杂工作委派 Task Worker。 | 是 · 已完成 |
 | [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI/Web 与个人飞书具名问题、确切成果审阅接通，真实渠道与模型质量待验证。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
@@ -56,7 +56,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | Main 经 Code Mode 的 intelligent_ui_show 与内建 Skill 生成原生组件和隔离 HTML 交互；持久回复、显式回传与文字替代共用原交付链路。 | 是 · 已完成 |
 | [F-022](features/skills-experience.md#f-022) | 受版本控制的 Skill 读取 | Main 与 Worker 按名称或用途搜索冻结目录，按名称读取时由 Host 绑定版本，system 不预载 Skill 索引。 | 是 · 已完成 |
 | [F-023](features/skills-experience.md#f-023) | 执行后的自动经验闭环 | 用户纠正、恢复失败或重复成功能进入候选、验证和晋升流程。 | 否 · 部分完成 |
-| [F-024](features/integrations.md#f-024) | 受限本地 MCP 工具接入 | 操作员可接入允许的本地 stdio 工具；固定 Code Mode 调用、渐进发现与 500 工具目录已接通。 | 是 · 已完成 |
+| [F-024](features/integrations.md#f-024) | 受限本地 MCP 工具接入 | 操作员可接入允许的本地 stdio 工具；固定 Code Mode 调用、按工具或服务用途检索与 500 工具目录已接通，system 不预载 MCP Server 目录。 | 是 · 已完成 |
 | [F-025](features/integrations.md#f-025) | 可认证的真实服务接入 | GitHub 精确 PR 监听可经 SecretStore PAT 认证读取；通用连接、授权动作及凭据生命周期仍有缺口。 | 否 · 部分完成 |
 | [F-026](features/coding.md#f-026) | 代码理解、修改与交付 | Linux/macOS 本地显式仓库源、Task 私有工作副本、修改集和历史验证 Artifact 已接通，可手工关联已观察的 PR head，远端发布与修订核对待补。 | 否 · 部分完成 |
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |

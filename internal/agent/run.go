@@ -27,6 +27,10 @@ type RunClaim interface{ RunID() string }
 type SystemSection struct {
 	Kind string `json:"kind"`
 	Text string `json:"text"`
+	// ChildText excludes Root-only instructions from a Child's frozen rules.
+	ChildText string `json:"child_text,omitempty"`
+	// Progress opts the Root's execution section into Host stage projection.
+	Progress bool `json:"progress,omitempty"`
 }
 
 type AgentMessage struct {

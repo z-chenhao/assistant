@@ -11,6 +11,7 @@ Use Go 1.26.10+, Node 24.21.0 (`.node-version`), Python 3.10.12+, bash, and a C 
 - `make setup`: install pinned dependencies.
 - `make build` / `make run`: compile `bin/steward` / build and start locally.
 - `make test lint`: run Go, Node, browser, frontend-output, Python, formatting, type, documentation, and workflow checks.
+- `make test-prompts`: check Main/Root/Child system ordering, frozen inheritance and Root progress projection.
 - `make test-e2e E2E_EVIDENCE=evidence/my-change`: run core system flows; always choose a fresh evidence directory.
 - `make test-full` / `make test-race`: extended system coverage / Go race checks.
 - `make audit`: query current Go/npm advisories; requires network access.

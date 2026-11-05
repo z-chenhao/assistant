@@ -8,6 +8,7 @@ import (
 
 	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/prompt"
 	"github.com/z-chenhao/assistant/internal/task"
 )
 
@@ -149,8 +150,8 @@ func TestProgressCheckpointAtomicRecoveryAndOwnership(t *testing.T) {
 
 func TestProgressExcludesChildrenLegacyAndInvalidProse(t *testing.T) {
 	for _, tc := range []struct {
-		name, text, want string
-		clipped, legacy  bool
+		name, text, want           string
+		clipped, legacy, oldLayout bool
 	}{
 		{name: "empty"},
 		{name: "whitespace", text: " \n\t "},
@@ -158,6 +159,7 @@ func TestProgressExcludesChildrenLegacyAndInvalidProse(t *testing.T) {
 		{name: "clipped", text: "incomplete", clipped: true},
 		{name: "terminal controls", text: "\x1b[2JHidden instructions"},
 		{name: "legacy", text: "LEGACY_PRIVATE_TEXT", legacy: true},
+		{name: "frozen separate progress section", text: "Previously frozen stage", want: "Previously frozen stage", oldLayout: true},
 		{name: "bounded", text: strings.Repeat("a", 512), want: strings.Repeat("a", 512)},
 		{name: "normalized", text: "已核对来源。\n\t 正在比较。", want: "已核对来源。 正在比较。"},
 	} {
@@ -184,8 +186,9 @@ func TestProgressExcludesChildrenLegacyAndInvalidProse(t *testing.T) {
 			if err := executeTaskRunID(t, a, r, main.RunID); err != nil {
 				t.Fatal(err)
 			}
-			if tc.legacy {
-				// Construct the pre-feature frozen Root context, with no opt-in.
+			if tc.legacy || tc.oldLayout {
+				// Construct frozen progress policy before section consolidation:
+				// either no opt-in or the previous standalone guidance section.
 				var id string
 				if err := s.db.QueryRow(`SELECT run_id FROM run WHERE worker_position='root'`).Scan(&id); err != nil {
 					t.Fatal(err)
@@ -207,9 +210,18 @@ func TestProgressExcludesChildrenLegacyAndInvalidProse(t *testing.T) {
 					sections := []agent.SystemSection{}
 					texts := []string{}
 					for _, section := range cp.Messages[i].SystemSections {
-						if section.Kind != "progress_guidance" {
-							sections = append(sections, section)
-							texts = append(texts, section.Text)
+						if section.Kind == "progress_guidance" {
+							continue
+						}
+						if section.Kind == "execution" && section.Progress {
+							section.Text = section.ChildText
+							section.ChildText, section.Progress = "", false
+						}
+						sections = append(sections, section)
+						texts = append(texts, section.Text)
+						if tc.oldLayout && section.Kind == "execution" {
+							sections = append(sections, agent.SystemSection{Kind: "progress_guidance", Text: prompt.Progress()})
+							texts = append(texts, prompt.Progress())
 						}
 					}
 					cp.Messages[i].SystemSections = sections

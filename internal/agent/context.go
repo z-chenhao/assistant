@@ -29,35 +29,36 @@ func InitialContext(o ContextOptions) []AgentMessage {
 			continue
 		}
 		for _, section := range m.SystemSections {
+			text := section.Text
+			if section.ChildText != "" {
+				text = section.ChildText
+			}
 			switch section.Kind {
 			case "safety":
-				safety = section.Text
+				safety = text
 			case "worker_role":
-				worker = section.Text
+				worker = text
 			case "execution":
-				execution = section.Text
+				execution = text
 			}
 		}
 	}
-	safetyPart := systemPart("safety", safety)
-	var out []AgentMessage
+	role := SystemSection{Kind: "worker_role", Text: worker}
+	executionSection := SystemSection{Kind: "execution", Text: execution}
 	switch o.Position {
 	case "main":
-		out = []AgentMessage{systemPart("main_role", prompt.Main()), safetyPart}
+		role = SystemSection{Kind: "main_role", Text: prompt.Main()}
+		executionSection.Text = strings.TrimSuffix(execution, "\n</execution_rules>") + "\n" + prompt.MainExecution() + "\n</execution_rules>"
 	case "root":
-		out = []AgentMessage{safetyPart, systemPart("identity", prompt.Identity()), systemPart("worker_role", worker)}
+		role.Text, role.ChildText = prompt.Identity()+"\n\n"+worker, worker
+		executionSection.Text = strings.TrimSuffix(execution, "\n</execution_rules>") + "\n" + prompt.Progress() + "\n</execution_rules>"
+		executionSection.ChildText, executionSection.Progress = execution, true
 	case "child":
-		out = []AgentMessage{safetyPart, systemPart("worker_role", worker)}
+		// The inherited shared role and execution need no Root-only additions.
 	default:
 		panic("invalid context position")
 	}
-	if o.Position == "main" {
-		execution = strings.TrimSuffix(execution, "\n</execution_rules>") + "\n" + prompt.MainExecution() + "\n</execution_rules>"
-	}
-	out = append(out, systemPart("execution", execution))
-	if o.Position == "root" {
-		out = append(out, systemPart("progress_guidance", prompt.Progress()))
-	}
+	sections := []SystemSection{role, {Kind: "safety", Text: safety}, executionSection}
 	seen := map[string]bool{}
 	rules := []string{}
 	for _, s := range o.Tools {
@@ -87,20 +88,15 @@ func InitialContext(o ContextOptions) []AgentMessage {
 		}
 	}
 	if len(rules) > 0 {
-		out = append(out, systemPart("capabilities", "<capability_guidance>\n"+strings.Join(rules, "\n")+"\n</capability_guidance>"))
+		sections = append(sections, SystemSection{Kind: "capabilities", Text: "<capability_guidance>\n" + strings.Join(rules, "\n") + "\n</capability_guidance>"})
 	}
-	if index := mcpServerIndex(o.Tools); index != "" {
-		out = append(out, systemPart("mcp_servers", index))
-	}
-	sections := make([]SystemSection, 0, len(out))
-	texts := make([]string, 0, len(out))
-	for _, m := range out {
-		sections = append(sections, SystemSection{Kind: m.Source.Kind, Text: messageText(m)})
-		texts = append(texts, messageText(m))
+	texts := make([]string, 0, len(sections))
+	for _, section := range sections {
+		texts = append(texts, section.Text)
 	}
 	combined := systemPart("system_prompt", strings.Join(texts, "\n\n"))
 	combined.SystemSections = sections
-	out = []AgentMessage{combined}
+	out := []AgentMessage{combined}
 	if o.Position != "main" {
 		text := o.Task
 		if o.Position == "root" {

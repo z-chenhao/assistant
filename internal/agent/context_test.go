@@ -25,8 +25,9 @@ func TestContextPromptBytes(t *testing.T) {
 		{Name: "builtin__skill_view"},
 		{Name: "builtin__skill_list", PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:frozen", Text: `[{"name":"research","description":"Find and verify sources.","scope":"agent","version":"frozen"}]`}}},
 		{Name: "builtin__computer_observe", Internal: true},
+		{Name: "mcp__calendar__lookup", Provider: "mcp:calendar", NamespaceDescription: "Find calendar events", Exposure: tool.CodeMode, CodeModeOnly: true},
 	}
-	for _, tc := range []struct{ position, hash string }{{"main", "0497f281884ae2a016b9c815cf6287e1909d17f23f1c2340cbb4140e5ca7fe2a"}, {"root", "9d60c7e2985f3758e08ebc9a456e98ec7b2cb95f32bc373ec9eb115772e319a9"}, {"child", "9b4105495a6c01816804bb527b4f1a4d41f22d9dee22fa79671d2a2bc7913956"}} {
+	for _, tc := range []struct{ position, hash string }{{"main", "0497f281884ae2a016b9c815cf6287e1909d17f23f1c2340cbb4140e5ca7fe2a"}, {"root", "b54fb61aae5c0218e08fb34800df93717a7882c4c74c5ca68d27d1279376cdad"}, {"child", "82b6bf0711efec7748cf715ae1f82df5b77413ec4d04bdfca3f1367dbf823bc6"}} {
 		t.Run(tc.position, func(t *testing.T) {
 			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}), false)
 			if err != nil {
@@ -53,8 +54,16 @@ func TestContextRolesAndFrozenResources(t *testing.T) {
 		t.Fatal("task and references are not one protected input", last)
 	}
 	for i := range root[0].SystemSections {
-		if root[0].SystemSections[i].Kind == "safety" {
-			root[0].SystemSections[i].Text = "frozen parent safety"
+		section := &root[0].SystemSections[i]
+		switch section.Kind {
+		case "safety":
+			section.Text = "frozen parent safety"
+		case "worker_role":
+			section.ChildText = "frozen parent Worker role"
+			section.Text = prompt.Identity() + "\n\n" + section.ChildText
+		case "execution":
+			section.ChildText = "<execution_rules>\nfrozen parent execution\n</execution_rules>"
+			section.Text = "<execution_rules>\nfrozen parent execution\n" + prompt.Progress() + "\n</execution_rules>"
 		}
 	}
 	texts := []string{}
@@ -62,12 +71,16 @@ func TestContextRolesAndFrozenResources(t *testing.T) {
 		texts = append(texts, section.Text)
 	}
 	root[0].Content[0].Text = strings.Join(texts, "\n\n")
+	frozen, err := json.Marshal(root)
+	if err != nil || json.Unmarshal(frozen, &root) != nil {
+		t.Fatal("frozen sections did not round-trip", err)
+	}
 	child := InitialContext(ContextOptions{Position: "child", Tools: specs, Task: "explicit subtask", ParentSystem: append(root, TextMessage("user", "PARENT_PRIVATE"))})
 	raw, _ := json.Marshal(child)
 	if !strings.Contains(string(raw), "frozen parent safety") || strings.Contains(string(raw), "PARENT_PRIVATE") || strings.Contains(string(raw), prompt.Identity()) || strings.Contains(string(raw), prompt.Progress()) {
 		t.Fatal("child scope or frozen rules drift", string(raw))
 	}
-	for _, needle := range []string{"frozen parent safety", "Delegation:"} {
+	for _, needle := range []string{"frozen parent safety", "frozen parent Worker role", "frozen parent execution", "Delegation:"} {
 		if !strings.Contains(messageText(child[0]), needle) {
 			t.Fatal("missing scoped guidance", needle)
 		}

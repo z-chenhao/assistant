@@ -22,7 +22,7 @@ flowchart TD
 
 ### 阶段进度接入（F-005）
 
-- 新 Root 的独立 `progress_guidance` system 片段约定：阶段变化时，在带工具调用的 assistant 文本中写一句不超过 512 UTF-8 字节的进度，描述已确认进展与下一阶段，不写推理、原始调用或私有数据。普通 Worker 规则不改，Child 不继承该片段。
+- 新 Root 的 `<execution_rules>` 内包含阶段进度约定，Host 在冻结 execution 段上保存 `progress` 标记：阶段变化时，在带工具调用的 assistant 文本中写一句不超过 512 UTF-8 字节的进度，描述已确认进展与下一阶段，不写推理、原始调用或私有数据。共享 Worker 规则不改，Child 继承的执行文本排除该要求。历史冻结的独立 `progress_guidance` 分段仍可识别，不改写已有 Run。
 - 共享 Agent Loop 不新增分支、接口或工具。`Runs.Checkpoint` 在现有事务中先 fence 与 CAS 保存 checkpoint，再由 `progress.go` 接纳 Root 阶段文本并写 `task.progress_summary`；两者一起提交或回滚。重启复用已接受的 generation，摘要失败不会留下已推进的 checkpoint 或提前执行工具。
 - 接纳仅限 `tools` phase、完整且未截断的工具调用响应，并要求 Root 冻结的 system 上下文包含进度约定。空白、过长、含控制字符或非法 UTF-8 文本不替换上一条；归一化段落空白后保存。重复摘要不递增 Task version、不改变其更新时间。最终结果、压缩和 Child 文本不进入此路径。
 - `task/sqlite.Reader` 使用同一次只读查询聚合当前 Task epoch 的 Root 状态、等待原因和 Child 数量，并保留 `Last update`。等待审批包含 Child 审批及 Root 的费用授权；未知外部结果显示未确认，失败 Run 保持 Task 开放，ongoing 一轮结束与 Task 完成分开。界面不暴露 Run ID、Child 任务正文或工具参数。
@@ -472,8 +472,9 @@ step. With no active Root, append reactivates the Task, increments `task_epoch`
 and creates a new Root with current model/config snapshots. Earlier Roots stay
 terminal. Previous Task instructions and authoritative prior business results remain available to the new Root; results retain runtime provenance.
 
-Each Root receives safety, compact identity and Worker rules plus the Task
-anchor/instructions. It receives no Conversation, Main checkpoint or mutable
+Each Root receives role (compact identity and Worker rules), safety, execution
+rules (including stage progress), and capability guidance in one system message,
+followed by the Task anchor/instructions. It receives no Conversation, Main checkpoint or mutable
 peer context. The role-derived Tool snapshot removes both Task controls and
 user delivery. Main has no `agent.run()`. Host lease admission bounds execution
 to four Roots and reserves a separate Main slot, including across CLI processes.
