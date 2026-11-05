@@ -34,6 +34,8 @@ Web POST 分发只选择有名动作处理函数；消息/附件、模型、账�
 
 `routes.go` 维护认证后的路由分发，`navigation.go` 维护规范路径、旧地址跳转和本地返回地址校验；`page.go` 只组装共享框架与分派加载。`settings.go`、`tasks.go`、`conversation.go` 与 `approval_view.go` 拥有各自的查询/呈现。前端样式按 shell、workspace、conversation、observability 分开，共享设计变量；没有引入新框架或第二套状态管理。
 
+消息输入框的键盘增强保留原生节点：Enter 阻止默认换行并通过 `requestSubmit` 复用按钮的表单校验与提交流程；Shift + Enter 保留原生换行。输入法组合事件（含兼容性键码 229）不触发发送，按键自动重复、正在提交和按钮禁用时也不提交。发送按钮在 conversation 样式中使用固定 `#D97757` 背景与白色图标，不修改其他主操作的主题变量。
+
 Models 概览 → 来源选择 → 新模型表单 → 模型详情验证/选择；Notifications 单独子页。候选模型的 probe 成功不等于 profile 已激活：呈现检查已存 Probe 的 profile/auth version、BridgeIdentity 和能力，真正选择仍由原 Control.Select 校验权限、实时凭据和版本。表单失败留在对应流程，凭据和底层错误不反射到页面。选中模型只影响新 Run，已有冻结执行树保持原配置。通知选项绑定实际持久化值，不可用的旧绑定明确提示。
 
 Tasks 的分页、详情、历史与 Main 交付由 `task/sqlite.Reader` 提供；共享同一进度定义的 TUI/旧 API 保持原摘要契约，见 [任务设计](tasks.md)。详情中的继续沟通先校验所有权，再作为带可见任务说明的普通用户消息进入现有 Main ingress；不增加 Task 控制 API。
