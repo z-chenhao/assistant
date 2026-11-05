@@ -33,15 +33,16 @@ var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 // allowlisted tools are exposed. Effect calls use never: standard MCP provides
 // no authoritative idempotency/query contract.
 type Config struct {
-	Name      string            `yaml:"name"`
-	Command   string            `yaml:"command"`
-	Args      []string          `yaml:"args"`
-	Directory string            `yaml:"directory"`
-	Tools     map[string]string `yaml:"tools"` // read_only or external_effect
+	Name        string            `yaml:"name"`
+	Command     string            `yaml:"command"`
+	Args        []string          `yaml:"args"`
+	Directory   string            `yaml:"directory"`
+	Tools       map[string]string `yaml:"tools"` // read_only or external_effect
+	Description string            `yaml:"description,omitempty"`
 }
 
 func (c Config) Validate() error {
-	if !identifier.MatchString(c.Name) || strings.Contains(c.Name, "__") || !filepath.IsAbs(c.Command) || !filepath.IsAbs(c.Directory) || len(c.Tools) == 0 || len(c.Tools) > 128 || len(c.Args) > 32 {
+	if !identifier.MatchString(c.Name) || strings.Contains(c.Name, "__") || !filepath.IsAbs(c.Command) || !filepath.IsAbs(c.Directory) || len(c.Tools) == 0 || len(c.Tools) > 4096 || len(c.Args) > 32 || len(c.Description) > 4096 {
 		return errInvalid
 	}
 	for name, permission := range c.Tools {
@@ -58,11 +59,12 @@ type advertised struct {
 	InputSchema json.RawMessage `json:"inputSchema"`
 }
 type session struct {
-	cmd      *exec.Cmd
-	in       io.WriteCloser
-	frames   *bufio.Scanner
-	id       int
-	stopRead func() bool
+	cmd          *exec.Cmd
+	in           io.WriteCloser
+	frames       *bufio.Scanner
+	id           int
+	stopRead     func() bool
+	instructions string
 }
 
 func start(ctx context.Context, c Config) (*session, error) {
@@ -104,6 +106,7 @@ func start(ctx context.Context, c Config) (*session, error) {
 	s.frames.Buffer(make([]byte, 4096), maxFrame)
 	var init struct {
 		Protocol     string `json:"protocolVersion"`
+		Instructions string `json:"instructions"`
 		Capabilities struct {
 			Tools *json.RawMessage `json:"tools"`
 		} `json:"capabilities"`
@@ -112,6 +115,7 @@ func start(ctx context.Context, c Config) (*session, error) {
 		s.close()
 		return nil, errInvalid
 	}
+	s.instructions = init.Instructions
 	if json.NewEncoder(in).Encode(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"}) != nil {
 		s.close()
 		return nil, errInvalid
@@ -175,7 +179,7 @@ func (s *session) list() ([]advertised, error) {
 			}
 			seen[a.Name] = true
 			all = append(all, a)
-			if len(all) > 256 {
+			if len(all) > 4096 {
 				return nil, errInvalid
 			}
 		}
@@ -299,9 +303,9 @@ func Definitions(ctx context.Context, c Config) ([]tool.Definition, error) {
 			return nil, errInvalid
 		}
 		spec := tool.Spec{Name: "mcp__" + c.Name + "__" + a.Name, Description: a.Description, ResourceHash: hash(struct {
-			Config Config
+			Config any
 			Tool   advertised
-		}{c, a}), Version: 1, InputSchema: string(a.InputSchema), Permission: permission, ReplayPolicy: "safe", Risk: "low", Provider: "mcp:" + c.Name, TimeoutMS: 10000, OutputBytes: 65536, ConflictPolicy: "server-v1"}
+		}{executionConfig(c), a}), Version: 1, InputSchema: string(a.InputSchema), Permission: permission, ReplayPolicy: "safe", Risk: "low", Provider: "mcp:" + c.Name, TimeoutMS: 10000, OutputBytes: 65536, ConflictPolicy: "server-v1", Exposure: tool.CodeMode, CodeModeOnly: true, NamespaceDescription: namespaceDescription(c.Description, s.instructions)}
 
 		d := tool.Definition{Spec: spec, ConflictKeys: func(string) []string { return []string{"mcp:" + c.Name} }}
 		if permission == "read_only" {

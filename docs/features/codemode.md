@@ -18,7 +18,7 @@ Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果�
 
 **需求**：Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果。
 
-**当前实现**：Node/QuickJS Sidecar、嵌套调用、Store、固定源重放和等待释放已实现。
+**当前实现**：Main 和 Worker 统一使用 Node/QuickJS Sidecar，支持嵌套调用、Store、固定源重放和等待释放；模型只声明 Code Mode，脚本权限仍由各角色冻结能力决定。
 
 **边界与剩余工作**：运行时不提供任意网络、文件、凭据或不可重放时间随机源；不是通用 shell。
 
@@ -54,9 +54,13 @@ return results.map(result => result.status);
 ```
 
 `ALL_TOOLS` contains canonical names and short descriptions. Complete schemas, TypeScript declarations and usage instructions
-remain behind discovery. Canonical bracket calls always work; an escaped alias
+remain behind discovery. MCP tools default to codemode exposure and are omitted
+from model tool declarations until explicitly loaded through tool search.
+`searchTools` shares the ranked frozen-catalog search, defaults to 8 matches,
+and does not load model declarations. Hidden and model-only tools are absent
+from scripts. Canonical bracket calls always work; an escaped alias
 is available only when unambiguous. Discovery searches only the frozen Run
-view. Main has no `agent` global and cannot invoke the hidden Agent Tool.
+view. New Main Runs use Code Mode for their own frozen tools; Computer and native workspace work remains delegated through Task.
 Workers with the frozen capability get exactly
 `agent.run({task, artifactRefs?}) -> Promise<{text, artifactRefs}>`. No Run ID,
 usage, output schema, agent selector or control handle enters this API.

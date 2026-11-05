@@ -15,6 +15,9 @@ var safety string
 //go:embed system/main.md
 var main string
 
+//go:embed system/main-execution.md
+var mainExecution string
+
 //go:embed system/identity.md
 var identity string
 
@@ -42,9 +45,6 @@ var artifacts string
 //go:embed capability/memory.md
 var memory string
 
-//go:embed capability/skills.md
-var skills string
-
 //go:embed capability/computer.md
 var computer string
 
@@ -59,6 +59,7 @@ var summaryInstructions string
 func text(value string) string { return strings.TrimSuffix(value, "\n") }
 
 func Safety() string        { return text(safety) }
+func MainExecution() string { return text(mainExecution) }
 func Main() string          { return text(main) }
 func Identity() string      { return text(identity) }
 func Worker() string        { return text(worker) }
@@ -69,7 +70,6 @@ func CodeMode() string      { return text(codeMode) }
 func Delegation() string    { return text(delegation) }
 func Artifacts() string     { return text(artifacts) }
 func Memory() string        { return text(memory) }
-func Skills() string        { return text(skills) }
 func Computer() string      { return text(computer) }
 func SummarySystem() string { return text(summarySystem) }
 

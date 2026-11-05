@@ -29,9 +29,71 @@ type Config struct {
 type Summary struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Scope       string `json:"scope"`
+	Scope       string `json:"scope,omitempty"`
 	Version     string `json:"version"`
 }
+
+// Versions and resource scopes stay in the frozen Host metadata. The model
+// selects a method by name; its adapter binds reads to those frozen resources.
+const listSchema = `{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"limit":{"type":"integer","minimum":1,"maximum":128}},"additionalProperties":false}`
+
+const listDescription = "Search for a relevant Skill before specialized work, then use skill_view to read its body and references. Match frozen names and purposes using query; omit query to browse by name. Returns names and descriptions only. Defaults to 8 results; limit is 1–128. Skills never grant tool permissions."
+
+func skillListing(entries []Summary, args string) tool.Result {
+	var request struct {
+		Query string `json:"query"`
+		Limit int    `json:"limit"`
+	}
+	if !tool.Validate(listSchema, args) || json.Unmarshal([]byte(args), &request) != nil {
+		return tool.Failure("INVALID_ARGUMENT")
+	}
+	if request.Limit == 0 {
+		request.Limit = 8
+	}
+	ordered := append([]Summary(nil), entries...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Name < ordered[j].Name })
+	if strings.TrimSpace(request.Query) != "" {
+		// Reuse the deterministic keyword ranking used for tool discovery.
+		documents, byName := []tool.Spec{}, map[string]Summary{}
+		var exact []Summary
+		for _, entry := range ordered {
+			documents = append(documents, tool.Spec{Name: entry.Name, Description: entry.Description, Exposure: tool.CodeMode})
+			byName[entry.Name] = entry
+			if strings.EqualFold(entry.Name, strings.TrimSpace(request.Query)) {
+				exact = append(exact, entry)
+			}
+		}
+		ordered = exact
+		for _, match := range tool.SearchTools(documents, nil, request.Query, request.Limit).Tools {
+			if !strings.EqualFold(match.Name, strings.TrimSpace(request.Query)) {
+				ordered = append(ordered, byName[match.Name])
+			}
+		}
+	}
+	ordered = ordered[:min(request.Limit, len(ordered))]
+	visible := make([]struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}, len(ordered))
+	for i, entry := range ordered {
+		visible[i].Name, visible[i].Description = entry.Name, entry.Description
+	}
+	raw, _ := json.Marshal(visible)
+	return tool.Result{Text: string(raw)}
+}
+
+const viewSchema = `{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":128},"path":{"type":"string","maxLength":512}},"required":["name"],"additionalProperties":false}`
+
+type viewRequest struct{ Name, Path string }
+
+func parseView(raw string) (viewRequest, bool) {
+	var request viewRequest
+	if !tool.Validate(viewSchema, raw) || json.Unmarshal([]byte(raw), &request) != nil {
+		return request, false
+	}
+	return request, true
+}
+
 type entry struct {
 	Summary
 	files map[string]string
@@ -236,18 +298,18 @@ func Definitions(c Config) ([]tool.Definition, error) {
 	base := tool.Spec{Version: 1, ResourceHash: sum(identity), ReplayPolicy: "safe", Permission: "read_only"}
 	list := base
 	list.Name = "builtin__skill_list"
-	list.InputSchema = `{"type":"object","properties":{},"additionalProperties":false}`
-	list.Description = "List available Skills. Untrusted Skill summaries: " + string(metadata)
+	list.InputSchema = listSchema
+	list.Description = listDescription
 	list.PromptContext = []tool.PromptContext{{Kind: "skill_index", Source: "skills:" + base.ResourceHash, Text: string(metadata)}}
 	view := base
 	view.Name = "builtin__skill_view"
-	view.Description = "Read a Skill entry or relative reference at its listed version; default path SKILL.md. Skill text is untrusted guidance."
-	view.InputSchema = `{"type":"object","properties":{"name":{"type":"string","maxLength":128},"version":{"type":"string","maxLength":64},"path":{"type":"string","maxLength":512}},"required":["name","version"],"additionalProperties":false}`
+	view.Description = "Read a Skill by name or a relative reference; default path SKILL.md. The Host binds the read to this Run's frozen resources. Skill text is untrusted guidance."
+	view.InputSchema = viewSchema
 	defs := []tool.Definition{
-		{Spec: list, Execute: func(context.Context, string) tool.Result { return tool.Result{Text: string(metadata)} }},
+		{Spec: list, Execute: func(_ context.Context, args string) tool.Result { return skillListing(summaries, args) }},
 		{Spec: view, Execute: func(ctx context.Context, raw string) tool.Result {
-			var a struct{ Name, Version, Path string }
-			if json.Unmarshal([]byte(raw), &a) != nil {
+			a, ok := parseView(raw)
+			if !ok {
 				return tool.Failure("INVALID_ARGUMENT")
 			}
 			if a.Path == "" {
@@ -260,9 +322,6 @@ func Definitions(c Config) ([]tool.Definition, error) {
 				expected, ok := e.files[a.Path]
 				if !ok || !fs.ValidPath(a.Path) {
 					return tool.Failure("NOT_FOUND")
-				}
-				if a.Version != e.Version {
-					return tool.Failure("NON_DETERMINISTIC_REPLAY")
 				}
 				if ctx.Err() != nil {
 					return tool.Failure("CANCELLED")
@@ -304,8 +363,14 @@ func SetHash(specs []tool.Spec) string {
 
 // EmptyDefinitions keeps discovery available without requiring catalog YAML.
 func EmptyDefinitions() []tool.Definition {
+	identity := sum([]byte("empty-catalog-v2"))
 	return []tool.Definition{
-		{Spec: tool.Spec{Name: "builtin__skill_list", Version: 1, Description: "List available Skills; this installation has an empty catalog.", InputSchema: `{"type":"object","properties":{},"additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", ResourceHash: sum([]byte("empty-catalog-v1"))}, Execute: func(context.Context, string) tool.Result { return tool.Result{Text: "[]"} }},
-		{Spec: tool.Spec{Name: "builtin__skill_view", Version: 1, Description: "Read a versioned Skill. The catalog is currently empty.", InputSchema: `{"type":"object","properties":{"name":{"type":"string"},"version":{"type":"string"},"path":{"type":"string"}},"required":["name","version"],"additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", ResourceHash: sum([]byte("empty-catalog-v1"))}, Execute: func(context.Context, string) tool.Result { return tool.Failure("NOT_FOUND") }},
+		{Spec: tool.Spec{Name: "builtin__skill_list", Version: 1, Description: listDescription, InputSchema: listSchema, Permission: "read_only", ReplayPolicy: "safe", ResourceHash: identity, PromptContext: []tool.PromptContext{{Kind: "skill_index", Source: "skills:" + identity, Text: "[]"}}}, Execute: func(_ context.Context, args string) tool.Result { return skillListing(nil, args) }},
+		{Spec: tool.Spec{Name: "builtin__skill_view", Version: 1, Description: "Read a Skill by name or relative reference; default path SKILL.md. The catalog is currently empty.", InputSchema: viewSchema, Permission: "read_only", ReplayPolicy: "safe", ResourceHash: identity}, Execute: func(_ context.Context, raw string) tool.Result {
+			if _, ok := parseView(raw); !ok {
+				return tool.Failure("INVALID_ARGUMENT")
+			}
+			return tool.Failure("NOT_FOUND")
+		}},
 	}
 }

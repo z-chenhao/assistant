@@ -76,7 +76,7 @@ func description(id, root string) web.Capability {
 	case "mcp":
 		v.Title = "MCP tools"
 		v.Description = "Connect allowlisted tools from isolated local stdio providers."
-		v.Help = "Use absolute executable and private state paths. Testing starts the configured providers in the existing kernel sandbox and checks tool discovery; it never invokes an advertised tool. Credentials in command arguments are not supported."
+		v.Help = "Use absolute executable and private state paths. Testing starts the configured providers in the existing kernel sandbox and checks tool discovery; it never invokes an advertised tool. MCP tools always run through Code Mode; no exposure modes or per-tool exposure settings are needed. Credentials in command arguments are not supported."
 		v.Example = fmt.Sprintf("- name: local_catalog\n  command: /absolute/path/to/mcp-server\n  args: []\n  directory: %s\n  tools: {lookup: read_only}\n", filepath.Join(parent, "steward-mcp"))
 	case "skills":
 		v.Title = "Skills"

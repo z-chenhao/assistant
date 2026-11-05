@@ -1,3 +1,4 @@
+from codemode_peer import project as project_codemode, wrap as wrap_codemode
 """Shared offline model HTTP peer for deterministic system scenarios.
 
 Owns only the HTTP protocol; gate launch, evidence and cleanup stay with callers.
@@ -48,7 +49,11 @@ class Endpoint(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
 
+        body, code_only = project_codemode(body)
+
         def chunk(delta, finish=None, usage=None):
+            if code_only:
+                delta = wrap_codemode(delta)
             value = {"id": "fixture", "object": "chat.completion.chunk", "model": body["model"],
                      "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
             if usage:
@@ -108,6 +113,40 @@ class Endpoint(BaseHTTPRequestHandler):
                 else:
                     chunk({"content": "Screenshot selection verified."})
                     chunk({}, "stop")
+            elif self.server.mode == "screenshots" and any(t["function"]["name"] == "builtin__task_manage" for t in body.get("tools", [])):
+                runtime = any("Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in body["messages"])
+                if not runtime and not any(m["role"] == "tool" for m in body["messages"]):
+                    arguments = {"operation": "create", "task": "Observe two screenshots; explicitly select only the second image."}
+                    chunk({"tool_calls": [{"index": 0, "id": "screenshot-task", "type": "function", "function": {"name": "builtin__task_manage", "arguments": json.dumps(arguments)}}]})
+                    chunk({}, "tool_calls")
+                else:
+                    chunk({"content": "Screenshot Task observed."})
+                    chunk({}, "stop")
+            elif self.server.mode == "intelligent-ui":
+                has_tools = any(m['role'] == 'tool' for m in body['messages'])
+                names = [c.get('function',{}).get('name') for m in body['messages'] for c in m.get('tool_calls',[])]
+                has_search = 'builtin__skill_list' in names
+                has_view = 'builtin__skill_view' in names
+                has_widget = 'builtin__intelligent_ui_show' in names
+                if not has_tools and 'SHOW_INTELLIGENT_UI' in text:
+                    system = '\n'.join(m.get('content','') for m in body['messages'] if m['role']=='system')
+                    require('<skills>' not in system and '<skill_index>' not in system and
+                            'Present a compact native component' not in system,
+                            'Skill catalog was preloaded into system')
+                    chunk({'tool_calls':[dict(index=0,id='ui-search',type='function',function=dict(name='builtin__skill_list',arguments=json.dumps(dict(query='interactive visual',limit=1))))]})
+                    chunk({},'tool_calls')
+                elif has_search and not has_view:
+                    listing = json.loads(next(m['content'] for m in reversed(body['messages']) if m['role']=='tool'))
+                    require(len(listing)==1 and set(listing[0])=={'name','description'} and listing[0]['name']=='intelligent_ui',
+                            'Skill search did not return the selected method without internal metadata')
+                    chunk({'tool_calls':[dict(index=0,id='ui-skill',type='function',function=dict(name='builtin__skill_view',arguments=json.dumps(dict(name=listing[0]['name']))))]})
+                    chunk({},'tool_calls')
+                elif has_tools and not has_widget:
+                    chunk({'tool_calls': [dict(index=i,id='widget-'+str(i),type='function',function=dict(name='builtin__intelligent_ui_show',arguments=json.dumps(args))) for i,args in enumerate(self.server.widgets)]})
+                    chunk({},'tool_calls')
+                else:
+                    chunk({'content':'The interactive answer and its text alternatives are ready.'})
+                    chunk({},'stop',{'prompt_tokens':7,'completion_tokens':8,'total_tokens':15})
             elif self.server.mode == "tasks":
                 names = [item["function"]["name"] for item in body.get("tools", [])]
                 root = any("general Worker executing" in str(m.get("content", "")) for m in body["messages"])
@@ -152,8 +191,7 @@ class Endpoint(BaseHTTPRequestHandler):
                 await_browser('second')
                 chunk({"content": "\nSecond chunk 中文."})
                 await_browser('finish')
-                chunk({"content": "\nFinal tail.\n```stew"})
-                chunk({"content": 'ard-result\n{"schema_version":1,"fallback":"Rich fallback.","components":[{"type":"table","columns":["Status"],"rows":[["Done"]]}]}\n```'})
+                chunk({"content": "\nFinal tail.\n"})
                 chunk({}, "stop")
             elif body.get("tools") and not any(m["role"] == "tool" for m in body["messages"]):
                 if self.server.mode == "no-tools":

@@ -16,6 +16,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/artifact"
 	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/prompt"
 	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
@@ -87,10 +88,10 @@ func TestChildDirectToolRootChildGrandchild(t *testing.T) {
 			}
 			continue
 		}
-		if strings.Contains(req.Messages[2].Text, "root private instruction") {
+		if strings.Contains(req.Messages[0].Text, "root private instruction") {
 			t.Fatal("wrong prompt fragments")
 		}
-		if source := req.Messages[1].Source; source != nil && source.Kind == "identity" {
+		if strings.Contains(req.Messages[0].Text, prompt.Identity()) {
 			continue
 		}
 		raw, _ := json.Marshal(req.Messages)

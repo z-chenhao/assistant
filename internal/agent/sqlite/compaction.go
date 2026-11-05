@@ -87,7 +87,7 @@ func (r *Runs) compactMessages(ctx context.Context, c agent.RunClaim, run agent.
 	if len(in) == len(refs)+1 {
 		refs = append(refs, "recall:"+digest(fmt.Sprintf("%s:%d", run.ID, run.Checkpoint.Step)))
 	}
-	result, e := contextbuilder.Compact(in, refs, run.Snapshot.ContextWindow, contextbuilder.Size(agent.ProviderTools(run.Tools)), p, run.Checkpoint.ContextRetries > 0)
+	result, e := contextbuilder.Compact(in, refs, run.Snapshot.ContextWindow, contextbuilder.Size(agent.ProviderTools(run.Tools, run.Checkpoint.LoadedTools)), p, run.Checkpoint.ContextRetries > 0)
 	if e != nil {
 		return nil, e
 	}

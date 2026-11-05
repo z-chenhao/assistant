@@ -6,14 +6,14 @@
 
 ## 当前架构
 
-Go Control 管理配置、Probe 和选择；账户 Manager 访问 SecretStore；Node Bridge 负责供应商协议转换。每个 Run 保存冻结的 ModelSnapshot，后续配置变化仅影响新 Run。
+Go Control 管理配置、Probe 和选择；账户 Manager 访问 SecretStore；独立 Go Bridge 负责供应商协议转换。每个 Run 保存冻结的 ModelSnapshot，后续配置变化仅影响新 Run。
 
 ```mermaid
 flowchart TD
     U["TUI / Web / CLI"] --> C["Model Control / Account Manager"]
     C --> S["Profile / ModelSnapshot"]
     C --> K["SecretStore"]
-    S --> B["Node Provider Bridge"]
+    S --> B["Native Go Provider Bridge"]
     B --> P["选定模型端点"]
 ```
 
@@ -197,7 +197,7 @@ auth_connection_id: null
 
 #### 5.5 Provider Bridge 与安全边界
 
-MVP 使用独立的 Model Provider Bridge 复用 Pi AI 的 Provider、OAuth、模型目录、流式 Responses/Completions 与 token refresh 行为；它和 Code Mode Sidecar 是两个权限隔离的进程：
+Steward 使用自身二进制内的独立 Go Model Provider Bridge 实现 Provider、OAuth、模型目录、流式 Responses/Completions 与 token refresh 行为，以 Pi AI 1.5.0 为协议参考；它和 Code Mode Sidecar 是两个权限隔离的进程：
 
 | 进程 | 可以访问 | 明确不能访问 |
 |---|---|---|
@@ -236,12 +236,18 @@ MVP 使用独立的 Model Provider Bridge 复用 Pi AI 的 Provider、OAuth、�
 
 ## Provider Bridge and local model control
 
-The Go Host runs a separate Node stdio Bridge using exact dependency
-`@earendil-works/pi-ai@1.3.0` (MIT), with a checked-in transitive lockfile.
-Pi's Chat Completions and Responses adapters are imported. Installation downloads the Pi
-SDK dependency tree; it adds no hosted service or account cost. Its SDK still
-brings other provider packages transitively, although Steward does not enable them.
-Current OpenAI account OAuth is also implemented; see the account lifecycle below.
+The Go Host starts its own executable with `-model-bridge` as an isolated stdio
+process. `internal/llm/bridge` owns both client and server sides of the existing RPC;
+`internal/llm/provider` owns provider wire encoding, streams and catalog data,
+with request/stream implementations grouped by protocol. Host-owned transient
+connection and acceptance contracts live in `llm`, so account and SQLite adapters
+do not import the Bridge implementation. These are
+internal packages in Steward's existing Go module, not a public SDK. No Pi SDK
+is imported, installed or executed by the model bridge. Pi AI 1.5.0 is the
+reference version; its MIT catalog attribution is retained. The historical
+Node entry is a forwarding launcher for existing configured deployments.
+The full provider reference scope and remaining integration boundaries are
+recorded in the [feature contract](../features/model-connections.md#provider-bridge-connect-a-local-model).
 The [Main CLI](../features/conversation.md) uses the same Bridge for frozen Run requests,
 Direct Tool continuation and Conversation recovery. Main and Worker use the
 same Agent Loop and frozen snapshots; [delegation](delegation.md) and
@@ -401,13 +407,12 @@ also cover these failures.
 ### Decision and evidence
 
 Use the current OpenAI public-client subscription protocol in the Provider
-Bridge. Use the locked Pi AI SDK for Responses generation; the installed version is
-defined in [package.json](../../provider-bridge/package.json). Account login and
-catalog discovery are owned by the Bridge so they can satisfy §5.4 independently
-of the SDK's bundled login. Implement the documented OAuth protocol there, with random-port
+Bridge. Implement Responses generation and account authentication in Go.
+Account login and catalog discovery remain owned by the isolated Bridge: random-port
 loopback, expiring one-use state, PKCE S256, verified ID-token identity and a
-dynamic account-specific catalog. Go does not implement provider-private wire
-details. No additional production dependency is required.
+dynamic account-specific catalog. The business Host continues to own SecretStore,
+frozen model snapshots, authentication fences and final result acceptance.
+No Pi SDK or provider SDK process is required.
 
 Device Authorization is deferred until a supported **current-provider** grant
 is established. It remains an explicit future requirement and is excluded from

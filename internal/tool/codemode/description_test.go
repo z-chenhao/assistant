@@ -25,7 +25,7 @@ func TestDescriptionIncludesSchemaDeclarationsAndInstructions(t *testing.T) {
 
 func TestDefinitionExplainsUnifiedCapabilities(t *testing.T) {
 	description := Definition().Spec.Description
-	for _, required := range []string{"tools[name](args)", `describeNamespace("cua")`, "cua.getState()", "documentation()", "observe after actions", `describeNamespace("agent")`, "agent.run({task,artifactRefs})", "Main has no agent namespace", "{text,artifactRefs}", "unawaited", "Approval"} {
+	for _, required := range []string{"tools[name](args)", "builtin__skill_list", "builtin__skill_view", `describeNamespace("cua")`, "cua.getState()", "documentation()", "observe after actions", `describeNamespace("agent")`, "agent.run({task,artifactRefs})", "Main has no agent namespace", "{text,artifactRefs}", "unawaited", "Approval"} {
 		if !strings.Contains(description, required) {
 			t.Fatalf("missing %q in %s", required, description)
 		}

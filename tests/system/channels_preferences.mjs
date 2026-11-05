@@ -216,9 +216,16 @@ export async function preferences(page,context,browser,url,evidence){
   await check(page.locator('.settings-navigation [aria-current=page]').getAttribute('href').then(v=>v==='/settings/'+section),'neighbor selection lost');
   await check(page.locator('[data-language-preference]').count().then(v=>v===0),'preference leaked to neighbor');
   if(section==='notifications'){
-   await page.locator('select[name=target]').selectOption('tui:');await page.getByRole('button',{name:'Save notification channel',exact:true}).click();await page.reload();
+   const save=async()=>{
+    const button=page.getByRole('button',{name:'Save notification channel',exact:true});
+    const action=await button.evaluate(node=>node.form.action);
+    await Promise.all([page.waitForResponse(response=>response.url()===action&&response.request().method()==='POST'),button.click()]);
+    await page.waitForURL(u=>u.pathname==='/settings/notifications'&&u.searchParams.get('notice')==='saved');
+    await page.waitForLoadState();
+   };
+   await page.locator('select[name=target]').selectOption('tui:');await save();await page.reload();
    await check(page.locator('select[name=target]').inputValue().then(v=>v==='tui:'),'neighbor submit guard regressed');
-   await page.locator('select[name=target]').selectOption('auto:');await page.getByRole('button',{name:'Save notification channel',exact:true}).click();
+   await page.locator('select[name=target]').selectOption('auto:');await save();
   }
  }
  await writeFile(evidence+'/preferences-browser.json',JSON.stringify({matrix,hoverPaths,keyboard:true,touch:true,autosave:true,singleFlight:true,rejectedRetry:true,unknownAppliedReadback:true,network:true,timeout:true,authRejection:true,mismatchedAck:true,blockedCookieReadback:true,bfcache:true,fallbacks:true,flipped:true,cssZoom:2,neighborSections:true},null,2));

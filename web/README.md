@@ -43,3 +43,7 @@ optional artwork pipeline is not needed for ordinary builds.
 [License notices](licenses/) preserve incorporated components and fonts.
 The Go module remains `github.com/z-chenhao/assistant` for import compatibility;
 the canonical repository is [z-chenhao/steward](https://github.com/z-chenhao/steward).
+
+## Intelligent UI
+
+`src/widgets.tsx` renders Main-owned UI tool artifacts in opaque-origin, CSP-sandboxed iframes. Native structured components retain the OpenIntelligentUI-derived DataTable. The custom renderer adapts the upstream isolated-answer/validated-follow-up pattern to Steward's durable messages; it does not run an Agent or provider in the browser. Widget code is served only after authenticated account/binding checks, and only an explicit Host Send button submits a proposed follow-up. See the [Intelligent UI contract](../docs/designs/intelligent-ui.md).

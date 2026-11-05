@@ -7,20 +7,19 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/llm"
-	"github.com/z-chenhao/assistant/internal/llm/bridge"
 )
 
 // Resolver uses the frozen endpoint hash, never a profile's current endpoint.
-func (s *Store) Resolver(secrets llm.SecretStore) bridge.Resolver {
-	return func(ctx context.Context, snapshot llm.Snapshot) (bridge.Connection, error) {
+func (s *Store) Resolver(secrets llm.SecretStore) llm.ConnectionResolver {
+	return func(ctx context.Context, snapshot llm.Snapshot) (llm.Connection, error) {
 		if snapshot.ProviderKind != "openai_compatible" || snapshot.WireAPI != "openai_completions" {
-			return bridge.Connection{}, llm.ModelIncompatible
+			return llm.Connection{}, llm.ModelIncompatible
 		}
 		rows, err := s.db.QueryContext(ctx, `SELECT endpoint FROM model_endpoint`)
 		if err != nil {
-			return bridge.Connection{}, llm.ErrStorage
+			return llm.Connection{}, llm.ErrStorage
 		}
-		var connection bridge.Connection
+		var connection llm.Connection
 		for rows.Next() {
 			var endpoint string
 			if rows.Scan(&endpoint) != nil {
@@ -117,20 +116,20 @@ func (s *Store) RecordUsageAnd(ctx context.Context, r llm.GenerationRequest, res
 	return commit(false)
 }
 
-func (s *Store) Connection(ctx context.Context, endpoint, authID string, secrets llm.SecretStore) (bridge.Connection, error) {
+func (s *Store) Connection(ctx context.Context, endpoint, authID string, secrets llm.SecretStore) (llm.Connection, error) {
 	if _, err := llm.EndpointHash(endpoint); err != nil || endpoint == "" {
-		return bridge.Connection{}, llm.ModelIncompatible
+		return llm.Connection{}, llm.ModelIncompatible
 	}
-	connection := bridge.Connection{Endpoint: endpoint}
+	connection := llm.Connection{Endpoint: endpoint}
 
 	if authID != "" {
 		a, err := s.Auth(ctx, authID)
 		if err != nil || a.Status != "connected" || a.AuthKind != "api_key" || a.Provider != "openai_compatible" || a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now()) || secrets == nil {
-			return bridge.Connection{}, llm.AuthRequired
+			return llm.Connection{}, llm.AuthRequired
 		}
 		secret, err := secrets.Get(ctx, a.CredentialRef)
 		if err != nil || len(secret) == 0 {
-			return bridge.Connection{}, llm.AuthRequired
+			return llm.Connection{}, llm.AuthRequired
 		}
 		connection.APIKey = string(secret)
 		for i := range secret {

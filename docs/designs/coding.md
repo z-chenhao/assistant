@@ -4,11 +4,13 @@
 
 ## 当前架构
 
-Main、Root 和 Child 默认都有 `builtin__read`、`builtin__bash`、`builtin__edit`、`builtin__write`。这是文件/执行层的最小工具集；Task、Memory、Artifact、Automation、Skills、MCP 和 Code Mode 保留自己的结构化职责。
+Root 和 Child 默认拥有 `builtin__read`、`builtin__bash`、`builtin__edit`、`builtin__write`。新 Main 不获得文件、命令或 Computer 工具，通过 Task 委派这类工作并核对成果；Main 与 Worker 均经 Code Mode 使用各自的冻结工具，聚焦业务查询与单步变更可在 Main 的脚本内调用已配置 MCP。角色权限与冻结升级边界见[统一工具方案](tools-approvals.md)。
 
 ```mermaid
 flowchart TD
-    A[Main / Worker] --> T[统一 ToolExecutor / 具体动作审批]
+    M[Main] --> Q[Task 委派]
+    Q --> A[Root / Child Worker]
+    A --> T[统一 ToolExecutor / 具体动作审批]
     J[Code Mode tools] --> T
     T --> E[默认隔离持久工作区]
     T --> C[配置的 macOS Computer / 同一个 Guest]
@@ -57,13 +59,13 @@ macOS 原生工具在 Host 侧以固定 `/usr/bin/xcrun --no-cache --find python
 
 `audit/edit/protected` 不迁移成假限制：四工具始终存在，写入和命令逐次审批，读取内容哈希约束精确文件修改。只读工作请拒绝相应动作的审批。需保留的原始用户 checkout 放在执行目录之外，仅把明确选定的副本放进环境。
 
-Skills list/view 也默认提供，未配置内容时返回空目录；服务 MCP 仍需明确连接和认证。正常安装启动已带 Code Mode，无须为核心方法手写启用 YAML；独立执行命令/恢复不猜测原先未冻结的运行时。
+Skills list/view 默认向 Main 和 Worker 提供；未配置内容时读取空目录；服务 MCP 仍需明确连接和认证。正常安装启动已带 Code Mode，无须为核心方法手写启用 YAML；独立执行命令/恢复不猜测原先未冻结的运行时。
 
 ## 当前 Task 代码环境
 
 ### F-026 · 任务独立代码环境与交付证据
 
-当前消费者是配置本地仓库的安装所有者、运行其 Task 的 Root/Child、审阅工作副本和验证回执的 CLI。普通 Main 仍使用 `execution.root`。配置启用完整工作目录导入，暂不让模型选择仓库、分支、主机路径或网络。目录隔离由已有内核沙箱落实，审批、冻结 ToolSpec 和不可重试的 unknown 仍由既有 ToolExecutor 裁决。
+当前消费者是配置本地仓库的安装所有者、运行其 Task 的 Root/Child、审阅工作副本和验证回执的 CLI。新 Main 不直接使用工作区，通过 Task 与 Artifact 核对结果。配置启用完整工作目录导入，暂不让模型选择仓库、分支、主机路径或网络。目录隔离由已有内核沙箱落实，审批、冻结 ToolSpec 和不可重试的 unknown 仍由既有 ToolExecutor 裁决。
 
 Task Root admission 同事务保存 `task_code_environment`（schema 37）的源路径、冻结资源 hash、派生位置和 pending 状态。工作副本、基线及 receipt 存在 canonical data-root 的私有兄弟目录 `<data-root>.task-code`。该兄弟目录是 Host 保留的受保护位置。配置拒绝它与通用执行、只读工具链、Skills/MCP、Computer 或源目录相交，取消源配置后仍保留此边界。只向 Root/Child 沙箱挂载同 Task 的 `work`。Task 目录、基线和 scope hash 由 Host 校验，源路径与本机内部行不作为外部协议。
 

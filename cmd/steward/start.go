@@ -13,6 +13,7 @@ import (
 
 	"github.com/z-chenhao/assistant/internal/computer/environment"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/llm/bridge"
 	"github.com/z-chenhao/assistant/internal/llm/secret"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 )
@@ -36,7 +37,7 @@ func configureRuntime(cfg *config.Config, home string) {
 		cfg.Defaults = &config.Defaults{Memory: cfg.Embedding == nil || cfg.Embedding.Local(), Search: true, Skills: true, Computer: true}
 	}
 	if cfg.LLM.ProviderBridgeCommand == "" {
-		cfg.LLM = config.LLM{ProviderBridgeCommand: "node", ProviderBridgeScript: filepath.Join(home, "provider-bridge", "bridge.mjs"), ProviderBridgeVersion: "pi-ai-1.3.0-v1"}
+		cfg.LLM = config.LLM{ProviderBridgeCommand: filepath.Join(home, "bin", "steward"), ProviderBridgeScript: "-model-bridge", ProviderBridgeVersion: bridge.Version}
 	}
 	if cfg.JavaScript == nil {
 		node, err := exec.LookPath("node")
@@ -62,7 +63,19 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 	type runtimeCheck struct{ name, command, script, dependency string }
 	var runtimes []runtimeCheck
 	if cfg.LLM.ProviderBridgeCommand != "" {
-		runtimes = append(runtimes, runtimeCheck{"model bridge", cfg.LLM.ProviderBridgeCommand, cfg.LLM.ProviderBridgeScript, "node_modules/@earendil-works/pi-ai/package.json"})
+		if cfg.LLM.ProviderBridgeVersion == bridge.Version {
+			value, err := exec.CommandContext(ctx, cfg.LLM.ProviderBridgeCommand, "-model-bridge-version").Output()
+			if err == nil && strings.TrimSpace(string(value)) != bridge.Version {
+				err = errors.New("unsupported native model bridge")
+			}
+			check("model bridge: native Go protocol", err)
+		} else {
+			value, err := exec.LookPath(cfg.LLM.ProviderBridgeCommand)
+			check("model bridge: configured command", err)
+			_ = value
+			_, err = os.Stat(cfg.LLM.ProviderBridgeScript)
+			check("model bridge: installed source", err)
+		}
 	} else {
 		fmt.Fprintln(out, "SKIP model bridge: not configured; use default steward startup or add llm settings")
 	}

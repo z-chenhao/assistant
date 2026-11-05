@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Steward’s Go entry point is `cmd/steward/`; domain packages and adapters live in `internal/`. Keep `internal/app/` focused on composition. React/TypeScript sources live in `web/src/`; generated assets in `internal/interaction/web/assets/`. Node sidecars occupy `provider-bridge/` and `runtime/javascript/`. `guest-browser/` contains browser checks; `tests/{system,harness,fixtures}/` holds system flows, Python regressions, and fixtures. Operational helpers belong in `scripts/`.
+Steward’s Go entry point is `cmd/steward/`; domain packages and adapters live in `internal/`. Keep `internal/app/` focused on composition. React/TypeScript sources live in `web/src/`; generated assets in `internal/interaction/web/assets/`. Model protocols live in `internal/llm/provider/`; the isolated RPC client/server share `internal/llm/bridge/`. The Node execution sidecar lives in `runtime/javascript/`; `provider-bridge/` retains the compatibility launcher and protocol fixtures. `guest-browser/` contains browser checks; `tests/{system,harness,fixtures}/` holds system flows, Python regressions, and fixtures. Operational helpers belong in `scripts/`.
 
 ## Build, Test, and Development Commands
 

@@ -75,18 +75,42 @@ F-020 继续负责原消息/话题路由；GitHub 因果 Main 通过已有 githu
 ## MCP, Skills and controlled coding
 
 External MCP and curated Skill content enter the existing registry and ToolExecutor.
-File/command tools and empty Skill discovery are built in by default (see [execution](coding.md)). Main and
-Root receive the same frozen work surface; Root still lacks Task control and
-user delivery. Neither role receives Skill management. No second discovery API,
-execution loop, approval pipeline or model credential channel is introduced.
+File/command tools and empty Skill discovery are built in by default (see [execution](coding.md)).
+Main retains its explicit control, memory, evidence and delivery surface, Skill
+list/view, and MCP tools configured by the Host as read_only or external_effect.
+Focused lookups and explicit single-step changes may run directly; multi-step,
+long-running, batch and native workspace/Computer execution go to Tasks. Root derives execution
+capabilities independently from the full registry and still lacks Task control and
+user delivery. Neither role receives Skill management. Tool search and Code Mode
+discovery share the frozen registry; no second execution loop, approval pipeline
+or model credential channel is introduced.
 
 Use `config.example.yaml` for configuration. Paths are operator configuration;
 frozen ToolSpecs represent their scopes with hashes. A `resource_hash` binds
 each new ToolSpec to its configured scope. Descriptions and hashes are part of
 frozen `tools_json`; Skill resources also determine `skill_set_hash`.
-Descriptions reach the Pi Bridge. Full Skill bodies enter context only on view.
+The model invokes tools through Code Mode. Skill names and descriptions enter
+context only through skill_list search; bodies enter only through skill_view.
+Skill versions remain in the Host's frozen resource metadata.
 
 <a id="capabilities-mcp-transport"></a>
+
+### MCP 工具暴露
+
+MCP 工具统一经 Code Mode 调用，不提供服务器或单工具暴露模式。配置示例：
+
+```yaml
+mcp:
+  - name: local_catalog
+    command: /absolute/path/to/server
+    directory: /absolute/private/provider
+    description: Find and update catalog records
+    tools: {lookup: read_only, send_message: external_effect}
+```
+
+`tools` 是权限允许列表；只允许这里配置的工具进入冻结目录。旧 `exposure` / `tool_exposure` 字段应删除，严格配置校验拒绝这些字段。Main 和 Worker 都在各自的 Code Mode 中发现、描述和组合调用，不向模型声明单个 MCP Schema。执行与恢复契约见[统一工具方案](tools-approvals.md#mcp-渐进暴露与动态声明)。
+
+单服务器允许列表和发现目录各至多 4096 个工具，保留 1 MiB 帧、16 页、单 Schema 64 KiB 及既有超时限制；500 个工具的目录可注册而不全量进入模型请求。服务器默认描述优先取配置 `description`，否则只取初始化 instructions 首行，最多 512 个字符；这些只是路由数据，不是授权或指令。
 
 ### MCP transport
 

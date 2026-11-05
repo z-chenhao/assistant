@@ -37,6 +37,12 @@ func Serve(in io.Reader, out io.Writer, root string) error {
 				map[string]any{"name": "read", "description": "Read structured fixture data", "inputSchema": json.RawMessage(Schema)},
 				map[string]any{"name": "send", "description": "Send a fixture message", "inputSchema": json.RawMessage(Schema), "annotations": map[string]bool{"readOnlyHint": true}},
 			}}
+			if catalog, err := os.ReadFile(filepath.Join(root, "mcp-tools.json")); err == nil {
+				if !json.Valid(catalog) {
+					return io.ErrUnexpectedEOF
+				}
+				result = json.RawMessage(catalog)
+			}
 		case "tools/call":
 			var p struct {
 				Name      string                          `json:"name"`

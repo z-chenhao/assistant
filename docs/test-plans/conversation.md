@@ -18,7 +18,7 @@
 
 覆盖同源输入去重、模型生成中追加、工具提交后中断、已提交回复复用与并发 Main fencing。原始历史与模型工作上下文分别断言。
 
-- Prompt：[TestContextPromptBytes](../../internal/agent/context_test.go) 固定 Main 的角色说明与安全规则顺序，以及 Root/Child 的完整消息投影。[Bridge 回归](../../provider-bridge/test/bridge.test.mjs) 检查系统段按原顺序合为一条消息。
+- Prompt：[TestContextPromptBytes](../../internal/agent/context_test.go) 固定 Main 的角色说明与安全规则顺序，以及 Root/Child 的完整消息投影。`TestAgentStartsWithOneFrozenSystemMessage` 检查 Agent 内已是一条 system，Host 分段不进入模型；Bridge 拒绝拆分的系统消息。
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
 - Live/质量：涉及真实账户、Guest 平台或语义质量时单独记录环境与证据；不适用项说明理由，不用软件回归代替。

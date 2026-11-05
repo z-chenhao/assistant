@@ -6,11 +6,13 @@
 
 ## 当前架构
 
-Catalog 提供冻结版本的读取工具；可信 Reviewer 维护 skill_candidate 与验证回执，并将已晋升方法发布进目录。自动事件到 Reviewer 的路径尚未连接。
+Catalog 向 Worker 提供冻结版本的读取工具；可信 Reviewer 维护 skill_candidate 与验证回执，并将已晋升方法发布进目录。自动事件到 Reviewer 的路径尚未连接。
+
+system 不注入 `<skills>` 或 Skill 索引。Agent 通过 `skill_list({query?, limit?})` 按需搜索当前 Run 的冻结目录；query 匹配名称与用途，复用工具发现的确定性关键词排名（支持中英文），空查询按名称浏览。默认 8 条，limit 限于 1–128 条，返回仅含 name/description，不加载正文。Host 的版本、范围、资源来源留在冻结元数据中。`skill_view({name, path?})` 按名称读取正文或相对资源，适配器校验冻结文件指纹；Skill 不声明角色，也不授予工具权限。
 
 ```mermaid
 flowchart TD
-    C["受控 Skill Catalog"] --> L["list / view → Agent"]
+    C["受控 Skill Catalog"] --> L["list / view → Main 与 Worker"]
     X["CLI skill manage"] --> R["可信 Experience Reviewer"]
     R --> V["候选 / 证据 / 晋升"]
     V --> C
@@ -47,11 +49,11 @@ flowchart TD
 
 #### 7.1 Skill 结构与加载
 
-M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 与 Root 开放，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。仅摘要进入 Tool description，全文按需读取。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/designs/integrations.md`。
+M3 实现说明：本地 Agent 从显式配置的受控目录读取摘要；list/view 对 Main 和 Root/Child Worker 开放；新 Run 冻结 Skill 目录摘要，模型按需搜索，manage 不对普通循环开放。完整目录（含 references/scripts/assets）的内容版本和 scope 进入冻结 ToolSpec `resource_hash` 及 Capability Snapshot `skill_set_hash`。工具描述只说明搜索和读取接口，目录摘要与全文均按需返回。旧 Run 不热更新 Skill；内容或配置漂移时 fail closed。配置、权限和兼容规则见 `docs/designs/integrations.md`。
 
 - 使用成熟的 Agent Skills 目录约定。
 - 每个 Skill 以 `SKILL.md` 为入口，可选包含 `scripts/`、`references/` 和 `assets/`。
-- 启动时只加载 Skill 摘要，需要使用时再读取完整内容，以减少上下文占用。
+- 启动时在 Host 冻结 Skill 摘要和资源指纹，模型按需搜索摘要并读取完整内容。
 - Skill 保存可复用的方法、工作流和经验，不保存原始执行日志。
 
 <a id="contract-72-skill-工具"></a>
@@ -64,7 +66,7 @@ builtin__skill_view
 builtin__skill_manage
 ```
 
-- Main Agent Loop 和 Worker Agent Loop 可以列出和读取 Skill。
+- Main 和 Worker Agent Loop 可以列出和读取 Skill；Main 用于聚焦业务调用及委派判断，Worker 独立选择执行方法。旧 Main 仍按原冻结快照恢复，不重写既有能力。
 - Skill 修改主要由 Experience Reviewer 执行，普通 Agent Loop 不直接随意修改 Skill。
 - 用户明确纠正，或一次失败后得到验证成功的解决方案，可以快速形成候选经验。
 - 普通成功执行先保留为候选，重复验证后再提升为稳定 Skill。
@@ -80,10 +82,11 @@ references/scripts/assets. Names match their directories. Symlinks, malformed
 metadata and oversized catalogs are rejected. Hashes include every catalog file,
 not only the summary. No full body is embedded in the startup description.
 
-`builtin__skill_list({})` returns name, description, scope and content version.
-`builtin__skill_view({name, version, path?})` defaults to `SKILL.md`; relative
-references must already exist in the catalog. A wrong version or changed file
-returns `NON_DETERMINISTIC_REPLAY`; paths cannot escape the configured root.
+`builtin__skill_list({query?, limit?})` searches frozen names and descriptions; an empty query browses alphabetically. Defaults to 8 results, with a 1–128 limit. Ranking reuses deterministic tool keyword search, including CJK terms; this is not embedding search. Only name and description are returned. Versions and curated resource scopes remain in the Host capability snapshot.
+`builtin__skill_view({name, path?})` defaults to `SKILL.md`; relative
+references must already exist in the catalog. The Host binds reads to frozen file hashes. A changed file returns
+`NON_DETERMINISTIC_REPLAY`; paths cannot escape the configured root. The model
+cannot select a version; a supplied `version` field is rejected.
 Non-UTF-8 assets use the common binary-result Artifact path, preserving bytes
 without placing invalid text in model history.
 Changing a reference or scope changes the frozen set hash. A restarted old Run
@@ -126,8 +129,8 @@ context-budget assertions run unchanged before that selection.
 
 ## Prompt 资源
 
-新 Run 的 Capability Snapshot 保存 Skill 索引与版本元数据，并在 system 的 `skill_index` 分区说明匹配任务后使用 skill view 读取正文。正文仍按需作为 Tool 结果提供，不预载全部 Skill；Skill 无法扩大角色权限。已有 skill list/view 模型接口保持不变，恢复 Run 不用新索引覆盖冻结索引。
+新 Run 的 Capability Snapshot 保存 Skill 摘要、版本与文件指纹元数据，system 不预载目录或工具操作说明，发现与读取指导放在 Code Mode 和 Skill 工具描述中。正文和相对资源通过 `skill_view({name, path?})` 按需读取，Host 执行冻结校验。模型不传版本；旧必填 version 接口不保留兼容分支，已有 Run 的冻结记录不重写。Skill 无法扩大角色权限。
 
 ## 当前设计取舍
 
-Skill 是方法库，Memory 是用户事实，两者分开。初始 Skill 索引使用冻结的 Host prompt metadata；内容按需读取，保留匹配、版本及相对资源约束。经验审核生命周期不授予普通 Main/Worker Skill 管理或写入权限。
+Skill 是方法库，Memory 是用户事实，两者分开。Skill 目录保存在冻结的 Host metadata 中；摘要按需搜索，内容按需读取，保留匹配、版本及相对资源约束。经验审核生命周期不授予普通 Main/Worker Skill 管理或写入权限。

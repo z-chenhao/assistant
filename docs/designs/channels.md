@@ -175,8 +175,7 @@ selected attachment and a picker whose selection finishes after the bundle loads
 No frontend asset requires an external request. Source revisions, local changes,
 MIT/Apache-2.0 notices, build and verification commands are recorded in
 `web/README.md`; bundled notices are at `/licenses.txt`.
-OpenIntelligentUI's arbitrary generated HTML/JS path is outside this integration
-and requires an explicit architecture/security decision under the baseline.
+Generated HTML/CSS/JavaScript answers use the Main UI tool and an opaque-origin Web iframe described in [Intelligent UI](intelligent-ui.md); Host execution and external actions remain outside this rendering path.
 
 ### Feishu application credential lifecycle
 
@@ -247,8 +246,7 @@ The producer owns the private enqueue boundary (`delivery/sqlite.Enqueue` inside
 its transaction); `delivery.Service` owns transport and reconciliation; adapters
 own presentation and delivery receipts. Tools and Workers do not select a
 channel or send completion messages. The composer accepts assistant semantic
-parts, including opaque Artifact references, and rejects Tool traces. No arbitrary
-HTML or executable UI enters the protocol.
+parts, including opaque Artifact references, and rejects Tool traces. UI tool artifacts bind to a Main reply and become opaque Widget references in the projection; their code executes only in the Web sandbox.
 
 | State | Meaning | Next state |
 | --- | --- | --- |
@@ -313,18 +311,14 @@ There are no paid frontend services. Pinned runtime dependencies are React,
 React DOM, Zod and the ad-agent component helpers. Tailwind and esbuild compile
 checked-in local assets; they do not run as product services.
 
-OpenIntelligentUI's native component is integrated here. Its Python agent,
-CopilotKit/AG-UI transport, model routing, browser-key flow and generated
-HTML/JavaScript sandbox are not integrated. Steward's frozen ModelSnapshot,
+OpenIntelligentUI's native component is integrated here. Its isolated-answer and validated bridge patterns inform Steward's own durable Widget renderer. The upstream Python agent, CopilotKit/AG-UI transport, model routing and browser-key flow are not integrated. Steward's frozen ModelSnapshot,
 SecretStore, Actor, approval and controlled UISpec v1 contracts remain the owners
-of those responsibilities. Enabling arbitrary generated code requires a separate
-architecture/security decision.
+of those responsibilities. Generated Widget code is confined to the dedicated Web sandbox and receives no Host execution authority.
 
 The client accepts only supported UISpec v1 components. Invalid/unknown versions,
 components and unsupported table dimensions retain the server-rendered result.
 Empty or failed renders use authoritative semantic text from the Host, never a
-replacement fallback supplied inside a projection. There is no HTML evaluator,
-dynamic component import, remote asset or browser credential input.
+replacement fallback supplied inside a projection. Custom Widget HTML is served through its dedicated sandbox route; no dynamic component import, remote asset or browser credential input is added.
 
 ## 当前 Web 交互取舍
 

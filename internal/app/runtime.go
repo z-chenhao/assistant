@@ -14,6 +14,7 @@ import (
 	computerfake "github.com/z-chenhao/assistant/internal/computer/fake"
 	"github.com/z-chenhao/assistant/internal/computer/macosvm"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/evidence"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
@@ -125,6 +126,10 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 	if cfg.Skills == nil {
 		defs = append(defs, skill.EmptyDefinitions()...)
 	}
+	defs, err = skill.IncludeIntelligentUI(defs)
+	if err != nil {
+		return nil, err
+	}
 	identity := any(cfg.ExecutionConfig())
 	if cfg.Computer != nil {
 		identity = cfg.Computer
@@ -151,6 +156,13 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 	for _, spec := range base.Describe() {
 		d, _ := base.Resolve(spec.Name)
 		defs = append(defs, d)
+	}
+	// Production has one model-facing execution entry. Historical frozen specs
+	// and explicit test peers keep their recorded calling contracts.
+	if fixture == "" {
+		for i := range defs {
+			defs[i].Spec.CodeModeOnly = defs[i].Spec.Name != codemode.ToolName
+		}
 	}
 	registry, err := tool.NewRegistry(defs)
 	if err != nil {
@@ -181,6 +193,7 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 
 func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Definition, error) {
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
+	defs = append(defs, tool.SearchDefinition())
 	defs = append(defs, automation.Definitions()...)
 	manageMemory := memory.Definition()
 	if cfg.Memory == nil {
@@ -202,7 +215,7 @@ func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Defi
 		searchMemory.Spec.Description += " Not configured: requires an explicit embedding provider; calls fail with PROVIDER_UNAVAILABLE until configured."
 	}
 	defs = append(defs, searchMemory)
-	defs = append(defs, evidence.Definition())
+	defs = append(defs, evidence.Definition(), ui.ShowDefinition())
 
 	if cfg.JavaScript != nil {
 		runtime := &codemode.Sidecar{Command: cfg.JavaScript.Command, Script: cfg.JavaScript.Script}

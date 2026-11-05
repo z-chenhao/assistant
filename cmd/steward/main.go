@@ -16,6 +16,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/app"
 	"github.com/z-chenhao/assistant/internal/computer/macosvm"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/llm/bridge"
 	"github.com/z-chenhao/assistant/internal/startup"
 )
 
@@ -33,6 +34,13 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) (err error) {
+	if len(args) == 1 && args[0] == "-model-bridge" {
+		return (&bridge.Server{}).Serve(ctx, in, out)
+	}
+	if len(args) == 1 && args[0] == "-model-bridge-version" {
+		_, err := fmt.Fprintln(out, bridge.Version)
+		return err
+	}
 	if handled, err := runTestPeer(ctx, args, in, out); handled {
 		return err
 	}

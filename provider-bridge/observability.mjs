@@ -1,5 +1,4 @@
 import {createHash,randomUUID} from 'node:crypto';
-import manifest from './package.json' with {type:'json'};
 
 // A diagnostic projection of the final SDK body. No headers, connection,
 // credentials, provider response bodies or image Base64 cross this boundary.
@@ -25,7 +24,7 @@ export function wireObserver(request,send){
   if(!attempt)return;
   // Diagnostics are bounded and never alter transport success/failure.
   try{
-   const event={generation_id:request.generation_id,attempt,phase,at:Date.now()*1000,format:`steward-wire-v1/pi-ai-${manifest.dependencies['@earendil-works/pi-ai']}`,http_status:status,error_code:error};
+   const event={generation_id:request.generation_id,attempt,phase,at:Date.now()*1000,format:'steward-wire-v1/go-ai-v1',http_status:status,error_code:error};
    if(phase==='started'){
     const clean=redact(JSON.parse(body));
     const encoded=JSON.stringify(clean);

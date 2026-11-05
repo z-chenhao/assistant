@@ -44,32 +44,37 @@ func TestProgressiveCatalogScopeVersionsAndNoManagement(t *testing.T) {
 		t.Fatal("full body in startup summary")
 	}
 	var summaries []Summary
-	if json.Unmarshal([]byte(list.Execute(context.Background(), `{}`).Text), &summaries) != nil || len(summaries) != 1 || summaries[0].Scope != "agent" {
+	listing := list.Execute(context.Background(), `{}`).Text
+	if json.Unmarshal([]byte(listing), &summaries) != nil || len(summaries) != 1 || summaries[0].Name != "review" || strings.Contains(listing, `"version"`) || strings.Contains(listing, `"scope"`) {
 		t.Fatal(summaries)
 	}
-	invoke := func(path, version string) tool.Result {
-		raw, _ := json.Marshal(map[string]string{"name": "review", "path": path, "version": version})
+	var frozenEntries []Summary
+	if json.Unmarshal([]byte(list.Spec.PromptContext[0].Text), &frozenEntries) != nil || len(frozenEntries) != 1 || frozenEntries[0].Scope != "agent" || frozenEntries[0].Version == "" {
+		t.Fatal("Host lost frozen resource identity", list.Spec.PromptContext)
+	}
+	invoke := func(path string) tool.Result {
+		raw, _ := json.Marshal(map[string]string{"name": "review", "path": path})
 		return view.Execute(context.Background(), string(raw))
 	}
-	if got := invoke("SKILL.md", summaries[0].Version); got.Error != nil || !strings.Contains(got.Text, "BODY_ONLY_MARKER") {
+	if got := invoke(""); got.Error != nil || !strings.Contains(got.Text, "BODY_ONLY_MARKER") {
 		t.Fatal(got)
 	}
-	if got := invoke("references/rules.md", summaries[0].Version); got.Text != "reference" {
+	if got := invoke("references/rules.md"); got.Text != "reference" {
 		t.Fatal(got)
 	}
 	for _, p := range []string{"../SKILL.md", "/etc/passwd", "missing.md"} {
-		if got := invoke(p, summaries[0].Version); got.Error == nil {
+		if got := invoke(p); got.Error == nil {
 			t.Fatal(got)
 		}
 	}
-	if got := invoke("SKILL.md", "wrong"); got.Error == nil || got.Error.Code != "NON_DETERMINISTIC_REPLAY" {
+	if got := view.Execute(context.Background(), `{"name":"review","version":"injected"}`); got.Error == nil || got.Error.Code != "INVALID_ARGUMENT" {
 		t.Fatal(got)
 	}
 	frozen := r.Describe()
 	if err := os.WriteFile(filepath.Join(c.Root, "review", "references", "rules.md"), []byte("changed"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got := invoke("references/rules.md", summaries[0].Version); got.Error == nil || got.Error.Code != "NON_DETERMINISTIC_REPLAY" {
+	if got := invoke("references/rules.md"); got.Error == nil || got.Error.Code != "NON_DETERMINISTIC_REPLAY" {
 		t.Fatal(got)
 	}
 	changed, _ := Definitions(c)
@@ -85,6 +90,78 @@ func TestProgressiveCatalogScopeVersionsAndNoManagement(t *testing.T) {
 	scopedRegistry, _ := tool.NewRegistry(scoped)
 	if SetHash(current.Describe()) == SetHash(scopedRegistry.Describe()) {
 		t.Fatal("hash ignored scope")
+	}
+}
+
+func TestSkillSearchRanksBoundsAndFreezesResults(t *testing.T) {
+	c := catalog(t)
+	fillCatalog(t, c, 12)
+	if err := Publish(context.Background(), c, "plot", "plotter", "绘制图表并比较趋势。", "1. Inspect data.\n2. Plot verified values."); err != nil {
+		t.Fatal(err)
+	}
+	defs, err := Definitions(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defs, err = IncludeIntelligentUI(defs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	search := func(args string) []map[string]string {
+		t.Helper()
+		result := defs[0].Execute(context.Background(), args)
+		var entries []map[string]string
+		if result.Error != nil || json.Unmarshal([]byte(result.Text), &entries) != nil {
+			t.Fatal(result)
+		}
+		for _, entry := range entries {
+			if len(entry) != 2 || entry["name"] == "" || entry["description"] == "" {
+				t.Fatal("search exposed internal metadata or body", entries)
+			}
+		}
+		return entries
+	}
+	if entries := search(`{}`); len(entries) != 8 || entries[0]["name"] != "fixture-000" {
+		t.Fatal("unbounded or unordered browsing", entries)
+	}
+	if entries := search(`{"query":"Fixture method","limit":2}`); len(entries) != 2 {
+		t.Fatal("limit ignored", entries)
+	}
+	for query, want := range map[string]string{"INTELLIGENT_UI": "intelligent_ui", "Review code": "review", "图表": "plotter"} {
+		args, _ := json.Marshal(map[string]any{"query": query, "limit": 1})
+		if entries := search(string(args)); len(entries) != 1 || entries[0]["name"] != want {
+			t.Fatal("name or purpose search failed", query, entries)
+		}
+	}
+	if entries := search(`{"query":"nonexistentmethod"}`); len(entries) != 0 {
+		t.Fatal("unrelated search returned methods", entries)
+	}
+	for _, args := range []string{`{"limit":0}`, `{"limit":129}`, `{"limit":1.5}`, `{"query":12}`, `{"version":"injected"}`} {
+		if got := defs[0].Execute(context.Background(), args); got.Error == nil || got.Error.Code != "INVALID_ARGUMENT" {
+			t.Fatal("invalid search accepted", args, got)
+		}
+	}
+	if err := Publish(context.Background(), c, "news", "fresh-news", "New method.", "1. Inspect sources."); err != nil {
+		t.Fatal(err)
+	}
+	if entries := search(`{"query":"fresh-news"}`); len(entries) != 0 {
+		t.Fatal("new publication entered an already frozen catalog", entries)
+	}
+}
+
+func TestSkillSearchFindsPunctuationOnlyName(t *testing.T) {
+	c := catalog(t)
+	if err := Publish(context.Background(), c, "punctuation", "---", "Retained method.", "1. Inspect sources."); err != nil {
+		t.Fatal(err)
+	}
+	defs, err := Definitions(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []Summary
+	result := defs[0].Execute(context.Background(), `{"query":"---","limit":1}`)
+	if result.Error != nil || json.Unmarshal([]byte(result.Text), &entries) != nil || len(entries) != 1 || entries[0].Name != "---" {
+		t.Fatal("valid catalog name could not be found", result)
 	}
 }
 func TestSkillLinksAndMalformedFrontMatterRejected(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/delivery"
 	deliverysqlite "github.com/z-chenhao/assistant/internal/delivery/sqlite"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
 
 func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) (agent.Generation, error) {
@@ -46,7 +47,7 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 		}
 	}
 	request := llm.GenerationRequest{RunID: run.ID, SessionID: run.ID, Snapshot: run.Snapshot, Messages: messages, OutputLimitBytes: 64 << 10}
-	request.Tools = agent.ProviderTools(run.Tools)
+	request.Tools = agent.ProviderTools(run.Tools, run.Checkpoint.LoadedTools)
 	if compaction != nil {
 		request.Tools = nil
 		request.OutputLimitBytes = compaction.MaxBytes
@@ -167,7 +168,11 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 		}
 		seen := map[string]bool{}
 		for _, call := range result.ToolCalls {
-			if call.ID == "" || len(call.ID) > 256 || call.Name == "" || seen[call.ID] || len(call.Arguments) > 16<<10 || !json.Valid([]byte(call.Arguments)) {
+			argumentLimit := 16 << 10
+			if call.Name == codemode.ToolName {
+				argumentLimit = 64 << 10 // Match the native bridge's bounded script envelope.
+			}
+			if call.ID == "" || len(call.ID) > 256 || call.Name == "" || seen[call.ID] || len(call.Arguments) > argumentLimit || !json.Valid([]byte(call.Arguments)) {
 				return llm.InvalidProviderResponse
 			}
 			seen[call.ID] = true
@@ -227,6 +232,26 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		messageID := "reply:" + run.Checkpoint.ExchangeID
 		deliveryID := "delivery:" + messageID
 		message := conversation.Message{MessageID: messageID, ConversationID: run.ConversationID, Role: "assistant", Content: conversation.Text(run.Checkpoint.Result.Text), Source: "main", SourceEventID: run.Checkpoint.ExchangeID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		if _, err := tx.ExecContext(ctx, `UPDATE ui_widget SET message_id=? WHERE run_id=? AND message_id IS NULL AND invocation_id IN (SELECT invocation_id FROM tool_invocation WHERE status='succeeded')`, messageID, run.ID); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT json_extract(document_json,'$.fallback') FROM ui_widget w JOIN tool_invocation i USING(invocation_id) WHERE message_id=? ORDER BY i.delivery_seq`, messageID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var fallback string
+			if err = rows.Scan(&fallback); err != nil {
+				rows.Close()
+				return err
+			}
+			message.Content = append(message.Content, conversation.ContentPart{Type: "text", Text: fallback})
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
 		refs, err := published(ctx, tx, run.ID)
 		if err != nil {
 			return err

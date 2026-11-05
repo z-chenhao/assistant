@@ -30,6 +30,14 @@ func artifactOwner(t *testing.T, s *Store) artifact.Scope {
 	t.Helper()
 	return artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), Owner: true}
 }
+func toolRunScope(t *testing.T, s *Store, runID string) artifact.Scope {
+	t.Helper()
+	scope := artifact.Scope{UserID: artifact.LocalUser, RunID: runID}
+	if err := s.db.QueryRow(`SELECT agent_id,coalesce(task_id,'') FROM run WHERE run_id=?`, runID).Scan(&scope.AgentID, &scope.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	return scope
+}
 func putArtifact(t *testing.T, s *Store, a artifact.Scope, text string) string {
 	t.Helper()
 	ref, err := s.Artifacts().Put(context.Background(), a, artifact.Input{Name: "input.txt", MediaType: "text/plain"}, strings.NewReader(text))
@@ -405,7 +413,7 @@ func TestArtifactProviderCannotSelectFinalPublication(t *testing.T) {
 	def := tool.Definition{Spec: tool.Spec{Name: "mcp__fixture__hidden_publish", Version: 1, InputSchema: `{"type":"object","additionalProperties":false}`, ReplayPolicy: "safe", Permission: "read_only"}, Execute: func(context.Context, string) tool.Result { return tool.Result{PublishRefs: []string{ref}} }}
 	call := []llm.ToolCall{{ID: "hidden", Name: def.Spec.Name, Arguments: `{}`}}
 	s, _, c, e, exchange := admitPolicy(t, []tool.Definition{def}, call)
-	ref = putArtifact(t, s, artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: c.RunID()}, "output")
+	ref = putArtifact(t, s, toolRunScope(t, s, c.RunID()), "output")
 	results, err := e.Execute(ctx, exchange, call)
 	if err != nil || len(results) != 1 || results[0].Error == nil || results[0].Error.Code != "PERMISSION_DENIED" || scalar(t, s, `SELECT count(*) FROM artifact_publication`) != 0 {
 		t.Fatal("provider selected final output without explicit publish", results, err)

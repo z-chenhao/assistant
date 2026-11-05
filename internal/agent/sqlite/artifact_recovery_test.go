@@ -148,7 +148,7 @@ func TestArtifactQueryRecoveryCommitsExactReceipt(t *testing.T) {
 				if err := s.db.QueryRow(`SELECT run_id FROM tool_invocation`).Scan(&runID); err != nil {
 					t.Fatal(err)
 				}
-				scope := artifact.Scope{UserID: artifact.LocalUser, AgentID: idAgent(t, s), RunID: runID}
+				scope := toolRunScope(t, s, runID)
 				for _, bad := range []artifact.Scope{{UserID: "other", AgentID: scope.AgentID, RunID: scope.RunID}, {UserID: scope.UserID, AgentID: "other", RunID: scope.RunID}, {UserID: scope.UserID, AgentID: scope.AgentID, RunID: "other"}} {
 					if _, err := s.Artifacts().Open(ctx, bad, ref); !errors.Is(err, artifact.ErrNotFound) {
 						t.Fatal("scope leak", bad, err)

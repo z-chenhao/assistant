@@ -40,7 +40,7 @@ flowchart TD
     START["启动 / 模型设置 / Probe / 显式选择"] --> INPUT["用户输入文字与附件"]
     INPUT --> MAIN["Main 理解并执行"]
     MAIN --> KIND{"即时工作或委派？"}
-    KIND -->|"即时"| DIRECT["推理或普通工具"]
+    KIND -->|"即时"| DIRECT["推理 / 控制 / Skill / 聚焦 MCP 操作"]
     DIRECT --> ANSWER["Main 保存最终回复"]
     KIND -->|"耗时 / 异步 / 需 Child"| TASK["显式创建 Task"]
     TASK --> ROOT["Root Worker"]
@@ -124,8 +124,9 @@ flowchart TD
     K --> W["Root Worker Run"]
     M --> L["Model Provider Bridge"]
     W --> L
-    M --> T["Tooling / Security"]
-    W --> T
+    M --> V["控制 / 记忆 / 证据 / 交付工具"]
+    V --> M
+    W --> T["Tooling / Security"]
     T --> X["Computer / MCP"]
     X --> P["结果与 Artifact 持久化"]
     P --> M
@@ -136,11 +137,11 @@ flowchart TD
 
 主链路定义为：
 
-`ChannelMessage → Interaction → InboundEvent → AgentActor → Run → MainAgentLoop → Tooling → Security → Computer/MCP → ResultPersistence → MainAgentLoop → AssistantMessage → DeliveryRequest → Outbox → Delivery → Channel`
+`ChannelMessage → Interaction → InboundEvent → AgentActor → Run → MainAgentLoop → Context/Control Tools → AssistantMessage → DeliveryRequest → Outbox → Delivery → Channel`
 
-创建异步任务时，从 Main Agent Loop 分支为：
+聚焦 MCP 业务调用可直接经过 `MainAgentLoop → Tooling/Security → MCP → ResultPersistence → MainAgentLoop`；复杂工作委派为：
 
-`MainAgentLoop → Task → WorkerRun → WorkerAgentLoop → ResultEvent → MainAgentLoop`
+`MainAgentLoop → Task → WorkerRun → WorkerAgentLoop → Tooling/Security → Computer/MCP → ResultPersistence → ResultEvent → MainAgentLoop`
 
 <a id="contract-21-agent-actor-与-main-agent-loop"></a>
 
@@ -157,8 +158,8 @@ flowchart TD
 
 - 当前对话由 Main Agent Loop 负责。
 - 实现层只有一套可复用 Agent Loop 内核。`Main` 与 `Worker` 是两种运行角色；`Root Worker` 与 `Child Worker` 又是 Worker Run 在 Run 树中的两种位置，不实现第三套 Child Agent Loop。
-- 只要工作是异步、耗时，或计划中包含并行 Child Run，Main Agent Loop 就在执行前显式创建一个 Task，并启动一个 Root Worker Run；`agent.run()` 和 Runtime 都不会把正在执行的工作自动“升级”为 Task。
-- Main Run 默认不能创建 Child Run，也不暴露 `agent.run()`。短时、同步且不需要独立 Agent Loop 的工作可以留在 Main Run 中直接推理或调用普通 Tool；一旦需要另一个 Agent Loop，即由 Main 创建 Task 并委派给 Root Worker Run。
+- 多步、耗时、批量、文件、命令和浏览器/桌面工作由 Main 在执行前显式创建或接续 Task，并启动 Root Worker Run；`agent.run()` 和 Runtime 不会将已有调用自动“升级”为 Task。
+- Main Run 不创建 Child Run，也不获得原生文件/命令或 Computer 权限。Main 可直接推理，并通过 Code Mode 使用控制/记忆/证据/Skill 工具、调用已配置 MCP 完成聚焦查询和单步变更，交付成果；具体白名单见[统一工具方案](tools-approvals.md)。Root 从完整 Registry 独立派生执行能力，不能从已收窄的 Main 工具集继承。
 - 这一限制是当前产品的默认 Capability Policy，不写死为 Agent Loop 内核限制；未来若需要允许 Main 直接创建 Child，只调整工具暴露与 Parent 校验，不重构 Run、ToolInvocation 或 Worker Loop。
 - 同一 Task 同时最多只有一个活动 Root Worker Run；任务内部的并发统一由该 Run 的 Child Run 表达。不同 Task 的 Root Worker Run 可以并行。
 - Root Worker Run 拥有独立上下文，可以与 Main Agent Loop 及其他 Task 的 Worker 并行运行。

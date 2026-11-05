@@ -70,20 +70,25 @@ func (r Result) ModelText() string {
 type Spec struct {
 	// PromptContext is trusted Host resource metadata, frozen with capability.
 	// It is excluded from the provider Tool declaration by ProviderTools.
-	PromptContext  []PromptContext `json:"prompt_context,omitempty"`
-	Internal       bool            `json:"internal,omitempty"` // Host bridge binding; excluded from the model Tool projection.
-	Name           string          `json:"name"`
-	Description    string          `json:"description,omitempty"`
-	ResourceHash   string          `json:"resource_hash,omitempty"`
-	Version        int             `json:"version"`
-	InputSchema    string          `json:"input_schema"`
-	ReplayPolicy   string          `json:"replay_policy"`
-	Permission     string          `json:"permission"`
-	Risk           string          `json:"risk,omitempty"`
-	TimeoutMS      int             `json:"timeout_ms,omitempty"`
-	OutputBytes    int             `json:"output_bytes,omitempty"`
-	Provider       string          `json:"provider,omitempty"`
-	ConflictPolicy string          `json:"conflict_policy,omitempty"`
+	PromptContext []PromptContext `json:"prompt_context,omitempty"`
+	Internal      bool            `json:"internal,omitempty"` // Host bridge binding; excluded from the model Tool projection.
+	Exposure      Exposure        `json:"exposure,omitempty"`
+	// CodeModeOnly is a frozen invocation constraint, not a user-selectable mode.
+	// Absent on historical snapshots, whose declarations retain their old contract.
+	CodeModeOnly         bool   `json:"codemode_only,omitempty"`
+	NamespaceDescription string `json:"namespace_description,omitempty"`
+	Name                 string `json:"name"`
+	Description          string `json:"description,omitempty"`
+	ResourceHash         string `json:"resource_hash,omitempty"`
+	Version              int    `json:"version"`
+	InputSchema          string `json:"input_schema"`
+	ReplayPolicy         string `json:"replay_policy"`
+	Permission           string `json:"permission"`
+	Risk                 string `json:"risk,omitempty"`
+	TimeoutMS            int    `json:"timeout_ms,omitempty"`
+	OutputBytes          int    `json:"output_bytes,omitempty"`
+	Provider             string `json:"provider,omitempty"`
+	ConflictPolicy       string `json:"conflict_policy,omitempty"`
 }
 
 type PromptContext struct {
@@ -121,6 +126,9 @@ func NewRegistry(definitions []Definition) (*Registry, error) {
 	return r, nil
 }
 func validDefinition(d Definition) bool {
+	if !d.Spec.Exposure.Valid() {
+		return false
+	}
 	if d.Host {
 		policy, ok := builtinCatalog[d.Spec.Name]
 		return ok && d.Execute == nil && d.Invoke == nil && d.Spec.Permission == policy.permission && (!d.Spec.Internal || policy.internal)
@@ -140,6 +148,14 @@ func (r *Registry) Select(specs []Spec) (*Registry, error) {
 		// Prompt resources belong to the frozen capability, not live execution
 		// policy. Reopening a Run never substitutes freshly loaded instructions.
 		d.Spec.PromptContext = append([]PromptContext(nil), s.PromptContext...)
+		// Exposure is frozen presentation, not execution authority. Loading a
+		// new configuration cannot change an existing Run's tool declarations.
+		d.Spec.Exposure = s.Exposure
+		d.Spec.CodeModeOnly = s.CodeModeOnly
+		if s.Name == SearchName {
+			d.Spec.Description = s.Description
+		}
+		d.Spec.NamespaceDescription = s.NamespaceDescription
 		if !ok || !reflect.DeepEqual(d.Spec, s) {
 			return nil, llm.ModelIncompatible
 		}

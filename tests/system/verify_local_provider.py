@@ -20,10 +20,10 @@ import threading
 import time
 from verify import STATE_SCHEMA_VERSION, require
 from provider_endpoint import Endpoint
+from codemode_peer import runtime_yaml
 
 def verify(binary, script):
     require(shutil.which("node") is not None, "Node is missing")
-    require((script.parent / "node_modules/@earendil-works/pi-ai").is_dir(), "run npm ci --prefix provider-bridge")
     server = ThreadingHTTPServer(("127.0.0.1", 0), Endpoint)
     server.daemon_threads = True
     server.requests, server.mode = [], "success"
@@ -39,6 +39,8 @@ def verify(binary, script):
             env["STEWARD_FIXTURE_KEY"] = "SYNTHETIC_LOCAL_KEY_NEVER_PERSIST"
             config = root / "config.yaml"
             config.write_text("version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: " + json.dumps(str(script)) + "\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+            if '\njavascript:' not in config.read_text():
+                config.write_text(config.read_text()+runtime_yaml())
 
             def command(*args, ok=True, text=None):
                 p = subprocess.run([str(binary), "-config", str(config), *args], cwd=root, env=env,
@@ -64,12 +66,18 @@ def verify(binary, script):
             require(history[-1]["content"][0]["text"] == "PROBE_RESULT_OK", "local Main did not continue after Direct Tool")
             require(any(m["role"] == "system" for r in server.requests if r.get("body") for m in r["body"].get("messages", [])), "Main System Prompt missing from actual wire")
             report["main_history"] = history
-            surface = next(r["body"]["tools"] for r in reversed(server.requests) if r.get("body", {}).get("tools") and any(t["function"]["name"] == "builtin__artifact_search" for t in r["body"]["tools"]))
-            names = [t["function"]["name"] for t in surface]
-            require(sorted(n for n in names if n.startswith("builtin__artifact_")) == ["builtin__artifact_manage", "builtin__artifact_search"], "production Artifact surface not consolidated")
-            require("builtin__text_echo" not in names and "mcp__fixture__echo" not in names, "fixture echo leaked to production")
-            require("builtin__memory_search" in names and "builtin__memory_manage" in names, "Memory tools hidden")
-            require("builtin__image_ocr" in names, "default OCR tool hidden")
+            surface = next(r["body"]["tools"] for r in reversed(server.requests)
+                           if any(t["function"]["name"] == "builtin__codemode_execute"
+                                  for t in r.get("body", {}).get("tools", [])))
+            require([t["function"]["name"] for t in surface] == ["builtin__codemode_execute"],
+                    "production model has tools outside Code Mode")
+            with closing(sqlite3.connect(root / "data/state.db")) as db:
+                frozen = json.loads(db.execute("SELECT tools_json FROM capability_snapshot WHERE role='main' ORDER BY created_at LIMIT 1").fetchone()[0])
+            names = {spec['name'] for spec in frozen}
+            require({'builtin__artifact_search','builtin__artifact_manage','builtin__memory_search',
+                     'builtin__memory_manage','builtin__image_ocr'} <= names, 'internal tool authority disappeared')
+            require(all(spec.get('codemode_only') for spec in frozen if spec['name'] != 'builtin__codemode_execute'),
+                    'production authority permits a direct tool bypass')
             report["production_surface"] = surface
 
             # Real PNG -> scoped source -> offline Tesseract -> Tool result ->
@@ -135,10 +143,13 @@ def verify(binary, script):
             task_requests = [r["body"] for r in server.requests[task_start:] if r.get("body")]
             roots = [r for r in task_requests if any("general Worker executing" in str(m.get("content", "")) for m in r["messages"])]
             require(roots and all(not any(t["function"]["name"].startswith("builtin__task_") or t["function"]["name"] == "builtin__memory_manage" for t in r["tools"]) for r in roots), "Root Task or Memory control exposed on actual Pi wire")
-            require(all(any(t["function"]["name"] == "builtin__memory_search" for t in r["tools"]) for r in roots), "Root read-only Memory search missing")
+            require(all([t["function"]["name"] for t in r["tools"]] == ["builtin__codemode_execute"] for r in roots), "Root model bypasses Code Mode")
             require(all("actual local conversation" not in json.dumps(r["messages"]) for r in roots), "Root inherited Main Conversation")
             require(any(any(m["role"] == "user" and "Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in r["messages"]) for r in task_requests), "runtime framing lost at actual Pi boundary")
             with closing(sqlite3.connect(root / "data/state.db")) as db:
+                frozen_worker = json.loads(db.execute("SELECT tools_json FROM capability_snapshot WHERE role='worker' ORDER BY created_at LIMIT 1").fetchone()[0])
+                require(any(spec['name']=='builtin__memory_search' and spec['permission']=='read_only' for spec in frozen_worker) and
+                        not any(spec['name']=='builtin__memory_manage' for spec in frozen_worker), 'Worker memory scope changed')
                 require(db.execute("SELECT count(*) FROM task WHERE status='completed'").fetchone()[0] == 1, "actual Pi Task missing")
                 require(db.execute("SELECT count(*) FROM main_inbox").fetchone()[0] == 1, "actual Pi Reporter dedup missing")
             report["task_requests"] = task_requests
@@ -219,8 +230,12 @@ def verify_screenshot_projection(binary, script):
                     h.send("screenshot-profile", "Observe two screenshots; explicitly select only the second image.")
                     h.command("chat", "work")
                     with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db:
-                        requests = [json.loads(r[0]) for r in db.execute("SELECT request_json FROM model_generation ORDER BY created_at")]
-                        require(len(requests) == 3, "screenshot Run exchanges")
+                        requests = [json.loads(r[0]) for r in db.execute("SELECT g.request_json FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker' ORDER BY g.created_at")]
+                        main_requests = [json.loads(r[0]) for r in db.execute("SELECT g.request_json FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='main' ORDER BY g.created_at")]
+                        require(main_requests and all([t['name'] for t in r['tools']] == ['builtin__codemode_execute'] for r in main_requests), "Main model bypassed Code Mode")
+                        main_frozen = [json.loads(row[0]) for row in db.execute("SELECT tools_json FROM capability_snapshot WHERE role='main'")]
+                        require(all(not any(s['name'].startswith('builtin__computer_') or s['name'] in ['builtin__read','builtin__bash','builtin__edit','builtin__write'] for s in specs) for specs in main_frozen), "Main obtained screenshot execution authority")
+                        require(len(requests) == 3, "screenshot Worker exchanges")
                         require(all(r["model_snapshot"]["capabilities"]["image_input"] == enabled for r in requests), "normally selected image capability lost or gained")
                         selected = [sum(len(m.get("image_refs", [])) for m in r["messages"]) for r in requests]
                         require(selected == [0, 0, 1], "explicit screenshot selection not persisted")
@@ -261,6 +276,8 @@ def verify_user_images(binary, script, evidence):
                 h=ChannelHarness(binary,Path(temp),platform)
                 try:
                     h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(script))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
+                    if '\njavascript:' not in h.config.read_text():
+                        h.config.write_text(h.config.read_text()+runtime_yaml())
                     h.args=lambda *a:[str(binary),'-config',str(h.config),*a]
                     metadata={'name':'User images','provider_kind':'openai_compatible','endpoint':f'http://127.0.0.1:{server.server_port}/v1',
                               'wire_api':'openai_completions','model_id':'fixture-model','context_window':65536,'max_output_tokens':4096,
@@ -323,6 +340,8 @@ def verify_live_probe(binary, script, endpoint, model, context_tokens, output_to
         env["STEWARD_DATA_ROOT"] = str(root / "data")
         config = root / "config.yaml"
         config.write_text("version: 1\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: " + json.dumps(str(script)) + "\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+        if '\njavascript:' not in config.read_text():
+            config.write_text(config.read_text()+runtime_yaml())
 
         def command(*args, text=None):
             return subprocess.run([str(binary), "-config", str(config), *args], cwd=root, env=env,

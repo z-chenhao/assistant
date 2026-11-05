@@ -28,7 +28,7 @@ def state(h):
         db.row_factory = sqlite3.Row
         for name, query in {
             'approvals': 'SELECT * FROM approval ORDER BY created_at',
-            'invocations': 'SELECT * FROM tool_invocation ORDER BY created_at,delivery_seq',
+            'invocations': "SELECT * FROM tool_invocation WHERE tool_name='mcp__fixture__send' ORDER BY created_at,delivery_seq",
             'claims': 'SELECT * FROM run_claim',
             'tasks': 'SELECT * FROM task',
             'updates': 'SELECT * FROM task_update ORDER BY occurred_at',
@@ -133,20 +133,22 @@ def run(binary, scenario_jobs=1):
 
         def steering(h):
             approval = pending(h, {'target': 'alex.chen@example.test', 'text': 'Monday'})
-            decide(h, approval)
             h.send('steering', json.dumps({'target': 'alex.chen@example.test', 'text': 'Tuesday'}))
+            # Main must first translate this correction into an append to the
+            # delegated Task. User ingress alone cannot revoke every Worker's
+            # independently frozen approval.
+            h.command('chat', 'work')
             require(h.command('approval', 'approve', approval['approval_id'], approval['frozen_arguments_hash'], ok=False).returncode != 0,
                     'stale approval accepted')
-            h.command('chat', 'work')
             newer = h.command('approval', 'list')[-1]
             require(newer['status'] == 'pending' and newer['approval_id'] != approval['approval_id'] and 'Tuesday' in newer['arguments'],
                     'new arguments lack distinct approval')
-            require(not state(h)['effects'], 'invalidated approved invocation executed')
+            require(not state(h)['effects'], 'invalidated invocation executed')
             decide(h, newer)
             h.command('chat', 'work')
             value = state(h)
             require(len(value['effects']) == 1 and 'Tuesday' in value['effects'][0]['args'], 'wrong frozen effect')
-            return {'name': 'GC-12_steering_invalidates_approved_parameters', 'state': value}
+            return {'name': 'GC-12_Task_steering_invalidates_pending_parameters', 'state': value}
         report['checks'].append(scenario('steering', steering))
 
         def worker(h):

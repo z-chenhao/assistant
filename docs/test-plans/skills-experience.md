@@ -17,7 +17,11 @@
 
 ## 层级与关键路径
 
+`TestMainBusinessToolsDelegateWorkerExecution` 验证 Main 和 Worker 均保留搜索与读取工具，目录与正文均按需返回。`TestOldMainCapabilitySnapshotSurvivesTaskRegistryUpgrade` 验证历史 Main 能力保持冻结，新 Main 才采用当前策略。系统回归通过 Main 读取真实目录及正文，通过 Worker 读取目录、正文和二进制资源；两者均无普通 Skill 管理权限。
+
 读取覆盖目录版本与资源漂移；经验闭环从真实纠正/执行结果开始，不直接调用 Reviewer 伪造自动沉淀。晋升要绑定同方法的验证证据，并检查普通 Worker 无写权限。
+
+`TestSkillsUseSearchWithoutPromptCatalog` 验证 Main/Root/Child 的 system 不包含目录，并通过实际 Skill 搜索和按名称读取正文。`TestSkillSearchRanksBoundsAndFreezesResults` 覆盖中英文名称/用途匹配、默认与显式数量上限、空结果、非法参数及新发布方法不进入旧冻结目录。`intelligent-ui` 系统门禁经真实 Code Mode 搜索、读取 Skill 后展示 UI。目录适配器回归验证文件变化和旧快照选择被拒绝；显式传入 version 也被拒绝。
 
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。

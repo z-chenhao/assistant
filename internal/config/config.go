@@ -203,8 +203,10 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	if value, ok := lookupEnv("STEWARD_NATS_STREAM_PREFIX"); ok {
 		cfg.NATS.StreamPrefix = value
 	}
-	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && (!filepath.IsAbs(cfg.LLM.ProviderBridgeScript) || cfg.LLM.ProviderBridgeVersion != "pi-ai-1.3.0-v1") {
-		return Config{}, errors.New("llm requires command, absolute script, and supported provider_bridge_version pi-ai-1.3.0-v1")
+	nativeBridge := cfg.LLM.ProviderBridgeVersion == "steward-go-v1" && filepath.IsAbs(cfg.LLM.ProviderBridgeCommand) && cfg.LLM.ProviderBridgeScript == "-model-bridge"
+	legacyBridge := filepath.IsAbs(cfg.LLM.ProviderBridgeScript) && cfg.LLM.ProviderBridgeVersion == "pi-ai-1.3.0-v1"
+	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && !nativeBridge && !legacyBridge {
+		return Config{}, errors.New("llm requires a native steward-go-v1 bridge or a supported external RPC bridge")
 	}
 	switch cfg.LLM.AccountSecretStore {
 	case "", "file", "native":

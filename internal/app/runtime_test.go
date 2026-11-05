@@ -3,14 +3,72 @@ package app
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/config"
 	"github.com/z-chenhao/assistant/internal/llm/memory"
 	"github.com/z-chenhao/assistant/internal/skill"
+	"github.com/z-chenhao/assistant/internal/tool"
+	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
+
+// Exercise production composition rather than marking a test registry ourselves.
+// New builtin registrations must inherit the single model-facing entry point.
+func TestProductionToolSurfaceUsesOnlyCodeMode(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script, err := filepath.Abs("../../runtime/javascript/src/sidecar.mjs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, configured := range []bool{true, false} {
+		name := "configured"
+		if !configured {
+			name = "missing-runtime-does-not-enable-native-fallback"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			cfg, err := config.Load("", func(key string) (string, bool) { return root, key == "STEWARD_DATA_ROOT" })
+			if err != nil {
+				t.Fatal(err)
+			}
+			if configured {
+				cfg.JavaScript = &config.JavaScript{Command: node, Script: script}
+			}
+			registry, err := (&App{}).runtimeRegistry(context.Background(), cfg, "", memory.New(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, spec := range registry.Describe() {
+				if spec.Name != codemode.ToolName && !spec.CodeModeOnly {
+					t.Errorf("production registration permits native calls: %s", spec.Name)
+				}
+			}
+			for role, specs := range map[string][]tool.Spec{"main": agent.MainTools(registry.Describe()), "worker": agent.WorkerTools(registry.Describe())} {
+				// Treat every frozen tool as loaded to test the strongest checkpoint
+				// forgery, not just the ordinary initial projection.
+				loaded := make([]string, 0, len(specs))
+				for _, spec := range specs {
+					loaded = append(loaded, spec.Name)
+				}
+				declared := agent.ProviderTools(specs, loaded)
+				if configured {
+					if len(declared) != 1 || declared[0].Name != codemode.ToolName {
+						t.Fatalf("%s declares native tools: %+v", role, declared)
+					}
+				} else if len(declared) != 0 {
+					t.Fatalf("%s falls back to native tools without runtime: %+v", role, declared)
+				}
+			}
+		})
+	}
+}
 
 func TestCoreExecutionAndSkillDiscoveryAreAvailableWithoutOptionalConfig(t *testing.T) {
 	root := t.TempDir()
@@ -33,8 +91,8 @@ func TestCoreExecutionAndSkillDiscoveryAreAvailableWithoutOptionalConfig(t *test
 		}
 	}
 	list, _ := registry.Resolve("builtin__skill_list")
-	if result := list.Execute(context.Background(), `{}`); result.Error != nil || result.Text != "[]" {
-		t.Fatal("empty catalog not usable", result)
+	if result := list.Execute(context.Background(), `{}`); result.Error != nil || !strings.Contains(result.Text, `"name":"intelligent_ui"`) {
+		t.Fatal("builtin catalog not usable", result)
 	}
 	if _, err := os.Stat(cfg.Execution.Root); !os.IsNotExist(err) {
 		t.Fatal("registry discovery created execution files")

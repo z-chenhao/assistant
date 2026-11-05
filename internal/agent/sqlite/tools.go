@@ -56,10 +56,11 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 			}
 			return llm.ModelIncompatible
 		}
+		declared := map[string]bool{}
 		if parent == "" {
 			// Only calls in a persisted complete model response can be accepted.
-			var value string
-			if err := tx.QueryRowContext(ctx, `SELECT result_json FROM model_generation WHERE generation_id=? AND run_id=? AND status='completed'`, exchange, t.claim.RunID()).Scan(&value); err != nil {
+			var value, requestJSON string
+			if err := tx.QueryRowContext(ctx, `SELECT result_json,request_json FROM model_generation WHERE generation_id=? AND run_id=? AND status='completed'`, exchange, t.claim.RunID()).Scan(&value, &requestJSON); err != nil {
 				return err
 			}
 			var response llm.GenerationResult
@@ -70,6 +71,13 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 			b, _ := encoded(calls)
 			if a != b {
 				return tool.ErrReplay
+			}
+			var request llm.GenerationRequest
+			if json.Unmarshal([]byte(requestJSON), &request) != nil {
+				return agent.ErrStorage
+			}
+			for _, spec := range request.Tools {
+				declared[spec.Name] = true
 			}
 		} else {
 			var valid bool
@@ -108,11 +116,13 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 				policy := "never"
 				p := tool.Spec{}.Policy()
 				keys := []string{}
+				undeclared := false
 				for _, spec := range specs {
 					if spec.Name == call.Name {
+						undeclared = spec.Exposure == tool.Hidden || (parent == "" && spec.CodeModeOnly) || (parent != "" && spec.Exposure == tool.ModelOnly) || (parent == "" && spec.Searchable() && !declared[call.Name])
 						p = spec.Policy()
 						policy = p.Replay
-						if d, ok := t.runs.registry.Resolve(spec.Name); ok && d.ConflictKeys != nil && tool.Validate(spec.InputSchema, call.Arguments) {
+						if d, ok := t.runs.registry.Resolve(spec.Name); !undeclared && ok && d.ConflictKeys != nil && tool.Validate(spec.InputSchema, call.Arguments) {
 							keys = d.ConflictKeys(call.Arguments)
 						}
 					}
@@ -152,7 +162,9 @@ func (t *tools) accept(ctx context.Context, exchange string, calls []llm.ToolCal
 					return err
 				}
 				rejection := tool.Result{}
-				if !allowed {
+				if undeclared {
+					rejection = tool.Failure("NOT_FOUND")
+				} else if !allowed {
 					rejection = tool.Failure("RESOURCE_LIMIT")
 				} else if call.Name == agent.RunToolName {
 					rejection, err = t.runs.StartChildRun(ctx, tx, t.claim, inv)
@@ -256,12 +268,12 @@ func (t *tools) Start(ctx context.Context, id string) error {
 		// The Code Mode wrapper coordinates nested ToolInvocations; it never
 		// owns their execution slots. Counting it would deadlock a limit of one.
 		// Its VM remains bounded by the Loop/Executor and JavaScript limits.
-		// Main must be able to search/control Tasks while its data tools fill
+		// Main must be able to discover tools and search/control Tasks while its data tools fill
 		// every execution slot. These bounded Host transactions have no provider
 		// effect and retain ordinary admission, fencing and role checks.
 		family, trusted := tool.HostFamily(inv.Call.Name)
 		definition, registered := t.runs.registry.Resolve(inv.Call.Name)
-		control := trusted && registered && definition.Host && family == tool.TaskBuiltin
+		control := trusted && registered && definition.Host && (family == tool.TaskBuiltin || family == tool.SearchBuiltin)
 		if inv.Call.Name != codemode.ToolName && !control {
 			// Actual Tools share atomic quotas/conflicts across direct and nested
 			// calls. Expired owners and wrappers retain no execution capacity.
@@ -453,7 +465,7 @@ func (t *tools) Prepare(ctx context.Context, id string) (tool.Invocation, error)
 		}
 		// Computer bridge declarations are read_only, but their accepted
 		// per-action policy can be high risk. Honor that frozen action policy.
-		if rejection == "" && (p.Risk == "high" || d.Spec.Permission != "read_only" && d.Spec.Permission != "artifact_write" && inv.Call.Name != task.ManageName) {
+		if rejection == "" && (p.Risk == "high" || d.Spec.Permission != "read_only" && d.Spec.Permission != "artifact_write" && d.Spec.Permission != "ui_present" && inv.Call.Name != task.ManageName) {
 			var external bool
 			if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM github_task_followup WHERE run_id=?)`, t.claim.RunID()).Scan(&external); err != nil {
 				return err

@@ -17,6 +17,8 @@ flowchart TD
     E <--> S["固定源 / Store / replay 记录"]
 ```
 
+Code Mode 是 Main 与 Worker 新生产 Run 的统一模型工具入口。普通工具只存在于各角色的冻结脚本目录中；脚本 `searchTools` 复用 BM25 发现，默认 8 个，不改变模型工具集。每个嵌套调用仍进入 Host 执行器、精确审批和持久恢复；Main 的脚本不取得 Worker 的文件、Computer 或 Child 权限。具体契约见[统一工具方案](tools-approvals.md#mcp-渐进暴露与动态声明)。
+
 ### 执行协调边界（F-039）
 
 `internal/tool/codemode/execution.go` 拥有 VM 尝试、最多三次 transport 重建、已存 outcome 复用、嵌套调用 drain 与挂起协调。消费方定义 `ExecutionHost`，SQLite 的 `codeBridge` 提供 claim/fence、读取/记录 outcome、原子事件接纳、release 和 Computer idle。所有工具仍进入原 Tool Executor；VM 不接触数据库或模型凭据。shutdown watcher 在返回前 join。指纹、source、call key、既存 schema 与重放结果保持不变。
@@ -50,7 +52,7 @@ flowchart TD
 - 采用类似 Pi 1.2.0 / CUA REPL 的 JavaScript Code Mode。
 - 模型侧只暴露一个**代码执行入口** `builtin__codemode_execute`；这不排斥经过 Tool Exposure Policy 选出的普通 Direct Tool。输入直接使用 JavaScript 源码，不再另设 `builtin__computer_run`、Agent 专用 Code Cell 或第二个 CUA JavaScript 工具。
 - Agent 可以在 Code Mode 中搜索、组合和调用工具。
-- Code Mode 在同一个 JavaScript Code Cell 中按 Capability Policy 注入 `tools.*`、`cua.*` 与可选的 `agent.*`：三者只是同一 Tool Registry 和 ToolInvocation 管线的不同 Facade，不创建第二种 Code Cell 或 Agent 专用执行协议。Main 默认不注入 `agent.*`，Worker 在允许委派时注入。
+- Code Mode 向新 Main 与 Worker 提供，在同一个 JavaScript Code Cell 中按 Capability Policy 注入 `tools.*`、`cua.*` 与可选的 `agent.*`：三者只是同一 Tool Registry 和 ToolInvocation 管线的不同 Facade，不创建第二种 Code Cell 或 Agent 专用执行协议。新 Main 只注入自身冻结的 `tools.*`，不获得内部 Computer bridge、`cua` 调用权或 `agent.run` 权限。旧 Run 按其原冻结能力恢复。
 - 简单工具调用仍允许直接执行；复杂工作可在一次 JavaScript 执行中组织多个工具调用。
 - 核心后端使用 Go；模型生成的 JavaScript 运行在独立的 QuickJS 隔离环境中，不直接拥有 Node.js、文件系统、网络或定时器能力，只能通过宿主注入的受控能力访问外部世界。MVP 固定采用独立 Node.js Sidecar 承载 Pi Code Mode 的 QuickJS Worker；Node.js 只是宿主，不是脚本的安全边界。
 - 每次 `builtin__codemode_execute` 都创建一次性 QuickJS 执行环境，调用完成、失败或取消后销毁；不提供跨调用持久 JavaScript REPL。长期状态保存在 Task/Run、ToolInvocation、Code Mode Store、Computer Checkpoint 和 ArtifactStore 中，而不是 JS Heap 中。
@@ -383,3 +385,7 @@ dispatch audits, reattached identities, quotas, final aggregation, memory
 metrics and cleanup. The normal CLI harness covers unawaited work, Store
 isolation, approval rejection and crashes before/after effects. Both harnesses are available through the system runner; repetition is explicit. Fake-clock tests advance approval by six hours
 and prove the disposed VM is not retained.
+
+## Main 呈现能力
+
+Main 在同一 Code Mode 工具目录中发现 intelligent_ui_show，先读取 intelligent_ui Skill，再提交原生组件或交互片段。Code Mode 不执行 Widget 代码，也不访问浏览器 DOM；实际呈现与提问桥接属于 [Intelligent UI](intelligent-ui.md)。模型工具声明仍只有 Code Mode。

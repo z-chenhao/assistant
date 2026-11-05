@@ -16,7 +16,7 @@ import (
 )
 
 // Pause after the observer's Guard, before the real usage transaction. A second
-// Host/DB handle then mutates auth while Go -> Node -> Pi has already completed.
+// Host/DB handle then mutates auth while Host -> native Go SDK has already completed.
 func TestAccountFinalAcceptanceSerializesWithAuthMutation(t *testing.T) {
 	for _, mode := range []string{"unchanged", "refresh", "logout", "reauthorize", "auth-loss", "storage-failure"} {
 		t.Run(mode, func(t *testing.T) {
@@ -49,11 +49,8 @@ func TestAccountFinalAcceptanceSerializesWithAuthMutation(t *testing.T) {
 				}
 				return s.Models().RecordUsage(ctx, r, result, latency, cause)
 			})
-			script, err := filepath.Abs("../../../provider-bridge/test/account-completion.mjs")
-			if err != nil {
-				t.Fatal(err)
-			}
-			client, err := bridge.OpenLocal(ctx, "node", script, m.Resolver(nil), observer)
+			command, script := nativeModelPeer(t)
+			client, err := bridge.OpenLocal(ctx, command, script, m.Resolver(nil), observer)
 			if err != nil {
 				t.Fatal(err)
 			}

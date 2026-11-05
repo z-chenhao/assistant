@@ -219,6 +219,9 @@ func (l *agentLoop) collectTools(r Run) (bool, error) {
 			return false, j.err
 		}
 		for i, result := range j.results {
+			if err := applyToolLoads(&cp, r.Tools, batch.Calls[i].Name, result); err != nil {
+				return false, err
+			}
 			ref := operationRef(batch.Step, i)
 			m := RuntimeContext("tool_results", "", result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT", struct {
 				OperationRef string      `json:"operation_ref"`

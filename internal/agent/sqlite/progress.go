@@ -39,7 +39,7 @@ func (r *Runs) checkpointProgress(ctx context.Context, tx *sql.Tx, c agent.RunCl
 		return false, nil
 	}
 	var eligible bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM run r,json_each(r.checkpoint_json,'$.messages') m WHERE r.run_id=? AND r.kind='worker' AND r.worker_position='root' AND json_extract(m.value,'$.type')='system' AND json_extract(m.value,'$.source.kind')='progress_guidance')`, c.RunID()).Scan(&eligible); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM run r,json_each(r.checkpoint_json,'$.messages') m,json_each(m.value,'$.system_sections') section WHERE r.run_id=? AND r.kind='worker' AND r.worker_position='root' AND json_extract(m.value,'$.type')='system' AND json_extract(section.value,'$.kind')='progress_guidance')`, c.RunID()).Scan(&eligible); err != nil {
 		return false, err
 	}
 	if !eligible {

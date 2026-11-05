@@ -45,7 +45,7 @@ Go 工程结构减少跨领域的适配器依赖与入口内的多阶段控制�
 
 正常使用方式不变。开发时从所属包进入，跨领域的原子变更继续由原 Host 事务接纳。Computer 适配器通过 `ExecutionHost` 加入既有 fenced transaction，不打开第二个数据库连接或自行调度。App 不再导出执行用的 SQLite Runs 访问器，也不向 CLI 返回 SQLite 自有的展示类型。
 
-内部职责拆分须保持 CLI 命令参数、JSON 字段、HTTP 路由、审批/重放语义、schema 及冻结指纹一致。模块依赖与边界详见并列技术方案；测试方案列出已有集成回归如何覆盖拆出的模块。
+内部职责拆分须保持 CLI 命令参数、JSON 字段、HTTP 路由、审批/重放语义、schema 及冻结指纹一致。LLM 契约、协议实现与 RPC 适配器的依赖方向由 Go 传递依赖测试保护；生产工具装配与 Code Mode 的大目录、审批、慢调用响应场景进入 PR 门禁。模块依赖与边界详见并列技术方案；测试方案列出已有集成回归如何覆盖拆出的模块。
 
 ## 如何使用
 
@@ -163,7 +163,7 @@ decision history and execution evidence remain in PRs, Git history or CI artifac
 | Release | Extended regression, race checks, native packages and relevant live compatibility checks |
 
 Go package tests currently mix unit and component integration checks; `go test
-./...` is not called a pure UT suite. The nine deterministic core system gates
+./...` is not called a pure UT suite. The ten deterministic core system gates
 run in PR CI. Extended system coverage and the full race inventory run separately
 on a weekly schedule or manual request. See [CI](../designs/engineering.md#ci-continuous-integration-and-delivery).
 

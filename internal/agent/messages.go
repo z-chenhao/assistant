@@ -14,6 +14,7 @@ import (
 // profile. False preserves pre-image-input request bytes during recovery.
 func ProviderMessages(messages []AgentMessage, userImages bool) ([]llm.Message, error) {
 	out := make([]llm.Message, 0, len(messages))
+	systemSeen := false
 	for _, m := range messages {
 		parts, err := conversation.Normalize(m.Content)
 		if err != nil {
@@ -22,6 +23,10 @@ func ProviderMessages(messages []AgentMessage, userImages bool) ([]llm.Message, 
 		role := ""
 		switch m.Type {
 		case "system":
+			if systemSeen || len(out) != 0 {
+				return nil, llm.ModelIncompatible
+			}
+			systemSeen = true
 			role = "system"
 		case "user":
 			role = "user"

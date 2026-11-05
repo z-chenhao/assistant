@@ -22,29 +22,21 @@ type ContextOptions struct {
 
 func InitialContext(o ContextOptions) []AgentMessage {
 	safety, worker, execution := prompt.Safety(), prompt.Worker(), "<execution_rules>\n"+prompt.Execution()+"\n</execution_rules>"
-	// A descendant inherits stable rules already frozen by its Parent. Capability
-	// guidance is derived again only from the Parent's reduced, frozen Tool specs.
-	for i, m := range o.ParentSystem {
+	// Inherit typed, frozen sections, never parse model-facing text or import
+	// the parent's transcript/capability index into a Child.
+	for _, m := range o.ParentSystem {
 		if m.Type != "system" {
 			continue
 		}
-		if m.Source == nil {
-			if i == 0 {
-				safety = messageText(m)
+		for _, section := range m.SystemSections {
+			switch section.Kind {
+			case "safety":
+				safety = section.Text
+			case "worker_role":
+				worker = section.Text
+			case "execution":
+				execution = section.Text
 			}
-			if strings.HasPrefix(messageText(m), "You are a general Worker executing a delegated Task.") {
-				worker = messageText(m)
-			}
-			continue
-		}
-		if m.Source.Kind == "safety" {
-			safety = messageText(m)
-		}
-		if m.Source.Kind == "worker_role" {
-			worker = messageText(m)
-		}
-		if m.Source.Kind == "execution" {
-			execution = messageText(m)
 		}
 	}
 	safetyPart := systemPart("safety", safety)
@@ -58,6 +50,9 @@ func InitialContext(o ContextOptions) []AgentMessage {
 		out = []AgentMessage{safetyPart, systemPart("worker_role", worker)}
 	default:
 		panic("invalid context position")
+	}
+	if o.Position == "main" {
+		execution = strings.TrimSuffix(execution, "\n</execution_rules>") + "\n" + prompt.MainExecution() + "\n</execution_rules>"
 	}
 	out = append(out, systemPart("execution", execution))
 	if o.Position == "root" {
@@ -85,8 +80,6 @@ func InitialContext(o ContextOptions) []AgentMessage {
 			rule = prompt.Artifacts()
 		case s.Name == "builtin__memory_search":
 			rule = prompt.Memory()
-		case s.Name == "builtin__skill_view":
-			rule = prompt.Skills()
 		}
 		if rule != "" && !seen[rule] {
 			rules = append(rules, "- "+rule)
@@ -96,16 +89,18 @@ func InitialContext(o ContextOptions) []AgentMessage {
 	if len(rules) > 0 {
 		out = append(out, systemPart("capabilities", "<capability_guidance>\n"+strings.Join(rules, "\n")+"\n</capability_guidance>"))
 	}
-	for _, s := range o.Tools {
-		for _, p := range s.PromptContext {
-			// Only these local Host adapters may contribute resource sections.
-			if !(p.Kind == "skill_index" && s.Name == "builtin__skill_list") {
-				continue
-			}
-			raw, _ := json.Marshal(p)
-			out = append(out, systemPart(p.Kind, "<"+p.Kind+">\n"+string(raw)+"\n</"+p.Kind+">"))
-		}
+	if index := mcpServerIndex(o.Tools); index != "" {
+		out = append(out, systemPart("mcp_servers", index))
 	}
+	sections := make([]SystemSection, 0, len(out))
+	texts := make([]string, 0, len(out))
+	for _, m := range out {
+		sections = append(sections, SystemSection{Kind: m.Source.Kind, Text: messageText(m)})
+		texts = append(texts, messageText(m))
+	}
+	combined := systemPart("system_prompt", strings.Join(texts, "\n\n"))
+	combined.SystemSections = sections
+	out = []AgentMessage{combined}
 	if o.Position != "main" {
 		text := o.Task
 		if o.Position == "root" {
@@ -120,6 +115,33 @@ func InitialContext(o ContextOptions) []AgentMessage {
 		out = append(out, m)
 	}
 	return out
+}
+
+// FrozenSystemSections validates the Host snapshot used for Child inheritance.
+func FrozenSystemSections(messages []AgentMessage) ([]SystemSection, bool) {
+	var found []SystemSection
+	for _, m := range messages {
+		if m.Type != "system" {
+			continue
+		}
+		if found != nil || len(m.SystemSections) == 0 {
+			return nil, false
+		}
+		texts := []string{}
+		kinds := map[string]bool{}
+		for _, section := range m.SystemSections {
+			if section.Kind == "" {
+				return nil, false
+			}
+			kinds[section.Kind] = true
+			texts = append(texts, section.Text)
+		}
+		if !kinds["safety"] || !kinds["execution"] || (!kinds["main_role"] && !kinds["worker_role"]) || strings.Join(texts, "\n\n") != messageText(m) {
+			return nil, false
+		}
+		found = m.SystemSections
+	}
+	return found, len(found) > 0
 }
 
 func systemPart(kind, text string) AgentMessage {

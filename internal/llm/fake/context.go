@@ -14,10 +14,11 @@ import (
 // receipt ordinals so protocol tests can continue after real context selection.
 // This deliberately makes no claim about semantic summarization quality.
 type fixtureContextSummary struct {
-	Fixture    bool                `json:"fixture_context_summary"`
-	Completed  []string            `json:"completed_call_ids"`
-	Batch      fixtureBatchSummary `json:"batch"`
-	TaskUpdate bool                `json:"task_update,omitempty"`
+	Fixture       bool                `json:"fixture_context_summary"`
+	Completed     []string            `json:"completed_call_ids"`
+	Batch         fixtureBatchSummary `json:"batch"`
+	TaskUpdate    bool                `json:"task_update,omitempty"`
+	UnknownEffect bool                `json:"unknown_effect,omitempty"`
 }
 
 type fixtureBatchSummary struct {
@@ -42,6 +43,7 @@ func contextReply(request llm.GenerationRequest) llm.GenerationResult {
 	for _, m := range sources {
 		old := contextSummary(m)
 		summary.TaskUpdate = summary.TaskUpdate || old.TaskUpdate || m.Origin == "runtime" && m.Source != nil && m.Source.Kind == "task_update"
+		summary.UnknownEffect = summary.UnknownEffect || old.UnknownEffect || strings.Contains(m.Text, "UNKNOWN_SIDE_EFFECT")
 		if old.Fixture && old.Batch.Next > summary.Batch.Next {
 			summary.Batch = old.Batch
 		}
@@ -78,6 +80,27 @@ func contextReply(request llm.GenerationRequest) llm.GenerationResult {
 
 func contextReceipts(m llm.Message) []string {
 	return contextSummary(m).Completed
+}
+
+// Retrieval and compaction are context, not another scripted user command.
+// Keep the Main fixture's completed step when either follows its tool result.
+func mainFixtureMessage(messages []llm.Message) llm.Message {
+	var last llm.Message
+	for _, m := range messages {
+		if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Retrieved durable context") {
+			continue
+		}
+		if state := contextSummary(m); state.Fixture {
+			for _, id := range state.Completed {
+				if id == "echo-a" || id == "echo-b" {
+					last = llm.Message{Role: "tool", ToolCallID: id}
+				}
+			}
+			continue
+		}
+		last = m
+	}
+	return last
 }
 
 func contextSummary(m llm.Message) fixtureContextSummary {

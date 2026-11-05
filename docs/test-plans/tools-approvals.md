@@ -18,6 +18,10 @@
 
 覆盖批准前/后及 dispatch 前/后中断、Steering 失效审批、可信 query、过期/冲突决定和 unknown 保留。断言外部效果次数与内部回执身份。
 
+`TestMainToolsAllowConfiguredBusinessAndExcludeWorkerExecution` 验证 Main 获得 Skill 与 Host 配置的读/写 MCP，未知 builtin、非业务权限 MCP、原生执行工具及内部桥接仍被排除。`TestMainAndWorkerUseOnlyCodeModeWithinTheirFrozenRole` 通过真实 SQLite/Actor/QuickJS 验证模型仅有 Code Mode 入口、Main 脚本创建 Task、Worker 脚本调用自身工具，以及顶层绕过在参数校验前返回 NOT_FOUND。`TestMainPendingApprovalAcceptsSteeringWithoutDispatch` 验证新 Main 的未执行审批遇到纠正后失效且零派发。LegacyMain 回归保留旧冻结能力的费用等待及 pending 结果恢复，不热更新权限。
+
+CLI capabilities 的 `main-business` 场景通过真实 stdio MCP 验证 Main 查询与 Skill 读取不创建 Worker、拒绝写入零派发、批准后仅执行一次；持有慢 MCP 时在释放屏障前先回复新输入，之后交付原结果，调用 attempt 仍为一。该场景记录观察延迟，不将宿主同步窗口视为端到端响应 SLA。
+
 - 单元/组件：规则、实际 SQLite 和协议边界在所属模块验证。
 - 系统：用真实 CLI/Web/Actor/Bridge 链路证明目标行为；允许受控外部 peer，不能伪造产品内部接受结果。
 - Live/质量：涉及真实账户、Guest 平台或语义质量时单独记录环境与证据；不适用项说明理由，不用软件回归代替。
@@ -67,3 +71,21 @@ establish those capabilities or full Golden Case scores.
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## 渐进工具发现与 500 工具目录
+
+`TestMCPConfigurationHasOneInvocationPath` 验证 MCP 无模式配置，并拒绝过时的 exposure 与单工具覆盖字段。`TestMCPDiscovers500ToolsWithoutChangingExecutionIdentity` 使用真实 stdio peer 验证 500 工具发现、展示变更不重绑执行资源及旧直接声明快照恢复。
+
+`TestLegacyMainLoadsOneOf500ToolsAndWorkerUsesCodeModeWithoutLoading` 通过实际 Actor/SQLite/QuickJS 验证旧冻结面的 Main 搜索加载与 Worker 脚本调用。`TestLoadedToolSurvivesApprovalWaitAndPresentationChange` 验证旧冻结面等待、重建适配器和配置变化后仍只执行原批准动作一次。`TestLoadedDeclarationsRemainSeparateFromAuthorityAndWorkingState` 验证历史加载状态不随语义压缩丢失，外部结果不能激活工具；隐藏、内部及范围外工具不能加载。`TestMainToolSearchRespondsWithFullToolCapacity` 保护历史发现入口在满载时的新输入响应。新 Run 的统一入口由下述 Code Mode-only 场景验证。
+
+CLI capabilities 的 `tool-loading` 场景在真实 stdio MCP 的 500 工具目录中验证无原生 MCP 声明、默认 8 条描述匹配、直接绕过拒绝，以及 Worker 通过 Code Mode 调用全部允许工具。该场景用 16K 测试窗口容纳显式历史工具面的固定控制声明及多轮结果；全量 500 个 Schema 不进入模型请求。实际模型的检索与任务分流质量仍需独立评测。
+
+记忆维护综合场景使用 16K 模型窗口容纳新增控制/发现 Schema 和受保护记忆结果；24 条长历史合计超过该窗口，继续断言真实摘要执行、私有历史 Artifact 和原始消息保留。独立的小窗口拒绝/压缩 Go 回归保持原参数。
+
+### Code Mode-only 与冻结兼容
+
+`TestProductionToolSurfaceUsesOnlyCodeMode` 调用实际生产 registry 组装，检查全部已注册 builtin 的调用约束，避免仅在测试里重建相同标记。Main 与 Worker 即使收到包含全部工具名的伪造 loaded checkpoint，也只能声明 Code Mode；缺少 JavaScript 运行时不得回退为原生工具。该测试随 `make test` 在每次代码 PR 中运行。
+
+真实 Main/Worker 组件场景验证模型只声明 Code Mode、Main 脚本能创建 Task、Worker 脚本只能看到自身冻结权限，以及伪造顶层普通工具调用在 schema 校验前被拒绝。真实 500 工具 stdio 场景检查无原生 MCP 声明、脚本搜索默认 8 条、全部 500 个允许工具可通过 Code Mode 发现且直接绕过失败。原生模型系统回归检查实际 HTTP tools 数组仅含 Code Mode，并从数据库独立核对被隐藏的角色权限仍存在。旧冻结面和加载 checkpoint 的回归用于证明恢复兼容，不代表新增暴露模式。
+
+PR 的 `Ubuntu checks` 显式运行 capabilities 的 `tool-loading` 与 `main-business` 两个场景，使用真实 MCP/QuickJS/SQLite 验证目录规模、具体动作审批与慢工具挂起期间的 Main 响应，并保留失败证据。完整回归仍覆盖相同场景；不需要真实模型账号。

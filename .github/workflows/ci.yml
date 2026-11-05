@@ -58,6 +58,11 @@ jobs:
         run: |
           python3 tests/system/process_step.py --name task-code-environments --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario task-code-environments --evidence evidence/task-code-environments.json
           exec python3 tests/system/process_step.py --name task-code-recovery --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario task-code-recovery --evidence evidence/task-code-recovery.json
+      - name: Code Mode discovery, approval and Main responsiveness
+        if: steps.scope.outputs.docs_only != 'true'
+        run: |
+          python3 tests/system/process_step.py --name codemode-catalog --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario tool-loading --evidence evidence/codemode-catalog.json
+          exec python3 tests/system/process_step.py --name codemode-main --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario main-business --evidence evidence/codemode-main.json
       - name: Native Linux account credentials
         if: steps.scope.outputs.docs_only != 'true'
         run: exec python3 tests/system/process_step.py --name native-account --phase test -- python3 tests/system/entrypoint.py tests/system/verify_account.py --binary bin/steward --native-secret-service --evidence evidence/native-account.json

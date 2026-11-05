@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
-func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
+func TestNativeBridgeClippingCrashAndRestart(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	var partial atomic.Bool
@@ -35,12 +34,11 @@ func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
 		fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":8,\"total_tokens\":15}}\n\ndata: [DONE]\n\n")
 	}))
 	defer server.Close()
-	script, err := filepath.Abs("../../../provider-bridge/bridge.mjs")
-	if err != nil {
-		t.Fatal(err)
-	}
+	command, argument := nativeBridgeProcess(t)
 	endpoint := server.URL + "/v1"
-	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (Connection, error) { return Connection{Endpoint: endpoint}, nil }, nil)
+	client, err := OpenLocal(ctx, command, argument, func(context.Context, llm.Snapshot) (llm.Connection, error) {
+		return llm.Connection{Endpoint: endpoint}, nil
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +47,7 @@ func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
 	r := llm.GenerationRequest{GenerationID: "one", RunID: "run", SessionID: "run", OutputLimitBytes: 8, Snapshot: llm.Snapshot{SnapshotID: "s", ProviderKind: "openai_compatible", WireAPI: "openai_completions", EndpointHash: hash, ModelID: "fixture-model", ContextWindow: 8192, MaxOutputTokens: 1024, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}}, Messages: []llm.Message{{Role: "user", Text: "hello"}}}
 	result, err := client.Generate(ctx, r, nil)
 	if err != nil || !result.Clipped || result.Text != "ABCDEFGH" || result.Usage == nil || result.Usage.InputTokens != 7 {
-		t.Fatal("actual Pi clipping/usage", result, err)
+		t.Fatal("native bridge clipping/usage", result, err)
 	}
 	partial.Store(true)
 	r.GenerationID = "two"
@@ -66,7 +64,7 @@ func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
 	if err != llm.ProviderUnavailable || result.Text != "" {
 		t.Fatal("partial crash published completion", result, err)
 	}
-	models, err := client.CatalogAt(ctx, Connection{Endpoint: endpoint})
+	models, err := client.CatalogAt(ctx, llm.Connection{Endpoint: endpoint})
 	if err != nil || len(models) != 1 || models[0].ModelID != "fixture-model" {
 		t.Fatal("same Bridge restart", models, err)
 	}
@@ -75,7 +73,7 @@ func TestActualPiBridgeClippingCrashAndRestart(t *testing.T) {
 	}
 }
 
-func TestActualPiDisposeSettlesMatchingGenerateAndContinue(t *testing.T) {
+func TestNativeBridgeDisposeSettlesMatchingGenerateAndContinue(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	closed := make(chan string, 3)
@@ -89,9 +87,11 @@ func TestActualPiDisposeSettlesMatchingGenerateAndContinue(t *testing.T) {
 		closed <- r.Header.Get("session_id")
 	}))
 	defer server.Close()
-	script, _ := filepath.Abs("../../../provider-bridge/bridge.mjs")
+	command, argument := nativeBridgeProcess(t)
 	endpoint := server.URL + "/v1"
-	client, err := OpenLocal(ctx, "node", script, func(context.Context, llm.Snapshot) (Connection, error) { return Connection{Endpoint: endpoint}, nil }, nil)
+	client, err := OpenLocal(ctx, command, argument, func(context.Context, llm.Snapshot) (llm.Connection, error) {
+		return llm.Connection{Endpoint: endpoint}, nil
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

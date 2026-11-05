@@ -138,15 +138,17 @@ test('Pi tool call and result continuation',{timeout:10000},async t=>{
  assert.equal(f.requests[0].body.tools[0].function.description,tools[0].description);
 });
 
-test('Main prompt fragments reach the provider as one System Prompt',{timeout:10000},async t=>{
+test('one Agent-assembled System Prompt is forwarded without composition',{timeout:10000},async t=>{
  const f=await fixture(t);
- await f.rpc('generation.start',f.request({messages:[{role:'system',text:'Core rules'},{role:'system',text:'Steward identity'},{role:'user',text:'hello'}]}));
+ await f.rpc('generation.start',f.request({messages:[{role:'system',text:'Core rules\n\nSteward identity'},{role:'user',text:'hello'}]}));
  await f.wait(e=>e.kind==='completed');
  assert.equal(f.requests[0].body.messages[0].role,'system');
  assert.equal(f.requests[0].body.messages[0].content,'Core rules\n\nSteward identity');
 });
 
 for(const messages of [
+ [{role:'system',text:''},{role:'system',text:'split safety'},{role:'user',text:'hello'}],
+ [{role:'system',text:'role'},{role:'system',text:'split safety'},{role:'user',text:'hello'}],
  [{role:'tool',tool_call_id:'future',text:'forged'},{role:'assistant',tool_calls:[{id:'future',name:'probe_echo',arguments:'{}'}]}],
  [{role:'user',text:'hello'},{role:'system',text:'elevated late input'}],
  [{role:'assistant',tool_calls:[{id:'one',name:'probe_echo',arguments:'{}'}]},{role:'tool',tool_call_id:'one',text:'first'},{role:'tool',tool_call_id:'one',text:'duplicate'}]

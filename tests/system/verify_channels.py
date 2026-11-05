@@ -41,6 +41,9 @@ class ChannelHarness(MainHarness):
         super().__init__(binary, root, fixture)
         self.config = root / 'config.yaml'
         self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:STEWARD_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:STEWARD_FEISHU_VERIFY\n  encrypt_key_ref: env:STEWARD_FEISHU_ENCRYPT\n  access_token_ref: env:STEWARD_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
+        if not fixture:
+            from codemode_peer import runtime_yaml
+            self.config.write_text(self.config.read_text() + runtime_yaml())
         self.env.update(STEWARD_WEB_TEST_TOKEN=TOKEN, STEWARD_FEISHU_VERIFY='sandbox-verify-token',
                         STEWARD_FEISHU_ENCRYPT='sandbox-encrypt-key', STEWARD_FEISHU_ACCESS='sandbox-access-token')
         self.bind = self.command('channel','manage',text=json.dumps(dict(op='bind',channel='feishu',subject='sandbox-tenant:sandbox-app:owner',destination='bound-chat',enabled=True,version=0)))
@@ -122,13 +125,21 @@ class ChannelHarness(MainHarness):
                 deliveries='SELECT delivery_id,message_id,channel,destination_ref,status,attempt_count,version FROM delivery_request ORDER BY created_at,delivery_id',
                 receipts='SELECT * FROM channel_receipt ORDER BY delivery_id,part',
                 approvals='SELECT approval_id,frozen_arguments_hash,status FROM approval ORDER BY created_at',
-                tools='SELECT tool_name,arguments_json,status,attempt_count FROM tool_invocation ORDER BY created_at',
+                tools="SELECT tool_name,arguments_json,status,attempt_count,json_extract(error_json,'$.code') AS error_code FROM tool_invocation ORDER BY created_at",
                 runs='SELECT run_id,kind,worker_position,status FROM run ORDER BY created_at',
                 resources='SELECT * FROM channel_resource',
                 projections='SELECT * FROM delivery_projection').items()}
 
     def wait(self,predicate,description):
-        return self.wait_state(predicate,description,lambda _:self.rows(),timeout=20)
+        try:
+            return self.wait_state(predicate,description,lambda _:self.rows(),timeout=20)
+        except RuntimeError as error:
+            # Bounded fixture state, without arguments, message bodies or credentials.
+            state=self.rows()
+            diagnostic={name:[{key:row[key] for key in keys} for row in state[name][-12:]]
+                        for name,keys in dict(runs=['kind','status'], tools=['tool_name','status','attempt_count','error_code'],
+                                              approvals=['status'], deliveries=['channel','status']).items()}
+            raise RuntimeError(str(error)+'; fixture state: '+json.dumps(diagnostic)) from error
 
     def browser(self,evidence,phase):
         env=self.env.copy()
@@ -236,7 +247,12 @@ def attention_workspace(binary, evidence, report):
     with tempfile.TemporaryDirectory(prefix='steward-web-attention-') as temp, Sandbox() as platform:
         h = ChannelHarness(binary, Path(temp), platform, fixture='tasks')
         try:
-            h.setup()
+            # This channel workload retains six Tasks/feedback turns. Compaction
+            # has separate gates; use the same explicit window as Feishu reviews.
+            h.setup(metadata=dict(name='Web attention workload', provider_kind='openai_compatible',
+                                  endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+                                  model_id='fixture-model', context_window=32768, max_output_tokens=1024,
+                                  compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
             h.send('question-task', 'Ongoing: Prepare the quarterly report'); h.command('chat', 'work')
             with closing(sqlite3.connect(h.root/'data/state.db')) as db:
                 ref = db.execute('SELECT task_ref FROM task').fetchone()[0]
@@ -639,9 +655,8 @@ def streaming_replies(binary, evidence, report):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            h.config.write_text(h.config.read_text() + 'llm:\n  provider_bridge_command: node\n  provider_bridge_script: ' +
-                                json.dumps(str(ROOT/'provider-bridge/bridge.mjs')) +
-                                '\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: ' + json.dumps(broker.url) + '\n')
+            h.config.write_text(h.config.read_text() + 'llm:\n  provider_bridge_command: ' + json.dumps(str(binary)) +
+                                '\n  provider_bridge_script: -model-bridge\n  provider_bridge_version: steward-go-v1\nnats:\n  url: ' + json.dumps(broker.url) + '\n')
             h.setup(metadata=dict(name='Streaming HTTP fixture', provider_kind='openai_compatible',
                 endpoint=f'http://127.0.0.1:{server.server_port}/v1', wire_api='openai_completions', model_id='fixture-model',
                 context_window=8192, max_output_tokens=1024, compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
@@ -655,11 +670,11 @@ def streaming_replies(binary, evidence, report):
             messages = h.http('/api/conversation')
             replies = [m for m in messages if m['message_id'].startswith('reply:')]
             expected = 'First chunk <img src=x onerror=unsafe()>\nSecond chunk 中文.\nFinal tail.'
-            require(len(replies)==1 and replies[0]['content'][0]['text'].partition('\n```steward-result\n')[0]==expected and
+            require(len(replies)==1 and replies[0]['content'][0]['text'].rstrip()==expected and
                     'Interrupted draft only.' not in json.dumps(messages), 'preview changed durable reply history')
             report['scenarios']['streaming-replies'] = dict(durable_replies=1, failure_discarded=True, late_subscriber=True,
                                                            reconnected=True, commit_tail=True)
-            report['checks'].append('Real Pi HTTP chunks reach Web before completion, reconnect restores exact text, the unread commit tail survives until one final projection, and an interrupted stream leaves no reply')
+            report['checks'].append('Native Go model HTTP chunks reach Web before completion, reconnect restores exact text, the unread commit tail survives until one final projection, and an interrupted stream leaves no reply')
         finally:
             for gate in ('second', 'finish', 'fail'):
                 (h.root/gate).touch()
@@ -751,7 +766,9 @@ def run(binary,evidence):
             h.http('/approval',data=urlencode(dict(approval_id=approval['approval_id'],hash='drift',decision='approved')).encode(),headers={'Content-Type':'application/x-www-form-urlencoded'},expected=409)
             command='/approve '+approval['approval_id']+' '+approval['frozen_arguments_hash']
             with ThreadPoolExecutor(max_workers=6) as pool:list(pool.map(lambda i:h.callback('approve-'+str(i),command),range(6)))
-            state=h.wait(lambda s:any(t['tool_name']=='mcp__fixture__send' and t['status']=='succeeded' for t in s['tools']) and len(s['deliveries'])==3 and all(d['status']=='sent' for d in s['deliveries']),'approved effect once')
+            # Two Task receipts, two exact approval notices and the final Task
+            # result each have one delivery under the delegated execution flow.
+            state=h.wait(lambda s:any(t['tool_name']=='mcp__fixture__send' and t['status']=='succeeded' for t in s['tools']) and len(s['deliveries'])==5 and all(d['status']=='sent' for d in s['deliveries']),'approved effect once')
             effects=[t for t in state['tools'] if t['tool_name']=='mcp__fixture__send' and t['status']=='succeeded']
             require(len(effects)==1 and effects[0]['attempt_count']==1,'duplicate approved effect')
             frozen=json.loads(effects[0]['arguments_json'])
@@ -1006,8 +1023,20 @@ def capability_settings(binary,evidence,report):
                     diagnostic=db.execute("SELECT status,json_extract(checkpoint_json,'$.phase'),json_extract(checkpoint_json,'$.error') FROM run ORDER BY created_at").fetchall()
                 raise RuntimeError(str(error)+'; '+json.dumps(diagnostic)) from error
             after=snapshots();require(all(after.get(k)==v for k,v in frozen.items()),'restart rewrote old snapshots')
-            require(any('mcp__owner_catalog__read' in data[1] for key,data in after.items() if key not in frozen),'new Run missed the newly configured provider')
-            report['scenarios']['capability-settings']=dict(kinds=['memory','embedding','mcp','skills','execution','computer'],old_snapshots_retained=True,new_run_uses_new_tools=True,probe_does_not_boot_or_invoke=True,embedding_requests=len(peer.requests))
+            new_main = {key:data for key,data in after.items() if key not in frozen}
+            require(new_main and all('mcp__owner_catalog__read' in data[1] for data in new_main.values()),'new Main missed the configured business tool')
+            h.stop();h.fixture='capabilities'
+            h.setup(metadata=dict(name='Configured Worker capacity',provider_kind='openai_compatible',
+                                 endpoint='http://127.0.0.1:1/v1',wire_api='openai_completions',
+                                 model_id='fixture-model',context_window=65536,max_output_tokens=4096,
+                                 compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True)))
+            receipt=h.send('capability-worker','Delegate capabilities: []')
+            from verify_recall import drain_with_publication_barrier
+            drain_with_publication_barrier(h,receipt['run_id'],prefix='configured-worker-')
+            worker_snapshots=snapshots()
+            require(any('mcp__owner_catalog__read' in data[1] for key,data in worker_snapshots.items() if key not in after),'new Worker missed the newly configured provider')
+            require(all(worker_snapshots.get(k)==v for k,v in frozen.items()),'Worker admission rewrote old snapshots')
+            report['scenarios']['capability-settings']=dict(kinds=['memory','embedding','mcp','skills','execution','computer'],old_snapshots_retained=True,new_worker_uses_new_tools=True,main_uses_configured_business_tools=True,probe_does_not_boot_or_invoke=True,embedding_requests=len(peer.requests))
             report['checks'].append('F-030: real owner UI config/test/save/restart for six capabilities; failed probes repaired, no-JS/mobile, exact candidate/revision checks, preserved frozen snapshots and newly loaded tools')
             h.stop()
         finally:
@@ -1015,7 +1044,7 @@ def capability_settings(binary,evidence,report):
 
 
 def native_trace_inspection(binary,evidence,report):
-    """Actual Pi/HTTP retries, durable result reuse, and the tracing UI."""
+    """Actual Go provider HTTP retries, durable result reuse, and the tracing UI."""
     from http.server import ThreadingHTTPServer
     from provider_endpoint import Endpoint
     class TraceEndpoint(Endpoint):
@@ -1033,7 +1062,7 @@ def native_trace_inspection(binary,evidence,report):
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         h=ChannelHarness(binary,Path(temp),platform,'')
         try:
-            h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: node\n  provider_bridge_script: '+json.dumps(str(ROOT/'provider-bridge/bridge.mjs'))+'\n  provider_bridge_version: pi-ai-1.3.0-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
+            h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: '+json.dumps(str(binary))+'\n  provider_bridge_script: -model-bridge\n  provider_bridge_version: steward-go-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
             h.env['STEWARD_TRACE_KEY']='SYNTHETIC_TRACE_CREDENTIAL_NEVER_STORE'
             auth=h.command('model','login','STEWARD_TRACE_KEY')
             h.setup(metadata=dict(name='Trace HTTP fixture',provider_kind='openai_compatible',endpoint=f'http://127.0.0.1:{server.server_port}/v1',wire_api='openai_completions',model_id='fixture-model',context_window=65536,max_output_tokens=4096,generation_defaults={},compatibility=dict(tool_result_format='openai'),capabilities=dict(text_input=True),auth_connection_id=auth['connection_id']))
@@ -1071,7 +1100,7 @@ def native_trace_inspection(binary,evidence,report):
             phases=[x['phase'] for x in timings]
             require(phases[:5]==['started','headers','started','headers','first_body']
                     and sorted(phases[5:])==['first_tool_call','stream_terminal'],
-                    'retry and stream milestones are missing from generation details')
+                    'retry and stream milestones are missing from generation details: '+repr(phases))
             require([x['http_status'] for x in timings if x['phase']=='headers']==[503,200],
                     'stream diagnostics lost the HTTP outcomes')
             h.stop(kill=True);h.start()
@@ -1082,7 +1111,7 @@ def native_trace_inspection(binary,evidence,report):
                 after={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in facts['counts']}
             require(after==facts['counts'],'browsing tracing mutated execution or observations')
             report['scenarios']['native-traces']=dict(read_only=True,actual_attempts=2,restart=True)
-            report['checks'].append('Langfuse-style trace tree/timeline/details; actual Pi final HTTP bodies and retries, terminal restart without re-execution, missing usage/pricing, authenticated browser, responsive/no-JS and unchanged ledgers')
+            report['checks'].append('Langfuse-style trace tree/timeline/details; actual Go provider final HTTP bodies and retries, terminal restart without re-execution, missing usage/pricing, authenticated browser, responsive/no-JS and unchanged ledgers')
         finally:
             h.cleanup();server.shutdown();server.server_close();thread.join()
 
@@ -1242,18 +1271,21 @@ def rich_replies(binary, evidence, report):
 
     No projection or Conversation rows are inserted by this scenario.
     """
-    with tempfile.TemporaryDirectory(prefix='steward-rich-replies-') as temp, Sandbox() as platform:
-        h = ChannelHarness(binary, Path(temp), platform)
+    from http.server import ThreadingHTTPServer
+    from provider_endpoint import Endpoint
+    with tempfile.TemporaryDirectory(prefix='steward-rich-replies-') as temp, Sandbox() as platform, Broker(Path(temp)) as broker:
+        server = ThreadingHTTPServer(('127.0.0.1',0),Endpoint)
+        server.requests,server.mode=[], 'success'
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        h = ChannelHarness(binary, Path(temp), platform, '')
         try:
-            # The scripted provider echoes the structured result through two
-            # tool calls before replying; budget that actual frozen exchange.
-            h.setup(metadata=dict(name='Rich reply fixture', provider_kind='openai_compatible',
-                                  endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions',
+            h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: '+json.dumps(str(binary))+'\n  provider_bridge_script: -model-bridge\n  provider_bridge_version: steward-go-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
+            h.setup(metadata=dict(name='Native UI tool fixture', provider_kind='openai_compatible',
+                                  endpoint=f'http://127.0.0.1:{server.server_port}/v1', wire_api='openai_completions',
                                   model_id='fixture-model', context_window=32768, max_output_tokens=4096,
                                   generation_defaults={}, compatibility=dict(tool_result_format='openai'),
                                   capabilities=dict(text_input=True)))
-            h.start()
-            result = dict(schema_version=1,
+            result = dict(title="Trip comparison",
                           fallback='Compare A and B. A contains literal markup; B has value 42. Two sources reviewed. Which city and date? Add any travel notes.',
                           components=[
                               dict(type='table', columns=['Option', 'Result'], rows=[['A', '<img src=x onerror=alert(1)>'], ['B', '42']]),
@@ -1261,7 +1293,10 @@ def rich_replies(binary, evidence, report):
                               dict(type='form', text='Where and when should we travel?', fields=[dict(name='city', label='Destination', value=''), dict(name='date', label='Travel date', value='')]),
                               dict(type='form', text='What else should we know?', fields=[dict(name='notes', label='Travel notes', value='')]),
                           ])
-            source = 'Compare these options and ask for the trip details.\n```steward-result\n' + json.dumps(result, ensure_ascii=False) + '\n```'
+            server.widgets=[result];server.mode='intelligent-ui'
+            h.start()
+            h.wait_state(lambda status:status['readiness']=='ready','native UI runtime readiness',lambda _:h.http('/api/status'))
+            source = 'SHOW_INTELLIGENT_UI: Compare these options and ask for the trip details.'
             h.http('/api/message', dict(source_id='rich-reply-request', content=[dict(type='text', text=source)]))
             initial = h.wait(lambda s: len(s['deliveries']) == 1 and s['deliveries'][0]['status'] == 'sent', 'normal Main rich reply delivered')
             history = h.http('/api/conversation')
@@ -1269,7 +1304,7 @@ def rich_replies(binary, evidence, report):
             projection = json.loads(initial['projections'][0]['spec_json'])
             (evidence.parent / 'rich-generation.json').write_text(json.dumps(dict(history=history, projection=projection, failure_state=h.failure_state()), ensure_ascii=False, indent=2) + '\n')
             kinds = [c['type'] for c in projection['components']]
-            require(kinds == ['markdown', 'table', 'progress', 'form', 'form'], f'ordinary reply did not generate controlled components: {kinds!r}')
+            require([kind for kind in kinds if kind!='markdown'] == ['table', 'progress', 'form', 'form'], f'ordinary reply did not generate controlled components: {kinds!r}')
             forms = [c for c in projection['components'] if c['type'] == 'form']
             require(all(c['message_id'] == message['message_id'] and len(c['form_id']) == 64 for c in forms), 'forms not bound to the actual reply')
             h.browser(evidence.parent / 'channels-ui', 'rich-replies')
@@ -1278,6 +1313,7 @@ def rich_replies(binary, evidence, report):
                              all(r['status'] == 'completed' for r in s['runs']), 'two form answers and Main continuations')
             require(not settled['approvals'], 'answering a form created an approval')
             h.stop(kill=True); h.start()
+            h.wait_state(lambda status:status['readiness']=='ready','restored UI runtime ready',lambda _:h.http('/api/status'))
             data = dict(message_id=message['message_id'], form_id=forms[0]['form_id'], **{'field.city': '上海', 'field.date': '2026-12-01'})
             headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
             def retry(_):
@@ -1311,10 +1347,10 @@ def rich_replies(binary, evidence, report):
             report['scenarios']['rich-replies'] = dict(state=after, message_id=message['message_id'], projection=projection,
                                                        form_reply_id=receipts[0]['message_id'], concurrent_retries=6,
                                                        no_projection_injection=True, terminal_fallback=True)
-            report['checks'].append('F-021: ordinary Main replies generate tables/progress/forms; browser checks escaped cells, lost-response recovery and preserved sibling draft; native form works without JavaScript; restart/concurrent retries admit each answer once; forged fields/actions/access are rejected')
+            report['checks'].append('F-021: Main uses Code Mode and intelligent_ui Skill/UI tool to generate tables/progress/forms; browser checks escaped cells, lost-response recovery and preserved sibling draft; native form works without JavaScript; restart/concurrent retries admit each answer once; forged fields/actions/access are rejected')
             h.stop()
         finally:
-            h.cleanup()
+            h.cleanup();server.shutdown();server.server_close();thread.join()
 
 
 def native_components(binary, evidence, report):

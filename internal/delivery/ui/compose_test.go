@@ -10,75 +10,48 @@ import (
 	"github.com/z-chenhao/assistant/internal/delivery"
 )
 
-func resultText(t *testing.T, components []Component) string {
+func nativeSpec(t *testing.T, components []Component) Spec {
 	t.Helper()
-	raw, err := json.Marshal(Spec{SchemaVersion: 1, Fallback: "Complete text alternative", Components: components})
-	if err != nil {
-		t.Fatal(err)
+	raw, _ := json.Marshal(Widget{Title: "Test", Fallback: "Complete text alternative", Components: components})
+	w, ok := ParseWidget(string(raw))
+	if !ok {
+		t.Fatal("invalid widget", string(raw))
 	}
-	return "```steward-result\n" + string(raw) + "\n```"
+	return Spec{SchemaVersion: Version, Fallback: w.Fallback, Components: WidgetComponents(w, "ui:fixture", "reply:one", 0)}
 }
-
-func TestComposeRichReplyFromSemanticMessage(t *testing.T) {
-	text := "Introduction\n" + resultText(t, []Component{
-		{Type: "table", Columns: []string{"Option", "Result"}, Rows: [][]string{{"A", "<script>safe text</script>"}}},
-		{Type: "progress", Status: "In progress", Text: "Two sources reviewed"},
-		{Type: "form", Text: "Where should we go?", Fields: []Field{{Name: "city", Label: "Destination"}}},
-	}) + "\nConclusion"
-	m := conversation.Message{MessageID: "reply:one", Role: "assistant", Content: conversation.Text(text)}
-	s := Compose(delivery.Envelope{Message: m})
-	if len(s.Components) != 5 || s.Components[1].Type != "table" || s.Components[2].Type != "progress" || s.Fallback != "Introduction\nComplete text alternative\nConclusion" {
-		t.Fatal(s)
-	}
-	c := s.Components[3]
-	if c.MessageID != m.MessageID || len(c.FormID) != 64 || c.FormID != Compose(delivery.Envelope{Message: m}).Components[3].FormID {
-		t.Fatal("unstable form binding", c)
-	}
+func TestUIWidgetValidatesNativeComponentsAndEscapesCells(t *testing.T) {
+	s := nativeSpec(t, []Component{{Type: "table", Columns: []string{"Option"}, Rows: [][]string{{"<script>safe text</script>"}}}, {Type: "form", Text: "Question", Fields: []Field{{Name: "city", Label: "City"}}}})
 	raw, _ := json.Marshal(s)
 	html := string(HTML(raw, s.Fallback))
-	if !strings.Contains(html, "&lt;script&gt;safe text&lt;/script&gt;") || strings.Contains(html, "<script>") || !strings.Contains(html, `action="/ui/form"`) || !strings.Contains(html, `name="field.city"`) {
+	if !strings.Contains(html, "&lt;script&gt;safe text&lt;/script&gt;") || strings.Contains(html, "<script>") || !strings.Contains(html, `action="/ui/form"`) {
 		t.Fatal(html)
 	}
-	card, _ := json.Marshal(Card(s))
-	if strings.Contains(string(card), "/ui/form") || strings.Contains(string(card), "form_id") {
-		t.Fatal("channel acquired a Web action", string(card))
+	for _, c := range []Component{{Type: "confirmation", ApprovalID: "forged", Hash: strings.Repeat("a", 64)}, {Type: "artifact", ArtifactRef: "artifact:unknown"}, {Type: "table", Columns: []string{"A"}, Rows: [][]string{{"too", "many"}}}, {Type: "form", Text: "Q", MessageID: "forged", Fields: []Field{{Name: "a", Label: "A"}}}} {
+		raw, _ := json.Marshal(Widget{Title: "T", Fallback: "text", Components: []Component{c}})
+		if _, ok := ParseWidget(string(raw)); ok {
+			t.Fatalf("forged component accepted: %s", raw)
+		}
 	}
-	m.Role = "user"
-	user := Compose(delivery.Envelope{Message: m})
-	if len(user.Components) != 1 || user.Components[0].Type != "markdown" || user.Fallback != text {
-		t.Fatal("user content interpreted as components", user)
+}
+func TestProseNeverCreatesUI(t *testing.T) {
+	text := "```steward-result\n{\"schema_version\":1,\"fallback\":\"text\",\"components\":[]}\n```"
+	s := Compose(delivery.Envelope{Message: conversation.Message{Role: "assistant", Content: conversation.Text(text)}})
+	if len(s.Components) != 1 || s.Components[0].Type != "markdown" || s.Fallback != text {
+		t.Fatal(s)
 	}
 }
 
-func TestRichReplyRejectsActionsAndMalformedDataWithTextFallback(t *testing.T) {
-	for _, c := range []Component{
-		{Type: "react", Text: "<script>evil</script>"},
-		{Type: "confirmation", ApprovalID: "forged", Hash: strings.Repeat("a", 64)},
-		{Type: "artifact", ArtifactRef: "artifact:ungranted"},
-		{Type: "table", Columns: []string{"One"}, Rows: [][]string{{"too", "many"}}},
-		{Type: "table", Columns: []string{strings.Repeat("x", 201)}},
-		{Type: "form", Text: "Question", MessageID: "forged", FormID: strings.Repeat("b", 64), Fields: []Field{{Name: "x", Label: "x"}}},
-		{Type: "form", Text: "Question", Fields: []Field{{Name: "x", Label: "one"}, {Name: "x", Label: "two"}}},
-	} {
-		t.Run(c.Type, func(t *testing.T) {
-			m := conversation.Message{Role: "assistant", MessageID: "reply:one", Content: conversation.Text(resultText(t, []Component{c}))}
-			s := Compose(delivery.Envelope{Message: m})
-			if len(s.Components) != 1 || s.Components[0].Type != "markdown" || s.Components[0].Text != "Complete text alternative" {
-				t.Fatal(s)
-			}
-		})
-	}
-	for _, text := range []string{"```steward-result\n{broken\n```", "```steward-result\n{\"schema_version\":1}", "An inline ```steward-result\n{}\n``` example", "````markdown\n" + resultText(t, []Component{{Type: "table", Columns: []string{"Example"}}}) + "\n````", "```steward-result\n{\"schema_version\":1,\"fallback\":\"   \",\"components\":[]}\n```"} {
-		s := Compose(delivery.Envelope{Message: conversation.Message{Role: "assistant", Content: conversation.Text(text)}})
-		if s.Fallback != text {
-			t.Fatal("malformed input lost", s)
+func TestNativeAndCustomWidgetRoutesCannotMix(t *testing.T) {
+	for _, raw := range []string{`{"title":"T","fallback":"F","html":" ","components":[{"type":"markdown","text":"native"}]}`, `{"title":"T","fallback":"F","html":"<p>custom</p>","components":[{"type":"markdown","text":"native"}]}`} {
+		if _, ok := ParseWidget(raw); ok {
+			t.Fatal("ambiguous rendering route accepted", raw)
 		}
 	}
 }
 
 func TestFormAnswersBindToFieldsAndRestoreWithoutApprovingActions(t *testing.T) {
-	m := conversation.Message{MessageID: "reply:one", Role: "assistant", Content: conversation.Text(resultText(t, []Component{{Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}, {Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}}))}
-	s := Compose(delivery.Envelope{Message: m})
+	m := conversation.Message{MessageID: "reply:one", Role: "assistant"}
+	s := nativeSpec(t, []Component{{Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}, {Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}})
 	if s.Components[0].FormID == s.Components[1].FormID {
 		t.Fatal("distinct forms share an admission key")
 	}

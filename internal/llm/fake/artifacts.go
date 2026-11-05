@@ -82,7 +82,7 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 		}
 		return llm.GenerationResult{Text: "Artifact operation observed: " + last.Text}
 	}
-	if request.Delegate && !root {
+	if (request.Delegate || request.Operation == "binary" || request.Operation == "large" || request.Operation == "slow_binary") && !root {
 		return call(task.ManageName, task.ManageRequest{Operation: "create", Task: "Artifact fixture:\n" + user, ArtifactRefs: request.Refs})
 	}
 	switch request.Operation {

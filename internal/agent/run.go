@@ -23,16 +23,23 @@ var ErrSetup = errors.New("setup_required: select an available model before chat
 // RunClaim deliberately exposes no lease, owner, epoch or database internals.
 type RunClaim interface{ RunID() string }
 
+// SystemSection is Host-owned frozen provenance, not another model message.
+type SystemSection struct {
+	Kind string `json:"kind"`
+	Text string `json:"text"`
+}
+
 type AgentMessage struct {
-	Source     *llm.ContextSource         `json:"source,omitempty"`
-	MessageID  string                     `json:"message_id,omitempty"`
-	CustomType string                     `json:"custom_type,omitempty"`
-	Origin     string                     `json:"origin,omitempty"`
-	Details    *task.UpdateDetails        `json:"details,omitempty"`
-	CreatedAt  *time.Time                 `json:"created_at,omitempty"`
-	Type       string                     `json:"type"`
-	Content    []conversation.ContentPart `json:"content"`
-	ToolCallID string                     `json:"tool_call_id,omitempty"`
+	SystemSections []SystemSection            `json:"system_sections,omitempty"`
+	Source         *llm.ContextSource         `json:"source,omitempty"`
+	MessageID      string                     `json:"message_id,omitempty"`
+	CustomType     string                     `json:"custom_type,omitempty"`
+	Origin         string                     `json:"origin,omitempty"`
+	Details        *task.UpdateDetails        `json:"details,omitempty"`
+	CreatedAt      *time.Time                 `json:"created_at,omitempty"`
+	Type           string                     `json:"type"`
+	Content        []conversation.ContentPart `json:"content"`
+	ToolCallID     string                     `json:"tool_call_id,omitempty"`
 }
 
 func TextMessage(kind, text string) AgentMessage {
@@ -41,22 +48,44 @@ func TextMessage(kind, text string) AgentMessage {
 
 // ProviderTools is the one model-visible projection. Context budgeting must
 // count this wire shape, not Host policy/hash/permission metadata.
-func ProviderTools(specs []tool.Spec) []llm.ToolSpec {
+func ProviderTools(specs []tool.Spec, loaded ...[]string) []llm.ToolSpec {
 	out := []llm.ToolSpec{}
-	for _, spec := range specs {
-		if spec.Internal {
-			continue
-		}
+	appendSpec := func(spec tool.Spec) {
 		description := spec.Description
 		if spec.Name == "builtin__skill_list" && len(spec.PromptContext) > 0 {
 			description = "List available Skills and their frozen versions. Read a matching Skill with skill view before applying its scoped guidance."
 		}
 		out = append(out, llm.ToolSpec{Name: spec.Name, Description: description, InputSchema: spec.InputSchema})
 	}
+	indirect := map[string]tool.Spec{}
+	for _, spec := range specs {
+		if spec.CodeModeOnly {
+			continue
+		}
+		if spec.Searchable() {
+			indirect[spec.Name] = spec
+			continue
+		}
+		if spec.ModelVisible(nil) {
+			appendSpec(spec)
+		}
+	}
+	// Keep the original direct declarations and loaded prefix stable as search
+	// appends capabilities, matching Pi's active-tool ordering.
+	seen := map[string]bool{}
+	for _, names := range loaded {
+		for _, name := range names {
+			if spec, ok := indirect[name]; ok && !seen[name] {
+				appendSpec(spec)
+				seen[name] = true
+			}
+		}
+	}
 	return out
 }
 
 type Checkpoint struct {
+	LoadedTools    []string              `json:"loaded_tools,omitempty"`
 	PendingTools   []PendingToolBatch    `json:"pending_tools,omitempty"`
 	ContextVersion int                   `json:"context_version,omitempty"`
 	WorkingState   *WorkingState         `json:"working_state,omitempty"`

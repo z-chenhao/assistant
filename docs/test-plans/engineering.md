@@ -12,6 +12,8 @@ F-038：固定依赖和构建入口可用；文档改动只运行适用检查；
 
 ## 工程基础重构回归
 
+`internal/llm/architecture_test.go` 使用 `go list` 的实际传递依赖保护模型边界：`llm` 共享契约不依赖适配器、`provider` 协议不依赖 Steward 领域状态，`account` 与 `sqlite` 不依赖 `bridge`。该检查随 Go 包测试进入每次代码 PR，间接引入的越界依赖也会失败。
+
 F-039：`internal/agent/sqlite/foundation_test.go` 验证流暂停时状态查询与跨进程回收、Web Run 失败后的下一条请求、流式预览无逐片状态写入、trace 写失败诊断和内部错误 cause。`internal/app/runtime_test.go` 验证实际能力依赖修复后可重试且只发布成功 registry。Task/CodeMode 相关既有暂停、Child、重放、未知副作用和 SIGKILL 测试必须继续通过；使用 race 检查受影响并发边界。
 
 [渠道观察器回归](../../tests/harness/test_channels.py) 使用真实 SQLite WAL 连接，在两次查询之间提交 Run 完成和新投递，验证等待条件使用一致快照，并验证成功、查询异常均关闭连接。系统测试中的连接关闭继续保留事务提交/回滚语义。
