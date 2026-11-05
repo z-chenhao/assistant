@@ -826,6 +826,7 @@ try{
   await page.getByRole('button',{name:'Save schedule',exact:true}).click();
   await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
   if(await page.getByLabel('Frequency',{exact:true}).inputValue()!=='weekdays'||await page.getByLabel('Local time',{exact:true}).inputValue()!=='07:40'||await page.getByLabel('Time zone',{exact:true}).inputValue()!=='Asia/Shanghai')throw Error('schedule did not persist friendly fields');
+  await page.screenshot({path:evidence+'/schedule-editor-wide.png',fullPage:true});
   const editURL=page.url();
   const replay=await context.request.post(url+'/schedule/configure',{form:submitted,maxRedirects:0});
   if(replay.status()!==303)throw Error('identical schedule retry did not return its durable receipt');
@@ -870,6 +871,11 @@ try{
   await page.screenshot({path:evidence+'/schedule-mobile.png',fullPage:true});
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
   await page.screenshot({path:evidence+'/schedule-mobile-dark.png',fullPage:true});
+  if(await page.getByRole('button',{name:'Save schedule',exact:true}).isDisabled())throw Error('invalid schedule response disabled explicit retry');
+  await page.getByLabel('Local time',{exact:true}).fill('03:30');
+  await page.getByRole('button',{name:'Save schedule',exact:true}).click();
+  await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
+  if(await page.getByLabel('Local time',{exact:true}).inputValue()!=='03:30')throw Error('corrected schedule could not be saved');
   const touch=await browser.newContext({hasTouch:true,viewport:{width:320,height:740}});
   try{
    await touch.addCookies(await context.cookies());const p=await touch.newPage();await p.goto(editURL);
@@ -884,12 +890,13 @@ try{
    await native.addCookies(await context.cookies());const p=await native.newPage();await p.goto(editURL);
    await p.getByLabel('Frequency',{exact:true}).selectOption('weekly');await p.locator('select[name=weekday]').waitFor({state:'visible'});
    await p.getByRole('switch',{name:'Schedule enabled',exact:true}).uncheck();
-   await p.getByRole('button',{name:'Save schedule',exact:true}).click();await p.reload();
+   await Promise.all([p.waitForNavigation({waitUntil:'load'}),p.getByRole('button',{name:'Save schedule',exact:true}).click()]);
+   await p.reload();
    if(await p.getByLabel('Frequency',{exact:true}).inputValue()!=='weekly'||await p.getByRole('switch',{name:'Schedule enabled',exact:true}).isChecked())throw Error('native Task controls did not persist');
    await p.screenshot({path:evidence+'/schedule-native.png',fullPage:true});
   }finally{await native.close()}
   if((await (await context.request.get(url+'/api/progress')).json()).length!==taskCount)throw Error('control checks dispatched a Task');
-  await writeFile(evidence+'/schedule-browser.json',JSON.stringify({keyboard:true,search:true,emptyResults:true,dependentFields:true,singlePopup:true,switchManualSave:true,persistence:true,staleDraft:true,touch:true,nativeFallback:true,noPrematureDispatch:true,widths:[1400,720,320]},null,2));
+  await writeFile(evidence+'/schedule-browser.json',JSON.stringify({keyboard:true,search:true,emptyResults:true,dependentFields:true,singlePopup:true,switchManualSave:true,persistence:true,staleDraft:true,invalidRetry:true,touch:true,nativeFallback:true,noPrematureDispatch:true,widths:[1400,720,320]},null,2));
   await page.setViewportSize({width:1400,height:980});
   await page.goto(url);
  }

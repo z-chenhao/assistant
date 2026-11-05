@@ -33,7 +33,7 @@ F-041 覆盖项目身份和实际 Web 操作，不包含真实模型语义效果
 
 公共控件复用门禁通过 `npm run check --prefix web` 在构建资源检查前执行，正反例与过滤／键盘状态 UT 通过 `npm test --prefix web` 执行；两者均属于现有 `make test`／`Ubuntu checks`。新页面私建下拉运行逻辑、模板选项列表或开关皮肤时应失败并报告文件位置，原生表单与容器布局应通过。
 
-Task 计划页由 `verify_channels.py` 的 `task_control_components` 实际调用现有 schedule 浏览器阶段，结果写入 `task-controls-ui/schedule-browser.json`。覆盖 1400／720／320px、搜索与空结果、多个选择器互斥、依赖字段、开关键盘和触摸、显式保存与刷新、原生提交、陈旧版本草稿，以及保存配置不提前派发任务。
+Task 计划页由 `verify_channels.py` 的 `task_control_components` 实际调用现有 schedule 浏览器阶段，结果写入 `task-controls-ui/schedule-browser.json`。覆盖 1400／720／320px、搜索与空结果、多个选择器互斥、依赖字段、开关键盘和触摸、显式保存与刷新、无效时间修正后重试、原生提交、陈旧版本草稿，以及保存配置不提前派发任务。
 
 公共控件在 Preferences、能力配置、Task 计划及 Dev Trace 筛选中检查搜索／空结果、方向键／Home／End 浏览、确认、Escape／Tab 取消、跨控件互斥、44px 触控与无脚本原生提交。普通布尔开关保留原有 checked、disabled、表单值和保存时机；能力与模型声明、计划启用以及外观动效沿用现有真实浏览器场景。
 
