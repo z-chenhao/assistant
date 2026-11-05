@@ -17,6 +17,8 @@
   "Check your startup settings to continue.": "请检查启动设置后继续。",
   "Preferences": "偏好设置",
   "Language": "语言",
+  "Save": "保存",
+  "Choose the language used throughout your workspace.": "选择整个工作空间使用的界面语言。",
   "Interface language": "界面语言",
   "Save language": "保存语言",
   "Language saved.": "语言已保存。",
@@ -900,5 +902,10 @@
   "Source execution": "来源执行",
   "Attached to message": "关联消息",
   "Used by task": "引用任务",
-  "Used by execution": "引用执行"
+  "Used by execution": "引用执行",
+  "Refresh to check": "刷新核对",
+  "Save result not confirmed.": "保存结果未确认。",
+  "Language could not be saved. Reopen settings to check access.": "语言未能保存，请重新进入设置检查访问权限。",
+  "Language could not be retained. Check your browser cookie settings.": "语言偏好未能保留，请检查浏览器 Cookie 设置。",
+  "Saving…": "正在保存…"
 }

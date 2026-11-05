@@ -44,6 +44,37 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
  .model-connection button,.model-use button{max-width:100%}
 }
 @media(max-width:760px){.setting-action,.setting-controls select{min-height:44px}}
+/* Preferences share the tab strip's density; other settings keep their forms. */
+.settings-page:has(.preference-group)>.section-tabs{margin-bottom:24px}
+.preference-group{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px}
+.preference-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:12px 16px}
+.preference-name{position:relative;display:flex;align-items:center;gap:4px;min-height:36px;white-space:nowrap}
+.preference-name label{margin:0;font-size:14px;font-weight:550;color:var(--foreground)}
+.preference-controls{display:flex;flex:1 1 112px;align-items:center;gap:8px;max-width:168px;min-width:112px;margin-left:auto}
+.preference-controls:has(.preference-save:not([hidden])){flex-basis:168px;max-width:220px}
+.preference-controls select{margin:0;min-height:36px;padding:5px 8px;border-radius:7px;font-size:14px}
+.preference-group :is(button,select,summary){outline-offset:2px}
+.preference-group .preference-save{min-height:36px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:7px;white-space:nowrap}
+.preference-help{display:inline-flex}
+.preference-help-trigger,.preference-help summary{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:36px;min-height:36px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;list-style:none}
+.preference-help summary::-webkit-details-marker{display:none}
+.preference-help-trigger:hover,.preference-help summary:hover,.preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
+/* Keep the trigger-to-tooltip path connected even when the form gains feedback or wraps. */
+.preference-tooltip{position:absolute;z-index:20;top:calc(100% - 1px);left:0;display:block;width:min(280px,calc(100vw - 66px));padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+.preference-group .preference-picker-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:36px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--background);color:var(--foreground);font-weight:400;white-space:nowrap}
+.preference-picker-trigger>.icon{width:16px;height:16px;color:var(--muted-foreground)}
+.preference-picker-trigger:hover{background:var(--hover)}
+.preference-picker-trigger[aria-disabled=true]{color:var(--muted-foreground);cursor:wait}
+.preference-picker{position:fixed;inset:auto;margin:0;padding:4px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--foreground);box-shadow:0 8px 20px color-mix(in srgb,var(--backdrop) 35%,transparent);overflow:auto;overscroll-behavior:contain;font:14px/1.6 var(--font-ui)}
+.preference-picker [role=option]{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;padding:7px 10px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.preference-picker [role=option]>.icon{visibility:hidden;flex-shrink:0}
+.preference-picker [aria-selected=true]{background:var(--muted)}
+.preference-picker [aria-selected=true]>.icon{visibility:visible}
+.preference-picker [role=option]:hover{background:var(--hover)}
+.preference-picker[data-keyboard] [data-active]{outline:2px solid var(--focus);outline-offset:-2px}
+.preference-feedback{padding:0 16px 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
+.preference-feedback :is(button,a){min-height:36px;padding:3px 6px;background:transparent;border:0;color:var(--foreground);font-size:13px;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-controls :is(select,.preference-picker-trigger){min-height:44px;font-size:16px;padding-inline:8px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}.preference-picker [role=option]{min-height:44px;font-size:16px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
 .list-heading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}.list-heading h2{margin:0}.list-heading span{font-size:12px;color:var(--muted-foreground)}
 .object-list{border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;background:transparent}
 .object-list:has(>.empty-state){border:0}

@@ -32,7 +32,7 @@ func TestLanguageDefaultsToEnglishAndPersistsExplicitChoice(t *testing.T) {
 	for _, language := range []string{"", "en", "invalid"} {
 		w := httptest.NewRecorder()
 		s.ServeHTTP(w, languageRequest("GET", "/settings/preferences", language, ""))
-		if w.Code != 200 || !strings.Contains(w.Body.String(), `<html lang="en">`) || !strings.Contains(w.Body.String(), "Interface language") {
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `<html lang="en">`) || !strings.Contains(w.Body.String(), `<label id="language-label" for="interface-language">Language</label>`) {
 			t.Fatal("default must be English, independent of browser language", w.Code, w.Body.String())
 		}
 	}
@@ -45,7 +45,7 @@ func TestLanguageDefaultsToEnglishAndPersistsExplicitChoice(t *testing.T) {
 	location := w.Header().Get("Location")
 	w = httptest.NewRecorder()
 	s.ServeHTTP(w, languageRequest("GET", location, "zh-CN", ""))
-	if w.Code != 200 || w.Header().Get("Content-Language") != "zh-CN" || !strings.Contains(w.Body.String(), `<html lang="zh-CN">`) || !strings.Contains(w.Body.String(), "语言已保存。") || !strings.Contains(w.Body.String(), "保存语言") {
+	if w.Code != 200 || w.Header().Get("Content-Language") != "zh-CN" || !strings.Contains(w.Body.String(), `<html lang="zh-CN">`) || !strings.Contains(w.Body.String(), "语言已保存。") || !strings.Contains(w.Body.String(), `type="submit">保存</button>`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()
@@ -127,19 +127,63 @@ func TestStaticInterfaceCopyHasChineseTranslations(t *testing.T) {
 
 func TestLanguagePreferenceUsesExistingAuthenticationAndCSRFBoundary(t *testing.T) {
 	s := languageServer()
-	for _, authenticated := range []bool{false, true} {
-		r := languageRequest("POST", "/settings/language", "", "language=zh-CN")
-		want := http.StatusUnauthorized
-		if authenticated {
-			r.Header.Set("Origin", "http://other.example")
-			want = http.StatusForbidden
-		} else {
-			r.Header.Del("Authorization")
+	for _, accept := range []string{"text/html", "application/json"} {
+		for _, authenticated := range []bool{false, true} {
+			r := languageRequest("POST", "/settings/language", "", "language=zh-CN")
+			r.Header.Set("Accept", accept)
+			want := http.StatusUnauthorized
+			if authenticated {
+				r.Header.Set("Origin", "http://other.example")
+				want = http.StatusForbidden
+			} else {
+				r.Header.Del("Authorization")
+			}
+			w := httptest.NewRecorder()
+			s.ServeHTTP(w, r)
+			if w.Code != want || len(w.Result().Cookies()) != 0 {
+				t.Fatal("language preference bypassed auth/CSRF", accept, w.Code, w.Header())
+			}
 		}
+	}
+}
+
+func TestLanguageAutosaveJSONAndCookieReadback(t *testing.T) {
+	s := languageServer()
+	for _, language := range []string{"en", "zh-CN"} {
+		r := languageRequest("POST", "/settings/language", "", "language="+language)
+		r.Header.Set("Accept", "application/json")
 		w := httptest.NewRecorder()
 		s.ServeHTTP(w, r)
-		if w.Code != want || len(w.Result().Cookies()) != 0 {
-			t.Fatal("language preference bypassed auth/CSRF", w.Code, w.Header())
+		var result struct {
+			Language string `json:"language"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		cookies := w.Result().Cookies()
+		if w.Code != 200 || result.Language != language || w.Header().Get("Location") != "" || len(cookies) != 1 || cookies[0].Value != language || cookies[0].Path != "/" || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].MaxAge != 365*24*60*60 {
+			t.Fatal("autosave did not confirm the persisted preference", w.Code, w.Header(), w.Body.String())
+		}
+	}
+	r := languageRequest("POST", "/settings/language", "en", "language=es")
+	r.Header.Set("Accept", "application/json")
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	if w.Code != 400 || len(w.Result().Cookies()) != 0 || !strings.Contains(w.Body.String(), `"invalid_language"`) {
+		t.Fatal(w.Code, w.Header(), w.Body.String())
+	}
+	for _, cookie := range []string{"en", "zh-CN"} {
+		w = httptest.NewRecorder()
+		s.ServeHTTP(w, languageRequest("GET", "/settings/preferences?notice=language-saved&language=zh-CN", cookie, ""))
+		if w.Code != 200 || len(w.Result().Cookies()) != 0 {
+			t.Fatal("readback must not write", w.Code, w.Header())
+		}
+		if cookie == "en" {
+			if strings.Contains(w.Body.String(), "Language saved.") || !strings.Contains(w.Body.String(), "Check your browser cookie settings.") {
+				t.Fatal("false save confirmation", w.Body.String())
+			}
+		} else if !strings.Contains(w.Body.String(), "语言已保存。") {
+			t.Fatal("missing save confirmation", w.Body.String())
 		}
 	}
 }

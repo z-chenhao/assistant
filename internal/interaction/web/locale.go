@@ -90,6 +90,12 @@ func localizedLayout(language string) *template.Template {
 func (s *Server) setLanguage(w http.ResponseWriter, r *http.Request) error {
 	language := r.FormValue("language")
 	if language != "en" && language != "zh-CN" {
+		if r.Header.Get("Accept") == "application/json" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			jsonResult(w, map[string]string{"error": "invalid_language"})
+			return nil
+		}
 		p := page{View: "settings", Tab: "/settings", Title: "Preferences", Settings: &settingsView{Section: "preferences"}, Error: "Invalid language. Choose English or Simplified Chinese."}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Language", requestLanguage(r))
@@ -98,6 +104,10 @@ func (s *Server) setLanguage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 	http.SetCookie(w, &http.Cookie{Name: languageCookie, Value: language, Path: "/", MaxAge: 365 * 24 * 60 * 60, SameSite: http.SameSiteStrictMode})
+	if r.Header.Get("Accept") == "application/json" {
+		jsonResult(w, map[string]string{"language": language})
+		return nil
+	}
 	http.Redirect(w, r, "/settings/preferences?notice=language-saved", http.StatusSeeOther)
 	return nil
 }

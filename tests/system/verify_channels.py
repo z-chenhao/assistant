@@ -139,6 +139,20 @@ class ChannelHarness(MainHarness):
         require(result.returncode==0,'browser drive failed: '+result.stderr)
 
 
+def preference_settings(binary, evidence, report):
+    with tempfile.TemporaryDirectory(prefix='steward-preferences-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.setup()
+            h.start()
+            output = evidence.parent / 'preferences-ui'
+            h.browser(output, 'preferences')
+            report['scenarios']['preferences'] = json.loads((output / 'preferences-browser.json').read_text())
+            report['checks'].append('Preferences: bilingual grouped dropdown, keyboard/touch and help, single-flight autosave, rejection/retry, unknown-result and cookie readback, timeout, restoration, native fallbacks and neighboring settings')
+        finally:
+            h.cleanup()
+
+
 def feishu_auth_lifecycle(binary, report):
     """Real CLI/Actor/Delivery against the HTTP peer; no browser or real account."""
     with tempfile.TemporaryDirectory(prefix='steward-feishu-auth-') as temp, Sandbox(managed_auth=True, token_ttl=2) as platform:
@@ -673,6 +687,8 @@ def run(binary,evidence):
             h.callback('unbound','bad',sender='other',expected=403)
             h.callback('recipient','bad',destination='other',expected=403)
             h.browser(evidence.parent/'channels-ui','setup')
+            h.browser(evidence.parent/'preferences-ui','preferences')
+            report['checks'].append('Preferences: grouped bilingual language list, accessible hover/keyboard/touch help, single-flight autosave, browser persistence, no-JS fallback and neighboring Resources/Notifications/Capabilities')
             h.wait(lambda s:any(d['status']=='sent' and d['channel']=='web' for d in s['deliveries']),'browser setup and first reply')
             report['checks'].append('Launch/Doctor: browser language switch persists into Chat, followed by real loopback Web setup and file attachment; explicit model Fake; auth/CSRF/signature/identity/recipient rejection')
             # Duplicate callback IDs and new callback IDs carrying the same source
@@ -1603,13 +1619,16 @@ if __name__=='__main__':
     action.add_argument('--attention-only',action='store_true')
     action.add_argument('--feishu-questions-only',action='store_true')
     action.add_argument('--feishu-reviews-only',action='store_true')
+    action.add_argument('--preferences-only',action='store_true')
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
-        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.database_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.database_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only and not args.preferences_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
-        if args.database_only:
+        if args.preferences_only:
+            preference_settings(args.binary.resolve(),args.evidence.resolve(),report)
+        elif args.database_only:
             database_inspection(args.binary.resolve(),args.evidence.resolve(),report)
         elif args.rich_replies_only:
             rich_replies(args.binary.resolve(),args.evidence.resolve(),report)

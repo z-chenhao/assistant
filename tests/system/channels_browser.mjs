@@ -1,6 +1,7 @@
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
 import {capabilitySetup} from './channels_capabilities.mjs';
 import {databaseInspection} from './channels_database.mjs';
+import {preferences} from './channels_preferences.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 const [url,evidence,phase='conversation']=process.argv.slice(2);
@@ -67,7 +68,9 @@ try{
  if(await avatar.getAttribute('data-frame')!=='0')throw Error('paused avatar retained a moving pose');
  if(await avatar.locator('.ghost-art').evaluate(node=>getComputedStyle(node).animationPlayState)!=='paused')throw Error('pause did not stop ghost drift');
  await page.locator('[data-avatar-pause]').click();
- if(phase==='account-signin'||phase==='account-reconnect'){
+ if(phase==='preferences'){
+  await preferences(page,context,browser,url,evidence);
+ }else if(phase==='account-signin'||phase==='account-reconnect'){
   await context.route(requestURL=>requestURL.origin!==new URL(url).origin,route=>{
    const requestURL=new URL(route.request().url());
    return requestURL.origin==='https://auth.openai.com'&&requestURL.pathname==='/api/accounts/authorize'
@@ -214,19 +217,20 @@ try{
   const preferenceRow=page.locator('form[action="/settings/language"]');
   const help=preferenceRow.getByRole('button',{name:'About interface language'});
   const tooltip=preferenceRow.locator('[role=tooltip]');
-  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()||await tooltip.isVisible())throw Error('Preferences duplicates its title or shows help by default');
+  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()!==1||await page.locator('h1:not(.sr-only)').count()||await tooltip.isVisible())throw Error('Preferences loses its semantic title, duplicates it visually or shows help by default');
   await help.hover();
   if(!await tooltip.isVisible())throw Error('language help is unavailable on hover');
   await page.locator('.section-tabs').hover();
   await help.focus();
   if(!await tooltip.isVisible())throw Error('language help is unavailable from the keyboard');
   const row=await preferenceRow.boundingBox();
-  const save=await preferenceRow.getByRole('button',{name:'Save language',exact:true}).boundingBox();
-  if(!row||!save||row.height>72||save.height>40)throw Error('language preference does not fit a compact row');
-  await page.getByLabel('Interface language',{exact:true}).selectOption('zh-CN');
-  await page.getByRole('button',{name:'Save language',exact:true}).click();
-  await page.getByLabel('界面语言',{exact:true}).selectOption('en');
-  await page.getByRole('button',{name:'保存语言',exact:true}).click();
+  const control=await preferenceRow.locator('[data-language-trigger]').boundingBox();
+  if(!row||!control||row.height>72||control.height>40||await preferenceRow.locator('.preference-save').isVisible())throw Error('language preference does not fit a compact autosave row');
+  for(const language of ['zh-CN','en']){
+   await page.locator('[data-language-trigger]').click();
+   await page.locator(`[data-language-option="${language}"]`).click();
+   await page.locator(`html[lang="${language}"]`).waitFor();
+  }
   await workspaceNav.getByRole('link',{name:'Chat',exact:true}).click();
   await page.waitForURL(url+'/');
   if(await page.locator('html').getAttribute('lang')!=='en')throw Error('saved English preference did not carry into Chat');

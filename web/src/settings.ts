@@ -1,4 +1,29 @@
 import {t} from './i18n';
+import {enhanceLanguagePreference} from './preferences';
+
+// The fallback is a native disclosure. Enhance only after the whole help is ready.
+function enhancePreferenceHelp(){
+ for(const help of document.querySelectorAll<HTMLElement>('[data-preference-help]')){
+  const trigger=help.querySelector<HTMLButtonElement>('[data-help-trigger]');
+  const tooltip=help.querySelector<HTMLElement>('[data-help-tooltip]');
+  const fallback=help.querySelector<HTMLDetailsElement>('[data-help-fallback]');
+  if(!trigger||!tooltip||!fallback)continue;
+  let hovered=false,pinned=false,dismissed=false;
+  const render=()=>{tooltip.hidden=dismissed||!(hovered||pinned||document.activeElement===trigger);if(!tooltip.hidden)document.dispatchEvent(new Event('preference-help-open'))};
+  document.addEventListener('preference-picker-open',()=>{pinned=false;dismissed=true;render()});
+  help.addEventListener('pointerenter',event=>{if(event.pointerType==='touch')return;hovered=true;dismissed=false;render()});
+  help.addEventListener('pointerleave',()=>{hovered=false;render()});
+  trigger.addEventListener('focus',()=>{dismissed=false;render()});
+  trigger.addEventListener('blur',()=>{pinned=false;render()});
+  // Focus can reveal the tooltip before a touch/keyboard click. Toggle the
+  // explicit pin, not visibility, so that first activation never closes it.
+  trigger.addEventListener('click',()=>{pinned=!pinned;dismissed=!pinned;render()});
+  document.addEventListener('pointerdown',event=>{if(event.target instanceof Node&&!help.contains(event.target)){pinned=false;dismissed=true;render()}});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!tooltip.hidden){pinned=false;dismissed=true;render()}});
+  window.addEventListener('pageshow',event=>{if(event.persisted){pinned=false;dismissed=true;render()}});
+  fallback.hidden=true;trigger.hidden=false;
+ }
+}
 
 const signInOpenedHash='#auth-window-opened';
 
@@ -38,6 +63,8 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
 
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
+ enhancePreferenceHelp();
+ enhanceLanguagePreference();
  if(location.hash===signInOpenedHash){
   const signIn=document.querySelector<HTMLElement>('#signin-status');
   if(signIn?.querySelector('[data-signin-pending]'))signIn.dataset.authWindowOpened='';
@@ -55,7 +82,7 @@ export function enhanceSettings(){
  const forms=document.querySelectorAll<HTMLFormElement>('.settings-page form');
  const reset=new Map<HTMLFormElement,()=>void>();
  for(const form of forms){form.addEventListener('submit',event=>{
-  if(event.defaultPrevented)return;
+  if(event.defaultPrevented||form.dataset.autosaveReady)return;
   if(form.dataset.submitting){event.preventDefault();return}
   if(form.hasAttribute('data-open-signin')){
    const popup=window.open('about:blank','_blank');
@@ -75,7 +102,7 @@ export function enhanceSettings(){
   if(submitter instanceof HTMLButtonElement&&submitter.name){action=document.createElement('input');action.type='hidden';action.name=submitter.name;action.value=submitter.value;form.append(action)}
   form.dataset.submitting='true';form.setAttribute('aria-busy','true');
   const verifying=form.hasAttribute('data-model-verify')||form.getAttribute('action')?.endsWith('/model/test')&&!submitter?.hasAttribute('data-model-restore');
-  for(const button of buttons){button.disabled=true;button.textContent=verifying?t('Verifying…'):t('Working…')}
+  for(const button of buttons){button.disabled=true;if(!form.hasAttribute('data-preserve-submit-label'))button.textContent=verifying?t('Verifying…'):t('Working…')}
   reset.set(form,()=>{action?.remove();delete form.dataset.submitting;form.removeAttribute('aria-busy');buttons.forEach((button,i)=>{button.disabled=disabled[i];button.textContent=labels[i]})});
  })}
  window.addEventListener('pageshow',event=>{if(event.persisted){for(const restore of reset.values())restore();reset.clear()}});
