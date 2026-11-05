@@ -47,14 +47,15 @@ func InitialContext(o ContextOptions) []AgentMessage {
 			execution = messageText(m)
 		}
 	}
-	out := []AgentMessage{systemPart("safety", safety)}
+	safetyPart := systemPart("safety", safety)
+	var out []AgentMessage
 	switch o.Position {
 	case "main":
-		out = append(out, systemPart("main_role", prompt.Main()))
+		out = []AgentMessage{systemPart("main_role", prompt.Main()), safetyPart}
 	case "root":
-		out = append(out, systemPart("identity", prompt.Identity()), systemPart("worker_role", worker))
+		out = []AgentMessage{safetyPart, systemPart("identity", prompt.Identity()), systemPart("worker_role", worker)}
 	case "child":
-		out = append(out, systemPart("worker_role", worker))
+		out = []AgentMessage{safetyPart, systemPart("worker_role", worker)}
 	default:
 		panic("invalid context position")
 	}

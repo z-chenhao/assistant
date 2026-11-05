@@ -22,6 +22,7 @@ export function wireObserver(request,send){
   return value;
  };
  return (phase,attempt,body,status=0,error='')=>{
+  if(!attempt)return;
   // Diagnostics are bounded and never alter transport success/failure.
   try{
    const event={generation_id:request.generation_id,attempt,phase,at:Date.now()*1000,format:`steward-wire-v1/pi-ai-${manifest.dependencies['@earendil-works/pi-ai']}`,http_status:status,error_code:error};

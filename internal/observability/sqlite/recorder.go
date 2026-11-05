@@ -62,13 +62,13 @@ func (r *Recorder) Record(req llm.GenerationRequest, d llm.Dispatch) {
 func (r *Recorder) run() {
 	defer close(r.done)
 	for d := range r.queue {
-		r.write(d)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		r.write(ctx, d)
+		cancel()
 	}
 }
 
-func (r *Recorder) write(d llm.Dispatch) {
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
+func (r *Recorder) write(ctx context.Context, d llm.Dispatch) {
 	var body any
 	if d.Body != nil {
 		body = string(d.Body)

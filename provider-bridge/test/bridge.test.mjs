@@ -24,6 +24,8 @@ async function fixture(t, mode='success', redirectURL='/trap') {
   }
   if(mode==='disconnect' && requests.length<3){req.socket.destroy();return;}
   if(mode==='retry' && requests.length<3){res.writeHead(503);res.end('unsafe-secret');return;}
+  if(mode==='header-timeout'){res.on('close',()=>{closed++;});return;}
+  if(mode==='error-body-idle-timeout'){res.writeHead(400);res.flushHeaders();res.on('close',()=>{closed++;});return;}
   res.writeHead(200,{'content-type':'text/event-stream'});
   const chunk=(delta,finish_reason=null,usage)=>res.write('data: '+JSON.stringify({id:'fixture',object:'chat.completion.chunk',model:'fixture-model',choices:[{index:0,delta,finish_reason}],...(usage ? {usage}: {})})+'\n\n');
   if(mode==='oversized-frame'){chunk({content:'\n'.repeat(600000)});chunk({},'stop');res.end('data: [DONE]\n\n');return;}
@@ -39,6 +41,21 @@ async function fixture(t, mode='success', redirectURL='/trap') {
    res.on('close',()=>{closed++;clearInterval(interval);});
    return;
   }
+  if(mode==='idle-timeout'){
+   res.flushHeaders();
+   res.on('close',()=>{closed++;});
+   return;
+  }
+  if(mode==='slow-first-body'){
+   res.flushHeaders();
+   const timer=setTimeout(()=>{
+    chunk({content:'delayed success'});
+    chunk({},'stop');
+    res.end('data: [DONE]\n\n');
+   },32000);
+   res.on('close',()=>clearTimeout(timer));
+   return;
+  }
   if(mode==='malformed'){res.end('data: {oops}\n\n');return;}
   if(mode==='cancel'||mode==='partial') {
    chunk({content:'partial'});
@@ -47,6 +64,7 @@ async function fixture(t, mode='success', redirectURL='/trap') {
    return;
   }
   const b=JSON.parse(body);
+  if(mode==='metadata-chunk')res.write('data: {"choices":{}}\n\n');
   if(b.tools?.length && !b.messages.some(m=>m.role==='tool')) {
    chunk({tool_calls:[{index:0,id:'call_echo',type:'function',function:{name:'probe_echo',arguments:'{"value":"OK"}'}}]});chunk({},'tool_calls');
   } else {chunk({content:b.messages.some(m=>m.role==='tool') ? 'PROBE_RESULT_OK':'OK long text ABCDEFGHIJKLMNOPQRSTUVWXYZ'});chunk({},'stop',mode==='no-usage' ? undefined : {prompt_tokens:7,completion_tokens:mode==='invalid-usage' ? -1 : 8,total_tokens:15});}
@@ -182,13 +200,43 @@ test('an explicit empty argument object remains valid',{timeout:10000},async t=>
  const f=await fixture(t,'arguments-empty');await f.rpc('generation.start',f.request());
  const call=await f.wait(e=>e.kind==='tool_call');assert.equal(call.tool_call.arguments,'{}');await f.wait(e=>e.kind==='completed');
 });
-test('absolute generation deadline aborts a trickling response body',{timeout:40000},async t=>{
- const f=await fixture(t,'deadline');const started=performance.now();
- await f.rpc('generation.start',f.request());await f.wait(e=>e.kind==='text_delta');
- const error=await f.wait(e=>e.kind==='error',35000);
- assert.equal(error.error_code,'PROVIDER_UNAVAILABLE');assert(performance.now()-started>=29000);
- assert(!f.events.some(e=>e.kind==='completed'));assert.equal(f.requests.length,1);
- for(let i=0;i<200 && !f.stats().closed;i++)await new Promise(r=>setTimeout(r,5));
- assert.equal(f.stats().closed,1);
- await f.rpc('models.list',{connection:{endpoint:f.endpoint}});
+test('generation timing marks the first output and terminal event before acceptance',{timeout:10000},async t=>{
+ const f=await fixture(t,'metadata-chunk');
+ await f.rpc('generation.start',f.request({observe:true}));
+ await f.wait(e=>e.kind==='completed');
+ assert.deepEqual(f.events.filter(e=>e.phase).map(e=>e.phase),['started','headers','first_body','first_text','stream_terminal']);
+ assert.equal(new Set(f.events.filter(e=>e.phase).map(e=>e.attempt)).size,1);
+ assert(!f.events.filter(e=>e.phase && e.phase!=='started').some(e=>e.body));
+});
+
+test('independent generation deadlines abort the right phase',{timeout:195000,concurrency:true},async t=>{
+ const cases=[
+  {mode:'header-timeout',ms:30000,phases:['started','header_timeout','error']},
+  {mode:'idle-timeout',ms:90000,phases:['started','headers','stream_idle_timeout']},
+  {mode:'error-body-idle-timeout',ms:90000,phases:['started','headers','stream_idle_timeout']},
+  {mode:'deadline',ms:180000,phases:['started','headers','first_body','first_text','generation_deadline']},
+ ];
+ const timeouts=cases.map(({mode,ms,phases})=>t.test(mode,async t=>{
+  const f=await fixture(t,mode);const started=performance.now();
+  await f.rpc('generation.start',f.request({observe:true}));
+  const error=await f.wait(e=>e.kind==='error',ms+5000);
+  assert.equal(error.error_code,'PROVIDER_UNAVAILABLE');
+  assert(performance.now()-started>=ms-1000);
+  assert.deepEqual(f.events.filter(e=>e.phase).map(e=>e.phase),phases);
+  assert(!f.events.some(e=>e.kind==='completed'));assert.equal(f.requests.length,1);
+  for(let i=0;i<200 && !f.stats().closed;i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(f.stats().closed,1);
+  await f.rpc('models.list',{connection:{endpoint:f.endpoint}});
+ }));
+ await Promise.all([...timeouts,t.test('HTTP 200 can finish after 30 seconds without body data',async t=>{
+  const f=await fixture(t,'slow-first-body');
+  await f.rpc('generation.start',f.request({observe:true}));
+  const headers=await f.wait(e=>e.phase==='headers');
+  await f.wait(e=>e.kind==='completed' || e.kind==='error',38000);
+  assert.equal(headers.http_status,200);
+  assert.equal(f.events.at(-1).kind,'completed');
+  const firstBody=f.events.find(e=>e.phase==='first_body');
+  assert(firstBody.at-headers.at>30_000_000);
+  assert.equal(f.requests.length,1);
+ })]);
 });

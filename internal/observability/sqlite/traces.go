@@ -229,7 +229,31 @@ func (s Inspector) Observations(ctx context.Context, q observability.Observation
 	if errors.Is(err, sql.ErrNoRows) {
 		err = observability.ErrNotFound
 	}
+	if err == nil && out.Selected.Type == "generation" {
+		out.ProviderTimings, err = providerTimings(ctx, tx, out.Selected.Key)
+	}
 	return out, err
+}
+
+func providerTimings(ctx context.Context, tx *sql.Tx, generationID string) ([]observability.ProviderTiming, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT attempt,phase,occurred_at,http_status,error_code FROM dispatch_observation
+ WHERE generation_id=? ORDER BY occurred_at, CASE phase
+ WHEN 'started' THEN 1 WHEN 'headers' THEN 2 WHEN 'first_body' THEN 3
+ WHEN 'first_text' THEN 4 WHEN 'first_tool_call' THEN 4
+ WHEN 'stream_terminal' THEN 5 WHEN 'error' THEN 7 ELSE 6 END,attempt LIMIT 32`, generationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var timings []observability.ProviderTiming
+	for rows.Next() {
+		var timing observability.ProviderTiming
+		if err = rows.Scan(&timing.Attempt, &timing.Phase, &timing.At, &timing.HTTPStatus, &timing.ErrorCode); err != nil {
+			return nil, err
+		}
+		timings = append(timings, timing)
+	}
+	return timings, rows.Err()
 }
 
 func parseStamp(raw string) (int64, error) {

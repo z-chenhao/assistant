@@ -69,10 +69,19 @@ type Observation struct {
 	Detail  string `json:"detail,omitempty"`
 }
 type ObservationTree struct {
-	Trace    Trace         `json:"trace"`
-	Items    []Observation `json:"items"`
-	Selected Observation   `json:"selected"`
-	Next     string        `json:"next,omitempty"`
+	Trace           Trace            `json:"trace"`
+	Items           []Observation    `json:"items"`
+	Selected        Observation      `json:"selected"`
+	Next            string           `json:"next,omitempty"`
+	ProviderTimings []ProviderTiming `json:"provider_timings,omitempty"`
+}
+
+type ProviderTiming struct {
+	Attempt    string `json:"attempt"`
+	Phase      string `json:"phase"`
+	At         int64  `json:"at_us"`
+	HTTPStatus int    `json:"http_status,omitempty"`
+	ErrorCode  string `json:"error_code,omitempty"`
 }
 type BodyQuery struct {
 	ObservationQuery

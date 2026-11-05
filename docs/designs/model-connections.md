@@ -376,8 +376,15 @@ before disposal remains complete. Failed disposal retires the peer instead of
 leaving suppressed work unobservable. Terminal session admission fences remain
 for the lifetime of the Host client, including Bridge restarts; new Runs use new
 session IDs. the system runner covers ack-only/pre-ack/late/completion races, matching
-Generate/Continue calls against actual Node/HTTP, dispatch ordering, failed cleanup,
-and the full 30-second trickling-body deadline (not a shortened test-only timer).
+Generate/Continue calls against actual Node/HTTP, dispatch ordering and failed cleanup.
+The Bridge starts a 30-second timer per HTTP attempt and clears it at headers.
+The accepted response reader starts a 90-second inactivity timer and resets it
+on nonempty data chunks. A 180-second generation timer spans catalog lookup,
+transport retries and stream handling. Cancellation uses the existing abort
+signal and wins when observed first. The Go Host's 195-second context leaves
+15 seconds for admission and terminal reporting. Phase markers are optional
+dispatch diagnostics. The existing error taxonomy and frozen request format
+also cover these failures.
 
 ## 当前设计取舍
 

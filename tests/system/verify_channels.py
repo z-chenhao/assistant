@@ -993,6 +993,14 @@ def native_trace_inspection(binary,evidence,report):
                 facts=dict(main=main,root=root,generation=generation,counts={table:db.execute('SELECT count(*) FROM '+table).fetchone()[0] for table in ('model_generation','provider_usage','tool_invocation','dispatch_observation','run_trace')})
             tree=h.http('/api/developer/observations?'+urlencode(dict(run=main)))
             require(sum(o['name']=='Provider HTTP' for o in tree['items'])>=2,'actual sends missing from observation tree')
+            round_tree=h.http('/api/developer/observations?'+urlencode(dict(run=main,obs='generation:'+generation)))
+            timings=round_tree['provider_timings']
+            phases=[x['phase'] for x in timings]
+            require(phases[:5]==['started','headers','started','headers','first_body']
+                    and sorted(phases[5:])==['first_tool_call','stream_terminal'],
+                    'retry and stream milestones are missing from generation details')
+            require([x['http_status'] for x in timings if x['phase']=='headers']==[503,200],
+                    'stream diagnostics lost the HTTP outcomes')
             h.stop(kill=True);h.start()
             require(h.http('/api/developer/observations?'+urlencode(dict(run=main)))==tree,'completed trace changed across restart')
             h.env['STEWARD_NATIVE_TRACE_FACTS']=json.dumps(facts)
