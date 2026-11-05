@@ -8,7 +8,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
-const credentialStoreHelp = "The credential store is unavailable. Unlock your login keyring and try again. On Linux, install libsecret and a Secret Service keyring."
+const credentialStoreHelp = "The credential store is unavailable. Check your credential storage settings and try again."
 
 func (s *Server) startLogin(r *http.Request) error {
 	if s.Accounts == nil {
@@ -26,6 +26,7 @@ func (s *Server) startLogin(r *http.Request) error {
 	ctx, cancel := context.WithCancel(lifetime)
 	s.authCancel = cancel
 	s.auth = llm.AuthState{Status: "pending", Events: []llm.AuthEvent{}}
+	s.authOnResources = accountReturn(r) == "/settings/setup"
 	s.authError = ""
 	s.accountID = ""
 	done := make(chan struct{})
@@ -52,4 +53,19 @@ func (s *Server) startLogin(r *http.Request) error {
 	}()
 
 	return nil
+}
+
+func accountReturn(r *http.Request) string {
+	if r.FormValue("return_to") == "/settings/setup" || r.FormValue("profile") != "" {
+		return "/settings/setup"
+	}
+	return "/settings/models/new?provider=chatgpt"
+}
+
+func (s *Server) loadSignIn(p *page, path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if (s.authOnResources && path == "/settings/setup") || (!s.authOnResources && path == "/settings/models/new") {
+		p.Auth, p.AuthError, p.AccountID, p.AuthOnResources = s.auth, s.authError, s.accountID, s.authOnResources
+	}
 }

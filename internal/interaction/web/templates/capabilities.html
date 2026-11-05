@@ -22,7 +22,7 @@
  </form></details>
  <details class="technical-details"><summary>{{tr "Configuration source and lifecycle"}}</summary><p>{{tr "File:"}} <code>{{.Path}}</code></p><p>{{if .Active}}{{tr "This capability was configured when the process started."}}{{else}}{{tr "This capability was not configured when the process started."}}{{end}} {{tr "Saving preserves other sections and never modifies an active Run. After restarting, new Runs use the loaded settings; incompatible old snapshots are rejected rather than silently upgraded."}}</p></details>
  {{else}}
- <div class="page-heading"><div><h1>{{tr "Capabilities"}}</h1><p>{{tr "Connect what Steward needs, and check that it works."}}</p></div></div>
+ <h1 class="sr-only">{{tr "Capabilities"}}</h1>
  <p class="field-help">{{tr "Connections are optional and use your own services and local resources. Open a capability to configure and test it. Saved changes take effect after restarting Steward."}}</p>
  <div class="object-list">{{range .Capabilities}}<a class="object-row" href="{{capabilityURL .ID}}"><div><strong>{{tr .Title}}</strong><span>{{tr .Description}}</span>{{if .PendingRestart}}<span>{{tr "Restart required to load saved changes"}}</span>{{end}}</div><div class="row-badges"><span class="status-pill" data-status="{{.State}}">{{if eq .State "managed"}}{{tr "Uses Computer"}}{{else if eq .State "ready"}}{{tr "Verified"}}{{else if eq .State "unavailable"}}{{tr "Needs attention"}}{{else if .Configured}}{{tr "Not verified"}}{{else}}{{tr "Not configured"}}{{end}}</span><span aria-hidden="true">→</span></div></a>{{end}}</div>
  {{end}}

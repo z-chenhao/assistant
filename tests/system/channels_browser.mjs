@@ -43,19 +43,92 @@ try{
  if(await page.locator('.chat-identity .agent-name').innerText()!=='Ghost')throw Error('Chat agent identity is not Ghost');
  if(await page.locator('#conversation-messages .avatar-slot,#conversation-messages .steward-avatar').count())throw Error('conversation repeated the header avatar');
  if(await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link').count()!==4)throw Error('workspace navigation must have four entries');
- const avatar=page.locator('.steward-avatar').first();
+ const avatar=page.locator('.chat-identity .steward-avatar');
  await avatar.waitFor();
  await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.dataset.renderer==='prerendered');
  const canvas=await avatar.locator('canvas').elementHandle();
+ const avatarSize=element=>{
+  const {width,height}=element.getBoundingClientRect();
+  return {width,height};
+ };
+ const restingSize=await avatar.evaluate(avatarSize);
+ const assertAvatarSize=async state=>{
+  const size=await avatar.evaluate(avatarSize);
+  if(size.width!==restingSize.width||size.height!==restingSize.height){
+   throw Error(`Chat avatar resized ${state}: ${restingSize.width}x${restingSize.height} → ${size.width}x${size.height}`);
+  }
+ };
  await avatar.hover();
  await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.classList.contains('is-waving'));
+ await assertAvatarSize('on hover');
  if(!await canvas.evaluate(node=>node.isConnected))throw Error('greeting replaced the complete-frame canvas');
+ await page.getByRole('link',{name:'Steward home',exact:true}).hover();
+ await assertAvatarSize('after hover');
  await page.locator('[data-avatar-pause]').click();
  if(await avatar.getAttribute('data-frame')!=='0')throw Error('paused avatar retained a moving pose');
  if(await avatar.locator('.ghost-art').evaluate(node=>getComputedStyle(node).animationPlayState)!=='paused')throw Error('pause did not stop ghost drift');
  await page.locator('[data-avatar-pause]').click();
  if(phase==='preferences'){
   await preferences(page,context,browser,url,evidence);
+ }else if(phase==='account-signin'||phase==='account-reconnect'){
+  await context.route(requestURL=>requestURL.origin!==new URL(url).origin,route=>{
+   const requestURL=new URL(route.request().url());
+   return requestURL.origin==='https://auth.openai.com'&&requestURL.pathname==='/api/accounts/authorize'
+    ?route.fulfill({contentType:'text/plain',body:'Controlled authorization page'})
+    :route.abort();
+  });
+  if(phase==='account-reconnect'){
+   await page.goto(url+'/settings/setup');
+   const account=page.getByRole('region',{name:/^ChatGPT/});
+   const current=account.locator('.resource-model').filter({hasText:'fixture-account-model'});
+   await current.getByText('Current model',{exact:true}).waitFor();
+   await current.getByText('Connection verified',{exact:true}).waitFor();
+   if(await current.getByRole('button',{name:/Test connection|Use for new work/}).count())throw Error('current verified model still exposes replaced actions');
+   await account.locator('.resource-account > summary').click();
+   if(await current.getByRole('button',{name:'Reconnect account',exact:true}).count())throw Error('account actions are repeated inside the model');
+   await page.setViewportSize({width:320,height:740});
+   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Resources overflowed the narrow layout');
+   await page.setViewportSize({width:1400,height:980});
+   if(await page.locator('#signin-status').innerText())throw Error('another page’s sign-in appeared in Resources');
+   await page.locator('.workspace-topbar [data-theme-toggle]').click();
+   await page.waitForFunction(()=>document.documentElement.classList.contains('dark'));
+   const reconnect=account.getByRole('button',{name:'Reconnect account',exact:true});
+   const signOut=account.getByRole('button',{name:'Sign out of provider',exact:true});
+   const [left,right]=await Promise.all([reconnect.boundingBox(),signOut.boundingBox()]);
+   if(!left||!right||Math.abs(left.y-right.y)>1)throw Error('provider account actions sit on different baselines');
+   await page.screenshot({path:evidence+'/model-account-dark.png',fullPage:true,animations:'disabled'});
+   const originPath=new URL(page.url()).pathname;
+   const popupOpened=context.waitForEvent('page');
+   await reconnect.click();
+   const popup=await popupOpened;
+   await popup.getByText('Controlled authorization page').waitFor();
+   await page.getByRole('button',{name:'Cancel sign-in',exact:true}).waitFor();
+   if(new URL(page.url()).pathname!==originPath||await reconnect.isVisible()||await signOut.isVisible()){
+    throw Error('reconnect returned to the wrong page or displayed competing account actions');
+   }
+  }else{
+   await page.goto(url+'/settings/models/new');
+   const signIn=page.getByRole('button',{name:'Sign in with ChatGPT',exact:false});
+   await page.evaluate(()=>{window.open=()=>null});
+   await signIn.click();
+   const fallback=page.getByRole('link',{name:'Continue sign-in in your browser',exact:false});
+   await fallback.waitFor();
+   if(context.pages().length!==1)throw Error('blocked popup did not preserve native sign-in');
+   await page.getByRole('button',{name:'Cancel sign-in',exact:true}).click();
+   // Wait for cancellation to settle, then load the complete account controls.
+   await page.getByText('Sign-in was not completed. Reconnect when you are ready.').waitFor();
+   await page.goto(url+'/settings/models/new');
+   const popupOpened=context.waitForEvent('page');
+   await signIn.click();
+   const popup=await popupOpened;
+   await popup.getByText('Controlled authorization page').waitFor();
+   if(!await popup.evaluate(()=>window.opener===null))throw Error('authorization popup can access the workspace');
+   const pending=page.locator('#signin-status[data-auth-window-opened] [data-signin-pending]');
+   await pending.getByRole('status').waitFor();
+   const bounds=await pending.boundingBox();
+   if(!bounds||bounds.height>55||await fallback.isVisible())throw Error('automatically opened authorization still prompts the user to open it');
+   if(!await pending.getByRole('button',{name:'Cancel sign-in',exact:true}).isVisible())throw Error('pending sign-in has no cancellation action');
+  }
  }else if(phase==='database'){
   await databaseInspection(page,context,browser,url,evidence);
  }else if(phase==='attention'){
@@ -138,21 +211,118 @@ try{
   await page.screenshot({path:evidence+'/navigation-compact.png',fullPage:true});
   await page.locator('.brand-row').getByRole('button',{name:'Close navigation',exact:true}).click();
   await page.setViewportSize({width:1400,height:980});
+  const workspaceNav=page.getByRole('navigation',{name:'Workspace',exact:true});
+  await workspaceNav.getByRole('link',{name:'Settings',exact:true}).click();
+  await page.getByRole('link',{name:'Preferences',exact:true}).click();
+  const preferenceRow=page.locator('form[action="/settings/language"]');
+  const help=preferenceRow.getByRole('button',{name:'About interface language'});
+  const tooltip=preferenceRow.locator('[role=tooltip]');
+  if(await page.getByRole('heading',{name:'Preferences',exact:true}).count()||await tooltip.isVisible())throw Error('Preferences duplicates its title or shows help by default');
+  await help.hover();
+  if(!await tooltip.isVisible())throw Error('language help is unavailable on hover');
+  await page.locator('.section-tabs').hover();
+  await help.focus();
+  if(!await tooltip.isVisible())throw Error('language help is unavailable from the keyboard');
+  const row=await preferenceRow.boundingBox();
+  const save=await preferenceRow.getByRole('button',{name:'Save language',exact:true}).boundingBox();
+  if(!row||!save||row.height>72||save.height>40)throw Error('language preference does not fit a compact row');
+  await page.getByLabel('Interface language',{exact:true}).selectOption('zh-CN');
+  await page.getByRole('button',{name:'Save language',exact:true}).click();
+  await page.getByLabel('界面语言',{exact:true}).selectOption('en');
+  await page.getByRole('button',{name:'保存语言',exact:true}).click();
+  await workspaceNav.getByRole('link',{name:'Chat',exact:true}).click();
+  await page.waitForURL(url+'/');
+  if(await page.locator('html').getAttribute('lang')!=='en')throw Error('saved English preference did not carry into Chat');
   if(!await page.getByRole('button',{name:'Send message',exact:true}).isDisabled())throw Error('unconfigured composer can send');
   if(await page.locator('.welcome').count())throw Error('setup competes with the normal welcome');
-  await page.getByRole('link',{name:'Set up Steward',exact:false}).click();
-  await page.getByRole('link',{name:'Connect a model',exact:true}).click();
-  await page.getByRole('link',{name:'Local or compatible API',exact:false}).click();
+  if(await page.locator('#conversation-attention a').count())throw Error('missing configuration became a work attention item');
+  const setupCallout=page.locator('.setup-callout');
+  const composer=page.locator('#composer-root .composer');
+  await setupCallout.getByRole('heading',{name:"Let's get Steward ready."}).waitFor();
+  const setupBounds=await setupCallout.boundingBox();
+  const composerBounds=await composer.boundingBox();
+  if(!setupBounds||setupBounds.height>100||!composerBounds||composerBounds.height>130)throw Error('empty Chat setup or composer takes too much vertical space');
+  if((await page.locator('#composer-root').innerText()).match(/Connect a ready model|Your ongoing conversation/))throw Error('Chat repeats setup or generic approval copy below the composer');
+  const setupLink=page.getByRole('link',{name:'Set up Steward',exact:false});
+  if(await setupLink.count()!==1)throw Error('Chat has competing setup actions');
+  await setupLink.click();
+  await page.waitForURL(url+'/settings/setup');
+  const settingsNav=page.getByRole('navigation',{name:'Settings sections',exact:true});
+  const resourcesTab=settingsNav.getByRole('link',{name:'Resources',exact:true});
+  if(await resourcesTab.getAttribute('aria-current')!=='page'||await settingsNav.getByRole('link',{name:'Models',exact:true}).count())throw Error('models are not nested under Resources');
+  const models=page.getByRole('region',{name:'Models',exact:true});
+  await models.getByText('No model selected',{exact:true}).waitFor();
+  await models.getByRole('link',{name:'Connect a model',exact:true}).click();
+  if(await resourcesTab.getAttribute('aria-current')!=='page')throw Error('model connection left the Resources section');
+  await page.getByRole('button',{name:'Sign in with ChatGPT',exact:false}).waitFor();
+  const connectURL=page.url();
+  await page.getByLabel('Connection method').selectOption('compatible');
+  await page.getByLabel('Endpoint URL').waitFor();
+  if(page.url()!==connectURL||await page.getByRole('button',{name:'Sign in with ChatGPT',exact:false}).count())throw Error('provider selection did not switch fields in place');
+  const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:320,height:740}});
+  try{
+   await plain.addCookies(await context.cookies());
+   const native=await plain.newPage();
+   await native.goto(connectURL);
+   await native.getByLabel('Connection method',{exact:true}).selectOption('compatible');
+   await native.getByRole('button',{name:'Show settings',exact:true}).click();
+   await native.getByLabel('Endpoint URL').waitFor();
+   if(await native.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('model connection overflows the narrow layout');
+  }finally{await plain.close()}
   if(await page.getByRole('checkbox',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
   await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
   await page.locator('input[name="model"]').fill('fixture-model');
   await page.getByRole('button',{name:'Add connection',exact:true}).click();
-  if(!new URL(page.url()).pathname.startsWith('/settings/models/'))throw Error('add left model setup');
-  await page.getByRole('button',{name:'Test connection',exact:true}).click();
-  if(!new URL(page.url()).pathname.startsWith('/settings/models/'))throw Error('test left model setup');
-  await page.getByRole('checkbox',{name:'Use this provider for new work'}).check();
-  await page.getByRole('button',{name:'Select model',exact:true}).click();
-  await page.getByRole('heading',{name:'Ready for new work',exact:true}).waitFor();
+  const onResources=(notice)=>page.waitForURL(location=>location.pathname==='/settings/setup'&&location.searchParams.get('notice')===notice);
+  await onResources('added');
+  const firstModel=page.locator('.resource-model').filter({has:page.locator('summary').getByText('fixture-model',{exact:true})});
+  await firstModel.getByRole('button',{name:'Test connection',exact:true}).waitFor();
+  if(await firstModel.getByText(/^(Context \/ maximum output|Image handling)$/).count())throw Error('Resources shows read-only capability fields');
+  const firstID=new URL(page.url()).searchParams.get('model');
+  await page.screenshot({path:evidence+'/model-detail-wide.png',fullPage:true});
+  await page.setViewportSize({width:320,height:740});
+  const mobileHeader=await page.locator('.workspace-topbar').evaluate(topbar=>{
+   const crumb=topbar.querySelector('.breadcrumbs').lastElementChild.getBoundingClientRect();
+   const status=topbar.querySelector('#workspace-status').getBoundingClientRect();
+   return {overlap:crumb.right>status.left,overflow:document.documentElement.scrollWidth>innerWidth};
+  });
+  if(mobileHeader.overlap||mobileHeader.overflow)throw Error('expanded model overlapped or overflowed the narrow layout');
+  await page.screenshot({path:evidence+'/model-detail-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:980});
+  await firstModel.locator('summary').click();
+  await firstModel.getByRole('button',{name:'Use for new work',exact:true}).click();
+  await onResources('active');
+  await firstModel.getByText('Current model',{exact:true}).waitFor();
+  await firstModel.getByText('Connection verified',{exact:true}).waitFor();
+  if(await firstModel.getByRole('button',{name:/Test connection|Use for new work/}).count())throw Error('current verified model still exposes replaced actions');
+
+  await models.getByRole('link',{name:'Connect a model',exact:true}).click();
+  await page.getByLabel('Connection method').selectOption('compatible');
+  await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
+  await page.locator('input[name="name"]').fill('Backup model');
+  await page.locator('input[name="model"]').fill('fixture-model');
+  await page.getByRole('button',{name:'Add connection',exact:true}).click();
+  await onResources('added');
+  const backupModel=page.locator('.resource-model').filter({has:page.getByText('Backup model',{exact:true})});
+  await page.goto(url+'/settings/setup');
+  if(await page.locator('.resource-model > details[open]').count())throw Error('Resources shows expanded model configurations by default');
+  await firstModel.locator('summary').click();
+  await backupModel.locator('summary').click();
+  if(await firstModel.locator('details[open]').count())throw Error('multiple model configurations remain open');
+  await backupModel.getByRole('button',{name:'Test connection',exact:true}).click();
+  await onResources('tested');
+  await backupModel.getByText('Connection verified',{exact:true}).waitFor();
+  if(await backupModel.getByRole('button',{name:'Test connection',exact:true}).count())throw Error('successful test did not replace the test action');
+  await backupModel.locator('summary').click();
+  await backupModel.getByRole('button',{name:'Use for new work',exact:true}).click();
+  await onResources('active');
+  await backupModel.getByText('Current model',{exact:true}).waitFor();
+  if(await firstModel.getByText('Current model',{exact:true}).count())throw Error('switching left both models current');
+  if(await resourcesTab.getAttribute('aria-current')!=='page')throw Error('model selection left the Resources section');
+  await page.goto(url+'/settings/models/'+encodeURIComponent(firstID));
+  await page.waitForURL(location=>location.pathname==='/settings/setup'&&location.searchParams.get('model')===firstID);
+  await firstModel.locator('details[open]').waitFor();
+  await firstModel.getByRole('button',{name:'Use for new work',exact:true}).waitFor();
   await page.screenshot({path:evidence+'/model-ready.png',fullPage:true});
   // Deterministically type into usable server HTML before the local bundle is
   // released. Progressive enhancement must preserve this draft and its file.
@@ -161,7 +331,7 @@ try{
   let requested;
   const loading=new Promise(resolve=>{requested=resolve});
   await page.route('**/app.js',async route=>{requested();await bundle;await route.continue()});
-  const selecting=page.getByRole('link',{name:'Start a conversation',exact:false}).click();
+  const selecting=page.locator('.app-sidebar').getByRole('link',{name:'Chat',exact:true}).click();
   await loading;
   await page.getByLabel('Message Ghost').fill('Plan my day: finish the release risk note before noon.');
   await page.getByLabel('Attach a file').setInputFiles({name:'web-note.txt',mimeType:'text/plain',buffer:Buffer.from('Web owner attachment fixture.\n')});
@@ -194,7 +364,7 @@ try{
    await settings.reload();if(await settings.locator('select[name=target]').inputValue()!=='tui:')throw Error('notification preference did not persist');
    await settings.screenshot({path:evidence+'/notifications.png',fullPage:true});
    await settings.locator('select[name=target]').selectOption('auto:');await settings.getByRole('button',{name:'Save notification channel',exact:true}).click();
-   await settings.goto(url+'/settings/models');await settings.getByRole('region',{name:'Current model',exact:true}).waitFor();
+   await settings.goto(url+'/settings/models');await settings.getByText('Current model',{exact:true}).waitFor();
    await settings.screenshot({path:evidence+'/models.png',fullPage:true});
    await settings.getByRole('link',{name:'Connect a model',exact:true}).click();await settings.screenshot({path:evidence+'/model-sources.png',fullPage:true});
   }finally{await native.close()}
@@ -237,7 +407,8 @@ try{
   await page.locator('.app-sidebar').getByRole('link',{name:'Tasks',exact:true}).click();
   await page.getByRole('link',{name:'All tasks',exact:true}).click();
   await page.locator('.task-row').first().click();
-  await page.getByRole('heading',{name:'Planned objective',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Prepare a safe independent report. Return evidence; perform no external actions.',exact:true}).waitFor();
+  if(await page.getByRole('heading',{name:'Planned objective',exact:true}).count())throw Error('task detail repeated its title as the objective');
   if(!await page.locator('#task-messages').innerText().then(text=>text.includes('Main Task follow-up through Pi.')))throw Error('completed task did not show Main delivery');
   await page.screenshot({path:evidence+'/task-result.png',fullPage:true});
 
@@ -347,9 +518,7 @@ try{
  }
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
-  await page.getByRole('link',{name:'Manage model',exact:false}).click();
-  const capability=process.env.STEWARD_TEST_VISION==='yes'?'Image input verified':'Text only · attachments by reference';
-  await page.getByText(capability,{exact:false}).waitFor();
+  await page.locator('.resource-model').filter({has:page.getByText('Current model',{exact:true})}).getByText('Connection verified',{exact:true}).waitFor();
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
   let release,requested;
@@ -736,6 +905,7 @@ try{
  if(remote.length)throw new Error('UI contacted an external service: '+remote.join(', '));
  if(errors.length)throw new Error(errors.join(';'));
 }catch(error){
+ if(phase==='account-signin'||phase==='account-reconnect')throw Error('Browser did not complete the controlled account flow');
  if(page){await page.screenshot({path:evidence+'/'+phase+'-failure.png',fullPage:true});await writeFile(evidence+'/'+phase+'-failure.txt',await page.locator('body').innerText())}
  throw error;
 }finally{await browser.close()}

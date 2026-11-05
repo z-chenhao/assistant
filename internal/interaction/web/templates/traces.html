@@ -7,7 +7,7 @@
 {{with .Relations}}{{with .Task}}<p class="obs-task-link"><a href="{{taskURL .Ref}}">{{.Title}}</a> {{tr "· Task execution"}} {{if $.Trace.Tree.Trace.Epoch}}{{tr "· epoch"}} {{$.Trace.Tree.Trace.Epoch}}{{end}}</p>{{end}}{{end}}
 <div id="observability-workbench">{{template "trace-workbench" $}}</div>
 {{else}}
-<div class="page-heading"><div><h1>{{tr "Traces"}}</h1><p>{{tr "Find an execution, then inspect what happened."}}</p></div></div>
+<h1 class="sr-only">{{tr "Traces"}}</h1>
 {{if .Task}}
  {{with .Relations}}<section class="panel obs-task-epochs">{{with .Task}}<h2>{{.Title}}</h2><a href="{{taskURL .Ref}}">{{tr "Open task →"}}</a>{{end}}<p class="muted">{{tr "Each continuation creates a separate Root epoch. Main creation is a causal link, not Worker ancestry."}}</p><div class="object-list">{{range .Executions}}{{if eq .Role "root"}}<a class="object-row" href="{{traceURL $.Trace "run" .ID}}"><strong>{{tr "Root Worker · epoch"}} {{.Epoch}}</strong><span class="status-pill" data-status="{{.Status}}">{{tr .Status}}</span></a>{{end}}{{end}}</div></section>{{end}}
 {{else}}

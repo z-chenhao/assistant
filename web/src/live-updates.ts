@@ -38,8 +38,13 @@ function regionPatcher(ids:readonly string[]){
   if(!region||markup.get(id)===html)return;
   const parsed=document.createElement('template');parsed.innerHTML=html;
   const restoreDrafts=captureRichFormDrafts(region);
+  if(id==='signin-status'&&region.querySelector('[data-signin-pending]')&&parsed.content.querySelector('[data-account-reconnected]')){
+   location.reload();
+   return;
+  }
   if(id==='workspace-status'||id==='signin-status'){
    releaseProjections(region);region.replaceChildren(parsed.content);
+   if(id==='signin-status'&&!region.querySelector('[data-signin-pending]'))delete region.dataset.authWindowOpened;
   }else{
    const previous=Array.from(region.children);
    const keyed=new Map(previous.map((child,i)=>[(child as HTMLElement).dataset.liveKey??`position:${i}`,child]));
@@ -189,7 +194,7 @@ export function startLiveUpdates(){
    if(hasReply(draftKey)||committing&&deferMessages&&!follow)clearDraft();
    const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
    const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;
-   if(send&&form&&!form.dataset.submitting&&readiness){send.disabled=readiness!=='true';const hint=document.querySelector<HTMLElement>('#composer-feedback');if(hint?.dataset.modelNeeded&&readiness==='true'){hint.textContent=t('');delete hint.dataset.modelNeeded}}
+   if(send&&form&&!form.dataset.submitting&&readiness)send.disabled=readiness!=='true';
 
    if(view==='/'&&(follow||bottom&&before===0))finishFollow();
    else{

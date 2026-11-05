@@ -190,6 +190,7 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 沿用 `verify_channels.py` 和真实浏览器 action，不新增脚本或 CI gate：
 
 - 原生设置：模型来源 → 保存 → Verify → 明确授权 Select → Conversation；候选 probe 与活动状态分开；ChatGPT 登录、可见目录、重启和退出仍经真实 Manager/Bridge（外部 OAuth 为受控 peer）。通知保存后停留原页，重载仍选实际目的地。
+- 首次设置浏览器路径：在 Preferences 从中文切回英文，经 Chat 返回对话，确认英文保留且未就绪时无法发送，再通过 Set up Steward 连接、验证并显式选用模型。标题、提示密度、设置控件尺寸与登录步骤数量随界面改动在桌面和窄屏验收。
 - 原生输入：延迟脚本时编辑、选文件与打开 picker，增强后保持同一节点/文件；拒绝或丢失确认不自动重发并保留草稿和附件；任务上下文可移除而不丢输入。
 - Tasks：列表筛选、分页、详情目标/阶段、对应的冻结审批、已由 Main 交付的结果，以及带任务上下文回到 Main；不能用 Worker 结果替代 Main 交付。详情和 Conversation 保留同一审批 hash。
 - Developer：列表打开独立 Trace 详情，树与时间线对齐；节点类型决定可用 Tab；完整 Context/JSON/来源/长正文和 Diff 深链接可达，原生链接、移动端与无 JavaScript 路径继续可用。
@@ -197,6 +198,12 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 - 模块测试：notification 持久化选择、候选 proof version、登录本地返回、Host 审批单卡片/用户文本不改写、任务消息通过既有 ingress；`make test lint` 检查所有包及嵌入资源一致。
 
 系统断言采用受控模型/HTTP 响应，证明产品链路与回归，不证明真实模型质量或真实账户可用性。执行结果与截图留在对应运行的 evidence，不把测试计划写成执行报告。
+
+首次设置界面通过现有浏览器和 Web 组件场景检查以下路径。
+
+- 在没有模型且没有工作待办时，配置提示有可达入口，待办计数不包含配置项。已有工作待办在不同就绪状态下仍可见，系统操作按当前语言翻译，任务标题保留原文。
+- 检查 Preferences 与 Models 各有一个可见的页面标识，帮助可通过键盘访问。Chat 未就绪时保留一个清楚的设置入口。桌面与窄屏的视觉验收核对标题、输入区尺寸和提示密度。
+- 从 Chat 进入 Resources，直接看到模型状态和连接入口。连接、验证和选择模型期间均保持 Resources 标签选中。选择模型连接方式后在当前页显示对应配置。点击一次 ChatGPT 登录操作即发起授权，浏览器未打开时仍能手动继续。
 
 
 ## F-020 自建应用凭据与失效诊断

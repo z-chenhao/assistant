@@ -690,7 +690,7 @@ def run(binary,evidence):
             h.browser(evidence.parent/'preferences-ui','preferences')
             report['checks'].append('Preferences: compact bilingual language row, accessible hover/keyboard/touch help, one native save, browser persistence, no-JS fallback and neighboring settings')
             h.wait(lambda s:any(d['status']=='sent' and d['channel']=='web' for d in s['deliveries']),'browser setup and first reply')
-            report['checks'].append('Launch/Doctor: real loopback Web setup and file attachment through browser; explicit model Fake; auth/CSRF/signature/identity/recipient rejection')
+            report['checks'].append('Launch/Doctor: browser language switch persists into Chat, followed by real loopback Web setup and file attachment; explicit model Fake; auth/CSRF/signature/identity/recipient rejection')
             # Duplicate callback IDs and new callback IDs carrying the same source
             # message are distinct retry patterns, both deduplicated durably.
             with ThreadPoolExecutor(max_workers=8) as pool:
@@ -769,7 +769,7 @@ def run(binary,evidence):
     native_components(binary, evidence, report)
     rich_replies(binary, evidence, report)
     delivery_leases(binary, report)
-    account_presentation(binary,report)
+    account_presentation(binary, evidence.parent/'account-ui', report)
     native_trace_inspection(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
@@ -1142,7 +1142,7 @@ def dependency_recovery(binary, report):
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
             h.start()
-            require('<h1>Models</h1>' in h.http('/settings/models'), 'dependency failure hid Settings')
+            require('href="/settings/models/new"' in h.http('/settings/setup'), 'dependency failure hid model settings in Resources')
             require('<h1>Tasks</h1>' in h.http('/tasks'), 'dependency failure hid Progress')
             require(h.http('/api/status')['readiness'] != 'ready', 'broken runtime admitted work')
             h.http('/api/message', dict(source_id='blocked', content=[dict(type='text', text='blocked')]), expected=409)
@@ -1471,7 +1471,7 @@ def extra_scenarios(binary,report):
     report['checks'].append('Task continuation across Feishu/Web; real zoned scheduling to default Feishu with only two threshold notices')
 
 
-def account_presentation(binary,report):
+def account_presentation(binary, browser_evidence, report):
     # Reuse the account harness' owned OAuth network substitution and SecretStore.
     # The production Bridge/Manager is real; no login token or auth URL is evidence.
     from verify_account import account_config, Secrets
@@ -1489,6 +1489,7 @@ def account_presentation(binary,report):
             server=socketserver.ThreadingUnixStreamServer(str(socket),Secrets)
             server.values={'credential:web-owner':base64.b64encode(TOKEN.encode()).decode()}
             server.lock=threading.Lock();server.sensitive=set();os.chmod(socket,0o600)
+            server.credential_reads = {}
             thread=threading.Thread(target=server.serve_forever);thread.start()
             h=object.__new__(ChannelHarness);MainHarness.__init__(h,binary,root,fixture='')
             h.env.update(STEWARD_NATS_URL=broker.url,STEWARD_NATS_STREAM_PREFIX='web_account')
@@ -1499,9 +1500,31 @@ def account_presentation(binary,report):
                 h.args=lambda *args:original('-test-secret-store',str(socket),*args)
                 h.env['STEWARD_WEB_TEST_TOKEN']=TOKEN;h.process=None;h.start()
                 form={'Content-Type':'application/x-www-form-urlencoded'}
-                h.http('/auth/login',b'',headers=form)
-                pending=h.wait_state(lambda s:any(e['kind']=='open_url' for e in s['events']),'UI-neutral account authorization event',lambda _:h.http('/api/auth'))
-                private_url=next(e['url'] for e in pending['events'] if e['kind']=='open_url')
+                def pending_login():
+                    pending = h.wait_state(
+                        lambda s: s['status'] == 'pending' and any(e['kind'] == 'open_url' for e in s['events']),
+                        'UI-neutral account authorization event', lambda _: h.http('/api/auth'),
+                    )
+                    return pending, next(e['url'] for e in pending['events'] if e['kind'] == 'open_url')
+
+                # The external browser can fail before it sends a callback.
+                h.browser(root/'browser', 'account-signin')
+                _, abandoned_url = pending_login()
+                require('Cancel sign-in' in h.http('/settings/models/new?provider=chatgpt'), 'pending login has no way to cancel')
+                h.http('/auth/cancel', b'', headers=form)
+                cancelled = h.wait_state(lambda s: s['status'] == 'reauth_required',
+                                         'cancelled Web login', lambda _: h.http('/api/auth'))
+                require(not cancelled.get('account_id') and not h.command('model', 'accounts'),
+                        'abandoned authorization created an account')
+                require(h.http('/api/status')['readiness'] == 'setup_required', 'abandoned authorization changed readiness')
+                retry_page = h.http('/settings/models/new?provider=chatgpt')
+                require('Sign-in was not completed.' in retry_page and 'action="/auth/login"' in retry_page,
+                        'cancelled authorization did not offer another login')
+                require(abandoned_url not in retry_page and 'Continue sign-in in your browser' not in retry_page,
+                        'cancelled authorization still offers the abandoned URL')
+                h.http('/auth/login', b'', headers=form)
+                pending, private_url = pending_login()
+                require(private_url != abandoned_url, 'retry reused the abandoned authorization')
                 request=Request(endpoint+'/fixture/authorize',data=json.dumps(dict(url=private_url)).encode(),headers={'Content-Type':'application/json'})
                 with urlopen(request,timeout=10) as response:callback=json.load(response)['callback']
                 with urlopen(callback,timeout=10) as response:require(response.status==200,'OAuth callback rejected')
@@ -1513,16 +1536,71 @@ def account_presentation(binary,report):
                 h.http('/model/test',urlencode(dict(profile=profile['profile_id'])).encode(),headers=form)
                 h.http('/model/select',urlencode(dict(profile=profile['profile_id'],profile_version=profile['version'],config_version=1,consent='yes')).encode(),headers=form)
                 require(h.http('/api/status')['readiness']=='ready','Web account profile unavailable')
+                detail = '/settings/models/' + profile['profile_id']
+                add_page = '/settings/models/new?provider=chatgpt'
+                require('Choose an account model' not in h.http(detail), 'add-model sign-in result appeared on existing model')
+                h.browser(browser_evidence, 'account-reconnect')
+                pending_login()
+                resources = '/settings/setup'
+                require('Waiting for sign-in' in h.http(resources) and 'Waiting for sign-in' not in h.http(add_page),
+                        'reconnect status was displayed outside the Resources account section')
+                for view, visible in ((resources, True), (detail, False), ('/settings/models/new', False)):
+                    updates = h.http('/api/updates?' + urlencode(dict(view=view)))
+                    require(('Waiting for sign-in' in updates['regions']['signin-status']) == visible,
+                            'live updates put reconnect status on the wrong page')
+                h.http('/auth/cancel', urlencode(dict(return_to=resources)).encode(), headers=form)
+                h.wait_state(lambda s:s['status']=='reauth_required', 'Resources reconnect cancels', lambda _:h.http('/api/auth'))
+                def account_credential_reads():
+                    with server.lock:
+                        return sum(count for ref, count in server.credential_reads.items() if ref != 'credential:web-owner')
+
+                reads_before = account_credential_reads()
                 h.stop();h.start()
-                require('ChatGPT account' in h.http('/settings/models/new?provider=chatgpt'),'restart hid connected account')
+                require('Load models' in h.http(add_page), 'connected account needs an explicit catalog action')
+                for _ in range(2):
+                    h.http(resources)
+                    h.http('/api/status')
+                    for view in ('/', resources, '/settings/models/new'):
+                        h.http('/api/updates?' + urlencode(dict(view=view)))
+                require(account_credential_reads() == reads_before,
+                        'startup, page load or polling read the account credential')
+                catalog_page = h.http('/model/catalog', urlencode(dict(account=aid)).encode(), headers=form)
+                require('Add account model' in catalog_page and 'fixture-account-model' in catalog_page
+                        and account_credential_reads() > reads_before,
+                        'explicit catalog load did not read credentials and render the picker')
                 h.http('/auth/logout',urlencode(dict(account=aid)).encode(),headers=form)
                 require(h.command('model','accounts')[0]['status']=='logged_out','Web logout missed existing lifecycle')
+                require('Sign-in required' in h.http(resources), 'signed-out model does not show its blocked connection')
+                h.http('/auth/login', urlencode(dict(account=aid, return_to=resources)).encode(), headers=form)
+                _, reconnect_url = pending_login()
+                request = Request(endpoint+'/fixture/authorize', data=json.dumps(dict(url=reconnect_url)).encode(),
+                                  headers={'Content-Type':'application/json'})
+                with urlopen(request, timeout=10) as response:
+                    callback = json.load(response)['callback']
+                with urlopen(callback, timeout=10) as response:
+                    require(response.status == 200, 'OAuth reconnect callback rejected')
+                h.wait_state(lambda s: s.get('account_id') == aid and s['status'] == 'connected',
+                             'Web account reconnect completes', lambda _: h.http('/api/auth'))
+                require('Test connection' in h.http(resources) and 'Use for new work' not in h.http(resources),
+                        'current model needs another selection after reconnect')
+                restored_profile = h.command('model','list')[0]
+                restore = dict(profile=profile['profile_id'], restore_current='yes',
+                               profile_version=restored_profile['version'],
+                               config_version=h.http('/api/status')['config_version'])
+                h.http('/model/test', urlencode(restore).encode(), headers=form)
+                restored = h.http('/api/status')
+                require(restored['readiness'] == 'ready' and restored['active_model_profile_id'] == profile['profile_id'],
+                        'testing did not restore the existing selection')
+                restored_page = h.http(resources)
+                require('Connection verified' in restored_page and 'Test connection' not in restored_page and 'Use for new work' not in restored_page,
+                        'restored model still exposes replaced actions')
+                h.http('/auth/logout', urlencode(dict(account=aid)).encode(), headers=form)
                 with server.lock:
                     sensitive=list(server.sensitive)
                 for path in (root/'data').rglob('*'):
                     if path.is_file():require(all(value not in path.read_bytes() for value in sensitive),'credential persisted outside SecretStore')
-                report['scenarios']['account-auth']=dict(status='connected_then_logged_out',event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
-                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; ephemeral URL, hidden-model rejection, actual Probe/Select, restart picker, logout and credential scan verified')
+                report['scenarios']['account-auth']=dict(status='connected_then_logged_out',abandoned_login_recovered=True,event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
+                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; direct popup and manual fallback, cancel without callback, fresh authorization on retry, hidden-model rejection, actual Probe/Select, reconnect page and live update scoping, restart picker, logout and credential scan verified')
                 h.stop()
             finally:
                 h.cleanup();server.shutdown();server.server_close();thread.join(timeout=10)

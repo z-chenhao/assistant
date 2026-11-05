@@ -4,6 +4,12 @@ export async function databaseInspection(page,context,browser,url,evidence){
  await page.locator('aside').getByRole('link',{name:'Developer',exact:true}).click();
  await page.getByRole('navigation',{name:'Developer sections'}).getByRole('link',{name:'Database',exact:true}).click();
  await page.locator('.database-page').waitFor();
+ const filterOffset=await page.locator('.database-filter').evaluate(form=>{
+  const field=form.querySelector('input[name=ref]').getBoundingClientRect();
+  const action=form.querySelector('button').getBoundingClientRect();
+  return Math.abs(field.bottom-action.bottom);
+ });
+ if(filterOffset>1)throw Error('record reference and filter action sit on different baselines');
  const collections=page.getByRole('navigation',{name:'Record collections'});
  if(await collections.getByRole('link').count()!==4)throw Error('metadata collections missing');
  await collections.getByRole('link',{name:'Messages',exact:true}).click();
