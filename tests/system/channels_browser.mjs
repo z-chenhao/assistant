@@ -544,6 +544,7 @@ try{
  }
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
+  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('link',{name:'Resources',exact:true}).click();
   await page.locator('.resource-model').filter({has:page.getByText('Current model',{exact:true})}).getByText('Connection verified',{exact:true}).waitFor();
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
