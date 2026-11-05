@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test": "node --test *.test.mjs",
     "build": "node build.mjs",
     "check": "node build.mjs --check",
-    "lint": "tsc --noEmit && node --check build.mjs"
+    "lint": "tsc --noEmit && node --check build.mjs && node --check controls-policy.mjs"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",

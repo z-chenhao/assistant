@@ -96,7 +96,7 @@ export async function capabilityDefaults(page,context,url,evidence){
  if(!await page.locator('#interface-theme').evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Tab did not continue to the next setting');
  await language.click();await page.getByRole('heading',{level:1}).click();
  if(await languagePopup.isVisible())throw Error('outside click kept dropdown open');
- const popup=page.locator('.settings-select-menu:visible');
+ const popup=page.locator('.control-select-menu:visible');
  const navSearch=page.getByRole('searchbox',{name:'搜索设置',exact:true});await navSearch.fill('通知');
  if(await page.locator('.settings-navigation a:visible').count()!==1)throw Error('settings navigation filter did not match');
  await navSearch.fill('zz-no-result');await page.getByText('未找到设置。',{exact:true}).waitFor();await navSearch.press('Escape');
@@ -267,7 +267,16 @@ export async function capabilitySetup(page,context,url,evidence){
   if(new URL(p.url()).searchParams.get('editor')!=='advanced'||!await p.locator('details.capability-advanced').evaluate(node=>node.open))throw Error('no-JavaScript advanced PRG lost its editor');
   await p.screenshot({path:evidence+'/capability-no-script.png',fullPage:true});
  }finally{await plain.close()}
- await open('execution');await test({root:facts.workspace,toolchain_roots:[]});await page.getByText('Connection available.',{exact:false}).waitFor();await save();
+ await open('execution');
+ await page.setViewportSize({width:720,height:980});
+ const editorFont=await guided().locator('textarea').evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
+ if(editorFont<16)throw Error('guided textarea missed the compact input rule');
+ if(!await guided().locator('textarea').evaluate(node=>{const probe=document.createElement('span');probe.style.color='var(--control-border)';node.after(probe);const color=getComputedStyle(probe).color;probe.remove();return getComputedStyle(node).borderTopColor===color}))throw Error('guided textarea uses a divider instead of the input boundary');
+ if(await page.locator('#capability-configuration').evaluate(node=>parseFloat(getComputedStyle(node).fontSize))<16)throw Error('Advanced YAML missed the compact input rule');
+ await page.setViewportSize({width:320,height:740});
+ for(const summary of await page.locator('.capability-advanced>summary,details.technical-details>summary').all())if(await summary.evaluate(node=>node.getBoundingClientRect().height)<44)throw Error('capability disclosure lost its touch target');
+ await page.setViewportSize({width:1400,height:980});
+ await test({root:facts.workspace,toolchain_roots:[]});await page.getByText('Connection available.',{exact:false}).waitFor();await save();
  // Restore the implicit workspace so Computer can be the sole saved backend.
  await test('');await page.getByText('Connection available.',{exact:false}).waitFor();await save();
  await open('computer');await test(facts.computer);await page.getByText('Connection available.',{exact:false}).waitFor();

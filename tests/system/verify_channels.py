@@ -771,8 +771,27 @@ def run(binary,evidence):
     delivery_leases(binary, report)
     account_presentation(binary, evidence.parent/'account-ui', report)
     native_trace_inspection(binary,evidence,report)
+    task_control_components(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def task_control_components(binary, evidence, report):
+    # The CI channels gate owns this scenario; the browser driver is not an
+    # uncalled example. All schedule writes use a disposable data root.
+    with tempfile.TemporaryDirectory(prefix='steward-task-controls-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        h.now = '2026-10-15T12:00:00+08:00'
+        try:
+            h.setup()
+            h.start()
+            output = evidence.parent / 'task-controls-ui'
+            h.browser(output, 'schedule')
+            require(not h.rows()['runs'], 'schedule control checks unexpectedly started a Run')
+            report['scenarios']['task-controls'] = json.loads((output / 'schedule-browser.json').read_text())
+            report['checks'].append('Task shared Select/Switch: search and empty results, keyboard cancellation, dependent fields, single popup, manual save, persistence, stale drafts, touch, native fallback and no premature dispatch')
+        finally:
+            h.cleanup()
 
 
 def database_inspection(binary, evidence, report):

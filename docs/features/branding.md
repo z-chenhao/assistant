@@ -6,7 +6,7 @@ Your personal AI steward.
 
 ## 功能说明
 
-Steward 是拥有对话、工具、记忆与委派任务的私人助手。产品名为 Steward，当前 Agent 名为 Ghost。字标使用 Michroma，形象为黑白小幽灵。正式 Web 使用非纯黑纯白的单色界面，英文界面为 Inter，回复正文为 Source Serif 4，中文优先 PingFang SC、回退自托管思源黑体；代码为 JetBrains Mono。图片与字体全部同源嵌入。
+Steward 是拥有对话、工具、记忆与委派任务的私人助手。产品名为 Steward，当前 Agent 名为 Ghost。字标使用 Michroma，形象为黑白小幽灵。正式 Web 使用非纯黑纯白的单色界面，Chat 发送按钮以橙色作为局部例外，英文界面为 Inter，回复正文为 Source Serif 4，中文优先 PingFang SC、回退自托管思源黑体；代码为 JetBrains Mono。图片与字体全部同源嵌入。
 
 ## 需求与验收
 
@@ -15,7 +15,7 @@ Steward 是拥有对话、工具、记忆与委派任务的私人助手。产品
 ### F-041：品牌、身份与工作空间
 
 - 单个 256px 侧栏；首页接续真实持续对话，采用居中正文、无卡片回复、浅灰用户气泡与多行输入。Computer/Worker 详情按需查看实时画面和执行历史；成果仍归实际任务及其交付消息。
-- Conversation、Tasks、Settings & capabilities、Developer 共用配色和控件。操作页采用紧凑字号、对齐的字段和按钮，以及单一可见标题。模型未就绪时显示配置入口并禁用发送。
+- Conversation、Tasks、Settings & capabilities、Developer 共用配色和控件。公共控件复用与选项状态测试属于现有 CI 必过检查，Task 计划页沿用真实浏览器验证保存与回退。下拉选择与普通布尔开关在跨页使用同一套外观与交互，页面各自保留原有保存、筛选或即时应用行为。操作页采用共享字号、对齐的字段和按钮，以及单一可见标题；760px 及以下的普通输入使用 16px，按钮、选择器和折叠入口保留至少 44px 的触控高度。模型选用前常驻显示提供方同意说明，Trace 树逐项显示可读状态文字。模型未就绪时显示配置入口并禁用发送。
 - 浅色用深色幽灵，深色用浅色幽灵；可暂停动效，尊重 reduced-motion、页面可见性和离屏状态。悬停问候时头像尺寸和点击区域保持稳定。动画只表达角色反馈，不伪造任务状态。
 - 实际发送、附件、审批、冻结哈希、任务接续、分页与实时更新维持既有执行链路。未确认发送保留草稿与附件，不自动重发。
 - 品牌贯穿 Web、终端、授权页、安装器与打包说明。命令为 `steward`，环境变量使用 `STEWARD_*`，默认数据根为 `~/.local/share/steward`，模块为 `github.com/z-chenhao/assistant`。不提供其他品牌的命令、路径、协议或配置别名。

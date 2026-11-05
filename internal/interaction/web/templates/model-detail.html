@@ -40,12 +40,10 @@
     <input name="profile" type="hidden" value="{{.ProfileID}}">
     <input name="profile_version" type="hidden" value="{{.Version}}">
     <input name="config_version" type="hidden" value="{{.ConfigVersion}}">
-    <span class="setting-help">
-     <span><button class="setting-action" name="consent" value="yes" aria-describedby="model-consent-{{.ProfileID}}">{{tr "Use for new work"}}</button></span>
-     <span id="model-consent-{{.ProfileID}}" role="tooltip">{{tr "New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration."}}</span>
-    </span>
+    <button class="setting-action" name="consent" value="yes" aria-describedby="model-consent-{{.ProfileID}}">{{tr "Use for new work"}}</button>
    </form>
   {{end}}
  </div>
+ {{if and (not .Current) .CanTest}}<p class="field-help model-consent" id="model-consent-{{.ProfileID}}">{{tr "New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration."}}</p>{{end}}
 </div>
 {{end}}

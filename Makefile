@@ -34,6 +34,7 @@ test-go:
 
 test-node:
 	npm run check --prefix web
+	npm test --prefix web
 	npm test --prefix provider-bridge
 	npm test --prefix runtime/javascript
 

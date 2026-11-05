@@ -11,7 +11,7 @@ function enhancePreferenceHelp(){
   if(!trigger||!tooltip||!fallback)continue;
   let hovered=false,pinned=false,dismissed=false;
   const render=()=>{tooltip.hidden=dismissed||!(hovered||pinned||document.activeElement===trigger);if(!tooltip.hidden)document.dispatchEvent(new Event('preference-help-open'))};
-  document.addEventListener('preference-picker-open',()=>{pinned=false;dismissed=true;render()});
+  document.addEventListener('control-select-open',()=>{pinned=false;dismissed=true;render()});
   help.addEventListener('pointerenter',event=>{if(event.pointerType==='touch')return;hovered=true;dismissed=false;render()});
   help.addEventListener('pointerleave',()=>{hovered=false;render()});
   trigger.addEventListener('focus',()=>{dismissed=false;render()});
