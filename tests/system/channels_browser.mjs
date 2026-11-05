@@ -352,9 +352,35 @@ try{
   if(preserved!==JSON.stringify(selection)||await page.locator('input[name="source_id"]').inputValue()!==earlySource)throw new Error('frontend enhancement changed draft focus, selection or source identity');
   const file=await page.getByLabel('Attach a file').evaluate(async input=>input.files[0]?{name:input.files[0].name,text:await input.files[0].text()}:null);
   if(file?.name!=='web-note.txt'||file?.text!=='Web owner attachment fixture.\n')throw new Error('frontend enhancement lost early attachment');
+  const editor=page.getByLabel('Message Ghost');
+  await editor.evaluate(input=>{
+   window.keyboardSubmissions=0;
+   input.form.addEventListener('submit',()=>window.keyboardSubmissions++);
+  });
+  await editor.press('End');await editor.press('Shift+Enter');
+  if(await editor.inputValue()!=='Plan my day: finish the release risk note before noon.\n')throw Error('Shift+Enter did not insert a newline');
+  await editor.evaluate(input=>{
+   input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true}));
+   input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:229,bubbles:true,cancelable:true}));
+   input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',repeat:true,bubbles:true,cancelable:true}));
+   const send=input.form.querySelector('button[type=submit]');send.disabled=true;
+   input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));send.disabled=false;
+  });
+  if(await page.evaluate(()=>window.keyboardSubmissions)!==0)throw Error('newline, composition, repeated or disabled Enter submitted a message');
+  await page.getByRole('button',{name:'Send message',exact:true}).evaluate(button=>{
+   const wasDark=document.documentElement.classList.contains('dark');
+   try{
+    for(const dark of [false,true]){
+     document.documentElement.classList.toggle('dark',dark);
+     if(getComputedStyle(button).backgroundColor!=='rgb(217, 119, 87)')throw Error('send button is not #D97757 in both themes');
+    }
+   }finally{document.documentElement.classList.toggle('dark',wasDark)}
+  });
+  await editor.fill('Plan my day: finish the release risk note before noon.');
   const submitted=page.waitForResponse(r=>r.url()===url+'/message'&&r.request().method()==='POST');
-  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  await editor.press('Enter');
   if((await submitted).status()!==200)throw new Error('composer submission was not accepted');
+  if(await page.evaluate(()=>window.keyboardSubmissions)!==1)throw Error('Enter did not submit exactly once');
   await page.waitForFunction(()=>document.querySelectorAll('.message.assistant').length>0);
   const native=await browser.newContext({javaScriptEnabled:false});
   try{
@@ -638,8 +664,14 @@ try{
   const afterPanels=await page.locator('[data-live-key="'+anchor.key+'"]').evaluate(node=>({top:node.getBoundingClientRect().top,scroll:scrollY}));
   if(Math.abs(afterPanels.top-anchor.top)>2)throw Error('pane roundtrip moved anchor: '+JSON.stringify({before:anchor,after:afterPanels}));
   let attemptedSends=0;
-  await page.route('**/message',async route=>{attemptedSends++;await route.abort('failed')});
-  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  let releaseSend;
+  const heldSend=new Promise(resolve=>{releaseSend=resolve});
+  await page.route('**/message',async route=>{attemptedSends++;await heldSend;await route.abort('failed')});
+  const sending=page.waitForRequest(r=>r.url()===url+'/message'&&r.method()==='POST');
+  await editor.press('Enter');await sending;
+  await editor.press('Enter');await editor.press('Enter');
+  if(attemptedSends!==1||await editor.inputValue()!=='Keep this unsent draft exactly.')throw Error('pending Enter repeated submission or changed the draft');
+  releaseSend();
   await page.locator('#composer-feedback').filter({hasText:'Send was not confirmed'}).waitFor();
   await checkDraft(false);if(attemptedSends!==1)throw Error('failed send was automatically repeated');
   await page.unroute('**/message');await editor.focus();await editor.evaluate((input,range)=>input.setSelectionRange(...range),selection);

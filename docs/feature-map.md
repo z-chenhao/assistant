@@ -50,7 +50,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Resources 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Enter 发送、Shift + Enter 换行及橙色发送按钮；Resources 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 模型生成时，Web 逐段显示 Main 回复；完成后展示正式消息。审批、状态更新和输入保留仍独立工作。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、具名问题及成果审阅卡、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | 普通 Main 回复生成受控表格、进度和 Web 表单；回答可恢复、并发重试去重，其他渠道与坏数据保留文字替代。 | 是 · 已完成 |

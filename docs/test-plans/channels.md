@@ -160,10 +160,12 @@ action also drives model setup, file upload and actual message submission.
 It deliberately holds the local JavaScript bundle while entering a draft and
 selecting an attachment through the usable server form, then releases it and
 checks text, file bytes, focus, selection and source identity before submitting.
-The composer retains the native form and input nodes and only applies shared
-control styles. The existing image scenario also holds the bundle while opening
+The composer retains the native form and input nodes, applies shared control
+styles and adds keyboard submission. The existing image scenario also holds the bundle while opening
 a native picker, completes selection after enhancement, then verifies scoped
 pixels at the actual Pi HTTP peer; text-only and recovery checks still apply.
+
+消息键盘回归使用同一浏览器驱动：Enter 经实际消息入口发送，Shift + Enter 产生换行且不提交；组合输入与兼容性键码 229 不提交，按键重复、按钮禁用和请求进行中不重复提交。检查明暗主题发送按钮背景均为 `#D97757`，失败仍保留草稿与附件；原有按钮与无 JavaScript 提交场景继续覆盖。合成组合事件验证处理逻辑，物理输入法候选确认仍需人工验证。
 
 ## 执行与完成判定
 
