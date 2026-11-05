@@ -688,7 +688,7 @@ def run(binary,evidence):
             h.callback('recipient','bad',destination='other',expected=403)
             h.browser(evidence.parent/'channels-ui','setup')
             h.browser(evidence.parent/'preferences-ui','preferences')
-            report['checks'].append('Preferences: compact bilingual language row, accessible hover/keyboard/touch help, one native save, browser persistence, no-JS fallback and neighboring settings')
+            report['checks'].append('Preferences: grouped bilingual language list, accessible hover/keyboard/touch help, single-flight autosave, browser persistence, no-JS fallback and neighboring Resources/Notifications/Capabilities')
             h.wait(lambda s:any(d['status']=='sent' and d['channel']=='web' for d in s['deliveries']),'browser setup and first reply')
             report['checks'].append('Launch/Doctor: browser language switch persists into Chat, followed by real loopback Web setup and file attachment; explicit model Fake; auth/CSRF/signature/identity/recipient rejection')
             # Duplicate callback IDs and new callback IDs carrying the same source

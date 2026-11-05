@@ -210,7 +210,7 @@ export async function preferences(page,context,browser,url,evidence){
  await trigger(page).click();const flipped=await popupBounds(page),control=await trigger(page).boundingBox();
  if(flipped.y+flipped.height>control.y+1)throw Error('popup did not flip above near viewport bottom');
  await page.setViewportSize({width:320,height:600});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await popupBounds(page);await page.keyboard.press('Escape');
- for(const section of ['models','notifications','capabilities']){
+ for(const section of ['setup','notifications','capabilities']){
   await page.goto(url+'/settings/'+section);
   await check(page.locator('.section-tabs [aria-current=page]').getAttribute('href').then(v=>v==='/settings/'+section),'neighbor selection lost');
   await check(page.locator('[data-language-preference]').count().then(v=>v===0),'preference leaked to neighbor');
