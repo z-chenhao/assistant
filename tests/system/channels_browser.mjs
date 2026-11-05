@@ -1,5 +1,5 @@
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
-import {capabilitySetup,capabilityDefaults,settingsAccount} from './channels_capabilities.mjs';
+import {capabilitySetup,capabilityDefaults,settingsAccount,pageTransitions} from './channels_capabilities.mjs';
 import {databaseInspection} from './channels_database.mjs';
 import {preferences} from './channels_preferences.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
@@ -210,7 +210,7 @@ try{
   if(!await original.evaluate(node=>node.isConnected&&node.value==='Keep my conversation draft.')||await page.locator('.composer input[type=file]').evaluate(node=>node.files?.[0]?.name)!=='kept.txt')throw Error('attention navigation lost original conversation draft/file');
   await writeFile(evidence+'/attention-browser.json',JSON.stringify({questionPosts:posts,keptDraft:true,keptAttachment:true,staleReviewRejected:true,keyboard:true,language:'zh-CN',width:390},null,2));
   await stale.close();await work.close();
- }else if(phase==='capability-defaults'){await capabilityDefaults(page,context,url,evidence)}else if(phase==='settings-account'){await settingsAccount(page,context,url,evidence)}else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
+ }else if(phase==='page-transitions'){await pageTransitions(page,context,url,evidence)}else if(phase==='capability-defaults'){await capabilityDefaults(page,context,url,evidence)}else if(phase==='settings-account'){await settingsAccount(page,context,url,evidence)}else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
  if(phase==='setup'){
   await page.evaluate(()=>document.fonts.ready);
   await page.setViewportSize({width:320,height:740});

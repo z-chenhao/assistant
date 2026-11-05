@@ -5,10 +5,22 @@ import {t} from './i18n';
 export function enhanceSettingsControls(){
  const page=document.querySelector('.settings-page');
  if(!page)return;
+ const notification=page.querySelector<HTMLFormElement>('[data-notification-preference]');
+ if(notification){
+  const initial=JSON.stringify(Array.from(new FormData(notification).entries()));
+  const feedback=document.querySelector<HTMLElement>('.page-feedback.success');
+  const draft=page.querySelector<HTMLElement>('[data-notification-draft]');
+  const sync=()=>{
+   const dirty=JSON.stringify(Array.from(new FormData(notification).entries()))!==initial;
+   if(feedback)feedback.hidden=dirty;
+   if(draft)draft.hidden=!dirty;
+  };
+  notification.addEventListener('input',sync);notification.addEventListener('change',sync);window.addEventListener('pageshow',sync);
+ }
  const search=document.querySelector<HTMLElement>('[data-settings-search]');
  const field=search?.querySelector<HTMLInputElement>('input');
  if(search&&field){
-  search.hidden=false;
+  search.removeAttribute('data-client-pending');
   const links=Array.from(document.querySelectorAll<HTMLAnchorElement>('.settings-navigation a'));
   const filter=()=>{
    const query=field.value.trim().toLocaleLowerCase();
@@ -23,7 +35,7 @@ export function enhanceSettingsControls(){
   const media=matchMedia('(prefers-color-scheme: dark)');
   const read=()=>{try{return localStorage.getItem('steward-theme')??'system'}catch{return 'system'}};
   const sync=()=>{theme.value=read();document.documentElement.classList.toggle('dark',theme.value==='dark'||theme.value==='system'&&media.matches)};
-  sync();theme.closest<HTMLElement>('[data-appearance-setting]')!.hidden=false;
+  sync();theme.closest<HTMLElement>('[data-appearance-setting]')!.removeAttribute('data-client-pending');
   theme.addEventListener('change',()=>{try{if(theme.value==='system')localStorage.removeItem('steward-theme');else localStorage.setItem('steward-theme',theme.value)}catch{};document.documentElement.classList.toggle('dark',theme.value==='dark'||theme.value==='system'&&media.matches)});
   media.addEventListener('change',sync);window.addEventListener('storage',sync);
  }

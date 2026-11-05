@@ -6,7 +6,7 @@ Steward 是产品品牌，Ghost 是当前 Agent 的名称。当前代码与自�
 
 ## 当前架构与流程
 
-Go 继续提供认证、页面、原生表单与局部更新；React 只增强 Host-owned UISpec。`foundation.css` 定义 Demo 的配色和自托管字体；shell、workspace、conversation、observability、avatar 分别负责局部表现。`appearance.js` 为同源外部脚本，在 CSS 前应用本地明暗偏好，不放宽 CSP。
+Go 继续提供认证、页面、原生表单与局部更新；React 只增强 Host-owned UISpec。`foundation.css` 定义 Demo 的配色和自托管字体；shell、workspace、conversation、observability、avatar 分别负责局部表现。`appearance.js` 为同源外部脚本，在 CSS 前应用本地明暗、桌面折叠偏好和脚本可用标记，不依赖页面所属模块，不放宽 CSP。脚本专属搜索／设置行预留几何位置，语言控件增强完成或回退后再显示；bundle 下载失败恢复原生导航与表单。资源列表通过自身 inline-size 容器查询适配双侧栏后的可用宽度。通知编辑通过表单值快照区分未保存草稿与已保存反馈，提交仍由原服务端处理。
 
 一级侧栏保留 Chat、Tasks、Developer，Settings 固定左下；Settings 和 Developer 在旁边展开二级分类。Chat 顶部居中显示名称和动态头像，真实就绪/工作状态在头像下方同轴居中，以绿/蓝/琥珀/红/灰小圆点区分就绪、工作、需配置、模型异常与未知，保留明确文字和明暗主题对比，右上角 Computer/Worker 打开互斥只读详情面板，关闭/隐藏停止画面轮询；Task 保留独立列表与详情。面板不替换对话和 composer，后台更新不强行拉回阅读位置。头像尺寸由所在位置决定，悬停只改变动画状态。
 

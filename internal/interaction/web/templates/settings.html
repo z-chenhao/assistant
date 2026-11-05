@@ -11,7 +11,7 @@
 
 {{define "settings-navigation"}}
  <div class="section-navigation-heading"><span>{{tr "Settings"}}</span></div>
- <div class="settings-search" hidden data-settings-search><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" aria-label="{{tr "Search settings"}}" placeholder="{{tr "Search"}}" autocomplete="off"></div>
+ <div class="settings-search" data-client-pending data-settings-search><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" aria-label="{{tr "Search settings"}}" placeholder="{{tr "Search"}}" autocomplete="off"></div>
  <p class="settings-nav-heading">{{tr "Personal"}}</p>
  <nav class="section-navigation settings-navigation" aria-label="{{tr "Settings sections"}}">
   <a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Preferences"}}</span></a>
@@ -48,8 +48,8 @@
  </div>
  <div class="preference-feedback" data-language-feedback role="{{if .Error}}alert{{else}}status{{end}}" {{if not (or .Notice .Error)}}hidden{{end}}><span data-language-message>{{if .Error}}{{tr .Error}}{{else}}{{tr .Notice}}{{end}}</span> <button type="button" data-language-retry hidden>{{tr "Retry"}}</button><a href="/settings/preferences" data-language-refresh hidden>{{tr "Refresh to check"}}</a></div>
 </form>
-<div class="setting-row" data-appearance-setting hidden><div class="setting-copy"><label for="interface-theme">{{tr "Appearance"}}</label></div><select id="interface-theme"><option value="system">{{tr "System"}}</option><option value="light">{{tr "Light"}}</option><option value="dark">{{tr "Dark"}}</option></select></div>
-<div class="setting-row" data-avatar-setting hidden><div class="setting-copy"><label for="avatar-motion">{{tr "Avatar motion"}}</label><p data-reduced-motion-note hidden>{{tr "Follows your system’s reduced motion preference."}}</p></div><div class="setting-switch"><input id="avatar-motion" type="checkbox" role="switch" data-avatar-motion></div></div>
+<div class="setting-row" data-appearance-setting data-client-pending><div class="setting-copy"><label for="interface-theme">{{tr "Appearance"}}</label></div><select id="interface-theme"><option value="system">{{tr "System"}}</option><option value="light">{{tr "Light"}}</option><option value="dark">{{tr "Dark"}}</option></select></div>
+<div class="setting-row" data-avatar-setting data-client-pending><div class="setting-copy"><label for="avatar-motion">{{tr "Avatar motion"}}</label><p data-reduced-motion-note hidden>{{tr "Follows your system’s reduced motion preference."}}</p></div><div class="setting-switch"><input id="avatar-motion" type="checkbox" role="switch" data-avatar-motion></div></div>
 </section>
 {{end}}
 

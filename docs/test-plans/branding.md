@@ -50,3 +50,5 @@ Preferences 的头像动效开关由 channels 的 `default_capability_settings` 
 
 
 系统减少动效还验证运行时往返切换：解除系统限制恢复用户原有选择；用户主动关闭后，再次开启／解除系统减少动效仍保持关闭，不覆盖浏览器保存的偏好。
+
+跨页稳定性由 core channels 的 `page_transitions` 调用现有浏览器驱动：中英文、明暗主题、320／390／760／761／780／800／820／1024／1400px 检查模型名、操作、同级标题及无溢出；折叠后跨模块并刷新保持状态。拦住真实 app.js 下载，比较导航、设置组和正文增强前后几何；下载失败验证原生回退。通知编辑验证旧保存提示失效、草稿不自动落盘及显式提交持久化。证据写入 `page-transitions-ui/page-transitions.json` 和截图。`web/appearance.test.mjs` 验证明暗优先级、桌面／手机折叠、不可用存储和下载失败；这些检查沿用 `make test lint`／`make test-e2e` 及必需的 `Ubuntu checks`。

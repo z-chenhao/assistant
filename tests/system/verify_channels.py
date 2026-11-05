@@ -771,9 +771,25 @@ def run(binary,evidence):
     delivery_leases(binary, report)
     account_presentation(binary, evidence.parent/'account-ui', report)
     native_trace_inspection(binary,evidence,report)
+    page_transitions(binary,evidence,report)
     task_control_components(binary,evidence,report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
+
+
+def page_transitions(binary, evidence, report):
+    with tempfile.TemporaryDirectory(prefix='steward-page-transitions-') as temp, Sandbox() as platform:
+        h = ChannelHarness(binary, Path(temp), platform)
+        try:
+            h.setup()
+            h.command('model', 'add', 'http://127.0.0.1:1/v1', 'candidate-model')
+            h.start()
+            output = evidence.parent / 'page-transitions-ui'
+            h.browser(output, 'page-transitions')
+            report['scenarios']['page-transitions'] = json.loads((output / 'page-transitions.json').read_text())
+            report['checks'].append('Page transitions: bilingual light/dark Resources sizing and titles, persisted collapse across modules, stable pre-bundle layout, failed-bundle native fallback and explicit notification save feedback')
+        finally:
+            h.cleanup()
 
 
 def task_control_components(binary, evidence, report):

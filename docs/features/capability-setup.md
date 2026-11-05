@@ -13,7 +13,7 @@ Settings / Capabilities 提供“自动（推荐）／自定义／关闭”。�
 
 ## 功能说明
 
-Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and commands、Computer 五个入口。Memory 包含存储与检索，可选语义检索放在 Memory 的高级设置中。默认开启显示“已启用（默认）”，自定义配置显示“已启用”；准备中、异常和重启后生效单独呈现，连接检查证明不作为启用状态。页面与 Preferences 共用左侧导航、居中窄列、紧凑分组行和可搜索下拉，配置后直接保存。
+Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and commands、Computer 五个入口。Memory 包含存储与检索，可选语义检索放在 Memory 的高级设置中。默认开启显示“已启用（默认）”，自定义配置显示“已启用”；准备中、异常和重启后生效单独呈现，连接检查证明不作为启用状态。修改普通字段或高级 YAML 后，旧连接反馈立即失效；重新检查后才显示对应新候选的结果。页面与 Preferences 共用左侧导航、居中窄列、紧凑分组行和可搜索下拉，配置后直接保存。
 
 ## 需求与验收
 

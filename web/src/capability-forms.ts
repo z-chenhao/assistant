@@ -19,7 +19,9 @@ export function enhanceCapabilityForms(){
   const changed=()=>{
    form.querySelector<HTMLButtonElement>('button[value="save"]')?.setAttribute('disabled','');
    const status=form.querySelector<HTMLElement>('[data-capability-draft]');
-   if(status)status.textContent=snapshot()===initial?'':t('Unsaved changes.');
+   const dirty=snapshot()!==initial;
+   if(status)status.textContent=dirty?t('Unsaved changes.'):'';
+   if(dirty)document.querySelectorAll<HTMLElement>('[data-capability-feedback]').forEach(feedback=>{feedback.hidden=true});
   };
   form.addEventListener('input',changed);form.addEventListener('change',()=>{syncEnabled();changed()});
  });
