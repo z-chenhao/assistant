@@ -50,6 +50,8 @@ class Endpoint(BaseHTTPRequestHandler):
         self.end_headers()
 
         body, code_only = project_codemode(body)
+        if self.server.mode == "intelligent-ui-stream":
+            code_only = False # Exercise the actual direct declarations and raw JSON deltas.
 
         def chunk(delta, finish=None, usage=None):
             if code_only:
@@ -122,6 +124,31 @@ class Endpoint(BaseHTTPRequestHandler):
                 else:
                     chunk({"content": "Screenshot Task observed."})
                     chunk({}, "stop")
+            elif self.server.mode == "intelligent-ui-stream":
+                mode = self.server.preview_path
+                if body['messages'][-1]['role'] != 'tool':
+                    if mode == 'direct':
+                        remainders = []
+                        for index, widget in enumerate(self.server.stream_widgets):
+                            raw = json.dumps(widget, ensure_ascii=False)
+                            marker = ', ["B"' if index == 0 else 'Script stays off'
+                            cut = raw.index(marker) if index == 0 else raw.index(marker) + len(marker)
+                            remainders.append(raw[cut:])
+                            chunk({'tool_calls':[dict(index=index,id=f'stream-direct-{index}',type='function',function=dict(name='builtin__intelligent_ui_show',arguments=raw[:cut]))]})
+                        self.server.preview_ready.set()
+                        require(self.server.preview_release.wait(40), 'direct UI preview was never released')
+                        for index, tail in enumerate(remainders):
+                            chunk({'tool_calls':[dict(index=index,function=dict(arguments=tail))]})
+                    else:
+                        source = '\n'.join('await tools.builtin__intelligent_ui_show('+json.dumps(widget)+');' for widget in self.server.stream_widgets)
+                        chunk({'tool_calls':[dict(index=0,id='stream-code',type='function',function=dict(name='builtin__codemode_execute',arguments=json.dumps(dict(source=source))))]})
+                    chunk({},'tool_calls')
+                else:
+                    if mode == 'code':
+                        self.server.preview_ready.set()
+                        require(self.server.preview_release.wait(40), 'Code Mode UI preview was never released')
+                    chunk({'content': 'Streamed '+mode+' answer.'})
+                    chunk({},'stop')
             elif self.server.mode == "intelligent-ui":
                 has_tools = any(m['role'] == 'tool' for m in body['messages'])
                 names = [c.get('function',{}).get('name') for m in body['messages'] for c in m.get('tool_calls',[])]

@@ -24,6 +24,19 @@ class CIChecksTests(unittest.TestCase):
         lanes = {lane['lane'] for lane in ci.plan('system')['include']}
         self.assertEqual({name.removeprefix('channels-') for name in lanes if name.startswith('channels-')}, set(ci.CHANNEL_GROUPS))
 
+    def test_intelligent_ui_uses_required_go_browser_and_race_checks(self):
+        self.assertIn('test-go', ci.command('go'))
+        self.assertIn('intelligent-ui', ci.SYSTEM['startup-ui'])
+        self.assertIn('ui-interactions', ci.SYSTEM['startup-ui'])
+        lanes = {row['lane']: row for row in ci.plan('system')['include']}
+        self.assertEqual(lanes['startup-ui']['browser'], 'true')
+        race = ci.command('capabilities-race')
+        for package in ('agent', 'agent/sqlite', 'interaction/web', 'llm/bridge'):
+            self.assertIn('./internal/' + package + ' ', ci.RACE)
+        self.assertIn(ci.RACE, race)
+        self.assertIn('.*UI.*', ci.RACE)
+        self.assertIn('ReplyStream.*', ci.RACE)
+
     def test_required_check_rejects_missing_failed_and_cancelled_work(self):
         for docs in ('true', 'false'):
             selected = 'skipped' if docs == 'true' else 'success'

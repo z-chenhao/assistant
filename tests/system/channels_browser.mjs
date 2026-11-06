@@ -951,6 +951,48 @@ try{
  }
 
  if(phase==='ui-interactions'||phase==='ui-interactions-restart')await uiInteractions(page,context,browser,url,evidence,phase==='ui-interactions-restart');
+ if(phase.startsWith('intelligent-ui-preview-')){
+  if(phase.endsWith('committed')){
+   if(await page.locator('[data-ui-preview]').count())throw Error('committed reply retained duplicate previews');
+   await page.locator('.message .intelligent-widget iframe[title="Streaming visual"]').last().waitFor();
+   const frame=page.frameLocator('.message .intelligent-widget iframe[title="Streaming visual"]').last();
+   await frame.locator('#preview-text').getByText('Activated after delivery',{exact:true}).waitFor();
+  }else{
+   let executed=false;await page.exposeFunction('recordPreviewExecution',()=>{executed=true});
+   await page.evaluate(()=>addEventListener('message',event=>{if(event.data?.previewExecuted&&Array.from(document.querySelectorAll('#conversation-ui-preview iframe')).some(frame=>frame.contentWindow===event.source))window.recordPreviewExecution()}));
+   const preview=page.locator('#conversation-ui-preview');
+   await preview.locator('[data-ui-preview]').first().waitFor();
+   await preview.locator('td').filter({hasText:/^A$/}).waitFor();
+   const rows=await preview.locator('tbody tr').count();
+   if(rows!==(phase.endsWith('direct')?1:2))throw Error('preview fabricated or lost complete rows: '+rows);
+   const frame=page.frameLocator('#conversation-ui-preview iframe[title="Streaming visual"]');
+   await frame.locator('#preview-text').getByText('Script stays off',{exact:true}).waitFor();
+   if(await frame.locator('script,img,a,form').count())throw Error('preview retained executable or navigable markup');
+   if(await preview.locator('iframe').getAttribute('sandbox')!=='')throw Error('preview sandbox permits capabilities');
+   const button=preview.locator('button').first();await button.evaluate(node=>node.focus());
+   if(await button.evaluate(node=>document.activeElement===node))throw Error('preview controls accepted focus');
+   for(const theme of ['light','dark'])for(const width of [1400,390]){
+    await page.setViewportSize({width,height:980});
+    await page.evaluate(theme=>document.documentElement.classList.toggle('dark',theme==='dark'),theme);
+    await frame.locator('html[data-widget-theme="'+theme+'"]').waitFor();
+    await frame.locator('#preview-text').waitFor();
+    const expected=await preview.locator('.message-bubble').last().evaluate(node=>getComputedStyle(node).backgroundColor);
+    const actual=await frame.locator('body').evaluate(node=>({background:getComputedStyle(node).backgroundColor,font:getComputedStyle(node).fontFamily}));
+    if(actual.background!==expected||!actual.font.includes('Inter'))throw Error('preview lost shared theme or font: '+JSON.stringify({expected,actual}));
+    await preview.scrollIntoViewIfNeeded();
+    await page.screenshot({path:evidence+'/preview-'+theme+'-'+width+'.png'});
+    if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('preview overflowed the viewport');
+   }
+   await page.reload();await preview.locator('[data-ui-preview]').first().waitFor();
+   await preview.locator('td').filter({hasText:/^A$/}).waitFor();
+   if(executed)throw Error('generated script ran during preview');
+   await writeFile(evidence+'/preview-observed.json',JSON.stringify({observed:true}));
+   await preview.waitFor({state:'hidden'});
+   await page.frameLocator('.message .intelligent-widget iframe[title="Streaming visual"]').last().locator('#preview-text').getByText('Activated after delivery',{exact:true}).waitFor();
+   if(await page.locator('[data-ui-preview]').count())throw Error('same-page commit retained duplicate preview');
+  }
+  await page.setViewportSize({width:1400,height:980});
+ }
  if(phase==='intelligent-ui'){
   const activate=async button=>{await button.hover();await button.click()};
   await page.getByRole('columnheader',{name:'Option',exact:true}).waitFor();

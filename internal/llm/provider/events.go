@@ -79,7 +79,8 @@ func (s *streamState) tool(key int, id, name, namespace string) *pendingTool {
 func (s *streamState) args(key int, delta string) {
 	p := s.tool(key, "", "", "")
 	p.arguments.WriteString(delta)
-	s.send(Event{Type: "toolcall_delta", Index: p.index, Delta: delta})
+	c := s.message.Content[p.index]
+	s.send(Event{Type: "toolcall_delta", Index: p.index, Delta: delta, Content: &c})
 }
 func (s *streamState) endTool(key int) error {
 	p := s.tools[key]

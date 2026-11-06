@@ -31,6 +31,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 
 	case "/api/apps/detail":
 		s.appDetail(w, r)
+	case "/ui/preview":
+		s.previewWidget(w, r)
 	case "/ui/widget":
 		s.widget(w, r)
 	case "/api/developer/memory":

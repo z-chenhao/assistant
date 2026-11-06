@@ -4,6 +4,7 @@ import {enhanceProjections,releaseProjections,retainProjectionNodes} from './pro
 import {captureRichFormDrafts} from './rich-forms';
 import {renderDraftMarkdown} from './markdown';
 import {reconcileOutgoing} from './outgoing';
+import {createUIPreview} from './intelligent-ui/preview';
 
 const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
 const replyFrame=z.object({key:z.string().regex(/^[a-f0-9]{32}$/),state:z.enum(['draft','discarded','committed']),text:z.string().optional(),reset:z.boolean().optional()});
@@ -107,12 +108,18 @@ export function startLiveUpdates(){
  let etag='',timer=0,generation=0,delay=1000,stopped=false,follow=false,pendingTarget='';
  let request:AbortController|null=null;
  let replies:EventSource|null=null,draftKey='',committing=false;
+ const uiNode=document.getElementById('conversation-ui-preview');
+ const uiPreview=uiNode?createUIPreview(uiNode):null;
  const clearDraft=()=>{draftKey='';committing=false;draftText='';if(draftNode)draftNode.replaceChildren();if(draft)draft.hidden=true};
- const stopReplies=()=>{replies?.close();replies=null;clearDraft()};
+ const stopReplies=()=>{replies?.close();replies=null;clearDraft();uiPreview?.clear()};
  const hasReply=(key:string)=>!!key&&!!document.querySelector(`[data-reply-key="${key}"]`);
  const startReplies=()=>{
   if(!draft||replies||stopped||before!==0||document.visibilityState!=='visible'||typeof EventSource==='undefined')return;
   const source=new EventSource('/api/conversation/stream');replies=source;
+  source.addEventListener('ui-preview',(event:MessageEvent<string>)=>{
+   if(source!==replies)return;
+   try{const bottom=atBottom();if(uiPreview?.receive(JSON.parse(event.data))==='committed')void refresh();if(bottom)scrollToLatest();else showJump()}catch{/* Invalid preview keeps the current safe display. */}
+  });
   source.addEventListener('reply',(event:MessageEvent<string>)=>{
    if(source!==replies)return;
    let data:unknown;
@@ -133,7 +140,7 @@ export function startLiveUpdates(){
    }
    if(state==='committed')void refresh();
   });
-  source.onerror=()=>{if(source===replies){clearDraft();if(source.readyState===EventSource.CLOSED)replies=null}};
+  source.onerror=()=>{if(source===replies){clearDraft();uiPreview?.clear();if(source.readyState===EventSource.CLOSED)replies=null}};
  };
  const say=(text:string)=>{if(feedback&&feedback.textContent!==t(text))feedback.textContent=t(text)};
  const accessLost=()=>{
@@ -195,6 +202,7 @@ export function startLiveUpdates(){
    }
    for(const id of regions){if(id!=='conversation-messages'||!deferMessages||follow)patch(id,value.regions[id])}
    reconcileOutgoing();
+   uiPreview?.reconcile(deferMessages&&!follow);
    if(hasReply(draftKey)||committing&&deferMessages&&!follow)clearDraft();
    const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
    const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;

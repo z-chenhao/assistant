@@ -25,6 +25,8 @@ Use `gofmt`, tabs, lowercase Go packages, and interfaces defined by consumers. K
 
 Use Go `testing` (`*_test.go`, beside sources), Node `node:test` (`*.test.mjs`), and Python `unittest` (`test_*.py`). Coverage targets observable scenarios, without a fixed percentage. Run focused checks first; cross-module changes require `make test lint` and relevant system gates. Follow the [testing guide](docs/test-plans/product.md); report skipped/unrun checks.
 
+Finish edits and focused regressions before starting final acceptance. Keep the source and binary fixed during a gate; changes invalidate that gate's evidence and require a fresh run of the affected checks.
+
 Use disposable `STEWARD_DATA_ROOT` directories. Close Python SQLite connections with `contextlib.closing`; use read transactions for consistent cross-table predicates.
 
 ## Agent Context Changes
