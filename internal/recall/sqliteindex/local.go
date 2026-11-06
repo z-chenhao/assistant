@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,31 +26,61 @@ func SearchLocal(ctx context.Context, db *sql.DB, scope recall.Scope, q recall.Q
 			end = q.TimeRange.End.UnixMicro()
 		}
 	}
-	term := words(q.Query)
+	terms := recall.Terms(q.Query)
 	out := []recall.Hit{}
-	if term == "" {
+	if len(terms) == 0 {
 		return out, nil
 	}
-	// instr also matches a Chinese phrase within unicode61's unsegmented text.
-	rows, err := db.QueryContext(ctx, `SELECT d.ref,d.content,d.occurred_at,d.author_role FROM recall_document d
+	conditions := []string{}
+	args := []any{scope.UserID, scope.AgentID, start, end}
+	for _, term := range terms {
+		conditions = append(conditions, "instr(lower(d.content),?)>0")
+		args = append(args, term)
+	}
+	// Scope/time/visibility filter every candidate. Rank by actual query
+	// coverage before Core/recency, rather than recency of a common OR term.
+	rows, err := db.QueryContext(ctx, `SELECT d.ref,d.content,d.occurred_at,d.author_role,d.core FROM recall_document d
 WHERE d.user_id=? AND (d.agent_id='' OR d.agent_id=?) AND d.active=1 AND d.occurred_at>=? AND d.occurred_at<=?
-AND (d.rowid IN (SELECT rowid FROM recall_fts WHERE recall_fts MATCH ?) OR instr(lower(d.content),?)>0)
-ORDER BY d.core DESC,d.occurred_at DESC,d.ref LIMIT ?`, scope.UserID, scope.AgentID, start, end, term, strings.ToLower(strings.TrimSpace(q.Query)), q.Count())
+AND (`+strings.Join(conditions, " OR ")+`)`, args...)
 	if err != nil {
 		return nil, recall.ErrUnavailable
 	}
 	defer rows.Close()
+	less := func(i, j int) bool {
+		if out[i].Relevance != out[j].Relevance {
+			return out[i].Relevance > out[j].Relevance
+		}
+		if !out[i].OccurredAt.Equal(out[j].OccurredAt) {
+			return out[i].OccurredAt.After(out[j].OccurredAt)
+		}
+		return out[i].SourceRef < out[j].SourceRef
+	}
 	for rows.Next() {
 		var h recall.Hit
 		var at int64
-		if rows.Scan(&h.SourceRef, &h.Content, &at, &h.AuthorRole) != nil {
+		var core bool
+		if rows.Scan(&h.SourceRef, &h.Content, &at, &h.AuthorRole, &core) != nil {
 			return nil, recall.ErrUnavailable
 		}
 		h.SourceType, h.OccurredAt = source, time.UnixMicro(at).UTC()
-		out = append(out, h)
+		h.Relevance = recall.Relevance(terms, h.Content)
+		if h.Relevance >= .25 {
+			if core {
+				h.Relevance += .001
+			}
+			out = append(out, h)
+			if len(out) >= 400 {
+				sort.SliceStable(out, less)
+				out = out[:200]
+			}
+		}
 	}
 	if rows.Err() != nil {
 		return nil, recall.ErrUnavailable
+	}
+	sort.SliceStable(out, less)
+	if len(out) > q.Count() {
+		out = out[:q.Count()]
 	}
 	return out, nil
 }

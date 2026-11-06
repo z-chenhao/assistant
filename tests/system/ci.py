@@ -23,12 +23,13 @@ SYSTEM = {
     'tools-provider': ('tools', 'code-recovery', 'local-provider', 'account'),
     'startup-ui': ('startup', 'intelligent-ui', 'ui-interactions'),
 }
+MEMORY_GATES = ('memory-maintenance', 'recall')
 CAPABILITIES = ('task-code-environments', 'task-code-recovery', 'tool-loading', 'main-business')
 RACE = "go test -race ./internal/agent ./internal/agent/sqlite ./internal/interaction/web ./internal/llm/bridge ./internal/app ./internal/llm/secret -run 'Test(MainQueuesSecondRequest|SerialMain|Recall.*|ConversationalRecall.*|.*UI.*|ReplyStream.*|InboundAdmission|Files|AccountFiles|.*Refresh.*)' -count=1"
 
 
 def plan(kind):
-    names = SOFTWARE if kind == 'software' else (*SYSTEM, *('channels-' + group for group in CHANNEL_GROUPS), 'capabilities-race')
+    names = SOFTWARE if kind == 'software' else (*SYSTEM, *('channels-' + group for group in CHANNEL_GROUPS), 'capabilities-race', 'memory-context')
     return dict(include=[dict(lane=name,
         frontend=str(name in ('frontend', 'browser-infra', 'lint')).lower(),
         browser=str(name in ('browser-infra', 'lint', 'tools-provider', 'startup-ui') or name.startswith('channels-')).lower())
@@ -44,6 +45,9 @@ def command(lane):
     if lane.startswith('channels-') and lane.removeprefix('channels-') in CHANNEL_GROUPS:
         group = lane.removeprefix('channels-')
         return f'make build\npython3 tests/system/verify_channels.py --group {group} --binary bin/steward --evidence evidence/{lane}/report.json'
+    if lane == 'memory-context':
+        gates = ' '.join('--gate ' + gate for gate in MEMORY_GATES)
+        return f'make test-memory build\npython3 tests/system/runner.py {gates} --binary bin/steward --evidence evidence/e2e-{lane}'
     if lane == 'capabilities-race':
         commands = ['make build', 'make test-web-access', RACE]
         commands.extend(f'python3 tests/system/verify_capabilities.py --binary bin/steward --scenario {scenario} --evidence evidence/{scenario}.json'

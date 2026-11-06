@@ -217,7 +217,14 @@ def verify(value):
         hits = json.loads(json.loads(t['result_json'])['text'])
         require({'memory', 'conversation'} <= {h['source_type'] for h in hits}, 'source missing')
         require(any(h['source_ref'] == 'memory:semantic' for h in hits), 'vector-only synonym missing')
-        require(any(h['source_ref'] == 'conversation:original' and h['author_role'] == 'user' for h in hits), 'original provenance missing')
+        selected = {h['source_ref'] for h in hits}
+        derived_sources = {source['source_ref'] for record in value['memories']
+                           if 'memory:' + record['memory_id'] in selected
+                           for source in json.loads(record['source_refs'])}
+        require('conversation:original' in derived_sources,
+                'derived facts lost their persisted original provenance')
+        require('conversation:original' not in selected,
+                'Memory and its original Conversation were both recalled')
         require(all(set(h) <= {'content', 'source_type', 'source_ref', 'occurred_at', 'author_role'} for h in hits), 'score or private field leaked')
         require('FOREIGN_' not in json.dumps(hits), 'cross-scope recall')
     require(all(r['status'] == 'completed' for r in value['runs']), 'nonterminal Run')
@@ -317,23 +324,31 @@ def concurrent_append_case(binary, root, failure_evidence=None):
             require(observed['pending_assistant_vectors'] == 1, 'concurrent append boundary was not forced')
         barrier = threading.Barrier(2, action=append_after_catch_up)
         def hold_query(value):
-            if 'Retrieve tea context independently and delegate a separate recall.' in value['input']:
+            if value['input'].strip() != 'tea work with independent child recall' or observed['query_requests'] >= 2:
+                return
+            # The Host now queries the original Task source, not its expanded
+            # instruction. Main's earlier identical query must pass normally.
+            with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'state.db')) as db:
+                worker_exists = db.execute("SELECT count(*) FROM run WHERE kind='worker'").fetchone()[0]
+            if worker_exists:
                 observed['query_requests'] += 1
                 barrier.wait(timeout=10)
         embeddings.before_response = hold_query
-        stage = 'forced-conflict'
+        stage = 'concurrent-cutoff'
         child = h.hold('after_task_commit', extra_flags=('-test-main-release', str(release)))
         _, error = child.communicate(timeout=20)
-        require(child.returncode == 1 and error.strip() == 'steward: PROVIDER_UNAVAILABLE',
-                'concurrent pending append did not fail the CLI closed')
+        require(child.returncode == 0, 'bounded recall failed on a publication after its time cutoff: ' + error)
         require(not embeddings.callback_errors and observed['query_requests'] == 2,
                 'embedding barrier failed instead of exercising recall')
         before = h.snapshot()
         workers = {r['run_id'] for r in before['runs'] if r['kind'] == 'worker'}
-        require(len(workers) == 1 and h.worker_requests() == 0 and
-                not any(r['run_id'] in workers for r in before['recall']) and
-                not any(g['run_id'] in workers for g in before['generations']),
-                'failed recall admitted a partial Worker context/model request')
+        require(workers and h.worker_requests() > 0,
+                'the cutoff regression did not exercise actual Worker model admission')
+        root_run = next(c['run_id'] for c in before['children'] if c['worker_position'] == 'root')
+        first_recall = next(r for r in before['recall'] if r['run_id'] == root_run and r['step_index'] == 0)
+        published = next(m for m in before['conversation'] if m['role'] == 'assistant' and m.get('source') == 'main')
+        require('conversation:' + published['message_id'] not in {hit['source_ref'] for hit in json.loads(first_recall['hits_json'])},
+                'publication after the frozen time cutoff entered the first Worker recall')
         embeddings.before_response = None
         stage = 'explicit-later-caller'
         h.command('chat', 'work')
@@ -345,8 +360,8 @@ def concurrent_append_case(binary, root, failure_evidence=None):
                 'explicit recovery rewrote frozen recall or original messages')
         h.command('chat', 'work')
         require(h.snapshot() == value, 'repeated recovery drain changed terminal state')
-        return dict(name='concurrent-append', first_drive_rejected=True,
-                    worker_model_requests_before_recovery=0, explicit_later_caller_recovered=True,
+        return dict(name='concurrent-append', first_drive_rejected=False, future_publication_excluded_from_first_recall=True,
+                    explicit_later_caller_idempotent=True,
                     boundary=observed, state=value, embedding_requests=embeddings.requests,
                     generation_counts=generation_counts)
     except Exception:

@@ -64,34 +64,24 @@ func (r *Runs) recallMessages(ctx context.Context, c agent.RunClaim, run agent.R
 		if err = r.write(ctx, func(tx *sql.Tx) error { return fence(ctx, tx, c) }); err != nil {
 			return nil, err
 		}
-		query := ""
-		for i := len(messages) - 1; i >= 0; i-- {
-			if messages[i].Role == "user" && messages[i].Origin != "runtime" {
-				query = messages[i].Text
-				break
-			}
+		q, e := r.automaticRecallQuery(ctx, run, messages)
+		if e != nil {
+			return nil, e
 		}
-		if len(query) > 4096 {
-			query = string([]rune(query)[:min(len([]rune(query)), 1000)])
+		if contextual && run.Kind == "main" && strings.TrimSpace(q.Query) != "" {
+			q.Query = conversationalRecallQuery(messages, q.Query)
 		}
-		if strings.TrimSpace(query) == "" {
-			query = "durable context"
-		}
-		if contextual && run.Kind == "main" {
-			query = conversationalRecallQuery(messages, query)
-		}
+		query := q.Query
 		// Bound serialized evidence to a quarter of the remaining model budget.
 		budget := maxBytes
 		if maxBytes < 0 {
 			budget = max(0, min(16<<10, int(run.Snapshot.ContextWindow*3)/8))
 		}
 		lookup, cancel := context.WithTimeout(ctx, 30*time.Second)
-		q, e := r.privacyQuery(lookup, run.AgentID, recall.Query{Query: query})
-		if e != nil {
-			cancel()
-			return nil, e
+		hits := []recall.Hit{}
+		if strings.TrimSpace(query) != "" {
+			hits, e = r.recall.Search(lookup, recall.Scope{UserID: artifact.LocalUser, AgentID: run.AgentID}, q, budget)
 		}
-		hits, e := r.recall.Search(lookup, recall.Scope{UserID: artifact.LocalUser, AgentID: run.AgentID}, q, budget)
 		cancel()
 		if e != nil {
 			return nil, &agent.OperationError{Operation: "context recall", Category: llm.ProviderUnavailable, Cause: e}

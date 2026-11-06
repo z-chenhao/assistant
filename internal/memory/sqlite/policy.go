@@ -70,13 +70,14 @@ func (s *Store) ForgetCategory(ctx context.Context, scope recall.Scope, category
 		if e = setPolicy(ctx, tx, scope, category, true, at); e != nil {
 			return e
 		}
-		rows, e := tx.QueryContext(ctx, `SELECT memory_id,user_id,scope_type,scope_id,content FROM memory_record WHERE user_id=? AND ((scope_type='user' AND scope_id=?) OR (scope_type='agent' AND scope_id=?)) AND deleted_at IS NULL`, scope.UserID, scope.UserID, scope.AgentID)
+		rows, e := tx.QueryContext(ctx, `SELECT m.memory_id,m.user_id,m.scope_type,m.scope_id,m.content,coalesce((SELECT metadata FROM memory_semantic_record x WHERE x.memory_id=m.memory_id),'') FROM memory_record m WHERE m.user_id=? AND ((m.scope_type='user' AND m.scope_id=?) OR (m.scope_type='agent' AND m.scope_id=?)) AND m.deleted_at IS NULL`, scope.UserID, scope.UserID, scope.AgentID)
 		if e != nil {
 			return recall.ErrUnavailable
 		}
 		for rows.Next() {
 			var r memory.Record
-			if rows.Scan(&r.ID, &r.UserID, &r.ScopeType, &r.ScopeID, &r.Content) != nil {
+			var metadata string
+			if rows.Scan(&r.ID, &r.UserID, &r.ScopeType, &r.ScopeID, &r.Content, &metadata) != nil {
 				rows.Close()
 				return recall.ErrUnavailable
 			}
@@ -88,7 +89,17 @@ func (s *Store) ForgetCategory(ctx context.Context, scope recall.Scope, category
 					return e
 				}
 			}
-			if category == "all" || memory.Category(text) == category {
+			recordCategory := memory.Category(text)
+			if metadata != "" {
+				plain, err := s.vault.Open(ctx, metadata, "semantic:"+r.ID)
+				var meta semanticMetadata
+				if err != nil || json.Unmarshal([]byte(plain), &meta) != nil {
+					rows.Close()
+					return recall.ErrUnavailable
+				}
+				recordCategory = meta.Category
+			}
+			if category == "all" || recordCategory == category {
 				ids = append(ids, r.ID)
 			}
 		}

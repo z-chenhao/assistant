@@ -1,4 +1,4 @@
-.PHONY: help setup install run build test test-prompts test-web-access test-connected-apps test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
+.PHONY: help setup install run build test test-prompts test-memory test-web-access test-connected-apps test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
 
 .DEFAULT_GOAL := setup
 
@@ -40,6 +40,11 @@ test-go:
 # Deterministic connector contracts; live network checks are explicitly opt-in.
 test-web-access:
 	go test -race ./internal/plugin/webaccess ./internal/connector/... ./internal/webcontent ./internal/llm/bridge ./internal/llm/provider ./internal/agent ./internal/agent/sqlite -run '(WebAccess|WebSearch|HostedSearch|SearchCompletion|SearchPolicy|DefinitionsFreeze|ExaMCP|FetchAddresses)' -count=1
+
+# Privacy, provenance and lifecycle regressions run in the required CI lane.
+test-memory:
+	go test -race ./internal/memory/... ./internal/recall/... -count=1
+	go test -race ./internal/agent/sqlite ./internal/app -run 'Semantic|AutomaticRecall|Recall|Forget' -count=1
 
 test-connected-apps:
 	go test -race ./internal/connector/composio ./internal/connectedapps ./internal/plugin/connectedapps ./internal/interaction/web ./internal/tool ./internal/app ./internal/agent/sqlite -run '^Test(ConnectedApps|Apps|AppLogo|ToolDescriptor|RegistryGroup|Client)' -count=1

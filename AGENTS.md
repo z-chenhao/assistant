@@ -35,6 +35,12 @@ Follow the [context contract](docs/designs/memory-context.md#recall-ranking-budg
 
 Context changes must verify message order, byte-stable continuation prefixes, recall reuse despite corpus/provider changes, refresh on a new input identity, and frozen replay. Keep UI state and retrieved history scoped as evidence. Run `make test-prompts` and the owning store/observability regressions; new regression tests must remain included in the required CI checks.
 
+## Memory and Recall Changes
+
+Follow the [memory/recall invariants](docs/designs/memory-context.md#memory-and-recall-invariants). Fix extraction, provenance, lifecycle and retrieval in the owning code; prompt wording alone is not a data-integrity fix. Conversation is the original evidence, not a Memory record. Keep private Curator proposals behind Host validation, durable receipts, privacy fences and model-usage authorization.
+
+Add behavioral regressions for the reproduced failure, including negative cases. Memory/Recall changes must run `make test-memory` and both `memory-maintenance` and `recall` system gates; the required PR CI must keep those gates and their race checks enabled. Preserve historical frozen requests and unrelated local work.
+
 ## UI Component Changes
 
 Before changing Web UI, read [design.md](design.md), especially the [global component contract](design.md#全局组件契约). It is the single source of visual and interaction rules; do not maintain a separate design specification here.

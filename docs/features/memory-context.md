@@ -29,9 +29,9 @@
 
 **需求**：后台从用户事实与反馈形成记忆，能处理纠正、重复和过时信息。
 
-**当前实现**：remember/forget、隐私屏障、后台维护已实现；提取与稳定性判定采用规则，归并主要按指纹。
+**当前实现**：独立后台模型提炼规范事实，宿主校验证据与类别后归并；支持同义支持、纠正替代、撤回、独立证据晋升、自动 Core 降级、Recall 过期和幂等恢复。旧自动摘句退役后按原始来源重提炼。
 
-**边界与剩余工作**：补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
+**边界与剩余工作**：语义质量取决于当前模型，真实数据需持续评测；低置信标记、原文出处和状态校验由代码强制执行。超限/不可用延期，无效候选最多尝试 3 次后隔离，不回退到原话摘抄。
 
 **验收目标**：验证同义事实归并、明确纠正替代、证据不足保留低置信、遗忘后不可继续使用旧上下文。
 
@@ -41,9 +41,9 @@
 
 **需求**：每轮或按需检索可访问的 Memory 和原始 Conversation；从当前消息或任务沿明确引用查找关联工作、产物与原始证据，摘要不足时按需续读。
 
-**当前实现**：显式 embedding 配置下，全文与向量结果融合，召回结果按轮冻结并带来源。Main 的 `builtin__evidence_read` 和本机 `evidence read` 支持确切 Conversation、Task 和 Artifact 引用及有界续读。本机所有者还可精读当前 `memory:` 记录和可见 Conversation/Task 来源。精确读取无需 embedding。结构化摘要的原文仍通过已有私有 Artifact 授权读取。
+**当前实现**：默认本地文本相关性检索，自定义 embedding 下融合全文与向量。自动召回按真实输入查询，排除上下文已有原文及其派生记忆，跨来源去重，结果按轮冻结并带来源。Main 的 `builtin__evidence_read` 和本机 `evidence read` 支持确切 Conversation、Task 和 Artifact 引用及有界续读。本机所有者还可精读当前 `memory:` 记录和可见 Conversation/Task 来源。精确读取无需 embedding。结构化摘要的原文仍通过已有私有 Artifact 授权读取。
 
-**边界与剩余工作**：导航基于已保存的任务请求、交付、附件、Memory 来源和当前 GitHub 接续记录。每跳校验作用域、Forget 和对象可见性。Worker/Child 保持显式子任务边界。Main 的 Memory 原文解密需要独立的结果隐私设计。Memory 替代谱系、Main 的 GitHub 导航和其他外部来源尚待接通。记忆召回仍需要 embedding。大规模 ANN 性能和真实模型导航质量另行验证。
+**边界与剩余工作**：导航基于已保存的任务请求、交付、附件、Memory 来源和当前 GitHub 接续记录。每跳校验作用域、Forget 和对象可见性。Worker/Child 保持显式子任务边界。Main 的 Memory 原文解密需要独立的结果隐私设计。Memory 替代谱系、Main 的 GitHub 导航和其他外部来源尚待接通。本地文本召回无需 embedding，跨语言近义检索需自定义 embedding。大规模 ANN 性能和真实模型导航质量另行验证。
 
 **验收目标**：可见范围、来源、时间、逐轮冻结与故障恢复正确，索引故障不产生不完整成功结果；能从当前消息找到正确关联任务、可访问产物并续读摘要外原文；无权、缺失、过期引用和循环关系有界返回，Forget 后旧引用不能重新引入撤销内容。
 
@@ -61,7 +61,7 @@
 
 ## 如何使用
 
-在配置中提供 `memory.encryption_key_ref` 开启记忆维护，提供显式 embedding 配置开启搜索与自动召回。加密 Memory 当前要求本地 loopback embedding 端点。
+安装版默认准备本地文件 SecretStore 密钥并开启记忆维护与本地搜索。显式配置可关闭或自定义。模型提炼使用当前已验证模型并沿用账号与用量授权；加密 Memory 的自定义 embedding 必须为 loopback 端点。
 
 用户可说“记住这个偏好”“之前的信息改为……”或“忘记这类信息”。CLI `steward memory status` 查看维护状态；`steward memory manage REQUEST_KEY` 接受 JSON 控制请求。压缩自动发生；需要语义摘要时会调用当前 Run 已冻结的模型，并计入原有用量和费用授权。没有额外默认模型。
 
@@ -116,8 +116,7 @@ HTTPS. Credentials are resolved from SecretStore only. Redirects, malformed
 responses, dimension mismatch, zero/nonfinite vectors and provider failures fail
 closed with sanitized errors. There is no provider switch or FTS-only success.
 
-Without embedding configuration, ordinary chat remains available and recall is
-absent. This state does not constitute configured M6 vector recall. Adding it
+Without embedding configuration, default installations use local text recall. Explicitly disabled installations retain unavailable recall. Adding custom embeddings
 affects new Runs only. Existing capability snapshots gain no new Tool or automatic
 recall. Removing/changing it rejects a Run that already has recall capability.
 Endpoint/model/dimension are hashed into the capability; the model sees neither
@@ -128,7 +127,7 @@ credentials nor endpoint strings. Credential rotation does not change vector spa
 ## Memory, context and verified experience
 
 Enable maintenance explicitly with `memory.encryption_key_ref`, an existing
-SecretStore reference to a 32-byte AES key. Store the key in the native credential
+SecretStore reference to a 32-byte AES key. Store the key in the local file credential
 store or use an explicit `env:NAME` reference. YAML contains only the reference.
 Keep the same key across process restarts and backups; key loss fails closed.
 There is no implicit credential backend or per-record approval.
@@ -155,7 +154,7 @@ Main always discovers `builtin__memory_manage` with `remember`/`forget`. The Hos
 scope and provenance. Without `memory.encryption_key_ref`, it returns
 `PROVIDER_UNAVAILABLE` without accepting a mutation or changing privacy state.
 Main and Workers always discover `builtin__memory_search`; it requires an
-explicit embedding configuration. Without that configuration, search returns
+an enabled local or explicit embedding search configuration. With search explicitly disabled, it returns
 `PROVIDER_UNAVAILABLE`, and automatic recall is disabled. Tool descriptions name
 the missing configuration. No provider or encryption credential is implicit. Workers retain only read-only search; their results become
 Curator source observations. The authenticated local equivalent is:

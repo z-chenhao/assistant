@@ -33,8 +33,8 @@ flowchart TD
 
 观察或显式记忆请求 → 保存事件 → Curator 提取归并 → 后续轮次召回 → 压缩 → 冻结模型请求。Forget 先建立隐私屏障，再异步维护记录。
 
-- **F-009**：remember/forget、隐私屏障、后台维护已实现；提取与稳定性判定采用规则，归并主要按指纹。 补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
-- **F-010**：显式 embedding 配置下，全文与向量结果融合；召回结果按轮冻结并带来源。新的 Main 与本机所有者可经只读 evidence 入口逐跳读取明确关联的 Conversation、Task 与授权 Artifact，按正文/链接游标续读；它独立于 embedding，不将精确引用导航混同语义搜索。
+- **F-009**：独立后台模型提炼，严格结构化候选经宿主证据、作用域、类别与当前版本校验后归并；同义支持、纠正替代、撤回、晋升、降级与过期均由持久状态维护。
+- **F-010**：默认本地文本相关性检索；自定义 embedding 路径保留全文/向量融合。自动召回排除当前上下文原文及其派生记忆，跨来源去重，按轮冻结并带来源。新的 Main 与本机所有者可经只读 evidence 入口逐跳读取明确关联的 Conversation、Task 与授权 Artifact，按正文/链接游标续读；它独立于 embedding，不将精确引用导航混同语义搜索。
 - **F-011**：新 Run 已接通结构化模型摘要、工作状态、私有原文 Artifact 和逐轮冻结；目标与未知操作保留原文。真实模型的约束保留质量仍需离线验证；不得改写原文或旧 Run 的冻结请求。
 
 ## 代码与依赖
@@ -224,7 +224,7 @@ Agent 只使用一个统一搜索工具：
 builtin__memory_search
 ```
 
-该工具内部同时搜索 MemoryProvider 与 ConversationProvider，Agent 不选择数据源。工具始终可发现；未配置显式 embedding 时，描述说明配置要求，调用返回 `PROVIDER_UNAVAILABLE`，不触发自动召回或隐式 Provider。已配置的 Run 仍冻结 embedding 身份并对漂移 fail-closed。
+该工具同时搜索 MemoryProvider 与 ConversationProvider，Agent 不选择数据源。安装版默认本地文本检索；显式部署关闭 recall 时仍保留不可用描述。新 Run 冻结所选本地/向量资源身份，旧 Run 不追溯改变；漂移 fail-closed。
 
 输入：
 
@@ -357,8 +357,7 @@ require cosine >= 0.25; each path supplies at most 200 candidates. RRF is
 `sum(1/(60+rank))`, starting at rank one. Memory breaks equal fused scores by Core
 tier, recent timestamp and stable reference. Conversation breaks ties by recent
 timestamp and stable reference. The Service queries both Providers concurrently,
-alternating their domain-ranked lists under one count and serialized evidence
-budget. Scores remain private to each Provider.
+merging their ranked lists under one count and serialized evidence budget. Local lexical coverage dominates rank tie-breaks; vector results retain reciprocal provider rank. Ranking and provenance fields remain private, outside the serialized Tool contract.
 
 Tool input is `query`, optional `limit` (1–50, default 10), and optional
 `time_range: {start?, end?}` using RFC3339. Output contains only `content`,
@@ -398,21 +397,15 @@ Evidence uses at
 most one quarter of the remaining conservative byte budget, capped at 16 KiB;
 hierarchical compaction and the final model-window check also apply; see maintenance operations.
 
-`contextual_recall` is a Host-only frozen policy opt-in. Missing on historical
-policies preserves the original latest-input query, unfiltered hits, suffix text
-and placement, as well as per-model-round retrieval, including accepted request
-hashes. New Children inherit their
-Parent policy. No schema migration or public configuration switch is added.
+`contextual_recall` is a Host-only frozen policy opt-in for logical-input reuse,
+contextual Main query expansion and placement. Accepted historical requests and
+recall rows remain immutable. Unfrozen lookups use Host source exclusions and
+current corpus visibility; a policy flag never restores forgotten or retired
+Memory. New Children inherit their Parent context policy.
 
-Automatic extraction conservatively retains bounded first-person reports from
-user Conversation. Attributed Worker results use `User reported: ...`; untrusted
-Worker material never counts toward Core promotion. Questions, long logs and
-credential-bearing input are excluded. Exploratory and transient statements stay
-Recall. Identical independent user evidence can promote a stable statement after
-three sources. Explicit remember can establish Core, but exploratory language
-remains Recall. Corrections create immutable successors; competing successors
-conflict. This deterministic extractor preserves reports rather than inventing
-diagnoses or certainty; it is not a general semantic fact normalizer.
+Automatic observations use a separate structured semantic generation, not
+literal first-person sentence copying. Main/Worker prompts are unchanged. The
+private proposal is validated and applied by Host code as specified below.
 
 With maintenance enabled, every derived Memory record is encrypted with AES-GCM
 bound to record identity and scope; deduplication uses keyed hashes. This avoids
@@ -569,3 +562,66 @@ semantic model quality or selective dependency tracking.
 两个文件目录复用私有 fileStore，限制固定目录、不可穿越的引用名、0700/0600 权限、普通单链接文件、禁止跟随符号链接，以及原子写入与 fsync。跨进程串行仍由 Memory defaults 锁和账户锁负责，不新增通用存储平台或公共文件路径接口。环境引用保持显式。文件存储依赖本地账户和目录访问控制，不再依赖操作系统钥匙串访问策略。
 
 密钥身份与已加密数据不可分离，旧引用缺文件时失败关闭，不自动回退系统服务或生成新密钥。已有加密记忆须先将原密钥保存到文件 SecretStore；空数据库可在离线核对后建立新默认密钥。凭据文件不进入现有数据备份白名单，须独立保留原密钥；不把密钥写进 owner YAML、日志或模型输入。
+
+
+### 语义 Curator 与召回修复（2026-11-06）
+
+**需求与证据。** 当前消费者是单机用户、Main/Worker 的自动召回及所有者 Memory 检视。
+现场旧 12 条自动记录均为原文片段；当前任务同时以 Memory 与 Conversation 两次进入 recall。
+Conversation 原文、既有 Run 的冻结输入和公开 Tool 输出结构是下游契约，均不重写。
+
+**机制与策略。** 观察仍写入持久 mutation，串行 Curator 在独立后台任务中调用当前已验证模型；
+不创建用户 Task/Run，不阻塞当轮答复，不以主 Agent 的提示词约束替代数据治理。
+模型仅建议 add/support/replace/retract、语义 facet、类别、规范事实、原文 quote 和 tentative。
+宿主严格解析单一 JSON，限制 8 项/32 KiB，校验精确用户证据、已提供的当前目标、类别/facet、一致时间、
+作用域、隐私屏障与类别 opt-out。原文引用只能证明出处，不能数学证明模型对语义的解释；
+因此模型质量仍需真实数据评测，不能凭 JSON 校验宣称推理绝对正确。
+
+候选上下文限 128 条/64 KiB，并在派发前检查实际模型窗口；超限或模型不可用延期，不退回原话摘抄。
+证据不足的可能性信息保留 tentative Recall，不能覆盖既定事实。
+同义/跨语言事实通过已有 ref support；纠正创建不可变 successor；撤回退役。
+独立原始用户来源满 3 个可晋升 Core；重放及 Worker 复述不增加独立来源。
+facet 与内容摘要使用密钥摘要，元信息、请求与返回均 Vault 密封。
+独立来源计数按当前事实生命周期维护，历史来源保留在不可变记录与密封 receipt；当前记录带去重后的最近 64 个来源。
+
+当前私有生命周期策略：tentative Recall 14 天；普通 Recall 180 天；自动 Core 一年未确认
+降为 Recall，按最后确认起 545 天到期。降级继承原始时间，不把维护时间伪装为新证据。
+显式 remember 不受自动老化策略影响。过期、退役、替代、删除项在搜索、精读和检视中采用同一可见性规则；
+退役项只返回审计元数据，不作为有效记忆解密。类别遗忘使用密封语义类别，旧来源的 suppression 防止复活。
+
+**恢复与授权。** state schema 47 保存私有 memory_generation、semantic receipt 和费用预留；
+memory schema 3 保存密封 facet、到期、退役与不可变归并 receipt。
+复用现有模型冻结、账号授权/撤销、GenerationObserver 用量记录和费用边界。
+派发与接纳验证维护租约和隐私 epoch；归并期间再次串行校验 Forget 边界。
+跨库崩溃重放同一已接纳 proposal，避免再次调用模型；迟到结果不可接纳。
+无效输出最多尝试 3 次后记为失败并隔离，后续观察继续；临时不可用保持待处理。
+旧规则生成的自动记录仅退役保留审计，再从原始来源处理；显式 remember 与历史对话保留。
+
+**召回。** 自动查询来自真实用户消息/Task 来源，不采用展开后的 Task anchor 指令。
+排除当前上下文及当前 Main 输入（含已接受的后续输入）及其派生 Memory，过滤未来来源。
+两路结果按精确 ref、规范文本与 Memory→Conversation provenance 去重，然后受数量和字节预算约束。
+默认本地搜索采用中英文分词/中文二元词、主题覆盖优先于 Core/时间；仅共同的请求词不应召回无关 UI 对话。
+最多保留 400 个工作候选并收敛到最佳 200 个，扫描受请求 context 时限约束。
+本地文本路径不承诺跨语言语义搜索；自定义 embedding 路径继续负责向量近义检索。
+既有 run_recall、model_generation 与冻结上下文仍作为历史审计保留。
+
+**取舍与稳定范围。** 这是 private 后台协议，未开放模型直接写库、通用 Curator 插件、
+新的用户配置或公共 facet schema。作用域、原始证据、幂等、加密、租约、撤销及版本是必要机制；
+次数、TTL、上下文容量与相关性阈值是可替换的当前策略。
+拒绝继续把原句当事实、单靠 system prompt 去重、每条派生记忆创建用户 Task、重写旧 Run 或默认外发 embedding。
+
+<a id="memory-and-recall-invariants"></a>
+
+### Memory and recall invariants
+
+These are enforced engineering contracts, not model instructions:
+
+- Conversation preserves original messages. Automatic Memory contains derived, evidence-backed state; do not persist ordinary requests, tool plans or UI error reports as lasting facts merely because they contain first-person words.
+- Only Host-owned identity and original provenance authorize writes. A Curator may suggest operations; code validates exact evidence, scope, category, current target, uncertainty and version before committing. A structured response alone does not prove semantic correctness.
+- Equivalent facts share one current lineage; corrections and withdrawals preserve immutable audit. Replays and Worker repetitions of one source never count as independent evidence. Forget, opt-out, retirement, expiry and supersession apply to search, exact reads and owner inspection alike.
+- Dispatch, acceptance and cross-database retry must retain privacy epochs, leases, durable result reuse and usage/cost accounting. Maintenance never manufactures user Tasks or deliveries, and never falls back to literal extraction when its model fails.
+- Automatic Recall queries the original input/Task source, excludes evidence already in the working input, deduplicates Memory/Conversation echoes by provenance, and applies authorization/time/byte/count limits. Local lexical matching must not treat shared request words as topic relevance.
+- Empty or ordinary maintenance must not close an index used by another query. Publish updates through the store's synchronized incremental index; privacy revocation keeps its explicit invalidation/fail-closed behavior.
+- Unit and system tests must assert these behaviors and their failure paths. CI must execute them on every code PR; a regression existing only in optional/nightly jobs is insufficient. Fakes verify transport and state contracts, while semantic-model quality requires separate real-model evidence.
+
+Keep this contract here; `AGENTS.md` routes contributors to it. The UI design document remains the owner of visual/interaction constraints, rather than duplicating backend memory rules there.

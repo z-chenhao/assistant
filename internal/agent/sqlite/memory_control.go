@@ -75,7 +75,7 @@ func (r *Runs) ManageMemory(ctx context.Context, key string, m memory.Mutation) 
 }
 
 func (r *Runs) MemoryStatus(ctx context.Context) ([]map[string]any, error) {
-	rows, e := r.host.db.QueryContext(ctx, `SELECT event_id,operation,applied_at,attempts,failed_at,last_error FROM memory_mutation ORDER BY sequence`)
+	rows, e := r.host.db.QueryContext(ctx, `SELECT e.event_id,e.operation,CASE WHEN operation='observe' THEN (SELECT s.completed_at FROM memory_semantic_receipt s WHERE s.event_id=e.event_id) ELSE applied_at END,attempts,failed_at,last_error FROM memory_mutation e ORDER BY sequence`)
 	if e != nil {
 		return nil, agent.ErrStorage
 	}
