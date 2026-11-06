@@ -117,6 +117,10 @@ F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统
 
 ## 上下文装配与语义压缩回归
 
+`TestRecallFollowUpUsesRecentTopicWithoutDuplicatingVisibleHistory` 通过真实存储与 generation admission 构造旧 Pi 话题、新 Grokbot roadmap 及“展示结论”接续，验证查询保留最近问答、排除旧 UI 标题、去掉工作上下文已有证据、召回位于当前请求之前、冻结请求复用，以及后续工具交换只追加而不被召回拆开。`TestConversationalRecallQueryBoundsAndEvidenceIsolation` 覆盖 UTF-8/4096 字节上限、工具/runtime 隔离和旧策略缺省；`TestRecallFrozenPerTurnAndFenced` 覆盖同一输入内即使新增记忆或 embedding 不可用也不重查、重复文字的新输入重新检索、旧策略原始消息字节和旧 owner 拒绝。这些是装配规则的确定性证明，真实模型选题质量仍需单独评测。
+
+以上顺序与冻结回归进入 `make test-prompts`，随 PR 必过的 Go lane 执行；召回/输入身份回归同时进入现有 capabilities-race lane。`verify_recall.py` 核对每个单输入 Run 只有一份召回，并分别核对九个业务 Generation 与工具关闭的内部摘要，不将摘要次数当作业务执行次数；SIGKILL、并发追加失败关闭、四个 Run 和三种角色的真实搜索断言仍保留。
+
 `TestContextPromptBytes` 与 `TestSummaryPromptBytes` 对照当前约定的完整模型消息 hash，覆盖 Main/Root/Child、全部能力指导、冻结项目/Skill 资源、显式 Artifact 输入及三种摘要目标大小；从空临时目录调用，验证内置文案不依赖运行目录。这是确定性的消息兼容回归，预期 hash 仅在明确调整模型输入时更新，不评价模型效果。
 
 [internal/agent/context_test.go](../../internal/agent/context_test.go) 检查角色组合、冻结项目/Skill 来源和显式子任务；[internal/context/working_test.go](../../internal/context/working_test.go) 检查目标与未知事实保留、工具交换边界、媒体与传输预算；[internal/agent/sqlite/context_test.go](../../internal/agent/sqlite/context_test.go) 通过真实存储和共享 Loop 检查：

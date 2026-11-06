@@ -27,6 +27,12 @@ Use Go `testing` (`*_test.go`, beside sources), Node `node:test` (`*.test.mjs`),
 
 Use disposable `STEWARD_DATA_ROOT` directories. Close Python SQLite connections with `contextlib.closing`; use read transactions for consistent cross-table predicates.
 
+## Agent Context Changes
+
+Follow the [context contract](docs/designs/memory-context.md#recall-ranking-budget-and-recovery). For new policies, order the first request as system → history → recall → current user input. Freeze automatic recall by logical input identity, not model step; tool continuations preserve the exact message prefix and append exchanges unless compaction is required. Per-generation budget checks and request freezing remain necessary.
+
+Context changes must verify message order, byte-stable continuation prefixes, recall reuse despite corpus/provider changes, refresh on a new input identity, and frozen replay. Keep UI state and retrieved history scoped as evidence. Run `make test-prompts` and the owning store/observability regressions; new regression tests must remain included in the required CI checks.
+
 ## UI Component Changes
 
 Before changing Web UI, read [design.md](design.md), especially the [global component contract](design.md#全局组件契约). It is the single source of visual and interaction rules; do not maintain a separate design specification here.

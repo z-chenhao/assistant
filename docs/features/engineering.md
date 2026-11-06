@@ -61,7 +61,7 @@ Go 工程结构减少跨领域的适配器依赖与入口内的多阶段控制�
 
 ```sh
 make test lint
-make test-prompts  # Agent prompt ordering, inheritance and stage progress
+make test-prompts  # Agent prompt order, frozen recall/prefix, inheritance and progress
 make test-e2e E2E_EVIDENCE=evidence/my-change
 make test-full E2E_EVIDENCE=evidence/full-check
 make test-race

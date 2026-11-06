@@ -50,6 +50,8 @@ Race 入口在 SQLite 分片之前分别运行 Bridge 与诊断记录器包，�
 
 ## 当前验证限制
 
+上下文契约的必过保护复用现有 Go lane 的 `make test-prompts test-go` 和 capabilities-race lane：首轮 system/history/recall/user 顺序、工具续轮前缀字节一致、同一输入不重复检索、新输入身份重新检索及旧策略重放由所属 Go 回归证明。真实 CLI 召回系统场景另行核对一次冻结与业务/内部摘要轮次，避免把合法压缩当作重复业务执行。
+
 容量门禁的模型元数据持久化偶发失败根因尚未确认，追踪证据见 [PR #118](https://github.com/z-chenhao/steward/pull/118)。后续通过不等于该问题已修复；再次出现时保留具体失败位置、上下文及存储等待证据，不放宽生产时限、写入或恢复保护。
 
 文档检查复用 `scripts/check_docs.py`：页面需可从 README 导航到达，本地链接有效，且遵循当前主题布局、稳定文件名和非日志式章节规则。对应 harness 覆盖违规文档的 CLI 失败与真实协议日期、代码示例的合法使用。内容准确性和有效约束仍须人工审查。

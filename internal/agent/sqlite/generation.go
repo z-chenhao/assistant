@@ -38,7 +38,7 @@ func (r *Runs) Generation(ctx context.Context, c agent.RunClaim, run agent.Run) 
 	} else {
 		messages, err = agent.ProviderMessages(run.Checkpoint.Messages, false)
 		if err == nil {
-			messages, err = r.recallMessages(ctx, c, run, messages, -1)
+			messages, err = r.recallMessages(ctx, c, run, messages, -1, false)
 		}
 		if err == nil {
 			messages, err = r.compactMessages(ctx, c, run, messages)

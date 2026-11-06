@@ -6,6 +6,8 @@
 
 产品逻辑与测试分属明确模块。Makefile 和现有 system runner 提供本地入口，CI 自动执行这些入口；发布流水线独立准备原生包和草稿发布。
 
+上下文顺序与逻辑输入冻结属于现有 Go 必过检查：`make test-prompts` 校验 system/history/recall/user 顺序、工具续轮消息前缀字节不变及新输入重新召回；capabilities-race 的既有定向 race 入口包含 Recall 与 ConversationalRecall 回归。不新增 workflow 或更改 `Ubuntu checks` 聚合条件。
+
 Web 的固定资源目录归 `assets.go`，MCP 注册与调用分别维护；系统测试共用的模型 HTTP peer 归 `tests/system/provider_endpoint.py`，不再由渠道 gate 反向导入模型 gate。
 
 调度器在单条 SQL 内物化一次活跃租约集合，供各额度维度复用，避免查询计划按 Agent 反复扫描历史 Run。该集合仅属于当前语句的数据库快照，保留既有 claim 事务、fencing、公平排序与额度配置。

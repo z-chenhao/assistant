@@ -98,6 +98,9 @@ func TestUIStateCASFreezeAndActionUsesOrdinaryExecutor(t *testing.T) {
 	if !strings.Contains(raw, `\"selected\":\"A\"`) || strings.Contains(raw, `\"selected\":\"B\"`) {
 		t.Fatal("UI context was not frozen at input acceptance", raw)
 	}
+	if !strings.Contains(raw, "Persisted component state") || !strings.Contains(raw, "not the active page") {
+		t.Fatal("persisted state can be mistaken for the current topic", raw)
+	}
 	found := false
 	for _, req := range p.requests {
 		for _, m := range req.Messages {

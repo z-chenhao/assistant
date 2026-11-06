@@ -24,7 +24,7 @@ SYSTEM = {
     'startup-ui': ('startup', 'intelligent-ui', 'ui-interactions'),
 }
 CAPABILITIES = ('task-code-environments', 'task-code-recovery', 'tool-loading', 'main-business')
-RACE = "go test -race ./internal/agent/sqlite ./internal/app ./internal/llm/secret -run 'Test(MainQueuesSecondRequest|SerialMain|.*UI.*|InboundAdmission|Files|AccountFiles|.*Refresh.*)' -count=1"
+RACE = "go test -race ./internal/agent/sqlite ./internal/app ./internal/llm/secret -run 'Test(MainQueuesSecondRequest|SerialMain|Recall.*|ConversationalRecall.*|.*UI.*|InboundAdmission|Files|AccountFiles|.*Refresh.*)' -count=1"
 
 
 def plan(kind):
