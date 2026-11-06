@@ -16,6 +16,8 @@ F-038：固定依赖和构建入口可用；文档改动只运行适用检查；
 
 五分钟目标使用完整远端 workflow 起止时间验证，同时区分排队、安装与实际检查时间；冷缓存、外部服务和 hosted runner 排队不能通过删除覆盖或放宽断言规避。文档-only 仍实际执行文档检查，并产生同名 required status。
 
+必需的 `channels-web` 分片运行完整 Preferences 交互、设置一致性、账户/API 连接和任务导航场景；`test_required_web_lane_reaches_settings_and_task_regressions` 实际调用该分片选择的 dispatcher，防止场景仅能手动运行而未接入 CI。布局断言、通知 CAS／丢失确认／无脚本回退和真实模型连接仍由浏览器与 HTTP 场景验证。CI 无法检查未提交的代码；本地修复清单、PR 范围及合并后部署的 revision／资源核对记录在 PR，而非用文档字串测试替代。
+
 Main 交接回归等待实际 `reply_committed` 通知后检查两条持久回复，Worker 在整个断言期间保持阻塞；保留五秒测试挂起保护；假模型按协议同时识别原生 ToolResult 和响应式 Main 的 runtime tool_results 证据，按最近普通用户输入作答，不把合法的异步投递当成模型错误。原生下拉的外部点击检查等待弹层完成打开后再点击，保留关闭与焦点断言，不通过人工关闭掩盖失败。
 
 ## 工程基础重构回归

@@ -48,8 +48,8 @@ func (s *Server) loadAttention(ctx context.Context, p *page, ref, before string,
 	} else {
 		v.More = feedbacks.Next != ""
 		if feedbacks.Next != "" {
-			q := url.Values{"view": {"attention"}, "feedback_before": {feedbacks.Next}}
-			v.Next = "/tasks?" + q.Encode() + "#needs-attention"
+			q := url.Values{"feedback_before": {feedbacks.Next}}
+			v.Next = "/tasks/attention?" + q.Encode()
 		}
 		for _, f := range feedbacks.Items {
 			entry := feedbackView{Feedback: f}
@@ -106,8 +106,7 @@ func (s *Server) loadAttention(ctx context.Context, p *page, ref, before string,
 				}
 				if list.Next != "" {
 					v.More = true
-					q := url.Values{"view": {"attention"}, "cursor": {list.Next}}
-					v.TasksNext = "/tasks?" + q.Encode() + "#ongoing-work"
+					v.TasksNext = "/tasks?view=attention#ongoing-work"
 				}
 			}
 		}

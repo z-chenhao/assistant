@@ -19,19 +19,30 @@ type authConfig struct {
 	} `json:"toolkit"`
 }
 
+// AuthConfigSelection distinguishes an absent project configuration from a
+// scoped key that cannot read it. Neither case contains OAuth credentials.
+type AuthConfigSelection struct {
+	ID       string
+	Readable bool
+}
+
 func (c Client) AuthConfig(ctx context.Context, toolkit, override string) (string, error) {
+	selection, err := c.FindAuthConfig(ctx, toolkit, override)
+	return selection.ID, err
+}
+func (c Client) FindAuthConfig(ctx context.Context, toolkit, override string) (AuthConfigSelection, error) {
 	if !ValidID(toolkit) || override != "" && !ValidID(override) {
-		return "", &Error{Status: 400}
+		return AuthConfigSelection{}, &Error{Status: 400}
 	}
 	if override != "" {
 		var config authConfig
 		if err := c.request(ctx, "GET", "/auth_configs/"+override, nil, nil, &config); err != nil {
-			return "", err
+			return AuthConfigSelection{}, err
 		}
 		if config.ID != override || config.Toolkit.Slug != toolkit || config.Status != "ENABLED" || !config.Router {
-			return "", &Error{Status: 400}
+			return AuthConfigSelection{}, &Error{Status: 400}
 		}
-		return override, nil
+		return AuthConfigSelection{ID: override, Readable: true}, nil
 	}
 	var chosen authConfig
 	cursor := ""
@@ -47,9 +58,9 @@ func (c Client) AuthConfig(ctx context.Context, toolkit, override string) (strin
 			// Composio-managed sign-in. The link endpoint decides availability.
 			var failure *Error
 			if errors.As(err, &failure) && (failure.Status == 401 || failure.Status == 403) {
-				return "", nil
+				return AuthConfigSelection{}, nil
 			}
-			return "", err
+			return AuthConfigSelection{}, err
 		}
 		for _, config := range page.Items {
 			if config.Toolkit.Slug == toolkit && !config.Managed && config.Status == "ENABLED" && config.Router && ValidID(config.ID) {
@@ -59,13 +70,13 @@ func (c Client) AuthConfig(ctx context.Context, toolkit, override string) (strin
 			}
 		}
 		if page.Next == "" {
-			return chosen.ID, nil
+			return AuthConfigSelection{ID: chosen.ID, Readable: true}, nil
 		}
 		if seen[page.Next] {
-			return "", &Error{}
+			return AuthConfigSelection{}, &Error{}
 		}
 		seen[page.Next] = true
 		cursor = page.Next
 	}
-	return "", &Error{}
+	return AuthConfigSelection{}, &Error{}
 }

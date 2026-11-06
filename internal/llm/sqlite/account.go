@@ -78,91 +78,94 @@ func (s *Store) InsertAccount(ctx context.Context, a llm.AuthConnection, r llm.A
 // AccountState commits auth CAS, readiness/proof changes and events together.
 // Refresh of the same identity preserves capability proof; auth loss revokes it.
 func (s *Store) AccountState(ctx context.Context, a llm.AuthConnection, status string, credential *llm.OAuthCredential) error {
-	return s.write(ctx, func(tx *sql.Tx) error {
-		var expires any
-		refreshed := micros(a.LastRefreshedAt)
-		if credential != nil {
-			expires = credential.ExpiresAt.UnixMicro()
-			var registration llm.AccountRegistration
-			if tx.QueryRowContext(ctx, `SELECT client_id,subject_hash FROM account_registration WHERE connection_id=?`, a.ConnectionID).Scan(&registration.ClientID, &registration.SubjectHash) != nil || credential.ClientID != registration.ClientID || credential.SubjectHash != registration.SubjectHash {
-				return llm.AuthRequired
-			}
-			refreshed = now().UnixMicro()
-		} else {
-			expires = micros(a.ExpiresAt)
+	return s.write(ctx, func(tx *sql.Tx) error { return accountState(ctx, tx, a, status, credential) })
+}
+
+func accountState(ctx context.Context, tx *sql.Tx, a llm.AuthConnection, status string, credential *llm.OAuthCredential) error {
+
+	var expires any
+	refreshed := micros(a.LastRefreshedAt)
+	if credential != nil {
+		expires = credential.ExpiresAt.UnixMicro()
+		var registration llm.AccountRegistration
+		if tx.QueryRowContext(ctx, `SELECT client_id,subject_hash FROM account_registration WHERE connection_id=?`, a.ConnectionID).Scan(&registration.ClientID, &registration.SubjectHash) != nil || credential.ClientID != registration.ClientID || credential.SubjectHash != registration.SubjectHash {
+			return llm.AuthRequired
 		}
-		r, err := tx.ExecContext(ctx, `UPDATE auth_connection SET status=?,expires_at=?,last_refreshed_at=?,updated_at=max(updated_at,?),version=version+1 WHERE connection_id=? AND version=?`, status, expires, refreshed, now().UnixMicro(), a.ConnectionID, a.Version)
+		refreshed = now().UnixMicro()
+	} else {
+		expires = micros(a.ExpiresAt)
+	}
+	r, err := tx.ExecContext(ctx, `UPDATE auth_connection SET status=?,expires_at=?,last_refreshed_at=?,updated_at=max(updated_at,?),version=version+1 WHERE connection_id=? AND version=?`, status, expires, refreshed, now().UnixMicro(), a.ConnectionID, a.Version)
+	if err != nil {
+		return err
+	}
+	n, err := r.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return llm.ErrConflict
+	}
+	if status == "connected" && a.Status == "refreshing" {
+		if _, err = tx.ExecContext(ctx, `UPDATE model_probe SET auth_version=? WHERE profile_id IN (SELECT profile_id FROM model_profile WHERE auth_connection_id=?) AND auth_version=?`, a.Version+1, a.ConnectionID, a.Version-1); err != nil {
+			return err
+		}
+	}
+	if status == "reauth_required" || status == "logged_out" {
+		if _, err = tx.ExecContext(ctx, `UPDATE account_registration SET auth_epoch=auth_epoch+1 WHERE connection_id=?`, a.ConnectionID); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM model_probe WHERE profile_id IN(SELECT profile_id FROM model_profile WHERE auth_connection_id=?)`, a.ConnectionID); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT profile_id,version FROM model_profile WHERE auth_connection_id=?`, a.ConnectionID)
 		if err != nil {
 			return err
 		}
-		n, err := r.RowsAffected()
+		type item struct {
+			id string
+			v  int64
+		}
+		var items []item
+		for rows.Next() {
+			var i item
+			if err = rows.Scan(&i.id, &i.v); err != nil {
+				rows.Close()
+				return err
+			}
+			items = append(items, i)
+		}
+		err = rows.Err()
+		rows.Close()
 		if err != nil {
 			return err
 		}
-		if n != 1 {
-			return llm.ErrConflict
-		}
-		if status == "connected" && a.Status == "refreshing" {
-			if _, err = tx.ExecContext(ctx, `UPDATE model_probe SET auth_version=? WHERE profile_id IN (SELECT profile_id FROM model_profile WHERE auth_connection_id=?) AND auth_version=?`, a.Version+1, a.ConnectionID, a.Version-1); err != nil {
+		for _, i := range items {
+			if _, err = tx.ExecContext(ctx, `UPDATE model_profile SET status='reauth_required',verified_at=NULL,updated_at=max(updated_at,?),version=version+1 WHERE profile_id=?`, now().UnixMicro(), i.id); err != nil {
+				return err
+			}
+			if err = enqueue(ctx, tx, "model_profile.auth_lost", i.id, i.v+1); err != nil {
 				return err
 			}
 		}
-		if status == "reauth_required" || status == "logged_out" {
-			if _, err = tx.ExecContext(ctx, `UPDATE account_registration SET auth_epoch=auth_epoch+1 WHERE connection_id=?`, a.ConnectionID); err != nil {
+		r, err = tx.ExecContext(ctx, `UPDATE agent_config SET setup_status='degraded',config_version=config_version+1,updated_at=max(updated_at,?) WHERE setup_status='ready' AND active_model_profile_id IN(SELECT profile_id FROM model_profile WHERE auth_connection_id=?)`, now().UnixMicro(), a.ConnectionID)
+		if err != nil {
+			return err
+		}
+		n, err = r.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			var id string
+			var v int64
+			if tx.QueryRowContext(ctx, `SELECT agent_id,config_version FROM agent_config WHERE singleton=1`).Scan(&id, &v) != nil {
+				return llm.ErrStorage
+			}
+			if err = enqueue(ctx, tx, "agent.model_degraded", id, v); err != nil {
 				return err
-			}
-			if _, err = tx.ExecContext(ctx, `DELETE FROM model_probe WHERE profile_id IN(SELECT profile_id FROM model_profile WHERE auth_connection_id=?)`, a.ConnectionID); err != nil {
-				return err
-			}
-			rows, err := tx.QueryContext(ctx, `SELECT profile_id,version FROM model_profile WHERE auth_connection_id=?`, a.ConnectionID)
-			if err != nil {
-				return err
-			}
-			type item struct {
-				id string
-				v  int64
-			}
-			var items []item
-			for rows.Next() {
-				var i item
-				if err = rows.Scan(&i.id, &i.v); err != nil {
-					rows.Close()
-					return err
-				}
-				items = append(items, i)
-			}
-			err = rows.Err()
-			rows.Close()
-			if err != nil {
-				return err
-			}
-			for _, i := range items {
-				if _, err = tx.ExecContext(ctx, `UPDATE model_profile SET status='reauth_required',verified_at=NULL,updated_at=max(updated_at,?),version=version+1 WHERE profile_id=?`, now().UnixMicro(), i.id); err != nil {
-					return err
-				}
-				if err = enqueue(ctx, tx, "model_profile.auth_lost", i.id, i.v+1); err != nil {
-					return err
-				}
-			}
-			r, err = tx.ExecContext(ctx, `UPDATE agent_config SET setup_status='degraded',config_version=config_version+1,updated_at=max(updated_at,?) WHERE setup_status='ready' AND active_model_profile_id IN(SELECT profile_id FROM model_profile WHERE auth_connection_id=?)`, now().UnixMicro(), a.ConnectionID)
-			if err != nil {
-				return err
-			}
-			n, err = r.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if n > 0 {
-				var id string
-				var v int64
-				if tx.QueryRowContext(ctx, `SELECT agent_id,config_version FROM agent_config WHERE singleton=1`).Scan(&id, &v) != nil {
-					return llm.ErrStorage
-				}
-				if err = enqueue(ctx, tx, "agent.model_degraded", id, v); err != nil {
-					return err
-				}
 			}
 		}
-		return enqueue(ctx, tx, "auth_connection.updated", a.ConnectionID, a.Version+1)
-	})
+	}
+	return enqueue(ctx, tx, "auth_connection.updated", a.ConnectionID, a.Version+1)
 }

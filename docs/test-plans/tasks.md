@@ -136,3 +136,9 @@ to survive the command or test harness.
 `TestMainQueuesSecondRequestUntilFirstTaskHandoffReply` 在真实 SQLite/Actor 中阻塞第一轮模型生成，再接纳第二条请求；验证首条创建一个 Task、交接回复先提交，第二条才进入模型，且第二条回复不等待 Worker 完成。并发 ingress 回归逐条核对全部回复；旧 checkpoint 继续覆盖原 Steering 与恢复语义。
 
 `TestSerialMainRetainsBothRequestsAfterReopeningBeforeFirstReply` 在首条输入 checkpoint 后接纳第二条，关闭并重开真实状态库，验证两条请求各回复一次且先后关系不变。Main 系统 gate 对 16 条并发输入逐条核对回复内容与顺序，并保留旧冻结 checkpoint 的慢工具响应和 SIGKILL 恢复场景。
+
+执行列表回归覆盖同一持续任务的两轮真实 Root、Task 仍 active 而两轮 execution 已 completed、旧轮指令与结果隔离、有界游标及跨筛选拒绝、标题／完整目标搜索、读取不改变任务或执行。title 合约验证独立存储、缺省旧调用、空白／null／超长／非 create 字段拒绝。Web 检查任务配置与执行列表分离、列表不重复描述或结果、行属性列、详情安全转义、明暗与窄屏截图、表格本地滚动，以及既有人工反馈、审批与冻结执行语义。
+
+二级导航回归检查 Tasks 与 Settings／Developer 的共享侧栏几何、分类切换和详情选中态、内容区无重复分类 Tab、320／390／761／1024／1440px 明暗主题与中英文布局、折叠偏好、手机抽屉 Escape 与焦点恢复，以及无脚本入口可达。
+
+执行记录默认列出全部，搜索旁共享 Filters 菜单选择执行状态及独立 Needs me 条件；组合条件、搜索、分页游标与实时刷新保持一致，旧 view=attention 深链接仍可用。无脚本使用原生筛选表单。

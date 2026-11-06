@@ -28,7 +28,7 @@ type progressCore struct{ Core }
 func (progressCore) WebStatus(context.Context) (Status, error)        { return Status{Status: "idle"}, nil }
 func (progressCore) Activity(context.Context) ([]task.Summary, error) { return nil, nil }
 func TestSettingsAndProgressDoNotQueryConversation(t *testing.T) {
-	for _, path := range []string{"/settings/setup", "/tasks"} {
+	for _, path := range []string{"/settings/models", "/tasks"} {
 		t.Run(path, func(t *testing.T) {
 			server := &Server{Core: settingsCore{}, Models: settingsModels{}}
 			if path == "/tasks" {
@@ -45,11 +45,11 @@ func TestSettingsAndProgressDoNotQueryConversation(t *testing.T) {
 	}
 }
 
-func TestLegacyModelSettingsOpenResources(t *testing.T) {
-	for _, path := range []string{"/settings", "/settings/models"} {
+func TestLegacyModelSettingsOpenModels(t *testing.T) {
+	for _, path := range []string{"/settings", "/settings/setup"} {
 		w := httptest.NewRecorder()
 		(&Server{}).get(w, httptest.NewRequest("GET", path, nil))
-		if w.Code != 303 || w.Header().Get("Location") != "/settings/setup" {
+		if w.Code != 303 || w.Header().Get("Location") != "/settings/models" {
 			t.Fatalf("%s returned %d with Location %q", path, w.Code, w.Header().Get("Location"))
 		}
 	}

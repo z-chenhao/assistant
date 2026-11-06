@@ -29,7 +29,7 @@ export function enhanceComposer(messageAccepted?: (target:URL)=>void){
   form.requestSubmit(submit??undefined);
  });
  form.addEventListener('submit',event=>{
-  event.preventDefault();if(pending||submit?.disabled)return;
+  event.preventDefault();if(pending||submit?.disabled||form.dataset.modelSelecting)return;
   const data=new FormData(form),submittedSource=source.value;
   const submittedText=text.value,submittedFile=file?.files?.[0];
   const feedback=root.querySelector<HTMLElement>('#composer-feedback');
@@ -67,7 +67,7 @@ export function enhanceComposer(messageAccepted?: (target:URL)=>void){
     if(!entry.confirmed)outgoingState(entry,'uncertain',()=>void send());
    }finally{
     clearTimeout(timeout);pending=false;delete form.dataset.submitting;
-    if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false';
+    if(submit)submit.disabled=!!form.dataset.modelSelecting||document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false';
    }
   };
   void send();

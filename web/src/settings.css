@@ -1,17 +1,13 @@
 /* Settings share the module navigation shell and use a compact content column. */
-.settings-workspace{--settings-width:680px;background:var(--card)}
+.settings-workspace{--settings-width:680px;--settings-action-width:12.5rem;background:var(--card)}
 .settings-workspace .workspace-main{background:var(--card)}
-.settings-search{display:flex;align-items:center;gap:7px;background:var(--muted);border-radius:999px;padding:0 12px;margin-bottom:16px;color:var(--muted-foreground)}
-.settings-search input{border:0;background:transparent;padding:8px 0;margin:0;font-size:13px;min-height:34px}
-.settings-search:focus-within{outline:2px solid var(--focus);outline-offset:2px}.settings-search input:focus{outline:0}
 /* Reserve client-only rows before enhancement. No-script pages retain their
    native forms and omit settings that require local browser scripting. */
 html:not(.js) [data-client-pending]{display:none}
 .js [data-client-pending]{visibility:hidden}
-.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden;flex-basis:112px;max-width:168px}
+.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden;flex-basis:112px;max-width:120px}
 .js [data-language-preference]:not([data-language-ready]) .preference-save{display:none}
 .settings-nav-heading{font-size:12px;color:var(--muted-foreground);margin:0 8px 6px}
-.settings-no-results{font-size:13px;color:var(--muted-foreground);padding:8px}
 .settings-topbar{display:none}
 .settings-workspace .settings-page{max-width:var(--settings-width);padding:40px 24px 64px;margin:0 auto}
 .settings-page h1{font-size:var(--text-page);font-weight:600;line-height:1.4;margin:0}
@@ -59,12 +55,16 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-page form>label>select,.settings-page fieldset>label>select{grid-column:2;justify-self:end}
 .settings-page form>label>.muted{grid-column:1;font-size:11px}
 .settings-page label:has(>textarea){align-items:start}
-.settings-page .capability-guided> .setting-row:first-of-type{padding-top:0;min-height:42px;border:0}
+.settings-page :is(.model-connect-form,.capability-guided) label:not(.check):has(>input,>textarea,>select,>.control-select){display:grid;grid-template-columns:minmax(0,1fr) minmax(112px,1.3fr);gap:8px 18px;align-items:center;margin:0}
+.settings-page :is(.model-connect-form,.capability-guided) label>input,.settings-page :is(.model-connect-form,.capability-guided) label>textarea,.settings-page :is(.model-connect-form,.capability-guided) label>select,.settings-page :is(.model-connect-form,.capability-guided) label>.control-select{grid-column:2;width:100%;margin:0;justify-self:end}
+.settings-page :is(.model-connect-form,.capability-guided) label:has(>textarea){align-items:start}
+.settings-page .model-connect-form>label>span .muted{font-size:11px;font-weight:400}
+.settings-page .capability-guided>.setting-row:first-of-type{min-height:62px;border:0}
 .settings-page .capability-guided fieldset{margin-top:20px;padding-top:16px}
 .settings-page .capability-guided legend{font-size:var(--text-section);font-weight:600}
-.settings-page .capability-submit{justify-content:flex-start;margin-top:18px;flex-direction:row-reverse}
+.settings-page .capability-submit{margin-top:18px}
 .settings-page .capability-advanced{margin-top:28px;padding-top:16px}
-.settings-page .capability-field-pair{gap:12px}.settings-page .capability-field-pair label{font-size:12px}
+.settings-page .capability-field-pair{grid-template-columns:minmax(0,1fr);gap:16px}.settings-page .capability-field-pair label{font-size:12px}
 .settings-page .setting-switch{flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:20px;font-size:13px;margin:14px 0}
 /* The native select stays usable without JS; the enhancement adds filtering. */
 .settings-confirm{width:420px}
@@ -78,14 +78,13 @@ html:not(.js) [data-client-pending]{display:none}
  .settings-page .panel{padding:16px}.settings-page .settings-group{padding:0 14px}
  .settings-page form>label:not(.check),.settings-page fieldset>label:not(.check){display:block;font-size:13px}.settings-page form>label>input,.settings-page fieldset>label>input,.settings-page form>label>textarea,.settings-page fieldset>label>textarea{margin-top:7px;font-size:16px}.settings-page form>label>select,.settings-page fieldset>label>select{display:block;margin-top:7px}
  .settings-page .capability-submit{align-items:center;flex-direction:row-reverse;flex-wrap:wrap}.settings-page .capability-submit button{min-height:40px}
- .settings-search input{font-size:16px}
+ .settings-page :is(.model-connect-form,.capability-guided) label:not(.check):has(>input,>textarea,>select,>.control-select){gap:8px 12px}
  .settings-workspace .page-feedback{margin:16px 20px 0}
 }
 
 .settings-row-controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;min-width:0}
 .settings-row-controls button{flex-shrink:0}
 .setting-row>.control-select{max-width:58%;flex-shrink:0}
-.settings-page form>label>.control-select,.settings-page fieldset>label>.control-select{grid-column:2;justify-self:end}
 .settings-page .panel form>button{display:flex;margin-left:auto}
 .settings-workspace .page-feedback{max-width:632px;margin:20px auto 0}
 .settings-workspace .page-feedback.success{position:fixed;right:24px;bottom:24px;z-index:50;margin:0;max-width:360px;box-shadow:0 4px 16px #0001}
@@ -100,3 +99,84 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-group .preference-group{border:0;border-radius:0;margin:0;background:transparent}
 .settings-group .preference-row{padding-inline:0}
 .settings-group .preference-feedback{padding-inline:0}
+
+/* Configuration keys, values and footer commands keep their own alignment. */
+.settings-page .setting-row>.setting-controls{margin-inline-start:auto;justify-content:flex-end}
+.settings-page .setting-row>label{flex:1 1 0;font-size:14px;font-weight:500;color:var(--foreground)}
+.settings-page .notification-preference .setting-controls{flex:0 1 16rem}
+.settings-page .notification-preference .control-select{width:100%}
+.settings-page .notification-preference .setting-row>label{flex-basis:12rem}
+.settings-actions,.settings-page .capability-guided .actions{display:flex;justify-content:flex-end;align-items:center;flex-direction:row;flex-wrap:wrap;gap:var(--control-gap);margin-top:16px}
+.settings-page .model-provider-panel>form:not(.model-connect-form):not(.setting-row){display:flex;justify-content:flex-end}
+.settings-page .resource-summary{padding-inline-end:0}
+.settings-page .resource-body .provider-account-actions{justify-content:flex-end}
+@media(max-width:760px){
+ .settings-page .notification-preference .setting-row{flex-wrap:nowrap}
+ .settings-page .notification-preference .setting-row>label{flex-basis:0}
+ .settings-page .notification-preference .setting-controls{flex-basis:112px;max-width:48%}
+}
+
+.settings-page form.setting-row>label,.settings-page .setting-row>label{display:block;min-width:0;margin:0}
+
+.settings-page .setting-row>.setting-action,.settings-page .models-heading>form{margin-inline-start:auto}
+.settings-page .models-heading>form{min-width:0;max-width:100%}
+.settings-page .resource-body{padding-inline-end:0}
+
+.settings-page .settings-group{--settings-value-width:120px}
+.settings-page .settings-group .preference-controls{flex:1 1 112px;min-width:112px;max-width:var(--settings-value-width)}
+.settings-page .settings-group .setting-row>:is(select,.control-select){width:var(--settings-value-width);max-width:48%;flex:0 0 var(--settings-value-width)}
+.settings-page .settings-group [data-language-ready] .preference-controls:has(.preference-save:not([hidden])){flex-basis:220px;max-width:220px}
+.settings-page .resource-section{margin-bottom:28px}
+.settings-page .resource-section-title{font-size:14px;font-weight:600;margin:0 0 8px}
+.settings-page .resource-section .setting-copy h3{font-size:14px;font-weight:500;margin:0}
+.settings-page .service-configuration .setting-controls{flex:0 1 60%;min-width:0}
+.settings-page .service-configuration .setting-controls input{margin:0;width:100%}
+.settings-page .service-configuration .service-advanced{margin-top:20px}
+.settings-page .service-configuration .service-advanced label{display:block;margin:16px 0 8px}
+.settings-page .service-configuration .service-advanced textarea{margin:0}
+@media(max-width:760px){.settings-page .service-configuration .setting-controls{flex-basis:55%}}
+
+.settings-page .resource-section .resource-summary h3{font-size:14px;font-weight:500}
+
+.settings-page .setting-row>form{display:flex;justify-content:flex-end;margin-inline-start:auto;min-width:0;max-width:100%}
+.settings-page .resource-section .direct-models-heading{font-size:14px}
+
+.settings-page .model-connections{margin-top:32px}
+.settings-page .model-connections>.settings-section-title{margin-bottom:4px}
+.settings-page .model-connection-row{display:flex;margin:0;gap:16px;padding:12px 0;align-items:center;flex-wrap:nowrap}
+.settings-page .connection-name{font-size:14px;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.settings-page .connection-meta{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-shrink:0;margin-inline-start:auto}
+.settings-page .connection-details{min-width:0;flex:1}
+.settings-page .connection-details .facts{margin-bottom:0}
+.settings-page .connection-details summary{cursor:pointer}
+.settings-page [data-form-menu]>.actions{flex-direction:column}
+.settings-page .model-connect>h1{margin-bottom:28px}
+.settings-page .model-connection-advanced{min-width:0}
+.settings-page .model-connection-advanced>label{margin-top:16px!important}
+
+.settings-page .model-connection-row:has(.connection-details[open]){align-items:flex-start}
+.settings-page .connection-meta{min-height:36px}
+.settings-page .connection-details>summary{min-height:36px;line-height:36px}
+
+.model-resources:has([data-signin-pending]) [data-account-connection] .connection-meta>:is([data-form-menu],span:has(>button)){visibility:hidden}
+
+@media(max-width:760px){.settings-page .connection-details .facts>div{grid-template-columns:minmax(0,1fr);gap:4px}}
+
+.settings-page .model-connections:first-of-type{margin-top:0}
+.settings-page .model-connections>.list-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 12px}
+.settings-page .model-connections>.list-heading h2{margin:0;font-size:14px}
+.settings-page .signin-progress .setting-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.settings-page .signin-progress .setting-copy strong{font-size:14px;font-weight:500}
+.settings-page .signin-progress .setting-copy [role=status]{font-size:12px;color:var(--muted-foreground)}
+
+.model-resources:has([data-signin-pending]) .account-add{display:none}
+.settings-page .capability-guided>.setting-row>.control-select{width:12.5rem;flex-basis:12.5rem}
+
+.settings-page .service-advanced fieldset{min-width:0;border:0;border-top:1px solid var(--border);padding:16px 0;margin:16px 0}
+.settings-page .service-configuration .service-advanced fieldset>label{display:grid;grid-template-columns:minmax(0,1fr) minmax(112px,1.3fr);align-items:center;gap:12px 18px}
+.settings-page .service-advanced fieldset>label>input{width:100%;margin:0}
+.settings-page .model-connections>.list-heading>.setting-action{flex:0 0 auto;width:min(var(--settings-action-width),58%);max-width:58%}
+.settings-page .model-connections>.list-heading>h2{min-width:0;overflow-wrap:anywhere}
+
+.settings-page .signin-progress{display:block}
+.settings-page .signin-progress .setting-row>form{flex:0 0 min(var(--settings-action-width),58%)}

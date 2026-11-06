@@ -6,14 +6,14 @@
 
 ## 默认能力与设置
 
-正常安装启动无需先填写能力配置。Memory 自动生成 256 位密钥并保存在系统 SecretStore；搜索默认使用本地全文检索；Skills 自动准备私有空目录。Computer 在 Apple silicon Mac 首次使用时自动下载固定版本的 Lume 和 macOS 镜像、校验并准备私有 Guest。其他平台显示不支持自动 macOS 桌面，本地文件与命令仍可用。
+正常安装启动无需先填写能力配置。Memory 自动生成 256 位密钥并保存在本地文件 SecretStore；搜索默认使用本地全文检索；Skills 自动准备私有空目录。Computer 在 Apple silicon Mac 首次使用时自动下载固定版本的 Lume 和 macOS 镜像、校验并准备私有 Guest。其他平台显示不支持自动 macOS 桌面，本地文件与命令仍可用。
 
 Settings / Capabilities 提供“自动（推荐）／自定义／关闭”。自定义资源优先；关闭保留已有数据。保存后重启，新 Run 使用新配置；正在执行和恢复的 Run 继续校验原冻结能力。显式 `-config` 部署保留现有配置语义，可通过 `defaults` 选择自动资源。
 
 
 ## 功能说明
 
-Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and commands、Computer 五个入口。Memory 包含存储与检索，可选语义检索放在 Memory 的高级设置中。默认开启显示“已启用（默认）”，自定义配置显示“已启用”；准备中、异常和重启后生效单独呈现，连接检查证明不作为启用状态。修改普通字段或高级 YAML 后，旧连接反馈立即失效；重新检查后才显示对应新候选的结果。页面与 Preferences 共用左侧导航、居中窄列、紧凑分组行和可搜索下拉，配置后直接保存。
+Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and commands、Computer 五个入口。Memory 包含存储与检索，可选语义检索放在 Memory 的高级设置中。默认开启显示“已启用（默认）”，自定义配置显示“已启用”；准备中、异常和重启后生效单独呈现，连接检查证明不作为启用状态。修改字段后，旧连接反馈立即失效；重新检查后才显示对应新候选的结果。页面与 Preferences 共用左侧导航、居中窄列、紧凑分组行和共享下拉，配置后直接保存。
 
 ## 需求与验收
 
@@ -23,7 +23,7 @@ Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and command
 
 **需求**：用户能在设置中看见记忆、embedding、MCP、Skills、代码工作区及 Computer 是否已连接，并完成配置验证。
 
-**当前实现**：底层保留六类资源的独立验证与迁移边界，用户只需在五个主入口配置。普通 Save 自动执行有界检查并保存；自定义连接可单独检查。YAML、来源路径、检查时间和详细说明放在高级设置。关闭 Memory 同时关闭检索并清除自定义 embedding 连接，保留数据和密钥引用；重新启用恢复默认本地检索。保存仍绑定成功验证的精确候选和未变化的源文件。新配置经明确重启后供新 Run 使用，运行中的配置和旧快照不会热改。
+**当前实现**：底层保留六类资源的独立验证与迁移边界，用户只需在五个主入口配置。字段修改后自动执行有界检查并保存，失败保留草稿。用户界面不展示 YAML、模板下载或宿主配置文件路径。关闭 Memory 同时关闭检索并清除自定义 embedding 连接，保留数据和密钥引用；重新启用恢复默认本地检索。保存仍绑定成功验证的精确候选和未变化的源文件。新配置经明确重启后供新 Run 使用，运行中的配置和旧快照不会热改。
 
 **边界**：模型与通知继续使用各自设置页；不增加模型可见的能力发现 API。自定义语义检索、Skill catalog、MCP 和 Computer 连接仍可由用户提供；自动资源走默认准备流程。诊断验证连接与资源边界，不评价模型质量，不代替 Guest 首次运行时的身份检查，也不代办账户授权或数据迁移。
 
@@ -31,11 +31,10 @@ Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and command
 
 ## 如何使用
 
-1. 打开 Settings → Capabilities，选择一项能力，按说明准备自己的服务、已有凭据引用和私有路径。
-2. 启用该能力并填写普通字段；MCP 使用 provider／允许工具行，Computer 按连接、Guest、兼容与运行时分组。需要未展示字段时再展开 Advanced YAML。
-3. 点击 Test settings（高级编辑器为 Test configuration）。失败后根据诊断修改并再次测试；测试不会保存文件。成功后可以刷新页面继续查看尚未保存的候选。
-4. 点击 Save tested settings（高级编辑器为 Save verified configuration）。修改候选、其他设置保存、外部文件修改、测试结果超过五分钟或进程重启都会要求重新验证。过期页面不能覆盖已观察到的新配置。
-5. 按原启动方式停止并重启 Steward。页面显示的“启动时已配置”和“待重启”用于区分当前配置与保存配置。新的请求创建新快照；不兼容的旧快照继续按既有运行时规则拒绝恢复，不会自动升级。
+1. 打开 Settings → Capabilities，选择一项能力。
+2. 选择自动、自定义或关闭。自定义时填写具体字段；MCP 按服务与允许工具行管理，Computer 按连接、Guest、兼容与运行时分组。
+3. 字段修改后自动验证并保存；失败保留输入，修正字段或重试。MCP 增加行是草稿操作；删除完整服务或工具按最终候选验证保存，删除最后服务停用 MCP。无 JavaScript 时使用原生 Save。
+4. 保存后需要重启的设置明确显示待重启。按原启动方式重启 Steward，新请求创建新快照；已有执行保持其冻结配置。
 
 凭据只填写 `env:NAME` 或 `credential:NAME` 引用；真实值放 SecretStore/进程环境，不放 YAML、命令参数或截图。新环境引用需先提供给 Steward 进程，再测试。保留 Memory 的原始 32-byte 密钥和备份；更换引用须指向同一密钥。embedding endpoint/model/dimensions 的变化需要离线重建索引，单纯连接测试不会迁移已有向量。先前已停用能力的数据也不会被删除；再次启用必须保留原身份。
 
@@ -56,7 +55,7 @@ Settings → Capabilities 保留 Memory、MCP tools、Skills、Files and command
 
 显式 `-config` 文件是编辑目标；未指定时读取 `STEWARD_DATA_ROOT/config.yaml`，默认是 `~/.local/share/steward/config.yaml`。文件不存在则沿用内置默认值，首次成功保存才创建 0600 文件。显式文件必须是普通文件，设置页拒绝符号链接；其他 section 和注释保留。
 
-设置页使用完整配置校验，路径必须遵守各能力的隔离要求，配置文件也不能放进 Agent 或 provider 可读写的工作目录。手工把整个文件改坏导致进程无法启动时，需先从终端修复文件；Web 不能修复一个尚未启动的进程。只读 `doctor` 仍不读取凭据或探测服务，页面上的 Test 是用户主动发起的独立操作。
+设置页使用完整配置校验，路径必须遵守各能力的隔离要求，配置文件也不能放进 Agent 或 provider 可读写的工作目录。手工把整个文件改坏导致进程无法启动时，需先从终端修复文件；Web 不能修复一个尚未启动的进程。只读 `doctor` 仍不读取凭据或探测服务，设置保存的连接检查只由用户修改配置触发，不在后台自动探测未修改的连接。
 
 ## 详细操作参考
 

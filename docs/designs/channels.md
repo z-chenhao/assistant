@@ -54,7 +54,7 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 ### Web 待办投影与反馈来源（F-018/F-004）
 
-启动配置和运行时就绪状态由 Chat 的设置提示及 Settings 的 Resources 标签展示。模型列表、连接与详情都属于 Resources，旧模型列表地址重定向到该标签。工作待办只投影问题、成果审阅、审批与任务执行事实，模型设置状态不参与待办计数。任务标题使用原始内容，系统生成的描述和操作按界面语言呈现。
+启动配置和运行时就绪状态由 Chat 的设置提示及 Settings 的 Models 标签展示。模型列表、连接与详情都属于 Models，旧模型列表地址重定向到该标签。工作待办只投影问题、成果审阅、审批与任务执行事实，模型设置状态不参与待办计数。任务标题使用原始内容，系统生成的描述和操作按界面语言呈现。
 
 `attention.go` 为现有 SSR 与条件更新提供私有只读投影。具名问题/审阅读取 F-004 当前记录，不依赖 Task 是否 active；审批读取有界 `PendingApprovals`，保留既有历史 `ApprovalView`；Task 失败、unknown 和无结构化问题时的需要信息状态来自当前执行事实。同 Task 的结构化 input question 抑制 generic input 兜底，失败与 unknown 保持独立事实。模型不可用提供现有 Settings 修复入口，不猜测模型进度文本或建立新状态机。
 
@@ -371,7 +371,7 @@ Chat 顶部居中两行显示名称与动态头像。Computer 与 Worker 为互�
 
 ### 设置页布局与交互
 
-Settings 保留一级导航，在旁边展开二级侧栏，呈现 Preferences、Notifications、Resources、Capabilities 四个真实分类。正文居中，单列窄宽度；移动端在同一抽屉中并排保留两级导航，可关闭、可键盘退出并还原焦点。搜索只筛选设置分类，不查询或更改配置。
+Settings 保留一级导航，在旁边展开二级侧栏，直接呈现 Preferences、Notifications、Models、Apps、Capabilities 五个分类，不设置分类搜索。正文居中，单列窄宽度；移动端在同一抽屉中并排保留两级导航，可关闭、可键盘退出并还原焦点。
 
 | 参考组件 | 当前设置页的映射 |
 |---|---|
@@ -388,7 +388,7 @@ Settings 保留一级导航，在旁边展开二级侧栏，呈现 Preferences�
 
 ### 两级导航实现
 
-公共规则维护在根目录 [design.md](../../design.md#两级导航)。共享 shell 使用 `workspace-navigation` 容纳一级栏与可选的 `section-sidebar`，`has-section-navigation` 负责内容占宽。Settings 与 Developer 的分类共用这一结构，Task 当前不创建空栏。导航使用原生链接，焦点约束与 inert 以整个容器为边界，没有新增运行时路由或数据查询。
+公共规则维护在根目录 [design.md](../../design.md#两级导航)。共享 shell 使用 `workspace-navigation` 容纳一级栏与可选的 `section-sidebar`，`has-section-navigation` 负责内容占宽。Settings、Developer 与 Tasks 的分类共用这一结构；Tasks 提供执行记录和任务配置两个入口。导航使用原生链接，焦点约束与 inert 以整个容器为边界，没有新增运行时路由或数据查询。
 
 一级栏底部仅保留 Settings，外观和头像动效集中在 Preferences；不再渲染宣传语或重复的主题按钮。头像动效开关调用已有 `StewardGhost.pause`，继续使用原浏览器存储键；系统 reduced-motion 优先时禁用开关并显示原因，不改变既有动画帧与状态呈现。
 
@@ -413,3 +413,19 @@ Web 读取绑定 UI artifact 的原调用顺序，并与冻结投影的组件逐
 当前消费者是服务端设置/任务/开发者表单和 React 会话富组件。全局组件皮肤保持 Steward 的字体、字号、导航、内容布局和品牌语义，统一按钮、输入框、选择器、菜单、卡片、复选框及开关。选择器与菜单的键盘、定位、取消和焦点交由 Base UI；原生值适配器仅连接表单值与业务事件，不再自建筛选/导航状态机。选择器在弹窗中把浮层放进相同 dialog，避免进入不可交互的背景；定位器消除根 CSS zoom 的坐标倍率、浮层恢复该倍率，保留放大后的文字与触控尺寸。原生必填校验把焦点交给可见控件，不尝试聚焦隐藏值。
 
 机制是原生表单值、服务端校验、版本和请求身份；当前控件结构与外观是可替换策略。适配器、皮肤和裁剪的上游组件保持仓库私有，不新增通用跨产品组件 SDK。采用组件源码与小型运行时依赖，拒绝整体搬入 Multica 页面、业务层或第二套主题；没有引入 ReUI 商业页面块。无脚本仍使用相同皮肤的原生表单。
+
+### Settings 行布局与对话模型选择
+
+Settings 的单值配置与右侧命令遵守根目录 design.md。纯标签不继承含控件标签的网格规则；组合输入使用共享 embedded 变体消除双层焦点边界。Apps 目录和详情布局保持原契约。
+
+私有 Web 选择投影位于 composer_models.go；GET /api/models 只读账户目录与本地配置，正常页面与轮询不读取账户凭据。用户通过 POST /model/choose 按配置版本选择，复用 Control 的账户目录激活与直连验证路径；未保存账户模型仅在选择时创建配置，冻结执行不受影响。首次 Web 登录仅在尚无当前模型时选用首个账户目录模型。目录与激活机制属于现有模型控制契约；首项默认、紧凑触发器和 12 项搜索阈值是 Web 策略，不建立公开通用模型选择 API、批量同步器或新持久层。拒绝读取目录时批量创建配置，以避免 GET 写入与过期目录残留。
+
+App 连接配置发现区分「已读取但未配置」与「当前密钥不能读取配置」；只有确认未配置且提供方明确没有托管授权时，才显示自有 OAuth 配置提示。读取权限不足仍由既有授权链接端点决定可用性，不将未知状态误报为缺少配置，也不暴露提供方响应中的客户端密钥。该元数据仅在仓库内部适配器与连接服务之间使用。
+
+Tasks 复用 has-section-navigation、section-sidebar 和 section-navigation，与 Settings、Developer 共用桌面布局、折叠和手机抽屉。分类选中由私有 taskConfigurationPage 根据规范路由判断；页面内不再重复分类 Tab，不新增导航状态机或持久化状态。
+
+通知目的地选择后自动保存，携带版本并更新确认版本；冲突／写入结果未知不自动重发，刷新读取实际状态。无脚本保留原生提交。Preferences 同组短值选择器等宽，Models 按 Models 归组两类模型连接，App service 使用键值行和右对齐同宽操作；Apps 目录布局不变。相关回归由 settings_test、channels_preferences 和 page-transitions 覆盖。
+
+Models 为 Settings 的独立分类，包含「Sign in with an account」和「Connect with an API key」。账户目录自动进入聊天模型选择器；API 连接使用现有私有文件 SecretStore，凭据与首个模型元数据一次事务保存，失败清理新文件。连接后自动验证；首次无当前模型自动选用，后续连接不覆盖选择。连接操作复用共享菜单和原生表单，断开采用模型及凭据双版本确认并撤销后续使用，保留历史冻结配置。Apps 工具栏 App settings 进入服务配置；原 Models/Resources 服务入口移除，旧 setup 与 services/apps 深链接保留重定向。浏览器回归覆盖实际 HTTP provider 的 API key、聊天模型切换、断开及明暗／窄屏布局。
+
+Models 将账户与 API 连接分组；账户入口先呈现实际支持的 ChatGPT 提供方，明确确认后才发起授权，重连绑定已有连接 ID，添加其他账户是独立操作。等待状态与取消保持配置行，完成后刷新账户投影。不能仅凭相似名称合并不同注册身份，现有账户记录不自动删除。协议、凭据生命周期、当前模型和冻结快照不改变。浏览器回归断言进入提供方页不发送 auth/login，并保留 API 连接、原生路径、明暗和窄屏验证。Apps 服务高级授权配置使用应用标识／配置 ID 行，删除 JSON 编辑框；显式验证保存和版本检查保留，目录布局不变。

@@ -80,23 +80,24 @@ func (s *Store) AddProfile(ctx context.Context, input llm.ProfileInput) (llm.Pro
 	if err != nil {
 		return llm.Profile{}, err
 	}
-	err = s.write(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO model_profile (`+profileColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			p.ProfileID, input.Name, input.ProviderKind, nullable(input.Endpoint), input.WireAPI, input.ModelID, nullable(input.AuthConnectionID), nullable(input.ReasoningEffort), input.ContextWindow, input.MaxOutputTokens,
-			g, c, caps, p.Status, nil, t.UnixMicro(), t.UnixMicro(), p.Version)
-		if err != nil {
-			return err
-		}
-		if err := enqueue(ctx, tx, "model_profile.added", p.ProfileID, 1); err != nil {
-			return err
-		}
-		p, err = scanProfile(tx.QueryRowContext(ctx, `SELECT `+profileColumns+` FROM model_profile WHERE profile_id=?`, p.ProfileID))
-		return err
-	})
+	err = s.write(ctx, func(tx *sql.Tx) error { return insertProfile(ctx, tx, &p, g, c, caps) })
 	if err != nil {
 		return llm.Profile{}, err
 	}
 	return p, nil
+}
+
+func insertProfile(ctx context.Context, tx *sql.Tx, p *llm.Profile, g, c, caps string) error {
+	input := p.ProfileInput
+	_, err := tx.ExecContext(ctx, `INSERT INTO model_profile (`+profileColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.ProfileID, input.Name, input.ProviderKind, nullable(input.Endpoint), input.WireAPI, input.ModelID, nullable(input.AuthConnectionID), nullable(input.ReasoningEffort), input.ContextWindow, input.MaxOutputTokens, g, c, caps, p.Status, nil, p.CreatedAt.UnixMicro(), p.UpdatedAt.UnixMicro(), p.Version)
+	if err != nil {
+		return err
+	}
+	if err = enqueue(ctx, tx, "model_profile.added", p.ProfileID, 1); err != nil {
+		return err
+	}
+	*p, err = scanProfile(tx.QueryRowContext(ctx, `SELECT `+profileColumns+` FROM model_profile WHERE profile_id=?`, p.ProfileID))
+	return err
 }
 
 // UpdateProfile changes metadata using CAS and invalidates prior verification.
@@ -215,13 +216,14 @@ func (s *Store) InsertAuth(ctx context.Context, a llm.AuthConnection) error {
 	if err != nil || id.Version() != 7 {
 		return llm.ErrStorage
 	}
-	return s.write(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO auth_connection (connection_id,provider,auth_kind,credential_ref,account_label,workspace_label,status,expires_at,last_refreshed_at,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, a.ConnectionID, a.Provider, a.AuthKind, a.CredentialRef, nullable(a.AccountLabel), nullable(a.WorkspaceLabel), a.Status, micros(a.ExpiresAt), micros(a.LastRefreshedAt), a.CreatedAt.UnixMicro(), a.UpdatedAt.UnixMicro(), a.Version)
-		if err != nil {
-			return err
-		}
-		return enqueue(ctx, tx, "auth_connection.added", a.ConnectionID, 1)
-	})
+	return s.write(ctx, func(tx *sql.Tx) error { return insertAuth(ctx, tx, a) })
+}
+func insertAuth(ctx context.Context, tx *sql.Tx, a llm.AuthConnection) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO auth_connection (connection_id,provider,auth_kind,credential_ref,account_label,workspace_label,status,expires_at,last_refreshed_at,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, a.ConnectionID, a.Provider, a.AuthKind, a.CredentialRef, nullable(a.AccountLabel), nullable(a.WorkspaceLabel), a.Status, micros(a.ExpiresAt), micros(a.LastRefreshedAt), a.CreatedAt.UnixMicro(), a.UpdatedAt.UnixMicro(), a.Version)
+	if err != nil {
+		return err
+	}
+	return enqueue(ctx, tx, "auth_connection.added", a.ConnectionID, 1)
 }
 
 func (s *Store) Auth(ctx context.Context, id string) (llm.AuthConnection, error) {

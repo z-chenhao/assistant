@@ -101,7 +101,6 @@ func description(id, root string) web.Capability {
 			lines[i] = "  " + lines[i]
 		}
 		v.Example = "computer:\n" + strings.Join(lines, "\n") + "\njavascript:\n  command: /absolute/path/to/node\n  script: /absolute/path/to/runtime/javascript/src/sidecar.mjs\n"
-		v.Help += " Include computer and javascript sections in this editor."
 	}
 	return v
 }

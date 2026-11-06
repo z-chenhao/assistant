@@ -791,6 +791,7 @@ def transport_channels(binary, evidence, report):
 
 
 def web_channels(binary, evidence, report):
+    preference_settings(binary,evidence,report)
     memory_inspection(binary,evidence,report)
     attention_workspace(binary,evidence,report)
     sending_feedback(binary,evidence,report)
@@ -806,6 +807,7 @@ def web_channels(binary, evidence, report):
     account_presentation(binary, evidence.parent/'account-ui', report)
     native_trace_inspection(binary,evidence,report)
     page_transitions(binary,evidence,report)
+    model_connections(binary,evidence,report)
     task_control_components(binary,evidence,report)
 
 
@@ -821,6 +823,31 @@ def run(binary, evidence, group='all'):
     return report
 
 
+def model_connections(binary,evidence,report):
+    """Real Web key entry, owned HTTP model peer, file credentials and composer."""
+    from http.server import ThreadingHTTPServer
+    from provider_endpoint import Endpoint
+    with tempfile.TemporaryDirectory(prefix='steward-model-connections-') as temp,Sandbox() as platform,Broker(Path(temp)) as broker:
+        server=ThreadingHTTPServer(('127.0.0.1',0),Endpoint);server.daemon_threads=True;server.requests=[];server.mode='success'
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        h=ChannelHarness(binary,Path(temp),platform,'')
+        try:
+            h.config.write_text(h.config.read_text()+'llm:\n  provider_bridge_command: '+json.dumps(str(binary))+'\n  provider_bridge_script: -model-bridge\n  provider_bridge_version: steward-go-v1\nnats:\n  url: '+json.dumps(broker.url)+'\n')
+            h.env['STEWARD_MODEL_CONNECTION_ENDPOINT']=f'http://127.0.0.1:{server.server_port}/v1'
+            h.start();output=evidence.parent/'model-connections-ui';h.browser(output,'model-connections')
+            key=b'SYNTHETIC_WEB_CONNECTION_KEY_NEVER_ECHO'
+            require(any(r.get('auth')=='Bearer '+key.decode() for r in server.requests),'API key did not reach the owned provider boundary')
+            for path in h.root.rglob('*'):
+                if not path.is_file() or path.parent.name in ('secrets','account-secrets'):continue
+                require(key not in path.read_bytes(),'API key leaked outside private credential files')
+            keys=[p for p in (h.root/'data/secrets').glob('*') if p.is_file() and p.read_bytes()==key]
+            require(len(keys)==1 and keys[0].stat().st_mode&0o777==0o600,'disconnect did not remove its credential or key permissions are wrong')
+            report['scenarios']['model-connections']=json.loads((output/'models-connections.json').read_text())
+            report['checks'].append('Models: native API-key entry through owned HTTP provider, atomic file/metadata handling, automatic verification, composer selection, versioned disconnect, retained history, no credential echo, responsive screenshots')
+        finally:
+            h.cleanup();server.shutdown();server.server_close();thread.join()
+
+
 def page_transitions(binary, evidence, report):
     with tempfile.TemporaryDirectory(prefix='steward-page-transitions-') as temp, Sandbox() as platform:
         h = ChannelHarness(binary, Path(temp), platform)
@@ -831,7 +858,10 @@ def page_transitions(binary, evidence, report):
             output = evidence.parent / 'page-transitions-ui'
             h.browser(output, 'page-transitions')
             report['scenarios']['page-transitions'] = json.loads((output / 'page-transitions.json').read_text())
-            report['checks'].append('Page transitions: cached critical fonts without fallback frames, bilingual light/dark Resources sizing, persisted collapse, stable pre-bundle layout, native fallback, explicit notification save and pointer/keyboard composer focus without an outer frame')
+            consistency=evidence.parent/'settings-consistency-ui'
+            h.browser(consistency,'settings-consistency')
+            report['scenarios']['settings-consistency']=json.loads((consistency/'settings-consistency.json').read_text())
+            report['checks'].append('Page transitions: cached critical fonts without fallback frames, bilingual light/dark Resources sizing, persisted collapse, stable pre-bundle layout, native fallback, notification autosave and pointer/keyboard composer focus without an outer frame')
         finally:
             h.cleanup()
 
@@ -1026,7 +1056,8 @@ def capability_settings(binary,evidence,report):
             require(h.config.stat().st_mode&0o777==0o600,'configuration is not private')
             h.stop();h.start()
             for kind in ('memory','embedding','mcp','skills','computer'):
-                require('configured when the process started' in h.http('/settings/capabilities/'+kind),'saved capability was not loaded after restart: '+kind)
+                view=h.http('/settings/capabilities/'+kind)
+                require('data-status="configured">Enabled' in view and 'Restart required' not in view,'saved capability was not loaded after restart: '+kind)
             h.http('/api/message',dict(source_id='capability-after-restart',content=[dict(type='text',text='Confirm the new setup is available.')]))
             try:
                 h.wait(lambda state:len(state['deliveries'])==2 and all(d['status']=='sent' for d in state['deliveries']),'new request after restart')
@@ -1263,8 +1294,8 @@ def dependency_recovery(binary, report):
             with h.config.open('a') as config:
                 config.write('skills:\n  root: ' + str(catalog) + '\n  scope: agent\n')
             h.start()
-            require('href="/settings/models/new"' in h.http('/settings/setup'), 'dependency failure hid model settings in Resources')
-            require('<h1>Tasks</h1>' in h.http('/tasks'), 'dependency failure hid Progress')
+            require('href="/settings/models/new"' in h.http('/settings/models'), 'dependency failure hid model settings in Resources')
+            require('<h1>Execution records</h1>' in h.http('/tasks'), 'dependency failure hid Progress')
             require(h.http('/api/status')['readiness'] != 'ready', 'broken runtime admitted work')
             h.http('/api/message', dict(source_id='blocked', content=[dict(type='text', text='blocked')]), expected=409)
             catalog.mkdir(mode=0o700)
@@ -1649,7 +1680,7 @@ def account_presentation(binary, browser_evidence, report):
                         'abandoned authorization created an account')
                 require(h.http('/api/status')['readiness'] == 'setup_required', 'abandoned authorization changed readiness')
                 retry_page = h.http('/settings/models/new?provider=chatgpt')
-                require('Sign-in was not completed.' in retry_page and 'action="/auth/login"' in retry_page,
+                require('Sign-in was not completed.' in retry_page and 'href="/settings/models/new?method=account"' in retry_page,
                         'cancelled authorization did not offer another login')
                 require(abandoned_url not in retry_page and 'Continue sign-in in your browser' not in retry_page,
                         'cancelled authorization still offers the abandoned URL')
@@ -1662,7 +1693,6 @@ def account_presentation(binary, browser_evidence, report):
                 connected=h.wait_state(lambda s:s['status']=='connected','Web account login completes',lambda _:h.http('/api/auth'))
                 aid=connected['account_id'];require(aid,'account metadata absent')
                 h.http('/model/add',urlencode(dict(account=aid,model='hidden-model')).encode(),headers=form,expected=409)
-                h.http('/model/add',urlencode(dict(account=aid,model='fixture-account-model')).encode(),headers=form)
                 profile=h.command('model','list')[0]
                 require(h.http('/api/status')['readiness']=='ready','Web account profile unavailable')
                 with urlopen(endpoint+'/fixture/stats',timeout=10) as response:
@@ -1670,10 +1700,12 @@ def account_presentation(binary, browser_evidence, report):
                 detail = '/settings/models/' + profile['profile_id']
                 add_page = '/settings/models/new?provider=chatgpt'
                 require('Choose an account model' not in h.http(detail), 'add-model sign-in result appeared on existing model')
+                request=Request(endpoint+'/fixture/control',data=json.dumps(dict(models=['fixture-account-model','fixture-account-backup']+[f'fixture-extra-{index:02}' for index in range(12)])).encode(),headers={'Content-Type':'application/json'})
+                with urlopen(request,timeout=10) as response:require(response.status==200,'catalog fixture update failed')
                 h.browser(browser_evidence, 'account-reconnect')
                 pending_login()
-                resources = '/settings/setup'
-                require('Waiting for sign-in' in h.http(resources) and 'Waiting for sign-in' not in h.http(add_page),
+                resources = '/settings/models'
+                require('Waiting for sign-in' in h.http(resources),
                         'reconnect status was displayed outside the Resources account section')
                 for view, visible in ((resources, True), (detail, False), ('/settings/models/new', False)):
                     updates = h.http('/api/updates?' + urlencode(dict(view=view)))
@@ -1690,7 +1722,7 @@ def account_presentation(binary, browser_evidence, report):
 
                 reads_before = account_credential_reads()
                 h.stop();h.start()
-                require('Load models' in h.http(add_page), 'connected account needs an explicit catalog action')
+                require('Add another account' in h.http(add_page), 'account management has no explicit additional-account action')
                 for _ in range(2):
                     h.http(resources)
                     h.http('/api/status')
@@ -1698,13 +1730,19 @@ def account_presentation(binary, browser_evidence, report):
                         h.http('/api/updates?' + urlencode(dict(view=view)))
                 require(account_credential_reads() == reads_before,
                         'startup, page load or polling read the account credential')
-                catalog_page = h.http('/model/catalog', urlencode(dict(account=aid)).encode(), headers=form)
-                require('Add account model' in catalog_page and 'fixture-account-model' in catalog_page
+                catalog = h.http('/api/models')
+                require(any(item['label']=='fixture-account-model' for item in catalog['choices'])
                         and account_credential_reads() > reads_before,
-                        'explicit catalog load did not read credentials and render the picker')
+                        'composer catalog did not load authenticated models')
+                require(len(h.command('model','list'))==2,'catalog reads created extra profiles')
+                status=h.http('/api/status')
+                choice='account:'+aid+':fixture-account-model'
+                h.http('/model/choose',urlencode(dict(consent='yes',choice='account:'+aid+':hidden-model',config_version=status['config_version'])).encode(),headers={**form,'Accept':'application/json'},expected=422)
+                h.http('/model/choose',urlencode(dict(consent='yes',choice=choice,config_version=status['config_version']-1)).encode(),headers={**form,'Accept':'application/json'},expected=409)
+                require(h.http('/api/status')['active_model_profile_id']==profile['profile_id'],'rejected model selection changed active profile')
                 h.http('/auth/logout',urlencode(dict(account=aid)).encode(),headers=form)
                 require(h.command('model','accounts')[0]['status']=='logged_out','Web logout missed existing lifecycle')
-                require('Sign-in required' in h.http(resources), 'signed-out model does not show its blocked connection')
+                require('logged_out' in h.http(resources), 'signed-out account has no blocked status')
                 h.http('/auth/login', urlencode(dict(account=aid, return_to=resources)).encode(), headers=form)
                 _, reconnect_url = pending_login()
                 request = Request(endpoint+'/fixture/authorize', data=json.dumps(dict(url=reconnect_url)).encode(),
@@ -1715,9 +1753,9 @@ def account_presentation(binary, browser_evidence, report):
                     require(response.status == 200, 'OAuth reconnect callback rejected')
                 h.wait_state(lambda s: s.get('account_id') == aid and s['status'] == 'connected',
                              'Web account reconnect completes', lambda _: h.http('/api/auth'))
-                require('Test connection' not in h.http(resources) and 'Use model' in h.http(resources),
+                require('Test connection' not in h.http(resources) and 'Add account model' not in h.http(resources),
                         'account reconnect requires an unnecessary connection test')
-                restored_profile = h.command('model','list')[0]
+                restored_profile = next(item for item in h.command('model','list') if item['profile_id']==profile['profile_id'])
                 restore = dict(profile=profile['profile_id'], restore_current='yes',
                                profile_version=restored_profile['version'],
                                config_version=h.http('/api/status')['config_version'])
@@ -1727,7 +1765,7 @@ def account_presentation(binary, browser_evidence, report):
                 require(restored['readiness'] == 'ready' and restored['active_model_profile_id'] == profile['profile_id'],
                         'account selection did not restore the existing model')
                 restored_page = h.http(resources)
-                require('Current model' in restored_page and 'Test connection' not in restored_page and 'Use model' not in restored_page,
+                require('fixture-account-model' in h.http('/') and 'Test connection' not in restored_page and 'Use model' not in restored_page,
                         'restored model still exposes replaced actions')
                 # Price a real accepted response using the bundled catalog. Only
                 # the owned OAuth/Responses peer is substituted; no ledger or

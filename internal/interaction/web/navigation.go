@@ -13,14 +13,20 @@ import (
 
 func pageRoute(path string) (tab, view, title string) {
 	switch {
-	case path == "/settings/services/apps":
+	case path == "/settings/apps/service":
 		return "/settings", "app-service", "App connection service"
 	case path == "/settings/apps":
 		return "/settings", "apps", "Apps"
 	case path == "/":
 		return "/", "conversation", "Conversation"
+	case path == "/tasks/attention":
+		return "/tasks", "attention", "Needs your attention"
+	case path == "/tasks/configurations":
+		return "/tasks", "tasks", "Configurations"
 	case path == "/tasks" || path == "/progress":
-		return "/tasks", "tasks", "Tasks"
+		return "/tasks", "tasks", "Execution records"
+	case strings.HasPrefix(path, "/tasks/executions/") && pageLeaf(strings.TrimPrefix(path, "/tasks/executions/")):
+		return "/tasks", "execution", "Execution record"
 	case path == "/tasks/schedules/new" || strings.HasPrefix(path, "/tasks/schedules/automation:") && pageLeaf(strings.TrimPrefix(path, "/tasks/schedules/")):
 		return "/tasks", "schedule", "Schedule settings"
 	case strings.HasPrefix(path, "/tasks/") && task.ValidRef(strings.TrimPrefix(path, "/tasks/")):
@@ -32,11 +38,11 @@ func pageRoute(path string) (tab, view, title string) {
 	case path == "/settings/preferences":
 		return "/settings", "settings", "Preferences"
 	case path == "/settings/setup" || path == "/settings" || path == "/settings/models":
-		return "/settings", "settings", "Resources"
+		return "/settings", "settings", "Models"
 	case path == "/settings/notifications":
 		return "/settings", "settings", "Notifications"
 	case path == "/settings/models/new":
-		return "/settings", "settings", "Connect a model"
+		return "/settings", "settings", "Connect with an API key"
 	case strings.HasPrefix(path, "/settings/models/") && pageLeaf(strings.TrimPrefix(path, "/settings/models/")):
 		return "/settings", "settings", "Model details"
 	case path == "/developer/observability":
@@ -79,8 +85,10 @@ func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {
 func legacyPageRedirect(w http.ResponseWriter, r *http.Request) bool {
 	target := ""
 	switch r.URL.Path {
-	case "/settings", "/settings/models":
-		target = "/settings/setup"
+	case "/settings", "/settings/setup":
+		target = "/settings/models"
+	case "/settings/services/apps":
+		target = "/settings/apps/service"
 	case "/progress":
 		target = "/tasks"
 	case "/developer/context":
@@ -106,10 +114,19 @@ func legacyPageRedirect(w http.ResponseWriter, r *http.Request) bool {
 	if target == "" {
 		return false
 	}
+	if (r.URL.Path == "/settings/setup" || r.URL.Path == "/settings/services/apps" || r.URL.Path == "/settings") && r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
 	http.Redirect(w, r, target, http.StatusSeeOther)
 	return true
 }
 
 func pageLeaf(value string) bool {
 	return value != "" && len(value) <= 256 && !strings.ContainsAny(value, "/\\\r\n\x00")
+}
+
+// Task definitions and schedule editors belong to configuration; dispatched
+// rounds and the attention inbox retain the execution category.
+func taskConfigurationPage(path string) bool {
+	return path == "/tasks/configurations" || strings.HasPrefix(path, "/tasks/schedules/") || strings.HasPrefix(path, "/tasks/") && task.ValidRef(strings.TrimPrefix(path, "/tasks/"))
 }

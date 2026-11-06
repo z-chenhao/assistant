@@ -142,7 +142,7 @@ func TestWebFeedbackAttentionRendersExactEscapedSourceAndBoundSubmission(t *test
 		s.ServeHTTP(w, r)
 		return w
 	}
-	w := get("/tasks")
+	w := get("/tasks/attention")
 	for _, value := range []string{"Needs your attention", "Finished report", "Review result", "&lt;script&gt;revision A&lt;/script&gt;", "report &lt;script&gt;.txt"} {
 		if w.Code != 200 || !strings.Contains(w.Body.String(), value) {
 			t.Fatal(value, w.Code, w.Body.String())
@@ -164,7 +164,7 @@ func TestWebFeedbackAttentionRendersExactEscapedSourceAndBoundSubmission(t *test
 	if w.Code != 200 || f.last.Channel != "web" || f.last.Subject != Subject || f.last.Destination != Destination || f.answer != "Keep revision A" {
 		t.Fatal(w.Code, w.Body.String(), f.last)
 	}
-	if strings.Contains(get("/tasks").Body.String(), "feedback:one") {
+	if strings.Contains(get("/tasks/attention").Body.String(), "feedback:one") {
 		t.Fatal("answered review remains actionable")
 	}
 	core := s.Core.(attentionCore)

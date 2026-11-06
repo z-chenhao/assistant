@@ -1,0 +1,108 @@
+package web
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/llm/account"
+)
+
+type pickerModels struct {
+	Models
+	profiles []llm.Profile
+}
+
+func (m pickerModels) ListProfiles(context.Context) ([]llm.Profile, error) { return m.profiles, nil }
+
+type pickerAccounts struct {
+	account.Store
+	entries []llm.AuthConnection
+}
+
+func (p pickerAccounts) Accounts(context.Context) ([]llm.AuthConnection, error) {
+	if p.entries != nil {
+		return p.entries, nil
+	}
+	return []llm.AuthConnection{{ConnectionID: "owned", Status: "connected"}, {ConnectionID: "signed-out", Status: "logged_out"}}, nil
+}
+
+func TestComposerCatalogIsReadOnlyAndFiltersStaleAccountModels(t *testing.T) {
+	ctx := context.Background()
+	model := func(id, name string) llm.Profile {
+		return llm.Profile{ProfileID: id, ProfileInput: llm.ProfileInput{ProviderKind: "openai_account", AuthConnectionID: "owned", ModelID: name}}
+	}
+	s := Server{Core: settingsCore{}, Models: pickerModels{profiles: []llm.Profile{model("one", "first"), model("stale", "retired")}}, Accounts: &account.Manager{Store: pickerAccounts{}}}
+	reads := 0
+	s.AccountCatalog = func(_ context.Context, id string) ([]llm.CatalogModel, error) {
+		reads++
+		if id != "owned" {
+			t.Fatal("read disconnected account")
+		}
+		return []llm.CatalogModel{{ModelID: "first"}, {ModelID: "second"}}, nil
+	}
+	initial, err := s.modelChoices(ctx, false)
+	if err != nil || reads != 0 || len(initial.Choices) != 2 {
+		t.Fatal("page load fetched credentials", err, reads)
+	}
+	full, err := s.modelChoices(ctx, true)
+	if err != nil || reads != 1 || len(full.Choices) != 2 || full.Choices[0].Key != "account:owned:second" {
+		t.Fatal("available unsaved model missing or retired model retained", full, err)
+	}
+	// AddProfile is deliberately not implemented: a catalog GET must never write.
+	s.AccountCatalog = func(context.Context, string) ([]llm.CatalogModel, error) {
+		return nil, errors.New("private provider diagnostic")
+	}
+	fallback, err := s.modelChoices(ctx, true)
+	if err != nil || !fallback.Unavailable || len(fallback.Choices) != 2 {
+		t.Fatal("failed catalog lost local choices", fallback, err)
+	}
+}
+
+func TestComposerModelsSortDescendingWithoutAccountNames(t *testing.T) {
+	ctx := context.Background()
+	profiles := []llm.Profile{
+		{ProfileID: "lower", ProfileInput: llm.ProfileInput{ProviderKind: "openai_account", AuthConnectionID: "owned", ModelID: "gpt-5.6-luna", Name: "gpt-5.6-luna · Private account"}},
+		{ProfileID: "higher", ProfileInput: llm.ProfileInput{ProviderKind: "openai_account", AuthConnectionID: "owned", ModelID: "gpt-6-luna"}},
+	}
+	accounts := pickerAccounts{entries: []llm.AuthConnection{
+		{ConnectionID: "owned", Status: "connected", AuthInput: llm.AuthInput{AccountLabel: "Private account"}},
+		{ConnectionID: "another", Status: "connected", AuthInput: llm.AuthInput{AccountLabel: "Another private account"}},
+	}}
+	s := Server{Core: settingsCore{}, Models: pickerModels{profiles: profiles}, Accounts: &account.Manager{Store: accounts}}
+	reads := 0
+	s.AccountCatalog = func(_ context.Context, id string) ([]llm.CatalogModel, error) {
+		reads++
+		if id == "another" {
+			return []llm.CatalogModel{{ModelID: "gpt-6-luna"}}, nil
+		}
+		return []llm.CatalogModel{{ModelID: "gpt-5.6-luna"}, {ModelID: "gpt-6-luna"}}, nil
+	}
+	for _, catalog := range []bool{false, true} {
+		got, err := s.modelChoices(ctx, catalog)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"gpt-6-luna", "gpt-5.6-luna"}
+		if catalog {
+			want = []string{"gpt-6-luna", "gpt-6-luna", "gpt-5.6-luna"}
+		}
+		if len(got.Choices) != len(want) {
+			t.Fatal(got)
+		}
+		seen := map[string]bool{}
+		for i, choice := range got.Choices {
+			if choice.Label != want[i] || seen[choice.Key] {
+				t.Fatal("name order, label or account routing changed", got)
+			}
+			seen[choice.Key] = true
+		}
+		if got.Choices[0].Key != "account:owned:gpt-6-luna" {
+			t.Fatal("equal names lost stable account routing", got)
+		}
+		if !catalog && reads != 0 {
+			t.Fatal("initial picker read account credentials")
+		}
+	}
+}

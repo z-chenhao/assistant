@@ -34,7 +34,7 @@ func TestDefaultMemoryHasOneEnabledEntryAndPreferenceLayout(t *testing.T) {
 	}
 	response = capabilityRequest(s, "GET", "/settings/capabilities/memory", nil)
 	body = response.Body.String()
-	if !strings.Contains(body, `class="panel form-panel settings-group"`) || !strings.Contains(body, `<noscript>`) || !strings.Contains(body, `href="/settings/capabilities/embedding"`) || !strings.Contains(body, `data-capability-import`) || strings.Contains(body, "Successful candidate tests expire") {
+	if !strings.Contains(body, `class="panel form-panel settings-group"`) || !strings.Contains(body, `<noscript>`) || !strings.Contains(body, `href="/settings/capabilities/embedding"`) || strings.Contains(body, `data-capability-import`) || strings.Contains(body, "Successful candidate tests expire") {
 		t.Fatal(body)
 	}
 	v, _ := m.Detail(context.Background(), "memory")
@@ -199,33 +199,50 @@ func TestCapabilityGuidedServerStaleRevisionCannotSave(t *testing.T) {
 		t.Fatal("stale guided save changed file", stale.Code, stale.Body.String())
 	}
 }
-func TestCapabilityPagesHaveNativeGuidedFormsAndAdvancedFallback(t *testing.T) {
+func TestCapabilityPagesUseFieldsWithoutExposingConfigurationDocuments(t *testing.T) {
 	s, _, _ := capabilityFixture(t)
 	for _, id := range []string{"memory", "embedding", "mcp", "skills", "execution", "computer"} {
 		response := capabilityRequest(s, http.MethodGet, "/settings/capabilities/"+id, nil)
 		body := response.Body.String()
-		if response.Code != 200 || !strings.Contains(body, `class="capability-guided"`) || !strings.Contains(body, `name="editor" value="guided"`) || !strings.Contains(body, `id="capability-configuration"`) || strings.Index(body, `class="capability-guided"`) > strings.Index(body, `capability-advanced`) {
+		if response.Code != 200 || !strings.Contains(body, `class="capability-guided"`) || !strings.Contains(body, `name="editor" value="guided"`) || strings.Contains(body, `name="configuration"`) || strings.Contains(body, "YAML") || strings.Contains(body, "config.yaml") || strings.Contains(body, "Download example") {
 			t.Fatal(id, response.Code, body)
 		}
 	}
 }
 
-func TestCapabilityGuidedServerRetainsUnknownBaselineAndNativeRows(t *testing.T) {
+func TestCapabilityGuidedServerIgnoresPostedDocumentAndKeepsNativeRows(t *testing.T) {
 	s, m, root := capabilityFixture(t)
 	t.Setenv("STEWARD_GUIDED_UNKNOWN", strings.Repeat("u", 32))
 	v, _ := m.Detail(context.Background(), "memory")
 	values := url.Values{"editor": {"guided"}, "capability": {"memory"}, "revision": {v.Revision}, "configuration": {"encryption_key_ref: env:STEWARD_GUIDED_UNKNOWN\nunrepresented: true\n"}, "enabled": {"yes"}, "key_ref": {"env:STEWARD_GUIDED_UNKNOWN"}, "action": {"test"}}
-	rejected := capabilityRequest(s, "POST", "/capability/configure", values)
-	if rejected.Code != 409 || !strings.Contains(rejected.Body.String(), "unrepresented: true") {
-		t.Fatal("unknown advanced field silently dropped", rejected.Code, rejected.Body.String())
+	checked := capabilityRequest(s, "POST", "/capability/configure", values)
+	if checked.Code != 303 {
+		t.Fatal("guided form trusted the posted document", checked.Code, checked.Body.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "config.yaml")); !os.IsNotExist(err) {
-		t.Fatal("invalid settings written", err)
+		t.Fatal("test-only settings written", err)
 	}
 	values = url.Values{"editor": {"guided"}, "capability": {"mcp"}, "revision": {v.Revision}, "enabled": {"yes"}, "provider_count": {"1"}, "provider.0.original": {"-1"}, "provider.0.name": {"<img src=x onerror=alert(1)>"}, "provider.0.command": {"/private/mcp"}, "provider.0.directory": {"/private/state"}, "provider.0.args": {"argument with spaces"}, "provider.0.tool_count": {"1"}, "provider.0.tool.0.name": {"lookup"}, "provider.0.tool.0.permission": {"read_only"}, "action": {"add-provider"}}
 	added := capabilityRequest(s, "POST", "/capability/configure", values)
 	body := added.Body.String()
 	if added.Code != 200 || !strings.Contains(body, `name="provider_count" value="2"`) || !strings.Contains(body, "argument with spaces") || !strings.Contains(body, "&lt;img") || strings.Contains(body, "<img src=x") {
 		t.Fatal("native provider row action lost data or escaped content", added.Code, body)
+	}
+}
+
+func TestOrdinaryCapabilityPageDoesNotRebaseOntoFailedProbe(t *testing.T) {
+	s, m, _ := capabilityFixture(t)
+	v, _ := m.Detail(context.Background(), "memory")
+	failed, err := m.Test(context.Background(), "memory", v.Revision, "encryption_key_ref: env:STEWARD_MISSING_DRAFT_KEY\n")
+	if err != nil || failed.Verified {
+		t.Fatal("expected a failed probe", err)
+	}
+	candidate, err := m.Detail(context.Background(), "memory")
+	if err != nil || !candidate.Candidate {
+		t.Fatal("test did not create an independent candidate", err)
+	}
+	response := capabilityRequest(s, http.MethodGet, "/settings/capabilities/memory", nil)
+	if response.Code != 200 || strings.Contains(response.Body.String(), `value="env:STEWARD_MISSING_DRAFT_KEY"`) {
+		t.Fatal("saved settings were replaced by a failed candidate", response.Code)
 	}
 }

@@ -52,8 +52,8 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 			query.Set("provider", "chatgpt")
 			query.Set("account", r.FormValue("account"))
 		}
-	case "/model/test", "/model/select":
-		path = "/settings/setup"
+	case "/model/test", "/model/select", "/model/disconnect", "/model/reconnect":
+		path = "/settings/models"
 		query = resourceModelQuery(r.FormValue("profile"), "")
 	case "/notification":
 		path = "/settings/notifications"
@@ -134,6 +134,12 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 	}
 	if p.Settings != nil && p.Settings.Section == "new" {
 		p.Settings.Model = r.FormValue("model")
+		if r.FormValue("service") == "custom" {
+			p.Settings.Service = "custom"
+		}
+		if r.FormValue("wire_api") == "openai_responses" {
+			p.Settings.WireAPI = "openai_responses"
+		}
 		p.Settings.Name = r.FormValue("name")
 		if endpoint, err := url.Parse(r.FormValue("endpoint")); err == nil && endpoint.User == nil && endpoint.RawQuery == "" && endpoint.Fragment == "" {
 			p.Settings.Endpoint = endpoint.String()

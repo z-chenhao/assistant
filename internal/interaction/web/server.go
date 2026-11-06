@@ -72,6 +72,7 @@ type Models interface {
 	AddProfile(context.Context, llm.ProfileInput) (llm.Profile, error)
 }
 type Server struct {
+	modelMu         sync.Mutex
 	appLogos        appLogoCache
 	Apps            AppConnections
 	Computer        ComputerReader

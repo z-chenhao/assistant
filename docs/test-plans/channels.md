@@ -191,7 +191,7 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 
 沿用 `verify_channels.py` 和真实浏览器 action，不新增脚本或 CI gate：
 
-- 原生设置：模型来源 → 保存 → Verify → 明确授权 Select → Conversation；候选 probe 与活动状态分开；ChatGPT 登录、可见目录、重启和退出仍经真实 Manager/Bridge（外部 OAuth 为受控 peer）。通知保存后停留原页，重载仍选实际目的地。
+- 原生设置：模型来源 → 保存 → 选用时自动校验并明确授权 Select → Conversation；候选 probe 与活动状态分开；ChatGPT 登录、可见目录、重启和退出仍经真实 Manager/Bridge（外部 OAuth 为受控 peer）。通知保存后停留原页，重载仍选实际目的地。
 - 首次设置浏览器路径：在 Preferences 从中文切回英文，经 Chat 返回对话，确认英文保留且未就绪时无法发送，再通过 Set up Steward 连接、验证并显式选用模型。标题、提示密度、设置控件尺寸与登录步骤数量随界面改动在桌面和窄屏验收。
 - 原生输入：延迟脚本时编辑、选文件与打开 picker，增强后保持同一节点/文件；拒绝或丢失确认不自动重发并保留草稿和附件；任务上下文可移除而不丢输入。
 - Tasks：列表筛选、分页、详情目标/阶段、对应的冻结审批、已由 Main 交付的结果，以及带任务上下文回到 Main；不能用 Worker 结果替代 Main 交付。详情和 Conversation 保留同一审批 hash。
@@ -205,7 +205,7 @@ F-018/F-039：`foundation_test.go` 实际 HTTP listener 在 Main provider failur
 
 - 在没有模型且没有工作待办时，配置提示有可达入口，待办计数不包含配置项。已有工作待办在不同就绪状态下仍可见，系统操作按当前语言翻译，任务标题保留原文。
 - 检查 Preferences 与 Models 各有一个可见的页面标识，帮助可通过键盘访问。Chat 未就绪时保留一个清楚的设置入口。桌面与窄屏的视觉验收核对标题、输入区尺寸和提示密度。
-- 从 Chat 进入 Resources，直接看到模型状态和连接入口。连接、验证和选择模型期间均保持 Resources 标签选中。选择模型连接方式后在当前页显示对应配置。点击一次 ChatGPT 登录操作即发起授权，浏览器未打开时仍能手动继续。
+- 从 Chat 进入 Models，直接看到模型状态和连接入口。连接、验证和选择模型期间均保持 Models 标签选中。选择模型连接方式后在当前页显示对应配置。点击一次 ChatGPT 登录操作即发起授权，浏览器未打开时仍能手动继续。
 
 
 ## F-020 自建应用凭据与失效诊断
@@ -233,7 +233,7 @@ Chat / Worker：`workers_test.go` 验证认证与绑定撤销、只读字段和�
 
 ### 设置页视觉与控件回归
 
-channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 SecretStore 和 Chromium 验证分类搜索／空结果／Escape、两项语言下拉无搜索、紧凑尺寸、原生方向键／Enter、点击外部与 Escape 关闭、外观保存与刷新、默认 Memory 单入口、自动／自定义字段切换、390px 导航及无 JS 语言保存。输出偏好、下拉、通知、模型输入、能力和明暗／移动端截图。`account_presentation` 经原有真实 Manager/Bridge 和自有 OAuth fixture 验证账户退出确认：取消和 Escape 零 POST、取消焦点归还、确认一次 POST；原有凭据扫描与重启校验保留。
+channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 SecretStore 和 Chromium 验证五个设置分类直接可见且无导航搜索、两项语言下拉无搜索、紧凑尺寸、原生方向键／Enter、点击外部与 Escape 关闭、外观保存与刷新、默认 Memory 单入口、自动／自定义字段切换、390px 导航及无 JS 语言保存。输出偏好、下拉、通知、模型输入、能力和明暗／移动端截图。`account_presentation` 经原有真实 Manager/Bridge 和自有 OAuth fixture 验证账户退出确认：取消和 Escape 零 POST、取消焦点归还、确认一次 POST；原有凭据扫描与重启校验保留。
 
 
 两级导航回归复用 `default_capability_settings`：从 Chat 点击左下 Settings，断言一级入口次序／位置不变、二级栏位于一级与内容之间；切换 Dev → Database 复用同一二级栏，Tasks 不创建空分类；显式折叠后可原页展开。390px 抽屉同时保留两级选中态且不越界，Tab 在整个抽屉内循环，Escape 归还焦点；保留无 JS 表单验证。完整 channels gate 继续覆盖 Developer、数据库导航、320px 布局与聊天面板。
@@ -252,13 +252,21 @@ Settings 切页回归复用 `page_transitions`：真实点击 Preferences／Noti
 
 Chat 输入框焦点回归在真实浏览器中检查鼠标点击和 Tab 导航：容器不出现向外扩张的 outline，焦点仍通过既有边界的颜色／内侧描边呈现，明暗主题和窄屏一致。
 
-组件场景通过真实交付投影验证 Markdown 加粗、危险协议／HTML 拒绝、认证 artifact 字节与下载头、Mermaid 图像实际可解码、明暗 favicon 与固定 Computer/Worker 几何。page-transitions 检查 64px 折叠图标栏和脚本前后布局；主动阻塞主脚本时，导航按钮须保持禁用，释放后桌面／手机都必须首次点击即可切换并恢复；capability-setup 检查自动保存、失败草稿、YAML 导入／示例和原生无脚本提交。
+组件场景通过真实交付投影验证 Markdown 加粗、危险协议／HTML 拒绝、认证 artifact 字节与下载头、Mermaid 图像实际可解码、明暗 favicon 与固定 Computer/Worker 几何。page-transitions 检查 64px 折叠图标栏和脚本前后布局；主动阻塞主脚本时，导航按钮须保持禁用，释放后桌面／手机都必须首次点击即可切换并恢复；capability-setup 检查自动保存、失败草稿、六类字段与 MCP 权限、无配置文档暴露、原生无脚本提交及明暗／窄屏几何。
 
 `send-feedback` 使用实际 HTTP/Actor，分别阻塞发送、丢失已提交回执和拒绝请求，检查立即出泡、输入区释放、附件／后续草稿保留、重试复用来源键和权威消息去重；明暗白字对比度与移动布局一并测量。rich-replies 检查原生 UI 在前、最终文字独立气泡，以及原表单身份、重试、重启和无脚本路线。`TestInboundAdmissionDoesNotWaitForCredentialIO` 检查接纳不读取模型凭据，执行就绪仍须认证；`TestMainUIWidgetUsesCodeModeAndDurableReply` 检查分组不修改冻结投影。
 
 全局组件回归使用可见 Base UI 控件选择，直接读取原生字段验证提交值。覆盖 Settings 语言搜索/键盘/取消/单次保存、主题立即应用、Task 依赖字段与显式保存、Dev 筛选和富组件弹窗内的选择器/菜单；无脚本与初始化失败继续操作原生表单。保持原有字体、导航和布局几何检查，不依赖组件库生成的内部 ID。
 
 富组件交互 gate 用实际 Main 交付的 14 项表单选项验证原生 Combobox 搜索、空结果和弹窗内选择；短列表与语言选择保持原生 Select，无额外搜索区域。
+
+Settings 行布局回归检查通知标签与控件同行、尾部命令右对齐及同级宽度一致，覆盖桌面／窄屏与深浅主题。输入框鼠标和键盘聚焦不得产生内外双框。Apps 目录与详情保持原布局。账户场景验证首次 Web 登录即就绪、目录读取不创建配置、隐藏模型与陈旧配置版本拒绝、切换保留草稿附件、无脚本回退和退出权限。
+
+Apps 协议回归覆盖无托管 OAuth 且未配置的具体提示、自定义 OAuth 的正常连接、元数据缺省及受限 API Key 无配置读取权限时保留链接流程；失败不创建本地连接、不泄露凭据。
+
+通知目的地选择后自动保存，携带版本并更新确认版本；冲突／写入结果未知不自动重发，刷新读取实际状态。无脚本保留原生提交。Preferences 同组短值选择器等宽，Models 按 Models 归组两类模型连接，App service 使用键值行和右对齐同宽操作；Apps 目录布局不变。相关回归由 settings_test、channels_preferences 和 page-transitions 覆盖。
+
+Models 为 Settings 的独立分类，包含「Sign in with an account」和「Connect with an API key」。账户目录自动进入聊天模型选择器；API 连接使用现有私有文件 SecretStore，凭据与首个模型元数据一次事务保存，失败清理新文件。连接后自动验证；首次无当前模型自动选用，后续连接不覆盖选择。连接操作复用共享菜单和原生表单，断开采用模型及凭据双版本确认并撤销后续使用，保留历史冻结配置。Apps 工具栏 App settings 进入服务配置；原 Models/Resources 服务入口移除，旧 setup 与 services/apps 深链接保留重定向。浏览器回归覆盖实际 HTTP provider 的 API key、聊天模型切换、断开及明暗／窄屏布局。
 
 确定性浏览器 fixture 不继承宿主的 Composio 部署凭据，避免未配置目录场景访问真实服务；显式协议 peer 测试自行配置。原生弹窗关闭后的焦点恢复在 close 事件完成后断言，不能用立即采样代替状态等待。
 

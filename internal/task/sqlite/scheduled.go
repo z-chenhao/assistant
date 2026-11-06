@@ -13,7 +13,7 @@ func (r *Reader) Scheduled(ctx context.Context, query string) ([]task.ScheduledW
 	if len(query) > 300 {
 		return nil, task.ErrInvalid
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT a.automation_id,coalesce(t.task_ref,''),a.instruction,a.trigger_type,a.trigger_spec,a.timezone,a.version,a.enabled,a.next_fire_at,a.below_value,
+	rows, err := r.db.QueryContext(ctx, `SELECT a.automation_id,coalesce(t.task_ref,''),a.instruction,a.trigger_type,a.trigger_spec,a.timezone,a.version,a.enabled,a.next_fire_at,a.below_value,a.created_at,a.updated_at,
  a.intent_privacy_epoch=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=a.agent_id),0)
  FROM automation a LEFT JOIN task t ON t.task_id=a.task_id AND t.agent_id=a.agent_id
  WHERE a.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1)
@@ -38,11 +38,14 @@ func scanScheduled(row scanner) (task.ScheduledWork, error) {
 	var v task.ScheduledWork
 	var next, below sql.NullInt64
 	var visible bool
-	if err := row.Scan(&v.Ref, &v.TaskRef, &v.Instruction, &v.Type, &v.Spec, &v.Timezone, &v.Version, &v.Enabled, &next, &below, &visible); err != nil {
+	var created, updated int64
+	if err := row.Scan(&v.Ref, &v.TaskRef, &v.Instruction, &v.Type, &v.Spec, &v.Timezone, &v.Version, &v.Enabled, &next, &below, &created, &updated, &visible); err != nil {
 		return v, err
 	}
+	v.CreatedAt = stamp(created)
+	v.UpdatedAt = stamp(updated)
 	if !visible {
-		v.Schedule = task.Schedule{Ref: v.Ref, Version: v.Version, Enabled: v.Enabled, Restricted: true}
+		v.Schedule = task.Schedule{Ref: v.Ref, Version: v.Version, Enabled: v.Enabled, Restricted: true, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt}
 	} else {
 		if next.Valid {
 			v.NextAt = stamp(next.Int64)
@@ -61,7 +64,7 @@ func (r *Reader) ScheduledDetail(ctx context.Context, ref string) (task.Schedule
 	if len(ref) > 256 {
 		return task.ScheduledWork{}, task.ErrInvalid
 	}
-	v, err := scanScheduled(r.db.QueryRowContext(ctx, `SELECT a.automation_id,coalesce(t.task_ref,''),a.instruction,a.trigger_type,a.trigger_spec,a.timezone,a.version,a.enabled,a.next_fire_at,a.below_value,
+	v, err := scanScheduled(r.db.QueryRowContext(ctx, `SELECT a.automation_id,coalesce(t.task_ref,''),a.instruction,a.trigger_type,a.trigger_spec,a.timezone,a.version,a.enabled,a.next_fire_at,a.below_value,a.created_at,a.updated_at,
  a.intent_privacy_epoch=coalesce((SELECT epoch FROM memory_privacy WHERE agent_id=a.agent_id),0)
  FROM automation a LEFT JOIN task t ON t.task_id=a.task_id AND t.agent_id=a.agent_id
  WHERE a.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND a.automation_id=?`, ref))

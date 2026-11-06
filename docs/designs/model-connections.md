@@ -55,7 +55,7 @@ flowchart TD
 
 #### 5.1 首次启动设置流程
 
-TUI 首次启动展示 Setup Wizard。Web 首次设置时保留 Chat 和 Settings 导航，禁止发送，Set up Steward 进入 Resources。模型按共享账户或直连来源分组。模型行默认收起，展开可查看连接标识。连接位置在测试操作和验证状态之间切换，选用位置在切换操作和当前模型标记之间切换。从候选模型行尾确认切换时，Host 复用有效 Probe，缺少有效结果时先验证，随后按原模型版本和配置版本提交。当前模型的连接操作可在验证后恢复既有选用，提交时校验模型和配置版本。有效 Probe 可直接用于恢复。旧模型详情链接打开 Resources 中对应的行。账户操作从分组标题展开。资源视图复用已保存配置、账户状态和已有验证结果。页面加载、状态轮询和启动检查只读取这些信息。连接账户、主动加载模型目录、验证模型和实际执行时按需访问凭据。两条模型连接路径为：
+TUI 首次启动展示 Setup Wizard。Web 首次设置时保留 Chat 和 Settings 导航，禁止发送，Set up Steward 进入 Models。该页按 Accounts 和 API connections 管理连接，模型选择归 Chat 输入区。目录 GET 不写配置；显式选择时才物化账户模型并沿 Control 的目录激活或 SelectWithProbe 路径提交模型／账户／配置版本。旧模型详情链接打开 Models 中对应连接。页面加载、轮询和启动检查只读配置与账户元数据；连接、主动目录加载、验证及实际执行时按需访问凭据。两条模型连接路径为：
 
 ```text
 Choose model connection
@@ -179,7 +179,7 @@ auth_connection_id: null
 第二条路径采用 Pi 当前 OpenAI Provider 的 “Sign in with ChatGPT” 语义，而不是 legacy `openai-codex` Provider：
 
 - Setup Wizard 启动带 PKCE S256、state 和 OIDC nonce 的浏览器登录；Loopback Callback 只监听 `127.0.0.1` 的随机端口，state 单次使用并带短时过期，回调内容不得进入 access log。以 OpenAI JWKS 验证 ID Token 签名、issuer、issued-client audience、期限和 nonce；重新登录必须匹配所选账号身份。Device Authorization 保留为明确的后续需求，待当前官方 Provider 的受支持协议确认后实现；不包含在当前浏览器登录的完成范围内，不得记为已交付或已测试（见[账户认证设计](#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow)）。
-- 登录中和失败反馈归发起页面。新增模型与 Resources 中的账户重连分别呈现各自的状态，直接打开授权窗口时隐藏继续登录链接，窗口被拦截时保留手动入口；原生页面和实时片段应用同一规则。
+- 登录中和失败反馈归发起页面。新增模型与 Models 中的账户重连分别呈现各自的状态，直接打开授权窗口时隐藏继续登录链接，窗口被拦截时保留手动入口；原生页面和实时片段应用同一规则。
 - 默认文件后端只保存 ChatGPT OAuth 凭据。数据根下的 `account-secrets/` 目录使用 `0700`，单账户文件使用 `0600`，轮换时在同一目录写入并同步后原子替换。项目备份只包含白名单中的数据库和产物，凭据目录不进入归档。文件权限控制访问，文件内容没有单独加密。
 - 登录完成后创建 `AuthConnection{provider: openai, auth_kind: chatgpt_oauth}`，刷新凭据进入 SecretStore；`state.db` 只保存 credential ref、账号/Workspace 的脱敏显示信息、过期状态和版本。
 - `AuthConnection.status = connected | refreshing | reauth_required | logged_out`。状态迁移由 Auth 层持久化；模型和 Run 只引用 Connection ID，不能读取 CredentialRef。
@@ -543,3 +543,15 @@ account checks alone do not establish release readiness.
 所有长期凭据采用同一文件机制与权限约束；显式 env 引用仍由同一入口解析，不隐式读取用户主目录的凭据。MCP 当前没有认证配置与凭据存储接口，其受限子进程不继承宿主认证环境。会话 cookie、OAuth PKCE/nonce 等只在对应会话内有效的随机材料保持内存生命周期，不另存磁盘。公开 host-key 指纹、哈希与签名校验公钥不属于私有凭据。
 
 系统后端与配置开关已移除。旧配置中的 account_secret_store 须删除；已有系统账户重新连接以恢复文件凭据，已有加密 Memory 必须保留原密钥。没有隐式读取系统钥匙串、创建新密钥覆盖既有数据或把凭据写入 YAML 的迁移旁路。
+
+Web 模型选择使用私有 composer_models 投影，读目录不写配置；显式选择时才物化所选账户模型并调用 Control。已有运行的冻结 profile、账户版本和配置保持不变。首个账户模型是 Web 默认策略，不改变 CLI 的显式配置契约；没有新数据库迁移或账户批量同步任务。
+
+Web 的所有模型连接（包括 Local/API）不提供独立 Test connection。首次连接和聊天模型切换复用服务端 Control 校验，并保留版本、授权及失败恢复；旧 POST 路由仅兼容已有调用，不再由页面引导。
+
+Models 为 Settings 的独立分类，包含「Sign in with an account」和「Connect with an API key」。账户目录自动进入聊天模型选择器；API 连接使用现有私有文件 SecretStore，凭据与首个模型元数据一次事务保存，失败清理新文件。连接后自动验证；首次无当前模型自动选用，后续连接不覆盖选择。连接操作复用共享菜单和原生表单，断开采用模型及凭据双版本确认并撤销后续使用，保留历史冻结配置。Apps 工具栏 App settings 进入服务配置；原 Models/Resources 服务入口移除，旧 setup 与 services/apps 深链接保留重定向。浏览器回归覆盖实际 HTTP provider 的 API key、聊天模型切换、断开及明暗／窄屏布局。
+
+此变更的当前消费者为 Web Models 与既有 CLI/TUI 模型控制面。复用机制是 Profile、AuthConnection、SecretStore、SelectWithProbe 和 CAS；连接入口、默认 Provider 以及 Advanced 的字段分组属于 Web 产品策略。原子 metadata 写入、未知写入不重试、鉴权版本和断开后保留历史属于生命周期要求。新增 AddKeyProfile/DisconnectKeyProfile 是仓库内的窄持久化操作，不是公开插件协议；不引入通用 provider 注册平台、自动发现承诺或新身份体系。未采用「先落凭据 metadata，再单独建模型」以避免失败后的孤立记录；保留兼容 URL，页面不暴露凭据引用或数据库模型。
+
+Models 将账户与 API 连接分组；账户入口先呈现实际支持的 ChatGPT 提供方，明确确认后才发起授权，重连绑定已有连接 ID，添加其他账户是独立操作。等待状态与取消保持配置行，完成后刷新账户投影。不能仅凭相似名称合并不同注册身份，现有账户记录不自动删除。协议、凭据生命周期、当前模型和冻结快照不改变。浏览器回归断言进入提供方页不发送 auth/login，并保留 API 连接、原生路径、明暗和窄屏验证。Apps 服务高级授权配置使用应用标识／配置 ID 行，删除 JSON 编辑框；显式验证保存和版本检查保留，目录布局不变。
+
+聊天模型选择器按可见模型名降序排列，账户模型不附带账户名称；同名模型保持独立账户键和稳定顺序。原生首屏、目录刷新和切换响应共用排序投影，保持当前模型与草稿。`composer_models_test.go` 验证多账户、已保存／未保存目录模型、稳定同名路由、无账户名和只读首屏。

@@ -10,7 +10,9 @@ const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),l
 const replyFrame=z.object({key:z.string().regex(/^[a-f0-9]{32}$/),state:z.enum(['draft','discarded','committed']),text:z.string().optional(),reset:z.boolean().optional()});
 function viewRegions(view:string):string[]|null {
  if(view==='/')return ['workspace-status','conversation-attention','conversation-messages','conversation-approvals'];
- if(view==='/tasks')return ['workspace-status','tasks-attention','ongoing-work'];
+ if(view==='/tasks/attention')return ['workspace-status','tasks-attention'];
+ if(view==='/tasks'||view==='/tasks/configurations')return ['workspace-status','ongoing-work'];
+ if(view.startsWith('/tasks/executions/'))return null;
  if(view.startsWith('/tasks/'))return ['workspace-status','task-header','task-feedback','task-progress','task-decisions','task-messages','task-milestones'];
  if(view.startsWith('/settings/'))return ['workspace-status','signin-status'];
  return null;
@@ -183,7 +185,7 @@ export function startLiveUpdates(){
   const timeout=setTimeout(()=>controller.abort(),10000);
   try{
    const query=new URLSearchParams({view});if(before)query.set('before',String(before));
-   if(view==='/tasks'||view.startsWith('/tasks/')){const pageQuery=new URLSearchParams(location.search);for(const key of ['q','cursor','history','feedback_before']){const value=pageQuery.get(key);if(value)query.set(key,value)}const taskView=pageQuery.get('view');if(taskView)query.set('task_view',taskView)}
+   if(view==='/tasks'||view.startsWith('/tasks/')){const pageQuery=new URLSearchParams(location.search);for(const key of ['q','cursor','history','feedback_before','needs_me']){const value=pageQuery.get(key);if(value)query.set(key,value)}const taskView=pageQuery.get('view');if(taskView)query.set('task_view',taskView)}
    const response=await fetch('/api/updates?'+query,{credentials:'same-origin',cache:'no-store',signal:controller.signal,headers:etag?{'If-None-Match':etag}:{}});
    if(current!==generation)return;
    if(response.status===401||response.status===403){accessLost();return}
@@ -206,7 +208,7 @@ export function startLiveUpdates(){
    if(hasReply(draftKey)||committing&&deferMessages&&!follow)clearDraft();
    const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
    const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;
-   if(send&&form&&!form.dataset.submitting&&readiness)send.disabled=readiness!=='true';
+   if(send&&form&&!form.dataset.submitting&&readiness)send.disabled=!!form.dataset.modelSelecting||readiness!=='true';
    delete document.body.dataset.waitingReply;
 
    if(view==='/'&&(follow||bottom&&before===0))finishFollow();

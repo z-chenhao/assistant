@@ -144,3 +144,7 @@
 .shared-action-menu [role=menuitem][data-disabled]{opacity:.45;cursor:default}
 @container (min-width:480px){.native-input-form>fieldset{grid-template-columns:1fr 1fr}.native-form-field[data-type=date],.native-form-field[data-type=number]{grid-column:auto}.native-input-form button[type=submit]{grid-column:1/-1}}
 @media(max-width:760px){.answer-button,.shared-action-menu [role=menuitem]{min-height:44px}.native-input-form{padding:14px}.native-carousel-heading{min-height:44px;padding-inline-end:54px}.native-carousel-heading .native-carousel-controls{min-height:44px}.native-form-choice{min-height:44px}.answer-surface[data-mode=inline]:has(>.native-input-form)>.answer-toolbar{top:6px;right:8px}.answer-surface[data-mode=inline]:has(>.answer-table)>.answer-toolbar{top:0}}
+
+/* Wide answer content scrolls locally without persistent scrollbar chrome. */
+.answer-table-scroll,.native-carousel-list{scrollbar-width:none;overscroll-behavior-x:contain}
+.answer-table-scroll::-webkit-scrollbar,.native-carousel-list::-webkit-scrollbar{display:none}

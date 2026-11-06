@@ -238,3 +238,17 @@ func TestAppendWaitsForOldTreeAndNeverRevivesRoot(t *testing.T) {
 		t.Fatal("invalid stop transition")
 	}
 }
+
+func TestTaskTitleIsSeparateFromTheWorkerBrief(t *testing.T) {
+	for _, raw := range []string{`{"operation":"create","title":"Compare products","task":"Full constraints and completion criteria"}`, `{"operation":"create","task":"Legacy self-contained brief"}`} {
+		r, err := ParseManage(raw)
+		if err != nil || !tool.Validate(ManageSchema, raw) || r.Task == "" {
+			t.Fatal("title contract rejected", r, err)
+		}
+	}
+	for _, raw := range []string{`{"operation":"create","title":" ","task":"Brief"}`, `{"operation":"create","title":null,"task":"Brief"}`, `{"operation":"create","title":"` + strings.Repeat("字", 81) + `","task":"Brief"}`, `{"operation":"append","title":"New label","taskRef":"task:one","instruction":"Act"}`} {
+		if _, err := ParseManage(raw); err == nil {
+			t.Fatal("invalid title accepted", raw)
+		}
+	}
+}

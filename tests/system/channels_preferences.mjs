@@ -229,21 +229,17 @@ export async function preferences(page,context,browser,url,evidence){
  await trigger(page).click();const flipped=await popupBounds(page),control=await trigger(page).boundingBox();
  if(flipped.y+flipped.height>control.y+1)throw Error('popup did not flip above near viewport bottom');
  await page.setViewportSize({width:320,height:600});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await popupBounds(page);await page.keyboard.press('Escape');
- for(const section of ['setup','notifications','capabilities']){
+ for(const section of ['models','notifications','capabilities']){
   await page.goto(url+'/settings/'+section);
   await check(page.locator('.settings-navigation [aria-current=page]').getAttribute('href').then(v=>v==='/settings/'+section),'neighbor selection lost');
   await check(page.locator('[data-language-preference]').count().then(v=>v===0),'preference leaked to neighbor');
   if(section==='notifications'){
-   const save=async()=>{
-    const button=page.getByRole('button',{name:'Save notification channel',exact:true});
-    const action=await button.evaluate(node=>node.form.action);
-    await Promise.all([page.waitForResponse(response=>response.url()===action&&response.request().method()==='POST'),button.click()]);
-    await page.waitForURL(u=>u.pathname==='/settings/notifications'&&u.searchParams.get('notice')==='saved');
-    await page.waitForLoadState();
-   };
-   await selectValue(page,page.locator('select[name=target]'),'tui:');await save();await page.reload();
-   await check(page.locator('select[name=target]').inputValue().then(v=>v==='tui:'),'neighbor submit guard regressed');
-   await selectValue(page,page.locator('select[name=target]'),'auto:');await save();
+   if(await page.getByRole('button',{name:'Save notification channel',exact:true}).isVisible())throw Error('notification autosave exposes Save');
+   for(const value of ['tui:','auto:']){
+    await Promise.all([page.waitForResponse(response=>response.url().endsWith('/notification')&&response.request().method()==='POST'&&response.status()===200),selectValue(page,page.locator('select[name=target]'),value)]);
+    await page.waitForFunction(()=>document.querySelector('[data-notification-feedback]').hidden);
+    await page.reload();await check(page.locator('select[name=target]').inputValue().then(v=>v===value),'notification autosave did not persist');
+   }
   }
  }
  await writeFile(evidence+'/preferences-browser.json',JSON.stringify({matrix,hoverPaths,keyboard:true,touch:true,autosave:true,singleFlight:true,rejectedRetry:true,unknownAppliedReadback:true,network:true,timeout:true,authRejection:true,mismatchedAck:true,blockedCookieReadback:true,bfcache:true,fallbacks:true,flipped:true,cssZoom:2,neighborSections:true},null,2));

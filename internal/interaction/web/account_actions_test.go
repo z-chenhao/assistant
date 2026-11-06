@@ -71,3 +71,12 @@ func TestAccountStoreFailureExplainsRepairWithoutExposingBackendDetails(t *testi
 		t.Fatal("new authentication failure retained an unrelated credential error")
 	}
 }
+
+func TestUnsupportedAccountProviderDoesNotStartAuthorization(t *testing.T) {
+	s := &Server{}
+	r := httptest.NewRequest("POST", "/auth/login", strings.NewReader("provider=unsupported"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := s.startLogin(r); err == nil || s.auth.Status == "pending" {
+		t.Fatal("unsupported provider started authorization", err)
+	}
+}

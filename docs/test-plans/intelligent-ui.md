@@ -99,3 +99,5 @@ python3 tests/system/verify_ui_interactions.py --binary bin/steward --evidence e
 - `verify_intelligent_ui.py`：真实 HTTP 模型输出停在未闭合 JSON/HTML，再由 Chromium 验证首行与静态 HTML 已显示；Code Mode 实际完成嵌套 UI 暂存而最后文字尚未产生时同样可见。检查 inert、scriptless sandbox、生成脚本未执行、刷新重连、正式交付后不重复预览且脚本才启用；保留两条链路明暗主题与桌面/手机截图，随后 kill/restart 核对产物未再生成。
 
 这些回归通过现有 PR CI 的 Go 软件分片、`startup-ui` 中的 `intelligent-ui` / `ui-interactions` 系统门禁，以及 `capabilities-race` 中的 Agent、SQLite、Web、Bridge 定向并发检查执行。`tests/harness/test_ci.py` 验证这些入口及浏览器依赖仍在必需分片中；保留原 `Ubuntu checks` 汇总，不新增执行状态机或独立测试平台。真实模型的参数输出顺序、组件选择和视觉质量仍需另行评测。
+
+verify_ui_interactions 的超宽沙箱夹具在桌面及 390px 视口验证：内容宽于组件、ArrowRight 实际滚动、最右侧标记可达、滚动条隐藏、外层页面无横向溢出；同时保留导出、模式切换及持久状态回归。

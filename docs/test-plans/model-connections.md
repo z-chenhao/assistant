@@ -31,7 +31,7 @@
 | [tests/system/verify_account.py](../../tests/system/verify_account.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
 - **F-002 文件覆盖**：测试验证目录和文件权限、重新打开、轮换、删除和拒绝符号链接。
-- **Web 登录未回调**：`verify_channels.py` 的 `account_presentation` 用浏览器验证单击直达受控授权页。自动打开后只显示一行等待状态和取消操作，弹窗被拦截时显示手动入口。未发送回调时验证页面可取消、没有写入账号、工作区仍需设置，随后重新发起并以受控 OAuth peer 完成授权与模型验证和选择。现有 `channels` CI 门禁还验证 Resources 默认收起模型，可展开连接标识，测试和切换完成后原位替换为对应状态。重新授权后测试可恢复既有当前模型。受控 SecretStore 验证重启、页面加载和轮询期间无模型凭据读取，显式加载模型目录时才读取。无有效 Probe 时先验证，已有 Probe 时可直接切换，账户模型按账户分组，重连与取消回到 Resources，登录状态只显示在发起页面。
+- **Web 登录未回调**：`verify_channels.py` 的 `account_presentation` 用浏览器验证单击直达受控授权页。自动打开后只显示一行等待状态和取消操作，弹窗被拦截时显示手动入口。未发送回调时验证页面可取消、没有写入账号、工作区仍需设置，随后重新发起并以受控 OAuth peer 完成授权与模型验证和选择。现有 `channels` CI 门禁还验证 Models 默认收起模型，可展开连接标识，选用时自动校验，完成后原位显示当前模型，不出现独立测试入口。重新授权后恢复既有当前模型。受控 SecretStore 验证重启、页面加载和轮询期间无模型凭据读取，显式加载模型目录时才读取。无有效 Probe 时先验证，已有 Probe 时可直接切换，账户模型按账户分组，重连与取消回到 Models，登录状态只显示在发起页面。
 - **Google 登录 Live 验收**：用获准的测试账号从 Web 的 Connect a model 发起 ChatGPT 登录，选择 Google，验证授权页正常完成、返回 Steward 后可选择模型。若授权页报错且重试无效，记录阶段、时间、公开错误文案以及本地状态，并确认可回到 Steward 取消和重新发起。证据只保留脱敏内容。
 
 ## 详细测试入口与证明边界
@@ -99,3 +99,13 @@ transport and do not change production endpoints.
 `TestExplicitCloudEndpointsArePreserved` 验证 Bedrock、Vertex 和 Azure 的显式 HTTPS/HTTP 端点不会被区域或环境变量替换；默认端点仍按区域或 Azure 环境配置解析。
 
 账户目录选用回归：`TestAccountCatalogSelectionNeedsNoProbeAndFencesChanges` 验证目录选用不生成 Probe、保留 128,000 输出与图片能力，以及目录缺失、认证版本变化、配置竞争、事件写入失败均不部分激活；退出后不可用。`TestAccountCatalogUsesModelLimitsAndImageCapabilities` 验证缺失元数据补充自 Pi 聊天目录、明确服务端字段优先、隐藏模型不可选。自定义端点原有 Probe／取消／冻结测试继续运行。Schema 44 只更新激活触发器，已有历史迁移与新库门禁继续覆盖。
+
+Web account-auth 场景覆盖首次登录自动激活且无测试推理、全部可用模型出现在输入区、读取目录无配置写入、隐藏模型与旧配置版本拒绝、草稿附件保留、账户重连／退出与原生表单路径。账户授权、密钥不写入普通证据。
+
+Web 的所有模型连接（包括 Local/API）不提供独立 Test connection。首次连接和聊天模型切换复用服务端 Control 校验，并保留版本、授权及失败恢复；旧 POST 路由仅兼容已有调用，不再由页面引导。
+
+Models 为 Settings 的独立分类，包含「Sign in with an account」和「Connect with an API key」。账户目录自动进入聊天模型选择器；API 连接使用现有私有文件 SecretStore，凭据与首个模型元数据一次事务保存，失败清理新文件。连接后自动验证；首次无当前模型自动选用，后续连接不覆盖选择。连接操作复用共享菜单和原生表单，断开采用模型及凭据双版本确认并撤销后续使用，保留历史冻结配置。Apps 工具栏 App settings 进入服务配置；原 Models/Resources 服务入口移除，旧 setup 与 services/apps 深链接保留重定向。浏览器回归覆盖实际 HTTP provider 的 API key、聊天模型切换、断开及明暗／窄屏布局。
+
+Models 将账户与 API 连接分组；账户入口先呈现实际支持的 ChatGPT 提供方，明确确认后才发起授权，重连绑定已有连接 ID，添加其他账户是独立操作。等待状态与取消保持配置行，完成后刷新账户投影。不能仅凭相似名称合并不同注册身份，现有账户记录不自动删除。协议、凭据生命周期、当前模型和冻结快照不改变。浏览器回归断言进入提供方页不发送 auth/login，并保留 API 连接、原生路径、明暗和窄屏验证。Apps 服务高级授权配置使用应用标识／配置 ID 行，删除 JSON 编辑框；显式验证保存和版本检查保留，目录布局不变。
+
+聊天模型选择器按可见模型名降序排列，账户模型不附带账户名称；同名模型保持独立账户键和稳定顺序。原生首屏、目录刷新和切换响应共用排序投影，保持当前模型与草稿。`composer_models_test.go` 验证多账户、已保存／未保存目录模型、稳定同名路由、无账户名和只读首屏。
