@@ -8,8 +8,6 @@
   <img src="internal/interaction/web/assets/brand/ghost-charcoal.png" alt="Ghost, the Steward assistant" width="160" height="160">
 </picture>
 
-**Your personal AI steward.**
-
 Steward is a local personal agent with terminal and Web interfaces. Its assistant,
 Ghost, can answer questions, use tools and work on delegated tasks. You can inspect
 progress, approve consequential actions and follow work across process restarts.
