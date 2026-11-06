@@ -40,7 +40,7 @@
 | [internal/agent/child_test.go](../../internal/agent/child_test.go) | Main Conversation 导航不进入 Worker/Child 的冻结工作面；旧 catalog Select 不自动追加新工具由 evidence 存储回归验证 |
 | [internal/llm/fake/context_test.go](../../internal/llm/fake/context_test.go) | 确定性 Delegate fixture 消费摘要保留的已接纳回执与 Host Task update，再次摘要仍保留进度；旧摘要位于新显式输入之前时不抑制新请求，仅验证测试协议而不代表模型语义质量 |
 
-- **F-009 剩余覆盖**：补语义去重、冲突识别和过时信息维护；保留证据与隐私边界，不将模型推测直接升级为事实。
+- **F-009 质量边界**：结构化模型提炼已接入；真实模型的语义归一、遗漏和误提取质量需要持续外部评测，不能用 Fake 结果替代模型效果。
 - **F-010 剩余覆盖**：Main 的 Memory 精读/解密和 GitHub 导航、替代谱系及其他外部来源尚待接通。实际模型自主导航路径的质量需外部效果评测。
 - **F-011 剩余覆盖**：用外部模型评测验证长对话中的目标、约束、决策和待办保留质量；软件测试只证明上下文选择、冻结、隔离与恢复。
 
@@ -135,3 +135,40 @@ F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统
 这些用例不评价真实模型总结质量。现有取消、Forget、审批、Worker 树和 legacy 请求恢复测试继续适用。
 
 `TestAutomaticMemoryUsesPrivateFilesAcrossStartup` 使用生产应用组装连续启动并核对同一文件密钥；删除已发布密钥后，启动仍可返回但 Memory 显示 unavailable 且不重新生成。`TestFilesKeepsMemoryKeyAcrossReopen` 以重开的文件后端解密真实 Vault 密文并检查目录和文件权限；路径穿越、符号／硬链接及宽权限回归拒绝不安全读取。原账户文件刷新和退出回归继续保护既有 OAuth 路径。
+
+## 语义提炼、归并与召回回归（2026-11-06）
+
+- `internal/memory/semantic_test.go`：一次性任务/UI 报错不成为候选；精确引用、当前 ref、facet/类别/操作和用户作者校验。
+- `internal/memory/sqlite/semantic_test.go`：跨语言同义事实归并、独立来源晋升、纠正 successor、撤回、过期、Core 老化、类别遗忘/恢复、来源 suppression、退役审计、超期 facet 更新和幂等。
+- `internal/agent/sqlite/memory_generation_test.go`：真实 state/memory 库、模型冻结及用量接纳事务；密封后台生成、跨库提交后重放不重调模型、无用户 Task/Run/交付、无效候选隔离、Forget 先于接纳/派发的竞态。
+- `internal/agent/sqlite/recall_test.go` 与 `recall_query_test.go`：此前真实证据按轮冻结，当前输入及其派生内容被排除；Task 原始来源查询、已接受后续输入排除。
+- `internal/recall/relevance_test.go`、`recall_test.go`：Grokbot 主题不匹配无关 UI 反馈，中文相关性，provenance/ref/内容去重，跳过过大 Memory 时仍能选中原始来源，私有分数不序列化。
+- state 46/47→48、memory 2→3 及旧版本升级保留原始 Conversation、Task、模型冻结记录；旧自动摘句仅退役，显式记忆不变。
+- `tests/system/verify_memory_maintenance.py`：实际 CLI/stdio Bridge 的有限脚本候选、隐私/恢复/压缩门禁；Fake 仅为传输和状态证据。
+
+验证命令：`make test lint`，聚焦 `go test -race ./internal/memory/... ./internal/recall/... ./internal/agent/sqlite -run 'Semantic|Recall|Forget'`，系统 `runner.py --gate memory-maintenance --gate recall`。
+本地部署前备份 state/memory/conversation 三库及配置，验证当前账号、模型和原始记录保持一致；退役和重新派生的记忆数量允许改变。
+
+并发发布回归：Root 的真实原始查询在两路 embedding catch-up 后暂停，强制 Main 发布。发布时间晚于已冻结查询上界的原文不进入首轮 recall，且不会破坏本轮模型接纳；独立 embedding 故障仍验证无部分成功/无冻结模型调用。
+
+## Required PR regression coverage
+
+`make test-memory` runs the Memory/Recall domain tests with race detection and the
+owning runtime privacy/recall regressions. The required `System / memory-context`
+CI lane runs that target and both `memory-maintenance` and `recall` system gates;
+`Ubuntu checks` requires the entire selected matrix. `tests/harness/test_ci.py`
+asserts this lane and both gates stay in the PR matrix. Ordinary `go test ./...`
+continues to run the complete unit/component inventory.
+
+The enforced design invariants live in [the owning technical design](../designs/memory-context.md#memory-and-recall-invariants).
+
+The required channels-web Memory browser scenario uses a finite structured Curator
+fixture with a normalized fact and an exact user-only evidence quote. It checks
+that neither the original first-person sentence nor its surrounding Tool plan is
+stored as the derived Memory, while retaining pagination, Unicode search, source
+navigation, correction, Forget, restart and read-only browser assertions.
+
+`tests/harness/test_schema_version.py` checks that the system fixtures' explicit
+state-schema expectation matches the contiguous migration catalog, so a forward
+migration cannot silently leave foundation/local-provider/Code Mode gates testing
+an obsolete schema version. The ordinary harness suite and required CI execute it.

@@ -16,7 +16,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/tool"
 )
 
-const removeUIInteractionFixtureSchema = `DROP TABLE IF EXISTS generation_cost_estimate; DROP TABLE IF EXISTS connected_apps; DROP TABLE IF EXISTS ui_action_request; DROP TABLE IF EXISTS main_ui_context; DROP TABLE IF EXISTS ui_view_state; `
+const removeUIInteractionFixtureSchema = `DROP TABLE IF EXISTS generation_cost_estimate; DROP TABLE IF EXISTS memory_cost_reservation; DROP TABLE IF EXISTS memory_generation; DROP TABLE IF EXISTS memory_semantic_receipt; DROP TABLE IF EXISTS connected_apps; DROP TABLE IF EXISTS ui_action_request; DROP TABLE IF EXISTS main_ui_context; DROP TABLE IF EXISTS ui_view_state; `
 
 func uiInteractionFixture(t *testing.T) (*Store, *Runs, agent.Actor, *loopProvider, string, *atomic.Int32) {
 	t.Helper()

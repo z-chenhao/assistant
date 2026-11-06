@@ -11,6 +11,7 @@ import (
 
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/llm/bridge"
+	"github.com/z-chenhao/assistant/internal/memory"
 	"github.com/z-chenhao/assistant/internal/prompt"
 )
 
@@ -126,6 +127,14 @@ func serve(in io.Reader, out io.Writer, fixture string, audit io.Writer) error {
 			}
 			if err = reply(struct{}{}); err != nil {
 				return err
+			}
+			if len(request.Messages) > 0 && request.Messages[0].Text == memory.CurationInstruction {
+				value := memoryReply(request)
+				if err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: value.Text}); err != nil {
+					return err
+				}
+				err = event(llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 2, Kind: "completed"})
+				break
 			}
 			e := llm.GenerationEvent{GenerationID: request.GenerationID, Sequence: 1, Kind: "text_delta", Text: "OK"}
 			last := request.Messages[len(request.Messages)-1]

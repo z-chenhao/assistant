@@ -14,7 +14,7 @@ import (
 
 const currentMemoryRows = ` FROM memory_record m LEFT JOIN recall_document d ON d.ref='memory:'||m.memory_id
  WHERE m.user_id=? AND ((m.scope_type='user' AND m.scope_id=?) OR (m.scope_type='agent' AND m.scope_id=?))
- AND m.deleted_at IS NULL AND (d.active=1 OR m.content LIKE 'sealed:v1:%')
+ AND m.deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM memory_retirement retired WHERE retired.memory_id=m.memory_id) AND NOT EXISTS(SELECT 1 FROM memory_semantic_record semantic WHERE semantic.memory_id=m.memory_id AND semantic.expires_at>0 AND semantic.expires_at<=unixepoch('subsec')*1000000) AND (d.active=1 OR m.content LIKE 'sealed:v1:%')
  AND NOT EXISTS(SELECT 1 FROM memory_record n WHERE n.supersedes_memory_id=m.memory_id)`
 
 // Evidence is an in-process exact read and the identity needed to recheck it.

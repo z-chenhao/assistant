@@ -59,3 +59,31 @@ func TestSchemaRejectsAuthorityAndBadTime(t *testing.T) {
 		}
 	}
 }
+
+func TestHostExclusionsAndSourceContentDeduplication(t *testing.T) {
+	scope := recall.Scope{UserID: "u", AgentID: "a"}
+	s := recall.Service{Memory: provider{hits: []recall.Hit{
+		{SourceRef: "memory:self", SourceType: "memory", Content: "normalized current input", Sources: []string{"conversation:current"}, Relevance: 1},
+		{SourceRef: "memory:past", SourceType: "memory", Content: "normalized lasting fact", Sources: []string{"conversation:past"}, Relevance: .9},
+	}}, Conversation: provider{hits: []recall.Hit{
+		{SourceRef: "conversation:current", SourceType: "conversation", Content: "current input", Relevance: 1},
+		{SourceRef: "conversation:past", SourceType: "conversation", Content: "original lasting fact", Relevance: .8},
+		{SourceRef: "conversation:other", SourceType: "conversation", Content: " NORMALIZED   lasting FACT ", Relevance: .7},
+		{SourceRef: "conversation:distinct", SourceType: "conversation", Content: "different relevant evidence", Relevance: .6},
+	}}}
+	hits, e := s.Search(context.Background(), scope, recall.Query{Query: "fact", ExcludeRefs: []string{"conversation:current"}}, 4096)
+	if e != nil || len(hits) != 2 || hits[0].SourceRef != "memory:past" || hits[1].SourceRef != "conversation:distinct" {
+		t.Fatal(hits, e)
+	}
+	raw, _ := json.Marshal(hits)
+	if strings.Contains(string(raw), "Relevance") || strings.Contains(string(raw), "Sources") {
+		t.Fatal("private ranking/provenance leaked", string(raw))
+	}
+	// Oversized derived text must not hide a source that fits the budget.
+	s.Memory = provider{hits: []recall.Hit{{SourceRef: "memory:large", SourceType: "memory", Content: strings.Repeat("x", 1000), Sources: []string{"conversation:short"}, Relevance: 1}}}
+	s.Conversation = provider{hits: []recall.Hit{{SourceRef: "conversation:short", SourceType: "conversation", Content: "short", Relevance: .9}}}
+	hits, e = s.Search(context.Background(), scope, recall.Query{Query: "fact"}, 200)
+	if e != nil || len(hits) != 1 || hits[0].SourceRef != "conversation:short" {
+		t.Fatal(hits, e)
+	}
+}

@@ -71,6 +71,7 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 	if cfg.Memory != nil {
 		v := memory.Vault{Secrets: secrets, Ref: cfg.Memory.EncryptionKeyRef}
 		runs.ConfigureMemory(a.memory, v)
+		runs.ConfigureSemanticMemory(a.provider)
 	}
 	if cfg.Embedding != nil || cfg.Automatic("embedding") {
 		var memories recall.MemoryProvider = a.memory

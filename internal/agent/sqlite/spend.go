@@ -130,7 +130,7 @@ func (r *Runs) gateSpend(ctx context.Context, tx *sql.Tx, req llm.GenerationRequ
 		}
 		if status != "approved" {
 			var total int64
-			if err = tx.QueryRowContext(ctx, `SELECT coalesce(sum(CASE WHEN status='priced' THEN actual_micros ELSE reserved_micros END),0) FROM spend_reservation WHERE account_key=? AND currency=?`, account, currency).Scan(&total); err != nil {
+			if err = tx.QueryRowContext(ctx, `SELECT coalesce(sum(CASE WHEN status='priced' THEN actual_micros ELSE reserved_micros END),0) FROM (SELECT account_key,currency,status,actual_micros,reserved_micros FROM spend_reservation UNION ALL SELECT account_key,currency,status,actual_micros,reserved_micros FROM memory_cost_reservation) WHERE account_key=? AND currency=?`, account, currency).Scan(&total); err != nil {
 				return false, false, err
 			}
 			if total >= boundary || projected >= boundary-total {

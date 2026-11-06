@@ -206,13 +206,13 @@ func (s *Store) search(ctx context.Context, scope recall.Scope, q recall.Query) 
 			s.clearWorking()
 		}
 		s.unlockSearch()
-		return s.searchIndex(ctx, s.db, scope, q)
+		return s.visibleSearch(ctx, s.db, scope, q)
 	}
 	working, err := s.encryptedIndex(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	return s.searchIndex(ctx, working, scope, q)
+	return s.visibleSearch(ctx, working, scope, q)
 }
 
 func (s *Store) encryptedIndex(ctx context.Context, scope recall.Scope) (*sql.DB, error) {

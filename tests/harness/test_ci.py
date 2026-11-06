@@ -37,6 +37,18 @@ class CIChecksTests(unittest.TestCase):
         self.assertIn('.*UI.*', ci.RACE)
         self.assertIn('ReplyStream.*', ci.RACE)
 
+    def test_memory_privacy_race_and_system_gates_are_required(self):
+        lanes = {lane['lane']: lane for lane in ci.plan('system')['include']}
+        self.assertIn('memory-context', lanes)
+        self.assertEqual(lanes['memory-context']['browser'], 'false')
+        command = ci.command('memory-context')
+        self.assertIn('make test-memory build', command)
+        self.assertEqual(ci.MEMORY_GATES, ('memory-maintenance', 'recall'))
+        for gate in ci.MEMORY_GATES:
+            self.assertEqual(command.count('--gate ' + gate), 1)
+        self.assertNotIn('|| true', command)
+        self.assertNotIn('continue-on-error', command)
+
     def test_required_check_rejects_missing_failed_and_cancelled_work(self):
         for docs in ('true', 'false'):
             selected = 'skipped' if docs == 'true' else 'success'

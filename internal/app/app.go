@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -397,6 +398,9 @@ func (a *App) Close() error {
 
 func (a *App) recordGeneration(ctx context.Context, r llm.GenerationRequest, result llm.GenerationResult, latency time.Duration, cause error) error {
 	err := a.store.Models().RecordUsageAnd(ctx, r, result, latency, cause, func(ctx context.Context, tx *sql.Tx, r llm.GenerationRequest, result llm.GenerationResult, cause error) error {
+		if strings.HasPrefix(r.GenerationID, "memory:") {
+			return a.runtimeRuns().AcceptMemoryGeneration(ctx, tx, r, result, cause)
+		}
 		return a.store.AcceptGeneration(ctx, tx, r, result, cause)
 	})
 	if err == nil && r.OwnerToken != "" && a.store.MainBoundary != nil {

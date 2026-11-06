@@ -167,6 +167,9 @@ func TestRecallFrozenPerTurnAndFenced(t *testing.T) {
 	r.registry = registry
 	a.Registry = registry
 	r.ConfigureRecall(recall.Service{Memory: m, Conversation: h})
+	if e = m.Apply(ctx, memory.Record{ID: "prior-tea", UserID: "local", ScopeType: "user", ScopeID: "local", Tier: "recall", Content: "tea PRIOR_EVIDENCE", SourceRefs: []memory.SourceRef{{Type: "conversation", Ref: "conversation:prior-tea"}}, CreatedAt: time.Now().Add(-time.Hour)}); e != nil {
+		t.Fatal(e)
+	}
 	rc := mustSubmit(t, a, "recall", "tea context")
 	c, e := r.Claim(ctx, rc.RunID)
 	if e != nil {
@@ -312,6 +315,14 @@ func TestRecallFailureLeavesNoFrozenTurnOrModelCall(t *testing.T) {
 		t.Fatal(e)
 	}
 	run, e := r.Load(ctx, c)
+	if e != nil {
+		t.Fatal(e)
+	}
+	run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.TextMessage("user", "tea"))
+	if e = r.Checkpoint(ctx, c, run.Version, run.Checkpoint); e != nil {
+		t.Fatal(e)
+	}
+	run, e = r.Load(ctx, c)
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,9 +23,11 @@ type TimeRange struct {
 	End   *time.Time `json:"end,omitempty"`
 }
 type Query struct {
-	Query     string     `json:"query"`
-	Limit     int        `json:"limit,omitempty"`
-	TimeRange *TimeRange `json:"time_range,omitempty"`
+	// Host-only exclusions never come from model arguments or cross the wire.
+	ExcludeRefs []string   `json:"-"`
+	Query       string     `json:"query"`
+	Limit       int        `json:"limit,omitempty"`
+	TimeRange   *TimeRange `json:"time_range,omitempty"`
 }
 
 func (q Query) Valid() bool {
@@ -38,6 +41,8 @@ func (q Query) Count() int {
 }
 
 type Hit struct {
+	Sources    []string  `json:"-"`
+	Relevance  float64   `json:"-"`
 	Content    string    `json:"content"`
 	SourceType string    `json:"source_type"`
 	SourceRef  string    `json:"source_ref"`
@@ -74,29 +79,82 @@ func (s Service) Search(ctx context.Context, scope Scope, q Query, budget int) (
 		hits []Hit
 		err  error
 	}
+	lookup := q
+	lookup.Limit = min(50, max(q.Count(), q.Count()*3))
 	ch := make(chan response, 1)
-	go func() { h, e := s.Memory.Search(ctx, scope, q); ch <- response{h, e} }()
-	b, e := s.Conversation.Search(ctx, scope, q)
+	go func() { h, e := s.Memory.Search(ctx, scope, lookup); ch <- response{h, e} }()
+	b, e := s.Conversation.Search(ctx, scope, lookup)
 	a := <-ch
 	if e != nil || a.err != nil {
 		return nil, ErrUnavailable
 	}
-	// Equal source ranks alternate. Raw BM25/cosine scores are incomparable
-	// across domains; one source cannot consume the complete context budget.
+	// Filter by Host provenance before ranking and budgeting. Facts from the
+	// same original input may differ; only cross-domain echoes are collapsed.
+	excluded := map[string]bool{}
+	for _, ref := range q.ExcludeRefs {
+		excluded[ref] = true
+	}
+	type ranked struct {
+		hit   Hit
+		score float64
+	}
+	candidates := []ranked{}
+	for _, list := range [][]Hit{a.hits, b} {
+		for i, h := range list {
+			if excluded[h.SourceRef] {
+				continue
+			}
+			blocked := false
+			for _, ref := range h.Sources {
+				blocked = blocked || excluded[ref]
+			}
+			if blocked {
+				continue
+			}
+			candidates = append(candidates, ranked{h, h.Relevance + 1/float64(61+i)/100})
+		}
+	}
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].score > candidates[j].score })
+	memorySources := map[string]bool{}
+	conversationSources := map[string]bool{}
 	out := []Hit{}
 	used := 0
-	for i := 0; len(out) < q.Count() && (i < len(a.hits) || i < len(b)); i++ {
-		for _, list := range [][]Hit{a.hits, b} {
-			if i >= len(list) || len(out) >= q.Count() {
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		h := candidate.hit
+		if h.SourceType == "conversation" && memorySources[h.SourceRef] {
+			continue
+		}
+		if h.SourceType == "memory" {
+			echo := false
+			for _, ref := range h.Sources {
+				echo = echo || conversationSources[ref]
+			}
+			if echo {
 				continue
 			}
-			h := list[i]
-			raw, _ := json.Marshal(h)
-			if used+len(raw) > budget {
-				continue
+		}
+		text := strings.ToLower(strings.Join(strings.Fields(h.Content), " "))
+		if seen[h.SourceRef] && h.SourceRef != "" || seen["text:"+text] {
+			continue
+		}
+		raw, _ := json.Marshal(h)
+		if used+len(raw) > budget {
+			continue
+		}
+		if h.SourceType == "memory" {
+			for _, ref := range h.Sources {
+				memorySources[ref] = true
 			}
-			out = append(out, h)
-			used += len(raw)
+		} else if h.SourceType == "conversation" {
+			conversationSources[h.SourceRef] = true
+		}
+		out = append(out, h)
+		used += len(raw)
+		seen[h.SourceRef] = true
+		seen["text:"+text] = true
+		if len(out) >= q.Count() {
+			break
 		}
 	}
 	return out, nil

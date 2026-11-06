@@ -167,7 +167,10 @@ var connectedAppsSQL string
 //go:embed migrations/047_cost_estimates.sql
 var costEstimatesSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL, githubRuleObservationSQL, feishuTaskQuestionsSQL, feishuReviewLinksSQL, githubFailedCheckRuleSQL, providerTimingsSQL, uiWidgetsSQL, accountCatalogSelectionSQL, uiInteractionsSQL, connectedAppsSQL, costEstimatesSQL}
+//go:embed migrations/048_semantic_memory.sql
+var semanticMemorySQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL, githubRuleObservationSQL, feishuTaskQuestionsSQL, feishuReviewLinksSQL, githubFailedCheckRuleSQL, providerTimingsSQL, uiWidgetsSQL, accountCatalogSelectionSQL, uiInteractionsSQL, connectedAppsSQL, costEstimatesSQL, semanticMemorySQL}
 
 type Store struct {
 	costEstimator agent.CostEstimator
@@ -324,7 +327,11 @@ func migrate(ctx context.Context, db *sql.DB, scripts []string) error {
 		}
 	}
 	for i := version; i < len(scripts); i++ {
-		if _, err := tx.ExecContext(ctx, scripts[i]); err != nil {
+		script, err := adoptSemantic47(ctx, tx, version, i, scripts)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, script); err != nil {
 			return fmt.Errorf("apply migration %d: %w", i+1, err)
 		}
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {

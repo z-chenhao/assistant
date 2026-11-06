@@ -41,7 +41,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
 | [F-007](features/tools-approvals.md#f-007) | 工具、审批与未知副作用处理 | Main 与 Worker 以 Code Mode 组合工具，直接声明少量高频工具，调用权限按角色冻结；MCP 不提供暴露模式，双方共用具体审批与恢复。 | 是 · 已完成 |
 | [F-008](features/codemode.md#f-008) | 可恢复的 JavaScript 编排 | Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果。 | 是 · 已完成 |
-| [F-009](features/memory-context.md#f-009) | 自动记忆形成与语义归并 | 后台从用户事实与反馈形成记忆，能处理纠正、重复和过时信息。 | 否 · 部分完成 |
+| [F-009](features/memory-context.md#f-009) | 自动记忆形成与语义归并 | 独立后台提炼并校验证据，同义归并、纠正替代、撤回、晋升/老化、遗忘屏障和幂等恢复；真实模型质量持续评测。 | 是 · 已完成 |
 | [F-010](features/memory-context.md#f-010) | 按作用域召回记忆与对话 | Main/本机沿消息、Task、授权产物续读。本机另可精读当前 Memory、可见来源及 Task 已关联的确切 GitHub 观察。Main Memory 与更广外部导航待接通。 | 否 · 部分完成 |
 | [F-011](features/memory-context.md#f-011) | 长期上下文压缩 | 长对话保留目标、决策、约束和待办，省略内容可追溯；新 Main 召回结合最近问答、去重并按逻辑输入冻结，工具续轮保持消息前缀。 | 否 · 部分完成 |
 | [F-012](features/artifacts-media.md#f-012) | 可重新打开的文件产物 | 用户能上传、保存、搜索、下载交付物，引用具有访问边界。 | 是 · 已完成 |

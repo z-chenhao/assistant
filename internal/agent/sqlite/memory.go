@@ -131,14 +131,25 @@ func (r *Runs) revokeMemory(ctx context.Context, tx *sql.Tx, agentID string) err
 // CurateMemory processes a bounded serial batch. A crash after memory.db commit
 // and before the state receipt repeats the SAME event; memory.db deduplicates it.
 // A transient failure keeps the head event pending and emits no user delivery.
+// Invalid proposals are quarantined with a receipt, never copied as raw memories.
 func (r *Runs) CurateMemory(ctx context.Context) error {
+	r.memoryWorkMu.Lock()
+	defer r.memoryWorkMu.Unlock()
+	if err := r.prepareLegacyMemory(ctx); err != nil {
+		return err
+	}
 	if r.memory == nil {
 		return nil
+	}
+	if writer, ok := r.memory.(semanticWriter); ok {
+		if e := writer.AgeSemantic(ctx, time.Now()); e != nil {
+			return e
+		}
 	}
 	for n := 0; n < 32; n++ {
 		var id, agentID, op, typ, ref, payload string
 		var at, revoked int64
-		e := r.host.db.QueryRowContext(ctx, `SELECT e.event_id,e.agent_id,e.operation,e.source_type,e.source_ref,e.payload,e.accepted_at,coalesce(p.updated_at,0) FROM memory_mutation e LEFT JOIN memory_privacy p USING(agent_id) WHERE e.applied_at IS NULL AND e.failed_at IS NULL ORDER BY e.sequence LIMIT 1`).Scan(&id, &agentID, &op, &typ, &ref, &payload, &at, &revoked)
+		e := r.host.db.QueryRowContext(ctx, `SELECT e.event_id,e.agent_id,e.operation,e.source_type,e.source_ref,e.payload,e.accepted_at,coalesce(p.updated_at,0) FROM memory_mutation e LEFT JOIN memory_privacy p USING(agent_id) WHERE e.failed_at IS NULL AND ((e.operation!='observe' AND e.applied_at IS NULL) OR (e.operation='observe' AND NOT EXISTS(SELECT 1 FROM memory_semantic_receipt s WHERE s.event_id=e.event_id))) ORDER BY (e.operation='observe'),e.sequence LIMIT 1`).Scan(&id, &agentID, &op, &typ, &ref, &payload, &at, &revoked)
 		if e == sql.ErrNoRows {
 			return nil
 		}
@@ -150,6 +161,7 @@ func (r *Runs) CurateMemory(ctx context.Context) error {
 			e = nil
 		} else if op == "observe" {
 			var content, author string
+			observedAt := time.UnixMicro(at).UTC()
 			sourceRef := typ + ":" + ref
 			if typ == "conversation" {
 				var raw string
@@ -158,6 +170,7 @@ func (r *Runs) CurateMemory(ctx context.Context) error {
 				if e == nil {
 					e = json.Unmarshal([]byte(raw), &m)
 					author = m.Role
+					observedAt = m.CreatedAt
 					if m.CreatedAt.UnixMicro() <= revoked {
 						author = "revoked"
 					}
@@ -183,7 +196,8 @@ func (r *Runs) CurateMemory(ctx context.Context) error {
 				}
 			}
 			if e == nil {
-				e = r.memory.Curate(ctx, id, scope, memory.SourceRef{Type: typ, Ref: sourceRef}, time.UnixMicro(at).UTC(), memory.Extract(content, author), false, "")
+				observation := memory.Observation{EventID: id, Source: memory.SourceRef{Type: typ, Ref: sourceRef}, Author: author, Text: content, At: observedAt}
+				e = r.curateObservation(ctx, scope, observation, revoked)
 			}
 		} else {
 			if strings.HasPrefix(payload, "sealed:v1:") {
@@ -209,9 +223,27 @@ func (r *Runs) CurateMemory(ctx context.Context) error {
 			}
 		}
 		if e != nil {
+			if errors.Is(e, memory.ErrProposal) {
+				// Malformed/unsupported output gets a bounded fresh proposal,
+				// never a raw-text fallback or an indefinitely poisoned queue.
+				var rejected bool
+				writeErr := r.write(ctx, func(tx *sql.Tx) error {
+					if _, err := tx.ExecContext(ctx, `UPDATE memory_mutation SET attempts=attempts+1,last_error='MEMORY_INVALID_PROPOSAL',failed_at=CASE WHEN attempts+1>=3 THEN ? ELSE NULL END WHERE event_id=? AND failed_at IS NULL`, time.Now().UnixMicro(), id); err != nil {
+						return err
+					}
+					return tx.QueryRowContext(ctx, `SELECT failed_at IS NOT NULL FROM memory_mutation WHERE event_id=?`, id).Scan(&rejected)
+				})
+				if writeErr != nil {
+					return writeErr
+				}
+				if rejected {
+					continue
+				}
+				return e
+			}
 			if errors.Is(e, recall.ErrConflict) || errors.Is(e, recall.ErrInvalid) {
 				if writeErr := r.write(ctx, func(tx *sql.Tx) error {
-					_, e := tx.ExecContext(ctx, `UPDATE memory_mutation SET failed_at=?,last_error='MEMORY_CONFLICT',attempts=attempts+1 WHERE event_id=? AND applied_at IS NULL AND failed_at IS NULL`, time.Now().UnixMicro(), id)
+					_, e := tx.ExecContext(ctx, `UPDATE memory_mutation SET failed_at=?,last_error='MEMORY_CONFLICT',attempts=attempts+1 WHERE event_id=? AND failed_at IS NULL`, time.Now().UnixMicro(), id)
 					if e != nil {
 						return e
 					}
@@ -221,7 +253,7 @@ func (r *Runs) CurateMemory(ctx context.Context) error {
 				}
 				continue
 			}
-			if _, writeErr := r.host.db.ExecContext(context.WithoutCancel(ctx), `UPDATE memory_mutation SET attempts=attempts+1,last_error='MEMORY_UNAVAILABLE' WHERE event_id=? AND applied_at IS NULL AND failed_at IS NULL`, id); writeErr != nil {
+			if _, writeErr := r.host.db.ExecContext(context.WithoutCancel(ctx), `UPDATE memory_mutation SET attempts=attempts+1,last_error='MEMORY_UNAVAILABLE' WHERE event_id=? AND failed_at IS NULL`, id); writeErr != nil {
 				return agent.ErrStorage
 			}
 			return e
@@ -229,6 +261,11 @@ func (r *Runs) CurateMemory(ctx context.Context) error {
 		r.host.boundary("after_memory_commit")
 		r.host.boundary("after_memory_commit:" + id)
 		if e = r.write(ctx, func(tx *sql.Tx) error {
+			if op == "observe" {
+				if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_semantic_receipt VALUES(?,?)`, id, time.Now().UnixMicro()); err != nil {
+					return err
+				}
+			}
 			res, e := tx.ExecContext(ctx, `UPDATE memory_mutation SET applied_at=?,attempts=attempts+1 WHERE event_id=? AND applied_at IS NULL`, time.Now().UnixMicro(), id)
 			if e != nil {
 				return e

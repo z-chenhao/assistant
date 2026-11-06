@@ -72,7 +72,7 @@ def run(binary, failure_evidence=None):
     report = {'scope': 'M6 memory/context/Skill contracts and GC-01/02/03/06 fragments; not full product scores',
               'scenarios': [], 'passed': False}
     with tempfile.TemporaryDirectory(prefix='steward-memory-maintenance-') as temp:
-        root = Path(temp)
+        root = Path(temp).resolve()
         embeddings = Embeddings()
         h = None
         try:
@@ -91,9 +91,9 @@ def run(binary, failure_evidence=None):
                           '  model: semantic-fixture-v1\n  dimensions: 5\n')
             # Doctor: same activated profile, explicit local Fakes, no online account.
             require(h.command('status')['agent_ingress_enabled'], 'doctor: no selected model')
-            scenarios = [('health', 'My health report: I slept late and feel tired today'),
+            scenarios = [('health', 'My health report: I have a diagnosed kidney stone condition'),
                          ('goals', 'I might explore independent development, but have not decided'),
-                         ('learning', 'I am practicing English for travel today')]
+                         ('learning', 'I am practicing English for travel')]
             for name, text in scenarios:
                 before = len(h.command('delivery', 'list'))
                 h.send(name, text)

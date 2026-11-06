@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,6 +52,9 @@ type Runs struct {
 	computerManifest      computer.RestorationManifest
 	contextPolicy         contextbuilder.Policy
 	memory                MemoryWriter
+	memoryProvider        llm.LLMProvider
+	memoryWorkMu          sync.Mutex
+	memoryPrepared        bool
 	vault                 memory.Vault
 	recall                *recall.Service
 	javascript            codemode.JavaScriptRuntime

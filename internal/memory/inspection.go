@@ -42,7 +42,7 @@ func (q InspectionQuery) Validate() error {
 	if !utf8.ValidString(q.Search) || len(q.Search) > 200 || strings.ContainsAny(q.Search, "\x00\r\n") || len(q.Cursor) > 1024 || q.Limit < 0 || q.Limit > 50 || q.Offset < 0 || q.Offset > 1<<30 {
 		return ErrInspectionInvalid
 	}
-	if q.Tier != "" && q.Tier != "core" && q.Tier != "recall" || q.Origin != "" && q.Origin != "automatic" && q.Origin != "explicit" && q.Origin != "unknown" || q.Status != "" && q.Status != "active" && q.Status != "superseded" && q.Status != "all" || q.View != "" && q.View != "maintenance" {
+	if q.Tier != "" && q.Tier != "core" && q.Tier != "recall" || q.Origin != "" && q.Origin != "automatic" && q.Origin != "explicit" && q.Origin != "unknown" || q.Status != "" && q.Status != "active" && q.Status != "superseded" && q.Status != "retired" && q.Status != "all" || q.View != "" && q.View != "maintenance" {
 		return ErrInspectionInvalid
 	}
 	if q.Ref != "" && (!ValidInspectionRef(q.Ref) || q.Cursor != "" || q.View != "") || q.Source != "" && (q.Ref == "" || len(q.Source) > 256 || strings.ContainsAny(q.Source, " /\\\r\n\x00")) || q.Source == "" && q.Offset != 0 {
