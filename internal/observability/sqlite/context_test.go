@@ -230,3 +230,14 @@ func TestFrozenContextMissingResponseAndProvenanceAreUnknown(t *testing.T) {
 		}
 	}
 }
+
+func TestFrozenContextUsesExplicitReusedRecallReference(t *testing.T) {
+	s, db := contextFixture(t, map[string]any{"messages": []any{}}, map[string]any{"messages": []any{}})
+	if _, err := db.Exec(`INSERT INTO run_recall VALUES('run',0,'[{"source_type":"memory","source_ref":"memory:first","content":"frozen fact"}]');INSERT INTO context_compaction VALUES('run',1,'{"stage":"working_set","recall_step":0}');`); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.Context(context.Background(), observability.ContextQuery{RunID: "run", Step: 1, Section: "recall", JSON: true})
+	if err != nil || !strings.Contains(out.Content, "memory:first") {
+		t.Fatal("continuation lost the exact frozen recall", out, err)
+	}
+}

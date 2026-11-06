@@ -109,7 +109,7 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 	}
 	remaining := min(budget.ModelBytes-contextbuilder.ModelSize(required), budget.FrameBytes-contextbuilder.Size(required))
 	recallBudget := max(0, min(16<<10, remaining/4))
-	in, e = r.recallMessages(ctx, c, run, in, recallBudget)
+	in, e = r.recallMessages(ctx, c, run, in, recallBudget, p.ContextualRecall)
 	if e != nil {
 		return workingPreparation{}, e
 	}
@@ -211,11 +211,24 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 	if prepared.Compaction != nil {
 		stage = "summary_request"
 	}
+	inputRef := ""
+	var recallStep *int64
+	if p.ContextualRecall {
+		inputRef = recallInputRef(in)
+		var step int64
+		if err := r.host.db.QueryRowContext(ctx, `SELECT step_index FROM run_recall WHERE run_id=? AND step_index<=? ORDER BY step_index DESC LIMIT 1`, run.ID, run.Checkpoint.Step).Scan(&step); err == nil {
+			recallStep = &step
+		} else if err != sql.ErrNoRows {
+			return workingPreparation{}, agent.ErrStorage
+		}
+	}
 	provenance, _ = encoded(struct {
-		Compaction    *agent.Compaction `json:"compaction,omitempty"`
-		Stage         string            `json:"stage"`
-		OmittedImages []string          `json:"omitted_images,omitempty"`
-	}{prepared.Compaction, stage, selection.OmittedImages})
+		Compaction     *agent.Compaction `json:"compaction,omitempty"`
+		Stage          string            `json:"stage"`
+		OmittedImages  []string          `json:"omitted_images,omitempty"`
+		RecallInputRef string            `json:"recall_input_ref,omitempty"`
+		RecallStep     *int64            `json:"recall_step,omitempty"`
+	}{prepared.Compaction, stage, selection.OmittedImages, inputRef, recallStep})
 	if len(selection.Sources) > 0 || len(selection.OmittedImages) > 0 {
 		saver, ok := r.history.(interface {
 			SaveCompaction(context.Context, string, string, string, string) error

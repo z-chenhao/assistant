@@ -12,11 +12,13 @@ import (
 type Policy struct {
 	// Host-frozen projection opt-in. Missing on older Runs means reference-only
 	// user images, preserving their accepted request bytes and replay hashes.
-	UserImages   bool    `yaml:"-" json:"user_images,omitempty"`
-	DOCXText     bool    `yaml:"-" json:"docx_text,omitempty"`
-	Threshold    float64 `yaml:"threshold_percentage" json:"threshold_percentage"`
-	Recent       int     `yaml:"recent_messages" json:"recent_messages"`
-	SummaryBytes int     `yaml:"summary_bytes" json:"summary_bytes"`
+	UserImages bool `yaml:"-" json:"user_images,omitempty"`
+	DOCXText   bool `yaml:"-" json:"docx_text,omitempty"`
+	// Missing on older policies preserves their query, evidence and placement.
+	ContextualRecall bool    `yaml:"-" json:"contextual_recall,omitempty"`
+	Threshold        float64 `yaml:"threshold_percentage" json:"threshold_percentage"`
+	Recent           int     `yaml:"recent_messages" json:"recent_messages"`
+	SummaryBytes     int     `yaml:"summary_bytes" json:"summary_bytes"`
 }
 
 func DefaultPolicy() Policy { return Policy{Threshold: .75, Recent: 6, SummaryBytes: 2048} }

@@ -113,20 +113,18 @@ func (r *Runs) SubmitUIAction(ctx context.Context, ref, source string) (agent.Re
 // freezeUIInput takes the snapshot in the ordinary input transaction, once.
 // It is user evidence, never a mutable system prompt or an execution bypass.
 func (r *Runs) freezeUIInput(ctx context.Context, tx *sql.Tx, messageID string, action *uiActionInput) error {
-	var contextData []struct {
+	type componentContext struct {
 		Ref     string          `json:"component_ref"`
 		Context json.RawMessage `json:"context"`
 	}
+	var contextData []componentContext
 	rows, err := tx.QueryContext(ctx, `SELECT v.component_ref,v.model_context_json FROM ui_view_state v JOIN ui_widget w ON w.ui_ref=substr(v.component_ref,1,instr(v.component_ref,'#')-1) JOIN run r USING(run_id) WHERE r.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND v.model_context_json!='{}' AND v.updated_at>coalesce((SELECT updated_at FROM memory_privacy WHERE agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1)),0) ORDER BY v.updated_at DESC,v.component_ref LIMIT 8`)
 	if err != nil {
 		return err
 	}
 	size := 0
 	for rows.Next() {
-		var item struct {
-			Ref     string          `json:"component_ref"`
-			Context json.RawMessage `json:"context"`
-		}
+		var item componentContext
 		var rawContext string
 		if err = rows.Scan(&item.Ref, &rawContext); err != nil {
 			rows.Close()
@@ -145,7 +143,10 @@ func (r *Runs) freezeUIInput(ctx context.Context, tx *sql.Tx, messageID string, 
 	}
 	messages := []agent.AgentMessage{}
 	if len(contextData) > 0 {
-		messages = append(messages, agent.RuntimeContext("ui_state", messageID, false, contextData))
+		messages = append(messages, agent.RuntimeContext("ui_state", messageID, false, struct {
+			Description string             `json:"description"`
+			Components  []componentContext `json:"components"`
+		}{"Persisted component state, possibly from older topics; this is not the active page or the subject of the current request. Use it only when relevant to the user's explicit request.", contextData}))
 	}
 	if action != nil {
 		// Revalidate the exact delivered definition inside the acceptance transaction.

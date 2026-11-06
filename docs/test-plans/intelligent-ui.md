@@ -74,7 +74,7 @@ python3 tests/system/verify_intelligent_ui.py --binary bin/steward --evidence ev
 
 ## 状态、数据与操作闭环
 
-- `TestUIStateCASFreezeAndActionUsesOrdinaryExecutor`、`TestUIStateConcurrentWritersAndInvalidPayloads` 验证授权引用、旧版本/并发写拒绝、状态有界和普通输入的不可变 UI 上下文快照。
+- `TestUIStateCASFreezeAndActionUsesOrdinaryExecutor`、`TestUIStateConcurrentWritersAndInvalidPayloads` 验证授权引用、旧版本/并发写拒绝、状态有界和普通输入的不可变 UI 上下文快照；快照明确标识已保存状态不是当前活动页或当前话题。
 - `TestUIActionCannotApproveAnExternalEffect` 验证动作按钮仍需既有高风险审批，未审批时提供商未被调用；动作结果只能取实际匹配的 ToolInvocation。
 - `TestTypedFormValidationAndRestore` 验证日期、有限数字、范围、候选、多选去重/规范顺序、布尔确认与回答恢复。
 - `web/ui-interactions.test.mjs` 验证 CSV 公式处理，以及同一页面并发排空保存、写入期间继续编辑和上下文合并。

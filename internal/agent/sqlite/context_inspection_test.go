@@ -36,13 +36,23 @@ func assertFrozenContextRun(t *testing.T, s *Store, id string) {
 		}
 		sections := map[string][]json.RawMessage{"messages": frozen.Messages, "tools": frozen.Tools}
 		var provenance, hits string
+		recallStep := round.Step
 		var sectionsRecall []json.RawMessage
 		if err = s.db.QueryRow(`SELECT provenance_json FROM context_compaction WHERE run_id=? AND step_index=?`, id, round.Step).Scan(&provenance); err == nil {
 			sections["provenance"] = []json.RawMessage{json.RawMessage(provenance)}
+			var refs struct {
+				RecallStep *int64 `json:"recall_step"`
+			}
+			if json.Unmarshal([]byte(provenance), &refs) != nil {
+				t.Fatal("invalid provenance")
+			}
+			if refs.RecallStep != nil {
+				recallStep = *refs.RecallStep
+			}
 		} else if err != sql.ErrNoRows {
 			t.Fatal(err)
 		}
-		if err = s.db.QueryRow(`SELECT hits_json FROM run_recall WHERE run_id=? AND step_index=?`, id, round.Step).Scan(&hits); err == nil {
+		if err = s.db.QueryRow(`SELECT hits_json FROM run_recall WHERE run_id=? AND step_index=?`, id, recallStep).Scan(&hits); err == nil {
 			if json.Unmarshal([]byte(hits), &sectionsRecall) != nil {
 				t.Fatal("invalid frozen recall")
 			}

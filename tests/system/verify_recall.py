@@ -143,6 +143,7 @@ class Harness(MainHarness):
             db.row_factory = sqlite3.Row
             result['recall'] = [dict(r) for r in db.execute('SELECT * FROM run_recall ORDER BY run_id,step_index')]
             result['children'] = [dict(r) for r in db.execute("SELECT run_id,parent_run_id,worker_position,checkpoint_json FROM run WHERE kind='worker' ORDER BY created_at")]
+            result['preparations'] = [dict(r) for r in db.execute('SELECT run_id,step_index,provenance_json FROM context_compaction ORDER BY run_id,step_index')]
         for name in ('memory', 'conversation'):
             with closing(sqlite3.connect(root / (name + '.db'))) as db, db:
                 db.row_factory = sqlite3.Row
@@ -239,6 +240,30 @@ def verify(value):
     original = next(m for m in value['conversation_index'] if m['ref'] == 'conversation:original')
     require(original['content'] == 'chai was my original preference', 'original changed')
     require(all('FOREIGN_' not in r['hits_json'] for r in value['recall']), 'automatic recall scope leak')
+    # Every Run in this fixture has one logical input, even across tool rounds,
+    # internal summaries and restart. Each must retrieve exactly once.
+    require(len(value['recall']) == len(runs) and
+            {r['run_id'] for r in value['recall']} == set(runs),
+            'automatic recall repeated within one logical input')
+
+
+def verify_complete_workflow(value):
+    summaries = {(p['run_id'], p['step_index']) for p in value['preparations']
+                 if json.loads(p['provenance_json'])['stage'] == 'summary_request'}
+    business = []
+    for generation in value['generations']:
+        if (generation['run_id'], generation['step_index']) not in summaries:
+            business.append(generation)
+            continue
+        request = json.loads(generation['request_json'])
+        result = json.loads(generation['result_json'])
+        require(generation['status'] == 'completed' and not request.get('tools') and
+                not result.get('tool_calls') and result.get('text', '').strip() and
+                not result.get('clipped'), 'internal summary violated the tool-free completion contract')
+    require(len(business) == 9 and len(value['runs']) == 4,
+            'recovery changed the complete business workflow')
+    return dict(business_generations=len(business), summary_generations=len(summaries),
+                total_generations=len(value['generations']))
 
 
 def failure_state(h, embeddings, scenario, stage):
@@ -314,8 +339,7 @@ def concurrent_append_case(binary, root, failure_evidence=None):
         h.command('chat', 'work')
         value = h.snapshot()
         verify(value)
-        require(len(value['generations']) == 9 and len(value['runs']) == 4,
-                'explicit recovery changed the complete recall fixture')
+        generation_counts = verify_complete_workflow(value)
         require(all(r in value['recall'] for r in before['recall']) and
                 value['conversation'][:len(before['conversation'])] == before['conversation'],
                 'explicit recovery rewrote frozen recall or original messages')
@@ -323,7 +347,8 @@ def concurrent_append_case(binary, root, failure_evidence=None):
         require(h.snapshot() == value, 'repeated recovery drain changed terminal state')
         return dict(name='concurrent-append', first_drive_rejected=True,
                     worker_model_requests_before_recovery=0, explicit_later_caller_recovered=True,
-                    boundary=observed, state=value, embedding_requests=embeddings.requests)
+                    boundary=observed, state=value, embedding_requests=embeddings.requests,
+                    generation_counts=generation_counts)
     except Exception:
         if failure_evidence is not None:
             failure_evidence.parent.mkdir(parents=True, exist_ok=True)
@@ -389,6 +414,7 @@ def run(binary, failure_evidence=None):
                 stage = 'assertions'
                 value = h.snapshot()
                 verify(value)
+                generation_counts = verify_complete_workflow(value)
                 multipart_evidence = None
                 if multipart:
                     document = next(d for d in value['conversation_index'] if d['ref'] == 'conversation:multipart')
@@ -399,14 +425,13 @@ def run(binary, failure_evidence=None):
                     with closing(sqlite3.connect(Path(h.env['STEWARD_DATA_ROOT']) / 'conversation.db')) as db, db:
                         stored = db.execute("SELECT content_json FROM conversation_message WHERE message_id='multipart'").fetchone()[0]
                     require(stored == original_json and value['conversation_schema'] == 3, 'migration rewrote original')
-                    require(len(value['generations']) == 9 and len(value['runs']) == 4, 'multipart blocked later model admission')
                     multipart_evidence = dict(original_json_unchanged=True, original_bytes=80001,
                                               chunk_bytes=[len(c.encode('utf-8')) for c in chunks],
-                                              generations=9, completed_runs=4)
+                                              **generation_counts, completed_runs=4)
                 if name == 'kill-restart':
                     same = next(r for r in value['recall'] if r['run_id'] == receipt['run_id'] and r['step_index'] == 0)
                     require(same == frozen, 'restart changed frozen recall')
-                    require('NEW_AFTER_FREEZE' not in same['hits_json'] and any('NEW_AFTER_FREEZE' in r['hits_json'] for r in value['recall'] if r != same), 'per-turn snapshot did not advance')
+                    require('NEW_AFTER_FREEZE' not in same['hits_json'] and any('NEW_AFTER_FREEZE' in r['hits_json'] for r in value['recall'] if r['run_id'] != same['run_id']), 'new logical input did not retrieve the updated corpus')
                 stage = 'idempotent-drain'
                 h.command('chat', 'work')
                 require(h.snapshot() == value, 'repeated drain changed terminal state')
@@ -414,6 +439,7 @@ def run(binary, failure_evidence=None):
                 report['scenarios'].append(dict(name=name, state=value, embedding_requests=embeddings.requests,
                                                 scheduling=scheduling,
                                                 multipart=multipart_evidence,
+                                                generation_counts=generation_counts,
                                                 before=before if name in ('kill-restart', 'embedding-failure') else None))
             except Exception:
                 if failure_evidence is not None:

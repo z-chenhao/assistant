@@ -367,16 +367,42 @@ return INVALID_ARGUMENT; provider/index faults return PROVIDER_UNAVAILABLE witho
 partial output. The Tool is read-only, needs no approval, and reuses the existing
 ToolInvocation replay/result pipeline.
 
-For each model turn, each Run independently queries its latest explicit user/Task
-input. Root and Child never copy Parent prompt state or search results. Recall
+For each new explicit input, each Run independently queries its authorized context. New Main
+policies combine the latest request with the immediately preceding user input and
+last textual assistant answer before that request (UTF-8 excerpts, at most 4096
+bytes total). Runtime UI state, tool payloads and older topics do not supply query
+antecedents. Root and Child query only their own explicit Task input and never
+copy Parent prompt state or search results. Recall
 freezes in `run_recall` before model admission with claim/epoch and version checks.
-Restart uses those exact hits; new turns query the current corpus. Execution
+New policies reuse that retrieval across tool rounds, summary rounds, retries and
+restart until a different explicit input is accepted, including a repeated text
+with a new input identity. Context preparation records `recall_input_ref` and
+`recall_step` in its immutable provenance; no additional retrieval row or retriever
+observation is created for reuse. Each generation still checks model/transport
+budgets and freezes its actual prepared request. With unchanged input and tools,
+and no compaction, the message prefix stays exact while tool exchanges append.
+Only a new explicit input queries the current corpus. Execution
 cancellation interrupts pending recall and admits no partial/frozen model turn.
-Evidence is
-untrusted runtime data in a dynamic suffix, preserving the static system/identity
-prefix. It never becomes a user-authored Conversation message. The suffix uses at
+New policies remove hits whose source reference or trimmed exact text already
+appears in the working context, and deduplicate remaining hits by those same keys
+before freezing. This is private automatic-recall policy; explicit memory search
+retains its original results. Filtering after bounded retrieval can return fewer
+hits; no new ranking interface or semantic topic classifier is introduced.
+Evidence is untrusted runtime data. New policies place it immediately before the
+latest explicit input, with a historical-evidence warning; tool exchanges remain
+intact and the static system/identity prefix is preserved. It never becomes a
+user-authored Conversation message. The first request is ordered as system →
+history → recall → current user input; tool continuations append exchanges to that
+exact prefix until a new input or required compaction changes the working set.
+Evidence uses at
 most one quarter of the remaining conservative byte budget, capped at 16 KiB;
 hierarchical compaction and the final model-window check also apply; see maintenance operations.
+
+`contextual_recall` is a Host-only frozen policy opt-in. Missing on historical
+policies preserves the original latest-input query, unfiltered hits, suffix text
+and placement, as well as per-model-round retrieval, including accepted request
+hashes. New Children inherit their
+Parent policy. No schema migration or public configuration switch is added.
 
 Automatic extraction conservatively retains bounded first-person reports from
 user Conversation. Attributed Worker results use `User reported: ...`; untrusted
