@@ -4,6 +4,8 @@ import (
 	"errors"
 	"regexp"
 
+	"github.com/z-chenhao/assistant/internal/llm"
+
 	"go.yaml.in/yaml/v3"
 )
 
@@ -25,6 +27,18 @@ type ModelPrice struct {
 	Output     int64  `yaml:"output_micros_per_million" json:"output_micros_per_million"`
 	CacheRead  int64  `yaml:"cache_read_micros_per_million" json:"cache_read_micros_per_million"`
 	CacheWrite int64  `yaml:"cache_write_micros_per_million" json:"cache_write_micros_per_million"`
+}
+
+// ReferencePrice is an observational catalog quote, never a spend authorization.
+// The applied rates and source are retained with each accepted generation.
+type ReferencePrice struct {
+	Price    ModelPrice
+	Currency string
+	Source   string
+}
+
+type CostEstimator interface {
+	Quote(llm.Snapshot, llm.TokenUsage) (ReferencePrice, bool)
 }
 
 func (a *SpendAccount) UnmarshalYAML(n *yaml.Node) error {

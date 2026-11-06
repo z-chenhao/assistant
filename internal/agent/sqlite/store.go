@@ -164,20 +164,24 @@ var uiInteractionsSQL string
 //go:embed migrations/046_connected_apps.sql
 var connectedAppsSQL string
 
-var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL, githubRuleObservationSQL, feishuTaskQuestionsSQL, feishuReviewLinksSQL, githubFailedCheckRuleSQL, providerTimingsSQL, uiWidgetsSQL, accountCatalogSelectionSQL, uiInteractionsSQL, connectedAppsSQL}
+//go:embed migrations/047_cost_estimates.sql
+var costEstimatesSQL string
+
+var migrations = []string{bootstrapSQL, eventsSQL, modelsSQL, providerSQL, localProviderSQL, accountAuthSQL, mainLoopSQL, tasksSQL, taskControlSQL, toolPolicySQL, artifactsSQL, deliverySQL, childrenSQL, schedulerSQL, spendSQL, codemodeSQL, codeRecoverySQL, recallSQL, memoryMaintenanceSQL, mainSuccessorSQL, computersSQL, computerUseSQL, automationSQL, automationPrivacySQL, channelsSQL, operationsSQL, contextSQL, toolNamesSQL, nativeExecutionSQL, inspectionSQL, dispatchObservationsSQL, responsiveMainSQL, githubObservationsSQL, taskFeedbackSQL, feishuReplySourcesSQL, githubTaskContinuationSQL, taskCodeEnvironmentsSQL, githubRuleObservationSQL, feishuTaskQuestionsSQL, feishuReviewLinksSQL, githubFailedCheckRuleSQL, providerTimingsSQL, uiWidgetsSQL, accountCatalogSelectionSQL, uiInteractionsSQL, connectedAppsSQL, costEstimatesSQL}
 
 type Store struct {
-	inspector   *inspectionsqlite.Inspector
-	taskReader  *tasksqlite.Reader
-	dispatches  *inspectionsqlite.Recorder
-	scheduler   atomic.Pointer[agent.SchedulerLimits]
-	githubScope atomic.Pointer[string]
-	nextRun     *sql.Stmt
-	activeRun   *sql.Stmt
-	db          *sql.DB
-	path        string
-	codeRoot    string
-	artifacts   *artifactsqlite.Store
+	costEstimator agent.CostEstimator
+	inspector     *inspectionsqlite.Inspector
+	taskReader    *tasksqlite.Reader
+	dispatches    *inspectionsqlite.Recorder
+	scheduler     atomic.Pointer[agent.SchedulerLimits]
+	githubScope   atomic.Pointer[string]
+	nextRun       *sql.Stmt
+	activeRun     *sql.Stmt
+	db            *sql.DB
+	path          string
+	codeRoot      string
+	artifacts     *artifactsqlite.Store
 	// MainBoundary is explicit fault injection; production composition leaves it nil.
 	MainBoundary func(string)
 }

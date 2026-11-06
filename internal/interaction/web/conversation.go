@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/delivery/ui"
@@ -13,6 +14,9 @@ import (
 
 func (s *Server) showMessage(ctx context.Context, m conversation.Message, approvals map[string]interaction.Approval) (shownMessage, error) {
 	out := shownMessage{Role: m.Role, Sequence: m.Sequence}
+	if !m.CreatedAt.IsZero() {
+		out.CreatedAt = m.CreatedAt.Format(time.RFC3339Nano)
+	}
 	if m.Source == "main" && m.Role == "assistant" && m.SourceEventID != "" && m.MessageID == "reply:"+m.SourceEventID {
 		out.ReplyKey = replyKey(m.SourceEventID)
 	}

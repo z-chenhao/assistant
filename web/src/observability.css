@@ -1,5 +1,4 @@
 /* Trace list and peek share the application's controls at compact density. */
-.trace-workspace{--sidebar-width:176px;--section-sidebar-width:168px}
 .trace-workspace .workspace-topbar{height:48px;padding:0 16px;border-bottom:1px solid var(--border)}
 .trace-workspace .breadcrumbs{font-size:13px}.trace-workspace .workspace-topbar #workspace-status{display:none}
 .observability{padding:0;max-width:none;margin:0;min-width:0;font-size:var(--text-ui);container:inspection-layout / inline-size}
@@ -25,7 +24,7 @@
 .obs-activity-chart{height:88px;display:flex;align-items:flex-end;gap:2px;padding:12px 0 0}.obs-activity-chart svg{display:block;width:100%;height:100%;overflow:visible}.obs-activity-chart rect{fill:var(--muted-foreground);opacity:.65}.obs-activity-axis{display:flex;justify-content:space-between;height:24px;padding-top:3px;font-size:11px;color:var(--muted-foreground)}
 .obs-trace-list{border:0;border-radius:0;overflow:hidden}.obs-table-scroll{overflow:auto;overscroll-behavior-x:contain}
 .obs-trace-list table{width:100%;min-width:1700px;border-collapse:collapse;table-layout:fixed}
-.obs-col-created{width:164px}.obs-col-role{width:105px}.obs-col-name{width:185px}.obs-col-preview{width:260px}.obs-col-duration{width:85px}.obs-col-model{width:140px}.obs-col-tokens{width:105px}.obs-col-cost{width:105px}.obs-col-status{width:100px}.obs-col-id{width:240px}
+.obs-col-created{width:164px}.obs-col-role{width:105px}.obs-col-name{width:185px}.obs-col-preview{width:260px}.obs-col-duration{width:85px}.obs-col-model{width:140px}.obs-col-tokens{width:105px}.obs-col-cost{width:176px}.obs-col-status{width:100px}.obs-col-id{width:240px}
 .obs-trace-list th{height:32px;font-size:12px;line-height:18px;font-weight:500;text-align:left;background:var(--card);color:var(--muted-foreground);padding:4px 8px;white-space:nowrap;border-bottom:1px solid var(--border)}.obs-trace-list th>svg{display:inline-block;width:12px;height:12px;vertical-align:middle}
 .obs-trace-list td{height:36px;font-size:12px;line-height:18px;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;font-variant-numeric:tabular-nums}
 .obs-trace-list tbody tr:hover{background:var(--hover)}.obs-trace-list small{font-size:11px;color:var(--muted-foreground)}.obs-trace-list .obs-number{text-align:right}.obs-cost{display:block}.trace-open,.obs-cell-text{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;margin:0}.trace-open{font-weight:400;text-decoration:none}.trace-open:hover{text-decoration:underline}
@@ -101,3 +100,9 @@
 .observation-node[data-observation-kind=wait]{--node-color:var(--status-attention)}
 
 .obs-node-status:is([data-status=queued],[data-status=unknown]) .obs-status-dot{color:var(--status-attention)}
+
+.js .obs-trace-list tr[data-execution-id]{cursor:pointer}
+
+.obs-wire-reader{display:grid;gap:20px}.obs-wire-attempt{min-width:0}.obs-wire-attempt>.obs-message{margin:10px 0}.obs-wire-attempt>.obs-message>summary{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.obs-wire-attempt .obs-message-text{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.75 var(--font-ui);padding:14px}.obs-wire-attempt .obs-json{max-height:480px;overflow:auto}
+
+.obs-message-excerpt{min-width:0;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted-foreground);font-weight:400}.obs-message[open]>.obs-message-excerpt{display:none}

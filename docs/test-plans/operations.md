@@ -30,6 +30,8 @@
 | --- | --- |
 | [tests/system/verify_operations.py](../../tests/system/verify_operations.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 | [tests/system/verify_spend.py](../../tests/system/verify_spend.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
+| [internal/llm/pricing/catalog_test.go](../../internal/llm/pricing/catalog_test.go) | 供应商地址／chat 模型精确匹配、同名 classifier 排除、缓存与长上下文分档、未知模型／代理、订阅参考价、十进制整数转换 |
+| [internal/agent/sqlite/cost_estimates_test.go](../../internal/agent/sqlite/cost_estimates_test.go) | 接纳事务中的固定估算、只读 Trace 投影、重放不重计、不可改写、缺失 usage、手动覆盖与货币审批隔离 |
 | [internal/operations/service/service_test.go](../../internal/operations/service/service_test.go) | 安装不启用、XML/argv、凭据不复制、持久停止及信号失败、双实例拒绝、独立巡检、健康过期、有限崩溃恢复、提示去重、配置修复/升级与元数据 fail-closed；外部 launchctl 用注册协议 peer，不更改宿主登录会话 |
 | [cmd/steward/service_test.go](../../cmd/steward/service_test.go) | 真 CLI service install/run/status/inspect 与 loopback Web/setup_required；浏览器断开不关闭服务、持久停机被运行时观察到、排队启动不恢复停止意图；macOS 才执行实际后台 CLI，其他平台验证明确拒绝 |
 
@@ -52,6 +54,12 @@ only Outbox quarantine fields/index. Empty and every supported prior schema
 follow the same forward migration path. Failed DDL rolls back version and schema
 together. Never lower `user_version` or downgrade in place. Retain the old binary
 and original cold backup until the rehearsal completes.
+
+When a state migration changes the current schema, update the independent
+`STATE_SCHEMA_VERSION` fixture in `tests/system/verify.py` and the populated
+upgrade fixtures together. Foundation, local-provider and Code Mode system
+checks retain exact version assertions; do not derive the expected version from
+the database under test or remove the assertions to make an upgrade pass.
 
 ```sh
 make test

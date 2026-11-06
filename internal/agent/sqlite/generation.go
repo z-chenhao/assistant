@@ -218,6 +218,9 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	if err := s.settleSpend(ctx, tx, request, llm.GenerationResult{Usage: usage}); err != nil {
 		return agent.ErrStorage
 	}
+	if err := s.estimateCost(ctx, tx, request, usage); err != nil {
+		return agent.ErrStorage
+	}
 	if err := s.recordProviderHealth(ctx, tx, runID, code); err != nil {
 		return agent.ErrStorage
 	}

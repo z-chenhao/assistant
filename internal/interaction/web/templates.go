@@ -3,6 +3,7 @@ package web
 import (
 	"embed"
 	"html/template"
+	"time"
 )
 
 //go:embed templates/*.html
@@ -15,33 +16,35 @@ func newLayout(language string) *template.Template {
 		"help":                help,
 		"memorySourcesOffset": memorySourcesOffset, "memoryOffset": memoryOffset, "memoryURL": memoryURL, "memorySourceLabel": memorySourceLabel, "memoryOriginLabel": memoryOriginLabel, "memoryStatus": memoryStatus,
 		"capabilityURL": capabilityURL,
-		"traceTime":     traceTime,
 		"traceColumns": func() []string {
-			return []string{"Created time", "Type", "Input", "Output", "Wall time", "Model", "Tokens", "Accepted cost", "Status", "Trace ID"}
+			return []string{"Created time", "Type", "Input", "Output", "Wall time", "TTFT", "Model", "Tokens", "Model cost", "Status", "Trace ID"}
 		},
 		"traceURL": traceURL, "traceListURL": traceListURL, "traceClearURL": traceClearURL, "tracePresetURL": tracePresetURL,
 		"canSend":       canSend,
-		"bindingTarget": bindingTarget, "humanTime": func(raw string) string { return localeTime(language, raw) }, "observedTime": func(raw string) string { return localeTime(language, raw) }, "toolLabel": toolLabel,
+		"bindingTarget": bindingTarget, "toolLabel": toolLabel,
 		"taskURL": taskURL, "taskListURL": taskListURL, "taskViews": taskViews, "historyLabel": historyLabel,
 		"scheduleTime":      func(raw, zone string) string { return localScheduleTime(language, raw, zone) },
 		"scheduleFrequency": scheduleFrequency,
 		"conversationURL":   conversationURL, "tabLabel": tabLabel,
 		"prettyBody":          prettyBody,
-		"observedDateTime":    observedDateTime,
-		"observedAt":          observedAt,
 		"providerTimingLabel": providerTimingLabel,
 		"duration":            duration,
 		"elapsed":             elapsed,
-		"obsStatuses":         func() []string { return []string{"queued", "running", "waiting", "completed", "failed", "cancelled"} },
-		"obsKind":             observationKind,
-		"obsRole":             observationRole,
-		"parentRun":           observationParent,
-		"obsIcon":             observationIcon,
+		"milliseconds": func(value *int64) string {
+			if value == nil {
+				return "—"
+			}
+			return (time.Duration(*value) * time.Millisecond).String()
+		},
+		"obsStatuses": func() []string { return []string{"queued", "running", "waiting", "completed", "failed", "cancelled"} },
+		"obsKind":     observationKind,
+		"obsRole":     observationRole,
+		"parentRun":   observationParent,
+		"obsIcon":     observationIcon,
 
 		"money":           money,
 		"obsJSON":         viewJSON,
 		"authURL":         AuthURL,
-		"timeInput":       timeInput,
 		"runRole":         runRole,
 		"taskAction":      taskAction,
 		"indent":          treeIndent,
@@ -49,9 +52,11 @@ func newLayout(language string) *template.Template {
 		"contextURL":      contextURL,
 		"contextLink":     contextLink,
 		"partEnd":         func(v *contextView) int { return v.Query.Offset + len(v.Frozen.Content) },
-	}).ParseFS(templates, "templates/*.html"))
+	}).Funcs(timeFunctions(time.Local, language)).ParseFS(templates, "templates/*.html"))
 
 }
 
-var layout = newLayout("en")
-var chineseLayout = newLayout("zh-CN")
+// Keep unexecuted sources for request-local function bindings.
+var layoutSource = newLayout("en")
+var chineseLayoutSource = newLayout("zh-CN")
+var layout = template.Must(layoutSource.Clone())

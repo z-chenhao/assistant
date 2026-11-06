@@ -76,7 +76,7 @@ func (s *Server) updates(w http.ResponseWriter, r *http.Request) {
 	regions := map[string]string{}
 	for id, name := range fragments {
 		var html bytes.Buffer
-		if err = localizedLayout(requestLanguage(r)).ExecuteTemplate(&html, name, p); err != nil {
+		if err = requestLayout(r).ExecuteTemplate(&html, name, p); err != nil {
 			fail(w, 500)
 			return
 		}

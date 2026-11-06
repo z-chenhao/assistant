@@ -13,7 +13,7 @@
  <div class="settings-search" data-client-pending data-settings-search><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input type="search" aria-label="{{tr "Search settings"}}" placeholder="{{tr "Search"}}" autocomplete="off"></div>
  <p class="settings-nav-heading">{{tr "Personal"}}</p>
  <nav class="section-navigation settings-navigation" aria-label="{{tr "Settings sections"}}">
-  <a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Preferences"}}</span></a>
+  <a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{template "icon-configuration"}}<span>{{tr "Preferences"}}</span></a>
   <a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{template "icon-notification"}}<span>{{tr "Notifications"}}</span></a>
   <a href="/settings/setup" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "apps") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{template "icon-connection"}}<span>{{tr "Resources"}}</span></a>
   <a href="/settings/apps" {{if eq .Settings.Section "apps"}}aria-current="page"{{end}}>{{template "icon-apps"}}<span>{{tr "Apps"}}</span></a>

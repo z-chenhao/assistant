@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/llm"
@@ -35,6 +36,7 @@ type traceView struct {
 	FullContext                        *contextView
 	Compare                            string
 	Tabs                               []string
+	TTFTMS                             *int64
 }
 type traceRow struct {
 	observability.Observation
@@ -95,6 +97,25 @@ func (s *Server) loadTrace(ctx context.Context, v *traceView) error {
 		return err
 	}
 	v.Tree = &tree
+	var started, firstText int64
+	starts := map[string]int64{}
+	for _, mark := range tree.ProviderTimings {
+		if mark.Phase == "started" {
+			starts[mark.Attempt] = mark.At
+			if started == 0 || mark.At < started {
+				started = mark.At
+			}
+		}
+	}
+	for _, mark := range tree.ProviderTimings {
+		if at, ok := starts[mark.Attempt]; ok && mark.Phase == "first_text" && mark.At >= at && (firstText == 0 || mark.At < firstText) {
+			firstText = mark.At
+		}
+	}
+	if started > 0 && firstText >= started {
+		ms := (firstText - started) / 1000
+		v.TTFTMS = &ms
+	}
 	v.Node = tree.Selected.ID
 	query.Selected = v.Node
 	v.Rows = traceRows(tree)
@@ -137,6 +158,26 @@ func (s *Server) loadTrace(ctx context.Context, v *traceView) error {
 	}
 	if v.Tab == "wire" {
 		v.Wire, err = read("wire")
+		// Capture is bounded and immutable after dispatch. Assemble small saved
+		// requests so a byte boundary does not turn valid JSON into unreadable
+		// fragments; the original paging route remains for larger captures.
+		if err == nil && v.Offset == 0 && v.Wire.Length <= 2<<20 && v.Wire.Next != nil {
+			first := v.Wire
+			var body strings.Builder
+			body.WriteString(first.Content)
+			next := first.Next
+			for next != nil {
+				part, e := s.Traces.ObservationBody(ctx, observability.BodyQuery{ObservationQuery: query, Field: "wire", Offset: *next})
+				if e != nil || !part.Available || part.Length != first.Length || (part.Next != nil && *part.Next <= *next) {
+					break
+				}
+				body.WriteString(part.Content)
+				next = part.Next
+			}
+			if next == nil && body.Len() == first.Length && json.Valid([]byte(body.String())) {
+				v.Wire.Content, v.Wire.Next = body.String(), nil
+			}
+		}
 		return err
 	}
 	if v.Tab == "metadata" {

@@ -93,7 +93,9 @@ html:has(body.chat-workspace),body.chat-workspace{overscroll-behavior-y:none}
  .sidebar-collapsed .primary-navigation a{justify-content:center;min-height:44px;padding:10px}
  .sidebar-collapsed .primary-navigation a>span{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  .sidebar-collapsed .primary-navigation .icon{width:20px;height:20px;flex-shrink:0}
- .sidebar-collapsed .workspace-main,.sidebar-collapsed .has-section-navigation .workspace-main{margin-left:64px}
+ .sidebar-collapsed .workspace-main{margin-left:64px}
+ .sidebar-collapsed .section-sidebar{display:flex;left:64px}
+ .sidebar-collapsed .has-section-navigation .workspace-main{margin-left:calc(64px + var(--section-sidebar-width))}
  .sidebar-collapsed .conversation-footer{left:64px}
  .sidebar-collapsed .sidebar-open{display:none}
 }

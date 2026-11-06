@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -12,6 +13,106 @@ import (
 )
 
 type traceReader struct{}
+
+func TestTraceCostDisclosesEstimateSourceAndPartialCoverage(t *testing.T) {
+	for _, tt := range []struct {
+		metrics observability.Metrics
+		want    []string
+		absent  string
+	}{
+		{observability.Metrics{}, []string{"Not priced"}, "Estimated"},
+		{observability.Metrics{Costs: []observability.Cost{{Currency: "USD", Micros: 42}}}, []string{"USD 0.000042"}, "Estimated"},
+		{observability.Metrics{Costs: []observability.Cost{{Currency: "USD", Micros: 42, Estimated: true, Source: "catalog-v1 <script>"}}, Unpriced: 1}, []string{"USD 0.000042", "Estimated", "Partial", "catalog-v1 &lt;script&gt;", "not an invoice"}, "<script>"},
+	} {
+		var html strings.Builder
+		if err := localizedLayout("en").ExecuteTemplate(&html, "trace-cost", tt.metrics); err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range tt.want {
+			if !strings.Contains(html.String(), want) {
+				t.Fatal("missing cost disclosure", want, html.String())
+			}
+		}
+		if strings.Contains(html.String(), tt.absent) {
+			t.Fatal("misleading or unsafe cost", html.String())
+		}
+	}
+}
+
+type pagedWireReader struct {
+	traceReader
+	wire  string
+	calls int
+	fault string
+}
+
+func (r *pagedWireReader) ObservationBody(_ context.Context, q observability.BodyQuery) (observability.Body, error) {
+	r.calls++
+	end := min(q.Offset+8192, len(r.wire))
+	part := observability.Body{Available: true, Length: len(r.wire), Content: r.wire[q.Offset:end]}
+	if end < len(r.wire) {
+		part.Next = &end
+	}
+	if r.calls > 1 {
+		switch r.fault {
+		case "length":
+			part.Length++
+		case "unavailable":
+			part.Available = false
+		case "offset":
+			part.Next = &q.Offset
+		case "error":
+			return observability.Body{}, errors.New("capture unavailable")
+		}
+	}
+	return part, nil
+}
+
+func TestRequestsKeepNativePagingWhenAssemblyCannotComplete(t *testing.T) {
+	for _, fault := range []string{"length", "unavailable", "offset", "error", "oversize"} {
+		t.Run(fault, func(t *testing.T) {
+			length := 10000
+			if fault == "oversize" {
+				length = 2 << 20
+			}
+			reader := &pagedWireReader{wire: `{"instructions":"` + strings.Repeat("x", length) + `"}`, fault: fault}
+			s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Inspector: &inspectionReader{}, Traces: reader}
+			v := &traceView{Run: "root-public", Node: "generation:g", Tab: "wire"}
+			if err := s.loadTrace(context.Background(), v); err != nil {
+				t.Fatal(err)
+			}
+			if v.Wire.Content != reader.wire[:8192] || v.Wire.Next == nil || *v.Wire.Next != 8192 || v.Wire.Length != len(reader.wire) {
+				t.Fatal("failed assembly discarded the original paging route", v.Wire)
+			}
+			wantCalls := 2
+			if fault == "oversize" {
+				wantCalls = 1
+			}
+			if reader.calls != wantCalls {
+				t.Fatal("unbounded capture reads", reader.calls, wantCalls)
+			}
+		})
+	}
+}
+
+func TestRequestsAssembleCompleteSavedJSONForReading(t *testing.T) {
+	reader := &pagedWireReader{wire: `[{"attempt":"test","body":{"instructions":"` + strings.Repeat("instruction ", 4000) + `","messages":[{"role":"user","content":"你好 <script>safe text</script>"}]}}]`}
+	s := &Server{Core: &updatesCore{allowed: true, status: "idle"}, Inspector: &inspectionReader{}, Traces: reader}
+	v := &traceView{Run: "root-public", Node: "generation:g", Tab: "wire"}
+	if err := s.loadTrace(context.Background(), v); err != nil {
+		t.Fatal(err)
+	}
+	if reader.calls < 2 || v.Wire.Next != nil || v.Wire.Content != reader.wire {
+		t.Fatal("request was left as a partial JSON fragment", reader.calls, v.Wire.Next)
+	}
+	var html strings.Builder
+	if err := localizedLayout("en").ExecuteTemplate(&html, "observation-detail", page{Trace: v}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html.String(), "data-wire-reader") || strings.Contains(html.String(), "<script>safe text</script>") {
+		t.Fatal("request reader lost safe original fallback")
+	}
+}
 
 func (traceReader) Traces(context.Context, observability.TraceQuery) (observability.Traces, error) {
 	return observability.Traces{Items: []observability.Trace{{Execution: observability.Execution{ID: "root-public", Role: "root", Status: "completed", CreatedAt: "2026-10-29T01:00:00Z", EndedAt: "2026-10-29T01:00:01Z"}, Title: "Review report", Session: "conversation:owner", Model: "fixture-model"}}, Next: "next-public", Total: 1}, nil

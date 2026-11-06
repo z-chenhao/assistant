@@ -163,3 +163,7 @@ pre[data-readonly-json]{white-space:pre-wrap}
 /* Native answer form controls consume the shared control palette. */
 
 .answer-chart-range input[type=range]{accent-color:var(--foreground)}
+
+time[data-local-time]{font-variant-numeric:tabular-nums}
+
+.control-time-detail{position:fixed;inset:auto;margin:0;padding:8px 10px;max-width:calc(100vw - 24px);border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font:12px/1.6 var(--font-ui);overflow-wrap:anywhere}

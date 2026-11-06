@@ -1,3 +1,4 @@
+import {localTimeElement} from './local-time';
 import {t} from './i18n';
 import {connectWorkspacePanel} from './workspace-panels';
 type Worker={id:string;title:string;role:string;status:string;task_ref?:string;created_at:string;started_at?:string;ended_at?:string};
@@ -15,9 +16,9 @@ export function enhanceWorkers(){
   const key=JSON.stringify(items);if(key===previous)return;previous=key;list.replaceChildren();
   for(const item of items){
    const row=document.createElement('a');row.className='worker-row';row.href='/developer/observability/'+encodeURIComponent(item.id);
-   const body=document.createElement('div'),title=document.createElement('strong'),meta=document.createElement('p'),state=document.createElement('span'),time=document.createElement('time');
+   const body=document.createElement('div'),title=document.createElement('strong'),meta=document.createElement('p'),state=document.createElement('span');
    title.textContent=item.title||t('Worker');state.className='status-pill';state.dataset.status=item.status;state.textContent=t(item.status);
-   meta.textContent=t(item.role);const at=item.started_at||item.created_at;time.dateTime=at;const date=new Date(at);time.textContent=Number.isNaN(date.valueOf())?'':date.toLocaleString(document.documentElement.lang);meta.append(' · ',time);
+   meta.textContent=t(item.role);const at=item.started_at||item.created_at;meta.append(' · ',localTimeElement(at));
    body.append(title,meta);row.append(body,state);list.append(row);
   }
   say(!items.length?'No Worker executions yet.':more?'Showing the latest 50 executions.':'');

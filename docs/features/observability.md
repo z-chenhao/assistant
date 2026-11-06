@@ -24,7 +24,7 @@
 
 **需求**：开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。
 
-**当前实现**：Web Developer → Observability 提供 Trace 列表，按 Main / Root、状态和 UTC 时间筛选；Conversation 作为 Session 关联 Main 与后台工作。选中 Trace 后进入独立详情，在同一导航区查看对齐的 observation 树/时间线，右侧检查节点详情，支持键盘/原生链接、浏览器前后退与刷新。Main 的 Task 创建/管理回执作为跨 trace 因果链接；Trace 详情的 Task execution 选择器列出各 epoch 的 Root，Child 在实际 Parent Worker 的 trace 内展示。
+**当前实现**：Web Developer → Observability 提供 Trace 列表，按 Main / Root、状态和当前用户时区的时间筛选；Conversation 作为 Session 关联 Main 与后台工作。点击列表行打开非模态详情侧栏，名称链接保留键盘与原生导航；选中 Trace 后进入独立详情，在同一导航区查看对齐的 observation 树/时间线，右侧检查节点详情，支持键盘/原生链接、浏览器前后退与刷新。Main 的 Task 创建/管理回执作为跨 trace 因果链接；Trace 详情的 Task execution 选择器列出各 epoch 的 Root，Child 在实际 Parent Worker 的 trace 内展示。
 
 **边界**：一个 Main Run 或一个 Task epoch 的 Root 执行树是一条 trace；Root 没有 Main parent。每页最多 100 个 observation，分页缺席的 parent 明确标记并可打开；不同分页看到当前提交状态。只读且沿用现有所有者授权。输入/输出与 Task 标题在列表中使用有界预览，节点详情和冻结上下文有完整读取入口；旧元数据 API 仍保持原含义。
 
@@ -50,7 +50,7 @@
 
 **需求**：开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。
 
-**当前实现**：新版本生产 Bridge 在 SDK 完成 system 合并、工具转换及图片投影后，在实际 HTTP fetch 边界记录独立 attempt。选中 Generation 或 Provider HTTP 节点，打开 **Requests** 查看脱敏最终请求、格式版本、UTC 时间与脱敏正文 hash。HTTP 重试各有独立 attempt，不把 generation 恢复接纳计数当网络次数。
+**当前实现**：新版本生产 Bridge 在 SDK 完成 system 合并、工具转换及图片投影后，在实际 HTTP fetch 边界记录独立 attempt。选中 Generation 或 Provider HTTP 节点，打开 **Requests** 查看脱敏最终请求、格式版本、原始时间与脱敏正文 hash。HTTP 重试各有独立 attempt，不把 generation 恢复接纳计数当网络次数。
 
 **边界**：不保存请求头、connection、API key 或 access token；Node 与 Host 都移除已知凭据。图片像素替换为 Artifact 引用（已知时）、预览 JPEG hash、原图/预览尺寸，不保存 Base64。脱敏正文最多 256 KiB，超限保留 hash 与明确省略原因；详情按 8192 字节续读。capture 为 best-effort，旧 Bridge/历史记录、队列溢出、数据库故障或强制退出可留空；缺失不能证明没有发送。开始事件表示 fetch 尝试，响应头事件不代表模型成功或服务端业务接受；原始 SSE 响应正文不另存。
 
@@ -74,10 +74,10 @@ Developer 的 [Memory 页面](memory.md)展示真实记忆正文与来源；记�
 
 登录现有 Web，点击侧栏 **Developer · Traces**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。
 
-1. 列表页顶部提供名称、Trace ID 或模型的字面子串搜索（ASCII 大小写不敏感），全局顶栏为独立时间范围与 Refresh。角色/状态按分组单选呈现，筛选侧栏可收起（手机默认收起），按角色、状态和 UTC 创建时间组合查询；起点包含、终点不包含，支持最近 24 小时／7 天／30 天及自定义边界。条件与分页写入 URL，可逐项清除；修改条件与刷新从第一页读取。点击 Session 查看同一 Conversation 的相关 Trace。
+1. 列表页顶部提供名称、Trace ID 或模型的字面子串搜索（ASCII 大小写不敏感），全局顶栏为独立时间范围与 Refresh。角色/状态按分组单选呈现，筛选侧栏可收起（手机默认收起），按角色、状态和当前用户时区的创建时间组合查询；起点包含、终点不包含，支持最近 24 小时／7 天／30 天及自定义边界。条件与分页写入 URL，可逐项清除；修改条件与刷新从第一页读取。点击 Session 查看同一 Conversation 的相关 Trace。
 2. 图表显示完整筛选范围的真实 Trace 时间计数；表格按创建时间、类型、名称、Input、Output、wall time、模型、Token 与已结算费用紧凑分列，ID 独立且默认隐藏，列显隐在当前浏览器保留。缺失指标保持未知，已知记录不足时标注 Partial；页脚报告完整筛选计数及当前页条数。
 3. 点击名称在默认半屏的右侧非模态面板展开详情，保留底下列表的筛选与滚动位置；关闭及浏览器后退恢复列表，支持前后 Trace、全屏展开，Open full page 打开独立 `/developer/observability/{run}`。直接书签和无 JavaScript 时仍使用完整详情页。左侧 **Trace tree** 以类型颜色、真实层级连接线、分支折叠和实际耗时呈现，搜索保留匹配祖先；面板外边缘与树/正文分栏支持鼠标和键盘调宽，偏好只在当前浏览器保留，右侧为 **Observation details**；返回 Traces 保留列表条件。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
-4. 节点 Preview 将类型、UTC 时间、耗时、状态及 Session/Run 放在顶部，正文依次为 Input、Output；支持 Formatted/JSON 切换、结构化 JSON 折叠与复制。部分片段或无法精确表示的数字保留原始 JSON 阅读。Generation 的 Preview 展示有界消息与接受响应，模型请求时间线折叠在下方。时间线显示响应头、首段响应数据、首段可见文本或首个工具调用、响应流终止事件，并区分等待响应头超时、响应流空闲和整轮超时。**Context** 是完整 messages / tools / response / provenance / recall 的阅读器，支持 JSON、来源与长正文连续读取。**Requests** 查看最终 HTTP 请求。存在前一轮时显示 **Compare**。HTTP 节点提供 Overview / Requests。
+4. 节点 Preview 将类型、当前用户时区的时间、耗时、状态及 Session/Run 放在顶部，正文依次为 Input、Output；支持 Formatted/JSON 切换、结构化 JSON 折叠与复制。部分片段或无法精确表示的数字保留原始 JSON 阅读。Generation 的 Preview 展示有界消息与接受响应，模型请求时间线折叠在下方。时间线显示响应头、首段响应数据、首段可见文本或首个工具调用、响应流终止事件，并区分等待响应头超时、响应流空闲和整轮超时。**Context** 是完整 messages / tools / response / provenance / recall 的阅读器，支持 JSON、来源与长正文连续读取。**Requests** 默认按系统指令、角色消息、工具与参数分组阅读最终 HTTP 请求，原始 JSON 可切换核对。Context 的条目、分页与格式切换留在当前详情侧栏内，不打开另一个完整页面。存在前一轮时显示 **Compare**。HTTP 节点提供 Overview / Requests。
 5. 选择 Tool、Retriever、等待或 HTTP 节点，核对各自保存的数据和时间语义。API/Page 不提供重试、重放、审批或取消动作；无 JavaScript 时原生导航、筛选和分页仍然可用。
 6. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Tasks 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
 
@@ -94,3 +94,8 @@ Developer 的 [Memory 页面](memory.md)展示真实记忆正文与来源；记�
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/observability.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/observability.md)。
+
+
+列表提供 TTFT，表示首次模型调用从首次 HTTP 请求开始到首段模型文本（含推理）的耗时，包含该调用的重试等待；缺少对应请求开始／首段文本证据时显示未知，不使用响应头或首段网络数据代替，也不对多次调用求和。Generation 详情显示所选调用的同口径值。只有工具调用而未记录文本的旧证据保持未知。
+
+Model cost 优先展示配置价格与已接纳用量的结算值；新调用没有手动价格时自动匹配内置目录并显示“估算”，hover 可查看目录来源及版本。未知价格／用量显示“未计价”，部分覆盖标明“部分”；历史记录不回填，订阅参考价不冒充账单。Traces 与 Memory 的筛选选择立即通过原生 GET 应用，搜索保留 Enter／搜索按钮；无 JavaScript 时保留 Apply filters。

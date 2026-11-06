@@ -1,3 +1,6 @@
+import {enhanceFilterForms} from './components/ui/filter-form';
+import {enhanceTimeDetails} from './components/ui/time-detail';
+import {enhanceLocalTimes} from './local-time';
 import {enhanceContextHelp} from './components/ui/help';
 import {enhanceWorkers} from './workers';
 import {enhanceAppConnections} from './app-connections';
@@ -21,6 +24,8 @@ enhanceShell();
 enhanceComputerView();
 enhanceWorkers();
 const live=startLiveUpdates();
+enhanceLocalTimes();
+enhanceTimeDetails();
 enhanceProjections();
 enhanceRichForms();
 enhanceComposer(live?.messageAccepted);
@@ -34,6 +39,7 @@ enhanceContextHelp();
 enhanceSettings();
 enhanceFormDisclosures();
 enhanceSelectControls();
+enhanceFilterForms();
 enhanceCapabilityForms();
 
 enhanceBrandMotion();

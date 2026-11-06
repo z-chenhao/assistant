@@ -1,5 +1,7 @@
 // Progressive navigation for the server-rendered trace workbench. The server
 // remains the only owner of query/selection state; native links work without JS.
+import {enhanceTraceRequests} from './trace-request';
+import {formatLocalTime} from './local-time';
 import {revealCurrentTabs} from './shell';
 import {createSideSheet} from './components/ui/sheet';
 import {t} from './i18n';
@@ -30,7 +32,7 @@ export function enhanceObservability() {
   disposeWorkbench=enhanceSplitView(root,t('Resize trace tree'));
   for(const node of root.querySelectorAll<HTMLElement>('.observation-node')){node.id='trace-node-'+node.dataset.observationId;const button=node.querySelector('[data-observation-toggle]');if(button){const children=Array.from(root.querySelectorAll<HTMLElement>('.observation-node')).filter(child=>child.dataset.parentObservation===node.dataset.observationId);button.setAttribute('aria-controls',children.map(child=>'trace-node-'+child.dataset.observationId).join(' '))}}
   const pane=root.querySelector<HTMLElement>('.obs-tree-pane');if(pane)renderTree(pane);
-  enhanceReadOnlyJson(root);setMode(root);
+  enhanceTraceRequests(root);enhanceReadOnlyJson(root);setMode(root);
   for(const button of root.querySelectorAll<HTMLButtonElement>('[data-copy-json]'))button.disabled=!root.querySelector('[data-json-source="'+button.dataset.copyJson+'"]')||!navigator.clipboard?.writeText;
  };
  initializeWorkbench(document);
@@ -43,10 +45,10 @@ export function enhanceObservability() {
   const table=document.querySelector<HTMLTableElement>('.obs-trace-list table')!;
   const columns=Array.from(table.querySelectorAll<HTMLElement>('col'));
   const widths=columns.map(col=>parseFloat(getComputedStyle(col).width)||0);
-  const columnIndexes=[0,1,3,4,5,6,7,8,9,10];
+  const columnIndexes=[0,1,3,4,5,6,7,8,9,10,11];
   const toggles=Array.from(document.querySelectorAll<HTMLInputElement>('[data-trace-column]'));
-  let visible=toggles.map((_,index)=>index<9);
-  try{const saved=JSON.parse(localStorage.getItem('steward.trace.columns.v2')??'null');if(Array.isArray(saved)&&saved.length===toggles.length&&saved.every(value=>typeof value==='boolean'))visible=saved}catch{}
+  let visible=toggles.map((_,index)=>index<10);
+  try{let saved=JSON.parse(localStorage.getItem('steward.trace.columns.v3')??'null');if(saved===null){const previous=JSON.parse(localStorage.getItem('steward.trace.columns.v2')??'null');if(Array.isArray(previous)&&previous.length===10)saved=[...previous.slice(0,5),true,...previous.slice(5)]};if(Array.isArray(saved)&&saved.length===toggles.length&&saved.every(value=>typeof value==='boolean'))visible=saved}catch{}
   const render=()=>{
    toggles.forEach((toggle,index)=>{
     toggle.checked=visible[index];toggle.disabled=false;
@@ -55,7 +57,7 @@ export function enhanceObservability() {
    });
    table.style.minWidth=columns.reduce((width,col,index)=>width+(col.hidden?0:widths[index]),0)+'px';
   };
-  toggles.forEach((toggle,index)=>toggle.addEventListener('change',()=>{visible[index]=toggle.checked;render();try{localStorage.setItem('steward.trace.columns.v2',JSON.stringify(visible))}catch{}}));
+  toggles.forEach((toggle,index)=>toggle.addEventListener('change',()=>{visible[index]=toggle.checked;render();try{localStorage.setItem('steward.trace.columns.v3',JSON.stringify(visible))}catch{}}));
   render();
  }
 
@@ -64,11 +66,11 @@ export function enhanceObservability() {
   if(!buckets?.length)continue;
   const maximum=Math.max(1,...buckets.map(bucket=>bucket.count));
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 960 80');svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('aria-hidden','true');
-  buckets.forEach((bucket,index)=>{const bar=document.createElementNS(ns,'rect');bar.setAttribute('x',String(index*20));bar.setAttribute('y',String(80-bucket.count/maximum*76));bar.setAttribute('width','16');bar.setAttribute('height',String(bucket.count/maximum*76));const title=document.createElementNS(ns,'title');title.textContent=bucket.at+' · '+bucket.count;bar.append(title);svg.append(bar)});
+  buckets.forEach((bucket,index)=>{const bar=document.createElementNS(ns,'rect');bar.setAttribute('x',String(index*20));bar.setAttribute('y',String(80-bucket.count/maximum*76));bar.setAttribute('width','16');bar.setAttribute('height',String(bucket.count/maximum*76));const title=document.createElementNS(ns,'title');title.textContent=(formatLocalTime(bucket.at,'datetime',document.documentElement.lang)?.full??'')+' · '+bucket.count;bar.append(title);svg.append(bar)});
   chart.append(svg);
   const axis=chart.nextElementSibling;
   const span=new Date(buckets.at(-1)!.at).valueOf()-new Date(buckets[0].at).valueOf();
-  for(const index of [0,12,24,36,47]){const label=document.createElement('span');const date=new Date(buckets[index].at);label.textContent=date.toLocaleString(document.documentElement.lang,span<86400000?{timeZone:'UTC',hour:'2-digit',minute:'2-digit',second:'2-digit',...(span<60000?{fractionalSecondDigits:3 as const}:{})}:{timeZone:'UTC',month:'short',day:'numeric'});axis?.append(label)}
+  for(const index of [0,12,24,36,47]){const label=document.createElement('span');const date=new Date(buckets[index].at);label.textContent=formatLocalTime(date.toISOString(),span<86400000?'clock':'date',document.documentElement.lang)?.text??'';axis?.append(label)}
  }
  document.addEventListener('input',event=>{const field=event.target;if(field instanceof HTMLInputElement&&field.closest('.obs-tree-search')){const pane=field.closest<HTMLElement>('.obs-tree-pane');if(pane)renderTree(pane)}});
  document.addEventListener('click',event=>{
@@ -142,7 +144,13 @@ export function enhanceObservability() {
  }
  document.addEventListener('click',event=>{
   if(!(event instanceof MouseEvent)||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
-  const anchor=(event.target as Element|null)?.closest<HTMLAnchorElement>(listPage?'a.obs-select,a.trace-open':'a.obs-select');
+  const target=event.target as Element|null;
+  let anchor=target?.closest<HTMLAnchorElement>(listPage?'a.obs-select,a.trace-open,.context-reader a':'a.obs-select,.context-reader a');
+  if(!anchor&&listPage&&!target?.closest('a,button,input,select,textarea,label,summary,[role=button],[contenteditable]')){
+   if(window.getSelection()?.toString())return;
+   anchor=target?.closest('tr[data-execution-id]')?.querySelector<HTMLAnchorElement>('a.trace-open');
+   anchor?.focus({preventScroll:true});
+  }
   if(!anchor||anchor.target||anchor.download)return;
   const url=new URL(anchor.href);
   if(url.origin!==location.origin||!url.pathname.startsWith('/developer/observability/'))return;

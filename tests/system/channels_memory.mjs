@@ -4,6 +4,11 @@ export async function memoryInspection({page,context,browser,url,evidence}) {
  await page.getByRole('navigation',{name:'Workspace'}).getByRole('link',{name:'Developer',exact:true}).click();
  await page.getByRole('navigation',{name:'Developer sections'}).getByRole('link',{name:'Memory',exact:true}).click();
  await page.locator('.memory-page').waitFor();
+ await page.getByRole('button',{name:'Apply filters',exact:true}).waitFor({state:'hidden'});
+ await page.getByRole('radio',{name:'Recall',exact:true}).check();await page.waitForURL(target=>target.searchParams.get('tier')==='recall');
+ if(await page.locator('[data-memory-ref]').count()<1||await page.locator('[data-memory-ref] td:nth-child(2)').allTextContents().then(values=>values.some(value=>value.trim()!=='Recall')))throw Error('Memory filter did not apply automatically');
+ await page.getByRole('radio',{name:'All tiers',exact:true}).check();await page.waitForURL(target=>!target.searchParams.get('tier'));
+
  if(await page.getByRole('link',{name:'Database',exact:true}).count())throw Error('Database navigation remains');
  const first=await page.locator('[data-memory-ref]').evaluateAll(rows=>rows.map(row=>row.dataset.memoryRef));
  if(first.length!==20)throw Error('Memory default page is not bounded');
@@ -27,7 +32,8 @@ export async function memoryInspection({page,context,browser,url,evidence}) {
   release();await page.locator('#memory-page[data-memory-ready]').waitFor();
  }finally{release();await page.unroute('**/app.js')}
  await page.getByRole('searchbox',{name:'Search memories',exact:true}).fill('walking by the river');
- await page.getByRole('button',{name:'Search memories',exact:true}).click();
+ await Promise.all([page.waitForURL(target=>target.searchParams.get('search')==='walking by the river'),page.getByRole('button',{name:'Search memories',exact:true}).click()]);
+ const listURL=page.url();
  if(await page.locator('[data-memory-ref]').count()!==1)throw Error('Memory content search failed');
  await page.locator('#memory-page[data-memory-ready]').waitFor();
  await page.locator('a.memory-open').click();
@@ -49,7 +55,10 @@ export async function memoryInspection({page,context,browser,url,evidence}) {
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Memory detail expanded mobile viewport');
  await page.screenshot({path:evidence+'/memory-detail-mobile.png'});
- await dialog.getByRole('button',{name:'Close details',exact:true}).click();await dialog.waitFor({state:'detached'});
+ await dialog.getByRole('button',{name:'Close details',exact:true}).click();
+ // A closed dialog and the asynchronous History traversal are separate browser
+ // events. Finish the roundtrip before starting another full-page navigation.
+ await page.waitForURL(listURL);await dialog.waitFor({state:'detached'});
  await page.goto(url+'/developer/memory');
  await page.evaluate(()=>document.documentElement.classList.remove('dark'));
  for(const width of [320,390,760,761,1024,1400]){await page.setViewportSize({width,height:844});await assertDeveloperList(page)}

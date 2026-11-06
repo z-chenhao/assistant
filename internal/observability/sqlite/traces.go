@@ -172,15 +172,33 @@ func (s Inspector) Traces(ctx context.Context, q observability.TraceQuery) (obse
 func traceMetrics(ctx context.Context, tx *sql.Tx, id string) (observability.Metrics, error) {
 	m := observability.Metrics{Costs: []observability.Cost{}}
 	var ms sql.NullInt64
-	const scope = ` FROM model_generation g JOIN run r USING(run_id) LEFT JOIN provider_usage u USING(generation_id) LEFT JOIN spend_reservation s USING(generation_id) WHERE (r.run_id=? OR r.root_run_id=?)`
-	err := tx.QueryRowContext(ctx, `SELECT count(*),count(u.input_tokens),coalesce(sum(u.input_tokens),0),coalesce(sum(u.output_tokens),0),coalesce(sum(u.cache_read_tokens),0),coalesce(sum(u.cache_write_tokens),0),sum(u.latency_ms),count(*)-count(s.actual_micros)`+scope, id, id).Scan(&m.Generations, &m.KnownUsage, &m.Input, &m.Output, &m.CacheRead, &m.CacheWrite, &ms, &m.Unpriced)
+	const scope = ` FROM model_generation g JOIN run r USING(run_id) LEFT JOIN provider_usage u USING(generation_id) LEFT JOIN spend_reservation s USING(generation_id) LEFT JOIN generation_cost_estimate e USING(generation_id) WHERE (r.run_id=? OR r.root_run_id=?)`
+	err := tx.QueryRowContext(ctx, `SELECT count(*),count(u.input_tokens),coalesce(sum(u.input_tokens),0),coalesce(sum(u.output_tokens),0),coalesce(sum(u.cache_read_tokens),0),coalesce(sum(u.cache_write_tokens),0),sum(u.latency_ms),count(*)-count(coalesce(s.actual_micros,e.estimated_micros))`+scope, id, id).Scan(&m.Generations, &m.KnownUsage, &m.Input, &m.Output, &m.CacheRead, &m.CacheWrite, &ms, &m.Unpriced)
 	if err != nil {
 		return m, err
 	}
 	if ms.Valid {
 		m.ProviderMS = &ms.Int64
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT s.currency,sum(s.actual_micros)`+scope+` AND s.status='priced' GROUP BY s.currency LIMIT 20`, id, id)
+	// The first generation defines trace TTFT. Do not average or sum model
+	// calls, substitute response headers, or turn absent text timing into zero.
+	var firstText sql.NullInt64
+	err = tx.QueryRowContext(ctx, `WITH first_generation AS (
+ SELECT g.generation_id FROM model_generation g JOIN run r USING(run_id)
+ WHERE (r.run_id=? OR r.root_run_id=?) ORDER BY g.created_at,g.generation_id LIMIT 1
+ ), timing AS (
+ SELECT (SELECT min(occurred_at) FROM dispatch_observation WHERE generation_id=(SELECT generation_id FROM first_generation) AND phase='started') AS started,
+ (SELECT min(t.occurred_at) FROM dispatch_observation t JOIN dispatch_observation s
+ ON s.generation_id=t.generation_id AND s.attempt=t.attempt AND s.phase='started'
+ WHERE t.generation_id=(SELECT generation_id FROM first_generation) AND t.phase='first_text' AND t.occurred_at>=s.occurred_at) AS first_text
+ ) SELECT CASE WHEN first_text>=started THEN (first_text-started)/1000 END FROM timing`, id, id).Scan(&firstText)
+	if err != nil {
+		return m, err
+	}
+	if firstText.Valid {
+		m.TTFTMS = &firstText.Int64
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN s.actual_micros IS NOT NULL THEN s.currency ELSE e.currency END AS currency,sum(coalesce(s.actual_micros,e.estimated_micros)),max(s.actual_micros IS NULL AND e.generation_id IS NOT NULL),coalesce(group_concat(DISTINCT CASE WHEN s.actual_micros IS NULL THEN e.source||' · '||json_extract(e.price_json,'$.version') END),'')`+scope+` AND coalesce(s.actual_micros,e.estimated_micros) IS NOT NULL GROUP BY 1 ORDER BY 1 LIMIT 20`, id, id)
 	// Parenthesize scope for the cost filter (Main's own rows obey it too).
 	if err != nil {
 		return m, err
@@ -188,7 +206,7 @@ func traceMetrics(ctx context.Context, tx *sql.Tx, id string) (observability.Met
 	defer rows.Close()
 	for rows.Next() {
 		var c observability.Cost
-		if err = rows.Scan(&c.Currency, &c.Micros); err != nil {
+		if err = rows.Scan(&c.Currency, &c.Micros, &c.Estimated, &c.Source); err != nil {
 			return m, err
 		}
 		m.Costs = append(m.Costs, c)
