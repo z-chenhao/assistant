@@ -209,9 +209,12 @@ required status name is preserved. One checkout and dependency setup serve:
 5. Code Mode discovery and Main responsiveness: the maintained capabilities
    scenarios check 500 MCP tools without native declarations, direct-call rejection,
    exact approval and a Main reply while a real MCP call remains held.
-6. File account credentials: the maintained account harness uses private files
+6. The core account harness uses private files
    in a disposable data root and a controlled OAuth/Responses peer. Cross-process
    refresh, cleanup and permission checks require no desktop credential service.
+7. Focused race checks cover Main input ordering and recovery, UI state/actions,
+   ingress admission and private credential access. The full race inventory stays
+   in extended regression.
 
 The job has a 30-minute outer budget for setup and all checks. Individual test
 deadlines and assertions remain unchanged.

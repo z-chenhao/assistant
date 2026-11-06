@@ -293,8 +293,12 @@ def run(binary):
             require(drift.returncode != 0, "request drift accepted")
             h.command("chat", "work")
             result = h.state()
-            assert_final(result, 16)
-            require(len(result["generations"]) == 2 and len(result["tools"]) == 2, "wrong model/Tool path")
+            assert_final(result, 16, 16)
+            turns = [generation for generation in result["generations"] if json.loads(generation["request_json"]).get("tools")]
+            require(len(turns) == 32 and len(result["tools"]) == 32, "wrong model/Tool path")
+            expected = ["Processed: " + json.loads(item["message_json"])["content"][0]["text"] for item in result["inputs"]]
+            replies = [part["text"] for message in result["conversation"] if message["role"] == "assistant" for part in message["content"]]
+            require(replies == expected, "concurrent inputs did not receive individual ordered replies")
             h.command("chat", "work")
             require(h.state() == result, "draining terminal work changed state")
             return result
@@ -304,7 +308,12 @@ def run(binary):
 
         def responsive(h, crash):
             h.setup()
-            h.send("long", "F003:long")
+            receipt = h.send("long", "F003:long")
+            # Recover an actual pre-policy checkpoint: legacy Main retains its
+            # frozen steering behavior even while a direct tool remains held.
+            with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db, db:
+                changed = db.execute("UPDATE run SET status='running',checkpoint_json=json_remove(checkpoint_json,'$.serial_inputs'),version=version+1 WHERE run_id=?", (receipt["run_id"],))
+                require(changed.rowcount == 1, "legacy recovery fixture missing")
             release = h.root / "release-tool"
             seen, observed = set(), {}
 
@@ -355,7 +364,7 @@ def run(binary):
 
         report["responsive"] = scenario("responsive", lambda h: responsive(h, False))
         report["responsive_restart"] = scenario("responsive-restart", lambda h: responsive(h, True))
-        report["checks"].append("held Tool -> second CLI input -> reply before release; one Main; durable deferred results; SIGKILL and recovery")
+        report["checks"].append("legacy frozen Main: held Tool -> second CLI input -> reply before release; durable deferred results; SIGKILL and recovery")
 
         for boundary in ("after_compaction_commit", "before_generation_dispatch", "before_generation_commit", "after_generation_commit",
                          "before_conversation_append", "after_conversation_append", "before_reply_checkpoint",
@@ -382,8 +391,8 @@ def run(binary):
                 accepted_tools = {t["invocation_id"]: t for t in before["tools"] if t["status"] == "succeeded"}
                 h.command("chat", "work")
                 after = h.state()
-                assert_final(after, 2 if steered else 1)
-                require(len(after["generations"]) == (3 if steered else 2) and len(after["tools"]) == (4 if steered else 2), "crash repeated a logical generation/Tool")
+                assert_final(after, 2 if steered else 1, 2 if steered else 1)
+                require(len(after["generations"]) == (4 if steered else 2) and len(after["tools"]) == (4 if steered else 2), "crash repeated a logical generation/Tool")
                 for g in after["generations"]:
                     if g["generation_id"] in accepted:
                         require(g == accepted[g["generation_id"]], "completed generation replayed or drifted")
@@ -420,15 +429,17 @@ def run(binary):
                 require(db.execute("SELECT status FROM run").fetchone()[0] == "running", "shutdown cancelled/lost business work")
             h.command("chat", "work")
             state = h.state()
-            assert_final(state, 3)
-            require(len(state["generations"]) == 3, "steering failed to overtake stale reply")
+            assert_final(state, 3, 3)
+            require(len(state["generations"]) == 6, "queued inputs did not retain separate model turns")
             requests = [json.loads(g["request_json"]) for g in state["generations"]]
             require(all(r["model_snapshot"]["profile_id"] == old_profile for r in requests), "hot model switch")
-            require([m["text"] for m in requests[1]["messages"][-2:]] == ["steer one", "steer two"], "steering not separate/ordered")
+            require([requests[i]["messages"][-1]["text"] for i in (2, 4)] == ["steer one", "steer two"], "queued inputs not separate/ordered")
+            for index, reply in ((2, "Processed: original"), (4, "Processed: steer one")):
+                require(any(m["role"] == "assistant" and m.get("text") == reply for m in requests[index]["messages"]), "later input overtook an uncommitted reply")
             h.send("fourth", "new run")
             h.command("chat", "work")
             final = h.state()
-            assert_final(final, 4, 2)
+            assert_final(final, 4, 4)
             require(json.loads(final["generations"][-1]["request_json"])["model_snapshot"]["profile_id"] == new_profile, "new Run missed profile switch")
             return final
         report["steering"] = scenario("steering", steering)

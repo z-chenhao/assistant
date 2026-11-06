@@ -134,3 +134,5 @@ to survive the command or test harness.
 计划视图由 `task_planning_view_test.go` 验证真实保存配置、首次触发前安排、已结束／无后续触发、最多50项、指令最多20条、搜索／视图分离、所有者与撤销上下文、不派发／不写库。Web 验证安排读取失败不隐藏普通任务、字段转义与原审批卡片；手动编辑的协议与浏览器验证归属 [Automation 测试](automation.md)。
 
 `TestMainQueuesSecondRequestUntilFirstTaskHandoffReply` 在真实 SQLite/Actor 中阻塞第一轮模型生成，再接纳第二条请求；验证首条创建一个 Task、交接回复先提交，第二条才进入模型，且第二条回复不等待 Worker 完成。并发 ingress 回归逐条核对全部回复；旧 checkpoint 继续覆盖原 Steering 与恢复语义。
+
+`TestSerialMainRetainsBothRequestsAfterReopeningBeforeFirstReply` 在首条输入 checkpoint 后接纳第二条，关闭并重开真实状态库，验证两条请求各回复一次且先后关系不变。Main 系统 gate 对 16 条并发输入逐条核对回复内容与顺序，并保留旧冻结 checkpoint 的慢工具响应和 SIGKILL 恢复场景。

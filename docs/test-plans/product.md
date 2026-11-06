@@ -144,7 +144,7 @@ launcher failure, missing reports or source/binary drift reject success. Local
 loopback peers, disposable databases and pinned runtimes make the checks account-free.
 Test output stays in ignored `evidence/`; credentials and personal data stay out.
 
-Ubuntu checks additionally runs the account harness against private credential files
+The core account gate runs the account harness against private credential files
 in a disposable data root. It checks permissions, cross-process refresh and cleanup
 without a desktop credential service. Commands and proof limits are
 in the [model connection test plan](model-connections.md#私有文件账户回归).
