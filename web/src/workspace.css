@@ -53,10 +53,8 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
  .resource-model[data-account-model]>.resource-model-label{padding-left:8px}
 }
 @media(max-width:760px){.setting-action{min-height:44px}}
-/* Preferences share the tab strip's density; other settings keep their forms. */
-.settings-page:has(.preference-group)>.section-tabs{margin-bottom:24px}
-.preference-group{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px}
-.preference-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:12px 16px}
+.preference-group{position:relative}
+.preference-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;min-height:62px;padding:13px 0}
 .preference-name{position:relative;display:flex;align-items:center;gap:4px;min-height:36px;white-space:nowrap}
 .preference-name label{margin:0;font-size:14px;font-weight:550;color:var(--foreground)}
 .preference-controls{display:flex;flex:1 1 112px;align-items:center;gap:8px;max-width:120px;min-width:112px;margin-left:auto}
@@ -65,9 +63,9 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .preference-group .preference-save{min-height:36px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:7px;white-space:nowrap}
 .preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
 .preference-controls>.control-select{width:100%}
-.preference-feedback{padding:0 16px 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
+.preference-feedback{padding:0 0 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
 .preference-feedback :is(button,a){min-height:36px;padding:3px 6px;background:transparent;border:0;color:var(--foreground);font-size:13px;text-decoration:underline;text-underline-offset:3px}
-@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
+@media(max-width:760px){.preference-row{column-gap:12px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-feedback :is(button,a){min-height:44px}}
 .list-heading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}.list-heading h2{margin:0}.list-heading span{font-size:12px;color:var(--muted-foreground)}
 .object-list{border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;background:transparent}
 .object-list:has(>.empty-state){border:0}

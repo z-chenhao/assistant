@@ -16,6 +16,8 @@ Go 继续提供认证、页面、原生表单与局部更新；React 只增强 H
 
 跨页面的字号、对齐、信息层级与状态呈现以 [Web 设计规范](../../design.md) 为准。Go 模板提供语义结构，共享 CSS 实现视觉规则。`controls-policy.mjs` 在现有构建检查中约束下拉行为与开关皮肤归属，`select-state.ts` 提供可独立验证的过滤与键盘状态计算；真实焦点、触摸、提交和回退继续由渠道浏览器证明。跨页面单选下拉统一使用 `components/ui/select.ts`：普通表单保留原生 select 为提交值源，语言偏好只在共享控件外处理单请求自动保存、失败和 Cookie 读回；搜索、方向键、Escape、Tab、焦点、互斥浮层、视口定位及无脚本回退不再各自维护。`components/ui/controls.css` 统一胶囊选择器、选项与原生 switch 的视觉；普通布尔配置使用 switch，选择组与授权确认保留 checkbox。验收覆盖实际页面几何、键盘与窄屏，并审查截图中的层级与密度。操作页共用 760px 窄屏断点与 44px 触控高度；Trace 的区块标题、界面文字和辅助信息，以及能力表单分组标题复用共享字号。普通文本框使用控件边界色。模型同意说明作为候选行的常驻文字，并由选用按钮通过 aria-describedby 引用；不使用悬浮提示承载必读内容。Trace 树在节点名称下显示状态文字，装饰圆点不参与辅助技术朗读。Chat 橙色发送按钮仅在消息输入区覆盖单色主操作，例外以根设计规范为准。
 
+设置分组使用无外框的字段行和分隔线，能力目录显示名称与实际状态，用途说明复用详情帮助；正常就绪只保留辅助技术文字，发送可用性和其他真实状态不变。此项只调整私有 Web 呈现，不新增公共协议、展示配置或客户端状态机；保留原生表单和现有组件，避免为视觉精简引入通用页面框架。Tasks 延续现有执行记录／任务配置表格，不恢复旧任务卡片。
+
 ## 资源与动效
 
 Michroma 字标、Inter UI、Source Serif 4 回复、Source Han Sans SC 中文回退和 JetBrains Mono 代码字体在 `/brand/` 同源提供，OFL 通知在 `/licenses.txt`。使用 Demo 已确认的黑白幽灵 PNG，身体、手臂、五官离线烘焙为完整无损 WebP 帧；运行时 Canvas2D 播放，身体不做整体缩放，不加载 WebGL。轻微整体现浮动与固定影子保留；暂停、reduced-motion、隐藏或离屏停止当前挥手。资源来源和完整生成提示保存在 `web/licenses/steward-artwork.md` 与 `web/artwork/manifest.json`。
@@ -29,7 +31,7 @@ README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通
 | 范围 | 当前标识 |
 | --- | --- |
 | 产品 / Agent | Steward / Ghost |
-| 字标 / 标语 | Steward / Your personal AI steward. |
+| 字标 | Steward；不附加标语 |
 | Go 模块 | `github.com/z-chenhao/assistant`（保留既有 import 路径；仓库现为 `z-chenhao/steward`） |
 | 命令入口 / 构建输出 | `cmd/steward` / `bin/steward` |
 | 环境变量 / 默认数据根 | `STEWARD_*` / `~/.local/share/steward` |
@@ -44,7 +46,7 @@ README、favicon 与 Web 静态图均来自正式 256px atlas 的第 0 帧，通
 
 使用现有原生设置流程新增 `/settings/preferences` 与认证后的 `POST /settings/language`。只接收 `en`、`zh-CN`，以路径 `/`、SameSite Strict、有效期一年的 `steward-language` 浏览器 Cookie 持久化。未设置或无效时一律英文；不使用 Accept-Language。服务端预编译两份不可变模板，显式 `tr` 仅作用于应用自有界面文案；客户端从同一私有 JSON 文案表读取。没有运行时 DOM 扫描或外部翻译服务。实时片段和日期展示随语言变化；正文、标识、字段值、冻结哈希及机器协议不变。此方案优先支持无 JS 的原生切换，未引入通用翻译平台或账户级语言同步。
 
-Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织单层圆角设置组，左侧名称／帮助，右侧语言触发器；保留读屏 h1 和当前导航标签。默认窄屏同行，长内容或放大时按根目录 design.md 有序换行。颜色、字体来自既有 token，触摸操作高度至少 44px。列表只显示真实语言与当前项勾号，无自动保存说明或正常界面的 Save。样式限定本项，不修改相邻表单密度。
+Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织无外框的设置行，左侧名称／帮助，右侧语言触发器；保留读屏 h1 和当前导航标签。默认窄屏同行，长内容或放大时按根目录 design.md 有序换行。颜色、字体来自既有 token，触摸操作高度至少 44px。列表只显示真实语言与当前项勾号，无自动保存说明或正常界面的 Save。样式限定本项，不修改相邻表单密度。
 
 `preferences.ts` 渐进增强原生 form/select，初始化完成后隐藏原生控件与保存按钮；原生 select 仍是唯一提交值源。支持 Popover API 时使用顶层非模态 combobox/listbox，焦点留在触发器，活动项与选中项可区分；定位随滚动／resize／visual viewport 更新，空间不足翻转或内部滚动。缺少浮层能力时仍通过原生 select 的 change 自动保存；缺少脚本／fetch 或初始化失败时保留原生选择与显式保存。方向键浏览不提交，确认不同值才提交；Escape、Tab、外部操作取消浏览，Tab 不抢焦点。
 

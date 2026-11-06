@@ -35,7 +35,7 @@ async function navigationViewports(page,evidence){
 // Real navigation, native form writes and delayed bundle delivery. Check
 // relationships before/after enhancement rather than platform-specific pixels.
 export async function pageTransitions(page,context,url,evidence){
- const measurements={resources:[],collapse:[],loading:[],fonts:[],focus:[]};
+ const measurements={resources:[],collapse:[],loading:[],fonts:[],focus:[],settings:[]};
  await page.setViewportSize({width:1400,height:980});
  await page.evaluate(()=>localStorage.setItem('steward-sidebar','open'));
  const widths=[];
@@ -170,9 +170,31 @@ export async function pageTransitions(page,context,url,evidence){
   await page.reload();if(await target.inputValue()!==value)throw Error('notification autosave was lost');
  }
  await page.screenshot({path:evidence+'/notifications-saved.png'});
+ for(const theme of ['light','dark'])for(const width of [1400,390]){
+  await page.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
+  await page.setViewportSize({width,height:980});
+  await page.goto(url+'/settings/preferences');await settle();
+  await page.getByRole('combobox',{name:'Language',exact:true}).waitFor();
+  const geometry=await page.locator('.settings-group').evaluate(group=>{
+   const left=node=>node.getBoundingClientRect().left;
+   return {title:left(document.querySelector('h1')),language:left(group.querySelector('.preference-name label')),appearance:left(group.querySelector('[data-appearance-setting] label')),border:getComputedStyle(group).borderWidth,scrollWidth:document.documentElement.scrollWidth};
+  });
+  if(geometry.border!=='0px'||geometry.scrollWidth>width||Math.max(geometry.title,geometry.language,geometry.appearance)-Math.min(geometry.title,geometry.language,geometry.appearance)>1)throw Error('Settings lost their flat, aligned layout: '+JSON.stringify(geometry));
+  if(await page.locator('.settings-page').getByRole('heading').count()!==1)throw Error('Preferences gained a redundant section heading');
+  measurements.settings.push({theme,width,...geometry});
+  await page.screenshot({path:`${evidence}/simple-preferences-${theme}-${width}.png`});
+  await page.goto(url+'/settings/capabilities');await settle();
+  const entries=page.locator('.settings-group .object-row');
+  if(await entries.count()!==5||await page.locator('.settings-group').evaluate(node=>parseFloat(getComputedStyle(node).borderWidth))!==0)throw Error('Capability directory lost entries or acquired an outer frame');
+  await page.screenshot({path:`${evidence}/simple-capabilities-${theme}-${width}.png`});
+  await page.locator('a[href="/settings/capabilities/memory"]').click();
+  await page.getByRole('button',{name:'Help: Memory',exact:true}).click();
+  await page.getByRole('tooltip').waitFor();await page.keyboard.press('Escape');
+ }
  for(const theme of ['light','dark']){
   await page.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
   await page.goto(url+'/');await settle();
+  if(await page.locator('#workspace-status .sr-only').innerText()!=='Ready'||await page.locator('#workspace-status .status-pill').count()!==0||await page.locator('#workspace-status [data-can-send]').getAttribute('data-can-send')!=='true')throw Error('Normal readiness lost its accessible text or send availability');
   for(const width of [1400,390]){
    await page.setViewportSize({width,height:980});
    const text=page.locator('.composer textarea');await text.click();
@@ -276,7 +298,7 @@ export async function capabilityDefaults(page,context,url,evidence){
  await page.screenshot({path:evidence+'/capabilities-default.png',fullPage:true});
  await memory.click();
  await page.getByText('已启用（默认）',{exact:true}).waitFor();
- if(!await page.locator('section.panel.form-panel').isVisible()||await page.locator('[data-capability-fields]').isVisible())throw Error('default mode exposed custom configuration');
+ if(!await page.locator('section.settings-group').isVisible()||await page.locator('[data-capability-fields]').isVisible())throw Error('default mode exposed custom configuration');
  await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname==='/capability/configure'&&r.request().method()==='POST'),selectValue(page,page.locator('#capability-mode'),'custom')]);
  await page.locator('[data-capability-draft]').filter({hasText:'已保存。'}).waitFor();
  if(!await page.locator('[data-capability-fields]').isVisible())throw Error('custom dropdown did not reveal inputs');

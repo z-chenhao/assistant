@@ -10,7 +10,6 @@
 
 {{define "settings-navigation"}}
  <div class="section-navigation-heading"><span>{{tr "Settings"}}</span></div>
- <p class="settings-nav-heading">{{tr "Personal"}}</p>
  <nav class="section-navigation settings-navigation" aria-label="{{tr "Settings sections"}}">
   <a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{template "icon-configuration"}}<span>{{tr "Preferences"}}</span></a>
   <a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{template "icon-notification"}}<span>{{tr "Notifications"}}</span></a>
@@ -24,8 +23,7 @@
 
 {{define "preferences"}}
 <div class="page-heading"><div><h1>{{tr "Preferences"}}</h1></div></div>
-<h2 class="settings-section-title">{{tr "General"}}</h2>
-<section class="panel form-panel settings-group">
+<section class="form-panel settings-group">
 <form class="preference-group" method="post" action="/settings/language" data-language-preference aria-labelledby="language-label">
  <div class="preference-row">
  <div class="preference-name"><label id="language-label" for="interface-language">{{tr "Language"}}</label>

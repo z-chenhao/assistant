@@ -14,6 +14,8 @@ web
 
 接续同一个 Agent 的长期对话，委派后台任务，查看已交付文件，并审阅需要确认的具体动作。2026-11-02 用户确认默认接上最近对话，旁边查看近期活动、任务进展和输出成果。
 
+界面以 Linear 官网和 Apple Notes 的克制为方向：每页围绕一个主要目标，用布局、分组与明确操作表达功能，删除标语、冗余介绍和次要标签。复用现有组件、语义结构与原生路径，同时改善 UX、DX 和 AX；保留授权、持久化、回放与必要状态，不为精简增加架构层或配置。
+
 ## Capabilities and Constraints
 
 依据 docs/feature-map.md、docs/features/channels.md 和现有 Web 路由：已有 Conversation、Tasks 列表与详情、附件、冻结审批、模型保存/测试/显式选用、通知偏好、能力配置与只读 Developer 检查。每个 Agent 一个 Conversation，任务控制由 Main 理解；批准不等于已执行，未知外部结果不能自动重发。
@@ -22,7 +24,7 @@ web
 
 ## Brand Commitments
 
-最新请求指定参考用户 Chrome 中的 ChatGPT 与其 Jarvis Dots，采用非纯黑、非纯白的黑白主色。品牌名由用户改为 Steward，标语为 “Your personal AI steward.”；纯文字字标使用接近 SpaceX 的舒展几何字形，最新字体要求：Logo 维持 Michroma，英文界面使用 Inter、英文回复正文使用 Source Serif 4、代码使用 JetBrains Mono；macOS 中文优先苹方，跨平台中文回退思源黑体。Newsreader 作为英文正文备选，不额外下载。Agent 形象更新为用户给定的绒感小幽灵，提供黑色与柔白两版适配主题；保留胶囊眼睛、笑脸、圆润下摆。角色轻微上下漂浮、偶尔眨眼；挥手使用预生成的完整无损帧，身体不缩放，手臂保持连贯。运行时不使用网格或 WebGL，可暂停并跟随系统减少动效。Agent 名称为 Ghost；本节为当前品牌基准。用户明确要求熟悉的对话产品结构，作为本轮方向。
+最新请求指定参考用户 Chrome 中的 ChatGPT 与其 Jarvis Dots，采用非纯黑、非纯白的黑白主色。品牌名为 Steward；纯文字字标使用接近 SpaceX 的舒展几何字形，最新字体要求：Logo 维持 Michroma，英文界面使用 Inter、英文回复正文使用 Source Serif 4、代码使用 JetBrains Mono；macOS 中文优先苹方，跨平台中文回退思源黑体。Newsreader 作为英文正文备选，不额外下载。Agent 形象更新为用户给定的绒感小幽灵，提供黑色与柔白两版适配主题；保留胶囊眼睛、笑脸、圆润下摆。角色轻微上下漂浮、偶尔眨眼；挥手使用预生成的完整无损帧，身体不缩放，手臂保持连贯。运行时不使用网格或 WebGL，可暂停并跟随系统减少动效。Agent 名称为 Ghost；本节为当前品牌基准。用户明确要求熟悉的对话产品结构，作为本轮方向。
 
 ## Evidence on Hand
 

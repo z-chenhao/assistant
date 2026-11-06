@@ -17,10 +17,9 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-page .panel{padding:18px;border-radius:16px;background:transparent;margin:0 0 24px}
 .settings-page .panel h2{font-size:14px;margin-bottom:16px}
 .settings-page .form-panel{max-width:none}
-.settings-page .settings-group{padding:0 16px}
+.settings-page .settings-group{padding:0;margin:0 0 24px}
 .settings-page .settings-group h2{margin:16px 0 0}
-.settings-page .settings-group .object-list{border:0;padding:0}
-.settings-page .object-list{border:1px solid var(--border);border-radius:16px;padding:0 16px}
+.settings-page .object-list{border:0;padding:0}
 .settings-page .object-row{padding:16px 0;gap:12px;min-height:64px}
 .settings-page .object-row:hover{background:transparent}.settings-page .object-row:hover strong{text-decoration:underline;text-underline-offset:3px}
 .settings-page .object-row>div>span{margin-top:2px;line-height:1.5}
@@ -75,7 +74,7 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-workspace .settings-page{padding:28px 20px 48px}.settings-page h1{font-size:22px}.settings-page .page-heading{margin-bottom:28px}
  .settings-page .object-row{gap:12px}.settings-page .object-row .row-badges{max-width:40%}.settings-page .row-badges .status-pill{font-size:11px}
  .setting-row{gap:12px}.setting-row label{font-size:13px}
- .settings-page .panel{padding:16px}.settings-page .settings-group{padding:0 14px}
+ .settings-page .panel{padding:16px}
  .settings-page form>label:not(.check),.settings-page fieldset>label:not(.check){display:block;font-size:13px}.settings-page form>label>input,.settings-page fieldset>label>input,.settings-page form>label>textarea,.settings-page fieldset>label>textarea{margin-top:7px;font-size:16px}.settings-page form>label>select,.settings-page fieldset>label>select{display:block;margin-top:7px}
  .settings-page .capability-submit{align-items:center;flex-direction:row-reverse;flex-wrap:wrap}.settings-page .capability-submit button{min-height:40px}
  .settings-page :is(.model-connect-form,.capability-guided) label:not(.check):has(>input,>textarea,>select,>.control-select){gap:8px 12px}
@@ -96,9 +95,6 @@ html:not(.js) [data-client-pending]{display:none}
 
 .setting-row>.setting-switch{margin:0}
 
-.settings-group .preference-group{border:0;border-radius:0;margin:0;background:transparent}
-.settings-group .preference-row{padding-inline:0}
-.settings-group .preference-feedback{padding-inline:0}
 
 /* Configuration keys, values and footer commands keep their own alignment. */
 .settings-page .setting-row>.setting-controls{margin-inline-start:auto;justify-content:flex-end}

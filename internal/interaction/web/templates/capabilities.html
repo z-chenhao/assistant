@@ -8,11 +8,11 @@
  {{if .ParentMemory}}<a class="back-link" href="/settings/capabilities/memory">{{tr "← Memory"}}</a>{{else}}<a class="back-link" href="/settings/capabilities">{{tr "← All capabilities"}}</a>{{end}}
  <div class="page-heading"><div><h1 aria-label="{{tr .Title}}">{{tr .Title}}{{template "help" (help (printf "capability-%s-help" .ID) (tr .Title) (printf "%s %s" (tr .Description) (tr .Help)))}}</h1></div>{{template "capability-status" .}}</div>
  {{if and (eq .State "unavailable") .Message}}<p class="feedback error" role="status" data-capability-feedback>{{tr .Message}}</p>{{else if and .Verified (or .Candidate .Checked .Advanced (not .PendingRestart))}}<p class="feedback success" role="status" data-capability-feedback>{{tr "Connection available."}}</p>{{end}}
- {{if .Form.Available}}<section class="panel form-panel settings-group">{{template "capability-guided-form" .}}</section>{{else}}<p class="feedback error" role="alert">{{tr "These settings cannot be edited here. Your existing configuration is unchanged."}}</p>{{end}}
+ {{if .Form.Available}}<section class="form-panel settings-group">{{template "capability-guided-form" .}}</section>{{else}}<p class="feedback error" role="alert">{{tr "These settings cannot be edited here. Your existing configuration is unchanged."}}</p>{{end}}
  {{if eq .ID "memory"}}<div class="setting-row"><span class="setting-name">{{tr "Semantic search"}}</span><a class="button secondary setting-action" href="/settings/capabilities/embedding">{{tr "Configure"}}</a></div>{{end}}
  {{else}}
  <div class="page-heading"><div><h1>{{tr "Capabilities"}}</h1></div></div>
- <section class="panel form-panel settings-group"><div class="object-list">{{range .Capabilities}}<a class="object-row" href="{{capabilityURL .ID}}"><div><strong>{{tr .Title}}</strong><span>{{tr .Description}}</span></div><div class="row-badges">{{template "capability-status" .}}<span class="settings-chevron" aria-hidden="true">›</span></div></a>{{end}}</div></section>
+ <section class="form-panel settings-group"><div class="object-list">{{range .Capabilities}}<a class="object-row" href="{{capabilityURL .ID}}"><div><strong>{{tr .Title}}</strong></div><div class="row-badges">{{template "capability-status" .}}<span class="settings-chevron" aria-hidden="true">›</span></div></a>{{end}}</div></section>
  {{end}}
 </section>
 {{end}}
