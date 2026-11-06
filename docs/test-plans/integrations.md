@@ -176,4 +176,6 @@ already frozen Run. Changing a configured scope fails old-Run selection closed.
 | 平台安全语义 | SQLite 既有辅助交换测试验证冻结 Snapshot、预算、请求哈希／重放／过期 claim；Main→真实 Code Mode→Artifact 测试验证作用域续读，媒体／证据／终态原子提交与失败回滚 |
 | F-070 待实现 | 将来需经实际安装／启停／移除入口验证共享连接保留、断连与卸载独立、冻结权限不扩大；内部模块拆分不视为生命周期验收通过 |
 
+核心 channels 的 tracing 只读验收先等待完整因果链与终态轨迹，再比较一致快照，详见[可观测性测试方案](observability.md)。
+
 工具名、配置序列化和资源身份保持兼容；重构兼容检查比较旧版冻结定义与当前定义。真实账户／实例及模型质量继续按各服务 Live 的证明范围验收。
