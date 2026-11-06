@@ -154,7 +154,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：用户交给助手原文查找、技术调研、帖子核验和商品比较后，能得到带来源的可核查结论。需求明确且重复出现；本项保留为 Tavily 的独立接入，免费优先的 Exa MCP／SearXNG 候选分别见 F-067/F-068，不再将 Tavily 预定为唯一或首个默认服务。
 
-**当前实现**：没有该服务的生产适配器；已有 MCP/Code Mode 不代表联网搜索已接通。
+**当前实现**：F-069 已有自建 Search API 适配器及协议回归；独立 Extract 正文操作和真实账户 Live 待完成。
 
 **目标与边界**：首版支持搜索及指定公开 URL 正文提取，保留来源 URL、读取时间、可用的发布时间、截断与提取失败。区分原文、转载和搜索摘要；不自动登录受限站点，不将私有资料拼入公共查询。认证与用量走 SecretStore 及现有额度机制。[Tavily Search](https://docs.tavily.com/documentation/api-reference/endpoint/search) 与 [Extract](https://docs.tavily.com/documentation/api-reference/endpoint/extract) 是不同操作，搜索命中不表示正文已读。
 
@@ -322,7 +322,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：为个人研究提供低设置成本的公开网络搜索，优先验证免密钥方案。Pi Web Access 的 Exa 适配器提供参考；[Exa 官方说明](https://exa.ai/blog/best-web-search-mcp-servers)确认其托管 MCP 可免密钥、按免费限流使用，不能推导为无限免费或长期服务保证。
 
-**当前实现**：F-069 内已实现免密钥 Exa 托管 MCP 搜索，经初始化和工具发现后调用 `web_search_exa`。仅在 `web_access.exa_fallback: true` 时启用；未提供独立固定源、付费凭据或严格过滤。当前为部分完成，真实中文质量与服务长期可用性仍待验证。
+**当前实现**：F-069 内已实现免密钥 Exa 托管 MCP 搜索，经初始化和工具发现后调用 `web_search_exa`。在显式 `source_order` 中允许 Exa，或兼容配置 `exa_fallback: true` 时启用；支持固定源，不支持高级过滤。当前为部分完成，真实中文质量与服务长期可用性仍待验证。
 
 **候选范围与边界**：先接固定官方服务的公开搜索、来源结果及服务实际返回的内容，不复制 Pi 的配置、会话或订阅认证。实际工具名称／schema 需在目标服务核实，不能依赖插件中硬编码的旧名称。高级过滤不支持时明确说明限制；只有显式允许时才可退为查询文字提示，并区分硬过滤、本地筛选与检索提示。带 API key 的付费／额度路径需独立授权和用量边界，不因免费限流自动切到付费调用。
 
@@ -334,7 +334,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：个人搜索可选择已有或自行部署的搜索服务，减少对单一商业 API 的依赖；借鉴 Pi Web Access 的独立 SearXNG 适配。SearXNG 是聚合搜索服务，软件开源不代表机器、维护或所有上游均无成本。
 
-**当前实现**：无 SearXNG connector，也未为用户部署实例；实例位置、上游、网络和维护责任尚待确认，保持待定义。
+**当前实现**：F-069 已有自建 JSON Search API 适配器及 HTTP peer；未选择或部署真实实例，实例位置、上游、网络和维护责任待确认。
 
 **候选范围与边界**：只连接所有者明确选择的实例，通过[官方 JSON 搜索接口](https://docs.searxng.org/dev/search_api.html)获得标题、URL、摘要和可用的时间信息。实例认证经 SecretStore 引用；受信搜索服务端点与任意网页 URL 的访问范围分别校验。不自动使用随机公共实例或部署服务；不少公共实例禁用 JSON，接口可达也不能证明所有上游正常。时间／域名能力按实际引擎验证，不把查询运算符当作统一硬过滤保证。
 
@@ -344,19 +344,28 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 ### F-069 · Web Access Connector
 
-**需求与消费者**：为 Main／Task Worker 提供搜索、公开网页读取和已存内容续读，减少手工复制资料。不同模型可使用不同搜索链路，主模型与账户保持原冻结快照。
+**需求与消费者**：Main／Task Worker 用同一 Registry／Code Mode／Executor 完成公开研究、网页读取和证据续读。connector、选路、服务协议、工具契约及状态管理均由 Steward 自建，不安装外部 agent SDK、不复制插件实现或类型，也不接管其他助手的会话与凭据。
 
-**当前实现**：内置 `builtin__web_search`、`builtin__web_fetch`，通过现有 Registry／Code Mode／Executor 调用；续读复用 `builtin__artifact_manage` 的 `read`。搜索优先尝试当前 Steward `openai_account` 的 Responses 托管 `web_search`，要求实际返回已完成的搜索事件，普通回答不能冒充搜索。每次查询独立记录模型交换、预算预留和用量，并复用账户撤权与 Run fence。它使用 Steward 自己的账户连接；没有导入 Pi／Codex CLI 凭据，也没有新增 ChatGPT 私有订阅端点。
+**入口与行为**：`builtin__web_search` 支持单查询或最多八个查询、显式 provider、域名条件、时间偏好、来源正文及摘要工作流。`builtin__fetch_content` 支持最多八个公开 HTTP(S) URL 的 readable／raw／answer 模式：本地提取 HTML Markdown、文本、PDF 和图片；问答使用当前冻结模型，并保存原始提取证据。`builtin__get_search_content` 从返回的 `responseId` 续读或 exact／case-insensitive／fuzzy 查找；分页和片段坐标是 UTF-8 字节偏移，不拆分字符，fuzzy 按顺序匹配忽略空白的词组。`builtin__source_check` 收集来源、原文片段及哈希供人工判断；有来源为 `unclear`，无证据为 `missing-evidence`，不声称自动裁定支持或反驳。旧 `builtin__web_fetch` 继续提供原有公开 HTML／文本读取。
 
-**配置与选路**：默认不允许第三方后备。显式配置 `web_access: {exa_fallback: true}` 后，本地模型、兼容网关及其他非原生路径可使用 Exa 免密钥托管 MCP；原生明确不支持、临时不可用或限流时也可后备。最多两个源，不并发广播；每个源最多一次搜索请求。零命中是成功，认证拒绝、预算阻断、无效响应和取消不换源。配置随工具身份冻结，修改后重启，新配置不能替换旧 Run 的身份。
+**选路与配置**：默认按已配置 SearXNG → 当前账户原生搜索 → 显式启用的 Exa → 已配置 Tavily 顺序尝试。零命中成功即停止；认证拒绝、预算阻断、无效响应和取消不换源。临时不可用、限流和明确不支持可进入下一来源。显式 provider 不换源，也不能绕过冻结的 `source_order` 目的地限制；不并发广播或自动部署／选择公共实例。
 
-**结果与读取**：搜索回执包含实际 provider、尝试、URL／标题、供应商答案、读取时间和可得 token 用量；托管搜索 live／cached 不可确认时明确为未知，token 用量不代表已知搜索总费用。公开读取仅支持 HTTP(S) 的 UTF-8 HTML／纯文本／Markdown；逐次连接校验并固定公开 DNS 地址，重定向再次检查，不带登录 cookie 或账户认证。限制端口、30 秒、五跳和解压后 2 MiB。HTML 提取可见正文并移除脚本等元素，不执行 JavaScript；正文保存到当前 Run 的 Artifact，回执提供 UTF-8 安全的前 4 KiB、总字节数及引用，按既有 offset／limit 续读。
+```yaml
+web_access:
+  source_order: [native, exa]
+```
 
-**权限与隐私**：只向搜索服务发送本次查询，不发聊天历史、附件或工具目录。搜索按 `never` 恢复策略处理，未知结果不在重启后自动重复计费；网页 GET 可安全重试。所有外部内容均为不可信证据，不能授予执行权限。Artifact 的可见性、发布、Forget 与工具接受继续由现有机制负责；Forget 是 Steward 内的隔离，不承诺撤回已经发给外部服务的查询。
+只使用账户原生搜索可设 `source_order: [native]`。默认不启用 Exa；兼容配置 `exa_fallback: true` 时将其加入默认顺序。自托管服务设 `searxng_url: https://search.example`，可选 `searxng_secret_ref` 指向 SecretStore 的 Bearer 凭据。Tavily 使用 `tavily_secret_ref`，例如显式 `env:TAVILY_API_KEY` 环境引用；密钥只从 SecretStore 解析，不写进配置或继承给正文提取进程。SearXNG 使用[官方 JSON Search API](https://docs.searxng.org/dev/search_api.html)，Tavily 使用[官方 Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)。改变来源、凭据引用、解析程序或锁定依赖会改变冻结工具身份，旧 Run 不静默套用新配置。
 
-**当前缺口**：Steward 真实 OpenAI 账户的托管搜索仍需单独 Live 验证；免费 Exa 无无限额度或 SLA。固定 provider、严格日期／域名过滤、API Key 官方 OpenAI 原生搜索、Gemini grounding、额外搜索源、PDF／登录页面／浏览器升级均未实现。本机代理若把公网 DNS 替换成私有／保留虚拟地址，直接读取会拒绝连接；没有为适配代理关闭 SSRF 保护。中文质量与事实忠实性另行评测，因此当前登记为部分完成。
+**账户与费用**：当前模型为 Steward `openai_account` 时使用自身 Sign in with ChatGPT 的 `api.openai.com/v1/responses` 托管搜索，要求实际完成的搜索事件；端点地址不意味着 API Key 计费。批量原生查询、网页问答及摘要各自经独立交换、预算、用量和撤权 fence，保留主模型快照。只发送本次查询或明确请求处理的证据，不发送聊天历史、附件或工具目录。当前账户路径已有真实账户／Main／Code Mode 搜索验收；其他账户、模型与订阅政策仍按实际能力验证。外部搜索费、服务额度与 token 用量分开，不宣称已知总费用或无限免费。
 
-**验收**：模型协议 peer 验证真实搜索事件、来源和查询隔离；SQLite 工具链验证冻结策略、独立交换、预算阻断、用量、拒绝旧 claim 和 Artifact 续读／重放；HTTP peer 验证地址／大小／格式。真实 Exa 和目标账户分别验证，不能互相替代。
+**过滤保证**：原生搜索将包含域名传给 hosted tool；排除域名和返回来源列表由本地严格筛选，带域名条件时不把未筛选的供应商回答当成结果。SearXNG 的时间范围依赖实例／引擎，Tavily 的时间范围由服务处理；日期没有统一硬保证。Exa 当前窄 MCP 工具不能承诺高级过滤，带域名／日期条件时明确不支持，不把条件降级为查询文字却声称成功。
+
+**提取与持久化**：网络访问在 Go Host 校验并固定公开 DNS，重定向重新检查，拒绝内网／保留地址、非标准端口及任意本机路径；不带浏览器登录或账户认证。提取进程只收到本次有界文档，使用独立 HOME／TMPDIR、不继承密钥且禁用解析器网络请求。HTML 通过通用 Readability／Defuddle／Turndown 解析，PDF 通过 unpdf 本地提取；未配置解析程序时 HTML 可用基本正文提取，PDF 明确不可用。标准安装自动装配 `web-extract.mjs`；显式安装可指定绝对路径 `extract_command`／`extract_script`。下载至多 8 MiB，PDF 至多 200 页，文本至多 5 MiB，证据集至多 24 MiB；超限明确失败。图片限 32M 像素并转为最大 2000×2000 JPEG；至多八个媒体附件，与状态和工具终态原子提交。
+
+全文、来源、时间与证据片段保存在当前作用域 Artifact，`responseId` 就是该 Artifact 引用，不依赖进程缓存。问答不会覆盖原文；摘要 `summary-review` 返回 `reviewRequired` 的未批准草稿。查找只读已保存证据；已完成工具结果重放不重新访问网络，未知的搜索／提取不自动重复计费。所有内容均为不可信证据，不能授予权限；可见性、Forget、发布和取消继续由既有机制负责。
+
+**明确缺口**：未实现独立 OpenAI API Key／私有订阅端点、其他搜索供应商、Tavily Extract、登录网页／浏览器升级、GitHub clone、YouTube／本机视频或交互摘要编辑器。GitHub 服务闭环仍归 F-047；普通公开网页可尝试本地提取，不能称为已读取完整仓库。免费服务限流、中文质量、SearXNG 真实实例和 Tavily 真实账户分别验收，F-069 仍登记为部分完成。本机 fake-IP 将公网 DNS 改为保留地址时会安全拒绝，没有为代理关闭保护。
 
 ## 相关能力候选（非 Connector）
 

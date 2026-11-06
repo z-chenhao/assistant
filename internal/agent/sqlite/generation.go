@@ -13,6 +13,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/delivery"
 	deliverysqlite "github.com/z-chenhao/assistant/internal/delivery/sqlite"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
 
@@ -151,9 +152,22 @@ func (s *Store) AcceptGeneration(ctx context.Context, tx *sql.Tx, request llm.Ge
 	if err := fence(ctx, tx, &claim{id: runID, token: token, epoch: epoch}); err != nil {
 		return err
 	}
+	if request.ToolGeneration != nil {
+		var name string
+		if e := tx.QueryRowContext(ctx, `SELECT tool_name FROM tool_invocation WHERE invocation_id=? AND run_id=? AND status='running'`, request.ToolGeneration.InvocationID, runID).Scan(&name); e != nil {
+			return agent.ErrClaimLost
+		}
+		family, ok := tool.HostFamily(name)
+		if !ok || family != tool.WebAccessBuiltin {
+			return agent.ErrClaimLost
+		}
+		if cause == nil && (result.Clipped || len(result.ToolCalls) > 0) {
+			return llm.InvalidProviderResponse
+		}
+	}
 	if request.WebSearch != nil {
 		var valid int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND run_id=? AND tool_name='builtin__web_search' AND status='running'`, request.WebSearch.InvocationID, runID).Scan(&valid); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM tool_invocation WHERE invocation_id=? AND run_id=? AND tool_name IN ('builtin__web_search','builtin__source_check') AND status='running'`, request.WebSearch.InvocationID, runID).Scan(&valid); err != nil {
 			return agent.ErrStorage
 		}
 		if valid != 1 {

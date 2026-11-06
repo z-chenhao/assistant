@@ -259,3 +259,19 @@ func TestTaskCodeStorageRemainsOutsideExecutionAndSourceScopes(t *testing.T) {
 		})
 	}
 }
+
+func TestWebAccessConfigurationBoundaries(t *testing.T) {
+	base := t.TempDir()
+	valid := fmt.Sprintf("version: 1\napp:\n  data_root: %s/data\nexecution:\n  root: %s/workspace\nweb_access:\n  source_order: [native, exa]\n  extract_command: /usr/bin/node\n  extract_script: %s/trusted/runtime/src/web-extract.mjs\n", base, base, base)
+	for name, body := range map[string]string{"valid": valid, "workspace": strings.Replace(valid, base+"/trusted", base+"/workspace", 1), "relative": strings.Replace(valid, "extract_command: /usr/bin/node", "extract_command: node", 1), "unknown": strings.Replace(valid, "[native, exa]", "[unknown]", 1), "duplicate": strings.Replace(valid, "[native, exa]", "[native, native]", 1), "missing endpoint": strings.Replace(valid, "[native, exa]", "[searxng]", 1), "endpoint credentials": valid + "  searxng_url: https://user:PRIVATE@search.example\n"} {
+		t.Run(name, func(t *testing.T) {
+			_, e := Decode([]byte(body), noEnv)
+			if (e == nil) != (name == "valid") {
+				t.Fatal(e)
+			}
+			if e != nil && strings.Contains(e.Error(), "PRIVATE") {
+				t.Fatal("secret exposed in configuration error")
+			}
+		})
+	}
+}

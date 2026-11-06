@@ -8,6 +8,7 @@ replace the licenses of incorporated code, fonts or dependencies.
 | Go standard library and linked modules | The pinned toolchain and `go.mod` / `go.sum`; upstream module license files | `licenses/go/` and `licenses/go-toolchain.txt` |
 | Web components, React and other bundled UI dependencies | [UI notices](web/licenses/) and the locked web dependencies | `licenses/web.txt`; also embedded and served at `/licenses.txt` |
 | Self-hosted fonts | SIL OFL notices in [web/licenses](web/licenses/) | Included in `licenses/web.txt` and the embedded UI notices |
+| Web content parsers (Readability, Defuddle, LinkeDOM, Turndown, unpdf) | Locked packages and their original licenses in `runtime/javascript/node_modules/` | Original notices retained in the installed runtime dependency trees |
 | QuickJS-WASI dependencies | Their locked npm packages | Their original notices remain inside the installed `node_modules` trees |
 | Reference model catalog | Pi AI 1.5.0 (MIT); [license](internal/llm/provider/LICENSE) and [provenance](internal/llm/provider/catalog/NOTICE.md) | `licenses/model-catalog/` |
 | Vendored JavaScript VM/prelude | [MIT license](runtime/javascript/src/vendor/LICENSE) and [provenance](runtime/javascript/src/vendor/NOTICE.md) | The same files in `runtime/javascript/src/vendor/` |

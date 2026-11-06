@@ -38,3 +38,5 @@ Update the [Feature Map](docs/feature-map.md), owning feature, design, and test 
 Follow the [engineering workflow](docs/features/engineering.md), [runtime contracts](docs/designs/runtime-contracts.md), and [governance](GOVERNANCE.md). Preserve approvals, frozen snapshots, and durable replay. Store credentials only in SecretStore. Releases require explicit authorization; remote branch deletion requires governance checks and exact-head leases.
 
 Derive README/favicon artwork from the current Ghost atlas; `web/artwork/source/` is build input. Preserve third-party notices.
+
+Connector implementations must be Steward-owned. Do not add external agent SDKs, vendor plugin implementations, or introduce their runtime-specific names. Reference behavior and public protocols while implementing adapters locally; general-purpose parsing libraries are allowed. Preserve required third-party attribution for retained code.

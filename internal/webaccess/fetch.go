@@ -100,6 +100,8 @@ func publicDialContext(lookup func(context.Context, string, string) ([]netip.Add
 }
 
 type Page struct {
+	MediaType   string `json:"media_type,omitempty"`
+	Image       *Image `json:"image,omitempty"`
 	URL         string `json:"url"`
 	Title       string `json:"title,omitempty"`
 	Text        string `json:"text"`

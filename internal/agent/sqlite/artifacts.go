@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"mime"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -173,10 +174,33 @@ func (r *Runs) storeOutput(ctx, outputCtx context.Context, tx *sql.Tx, runID, id
 		raw, err := encoded(agent.AgentResult{Text: value.Text, ArtifactRefs: refs})
 		return tool.Result{Text: raw}, err
 	}
-	if result.Output == nil && len(result.Text) <= p.OutputBytes && len(result.ArtifactRefs) == 0 && result.PublishRefs == nil {
+	if result.Output == nil && len(result.Text) <= p.OutputBytes && len(result.ArtifactRefs) == 0 && result.PublishRefs == nil && len(result.Attachments) == 0 {
 		return pack(result)
 	}
 	err = artifactChange(ctx, outputCtx, tx, func() error {
+		if prepared.err != nil {
+			return prepared.err
+		}
+		images := len(result.ImageRefs)
+		for _, output := range result.Attachments {
+			if output.Image {
+				images++
+			}
+		}
+		if images > 8 {
+			return artifact.ErrLimit
+		}
+		for i, staged := range prepared.attachments {
+			ref, e := store.CommitTx(ctx, tx, a, staged, "tool:"+id+":attachment:"+strconv.Itoa(i))
+			if e != nil {
+				return e
+			}
+			result.ArtifactRefs = append(result.ArtifactRefs, ref)
+			if result.Attachments[i].Image {
+				result.ImageRefs = append(result.ImageRefs, ref)
+			}
+		}
+		result.Attachments = nil
 		for _, ref := range result.ArtifactRefs {
 			if _, err := store.DescribeTx(outputCtx, tx, a, ref, true); err != nil {
 				return err
@@ -289,18 +313,38 @@ func imageRefsIncluded(images, refs []string) bool {
 // stageOutput performs provider I/O outside state.db. The terminal transaction
 // repeats policy, owner, result and reference validation before publication.
 type preparedOutput struct {
+	attachments []*artifactsqlite.Staged
 	staged      *artifactsqlite.Staged
 	publication *artifactsqlite.Publication
 	err         error
 }
 
 func (p preparedOutput) Close() {
+	for _, staged := range p.attachments {
+		staged.Close()
+	}
 	if p.staged != nil {
 		p.staged.Close()
 	}
 }
 func (r *Runs) stageOutput(ctx context.Context, id string, result tool.Result) preparedOutput {
 	var prepared preparedOutput
+	if len(result.Attachments) > 8 {
+		prepared.err = artifact.ErrLimit
+		return prepared
+	}
+	for _, output := range result.Attachments {
+		if output.Reader == nil || (output.Image && output.MediaType != "image/jpeg" && output.MediaType != "image/png") {
+			prepared.err = artifact.ErrInvalid
+			return prepared
+		}
+		staged, err := r.host.Artifacts().Stage(ctx, artifact.Input{Name: output.Name, MediaType: output.MediaType}, output.Reader)
+		if err != nil {
+			prepared.err = err
+			return prepared
+		}
+		prepared.attachments = append(prepared.attachments, staged)
+	}
 	prepared.staged, prepared.err = r.stageBinaryOutput(ctx, id, result)
 	if prepared.err != nil || result.PublishRefs == nil {
 		return prepared

@@ -101,10 +101,11 @@ type Message struct {
 }
 
 type Context struct {
-	WebSearch    bool      `json:"webSearch,omitempty"`
-	SystemPrompt string    `json:"systemPrompt,omitempty"`
-	Messages     []Message `json:"messages"`
-	Tools        []Tool    `json:"tools,omitempty"`
+	WebSearchDomains []string  `json:"webSearchDomains,omitempty"`
+	WebSearch        bool      `json:"webSearch,omitempty"`
+	SystemPrompt     string    `json:"systemPrompt,omitempty"`
+	Messages         []Message `json:"messages"`
+	Tools            []Tool    `json:"tools,omitempty"`
 }
 
 type Usage struct {

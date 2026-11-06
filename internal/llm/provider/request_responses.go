@@ -97,7 +97,7 @@ func responsesTools(tools []Tool) []any {
 		}
 	}
 	for _, name := range order {
-		out = append(out, map[string]any{"type": "namespace", "name": name, "tools": groups[name]})
+		out = append(out, map[string]any{"type": "namespace", "name": name, "description": "Steward tools", "tools": groups[name]})
 	}
 	return out
 }
@@ -181,7 +181,12 @@ func (b *requestBuilder) responses() {
 	if c.WebSearch {
 		p["tools"] = []any{map[string]any{"type": "web_search"}}
 		p["tool_choice"] = "required"
-		p["max_tool_calls"] = 1
+		if m.API != OpenAIResponses || m.Provider != "steward" {
+			p["max_tool_calls"] = 1
+		}
+		if len(c.WebSearchDomains) > 0 {
+			p["tools"] = []any{map[string]any{"type": "web_search", "filters": map[string]any{"allowed_domains": c.WebSearchDomains}}}
+		}
 		p["include"] = []string{"web_search_call.action.sources"}
 	}
 

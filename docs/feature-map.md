@@ -76,7 +76,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存与可访问帮助；模型同意常驻、Trace 状态可读，跨页复用 Select／Switch、字号与窄屏触控规则，通过复用门禁、首屏／状态 UT 和跨页／Task 浏览器回归约束；折叠偏好与慢加载布局稳定，编辑后清除过期连接／保存反馈，保留真实执行与审批语义。 | 是 · 已完成 |
 | [F-042](features/integrations.md#f-042) | 可靠的环境事件监听 | 精确 PR 评审/CI 持久接收，可显式关联原 Task 经 Main 接续；其他来源、平台历史与原话题交付边界保留。 | 否 · 部分完成 |
 | [F-045](features/automation.md#f-045) | 主动规则的观察与启用 | 确切 GitHub PR 可按事件类型或 CI 失败观察，再显式启用 Main 接续原 Task。其他来源与语义规则待验证。 | 否 · 部分完成 |
-| [F-046](features/integrations.md#f-046) | Tavily 搜索与网页正文 | 搜索原文、读取指定公开 URL 并保留来源、时间和提取失败边界；不将搜索摘要当全文。 | 否 · 未实现 |
+| [F-046](features/integrations.md#f-046) | Tavily 搜索与网页正文 | 已有自建 Search API 适配；独立 Extract 及真实服务 Live 待验，不将摘要当全文。 | 否 · 部分完成 |
 | [F-047](features/integrations.md#f-047) | GitHub Connector | 在明确仓库读取 issue/PR/diff/CI 并完成授权协作动作；与既有精确 PR 监听和代码交付分别验收。 | 否 · 未实现 |
 | [F-048](features/integrations.md#f-048) | 能力候选：macOS 本机文件与运行状态 | 在选定目录和具名服务内读取资料、检查环境和准备可审查的维护动作。 | 否 · 待定义 |
 | [F-049](features/integrations.md#f-049) | 能力候选：SSH 远端设备与服务 | 逐台绑定账户、host key 和允许范围，读取远端状态并在明确授权下维护，不扩大 Guest SSH 权限。 | 否 · 待定义 |
@@ -98,8 +98,8 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-065](features/integrations.md#f-065) | X 帖子与讨论只读接入 | 在搜索／网页不足时读取确切帖子及可取得讨论，独立核验主张，不接私信、发帖或交易。 | 否 · 未实现 |
 | [F-066](features/integrations.md#f-066) | YouTube 视频资料候选 | 确认视频委托需求后定义元数据及可授权取得的字幕，不能把元数据读取称为已看完视频。 | 否 · 待定义 |
 | [F-067](features/integrations.md#f-067) | Exa MCP 搜索候选 | 验证免密钥的官方托管搜索、免费限流与来源结果；严格过滤不得静默降级，远端协议及质量待验证。 | 否 · 部分完成 |
-| [F-068](features/integrations.md#f-068) | SearXNG 自托管搜索候选 | 连接明确实例的 JSON 搜索接口，保留上游失败与部分结果边界；实例、部署及维护责任待确认。 | 否 · 待定义 |
-| [F-069](features/integrations.md#f-069) | Web Access Connector | 统一搜索、公开网页读取和续读；依据冻结账户／端点的已验证能力选原生搜索或允许后备，保留来源、预算和失败语义。 | 否 · 部分完成 |
+| [F-068](features/integrations.md#f-068) | SearXNG 自托管搜索候选 | 已有自建 JSON API 适配及协议回归；真实实例、部署及维护责任待确认。 | 否 · 部分完成 |
+| [F-069](features/integrations.md#f-069) | Web Access Connector | 自建 native／Exa／SearXNG／Tavily 搜索、正文／PDF／图片、问答与来源证据；真实账户 Main 链路已验，更多服务／质量仍待验。 | 否 · 部分完成 |
 
 ## 实施优先级与依赖
 
@@ -140,7 +140,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | 16 | P2 | [F-061 · AWS](features/integrations.md#f-061) | 云账户／费用任务主要见于 Codex，不能据此占据日常个人助手首批开发资源 |
 | 17 | P2 | [F-066 · YouTube 候选](features/integrations.md#f-066) | 只有消费入口信号，尚未证明经常委托视频分析及可取得字幕范围 |
 
-首批交付是 **F-069 Web Access Connector＋高德＋Google Maps**。Web Access 按当前冻结账户／端点的已验证搜索能力选路，先验证你在 Pi 使用过的 ChatGPT／Codex 托管搜索模式，再用 F-067 Exa 提供一个显式允许的后备。F-068 SearXNG 与 F-046 Tavily 是后续可选适配器，不要求首版全部实现。既有主模型不会因搜索失败自动切换，原生能力也不凭模型名猜测。具体边界见[Web Access 方案](designs/integrations.md#f-069--web-access-的最小组合方案)和 [Pi 参考取舍](designs/integrations.md#pi-web-access-的参考边界)。第二批在确认真实资料来源后选择 Gmail、健康数据或飞书文档；GitHub 的工程优先级仍独立维护。
+首批交付是 **F-069 Web Access Connector＋高德＋Google Maps**。Web Access 按当前冻结账户／端点的已验证搜索能力选路，使用已验证的 Steward ChatGPT 托管搜索链路，再用 F-067 Exa 提供一个显式允许的后备。F-068 SearXNG 与 F-046 Tavily 已有独立适配，真实实例／凭据及各自 Live 分别验收。既有主模型不会因搜索失败自动切换，原生能力也不凭模型名猜测。具体边界见[Web Access 方案](designs/integrations.md#f-069--web-access-的最小组合方案)和 [自主实现边界](designs/integrations.md#参考行为与自主实现边界)。第二批在确认真实资料来源后选择 Gmail、健康数据或飞书文档；GitHub 的工程优先级仍独立维护。
 
 
 F-020 继续维护既有飞书消息连接，机器人身份不代表已具备个人云文档或日历权限。F-025 持有认证集成共性缺口，F-042/F-045 持有事件和主动接续；新增 connector 独立验收，不把全部目录变成某个既有编号完成的附加门槛。

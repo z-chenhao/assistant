@@ -19,6 +19,9 @@ const exaEndpoint = "https://mcp.exa.ai/mcp"
 // Exa's public, keyless hosted MCP is an explicit policy choice. It never
 // receives Steward account headers, conversation history, or a user endpoint.
 func exaSearch(ctx context.Context, query string, client *http.Client) (string, []llm.WebSource, error) {
+	return exaSearchWithLimit(ctx, query, 5, client)
+}
+func exaSearchWithLimit(ctx context.Context, query string, limit int, client *http.Client) (string, []llm.WebSource, error) {
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 	if client == nil {
@@ -129,7 +132,7 @@ func exaSearch(ctx context.Context, query string, client *http.Client) (string, 
 	if !found {
 		return "", nil, llm.ModelIncompatible
 	}
-	raw, e := call("tools/call", map[string]any{"name": "web_search_exa", "arguments": map[string]any{"query": query, "numResults": 5}}, false)
+	raw, e := call("tools/call", map[string]any{"name": "web_search_exa", "arguments": map[string]any{"query": query, "numResults": limit}}, false)
 	if e != nil {
 		return "", nil, e
 	}

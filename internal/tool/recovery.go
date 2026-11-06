@@ -9,8 +9,19 @@ import (
 // closeOutput retains ownership until consumption ends, including rejected
 // evidence. Cancellation closes a blocked provider stream and cleanup joins it.
 func closeOutput(ctx context.Context, result Result) func() {
-	if result.Output != nil {
-		if closer, ok := result.Output.Reader.(io.Closer); ok {
+	cleanups := []func(){closeBinaryOutput(ctx, result.Output)}
+	for _, item := range result.Attachments {
+		cleanups = append(cleanups, closeBinaryOutput(ctx, &item.BinaryOutput))
+	}
+	return func() {
+		for _, cleanup := range cleanups {
+			cleanup()
+		}
+	}
+}
+func closeBinaryOutput(ctx context.Context, output *BinaryOutput) func() {
+	if output != nil {
+		if closer, ok := output.Reader.(io.Closer); ok {
 			closed := make(chan struct{})
 			stop := context.AfterFunc(ctx, func() { _ = closer.Close(); close(closed) })
 			return func() {
