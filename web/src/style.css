@@ -13,6 +13,7 @@
 @import "./conversation.css";
 @import "./intelligent-ui.css";
 @import "./observability.css";
+@import "./memory.css";
 @import "./components/ui/controls.css";
 @source "./";
 

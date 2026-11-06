@@ -5,10 +5,11 @@ package observability
 type TraceQuery struct {
 	ExecutionQuery
 	Session string
+	Search  string
 }
 
 func (q TraceQuery) Validate() error {
-	if len(q.Session) > 128 {
+	if len(q.Session) > 128 || len(q.Search) > 200 {
 		return ErrInvalid
 	}
 	return q.ExecutionQuery.Validate()
@@ -39,8 +40,15 @@ type Trace struct {
 	Metrics Metrics `json:"metrics"`
 }
 type Traces struct {
-	Items []Trace `json:"items"`
-	Next  string  `json:"next,omitempty"`
+	Items    []Trace       `json:"items"`
+	Next     string        `json:"next,omitempty"`
+	Total    int64         `json:"total"`
+	Activity []TraceBucket `json:"activity"`
+}
+
+type TraceBucket struct {
+	At    string `json:"at"`
+	Count int64  `json:"count"`
 }
 
 type ObservationQuery struct {

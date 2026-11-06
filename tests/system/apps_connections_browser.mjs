@@ -100,7 +100,10 @@ try{
  await detail.locator(`[data-app-account="${firstID}"][data-app-state=active]`).waitFor({timeout:15000});
  await detail.locator('[data-app-add-account]').waitFor();
  assert.equal(await page.locator('#apps-sidebar [data-app-open=gmail] img').count(),1);
- await page.keyboard.press('Escape');assert.equal(await detail.isVisible(),false);assert.equal(await tile.locator('[data-app-manage]').evaluate(node=>node===document.activeElement),true);
+ await page.keyboard.press('Escape');await detail.waitFor({state:'hidden'});
+ // Native dialog close events restore focus asynchronously; assert the eventual
+ // focused opener rather than sampling before the queued close event.
+ await tile.locator('[data-app-manage]').and(page.locator(':focus')).waitFor();
  await tile.locator('[data-app-manage]').click();await detail.waitFor();
  await checkWidths('connected');
  for(const width of [1400,320]){

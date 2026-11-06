@@ -24,6 +24,8 @@ func traceQuery(r *http.Request) (*traceView, error) {
 				return nil, observability.ErrInvalid
 			}
 			v.Compare = list[0]
+		case "search":
+			v.Query.Search = strings.TrimSpace(list[0])
 		case "session":
 			v.Query.Session = list[0]
 		case "obs":
@@ -84,6 +86,9 @@ func traceQuery(r *http.Request) (*traceView, error) {
 
 func traceURL(v *traceView, field string, value any) string {
 	q := url.Values{}
+	if v.Query.Search != "" {
+		q.Set("search", v.Query.Search)
+	}
 	if v.Query.Session != "" {
 		q.Set("session", v.Query.Session)
 	}
@@ -170,7 +175,11 @@ func traceURL(v *traceView, field string, value any) string {
 		q.Set("field", field)
 		q.Set("offset", text)
 	default:
-		q.Set(field, text)
+		if text == "" {
+			q.Del(field)
+		} else {
+			q.Set(field, text)
+		}
 	}
 	path := "/developer/observability"
 	if run := q.Get("run"); run != "" {
@@ -250,4 +259,27 @@ func traceListURL(v *traceView) string {
 	copy.Offset = 0
 	copy.DiffAfter = 0
 	return traceURL(&copy, "cursor", v.Query.Cursor)
+}
+
+// Removing a list condition always restarts pagination; details keep list state.
+func traceClearURL(v *traceView, field string) string {
+	u, _ := url.Parse(traceListURL(v))
+	q := u.Query()
+	q.Del("cursor")
+	if field == "time" {
+		q.Del("since")
+		q.Del("until")
+	} else {
+		q.Del(field)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func tracePresetURL(v *traceView, hours int) string {
+	copy := *v
+	copy.Query.Cursor = ""
+	copy.Query.Since = time.Now().UTC().Add(-time.Duration(hours) * time.Hour).Truncate(time.Second)
+	copy.Query.Until = time.Time{}
+	return traceListURL(&copy)
 }

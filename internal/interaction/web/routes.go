@@ -33,8 +33,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		s.appDetail(w, r)
 	case "/ui/widget":
 		s.widget(w, r)
-	case "/api/developer/database":
-		s.databaseAPI(w, r)
+	case "/api/developer/memory":
+		s.memoryAPI(w, r)
 	case "/api/workers":
 		s.workerView(w, r, false)
 	case "/api/workers/current":

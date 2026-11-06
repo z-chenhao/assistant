@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/z-chenhao/assistant/internal/observability"
@@ -9,16 +10,15 @@ import (
 )
 
 func prettyBody(body string) string {
-	var value any
-	if json.Unmarshal([]byte(body), &value) != nil {
+	var formatted bytes.Buffer
+	// Indent tokens directly: decoding into a map loses duplicate fields and
+	// changes numeric or escape representations in recorded evidence.
+	if json.Indent(&formatted, []byte(body), "", "  ") != nil {
 		return body
 	}
-	raw, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return body
-	}
-	return string(raw)
+	return formatted.String()
 }
+
 func duration(start int64, end *int64) string {
 	if end == nil {
 		return "—"
@@ -68,8 +68,8 @@ func traceRows(tree observability.ObservationTree) []traceRow {
 	span := max(int64(1), end.UnixMicro()-start.UnixMicro())
 	rows := []traceRow{}
 	seen := map[string]bool{}
-	var visit func(observability.Observation, int)
-	visit = func(o observability.Observation, depth int) {
+	var visit func(observability.Observation, int, []bool)
+	visit = func(o observability.Observation, depth int, guides []bool) {
 		if seen[o.ID] {
 			return
 		}
@@ -79,18 +79,18 @@ func traceRows(tree observability.ObservationTree) []traceRow {
 		if o.Ended != nil {
 			width = max(4, min(1000-x, float64(*o.Ended-o.Started)/float64(span)*1000))
 		}
-		rows = append(rows, traceRow{Observation: o, Depth: min(16, depth), ParentOutside: o.Parent != "" && !present[o.Parent], X: x, Width: width})
-		for _, child := range children[o.ID] {
-			visit(child, depth+1)
+		rows = append(rows, traceRow{Observation: o, Depth: min(16, depth), ParentOutside: o.Parent != "" && !present[o.Parent], HasChildren: len(children[o.ID]) > 0, Guides: append([]bool(nil), guides[:min(16, len(guides))]...), X: x, Width: width})
+		for i, child := range children[o.ID] {
+			visit(child, depth+1, append(append([]bool(nil), guides...), i < len(children[o.ID])-1))
 		}
 	}
 	for _, o := range tree.Items {
 		if o.Parent == "" || !present[o.Parent] {
-			visit(o, 0)
+			visit(o, 0, nil)
 		}
 	}
 	for _, o := range tree.Items {
-		visit(o, 0)
+		visit(o, 0, nil)
 	}
 	return rows
 }
@@ -136,4 +136,26 @@ func observationTabs(o observability.Observation) []string {
 		return []string{"overview", "wire"}
 	}
 	return []string{"overview"}
+}
+
+func traceTime(raw string) string {
+	at, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		return raw
+	}
+	return at.UTC().Format("2006-01-02 15:04:05")
+}
+
+func observedDateTime(at int64) string {
+	return time.UnixMicro(at).UTC().Format("2006-01-02 15:04:05.000")
+}
+
+func observationKind(o observability.Observation) string {
+	if o.Name == "Provider HTTP" {
+		return "http"
+	}
+	if o.Type == "span" && (o.Timing == "approval wait" || o.Timing == "observed wait") {
+		return "wait"
+	}
+	return o.Type
 }

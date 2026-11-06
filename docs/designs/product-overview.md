@@ -64,18 +64,7 @@ Main 创建 Task 是因果关联，不是 Main 直接创建 Child。Child 结果
 
 保留上述架构，补齐用户流程中的断点：阶段进度生产、附件理解、富 UI 生成、自动经验、语义记忆和真实服务接入。逐项状态以 Feature Map 为准，不能由本页图推断完成。
 
-已确认在现有 Web 增加 Developer 区域，先实现 [Observability](observability.md)。其只读查询现有执行记录并补充供应商发送边界观测，不接管执行。后续 [Evals](evals.md) 与 [Database](database.md) 先登记待定义范围。
-
-```mermaid
-flowchart LR
-    R["现有 Run / Generation / Tool / Recall / usage"] --> Q["只读诊断聚合：待实现"]
-    B["最终供应商请求记录：待实现"] --> Q
-    Q --> O["Developer / Observability"]
-    O -.-> E["未来 Evals：范围待定义"]
-    O -.-> D["未来 Database：范围待定义"]
-```
-
-Evals 未来页面不改变独立评测项目的职责。Database 首版只读是建议，具体访问范围待设计；不开放修改执行或审批状态的后门。
+Developer 包含 [Traces](observability.md) 与 [Memory](memory.md)。Traces 查询既有执行记录与供应商边界观测；Memory 提供所有者可见的记忆正文、来源和维护回执。两者只读，不接管执行、召回或维护生命周期。通用 Database 检查入口已移除。[Evals](evals.md) 仍为待定义页面，不改变独立评测项目的职责。
 
 ## 验证
 

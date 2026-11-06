@@ -15,3 +15,38 @@ export async function selectValue(page,control,value){
  if(label===undefined)throw Error('Unknown native option: '+value+' in '+await native.evaluate(node=>node.outerHTML));
  await trigger.click();await page.getByRole('listbox').getByRole('option',{name:label,exact:true}).click();
 }
+
+// Rendered-list contracts shared by the two current compact-list consumers.
+// These compare actual regions and text bounds, not a second CSS implementation.
+export async function assertDeveloperList(page){
+ await page.evaluate(()=>document.fonts.ready);
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const problems=await page.evaluate(()=>{
+  const issues=[],visible=node=>!!node&&node.getBoundingClientRect().width>0&&getComputedStyle(node).visibility!=='hidden';
+  const main=document.querySelector('.workspace-main'),primary=document.querySelector('.app-sidebar'),secondary=document.querySelector('.section-sidebar');
+  if(document.documentElement.scrollWidth>innerWidth+1)issues.push('document overflows');
+  if(innerWidth>760&&visible(secondary)){
+   const p=primary.getBoundingClientRect(),s=secondary.getBoundingClientRect(),m=main.getBoundingClientRect();
+   if(Math.abs(p.right-s.left)>1||Math.abs(s.right-m.left)>1)issues.push('navigation overlaps content');
+   const title=secondary.querySelector('.section-navigation-heading span'),bounds=title.getBoundingClientRect();
+   if(bounds.left-s.left<16||s.right-bounds.right<16)issues.push('secondary title has no breathing room');
+   for(const label of secondary.querySelectorAll('.section-navigation a span'))if(label.scrollWidth>label.clientWidth+1)issues.push('navigation label clips');
+  }
+  const svg=selector=>document.querySelector(selector)?.innerHTML;
+  const symbols=[svg('.app-sidebar .primary-navigation-top>a[href="/developer/observability"] svg'),svg('.section-navigation a[href="/developer/observability"] svg'),svg('.section-navigation a[href="/developer/memory"] svg')];
+  if(symbols.some(symbol=>!symbol)||new Set(symbols).size!==3)issues.push('Developer, Traces and Memory reuse an icon');
+  const row=document.querySelector('.obs-trace-list tbody tr');
+  if(row&&!row.querySelector('.empty-state')){if(row.getBoundingClientRect().height>38)issues.push('list rows lost compact density');if(parseFloat(getComputedStyle(row.querySelector('td')).fontSize)>13)issues.push('list text became oversized')}
+  for(const input of document.querySelectorAll('.obs-search input')){
+   const box=input.closest('.control-search').getBoundingClientRect(),style=getComputedStyle(input);
+   if(innerWidth>760&&box.height>36)issues.push('search control became oversized');
+   if(innerWidth<=760&&(box.height<44||parseFloat(style.fontSize)<16))issues.push('mobile search lost touch size');
+  }
+  const filter=document.querySelector('.obs-filter-rail:not([open])>summary'),tabs=document.querySelector('.memory-list-toolbar .section-tabs');
+  if(visible(filter)&&visible(tabs)){const a=filter.getBoundingClientRect(),b=tabs.getBoundingClientRect();if(a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top)issues.push('collapsed filters overlap view tabs')}
+  const time=document.querySelector('.obs-list-toolbar .control-disclosure-trigger');
+  if(visible(time)&&time.getBoundingClientRect().height>(innerWidth<=760?48:36))issues.push('time-range trigger wrapped');
+  return issues;
+ });
+ if(problems.length)throw Error('Developer list layout: '+JSON.stringify({viewport:page.viewportSize(),problems}));
+}

@@ -37,9 +37,8 @@ select:not([multiple]):not([size]),.control-select-trigger{display:inline-flex;a
 .control-select-option[data-highlighted]{background:var(--hover);color:var(--foreground)}
 .control-select-option[data-disabled]{opacity:.45;cursor:default}
 .control-select-empty{padding:12px 10px;margin:0;font-size:var(--text-meta);color:var(--muted-foreground)}
-.schedule-field>.control-select,.schedule-editor label>.control-select,.obs-filters label>.control-select{display:block;width:100%}
+.schedule-field>.control-select,.schedule-editor label>.control-select{display:block;width:100%}
 .schedule-field>.control-select,.schedule-editor label>.control-select{margin-top:7px}
-.obs-filters label>.control-select{margin-top:5px}
 input[type=checkbox][role=switch]{appearance:none;position:relative;display:inline-block;flex-shrink:0;width:44px;min-width:44px;height:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:var(--control-radius);background:transparent;cursor:pointer;vertical-align:middle}
 input[type=checkbox][role=switch]::before{content:"";position:absolute;left:6px;top:12px;width:32px;height:20px;border-radius:999px;background:var(--switch-off,#d5d5d5);transition:background .15s}
 input[type=checkbox][role=switch]::after{content:"";position:absolute;left:8px;top:14px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
@@ -76,6 +75,74 @@ input[type=checkbox][role=switch]:disabled{opacity:.55;cursor:default}
 .control-tooltip,.preference-tooltip{position:fixed;inset:auto;margin:0;z-index:1100;display:block;width:min(280px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:12px;border:1px solid var(--border);border-radius:var(--control-radius);background:var(--card);color:var(--foreground);font:400 var(--text-meta)/1.6 var(--font-ui);text-align:start;white-space:normal;overflow-wrap:anywhere}
 .control-help details[open]>.control-tooltip,.preference-help details[open]>.preference-tooltip{inset:auto 16px 16px;width:auto}
 @media(max-width:760px){.control-help-trigger,.control-help summary,.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}}
+
+/* Form disclosures share Base UI positioning, dismissal and focus behavior.
+   Native details remain usable when the enhancement is unavailable. */
+.control-toolbar-button,.control-disclosure>summary,.control-disclosure-trigger{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:6px 12px;border:1px solid var(--control-edge);border-radius:var(--control-radius);background:var(--card);color:var(--foreground);font:400 var(--text-ui)/1.6 var(--font-ui);white-space:nowrap;text-decoration:none;cursor:pointer;list-style:none}
+.control-toolbar-button svg,.control-disclosure svg{width:16px;height:16px;flex:none}
+.control-disclosure>summary::-webkit-details-marker{display:none}
+.control-disclosure-trigger>span{display:flex;align-items:center;gap:8px}
+.control-disclosure>summary:hover,.control-disclosure-trigger:hover,.control-disclosure-trigger[data-popup-open]{background:var(--hover)}
+.control-disclosure>summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.control-disclosure:has(>details[open]),.control-disclosure[open]{flex-basis:100%}
+.control-disclosure-panel{padding:18px;min-width:0}
+.control-disclosure[open]>.control-disclosure-panel{border:1px solid var(--border);border-radius:var(--control-radius);margin-top:8px;max-width:360px}
+.control-disclosure-positioner{z-index:1000;outline:0}
+.control-disclosure-popup{zoom:var(--control-popup-zoom,1);width:340px;max-width:calc(var(--available-width) / var(--control-popup-zoom,1));max-height:calc(var(--available-height) / var(--control-popup-zoom,1));overflow:auto;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--foreground);font:var(--text-ui)/1.6 var(--font-ui)}
+.control-disclosure-popup[data-closed]{display:none}
+.control-disclosure-panel h2{font-size:var(--text-ui);font-weight:600;margin:0 0 14px}.control-disclosure-panel h2 small{font-size:var(--text-meta);font-weight:400;color:var(--muted-foreground)}
+.control-filter-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:32px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--foreground);text-decoration:none;overflow-wrap:anywhere}
+.control-filter-chip svg{width:14px;height:14px;flex:none}.control-filter-chip:hover{background:var(--hover)}
+@media(max-width:760px){.control-toolbar-button,.control-disclosure>summary,.control-disclosure-trigger,.control-filter-chip{min-height:44px}.control-disclosure-panel input{font-size:16px}}
+
+.control-sheet{position:fixed;z-index:50;inset:0 0 0 auto;width:var(--sheet-width,min(50vw,1400px));max-width:100vw;height:100dvh;max-height:100dvh;margin:0;padding:0;border:0;border-left:1px solid var(--border);border-radius:0;background:var(--background);color:var(--foreground);overflow:hidden}
+.control-sheet[data-expanded]{width:100vw}
+.control-sheet[open]{display:flex;flex-direction:column}.control-sheet::backdrop{background:var(--backdrop)}
+.control-sheet-header{display:flex;align-items:center;gap:4px;flex:none;min-height:40px;padding:4px 8px;border-bottom:1px solid var(--border);font-size:var(--text-ui);background:var(--muted)}
+.control-sheet-header>strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.control-sheet-body{flex:1;min-height:0;overflow:auto;container:inspection-layout / inline-size}
+/* Compact is a shared density, not a second page-specific control skin. */
+.control-density-compact{--text-ui:13px;--text-meta:12px;--text-page:18px;--text-section:14px;--control-height:32px;--control-radius:6px}
+.control-density-compact :is(button,.button){min-height:32px;padding:4px 10px;font-size:13px}
+.control-density-compact :is(.control-toolbar-button,.control-disclosure>summary,.control-disclosure-trigger){min-height:32px;padding:4px 10px;font-size:13px}
+.control-density-compact .control-icon-button{width:28px;height:28px;min-height:28px;padding:6px}
+.control-density-compact input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=hidden]),.control-density-compact .control-select-trigger{min-height:32px;font-size:13px;padding:4px 8px}
+.control-density-compact .control-search{min-height:32px}.control-density-compact .control-search>input{min-height:30px;border:0;padding:4px 0}
+.control-density-compact .control-help-trigger{width:24px;min-width:24px;min-height:24px;height:24px;padding:0}
+.control-density-compact .control-filter-chip{min-height:24px;padding:1px 6px;font-size:12px}
+@media(max-width:760px){.control-sheet{width:100vw}.control-density-compact :is(button,.button,.control-toolbar-button,.control-disclosure>summary,.control-disclosure-trigger,.control-icon-button){min-height:44px}.control-density-compact .control-icon-button{width:44px;height:44px}.control-density-compact input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=hidden]){min-height:44px;font-size:16px}.control-density-compact .control-search>input{min-height:42px}}
+
+
+/* Resizing, tree disclosure and read-only data use shared component skins. */
+.control-resize-handle{touch-action:none;cursor:col-resize;outline:0;z-index:4;position:relative;flex:none}
+.control-resize-handle::after{content:"";position:absolute;inset:0 2px;background:transparent}
+.control-resize-handle:hover::after,.control-resize-handle:focus-visible::after,.control-resize-handle[data-dragging]::after{background:var(--focus)}
+.control-split-handle{border-inline:1px solid var(--border);min-width:6px;align-self:stretch}
+.control-sheet-resize{position:absolute;inset:40px auto 0 -1px;width:7px;z-index:5}
+.control-tree-toggle,.control-density-compact .control-tree-toggle{display:inline-flex;align-items:center;justify-content:center;flex:none;width:20px;min-width:20px;height:28px;min-height:28px;padding:2px;border:0;border-radius:4px;background:transparent;color:var(--muted-foreground)}
+.control-tree-toggle svg{width:12px;height:12px}.control-tree-toggle[aria-expanded=false] svg{transform:rotate(-90deg)}.control-tree-toggle:hover{background:var(--hover);color:var(--foreground)}
+.control-segmented{display:inline-flex;align-items:center;padding:2px;gap:1px;background:var(--muted);border-radius:6px;flex:none}
+.control-segmented>button,.control-density-compact .control-segmented>button{min-height:26px;padding:2px 8px;border:0;border-radius:4px;background:transparent;color:var(--muted-foreground);font-size:12px;line-height:20px;font-weight:500}
+.control-segmented>button[aria-pressed=true]{background:var(--card);color:var(--foreground)}
+.control-kind-badge{--kind-color:var(--muted-foreground);display:inline-flex;align-items:center;gap:4px;padding:1px 5px;border-radius:4px;font-size:11px;line-height:18px;font-weight:500;color:var(--kind-color);background:color-mix(in srgb,var(--kind-color) 10%,var(--card))}
+[data-kind=agent]{--kind-color:var(--trace-agent)}[data-kind=generation]{--kind-color:var(--trace-generation)}[data-kind=tool]{--kind-color:var(--trace-tool)}[data-kind=http]{--kind-color:var(--trace-http)}[data-kind=retriever]{--kind-color:var(--trace-retriever)}[data-kind=wait]{--kind-color:var(--status-attention)}
+.control-status-badge{--state-color:var(--muted-foreground);color:var(--state-color);background:color-mix(in srgb,var(--state-color) 8%,var(--card));border-color:color-mix(in srgb,var(--state-color) 20%,var(--border))}
+.control-status-badge:is([data-status=completed],[data-status=succeeded],[data-status=resumed]){--state-color:var(--status-ready)}
+.control-status-badge:is([data-status=failed],[data-status=http_error],[data-status=error]){--state-color:var(--danger)}
+.control-status-badge:is([data-status=waiting],[data-status=pending],[data-status=queued],[data-status=unknown]){--state-color:var(--status-attention)}
+.control-metric-badge{display:inline-flex;align-items:center;max-width:100%;gap:4px;padding:2px 6px;border-radius:4px;background:var(--muted);font-size:11px;line-height:18px;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+a.control-metric-badge{color:var(--trace-agent)}a.control-metric-badge:hover{background:var(--hover)}
+.control-json-tree,pre[data-readonly-json]{padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:var(--json-surface,var(--card));font:11px/1.8 var(--font-code);overflow:auto;white-space:normal;overflow-wrap:anywhere}
+pre[data-readonly-json]{white-space:pre-wrap}
+.control-json-children{margin-left:12px;padding-left:8px;border-left:1px solid var(--border)}
+.control-json-branch>summary{display:list-item;padding:1px 0;cursor:pointer;list-style-position:inside;color:var(--muted-foreground)}
+.control-json-leaf{padding:1px 0;white-space:pre-wrap}.control-json-key{color:var(--syntax-key)}.control-json-string{color:var(--syntax-string)}.control-json-number{color:var(--syntax-number)}.control-json-boolean{color:var(--syntax-literal)}.control-json-null,.control-json-container{color:var(--muted-foreground)}
+@media(max-width:760px){.control-density-compact .control-tree-toggle{width:44px;min-width:44px;height:44px;min-height:44px}.control-segmented>button,.control-density-compact .control-segmented>button{min-height:44px}.control-sheet-resize{display:none}}
+
+.control-icon-button[data-copy-label]{position:relative}.control-icon-button[data-copy-label]::after{content:attr(data-copy-label);position:absolute;right:0;bottom:100%;padding:3px 6px;background:var(--card);color:var(--status-ready);border:1px solid var(--border);border-radius:4px;font:11px/1.6 var(--font-ui);white-space:nowrap}
+
+/* Read-only domain states share the existing semantic status palette. */
+.control-status-badge:is([data-status=active],[data-status=applied]){--state-color:var(--status-ready)}
+.control-status-badge[data-status=rejected]{--state-color:var(--danger)}
 
 /* Intelligent UI sandbox theme: shared control styling, scoped out of the Host page. */
 :root.ogui-theme{--font-sans:Inter,'PingFang SC','Microsoft YaHei',sans-serif;--font-serif:'Source Serif 4',Georgia,serif;--border-radius-md:8px;--border-radius-lg:12px;--border-radius-xl:16px;--color-background-primary:#eee;--color-background-secondary:#e9e9e9;--color-background-tertiary:#fcfcfc;--color-text-primary:#212121;--color-text-secondary:#666;--color-text-tertiary:#666;--color-border-primary:#858585;--color-border-secondary:#dfdfdf;--color-border-tertiary:#dfdfdf;--color-text-info:#b84f2f}

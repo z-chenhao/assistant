@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/z-chenhao/assistant/internal/observability"
 )
@@ -21,6 +22,51 @@ func TestTraceReadModelMainRootChildUsageAndBodies(t *testing.T) {
 	list, err := reader.Traces(ctx, observability.TraceQuery{})
 	if err != nil || len(list.Items) < 2 {
 		t.Fatal(list, err)
+	}
+	for _, trace := range list.Items {
+		created, e := time.Parse(time.RFC3339Nano, trace.CreatedAt)
+		if e != nil {
+			t.Fatal(e)
+		}
+		q := observability.TraceQuery{Search: strings.ToUpper(trace.ID), Session: trace.Session, ExecutionQuery: observability.ExecutionQuery{Role: trace.Role, Status: trace.Status, Since: created, Until: created.Add(time.Microsecond)}}
+		found, e := reader.Traces(ctx, q)
+		if e != nil || len(found.Items) != 1 || found.Items[0].ID != trace.ID {
+			t.Fatal("search did not intersect identity/session/role/status/time", found, e)
+		}
+	}
+	for _, search := range []string{"%", "' OR 1=1--"} {
+		found, e := reader.Traces(ctx, observability.TraceQuery{Search: search})
+		if e != nil || len(found.Items) != 0 {
+			t.Fatal("search was not literal", found, e)
+		}
+	}
+	filtered, e := reader.Traces(ctx, observability.TraceQuery{Search: "MAIN CONVERSATION", ExecutionQuery: observability.ExecutionQuery{Limit: 1}})
+	if e != nil || len(filtered.Items) != 1 || filtered.Items[0].Role != "main" {
+		t.Fatal("name search failed", filtered, e)
+	}
+	if filtered.Next != "" {
+		next, e := reader.Traces(ctx, observability.TraceQuery{Search: "MAIN CONVERSATION", ExecutionQuery: observability.ExecutionQuery{Limit: 1, Cursor: filtered.Next}})
+		if e != nil || len(next.Items) != 1 || next.Items[0].ID == filtered.Items[0].ID || next.Items[0].Role != "main" {
+			t.Fatal("filtered keyset pagination failed", next, e)
+		}
+	}
+
+	var activityCount int64
+	for _, bucket := range list.Activity {
+		activityCount += bucket.Count
+	}
+	if list.Total < int64(len(list.Items)) || activityCount != list.Total {
+		t.Fatal("activity count does not match filtered traces", list.Total, activityCount)
+	}
+	if filtered.Total < int64(len(filtered.Items)) {
+		t.Fatal("pagination changed total", filtered)
+	}
+	var filteredCount int64
+	for _, bucket := range filtered.Activity {
+		filteredCount += bucket.Count
+	}
+	if filteredCount != filtered.Total {
+		t.Fatal("activity ignored search", filteredCount, filtered.Total)
 	}
 	var root string
 	for _, trace := range list.Items {
