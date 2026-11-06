@@ -16,6 +16,8 @@ F-038：固定依赖和构建入口可用；文档改动只运行适用检查；
 
 五分钟目标使用完整远端 workflow 起止时间验证，同时区分排队、安装与实际检查时间；冷缓存、外部服务和 hosted runner 排队不能通过删除覆盖或放宽断言规避。文档-only 仍实际执行文档检查，并产生同名 required status。
 
+Main 交接回归等待实际 `reply_committed` 通知后检查两条持久回复，Worker 在整个断言期间保持阻塞；测试挂起保护不是生产延迟承诺。原生下拉的外部点击检查等待弹层完成打开后再点击，保留关闭与焦点断言，不通过人工关闭掩盖失败。
+
 ## 工程基础重构回归
 
 `internal/llm/architecture_test.go` 使用 `go list` 的实际传递依赖保护模型边界：`llm` 共享契约不依赖适配器、`provider` 协议不依赖 Steward 领域状态，`account` 与 `sqlite` 不依赖 `bridge`。该检查随 Go 包测试进入每次代码 PR，间接引入的越界依赖也会失败。

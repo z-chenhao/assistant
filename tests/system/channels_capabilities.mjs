@@ -213,7 +213,9 @@ export async function capabilityDefaults(page,context,url,evidence){
  if(!await language.evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Escape lost dropdown focus');
  await language.press('Enter');await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('Tab');await languagePopup.waitFor({state:'hidden'});
  if(!await page.locator('#interface-theme-picker').evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Tab did not continue to the next setting');
- await language.click();const heading=await page.getByRole('heading',{level:1}).boundingBox();await page.mouse.click(heading.x+heading.width/2,heading.y+heading.height/2);await languagePopup.waitFor({state:'hidden'});
+ await language.click();await languagePopup.waitFor();
+ await page.waitForFunction(()=>!document.querySelector('[data-language-popup]')?.hasAttribute('data-starting-style'));
+ const heading=await page.getByRole('heading',{level:1}).boundingBox();await page.mouse.click(heading.x+heading.width/2,heading.y+heading.height/2);await languagePopup.waitFor({state:'hidden'});
  if(await languagePopup.isVisible())throw Error('outside click kept dropdown open');
  const popup=page.locator('.control-select-menu:visible');
  const navSearch=page.getByRole('searchbox',{name:'搜索设置',exact:true});await navSearch.fill('通知');

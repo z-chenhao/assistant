@@ -78,6 +78,15 @@ func TestSerialMainRetainsBothRequestsAfterReopeningBeforeFirstReply(t *testing.
 func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	s, _, a, p := taskFixture(t)
 	firstStarted, firstRelease, workerRelease := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	replies := make(chan struct{}, 2)
+	a.Sink = func(event agent.Event) {
+		if event.Kind == "reply_committed" {
+			select {
+			case replies <- struct{}{}:
+			default:
+			}
+		}
+	}
 	var first, releaseFirst, releaseWorker sync.Once
 	p.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 		if isRoot(request) {
@@ -121,12 +130,23 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	}
 	mustSubmit(t, a, "trip", "recommend a snowy trip")
 	releaseFirst.Do(func() { close(firstRelease) })
-	deadline := time.Now().Add(5 * time.Second)
-	for scalar(t, s, `SELECT count(*) FROM main_reply`) < 2 {
-		if time.Now().After(deadline) {
+	// Ordering is the contract: both replies must commit while the Worker is
+	// still held. Avoid contending with instrumented writes through a 10ms SQL
+	// polling loop; the guard is for hung tests, not a production latency SLA.
+	deadline := time.NewTimer(15 * time.Second)
+	defer deadline.Stop()
+	for range 2 {
+		select {
+		case <-replies:
+		case err := <-done:
+			done <- err
+			t.Fatal("executor exited before both replies", err)
+		case <-deadline.C:
 			t.Fatal("second request lost the first handoff or waited for the Worker")
 		}
-		time.Sleep(10 * time.Millisecond)
+	}
+	if scalar(t, s, `SELECT count(*) FROM main_reply`) != 2 {
+		t.Fatal("reply notification preceded durable commit")
 	}
 	if scalar(t, s, `SELECT count(*) FROM task`) != 1 || scalar(t, s, `SELECT count(*) FROM run WHERE kind='worker' AND status IN('queued','running')`) != 1 {
 		t.Fatal("game was not delegated exactly once")
