@@ -55,6 +55,12 @@ follow the same forward migration path. Failed DDL rolls back version and schema
 together. Never lower `user_version` or downgrade in place. Retain the old binary
 and original cold backup until the rehearsal completes.
 
+When a state migration changes the current schema, update the independent
+`STATE_SCHEMA_VERSION` fixture in `tests/system/verify.py` and the populated
+upgrade fixtures together. Foundation, local-provider and Code Mode system
+checks retain exact version assertions; do not derive the expected version from
+the database under test or remove the assertions to make an upgrade pass.
+
 ```sh
 make test
 make test-race
