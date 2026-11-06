@@ -180,7 +180,7 @@ export async function capabilityDefaults(page,context,url,evidence){
  const rails=await page.evaluate(()=>{const primary=document.querySelector('.app-sidebar').getBoundingClientRect(),secondary=document.querySelector('.section-sidebar').getBoundingClientRect(),main=document.querySelector('.workspace-main').getBoundingClientRect();return {primary:primary.right,secondaryLeft:secondary.left,secondaryRight:secondary.right,mainLeft:main.left}});
  if(rails.primary!==rails.secondaryLeft||rails.secondaryRight!==rails.mainLeft)throw Error('secondary navigation replaced or overlaps the primary rail/content');
  await primary.getByRole('link',{name:'Developer',exact:true}).click();
- await page.getByRole('navigation',{name:'Developer sections'}).getByRole('link',{name:'Database',exact:true}).click();
+ await page.getByRole('navigation',{name:'Developer sections'}).getByRole('link',{name:'Memory',exact:true}).click();
  await page.screenshot({path:evidence+'/developer-navigation.png',fullPage:true});
  await primary.getByRole('link',{name:'Tasks',exact:true}).click();
  if(await page.locator('.section-sidebar').count())throw Error('Tasks acquired empty secondary categories');
