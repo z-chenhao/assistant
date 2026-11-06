@@ -37,7 +37,7 @@ typography:
     fontSize: "16px"
     lineHeight: 1.75
 rounded:
-  button: "9px"
+  button: "8px"
   surface: "12px"
 spacing:
   workspace-gutter: "40px"
@@ -53,7 +53,7 @@ spacing:
 
 ## Colors
 
-浅色与深色共用相同的语义。主操作使用高对比填充，普通操作使用透明底和细边框。状态同时使用文字，颜色提供辅助识别。内容分隔线、输入边界与键盘焦点各自使用对应的颜色。实际色值维护在 [共享样式](web/src/foundation.css)。
+浅色与深色共用相同的语义。主操作使用高对比填充，普通操作使用低强调填充或细边框。状态同时使用文字，颜色提供辅助识别。内容分隔线、输入边界与键盘焦点各自使用对应的颜色。实际色值维护在 [共享样式](web/src/foundation.css)。
 
 Chat 发送按钮是单色主操作的例外：明暗主题均使用 `#B84F2F` 橙色背景和白色图标，样式限定在消息输入区。
 
@@ -69,6 +69,39 @@ Chat 发送按钮是单色主操作的例外：明暗主题均使用 `#B84F2F` �
 - 页面优先呈现可操作的设置项、真实状态和必要反馈，详细说明按需展开。
 - 控件反映真实能力。未实现的功能不占分类，不显示没有作用的开关。
 - 界面调整保留原有授权、版本校验、失败反馈和数据边界。
+
+## 全局组件契约
+
+本节约束整个 Web 宿主：Chat、Tasks、Developer、Settings、弹窗和 Intelligent UI 使用同一套基础组件，不能按页面保留不同的下拉、按钮或输入框体系。功能页面负责组合组件、布局和业务保存，不拥有第二套基础控件实现。组件替换本身不改变现有字体、字号、导航、内容列、消息气泡、品牌色及保存语义；这些变化需要另有明确的产品要求。
+
+### 来源与实现归属
+
+- 基础控件采用 shadcn/ui 的可组合结构与 Base UI 行为，适配 Steward 自有主题。不直接引入组件库整套主题、字体或全局排版重置。
+- React 消费者使用 `web/src/components/ui/` 的封装；按钮归 [button.tsx](web/src/components/ui/button.tsx)，字段和结果卡片归 [answer-controls.tsx](web/src/components/ui/answer-controls.tsx)，图表基础归 [chart.tsx](web/src/components/ui/chart.tsx)。新增公共能力先补入所属共享组件，不在功能页复制实现。
+- 宿主下拉统一使用 [select-view.tsx](web/src/components/ui/select-view.tsx) 的 Base UI 选择器，菜单统一使用 [action-menu.tsx](web/src/components/ui/action-menu.tsx)。不得保留旧手写下拉状态机，也不得在页面直接拼装另一套浮层、选项导航和焦点管理。
+- 服务端原生 select 经 [select.ts](web/src/components/ui/select.ts) 适配，React 表单经 [native-select.tsx](web/src/components/ui/native-select.tsx) 接入同一选择器。原生值、字段名、校验和无脚本回退属于表单契约，不构成第二套增强控件。
+- 基础控件皮肤统一归 [controls.css](web/src/components/ui/controls.css)，颜色和字体使用 [foundation.css](web/src/foundation.css) 的语义变量。页面不得通过局部 CSS 重定义下拉或开关皮肤；其他控件变化也应落在共享的命名变体，不能用页面覆盖产生外观分叉。
+- 保留采用源码和打包依赖的许可证；来源、版本及协议边界记录在所属设计方案，不添加到产品页面介绍文案中。
+
+### 外观与状态
+
+基础按钮、输入框和选择器使用 8px 圆角，内容容器使用 12px 圆角；桌面基础控件最小高度为 36px，窄屏操作目标至少 44px。既有发送按钮、图标按钮等使用各自共享变体，不因接入组件库改动品牌造型。操作组有明确间距，窄屏可换行，不能挤压或叠放。
+
+同一操作角色在各页面、明暗主题、普通／hover／focus／disabled／loading／error 状态下保持同一语义。主操作、次操作和危险操作用共享变体区分；不能因页面或连接状态不同而随意切换黑白按钮。颜色跟随主题变量，不给新组件单独设一套配色。
+
+输入框聚焦只加强已有圆角边界或内侧描边，不增加外层方形白框。保留可见键盘焦点、标签、禁用及无效状态；不能为去掉白框而移除无障碍焦点。下拉和菜单在弹窗内、200% 缩放及窄屏下仍可操作，搜索、空结果、确认、取消和焦点恢复使用同一规则。
+
+### Intelligent UI 的组合边界
+
+OpenIntelligentUI 的原生组件协议是基础，保留上游组件名称和参数语义。HTML、SVG 流程图／架构图／图表、计算器、模拟教学与交互控件通过标准 `generateSandboxedUi` 或具名扩展接入，不重新建立另一套渲染协议或组件主题。扩展与宿主交互仍通过受控协议，业务动作复用原 Main／Tool 授权与持久化管线。
+
+原生组件使用同一基础控件，沙箱内容使用宿主共享主题和控件样式。正常呈现不常驻重复的 Text version；失败或无 JavaScript 时保留真实文字回退。组件与后续文字回复按顺序分成气泡，操作收进紧凑菜单。页面只出现内容、控件与必要状态，不新增组件介绍、实现细节或重复技术文案。
+
+### 修改与验收
+
+修改前先确认组件归属及本节约束；存在能力缺口时补充共享组件或具名扩展。任何明确获准的规则变化，应在同一变更中更新本文件及所属回归，不能只在对话、局部 CSS 或 `AGENTS.md` 中另立规范。
+
+现有控件归属门禁随 `npm run check --prefix web` 执行；行为使用真实浏览器场景验证，视觉结合深浅主题、桌面和窄屏截图评审。具体检查与证明范围见下文[自动回归与评审分工](#自动回归与评审分工)，不通过检查文案是否存在代替行为验证。
 
 ## 两级导航
 
@@ -165,7 +198,7 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 
 公共控件的复用边界也属于自动门禁：`npm run check --prefix web` 在检查构建资源前运行 `controls-policy.mjs`，扫描新增和已有页面，拦截页面直接操纵 Popover、私建 listbox／option，以及在共享样式外另写选择器／开关皮肤。普通原生 select、switch 消费者、容器布局及既有语言回退标记仍可使用；提示等其他公共浮层允许在共享组件层实现。
 
-`npm test --prefix web` 验证门禁的正反例，以及选项过滤、禁用项、空列表、方向键循环、Home／End 和过滤后的活动项边界。`make test` 包含这些检查；现有 core `channels` 门禁实际调用 Task 计划页场景，验证手动保存、触摸、原生回退、冲突草稿及保存不提前派发任务。
+`npm test --prefix web` 验证门禁的正反例、首屏行为和交互状态持久化。选择器的搜索、禁用项、空结果、方向键、Home／End、确认与取消由 channels 的真实浏览器场景验证；core `ui-interactions` 还覆盖弹窗内控件、表单校验、卡片布局、导出和重启恢复。`make test` 包含前端检查；core `channels` 的 Task 计划页场景验证手动保存、触摸、原生回退、冲突草稿及保存不提前派发任务。
 
 代码变更沿用 [PR CI](.github/workflows/ci.yml)：`make test lint` 运行单元／组件与资源一致性检查，`make test-e2e` 的 core 集合包含 `channels`，运行上述浏览器场景并保留失败截图与测量。纯文档变更沿用文档校验，不新增重复 CI 或发布步骤。
 
@@ -185,5 +218,3 @@ Ghost 回复左对齐，使用主题中的灰色气泡；用户消息右对齐�
 Intelligent UI uses OpenIntelligentUI native component contracts, SVG helpers and form controls as the foundation, with Steward typography, neutral surfaces, restrained chart colors and compact spacing. Normal interactive answers do not repeat a Text version control; text fallback appears on failure or without JavaScript. Action groups use explicit gaps and wrap on narrow screens. Generated HTML/SVG diagrams, calculators and simulations follow generateSandboxedUi with compact answer layouts, explicit theme tokens and bounded content sizing. Native UI and the final written reply remain separate bubbles. Standard conversation Markdown is independent of this component contract.
 
 Intelligent UI operations live in a compact options menu. Native tables, charts, typed forms and cards share state and control styling; fullscreen, dialogs and pinned views preserve the same content instance. The page contains content, controls and necessary state only, with no feature introductions or implementation explanations.
-
-全局基础组件采用 shadcn/ui 的可组合结构和 Base UI 的按钮、搜索选择器及菜单交互。组件映射现有主题，保持页面字体、字号、导航、内容列、消息气泡和品牌色；只统一控件内部留白、边界、圆角与交互状态。原生表单与脚本增强共用皮肤，语言和能力自动保存、通知和任务计划显式保存的业务语义保持。
