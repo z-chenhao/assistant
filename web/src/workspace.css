@@ -116,7 +116,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 /* Tasks are searchable records; details own the brief and delivered results. */
 .task-list-toolbar{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px}
 .task-list-toolbar .search-form{margin:0;max-width:360px;flex:1 1 240px}
-.task-table-scroll{max-width:100%;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
+.task-table-scroll{position:relative;max-width:100%;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
 .task-table-scroll::-webkit-scrollbar{display:none}
 .task-table{width:100%;min-width:720px;border-collapse:collapse;table-layout:fixed;font:13px/1.6 var(--font-ui)}
 .task-table th{color:var(--muted-foreground);font-weight:500;text-align:start}
