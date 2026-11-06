@@ -6,6 +6,7 @@ import os
 import sys
 
 from runner import CORE
+from verify_channels import CHANNEL_GROUPS
 
 # Keep the public local Make targets intact. CI partitions their existing work
 # across isolated runners rather than rebuilding a shared, mutable worktree.
@@ -19,7 +20,6 @@ SOFTWARE = {
 SYSTEM = {
     'main-tasks': ('main', 'tasks', 'children'),
     'tools-provider': ('tools', 'code-recovery', 'local-provider', 'account'),
-    'channels': ('channels',),
     'startup-ui': ('startup', 'intelligent-ui', 'ui-interactions'),
 }
 CAPABILITIES = ('task-code-environments', 'task-code-recovery', 'tool-loading', 'main-business')
@@ -27,10 +27,10 @@ RACE = "go test -race ./internal/agent/sqlite ./internal/app ./internal/llm/secr
 
 
 def plan(kind):
-    names = SOFTWARE if kind == 'software' else (*SYSTEM, 'capabilities-race')
+    names = SOFTWARE if kind == 'software' else (*SYSTEM, *('channels-' + group for group in CHANNEL_GROUPS), 'capabilities-race')
     return dict(include=[dict(lane=name,
         frontend=str(name in ('frontend', 'browser-infra', 'lint')).lower(),
-        browser=str(name in ('browser-infra', 'lint', 'tools-provider', 'channels', 'startup-ui')).lower())
+        browser=str(name in ('browser-infra', 'lint', 'tools-provider', 'startup-ui') or name.startswith('channels-')).lower())
         for name in names])
 
 
@@ -40,6 +40,9 @@ def command(lane):
     if lane in SYSTEM:
         gates = ' '.join('--gate ' + gate for gate in SYSTEM[lane])
         return f'make build\npython3 tests/system/runner.py {gates} --binary bin/steward --evidence evidence/e2e-{lane}'
+    if lane.startswith('channels-') and lane.removeprefix('channels-') in CHANNEL_GROUPS:
+        group = lane.removeprefix('channels-')
+        return f'make build\npython3 tests/system/verify_channels.py --group {group} --binary bin/steward --evidence evidence/{lane}/report.json'
     if lane == 'capabilities-race':
         commands = ['make build', 'make test-web-access', RACE]
         commands.extend(f'python3 tests/system/verify_capabilities.py --binary bin/steward --scenario {scenario} --evidence evidence/{scenario}.json'
@@ -68,7 +71,7 @@ def main():
     action.add_argument('--results', help='GitHub needs JSON for the required aggregate check')
     args = parser.parse_args()
     gates = [gate for group in SYSTEM.values() for gate in group]
-    if len(gates) != len(set(gates)) or set(gates) != set(CORE):
+    if len(gates) != len(set(gates)) or set(gates) != set(CORE) - {'channels'}:
         parser.error('CI must run every core gate exactly once')
     if args.plan:
         print(json.dumps(plan(args.plan)))

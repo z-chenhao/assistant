@@ -8,11 +8,13 @@ from runner import CORE
 class CIChecksTests(unittest.TestCase):
     def test_all_core_gates_run_once(self):
         gates = [gate for group in ci.SYSTEM.values() for gate in group]
-        self.assertCountEqual(gates, CORE)
+        self.assertCountEqual(gates + ['channels'], CORE)
         self.assertEqual(len(gates), len(set(gates)))
         for kind in ('software', 'system'):
             for lane in ci.plan(kind)['include']:
                 self.assertTrue(ci.command(lane['lane']))
+        lanes = {lane['lane'] for lane in ci.plan('system')['include']}
+        self.assertEqual({name.removeprefix('channels-') for name in lanes if name.startswith('channels-')}, set(ci.CHANNEL_GROUPS))
 
     def test_required_check_rejects_missing_failed_and_cancelled_work(self):
         for docs in ('true', 'false'):

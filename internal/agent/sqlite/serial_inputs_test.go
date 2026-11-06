@@ -78,8 +78,10 @@ func TestSerialMainRetainsBothRequestsAfterReopeningBeforeFirstReply(t *testing.
 func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	s, _, a, p := taskFixture(t)
 	firstStarted, firstRelease, workerRelease := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	workerStarted := make(chan struct{})
 	replies := make(chan struct{}, 2)
 	a.Sink = func(event agent.Event) {
+		t.Logf("event %s run=%s", event.Kind, event.RunID)
 		if event.Kind == "reply_committed" {
 			select {
 			case replies <- struct{}{}:
@@ -90,6 +92,7 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	var first, releaseFirst, releaseWorker sync.Once
 	p.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 		if isRoot(request) {
+			close(workerStarted)
 			<-workerRelease
 			return llm.GenerationResult{Text: "game delivered"}, nil
 		}
@@ -98,6 +101,7 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 		}
 		last := request.Messages[len(request.Messages)-1]
 		if last.Role == "tool" {
+			<-workerStarted
 			return llm.GenerationResult{Text: "game started in background"}, nil
 		}
 		if last.Role == "user" && last.Text == "make a game" {
@@ -142,6 +146,16 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 			done <- err
 			t.Fatal("executor exited before both replies", err)
 		case <-deadline.C:
+			rows, err := s.db.Query(`SELECT kind,status,coalesce(wait_reason,''),json_extract(checkpoint_json,'$.phase') FROM run ORDER BY created_at`)
+			if err == nil {
+				for rows.Next() {
+					var kind, status, wait, phase string
+					if rows.Scan(&kind, &status, &wait, &phase) == nil {
+						t.Log(kind, status, wait, phase)
+					}
+				}
+				rows.Close()
+			}
 			t.Fatal("second request lost the first handoff or waited for the Worker")
 		}
 	}

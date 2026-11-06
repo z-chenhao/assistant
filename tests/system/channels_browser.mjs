@@ -15,6 +15,7 @@ async function chooseSharedOption(page,control,label,value){
  const{native,trigger}=await selectParts(control),original=await native.inputValue();
  await trigger.click();
  const list=page.getByRole('listbox',{name:'Options',exact:true}),popup=list.locator('xpath=..');
+ await popup.and(page.locator(':not([data-starting-style])')).waitFor();
  if(await popup.locator('input[type=search]').count())throw Error('short option list unexpectedly requires search');
  await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});await trigger.and(page.locator(':focus')).waitFor();
  if(await native.inputValue()!==original)throw Error('shared select cancellation changed the value');

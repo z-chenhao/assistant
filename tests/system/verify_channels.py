@@ -693,10 +693,7 @@ def streaming_replies(binary, evidence, report):
             server.shutdown();server.server_close();thread.join()
 
 
-def run(binary,evidence):
-    report=dict(checks=[],scenarios={})
-    database_inspection(binary,evidence,report)
-    attention_workspace(binary,evidence,report)
+def transport_channels(binary, evidence, report):
     feishu_auth_lifecycle(binary,report)
     feishu_topic_delivery(binary,report)
     feishu_task_questions(binary, report)
@@ -753,12 +750,6 @@ def run(binary,evidence):
             h.stop()
         finally:h.cleanup()
 
-    sending_feedback(binary,evidence,report)
-    live_updates(binary,evidence,report)
-    streaming_replies(binary,evidence,report)
-
-    inspection_relationships(binary,evidence,report)
-
     # Approval recovery uses the same external-effect Fake and persistent Security
     # lifecycle as TUI. Callback races cross two authenticated transports.
     with tempfile.TemporaryDirectory(prefix='steward-channel-approval-') as temp, Sandbox() as platform:
@@ -792,16 +783,37 @@ def run(binary,evidence):
             report['checks'].append('GC-12 channel/Security fragment; Approval: exact frozen-hash rejection, SIGKILL/restart, concurrent duplicate callbacks; one approved Tool dispatch')
             h.stop()
         finally:h.cleanup()
+    extra_scenarios(binary,report)
+    delivery_leases(binary, report)
+
+
+def web_channels(binary, evidence, report):
+    database_inspection(binary,evidence,report)
+    attention_workspace(binary,evidence,report)
+    sending_feedback(binary,evidence,report)
+    live_updates(binary,evidence,report)
+    streaming_replies(binary,evidence,report)
+
+    inspection_relationships(binary,evidence,report)
+
     capability_settings(binary,evidence,report)
     dependency_recovery(binary,report)
-    extra_scenarios(binary,report)
     native_components(binary, evidence, report)
     rich_replies(binary, evidence, report)
-    delivery_leases(binary, report)
     account_presentation(binary, evidence.parent/'account-ui', report)
     native_trace_inspection(binary,evidence,report)
     page_transitions(binary,evidence,report)
     task_control_components(binary,evidence,report)
+
+
+CHANNEL_GROUPS = dict(transport=transport_channels, web=web_channels)
+
+
+def run(binary, evidence, group='all'):
+    report = dict(checks=[], scenarios={})
+    selected = CHANNEL_GROUPS if group == 'all' else {group: CHANNEL_GROUPS[group]}
+    for check in selected.values():
+        check(binary, evidence, report)
     report['checks'].append('Cleanup: Web/Bridge/browser children joined, sandbox HTTP servers stopped, disposable roots removed')
     return report
 
@@ -1744,6 +1756,7 @@ def account_presentation(binary, browser_evidence, report):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--evidence',type=Path,required=True)
     action=parser.add_mutually_exclusive_group()
+    action.add_argument('--group', choices=tuple(CHANNEL_GROUPS), help='Run one complete independent channel group')
     action.add_argument('--delivery-lease-only',action='store_true')
     action.add_argument('--ui-components-only',action='store_true')
     action.add_argument('--rich-replies-only',action='store_true')
@@ -1755,6 +1768,8 @@ if __name__=='__main__':
     args=parser.parse_args()
     args.evidence.parent.mkdir(parents=True,exist_ok=True)
     def verify(_):
+        if args.group:
+            return run(args.binary.resolve(), args.evidence.resolve(), args.group)
         if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.database_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only and not args.preferences_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})

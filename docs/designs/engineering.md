@@ -198,14 +198,15 @@ are test levels; using CI does not turn a unit test into an end-to-end test.
 
 [CI](../../.github/workflows/ci.yml) preserves `Ubuntu checks` as the sole required
 aggregate status. A scope job selects documentation-only checks or the full code
-path. Code runs in ten isolated Ubuntu lanes, described by the private
+path. Code runs in eleven isolated Ubuntu lanes, described by the private
 [CI partition](../../tests/system/ci.py):
 
 - Five software lanes retain all `make test lint` work and `make test-prompts`:
   Go, provider RPC, frontend/JavaScript, browser/infrastructure, and lint.
-- Four system lanes partition the eleven core gates exactly once. Each runner
+- Five system lanes cover the eleven core gates without duplicate scenarios. Each runner
   builds its own binary, records its hash and source state, and owns disposable
-  fixtures. Channels runs separately because it contains the longest UI matrix.
+  fixtures. Channels partitions its independent Web and transport scenarios
+  across two runners; the ordinary local gate still runs both groups.
 - One lane retains Web Access contracts, focused Main/UI/credential races, task
   coding isolation/recovery, Code Mode discovery and Main responsiveness.
 
