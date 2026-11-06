@@ -67,6 +67,7 @@ def run(binary, evidence):
                 server.stream_widgets = [
                     dict(title='Streaming comparison', fallback='A is 10 and B is 20.', components=[dict(name='Table', props=dict(title='Streaming comparison',columns=['Name','Value'],rows=[['A','10'],['B','20']],source='Fixture data'))]),
                     visual('Streaming visual', 'Scripts activate after delivery.', '<p id="preview-text">Script stays off</p><button id="preview-button">Compute</button><script>parent.postMessage({previewExecuted:true},"*")</script>', 'document.querySelector("#preview-text").textContent="Activated after delivery";'),
+                    dict(title='Weekly roadmap', fallback='Week 1–2: interview customers. Week 3–4: build an MVP.', components=[dict(name='generateSandboxedUi', props=dict(initialHeight=240, placeholderMessages=[], css='', html='<p>Script stays off</p><p id="weekly-roadmap">Week 1–2: interview customers. Week 3–4: build an MVP.</p>', jsFunctions='', jsExpressions=''))]),
                 ]
                 server.mode = 'intelligent-ui-stream'
                 previous_deliveries = len(h.rows()['deliveries'])
@@ -98,11 +99,17 @@ def run(binary, evidence):
                         release.join()
                 require(not failures, str(failures))
                 h.wait(lambda state: len(state['deliveries']) == previous_deliveries+1 and all(d['status']=='sent' for d in state['deliveries']), mode+' stream committed')
-                before += 2
+                before += 3
+                with closing(sqlite3.connect(h.root / 'data/state.db')) as db, db:
+                    row = db.execute("SELECT w.document_json,i.arguments_json FROM ui_widget w JOIN tool_invocation i USING(invocation_id) WHERE json_extract(w.document_json,'$.title')='Weekly roadmap' AND w.message_id IS NOT NULL ORDER BY w.created_at DESC LIMIT 1").fetchone()
+                    require(row is not None, 'static roadmap preview disappeared at commit')
+                    require(json.loads(row[0])['components'][0]['props']['jsExpressions'] == [], 'artifact did not normalize the empty script list')
+                    require(json.loads(row[1])['components'][0]['props']['jsExpressions'] == '', 'accepted request was rewritten')
                 h.browser(evidence.parent / ('preview-'+mode+'-committed'), 'intelligent-ui-preview-committed')
             h.stop(kill=True)
             h.start()
             h.http('/ui/widget?ref=' + quote(ref,safe=''))
+            h.browser(evidence.parent / 'preview-restarted', 'intelligent-ui-preview-committed')
             with closing(sqlite3.connect(h.root / 'data/state.db')) as db, db:
                 require(db.execute('SELECT count(*) FROM ui_widget').fetchone()[0] == before, 'restart regenerated UI')
                 runs={r[0] for r in db.execute('SELECT run_id FROM run')}

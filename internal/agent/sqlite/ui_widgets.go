@@ -33,6 +33,12 @@ func (t *tools) showUI(ctx context.Context, inv tool.Invocation) (tool.Result, e
 			result = tool.Failure("INVALID_ARGUMENT")
 			return nil
 		}
+		// Preserve accepted arguments; all artifact consumers use the same
+		// validated document, including the normalized empty script list.
+		document, err := json.Marshal(widget)
+		if err != nil {
+			return err
+		}
 		var count, components, forms int
 		if err = tx.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(CASE WHEN json_array_length(document_json,'$.components')>0 THEN json_array_length(document_json,'$.components') ELSE 1 END),0),(SELECT count(*) FROM ui_widget w,json_each(w.document_json,'$.components') c WHERE w.run_id=? AND w.message_id IS NULL AND w.invocation_id!=? AND (json_extract(c.value,'$.type')='form' OR json_extract(c.value,'$.name') IN ('scheduleTime','steward.form'))) FROM ui_widget WHERE run_id=? AND message_id IS NULL AND invocation_id!=?`, t.claim.RunID(), inv.ID, t.claim.RunID(), inv.ID).Scan(&count, &components, &forms); err != nil {
 			return err
@@ -48,12 +54,12 @@ func (t *tools) showUI(ctx context.Context, inv tool.Invocation) (tool.Result, e
 			return nil
 		}
 		ref := "ui:" + inv.ID
-		if _, err = tx.ExecContext(ctx, `INSERT INTO ui_widget(invocation_id,run_id,ui_ref,document_json,created_at) VALUES(?,?,?,?,?) ON CONFLICT(invocation_id) DO NOTHING`, inv.ID, t.claim.RunID(), ref, args, time.Now().UnixMicro()); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO ui_widget(invocation_id,run_id,ui_ref,document_json,created_at) VALUES(?,?,?,?,?) ON CONFLICT(invocation_id) DO NOTHING`, inv.ID, t.claim.RunID(), ref, string(document), time.Now().UnixMicro()); err != nil {
 			return err
 		}
 		data, _ := json.Marshal(map[string]string{"ui_ref": ref, "status": "staged"})
 		result = tool.Result{Text: string(data)}
-		previewInput = args
+		previewInput = string(document)
 		return nil
 	})
 	if err == nil && result.Error == nil {

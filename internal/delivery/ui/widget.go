@@ -33,6 +33,16 @@ func ParseWidget(raw string) (Widget, bool) {
 	meetings := 0
 	actionIDs := map[string]bool{}
 	for index, c := range w.Components {
+		// An empty script string contains no executable statements. Normalize
+		// only this shorthand before applying the unchanged catalog validation.
+		if c.Name == "generateSandboxedUi" {
+			var props map[string]json.RawMessage
+			if json.Unmarshal(c.Props, &props) == nil && string(props["jsExpressions"]) == `""` {
+				props["jsExpressions"] = json.RawMessage(`[]`)
+				c.Props, _ = json.Marshal(props)
+				w.Components[index] = c
+			}
+		}
 		if c.Name == "steward.action" {
 			var action ActionProps
 			if json.Unmarshal(c.Props, &action) != nil || actionIDs[action.ID] {
