@@ -160,8 +160,15 @@ try{
    if(!await popup.evaluate(()=>window.opener===null))throw Error('authorization popup can access the workspace');
    const pending=page.locator('#signin-status[data-auth-window-opened] [data-signin-pending]');
    await pending.getByRole('status').waitFor();
-   const bounds=await pending.boundingBox();
-   if(!bounds||bounds.height>55||await fallback.isVisible())throw Error('automatically opened authorization still prompts the user to open it');
+   // Auth fragments can be replaced by the live feed between locator calls.
+   // Read the current row's geometry and fallback visibility in one frame.
+   await page.evaluate(()=>document.fonts.ready);
+   await page.waitForFunction(()=>{
+    const row=document.querySelector('#signin-status[data-auth-window-opened] [data-signin-pending]');
+    if(!row)return false;
+    const bounds=row.getBoundingClientRect();
+    return bounds.height>0&&bounds.height<=55&&![...row.querySelectorAll('[data-signin-fallback]')].some(link=>link.checkVisibility());
+   });
    if(!await pending.getByRole('button',{name:'Cancel sign-in',exact:true}).isVisible())throw Error('pending sign-in has no cancellation action');
   }
  }else if(phase==='database'){
