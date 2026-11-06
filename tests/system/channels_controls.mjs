@@ -28,6 +28,7 @@ export async function assertDeveloperList(page){
   if(innerWidth>760&&visible(secondary)){
    const p=primary.getBoundingClientRect(),s=secondary.getBoundingClientRect(),m=main.getBoundingClientRect();
    if(Math.abs(p.right-s.left)>1||Math.abs(s.right-m.left)>1)issues.push('navigation overlaps content');
+   if(!document.documentElement.classList.contains('sidebar-collapsed')&&Math.abs(p.width-s.width)>1)issues.push('primary and secondary navigation widths differ');
    const title=secondary.querySelector('.section-navigation-heading span'),bounds=title.getBoundingClientRect();
    if(bounds.left-s.left<16||s.right-bounds.right<16)issues.push('secondary title has no breathing room');
    for(const label of secondary.querySelectorAll('.section-navigation a span'))if(label.scrollWidth>label.clientWidth+1)issues.push('navigation label clips');

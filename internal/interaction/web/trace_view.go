@@ -25,7 +25,6 @@ func duration(start int64, end *int64) string {
 	}
 	return (time.Duration(max(0, *end-start)) * time.Microsecond).Round(time.Millisecond).String()
 }
-func observedAt(at int64) string { return time.UnixMicro(at).UTC().Format("15:04:05.000") }
 
 func providerTimingLabel(phase string) string {
 	return map[string]string{
@@ -33,7 +32,7 @@ func providerTimingLabel(phase string) string {
 		"headers":             "Response headers received",
 		"error":               "HTTP request failed",
 		"first_body":          "First response data",
-		"first_text":          "First visible text",
+		"first_text":          "First model text",
 		"first_tool_call":     "First model tool call",
 		"stream_terminal":     "Provider stream terminal event",
 		"header_timeout":      "Response headers timed out",
@@ -136,18 +135,6 @@ func observationTabs(o observability.Observation) []string {
 		return []string{"overview", "wire"}
 	}
 	return []string{"overview"}
-}
-
-func traceTime(raw string) string {
-	at, err := time.Parse(time.RFC3339Nano, raw)
-	if err != nil {
-		return raw
-	}
-	return at.UTC().Format("2006-01-02 15:04:05")
-}
-
-func observedDateTime(at int64) string {
-	return time.UnixMicro(at).UTC().Format("2006-01-02 15:04:05.000")
 }
 
 func observationKind(o observability.Observation) string {

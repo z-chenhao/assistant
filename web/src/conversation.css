@@ -75,3 +75,12 @@
 @media(max-width:760px){.message-bubble:has(.openintelligentui-native){width:96%}}
 
 /* Upstream native components keep their Tailwind control styles rather than the page button recipe. */
+
+/* Metadata stays outside the bubble and reserves its height before hover. */
+.message:has(>.message-time){position:relative;margin-bottom:38px}
+.message-time{position:absolute;top:100%;left:0;padding-top:4px;color:var(--muted-foreground);font:12px/1.6 var(--font-ui);white-space:nowrap}
+.message.user>.message-time{left:auto;right:0}
+.message-time time{border-radius:3px}
+.message-time time:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.message-date{text-align:center;margin:24px 0 18px;color:var(--muted-foreground);font:13px/1.6 var(--font-ui)}
+@media(hover:hover) and (pointer:fine){.js .message-time{opacity:0}.js .message:is(:hover,:focus-within)>.message-time{opacity:1}}

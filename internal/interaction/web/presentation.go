@@ -3,7 +3,6 @@ package web
 import (
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"strings"
-	"time"
 )
 
 func activeProfile(s Status) string {
@@ -16,13 +15,6 @@ func canSend(s Status) bool {
 	return s.Readiness == "ready" || s.Readiness == "" && (s.Status == "idle" || s.Status == "busy")
 }
 func bindingTarget(b interaction.Binding) string { return b.Channel + ":" + b.ID }
-func humanTime(raw string) string {
-	t, err := time.Parse(time.RFC3339Nano, raw)
-	if err != nil {
-		return raw
-	}
-	return t.UTC().Format("Jan 2, 2006 · 15:04 UTC")
-}
 func toolLabel(name string) string {
 	if name == "account_spend" {
 		return "Continue model spending beyond the account boundary"

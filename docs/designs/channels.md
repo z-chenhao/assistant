@@ -24,6 +24,12 @@ Web 在依赖准备期间开放，ingress 保持关闭；缺失能力修复后�
 
 页面查询按用途分开：Models 读取模型与必要账户信息，Notifications 只读渠道设置，Tasks 通过独立只读池读取分页摘要/详情，Conversation 读取最近 100 条和审批。`before` 是排他的 sequence 游标；返回升序消息，页面提供 Earlier messages，API 通过 `X-Steward-Before` 返回下一页 cursor。GET 不 Flush intent、不写 projection；交付循环独立 Flush 并冻结投影。已有投影只读复用，无投影时内存合成。交付直接按 conversation/message ID 取一条，Main 初始化按冻结 ID 集合分批读取，不扫描不相关记录，也不改变已有上下文边界。
 
+### Web 时间呈现边界
+
+`web/time.go` 为每个请求绑定经校验的 `steward-timezone` IANA 时区；未执行的模板源用于克隆，避免语言或时区函数在并发请求间互相覆盖。聊天投影只增加已有 CreatedAt 的呈现，不改写消息、冻结投影、API 时间字段或排序。`web/src/local-time.ts` 统一转换宿主标记的时间、当地日历日、人性化日期与图表提示，覆盖首屏、实时片段及详情预览；不遍历或改写用户正文和原始 JSON。展示只到秒，时区仅用于内部转换，不写入可见时间标签。完整时间浮层归共享 `components/ui/time-detail.ts`。
+
+浏览器提交日期筛选时携带明确的绝对时刻；原生回退按浏览器已保存的时区解析无偏移输入，拒绝夏令时跳时中不存在的时刻。明确带偏移的 URL 时间保留原时刻；API 的旧无偏移时间参数继续按原 UTC 契约解析。计划规则的时区属于执行语义，时间展示偏好只转换其下一次发生的绝对时刻，不修改规则。
+
 ### Go 实现职责（F-040）
 
 Web POST 分发只选择有名动作处理函数；消息/附件、模型、账户、通知各自维护请求步骤，认证、CSRF 和 Server 生命周期仍为统一入口。

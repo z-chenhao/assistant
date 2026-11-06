@@ -210,7 +210,7 @@ func (s *Server) appDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = localizedLayout(requestLanguage(r)).ExecuteTemplate(w, "app-detail", p)
+	_ = requestLayout(r).ExecuteTemplate(w, "app-detail", p)
 }
 func appError(err error) string {
 	switch {
@@ -298,11 +298,11 @@ func (s *Server) appAction(w http.ResponseWriter, r *http.Request) error {
 		}
 		view := page{Apps: &appsView{View: connectedapps.View{State: state}, ConnectURL: link.URL, ConnectionID: link.ConnectionID, ExpiresAt: link.ExpiresAt.UnixMilli(), Managed: s.managedApps(state)}}
 		var html bytes.Buffer
-		if e = localizedLayout(requestLanguage(r)).ExecuteTemplate(&html, "app-accounts", view); e != nil {
+		if e = requestLayout(r).ExecuteTemplate(&html, "app-accounts", view); e != nil {
 			return e
 		}
 		var sidebar bytes.Buffer
-		if e = localizedLayout(requestLanguage(r)).ExecuteTemplate(&sidebar, "app-sidebar", view); e != nil {
+		if e = requestLayout(r).ExecuteTemplate(&sidebar, "app-sidebar", view); e != nil {
 			return e
 		}
 		jsonResult(w, map[string]string{"accounts_html": html.String(), "sidebar_html": sidebar.String(), "authorization_url": link.URL, "connection_id": link.ConnectionID, "authorization_expires": strconv.FormatInt(link.ExpiresAt.UnixMilli(), 10), "revision": strconv.FormatInt(state.Revision, 10)})

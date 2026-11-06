@@ -19,6 +19,7 @@ type shownMessage struct {
 	Sequence     int64
 	ReplyKey     string
 	ClientSource string
+	CreatedAt    string
 	Bubbles      []shownProjection
 	Projection   shownProjection
 	Approval     *approvalView
@@ -153,7 +154,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, p page) {
 		}
 	}
 	w.Header().Set("Content-Language", p.Language)
-	_ = localizedLayout(p.Language).Execute(w, p)
+	_ = requestLayout(r).Execute(w, p)
 }
 func conversationCursor(r *http.Request) (int64, error) {
 	raw := r.URL.Query().Get("before")

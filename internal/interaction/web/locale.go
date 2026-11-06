@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // A browser presentation preference, independent of model language and stored content.
@@ -71,21 +70,11 @@ func translate(language, text string) string {
 	}
 	return text
 }
-func localeTime(language, raw string) string {
-	if language != "zh-CN" {
-		return humanTime(raw)
-	}
-	value, err := time.Parse(time.RFC3339Nano, raw)
-	if err != nil {
-		return raw
-	}
-	return value.UTC().Format("2006年01月02日 · 15:04 UTC")
-}
 func localizedLayout(language string) *template.Template {
 	if language == "zh-CN" {
-		return chineseLayout
+		return template.Must(chineseLayoutSource.Clone())
 	}
-	return layout
+	return template.Must(layoutSource.Clone())
 }
 func (s *Server) setLanguage(w http.ResponseWriter, r *http.Request) error {
 	language := r.FormValue("language")

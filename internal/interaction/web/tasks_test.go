@@ -49,7 +49,7 @@ func TestTaskPagesAreAuthenticatedReadOnlyAndErrorsStayPrivate(t *testing.T) {
 		}
 	}
 	list := request("/tasks", true)
-	for _, text := range []string{"Scheduled work", "Not dispatched", "Prepare tomorrow &lt;script&gt;", "Next scheduled occurrence", "Asia/Shanghai", "0 8 * * *"} {
+	for _, text := range []string{"Scheduled work", "Not dispatched", "Prepare tomorrow &lt;script&gt;", "Next scheduled occurrence", `datetime="2026-11-04T00:00:00Z"`, "0 8 * * *"} {
 		if !strings.Contains(list.Body.String(), text) {
 			t.Fatal("missing saved schedule", text)
 		}

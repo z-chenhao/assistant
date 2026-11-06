@@ -65,13 +65,7 @@ func memoryQuery(r *http.Request) (memory.InspectionQuery, error) {
 	for key, target := range map[string]*time.Time{"since": &q.Since, "until": &q.Until} {
 		if value := values.Get(key); value != "" {
 			var err error
-			*target, err = time.Parse(time.RFC3339, value)
-			if err != nil {
-				*target, err = time.Parse("2006-01-02T15:04", value)
-			}
-			if err != nil {
-				*target, err = time.Parse("2006-01-02T15:04:05", value)
-			}
+			*target, err = inspectionTimeIn(value, filterLocation(r))
 			if err != nil {
 				return q, memory.ErrInspectionInvalid
 			}

@@ -41,9 +41,9 @@ flowchart LR
 
 当前消费者为安装所有者的 Developer 列表及已有 Trace API。新增可选 `search`（最多 200 UTF-8 字节）在当前 Agent、Session、角色、状态、时间范围内，对 Run ID、Task 标题（Main 使用 Main conversation）和模型做字面子串匹配；ASCII 大小写不敏感，不把 `%` 或 `_` 解释为通配符。查询在 keyset 分页前应用，不只过滤当前页，不扫描 observation 正文。API 输出与既有查询保持兼容，不更改持久化 schema、授权或冻结数据。
 
-服务端继续拥有查询机制、指标口径与时间边界；最近 24 小时／7 天／30 天是当前 Web 的时间快照链接，Refresh 不隐式滚动其起点。Developer 导航 176px/168px、筛选栏 176px（手机默认收起）、单行分列、默认显示 Input/Output 与默认隐藏 ID 是 Web 呈现策略；列显隐只存当前浏览器。共享 `disclosure.tsx` 使用 Base UI Popover 管理定位/焦点/关闭，顶栏时间字段通过 form 属性关联原列表 form，脚本失效保留 details 表单。详情抽屉复用同一 GET 页面解析的 workbench，不增加第二个详情 API 或查询引擎。
+服务端继续拥有查询机制、指标口径与时间边界；最近 24 小时／7 天／30 天是当前 Web 的时间快照链接，Refresh 不隐式滚动其起点。一级与二级导航共同使用全局 224px 宽度、筛选栏 176px（手机默认收起）、单行分列、默认显示 Input/Output 与默认隐藏 ID 是 Web 呈现策略；列显隐只存当前浏览器。共享 `disclosure.tsx` 使用 Base UI Popover 管理定位/焦点/关闭，顶栏时间字段通过 form 属性关联原列表 form，脚本失效保留 details 表单。详情抽屉复用同一 GET 页面解析的 workbench，不增加第二个详情 API 或查询引擎。
 
-`Traces` 额外返回完整筛选范围的 `total` 与最多 48 个时间桶 `activity`。同一个只读事务在 keyset 条件前计算 count/min/max 和分桶；行数据与指标继续分页读取，直方图不从当前 40 条摘要假造全量。无匹配记录返回零计数。未指定边界时使用匹配记录的最早/最晚创建时间，指定时间边界时按该边界分桶；时间戳与排序均为 UTC。新增投影字段不修改数据库 schema 或执行状态。
+`Traces` 额外返回完整筛选范围的 `total` 与最多 48 个时间桶 `activity`。同一个只读事务在 keyset 条件前计算 count/min/max 和分桶；行数据与指标继续分页读取，直方图不从当前 40 条摘要假造全量。无匹配记录返回零计数。未指定边界时使用匹配记录的最早/最晚创建时间，指定时间边界时按该边界分桶；存储时间戳与排序均为 UTC；Web 显示、图表提示和日期筛选输入使用当前浏览器时区，提交边界保留绝对时刻。新增投影字段不修改数据库 schema 或执行状态。
 
 这些组件和查询投影是仓库内实现，不提升为外部插件协议或通用查询语言。当前不实现 Langfuse 的 field:value DSL、facet 计数、保存视图、批量操作或公开分享；只借鉴布局与诊断密度。选择有界元数据子串查询而不增加 FTS 索引，避免将这次列表改造扩大为全文检索基础设施；大规模搜索优化需以真实数据量再验证。
 
@@ -68,7 +68,7 @@ flowchart LR
 
 Agent Loop 在实际复用结果和成功提交等待后发出 best-effort 事件；Tool 事件保留真实 invocation ID。旧记录没有该字段时不以跨 generation 可重复的 provider call ID 配对。事件缺失只保留未知，不改变权威执行。
 
-指标仅汇总唯一 model_generation 关联的 provider_usage 与 spend_reservation；HTTP 重试和 reuse 不倍增。部分 usage 标明已知记录数，费用直接读取已结算账本、按币种分开；不使用当前价格推算历史，不将缺失 usage、价格或 duration 补零。
+指标仅汇总唯一 model_generation 关联的 provider_usage、spend_reservation 与 generation_cost_estimate；HTTP 重试和 reuse 不倍增。部分 usage 标明已知记录数；费用优先读取已结算账本，否则使用接纳时固定的目录估算，按币种分开。包含目录估算的总额标注“估算”，来源 tooltip 展示目录及版本；未计价调用仍计入部分覆盖。不使用当前价格推算历史，不将缺失 usage、价格或 duration 补零。估算与货币授权账本的边界见[费用设计](operations.md#account-monetary-authorization)。
 
 ## F-034 冻结上下文
 
@@ -84,7 +84,7 @@ Agent Loop 在实际复用结果和成功提交等待后发出 best-effort 事�
 - Host `bridge/observations.go` 校验 registration、字段与上限，诊断错误/回调 panic 不拒绝 generation。`observability/sqlite/recorder.go` 使用 32 条非阻塞邮箱与独立单写连接，busy_timeout 25ms、单条总写期限 100ms；只在该预算内重试本地幂等 INSERT 的 SQLITE_BUSY/LOCKED，其他失败或超时/拥塞可丢弃。Provider 无数据库访问；Web 不取得写连接。App 关闭 provider 后再排空 recorder，强制退出允许留空；已终结的 generation/Run 缺少 HTTP 结束证据时显示 unknown，不冒充仍在请求或补造结束时间。
 - capture 的 started 仅证明 fetch 尝试，headers 仅证明响应头被收到；取消、网络错误、丢失事件与终态不确定性各自保留。generation.attempt_count 不能被解释为 HTTP 次数，工具 Host execution starts 也不等于实际网络次数。
 
-Generation Overview 按 UTC 时间显示各 HTTP 尝试及流时间点。首段数据来自传输层，首段可见文本或首个工具调用来自已解析的模型事件。终止标记记录 Responses 的完成或失败等事件，兼容接口使用 finish reason 或 SDK 完成事件。标记仅包含阶段、时间及关联键。整轮超时也可在发出生成 HTTP 请求之前记录。HTTP 节点的持续时间仍表示等待响应头。
+Generation Overview 按当前浏览器时区显示各 HTTP 尝试及流时间点。首段数据来自传输层，首段可见文本或首个工具调用来自已解析的模型事件。终止标记记录 Responses 的完成或失败等事件，兼容接口使用 finish reason 或 SDK 完成事件。标记仅包含阶段、时间及关联键。整轮超时也可在发出生成 HTTP 请求之前记录。HTTP 节点的持续时间仍表示等待响应头。
 
 ## 存储、兼容与隐私
 
@@ -141,3 +141,10 @@ state schema **31** 引入 `dispatch_observation` 与 Root 查询索引。schema
 完整 Context 阅读器归入 Generation；树、时间线和节点输入输出共享导航，旧深链接继续有效。上下文从已存冻结记录投影，不从当前 checkpoint 重建；40 项分页与 8192 字节连续 UTF-8 切片保留长文本，来源缺失如实显示，Diff 对重复键按出现顺序比较。
 
 最终 SDK fetch 独立捕捉脱敏 HTTP attempts，恢复复用事件与用量账本分开。schema 30 的索引和 schema 31 的诊断表不改变冻结协议；独立可丢失邮箱与短写隔离诊断故障。请求体与原冻结 context 受相同所有者和本地备份边界保护，不增加第三方导出授权。
+
+Web Trace 列表的普通行点击通过该行的既有名称链接打开非模态详情侧栏；名称仍是键盘与无脚本的原生入口。其他链接、控件、修饰键点击与文字选择不被整行点击处理接管。
+
+
+TTFT 是新增的只读派生指标 `metrics.ttft_ms`，不迁移 schema、不改变 runtime 记录或接受回执。Trace 取时间最早的 generation，计算其首次 HTTP started 到具有同 attempt started 证据的首段 first_text；包含该 generation 的重试时间，不混入后续调用、子执行的文本或 headers／first_body。Generation 的详情使用同口径。没有观测时省略字段，UI 显示未知；first_text 含模型推理，不称为用户首屏送达时间。
+
+Web 在 Requests 起始页内只读组装最多 2 MiB 的已有请求片段；长度变化、失败或超限保留原片段分页，不改变有界 body API。结构化阅读只解码文字，拒绝重复键与不可无损表达的数字；脱敏原始 JSON 不被改写。可读面板按实际协议的 instructions/system、messages/input/contents、tools 与其余参数组合，不引入新的外部协议。Context 链接经过同一详情导航处理，保留抽屉及树／导航状态。

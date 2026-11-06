@@ -261,3 +261,9 @@ Chat 输入框焦点回归在真实浏览器中检查鼠标点击和 Tab 导航�
 富组件交互 gate 用实际 Main 交付的 14 项表单选项验证原生 Combobox 搜索、空结果和弹窗内选择；短列表与语言选择保持原生 Select，无额外搜索区域。
 
 确定性浏览器 fixture 不继承宿主的 Composio 部署凭据，避免未配置目录场景访问真实服务；显式协议 peer 测试自行配置。原生弹窗关闭后的焦点恢复在 close 事件完成后断言，不能用立即采样代替状态等待。
+
+
+消息及列表时区回归：`web/time_test.go` 验证真实页面／片段使用浏览器时区、跨天、明确偏移与无脚本筛选同一时刻、无效 cookie 回退，以及请求间隔离；`web/local-time.test.mjs` 覆盖当地日期、非整小时偏移、夏令时重复时间、午夜和隐藏时区／毫秒文案。`channels_browser.mjs` 的 live 场景在 Asia/Shanghai 中检查消息时间、hover／键盘无布局位移、手机常驻及明暗截图；native-trace 场景验证列表的当地时分秒、无时区文案、当地筛选提交的精确时刻，以及点击普通单元格打开详情侧栏。原有 live 测试继续检查草稿、附件与富组件实例不被时间增强替换。
+
+
+Trace 阅读与筛选回归：`traces_test.go` 的分页请求读取测试验证完整 JSON 组装及安全原始回退；`agent/sqlite/traces_test.go` 使用真实数据库验证 TTFT 含重试、缺失证据与 HTTP 阶段区别。`web/trace-request.test.mjs` 验证转义、多行、重复键与精度回退；日期 UT 验证当地跨天、星期和旧日期 yyyy-MM-dd。native-trace 浏览器场景在同一抽屉中切换 Context 消息与 JSON 格式、核对结构化 Requests 与原始 JSON；Memory 与 Traces 场景直接选择筛选并核对 URL／结果，无需 Apply filters。共享列表及设置导航场景核对一级／二级宽度一致，保留明暗、宽窄屏截图及无脚本路线。

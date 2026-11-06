@@ -82,3 +82,7 @@ HTTP 诊断写入以真实 SQLite 锁验证：短业务写锁释放后保存记�
 真实 channels 浏览器 action 从列表进入独立 Trace 详情，验证树/时间线对齐导航、节点类型 Tab、折叠 metadata、完整 Context/JSON/来源与相邻 Compare 前后内容，返回列表和旧 deep link 保留参数；长 UTF-8 正文、桌面/移动端、无 JavaScript 与原 API 的读取边界继续覆盖。`TestTraceDetailDoesNotDependOnGlobalList` 明确让全局列表失败而详情成功，防止拆页后仍耦合列表查询。沿用同一 SQLite/HTTP peer 证据，不引入第二套执行或评测系统。
 
 列表共享规范见 [design.md](../../design.md#数据列表页契约)。`npm test --prefix web` 覆盖共享调宽与 JSON 无损回退；现有 native trace 浏览器场景调用公共列表几何断言，并进入 channels-web CI。
+
+费用覆盖分为两层：`llm/pricing` 与 `agent/sqlite` 的 Go 回归验证精确供应商／chat 模型匹配、长上下文与缓存价格、手动覆盖、缺失用量、迁移和不可变接纳；channels-web 的 account 场景使用受控 OAuth／Responses peer 生成真实接纳用量，验证无需价格配置的估算、来源、重启不重计及审批账本独立。浏览器以已计价金额核对列名和显隐菜单、单行密度、金额和估算标记不侵入相邻列，保留桌面／移动端及明暗截图；未知价格仍由 native trace 场景覆盖。
+
+Requests 阅读器的 Go 回归验证完整小请求组装，以及超限、分页长度变化、来源不可用、游标不前进和读取失败时保留原生分页；Node 回归验证转义文本、Unicode 重复键和无损数值，不能为了可读性覆盖原始请求证据。

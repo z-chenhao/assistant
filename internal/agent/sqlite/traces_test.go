@@ -207,3 +207,42 @@ func TestTraceMissingHTTPTerminalRemainsUnknownAfterCompletion(t *testing.T) {
 		t.Fatalf("missing terminal evidence misrepresented as a running/completed request: %+v", tree.Selected)
 	}
 }
+
+func TestTraceTTFTUsesFirstGenerationTextAndPreservesMissingEvidence(t *testing.T) {
+	s, _, a, p := childFixture(t)
+	p.respond = childPolicy
+	main := mustSubmit(t, a, "first-token", "Inspect first model output")
+	mustDrain(t, a)
+	ctx := context.Background()
+	reader := s.Inspector()
+	read := func() *int64 {
+		t.Helper()
+		traces, err := reader.Traces(ctx, observability.TraceQuery{Search: main.RunID})
+		if err != nil || len(traces.Items) != 1 {
+			t.Fatal(traces, err)
+		}
+		return traces.Items[0].Metrics.TTFTMS
+	}
+	if read() != nil {
+		t.Fatal("missing timing became zero TTFT")
+	}
+	var generation string
+	if err := s.db.QueryRow(`SELECT generation_id FROM model_generation WHERE run_id=? ORDER BY created_at,generation_id LIMIT 1`, main.RunID).Scan(&generation); err != nil {
+		t.Fatal(err)
+	}
+	for _, mark := range []struct {
+		attempt, phase string
+		at             int64
+	}{
+		{"retry-one", "started", 1000000}, {"retry-one", "error", 1100000},
+		{"retry-two", "started", 1500000}, {"retry-two", "headers", 1600000},
+		{"retry-two", "first_body", 1700000}, {"retry-two", "first_text", 2691000},
+	} {
+		if _, err := s.db.Exec(`INSERT INTO dispatch_observation VALUES(?,?,?,?,'test',NULL,'','',0,'')`, generation, mark.attempt, mark.phase, mark.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := read(); got == nil || *got != 1691 {
+		t.Fatal("TTFT ignored retries or used headers/first transport data", got)
+	}
+}

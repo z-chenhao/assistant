@@ -47,10 +47,10 @@ func inspectionQuery(r *http.Request) (*inspectionView, error) {
 			return nil, observability.ErrInvalid
 		}
 	}
-	if v.Query.Since, err = inspectionTime(q.Get("since")); err != nil {
+	if v.Query.Since, err = inspectionTimeIn(q.Get("since"), filterLocation(r)); err != nil {
 		return nil, err
 	}
-	if v.Query.Until, err = inspectionTime(q.Get("until")); err != nil {
+	if v.Query.Until, err = inspectionTimeIn(q.Get("until"), filterLocation(r)); err != nil {
 		return nil, err
 	}
 	if err = v.Query.Validate(); err != nil {
@@ -65,24 +65,6 @@ func inspectionQuery(r *http.Request) (*inspectionView, error) {
 		err = observability.ErrInvalid
 	}
 	return v, err
-}
-
-func inspectionTime(raw string) (time.Time, error) {
-	if raw == "" {
-		return time.Time{}, nil
-	}
-	for _, format := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02T15:04"} {
-		if at, err := time.Parse(format, raw); err == nil {
-			return at.UTC(), nil
-		}
-	}
-	return time.Time{}, observability.ErrInvalid
-}
-func timeInput(at time.Time) string {
-	if at.IsZero() {
-		return ""
-	}
-	return at.UTC().Format("2006-01-02T15:04:05")
 }
 
 func (s *Server) inspect(ctx context.Context, v *inspectionView, relationshipsOnly bool) error {

@@ -23,12 +23,15 @@ type Metrics struct {
 	CacheRead   int64  `json:"cache_read_tokens"`
 	CacheWrite  int64  `json:"cache_write_tokens"`
 	ProviderMS  *int64 `json:"provider_ms,omitempty"`
+	TTFTMS      *int64 `json:"ttft_ms,omitempty"`
 	Costs       []Cost `json:"costs"`
 	Unpriced    int64  `json:"unpriced"`
 }
 type Cost struct {
-	Currency string `json:"currency"`
-	Micros   int64  `json:"micros"`
+	Currency  string `json:"currency"`
+	Micros    int64  `json:"micros"`
+	Estimated bool   `json:"estimated,omitempty"`
+	Source    string `json:"source,omitempty"`
 }
 type Trace struct {
 	Execution

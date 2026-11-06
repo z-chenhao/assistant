@@ -36,6 +36,16 @@ async function navigationViewports(page,evidence){
 // relationships before/after enhancement rather than platform-specific pixels.
 export async function pageTransitions(page,context,url,evidence){
  const measurements={resources:[],collapse:[],loading:[],fonts:[],focus:[]};
+ await page.setViewportSize({width:1400,height:980});
+ await page.evaluate(()=>localStorage.setItem('steward-sidebar','open'));
+ const widths=[];
+ for(const path of ['/', '/tasks', '/settings/preferences', '/developer/observability']){
+  await page.goto(url+path);
+  const sizes=await page.evaluate(()=>({primary:document.querySelector('.app-sidebar').getBoundingClientRect().width,secondary:document.querySelector('.section-sidebar')?.getBoundingClientRect().width}));
+  widths.push(sizes.primary);if(sizes.secondary&&Math.abs(sizes.primary-sizes.secondary)>1)throw Error('primary and secondary navigation widths differ across modules');
+ }
+ if(Math.max(...widths)-Math.min(...widths)>1)throw Error('primary navigation resizes when switching modules');
+
  await page.addInitScript(()=>{
   window.navigationFontFrames=[];
   if(!['/settings/preferences','/settings/notifications'].includes(location.pathname))return;
@@ -100,9 +110,11 @@ export async function pageTransitions(page,context,url,evidence){
  await page.locator('.brand-row [data-sidebar-toggle]').click();
  for(const path of ['/settings/preferences','/settings/setup','/developer/observability','/developer/memory','/tasks','/']){
   await page.goto(url+path);await page.reload();
-  const state=await page.evaluate(()=>({path:location.pathname,main:document.querySelector('main').getBoundingClientRect().x,sidebar:getComputedStyle(document.querySelector('.app-sidebar')).display}));
-  if(state.main!==64||state.sidebar==='none'||!await page.locator('.brand-row [data-sidebar-toggle]').isVisible())throw Error('collapsed navigation reset: '+JSON.stringify(state));
+  const state=await page.evaluate(()=>({path:location.pathname,main:document.querySelector('main').getBoundingClientRect().x,secondary:document.querySelector('.section-sidebar')?.getBoundingClientRect().width??0,sidebar:getComputedStyle(document.querySelector('.app-sidebar')).display}));
+  if((path.startsWith('/settings')||path.startsWith('/developer'))&&state.secondary===0)throw Error('collapsing primary navigation hid secondary navigation');
+  if(Math.abs(state.main-(64+state.secondary))>1||state.sidebar==='none'||!await page.locator('.brand-row [data-sidebar-toggle]').isVisible())throw Error('collapsed navigation reset: '+JSON.stringify(state));
   measurements.collapse.push(state);
+  if(path==='/settings/preferences'||path==='/developer/observability')await page.screenshot({path:evidence+'/navigation-collapsed-'+(path.includes('settings')?'settings':'developer')+'.png'});
  }
  for(const [width,path,collapsed,theme] of [[390,'/settings/preferences',false,'light'],[320,'/settings/preferences',false,'dark'],[1400,'/settings/preferences',false,'light'],[1400,'/',true,'dark'],[390,'/tasks',false,'dark']]){
   await page.setViewportSize({width,height:980});

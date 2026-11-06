@@ -4,6 +4,11 @@ export async function memoryInspection({page,context,browser,url,evidence}) {
  await page.getByRole('navigation',{name:'Workspace'}).getByRole('link',{name:'Developer',exact:true}).click();
  await page.getByRole('navigation',{name:'Developer sections'}).getByRole('link',{name:'Memory',exact:true}).click();
  await page.locator('.memory-page').waitFor();
+ await page.getByRole('button',{name:'Apply filters',exact:true}).waitFor({state:'hidden'});
+ await page.getByRole('radio',{name:'Recall',exact:true}).check();await page.waitForURL(target=>target.searchParams.get('tier')==='recall');
+ if(await page.locator('[data-memory-ref]').count()<1||await page.locator('[data-memory-ref] td:nth-child(2)').allTextContents().then(values=>values.some(value=>value.trim()!=='Recall')))throw Error('Memory filter did not apply automatically');
+ await page.getByRole('radio',{name:'All tiers',exact:true}).check();await page.waitForURL(target=>!target.searchParams.get('tier'));
+
  if(await page.getByRole('link',{name:'Database',exact:true}).count())throw Error('Database navigation remains');
  const first=await page.locator('[data-memory-ref]').evaluateAll(rows=>rows.map(row=>row.dataset.memoryRef));
  if(first.length!==20)throw Error('Memory default page is not bounded');

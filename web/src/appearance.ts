@@ -15,3 +15,6 @@ const syncFavicon=()=>{if(favicon)favicon.href=html.classList.contains('dark')?'
 syncFavicon();
 new MutationObserver(syncFavicon).observe(html,{attributes:true,attributeFilter:['class']});
 html.classList.toggle('sidebar-collapsed',collapsed&&matchMedia('(min-width: 761px)').matches);
+
+// Remember only the browser zone; no account or scheduler settings are changed.
+try{document.cookie=`steward-timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}; Path=/; Max-Age=31536000; SameSite=Strict`}catch{}

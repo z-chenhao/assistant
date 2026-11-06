@@ -64,6 +64,32 @@ flowchart TD
 
 ## Account monetary authorization
 
+Automatic reference costs serve the existing Trace list and metrics consumers:
+operators should not need a price entry for every common model. The private
+`llm/pricing` adapter reuses the bundled, attributed model catalog. Exact chat
+model ID and endpoint hash select a quote; unknown proxies never inherit prices
+from a model name alone. Account subscriptions use the catalog's subscription
+model reference rates, explicitly disclosed as API estimates rather than bills.
+Input/cache buckets select the highest applicable long-context tier. Decimal
+catalog rates convert exactly to integer microcurrency rates; unrepresentable
+rates remain unknown. No inference-time network dependency is introduced.
+
+The Host accepts estimates in the same fenced transaction as usage and the
+generation result, only when the frozen spend snapshot has no explicit price.
+Migration 047 adds an immutable per-generation estimate containing currency,
+applied rates, catalog version, source and amount. Accepted estimates never
+reprice after upgrades or replay; old calls are not backfilled. Trace totals
+prefer configured settlements, otherwise estimates, aggregate separately per
+currency and disclose estimated/partial coverage. Unknown usage is not zero.
+
+The estimator is a private consumer-owned seam between catalog policy and
+acceptance persistence, not a public model/profile API. Existing model snapshots,
+reservations and monetary approval contracts remain unchanged. Catalog estimates
+are observational and do not authorize or consume monetary headroom. This
+separation is required for subscription/custom billing semantics; adding live
+price synchronization, a pricing configuration UI, invoice reconciliation or
+retroactive valuation would be speculative and is deliberately deferred.
+
 Use an explicitly configured account monetary boundary and provider/model price
 version. Token counts remain accounting and safety observations. They never
 authorize spending. No model-visible budget or capability query is added.

@@ -31,6 +31,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm/account"
 	"github.com/z-chenhao/assistant/internal/llm/bridge"
 	"github.com/z-chenhao/assistant/internal/llm/fake"
+	"github.com/z-chenhao/assistant/internal/llm/pricing"
 	"github.com/z-chenhao/assistant/internal/llm/secret"
 	llmsqlite "github.com/z-chenhao/assistant/internal/llm/sqlite"
 	"github.com/z-chenhao/assistant/internal/maintenance"
@@ -176,6 +177,7 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		return nil, errors.Join(err, t.Close())
 	}
 	store.Artifacts().Policy = cfg.Artifact
+	store.ConfigureCostEstimator(pricing.New())
 	a := &App{capabilitySettings: configsetup.New(cfg, secrets), rootLock: lock, store: store, telemetry: t, artifacts: store.Artifacts(), skillConfig: cfg.Skills}
 	cfg = a.capabilitySettings.PrepareDefaults(ctx)
 	a.skillConfig = cfg.Skills

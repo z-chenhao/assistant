@@ -31,7 +31,7 @@ async function chooseSharedOption(page,control,label,value){
 const browser=await chromium.launch(options);
 let page;
 try{
- const context=await browser.newContext({viewport:{width:1400,height:980},deviceScaleFactor:1,reducedMotion:['rich-replies','intelligent-ui','ui-interactions','ui-interactions-restart'].includes(phase)?'reduce':'no-preference'});
+ const context=await browser.newContext({viewport:{width:1400,height:980},timezoneId:'Asia/Shanghai',deviceScaleFactor:1,reducedMotion:['rich-replies','intelligent-ui','ui-interactions','ui-interactions-restart'].includes(phase)?'reduce':'no-preference'});
  if(phase==='streaming'){
   await context.addInitScript(()=>{
    const NativeEventSource=window.EventSource;
@@ -444,6 +444,33 @@ try{
   }finally{await native.close()}
  }
 
+ if(phase==='estimated-cost'){
+  await page.goto(url+'/developer/observability');
+  const row=page.locator('[data-execution-id]');await row.waitFor();
+  await page.getByRole('columnheader',{name:'Model cost',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Columns',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Show column: Model cost',exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  const cost=row.locator('.obs-cost');await cost.getByText('Estimated',{exact:true}).waitFor();
+  if(!/USD \d+\.\d{6}/.test(await cost.innerText())||!(await cost.getAttribute('title')).includes('openai-codex'))throw Error('automatic price lost its amount or provenance');
+  for(const width of [1400,390])for(const theme of ['light','dark']){
+   await page.setViewportSize({width,height:980});
+   await page.evaluate(value=>{localStorage.setItem('steward-theme',value);document.documentElement.classList.toggle('dark',value==='dark')},theme);
+   await cost.scrollIntoViewIfNeeded();
+   const geometry=await cost.evaluate(node=>{
+    const cell=node.closest('td'),style=getComputedStyle(cell),range=document.createRange();range.selectNodeContents(node);
+    const text=range.getBoundingClientRect(),box=cell.getBoundingClientRect();
+    return {left:text.left-box.left,right:box.right-text.right,paddingLeft:parseFloat(style.paddingLeft),paddingRight:parseFloat(style.paddingRight),height:cell.parentElement.getBoundingClientRect().height,font:parseFloat(style.fontSize),overflow:document.documentElement.scrollWidth-innerWidth};
+   });
+   if(geometry.left<geometry.paddingLeft-1||geometry.right<geometry.paddingRight-1||geometry.height>38||geometry.font!==12||geometry.overflow>1)throw Error('estimated cost overlaps or breaks compact layout: '+JSON.stringify(geometry));
+   await page.screenshot({path:evidence+'/estimated-cost-'+theme+'-'+width+'.png',fullPage:true});
+  }
+  await row.locator('a.trace-open').click();await page.locator('.control-sheet').waitFor();
+  await page.getByText('Trace metrics',{exact:true}).click();
+  await page.locator('.obs-metrics .obs-cost').getByText('Estimated',{exact:true}).waitFor();
+  await page.setViewportSize({width:1400,height:980});await page.goto(url);
+ }
+
  if(phase==='native-trace'){
   const facts=JSON.parse(process.env.STEWARD_NATIVE_TRACE_FACTS);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
@@ -452,8 +479,8 @@ try{
   await page.setViewportSize({width:720,height:980});
   await page.waitForFunction(()=>document.querySelector('.obs-filter-rail')?.open===false);
   await page.locator('.obs-filter-rail>summary').click();
-  await page.getByRole('radio',{name:'Root Worker',exact:true}).check();
-  await page.getByRole('radio',{name:'All agents',exact:true}).check();
+  await page.getByRole('radio',{name:'Root Worker',exact:true}).check();await page.waitForURL(target=>target.searchParams.get('role')==='root');
+  await page.getByRole('radio',{name:'All agents',exact:true}).check();await page.waitForURL(target=>!target.searchParams.get('role'));
   await page.setViewportSize({width:1400,height:980});
   await page.locator('[data-execution-id="'+facts.main+'"]').locator('a.trace-open').click();
   await page.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();
@@ -474,10 +501,15 @@ try{
   await page.getByRole('heading',{name:'Final provider request',exact:true}).waitFor();
   if(await page.locator('.obs-tree-pane').evaluate(node=>node.scrollTop)!==treeScroll)throw new Error('node selection lost tree position');
   if(!await page.locator('.wire-body').innerText().then(text=>text.includes('"messages"')&&text.includes('"attempt"')))throw new Error('final request view missing');
+  await page.locator('[data-wire-ready=true] .obs-wire-reader').waitFor();
+  if(await page.locator('.wire-body').isVisible())throw Error('Requests defaults to a raw JSON wall');
+  await page.getByRole('button',{name:'JSON',exact:true}).click();
+  await page.locator('.wire-body').waitFor();
+  await page.getByRole('button',{name:'Formatted',exact:true}).click();
   await page.screenshot({path:evidence+'/trace-wire.png',fullPage:true});
   await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'Preview'}).waitFor();
   await page.goto(url+'/developer/observability?run='+encodeURIComponent(facts.root));
-  await page.getByText('Execution facts & data coverage',{exact:true}).click();
+  await page.getByText('Trace metrics',{exact:true}).click();
   await page.getByRole('button',{name:'Help: Root Worker',exact:true}).hover();
   await page.getByRole('tooltip').filter({hasText:'Task root · no parent Worker.'}).waitFor();
   await page.keyboard.press('Escape');
@@ -496,6 +528,7 @@ try{
   await page.getByRole('heading',{name:'Prepare a safe independent report. Return evidence; perform no external actions.',exact:true}).waitFor();
   if(await page.getByRole('heading',{name:'Planned objective',exact:true}).count())throw Error('task detail repeated its title as the objective');
   if(!await page.locator('#task-messages').innerText().then(text=>text.includes('Main Task follow-up through Pi.')))throw Error('completed task did not show Main delivery');
+  if(await page.locator('.primary-settings svg').innerHTML()===await page.locator('.task-configuration h2>svg').innerHTML())throw Error('Settings and task configuration reuse one icon');
   await page.screenshot({path:evidence+'/task-result.png',fullPage:true});
 
  }
@@ -506,7 +539,7 @@ try{
   await page.getByRole('heading',{name:'Tracing',exact:true}).waitFor();
   const row=page.locator('[data-execution-id="'+main+'"]');
   await row.locator('a.trace-open').click();
-  await page.getByText('Execution facts & data coverage',{exact:true}).click();
+  await page.getByText('Trace metrics',{exact:true}).click();
   await page.locator('.task-timeline .inspect-task').click();
   await page.locator('.obs-task-epochs .object-row').first().click();
   await page.locator('.obs-tree .run-node').first().waitFor();
@@ -518,19 +551,19 @@ try{
   }
   if(await page.locator('.obs-task-link img').count()||!await page.locator('.obs-task-link').innerText().then(text=>text.includes('<img src=x')))throw new Error('Task title was interpreted as HTML');
   await page.locator('.run-node[data-run-id="'+child.id+'"] a.tree-heading').click();
-  await page.getByText('Saved metadata & timing',{exact:true}).click();
+  await page.getByText('Raw observation',{exact:true}).click();
   if(!await page.locator('.parent-run').innerText().then(text=>text.includes(child.parent)))throw new Error('selected Child lost parent navigation');
   await page.locator('.parent-run').click();
-  await page.getByText('Execution facts & data coverage',{exact:true}).click();
+  await page.getByText('Trace metrics',{exact:true}).click();
   await page.locator('.creator-run').click();
   if(await page.locator('.run-node[data-role="root"],.run-node[data-role="child"]').count())throw new Error('Main page presented Task Roots as its Child Runs');
   await page.getByRole('link',{name:'Traces',exact:true}).first().click();
-  await page.getByRole('radio',{name:'Root Worker',exact:true}).check();
-  await page.getByRole('radio',{name:'completed',exact:true}).check();
-  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await page.getByRole('radio',{name:'Root Worker',exact:true}).check();await page.waitForURL(target=>target.searchParams.get('role')==='root');
+  await page.getByRole('radio',{name:'completed',exact:true}).check();await page.waitForURL(target=>target.searchParams.get('status')==='completed');
+  await page.waitForURL(target=>target.searchParams.get('role')==='root');
   if(await page.locator('[data-execution-id]').count()!==1||await page.locator('[data-execution-id]:not([data-role="root"])').count())throw new Error('execution filters ignored');
   await page.getByRole('button',{name:'All time',exact:true}).click();
-  await page.getByLabel('Created before (UTC)').fill('2000-01-01T00:00');
+  await page.getByLabel('Created before').fill('2000-01-01T00:00');
   await page.getByRole('button',{name:'Apply range',exact:true}).click();
   await page.getByRole('heading',{name:'No matching traces',exact:true}).waitFor();
   await page.getByRole('link',{name:'Clear all',exact:true}).first().click();
@@ -544,7 +577,7 @@ try{
    if(!workbench.stacked||!workbench.contained)throw Error('intermediate trace details are clipped instead of stacked');
   }
   await page.setViewportSize({width:1400,height:980});
-  await page.getByText('Execution facts & data coverage',{exact:true}).click();
+  await page.getByText('Trace metrics',{exact:true}).click();
   await page.getByRole('button',{name:'Help: Root Worker',exact:true}).hover();
   await page.getByRole('tooltip').filter({hasText:'Task root · no parent Worker.'}).waitFor();
   await page.keyboard.press('Escape');
@@ -578,30 +611,30 @@ try{
   if(!await page.locator('.context-diff [data-change="added"]').count())throw Error('tool continuation additions missing from diff');
   await page.getByRole('link',{name:'Context',exact:true}).click();
   await page.getByRole('heading',{name:'Full frozen context',exact:true}).waitFor();
-  const system=page.locator('.context-item-link').filter({hasText:'system'}).first();await system.click();
+  const system=page.locator('.context-item-link').filter({hasText:'system'}).first();await system.click();await page.waitForFunction(()=>!document.querySelector('#observability-workbench')?.classList.contains('obs-loading'));
   const meta=await page.locator('.context-reader').evaluate(node=>({...node.dataset}));
   const frozen=await (await context.request.get(url+'/api/developer/context?'+new URLSearchParams({run:meta.contextRun,step:meta.contextStep,section:meta.contextSection,item:meta.contextItem,offset:meta.contextOffset}))).json();
   if(!frozen.content||await page.locator('.frozen-content').textContent()!==frozen.content)throw new Error('system prompt differs from frozen Host content');
   await page.getByRole('link',{name:'Complete stored item (JSON)',exact:true}).click();
-  if(!(await page.locator('.frozen-content').innerText()).includes('"role":"system"'))throw new Error('stored message JSON unavailable');
+  await page.waitForFunction(()=>document.querySelector('.frozen-content')?.textContent?.includes('"role":"system"'));
   await page.getByRole('link',{name:'tools',exact:true}).click();
-  if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('input_schema')))throw new Error('Tool schema unavailable');
-  await page.getByRole('link',{name:'response',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.frozen-content')?.textContent?.includes('input_schema'));
+  await page.getByRole('link',{name:'response',exact:true}).click();await page.waitForURL(target=>target.searchParams.get('section')==='response');
   await page.getByRole('link',{name:'Complete stored item (JSON)',exact:true}).click();
-  if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('tool_calls')))throw new Error('model response unavailable');
+  await page.waitForFunction(()=>document.querySelector('.frozen-content')?.textContent?.includes('tool_calls'));
   await page.getByRole('link',{name:'provenance',exact:true}).click();
-  if(!await page.locator('.frozen-content').innerText().then(text=>text.includes('stage')))throw new Error('saved compaction provenance unavailable');
+  await page.waitForFunction(()=>document.querySelector('.frozen-content')?.textContent?.includes('stage'));
   const long=facts.long_context;
   await page.goto(url+'/developer/observability?run='+encodeURIComponent(long.run));
   await page.goto(url+'/developer/observability/'+encodeURIComponent(long.run)+'?tab=context&ctx=1&step='+long.step);
-  await page.getByRole('link',{name:'Step '+long.step,exact:true}).click();
-  await page.locator('.context-item-link').filter({hasText:'['+long.item+']'}).click();
+  await page.getByRole('link',{name:'Step '+long.step,exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#observability-workbench')?.classList.contains('obs-loading'));
+  await page.locator('.context-item-link').filter({hasText:'['+long.item+']'}).click();await page.waitForURL(target=>target.searchParams.get('item')===String(long.item));
   let full='';
   for(let i=0;i<20;i++){
    full+=await page.locator('.frozen-content').innerText();
    const more=page.getByRole('link',{name:'Continue full content',exact:false});
    if(!await more.count())break;
-   await more.click();
+   await more.click();await page.waitForFunction(()=>!document.querySelector('#observability-workbench')?.classList.contains('obs-loading'));
   }
   if(!full.includes('LONG_CONTEXT_END')||!full.includes('完整上下文🦊'))throw new Error('long Unicode context silently clipped');
   if(await page.locator('.context-content img').count())throw new Error('context interpreted as HTML');
@@ -698,6 +731,49 @@ try{
   };
   const plan=(name,args)=>'Capabilities: '+JSON.stringify([{name,arguments:args}]);
   const echo=async(key,text)=>send(key,plan('mcp__fixture__echo',{text}));
+  await echo('live-time','Ready to review the updates.');
+  await page.locator('.message.assistant').filter({hasText:'Ready to review the updates.'}).waitFor();
+  const timestamp=page.locator('#conversation-messages .message-time time').first();
+  await timestamp.waitFor({state:'attached'});
+  const checkTimes=()=>{
+   for(const node of document.querySelectorAll('time[data-local-time=message]')){
+    const expected=new Intl.DateTimeFormat(document.documentElement.lang,{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date(node.dateTime));
+    if(node.textContent!==expected||/GMT|UTC|Asia\//.test(node.getAttribute('aria-label')))throw Error('message did not use the viewer timezone');
+   }
+  };
+  await page.evaluate(checkTimes);
+  const message=timestamp.locator('xpath=../..');
+  await message.scrollIntoViewIfNeeded();
+  await page.getByRole('link',{name:'Steward home',exact:true}).hover();
+  const before=await message.boundingBox();
+  if(await timestamp.evaluate(node=>getComputedStyle(node.parentElement).opacity)!=='0')throw Error('desktop message time was not deferred');
+  await message.hover();
+  if(await timestamp.evaluate(node=>getComputedStyle(node.parentElement).opacity)!=='1')throw Error('hover did not reveal the message time');
+  const after=await message.boundingBox();
+  if(before.y!==after.y||before.height!==after.height)throw Error('hover shifted the conversation');
+  await timestamp.focus();
+  if(await timestamp.evaluate(node=>getComputedStyle(node.parentElement).opacity)!=='1')throw Error('keyboard focus did not reveal the time');
+  for(const theme of ['light','dark']){
+   await page.evaluate(value=>document.documentElement.classList.toggle('dark',value==='dark'),theme);
+   await page.screenshot({path:`${evidence}/message-time-${theme}-desktop.png`});
+  }
+  const touch=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,timezoneId:'Asia/Shanghai'});
+  try{
+   await touch.addCookies(await context.cookies());const mobile=await touch.newPage();await mobile.goto(url);
+   const time=mobile.locator('#conversation-messages .message-time time').first();await time.waitFor();
+   if(await time.evaluate(node=>getComputedStyle(node.parentElement).opacity)!=='1')throw Error('touch timestamps require hover');
+   await time.tap();await mobile.locator('.control-time-detail:popover-open').waitFor();
+   if(!/\d{2}:\d{2}:\d{2}/.test(await mobile.locator('.control-time-detail').innerText()))throw Error('touch did not expose the complete timestamp');
+   for(const theme of ['light','dark']){await mobile.evaluate(value=>document.documentElement.classList.toggle('dark',value==='dark'),theme);await mobile.screenshot({path:`${evidence}/message-time-${theme}-mobile.png`})}
+  }finally{await touch.close()}
+  const otherZone=await browser.newContext({viewport:{width:1200,height:900},timezoneId:'America/New_York'});
+  try{
+   await otherZone.addCookies(await context.cookies());const other=await otherZone.newPage();await other.goto(url);
+   await other.waitForFunction(()=>{const time=document.querySelector('time[data-local-time=message]');return time?.textContent===new Intl.DateTimeFormat(document.documentElement.lang,{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date(time.dateTime))});
+   if((await other.locator('.message-date:visible').first().innerText()).includes('Asia/Shanghai'))throw Error('first-load date retained another browser timezone');
+  }finally{await otherZone.close()}
+  await page.evaluate(()=>document.documentElement.classList.remove('dark'));
+
   await echo('live-initial','Opening note\n'+'Context line\n'.repeat(55)+'INITIAL_DONE');
   await page.locator('.message.assistant').filter({hasText:'INITIAL_DONE'}).waitFor();
   const editor=page.getByLabel('Message Ghost',{exact:true});

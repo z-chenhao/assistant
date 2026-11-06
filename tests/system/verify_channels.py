@@ -1726,6 +1726,29 @@ def account_presentation(binary, browser_evidence, report):
                 restored_page = h.http(resources)
                 require('Current model' in restored_page and 'Test connection' not in restored_page and 'Use model' not in restored_page,
                         'restored model still exposes replaced actions')
+                # Price a real accepted response using the bundled catalog. Only
+                # the owned OAuth/Responses peer is substituted; no ledger or
+                # rendered result is injected by the browser fixture.
+                request = Request(endpoint+'/fixture/control', data=json.dumps(dict(models=['fixture-account-model','gpt-6-luna'])).encode(), headers={'Content-Type':'application/json'})
+                with urlopen(request, timeout=10) as response:
+                    require(response.status == 200, 'pricing model catalog setup failed')
+                h.command('model','account-catalog',aid)
+                priced = h.command('model','account-add',aid,'gpt-6-luna')
+                h.http('/model/select', urlencode(dict(profile=priced['profile_id'], profile_version=priced['version'], config_version=h.http('/api/status')['config_version'], consent='yes')).encode(), headers=form)
+                h.http('/api/message',dict(source_id='automatic-cost',content=[dict(type='text',text='Summarize the available evidence.')]))
+                h.wait(lambda state:len(state['runs'])==1 and state['runs'][0]['status']=='completed' and all(d['status']=='sent' for d in state['deliveries']), 'automatically priced account response')
+                traces=h.http('/api/developer/traces')['items']
+                require(len(traces)==1 and traces[0]['metrics']['unpriced']==0, 'known account usage remained unpriced')
+                costs=traces[0]['metrics']['costs']
+                require(len(costs)==1 and costs[0]['currency']=='USD' and costs[0]['estimated'] and costs[0]['micros']>0 and 'openai-codex' in costs[0]['source'], 'automatic price amount or provenance is missing')
+                with closing(sqlite3.connect(root/'data/state.db')) as db, db:
+                    db.execute('BEGIN')
+                    require(db.execute('SELECT count(*) FROM generation_cost_estimate').fetchone()[0]==db.execute('SELECT count(*) FROM model_generation').fetchone()[0], 'accepted usage estimate count diverged')
+                    require(db.execute('SELECT count(*) FROM spend_reservation').fetchone()[0]==0 and db.execute('SELECT count(*) FROM spend_approval').fetchone()[0]==0, 'subscription reference costs entered monetary consent')
+                h.browser(browser_evidence/'estimated-cost','estimated-cost')
+                h.stop(kill=True);h.start()
+                require(h.http('/api/developer/traces')['items'][0]['metrics']['costs']==costs, 'restart repriced accepted usage')
+                report['checks'].append('Automatic catalog price: actual accepted account usage, immutable estimates across restart, no monetary consent mutation, visible amount/source and compact cost-cell geometry in desktop/mobile light/dark browser views')
                 h.browser(browser_evidence/'signout','settings-account')
                 with server.lock:
                     sensitive=list(server.sensitive)
