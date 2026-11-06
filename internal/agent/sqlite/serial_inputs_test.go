@@ -100,16 +100,25 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 			return llm.GenerationResult{Text: "game delivered"}, nil
 		}
 		last := request.Messages[len(request.Messages)-1]
-		if last.Role == "tool" {
+		user := ""
+		for i := len(request.Messages) - 1; i >= 0; i-- {
+			if message := request.Messages[i]; message.Role == "user" && message.Origin != "runtime" {
+				user = message.Text
+				break
+			}
+		}
+		if user == "recommend a snowy trip" {
+			return llm.GenerationResult{Text: "trip recommendation"}, nil
+		}
+		// Responsive Main can deliver a slow tool's result as scoped runtime
+		// evidence after its native pending receipt. Both are valid envelopes.
+		if last.Role == "tool" || last.Origin == "runtime" && last.Source != nil && last.Source.Kind == "tool_results" {
 			<-workerStarted
 			return llm.GenerationResult{Text: "game started in background"}, nil
 		}
 		if last.Role == "user" && last.Text == "make a game" {
 			first.Do(func() { close(firstStarted); <-firstRelease })
 			return calls(task.ManageName, `{"operation":"create","task":"make a game"}`), nil
-		}
-		if last.Role == "user" && last.Text == "recommend a snowy trip" {
-			return llm.GenerationResult{Text: "trip recommendation"}, nil
 		}
 		return llm.GenerationResult{}, llm.InvalidProviderResponse
 	}
@@ -138,7 +147,7 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	// Ordering is the contract: both replies must commit while the Worker is
 	// still held. Avoid contending with instrumented writes through a 10ms SQL
 	// polling loop; the guard is for hung tests, not a production latency SLA.
-	deadline := time.NewTimer(15 * time.Second)
+	deadline := time.NewTimer(5 * time.Second)
 	defer deadline.Stop()
 	for range 2 {
 		select {
