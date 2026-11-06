@@ -70,7 +70,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-032](features/evals.md#f-032) | Web Evals 入口 | 后续可从 Developer 查看评测结果，并关联对应执行。 | 否 · 待定义 |
 | [F-033](features/database.md#f-033) | Web Database 检查入口 | Developer 中只读浏览执行、消息、记忆与文件元数据，支持分页、确切引用、作用域内关联和审计状态。 | 是 · 已完成 |
 | [F-037](features/installation.md#f-037) | 安装、首次启动与显式部署 | 安装、检查、前台启动及自定义部署，并保持持久数据。 | 是 · 已完成 |
-| [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证及可审查交付。 | 是 · 已完成 |
+| [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证、隔离并行 CI 与可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |
 | [F-040](features/engineering.md#f-040) | Go 模块边界与可读性重构 | 领域持有适配器和接口类型；LLM 依赖方向与生产 Code Mode 装配有自动回归，目录规模及响应场景纳入 PR 门禁。 | 是 · 已完成 |
 | [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存与可访问帮助；模型同意常驻、Trace 状态可读，跨页复用 Select／Switch、字号与窄屏触控规则，通过复用门禁、首屏／状态 UT 和跨页／Task 浏览器回归约束；折叠偏好与慢加载布局稳定，编辑后清除过期连接／保存反馈，保留真实执行与审批语义。 | 是 · 已完成 |

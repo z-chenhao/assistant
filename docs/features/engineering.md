@@ -166,7 +166,9 @@ decision history and execution evidence remain in PRs, Git history or CI artifac
 
 Go package tests currently mix unit and component integration checks; `go test
 ./...` is not called a pure UT suite. The eleven deterministic core system gates
-run in PR CI. Extended system coverage and the full race inventory run separately
+run in isolated parallel PR CI lanes, with one required aggregate status that
+rejects failed, cancelled or missing work. The five-minute latency target is
+verified against remote workflow timing. Extended system coverage and the full race inventory run separately
 on a weekly schedule or manual request. See [CI](../designs/engineering.md#ci-continuous-integration-and-delivery).
 
 `make lint` also runs pinned Staticcheck and actionlint. Compatibility exceptions

@@ -78,6 +78,17 @@ export async function preferences(page,context,browser,url,evidence){
    await page.setViewportSize({width,height:width===1400?980:844});
    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),theme==='dark');
    const geometry=await layout(page);
+   if(width===320){
+    // Exercise the shrink boundary independently of platform font metrics:
+    // enough space for the 112px minimum, less than the 120px desktop cap.
+    const row=page.locator('.preference-row').first();
+    await row.evaluate(node=>{
+     const style=getComputedStyle(node),name=node.querySelector('.preference-name');
+     node.style.inlineSize=`${name.getBoundingClientRect().width+parseFloat(style.columnGap)+116+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)}px`;
+    });
+    await layout(page);
+    await row.evaluate(node=>node.style.removeProperty('inline-size'));
+   }
    if(width<=390&&geometry.bounds.slice(1).some(r=>r.height<44||r.width<44))throw Error('small touch target');
    await page.screenshot({path:`${evidence}/preferences-${language}-${theme}-${width}.png`,fullPage:true});
    const height=await page.locator('.preference-group').evaluate(n=>n.getBoundingClientRect().height);

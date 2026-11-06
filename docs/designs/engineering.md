@@ -196,28 +196,29 @@ are test levels; using CI does not turn a unit test into an end-to-end test.
 
 ### Pull requests and main
 
-[CI](../../.github/workflows/ci.yml) runs one `Ubuntu checks` job. The existing
-required status name is preserved. One checkout and dependency setup serve:
+[CI](../../.github/workflows/ci.yml) preserves `Ubuntu checks` as the sole required
+aggregate status. A scope job selects documentation-only checks or the full code
+path. Code runs in ten isolated Ubuntu lanes, described by the private
+[CI partition](../../tests/system/ci.py):
 
-1. `make test-prompts`: an early contract gate for Main/Root/Child section order,
-   single-message assembly, frozen shared-rule inheritance and Root progress.
-2. `make test lint`: Go unit/component checks, Node runtime contracts, frontend
-   freshness/types, the real Chromium contract and retained infrastructure tests.
-3. `make test-e2e`: eleven deterministic product flows through actual CLI/UI,
-   stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
-4. Task coding isolation and publication recovery retain their dedicated checks.
-5. Code Mode discovery and Main responsiveness: the maintained capabilities
-   scenarios check 500 MCP tools without native declarations, direct-call rejection,
-   exact approval and a Main reply while a real MCP call remains held.
-6. The core account harness uses private files
-   in a disposable data root and a controlled OAuth/Responses peer. Cross-process
-   refresh, cleanup and permission checks require no desktop credential service.
-7. Focused race checks cover Main input ordering and recovery, UI state/actions,
-   ingress admission and private credential access. The full race inventory stays
-   in extended regression.
+- Five software lanes retain all `make test lint` work and `make test-prompts`:
+  Go, provider RPC, frontend/JavaScript, browser/infrastructure, and lint.
+- Four system lanes partition the eleven core gates exactly once. Each runner
+  builds its own binary, records its hash and source state, and owns disposable
+  fixtures. Channels runs separately because it contains the longest UI matrix.
+- One lane retains Web Access contracts, focused Main/UI/credential races, task
+  coding isolation/recovery, Code Mode discovery and Main responsiveness.
 
-The job has a 30-minute outer budget for setup and all checks. Individual test
-deadlines and assertions remain unchanged.
+The local Make targets remain sequential and unchanged. Jobs share dependency
+caches, not mutable build outputs, node_modules or application state. Native
+Select behavior and 320px touch/layout assertions remain part of channels.
+Production timeouts and the provider's real 30/90/180-second deadline probes
+remain unchanged. Full race coverage stays in extended regression.
+
+Each lane has a ten-minute failure boundary. The latency target is under five
+minutes from workflow start to the aggregate result on a warm hosted runner;
+this is measured remotely, not asserted from local runtimes. Cold tool/cache
+installation and hosted queue delays may exceed that target.
 
 The Go checks also exercise production tool composition, including a forged
 loaded-tool checkpoint and no native fallback without a JavaScript runtime.
@@ -232,16 +233,20 @@ Node or Chromium. The `Ubuntu checks` job still executes and reports a status;
 there is no workflow-level path filter that leaves branch protection pending.
 Unknown paths, code changes, empty diffs and main pushes use the full PR path.
 
-Failures stop the job; failed or cancelled work does not count as a pass. The
-process owner forwards cancellation, allows fixture cleanup and kills remaining
-owned process groups. Results and failed logs are uploaded with source/run
-identity. Tests never need an online model account.
+A lane stops on its first failure; other lanes finish and retain their evidence
+(`fail-fast: false`). The aggregate uses `always()` and requires successful scope
+and every selected lane. Missing, failed or cancelled work cannot pass; skipped
+code lanes are accepted only for the explicit successful documentation path.
+The process owner forwards cancellation, allows fixture cleanup and kills
+remaining owned groups. Logs and results include checked commit, lane and run
+attempt. Tests never need an online model account.
 
-The job has a 30-minute stop boundary. It is not a latency claim. This replaces
-38 job instances and their setup/build/upload/join overhead; GitHub-hosted queue
-time and wall-time improvements must be measured on the new workflow. Local
-results do not establish remote CI performance. There is no custom changed-file
-selector, secondary required gate, benchmark comparator or cross-job build bundle.
+The partition deliberately avoids per-file test selection, shared executable
+artifacts and a custom parallel process scheduler. Repeated runner setup is the
+tradeoff for isolation and bounded critical paths. Changes to the partition must
+preserve core coverage and fail-closed aggregation; the infrastructure tests
+exercise both. Queue time and complete remote wall time are reported with PR
+validation rather than treated as guaranteed by job timeouts.
 
 <a id="ci-extended-regression"></a>
 

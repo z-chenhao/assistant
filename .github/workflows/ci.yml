@@ -9,11 +9,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  checks:
-    # Preserve the existing required status name.
-    name: Ubuntu checks
+  scope:
+    name: Check scope
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+      software: ${{ steps.partitions.outputs.software }}
+      system: ${{ steps.partitions.outputs.system }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,44 +42,84 @@ jobs:
           else
             echo 'docs_only=false' >> "$GITHUB_OUTPUT"
           fi
+      - name: Check partitions
+        id: partitions
+        run: |
+          echo "software=$(python3 tests/system/ci.py --plan software)" >> "$GITHUB_OUTPUT"
+          echo "system=$(python3 tests/system/ci.py --plan system)" >> "$GITHUB_OUTPUT"
       - name: Documentation links
         if: steps.scope.outputs.docs_only == 'true'
         run: python3 scripts/check_docs.py
-      - uses: ./.github/actions/ci-inputs
-        if: steps.scope.outputs.docs_only != 'true'
+  software:
+    name: Software / ${{ matrix.lane }}
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.scope.outputs.software) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          frontend: 'true'
-          browser: 'true'
-      - name: Agent prompt assembly and frozen Worker inheritance
-        if: steps.scope.outputs.docs_only != 'true'
-        run: exec python3 tests/system/process_step.py --name prompts --phase test -- make test-prompts
-      - name: Code, component and test-infrastructure regressions
-        if: steps.scope.outputs.docs_only != 'true'
-        run: exec python3 tests/system/process_step.py --name code --phase test -- make test lint
-      - name: Core deterministic end-to-end flows
-        if: steps.scope.outputs.docs_only != 'true'
-        run: exec python3 tests/system/process_step.py --name e2e --phase test -- make test-e2e
-      - name: Web Access plugin, connectors, content and durable execution
-        if: steps.scope.outputs.docs_only != 'true'
-        run: exec python3 tests/system/process_step.py --name web-access --phase test -- make test-web-access
-      - name: Task coding isolation and recovery
-        if: steps.scope.outputs.docs_only != 'true'
-        run: |
-          python3 tests/system/process_step.py --name task-code-environments --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario task-code-environments --evidence evidence/task-code-environments.json
-          exec python3 tests/system/process_step.py --name task-code-recovery --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario task-code-recovery --evidence evidence/task-code-recovery.json
-      - name: Code Mode discovery, approval and Main responsiveness
-        if: steps.scope.outputs.docs_only != 'true'
-        run: |
-          python3 tests/system/process_step.py --name codemode-catalog --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario tool-loading --evidence evidence/codemode-catalog.json
-          exec python3 tests/system/process_step.py --name codemode-main --phase test -- python3 tests/system/verify_capabilities.py --binary bin/steward --scenario main-business --evidence evidence/codemode-main.json
-      - name: Main input, UI state and private credential races
-        if: steps.scope.outputs.docs_only != 'true'
-        run: exec python3 tests/system/process_step.py --name interaction-race --phase test -- go test -race ./internal/agent/sqlite ./internal/app ./internal/llm/secret -run 'Test(MainQueuesSecondRequest|SerialMain|.*UI.*|InboundAdmission|Files|AccountFiles|.*Refresh.*)' -count=1
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          frontend: ${{ matrix.frontend }}
+          browser: ${{ matrix.browser }}
+      - name: Run existing software checks
+        env:
+          CI_LANE: ${{ matrix.lane }}
+        run: exec python3 tests/system/ci.py --lane "$CI_LANE"
       - name: Retain results, including failures
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: checks-${{ github.sha }}-${{ github.run_attempt }}
+          name: software-${{ matrix.lane }}-${{ github.sha }}-${{ github.run_attempt }}
           path: evidence/
           if-no-files-found: warn
           retention-days: 7
+  system:
+    name: System / ${{ matrix.lane }}
+    needs: scope
+    if: needs.scope.outputs.docs_only != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.scope.outputs.system) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ci-inputs
+        with:
+          frontend: ${{ matrix.frontend }}
+          browser: ${{ matrix.browser }}
+      - name: Run existing deterministic system checks
+        env:
+          CI_LANE: ${{ matrix.lane }}
+        run: exec python3 tests/system/ci.py --lane "$CI_LANE"
+      - name: Retain results, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: system-${{ matrix.lane }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 7
+  checks:
+    # Branch protection continues to require this exact status.
+    name: Ubuntu checks
+    needs: [scope, software, system]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require every selected lane
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python3 tests/system/ci.py --results "$CI_NEEDS"
