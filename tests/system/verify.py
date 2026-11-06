@@ -161,7 +161,7 @@ def verify_models(harness):
     bounds_rejections = []
     for args in [("test", large_profile["profile_id"]), ("select", large_profile["profile_id"], "1", "1")]:
         rejected = harness.command("-test-bridge", "success", "model", *args)
-        require(rejected.returncode != 0 and "Host safety bounds" in rejected.stderr and not rejected.stdout,
+        require(rejected.returncode != 0 and "context window exceeds Host safety bound" in rejected.stderr and not rejected.stdout,
                 "over-limit diagnostic profile reached activation")
         bounds_rejections.append(rejected.stderr.strip())
     require(snapshot(harness.data_root) == preserved, "rejected over-limit activation changed metadata")
