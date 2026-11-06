@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,6 +16,41 @@ import (
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
 )
+
+func TestUIEmptyExpressionsPersistCanonicalArtifactAndRejectNonemptyString(t *testing.T) {
+	for _, expressions := range []string{`""`, `"initialize()"`} {
+		t.Run(expressions, func(t *testing.T) {
+			raw := `{"title":"Roadmap","fallback":"Interview customers, then build an MVP.","components":[{"name":"generateSandboxedUi","props":{"initialHeight":460,"placeholderMessages":[],"css":"","html":"<p>Week 1–2: interview customers</p>","jsFunctions":"","jsExpressions":` + expressions + `}}]}`
+			calls := []llm.ToolCall{{ID: "roadmap", Name: ui.ShowName, Arguments: raw}}
+			s, _, _, executor, exchange := admitPolicy(t, []tool.Definition{ui.ShowDefinition()}, calls)
+			results, err := executor.Execute(context.Background(), exchange, calls)
+			if err != nil || len(results) != 1 {
+				t.Fatal(results, err)
+			}
+			if expressions != `""` {
+				failure := results[0].Error
+				if failure == nil || failure.Code != "INVALID_ARGUMENT" || scalar(t, s, `SELECT count(*) FROM ui_widget`) != 0 {
+					t.Fatal("invalid script string was accepted", failure)
+				}
+				return
+			}
+			if results[0].Error != nil {
+				t.Fatal(results[0].Error)
+			}
+			var document, accepted string
+			if err := s.db.QueryRow(`SELECT w.document_json,i.arguments_json FROM ui_widget w JOIN tool_invocation i USING(invocation_id)`).Scan(&document, &accepted); err != nil {
+				t.Fatal(err)
+			}
+			if accepted != raw || !strings.Contains(document, `"jsExpressions":[]`) {
+				t.Fatal("normalized artifact changed the accepted invocation", document, accepted)
+			}
+			widget, ok := ui.StoredWidget(document)
+			if _, valid := ui.Sandbox(widget); !ok || !valid {
+				t.Fatal("canonical artifact cannot be replayed")
+			}
+		})
+	}
+}
 
 func TestMainUIWidgetUsesCodeModeAndDurableReply(t *testing.T) {
 	s, r, a, p := childFixture(t, ui.ShowDefinition(), codemode.Definition())
@@ -254,7 +290,7 @@ func TestUIPreviewUsesAcceptedArgumentsRatherThanCallerPayload(t *testing.T) {
 	observed := ""
 	ctx = ui.WithPreviewObserver(ctx, func(_ string, raw string) { observed = raw })
 	result, err := executor.Store.(tool.HostStore).ExecuteBuiltin(ctx, inv)
-	if err != nil || result.Error != nil || observed != calls[0].Arguments {
+	if err != nil || result.Error != nil || ui.Hash(json.RawMessage(observed)) != ui.Hash(json.RawMessage(calls[0].Arguments)) {
 		t.Fatal("preview bypassed the accepted invocation", result, err, observed)
 	}
 }

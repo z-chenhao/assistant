@@ -46,3 +46,26 @@ func TestRetiredAndMalformedPresentationInputsAreRejected(t *testing.T) {
 		t.Fatal("immutable history became unreadable")
 	}
 }
+
+func TestSandboxEmptyExpressionsNormalizeWithoutCoercingCode(t *testing.T) {
+	for _, expressions := range []string{`[]`, `""`, `["initialize()"]`, `"initialize()"`, `null`, `{}`, `false`} {
+		t.Run(expressions, func(t *testing.T) {
+			raw := `{"title":"Roadmap","fallback":"Interview, build, pilot, productize.","components":[{"name":"generateSandboxedUi","props":{"initialHeight":460,"placeholderMessages":[],"css":"","html":"<p>Week 1–2: interview customers</p>","jsFunctions":"","jsExpressions":` + expressions + `}}]}`
+			w, ok := ParseWidget(raw)
+			want := expressions == `[]` || expressions == `""` || expressions == `["initialize()"]`
+			if ok != want {
+				t.Fatalf("accepted=%v, want %v", ok, want)
+			}
+			if !ok {
+				return
+			}
+			sandbox, ok := Sandbox(w)
+			if !ok || sandbox.HTML != "<p>Week 1–2: interview customers</p>" {
+				t.Fatal("normalized visual cannot be delivered", sandbox)
+			}
+			if expressions == `""` && !strings.Contains(string(w.Components[0].Props), `"jsExpressions":[]`) {
+				t.Fatal("empty string was not normalized to the array contract")
+			}
+		})
+	}
+}

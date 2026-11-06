@@ -49,6 +49,8 @@ CSP sandbox 与 iframe allow-scripts 保持 opaque origin；禁止父 DOM、宿�
 
 ## 流式预览与正式交付
 
+新展示输入只将 `generateSandboxedUi.props.jsExpressions` 的精确空字符串规范化为 `[]`，随后仍经过完整 catalog 校验。该兼容仅用于无表达式的静态内容，不转换非空代码字符串、null、对象或其他字段。ToolInvocation 的原始参数与请求哈希不变；独立 UI 产物及 staging 预览使用同一规范文档，正式投影、沙箱与重启恢复均读取该文档。其他校验失败继续返回经统一工具层清理的 INVALID_ARGUMENT，不回传输入值；Skill 明确各空字段类型。历史冻结请求、交付投影和失败调用不重写，不新增 schema 或公共组件协议。
+
 具体需求是让 Web 用户在模型生成 UI 时看到逐步到达的内容，覆盖 Main 直接调用与 Code Mode 嵌套调用。消费者仅为当前已授权的 Web 会话；非 Web 渠道、历史消息、审批和持久重放仍使用原有正式产物。预览是私有、可丢弃的适配器状态，不是工具完成回执、表单身份或稳定公共协议。
 
 直接调用时，Provider 为工具参数增量附带调用身份；Bridge 在客户端通过内部 RPC 参数显式启用 `ui_preview` 时，才将 `builtin__intelligent_ui_show` 的参数按大小/时间合并为 `ui_delta`（旧 v1 客户端不接收新事件；旧服务端可继续使用暂存后的预览；该选项不进入冻结 GenerationRequest），其他工具参数、Code Mode 源码、推理与 Worker 内容不进入浏览器。Loop 对 JSON 前缀做有界解析，仅采用完整的数组项；当前组件对象及 HTML/CSS 字符串可逐步展开。表格行、图表点和卡片仍由原 catalog 校验；缺失的标题、来源等元数据暂为空，不补造数据。表单/时间选择仅在完整参数通过校验后显示；所有预览控件均 inert，不可聚焦、提交、导出或触发动作。

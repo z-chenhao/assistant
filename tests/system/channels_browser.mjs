@@ -980,7 +980,7 @@ try{
    const frame=page.frameLocator('#conversation-ui-preview iframe[title="Streaming visual"]');
    await frame.locator('#preview-text').getByText('Script stays off',{exact:true}).waitFor();
    if(await frame.locator('script,img,a,form').count())throw Error('preview retained executable or navigable markup');
-   if(await preview.locator('iframe').getAttribute('sandbox')!=='')throw Error('preview sandbox permits capabilities');
+   if(await preview.locator('iframe').first().getAttribute('sandbox')!=='')throw Error('preview sandbox permits capabilities');
    const button=preview.locator('button').first();await button.evaluate(node=>node.focus());
    if(await button.evaluate(node=>document.activeElement===node))throw Error('preview controls accepted focus');
    for(const theme of ['light','dark'])for(const width of [1400,390]){
@@ -1003,6 +1003,19 @@ try{
    await page.frameLocator('.message .intelligent-widget iframe[title="Streaming visual"]').last().locator('#preview-text').getByText('Activated after delivery',{exact:true}).waitFor();
    if(await page.locator('[data-ui-preview]').count())throw Error('same-page commit retained duplicate preview');
   }
+  const roadmap=page.frameLocator('.message .intelligent-widget iframe[title="Weekly roadmap"]').last();
+  await roadmap.locator('#weekly-roadmap').getByText('Week 1–2: interview customers. Week 3–4: build an MVP.',{exact:true}).waitFor();
+  const activity=JSON.parse(await roadmap.locator('#open-generative-ui-activity').textContent());
+  if(!Array.isArray(activity.content.jsExpressions)||activity.content.jsExpressions.length)throw Error('static roadmap lost the completed array contract');
+  for(const theme of ['light','dark'])for(const width of [1400,390]){
+   await page.setViewportSize({width,height:980});
+   await page.evaluate(theme=>document.documentElement.classList.toggle('dark',theme==='dark'),theme);
+   await roadmap.locator('html[data-widget-theme="'+theme+'"]').waitFor();
+   await page.locator('.message .intelligent-widget iframe[title="Weekly roadmap"]').last().scrollIntoViewIfNeeded();
+   await page.screenshot({path:evidence+'/roadmap-'+theme+'-'+width+'.png'});
+  }
+  await page.reload();
+  await roadmap.locator('#weekly-roadmap').waitFor();
   await page.setViewportSize({width:1400,height:980});
  }
  if(phase==='intelligent-ui'){

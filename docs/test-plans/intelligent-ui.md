@@ -101,3 +101,5 @@ python3 tests/system/verify_ui_interactions.py --binary bin/steward --evidence e
 这些回归通过现有 PR CI 的 Go 软件分片、`startup-ui` 中的 `intelligent-ui` / `ui-interactions` 系统门禁，以及 `capabilities-race` 中的 Agent、SQLite、Web、Bridge 定向并发检查执行。`tests/harness/test_ci.py` 验证这些入口及浏览器依赖仍在必需分片中；保留原 `Ubuntu checks` 汇总，不新增执行状态机或独立测试平台。真实模型的参数输出顺序、组件选择和视觉质量仍需另行评测。
 
 verify_ui_interactions 的超宽沙箱夹具在桌面及 390px 视口验证：内容宽于组件、ArrowRight 实际滚动、最右侧标记可达、滚动条隐藏、外层页面无横向溢出；同时保留导出、模式切换及持久状态回归。
+
+空脚本列表回归：`TestSandboxEmptyExpressionsNormalizeWithoutCoercingCode` 覆盖空字符串、数组及非空字符串/null/对象/布尔拒绝；`TestUIEmptyExpressionsPersistCanonicalArtifactAndRejectNonemptyString` 验证真实执行器保存规范产物而不改写请求，并继续拒绝非空字符串。`verify_intelligent_ui.py` 的 direct 与 Code Mode 流式场景均包含 `jsExpressions: ""` 静态周计划，浏览器验证同页提交、刷新及 kill/restart 后内容仍在、完成态表达式为数组，并保留桌面/手机明暗截图。以上复用现有必需 PR CI 的 Go 分片、startup-ui 与 capabilities-race 门禁。
