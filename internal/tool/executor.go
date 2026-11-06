@@ -26,13 +26,14 @@ type Error struct {
 type Result struct {
 	// HostFence is an opaque, process-local completion receipt. It is never model
 	// output; only the owning Host store can construct and validate its type.
-	HostFence    any           `json:"-"`
-	Text         string        `json:"text"`
-	ArtifactRefs []string      `json:"artifact_refs,omitempty"`
-	ImageRefs    []string      `json:"image_refs,omitempty"`
-	Output       *BinaryOutput `json:"-"`
-	PublishRefs  []string      `json:"-"`
-	Error        *Error        `json:"error,omitempty"`
+	HostFence    any                `json:"-"`
+	Text         string             `json:"text"`
+	ArtifactRefs []string           `json:"artifact_refs,omitempty"`
+	ImageRefs    []string           `json:"image_refs,omitempty"`
+	Output       *BinaryOutput      `json:"-"`
+	Attachments  []AttachmentOutput `json:"-"`
+	PublishRefs  []string           `json:"-"`
+	Error        *Error             `json:"error,omitempty"`
 }
 
 // BinaryOutput is an internal provider stream, never serialized into history.
@@ -42,6 +43,11 @@ type BinaryOutput struct {
 	Reader          io.Reader
 	// ResultJSON builds the bounded business envelope after the opaque ref exists.
 	ResultJSON func(string) string
+}
+
+type AttachmentOutput struct {
+	BinaryOutput
+	Image bool
 }
 
 // OutputStore atomically normalizes large/binary results and commits their
@@ -339,7 +345,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 			if store, ok := e.Store.(OutputStore); ok {
 				return store.ReconcileResult(queryCtx, inv.ID, result)
 			}
-			if result.Output != nil || len(result.ArtifactRefs) > 0 || result.PublishRefs != nil {
+			if result.Output != nil || len(result.Attachments) > 0 || len(result.ArtifactRefs) > 0 || result.PublishRefs != nil {
 				return Failure("UNKNOWN_SIDE_EFFECT"), nil
 			}
 			return result, policyStore.Reconcile(context.WithoutCancel(queryCtx), inv.ID, result)
@@ -433,7 +439,7 @@ func (e Executor) executeOne(ctx context.Context, inv Invocation) (Result, error
 	if store, ok := e.Store.(OutputStore); ok {
 		result, err = store.FinishResult(resultCtx, inv.ID, result)
 	} else {
-		if len(result.Text) > p.OutputBytes || result.Output != nil {
+		if len(result.Text) > p.OutputBytes || result.Output != nil || len(result.Attachments) > 0 {
 			result = Failure("RESOURCE_LIMIT")
 		}
 		err = e.Store.Finish(context.WithoutCancel(ctx), inv.ID, result)

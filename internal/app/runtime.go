@@ -43,7 +43,7 @@ func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture str
 		return err
 	}
 	runs := a.store.Runs(a.history, registry)
-	runs.ConfigureWebAccess(cfg.WebAccess, a.provider)
+	runs.ConfigureWebAccess(webAccessConfig(cfg), a.provider, secrets)
 	if cfg.Feishu != nil {
 		runs.ConfigureFeishuReviewWorkspace(cfg.Feishu.WorkspaceURL)
 	}
@@ -117,7 +117,8 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 	if fixture != "" {
 		kept := defs[:0]
 		for _, d := range defs {
-			if d.Spec.Name != webaccess.SearchName && d.Spec.Name != webaccess.FetchName {
+			family, _ := tool.HostFamily(d.Spec.Name)
+			if family != tool.WebAccessBuiltin {
 				kept = append(kept, d)
 			}
 		}
@@ -207,7 +208,7 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 
 func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Definition, error) {
 	defs := append(artifacttools.Definitions(), agent.AgentToolDefinition())
-	defs = append(defs, webaccess.Definitions(cfg.WebAccess)...)
+	defs = append(defs, webaccess.Definitions(webAccessConfig(cfg))...)
 	defs = append(defs, tool.SearchDefinition())
 	defs = append(defs, automation.Definitions()...)
 	manageMemory := memory.Definition()
@@ -247,4 +248,13 @@ func builtinDefinitions(cfg config.Config, secrets llm.SecretStore) ([]tool.Defi
 		defs = append(defs, definition)
 	}
 	return defs, nil
+}
+
+func webAccessConfig(cfg config.Config) webaccess.Config {
+	c := cfg.WebAccess
+	if c.ExtractScript == "" && cfg.JavaScript != nil {
+		c.ExtractCommand = cfg.JavaScript.Command
+		c.ExtractScript = filepath.Join(filepath.Dir(cfg.JavaScript.Script), "web-extract.mjs")
+	}
+	return c
 }

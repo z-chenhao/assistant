@@ -16,9 +16,13 @@ import (
 	"github.com/z-chenhao/assistant/internal/webaccess"
 )
 
-func (r *Runs) ConfigureWebAccess(c webaccess.Config, p llm.LLMProvider) {
+func (r *Runs) ConfigureWebAccess(c webaccess.Config, p llm.LLMProvider, secrets ...llm.SecretStore) {
 	r.webAccess = c
+	if len(secrets) > 0 {
+		r.webSecrets = secrets[0]
+	}
 	r.webFetch = webaccess.Fetch
+	r.webContentFetch = webaccess.FetchContent
 	r.webProvider = nil
 	if p != nil {
 		r.webProvider = r.GuardProvider(p)
@@ -47,6 +51,9 @@ func (t *tools) executeWebAccess(ctx context.Context, inv tool.Invocation) (tool
 	}
 	if !matched {
 		return tool.Failure("MODEL_INCOMPATIBLE"), nil
+	}
+	if name != webaccess.FetchName {
+		return t.executeWebResearch(ctx, inv, run, name, args)
 	}
 	if name == webaccess.FetchName {
 		var a struct {

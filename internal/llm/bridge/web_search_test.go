@@ -34,7 +34,7 @@ func TestHostedSearchRequiresNativeEvidence(t *testing.T) {
 					if json.NewDecoder(req.Body).Decode(&wire) != nil {
 						t.Fatal("payload")
 					}
-					if wire["model"] != "frozen-model" || wire["tool_choice"] != "required" || wire["store"] != false || wire["max_tool_calls"] != float64(1) {
+					if wire["model"] != "frozen-model" || wire["tool_choice"] != "required" || wire["store"] != false || wire["max_tool_calls"] != nil {
 						t.Fatal(wire)
 					}
 					tools := wire["tools"].([]any)

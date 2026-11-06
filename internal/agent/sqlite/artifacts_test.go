@@ -815,3 +815,41 @@ func TestArtifactManageSearchExecutionAndReplay(t *testing.T) {
 		t.Fatal("replay", err)
 	}
 }
+
+func TestWebAccessArtifactAttachmentsCommitAndRollback(t *testing.T) {
+	for _, failure := range []string{"none", "quota", "terminal"} {
+		t.Run(failure, func(t *testing.T) {
+			def := tool.Definition{Spec: tool.Spec{Name: "mcp__fixture__media", Version: 1, InputSchema: `{"type":"object","additionalProperties":false}`, Permission: "read_only", ReplayPolicy: "safe", OutputBytes: 1024}, Execute: func(context.Context, string) tool.Result {
+				return tool.Result{Output: &tool.BinaryOutput{Name: "state.json", MediaType: "application/json", Reader: strings.NewReader(`{"ok":true}`)}, Attachments: []tool.AttachmentOutput{{BinaryOutput: tool.BinaryOutput{Name: "one.txt", MediaType: "text/plain", Reader: strings.NewReader("one!")}}, {BinaryOutput: tool.BinaryOutput{Name: "two.txt", MediaType: "text/plain", Reader: strings.NewReader("two!")}}}}
+			}}
+			calls := []llm.ToolCall{{ID: "media", Name: def.Spec.Name, Arguments: `{}`}}
+			s, _, _, e, exchange := admitPolicy(t, []tool.Definition{def}, calls)
+			if failure == "quota" {
+				s.Artifacts().Policy.MaxBytes = 16
+				s.Artifacts().Policy.QuotaBytes = 10
+			}
+			if failure == "terminal" {
+				if _, err := s.db.Exec(`CREATE TRIGGER reject_media_terminal BEFORE UPDATE ON tool_invocation WHEN NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'fault'); END`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			result, err := e.Execute(context.Background(), exchange, calls)
+			if failure != "none" {
+				if err == nil && (len(result) != 1 || result[0].Error == nil) {
+					t.Fatal("accepted partial output", result)
+				}
+				if scalar(t, s, `SELECT count(*) FROM artifact`) != 0 {
+					t.Fatal("partial attachment metadata committed")
+				}
+				return
+			}
+			if err != nil || len(result) != 1 || result[0].Error != nil || len(result[0].ArtifactRefs) != 3 {
+				t.Fatal(result, err)
+			}
+			again, err := e.Execute(context.Background(), exchange, calls)
+			if err != nil || !reflect.DeepEqual(result, again) || scalar(t, s, `SELECT count(*) FROM artifact`) != 3 {
+				t.Fatal("attachments duplicated", again, err)
+			}
+		})
+	}
+}

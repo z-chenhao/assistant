@@ -62,7 +62,8 @@ type ToolSpec struct {
 }
 
 type GenerationRequest struct {
-	ResolveImage func(context.Context, string) (string, []byte, error) `json:"-"`
+	ToolGeneration *ToolGeneration                                       `json:"tool_generation,omitempty"`
+	ResolveImage   func(context.Context, string) (string, []byte, error) `json:"-"`
 	// DispatchGuard is a trusted Host lease held only while writing the request
 	// frame. Revocation and dispatch serialize; it never crosses the wire/hash.
 	DispatchGuard    func(context.Context) (func(), error) `json:"-"`
@@ -95,8 +96,11 @@ type TokenUsage struct {
 
 // WebSearch is a private hosted-tool request, never a replacement model profile.
 type WebSearchRequest struct {
-	InvocationID string `json:"invocation_id"`
-	Query        string `json:"query"`
+	InvocationID  string   `json:"invocation_id"`
+	Query         string   `json:"query"`
+	DomainFilter  []string `json:"domain_filter,omitempty"`
+	RecencyFilter string   `json:"recency_filter,omitempty"`
+	NumResults    int      `json:"num_results,omitempty"`
 }
 
 type WebSource struct {
@@ -200,3 +204,10 @@ type ModelProbe interface {
 
 //lint:ignore ST1005 Preserve the exported sentinel diagnostic text.
 var ErrNoBridge = errors.New("Provider Bridge is not configured; use explicit test injection for M0 fixtures")
+
+// ToolGeneration identifies a fenced auxiliary model exchange.
+type ToolGeneration struct {
+	InvocationID string `json:"invocation_id"`
+	CallKey      string `json:"call_key"`
+	Kind         string `json:"kind"`
+}

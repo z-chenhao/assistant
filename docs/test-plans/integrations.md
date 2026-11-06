@@ -46,18 +46,20 @@ F-046–F-069 的[分类与范围](../features/integrations.md#术语与登记�
 
 ### F-069 的链路与失败矩阵
 
-专项入口为 `make test-web-access`，在 CI 的 Ubuntu checks 中对 connector／bridge／SQLite 的相关用例运行 race 检查，不依赖外网或生产凭据。完整回归继续执行 `make test lint`、`make test-prompts` 及 core E2E。
+专项入口为 `make test-web-access`，在 Ubuntu checks 中对 connector／provider／bridge／SQLite 的相关用例运行 race；完整检查为 `make test lint`、`make test-prompts` 与 core E2E。
 
-| 场景 | 已有证明入口 | 证明边界／缺口 |
+| 场景 | 证明入口 | 证明边界／缺口 |
 | --- | --- | --- |
-| 当前冻结账户／模型托管搜索 | [bridge 协议 peer](../../internal/llm/bridge/web_search_test.go)：真实 SSE、required hosted tool、来源、用量；无搜索事件拒绝 | 实际 Steward 账户 Live 另验；不证明 Pi 的私有订阅路径 |
-| 来源与后备政策 | [connector 单测](../../internal/webaccess/webaccess_test.go)：零命中成功，认证／预算／取消／无效响应不后备；Exa initialize/list/call、429 | 多源链路最多两源，严格过滤及固定源尚未提供 |
-| 独立交换、预算和生命周期 | [SQLite 集成](../../internal/agent/sqlite/web_access_test.go)：接受的调用、同快照、查询隔离、独立负 step、usage、预算不发请求、旧 claim 拒绝、重复不再发送 | 账户撤权、Task／Forget 的完整矩阵由既有账户／Run／Artifact fence 回归共同保护；专门的真实账户取消与重启 Live 仍需补 |
-| 网页安全与内容界限 | connector HTTP peer：私网／metadata／IP 转换、重定向、类型／编码／大小及脚本提取 | DNS 固定不接受 fake-IP 保留地址；没有带登录浏览器或 PDF |
-| 长文本保存与续读 | SQLite 真实 Executor BinaryOutput→Artifact，验证 UTF-8 前缀、完整存储、引用及重复复用 | Artifact 的跨范围／Forget／续读工具行为继续由既有 Artifact 回归覆盖 |
-| Exa 真实服务 | `STEWARD_WEB_ACCESS_LIVE=1 go test -v ./internal/webaccess -run TestLivePublicWebAccess -count=1` | 显式 opt-in 在线测试；免费限流／网络和中文质量不是确定性 CI 的承诺 |
+| 自主实现边界 | `TestWebAccessHasNoAgentSDKDependency`：解析运行时仅允许锁定通用库，无外部 agent 实现目录 | 依赖变更仍须许可证、安全与架构审查，不以测试代替人工审查 |
+| 选路与服务协议 | `expanded_test.go`：SearXNG／Tavily 请求、凭据、域名、时间条件、限流与终止错误、禁用目的地；旧搜索回归验证零命中和不允许后备的错误 | SearXNG 真实例和 Tavily 真账户另验，不宣称统一日期硬保证 |
+| 公开网络与解析 | 既有地址／重定向／大小 peer，加真实本地解析进程的 Markdown／raw／PDF／图片、宿主路径拒绝 | 不执行网页脚本，无登录浏览器／视频；fake-IP 拒绝需与实际服务失败分开 |
+| 文本与证据 | Unicode 大小写、字节坐标、按序 fuzzy、完整原文片段与双哈希 | unclear 只表示待人工判断，不证明 claim 为真 |
+| 模型交换与生命周期 | SQLite 辅助调用的 frozen 模型、预算、usage、重入哈希、拒绝旧 claim／未接受查询；既有账户／Forget fence 回归 | 模型费用和外部搜索费用分别报告 |
+| Main 与持久化 | 真实 Code Mode 调用→图片和状态 Artifact 原子提交→后续调用读取全文／查找；多附件配额与终态失败回滚 | 外部内容为确定性 Fake；真实联网单独验证 |
+| Responses 协议 | bridge／provider peer：真实搜索 SSE／来源／usage，域名条件；SIWC 无 max_tool_calls，namespace 含 description | 实际账户已验证原生搜索及 Main Code Mode，不能扩展为所有模型／订阅保证 |
+| Live | 显式免费 Exa／公开网页探测；经本人授权的临时 Steward 账户跑 Main→Code Mode→native→Artifact，并核对来源／用量／终态 | 不读取其他助手凭据；凭据、账户身份和授权 URL 不进入 PR 或测试日志。其他服务、中文质量和长期额度独立验收 |
 
-首版尚未完成目标真实账户的托管搜索 Live，故 F-069 保持部分完成。不能把协议 peer、Exa 在线成功或 Pi 曾使用成功当作 Steward 自有账户验收。公开网页读取在 fake-IP 网络会被安全拒绝，此环境限制要与普通公网读取分开报告。服务语义忠实性、中文覆盖和时效另行评测；执行证据留在 PR／CI／忽略的 evidence/，不写入长期文档。
+F-069 保持部分完成：已接通的核心链路不证明未接入供应商、视频／登录网页或所有账户可用。真实执行证据留在 PR／CI／忽略的 evidence/，不写入长期运行日志；macOS 临时路径或浏览器系统差异与 Ubuntu 必需门禁分别报告。
 
 ### 非 Connector 能力候选的验收方向
 

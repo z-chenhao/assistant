@@ -102,6 +102,20 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 			return
 		}
 		in.WebSearch = true
+		if len(r.WebSearch.DomainFilter) > 20 {
+			fail(provider.ErrIncompatible)
+			return
+		}
+		for _, domain := range r.WebSearch.DomainFilter {
+			if strings.HasPrefix(domain, "-") {
+				continue
+			}
+			if len(domain) > 253 || strings.ContainsAny(domain, "/\\?#@% :") {
+				fail(provider.ErrIncompatible)
+				return
+			}
+			in.WebSearchDomains = append(in.WebSearchDomains, domain)
+		}
 	}
 	pending := map[string]string{}
 	systemSeen := false

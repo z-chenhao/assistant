@@ -32,6 +32,9 @@ type builtinPolicy struct {
 var builtinCatalog = map[string]builtinPolicy{
 	"builtin__web_search":          {WebAccessBuiltin, "read_only", false},
 	"builtin__web_fetch":           {WebAccessBuiltin, "read_only", false},
+	"builtin__fetch_content":       {WebAccessBuiltin, "read_only", false},
+	"builtin__get_search_content":  {WebAccessBuiltin, "read_only", false},
+	"builtin__source_check":        {WebAccessBuiltin, "read_only", false},
 	"builtin__intelligent_ui_show": {UIBuiltin, "ui_present", false},
 	"builtin__tool_search":         {SearchBuiltin, "read_only", false},
 	"builtin__read":                {EnvironmentBuiltin, "read_only", false},

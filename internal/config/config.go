@@ -215,6 +215,9 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	default:
 		return Config{}, errors.New("llm.account_secret_store must be file or native")
 	}
+	if err := cfg.WebAccess.Validate(); err != nil {
+		return Config{}, err
+	}
 	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
 		return Config{}, errors.New("javascript requires an absolute command and script")
 	}
@@ -322,6 +325,21 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 			return Config{}, errors.New("task code storage cannot overlap MCP provider")
 		}
 	}
+	if cfg.WebAccess.ExtractScript != "" {
+		trusted := filepath.Dir(filepath.Dir(cfg.WebAccess.ExtractScript))
+		var writable []string
+		if cfg.Execution != nil {
+			writable = append(writable, cfg.Execution.Root, cfg.Execution.RepositorySource, canonicalScopePath(cfg.App.DataRoot)+".task-code")
+		}
+		if cfg.Computer != nil {
+			writable = append(writable, cfg.Computer.Root)
+		}
+		for _, root := range writable {
+			if root != "" && (overlaps(root, trusted) || overlaps(root, cfg.WebAccess.ExtractCommand)) {
+				return Config{}, errors.New("web extractor must be separate from execution scopes")
+			}
+		}
+	}
 	if cfg.Execution != nil {
 		for _, root := range append([]string{cfg.Execution.Root}, cfg.Execution.ToolchainRoots...) {
 			if overlaps(codeStorage, root) {
@@ -427,6 +445,9 @@ func (c Config) ValidateDefaults() error {
 	}
 	if c.JavaScript != nil {
 		roots = append(roots, c.JavaScript.Command, c.JavaScript.Script)
+	}
+	if c.WebAccess.ExtractScript != "" {
+		roots = append(roots, c.WebAccess.ExtractCommand, filepath.Dir(filepath.Dir(c.WebAccess.ExtractScript)))
 	}
 	if c.LLM.ProviderBridgeScript != "" {
 		roots = append(roots, c.LLM.ProviderBridgeScript)
