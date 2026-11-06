@@ -2,14 +2,78 @@ package sqlite
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/z-chenhao/assistant/internal/agent"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
 )
+
+func TestSerialMainRetainsBothRequestsAfterReopeningBeforeFirstReply(t *testing.T) {
+	s, runs, history, actor, provider := loopFixture(t)
+	ctx := context.Background()
+	first := mustSubmit(t, actor, "first", "first request")
+	claim, err := runs.Claim(ctx, first.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = runs.Initialize(ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	run, err := runs.Load(ctx, claim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := runs.Steering(ctx, claim, 0)
+	if err != nil || len(inputs) != 1 {
+		t.Fatal("first input unavailable", inputs, err)
+	}
+	run.Checkpoint.Messages = append(run.Checkpoint.Messages, agent.AgentMessage{Type: "user", MessageID: inputs[0].Message.MessageID, Content: inputs[0].Message.Content})
+	run.Checkpoint.InputSequence = inputs[0].Sequence
+	if err = runs.Checkpoint(ctx, claim, run.Version, run.Checkpoint); err != nil {
+		t.Fatal(err)
+	}
+	second := mustSubmit(t, actor, "second", "second request")
+	if second.RunID != first.RunID {
+		t.Fatal("queued input started a competing Main")
+	}
+	if err = runs.Release(ctx, claim); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := Open(ctx, filepath.Dir(s.path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recovered.Close()
+	actor.Store = recovered.Runs(history, actor.Registry)
+	provider.store = recovered
+	provider.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {
+		return llm.GenerationResult{Text: "reply to " + request.Messages[len(request.Messages)-1].Text}, nil
+	}
+	mustDrain(t, actor)
+	if len(provider.requests) != 2 || scalar(t, recovered, `SELECT count(*) FROM main_reply`) != 2 {
+		t.Fatal("recovery did not answer both inputs exactly once")
+	}
+	for _, message := range provider.requests[0].Messages {
+		if message.Role == "user" && message.Text == "second request" {
+			t.Fatal("second input replaced the unreplied first input after recovery")
+		}
+	}
+	found := false
+	for _, message := range provider.requests[1].Messages {
+		found = found || message.Role == "assistant" && message.Text == "reply to first request"
+	}
+	if !found {
+		t.Fatal("second input ran before the first reply was retained")
+	}
+}
 
 func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	s, _, a, p := taskFixture(t)
