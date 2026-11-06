@@ -5,7 +5,7 @@
    native forms and omit settings that require local browser scripting. */
 html:not(.js) [data-client-pending]{display:none}
 .js [data-client-pending]{visibility:hidden}
-.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden;flex-basis:120px;max-width:120px}
+.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden;flex-basis:112px;max-width:120px}
 .js [data-language-preference]:not([data-language-ready]) .preference-save{display:none}
 .settings-nav-heading{font-size:12px;color:var(--muted-foreground);margin:0 8px 6px}
 .settings-topbar{display:none}

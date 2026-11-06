@@ -131,6 +131,13 @@ export async function pageTransitions(page,context,url,evidence){
     const selectors=['.workspace-main','.page-heading','.settings-group','.settings-footer','[data-appearance-setting]','[data-avatar-setting]',...Array.from({length:5},(_,i)=>`.settings-navigation a:nth-child(${i+1})`)];
     return {dark:document.documentElement.classList.contains('dark'),boxes:Object.fromEntries(selectors.map(selector=>{const node=document.querySelector(selector);return [selector,node?.getBoundingClientRect().toJSON()??null]}))};
    };
+   if(path==='/settings/preferences'&&width===320){
+    // Exercise the native/enhanced shrink boundary with every platform font.
+    await page.locator('.preference-row').first().evaluate(node=>{
+     const style=getComputedStyle(node),name=node.querySelector('.preference-name');
+     node.style.inlineSize=`${name.getBoundingClientRect().width+parseFloat(style.columnGap)+116+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)}px`;
+    });
+   }
    const before=await page.evaluate(geometry);
    if(before.dark!==(theme==='dark')||before.boxes['.workspace-main'].y!==0||collapsed&&before.boxes['.workspace-main'].x!==64)throw Error('first paint used the wrong theme/navigation');
    await page.screenshot({path:`${evidence}/loading-${width}-${path.split('/').filter(Boolean).join('-')}-before.png`});
