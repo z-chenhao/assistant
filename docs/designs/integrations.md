@@ -156,7 +156,7 @@ registry, frozen policy and invocation lifecycle.
 
 ## 个人 Connector 待实现方案
 
-F-046–F-069 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Connector；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已在既有执行框架内自建多源搜索、正文／PDF／图片提取与证据续读，详见下方实现方案；其他服务仍是需求与实施约束，未新增其适配器、OAuth 或公开接口。已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
+F-046–F-070 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Plugin；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已在既有执行框架内自建多源搜索、正文／PDF／图片提取与证据续读，详见下方实现方案；其他服务仍是需求与实施约束，未新增其适配器、OAuth 或公开接口。已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
 
 ### 具体要求与现有消费者
 
@@ -204,20 +204,28 @@ F-046–F-069 的具体范围及分类见[术语与登记边界](../features/int
 
 **具体要求与现有消费者**：Main／Task Worker 需要批量和固定源搜索、公开文档提取、问答、摘要及可重读证据。用户要求自主实现；已有 Go 搜索／读取、模型控制面、SecretStore、Code Mode 和 Artifact 是实际依赖与下游契约。服务适配按公开协议自建；不安装外部 agent SDK、复制插件源码或建立另一套 agent 运行时。
 
-**机制与政策**：`internal/webaccess` 持有具名服务适配器、公开网络检查、提取、文档／查找结构及来源路由；SQLite 适配器持有 accepted invocation、模型 admission、预算与原子提交。App 仅装配。`source_order` 和兼容的 `exa_fallback` 是当前政策；原生能力来自当前账户实际协议，不凭模型名猜测，也不切换冻结模型。
+**机制与政策**：`internal/plugin/webaccess` 是内置能力包，持有工具声明、冻结来源顺序、批处理、问答／摘要／来源核查配方及证据预览。消费方定义的私有 `Host` 仅提供辅助模型调用与作用域内证据读取，不暴露数据库、事务或模型选择器。SQLite 实现 Host，负责 accepted invocation、冻结身份比对、模型 admission／预算／请求哈希、fencing、作用域读取和原子提交；App 仅装配。
+
+| 模块 | 必要职责 | 不持有的职责 |
+| --- | --- | --- |
+| `internal/connector/exa`、`searxng`、`tavily` | 各服务公开协议；具名连接参数与 SecretStore 引用；有界响应和安全错误 | 工具目录、来源顺序、摘要、状态库或插件生命周期 |
+| `internal/connector/internal/searchhttp` | SearXNG／Tavily 已有共同 JSON 结果传输、凭据解析与脱敏 | 通用 connector SDK、任意服务注册 |
+| `internal/webcontent` | 公开 DNS 固定／重定向复验、有界下载、本地 HTML／PDF／图片处理 | 服务账户、研究目标或模型调用 |
+| `internal/plugin/webaccess` | 组合这些机制和当前研究配方；生成待持久化证据／媒体 | 连接授权、预算裁决、数据库与原子发布 |
+| 当前 LLM adapter／平台连接 | 原生搜索协议、账户认证／撤权及冻结模型；配置中的服务实例绑定 | 外部搜索服务选择政策 |
+
+`source_order` 和兼容的 `exa_fallback` 是当前插件政策；原生能力来自当前账户实际协议，不凭模型名猜测，也不切换冻结模型。SearXNG／Tavily 的内部 `Connection` 只表示已配置实例／凭据引用，并非新建账户生命周期或持久化格式。统一连接管理仍归 F-025。
 
 ```mermaid
 flowchart TD
-    C["Code Mode：搜索／提取／查找／证据"] --> E["Registry 与 Executor：冻结身份"]
-    E --> W["Steward Go：源路由和服务协议"]
-    W --> M["当前账户：Provider Bridge"]
-    M --> B["独立交换、预算、撤权和 Run fence"]
-    W --> P["公开 DNS 固定与有界下载"]
-    P --> X["私有本地解析进程：仅接收文档"]
-    W --> A["Artifact：状态、来源、原文和媒体"]
-    X --> A
-    E --> R["get_search_content：授权后读取"]
-    R --> A
+    C["Code Mode／冻结 Registry"] --> P["Web Access Plugin：工具、选路、研究配方"]
+    P --> S["Exa／SearXNG／Tavily connectors"]
+    P --> X["webcontent：公开下载、本地解析"]
+    P --> H["私有 Host：模型调用、证据读取"]
+    H --> Q["SQLite：admission、预算、fence、作用域、原子提交"]
+    Q --> M["当前冻结模型 adapter：原生搜索／文本生成"]
+    Q --> A["Artifact：证据、原文和媒体"]
+    S --> K["平台配置绑定与 SecretStore"]
 ```
 
 **必要复杂度**：具名源顺序与允许目的地防止静默扩大查询披露；结构化 HTTP／模型错误决定是否切换；DNS 连接固定和重定向复验防止 SSRF。解析进程的独立 HOME、禁用 fetch、有限输入／输出与进程组回收来自文档安全和取消需求。辅助模型交换复用 frozen Snapshot、负 step、预算与账户 observer；每个 invocation／call key 记录请求哈希，重入不重新发送或套用不同证据。工具 namespace 显式带 description，以满足真实账户 Responses 契约；SIWC hosted search 不发送不支持的 max_tool_calls。
@@ -228,7 +236,7 @@ flowchart TD
 
 参考工具能力与公开服务协议，connector 实现和命名均归 Steward。仅使用通用本地解析库：Readability、Defuddle、LinkeDOM、Turndown、unpdf；它们不持有账户、网络搜索或 agent 调度。搜索、来源优先级、失败分类、参数验证、证据结构、持久化、查找与摘要提示均由本项目实现；没有插件配置透传或内部模型直接公开。
 
-**开放范围与稳定性**：Go 包和解析进程协议保持 private／experimental；可在仓库内理解与复用，未承诺公共 SDK、通用 connector 平台或永久插件兼容。源顺序、解析源码及依赖锁进入资源身份；升级拒绝不匹配旧 Run，旧 web_fetch 的字节续读工具仍保留。没有为预测未来供应商设计抽象注册系统或泛型配置 DSL。
+**开放范围与稳定性**：这些模块、Host 和解析进程协议保持 private／experimental；可在仓库内理解与复用，未承诺公共 SDK、通用 connector 平台或永久插件兼容。本次仅移动职责，工具名／Schema／输出字段、配置序列化、资源身份算法及 Document v1 不变，无数据迁移；已完成结果继续从既有记录重放。源顺序、解析源码及依赖锁进入资源身份；升级拒绝不匹配旧 Run，旧 web_fetch 的字节续读工具仍保留。拒绝把包移动当成公共安装协议；没有为预测未来供应商设计抽象注册系统或泛型配置 DSL。
 
 **取舍与未泛化部分**：当前只有 native／Exa／SearXNG／Tavily 四条真实变化轴，不复制无实际凭据／消费者的供应商目录。原生域名条件与本地来源筛选分开，日期只报告服务实际保证；Exa 不支持的过滤直接拒绝。独立第三方全文外送、任意宿主文件、其他助手凭据、浏览器 profile、仓库 clone 和视频均未开放。摘要只用当前模型，summary-review 保持未批准草稿；没有伪造人类审核。已实现范围与缺口见功能说明，各服务 Live 不互相替代。
 
@@ -278,3 +286,7 @@ flowchart LR
 当前不扩展个人微信全聊天、支付／交易、自动购票、招聘系统批量资料或对全账户的持续采集；样本中的咨询、点餐、面试写作和财务研究并不证明这些授权或稳定接口需求。地域服务、费用、数据源与调用方式不确定的项目保持候选状态；不为了凑目录数量先稳定接口。
 
 验证要求见[分项验收计划](../test-plans/integrations.md#个人-connector-验收计划)。实施时同步本页当前架构、功能用法和主索引；需求登记不改变旧配置、数据、Run 快照或外部服务状态。
+
+### F-070 · 独立插件生命周期（待实现）
+
+Plugin 是能力包边界，Connection 是平台管理的账户／服务实例边界。当前以一个内置 plugin 验证内部组合，使用既有 Registry 冻结工具，没有独立安装系统。待有真实安装／启停消费者时再定义最小内部清单和操作入口；连接认证／撤销继续复用 F-025，不在 plugin 内复制账户状态机。卸载与断连不能互相隐式执行，旧 Run 的冻结权限不被新插件状态扩大。公共 SDK、市场、动态加载、研究 Skill 发布与通用工作流引擎均不在当前重构内。

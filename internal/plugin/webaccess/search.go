@@ -1,18 +1,18 @@
 package webaccess
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/z-chenhao/assistant/internal/connector/exa"
+	"github.com/z-chenhao/assistant/internal/connector/searxng"
+	"github.com/z-chenhao/assistant/internal/connector/tavily"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/webcontent"
 )
 
 var errFiltersUnsupported = errors.New("WEB_FILTERS_UNSUPPORTED")
@@ -95,9 +95,19 @@ func searchQueryWith(ctx context.Context, c Config, q SearchQuery, hosted QueryS
 				err = errFiltersUnsupported
 				break
 			} // No pretending query hints are strict Exa filters.
-			out.Text, out.Sources, err = exaSearchWithLimit(ctx, q.Query, q.NumResults, client)
-		case "searxng", "tavily":
-			out.Text, out.Sources, err = configuredSearch(ctx, c, q, source, secrets, client)
+			out.Text, out.Sources, err = exa.Search(ctx, q.Query, q.NumResults, client)
+		case "searxng":
+			out.Text, out.Sources, err = searxng.Search(ctx, searxng.Connection{URL: c.SearXNGURL, SecretRef: c.SearXNGSecretRef}, q.Query, q.RecencyFilter, secrets, client)
+		case "tavily":
+			request := tavily.Request{Query: q.Query, NumResults: q.NumResults, TimeRange: q.RecencyFilter}
+			for _, domain := range q.DomainFilter {
+				if strings.HasPrefix(domain, "-") {
+					request.ExcludeDomains = append(request.ExcludeDomains, domain[1:])
+				} else {
+					request.IncludeDomains = append(request.IncludeDomains, domain)
+				}
+			}
+			out.Text, out.Sources, err = tavily.Search(ctx, tavily.Connection{SecretRef: c.TavilySecretRef}, request, secrets, client)
 		}
 		outcome := "completed"
 		if err != nil {
@@ -126,7 +136,7 @@ func filterSources(sources []llm.WebSource, filters []string, limit int) []llm.W
 	out := []llm.WebSource{}
 	seen := map[string]bool{}
 	for _, source := range sources {
-		if ValidURL(source.URL) != nil || seen[source.URL] {
+		if webcontent.ValidURL(source.URL) != nil || seen[source.URL] {
 			continue
 		}
 		u, _ := url.Parse(source.URL)
@@ -147,118 +157,11 @@ func filterSources(sources []llm.WebSource, filters []string, limit int) []llm.W
 			continue
 		}
 		seen[source.URL] = true
-		source.Title = clipUTF8(source.Title, 1024)
+		source.Title = webcontent.Preview(source.Title, 1024)
 		out = append(out, source)
 		if len(out) >= limit {
 			break
 		}
 	}
 	return out
-}
-func configuredSearch(ctx context.Context, c Config, q SearchQuery, source string, secrets llm.SecretStore, client *http.Client) (string, []llm.WebSource, error) {
-	if client == nil {
-		client = &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	}
-	endpoint, ref := c.SearXNGURL, c.SearXNGSecretRef
-	method := http.MethodGet
-	var body io.Reader
-	if source == "tavily" {
-		endpoint, ref, method = "https://api.tavily.com/search", c.TavilySecretRef, http.MethodPost
-		include, exclude := []string{}, []string{}
-		for _, d := range q.DomainFilter {
-			if strings.HasPrefix(d, "-") {
-				exclude = append(exclude, d[1:])
-			} else {
-				include = append(include, d)
-			}
-		}
-		payload := map[string]any{"query": q.Query, "max_results": q.NumResults, "include_domains": include, "exclude_domains": exclude, "search_depth": "basic", "include_answer": false, "include_raw_content": false}
-		if q.RecencyFilter != "" {
-			payload["time_range"] = q.RecencyFilter
-		}
-		raw, _ := json.Marshal(payload)
-		body = bytes.NewReader(raw)
-	} else {
-		u, e := url.Parse(strings.TrimRight(endpoint, "/") + "/search")
-		if e != nil {
-			return "", nil, llm.ModelIncompatible
-		}
-		values := u.Query()
-		values.Set("q", q.Query)
-		values.Set("format", "json")
-		if q.RecencyFilter != "" {
-			values.Set("time_range", q.RecencyFilter)
-		}
-		u.RawQuery = values.Encode()
-		endpoint = u.String()
-	}
-	request, e := http.NewRequestWithContext(ctx, method, endpoint, body)
-	if e != nil {
-		return "", nil, llm.ModelIncompatible
-	}
-	request.Header.Set("Accept", "application/json")
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	secret := ""
-	if ref != "" {
-		if secrets == nil {
-			return "", nil, llm.AuthRequired
-		}
-		value, e := secrets.Get(ctx, ref)
-		if e != nil || len(value) == 0 || len(value) > 16384 || strings.ContainsAny(string(value), "\r\n\x00") {
-			return "", nil, llm.AuthRequired
-		}
-		secret = string(value)
-		request.Header.Set("Authorization", "Bearer "+secret)
-	}
-	response, e := client.Do(request)
-	if e != nil {
-		if ctx.Err() != nil {
-			return "", nil, llm.GenerationCancelled
-		}
-		return "", nil, llm.ProviderUnavailable
-	}
-	defer response.Body.Close()
-	if response.StatusCode == 401 || response.StatusCode == 403 {
-		return "", nil, llm.AuthRequired
-	}
-	if response.StatusCode == 429 {
-		return "", nil, llm.RateLimited
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", nil, llm.ProviderUnavailable
-	}
-	raw, e := io.ReadAll(io.LimitReader(response.Body, (256<<10)+1))
-	if e != nil || len(raw) > 256<<10 {
-		return "", nil, llm.InvalidProviderResponse
-	}
-	var result struct {
-		Results *[]struct {
-			URL     string `json:"url"`
-			Title   string `json:"title"`
-			Content string `json:"content"`
-		} `json:"results"`
-	}
-	if json.Unmarshal(raw, &result) != nil || result.Results == nil {
-		return "", nil, llm.InvalidProviderResponse
-	}
-	sources := []llm.WebSource{}
-	var text strings.Builder
-	for _, entry := range *result.Results {
-		if len(sources) == 20 {
-			break
-		}
-		if ValidURL(entry.URL) != nil || secret != "" && (strings.Contains(entry.URL, secret) || strings.Contains(entry.URL, url.QueryEscape(secret)) || strings.Contains(entry.URL, url.PathEscape(secret))) {
-			continue
-		}
-		title, content := entry.Title, entry.Content
-		if secret != "" {
-			title = strings.ReplaceAll(title, secret, "[redacted]")
-			content = strings.ReplaceAll(content, secret, "[redacted]")
-		}
-		sources = append(sources, llm.WebSource{URL: entry.URL, Title: clipUTF8(title, 1024)})
-		fmt.Fprintf(&text, "%s\n%s\n%s\n\n", clipUTF8(title, 1024), entry.URL, clipUTF8(content, 2048))
-	}
-	return clipUTF8(text.String(), 20000), sources, nil
 }

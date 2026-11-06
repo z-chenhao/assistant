@@ -1,4 +1,4 @@
-package webaccess
+package webcontent
 
 import (
 	"bytes"

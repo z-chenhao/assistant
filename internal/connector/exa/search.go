@@ -1,4 +1,4 @@
-package webaccess
+package exa
 
 import (
 	"bufio"
@@ -12,16 +12,14 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/webcontent"
 )
 
 const exaEndpoint = "https://mcp.exa.ai/mcp"
 
 // Exa's public, keyless hosted MCP is an explicit policy choice. It never
 // receives Steward account headers, conversation history, or a user endpoint.
-func exaSearch(ctx context.Context, query string, client *http.Client) (string, []llm.WebSource, error) {
-	return exaSearchWithLimit(ctx, query, 5, client)
-}
-func exaSearchWithLimit(ctx context.Context, query string, limit int, client *http.Client) (string, []llm.WebSource, error) {
+func Search(ctx context.Context, query string, limit int, client *http.Client) (string, []llm.WebSource, error) {
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 	if client == nil {
@@ -162,12 +160,12 @@ func exaSearchWithLimit(ctx context.Context, query string, limit int, client *ht
 		if strings.HasPrefix(line, "Title:") {
 			title = strings.TrimSpace(strings.TrimPrefix(line, "Title:"))
 			if len(title) > 1024 {
-				title = clipUTF8(title, 1024)
+				title = webcontent.Preview(title, 1024)
 			}
 		}
 		if strings.HasPrefix(line, "URL:") {
 			u := strings.TrimSpace(strings.TrimPrefix(line, "URL:"))
-			if ValidURL(u) == nil && len(sources) < 20 {
+			if webcontent.ValidURL(u) == nil && len(sources) < 20 {
 				sources = append(sources, llm.WebSource{URL: u, Title: title})
 			}
 		}

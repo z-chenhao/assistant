@@ -1,20 +1,17 @@
-// Package webaccess owns bounded public-web access and its private tool contract.
+// Package webaccess is the first-party Web Access plugin: tools, route policy and research composition.
 package webaccess
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
-	"unicode/utf8"
 
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/tool"
+	"github.com/z-chenhao/assistant/internal/webcontent"
 )
 
 const SearchName = "builtin__web_search"
@@ -71,57 +68,6 @@ type SearchResult struct {
 	Untrusted   bool            `json:"untrusted"`
 }
 
-type HostedSearch func(context.Context, string) (llm.GenerationResult, error)
-
-func Search(ctx context.Context, c Config, query string, hosted HostedSearch) (SearchResult, error) {
-	out := SearchResult{Query: query, Sources: []llm.WebSource{}, Attempts: []Attempt{}, Freshness: "provider_managed_unknown", Cost: "unknown; token usage excludes hosted-search charges", Untrusted: true}
-	if strings.TrimSpace(query) == "" || len(query) > 4096 || !utf8.ValidString(query) {
-		return out, errors.New("INVALID_ARGUMENT")
-	}
-	ctx, cancel := context.WithTimeout(ctx, 80*time.Second)
-	defer cancel()
-	err := error(llm.ModelIncompatible)
-	if hosted != nil {
-		var r llm.GenerationResult
-		r, err = hosted(ctx, query)
-		if err == nil && (r.WebSearch == nil || r.Clipped || len(r.ToolCalls) > 0) {
-			err = llm.InvalidProviderResponse
-		}
-		if err == nil {
-			out.Provider = "hosted"
-			out.Text = r.Text
-			out.Usage = r.Usage
-			for _, s := range r.WebSearch.Sources {
-				if ValidURL(s.URL) == nil {
-					out.Sources = append(out.Sources, s)
-				}
-			}
-		}
-	}
-	outcome := "completed"
-	if err != nil {
-		outcome = errorCode(err)
-	}
-	out.Attempts = append(out.Attempts, Attempt{"hosted", outcome})
-	if err != nil && c.ExaFallback && ctx.Err() == nil && fallbackAllowed(err) {
-		out.Text, out.Sources, err = exaSearch(ctx, query, nil)
-		outcome = "completed"
-		if err != nil {
-			outcome = errorCode(err)
-		}
-		out.Attempts = append(out.Attempts, Attempt{"exa", outcome})
-		if err == nil {
-			out.Provider = "exa"
-			out.Cost = "free tier, rate limited; availability and charges are provider controlled"
-		}
-	}
-	if ctx.Err() != nil {
-		return out, llm.GenerationCancelled
-	}
-	out.RetrievedAt = time.Now().UTC().Format(time.RFC3339)
-	return out, err
-}
-
 func fallbackAllowed(err error) bool {
 	return errors.Is(err, errFiltersUnsupported) || errors.Is(err, llm.ModelIncompatible) || errors.Is(err, llm.ProviderUnavailable) || errors.Is(err, llm.RateLimited)
 }
@@ -143,4 +89,8 @@ func ToolResult(v any) tool.Result {
 		return tool.Failure("OUTPUT_LIMIT")
 	}
 	return tool.Result{Text: string(b)}
+}
+
+func (c Config) Extraction() webcontent.Config {
+	return webcontent.Config{ExtractCommand: c.ExtractCommand, ExtractScript: c.ExtractScript}
 }

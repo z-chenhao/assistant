@@ -1,4 +1,4 @@
-package webaccess
+package webcontent
 
 import (
 	"bytes"
@@ -18,6 +18,18 @@ import (
 	"time"
 	"unicode/utf8"
 )
+
+type Config struct {
+	ExtractCommand string
+	ExtractScript  string
+}
+
+func (c Config) Validate() error {
+	if (c.ExtractCommand == "") != (c.ExtractScript == "") || c.ExtractScript != "" && (!filepath.IsAbs(c.ExtractCommand) || !filepath.IsAbs(c.ExtractScript)) {
+		return errors.New("web extractor requires absolute command and script")
+	}
+	return nil
+}
 
 func extractDocument(ctx context.Context, c Config, source, kind string, data []byte) (string, string, error) {
 	if c.ExtractScript == "" {

@@ -1,4 +1,4 @@
-package webaccess
+package webcontent
 
 import (
 	"context"
@@ -198,10 +198,10 @@ func extractHTML(raw string) (string, string) {
 		}
 	}
 	visit(doc, false)
-	return clipUTF8(strings.Join(strings.Fields(title.String()), " "), 1024), strings.Join(strings.Fields(body.String()), " ")
+	return Preview(strings.Join(strings.Fields(title.String()), " "), 1024), strings.Join(strings.Fields(body.String()), " ")
 }
 
-func clipUTF8(s string, n int) string {
+func Preview(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}

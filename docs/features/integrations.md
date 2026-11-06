@@ -34,7 +34,7 @@
 
 **当前实现**：已有本地 MCP 与配置型 Guest 浏览器基础；GitHub 精确 PR 监听可从 SecretStore 解析 PAT，经 `/user` 验证身份后读取评审及当前提交的 CI。凭据失效、来源失效、限流与协议错误通过安全状态码诊断；替换同一 SecretStore 引用中的 PAT 后下轮重试，无需将密钥复制到状态库。
 
-**边界与剩余工作**：此接入只读 GitHub.com 的一个明确 PR，不提供 Agent 服务工具、远程 OAuth MCP、自动签发/刷新 PAT 或授权写动作；统一连接与其他服务仍待实现。真实账户权限、PAT 到期恢复及实际平台结果需 Live 验证。
+**边界与剩余工作**：此接入只读 GitHub.com 的一个明确 PR，不提供 Agent 服务工具、远程 OAuth MCP、自动签发/刷新 PAT 或授权写动作；统一具名连接、多账户选择、健康／重连／断开入口与其他服务仍待实现。Web Access 目前复用配置中的实例地址／SecretStore 引用，不因拆出 Connection 类型就视为完成这些入口。真实账户权限、PAT 到期恢复及实际平台结果需 Live 验证。
 
 **验收目标**：在明确服务上完成真实读取/授权动作/失效恢复；无凭据泄漏，审批及 unknown 语义保持一致。
 
@@ -112,10 +112,12 @@ JSON
 
 ### 术语与登记边界
 
-本规划中的 **connector 是面向明确外部系统的集成适配器**：将该系统的数据／资源和允许的业务操作接入 Agent，并处理适用的认证、权限、错误及连接生命周期。按外部系统划分 connector，按具体操作划分 tool；只读系统和公共数据服务也可以有 connector，不要求每项都有 OAuth、写操作或后台同步。
+本规划中的 **connector 是面向明确外部系统的集成适配器**：将该系统的数据／资源和允许的业务操作接入 Agent，并适配该系统的认证、权限、错误及连接协议。具名账户／实例的连接状态、凭据引用与撤销由平台管理；适配器不拥有插件启停。按外部系统划分 connector，按具体操作划分 tool；只读系统和公共数据服务也可以有 connector，不要求每项都有 OAuth、写操作或后台同步。
 
 | 层次 | 示例 | 在本规划中的归属 |
 | --- | --- | --- |
+| 能力包 plugin | Web Access：组合搜索、读取、证据工具和研究配方 | F-069 内置能力；安装／启停等独立生命周期归 F-070 |
+| 连接实例 connection | 一个 SearXNG 实例、一个 Tavily 凭据引用、一个模型账户 | 平台配置与 SecretStore；统一连接管理归 F-025 |
 | 外部系统 connector | Gmail、GitHub、高德、飞书云文档、Jellyfin | 本节登记与排序；一个 connector 可暴露多个工具 |
 | 工具／执行通道 | 浏览器操作、文件读取、SSH 命令执行 | Agent 执行能力，不因可操作外部系统就各算一个业务 connector |
 | 模型能力／供应商 | 图片生成、视觉理解、语音识别 | 模型能力接入；“图片生成”本身不是一个外部业务系统 |
@@ -126,7 +128,7 @@ JSON
 
 F-048–F-054 保留原 ID，但归为[相关能力候选](#相关能力候选非-connector)，不计入 connector 数量或顺序，也不因需求分析自动成为已确认开发任务。F-057 只有连接 HealthKit 的设备端集成可作为 connector 候选，XML 导入仅是文件能力。Tavily 是公共检索服务 connector，与连接用户个人业务资料的 Gmail 等应区分用途；不能仅从“经常查资料”推断必须采用 Tavily。
 
-F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入，内部组合已允许的服务适配器和正文读取能力；它不是一个新的外部系统，不与 F-046/F-067/F-068 重复计算供应商数量。服务条目独立维护兼容性，组合能力负责选择链路及统一交付。
+F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，内部组合已允许的服务适配器和正文读取能力；它不是一个新的外部系统，不与 F-046/F-067/F-068 重复计算供应商数量。服务条目独立维护兼容性，插件负责选择链路、组织工具及统一交付。原生搜索属于当前模型适配器；本地解析是可复用处理机制；摘要／来源核查是插件内研究配方，不另算 connector。安装插件、连接账户与执行工具是三个独立动作。
 
 ### 选择依据与证据边界
 
@@ -320,7 +322,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 ### F-067 · Exa MCP 搜索候选
 
-**需求与依据**：为个人研究提供低设置成本的公开网络搜索，优先验证免密钥方案。Pi Web Access 的 Exa 适配器提供参考；[Exa 官方说明](https://exa.ai/blog/best-web-search-mcp-servers)确认其托管 MCP 可免密钥、按免费限流使用，不能推导为无限免费或长期服务保证。
+**需求与依据**：为个人研究提供低设置成本的公开网络搜索，优先验证免密钥方案。[Exa 官方说明](https://exa.ai/blog/best-web-search-mcp-servers)确认其托管 MCP 可免密钥、按免费限流使用，不能推导为无限免费或长期服务保证。
 
 **当前实现**：F-069 内已实现免密钥 Exa 托管 MCP 搜索，经初始化和工具发现后调用 `web_search_exa`。在显式 `source_order` 中允许 Exa，或兼容配置 `exa_fallback: true` 时启用；支持固定源，不支持高级过滤。当前为部分完成，真实中文质量与服务长期可用性仍待验证。
 
@@ -332,7 +334,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 ### F-068 · SearXNG 自托管搜索候选
 
-**需求与依据**：个人搜索可选择已有或自行部署的搜索服务，减少对单一商业 API 的依赖；借鉴 Pi Web Access 的独立 SearXNG 适配。SearXNG 是聚合搜索服务，软件开源不代表机器、维护或所有上游均无成本。
+**需求与依据**：个人搜索可选择已有或自行部署的搜索服务，减少对单一商业 API 的依赖。SearXNG 是聚合搜索服务，软件开源不代表机器、维护或所有上游均无成本。
 
 **当前实现**：F-069 已有自建 JSON Search API 适配器及 HTTP peer；未选择或部署真实实例，实例位置、上游、网络和维护责任待确认。
 
@@ -342,9 +344,11 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 <a id="f-069"></a>
 
-### F-069 · Web Access Connector
+### F-069 · Web Access Plugin
 
-**需求与消费者**：Main／Task Worker 用同一 Registry／Code Mode／Executor 完成公开研究、网页读取和证据续读。connector、选路、服务协议、工具契约及状态管理均由 Steward 自建，不安装外部 agent SDK、不复制插件实现或类型，也不接管其他助手的会话与凭据。
+**需求与消费者**：Main／Task Worker 用同一 Registry／Code Mode／Executor 完成公开研究、网页读取和证据续读。插件编排、connector 服务协议、工具契约及平台状态管理均由 Steward 自建，不安装外部 agent SDK、不复制插件实现或类型，也不接管其他助手的会话与凭据。
+
+**归属**：Web Access 是当前随程序装配的内置 plugin，不是一个新服务。Exa／SearXNG／Tavily 各自的 connector 只适配服务；实例／凭据绑定与当前模型连接由平台提供。本地内容处理不持有业务账户；研究配方可组合，尚未提供独立可安装 Skill。F-070 的安装／启停管理仍未实现。
 
 **入口与行为**：`builtin__web_search` 支持单查询或最多八个查询、显式 provider、域名条件、时间偏好、来源正文及摘要工作流。`builtin__fetch_content` 支持最多八个公开 HTTP(S) URL 的 readable／raw／answer 模式：本地提取 HTML Markdown、文本、PDF 和图片；问答使用当前冻结模型，并保存原始提取证据。`builtin__get_search_content` 从返回的 `responseId` 续读或 exact／case-insensitive／fuzzy 查找；分页和片段坐标是 UTF-8 字节偏移，不拆分字符，fuzzy 按顺序匹配忽略空白的词组。`builtin__source_check` 收集来源、原文片段及哈希供人工判断；有来源为 `unclear`，无证据为 `missing-evidence`，不声称自动裁定支持或反驳。旧 `builtin__web_fetch` 继续提供原有公开 HTML／文本读取。
 
@@ -462,3 +466,13 @@ F-048–F-054 分别属于执行能力、历史资料导入或模型能力，保
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/integrations.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/integrations.md)。
+
+<a id="f-070"></a>
+
+### F-070 · Plugin 生命周期与连接分离
+
+**需求与消费者**：所有者能够启用、停用和移除能力包，并显式选择可复用的服务连接。一个 plugin 可以组合多个 connector，同一 connector 可以绑定不同账户／实例；移除 plugin 不隐式删除连接或凭据，断开连接也不等于卸载 plugin。
+
+**当前实现**：仅有随程序装配的 Web Access 内部模块，经现有 Registry／Code Mode／Executor 暴露工具；没有安装／启停／移除入口、插件清单协议或独立连接选择器，本项未实现。统一连接的认证与撤销归 F-025，各外部服务的范围仍由独立 feature 验收。
+
+**验收目标与范围**：使用已有冻结能力与 SecretStore 边界；启停不改变已冻结 Run 的权限，连接缺失／撤销可诊断；共享连接不随某个 plugin 移除而被误删。先用真实能力包和连接证明管理需求，再决定内部清单；当前不建立公共 SDK、第三方市场、动态加载或通用工作流引擎。

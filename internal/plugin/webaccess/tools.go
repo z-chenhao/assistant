@@ -3,9 +3,8 @@ package webaccess
 import (
 	"encoding/json"
 	"errors"
-	"net/url"
-	"path/filepath"
 
+	"github.com/z-chenhao/assistant/internal/connector/searxng"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
 
@@ -45,15 +44,11 @@ func (c Config) Validate() error {
 		}
 	}
 	if c.SearXNGURL != "" {
-		u, e := url.Parse(c.SearXNGURL)
-		if e != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && u.Scheme != "http") {
-			return errors.New("invalid searxng endpoint")
+		if e := (searxng.Connection{URL: c.SearXNGURL}).Validate(); e != nil {
+			return e
 		}
 	}
-	if (c.ExtractCommand == "") != (c.ExtractScript == "") || c.ExtractScript != "" && (!filepath.IsAbs(c.ExtractCommand) || !filepath.IsAbs(c.ExtractScript)) {
-		return errors.New("web extractor requires absolute command and script")
-	}
-	return nil
+	return c.Extraction().Validate()
 }
 func expandedDefinitions(c Config, defs []tool.Definition) []tool.Definition {
 	str := func(max int) map[string]any {
