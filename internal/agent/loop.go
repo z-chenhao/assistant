@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
@@ -60,6 +61,9 @@ type agentLoop struct {
 	work      context.Context
 	execution context.Context
 	jobs      map[string]*toolJob
+	uiSession string
+	uiBase    context.Context
+	uiStop    func() bool
 	preview   Event // Main generation whose temporary text may still become a reply.
 }
 
@@ -69,6 +73,8 @@ func (l *agentLoop) run(ctx context.Context) error {
 		return err
 	}
 	l.emit(r, "agent_start", "", "")
+	l.beginUIPreview(r)
+	defer func() { l.endUIPreview(r, "ui_preview_discarded", "") }()
 	for {
 		if ctx.Err() != nil {
 			// Shutdown joins accepted work; it is not a business cancellation.
@@ -215,7 +221,28 @@ func (l *agentLoop) modelTurn(r Run) (bool, error) {
 		if cp.Step > 0 {
 			generate = l.options.Provider.Continue
 		}
+		prefixes := map[string]string{}
+		lastPreview := map[string]time.Time{}
+		defer func() {
+			for key := range prefixes {
+				l.publishUIPreview(r, "ui_preview_remove", key, nil)
+			}
+		}()
 		value, callErr := generate(callCtx, generation.Request, func(e llm.GenerationEvent) {
+			if visible && r.Kind == MainRole && callCtx.Err() == nil && e.Kind == "ui_delta" && e.ToolCall != nil && e.ToolCall.Name == ui.ShowName {
+				key := generation.Request.GenerationID + ":" + e.ToolCall.ID
+				if len(prefixes) < 16 || prefixes[key] != "" {
+					if len(prefixes[key])+len(e.ToolCall.Arguments) <= 128<<10 {
+						prefixes[key] += e.ToolCall.Arguments
+						if time.Since(lastPreview[key]) >= 25*time.Millisecond {
+							lastPreview[key] = time.Now()
+							if preview, ok := ui.ParsePreview(prefixes[key]); ok {
+								l.publishUIPreview(r, "ui_preview_update", key, &preview)
+							}
+						}
+					}
+				}
+			}
 			if visible && e.Kind == "text_delta" && e.Text != "" && callCtx.Err() == nil {
 				update := l.event(r, "message_update", e.Text, "")
 				update.GenerationID = generation.Request.GenerationID
@@ -383,6 +410,7 @@ func (l *agentLoop) replyTurn(r Run) (bool, error) {
 		return false, err
 	}
 	l.finishPreview("reply_committed")
+	l.endUIPreview(r, "ui_preview_committed", cp.ExchangeID)
 	l.emit(r, "turn_end", "", "")
 	return false, nil
 }
@@ -398,6 +426,7 @@ func (l *agentLoop) settleTurn(r Run) (bool, error) {
 		return true, nil
 	}
 	cp.Phase = ModelPhase
+	l.beginUIPreview(r)
 	if err = l.options.Store.Checkpoint(l.work, l.claim, r.Version, cp); err != nil {
 		return false, err
 	}

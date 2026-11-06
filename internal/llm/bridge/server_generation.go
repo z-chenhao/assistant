@@ -22,6 +22,7 @@ type generationRequest struct {
 	llm.GenerationRequest
 	Connection llm.Connection `json:"connection"`
 	Observe    bool           `json:"observe"`
+	UIPreview  bool           `json:"ui_preview"` // Optional v1 event opt-in; absent for older clients.
 	Images     map[string]struct {
 		MediaType      string `json:"media_type"`
 		Data           string `json:"data"`
@@ -205,6 +206,18 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 		o.MaxRetries = 0
 	}
 	toolCount, outputBytes := 0, 0
+	type pendingPreview struct {
+		text strings.Builder
+		sent time.Time
+	}
+	previews := map[string]*pendingPreview{}
+	flushPreview := func(id string) {
+		if p := previews[id]; p != nil && p.text.Len() > 0 {
+			event("ui_delta", map[string]any{"tool_call": llm.ToolCall{ID: id, Name: "builtin__intelligent_ui_show", Arguments: p.text.String()}})
+			p.text.Reset()
+			p.sent = time.Now()
+		}
+	}
 	invalid := false
 	result, err := (&provider.Client{}).Stream(work, m, in, o, func(e provider.Event) {
 		switch e.Type {
@@ -217,12 +230,34 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 				return
 			}
 			event("text_delta", map[string]any{"text": e.Delta})
+		case "toolcall_delta":
+			// Only presentation arguments have a browser-preview consumer. Other
+			// tool parameters, source code and reasoning stay on the execution path.
+			if r.UIPreview && e.Content != nil && e.Content.Name == "builtin__intelligent_ui_show" && e.Content.ID != "" {
+				p := previews[e.Content.ID]
+				if p == nil && len(previews) < 32 {
+					p = &pendingPreview{}
+					previews[e.Content.ID] = p
+				}
+				if p != nil {
+					if p.text.Len()+len(e.Delta) > 128<<10 {
+						invalid = true
+						cancel()
+						return
+					}
+					p.text.WriteString(e.Delta)
+					if p.sent.IsZero() || p.text.Len() >= 512 || time.Since(p.sent) >= 40*time.Millisecond {
+						flushPreview(e.Content.ID)
+					}
+				}
+			}
 		case "toolcall_end":
 			if e.Content == nil {
 				invalid = true
 				cancel()
 				return
 			}
+			flushPreview(e.Content.ID)
 			toolCount++
 			raw, _ := json.Marshal(e.Content.Arguments)
 			if toolCount > 32 || len(raw) > 65536 {

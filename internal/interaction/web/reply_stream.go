@@ -37,8 +37,12 @@ func replyKey(generation string) string {
 }
 
 // ObserveReply consumes in-process Agent events. The browser protocol never
-// carries Run IDs, tool payloads, reasoning or internal lifecycle events.
+// carries Run IDs, raw tool payloads, reasoning or internal lifecycle events.
 func (s *Server) ObserveReply(e agent.Event) {
+	if strings.HasPrefix(e.Kind, "ui_preview_") {
+		s.observeUIPreview(e)
+		return
+	}
 	if e.RunKind != string(agent.MainRole) || e.GenerationID == "" {
 		return
 	}
@@ -159,6 +163,7 @@ func (s *Server) streamReplies(w http.ResponseWriter, r *http.Request) {
 	heartbeat := time.NewTicker(10 * time.Second)
 	defer heartbeat.Stop()
 	var cursor replyCursor
+	var uiVersion uint64
 	// Bound flush frequency without adding a delay to the first chunk.
 	batch := time.NewTicker(25 * time.Millisecond)
 	defer batch.Stop()
@@ -180,7 +185,24 @@ func (s *Server) streamReplies(w http.ResponseWriter, r *http.Request) {
 			nextCheck = time.Now().Add(time.Second)
 			auth.Reset(time.Until(nextCheck))
 		}
+		uiFrame, uiChanged := s.uiPreviews.read(&uiVersion)
+		if uiFrame.State != "" {
+			data, err := json.Marshal(uiFrame)
+			if err != nil || !write("event: ui-preview\ndata: "+string(data)+"\n\n") {
+				return
+			}
+		}
 		frame, changed := s.replies.read(&cursor)
+		if frame.State == "" && uiFrame.State != "" {
+			select {
+			case <-ctx.Done():
+				return
+			case <-shutdown:
+				return
+			case <-batch.C:
+			}
+			continue
+		}
 		if frame.State != "" {
 			data, err := json.Marshal(frame)
 			if err != nil || !write("event: reply\ndata: "+string(data)+"\n\n") {
@@ -201,6 +223,7 @@ func (s *Server) streamReplies(w http.ResponseWriter, r *http.Request) {
 		case <-shutdown:
 			return
 		case <-changed:
+		case <-uiChanged:
 		case <-auth.C:
 		case <-heartbeat.C:
 			if !write(": keepalive\n\n") {

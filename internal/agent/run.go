@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
@@ -132,18 +133,21 @@ type Generation struct {
 	ErrorCode  string
 }
 type Event struct {
-	GenerationID string    `json:"-"` // Correlates live message events; not part of the persisted trace.
-	InvocationID string    `json:"invocation_id,omitempty"`
-	RunKind      string    `json:"run_kind"`
-	TaskID       string    `json:"task_id,omitempty"`
-	Kind         string    `json:"kind"`
-	RunID        string    `json:"run_id"`
-	AgentID      string    `json:"agent_id"`
-	Step         int64     `json:"step_index"`
-	Sequence     int64     `json:"sequence"`
-	OccurredAt   time.Time `json:"occurred_at"`
-	Text         string    `json:"text,omitempty"`
-	ToolCallID   string    `json:"tool_call_id,omitempty"`
+	UIPreview    *ui.Preview `json:"-"`
+	PreviewID    string      `json:"-"`
+	PreviewKey   string      `json:"-"`
+	GenerationID string      `json:"-"` // Correlates live message events; not part of the persisted trace.
+	InvocationID string      `json:"invocation_id,omitempty"`
+	RunKind      string      `json:"run_kind"`
+	TaskID       string      `json:"task_id,omitempty"`
+	Kind         string      `json:"kind"`
+	RunID        string      `json:"run_id"`
+	AgentID      string      `json:"agent_id"`
+	Step         int64       `json:"step_index"`
+	Sequence     int64       `json:"sequence"`
+	OccurredAt   time.Time   `json:"occurred_at"`
+	Text         string      `json:"text,omitempty"`
+	ToolCallID   string      `json:"tool_call_id,omitempty"`
 }
 type EventSink func(Event)
 

@@ -12,11 +12,13 @@ import (
 	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/delivery"
 	"github.com/z-chenhao/assistant/internal/delivery/ui"
+	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func (t *tools) showUI(ctx context.Context, inv tool.Invocation) (tool.Result, error) {
 	var result tool.Result
+	var previewInput string
 	err := t.runs.write(ctx, func(tx *sql.Tx) error {
 		kind, name, args, err := t.acceptedBuiltin(ctx, tx, inv)
 		if err != nil {
@@ -51,8 +53,12 @@ func (t *tools) showUI(ctx context.Context, inv tool.Invocation) (tool.Result, e
 		}
 		data, _ := json.Marshal(map[string]string{"ui_ref": ref, "status": "staged"})
 		result = tool.Result{Text: string(data)}
+		previewInput = args
 		return nil
 	})
+	if err == nil && result.Error == nil {
+		ui.ObservePreview(ctx, inv.ID, previewInput)
+	}
 	return result, err
 }
 
@@ -173,4 +179,28 @@ func (s *Store) WebBubbles(ctx context.Context, m conversation.Message, spec ui.
 		bubbles = append(bubbles, ui.Spec{SchemaVersion: ui.Version, Fallback: reply.Fallback, Components: spec.Components[:len(reply.Components)]})
 	}
 	return bubbles, nil
+}
+
+// StagedUIPreviews reads successful unbound UI artifacts under the active claim.
+func (r *Runs) StagedUIPreviews(ctx context.Context, c agent.RunClaim) ([]llm.ToolCall, error) {
+	var calls []llm.ToolCall
+	err := r.write(ctx, func(tx *sql.Tx) error {
+		if err := fence(ctx, tx, c); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT i.invocation_id,w.document_json FROM ui_widget w JOIN tool_invocation i USING(invocation_id) WHERE w.run_id=? AND w.message_id IS NULL AND i.status='succeeded' ORDER BY i.delivery_seq LIMIT 16`, c.RunID())
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var call llm.ToolCall
+			if err := rows.Scan(&call.ID, &call.Arguments); err != nil {
+				return err
+			}
+			calls = append(calls, call)
+		}
+		return rows.Err()
+	})
+	return calls, err
 }

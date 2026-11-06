@@ -33,6 +33,7 @@ type eventStream struct {
 	seen         map[int64][32]byte
 	last         int64
 	remaining    int
+	previewBytes int
 	toolCalls    int
 	terminal     bool
 	cancelled    chan struct{}
@@ -141,6 +142,14 @@ func (s *eventStream) accept(e llm.GenerationEvent) {
 		} else {
 			s.remaining -= n
 		}
+	case "ui_delta":
+		if e.ToolCall == nil || e.ToolCall.Name != "builtin__intelligent_ui_show" || e.ToolCall.ID == "" || len(e.ToolCall.ID) > 256 || s.previewBytes+len(e.ToolCall.Arguments) > MaxOutputBytes {
+			s.reject(llm.InvalidProviderResponse)
+			return
+		}
+		s.previewBytes += len(e.ToolCall.Arguments)
+		call := *e.ToolCall
+		d.event.ToolCall = &call
 	case "tool_call":
 		if e.ToolCall == nil || e.ToolCall.ID == "" || e.ToolCall.Name == "" || s.toolCalls >= 32 || len(e.ToolCall.Arguments) > MaxOutputBytes {
 			s.reject(llm.InvalidProviderResponse)

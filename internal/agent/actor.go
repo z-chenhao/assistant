@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -167,10 +168,10 @@ func (a Actor) execute(ctx context.Context, id string, claim RunClaim) error {
 		}
 	}()
 	emit := func(e Event) {
-		if e.Kind == "message_update" || e.Kind == "message_discarded" || e.Kind == "reply_committed" {
+		if strings.HasPrefix(e.Kind, "ui_preview_") || e.Kind == "message_update" || e.Kind == "message_discarded" || e.Kind == "reply_committed" {
 			// Preview chunks are ephemeral. The accepted GenerationResult and
 			// checkpoint retain the complete text under the ordinary fence.
-			if a.Sink != nil && (e.Kind != "message_update" || execution.Err() == nil) {
+			if a.Sink != nil && (e.Kind == "message_discarded" || e.Kind == "reply_committed" || e.Kind == "ui_preview_discarded" || execution.Err() == nil) {
 				a.Sink(e)
 			}
 			return

@@ -8,6 +8,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import threading
+import time
 from urllib.parse import quote
 
 from event_broker import Broker
@@ -57,6 +58,48 @@ def run(binary, evidence):
             h.http('/ui/widget?ref=ui:outside', expected=404)
             h.browser(evidence.parent / 'intelligent-ui-browser', 'intelligent-ui')
             h.wait(lambda s: len(s['inputs']) == 2 and len(s['deliveries']) == 2 and all(d['status'] == 'sent' for d in s['deliveries']), 'explicit Widget follow-up accepted')
+            # Hold the actual provider at an unfinished argument prefix, then
+            # hold the Code Mode final prose after its nested UI calls staged.
+            # The browser must display safe previews before either can commit.
+            for mode in ('direct', 'code'):
+                server.preview_path = mode
+                server.preview_ready, server.preview_release = threading.Event(), threading.Event()
+                server.stream_widgets = [
+                    dict(title='Streaming comparison', fallback='A is 10 and B is 20.', components=[dict(name='Table', props=dict(title='Streaming comparison',columns=['Name','Value'],rows=[['A','10'],['B','20']],source='Fixture data'))]),
+                    visual('Streaming visual', 'Scripts activate after delivery.', '<p id="preview-text">Script stays off</p><button id="preview-button">Compute</button><script>parent.postMessage({previewExecuted:true},"*")</script>', 'document.querySelector("#preview-text").textContent="Activated after delivery";'),
+                ]
+                server.mode = 'intelligent-ui-stream'
+                previous_deliveries = len(h.rows()['deliveries'])
+                h.http('/api/message', dict(source_id='stream-'+mode, content=[dict(type='text',text='STREAM_UI_'+mode.upper())]))
+                failures = []
+                def release_preview():
+                    try:
+                        observed = evidence.parent / ('preview-'+mode) / 'preview-observed.json'
+                        deadline = time.monotonic()+30
+                        while not observed.exists() and time.monotonic()<deadline:
+                            time.sleep(.05)
+                        require(observed.exists(), 'browser did not observe the preview')
+                        with closing(sqlite3.connect(h.root / 'data/state.db')) as db, db:
+                            db.execute('BEGIN')
+                            require(db.execute('SELECT count(*) FROM ui_widget WHERE message_id IS NOT NULL').fetchone()[0] == before, 'preview prematurely bound a reply')
+                            require(db.execute("SELECT count(*) FROM run_trace WHERE json_extract(event_json,'$.kind') LIKE 'ui_preview_%'").fetchone()[0] == 0, 'preview entered durable trace')
+                    except Exception as error:
+                        failures.append(error)
+                    finally:
+                        server.preview_release.set()
+                release = threading.Thread(target=release_preview)
+                try:
+                    require(server.preview_ready.wait(15), mode+' preview gate did not open')
+                    release.start()
+                    h.browser(evidence.parent / ('preview-'+mode), 'intelligent-ui-preview-'+mode)
+                finally:
+                    server.preview_release.set()
+                    if release.ident is not None:
+                        release.join()
+                require(not failures, str(failures))
+                h.wait(lambda state: len(state['deliveries']) == previous_deliveries+1 and all(d['status']=='sent' for d in state['deliveries']), mode+' stream committed')
+                before += 2
+                h.browser(evidence.parent / ('preview-'+mode+'-committed'), 'intelligent-ui-preview-committed')
             h.stop(kill=True)
             h.start()
             h.http('/ui/widget?ref=' + quote(ref,safe=''))
@@ -68,7 +111,7 @@ def run(binary, evidence):
             require(all({t['function']['name'] for t in body['tools']} == MAIN_DIRECT for body in requests), 'frequent UI and discovery declarations differ from the production surface')
             require(all(sum(m['role'] == 'system' for m in body['messages']) == 1 for body in requests), 'multiple system messages reached the provider')
             require(all('<skills>' not in m['content'] and '<skill_index>' not in m['content'] and 'Present a compact native component' not in m['content'] for body in requests for m in body['messages'] if m['role']=='system'), 'business requests preloaded the Skill catalog')
-            return dict(checks=['real Go model peer and Main Code Mode', 'Main-owned durable UI tool; upstream Table and generateSandboxedUi contract', 'opaque origin, storage/parent/network blocked', 'upstream shared theme/SVG/form styles, calculator, SVG simulation, expansion, failure/text fallback, mobile', 'Host-confirmed ordinary message follow-up', 'SIGKILL/restart without regeneration', 'one Agent system message and the fixed frequent direct tool surface'], widget_count=before, projection=first['projections'])
+            return dict(checks=['real Go model peer and Main Code Mode', 'Main-owned durable UI tool; upstream Table and generateSandboxedUi contract', 'opaque origin, storage/parent/network blocked', 'upstream shared theme/SVG/form styles, calculator, SVG simulation, expansion, failure/text fallback, mobile', 'Host-confirmed ordinary message follow-up', 'direct argument and Code Mode staged previews before reply commit; scriptless, inert, theme and mobile rendering', 'SIGKILL/restart without regeneration', 'one Agent system message and the fixed frequent direct tool surface'], widget_count=before, projection=first['projections'])
         finally:
             h.cleanup()
             server.shutdown()
