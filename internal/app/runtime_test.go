@@ -17,8 +17,8 @@ import (
 )
 
 // Exercise production composition rather than marking a test registry ourselves.
-// New builtin registrations must inherit the single model-facing entry point.
-func TestProductionToolSurfaceUsesOnlyCodeMode(t *testing.T) {
+// New registrations stay in Code Mode unless they are a fixed coordination primitive.
+func TestProductionToolSurfaceKeepsOnlyFrequentControlsDirect(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +30,7 @@ func TestProductionToolSurfaceUsesOnlyCodeMode(t *testing.T) {
 	for _, configured := range []bool{true, false} {
 		name := "configured"
 		if !configured {
-			name = "missing-runtime-does-not-enable-native-fallback"
+			name = "missing-runtime-keeps-execution-inaccessible"
 		}
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -45,27 +45,39 @@ func TestProductionToolSurfaceUsesOnlyCodeMode(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			direct := map[string]bool{codemode.ToolName: true, tool.SearchName: true, "builtin__intelligent_ui_show": true, "builtin__skill_list": true, "builtin__skill_view": true, "builtin__task_manage": true, "builtin__task_search": true}
 			for _, spec := range registry.Describe() {
-				if spec.Name != codemode.ToolName && !spec.CodeModeOnly {
-					t.Errorf("production registration permits native calls: %s", spec.Name)
+				if !spec.CodeModeOnly && !direct[spec.Name] {
+					t.Errorf("unintended native capability: %s", spec.Name)
 				}
+			}
+			found := tool.SearchTools(agent.MainTools(registry.Describe()), nil, "builtin__artifact_search", 1)
+			if len(found.Tools) != 1 || found.Tools[0].Name != "builtin__artifact_search" || len(found.Loaded) != 0 {
+				t.Fatalf("native search must discover a Code Mode tool without declaring it: %+v", found)
 			}
 			for role, specs := range map[string][]tool.Spec{"main": agent.MainTools(registry.Describe()), "worker": agent.WorkerTools(registry.Describe())} {
-				// Treat every frozen tool as loaded to test the strongest checkpoint
-				// forgery, not just the ordinary initial projection.
 				loaded := make([]string, 0, len(specs))
+				want := map[string]bool{}
 				for _, spec := range specs {
 					loaded = append(loaded, spec.Name)
+					if direct[spec.Name] && !spec.Internal {
+						want[spec.Name] = true
+					}
 				}
 				declared := agent.ProviderTools(specs, loaded)
-				if configured {
-					if len(declared) != 1 || declared[0].Name != codemode.ToolName {
-						t.Fatalf("%s declares native tools: %+v", role, declared)
+				if len(declared) != len(want) {
+					t.Fatalf("%s direct controls differ: %+v want %+v", role, declared, want)
+				}
+				for _, spec := range declared {
+					if !want[spec.Name] {
+						t.Fatalf("%s exposes unexpected native tool %s", role, spec.Name)
 					}
-				} else if len(declared) != 0 {
-					t.Fatalf("%s falls back to native tools without runtime: %+v", role, declared)
+				}
+				if !configured && want[codemode.ToolName] {
+					t.Fatal("missing runtime registered Code Mode")
 				}
 			}
+
 		})
 	}
 }

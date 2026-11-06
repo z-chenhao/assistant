@@ -49,7 +49,7 @@ func TestMainUIWidgetUsesCodeModeAndDurableReply(t *testing.T) {
 		if req.Messages[len(req.Messages)-1].Role == "tool" {
 			return llm.GenerationResult{Text: "Explore the comparison."}, nil
 		}
-		doc, _ := json.Marshal(ui.Widget{Title: "Calculator", Fallback: "The result is 42.", HTML: `<button id="compute">Compute</button><output id="result"></output>`, JavaScript: `document.getElementById("compute").addEventListener("click",()=>document.getElementById("result").textContent=42)`})
+		doc, _ := json.Marshal(ui.Widget{Title: "Comparison", Fallback: "The result is 42.", Components: []ui.Component{{Name: "Table", Props: json.RawMessage(`{"title":"Result","columns":["Value"],"rows":[["42"]],"source":"Calculated fixture"}`)}}})
 		args, _ := json.Marshal(map[string]string{"source": "return await tools.builtin__intelligent_ui_show(" + string(doc) + ");"})
 		return calls(codemode.ToolName, string(args)), nil
 	}
@@ -62,9 +62,8 @@ func TestMainUIWidgetUsesCodeModeAndDurableReply(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT ui_ref,message_id FROM ui_widget`).Scan(&ref, &messageID); err != nil {
 		t.Fatal(err)
 	}
-	widget, err := s.WebWidget(context.Background(), ref)
-	if err != nil || widget.Title != "Calculator" {
-		t.Fatal(widget, err)
+	if _, err := s.WebWidget(context.Background(), ref); err != agent.ErrNotFound {
+		t.Fatal("native component exposed as sandbox", err)
 	}
 	var raw string
 	if err = s.db.QueryRow(`SELECT message_json FROM conversation_intent WHERE message_id=?`, messageID).Scan(&raw); err != nil {
@@ -84,10 +83,18 @@ func TestMainUIWidgetUsesCodeModeAndDurableReply(t *testing.T) {
 	}
 	found := false
 	for _, c := range spec.Components {
-		found = found || c.Type == "widget" && c.WidgetRef == ref
+		found = found || c.Type == "openintelligentui" && c.Name == "Table"
 	}
 	if !found {
 		t.Fatal("reply lost UI reference", spec)
+	}
+	bubbles, err := s.WebBubbles(context.Background(), m, spec)
+	if err != nil || len(bubbles) != 2 || len(bubbles[0].Components) != 1 || bubbles[0].Components[0].Name != "Table" || bubbles[1].Fallback != "Explore the comparison." {
+		t.Fatal("UI must precede the separate final reply", bubbles, err)
+	}
+	again, err := s.WebProjection(context.Background(), m)
+	if err != nil || string(again) != string(projection) {
+		t.Fatal("Web bubble grouping changed the frozen delivery", err)
 	}
 	if _, err = s.WebWidget(context.Background(), "ui:outside"); err != agent.ErrNotFound {
 		t.Fatal("out-of-scope UI accessible", err)
@@ -100,7 +107,7 @@ func TestMainUIWidgetUsesCodeModeAndDurableReply(t *testing.T) {
 
 func TestUIStagingRecoversAfterResultCommitFailure(t *testing.T) {
 	ctx := context.Background()
-	calls := []llm.ToolCall{{ID: "show", Name: ui.ShowName, Arguments: `{"title":"Answer","fallback":"The answer is 42.","html":"<output>42</output>"}`}}
+	calls := []llm.ToolCall{{ID: "show", Name: ui.ShowName, Arguments: `{"title":"Answer","fallback":"The answer is 42.","components":[{"name":"Table","props":{"title":"Answer","columns":["Value"],"rows":[["42"]],"source":"Calculated"}}]}`}}
 	s, runs, owner, executor, exchange := admitPolicy(t, []tool.Definition{ui.ShowDefinition()}, calls)
 	if _, err := s.db.Exec(`CREATE TRIGGER ui_result_fault BEFORE UPDATE ON tool_invocation WHEN NEW.tool_name='builtin__intelligent_ui_show' AND NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'owned result commit fault'); END`); err != nil {
 		t.Fatal(err)

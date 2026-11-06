@@ -29,7 +29,7 @@ type SearchResult struct {
 }
 
 func SearchDefinition() Definition {
-	return Definition{Host: true, Spec: Spec{Name: SearchName, Version: 1, Exposure: ModelOnly, InputSchema: SearchSchema, Permission: "read_only", ReplayPolicy: "safe", OutputBytes: 1 << 20, Description: "Discover authorized MCP capabilities by name or intent. MCP tools execute through Code Mode: use its searchTools/describeTool helpers, or delegate to a Worker when Code Mode is unavailable. Search never executes a tool, grants permissions or approves an action. Defaults to 8 matches."}}
+	return Definition{Host: true, Spec: Spec{Name: SearchName, Version: 1, Exposure: ModelOnly, InputSchema: SearchSchema, Permission: "read_only", ReplayPolicy: "safe", OutputBytes: 1 << 20, Description: "Discover authorized tools by name or intent. Discovered tools execute through Code Mode: use its searchTools/describeTool helpers, or delegate to a Worker when Code Mode is unavailable. Search never executes a tool, grants permissions or approves an action. Defaults to 8 matches."}}
 }
 
 // SearchTools ranks frozen, unactivated capabilities. BM25, identifier terms,

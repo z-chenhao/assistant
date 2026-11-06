@@ -24,7 +24,6 @@ type settingsView struct {
 	AccountModels         map[string][]modelResource
 	Target                string
 	Model, Endpoint, Name string
-	ImageInput            bool
 }
 
 type modelResource struct {
@@ -181,6 +180,9 @@ var errPageNotFound = errors.New("page not found")
 // profile row until Select commits. Presentation reads existing proof metadata;
 // Control.Select still validates live credentials and every frozen version.
 func (s *Server) profileVerified(ctx context.Context, p llm.Profile) bool {
+	if p.ProviderKind == "openai_account" {
+		return p.Status == "ready"
+	}
 	if s.Control.Store == nil || s.Control.BridgeIdentity == "" || s.Control.BridgeError != nil {
 		return false
 	}

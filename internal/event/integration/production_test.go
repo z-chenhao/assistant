@@ -148,7 +148,7 @@ func TestRemoteBrokerFailsClosedAndBoundsCannotDrift(t *testing.T) {
 		}
 	}
 	o := options("tls://example.com:4222")
-	o.TokenRef = "keychain:broker"
+	o.TokenRef = "credential:broker"
 	checkErr(t, o.Validate())
 	broker := testbroker.New(t)
 	bus := connect(t, broker)

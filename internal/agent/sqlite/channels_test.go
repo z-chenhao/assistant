@@ -115,7 +115,7 @@ func TestChannelConcurrentCallbackAndSourceDedupSharedConversation(t *testing.T)
 	if _, e = r.AcceptInbound(ctx, bad); !errors.Is(e, interaction.ErrUnauthorized) {
 		t.Fatal("unbound accepted", e)
 	}
-	// Web and TUI steer the same Main, retain independent ordered messages.
+	// Every input retains its own reply and origin within the shared Main.
 	if _, e = r.AcceptInbound(ctx, interaction.InboundEvent{Channel: web.Channel, Subject: web.Subject, Destination: web.Destination, EventID: "web", SourceID: "web", Content: conversation.Text("from Web")}); e != nil {
 		t.Fatal(e)
 	}
@@ -125,12 +125,19 @@ func TestChannelConcurrentCallbackAndSourceDedupSharedConversation(t *testing.T)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if len(messages) != 4 || messages[0].Source != "feishu" || messages[1].Source != "web" || messages[2].Source != "cli" {
+	if len(messages) != 6 || messages[0].Source != "feishu" || messages[1].Source != "web" || messages[2].Source != "cli" {
 		t.Fatalf("shared ordering %+v", messages)
 	}
 	rows := deliveryRows(t, s)
-	if len(rows) != 1 || rows[0].Channel != "tui" {
-		t.Fatal("latest TUI input inherited older channel", rows)
+	if len(rows) != 3 {
+		t.Fatal("an input lost its independent reply", rows)
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		seen[row.Channel] = true
+	}
+	if !seen["feishu"] || !seen["web"] || !seen["tui"] {
+		t.Fatal("reply crossed input origin", rows)
 	}
 	for i, m := range messages {
 		if m.Sequence != int64(i+1) {

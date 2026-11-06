@@ -17,7 +17,7 @@ export function enhanceRichForms(){
   const data=new URLSearchParams();for(const [key,value] of new FormData(form)){if(typeof value==='string')data.append(key,value)}
   const group=form.querySelector('fieldset'),status=form.querySelector<HTMLElement>('[role=status]');
   form.dataset.submitting='true';if(group)group.disabled=true;
-  if(status)status.textContent=t('Sending your response…');
+  if(status)status.textContent=t('Sending…');
   void(async()=>{
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
    let failure='Your response was not confirmed. Your answers are kept. Check the conversation before changing or retrying them.';
@@ -31,7 +31,7 @@ export function enhanceRichForms(){
     }
     if((await response.json()).accepted!==true)throw new Error('response unconfirmed');
     form.dataset.submitted='true';delete form.dataset.dirty;
-    if(status)status.textContent=t('Your response was saved. Ghost will review it in the conversation.');
+    if(status)status.textContent=t('Saved.');
    }catch{
     if(status)status.textContent=t(failure);
    }finally{

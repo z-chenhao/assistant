@@ -34,7 +34,7 @@ func TestDefaultMemoryHasOneEnabledEntryAndPreferenceLayout(t *testing.T) {
 	}
 	response = capabilityRequest(s, "GET", "/settings/capabilities/memory", nil)
 	body = response.Body.String()
-	if !strings.Contains(body, `class="panel form-panel"`) || !strings.Contains(body, `value="apply">Save</button>`) || !strings.Contains(body, `href="/settings/capabilities/embedding"`) || strings.Contains(body, "Successful candidate tests expire") {
+	if !strings.Contains(body, `class="panel form-panel settings-group"`) || !strings.Contains(body, `<noscript>`) || !strings.Contains(body, `href="/settings/capabilities/embedding"`) || !strings.Contains(body, `data-capability-import`) || strings.Contains(body, "Successful candidate tests expire") {
 		t.Fatal(body)
 	}
 	v, _ := m.Detail(context.Background(), "memory")
@@ -97,7 +97,7 @@ func capabilityFixture(t *testing.T) (*web.Server, *setup.Manager, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager := setup.New(cfg, secret.Store{})
+	manager := setup.New(cfg, secret.Environment{})
 	return &web.Server{Core: capabilityCore{}, Capabilities: manager}, manager, root
 }
 func capabilityRequest(s *web.Server, method, path string, values url.Values) *httptest.ResponseRecorder {

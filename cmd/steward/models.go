@@ -57,7 +57,7 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 		}
 		for _, m := range models {
 			if m.ModelID == flags.Arg(3) {
-				input := llm.ProfileInput{Name: m.ModelID, ProviderKind: "openai_account", WireAPI: "openai_responses", ModelID: m.ModelID, AuthConnectionID: auth.ConnectionID, ContextWindow: m.ContextWindow, MaxOutputTokens: min(m.MaxOutputTokens, m.ContextWindow), Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true}}
+				input := llm.ProfileInput{Name: m.ModelID, ProviderKind: "openai_account", WireAPI: "openai_responses", ModelID: m.ModelID, AuthConnectionID: auth.ConnectionID, ContextWindow: m.ContextWindow, MaxOutputTokens: min(m.MaxOutputTokens, m.ContextWindow), Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true, ImageInput: m.ImageInput}}
 				profile, err := application.Models().AddProfile(ctx, input)
 				if err != nil {
 					return err
@@ -153,6 +153,6 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 
 func credentialHelp(out io.Writer, err error) {
 	if errors.Is(err, llm.ErrSecretStore) || errors.Is(err, llm.ErrSecretCleanup) {
-		fmt.Fprintln(out, "Check your credential storage settings and retry. Run steward doctor; see docs/features/model-connections.md.")
+		fmt.Fprintln(out, "Check your private credential files and their permissions, then retry. Run steward doctor; see docs/features/model-connections.md.")
 	}
 }

@@ -162,6 +162,7 @@ type CatalogModel struct {
 	ModelID         string `json:"model_id"`
 	ContextWindow   int64  `json:"context_window"`
 	MaxOutputTokens int64  `json:"max_output_tokens"`
+	ImageInput      bool   `json:"image_input,omitempty"`
 }
 
 type ModelCatalog interface {

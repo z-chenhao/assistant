@@ -173,7 +173,7 @@ tool/mcp
 - `memory`：长期记忆、召回与 Memory Curator。
 - `context`：为每次 Turn 组装、裁剪、冻结和压缩上下文，不拥有来源数据。
 - `llm`：管理 ModelProfile/ModelSnapshot、Provider Bridge、模型目录、能力 Probe 与固定主模型调用；一期不做动态模型路由。
-- `llm/secret`：封装 OS Credential Store；`llm/memory` 提供测试用内存实现。只返回受控 Credential，不把 Secret 暴露给领域存储或模型。
+- `llm/secret`：封装数据根下的私有文件 SecretStore 与显式环境变量引用；`llm/memory` 提供测试用内存实现。只返回受控 Credential，不把 Secret 暴露给领域存储或模型。
 - `skill`：Skill 的发现、读取、候选、审核和生命周期。
 - `tool`：工具注册、发现、ToolInvocation 与调用；包括 AgentToolExecutor、Computer Tool Executor、Code Mode 的内部 CodeExecutionState/CodeCall Ledger 和 Sidecar 桥接。
 - `tool` 与 `agent/sqlite` 共同落实副作用前的授权、冻结审批与执行权检查；当前没有独立的 `security` 包。
@@ -196,26 +196,36 @@ are test levels; using CI does not turn a unit test into an end-to-end test.
 
 ### Pull requests and main
 
-[CI](../../.github/workflows/ci.yml) runs one `Ubuntu checks` job. The existing
-required status name is preserved. One checkout and dependency setup serve:
+[CI](../../.github/workflows/ci.yml) preserves `Ubuntu checks` as the sole required
+aggregate status. A scope job selects documentation-only checks or the full code
+path. Code runs in eleven isolated Ubuntu lanes, described by the private
+[CI partition](../../tests/system/ci.py):
 
-1. `make test-prompts`: an early contract gate for Main/Root/Child section order,
-   single-message assembly, frozen shared-rule inheritance and Root progress.
-2. `make test lint`: Go unit/component checks, Node runtime contracts, frontend
-   freshness/types, the real Chromium contract and retained infrastructure tests.
-3. `make test-e2e`: ten deterministic product flows through actual CLI/UI,
-   stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
-4. Task coding isolation and publication recovery retain their dedicated checks.
-5. Code Mode discovery and Main responsiveness: the maintained capabilities
-   scenarios check 500 MCP tools without native declarations, direct-call rejection,
-   exact approval and a Main reply while a real MCP call remains held.
-6. Native Linux account credentials: the existing account harness uses a private
-   D-Bus and disposable password-protected GNOME Keyring, with real libsecret
-   storage and a controlled OAuth/Responses peer. An entrypoint wrapper unwinds
-   owned service processes on cancellation; no real account or user keyring is used.
+- Five software lanes retain all `make test lint` work and `make test-prompts`:
+  Go, provider RPC, frontend/JavaScript, browser/infrastructure, and lint.
+- Five system lanes cover the eleven core gates without duplicate scenarios. Each runner
+  builds its own binary, records its hash and source state, and owns disposable
+  fixtures. Channels partitions its independent Web and transport scenarios
+  across two runners; the ordinary local gate still runs both groups.
+- One lane retains Web Access contracts, focused Main/UI/credential races, task
+  coding isolation/recovery, Code Mode discovery and Main responsiveness.
 
-The job has a 30-minute outer budget for setup and all checks. Individual test
-deadlines and assertions remain unchanged.
+The local Make targets remain sequential and unchanged. Jobs share dependency
+caches, not mutable build outputs, node_modules or application state. Native
+Select behavior and 320px touch/layout assertions remain part of channels.
+Production timeouts and the provider's real 30/90/180-second deadline probes
+remain unchanged. Full race coverage stays in extended regression.
+
+Each lane has a ten-minute failure boundary. The latency target is under five
+minutes from workflow start to the aggregate result on a warm hosted runner;
+this is measured remotely, not asserted from local runtimes. Cold tool/cache
+installation and hosted queue delays may exceed that target.
+
+Hosted Ubuntu setup uses the official HTTPS archive instead of the image's
+Azure archive mirror. Package-manager phases have 90-second process boundaries;
+locked npm/browser setup has 120-second stage boundaries with owned-child
+cleanup. Slow or unavailable downloads fail the lane and cannot count as tested
+coverage. Browser revision and installed-package verification remain unchanged.
 
 The Go checks also exercise production tool composition, including a forged
 loaded-tool checkpoint and no native fallback without a JavaScript runtime.
@@ -230,16 +240,20 @@ Node or Chromium. The `Ubuntu checks` job still executes and reports a status;
 there is no workflow-level path filter that leaves branch protection pending.
 Unknown paths, code changes, empty diffs and main pushes use the full PR path.
 
-Failures stop the job; failed or cancelled work does not count as a pass. The
-process owner forwards cancellation, allows fixture cleanup and kills remaining
-owned process groups. Results and failed logs are uploaded with source/run
-identity. Tests never need an online model account.
+A lane stops on its first failure; other lanes finish and retain their evidence
+(`fail-fast: false`). The aggregate uses `always()` and requires successful scope
+and every selected lane. Missing, failed or cancelled work cannot pass; skipped
+code lanes are accepted only for the explicit successful documentation path.
+The process owner forwards cancellation, allows fixture cleanup and kills
+remaining owned groups. Logs and results include checked commit, lane and run
+attempt. Tests never need an online model account.
 
-The job has a 20-minute stop boundary. It is not a latency claim. This replaces
-38 job instances and their setup/build/upload/join overhead; GitHub-hosted queue
-time and wall-time improvements must be measured on the new workflow. Local
-results do not establish remote CI performance. There is no custom changed-file
-selector, secondary required gate, benchmark comparator or cross-job build bundle.
+The partition deliberately avoids per-file test selection, shared executable
+artifacts and a custom parallel process scheduler. Repeated runner setup is the
+tradeoff for isolation and bounded critical paths. Changes to the partition must
+preserve core coverage and fail-closed aggregation; the infrastructure tests
+exercise both. Queue time and complete remote wall time are reported with PR
+validation rather than treated as guaranteed by job timeouts.
 
 <a id="ci-extended-regression"></a>
 
@@ -247,7 +261,7 @@ selector, secondary required gate, benchmark comparator or cross-job build bundl
 
 [Extended regression](../../.github/workflows/regression.yml) runs weekly and via
 manual dispatch. It executes all retained deterministic system gates, then the
-complete Go race inventory. A separate macOS job checks native CLI/startup, the credential adapter and offline VM contracts; actual Keychain/Guest integration remains explicit live validation. It uploads failures as well as passing results and
+complete Go race inventory. A separate macOS job checks native CLI/startup, the credential adapter and offline VM contracts; actual Guest integration remains explicit live validation. It uploads failures as well as passing results and
 has a 60-minute outer limit. A failure remains a defect to investigate; it cannot
 be waived into a release pass. Run it before releases and broad protocol/state
 changes, or use the corresponding focused gates during development.

@@ -89,18 +89,20 @@ func ProviderTools(specs []tool.Spec, loaded ...[]string) []llm.ToolSpec {
 }
 
 type Checkpoint struct {
-	LoadedTools    []string              `json:"loaded_tools,omitempty"`
-	PendingTools   []PendingToolBatch    `json:"pending_tools,omitempty"`
-	ContextVersion int                   `json:"context_version,omitempty"`
-	WorkingState   *WorkingState         `json:"working_state,omitempty"`
-	ContextRetries int                   `json:"context_retries,omitempty"`
-	ContextReady   bool                  `json:"context_ready"`
-	Messages       []AgentMessage        `json:"messages"`
-	InputSequence  int64                 `json:"input_sequence"`
-	Step           int64                 `json:"step"`
-	Phase          Phase                 `json:"phase"`
-	ExchangeID     string                `json:"exchange_id,omitempty"`
-	Result         *llm.GenerationResult `json:"result,omitempty"`
+	SerialInputs         bool                  `json:"serial_inputs,omitempty"`
+	RepliedInputSequence int64                 `json:"replied_input_sequence,omitempty"`
+	LoadedTools          []string              `json:"loaded_tools,omitempty"`
+	PendingTools         []PendingToolBatch    `json:"pending_tools,omitempty"`
+	ContextVersion       int                   `json:"context_version,omitempty"`
+	WorkingState         *WorkingState         `json:"working_state,omitempty"`
+	ContextRetries       int                   `json:"context_retries,omitempty"`
+	ContextReady         bool                  `json:"context_ready"`
+	Messages             []AgentMessage        `json:"messages"`
+	InputSequence        int64                 `json:"input_sequence"`
+	Step                 int64                 `json:"step"`
+	Phase                Phase                 `json:"phase"`
+	ExchangeID           string                `json:"exchange_id,omitempty"`
+	Result               *llm.GenerationResult `json:"result,omitempty"`
 }
 type Run struct {
 	ResponsiveTools bool         `json:"-"`
@@ -117,6 +119,7 @@ type Run struct {
 	Checkpoint      Checkpoint   `json:"checkpoint"`
 }
 type Input struct {
+	Context  []AgentMessage // Frozen input-scoped UI evidence, absent on other channels.
 	Sequence int64
 	Message  conversation.Message
 }

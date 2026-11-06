@@ -7,24 +7,18 @@ export function enhanceLanguagePreference(){
  const form=document.querySelector<HTMLFormElement>('[data-language-preference]');
  if(!form||typeof fetch!=='function'||typeof AbortController!=='function')return;
  const select=form.querySelector<HTMLSelectElement>('select[name=language]');
- const trigger=form.querySelector<HTMLButtonElement>('[data-language-trigger]');
- const value=form.querySelector<HTMLElement>('#language-value');
- const popup=form.querySelector<HTMLElement>('[data-language-popup]');
  const label=form.querySelector<HTMLLabelElement>('#language-label');
  const fallbackSave=form.querySelector<HTMLButtonElement>('.preference-save');
  const feedback=form.querySelector<HTMLElement>('[data-language-feedback]');
  const message=form.querySelector<HTMLElement>('[data-language-message]');
  const retry=form.querySelector<HTMLButtonElement>('[data-language-retry]');
  const refresh=form.querySelector<HTMLAnchorElement>('[data-language-refresh]');
- const options=Array.from(form.querySelectorAll<HTMLElement>('[data-language-option]'));
- if(!select||!trigger||!value||!popup||!label||!fallbackSave||!feedback||!message||!retry||!refresh||options.length!==select.options.length)return;
- const search=form.querySelector<HTMLInputElement>('[data-language-search]');
- const empty=form.querySelector<HTMLElement>('[data-language-empty]');
+ if(!select||!label||!fallbackSave||!feedback||!message||!retry||!refresh)return;
  let confirmed=select.value,desired=confirmed;
  let state:'idle'|'saving'|'unknown'='idle';
  let generation=0;
  let controller:AbortController|undefined;
- const picker=search&&empty?enhanceSelect(select,{trigger,popup,list:popup.querySelector<HTMLElement>('[role=listbox]')!,search,empty,value,options}):undefined;
+ const picker=enhanceSelect(select),trigger=picker?.trigger??select;
  const custom=!!picker;
  const sync=()=>picker?.sync();
  const close=(focus=false)=>picker?.close(focus);
@@ -35,8 +29,7 @@ export function enhanceLanguagePreference(){
  const busy=(locked:boolean)=>{
   // Keep the feedback live region outside the busy subtree, including when an
   // unknown result locks further writes after the network operation has ended.
-  trigger.setAttribute('aria-busy',String(state==='saving'));
-  trigger.setAttribute('aria-disabled',String(locked));
+  picker?.setLocked(locked,state==='saving');
   if(!custom)select.disabled=locked;
  };
  const unknown=()=>{
@@ -82,7 +75,7 @@ export function enhanceLanguagePreference(){
  form.addEventListener('submit',event=>{event.preventDefault();void save()});
  sync();
  // Commit the enhancement last: initialization failures retain the native form.
- if(custom){popup.hidden=false;select.hidden=true;trigger.hidden=false;label.htmlFor=trigger.id}else popup.hidden=true;
+ if(custom){select.hidden=true;label.htmlFor=trigger.id}
  fallbackSave.hidden=true;form.dataset.autosaveReady='true';
  if(location.hash==='#interface-language-picker')requestAnimationFrame(()=>{if(custom)trigger.focus();else select.focus()});
 }

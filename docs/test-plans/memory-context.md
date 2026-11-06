@@ -129,3 +129,5 @@ F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统
 - 项目/Skill prompt 资源复制及冻结，读取当前资源不改写旧 capability。
 
 这些用例不评价真实模型总结质量。现有取消、Forget、审批、Worker 树和 legacy 请求恢复测试继续适用。
+
+`TestAutomaticMemoryUsesPrivateFilesAcrossStartup` 使用生产应用组装连续启动并核对同一文件密钥；删除已发布密钥后，启动仍可返回但 Memory 显示 unavailable 且不重新生成。`TestFilesKeepsMemoryKeyAcrossReopen` 以重开的文件后端解密真实 Vault 密文并检查目录和文件权限；路径穿越、符号／硬链接及宽权限回归拒绝不安全读取。原账户文件刷新和退出回归继续保护既有 OAuth 路径。

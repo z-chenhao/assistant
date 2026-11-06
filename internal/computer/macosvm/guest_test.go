@@ -29,7 +29,7 @@ func TestSSHNegotiationFrozenIdentityAndCompatibility(t *testing.T) {
 	}
 	defer s.Close()
 	t.Setenv("STEWARD_COMPUTER_FIXTURE_PASSWORD", "fixture-only")
-	g := macosvm.SSHGuest{Config: s.Config.Guest, Secrets: secret.Store{}}
+	g := macosvm.SSHGuest{Config: s.Config.Guest, Secrets: secret.Environment{}}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := g.Ready(ctx, "127.0.0.1", s.Config.Compatibility); err != nil {
@@ -79,7 +79,7 @@ func TestReadOnlyPreviewCapturesExistingWindowAndNeverStartsMissingComputer(t *t
 	if err = macosvm.ProvisionBase(context.Background(), root, source, peer.Config.Compatibility); err != nil {
 		t.Fatal(err)
 	}
-	provider, err := macosvm.New(peer.Config, macosvm.SSHGuest{Config: peer.Config.Guest, Secrets: secret.Store{}})
+	provider, err := macosvm.New(peer.Config, macosvm.SSHGuest{Config: peer.Config.Guest, Secrets: secret.Environment{}})
 	if err != nil {
 		t.Fatal(err)
 	}

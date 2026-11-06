@@ -1,3 +1,5 @@
+import {flushUIStates} from './intelligent-ui/state';
+import {showOutgoing,outgoingState,reconcileOutgoing,discardOutgoing} from './outgoing';
 import {t} from './i18n';
 import {buttonVariants,textareaStyle} from './components/ui/styles';
 import {cn} from './lib/utils';
@@ -28,26 +30,46 @@ export function enhanceComposer(messageAccepted?: (target:URL)=>void){
  });
  form.addEventListener('submit',event=>{
   event.preventDefault();if(pending||submit?.disabled)return;
-  pending=true;form.dataset.submitting='true';if(submit)submit.disabled=true;
-  const feedback=root.querySelector<HTMLElement>('#composer-feedback');
+  const data=new FormData(form),submittedSource=source.value;
   const submittedText=text.value,submittedFile=file?.files?.[0];
-  if(feedback)feedback.textContent=t('Sending…');
-  void(async()=>{
+  const feedback=root.querySelector<HTMLElement>('#composer-feedback');
+  document.querySelector('.welcome')?.remove();
+  const entry=showOutgoing(submittedSource,submittedText,submittedFile);
+  // Snapshot before clearing; uncertain retries reuse this exact source and file.
+  source.value=root.dataset.sourceId=crypto.randomUUID().replaceAll('-','');
+  text.value='';if(file)file.value='';showFile();if(feedback)feedback.textContent='';
+  text.focus({preventScroll:true});requestAnimationFrame(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
+  const send=async()=>{
+   if(pending||entry.confirmed)return;
+   pending=true;form.dataset.submitting='true';if(submit)submit.disabled=true;outgoingState(entry,'sending');
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
    try{
-    const response=await fetch('/message',{method:'POST',body:new FormData(form),credentials:'same-origin',signal:controller.signal,headers:{Accept:'application/json'}});
+    await flushUIStates().catch(()=>{});
+    const response=await fetch('/message',{method:'POST',body:data,credentials:'same-origin',signal:controller.signal,headers:{Accept:'application/json'}});
+    if([400,413,422].includes(response.status)){
+     outgoingState(entry,'rejected',()=>{
+      if(pending||text.value||file?.files?.length){if(feedback)feedback.textContent=t('Finish or clear your current draft before editing this message.');return}
+      text.value=submittedText;
+      if(file&&submittedFile){const transfer=new DataTransfer();transfer.items.add(submittedFile);file.files=transfer.files}
+      showFile();discardOutgoing(entry);if(feedback)feedback.textContent='';text.focus();
+     });
+     return;
+    }
     if(!response.ok)throw Error('send not confirmed');
     const result=await response.json();if(result.accepted!==true||typeof result.location!=='string')throw Error('invalid acknowledgement');
     const target=new URL(result.location,location.origin);if(target.origin!==location.origin||target.pathname!=='/')throw Error('invalid destination');
-    if(!messageAccepted||typeof result.next_source_id!=='string'||!/^[a-f0-9]{32}$/.test(result.next_source_id)){location.assign(target);return}
-    source.value=root.dataset.sourceId=result.next_source_id;
-    if(text.value===submittedText)text.value='';
-    if(file&&file.files?.[0]===submittedFile){file.value='';showFile()}
-    if(feedback)feedback.textContent='';
+    reconcileOutgoing();outgoingState(entry,'accepted');
+    if(!entry.confirmed)document.body.dataset.waitingReply='true';
+    if(!messageAccepted){location.assign(target);return}
     if(!form.querySelector('[name=task_ref]'))target.searchParams.delete('task');
     messageAccepted(target);
-   }catch{if(feedback)feedback.textContent=t('Send was not confirmed. Your draft and attachment are kept. Check the conversation before sending again.')}
-   finally{clearTimeout(timeout);pending=false;delete form.dataset.submitting;if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
-  })();
+   }catch{
+    if(!entry.confirmed)outgoingState(entry,'uncertain',()=>void send());
+   }finally{
+    clearTimeout(timeout);pending=false;delete form.dataset.submitting;
+    if(submit)submit.disabled=document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false';
+   }
+  };
+  void send();
  });
 }

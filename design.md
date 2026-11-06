@@ -37,7 +37,7 @@ typography:
     fontSize: "16px"
     lineHeight: 1.75
 rounded:
-  button: "9px"
+  button: "8px"
   surface: "12px"
 spacing:
   workspace-gutter: "40px"
@@ -53,9 +53,9 @@ spacing:
 
 ## Colors
 
-浅色与深色共用相同的语义。主操作使用高对比填充，普通操作使用透明底和细边框。状态同时使用文字，颜色提供辅助识别。内容分隔线、输入边界与键盘焦点各自使用对应的颜色。实际色值维护在 [共享样式](web/src/foundation.css)。
+浅色与深色共用相同的语义。主操作使用高对比填充，普通操作使用低强调填充或细边框。状态同时使用文字，颜色提供辅助识别。内容分隔线、输入边界与键盘焦点各自使用对应的颜色。实际色值维护在 [共享样式](web/src/foundation.css)。
 
-Chat 发送按钮是单色主操作的例外：明暗主题均使用 `#D97757` 橙色背景和白色图标，样式限定在消息输入区。
+Chat 发送按钮是单色主操作的例外：明暗主题均使用 `#B84F2F` 橙色背景和白色图标，样式限定在消息输入区。
 
 ## Typography
 
@@ -69,6 +69,41 @@ Chat 发送按钮是单色主操作的例外：明暗主题均使用 `#D97757` �
 - 页面优先呈现可操作的设置项、真实状态和必要反馈，详细说明按需展开。
 - 控件反映真实能力。未实现的功能不占分类，不显示没有作用的开关。
 - 界面调整保留原有授权、版本校验、失败反馈和数据边界。
+
+## 全局组件契约
+
+本节约束整个 Web 宿主：Chat、Tasks、Developer、Settings、弹窗和 Intelligent UI 使用同一套基础组件，不能按页面保留不同的下拉、按钮或输入框体系。功能页面负责组合组件、布局和业务保存，不拥有第二套基础控件实现。组件替换本身不改变现有字体、字号、导航、内容列、消息气泡、品牌色及保存语义；这些变化需要另有明确的产品要求。
+
+### 来源与实现归属
+
+- 基础控件采用 shadcn/ui 的可组合结构与 Base UI 行为，适配 Steward 自有主题。不直接引入组件库整套主题、字体或全局排版重置。
+- React 消费者使用 `web/src/components/ui/` 的封装；按钮归 [button.tsx](web/src/components/ui/button.tsx)，字段和结果卡片归 [answer-controls.tsx](web/src/components/ui/answer-controls.tsx)，图表基础归 [chart.tsx](web/src/components/ui/chart.tsx)。新增公共能力先补入所属共享组件，不在功能页复制实现。
+- 宿主下拉统一使用 [select-view.tsx](web/src/components/ui/select-view.tsx)：少量选项采用 Base UI Select，超过 12 个非空选项才采用带搜索的 Combobox。数量是当前可调整的产品默认值；两项语言选择不得出现搜索框或为搜索预留空白。弹层按触发器与内容紧凑定宽，不给短列表强加大面板。遵循 [Base UI 的原生选用准则](https://base-ui.com/react/components/select#usage-guidelines)，不自建筛选或键盘状态机。菜单统一使用 [action-menu.tsx](web/src/components/ui/action-menu.tsx)。不得保留旧手写下拉状态机，也不得在页面直接拼装另一套浮层、选项导航和焦点管理。
+- 服务端原生 select 经 [select.ts](web/src/components/ui/select.ts) 适配，React 表单经 [native-select.tsx](web/src/components/ui/native-select.tsx) 接入同一选择器。原生值、字段名、校验和无脚本回退属于表单契约，不构成第二套增强控件。
+- 基础控件皮肤统一归 [controls.css](web/src/components/ui/controls.css)，颜色和字体使用 [foundation.css](web/src/foundation.css) 的语义变量。页面不得通过局部 CSS 重定义下拉或开关皮肤；其他控件变化也应落在共享的命名变体，不能用页面覆盖产生外观分叉。
+- 保留采用源码和打包依赖的许可证；来源、版本及协议边界记录在所属设计方案，不添加到产品页面介绍文案中。
+
+### 外观与状态
+
+基础按钮、输入框和选择器使用 8px 圆角，内容容器使用 12px 圆角；桌面基础控件最小高度为 36px，窄屏操作目标至少 44px。既有发送按钮、图标按钮等使用各自共享变体，不因接入组件库改动品牌造型。操作组有明确间距，窄屏可换行，不能挤压或叠放。
+
+同一操作角色在各页面、明暗主题、普通／hover／focus／disabled／loading／error 状态下保持同一语义。主操作、次操作和危险操作用共享变体区分；不能因页面或连接状态不同而随意切换黑白按钮。颜色跟随主题变量，不给新组件单独设一套配色。
+
+仅靠脚本提供交互的控件，在对应事件绑定和状态初始化完成前保持禁用，不能先呈现为可点击却吞掉用户操作。脚本下载失败时仍须保留可用的原生页面与表单路线。
+
+输入框聚焦只加强已有圆角边界或内侧描边，不增加外层方形白框。保留可见键盘焦点、标签、禁用及无效状态；不能为去掉白框而移除无障碍焦点。下拉和菜单在弹窗内、200% 缩放及窄屏下仍可操作，搜索、空结果、确认、取消和焦点恢复使用同一规则。
+
+### Intelligent UI 的组合边界
+
+OpenIntelligentUI 的原生组件协议是基础，保留上游组件名称和参数语义。HTML、SVG 流程图／架构图／图表、计算器、模拟教学与交互控件通过标准 `generateSandboxedUi` 或具名扩展接入，不重新建立另一套渲染协议或组件主题。扩展与宿主交互仍通过受控协议，业务动作复用原 Main／Tool 授权与持久化管线。
+
+原生组件使用同一基础控件，沙箱内容使用宿主共享主题和控件样式。正常呈现不常驻重复的 Text version；失败或无 JavaScript 时保留真实文字回退。组件与后续文字回复按顺序分成气泡，操作收进紧凑菜单。页面只出现内容、控件与必要状态，不新增组件介绍、实现细节或重复技术文案。
+
+### 修改与验收
+
+修改前先确认组件归属及本节约束；存在能力缺口时补充共享组件或具名扩展。任何明确获准的规则变化，应在同一变更中更新本文件及所属回归，不能只在对话、局部 CSS 或 `AGENTS.md` 中另立规范。
+
+现有控件归属门禁随 `npm run check --prefix web` 执行；行为使用真实浏览器场景验证，视觉结合深浅主题、桌面和窄屏截图评审。具体检查与证明范围见下文[自动回归与评审分工](#自动回归与评审分工)，不通过检查文案是否存在代替行为验证。
 
 ## 两级导航
 
@@ -107,7 +142,7 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 
 ## 尺寸与响应式
 
-桌面一级栏宽 224px、二级栏宽 216px，由共享变量控制；模块没有二级分类时，内容只避让一级栏。Settings 内容容器最大宽度为 680px，包含左右留白。两级栏共用折叠／展开行为，折叠后必须保留重新展开入口；同一浏览器的折叠偏好跨模块、分类和刷新保持一致，并在首屏样式前应用。
+桌面一级栏宽 224px、二级栏宽 216px，由共享变量控制；模块没有二级分类时，内容只避让一级栏。Settings 内容容器最大宽度为 680px，包含左右留白。两级栏共用折叠／展开行为，桌面折叠为 64px 图标栏，保留四个模块入口、选中态和展开按钮；同一浏览器的折叠偏好跨模块、分类和刷新保持一致，并在首屏样式前应用。
 
 视口宽度不大于 760px 时，导航收进同一个抽屉。存在二级分类时，一级保持窄列，二级占据剩余宽度；两级入口和选中态同时可达。抽屉与内容不横向溢出。资源列表按自身可用宽度切换行布局，不能只根据视口宽度判断；桌面双侧栏留下的窄列也必须正常展示模型名与操作。操作页按钮、普通输入、选择器及折叠入口的触控高度至少 44px。
 
@@ -117,25 +152,25 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 
 设置项使用紧凑分组：圆角容器、细分隔线、左侧名称与必要说明、右侧值或操作。避免每个设置项各占一张大卡片，不在普通设置页堆叠实现细节。
 
-- 下拉使用统一胶囊外观、选中标记和键盘操作；需要搜索时提供筛选与空结果。Escape 或点击外部关闭，关闭后保留合理焦点。桌面与窄屏使用同一套交互和尺寸规则；无 JavaScript 或浮层能力不可用时保留原生选择器。
+- 下拉使用统一的紧凑圆角外观、选中标记和键盘操作；需要搜索时提供筛选与空结果。Escape 或点击外部关闭，关闭后保留合理焦点。桌面与窄屏使用同一套交互和尺寸规则；无 JavaScript 或浮层能力不可用时保留原生选择器。
 - 输入框和多行文本保持统一标签、边框和间距。必填、无效和服务端错误在当前流程中说明，失败保留已填内容。
 - 普通布尔偏好使用有名称的开关。涉及模型提供方授权等明确同意时，保留原有确认控件。
 - 主操作使用实色按钮，次操作使用低强调按钮；危险操作使用危险色，并清楚说明作用范围。
 - 退出账户等有影响的操作使用确认对话框，默认聚焦取消。取消和 Escape 不提交请求，确认只提交一次。
-- 本地外观与动效偏好立即应用并保存在当前浏览器；语言确认不同值后自动保存，失败保留原生表单路径。能力配置由服务端校验最终候选后保存。
+- 本地外观与动效偏好立即应用并保存在当前浏览器；语言确认不同值后自动保存，失败保留原生表单路径。能力配置修改后自动保存；服务端先校验最终候选，失败保留输入和重试入口。无 JavaScript 时保留原生提交。
 
-下拉交互统一由 [Select](web/src/components/ui/select.ts) 提供，胶囊选择器、选项浮层与 Switch 的样式统一维护在[公共控件样式](web/src/components/ui/controls.css)。Settings、Task、Dev 与后续页面复用同一实现；页面只负责布局、验证与保存，不能另建下拉或开关实现。单个布尔配置使用原生 checkbox 的 switch 语义，多选复选框与明确授权确认保留各自语义。开关视觉尺寸不扩张，点击和键盘焦点区域至少 44px。
+下拉交互统一由 [Base UI 选择器](web/src/components/ui/select-view.tsx) 提供；服务端表单通过 [原生值适配器](web/src/components/ui/select.ts) 接入，React 富组件直接消费同一选择器。按钮、选择器、选项浮层、复选框与 Switch 的样式统一维护在[公共控件样式](web/src/components/ui/controls.css)。Settings、Task、Dev、Chat 富组件与后续页面复用同一组件体系；页面只负责布局、验证与保存，不能另建下拉或开关实现。单个布尔配置使用原生 checkbox 的 switch 语义，多选复选框与明确授权确认保留各自语义。开关视觉尺寸不扩张，点击和键盘焦点区域至少 44px。
 
 ### 状态与账户操作
 
-标题旁展示必要状态。Resources 的模型列表默认收起配置，当前模型及连接状态在行内标明。展开一行即可查看连接标识。行尾保留连接和选用两个位置，未验证时显示「测试连接」，通过后显示「连接已验证」。候选模型的主操作「用于新工作」在选用后变为「当前模型」。切换会复用有效验证，缺少验证时先测试。「测试连接」使用次要按钮。已有有效验证的当前模型可从连接位置选择「恢复使用当前模型」。共享账户作为分组标题，模型直接列在对应账户下，直连模型独立分组。账户操作单独展开，重连和退出在同一操作行。登录进度归发起页面，首次渲染与实时更新采用同一规则。授权窗口成功打开后，原页面保留简短的等待状态和取消入口。弹窗被拦截时，原页面提供手动继续链接。
+标题旁展示必要状态。Resources 的模型列表默认收起配置，当前模型及连接状态在行内标明。展开一行即可查看连接标识。行尾保留连接和选用两个位置，自定义兼容端点未验证时显示「测试连接」，通过后显示「连接已验证」；ChatGPT 账户模型不显示测试操作。候选模型只提供「使用此模型」，选用后显示「当前模型」。首次成功连接自动用于对话，后续添加不覆盖当前选择。「测试连接」使用次要按钮。已有有效验证的当前模型可从连接位置选择「恢复使用当前模型」。共享账户作为分组标题，模型直接列在对应账户下，直连模型独立分组。账户操作单独展开，重连和退出在同一操作行。登录进度归发起页面，首次渲染与实时更新采用同一规则。授权窗口成功打开后，原页面保留简短的等待状态和取消入口。弹窗被拦截时，原页面提供手动继续链接。
 
 
 ## 文案、状态与动效
 
 同级设置页保留可见的页面标题和一致的对齐线，Resources 的 Models 是标题下的区块。脚本加载前后应保持导航、设置分组及正文位置稳定；脚本专属设置预留位置，下载失败时恢复原生表单和导航。
 
-连接检查反馈只对应检查时的字段；修改普通字段或高级 YAML 后清除旧反馈，并要求重新检查。通知偏好修改后撤下此前保存提示，明确显示未保存，仍须显式保存。
+连接检查反馈只对应检查时的字段；修改普通字段或导入高级 YAML 后清除旧反馈，自动校验并保存；不显示额外测试和保存按钮。通知偏好修改后撤下此前保存提示，明确显示未保存，仍须显式保存。
 
 页面标题和字段名称优先使用用户能理解的名称。帮助、YAML、连接详情和诊断放进 Advanced；影响当前决定的限制直接显示。
 
@@ -165,8 +200,23 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 
 公共控件的复用边界也属于自动门禁：`npm run check --prefix web` 在检查构建资源前运行 `controls-policy.mjs`，扫描新增和已有页面，拦截页面直接操纵 Popover、私建 listbox／option，以及在共享样式外另写选择器／开关皮肤。普通原生 select、switch 消费者、容器布局及既有语言回退标记仍可使用；提示等其他公共浮层允许在共享组件层实现。
 
-`npm test --prefix web` 验证门禁的正反例，以及选项过滤、禁用项、空列表、方向键循环、Home／End 和过滤后的活动项边界。`make test` 包含这些检查；现有 core `channels` 门禁实际调用 Task 计划页场景，验证手动保存、触摸、原生回退、冲突草稿及保存不提前派发任务。
+`npm test --prefix web` 验证门禁的正反例、首屏行为和交互状态持久化。选择器的搜索、禁用项、空结果、方向键、Home／End、确认与取消由 channels 的真实浏览器场景验证；core `ui-interactions` 还覆盖弹窗内控件、表单校验、卡片布局、导出和重启恢复。`make test` 包含前端检查；core `channels` 的 Task 计划页场景验证手动保存、触摸、原生回退、冲突草稿及保存不提前派发任务。
 
 代码变更沿用 [PR CI](.github/workflows/ci.yml)：`make test lint` 运行单元／组件与资源一致性检查，`make test-e2e` 的 core 集合包含 `channels`，运行上述浏览器场景并保留失败截图与测量。纯文档变更沿用文档校验，不新增重复 CI 或发布步骤。
 
 自动回归约束已确认的行为和布局关系。信息密度、说明是否冗余和整体视觉协调由评审结合本规范及桌面／移动端截图核对；截图是评审证据，不把生成了截图等同于像素视觉测试通过。新增规则时同步更新对应层级的回归，不锁死 CSS 类名、整页 HTML 或无关的绝对坐标。
+
+模型连接页只出现一次所选账户，目录模型的图片能力默认由元数据确定，不提供图片开关。模型连接、加载与选用按钮共用次要按钮样式，各操作组保持明确间距，不显示技术性选用说明或许可证页脚。共享字标和界面字体采用同源版本化预加载与私有缓存，原生切页时避免字体闪回。
+
+Chat 输入框在聚焦时只增强原有圆角边界，使用内侧描边保留键盘焦点，不增加外围白框。
+
+### Chat 消息呈现
+
+Ghost 回复左对齐，使用主题中的灰色气泡；用户消息右对齐，背景与发送按钮同为 #B84F2F，文字使用白色。正文支持安全 Markdown，artifact 链接走认证下载，Mermaid 按需渲染并在失败时保留源码。桌面输入字号 14px，移动端保持 16px 以避免输入放大。请求处理中只显示三点动效，状态名称保留为辅助标签，系统减少动态效果时显示静态点；不将接纳回执误称为已读。Computer 与 Worker 入口固定在视口，滚动末端不跟随页面移动。
+
+能力的 Advanced 优先提供 YAML 文件导入、示例下载及简短指引；文本编辑器折叠为审核和修改用途。浏览器标签页 Ghost 使用现有图集导出的黑／白图标，跟随实际页面主题。
+
+
+Intelligent UI uses OpenIntelligentUI native component contracts, SVG helpers and form controls as the foundation, with Steward typography, neutral surfaces, restrained chart colors and compact spacing. Normal interactive answers do not repeat a Text version control; text fallback appears on failure or without JavaScript. Action groups use explicit gaps and wrap on narrow screens. Generated HTML/SVG diagrams, calculators and simulations follow generateSandboxedUi with compact answer layouts, explicit theme tokens and bounded content sizing. Native UI and the final written reply remain separate bubbles. Standard conversation Markdown is independent of this component contract.
+
+Intelligent UI operations live in a compact options menu. Native tables, charts, typed forms and cards share state and control styling; fullscreen, dialogs and pinned views preserve the same content instance. The page contains content, controls and necessary state only, with no feature introductions or implementation explanations.

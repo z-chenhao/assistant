@@ -31,11 +31,11 @@ func TestBuiltinIntelligentUISkillIsVersioned(t *testing.T) {
 	for _, path := range []string{"SKILL.md", "references/design.md"} {
 		args, _ := json.Marshal(map[string]string{"name": "intelligent_ui", "path": path})
 		result = view.Execute(context.Background(), string(args))
-		if result.Error != nil || !strings.Contains(result.Text, "steward.sendPrompt") {
+		if result.Error != nil || !strings.Contains(result.Text, "Websandbox.connection.remote.sendPrompt") {
 			t.Fatal(path, result)
 		}
 	}
-	for _, path := range []string{"templates/native-comparison.json", "templates/calculator.json", "templates/flow-diagram.json"} {
+	for _, path := range []string{"templates/native-comparison.json", "templates/calculator.json", "templates/flow-diagram.json", "templates/native-explorer.json"} {
 		args, _ := json.Marshal(map[string]string{"name": "intelligent_ui", "path": path})
 		result := view.Execute(context.Background(), string(args))
 		if result.Error != nil {

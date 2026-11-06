@@ -205,14 +205,14 @@ JavaScript 收到带安全字段的 `Error`，其中可读取 `code/retryable/de
 
 #### 16.5 配置与 Secret
 
-配置使用一个版本化 YAML 文件，环境变量只做部署覆盖；Secret 使用环境变量引用或 OS Secret Store，不把明文写入 YAML、SQLite、Artifact、RunTrace 或日志。最小配置组：
+配置使用一个版本化 YAML 文件，环境变量只做部署覆盖；Secret 使用显式环境变量引用或数据根下的私有文件 SecretStore，不把明文写入 YAML、SQLite、Artifact、RunTrace 或日志。最小配置组：
 
 ```text
 app.data_root / app.log_level
 llm.provider_bridge_command / llm.provider_bridge_version
 llm.active_profile_id（由首次设置生成，不要求用户手写）
 llm.request_timeout / llm.catalog_cache_ttl / llm.probe_timeout
-secret.backend（macOS 默认 keychain；测试为 memory）
+SecretStore（默认数据根下的私有文件；测试可注入 memory）
 embedding.provider / embedding.model / embedding.api_key_ref
 nats.url / nats.stream_prefix
 codemode.sidecar_command / codemode.runtime_version / codemode.resource_limits
@@ -262,9 +262,9 @@ App 关闭完成后再停止本地 Broker。入口由原 `cmd/personal-agent` �
 
 - `ModelProfileService.Add/Test/Select/List`：用户控制面；只允许 `ready` Profile 成为 Active。
 - `ProviderAuth.Start/Continue/Refresh/Logout/Status`：浏览器、Device Code 与 token refresh 统一为 UI-neutral 事件。
-- `ModelCatalog.List/Refresh` 与 `ModelProbe.Run`：目录发现和能力验证分离，目录声明不能代替 Probe。
+- `ModelCatalog.List/Refresh` 与 `ModelProbe.Run`：目录发现和自定义端点能力验证分离；ChatGPT 账号按认证目录选用，不伪造 Probe，兼容端点继续要求实际行为验证。
 - `LLMProvider.Generate/Continue/Cancel`：必须接收不可变 ModelSnapshot，流式事件规范化为 Agent Loop 事件；Provider 专属消息不进入领域层。文本增量是临时预览，不参与回放；只有完整且通过当前执行权校验的结果可进入 Checkpoint、工具执行或正式回复。
-- `SecretStore.Get/Put/Delete`：OS Credential Store 实现与测试 Fake；领域表只保存 `credential_ref`。
+- `SecretStore.Get/Put/Delete`：私有文件实现与测试 Fake；领域表只保存 `credential_ref`。
 - `RunStore.Claim/Checkpoint/Wait/Complete/Fail`：所有写入验证 claim token 与 epoch。
 - `TaskService.Search/Manage`：唯一的 Task 控制面。
 - `ToolRegistry.Describe/Resolve` 与 `ToolExecutor.Execute`：所有工具调用的统一入口。

@@ -116,3 +116,7 @@ input creates a new Run after the old one ends.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/conversation.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/conversation.md)。
+
+### 连续请求
+
+新 Main 按输入顺序处理并分别提交回复。需要后台工作时，Main 可先创建 Task 并告知用户，然后处理下一条输入，Worker 独立执行；后到消息不会撤销较早请求尚未提交的回复。旧冻结 Main 沿其原接纳政策恢复。

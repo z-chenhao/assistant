@@ -217,8 +217,8 @@ func activateAccount(t *testing.T, s *Store, m *account.Manager, a llm.AuthConne
 		a, _, err := m.Ensure(ctx, id)
 		return a.Version, err
 	}
-	if _, err = c.Test(ctx, p.ProfileID); err != nil {
-		t.Fatal(err)
+	c.AccountCatalog = func(context.Context, string) ([]llm.CatalogModel, error) {
+		return []llm.CatalogModel{{ModelID: p.ModelID, ContextWindow: p.ContextWindow, MaxOutputTokens: p.MaxOutputTokens}}, nil
 	}
 	if err = c.Select(ctx, p.ProfileID, 1, 1); err != nil {
 		t.Fatal(err)
@@ -264,10 +264,10 @@ func TestAccountSingleFlightAcrossManagersAndLogout(t *testing.T) {
 	if peer.count.Load() != 1 {
 		t.Fatalf("refresh count %d", peer.count.Load())
 	}
-	proof, err := s.Models().Probe(ctx, p.ProfileID)
+	_, err = s.Models().Probe(ctx, p.ProfileID)
 	auth, _ := s.Models().Auth(ctx, a.ConnectionID)
-	if err != nil || proof.AuthVersion != auth.Version || auth.Status != "connected" {
-		t.Fatal("refresh lost proof", err)
+	if !errors.Is(err, llm.ErrNotFound) || auth.Status != "connected" {
+		t.Fatal("refresh lost account readiness or manufactured proof", err)
 	}
 	if confirmed, err := m2.Logout(ctx, a.ConnectionID); err != nil || !confirmed {
 		t.Fatal(err)
@@ -424,7 +424,7 @@ func TestAccountStateTransactionRollbackAndSecretRedaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, _ := s.Models().Auth(ctx, a.ConnectionID)
-	if after.Status != "connected" || before != countRows(t, s, "event_outbox") || countRows(t, s, "model_probe") != 1 {
+	if after.Status != "connected" || before != countRows(t, s, "event_outbox") || countRows(t, s, "model_probe") != 0 {
 		t.Fatal("auth transaction partially committed")
 	}
 	encoded, _ := json.Marshal(after)

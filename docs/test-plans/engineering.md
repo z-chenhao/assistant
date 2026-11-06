@@ -10,6 +10,14 @@ F-038：固定依赖和构建入口可用；文档改动只运行适用检查；
 
 [工程辅助回归](../../tests/harness/test_project_layout.py)、[Makefile](../../Makefile)、[PR CI](../../.github/workflows/ci.yml) 与 [扩展回归](../../.github/workflows/regression.yml)。运行方式及边界见产品测试方案。实际运行结果以对应 PR 或 CI 证据为准。
 
+## PR 并行检查
+
+[分片回归](../../tests/harness/test_ci.py) 核对十一项 core gate 无遗漏、无重复，每个分片都有实际命令；汇总状态必须拒绝缺失、失败、取消及未经文档路径授权的跳过。软件检查保留 `make test lint` 的全部入口、prompt、Web Access、四个 capabilities 场景和定向 race。每个分片使用独立 checkout、构建和证据目录，继续由 process owner 验证源状态及取消清理。GitHub 的 `Ubuntu checks` 必须等待全部选中分片；不以单个分片通过代替整个 PR 通过。
+
+五分钟目标使用完整远端 workflow 起止时间验证，同时区分排队、安装与实际检查时间；冷缓存、外部服务和 hosted runner 排队不能通过删除覆盖或放宽断言规避。文档-only 仍实际执行文档检查，并产生同名 required status。
+
+Main 交接回归等待实际 `reply_committed` 通知后检查两条持久回复，Worker 在整个断言期间保持阻塞；保留五秒测试挂起保护；假模型按协议同时识别原生 ToolResult 和响应式 Main 的 runtime tool_results 证据，按最近普通用户输入作答，不把合法的异步投递当成模型错误。原生下拉的外部点击检查等待弹层完成打开后再点击，保留关闭与焦点断言，不通过人工关闭掩盖失败。
+
 ## 工程基础重构回归
 
 `internal/llm/architecture_test.go` 使用 `go list` 的实际传递依赖保护模型边界：`llm` 共享契约不依赖适配器、`provider` 协议不依赖 Steward 领域状态，`account` 与 `sqlite` 不依赖 `bridge`。该检查随 Go 包测试进入每次代码 PR，间接引入的越界依赖也会失败。

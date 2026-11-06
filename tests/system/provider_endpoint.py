@@ -147,6 +147,17 @@ class Endpoint(BaseHTTPRequestHandler):
                 else:
                     chunk({'content':'The interactive answer and its text alternatives are ready.'})
                     chunk({},'stop',{'prompt_tokens':7,'completion_tokens':8,'total_tokens':15})
+            elif self.server.mode == "ui-interactions":
+                latest = next((str(m.get('content','')) for m in reversed(body['messages']) if m['role']=='user' and not str(m.get('content','')).startswith('Runtime ')), '')
+                if latest == 'Refresh catalog' and body['messages'][-1]['role'] != 'tool':
+                    code_only = False  # tool search is a declared model-only direct tool.
+                    request = next(m['content'] for m in reversed(body['messages']) if str(m.get('content','')).startswith('Runtime ui_action_request'))
+                    requested_args = json.loads(request.split('\n',1)[1])['content']['arguments']
+                    chunk({'tool_calls':[dict(index=0,id='refresh-catalog',type='function',function=dict(name='builtin__tool_search',arguments=json.dumps(requested_args)))]});chunk({},'tool_calls')
+                elif latest == 'SHOW_UI_INTERACTIONS' and body['messages'][-1]['role'] != 'tool':
+                    chunk({'tool_calls':[dict(index=0,id='ui-extensions',type='function',function=dict(name='builtin__intelligent_ui_show',arguments=json.dumps(self.server.widgets[0]))) ]});chunk({},'tool_calls')
+                else:
+                    chunk({'content':'Updated.'});chunk({},'stop')
             elif self.server.mode == "tasks":
                 names = [item["function"]["name"] for item in body.get("tools", [])]
                 root = any("general Worker executing" in str(m.get("content", "")) for m in body["messages"])

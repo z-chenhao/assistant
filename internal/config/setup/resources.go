@@ -66,7 +66,7 @@ func description(id, root string) web.Capability {
 	case "memory":
 		v.Title = "Memory"
 		v.Description = "Remember useful details across conversations."
-		v.Help = "Automatic mode creates a private encryption key in the system credential store. Custom mode uses your existing 32-byte key reference. Keep the original key for existing memories and backups."
+		v.Help = "Automatic mode stores a private encryption key in Steward’s local credential files. Custom mode uses your existing 32-byte key reference. Keep the original key for existing memories and backups."
 		v.Example = "encryption_key_ref: env:STEWARD_MEMORY_KEY\n"
 	case "embedding":
 		v.Title = "Semantic search"

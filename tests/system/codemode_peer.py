@@ -8,6 +8,8 @@ import copy
 import json
 
 ENTRY = 'builtin__codemode_execute'
+MAIN_DIRECT = {ENTRY, 'builtin__tool_search', 'builtin__intelligent_ui_show', 'builtin__skill_list', 'builtin__skill_view', 'builtin__task_manage', 'builtin__task_search'}
+WORKER_DIRECT = MAIN_DIRECT - {'builtin__intelligent_ui_show', 'builtin__task_manage', 'builtin__task_search'}
 MARKER = '// fixture-call: '
 MAIN = ['builtin__intelligent_ui_show', 'builtin__task_search', 'builtin__task_manage', 'builtin__artifact_search',
         'builtin__artifact_manage', 'builtin__evidence_read', 'builtin__memory_manage',
@@ -20,7 +22,7 @@ WORKER = ['builtin__read', 'builtin__bash', 'builtin__edit', 'builtin__write',
 
 def project(body):
     names = [t.get('function', {}).get('name') for t in body.get('tools', [])]
-    if names != [ENTRY]:
+    if ENTRY not in names or not set(names) <= MAIN_DIRECT:
         return body, False
     body = copy.deepcopy(body)
     root = any('general Worker executing' in str(m.get('content', '')) for m in body['messages'])

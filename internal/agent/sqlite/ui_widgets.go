@@ -4,9 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/conversation"
+	"github.com/z-chenhao/assistant/internal/delivery"
 	"github.com/z-chenhao/assistant/internal/delivery/ui"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
@@ -28,12 +32,12 @@ func (t *tools) showUI(ctx context.Context, inv tool.Invocation) (tool.Result, e
 			return nil
 		}
 		var count, components, forms int
-		if err = tx.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(CASE WHEN json_array_length(document_json,'$.components')>0 THEN json_array_length(document_json,'$.components') ELSE 1 END),0),(SELECT count(*) FROM ui_widget w,json_each(w.document_json,'$.components') c WHERE w.run_id=? AND w.message_id IS NULL AND w.invocation_id!=? AND json_extract(c.value,'$.type')='form') FROM ui_widget WHERE run_id=? AND message_id IS NULL AND invocation_id!=?`, t.claim.RunID(), inv.ID, t.claim.RunID(), inv.ID).Scan(&count, &components, &forms); err != nil {
+		if err = tx.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(CASE WHEN json_array_length(document_json,'$.components')>0 THEN json_array_length(document_json,'$.components') ELSE 1 END),0),(SELECT count(*) FROM ui_widget w,json_each(w.document_json,'$.components') c WHERE w.run_id=? AND w.message_id IS NULL AND w.invocation_id!=? AND (json_extract(c.value,'$.type')='form' OR json_extract(c.value,'$.name') IN ('scheduleTime','steward.form'))) FROM ui_widget WHERE run_id=? AND message_id IS NULL AND invocation_id!=?`, t.claim.RunID(), inv.ID, t.claim.RunID(), inv.ID).Scan(&count, &components, &forms); err != nil {
 			return err
 		}
 		added := max(1, len(widget.Components))
 		for _, c := range widget.Components {
-			if c.Type == "form" {
+			if c.Name == "scheduleTime" || c.Name == "steward.form" {
 				forms++
 			}
 		}
@@ -67,7 +71,7 @@ func appendWidgets(ctx context.Context, q uiQuerier, message string, spec ui.Spe
 		if err = rows.Scan(&ref, &raw); err != nil {
 			return spec, err
 		}
-		w, ok := ui.ParseWidget(raw)
+		w, ok := ui.StoredWidget(raw)
 		if !ok {
 			return spec, agent.ErrStorage
 		}
@@ -78,14 +82,95 @@ func appendWidgets(ctx context.Context, q uiQuerier, message string, spec ui.Spe
 
 // WebWidget reads only a delivered Main-owned artifact in the current account.
 func (s *Store) WebWidget(ctx context.Context, ref string) (ui.Widget, error) {
+	base, index, found := strings.Cut(ref, "#")
+	if !found {
+		return ui.Widget{}, agent.ErrNotFound
+	}
+	i, err := strconv.Atoi(index)
+	if err != nil || i < 0 || strconv.Itoa(i) != index {
+		return ui.Widget{}, agent.ErrNotFound
+	}
 	var raw string
-	err := s.db.QueryRowContext(ctx, `SELECT w.document_json FROM ui_widget w JOIN run r USING(run_id) JOIN conversation_intent c ON c.message_id=w.message_id JOIN tool_invocation i USING(invocation_id) WHERE w.ui_ref=? AND r.kind='main' AND r.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND i.status='succeeded'`, ref).Scan(&raw)
+	err = s.db.QueryRowContext(ctx, `SELECT w.document_json FROM ui_widget w JOIN run r USING(run_id) JOIN conversation_intent c ON c.message_id=w.message_id JOIN tool_invocation i USING(invocation_id) WHERE w.ui_ref=? AND r.kind='main' AND r.agent_id=(SELECT agent_id FROM agent_config WHERE singleton=1) AND i.status='succeeded'`, base).Scan(&raw)
 	if err != nil {
 		return ui.Widget{}, agent.ErrNotFound
 	}
-	w, ok := ui.ParseWidget(raw)
+	w, ok := ui.StoredWidget(raw)
 	if !ok {
 		return w, agent.ErrStorage
 	}
+	if i >= len(w.Components) || w.Components[i].Name != "generateSandboxedUi" {
+		return ui.Widget{}, agent.ErrNotFound
+	}
+	w.Components = w.Components[i : i+1]
 	return w, nil
+}
+
+// WebBubbles splits only a projection whose frozen parts match the bound UI
+// artifacts. Stored Conversation and Delivery projections remain untouched.
+// Slices share the original components, including submitted-form restoration.
+func (s *Store) WebBubbles(ctx context.Context, m conversation.Message, spec ui.Spec) ([]ui.Spec, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT ui_ref,document_json FROM ui_widget w JOIN tool_invocation i USING(invocation_id) WHERE w.message_id=? AND i.status='succeeded' ORDER BY i.delivery_seq`, m.MessageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type bound struct {
+		ref    string
+		widget ui.Widget
+	}
+	var items []bound
+	for rows.Next() {
+		var ref, raw string
+		if err := rows.Scan(&ref, &raw); err != nil {
+			return nil, err
+		}
+		w, ok := ui.StoredWidget(raw)
+		if !ok {
+			return nil, agent.ErrStorage
+		}
+		items = append(items, bound{ref, w})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 || len(m.Content) < len(items) {
+		return nil, nil
+	}
+	start := len(m.Content) - len(items)
+	for i, item := range items {
+		part := m.Content[start+i]
+		if part.Type != "text" || part.Text != item.widget.Fallback {
+			return nil, nil
+		}
+	}
+	base := ui.Compose(delivery.Envelope{Message: m})
+	if len(spec.Components) < len(base.Components) || ui.Hash(spec.Components[:len(base.Components)]) != ui.Hash(base.Components) {
+		return nil, nil
+	}
+	offset := len(base.Components)
+	var bubbles []ui.Spec
+	for _, item := range items {
+		expected := ui.WidgetComponents(item.widget, item.ref, m.MessageID, offset)
+		end := offset + len(expected)
+		if end > len(spec.Components) || ui.Hash(spec.Components[offset:end]) != ui.Hash(expected) {
+			return nil, nil
+		}
+		for j := range expected {
+			if expected[j].Name != "" {
+				spec.Components[offset+j].WidgetRef = item.ref + "#" + strconv.Itoa(j)
+			}
+		}
+		bubbles = append(bubbles, ui.Spec{SchemaVersion: ui.Version, Fallback: item.widget.Fallback, Components: spec.Components[offset:end]})
+		offset = end
+	}
+	if offset != len(spec.Components) {
+		return nil, nil
+	}
+	m.Content = m.Content[:start]
+	reply := ui.Compose(delivery.Envelope{Message: m})
+	if len(reply.Components) > 0 {
+		bubbles = append(bubbles, ui.Spec{SchemaVersion: ui.Version, Fallback: reply.Fallback, Components: spec.Components[:len(reply.Components)]})
+	}
+	return bubbles, nil
 }

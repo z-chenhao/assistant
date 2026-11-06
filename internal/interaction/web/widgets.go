@@ -2,9 +2,11 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"net/http"
+	"strings"
 
 	"github.com/z-chenhao/assistant/internal/delivery/ui"
 )
@@ -20,13 +22,14 @@ func (s *Server) widget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	doc, err := reader.WebWidget(r.Context(), r.URL.Query().Get("ref"))
-	if err != nil || doc.HTML == "" {
+	visual, valid := ui.Sandbox(doc)
+	if err != nil || !valid {
 		fail(w, 404)
 		return
 	}
 	// CSP sandbox applies to every HTML response. Direct browser navigation
 	// receives only text, keeping generated code inside the Host-owned frame.
-	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'")
+	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'")
 	w.Header().Set("Origin-Agent-Cluster", "?1")
 	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), clipboard-read=(), clipboard-write=()")
 	w.Header().Set("Referrer-Policy", "no-referrer")
@@ -36,10 +39,49 @@ func (s *Server) widget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// The bridge only proposes bounded text and resize events; the parent
+	// The upstream Websandbox bridge only proposes bounded text/links and resize events; the parent
 	// requires its own visible Send button before accepting any user input.
 	// Bootstrap precedes all generated CSS/HTML, which may contain closing tags.
-	_, _ = fmt.Fprint(w, `<!doctype html><html data-widget-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>`+html.EscapeString(doc.Title)+`</title><script>
-(()=>{for(const name of ['RTCPeerConnection','webkitRTCPeerConnection','Worker','SharedWorker']){try{Object.defineProperty(window,name,{value:undefined,writable:false,configurable:false})}catch{}}const send=(type,value)=>parent.postMessage({channel:'steward-widget-v1',type,...value},'*');Object.defineProperty(window,'steward',{value:Object.freeze({sendPrompt:({text})=>{if(typeof text==='string'&&text.trim()&&text.length<=4096)send('prompt',{text})}}),writable:false,configurable:false});addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!=='steward-widget-v1')return;if(event.data.type==='theme')document.documentElement.dataset.widgetTheme=event.data.theme==='dark'?'dark':'light'});addEventListener('error',event=>{send('error',{});event.preventDefault()});addEventListener('unhandledrejection',event=>{send('error',{});event.preventDefault()});addEventListener('DOMContentLoaded',()=>{send('ready',{});new ResizeObserver(()=>send('resize',{height:document.documentElement.scrollHeight})).observe(document.body)});})();
-</script><style>:root{color-scheme:light;--background:#fff;--foreground:#252521;--muted:#f4f3ee;--border:#dddcd4;--brand:#7050b5} :root[data-widget-theme=dark]{color-scheme:dark;--background:#252521;--foreground:#efeee8;--muted:#34342e;--border:#55554b;--brand:#b39bd9}body{margin:0;padding:16px;background:var(--background);color:var(--foreground);font:15px/1.5 system-ui,sans-serif}*{box-sizing:border-box}button,input,select{font:inherit}button{cursor:pointer}svg,img,canvas{max-width:100%}`+doc.CSS+`</style></head><body>`+doc.HTML+`<script>`+doc.JavaScript+`</script></body></html>`)
+	theme := "light"
+	if r.URL.Query().Get("theme") == "dark" {
+		theme = "dark"
+	}
+	styles, _ := assets.ReadFile("assets/widget.css")
+	meta, _ := json.Marshal(map[string]any{"type": "open-generative-ui", "content": map[string]any{"initialHeight": visual.InitialHeight, "generating": false, "css": visual.CSS, "cssComplete": true, "html": []string{visual.HTML}, "htmlComplete": true, "jsFunctions": visual.JSFunctions, "jsFunctionsComplete": true, "jsExpressions": visual.JSExpressions, "jsExpressionsComplete": true}})
+	_, _ = fmt.Fprint(w, `<!doctype html><html class="ogui-theme" data-widget-theme="`+theme+`"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>`+html.EscapeString(doc.Title)+`</title><script>
+(()=>{
+for(const name of ['RTCPeerConnection','webkitRTCPeerConnection','Worker','SharedWorker']){try{Object.defineProperty(window,name,{value:undefined,writable:false,configurable:false})}catch{}}
+const channel='open-generative-ui';let id=0,hydrated=false,restoring=false,interacted=false,gesture=-Infinity,local={},modelContext={},stateResolve;
+const stateReady=new Promise(resolve=>stateResolve=resolve),pending=new Map();
+const send=(type,value={})=>parent.postMessage({channel,type,...value},'*');
+const invoke=(method,args)=>new Promise(resolve=>{const key=String(++id);pending.set(key,resolve);send('invoke',{id:key,method,args})});
+const controls=()=>Array.from(document.querySelectorAll('input:not([type=password]):not([type=hidden]):not([type=file]),textarea,select'));
+const key=(node,index)=>node.dataset.stateKey||node.id||node.name||node.tagName.toLowerCase()+':'+index;
+function capture(){const values={},context={};controls().forEach((node,index)=>{const name=key(node,index),value=node.type==='checkbox'||node.type==='radio'?node.checked:node.multiple?Array.from(node.selectedOptions,o=>o.value):node.value;values[name]=value;context[(node.getAttribute('aria-label')||node.labels?.[0]?.innerText||name).slice(0,128)]=value});const outputs={};document.querySelectorAll('output,[data-state-output]').forEach((node,index)=>outputs[node.id||String(index)]=node.textContent.slice(0,4096));return {state:{controls:values,outputs,local,interacted},model_context:interacted?{controls:context,widget:modelContext}:{}}}
+function save(event){if(!hydrated||restoring)return;if(event?.type==='input'||event?.type==='change')interacted=true;send('view-state',capture())}
+function restore(state){restoring=true;local=state.local||{};interacted=state.interacted===true;controls().forEach((node,index)=>{const name=key(node,index);if(!Object.prototype.hasOwnProperty.call(state.controls||{},name))return;const value=state.controls[name];if(node.type==='checkbox'||node.type==='radio')node.checked=!!value;else if(node.multiple&&Array.isArray(value))Array.from(node.options,o=>o.selected=value.includes(o.value));else node.value=String(value??'');node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}))});document.querySelectorAll('output,[data-state-output]').forEach((node,index)=>{const value=state.outputs?.[node.id||String(index)];if(typeof value==='string')node.textContent=value});restoring=false;hydrated=true;stateResolve(local);reportHeight();send('restored',{graphic:!!document.querySelector('svg')})}
+function trusted(method,args){if(performance.now()-gesture>1200)return Promise.resolve({accepted:false,error:'USER_GESTURE_REQUIRED'});gesture=-Infinity;if(hydrated)send('view-state',capture());return invoke(method,args)}
+Object.defineProperty(window,'Websandbox',{value:Object.freeze({connection:Object.freeze({remote:Object.freeze({sendPrompt:args=>invoke('sendPrompt',args),openLink:args=>invoke('openLink',args),getState:()=>stateReady.then(()=>local),setState:async args=>{await stateReady;local=args?.state??args??{};if(args?.modelContext){modelContext=args.modelContext;interacted=true;}save();return {accepted:true}},updateModelContext:async value=>{await stateReady;modelContext=value??{};interacted=true;save();return {accepted:true}},callTool:args=>trusted('callTool',args),requestDisplayMode:args=>trusted('displayMode',args),requestModal:()=>trusted('displayMode',{mode:'modal'})})})}),writable:false,configurable:false});
+function exportView(format){
+ const snapshot=capture();if(format==='csv')return JSON.stringify([['Field','Value'],...Object.entries(snapshot.state.controls).map(([k,v])=>[k,Array.isArray(v)?v.join(', '):String(v)]),...Object.entries(snapshot.state.outputs)]);
+ if(format==='html'){const copy=document.body.cloneNode(true);copy.querySelectorAll('script').forEach(node=>node.remove());copy.querySelectorAll('input,textarea,select').forEach((node,index)=>{const source=document.body.querySelectorAll('input,textarea,select')[index];node.disabled=true;if(node.tagName==='TEXTAREA')node.textContent=source.value;else if(node.tagName==='SELECT')Array.from(node.options,(o,i)=>o.toggleAttribute('selected',source.options[i].selected));else{node.setAttribute('value',source.value);node.toggleAttribute('checked',source.checked)}});copy.querySelectorAll('button').forEach(node=>node.disabled=true);return '<!doctype html><html class="ogui-theme" data-widget-theme="'+document.documentElement.dataset.widgetTheme+'"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &apos;none&apos;; style-src &apos;unsafe-inline&apos;; font-src data:; img-src data:; form-action &apos;none&apos;; base-uri &apos;none&apos;"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+Array.from(document.querySelectorAll('style'),node=>node.textContent).join('\n')+'</style></head><body>'+copy.innerHTML+'</body></html>'}
+ const svg=document.querySelector('svg');if(!svg)throw Error('No SVG to export');const clone=svg.cloneNode(true),original=[svg,...svg.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];original.forEach((node,i)=>{const style=getComputedStyle(node);for(const name of ['fill','stroke','stroke-width','font-family','font-size','font-weight','opacity','text-anchor'])copies[i].setAttribute(name,style.getPropertyValue(name))});const box=svg.getBoundingClientRect();clone.setAttribute('xmlns','http://www.w3.org/2000/svg');clone.setAttribute('width',String(box.width));clone.setAttribute('height',String(box.height));return new XMLSerializer().serializeToString(clone)
+}
+addEventListener('click',event=>{if(event.isTrusted){gesture=performance.now();interacted=true;}},true);
+addEventListener('input',save);addEventListener('change',save);addEventListener('pagehide',()=>{if(hydrated)send('view-state',capture())});
+addEventListener('keydown',event=>{if(event.key==='Escape')send('exit',{})});
+addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;const value=event.data;
+ if(value.type==='theme'){document.documentElement.dataset.widgetTheme=value.theme==='dark'?'dark':'light';for(const [key,color] of Object.entries(value.tokens||{})){if((key.startsWith('--color-')||key==='--font-sans')&&typeof color==='string'&&color.length<512)document.documentElement.style.setProperty(key,color)}requestAnimationFrame(reportHeight)}
+ if(value.type==='restore'){restore(value.state||{});modelContext=value.modelContext?.widget||{}}
+ if(value.type==='capture'){send('view-state',{...capture(),id:value.id})}
+ if(value.type==='export'){try{send('exported',{id:value.id,format:value.format,data:exportView(value.format)})}catch{send('exported',{id:value.id,error:'Export unavailable.'})}}
+ if(value.type==='result'&&pending.has(value.id)){pending.get(value.id)(value.result);pending.delete(value.id)}
+});
+addEventListener('error',event=>{send('error',{});event.preventDefault()});addEventListener('unhandledrejection',event=>{send('error',{});event.preventDefault()});
+let last=0;function reportHeight(){const height=Math.ceil(document.body.scrollHeight);if(height!==last){last=height;send('resize',{height})}}
+addEventListener('DOMContentLoaded',()=>{document.fonts.ready.then(()=>{send('ready',{});reportHeight()});new ResizeObserver(reportHeight).observe(document.body);new MutationObserver(save).observe(document.body,{subtree:true,childList:true,characterData:true});addEventListener('resize',reportHeight);addEventListener('load',reportHeight);reportHeight()});
+})();
+</script><script type="application/json" id="open-generative-ui-activity">`+string(meta)+`</script><style>`+string(styles)+`
+html,body{height:auto!important;min-height:0!important;overflow:hidden!important}body{margin:0;padding:0;background:var(--color-background-primary);color:var(--color-text-primary);font-family:var(--font-sans)}*{box-sizing:border-box}svg,img,canvas{max-width:100%}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+`+visual.CSS+`</style></head><body>`+visual.HTML+`<script>`+visual.JSFunctions+`</script><script>`+strings.Join(visual.JSExpressions, ";\n")+`</script></body></html>`)
 }

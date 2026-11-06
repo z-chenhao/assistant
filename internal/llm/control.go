@@ -20,6 +20,14 @@ type ProfileStore interface {
 	InvalidateProbe(context.Context, string, int64, string) error
 	Probe(context.Context, string) (ProbeRecord, error)
 	Select(context.Context, string, int64, int64, string) error
+	SelectAccount(context.Context, AccountSelection) error
+}
+
+// AccountSelection carries authenticated catalog metadata, not a synthetic Probe.
+type AccountSelection struct {
+	ProfileID                                  string
+	ProfileVersion, ConfigVersion, AuthVersion int64
+	Model                                      CatalogModel
 }
 
 // Control owns user-driven Test/Select. No model Tool exposes this boundary.
@@ -30,6 +38,7 @@ type Control struct {
 	BridgeIdentity string
 	BridgeError    error
 	AccountAuth    func(context.Context, string) (int64, error)
+	AccountCatalog func(context.Context, string) ([]CatalogModel, error)
 }
 
 func (c Control) CheckAuth(ctx context.Context, p Profile) (int64, error) {
@@ -144,6 +153,21 @@ func (c Control) Select(ctx context.Context, id string, profileVersion, configVe
 	if err != nil {
 		return err
 	}
+	if p.ProviderKind == "openai_account" {
+		if c.AccountCatalog == nil {
+			return ErrNoBridge
+		}
+		models, err := c.AccountCatalog(ctx, p.AuthConnectionID)
+		if err != nil {
+			return err
+		}
+		for _, model := range models {
+			if model.ModelID == p.ModelID {
+				return c.Store.SelectAccount(ctx, AccountSelection{ProfileID: id, ProfileVersion: profileVersion, ConfigVersion: configVersion, AuthVersion: version, Model: model})
+			}
+		}
+		return ModelNotFound
+	}
 	r, err := c.Store.Probe(ctx, id)
 	if errors.Is(err, ErrNotFound) {
 		return ErrUnverified
@@ -210,6 +234,9 @@ func (c Control) available(ctx context.Context, id string, checkAuth func(contex
 	version, err := checkAuth(ctx, p)
 	if err != nil {
 		return false
+	}
+	if p.ProviderKind == "openai_account" {
+		return true
 	}
 	r, err := c.Store.Probe(ctx, id)
 	return err == nil && r.ProfileVersion == p.Version && r.AuthVersion == version && r.BridgeIdentity == c.BridgeIdentity && r.Result.ValidateCapabilities(p.Capabilities) == nil

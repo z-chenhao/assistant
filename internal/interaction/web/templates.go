@@ -13,6 +13,7 @@ var templates embed.FS
 func newLayout(language string) *template.Template {
 	return template.Must(template.New("layout.html").Funcs(template.FuncMap{
 		"tr":          func(text string) string { return translate(language, text) },
+		"fontURL":     fontURL,
 		"databaseURL": databaseURL, "databaseLink": databaseLink, "databaseLabel": databaseLabel, "databaseTrace": databaseTrace, "databaseCollections": database.Collections,
 		"capabilityURL": capabilityURL,
 		"traceURL":      traceURL, "traceListURL": traceListURL,

@@ -95,7 +95,7 @@ func OpenRuntime(ctx context.Context, cfg config.Config, fixture, secretsPath st
 	if fixture != "" && !fake.ValidFixture(fixture) {
 		return nil, llm.InvalidProviderResponse
 	}
-	var secrets llm.SecretStore = secret.Store{}
+	var secrets llm.SecretStore = secret.Files{DataRoot: cfg.App.DataRoot}
 	if secretsPath != "" {
 		secrets = secret.TestSocket{Path: secretsPath}
 	}
@@ -113,7 +113,7 @@ func OpenControl(ctx context.Context, cfg config.Config, fixture, secretsPath st
 }
 
 func Open(ctx context.Context, cfg config.Config) (*App, error) {
-	return open(ctx, cfg, "", secret.Store{}, false)
+	return open(ctx, cfg, "", secret.Files{DataRoot: cfg.App.DataRoot}, false)
 }
 
 func OpenWithTestSecrets(ctx context.Context, cfg config.Config, path string) (*App, error) {
@@ -126,7 +126,7 @@ func OpenWithTestBridge(ctx context.Context, cfg config.Config, fixture string) 
 	if !fake.ValidFixture(fixture) {
 		return nil, llm.InvalidProviderResponse
 	}
-	return open(ctx, cfg, fixture, secret.Store{}, false)
+	return open(ctx, cfg, fixture, secret.Files{DataRoot: cfg.App.DataRoot}, false)
 }
 
 func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore, deferred bool) (*App, error) {
@@ -225,10 +225,11 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		a.github = &github.Service{Config: *cfg.GitHub, Store: store, Client: github.Client{Secrets: secrets}}
 	}
 	accountSecrets := secrets
-	if _, production := secrets.(secret.Store); production && cfg.LLM.AccountSecretStore != "native" {
+	if _, production := secrets.(secret.Files); production {
 		accountSecrets = secret.AccountFiles{DataRoot: cfg.App.DataRoot}
 	}
 	a.accounts = &account.Manager{Store: store.Models(), Secrets: accountSecrets, LockRoot: filepath.Join(cfg.App.DataRoot, "auth-locks")}
+	a.control.AccountCatalog = a.AccountCatalog
 	if fixture != "" {
 		path, err := os.Executable()
 		if err == nil {

@@ -29,7 +29,7 @@ func (s *Server) showAccountCatalog(w http.ResponseWriter, r *http.Request) erro
 }
 
 func (s *Server) addModel(r *http.Request) (llm.Profile, error) {
-	input := llm.ProfileInput{Name: r.FormValue("model"), Endpoint: r.FormValue("endpoint"), ModelID: r.FormValue("model"), ProviderKind: "openai_compatible", WireAPI: "openai_completions", ContextWindow: 8192, MaxOutputTokens: 1024, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true, ImageInput: r.FormValue("image_input") == "yes"}}
+	input := llm.ProfileInput{Name: r.FormValue("model"), Endpoint: r.FormValue("endpoint"), ModelID: r.FormValue("model"), ProviderKind: "openai_compatible", WireAPI: "openai_completions", ContextWindow: 128000, MaxOutputTokens: 16384, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true, ImageInput: true}}
 	if r.FormValue("account") != "" {
 		input.AuthConnectionID = r.FormValue("account")
 		input.ProviderKind = "openai_account"
@@ -47,6 +47,7 @@ func (s *Server) addModel(r *http.Request) (llm.Profile, error) {
 			if m.ModelID == input.ModelID {
 				input.ContextWindow = m.ContextWindow
 				input.MaxOutputTokens = min(m.MaxOutputTokens, m.ContextWindow)
+				input.Capabilities.ImageInput = m.ImageInput
 				found = true
 			}
 		}

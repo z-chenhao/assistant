@@ -27,7 +27,7 @@ func runOfflineOperation(ctx context.Context, cfg config.Config, flags *flag.Fla
 		return true, json.NewEncoder(out).Encode(map[string]bool{"activated": true})
 	}
 	if flags.Arg(1) == "backup" || flags.Arg(1) == "restore" {
-		var secrets llm.SecretStore = secret.Store{}
+		var secrets llm.SecretStore = secret.Files{DataRoot: cfg.App.DataRoot}
 		if secretsPath != "" {
 			secrets = secret.TestSocket{Path: secretsPath}
 		}
@@ -44,7 +44,11 @@ func runOfflineOperation(ctx context.Context, cfg config.Config, flags *flag.Fla
 		if flags.Arg(1) == "backup" {
 			manifest, err = maintenance.Backup(ctx, cfg.App.DataRoot, flags.Arg(2), key, app.SchemaVersions())
 		} else {
-			manifest, err = maintenance.Restore(ctx, flags.Arg(2), cfg.App.DataRoot, key, app.SchemaVersions())
+			target := cfg.App.DataRoot
+			if flags.Arg(4) != "" {
+				target = flags.Arg(4)
+			}
+			manifest, err = maintenance.Restore(ctx, flags.Arg(2), target, key, app.SchemaVersions())
 		}
 		if err != nil {
 			return true, err

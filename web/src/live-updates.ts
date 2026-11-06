@@ -1,7 +1,9 @@
 import {t} from './i18n';
 import {z} from 'zod';
-import {enhanceProjections,releaseProjections} from './projections';
+import {enhanceProjections,releaseProjections,retainProjectionNodes} from './projections';
 import {captureRichFormDrafts} from './rich-forms';
+import {renderDraftMarkdown} from './markdown';
+import {reconcileOutgoing} from './outgoing';
 
 const snapshot=z.object({view:z.string(),before:z.number().int().nonnegative(),latest:z.number().int().nonnegative(),regions:z.record(z.string(),z.string())});
 const replyFrame=z.object({key:z.string().regex(/^[a-f0-9]{32}$/),state:z.enum(['draft','discarded','committed']),text:z.string().optional(),reset:z.boolean().optional()});
@@ -53,6 +55,7 @@ function regionPatcher(ids:readonly string[]){
     const key=(incoming as HTMLElement).dataset.liveKey??`position:${i}`;
     const old=keyed.get(key),raw=incoming.outerHTML;
     let child=old&&originals.get(old)===raw?old:incoming;
+    if(id==='conversation-messages'&&old&&child!==old&&retainProjectionNodes(old,incoming))child=old;
     if(id==='task-feedback'&&old){
      const native=old.querySelector<HTMLFormElement>('form[action="/task/feedback"]');
      if(native&&incoming.querySelector('form[action="/task/feedback"]')){
@@ -87,7 +90,7 @@ function viewportAnchor(){
  });
  return node?{node,top:node.getBoundingClientRect().top}:null;
 }
-function atBottom(){return scrollY+innerHeight>=document.documentElement.scrollHeight-100}
+function atBottom(){return scrollY+innerHeight>=document.documentElement.scrollHeight-100&&!(document.activeElement instanceof HTMLElement&&document.activeElement.closest('.intelligent-widget,.openintelligentui-native,.rich-answer-form'))}
 function scrollToLatest(){window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})}
 
 export function startLiveUpdates(){
@@ -98,13 +101,13 @@ export function startLiveUpdates(){
  const feedback=document.getElementById('live-update-status');
  const jump=document.querySelector<HTMLButtonElement>('#new-messages');
  const draft=document.querySelector<HTMLElement>('#conversation-draft');
- const draftText=document.createTextNode('');
- draft?.querySelector('[data-draft-text]')?.append(draftText);
+ const draftNode=draft?.querySelector<HTMLElement>('[data-draft-text]');
+ let draftText='';
  let before=Number(main.dataset.liveBefore??0),latest=Number(main.dataset.liveLatest??0);
  let etag='',timer=0,generation=0,delay=1000,stopped=false,follow=false,pendingTarget='';
  let request:AbortController|null=null;
  let replies:EventSource|null=null,draftKey='',committing=false;
- const clearDraft=()=>{draftKey='';committing=false;draftText.data='';if(draft)draft.hidden=true};
+ const clearDraft=()=>{draftKey='';committing=false;draftText='';if(draftNode)draftNode.replaceChildren();if(draft)draft.hidden=true};
  const stopReplies=()=>{replies?.close();replies=null;clearDraft()};
  const hasReply=(key:string)=>!!key&&!!document.querySelector(`[data-reply-key="${key}"]`);
  const startReplies=()=>{
@@ -125,7 +128,7 @@ export function startLiveUpdates(){
    }
    if(text&&draftKey===key&&!hasReply(key)){
     const bottom=atBottom();
-    draftText.appendData(text);draft.hidden=false;
+    draftText+=text;if(draftNode)renderDraftMarkdown(draftNode,draftText);draft.hidden=false;
     if(bottom)scrollToLatest();else showJump();
    }
    if(state==='committed')void refresh();
@@ -191,10 +194,12 @@ export function startLiveUpdates(){
     if(!Array.from(parsed.content.querySelectorAll<HTMLElement>('[data-live-key]')).some(node=>node.dataset.liveKey===anchor.node.dataset.liveKey))deferMessages=true;
    }
    for(const id of regions){if(id!=='conversation-messages'||!deferMessages||follow)patch(id,value.regions[id])}
+   reconcileOutgoing();
    if(hasReply(draftKey)||committing&&deferMessages&&!follow)clearDraft();
    const send=document.querySelector<HTMLButtonElement>('.composer button[type=submit]');
    const form=send?.form;const readiness=document.querySelector<HTMLElement>('#workspace-status [data-can-send]')?.dataset.canSend;
    if(send&&form&&!form.dataset.submitting&&readiness)send.disabled=readiness!=='true';
+   delete document.body.dataset.waitingReply;
 
    if(view==='/'&&(follow||bottom&&before===0))finishFollow();
    else{

@@ -45,12 +45,10 @@ cd steward
 ~/.local/bin/steward
 ```
 
-First launch in a terminal guides model setup. Choose a provider, probe it and
-confirm the model before starting work. `/setup` repairs a connection, `/models`
-lists profiles and `/quit` exits. ChatGPT sign-in uses native cgo builds with macOS
-Keychain or Linux libsecret and an unlocked Secret Service keyring. Other builds
-can use a local endpoint or an explicit API-key
-environment reference. Never paste credentials into YAML or issues.
+First launch in a terminal guides model setup. Choose a provider and confirm the model; custom compatible endpoints are probed, while ChatGPT account models use their authenticated catalog. `/setup` repairs a connection, `/models`
+lists profiles and `/quit` exits. ChatGPT sign-in and other saved credentials use
+private local files on all supported platforms. Explicit API-key environment
+references remain available. Never paste credentials into YAML or issues.
 
 The installer creates a versioned runtime under `~/.local/lib/steward` and a
 launcher under `~/.local/bin`. Data lives separately in `~/.local/share/steward`;
@@ -125,3 +123,5 @@ the canonical repository URL is `https://github.com/z-chenhao/steward`.
 Steward is licensed under [Apache-2.0](LICENSE). Incorporated components and fonts
 retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md) and
 [NOTICE](NOTICE). The project license does not grant trademark rights.
+
+Memory keys and ordinary credentials use private files under the data root (`secrets/`, directory 0700 and files 0600). Default startup does not require the system keychain. OAuth credentials retain their existing `account-secrets/` directory. Keep keys separately when backing up encrypted memories.

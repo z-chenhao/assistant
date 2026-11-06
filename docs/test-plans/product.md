@@ -144,10 +144,10 @@ launcher failure, missing reports or source/binary drift reject success. Local
 loopback peers, disposable databases and pinned runtimes make the checks account-free.
 Test output stays in ignored `evidence/`; credentials and personal data stay out.
 
-Ubuntu checks additionally runs the account harness with `--native-secret-service`.
-It owns a private session bus and disposable Linux keyring; the ordinary `account`
-gate keeps its independent in-memory SecretStore. Commands and proof limits are
-in the [model connection test plan](model-connections.md#linux-原生账户回归).
+The core account gate runs the account harness against private credential files
+in a disposable data root. It checks permissions, cross-process refresh and cleanup
+without a desktop credential service. Commands and proof limits are
+in the [model connection test plan](model-connections.md#私有文件账户回归).
 
 <a id="testing-system-coverage"></a>
 
@@ -161,7 +161,8 @@ in the [model connection test plan](model-connections.md#linux-原生账户回�
 | `children` | Recursive delegation, frozen capabilities, parent-only results and approvals |
 | `tools` | Frozen approved actions, invocation persistence and unknown side effects |
 | `code-recovery` | Actual Go/QuickJS interruption, 37 completed/8 waiting calls, no repeated completed work |
-| `intelligent-ui` | Main-only UI tool via Code Mode, frozen Skill, native and sandboxed widgets, explicit follow-up and restart |
+| `intelligent-ui` | Main-only UI tool, frozen Skill, native and sandboxed widgets, explicit follow-up and restart |
+| `ui-interactions` | Shared native controls, validated forms, durable state and tool actions, display modes, exports and restart |
 | `local-provider` | Discover/probe/select, transport and image projection with an owned HTTP peer |
 | `account` | Deterministic auth/callback/refresh/logout contracts and secret handling |
 | `channels` | Real Web/browser and channel delivery behavior |

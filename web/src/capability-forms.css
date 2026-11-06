@@ -1,5 +1,6 @@
 /* Native owner settings share the existing monochrome control vocabulary. */
 .capability-guided{margin:0}
+.js .capability-guided:has([data-capability-mode] option:checked:not([value=custom])) [data-capability-fields]{display:none}
 .capability-guided fieldset{min-width:0;border:0;border-top:1px solid var(--border);padding:22px 0 4px;margin:28px 0 0}
 .capability-guided legend{max-width:100%;overflow-wrap:anywhere;padding:0 12px 0 0;font-size:var(--text-section);line-height:1.5;font-weight:600;color:var(--foreground)}
 .capability-guided input,.capability-guided textarea{caret-color:var(--foreground)}
@@ -15,3 +16,10 @@
 @media(max-width:760px){.capability-field-pair,.capability-tool-row{grid-template-columns:minmax(0,1fr);gap:12px}.capability-guided input,.capability-guided textarea{font-size:1rem}.capability-tool-row{padding-bottom:18px;border-bottom:1px solid var(--border)}.capability-tool-row button{justify-self:start}.capability-guided .actions{align-items:stretch;flex-direction:column}.capability-guided button{min-height:44px}}
 .capability-options{margin:24px 0;border-top:1px solid var(--border);padding-top:18px}.capability-options>summary{font-size:14px;font-weight:500;color:var(--foreground)}.capability-options>fieldset{border:0;margin:0;padding-top:20px}
 .capability-guided input:disabled,.capability-guided textarea:disabled{opacity:.55}
+.capability-import{padding:16px 0}
+.capability-import>label{font-size:14px;font-weight:500;color:var(--foreground);margin:0 0 8px}
+.capability-import input[type=file]{width:100%;font-size:13px;padding:12px;background:var(--muted)}
+.capability-yaml-review{margin:16px 0}
+.capability-yaml-review summary{font-size:13px;color:var(--muted-foreground);margin-bottom:12px}
+.capability-editor .capability-yaml-review textarea{min-height:160px;max-height:420px;width:100%;margin:0}
+.capability-draft-status .setting-action{margin-inline:8px}

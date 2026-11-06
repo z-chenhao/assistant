@@ -1,14 +1,16 @@
 package web
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"net/http"
 	"strings"
 )
 
 // Bundled, pinned frontend components and Steward artwork and self-hosted fonts. No CDN or second server.
 //
-//go:embed assets/client.js assets/appearance.js assets/style.css assets/licenses.txt assets/brand/*
+//go:embed assets/client.js assets/diagrams.js assets/appearance.js assets/widget.css assets/style.css assets/licenses.txt assets/brand/*
 var assets embed.FS
 
 // This fixed allowlist is shared by requests; no user path reaches the filesystem.
@@ -16,6 +18,7 @@ var publicAssets = map[string]struct{ path, contentType string }{
 	"/style.css":                         {"assets/style.css", "text/css"},
 	"/appearance.js":                     {"assets/appearance.js", "text/javascript"},
 	"/app.js":                            {"assets/client.js", "text/javascript"},
+	"/diagrams.js":                       {"assets/diagrams.js", "text/javascript"},
 	"/licenses.txt":                      {"assets/licenses.txt", "text/plain; charset=utf-8"},
 	"/brand/ghost-ivory.png":             {"assets/brand/ghost-ivory.png", "image/png"},
 	"/brand/ghost-charcoal.png":          {"assets/brand/ghost-charcoal.png", "image/png"},
@@ -28,6 +31,24 @@ var publicAssets = map[string]struct{ path, contentType string }{
 	"/brand/SourceSerif4-Roman.woff2":    {"assets/brand/SourceSerif4-Roman.woff2", "font/woff2"},
 	"/brand/InterVariable.woff2":         {"assets/brand/InterVariable.woff2", "font/woff2"},
 	"/favicon.png":                       {"assets/brand/ghost-charcoal.png", "image/png"},
+}
+
+// Font URLs identify the shipped bytes, so a new build cannot reuse stale fonts.
+// Keep this digest in sync with the font URLs emitted by web/build.mjs.
+func fontURL(path string) (string, error) {
+	body, err := assets.ReadFile("assets" + path)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s?v=%x", path, sha256.Sum256(body)), nil
+}
+
+func writeAsset(w http.ResponseWriter, r *http.Request, body []byte, contentType string) {
+	if strings.HasPrefix(contentType, "font/") && r.URL.Query().Get("v") == fmt.Sprintf("%x", sha256.Sum256(body)) {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	}
+	w.Header().Set("Content-Type", contentType)
+	_, _ = w.Write(body)
 }
 
 // serveAsset runs after request guards and before workspace authentication.
@@ -45,8 +66,7 @@ func serveAsset(w http.ResponseWriter, r *http.Request) bool {
 			fail(w, 404)
 			return true
 		}
-		w.Header().Set("Content-Type", "font/woff2")
-		_, _ = w.Write(body)
+		writeAsset(w, r, body, "font/woff2")
 		return true
 	}
 	if file, ok := publicAssets[r.URL.Path]; ok {
@@ -55,8 +75,7 @@ func serveAsset(w http.ResponseWriter, r *http.Request) bool {
 			fail(w, 500)
 			return true
 		}
-		w.Header().Set("Content-Type", file.contentType)
-		_, _ = w.Write(body)
+		writeAsset(w, r, body, file.contentType)
 		return true
 	}
 	return false

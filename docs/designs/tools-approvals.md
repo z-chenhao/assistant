@@ -315,3 +315,11 @@ Artifact kill/restart recovery, configured Memory and channel delivery. See the
 ## Main 展示工具
 
 `builtin__intelligent_ui_show` 使用 Host 专属 `ui_present` 权限，通过 Code Mode 接纳、记录和幂等保存本地展示产物。Worker 裁剪该权限；模型参数不能提供审批、消息或表单身份。Tool 回执表示 staged，具体回复绑定后才进入 Delivery。交互、安全与恢复契约见 [Intelligent UI](intelligent-ui.md)。
+
+### 高频工具的直接声明
+
+生产 registry 对新 Run 固定直接声明 Code Mode、Tool search、intelligent_ui_show、skill_list、skill_view；Main 增加 task_manage、task_search，Worker 仍不取得 Task 管理权限。现有消费者是 Main/Worker 的模型请求，依据是高频发现与交接经多轮脚本发现时出现 INVALID_ARGUMENT 和多余生成轮次。直接与嵌套调用共用原 ToolExecutor、审批、幂等与审计；角色过滤和冻结快照保持权威。
+
+发现和权限边界属于必要机制，固定小型名单是可替换的内部政策。没有公开通用 exposure 配置，MCP 与 Computer 目录继续按需发现；不为未配置的 JavaScript 运行时提供任意原生执行回退。已有冻结 Run 保留原声明。
+
+新生产目录中其余普通工具标为 Code Mode 可发现，原生 Tool search 能返回其描述，但不会把其 schema 加入直接声明；MCP 和 builtin 使用相同的冻结目录检索，内部桥接不进入检索。

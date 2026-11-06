@@ -72,8 +72,7 @@ they are not the `current` target. User data is separate and survives reinstall.
 ### Connect a model and chat
 
 Bare `steward` opens guided setup on a terminal. Choose a local OpenAI-compatible
-endpoint or Sign in with ChatGPT. Follow the prompts to discover or enter a model,
-probe its capabilities, and explicitly confirm selection. Without a selected
+endpoint or Sign in with ChatGPT. Follow the prompts to discover or enter a model and confirm selection. Custom endpoints run capability checks; ChatGPT account models use the authenticated catalog without test inference. In Web Settings, the first successfully connected model is selected automatically; later additions preserve the current model. Without a selected
 model, Steward stays `setup_required` and accepts no Agent work.
 
 After selection, type your message. `/models` lists profiles, `/setup` repairs a
@@ -84,10 +83,8 @@ installed automatically. macOS users can explicitly install and start the
 [background Web service](operations.md#macos-后台运行与独立巡检); it remains active
 after closing the browser. Existing Task and Run recovery uses the same durable state on restart.
 
-ChatGPT credentials default to private files in the Steward data root. The optional
-native backend uses Keychain on macOS or libsecret and an unlocked Secret Service
-keyring on Linux. On Debian/Ubuntu, its optional packages are
-`libsecret-1-0 gnome-keyring dbus-user-session`.
+ChatGPT and other saved credentials use private files in the Steward data root.
+No operating-system keychain, session bus or credential daemon is required.
 Never put credentials in configuration files. See [provider setup](model-connections.md)
 for authentication requirements and model privacy details.
 
@@ -148,3 +145,5 @@ See [channels](channels.md) and [operations](operations.md).
 The underlying Go entry point is `cmd/steward`; local builds produce `bin/steward`.
 The previous `personal-agent` command/path is replaced; existing databases and
 model snapshots do not require a migration for this executable rename.
+
+默认 Memory 与本地凭据使用数据根下的私有文件 SecretStore；启动无需 macOS 钥匙串授权。OAuth 凭据仍在 `account-secrets/`，Memory 和一般凭据在 `secrets/`。两者都不进入普通数据备份，恢复加密记忆时须单独保留原密钥。

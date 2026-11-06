@@ -15,7 +15,7 @@
 .composer textarea{display:block;width:100%;border:0;resize:none;margin:0;padding:0 3px 4px;background:transparent;color:var(--foreground);font-size:16px;line-height:1.5;min-height:36px;max-height:180px;field-sizing:content;outline:none}.composer textarea::placeholder{color:var(--muted-foreground)}
 .composer-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.attachment-controls{display:flex;align-items:center;gap:6px;min-width:0;max-width:70%}
 .attachment-picker{position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;flex-shrink:0;color:var(--muted-foreground);border-radius:9px;margin:0;cursor:pointer}.attachment-picker:hover{background:var(--hover)}.attachment-picker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;margin:0;cursor:pointer}
-.attachment-status{font-size:12px;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.composer:focus-within{border-color:var(--focus)}.composer:has(textarea:focus-visible),.attachment-picker:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}.composer .send-button{position:relative;width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;flex-shrink:0;background:#D97757;color:#fff;border:0;box-shadow:none}.composer .send-button:hover{opacity:.85}.composer .send-button .icon{width:20px;height:20px;stroke-width:1.8}
+.attachment-status{font-size:12px;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.composer:focus-within{border-color:var(--focus)}.composer:has(textarea:focus-visible){outline:0;box-shadow:inset 0 0 0 1px var(--focus)}.attachment-picker:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}.composer .send-button{position:relative;width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;flex-shrink:0;background:var(--chat-accent);color:#fff;border:0;box-shadow:none}.composer .send-button:hover{opacity:.85}.composer .send-button .icon{width:20px;height:20px;stroke-width:1.8}
 .composer[data-submitting] .send-button .icon{opacity:0}.composer[data-submitting] .send-button:after{content:"";position:absolute;inset:10px;border:2px solid var(--muted-foreground);border-top-color:transparent;border-radius:50%;animation:send-wait .9s linear infinite}@keyframes send-wait{to{transform:rotate(360deg)}}
 .composer-feedback{font-size:13px;color:var(--muted-foreground);margin:10px 4px 0}.composer-feedback:empty{display:none}
 .task-context-chip{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 4px 12px;padding:6px 9px;font-size:12px;background:var(--muted);border-radius:7px}.task-context-chip>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -33,3 +33,45 @@
 .message,.approval{scroll-margin-top:176px}
 .rich-answer-form{margin:16px 0;padding:20px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:14px}
 .rich-answer-form fieldset{min-width:0;margin:0;padding:0;border:0;display:grid;gap:14px}.rich-answer-form label{display:grid;gap:7px}.rich-answer-form textarea{width:100%;max-width:100%;min-height:70px;resize:vertical;font:inherit}.rich-answer-form button{justify-self:start}.rich-answer-form fieldset:disabled textarea{opacity:.8}.rich-answer-form details{margin-top:12px}.rich-answer-form .field-help{margin-top:12px}
+/* Conversation roles share one bubble rhythm and keep the speaker side stable. */
+.message,.reply-draft{width:fit-content;max-width:90%;margin:14px 0;padding:14px 18px;border-radius:18px}
+.message.assistant,.reply-draft{margin-right:auto;background:var(--muted)}
+.message.user{margin-left:auto;background:var(--chat-accent);color:#fff}
+.message:has(.approval){width:100%;max-width:100%;padding:0;background:transparent}
+.markdown{white-space:normal;min-width:0}
+.markdown>:last-child{margin-bottom:0}.markdown p{margin-bottom:12px}
+.markdown :is(ul,ol){padding-left:1.5em;margin:10px 0 14px}.markdown li+li{margin-top:4px}
+.markdown ul{list-style:disc}.markdown ol{list-style:decimal}
+.markdown a{text-decoration:underline;text-underline-offset:3px}
+.markdown :is(h1,h2,h3,h4){font:600 1em/1.5 var(--font-ui);margin:18px 0 8px}
+.markdown pre{padding:14px;background:var(--background);border:1px solid var(--border);border-radius:10px;overflow:auto;white-space:pre;max-width:100%}
+.markdown :not(pre)>code{padding:2px 5px;background:var(--background);border-radius:4px;color:var(--foreground)}
+.markdown blockquote{margin:12px 0;padding:0 14px;border-left:1px solid var(--control-border);color:var(--muted-foreground)}
+.markdown table{display:block;max-width:100%;overflow:auto;border-collapse:collapse;font:13px/1.6 var(--font-ui);margin:14px 0}
+.markdown :is(th,td){padding:8px 12px;border:1px solid var(--border);text-align:left}
+.markdown-diagram{display:block;width:auto;max-width:100%;height:auto;margin:12px 0}
+.composer textarea{font-size:14px;line-height:1.6}
+.agent-processing{display:none;align-items:center;gap:10px;width:fit-content;border-radius:18px;padding:12px 16px;margin:14px 0;background:var(--muted);color:var(--muted-foreground);font-size:12px}
+.chat-workspace:has(#workspace-status .working) .agent-processing,.chat-workspace[data-waiting-reply] .agent-processing{display:flex}
+.chat-workspace:has(#conversation-draft:not([hidden])) .agent-processing{display:none}
+.typing-dots{display:inline-flex;gap:4px}.typing-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;animation:thinking 1.2s ease-in-out infinite}.typing-dots i:nth-child(2){animation-delay:.16s}.typing-dots i:nth-child(3){animation-delay:.32s}
+@keyframes thinking{0%,70%,100%{opacity:.35;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}
+@media(prefers-reduced-motion:reduce){.typing-dots i{animation:none}}
+@media(max-width:760px){.message,.reply-draft{max-width:96%;padding:12px 14px}.composer textarea{font-size:16px}}
+
+:root{--chat-accent:#B84F2F}
+.message.message-split{display:flex;flex-direction:column;gap:14px;width:100%;max-width:100%;padding:0;background:transparent}
+.message-bubble{width:fit-content;max-width:90%;padding:14px 18px;border-radius:18px;background:var(--muted);min-width:0}
+.message-bubble:has(.intelligent-widget,.answer-table,.openintelligentui-native){width:90%}
+.outgoing-status,.outgoing-file{font:12px/1.6 var(--font-ui);margin-top:6px}
+.outgoing-status button{min-height:32px;padding:0;background:transparent;color:inherit;text-decoration:underline;border:0}
+.outgoing[data-send-state=sending] .outgoing-status:before{content:"";display:inline-block;width:10px;height:10px;margin-right:7px;border:1px solid currentColor;border-right-color:transparent;border-radius:50%;animation:send-wait .9s linear infinite}
+@media(prefers-reduced-motion:reduce){.outgoing[data-send-state=sending] .outgoing-status:before{animation:none}}
+@media(max-width:760px){.message-bubble{max-width:96%;padding:12px 14px}.message-bubble:has(.intelligent-widget,.answer-table,.openintelligentui-native){width:96%}}
+
+:root{--chart-axis:var(--muted-foreground);--chart-tooltip-bg:var(--card);--chart-tooltip-border:var(--border)}
+.openintelligentui-native{min-width:0;width:100%;overflow-x:clip;--surface-primary:var(--card);--text-primary:var(--foreground);--text-secondary:var(--muted-foreground);--color-border-glass:var(--border);--color-background-secondary:var(--muted);--color-text-success:var(--success)}.message-bubble:has(.openintelligentui-native){width:90%}
+.openintelligentui-native fieldset{border:0;min-width:0}
+@media(max-width:760px){.message-bubble:has(.openintelligentui-native){width:96%}}
+
+/* Upstream native components keep their Tailwind control styles rather than the page button recipe. */

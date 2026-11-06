@@ -12,7 +12,7 @@ npm test --prefix web
 npm run lint --prefix web
 ```
 
-Shared Select/Switch behavior and skins live in `src/components/ui/`. The build/check command rejects page-owned popup implementations and control skins; `npm test` covers the ownership gate and pure selection state. Existing `make test` and the required CI job run both.
+Shared controls live in `src/components/ui/`. Base UI owns Button, Select, Combobox and Menu behavior; short lists use Select without search, while longer lists use Combobox according to the [global component contract](../design.md#全局组件契约); server forms and React components share these primitives and the same native-control skin. Native values and no-script forms remain available. The build/check command rejects page-owned popup implementations and control skins; `npm test` covers the ownership gate and durable interaction state. Existing `make test` and the required CI job run both.
 
 Edit sources, then commit the generated bundles with them. CI rejects stale
 outputs. `src/foundation.css` owns shared tokens/fonts; the other CSS modules own
@@ -47,3 +47,5 @@ the canonical repository is [z-chenhao/steward](https://github.com/z-chenhao/ste
 ## Intelligent UI
 
 `src/widgets.tsx` renders Main-owned UI tool artifacts in opaque-origin, CSP-sandboxed iframes. Native structured components retain the OpenIntelligentUI-derived DataTable. The custom renderer adapts the upstream isolated-answer/validated-follow-up pattern to Steward's durable messages; it does not run an Agent or provider in the browser. Widget code is served only after authenticated account/binding checks, and only an explicit Host Send button submits a proposed follow-up. See the [Intelligent UI contract](../docs/designs/intelligent-ui.md).
+
+The used shadcn/ui Field/Input/Card/Chart structures are adapted from `8a3536678a528cc012b9e62484290e79d0be410f`; `licenses/shadcn-ui.txt` is bundled with dependency notices. Steward owns typography, semantic theme, page layouts and message bubbles.

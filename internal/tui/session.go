@@ -468,7 +468,7 @@ func (u *terminal) setup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	p := llm.ProfileInput{ProviderKind: "openai_compatible", WireAPI: "openai_completions", ContextWindow: 8192, MaxOutputTokens: 1024, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true}}
+	p := llm.ProfileInput{ProviderKind: "openai_compatible", WireAPI: "openai_completions", ContextWindow: 128000, MaxOutputTokens: 16384, Compatibility: llm.Compatibility{ToolResultFormat: "openai"}, Capabilities: llm.Capabilities{TextInput: true, ImageInput: true}}
 	var catalog []llm.CatalogModel
 	switch choice {
 	case "1":
@@ -523,6 +523,7 @@ func (u *terminal) setup(ctx context.Context) error {
 	for _, m := range catalog {
 		if m.ModelID == p.ModelID {
 			found = true
+			p.Capabilities.ImageInput = m.ImageInput
 			if m.ContextWindow > 0 && m.MaxOutputTokens > 0 {
 				p.ContextWindow, p.MaxOutputTokens = m.ContextWindow, min(m.MaxOutputTokens, m.ContextWindow)
 			}
@@ -538,7 +539,7 @@ func (u *terminal) setup(ctx context.Context) error {
 			name  string
 			value *int64
 			max   int64
-		}{{"Context tokens", &p.ContextWindow, 1048576}, {"Max output tokens", &p.MaxOutputTokens, 65536}} {
+		}{{"Context tokens", &p.ContextWindow, 1048576}, {"Max output tokens", &p.MaxOutputTokens, 1048576}} {
 			max := setting.max
 			if setting.value == &p.MaxOutputTokens {
 				max = min(max, p.ContextWindow)
@@ -569,10 +570,12 @@ func (u *terminal) setup(ctx context.Context) error {
 		return err
 	}
 	u.print("Profile saved: " + profile.ProfileID)
-	if err = u.testModel(ctx, profile.ProfileID); err != nil {
-		return err
+	if p.ProviderKind != "openai_account" {
+		if err = u.testModel(ctx, profile.ProfileID); err != nil {
+			return err
+		}
+		u.print("Probe passed: text, streaming, Tool calls, continuation, cancellation and clipping. Additional modalities and reasoning settings are unverified.")
 	}
-	u.print("Probe passed: text, streaming, Tool calls, continuation, cancellation and clipping. Additional modalities and reasoning settings are unverified.")
 	return u.selectModel(ctx, profile.ProfileID)
 }
 

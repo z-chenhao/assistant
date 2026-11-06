@@ -49,9 +49,9 @@ make test-e2e E2E_EVIDENCE=evidence/my-core-run
 
 ## 生成式 Widget 与单条 Prompt
 
-`verify_intelligent_ui.py` 使用实际 Go 模型 HTTP peer、Actor、QuickJS、内建 Skill、持久 UI 工具和真实 Chromium。检查原生表格、计算器、主题、展开、移动端、无脚本替代和异常降级；父 DOM、存储与 fetch 被阻止，CSS 闭合标签不能在初始化前捕获禁用构造器，独立浏览器导航仅得纯文本；Widget 提问必须通过 Host 按钮发送，后续 Widget 消息不覆盖宿主草稿或重置不确定发送的来源键，重启不重复生成。该场景不注入投影或 Conversation 行。
+`verify_intelligent_ui.py` 使用实际 Go 模型 HTTP peer、Actor、QuickJS、内建 Skill、持久 UI 工具和真实 Chromium。检查上游原生表格、generateSandboxedUi 六字段与完成态 activity、计算器、SVG 模拟、主题、展开、移动端、无脚本替代和异常降级；父 DOM、存储与 fetch 被阻止，CSS 闭合标签不能在初始化前捕获禁用构造器，独立浏览器导航仅得纯文本；Widget 提问必须通过 Host 按钮发送，后续 Widget 消息不覆盖宿主草稿或重置不确定发送的来源键，重启不重复生成。该场景不注入投影或 Conversation 行。
 
-`TestMainUIWidgetUsesCodeModeAndDurableReply` 验证 Main 权限、Worker 排除、真实嵌套调用与持久绑定。`TestAgentStartsWithOneFrozenSystemMessage` 验证 Agent 内已经是一条 system，分段元数据不进入模型；拆分消息明确拒绝。工具 Schema 和原生表单校验继续由 Go 测试覆盖。
+`TestMainUIWidgetUsesCodeModeAndDurableReply` 验证 Main 权限、Worker 排除、真实嵌套调用与持久绑定。`TestAgentStartsWithOneFrozenSystemMessage` 验证 Agent 内已经是一条 system，分段元数据不进入模型；拆分消息明确拒绝。原生 catalog Schema 和候选时间选择校验继续由 Go 测试覆盖。
 
 ```sh
 python3 tests/system/verify_intelligent_ui.py --binary bin/steward --evidence evidence/my-intelligent-ui/report.json
@@ -62,3 +62,28 @@ python3 tests/system/verify_intelligent_ui.py --binary bin/steward --evidence ev
 使用隔离配置与可丢弃数据，保留产品版本、实际命令、环境、结果和清理情况。区分通过、失败、跳过、未执行以及未知外部结果。
 
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
+
+## OpenIntelligentUI 原生基础与协议扩展
+
+`verify_channels.py --rich-replies-only` 由 Main 的真实工具调用产生五类上游原生组件，验证柱状图/饼图的真实 SVG、表格字面量转义、来源、深浅主题与移动端宽度。候选时间测试覆盖提交前网络失败、提交后丢失回执、会话草稿不被覆盖、无脚本拒绝、重启恢复、六路并发去重、伪造身份/字段与更改已接受选择的拒绝。
+
+`verify_intelligent_ui.py` 验证生成式活动与 Websandbox 接口，真实修改计算器输入和模拟滑块，检查共享 SVG 样式与主题、展开/收起、异常文字降级、宿主确认的后续提问和重启不再生成。`native_test.go` 验证过期协议拒绝、原生参数/图表数据校验与候选选择的事实语义；历史数据仍能读取且不执行旧 HTML。
+
+原生组件的桌面、明暗主题与窄屏检查同时验证 Steward 字体/标题尺寸、去除演示装饰和重复 Text version 入口。生成式场景验证内嵌字体实际可用、正常画面不重复 fallback、失败仍显示替代；宿主按钮组在桌面与移动端有实际几何间距，沙箱按钮组不相接，展开和 Escape 操作可用。
+
+
+## 状态、数据与操作闭环
+
+- `TestUIStateCASFreezeAndActionUsesOrdinaryExecutor`、`TestUIStateConcurrentWritersAndInvalidPayloads` 验证授权引用、旧版本/并发写拒绝、状态有界和普通输入的不可变 UI 上下文快照。
+- `TestUIActionCannotApproveAnExternalEffect` 验证动作按钮仍需既有高风险审批，未审批时提供商未被调用；动作结果只能取实际匹配的 ToolInvocation。
+- `TestTypedFormValidationAndRestore` 验证日期、有限数字、范围、候选、多选去重/规范顺序、布尔确认与回答恢复。
+- `web/ui-interactions.test.mjs` 验证 CSV 公式处理，以及同一页面并发排空保存、写入期间继续编辑和上下文合并。
+- `verify_ui_interactions.py` 使用真实 Main、Code Mode、UI 工具、工具搜索与 Chromium，覆盖折线/散点、表格排序筛选、图表范围、typed form、原生无脚本多选提交、丢失动作回执时强制同源重试、轮询确认成功后才注入迟到 POST 错误、宿主确认的沙箱动作回传、真实 CSV/SVG/PNG 下载和浏览器错误检查。展开/弹窗/悬浮保持同一 iframe；刷新和 kill/restart 不重新生成 UI，恢复输入和已接纳表单。保留明暗/移动端截图，不注入产品表或投影。
+
+```sh
+python3 tests/system/verify_ui_interactions.py --binary bin/steward --evidence evidence/my-ui-interactions/report.json
+```
+
+真实模型是否选择合适组件、准确使用工具请求并生成优质交互仍属质量评测；脚本 Provider 只证明实际软件边界与恢复行为。
+
+组件呈现回归同时覆盖原生表单在 Host 弹窗顶层中的选择器与菜单操作，确认浮层可点、Escape 取消和原状态保留；必填选择器为空时校验聚焦可见控件并标明无效，选择后恢复；继续验证表单提交后不可编辑、无脚本回答和现有持久回放。明暗/窄屏截图核对组件内部留白、边框、数字列对齐、图表提示及焦点，不将截图生成本身作为视觉验收。

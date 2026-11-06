@@ -213,7 +213,13 @@ class FixturePoolTests(unittest.TestCase):
             if actions_shell:
                 workflow = (suite.ROOT / '.github/workflows/ci.yml').read_text()
                 line = next(line.strip() for line in workflow.splitlines()
-                            if '--name code --phase test --' in line)
+                            if 'tests/system/ci.py --lane' in line)
+                # Exercise the actual lane -> exec(process_step) entry as well
+                # as Actions' exec shell. Only the fixture command is replaced.
+                lane_command = shlex.join(['make', '-f', str(makefile), 'fixture'])
+                command = [sys.executable, '-c',
+                           f'import ci,sys; ci.SOFTWARE[{step_name!r}]={lane_command!r}; '
+                           f'sys.argv=["ci.py","--lane",{step_name!r}]; ci.main()']
                 shell = root / 'step.sh'
                 shell.write_text(('exec ' if line.startswith('run: exec ') else '') + shlex.join(command) + '\n')
                 entry_log = (root / 'log').open('w')

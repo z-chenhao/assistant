@@ -20,7 +20,7 @@ func (m *capturingModels) AddProfile(_ context.Context, input llm.ProfileInput) 
 	return llm.Profile{}, nil
 }
 
-func TestWebModelImageInputIsAnExplicitUnverifiedDeclaration(t *testing.T) {
+func TestWebModelImageInputDefaultsOnWithoutAUserSwitch(t *testing.T) {
 	for _, value := range []string{"", "yes"} {
 		models := &capturingModels{}
 		s := &Server{Models: models}
@@ -30,7 +30,7 @@ func TestWebModelImageInputIsAnExplicitUnverifiedDeclaration(t *testing.T) {
 		if _, err := s.addModel(r); err != nil {
 			t.Fatal(err)
 		}
-		if models.input.Capabilities.ImageInput != (value == "yes") || !models.input.Capabilities.TextInput {
+		if !models.input.Capabilities.ImageInput || !models.input.Capabilities.TextInput || models.input.MaxOutputTokens != 16384 {
 			t.Fatal(models.input)
 		}
 		if err := models.input.Validate(); err != nil {

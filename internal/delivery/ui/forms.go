@@ -33,7 +33,7 @@ func Form(raw json.RawMessage, messageID, formID string) (Component, error) {
 		return Component{}, conversation.ErrInvalid
 	}
 	for _, c := range spec.Components {
-		if c.Type == "form" && c.MessageID == messageID && c.FormID == formID && valid(c) {
+		if Respondable(c) && c.MessageID == messageID && c.FormID == formID && valid(c) {
 			return c, nil
 		}
 	}
@@ -41,6 +41,12 @@ func Form(raw json.RawMessage, messageID, formID string) (Component, error) {
 }
 
 func Answer(c Component, values map[string]string) ([]conversation.ContentPart, error) {
+	if c.Type == "openintelligentui" && c.Name == "steward.form" {
+		return extensionFormAnswer(c, values)
+	}
+	if c.Type == "openintelligentui" && c.Name == "scheduleTime" {
+		return meetingAnswer(c, values)
+	}
 	if c.Type != "form" || !valid(c) || len(values) != len(c.Fields) {
 		return nil, conversation.ErrInvalid
 	}
@@ -69,6 +75,12 @@ func Answer(c Component, values map[string]string) ([]conversation.ContentPart, 
 
 // Restore displays only answers already accepted through the ordinary ingress.
 func Restore(c *Component, content []conversation.ContentPart) error {
+	if c.Type == "openintelligentui" && c.Name == "steward.form" {
+		return restoreExtensionForm(c, content)
+	}
+	if c.Type == "openintelligentui" && c.Name == "scheduleTime" {
+		return restoreMeeting(c, content)
+	}
 	if len(content) != len(c.Fields)+1 || content[0].Type != "text" || content[0].Text != "Response to: "+c.Text+"\n" {
 		return conversation.ErrConflict
 	}
@@ -89,4 +101,4 @@ func Restore(c *Component, content []conversation.ContentPart) error {
 	return nil
 }
 
-var formComponent = template.Must(template.New("form").Parse(`{{$form:=.}}<form method="post" action="/ui/form" class="rich-answer-form" data-form-id="{{.FormID}}" data-submitted="{{.Submitted}}"><p class="semantic">{{.Text}}</p><input type="hidden" name="message_id" value="{{.MessageID}}"><input type="hidden" name="form_id" value="{{.FormID}}"><fieldset {{if or .Submitted .Disabled}}disabled{{end}}>{{range .Fields}}<div class="rich-field"><label for="{{$form.FormID}}-{{.Name}}">{{.Label}}</label><textarea id="{{$form.FormID}}-{{.Name}}" name="field.{{.Name}}" required maxlength="4096" rows="2">{{.Value}}</textarea></div>{{end}}<button type="submit">Send response</button></fieldset><p class="field-help" role="status" aria-live="polite">{{if .Submitted}}Your response was saved. Ghost will review it in the conversation.{{else if .Disabled}}This form is temporarily unavailable. Your conversation is kept.{{else}}Your answers go to Ghost. External actions still require their own approval.{{end}}</p></form>`))
+var formComponent = template.Must(template.New("form").Parse(`{{$form:=.}}<form method="post" action="/ui/form" class="rich-answer-form" data-form-id="{{.FormID}}" data-submitted="{{.Submitted}}"><p class="semantic">{{.Text}}</p><input type="hidden" name="message_id" value="{{.MessageID}}"><input type="hidden" name="form_id" value="{{.FormID}}"><fieldset {{if or .Submitted .Disabled}}disabled{{end}}>{{range .Fields}}<div class="rich-field"><label for="{{$form.FormID}}-{{.Name}}">{{.Label}}</label><textarea id="{{$form.FormID}}-{{.Name}}" name="field.{{.Name}}" required maxlength="4096" rows="2">{{.Value}}</textarea></div>{{end}}<button type="submit">Send response</button></fieldset><p class="field-help" role="status" aria-live="polite">{{if .Submitted}}Saved.{{else if .Disabled}}Unavailable.{{else}}{{end}}</p></form>`))

@@ -22,9 +22,9 @@
 
 **当前实现**：CLI/TUI/Web 有连接、Test、Select 入口，Run 冻结模型快照。
 
-**边界与剩余工作**：无活动模型时保持 setup_required；不隐式选取收费或 Fake 模型。
+**边界与剩余工作**：没有活动模型时，Web 用户主动添加的第一个连接成功后即成为当前模型；连接失败保持 setup_required，之后添加模型不覆盖当前选择。不会在启动、查看页面或恢复历史时任意挑选付费或 Fake 模型。
 
-在 Web 的 Chat 点 Set up Steward，进入 Resources，展开已保存模型可查看连接标识。连接未验证时可在行尾测试，通过后显示验证状态。当前模型的连接操作也可在重新授权后恢复原有选用。候选模型可直接点击行尾的「用于新工作」确认切换。没有有效验证结果时，Steward 会先测试连接，通过后才切换。账户模型列在对应账户下，直连模型单独分组。展开账户标题可重连或退出，影响该账户下的所有模型。Connect a model 通过连接方式下拉菜单切换配置。已连接账户可点击 Load models 获取模型列表。查看设置或等待状态更新时无需读取模型凭据。ChatGPT 登录按钮直接打开浏览器授权页，弹窗不可用时可从等待页手动继续。
+在 Web 的 Chat 点 Set up Steward，进入 Resources。账户模型列在对应账户下，直连模型单独分组；已选模型显示「当前模型」，其他模型用「使用此模型」切换。ChatGPT 账户登录并加载目录后，选用模型不再执行 Test connection；图片输入默认按模型目录开启，不需要用户勾选。只有本地兼容端点保留行为验证，首次连接会自动验证并选用，失败后可在原模型重试。展开账户标题可重连或退出。Connect a model 只显示一次账户信息，加载模型与连接其他账户分组留出间距。查看设置或等待状态更新不读取模型凭据。ChatGPT 登录按钮直接打开浏览器授权页，弹窗不可用时可从等待页手动继续。
 
 **验收目标**：连接、测试、选择、工具续轮和重启均沿真实 Provider Bridge 验证。
 
@@ -34,15 +34,15 @@
 
 **需求**：用户能登录、重新认证和退出 ChatGPT 账户，凭据可安全持久化。
 
-**当前实现**：账户生命周期复用同一 Manager、Provider Bridge 和冻结模型路径；默认在 Steward 数据根下使用 `account-secrets/` 私有文件。显式配置 `llm.account_secret_store: native` 时，macOS 使用 Keychain，Linux 使用 Secret Service。两个后端均支持跨进程保存、读取、更新与删除，刷新与退出继续使用既有跨进程锁和恢复裁决。CLI/TUI/Web 提供凭据设置与故障反馈。
+**当前实现**：账户生命周期复用同一 Manager、Provider Bridge 和冻结模型路径；默认在 Steward 数据根下使用 `account-secrets/` 私有文件。凭据后端统一为本地文件，支持跨进程保存、读取、更新与删除，刷新与退出继续使用既有跨进程锁和恢复裁决。CLI/TUI/Web 提供凭据设置与故障反馈。
 
-**边界**：默认文件后端使用 `0700` 目录和 `0600` 文件。OAuth 凭据由文件权限保护，同一用户下有访问权限的进程也能读取。原生后端需要 cgo，Linux 另需 libsecret、会话 D-Bus 和已解锁的 Secret Service。切换后端后，使用 Resources 中现有账户的「重新连接」保存新凭据，沿用已保存模型。项目备份排除凭据文件。
+**边界**：默认文件后端使用 `0700` 目录和 `0600` 文件。OAuth 凭据由文件权限保护，同一用户下有访问权限的进程也能读取。旧版本保存在系统凭据库中的账户须重新连接以写入文件，沿用已保存模型。项目备份排除凭据文件。
 
 **验收目标**：在每个声明支持的平台完成登录、刷新、退出、进程中断恢复和凭据隔离验证。
 
 ## 如何使用
 
-标准安装后运行 `steward`，按引导连接本地模型或登录 ChatGPT，再执行测试和选择。Web 的 Settings 提供相应入口。连接视觉模型时显式勾选 **Enable image input (verified when tested)**，通过图片 Probe 后再选择；模型卡显示已验证图片输入或 Text only。图片发送规则见 [F-013](artifacts-media.md#f-013)。
+标准安装后运行 `steward`，按引导连接本地模型或登录 ChatGPT。Web 首个成功连接自动用于对话，后续模型通过「使用此模型」切换。ChatGPT 模型的图片能力与 token 上限来自账户目录；缺失字段补充自内置 Pi AI 1.5.0 聊天模型目录。兼容端点默认请求图片能力，实际行为验证后才冻结。图片发送规则见 [F-013](artifacts-media.md#f-013)。
 
 CLI 可运行 `steward model list` 查看配置，使用 `steward model test PROFILE_ID` 测试。ChatGPT 凭据默认使用私有文件。原生后端的准备步骤见下文。明确配置的环境变量 API Key 仍只用于兼容端点，不充当 OAuth 凭据后端。
 
@@ -59,37 +59,17 @@ CLI 可运行 `steward model list` 查看配置，使用 `steward model test PRO
 
 ### ChatGPT account lifecycle
 
-Use the same explicit Bridge configuration shown below. ChatGPT credentials default
-to private files under the Steward data root. Set `llm.account_secret_store: native`
-to use macOS Keychain or Linux Secret Service via libsecret on native cgo builds.
-Environment API keys cannot authenticate this entry point. No Codex credential
-file is read or written.
-
-On Debian/Ubuntu Linux, install the optional native credential dependencies:
-
-```sh
-sudo apt-get install libsecret-1-0 gnome-keyring dbus-user-session
-steward doctor
-```
-
-Use your desktop login session's D-Bus and unlock its login keyring before
-signing in. A compatible Secret Service provider may replace GNOME Keyring.
-Headless installations need an explicitly managed session bus and keyring;
-Steward does not start or unlock a keyring with a saved password. `doctor` checks
-the backend library without retrieving credentials or contacting the keyring.
-Actual read/write access is checked when used. Missing/locked/unavailable stores
-return a sanitized credential-store error and never fall back to plaintext.
-The Linux backend bounds each operation to 30 seconds or the caller's earlier
-deadline. Install/repair missing libraries, restart Steward, unlock the keyring,
-and retry. Ordinary unauthenticated local models remain available without this
-optional dependency.
+Use the same explicit Bridge configuration shown below. ChatGPT credentials use
+private files under the Steward data root. No system credential backend or session
+bus is needed. Environment API keys cannot authenticate this entry point. No Codex
+credential file is read or written. Missing or unreadable files fail closed with a
+sanitized error; reconnect an existing account to save fresh OAuth credentials.
 
 ```sh
 bin/steward -config local.yaml model login-chatgpt
 bin/steward -config local.yaml model accounts
 bin/steward -config local.yaml model account-catalog ACCOUNT_ID
 bin/steward -config local.yaml model account-add ACCOUNT_ID RETURNED_MODEL_ID
-bin/steward -config local.yaml model test PROFILE_ID
 bin/steward -config local.yaml model select PROFILE_ID PROFILE_VERSION CONFIG_VERSION
 bin/steward -config local.yaml model refresh ACCOUNT_ID
 bin/steward -config local.yaml model logout ACCOUNT_ID
@@ -112,9 +92,7 @@ replacement. Logout retains this non-secret mapping and history for later login.
 
 `account-catalog` requests the current account's `/v1/models`; only server-returned
 `visibility=list` slugs can be chosen. Unknown/hidden IDs are rejected before
-inference. `account-add` uses conservative text/token defaults when the catalog
-omits optional metadata. Existing Test/Select still require streaming, actual
-Tool Call/Result continuation, cancellation and clipping before activation.
+inference. `account-add` uses account limits and image modalities, filling missing fields from the bundled Pi AI 1.5.0 OpenAI Responses chat catalog. Unknown models without limits use a 128,000 context / 16,384 output fallback, bounded by the Host context ceiling. Account selection checks live authentication and current catalog membership without generating a behavioral Probe. Compatible endpoints continue to require the streaming/tool/cancellation checks.
 Requests use Steward's native Go `openai-responses` transport to the fixed public API,
 with `store=false`, `stream=true` and namespace-wrapped function tools. Unsupported
 sampling, reasoning and modalities stay disabled; `response.completed` is required.
@@ -180,7 +158,7 @@ RPC before releasing storage. Failed disposal reaps its peer as usual.
 
 [ADR 001](../designs/model-connections.md#decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow) records approved Device
 Authorization deferral. It remains a future requirement, not a passing check.
-Real interactive login/Keychain/provider Live Shadow remains **inconclusive**
+Real interactive login/provider Live Shadow remains **inconclusive**
 until explicitly performed; deterministic fixtures do not establish account
 eligibility or real service availability.
 
@@ -221,7 +199,6 @@ unconfigured startup still provides setup/diagnostics without a provider.
 bin/steward -config local.yaml model discover http://127.0.0.1:8000/v1
 bin/steward -config local.yaml model add http://127.0.0.1:8000/v1 MODEL_ID
 bin/steward -config local.yaml model catalog PROFILE_ID
-bin/steward -config local.yaml model test PROFILE_ID
 bin/steward -config local.yaml model select PROFILE_ID 1 1
 bin/steward -config local.yaml status
 ```
@@ -238,15 +215,12 @@ closed instead of being silently dropped. Clipping Probe uses an eight-byte Host
 output limit while keeping the frozen model token limit, so it actually tests
 clipping rather than depending on a model exceeding its requested token limit.
 
-API keys are optional. On macOS with cgo, `model login` reads a key from stdin
-and writes it through Security.framework Keychain APIs (no credential process
-arguments). It returns an AuthConnection ID to use with `add`. On any platform,
-`model login ENV_NAME` explicitly registers a SecretStore environment reference;
-`ENV_NAME` must be present in each Host process using that connection. Pass the
-returned AuthConnection ID as the last argument to `add URL MODEL_ID AUTH_ID`
-or in the JSON metadata form. Missing credentials fail closed. Neither method
-prints or stores the key in SQLite. Do not enter credentials in metadata fields.
-The native backend is unavailable without macOS/cgo; it never falls back to a file.
+API keys are optional. `model login` reads a key from stdin and writes it to the
+private file SecretStore without credential process arguments. It returns an
+AuthConnection ID to use with `add`. `model login ENV_NAME` explicitly registers
+an environment reference; that variable must be present in every Host process
+using the connection. Missing credentials fail closed. Neither method prints or
+stores the key in SQLite; metadata fields accept references, never secret bytes.
 
 Privacy: model requests, conversation content, and Tool schemas go only to the
 configured endpoint. `localhost` resolves from the Go Host network namespace,
@@ -330,8 +304,7 @@ SecretStore/SQLite still have no distributed transaction: a hard crash between
 those commits can orphan a credential; automatic orphan enumeration/reconciliation
 is not implemented.
 
-`model cancel` cancels setup without changing durable state. No model is chosen
-automatically. Every process that uses a test profile must explicitly supply
+`model cancel` cancels setup without changing durable state. Web automatically selects only the first model the user actively connects, when no model is selected; later additions and restarts never replace that selection. Every process that uses a test profile must explicitly supply
 `-test-bridge success` again. Without it, an existing active test profile reports
 `degraded` with closed ingress. Incompatible Bridge versions, missing credentials,
 unavailable/invalid active profiles, or stale Probe evidence also close ingress.
@@ -349,3 +322,5 @@ a different provider or retries a generation automatically.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/model-connections.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/model-connections.md)。
+
+非账户 API 凭据默认与 Memory 密钥一样存入数据根下的 `secrets/` 文件 SecretStore。账户 OAuth 仍沿用 `account-secrets/`，不自动移动或重写既有账户凭据。

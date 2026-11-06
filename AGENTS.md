@@ -27,6 +27,15 @@ Use Go `testing` (`*_test.go`, beside sources), Node `node:test` (`*.test.mjs`),
 
 Use disposable `STEWARD_DATA_ROOT` directories. Close Python SQLite connections with `contextlib.closing`; use read transactions for consistent cross-table predicates.
 
+## UI Component Changes
+
+Before changing Web UI, read [design.md](design.md), especially the [global component contract](design.md#全局组件契约). It is the single source of visual and interaction rules; do not maintain a separate design specification here.
+
+- Use the shared primitives in `web/src/components/ui/` across Settings, Chat, Tasks, Developer and Intelligent UI. Extend the owning shared component when needed; do not create page-specific selectors, menus, switches or control skins.
+- Keep Steward typography, page layout and branding when adopting or replacing components, unless the user explicitly requests those changes. Follow the documented OpenIntelligentUI protocol and extension boundaries.
+- Preserve each feature's validation, persistence, authorization and native fallback semantics. A visual replacement does not authorize changing autosave or explicit-save behavior.
+- Run the existing control-ownership/build checks and relevant behavior regressions. Review desktop/mobile and light/dark screenshots for visual changes. Update `design.md` and the owning regression when an approved design rule changes; retain third-party notices.
+
 ## Commit & Pull Request Guidelines
 
 Use imperative subjects with customary prefixes, e.g. `feat(web): improve task navigation`, `fix:`, or `refactor:`. Keep PRs focused. Follow the [PR template](.github/pull_request_template.md): describe behavior, link existing issues, record exact validation/evidence, and identify compatibility implications and residual risks. Small fixes need no issue.

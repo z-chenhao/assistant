@@ -30,7 +30,7 @@ flowchart TD
 5. `llm/bridge/images.go` 将请求选择/去重/总量预算与单图解码/预览生成分开。PNG/JPEG 上限为 8 MiB、约 3355 万像素（32 × 1024²），每图最长边 640（极窄图仍至少 1 像素），JPEG 预览最多 48 KiB；工作集最多 8 张，激进重试 4 张，总 base64 预算 512 KiB，复用 1 MiB RPC 上限。单图解码与大小限制归 `media/image.go`，视觉 Bridge 和 OCR 共用；每次模型请求的图片数量预算仍归 LLM。
 6. 图片字节仅存在于临时 provider envelope，observer、SQLite generation、Conversation 和摘要档案均不写 base64。格式、大小、损坏与权限失败在供应商调用前拒绝。语义摘要不隐式获得图片；文本模型的 working set 明确说明像素不可用。
 
-Settings 的图片复选框只是候选声明；既有 Host 蓝色方块 Probe 经同一图像 envelope 验证成功后才可选择模型。Saved models 区分未验证请求、已验证图片输入和纯文本。更新模型只影响新 Run，现有模型快照保持冻结。
+Settings 不再提供图片复选框。ChatGPT 账户模型按认证目录的图片能力默认启用；自定义兼容端点通过 Host 蓝色方块 Probe 与同一图像 envelope 验证，后者不把目录声明当行为证明。更新模型只影响新 Run，现有模型快照保持冻结。
 
 ### 本地 OCR 工具（F-013 增强）
 

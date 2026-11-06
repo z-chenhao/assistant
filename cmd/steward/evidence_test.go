@@ -114,7 +114,7 @@ func TestMemoryEvidenceCLIUsesVaultWithoutEmbeddingOrProtectionWrites(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = m.ConfigureVault(memory.Vault{Secrets: secret.Store{}, Ref: "env:STEWARD_EVIDENCE_SYNTHETIC_KEY"}); err != nil {
+	if err = m.ConfigureVault(memory.Vault{Secrets: secret.Environment{}, Ref: "env:STEWARD_EVIDENCE_SYNTHETIC_KEY"}); err != nil {
 		m.Close()
 		t.Fatal(err)
 	}

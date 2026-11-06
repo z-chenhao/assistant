@@ -275,3 +275,10 @@ func TestWebAccessConfigurationBoundaries(t *testing.T) {
 		})
 	}
 }
+
+func TestSystemCredentialBackendConfigurationIsRejected(t *testing.T) {
+	_, err := Decode([]byte("version: 1\nllm:\n  account_secret_store: native\n"), os.LookupEnv)
+	if err == nil {
+		t.Fatal("removed system credential backend was accepted")
+	}
+}

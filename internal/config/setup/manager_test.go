@@ -29,7 +29,7 @@ func fixtureManager(t *testing.T) *Manager {
 	if e != nil {
 		t.Fatal(e)
 	}
-	return New(c, secret.Store{})
+	return New(c, secret.Environment{})
 }
 func detail(t *testing.T, m *Manager, id string) web.Capability {
 	t.Helper()
@@ -86,7 +86,7 @@ func TestMemoryCandidateSaveAndRestart(t *testing.T) {
 	if e != nil || c.Memory == nil || c.Memory.EncryptionKeyRef != "env:STEWARD_SETUP_KEY" {
 		t.Fatal(c.Memory, e)
 	}
-	restarted := detail(t, New(c, secret.Store{}), "memory")
+	restarted := detail(t, New(c, secret.Environment{}), "memory")
 	if !restarted.Active || restarted.PendingRestart || restarted.Verified {
 		t.Fatal(restarted)
 	}
@@ -144,7 +144,7 @@ func TestConfigPreservesUnrelatedSectionsAndRejectsInvalidCandidates(t *testing.
 }
 func TestConcurrentManagersCannotOverwriteSameRevision(t *testing.T) {
 	m := fixtureManager(t)
-	other := New(m.active, secret.Store{})
+	other := New(m.active, secret.Environment{})
 	t.Setenv("STEWARD_SETUP_KEY", strings.Repeat("a", 32))
 	text := "encryption_key_ref: env:STEWARD_SETUP_KEY\n"
 	a, b := verify(t, m, "memory", text), verify(t, other, "memory", text)
