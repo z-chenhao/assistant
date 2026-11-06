@@ -1,11 +1,33 @@
 """Check partition completeness and the fail-closed required status."""
 import unittest
+from pathlib import Path
+from unittest.mock import DEFAULT, patch
 
 import ci
+import verify_channels
 from runner import CORE
 
 
 class CIChecksTests(unittest.TestCase):
+    def test_required_web_lane_reaches_settings_and_task_regressions(self):
+        # Standalone scenarios protect a flow only when the required lane runs it.
+        scenarios = ('preference_settings', 'memory_inspection', 'attention_workspace',
+                     'sending_feedback', 'live_updates', 'streaming_replies',
+                     'inspection_relationships', 'capability_settings',
+                     'dependency_recovery', 'native_components', 'rich_replies',
+                     'account_presentation', 'native_trace_inspection',
+                     'page_transitions', 'model_connections', 'task_control_components')
+        lanes = {row['lane']: row for row in ci.plan('system')['include']}
+        self.assertEqual(lanes['channels-web']['browser'], 'true')
+        self.assertIn('--group web', ci.command('channels-web'))
+        report = dict(checks=[], scenarios={})
+        binary, evidence = Path('/unused/steward'), Path('/unused/evidence/report.json')
+        with patch.multiple(verify_channels, **dict.fromkeys(scenarios, DEFAULT)) as checks:
+            ci.CHANNEL_GROUPS['web'](binary, evidence, report)
+        for name in ('preference_settings', 'page_transitions', 'model_connections',
+                     'task_control_components', 'capability_settings'):
+            checks[name].assert_called_once_with(binary, evidence, report)
+
     def test_connected_apps_and_browser_regressions_are_required_software_lanes(self):
         lanes = {row['lane']: row for row in ci.plan('software')['include']}
         self.assertEqual(ci.command('connected-apps'), 'make test-connected-apps')

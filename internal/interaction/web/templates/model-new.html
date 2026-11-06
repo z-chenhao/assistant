@@ -1,30 +1,22 @@
 {{define "model-new"}}
 <div class="model-connect">
- <h1 class="setting-name">{{tr "Connect a model"}}</h1>
- <form class="setting-row" method="get" action="/settings/models/new" data-model-provider>
-  <label for="model-provider">{{tr "Connection method"}}</label>
-  <div class="setting-controls">
-   <select id="model-provider" name="provider">
-    <option value="chatgpt" {{if eq .Settings.Provider "chatgpt"}}selected{{end}}>{{tr "ChatGPT account"}}</option>
-    <option value="compatible" {{if eq .Settings.Provider "compatible"}}selected{{end}}>{{tr "Local or compatible API"}}</option>
-   </select>
-   <noscript><button class="secondary setting-action">{{tr "Show settings"}}</button></noscript>
-  </div>
+ <a class="back-link" href="/settings/models">{{tr "Models"}}</a>
+ {{if eq .Settings.ConnectionMethod "account"}}
+ <h1>{{tr "Sign in with an account"}}</h1>
+ <div class="setting-row"><span class="setting-name">ChatGPT</span><form action="/auth/login" method="post" data-open-signin><input type="hidden" name="provider" value="chatgpt"><input type="hidden" name="return_to" value="/settings/models"><button class="secondary setting-action">{{tr "Sign in with ChatGPT"}}</button></form></div>
+ {{else}}
+ <h1>{{tr "Connect with an API key"}}</h1>
+ <form class="model-connect-form" action="/model/add" method="post" data-api-connection>
+ <label>{{tr "Provider"}}<select name="service" id="api-service"><option value="openai" {{if eq .Settings.Service "openai"}}selected{{end}}>OpenAI</option><option value="custom" {{if eq .Settings.Service "custom"}}selected{{end}}>{{tr "Custom endpoint"}}</option></select></label>
+ <label><span class="control-field-label">{{tr "API key"}}{{template "help" (help "api-key-help" (tr "API key") (tr "Local endpoints may not require an API key."))}}</span><input type="password" aria-label="{{tr "API key"}}" name="api_key" maxlength="16384" autocomplete="new-password" spellcheck="false" autocapitalize="off"></label>
+ <label>{{tr "Model ID"}}<input name="model" value="{{.Settings.Model}}" required autocomplete="off"></label>
+ <details class="model-connection-advanced" {{if eq .Settings.Service "custom"}}open{{end}}><summary>{{tr "Advanced"}}</summary>
+ <label>{{tr "Endpoint URL"}}<input type="url" name="endpoint" value="{{.Settings.Endpoint}}" required></label>
+ <label>{{tr "Protocol"}}<select name="wire_api"><option value="openai_completions" {{if eq .Settings.WireAPI "openai_completions"}}selected{{end}}>Chat Completions</option><option value="openai_responses" {{if eq .Settings.WireAPI "openai_responses"}}selected{{end}}>Responses</option></select></label>
+ <label><span>{{tr "Display name"}} <span class="muted">{{tr "optional"}}</span></span><input name="name" value="{{.Settings.Name}}" placeholder="{{tr "My local model"}}"></label>
+ </details>
+ <button class="secondary setting-action">{{tr "Connect"}}</button>
  </form>
-<section class="model-provider-panel" data-model-provider-panel="compatible" {{if ne .Settings.Provider "compatible"}}hidden{{end}}><form class="model-connect-form" action="/model/add" method="post"><label>{{tr "Display name"}} <span class="muted">{{tr "optional"}}</span><input name="name" value="{{.Settings.Name}}" placeholder="{{tr "My local model"}}"></label><label>{{tr "Endpoint URL"}}<input type="url" name="endpoint" value="{{.Settings.Endpoint}}" required></label><label>{{tr "Model ID"}}<input name="model" value="{{.Settings.Model}}" required></label><button class="secondary setting-action">{{tr "Add connection"}}</button></form></section>
-<section class="model-provider-panel" data-model-provider-panel="chatgpt" {{if ne .Settings.Provider "chatgpt"}}hidden{{end}}>
- {{if gt (len .Accounts) 1}}<form class="setting-row" method="get" action="/settings/models/new"><input type="hidden" name="provider" value="chatgpt"><label for="model-account">{{tr "Account"}}</label><div class="setting-controls"><select id="model-account" name="account" data-model-account>{{range .Accounts}}<option value="{{.ConnectionID}}" {{if and $.Settings.Account (eq $.Settings.Account.ConnectionID .ConnectionID)}}selected{{end}}>{{.AccountLabel}}</option>{{end}}</select><noscript><button class="secondary setting-action">{{tr "Show settings"}}</button></noscript></div></form>
- {{else if .Settings.Account}}{{with .Settings.Account}}<div class="connected-account"><strong>{{.AccountLabel}}</strong><span class="status-pill">{{tr .Status}}</span></div>{{end}}{{end}}
- <div id="signin-status">{{template "signin" .}}</div>
- {{with .Settings.Account}}{{if eq .Status "connected"}}
-  {{if $.Settings.Catalog}}<form class="model-connect-form" method="post" action="/model/add"><input type="hidden" name="account" value="{{.ConnectionID}}"><label>{{tr "Model ID"}}<select name="model" required>{{range $.Settings.Catalog}}<option value="{{.ModelID}}">{{.ModelID}}</option>{{end}}</select></label><button class="secondary setting-action">{{tr "Add account model"}}</button></form>
-  {{else}}
-   {{if $.Settings.CatalogError}}<p class="feedback warning">{{tr "The account model list is unavailable."}}</p>
-   {{else if $.Settings.CatalogLoaded}}<p class="muted">{{tr "No compatible models were returned for this account."}}</p>{{end}}
-   <form method="post" action="/model/catalog"><input type="hidden" name="account" value="{{.ConnectionID}}"><button class="secondary setting-action">{{tr "Load models"}}</button></form>
-  {{end}}
- {{else}}<form method="post" action="/auth/login"><input type="hidden" name="account" value="{{.ConnectionID}}"><button class="secondary setting-action">{{tr "Reconnect account"}}</button></form>{{end}}{{end}}
- {{if ne .Auth.Status "pending"}}{{if .Settings.Account}}{{if eq .Settings.Account.Status "connected"}}<form class="account-connect-another" method="post" action="/auth/login" data-open-signin><button class="secondary setting-action">{{tr "Connect another account ↗"}}</button></form>{{end}}{{else}}<form method="post" action="/auth/login" data-open-signin><button class="secondary setting-action">{{tr "Sign in with ChatGPT ↗"}}</button></form>{{end}}{{end}}
-</section>
+ {{end}}
 </div>
 {{end}}

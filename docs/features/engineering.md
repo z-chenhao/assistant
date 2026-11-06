@@ -153,6 +153,17 @@ decision history and execution evidence remain in PRs, Git history or CI artifac
 7. Report the behavior, checks/results and remaining limitations. Distinguish
    failed, skipped and unrun checks; never turn scripted responses into model scores.
 
+Local deployments may include unmerged fixes. Before PR preparation, reconcile
+the requested behaviors against tracked and untracked sources, templates,
+generated assets, documentation and tests. List any requested fixes excluded
+from the PR. Before replacing that deployment with `main`, compare its source
+and local patches against the actual merged commits; preserve and report any
+remaining difference. Delivery evidence identifies the merged revision, the
+served JS/CSS and the affected UI behavior, not only a successful startup.
+CI can reject regressions present in its checkout; it cannot discover a patch
+that was never submitted. The change inventory and deployment comparison close
+that separate gap without requiring unrelated local work to be committed.
+
 | Change | Evidence |
 | --- | --- |
 | Documentation | Inspect content and run `python3 scripts/check_docs.py` |

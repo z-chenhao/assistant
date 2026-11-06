@@ -12,8 +12,8 @@
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;min-height:54px;padding:8px 0;border-bottom:1px solid var(--border);font-size:var(--text-ui)}
 .setting-row label{margin:0}.setting-name,.model-list-heading h2{font-size:var(--text-ui);font-weight:600;margin:0}.setting-description{font-size:13px;color:var(--muted-foreground);margin:4px 0 0}
 .setting-label,.setting-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}.setting-controls select{width:auto;max-width:100%;margin:0}.setting-controls button{flex-shrink:0}
-.setting-action{min-height:34px;padding:6px 10px;font-size:13px}.models-heading a{margin-inline-start:auto}
-.models-heading .setting-name{font-size:var(--text-section);line-height:1.5}.model-connect{max-width:560px}.model-connect>h1{font-size:var(--text-page);line-height:1.35;margin-bottom:var(--section-space)}.model-provider-panel{padding:12px 0;font-size:14px}.model-provider-panel>form{max-width:420px}
+.models-heading a{margin-inline-start:auto}
+.models-heading .setting-name{font-size:var(--text-section);line-height:1.5}.model-connect{max-width:none}.model-connect>h1{font-size:var(--text-page);line-height:1.35;margin-bottom:var(--section-space)}.model-provider-panel{padding:12px 0;font-size:14px}.model-provider-panel>form{max-width:none}
 .model-resources{container-type:inline-size}
 .resource-provider{padding:10px 0;border-bottom:1px solid var(--border)}
 .resource-summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px var(--control-gap);min-height:40px;padding:6px 8px;list-style:none}
@@ -24,18 +24,18 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .resource-name{flex:1;min-width:min(100%,7rem);overflow-wrap:anywhere;margin:0;font-size:var(--text-ui);font-weight:600}
 .resource-summary h2.resource-name{font-size:var(--text-section);line-height:1.5}
 .direct-models-heading{font-size:var(--text-section);line-height:1.5;padding:6px 8px;color:var(--muted-foreground)}
-.resource-model{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,9.75rem);column-gap:var(--control-gap);align-items:start;margin-inline-start:20px;scroll-margin-top:90px}
-.resource-model[data-account-model]{grid-template-columns:minmax(0,1fr) 9.75rem}
+.resource-model{display:grid;grid-template-columns:minmax(0,1fr) var(--settings-action-width,12.5rem);column-gap:var(--control-gap);align-items:start;margin-inline-start:20px;scroll-margin-top:90px}
+.resource-model[data-account-model]{grid-template-columns:minmax(0,1fr) var(--settings-action-width,12.5rem)}
 .resource-model .resource-name{font-weight:500}
 .resource-model-label{display:flex;align-items:center;min-height:40px;padding:6px 8px 6px 32px}
-.model-connection,.model-use{display:flex;align-items:center;justify-content:center;min-height:40px}
-.model-connection form,.model-use form{margin:0}
+.model-connection,.model-use{display:flex;align-items:center;justify-content:flex-end;min-height:40px}
+.model-connection form,.model-use form{margin:0;width:100%}
 .model-provider-panel{display:grid;gap:20px}
 .model-provider-panel>form{margin:0;width:100%}
 .model-provider-panel>#signin-status:empty,.model-provider-panel>#signin-status:has(>[hidden]:only-child){display:none}
 .model-connect-form{display:grid;gap:20px}
 .model-connect-form>label{margin:0}
-.model-connect-form>button{justify-self:start}
+.model-connect-form>button{justify-self:end}
 .connected-account{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .model-provider-panel>.account-connect-another{padding-top:16px;border-top:1px solid var(--border)}
 .resource-body{padding:4px 8px 14px 28px;min-width:0}
@@ -46,13 +46,11 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
  .resource-summary,.resource-model-label{min-height:44px}
 }
 /* Two navigation rails can leave a narrow column on a wide viewport. */
-@container(max-width:520px){
- .resource-model{margin-inline-start:8px;grid-template-columns:repeat(2,minmax(0,1fr));padding-bottom:6px}
- .resource-model>details,.resource-model-label{grid-column:1/-1}
- .model-connection,.model-use{min-height:44px}
- .model-connection button,.model-use button{max-width:100%}
- .resource-model[data-account-model]{grid-template-columns:minmax(0,1fr) auto}
- .resource-model[data-account-model]>.resource-model-label{grid-column:auto;padding-left:8px}
+@container(max-width:600px){
+ .resource-model,.resource-model[data-account-model]{margin-inline-start:8px;grid-template-columns:minmax(0,1fr) var(--settings-action-width,12.5rem);row-gap:6px;padding-bottom:10px}
+ .resource-model>details,.resource-model-label,.resource-model[data-account-model]>.resource-model-label{grid-column:1/-1}
+ .model-connection,.model-use{grid-column:2;min-height:44px}
+ .resource-model[data-account-model]>.resource-model-label{padding-left:8px}
 }
 @media(max-width:760px){.setting-action{min-height:44px}}
 /* Preferences share the tab strip's density; other settings keep their forms. */
@@ -114,3 +112,25 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 [data-worker-list]{margin-bottom:24px}
 /* Keep a readable conversation beside the 256px navigation and 460px pane. */
 @media(min-width:1280px){.workspace-panel-open:not(.workspace-panel-expanded) .workspace-main{margin-right:460px}.workspace-panel-open:not(.workspace-panel-expanded) .conversation-footer{right:460px}.workspace-panel-open:not(.workspace-panel-expanded) #new-messages{right:480px}}
+
+/* Tasks are searchable records; details own the brief and delivered results. */
+.task-list-toolbar{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px}
+.task-list-toolbar .search-form{margin:0;max-width:360px;flex:1 1 240px}
+.task-table-scroll{max-width:100%;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
+.task-table-scroll::-webkit-scrollbar{display:none}
+.task-table{width:100%;min-width:720px;border-collapse:collapse;table-layout:fixed;font:13px/1.6 var(--font-ui)}
+.task-table th{color:var(--muted-foreground);font-weight:500;text-align:start}
+.task-table :is(th,td){padding:14px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.task-table :is(th,td):first-child{padding-left:0;width:36%}
+.task-table :is(th,td):last-child{padding-right:0}
+.task-table th:nth-child(2){width:14%}.task-table th:nth-child(3){width:14%}
+.task-table tbody tr:hover{background:var(--hover)}
+.task-list-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--foreground);text-decoration:none}
+.task-list-title:hover{text-decoration:underline;text-underline-offset:3px}
+.task-table time{font-size:12px;color:var(--muted-foreground)}
+.task-table-empty{padding:32px 0!important;color:var(--muted-foreground)}
+.execution-facts{display:flex;flex-wrap:wrap;gap:16px 32px;margin:0 0 28px;font-size:13px}.execution-facts>div{display:grid;gap:4px}.execution-facts dt{color:var(--muted-foreground)}.execution-facts dd{margin:0}
+@media(max-width:760px){.task-list-toolbar .search-form{max-width:none}}
+
+.tasks-page>.page-heading{flex-wrap:wrap}
+.tasks-page>.page-heading>.button{margin-inline-start:auto}

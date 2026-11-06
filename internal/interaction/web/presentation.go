@@ -41,11 +41,6 @@ func historyLabel(kind string) string {
 	return kind
 }
 
-type viewOption struct{ Value, Label string }
-
-func taskViews() []viewOption {
-	return []viewOption{{"open", "Open"}, {"attention", "Needs me"}, {"closed", "Finished"}, {"all", "All tasks"}}
-}
 func tabLabel(name string) string {
 	switch name {
 	case "overview":

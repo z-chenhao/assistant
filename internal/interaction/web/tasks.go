@@ -16,11 +16,18 @@ type TaskReader interface {
 	List(context.Context, task.ListQuery) (task.List, error)
 	Detail(context.Context, string, string) (task.Detail, error)
 }
+type executionReader interface {
+	Executions(context.Context, task.ListQuery) (task.ExecutionList, error)
+	Execution(context.Context, string) (task.ExecutionDetail, error)
+}
 type shownArtifact struct{ Ref, Name string }
 type scheduledTaskReader interface {
 	Scheduled(context.Context, string) ([]task.ScheduledWork, error)
 }
 type taskView struct {
+	Configurations       bool
+	Executions           task.ExecutionList
+	Execution            *task.ExecutionDetail
 	Query                task.ListQuery
 	List                 task.List
 	Detail               *task.Detail
@@ -31,7 +38,8 @@ type taskView struct {
 	SchedulesUnavailable bool
 }
 
-func taskURL(ref string) string { return "/tasks/" + url.PathEscape(ref) }
+func executionURL(id string) string { return "/tasks/executions/" + url.PathEscape(id) }
+func taskURL(ref string) string     { return "/tasks/" + url.PathEscape(ref) }
 func conversationURL(sequence int64) string {
 	if sequence <= 0 {
 		return "/"
@@ -39,7 +47,7 @@ func conversationURL(sequence int64) string {
 	return "/?before=" + strconv.FormatInt(sequence+1, 10) + "#message-" + strconv.FormatInt(sequence, 10)
 }
 func tasksQuery(r *http.Request) (task.ListQuery, error) {
-	q := task.ListQuery{View: "open"}
+	q := task.ListQuery{View: "all"}
 	for key, values := range r.URL.Query() {
 		if len(values) != 1 {
 			return q, task.ErrInvalid
@@ -49,6 +57,11 @@ func tasksQuery(r *http.Request) (task.ListQuery, error) {
 			q.View = values[0]
 		case "q":
 			q.Query = values[0]
+		case "needs_me":
+			if values[0] != "1" {
+				return q, task.ErrInvalid
+			}
+			q.NeedsMe = true
 		case "cursor":
 			q.Cursor = values[0]
 		case "feedback_before":
@@ -60,7 +73,7 @@ func tasksQuery(r *http.Request) (task.ListQuery, error) {
 		}
 	}
 	if q.View == "" {
-		q.View = "open"
+		q.View = "all"
 	}
 	return q, q.Validate()
 }
@@ -69,12 +82,19 @@ func taskListURL(v *taskView, field, value string) string {
 	if v != nil {
 		q.Set("view", v.Query.View)
 		q.Set("q", v.Query.Query)
+		if v.Query.NeedsMe {
+			q.Set("needs_me", "1")
+		}
 	}
 	q.Set(field, value)
 	if field != "cursor" {
 		q.Del("cursor")
 	}
-	return "/tasks?" + q.Encode()
+	path := "/tasks"
+	if v != nil && v.Configurations {
+		path = "/tasks/configurations"
+	}
+	return path + "?" + q.Encode()
 }
 func (s *Server) loadTasks(ctx context.Context, r *http.Request, p *page) error {
 	if s.Tasks == nil {
@@ -84,26 +104,64 @@ func (s *Server) loadTasks(ctx context.Context, r *http.Request, p *page) error 
 	defer cancel()
 	v := &taskView{}
 	p.Tasks = v
-	if r.URL.Path == "/tasks" || r.URL.Path == "/progress" {
+	if r.URL.Path == "/tasks/attention" {
+		s.loadAttention(ctx, p, "", r.URL.Query().Get("feedback_before"), nil)
+		return nil
+	}
+	if strings.HasPrefix(r.URL.Path, "/tasks/executions/") {
+		reader, ok := s.Tasks.(executionReader)
+		if !ok {
+			return errors.New("execution view unavailable")
+		}
+		if len(r.URL.Query()) > 0 {
+			return task.ErrInvalid
+		}
+		detail, err := reader.Execution(ctx, strings.TrimPrefix(r.URL.Path, "/tasks/executions/"))
+		if err != nil {
+			return err
+		}
+		v.Execution = &detail
+		for _, m := range detail.Messages {
+			shown, e := s.showMessage(ctx, m, nil)
+			if e != nil {
+				return e
+			}
+			v.Messages = append(v.Messages, shown)
+		}
+		return nil
+	}
+	if r.URL.Path == "/tasks" || r.URL.Path == "/progress" || r.URL.Path == "/tasks/configurations" {
 		q, err := tasksQuery(r)
 		if err != nil {
 			return err
 		}
 		v.Query = q
-		v.List, err = s.Tasks.List(ctx, q)
-		if err == nil && (q.View == "open" || q.View == "all") {
-			if reader, ok := s.Tasks.(scheduledTaskReader); ok {
-				var scheduleErr error
-				v.Scheduled, scheduleErr = reader.Scheduled(ctx, q.Query)
-				v.SchedulesUnavailable = scheduleErr != nil
-				if scheduleErr != nil {
+		v.Configurations = r.URL.Path == "/tasks/configurations"
+		if v.Configurations {
+			q.View = "all"
+			q.NeedsMe = false
+			v.Query.NeedsMe = false
+			v.Query.View = "all"
+			v.List, err = s.Tasks.List(ctx, q)
+			if err != nil {
+				return err
+			}
+			if reader, ok := s.Tasks.(scheduledTaskReader); ok && q.Cursor == "" {
+				v.Scheduled, err = reader.Scheduled(ctx, q.Query)
+				if err != nil {
+					v.SchedulesUnavailable = true
 					v.Scheduled = nil
+					err = nil
 				}
 			}
+		} else {
+			reader, ok := s.Tasks.(executionReader)
+			if !ok {
+				return errors.New("execution list unavailable")
+			}
+			v.Executions, err = reader.Executions(ctx, q)
 		}
-		if err == nil {
-			s.loadAttention(ctx, p, "", r.URL.Query().Get("feedback_before"), nil)
-		}
+
 		return err
 	}
 	ref := strings.TrimPrefix(r.URL.Path, "/tasks/")

@@ -1,29 +1,29 @@
 import {t} from './i18n';
 
-// Save one exact candidate at a time. The Host still validates, probes and CASes
-// the configuration; changing controls while a request is pending queues a save.
+// Fields belong to the Web form; serialized configuration stays on the Host.
+// Validate and save one exact candidate at a time, with a revision check.
 export function enhanceCapabilityForms(){
- const forms=Array.from(document.querySelectorAll<HTMLFormElement>('[data-capability-form]'));
- const baseline=new Map<HTMLFormElement,string>();
- const values=(form:HTMLFormElement)=>{
-  const data=new URLSearchParams();
-  for(const [key,value] of new FormData(form))if(typeof value==='string')data.append(key,value);
-  return data;
- };
- const fields=(form:HTMLFormElement)=>{const data=values(form);data.delete('revision');data.delete('configuration');return data.toString()};
- for(const form of forms){
+ for(const form of document.querySelectorAll<HTMLFormElement>('[data-capability-form]')){
+  const id=form.querySelector<HTMLInputElement>('[name=capability]')!.value;
+  const pagePath='/settings/capabilities/'+encodeURIComponent(id);
+  // Native add/remove actions render a draft from POST. Keep its fields while
+  // restoring the canonical page URL before subsequent autosave/readback.
+  if(location.pathname==='/capability/configure')history.replaceState(history.state,'',pagePath);
   const enabled=form.querySelector<HTMLInputElement>('input[name="enabled"]');
   const mode=form.querySelector<HTMLSelectElement>('[data-capability-mode]');
   const status=form.querySelector<HTMLElement>('[data-capability-draft]');
-  const yaml=form.querySelector<HTMLTextAreaElement>('textarea[name="configuration"]');
-  const file=form.querySelector<HTMLInputElement>('[data-capability-import]');
-  const sync=()=>{
-   if(!enabled&&!mode)return;
-   const active=mode?mode.value==='custom':enabled!.checked;
-   const group=form.querySelector<HTMLElement>('[data-capability-fields]');if(group)group.hidden=!active;
-   form.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement|HTMLButtonElement>('[data-capability-fields] input:not([type="hidden"]),[data-capability-fields] select,[data-capability-fields] textarea,[data-capability-fields] button').forEach(control=>{control.disabled=!active});
+  const values=()=>{
+   const data=new URLSearchParams();
+   for(const [key,value] of new FormData(form))if(typeof value==='string')data.append(key,value);
+   return data;
   };
-  let pending=false,queued=false,timer:ReturnType<typeof setTimeout>|undefined;
+  const fields=()=>{const data=values();data.delete('revision');for(const key of Array.from(data.keys()))if(key.endsWith('.original'))data.delete(key);return data.toString()};
+  const sync=()=>{
+   const active=mode?mode.value==='custom':enabled?.checked;
+   const group=form.querySelector<HTMLElement>('[data-capability-fields]');if(group)group.hidden=!active;
+   form.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement|HTMLButtonElement>('[data-capability-fields] input:not([type="hidden"]),[data-capability-fields] select,[data-capability-fields] textarea,[data-capability-fields] button').forEach(control=>{control.disabled=!active||pending&&control instanceof HTMLButtonElement;if(!(control instanceof HTMLButtonElement))control.required=!!active&&control.hasAttribute('data-required')});
+  };
+  let pending=false,queued=false,baseline='',timer:ReturnType<typeof setTimeout>|undefined;
   const feedback=(message:string,error=false)=>{
    if(!status)return;
    status.replaceChildren(document.createTextNode(t(message)));status.setAttribute('role',error?'alert':'status');
@@ -32,53 +32,45 @@ export function enhanceCapabilityForms(){
   const save=async()=>{
    clearTimeout(timer);sync();
    if(pending){queued=true;return}
-   if(!form.checkValidity())return;
-   const data=values(form),sent=data.toString(),sentFields=fields(form),sentYAML=data.get('configuration')??'';
-   if(sent===baseline.get(form)){feedback('Saved.');return}
+   if(!form.checkValidity()){feedback('Complete the required fields.');return}
+   const data=values(),sent=fields();
+   if(sent===baseline){feedback('');return}
    data.set('action','apply');pending=true;queued=false;form.setAttribute('aria-busy','true');feedback('Saving…');
+   // Row edits use native POST navigation. Disable them until this write settles.
+   const rowButtons=Array.from(form.querySelectorAll<HTMLButtonElement>('button[name="action"]'));
+   for(const button of rowButtons)button.disabled=true;
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
    let saved=false;
    try{
-    const response=await fetch(form.action,{method:'POST',body:data,credentials:'same-origin',signal:controller.signal});
+    // Named action buttons shadow HTMLFormElement.action in MCP forms.
+    const response=await fetch(form.getAttribute('action')!,{method:'POST',body:data,credentials:'same-origin',signal:controller.signal});
     const parsed=new DOMParser().parseFromString(await response.text(),'text/html');
     if(!response.ok){const message=parsed.querySelector('.feedback.error')?.textContent?.trim();throw Error(message||t('Could not save. Your changes are kept.'))}
-    const next=new URL(response.url),revision=parsed.querySelector<HTMLInputElement>('[data-capability-form] [name="revision"]')?.value;
-    if(next.origin!==location.origin||next.pathname!==location.pathname||!revision)throw Error(t('Could not confirm the save. Refresh to check.'));
-    const canonical=parsed.querySelector<HTMLInputElement>('.capability-guided [name="configuration"]')?.value??parsed.querySelector<HTMLTextAreaElement>('.capability-editor [name="configuration"]')?.value??sentYAML;
-    for(const other of forms){
-     other.querySelector<HTMLInputElement>('[name="revision"]')!.value=revision;
-     const stored=other.querySelector<HTMLInputElement>('input[name="configuration"]');if(stored)stored.value=canonical;
-     const editor=other.querySelector<HTMLTextAreaElement>('textarea[name="configuration"]');if(editor&&(!editor.dataset.edited||editor===yaml&&editor.value===sentYAML)){editor.value=canonical;delete editor.dataset.edited}
+    const next=new URL(response.url),canonical=parsed.querySelector<HTMLFormElement>('[data-capability-form]');
+    const revision=canonical?.querySelector<HTMLInputElement>('[name="revision"]')?.value;
+    if(next.origin!==location.origin||next.pathname!==pagePath||!revision)throw Error(t('Could not confirm the save. Refresh to check.'));
+    form.querySelector<HTMLInputElement>('[name="revision"]')!.value=revision;
+    // Provider indexes refer to the persisted order, which may change on deletion.
+    for(const input of form.querySelectorAll<HTMLInputElement>('input[name$=".original"]')){
+     const updated=canonical?.elements.namedItem(input.name);if(updated instanceof HTMLInputElement)input.value=updated.value;
     }
     const current=document.querySelector('.capabilities-page>.page-heading .status-pill'),updated=parsed.querySelector('.capabilities-page>.page-heading .status-pill');
     if(current&&updated)current.replaceWith(updated);
     saved=true;
-    if(fields(form)!==sentFields||yaml&&yaml.value!==canonical)queued=true;
-    else{for(const other of forms)baseline.set(other,values(other).toString());feedback('Saved.')}
+    if(fields()!==sent)queued=true;
+    else{baseline=fields();feedback('Saved.')}
    }catch(error){feedback(error instanceof Error?error.message:'Could not save. Your changes are kept.',true)}
-   finally{clearTimeout(timeout);pending=false;form.removeAttribute('aria-busy');if(saved&&queued)void save()}
+   finally{clearTimeout(timeout);pending=false;form.removeAttribute('aria-busy');sync();if(saved&&queued)void save()}
   };
   const changed=(event:Event)=>{
    sync();document.querySelectorAll<HTMLElement>('[data-capability-feedback]').forEach(node=>{node.hidden=true});
-   if(yaml&&event.target===yaml)yaml.dataset.edited='true';
-   if(event.target===mode&&mode?.value==='custom'){feedback('Complete the settings below. Changes save automatically.');return}
+   if(event.target===mode&&mode?.value==='custom'&&!form.checkValidity()){feedback('Complete the required fields.');return}
    clearTimeout(timer);timer=setTimeout(()=>void save(),event.type==='input'?700:0);
   };
-  sync();baseline.set(form,values(form).toString());
-  form.addEventListener('change',event=>{if(event.target!==file)changed(event)});
-  form.addEventListener('input',event=>{if(event.target!==file&&!(event.target instanceof HTMLSelectElement))changed(event)});
+  sync();baseline=fields();
+  form.addEventListener('change',changed);
+  form.addEventListener('input',event=>{if(!(event.target instanceof HTMLSelectElement))changed(event)});
   form.addEventListener('submit',event=>{const submitter=(event as SubmitEvent).submitter;if(submitter instanceof HTMLButtonElement&&submitter.name==='action'&&submitter.value!=='apply')return;event.preventDefault();void save()});
-  file?.addEventListener('change',()=>{void(async()=>{
-   const selected=file.files?.[0];if(!selected||!yaml)return;
-   if(selected.size>65536){feedback('Choose a YAML file smaller than 64 KiB.',true);return}
-   try{yaml.value=await selected.text();yaml.dataset.edited='true';feedback('Checking configuration…');await save()}catch{feedback('Could not read the YAML file. Choose it again.',true)}
-  })()});
-  form.querySelector<HTMLButtonElement>('[data-capability-example]')?.addEventListener('click',event=>{
-   const button=event.currentTarget as HTMLButtonElement;
-   const href=URL.createObjectURL(new Blob([button.dataset.capabilityExample??''],{type:'application/yaml'}));
-   const link=document.createElement('a');link.href=href;link.download=(form.querySelector<HTMLInputElement>('[name="capability"]')?.value??'capability')+'.yaml';link.click();setTimeout(()=>URL.revokeObjectURL(href),1000);
-  });
-  form.querySelectorAll('[data-client-pending]').forEach(node=>node.removeAttribute('data-client-pending'));
   form.dataset.autosaveReady='true';
  }
 }

@@ -25,7 +25,7 @@
 | 数据边界 | 拒绝直接密钥轮换、embedding 身份变更不等于索引迁移、Computer bootstrap 结构正确 | config/setup 组件测试 |
 | 有界真实探测 | 固定 embedding 文本；实际沙箱 printf；MCP tools list 但无业务调用；实际 sidecar 握手 + sealed base 校验但无 VM | owned HTTP/stdio/Computer peers + 组件测试 |
 | 生命周期 | 保存前后旧快照一致；重启后新 Run 包含新 provider；旧快照仍一致 | channels 场景读取实际 SQLite 状态 |
-| 可访问操作 | 原生无 JavaScript Test 表单、320px 无横向溢出、浏览器无脚本错误 | channels browser 模块 |
+| 可访问操作 | 原生无 JavaScript 字段表单、320px 无横向溢出、浏览器无脚本错误 | channels browser 模块 |
 
 ## 维护入口
 
@@ -40,11 +40,11 @@
 
 Linux 验证了内核沙箱与受控 Lume 协议、tiny sealed base 和真实 Node runtime。Computer 诊断不启动 Guest，因此不以这份证据声称验证了 macOS/arm64 的实际桌面操作；该边界由 [Computer 测试方案](computer-use.md) 保持。真实外部 MCP/embedding 服务可通过同一 owner 入口按实际凭据测试，未配置时不自动补齐服务或选择默认模型。
 
-普通表单补充：`capability_forms_test.go` 与 `capability_server_test.go` 验证六类往返、未展示字段保留、别名回退、MCP 顺序／权限、明文凭据拒绝、版本冲突、精确候选证明与转义。维护中的 channels_capabilities 浏览器场景覆盖默认记忆、中文／移动端、Preferences 布局、单次 Save 的失败／成功／修改后重新校验／保存，MCP 原生增删行、无 JavaScript 普通及高级表单。真实工作区／Computer 诊断若因本机环境不可用而失败，必须记录未完成范围并拒绝无效保存，不能用 UI 成功状态替代。
+普通表单补充：`capability_forms_test.go` 与 `capability_server_test.go` 验证六类往返、未展示字段保留、别名回退、MCP 顺序／权限、明文凭据拒绝、版本冲突、精确候选证明与转义。维护中的 channels_capabilities 浏览器场景覆盖默认记忆、中文／移动端、Preferences 布局、自动保存的失败／成功／修改后重新校验／保存，MCP 原生增删行、无 JavaScript 字段表单。真实工作区／Computer 诊断若因本机环境不可用而失败，必须记录未完成范围并拒绝无效保存，不能用 UI 成功状态替代。
 
 状态与保存回归：`TestDefaultMemoryHasOneEnabledEntryAndPreferenceLayout` 和 `TestPreferenceStyleSaveChecksBeforePersisting` 验证默认启用、一处 Memory 入口、联合关闭、密钥保留、无效连接拒绝与版本冲突。channels 的 `default_capability_settings` 使用显式隔离 SecretStore 启动真实应用，验证默认密钥跨进程重用并输出新设置页截图。
 
 
 `TestCapabilityStatusDistinguishesConfigurationFromConnectionProof` 以表驱动验证关闭、自动／自定义启用、准备中、不支持、不可用、已保存待重启及未保存候选；各状态分别使用有／无连接检查证明和中英文渲染，防止再次把默认启用误写成未验证，或用启用文案掩盖异常。
 
-维护中的 capability-setup 浏览器场景还验证：普通表单测试成功后编辑字段，旧连接提示隐藏并显示未保存；高级 YAML 编辑后旧提示隐藏且保存禁用；重新测试恢复当前候选反馈。保存与失败后的修复仍走真实配置管理器及 owned peers，不以隐藏提示代替服务端验证。
+维护中的 capability-setup 浏览器场景还验证六类真实字段的失败修复、自动保存、MCP 权限与原生行编辑，无脚本提交；逐页覆盖 1400／390／320px 和明暗主题，测量布尔行标签与开关同排、无横向溢出；断言不包含 YAML 编辑、导入、模板与配置文件路径。服务端回归验证 guided 忽略附带整份文档、字段草稿保留和版本冲突。配置和探测仍使用真实 Manager 及 owned peers。

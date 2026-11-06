@@ -51,9 +51,8 @@ try{
  await page.reload();
  await page.locator('[data-app-tile=gmail]').getByRole('button',{name:'Connect Gmail',exact:true}).waitFor();
  assert.equal((await (await context.request.get(broker+'/test/count')).json()).created,0);
- await page.getByRole('link',{name:'Resources',exact:true}).click();
- await page.getByRole('link',{name:'Configure service',exact:true}).click();
- assert.equal(await page.locator('.settings-navigation [aria-current=page]').getAttribute('href'),'/settings/setup');
+ await page.getByRole('link',{name:'App settings',exact:true}).click();
+ assert.equal(await page.locator('.settings-navigation [aria-current=page]').getAttribute('href'),'/settings/apps');
  await page.locator('#composio-key-ref').fill('env:COMPOSIO_API_KEY');
  await page.getByRole('button',{name:'Verify and save',exact:true}).click();
  await page.getByText('App connection service saved.',{exact:true}).waitFor();

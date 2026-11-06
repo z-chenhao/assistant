@@ -7,7 +7,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-foreground text-background hover:bg-foreground/86',
-        secondary: 'border border-border bg-background hover:bg-muted',
+        secondary: 'secondary border border-border bg-background hover:bg-muted',
       },
       size: {default: 'h-9 px-4 py-2', icon: 'size-9'},
     },
@@ -15,4 +15,4 @@ export const buttonVariants = cva(
   },
 );
 
-export const textareaStyle = 'min-h-20 w-full resize-none rounded-lg border-0 bg-transparent px-3 py-2 text-base leading-normal outline-none placeholder:text-muted-foreground';
+export const textareaStyle = 'control-input-embedded min-h-20 w-full resize-none rounded-lg border-0 bg-transparent px-3 py-2 text-base leading-normal outline-none placeholder:text-muted-foreground';

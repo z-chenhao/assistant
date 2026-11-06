@@ -13,6 +13,8 @@ var ErrNotFound = errors.New("task not found")
 type ListQuery struct {
 	View, Query, Cursor string
 	Limit               int
+	// NeedsMe filters executions independently of their status.
+	NeedsMe bool
 }
 
 func (q ListQuery) Validate() error {
@@ -90,6 +92,7 @@ type Entry struct {
 // execution time or a frozen Run snapshot.
 type Schedule struct {
 	Ref, Instruction, Type, Spec, Timezone, NextAt string
+	CreatedAt, UpdatedAt                           string
 	Version                                        int64
 	Enabled, Restricted                            bool
 	Below                                          *int64

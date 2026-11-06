@@ -24,11 +24,16 @@ type settingsView struct {
 	AccountModels         map[string][]modelResource
 	Target                string
 	Model, Endpoint, Name string
+	Service, WireAPI      string
+	ConnectionMethod      string
 }
 
 type modelResource struct {
 	llm.Profile
 	Current, Verified, Open, CanTest bool
+	KeyAuth                          bool
+	AuthVersion                      int64
+	ConnectionStatus                 string
 	ConfigVersion                    int64
 }
 
@@ -41,11 +46,11 @@ func resourceModelQuery(id, notice string) url.Values {
 }
 
 func resourceModelURL(id, notice string) string {
-	return "/settings/setup?" + resourceModelQuery(id, notice).Encode() + "#model-" + url.PathEscape(id)
+	return "/settings/models?" + resourceModelQuery(id, notice).Encode() + "#model-" + url.PathEscape(id)
 }
 
 func (s *Server) loadSettings(ctx context.Context, r *http.Request, p *page) error {
-	v := &settingsView{Section: "resources", Provider: r.URL.Query().Get("provider"), Endpoint: "http://127.0.0.1:8000/v1"}
+	v := &settingsView{Section: "models", Provider: r.URL.Query().Get("provider"), Endpoint: "https://api.openai.com/v1", Service: "openai", WireAPI: "openai_completions"}
 	p.Settings = v
 	if r.URL.Path == "/settings/preferences" {
 		v.Section = "preferences"
@@ -81,15 +86,26 @@ func (s *Server) loadSettings(ctx context.Context, r *http.Request, p *page) err
 	}
 	if r.URL.Path == "/settings/models/new" {
 		v.Section = "new"
-		if v.Provider == "" {
-			v.Provider = "chatgpt"
+		v.ConnectionMethod = r.URL.Query().Get("method")
+		v.Provider = "compatible"
+		if source := r.URL.Query().Get("source"); source != "" {
+			if s.Control.Store == nil {
+				return errPageNotFound
+			}
+			profile, err := s.Control.Store.Profile(ctx, source)
+			if err != nil || profile.ProviderKind != "openai_compatible" {
+				return errPageNotFound
+			}
+			v.Model = profile.ModelID
+			v.Endpoint = profile.Endpoint
+			v.Name = profile.Name
+			v.WireAPI = profile.WireAPI
+			v.Service = "custom"
+			if profile.Endpoint == "https://api.openai.com/v1" {
+				v.Service = "openai"
+			}
 		}
-		if v.Provider != "compatible" && v.Provider != "chatgpt" {
-			return llm.ErrConflict
-		}
-		if v.Provider == "compatible" {
-			return nil
-		}
+		return nil
 	}
 	if s.Accounts != nil {
 		var err error
@@ -98,7 +114,7 @@ func (s *Server) loadSettings(ctx context.Context, r *http.Request, p *page) err
 			return err
 		}
 	}
-	if v.Section == "resources" {
+	if v.Section == "models" {
 		return s.loadResourceModels(ctx, r, p)
 	}
 
@@ -149,11 +165,23 @@ func (s *Server) loadResourceModels(ctx context.Context, r *http.Request, p *pag
 			ConfigVersion: p.Status.ConfigVersion,
 			CanTest:       profile.ProviderKind != "openai_account" || connectedAccounts[profile.AuthConnectionID],
 		}
+		row.ConnectionStatus = "connected"
+		if profile.AuthConnectionID != "" && profile.ProviderKind != "openai_account" && s.Control.Store != nil {
+			auth, e := s.Control.Store.Auth(ctx, profile.AuthConnectionID)
+			if e == nil {
+				row.KeyAuth = auth.AuthKind == "api_key"
+				row.AuthVersion = auth.Version
+				row.ConnectionStatus = auth.Status
+			}
+		}
+		if !row.Verified && row.ConnectionStatus != "logged_out" {
+			row.ConnectionStatus = "Needs attention"
+		}
 		if row.ProfileID == requested {
 			v.TargetModel = row.ProfileID
 			switch notice {
 			case "tested":
-				if !row.Verified {
+				if !row.Verified && row.ConnectionStatus != "logged_out" {
 					p.Notice = ""
 				}
 			case "active":

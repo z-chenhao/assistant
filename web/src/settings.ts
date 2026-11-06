@@ -1,5 +1,6 @@
 import {t} from './i18n';
 import {confirmSettingsAction,enhanceSettingsControls} from './settings-controls';
+import {enhanceNotificationPreference} from './notification-preference';
 import {enhanceLanguagePreference} from './preferences';
 
 const signInOpenedHash='#auth-window-opened';
@@ -14,7 +15,7 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
   const response=await fetch(form.action,{method:'POST',body,signal});
   if(!response.ok)return;
   const target=new URL(response.url);
-  if(target.origin===location.origin&&(target.pathname==='/settings/setup'||target.pathname==='/settings/models/new'))returnPath=target.pathname+target.search;
+  if(target.origin===location.origin&&(target.pathname==='/settings/models'||target.pathname==='/settings/models/new'))returnPath=target.pathname+target.search;
   while(!popup.closed&&!signal.aborted){
    const response=await fetch('/api/auth',{signal,cache:'no-store'});
    if(!response.ok)return;
@@ -34,7 +35,12 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
   // The local sign-in page remains the fallback for a blocked or failed launch.
  }finally{
   if(!opened)popup.close();
-  location.assign(opened?returnPath+signInOpenedHash:returnPath);
+  const target=new URL(opened?returnPath+signInOpenedHash:returnPath,location.href);
+  // Returning to Models can now be a hash-only navigation. Reload its
+  // server state so the pending form and popup marker initialize together.
+  if(target.pathname===location.pathname&&target.search===location.search){history.replaceState(history.state,'',target);location.reload()}
+  else location.assign(target);
+
  }
 }
 
@@ -42,7 +48,15 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
 export function enhanceSettings(){
  document.querySelector<HTMLSelectElement>('[data-model-account]')?.addEventListener('change',event=>{(event.target as HTMLSelectElement).form?.requestSubmit()});
  try{enhanceLanguagePreference()}finally{document.querySelector('[data-language-preference]')?.setAttribute('data-language-ready','')}
+ enhanceNotificationPreference();
  enhanceSettingsControls();
+ const api=document.querySelector<HTMLFormElement>('[data-api-connection]');
+ if(api){
+  const provider=api.querySelector<HTMLSelectElement>('[name=service]')!,key=api.querySelector<HTMLInputElement>('[name=api_key]')!,endpoint=api.querySelector<HTMLInputElement>('[name=endpoint]')!,advanced=api.querySelector<HTMLDetailsElement>('.model-connection-advanced')!;
+  const sync=()=>{key.required=provider.value==='openai';endpoint.readOnly=provider.value==='openai';if(provider.value==='custom')advanced.open=true};
+  sync();provider.addEventListener('change',()=>{sync();if(provider.value==='custom'&&endpoint.value==='https://api.openai.com/v1')endpoint.value='http://127.0.0.1:8000/v1';if(provider.value==='openai')endpoint.value='https://api.openai.com/v1'});
+ }
+
  if(location.hash===signInOpenedHash){
   const signIn=document.querySelector<HTMLElement>('#signin-status');
   if(signIn?.querySelector('[data-signin-pending]'))signIn.dataset.authWindowOpened='';

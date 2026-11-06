@@ -13,6 +13,9 @@ public interface, configuration, migration or frozen-runtime implications.
 
 For UI changes, identify the applicable rules in `design.md`, the behavior
 covered by regression tests, and desktop/mobile screenshot evidence reviewed.
+When replacing a locally patched deployment, identify the recovered fixes and
+any requested work still outside this PR. Report the merge revision and served
+asset verification after deployment; local startup alone is not merge evidence.
 
 ## Documentation and compatibility
 

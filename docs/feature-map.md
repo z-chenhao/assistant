@@ -10,7 +10,7 @@ F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让�
 
 F-031 提供 Developer → Observability 执行检查入口：按角色、状态和当前用户时区的时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；F-035/F-036 进一步统一为 Langfuse 式 Session/Trace/Observation 检查，支持真实 HTTP 尝试、恢复复用、输入输出、时间线和已有用量/费用。Trace 列表提供元数据搜索、组合筛选、顶栏时间范围、完整查询计数直方图、TTFT、自动目录费用估算与明确未计价状态、单行列显隐和点击整行打开的半屏非模态详情预览（可拖拽分栏、彩色层级树、结构化 Input/Output 与原始 JSON），完整页面及原生回退继续可用。
 
-F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。Settings 复用版本化字体以避免切页闪跳；ChatGPT 目录模型不再要求连接测试，首个成功连接直接用于对话。Chat 消息提供按需时间与当地日期分隔，Tasks、Worker、Traces、Memory 的时间及筛选统一跟随当前浏览器时区，近期日期使用自然标签、旧日期使用 yyyy-MM-dd；点击发送立即出泡并保留后续草稿，Intelligent UI 与最终文字按顺序分泡；支持主题气泡、安全 Markdown、认证附件链接与 Mermaid；折叠导航保留图标，标签页 Ghost 跟随主题。能力配置自动校验保存，并提供 YAML 导入。全部长期密钥统一使用本地私有文件，移除系统钥匙串后端及配置入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
+F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。Settings 复用版本化字体以避免切页闪跳；ChatGPT 目录模型不再要求连接测试，首个成功连接直接用于对话；聊天模型列表按名称降序排列，不附带账户名称。Chat 消息提供按需时间与当地日期分隔，Tasks、Worker、Traces、Memory 的时间及筛选统一跟随当前浏览器时区，近期日期使用自然标签、旧日期使用 yyyy-MM-dd；点击发送立即出泡并保留后续草稿，Intelligent UI 与最终文字按顺序分泡；支持主题气泡、安全 Markdown、认证附件链接与 Mermaid；折叠导航保留图标，标签页 Ghost 跟随主题。能力配置自动校验保存，使用结构化字段，不暴露底层配置文档。全部长期密钥统一使用本地私有文件，移除系统钥匙串后端及配置入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
 
 F-041：产品品牌统一为 Steward，Agent 名为 Ghost。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
 
@@ -33,7 +33,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 | ID / 详情 | 需求 | 简要描述 | 是否完成 / 状态 |
 | --- | --- | --- | --- |
-| [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。模型协议由 Steward 内部 Go 适配层实现；生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
+| [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | Settings 的 Models 支持账户登录或 API 密钥连接，连接时自动校验，聊天输入框选择活动模型。模型协议由 Steward 内部 Go 适配层实现；生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
 | [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | ChatGPT 账户凭据统一保存在 Steward 私有文件中，支持登录、按需刷新、重新认证、退出和中断恢复，后台状态检查只读配置与账户元数据。 | 是 · 已完成 |
 | [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main/Worker 系统提示统一按角色、安全、执行规则和能力指导拼为一条；Main 可通过 Code Mode 调用 MCP 和 Skill，复杂工作委派 Task Worker。 | 是 · 已完成 |
 | [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI/Web 与个人飞书具名问题、确切成果审阅接通，真实渠道与模型质量待验证。 | 否 · 部分完成 |
@@ -50,7 +50,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-015](features/automation.md#f-015) | 一次性与周期自动化 | 用户可在 Web 手动配置单次／周期安排、时区、指令及启停；CLI/Main 原有控制保留。 | 是 · 已完成 |
 | [F-016](features/automation.md#f-016) | 阈值状态与安静通知 | 周期观察在首次进入阈值区间时通知，其余成功检查保持安静。 | 是 · 已完成 |
 | [F-017](features/channels.md#f-017) | 终端交互 | 用户能完成模型设置、交代工作、查历史和状态。 | 是 · 已完成 |
-| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；导航按钮就绪后才可操作，保留慢脚本及原生回退；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Enter 发送、Shift + Enter 换行及橙色发送按钮；Resources 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
+| [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；导航按钮就绪后才可操作，保留慢脚本及原生回退；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Enter 发送、Shift + Enter 换行及橙色发送按钮；Models 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 模型生成时，Web 逐段显示 Main 回复；完成后展示正式消息。审批、状态更新和输入保留仍独立工作。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、具名问题及成果审阅卡、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
 | [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | Main 经 intelligent_ui_show 与内建 Skill 复用 OpenIntelligentUI 原生组件，Web 覆盖直接参数增量与 Code Mode 暂存后的可撤销预览，正式提交后启用交互，以 generateSandboxedUi 协议扩展 HTML/SVG、计算器和模拟；包含折线/散点、typed 表单、卡片和已声明动作扩展；状态 CAS、输入上下文快照、工具结果回传、筛选联动、导出与展开/弹窗/悬浮共用原交付链路，页面无功能介绍文案；组件以 shadcn 结构/Base UI 交互统一全局控件，短列表无搜索，长列表按需筛选，保留 Steward 字体和页面布局。 | 是 · 已完成 |
@@ -62,7 +62,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 健康检查、加密恢复与 macOS 显式后台服务/独立巡检；持久人工停机和有限恢复已接通，平台 Live 与主动渠道告警待补。 | 否 · 部分完成 |
 | [F-029](features/operations.md#f-029) | 用量记账与配置型费用授权 | 常见模型自动匹配目录价格估算费用，手动价格优先；显式货币授权继续独立。 | 是 · 已完成 |
-| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 六类能力以普通表单配置、验证和保存；高级 YAML 保留，重启边界与凭据引用不变。 | 是 · 已完成 |
+| [F-030](features/capability-setup.md#f-030) | 统一能力设置与诊断体验 | 六类能力以普通表单配置、验证和保存；界面不暴露 YAML，重启边界与凭据引用不变。 | 是 · 已完成 |
 | [F-031](features/observability.md#f-031) | Developer 导航与执行关系检查 | 开发者从现有 Web 的 Developer → Observability 进入执行列表与因果关系时间线。 | 是 · 已完成 |
 | [F-034](features/observability.md#f-034) | 逐轮上下文、来源与 Diff | 展开任意模型轮次查看 system/user/assistant/tool、工具定义、响应与上下文来源，并比较相邻轮次。 | 是 · 已完成 |
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |
@@ -101,7 +101,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-068](features/integrations.md#f-068) | SearXNG 自托管搜索候选 | 已有自建 JSON API 适配及协议回归；真实实例、部署及维护责任待确认。 | 否 · 部分完成 |
 | [F-069](features/integrations.md#f-069) | Web Access Plugin | 自建 native／Exa／SearXNG／Tavily 搜索、正文／PDF／图片、问答与来源证据；插件编排、服务适配及平台持久化已分离；更多服务／质量仍待验。 | 否 · 部分完成 |
 | [F-070](features/integrations.md#f-070) | Plugin 生命周期与连接分离 | 独立安装／启停能力插件，复用平台管理的账户／实例连接；安装、连接授权与动作审批分别处理，当前尚无插件管理入口。 | 否 · 未实现 |
-| [F-071](features/integrations.md#f-071) | Composio 应用目录与账户连接 | 默认读取 COMPOSIO_API_KEY，Resources 保留自定义连接服务配置，Apps 提供带官方 logo 的按用途分类目录、账户详情、已连接侧栏、按需认证、多账户、自动状态检查、重连与断开；工具走既有 Code Mode／审批／unknown 恢复。项目与真实服务验收待配置。 | 否 · 部分完成 |
+| [F-071](features/integrations.md#f-071) | Composio 应用目录与账户连接 | 默认读取 COMPOSIO_API_KEY，Apps 的 App settings 保留自定义连接服务配置，Apps 提供带官方 logo 的按用途分类目录、账户详情、已连接侧栏、按需认证、多账户、自动状态检查、重连与断开；工具走既有 Code Mode／审批／unknown 恢复。项目与真实服务验收待配置。 | 否 · 部分完成 |
 
 ## 实施优先级与依赖
 
@@ -177,3 +177,9 @@ docs/test-plans/<feature>.md        验收场景、测试层级、已有入口�
 复杂功能写独立场景矩阵；简单功能的测试方案可简短引用已有回归入口，无需为文档层级另建测试框架。
 
 Main 新建执行按输入逐条提交回复，Task Worker 独立运行；高频 Tool search、UI、Skill 与 Main Task 协调直接声明，其余工具保持按需 Code Mode 发现。旧冻结执行保持原有输入和工具面。
+
+Web Settings 的配置行与命令对齐、输入区账户模型选择见 [渠道功能](features/channels.md)；超宽组件的无滚动条横向操作见 [Intelligent UI](features/intelligent-ui.md)。
+
+Tasks 按真实 Root 派发分离[执行记录与任务配置](features/tasks.md)，短标题独立于完整任务简报，历史轮次保持可查。
+
+Tasks 的执行记录、任务配置采用共享二级侧栏；详情选中态及列表筛选边界见[任务说明](features/tasks.md)。

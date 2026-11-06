@@ -4,6 +4,8 @@ import (
 	"embed"
 	"html/template"
 	"time"
+
+	"github.com/z-chenhao/assistant/internal/task"
 )
 
 //go:embed templates/*.html
@@ -22,7 +24,7 @@ func newLayout(language string) *template.Template {
 		"traceURL": traceURL, "traceListURL": traceListURL, "traceClearURL": traceClearURL, "tracePresetURL": tracePresetURL,
 		"canSend":       canSend,
 		"bindingTarget": bindingTarget, "toolLabel": toolLabel,
-		"taskURL": taskURL, "taskListURL": taskListURL, "taskViews": taskViews, "historyLabel": historyLabel,
+		"taskConfigurationPage": taskConfigurationPage, "taskURL": taskURL, "executionURL": executionURL, "taskTitle": task.Title, "taskListURL": taskListURL, "historyLabel": historyLabel,
 		"scheduleTime":      func(raw, zone string) string { return localScheduleTime(language, raw, zone) },
 		"scheduleFrequency": scheduleFrequency,
 		"conversationURL":   conversationURL, "tabLabel": tabLabel,

@@ -292,6 +292,7 @@ func editCapabilityRows(f *capabilityForm, action string) bool {
 			f.Providers = append(f.Providers[:i], f.Providers[i+1:]...)
 			if len(f.Providers) == 0 {
 				f.Providers = []mcpProviderForm{blankMCPProvider()}
+				f.Enabled = false
 			}
 		}
 		return true
@@ -390,12 +391,12 @@ func guidedCapabilityText(id, baseline string, f *capabilityForm) (string, error
 	prepareCapabilityForm(&base)
 	if !base.Form.Available {
 		//lint:ignore ST1005 This validation message is displayed verbatim in the form.
-		return baseline, errors.New("This document needs the Advanced YAML editor. Your original settings are preserved.")
+		return baseline, errors.New("These settings cannot be edited here. Your existing configuration is unchanged.")
 	}
 	n, err := capabilityNode(baseline, id == "mcp")
 	if err != nil {
 		//lint:ignore ST1005 This validation message is displayed verbatim in the form.
-		return baseline, errors.New("This document needs the Advanced YAML editor. Your original settings are preserved.")
+		return baseline, errors.New("These settings cannot be edited here. Your existing configuration is unchanged.")
 	}
 	if !f.Enabled {
 		return "", nil

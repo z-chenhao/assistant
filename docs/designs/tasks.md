@@ -634,3 +634,13 @@ system gate. Model-quality evaluation is maintained outside this repository.
 连续请求曾在同一个 Main 的多轮工具发现期间批量进入上下文，后到输入又使较早的回复准备失效，导致首个请求没有交接回执。现有用户是 Web、TUI、飞书共享 Main，相关契约为单活动 Main、已接纳输入、Task 后台执行、原子交付与冻结恢复。新建 Main checkpoint 私有字段记录逐条接纳政策和已回复输入序号；当前输入经工具调用、Task 创建与最终回复提交后才能接纳下一条。机制不从自然语言推断 Task，也不替模型创建空 Worker。Worker 继续独立执行；需要后台工作时沿原 task_manage 管线创建 Task。
 
 顺序与原子提交属于领域必要复杂度；逐条用户输入是当前默认政策。checkpoint 字段保持私有，不新增公共排队 API、状态机或数据库表；旧冻结 Run 不热切换。拒绝以提示词要求模型记住被后到输入压过的任务，也不将全部工作串行到 Worker 完成。
+
+### 配置与逐次执行的只读边界
+
+当前消费者是 Web Tasks。原 Task.List／Search／Detail 保持 Task 领域汇总和控制契约；新增 owner-facing Execution 读取一条 Root 的事实，按创建时间和 run_id 做有界游标，跨历史 epoch 保留每次派发。它不公开 Run/checkpoint 内部模型、Child 返回或提供第二套调度控制。配置页组合现有 Task 说明与 Automation 安排，未派发配置不加入执行列表。列表只显示标题与属性，描述、指令和 Main 已确认的关联交付放入对应执行详情。详情的多表读取使用单一只读事务，按所选轮次限制指令和 root_run_id 限制 Main 关联消息。需要人工处理的当前轮链接既有 Task 详情，保持版本、隐私、审批及回执保护。
+
+机制是已有 Task、Root 执行、Automation 和 Main 交付身份；两页结构、状态筛选、单行标题和列宽是可替换呈现政策。读取接口限仓库内 owner 工作区，不作为通用 Run API 稳定化。未引入新表、迁移、配置同步器或历史重命名任务。拒绝把 Task 汇总改名成执行实例，因为它会丢失历史轮次；拒绝以调度触发时间伪造已执行记录。
+
+Task manage 的 create 新增可选 title（1–80 字符、非空白），与完整 task 简报分离；省略字段沿旧行为，序列化 omitempty 保持旧请求重放摘要。标题属于已验证的任务元数据，不通过系统提示词弥补字段缺失。
+
+执行记录默认列出全部，搜索旁共享 Filters 菜单选择执行状态及独立 Needs me 条件；组合条件、搜索、分页游标与实时刷新保持一致，旧 view=attention 深链接仍可用。无脚本使用原生筛选表单。

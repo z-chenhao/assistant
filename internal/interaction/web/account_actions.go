@@ -11,6 +11,11 @@ import (
 const credentialStoreHelp = "The credential files are unavailable. Check directory permissions and try again."
 
 func (s *Server) startLogin(r *http.Request) error {
+	// Only this provider implements account authorization today. The Web
+	// chooser names it explicitly; retain empty for existing native clients.
+	if provider := r.FormValue("provider"); provider != "" && provider != "chatgpt" {
+		return errors.New("unsupported account provider")
+	}
 	if s.Accounts == nil {
 		return llm.ErrNoBridge
 	}
@@ -26,7 +31,7 @@ func (s *Server) startLogin(r *http.Request) error {
 	ctx, cancel := context.WithCancel(lifetime)
 	s.authCancel = cancel
 	s.auth = llm.AuthState{Status: "pending", Events: []llm.AuthEvent{}}
-	s.authOnResources = accountReturn(r) == "/settings/setup"
+	s.authOnResources = accountReturn(r) == "/settings/models"
 	s.authError = ""
 	s.accountID = ""
 	done := make(chan struct{})
@@ -40,9 +45,16 @@ func (s *Server) startLogin(r *http.Request) error {
 			defer s.mu.Unlock()
 			s.auth.Events = append(s.auth.Events, event)
 		})
+		var selectionErr error
+		if e == nil {
+			selectionErr = s.selectFirstAccountModel(ctx, a.ConnectionID)
+		}
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.auth.Status = "connected"
+		if selectionErr != nil {
+			s.authError = "Signed in, but the first model could not be selected. Choose a model in Chat."
+		}
 		if e != nil {
 			s.auth.Status = "reauth_required"
 			if errors.Is(e, llm.ErrSecretStore) || errors.Is(e, llm.ErrSecretCleanup) {
@@ -55,17 +67,12 @@ func (s *Server) startLogin(r *http.Request) error {
 	return nil
 }
 
-func accountReturn(r *http.Request) string {
-	if r.FormValue("return_to") == "/settings/setup" || r.FormValue("profile") != "" {
-		return "/settings/setup"
-	}
-	return "/settings/models/new?provider=chatgpt"
-}
+func accountReturn(r *http.Request) string { return "/settings/models" }
 
 func (s *Server) loadSignIn(p *page, path string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if (s.authOnResources && path == "/settings/setup") || (!s.authOnResources && path == "/settings/models/new") {
+	if (s.authOnResources && path == "/settings/models") || (!s.authOnResources && path == "/settings/models/new") {
 		p.Auth, p.AuthError, p.AccountID, p.AuthOnResources = s.auth, s.authError, s.accountID, s.authOnResources
 	}
 }

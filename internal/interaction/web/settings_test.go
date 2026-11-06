@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -108,5 +109,45 @@ func TestWorkspaceLoginReturnIsLocalAndPreservesDeepLinks(t *testing.T) {
 	s.ServeHTTP(w, r)
 	if w.Code != 303 || w.Header().Get("Location") != valid {
 		t.Fatal("login discarded the original destination", w.Code, w.Header())
+	}
+}
+
+func TestNotificationAutosaveConfirmsRevisionAndRejectsStaleWrites(t *testing.T) {
+	core := &notificationCore{preference: interaction.Preference{Channel: "auto", Version: 3}}
+	server := &Server{Config: Config{TokenRef: "credential:test"}, Core: core, Secrets: fakeSecrets{}}
+	post := func(target, version string, auth bool) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "http://127.0.0.1:8080/notification", strings.NewReader(url.Values{"target": {target}, "version": {version}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+		if auth {
+			req.Header.Set("Authorization", "Bearer private-token-at-least-24-bytes")
+		}
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, req)
+		return response
+	}
+	for _, candidate := range []struct {
+		target, version string
+		code            int
+	}{{"tui:", "3", 200}, {"auto:", "3", 409}, {"auto:", "4", 200}, {"tui:", "invalid", 403}} {
+		response := post(candidate.target, candidate.version, true)
+		if response.Code != candidate.code || response.Header().Get("Location") != "" {
+			t.Fatal(response.Code, response.Header(), response.Body.String())
+		}
+		if response.Code == 200 {
+			var ack struct {
+				Target  string
+				Version int64
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &ack); err != nil || ack.Target != candidate.target || ack.Version != core.preference.Version {
+				t.Fatal("missing canonical acknowledgement", ack, err)
+			}
+		}
+	}
+	if core.preference.Channel != "auto" || core.preference.Version != 5 {
+		t.Fatal("stale write changed preference", core.preference)
+	}
+	if response := post("tui:", "5", false); response.Code != 401 || core.preference.Version != 5 {
+		t.Fatal("unauthenticated write accepted", response.Code)
 	}
 }

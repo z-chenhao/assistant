@@ -1,49 +1,12 @@
 {{define "model-resource"}}
-<div class="resource-model" id="model-{{.ProfileID}}" {{if eq .ProviderKind "openai_account"}}data-account-model{{end}}>
- {{if or (ne .Name .ModelID) .Endpoint}}
- <details name="resource-model" {{if .Open}}open{{end}}>
-  <summary class="resource-summary"><span class="resource-name">{{.Name}}</span></summary>
-  <div class="resource-body">
-   <dl class="facts">
-    {{if ne .Name .ModelID}}<div><dt>{{tr "Model ID"}}</dt><dd>{{.ModelID}}</dd></div>{{end}}
-    {{if .Endpoint}}<div><dt>{{tr "Endpoint URL"}}</dt><dd>{{.Endpoint}}</dd></div>{{end}}
-   </dl>
-  </div>
- </details>
- {{else}}
- <div class="resource-model-label"><span class="resource-name">{{.Name}}</span></div>
- {{end}}
- {{if ne .ProviderKind "openai_account"}}<div class="model-connection">
-  {{$restore := and .Current (ne .Status "ready")}}
-  {{if and .Verified (not $restore)}}
-   <span class="status-pill" data-status="ready">{{tr "Connection verified"}}</span>
-  {{else if .CanTest}}
-   <form method="post" action="/model/test">
-    <input name="profile" type="hidden" value="{{.ProfileID}}">
-    {{if .Current}}
-     <input name="restore_current" type="hidden" value="yes">
-     <input name="profile_version" type="hidden" value="{{.Version}}">
-     <input name="config_version" type="hidden" value="{{.ConfigVersion}}">
-    {{end}}
-    {{if .Verified}}<button class="secondary setting-action" data-model-restore>{{tr "Resume current model"}}</button>
-    {{else}}<button class="secondary setting-action">{{tr "Test connection"}}</button>{{end}}
-   </form>
-  {{else}}
-   <span class="status-pill warning">{{tr "Sign-in required"}}</span>
-  {{end}}
- </div>{{end}}
- <div class="model-use">
-  {{if and .Current (or (ne .ProviderKind "openai_account") .Verified)}}
-   <span class="status-pill selected">{{tr "Current model"}}</span>
-  {{else if .CanTest}}
-   <form class="model-selection" method="post" action="/model/select" {{if and (not .Verified) (ne .ProviderKind "openai_account")}}data-model-verify{{end}}>
-    <input name="profile" type="hidden" value="{{.ProfileID}}">
-    <input name="profile_version" type="hidden" value="{{.Version}}">
-    <input name="config_version" type="hidden" value="{{.ConfigVersion}}">
-    <button class="secondary setting-action" name="consent" value="yes">{{tr "Use model"}}</button>
-   </form>
-  {{else if eq .ProviderKind "openai_account"}}<span class="status-pill warning">{{tr "Sign-in required"}}</span>
-  {{end}}
+<div class="setting-row model-connection-row resource-model" id="model-{{.ProfileID}}">
+ <details class="connection-details" {{if .Open}}open{{end}}><summary class="connection-name">{{.Name}}</summary><dl class="facts"><div><dt>{{tr "Model ID"}}</dt><dd>{{.ModelID}}</dd></div><div><dt>{{tr "Endpoint URL"}}</dt><dd>{{.Endpoint}}</dd></div></dl></details>
+ <div class="connection-meta"><span class="status-pill" data-status="{{.ConnectionStatus}}">{{if eq .ConnectionStatus "logged_out"}}{{tr "Disconnected"}}{{else}}{{tr .ConnectionStatus}}{{end}}</span>
+ {{if or .KeyAuth (not .Verified)}}<details data-form-menu><summary class="control-icon-button" aria-label="{{tr "Manage connection"}}: {{.Name}}">{{template "app-more"}}</summary><div class="actions">
+ {{if and (ne .ConnectionStatus "logged_out") (not .Verified)}}<form method="post" action="/model/reconnect" data-model-verify><input type="hidden" name="profile" value="{{.ProfileID}}"><input type="hidden" name="profile_version" value="{{.Version}}"><input type="hidden" name="config_version" value="{{.ConfigVersion}}"><button class="secondary setting-action" name="consent" value="yes">{{tr "Reconnect"}}</button></form>{{end}}
+ {{if and .KeyAuth (ne .ConnectionStatus "logged_out")}}<form method="post" action="/model/disconnect" data-settings-confirm="{{tr "Disconnect"}}" data-confirm-description="{{tr "Disconnect this model connection?"}}"><input type="hidden" name="profile" value="{{.ProfileID}}"><input type="hidden" name="profile_version" value="{{.Version}}"><input type="hidden" name="auth_version" value="{{.AuthVersion}}"><button class="secondary setting-action danger-text" name="confirm" value="yes">{{tr "Disconnect"}}</button></form>{{end}}
+ {{if eq .ConnectionStatus "logged_out"}}<a class="button secondary setting-action" href="/settings/models/new?source={{.ProfileID}}">{{tr "Reconnect"}}</a>{{end}}
+ </div></details>{{end}}
  </div>
 </div>
 {{end}}

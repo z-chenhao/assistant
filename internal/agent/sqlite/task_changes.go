@@ -32,7 +32,11 @@ func (t *tools) createManagedTask(ctx context.Context, tx *sql.Tx, change *taskC
 	if policy == "" {
 		policy = "once"
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1,?)`, change.id, change.reference, change.agentID, change.conversationID, task.Title(change.request.Task), change.request.Task, change.artifactsJSON, change.at, change.at, policy); err != nil {
+	title := change.request.Title
+	if title == "" {
+		title = change.request.Task
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO task(task_id,task_ref,agent_id,conversation_id,title,anchor_task,anchor_artifact_refs,status,task_epoch,created_at,updated_at,version,completion_policy) VALUES(?,?,?,?,?,?,?,'active',1,?,?,1,?)`, change.id, change.reference, change.agentID, change.conversationID, task.Title(title), change.request.Task, change.artifactsJSON, change.at, change.at, policy); err != nil {
 		return err
 	}
 	for _, inputRef := range change.request.ArtifactRefs {

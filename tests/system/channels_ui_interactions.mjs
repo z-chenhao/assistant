@@ -23,6 +23,28 @@ export async function uiInteractions(page,context,browser,url,evidence,restart=f
  await menu(line,'Zoom');const ranges=line.locator('input[type=range]');await ranges.nth(1).fill('1');if(await line.locator('.recharts-line-dot').count()>2)throw Error('chart range did not update');await menu(line,'Reset');
  // The same live frame must survive every Host display mode.
  await frame.locator('#quantity').fill('7');await frame.locator('#value').getByText('14',{exact:true}).waitFor();
+ // Existing generated scroll containers keep their own keyboard and wheel input.
+ const nested=frame.locator('#nested-scroll');await nested.scrollIntoViewIfNeeded();await nested.focus();await page.keyboard.press('ArrowRight');
+ await nested.evaluate(node=>new Promise((resolve,reject)=>{const start=performance.now();const poll=()=>node.scrollLeft>0?resolve(true):performance.now()-start>3000?reject(Error('nested keyboard scroll failed')):setTimeout(poll,25);poll()}));
+ if(await nested.evaluate(node=>getComputedStyle(node).scrollbarWidth)!=='none')throw Error('nested widget scrollbar is visible');
+ await nested.evaluate(node=>node.scrollLeft=0);await nested.hover();await page.mouse.wheel(120,0);
+ await nested.evaluate(node=>new Promise((resolve,reject)=>{const start=performance.now();const poll=()=>node.scrollLeft>0?resolve(true):performance.now()-start>3000?reject(Error('trackpad scroll failed')):setTimeout(poll,25);poll()}));
+ // A wide generated diagram stays reachable inside its opaque-origin frame.
+ for(const width of [1400,390]){
+  await page.setViewportSize({width,height:980});await widget.locator('iframe').scrollIntoViewIfNeeded();
+  const root=frame.locator('html');await root.evaluate(node=>node.scrollLeft=0);
+  await root.focus();await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(()=>document.activeElement?.tagName==='IFRAME');
+  await root.evaluate(node=>new Promise((resolve,reject)=>{const deadline=performance.now()+3000;const check=()=>node.scrollLeft>0?resolve(true):performance.now()>deadline?reject(Error('keyboard did not scroll diagram: '+JSON.stringify({scroll:node.scrollWidth,width:node.clientWidth,active:document.activeElement.tagName,tab:node.tabIndex,overflow:getComputedStyle(node).overflow}))):setTimeout(check,25);check()}));
+  const metrics=await root.evaluate(node=>{node.scrollLeft=node.scrollWidth;return {left:node.scrollLeft,width:node.clientWidth,scroll:node.scrollWidth,bars:getComputedStyle(node).scrollbarWidth,edge:document.getElementById('far-edge').getBoundingClientRect().right,start:document.getElementById('far-edge').getBoundingClientRect().left}});
+  if(metrics.scroll<=metrics.width||metrics.left<=0||metrics.bars!=='none'||metrics.edge>metrics.width+1||metrics.start<0)throw Error('wide diagram is clipped or shows a scrollbar: '+JSON.stringify(metrics));
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('wide diagram stretched the conversation');
+  // Focusing the frame root can move the Host conversation. Capture the
+  // diagram after bringing its visible frame back above the fixed composer.
+  await widget.locator('iframe').scrollIntoViewIfNeeded();
+  await widget.screenshot({path:evidence+'/wide-diagram-'+width+'.png'});
+ }
+ await page.setViewportSize({width:1400,height:980});
  const frameNode=await widget.locator('iframe').elementHandle();
  const exportedSVG=await downloaded(widget,'Download SVG','.svg');if(/<script|onload=/i.test(exportedSVG.toString()))throw Error('graphic export retained executable markup');await downloaded(widget,'Download PNG','.png');const htmlSnapshot=await downloaded(widget,'Download HTML','.html');if(!htmlSnapshot.toString().includes('Content-Security-Policy'))throw Error('HTML snapshot lost its resource boundary');
  for(const[command,mode]of [['Expand','fullscreen'],['Open dialog','modal'],['Keep visible','pip']]){

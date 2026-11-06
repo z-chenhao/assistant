@@ -37,15 +37,20 @@ type appGroup struct {
 	Title string
 	Items []appCard
 }
+type appAuthConfigRow struct {
+	App, Config string
+}
+
 type appsView struct {
 	connectedapps.View
-	Items                                    []appCard
-	ConnectedOnly                            bool
-	ConnectURL, ConnectionID, AuthConfigText string
-	ExpiresAt                                int64
-	Groups                                   []appGroup
-	Managed                                  []appCard
-	Selected                                 *appCard
+	Items                    []appCard
+	ConnectedOnly            bool
+	ConnectURL, ConnectionID string
+	AuthConfigRows           []appAuthConfigRow
+	ExpiresAt                int64
+	Groups                   []appGroup
+	Managed                  []appCard
+	Selected                 *appCard
 }
 
 // Inventory includes every account even on a native app detail page, so opening
@@ -155,13 +160,16 @@ func (s *Server) loadAppService(ctx context.Context, p *page) error {
 	if err != nil {
 		return err
 	}
-	text := "{}"
-	if len(state.AuthConfigs) > 0 {
-		raw, _ := json.MarshalIndent(state.AuthConfigs, "", "  ")
-		text = string(raw)
+	var rows []appAuthConfigRow
+	for app, config := range state.AuthConfigs {
+		rows = append(rows, appAuthConfigRow{app, config})
 	}
-	p.Settings = &settingsView{Section: "resources"}
-	p.Apps = &appsView{View: connectedapps.View{State: state}, AuthConfigText: text}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].App < rows[j].App })
+	if len(rows) == 0 {
+		rows = []appAuthConfigRow{{}}
+	}
+	p.Settings = &settingsView{Section: "apps"}
+	p.Apps = &appsView{View: connectedapps.View{State: state}, AuthConfigRows: rows}
 	return nil
 }
 func (s *Server) loadApps(ctx context.Context, r *http.Request, p *page) error {
@@ -213,6 +221,9 @@ func (s *Server) appDetail(w http.ResponseWriter, r *http.Request) {
 	_ = requestLayout(r).ExecuteTemplate(w, "app-detail", p)
 }
 func appError(err error) string {
+	if errors.Is(err, connectedapps.ErrAuthConfigRequired) {
+		return "This app requires your own OAuth app. Ask the installation owner to configure it in Composio, then reconnect."
+	}
 	switch {
 	case errors.Is(err, connectedapps.ErrConflict):
 		return "App connections changed. Refresh and try again."
@@ -234,18 +245,61 @@ func (s *Server) appServiceAction(w http.ResponseWriter, r *http.Request) error 
 	}
 	revision, err := strconv.ParseInt(r.FormValue("revision"), 10, 64)
 	configs := map[string]string{}
-	text := r.FormValue("auth_configs")
-	if len(text) > 16384 {
-		err = connectedapps.ErrInvalid
-	} else if text != "" && (json.Unmarshal([]byte(text), &configs) != nil || configs == nil) {
-		err = connectedapps.ErrInvalid
+	var rows []appAuthConfigRow
+	if r.FormValue("editor") == "fields" {
+		apps, ids := r.PostForm["app_slug"], r.PostForm["auth_config"]
+		if len(apps) != len(ids) || len(apps) == 0 || len(apps) > 128 {
+			err = connectedapps.ErrInvalid
+		} else {
+			for i, app := range apps {
+				rows = append(rows, appAuthConfigRow{app, ids[i]})
+				if app == "" && ids[i] == "" {
+					continue
+				}
+				if _, exists := configs[app]; exists || !composio.ValidID(app) || !composio.ValidID(ids[i]) {
+					err = connectedapps.ErrInvalid
+				}
+				configs[app] = ids[i]
+			}
+		}
+	} else {
+		// Existing native clients retain the private serialized POST format.
+		text := r.FormValue("auth_configs")
+		if len(text) > 16384 || text != "" && (json.Unmarshal([]byte(text), &configs) != nil || configs == nil) {
+			err = connectedapps.ErrInvalid
+		}
+	}
+	p := page{Tab: "/settings", View: "app-service", Title: "App connection service", Path: "/settings/apps/service"}
+	if e := s.loadAppService(r.Context(), &p); e != nil {
+		return e
+	}
+	if len(rows) > 0 {
+		p.Apps.AuthConfigRows = rows
+		p.Apps.State.KeyRef = r.FormValue("key_ref")
+		p.Apps.State.Revision = revision
+		if r.FormValue("action") == "add-override" && len(rows) < 128 {
+			p.Apps.AuthConfigRows = append(rows, appAuthConfigRow{})
+			p.Notice = "Unsaved changes."
+			s.render(w, r, p)
+			return nil
+		}
+		if index, e := strconv.Atoi(strings.TrimPrefix(r.FormValue("action"), "remove-override-")); e == nil && index >= 0 && index < len(rows) {
+			p.Apps.AuthConfigRows = append(rows[:index], rows[index+1:]...)
+			if len(p.Apps.AuthConfigRows) == 0 {
+				p.Apps.AuthConfigRows = []appAuthConfigRow{{}}
+			}
+			p.Notice = "Unsaved changes."
+			s.render(w, r, p)
+			return nil
+		}
 	}
 	if err == nil {
 		err = s.Apps.ConfigureProject(r.Context(), r.FormValue("key_ref"), revision, configs)
 	}
-	p := page{Tab: "/settings", View: "app-service", Title: "App connection service", Path: "/settings/services/apps"}
-	if e := s.loadAppService(r.Context(), &p); e != nil {
-		return e
+	if err == nil {
+		if e := s.loadAppService(r.Context(), &p); e != nil {
+			return e
+		}
 	}
 	if err != nil {
 		p.Error = appError(err)

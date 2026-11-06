@@ -6,6 +6,8 @@
 
 [Feature Map](feature-map.md) 是唯一需求主入口，维护稳定需求 ID、当前状态和所属文档。
 
+Web 设置页的布局与控件准则见 [design.md](../design.md)。
+
 | 位置 | 维护内容 |
 | --- | --- |
 | [功能说明](feature-map.md#需求索引) `features/` | 用户行为、使用方法、安装与运维、当前限制和验收目标 |

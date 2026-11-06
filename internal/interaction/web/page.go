@@ -30,6 +30,7 @@ type shownProjection struct {
 	Spec, Fallback string
 }
 type page struct {
+	ComposerModels                                    composerModels
 	Apps                                              *appsView
 	Capabilities                                      []Capability
 	Capability                                        *Capability
@@ -79,7 +80,7 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	if view == "conversation" {
 		p.Live = "/"
 	}
-	if view == "tasks" || view == "task" || view == "settings" {
+	if view == "tasks" || view == "task" || view == "attention" || view == "settings" {
 		p.Live = r.URL.Path
 	}
 	var err error
@@ -101,7 +102,7 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 	case "settings":
 		s.loadSignIn(&p, r.URL.Path)
 		err = s.loadSettings(ctx, r, &p)
-	case "tasks", "task":
+	case "tasks", "task", "execution", "attention":
 		err = s.loadTasks(ctx, r, &p)
 	case "traces", "trace":
 		p.Trace, err = tracePageQuery(r)
@@ -127,6 +128,9 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 			p.DraftTask = &taskContext{Ref: d.TaskRef, Title: d.Title}
 		}
 		err = s.loadConversation(ctx, &p)
+		if err == nil {
+			p.ComposerModels, err = s.modelChoices(ctx, false)
+		}
 	}
 	return p, err
 }
@@ -136,7 +140,7 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) {
 		s.pageError(w, r, err)
 		return
 	}
-	if p.Settings != nil && p.Settings.Section == "resources" && strings.HasPrefix(r.URL.Path, "/settings/models/") {
+	if p.Settings != nil && p.Settings.Section == "models" && strings.HasPrefix(r.URL.Path, "/settings/models/") {
 		http.Redirect(w, r, resourceModelURL(p.Settings.TargetModel, r.URL.Query().Get("notice")), http.StatusSeeOther)
 		return
 	}

@@ -12,6 +12,10 @@ import (
 )
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/settings/models/new" && r.URL.Query().Get("provider") == "chatgpt" {
+		http.Redirect(w, r, "/settings/models", http.StatusSeeOther)
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, "/apps/logo/") {
 		s.appLogo(w, r)
 		return
@@ -24,6 +28,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
+	case "/api/models":
+		s.composerModelsAPI(w, r)
 	case "/api/ui/state", "/api/ui/action":
 		s.uiInteraction(w, r)
 	case "/ui/image":
@@ -169,6 +175,12 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		}
 		http.Redirect(w, r, safePageReturn(r.FormValue("return_to")), http.StatusSeeOther)
 		return nil
+	case "/model/choose":
+		return s.composerModelAction(w, r)
+	case "/model/reconnect":
+		return s.reconnectModel(w, r)
+	case "/model/disconnect":
+		return s.disconnectKeyModel(w, r)
 	case "/model/catalog":
 		return s.showAccountCatalog(w, r)
 	case "/model/add":
@@ -199,6 +211,17 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 				return nil
 			}
 			notice = "active"
+		} else if p.ProviderKind == "openai_compatible" {
+			if _, err = s.Control.Test(r.Context(), p.ProfileID); err != nil {
+				next := r.Clone(r.Context())
+				u := *r.URL
+				u.Path = "/model/select"
+				next.URL = &u
+				next.PostForm = url.Values{"profile": {p.ProfileID}}
+				next.Form = next.PostForm
+				s.postFailure(w, next, err)
+				return nil
+			}
 		}
 		http.Redirect(w, r, resourceModelURL(p.ProfileID, notice), http.StatusSeeOther)
 		return nil
@@ -215,11 +238,7 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		http.Redirect(w, r, resourceModelURL(r.FormValue("profile"), "active"), http.StatusSeeOther)
 		return nil
 	case "/notification":
-		if err := s.preferNotification(r); err != nil {
-			return err
-		}
-		http.Redirect(w, r, "/settings/notifications?notice=saved", http.StatusSeeOther)
-		return nil
+		return s.notificationAction(w, r)
 	case "/auth/login":
 		if err := s.startLogin(r); err != nil {
 			return err

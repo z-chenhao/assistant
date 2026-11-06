@@ -24,6 +24,7 @@ var ErrUnavailable = errors.New("app service unavailable; configure or check the
 var ErrConflict = errors.New("app connections changed; refresh and try again")
 var ErrDenied = errors.New("app connection is not active")
 var ErrAliasRequired = errors.New("choose a label for the additional account")
+var ErrAuthConfigRequired = errors.New("this app requires a custom OAuth configuration in the connection service")
 var ErrLinkExpired = errors.New("authorization link expired; reconnect this account")
 
 const AuthorizationTTL = 10 * time.Minute
@@ -267,9 +268,15 @@ func (s *Service) connect(ctx context.Context, toolkit, alias, authConfig string
 	if authConfig == "" {
 		authConfig = state.AuthConfigs[toolkit]
 	}
-	authConfig, err = client.AuthConfig(ctx, toolkit, authConfig)
+	selection, err := client.FindAuthConfig(ctx, toolkit, authConfig)
 	if err != nil {
 		return composio.Link{}, ErrUnavailable
+	}
+	// An explicit empty managed-auth list means the provider cannot supply
+	// hosted credentials. An omitted list remains unknown (e.g. scoped peers).
+	authConfig = selection.ID
+	if selection.Readable && authConfig == "" && app.ManagedAuth != nil && len(app.ManagedAuth) == 0 {
+		return composio.Link{}, ErrAuthConfigRequired
 	}
 	link, err := client.Connect(ctx, state.UserID, toolkit, alias, authConfig)
 	if err != nil {

@@ -4,31 +4,6 @@ import {t} from './i18n';
 export function enhanceSettingsControls(){
  const page=document.querySelector('.settings-page');
  if(!page)return;
- const notification=page.querySelector<HTMLFormElement>('[data-notification-preference]');
- if(notification){
-  const initial=JSON.stringify(Array.from(new FormData(notification).entries()));
-  const feedback=document.querySelector<HTMLElement>('.page-feedback.success');
-  const draft=page.querySelector<HTMLElement>('[data-notification-draft]');
-  const sync=()=>{
-   const dirty=JSON.stringify(Array.from(new FormData(notification).entries()))!==initial;
-   if(feedback)feedback.hidden=dirty;
-   if(draft)draft.hidden=!dirty;
-  };
-  notification.addEventListener('input',sync);notification.addEventListener('change',sync);window.addEventListener('pageshow',sync);
- }
- const search=document.querySelector<HTMLElement>('[data-settings-search]');
- const field=search?.querySelector<HTMLInputElement>('input');
- if(search&&field){
-  search.removeAttribute('data-client-pending');
-  const links=Array.from(document.querySelectorAll<HTMLAnchorElement>('.settings-navigation a'));
-  const filter=()=>{
-   const query=field.value.trim().toLocaleLowerCase();
-   for(const link of links)link.hidden=!(link.textContent??'').toLocaleLowerCase().includes(query);
-   const empty=document.querySelector<HTMLElement>('.settings-no-results');if(empty)empty.hidden=links.some(link=>!link.hidden);
-  };
-  field.addEventListener('input',filter);
-  field.addEventListener('keydown',event=>{if(event.key==='Escape'){field.value='';filter()}if(event.key==='Enter'){event.preventDefault();links.find(link=>!link.hidden)?.click()}});
- }
  const theme=document.querySelector<HTMLSelectElement>('#interface-theme');
  if(theme){
   const media=matchMedia('(prefers-color-scheme: dark)');
@@ -44,6 +19,7 @@ export function enhanceSettingsControls(){
 export function confirmSettingsAction(form:HTMLFormElement,submitter:HTMLElement|null){
  const title=form.dataset.settingsConfirm;
  if(!title||form.dataset.confirmed==='true'){delete form.dataset.confirmed;return false}
+ const focusReturn=document.getElementById(form.dataset.controlMenuOpener??'')??submitter;
  const dialog=document.createElement('dialog');dialog.className='settings-confirm';
  const heading=document.createElement('h2');heading.id='settings-confirm-title';heading.textContent=title;dialog.setAttribute('aria-labelledby',heading.id);
  const copy=document.createElement('p');copy.id='settings-confirm-description';copy.textContent=form.dataset.confirmDescription??'';dialog.setAttribute('aria-describedby',copy.id);
@@ -53,7 +29,7 @@ export function confirmSettingsAction(form:HTMLFormElement,submitter:HTMLElement
  actions.append(cancel,confirm);dialog.append(heading,copy,actions);document.body.append(dialog);
  cancel.addEventListener('click',()=>dialog.close());
  confirm.addEventListener('click',()=>{dialog.close();form.dataset.confirmed='true';form.requestSubmit(submitter instanceof HTMLButtonElement?submitter:undefined)});
- dialog.addEventListener('close',()=>{dialog.remove();submitter?.focus()});
+ dialog.addEventListener('close',()=>{dialog.remove();focusReturn?.focus()});
  dialog.addEventListener('click',event=>{if(event.target!==dialog)return;const rect=dialog.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)dialog.close()});
  dialog.showModal();return true;
 }

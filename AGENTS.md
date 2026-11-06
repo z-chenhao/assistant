@@ -56,6 +56,15 @@ Use imperative subjects with customary prefixes, e.g. `feat(web): improve task n
 
 Update the [Feature Map](docs/feature-map.md), owning feature, design, and test plan when behavior changes. [Documentation policy](docs/README.md#强制维护规则) requires current topics; keep development logs and execution results in PRs or CI artifacts.
 
+Local deployment is not delivery to `main`. Before preparing a PR, inventory all
+changes belonging to the requested behavior, including untracked sources,
+templates, generated assets, documentation and regressions; preserve unrelated
+work separately. Record any requested fixes left outside the PR explicitly.
+Before replacing a local deployment with `main`, compare its source revision and
+local-only fixes with the merged PRs. Preserve and report any difference; do not
+claim those fixes are included merely because the new server starts. Verify the
+merged revision and the actual served assets, then exercise the affected UI.
+
 ## Security & Agent Instructions
 
 Follow the [engineering workflow](docs/features/engineering.md), [runtime contracts](docs/designs/runtime-contracts.md), and [governance](GOVERNANCE.md). Preserve approvals, frozen snapshots, and durable replay. Store credentials only in SecretStore. Releases require explicit authorization; remote branch deletion requires governance checks and exact-head leases.

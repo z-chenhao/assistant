@@ -54,7 +54,26 @@ func (s *Server) loadCapabilities(ctx context.Context, r *http.Request, p *page)
 		return err
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/settings/capabilities/")
-	v, err := s.Capabilities.Detail(ctx, id)
+	var v Capability
+	if id != "mcp" && (r.URL.Query().Get("checked") == "1" || r.URL.Query().Get("editor") == "advanced") {
+		// Retain checked-candidate navigation for existing native clients.
+		v, err = s.Capabilities.Detail(ctx, id)
+	} else {
+		// Ordinary forms edit saved settings, never a previous failed probe.
+		// List projects the current document; Detail can project a test draft.
+		var items []Capability
+		items, err = s.Capabilities.List(ctx)
+		found := false
+		for _, item := range items {
+			if item.ID == id {
+				v, found = item, true
+				break
+			}
+		}
+		if err == nil && !found {
+			err = ErrCapabilityInvalid
+		}
+	}
 	v.ParentMemory = id == "embedding"
 	v.Checked = r.URL.Query().Get("checked") == "1"
 	prepareCapabilityForm(&v)
@@ -97,18 +116,33 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 	text := r.FormValue("configuration")
 	var guided *capabilityForm
 	if r.FormValue("editor") == "guided" {
+		// The persisted document is an implementation detail, never round-tripped
+		// through the user-facing form. Test/Save still enforce its revision.
+		text = p.Capability.Text
 		guided, err = postedCapabilityForm(id, r.PostForm)
 		if err == nil && id == "mcp" && editCapabilityRows(guided, r.FormValue("action")) {
-			p.Capability.Form = guided
-			p.Capability.Revision = r.FormValue("revision")
-			p.Capability.Verified = false
-			p.Capability.Candidate = true
-			p.Capability.Text = text
-			p.Capability.Message = ""
-			p.Capability.TestedAt = time.Time{}
-			p.Capability.State = "configured"
-			s.render(w, r, p)
-			return nil
+			if strings.HasPrefix(r.FormValue("action"), "remove-") {
+				// Removal is a real edit. Persist a complete remaining form rather
+				// than reporting an unsaved row deletion as the new baseline.
+				if _, e := guidedCapabilityText(id, text, guided); e == nil {
+					r.PostForm.Set("action", "apply")
+					r.Form.Set("action", "apply")
+				} else {
+					guided.Error = e.Error()
+				}
+			}
+			if r.FormValue("action") != "apply" {
+				p.Capability.Form = guided
+				p.Capability.Revision = r.FormValue("revision")
+				p.Capability.Verified = false
+				p.Capability.Candidate = true
+				p.Capability.Text = text
+				p.Capability.Message = ""
+				p.Capability.TestedAt = time.Time{}
+				p.Capability.State = "configured"
+				s.render(w, r, p)
+				return nil
+			}
 		}
 		if err == nil {
 			text, err = guidedCapabilityText(id, text, guided)
