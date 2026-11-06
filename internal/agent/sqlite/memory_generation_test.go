@@ -259,13 +259,13 @@ func TestSemanticMigrationFromV46PreservesAcceptedWork(t *testing.T) {
 	ctx := context.Background()
 	receipt := mustSubmit(t, a, "accepted-before-upgrade", "original accepted request")
 	original := scalar(t, s, `SELECT count(*) FROM conversation_intent`)
-	if _, e := s.db.Exec(`DROP TABLE memory_cost_reservation; DROP TABLE memory_generation; DROP TABLE memory_semantic_receipt; PRAGMA user_version=46;`); e != nil {
+	if _, e := s.db.Exec(`DROP TABLE generation_cost_estimate; DROP TABLE memory_cost_reservation; DROP TABLE memory_generation; DROP TABLE memory_semantic_receipt; PRAGMA user_version=46;`); e != nil {
 		t.Fatal(e)
 	}
 	if e := migrate(ctx, s.db, migrations); e != nil {
 		t.Fatal(e)
 	}
-	if SchemaVersion() != 47 || scalar(t, s, `PRAGMA user_version`) != 47 || scalar(t, s, `SELECT count(*) FROM conversation_intent`) != original || scalar(t, s, `SELECT count(*) FROM run WHERE run_id=?`, receipt.RunID) != 1 {
+	if SchemaVersion() != 48 || scalar(t, s, `PRAGMA user_version`) != 48 || scalar(t, s, `SELECT count(*) FROM conversation_intent`) != original || scalar(t, s, `SELECT count(*) FROM run WHERE run_id=?`, receipt.RunID) != 1 {
 		t.Fatal("forward migration changed accepted work")
 	}
 	if scalar(t, s, `SELECT count(*) FROM memory_generation`) != 0 {

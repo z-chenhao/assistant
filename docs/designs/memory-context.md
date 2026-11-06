@@ -589,7 +589,7 @@ facet 与内容摘要使用密钥摘要，元信息、请求与返回均 Vault �
 显式 remember 不受自动老化策略影响。过期、退役、替代、删除项在搜索、精读和检视中采用同一可见性规则；
 退役项只返回审计元数据，不作为有效记忆解密。类别遗忘使用密封语义类别，旧来源的 suppression 防止复活。
 
-**恢复与授权。** state schema 47 保存私有 memory_generation、semantic receipt 和费用预留；
+**恢复与授权。** state schema 48 保存私有 memory_generation、semantic receipt 和费用预留；
 memory schema 3 保存密封 facet、到期、退役与不可变归并 receipt。
 复用现有模型冻结、账号授权/撤销、GenerationObserver 用量记录和费用边界。
 派发与接纳验证维护租约和隐私 epoch；归并期间再次串行校验 Forget 边界。
@@ -625,3 +625,14 @@ These are enforced engineering contracts, not model instructions:
 - Unit and system tests must assert these behaviors and their failure paths. CI must execute them on every code PR; a regression existing only in optional/nightly jobs is insufficient. Fakes verify transport and state contracts, while semantic-model quality requires separate real-model evidence.
 
 Keep this contract here; `AGENTS.md` routes contributors to it. The UI design document remains the owner of visual/interaction constraints, rather than duplicating backend memory rules there.
+
+### Pre-release schema adoption
+
+Public state migration 47 adds reference cost estimates; semantic Memory is
+migration 48. An already deployed local pre-release used 47 for Memory. The
+v48 upgrade recognizes only the exact complete three private tables and index
+and the absence of the public cost table, then atomically adds the missing cost
+schema and advances to 48. Its encrypted requests/results, receipts and usage
+are preserved. Public v47 runs the ordinary semantic migration. Unknown or
+partial private schemas fail closed; no global IF NOT EXISTS policy or version
+rewind is introduced. Backups remain necessary for rollback.

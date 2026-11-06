@@ -327,7 +327,11 @@ func migrate(ctx context.Context, db *sql.DB, scripts []string) error {
 		}
 	}
 	for i := version; i < len(scripts); i++ {
-		if _, err := tx.ExecContext(ctx, scripts[i]); err != nil {
+		script, err := adoptSemantic47(ctx, tx, version, i, scripts)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, script); err != nil {
 			return fmt.Errorf("apply migration %d: %w", i+1, err)
 		}
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {

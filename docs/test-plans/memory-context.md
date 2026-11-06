@@ -143,7 +143,7 @@ F-010/F-039：`TestEncryptedRecallReusesVectorsAndInvalidatesScopeAndForget` 统
 - `internal/agent/sqlite/memory_generation_test.go`：真实 state/memory 库、模型冻结及用量接纳事务；密封后台生成、跨库提交后重放不重调模型、无用户 Task/Run/交付、无效候选隔离、Forget 先于接纳/派发的竞态。
 - `internal/agent/sqlite/recall_test.go` 与 `recall_query_test.go`：此前真实证据按轮冻结，当前输入及其派生内容被排除；Task 原始来源查询、已接受后续输入排除。
 - `internal/recall/relevance_test.go`、`recall_test.go`：Grokbot 主题不匹配无关 UI 反馈，中文相关性，provenance/ref/内容去重，跳过过大 Memory 时仍能选中原始来源，私有分数不序列化。
-- state 46→47、memory 2→3 及旧版本升级保留原始 Conversation、Task、模型冻结记录；旧自动摘句仅退役，显式记忆不变。
+- state 46/47→48、memory 2→3 及旧版本升级保留原始 Conversation、Task、模型冻结记录；旧自动摘句仅退役，显式记忆不变。
 - `tests/system/verify_memory_maintenance.py`：实际 CLI/stdio Bridge 的有限脚本候选、隐私/恢复/压缩门禁；Fake 仅为传输和状态证据。
 
 验证命令：`make test lint`，聚焦 `go test -race ./internal/memory/... ./internal/recall/... ./internal/agent/sqlite -run 'Semantic|Recall|Forget'`，系统 `runner.py --gate memory-maintenance --gate recall`。
