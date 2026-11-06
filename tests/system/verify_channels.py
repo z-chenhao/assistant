@@ -899,6 +899,9 @@ def memory_inspection(binary, evidence, report):
             target = next(item for item in items if item.get('content')==explicit)
             require(target['origin']=='explicit' and any(source.get('run_id') for source in target['sources']), 'tool memory lost its actual invocation source')
             automatic = next(item for item in items if item['origin']=='automatic')
+            require(automatic['content'] != 'I prefer walking by the river every morning'
+                    and 'Capabilities:' not in automatic['content'],
+                    'automatic Memory copied the original statement or Tool plan instead of a derived fact')
             source = next(source for source in automatic['sources'] if source['kind']=='conversation')
             source_page = h.http('/api/developer/memory?' + urlencode(dict(ref=automatic['ref'], source=source['ref'])))
             require(any('I prefer walking' in value.get('text','') for value in source_page['items'][0]['sources']), 'original Memory source content missing')

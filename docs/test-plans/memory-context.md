@@ -161,3 +161,14 @@ asserts this lane and both gates stay in the PR matrix. Ordinary `go test ./...`
 continues to run the complete unit/component inventory.
 
 The enforced design invariants live in [the owning technical design](../designs/memory-context.md#memory-and-recall-invariants).
+
+The required channels-web Memory browser scenario uses a finite structured Curator
+fixture with a normalized fact and an exact user-only evidence quote. It checks
+that neither the original first-person sentence nor its surrounding Tool plan is
+stored as the derived Memory, while retaining pagination, Unicode search, source
+navigation, correction, Forget, restart and read-only browser assertions.
+
+`tests/harness/test_schema_version.py` checks that the system fixtures' explicit
+state-schema expectation matches the contiguous migration catalog, so a forward
+migration cannot silently leave foundation/local-provider/Code Mode gates testing
+an obsolete schema version. The ordinary harness suite and required CI execute it.

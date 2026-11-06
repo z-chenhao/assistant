@@ -39,7 +39,7 @@ Context changes must verify message order, byte-stable continuation prefixes, re
 
 Follow the [memory/recall invariants](docs/designs/memory-context.md#memory-and-recall-invariants). Fix extraction, provenance, lifecycle and retrieval in the owning code; prompt wording alone is not a data-integrity fix. Conversation is the original evidence, not a Memory record. Keep private Curator proposals behind Host validation, durable receipts, privacy fences and model-usage authorization.
 
-Add behavioral regressions for the reproduced failure, including negative cases. Memory/Recall changes must run `make test-memory` and both `memory-maintenance` and `recall` system gates; the required PR CI must keep those gates and their race checks enabled. Preserve historical frozen requests and unrelated local work.
+Add behavioral regressions for the reproduced failure, including negative cases. Memory/Recall changes must run `make test-memory` and both `memory-maintenance` and `recall` system gates; the required PR CI must keep those gates and their race checks enabled. Preserve historical frozen requests and unrelated local work. Forward migrations must also update the shared system-fixture schema expectation; keep its migration-catalog consistency regression in ordinary harness checks.
 
 ## UI Component Changes
 

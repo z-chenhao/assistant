@@ -17,6 +17,7 @@ func memoryReply(req llm.GenerationRequest) llm.GenerationResult {
 	}
 	text := strings.TrimSpace(in.Observation.Text)
 	fixtures := map[string]memory.Candidate{
+		"Capabilities: []\nI prefer walking by the river every morning": {Facet: "preferences.morning_walk", Category: "preferences", Content: "The user prefers walking by the river each morning.", Quote: "I prefer walking by the river every morning"},
 		"My health report: I have a diagnosed kidney stone condition":   {Facet: "health.kidney_stones", Category: "health", Content: "The user reports a diagnosed kidney stone condition."},
 		"I might explore independent development, but have not decided": {Facet: "goals.independent_development", Category: "goals", Content: "The user is considering independent development, without a decision.", Tentative: true},
 		"I am practicing English for travel":                            {Facet: "learning.english", Category: "learning", Content: "The user is practicing English for travel."},
@@ -29,7 +30,9 @@ func memoryReply(req llm.GenerationRequest) llm.GenerationResult {
 	p := memory.Proposal{Facts: []memory.Candidate{}}
 	if c, ok := fixtures[text]; ok {
 		c.Operation = "add"
-		c.Quote = text
+		if c.Quote == "" {
+			c.Quote = text
+		}
 		for _, f := range in.Existing {
 			if f.Facet == c.Facet {
 				c.Target = f.Ref

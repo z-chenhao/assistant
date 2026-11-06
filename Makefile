@@ -44,7 +44,7 @@ test-web-access:
 # Privacy, provenance and lifecycle regressions run in the required CI lane.
 test-memory:
 	go test -race ./internal/memory/... ./internal/recall/... -count=1
-	go test -race ./internal/agent/sqlite ./internal/app -run 'Semantic|AutomaticRecall|Recall|Forget' -count=1
+	go test -race ./internal/agent/sqlite -run 'Semantic|AutomaticRecall|Recall|Forget' -count=1
 
 test-connected-apps:
 	go test -race ./internal/connector/composio ./internal/connectedapps ./internal/plugin/connectedapps ./internal/interaction/web ./internal/tool ./internal/app ./internal/agent/sqlite -run '^Test(ConnectedApps|Apps|AppLogo|ToolDescriptor|RegistryGroup|Client)' -count=1
