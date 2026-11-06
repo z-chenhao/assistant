@@ -35,14 +35,40 @@ export async function uiInteractions(page,context,browser,url,evidence,restart=f
  // Input snapshots are captured before the ordinary action request. A lost
  // HTTP acknowledgement retries the identical source, not a second execution.
  await table.getByRole('searchbox',{name:'Filter rows'}).fill('task');
- let lost=false;const sources=[];await page.route('**/api/ui/action',async route=>{if(route.request().method()!=='POST'){await route.continue();return}const value=route.request().postDataJSON();sources.push(value.source_id);if(!lost){lost=true;await route.fetch();await route.abort('failed')}else await route.continue()});
+ const actionURL=url=>url.pathname==='/api/ui/action';
+ let lost=false,retried=false;const sources=[];
+ await page.route(actionURL,async route=>{
+  if(route.request().method()!=='POST'){
+   if(!retried){await route.fulfill({status:404,contentType:'application/json',body:'{}'});return}
+   await route.continue();return;
+  }
+  const value=route.request().postDataJSON();sources.push(value.source_id);
+  if(!lost){lost=true;await route.fetch();await route.abort('failed')}
+  else{retried=true;await route.continue()}
+ });
  await activate(action.getByRole('button',{name:'Refresh catalog',exact:true}));
- await action.getByRole('button',{name:'Refresh catalog',exact:true}).waitFor({state:'visible'});
- await page.waitForFunction(()=>!document.querySelector('[data-openintelligentui="steward.action"] button').disabled);
- if(await action.getByRole('alert').count())await activate(action.getByRole('button',{name:'Refresh catalog',exact:true}));
+ await action.getByRole('alert').waitFor();
+ await activate(action.getByRole('button',{name:'Refresh catalog',exact:true}));
  await page.waitForFunction(()=>!!document.querySelector('[data-openintelligentui="steward.action"] button svg'));
- if(sources.length>1&&sources[0]!==sources[1])throw Error('lost action receipt changed source identity');await page.unroute('**/api/ui/action');
- await table.getByRole('searchbox',{name:'Filter rows'}).fill('memory');await activate(frame.getByRole('button',{name:'Refresh from Ghost',exact:true}));await action.locator('button[data-proposed=true]').waitFor();await activate(action.getByRole('button',{name:'Refresh catalog',exact:true}));await frame.locator('#value').getByText('Refreshed',{exact:true}).waitFor();await menu(table,'Reset');
+ if(sources.length!==2||sources[0]!==sources[1])throw Error('lost action receipt changed source identity');
+ await page.unroute(actionURL);
+ // A polled success must also win when the original POST fails afterwards.
+ await table.getByRole('searchbox',{name:'Filter rows'}).fill('memory');
+ await activate(frame.getByRole('button',{name:'Refresh from Ghost',exact:true}));
+ await action.locator('button[data-proposed=true]').waitFor();
+ let lateFailure;const failedAfterConfirmation=new Promise(resolve=>{lateFailure=resolve});
+ await page.route(actionURL,async route=>{
+  if(route.request().method()!=='POST'){await route.continue();return}
+  await route.fetch();
+  await page.waitForFunction(()=>!!document.querySelector('[data-openintelligentui="steward.action"] button svg'));
+  await route.abort('failed');lateFailure();
+ });
+ await activate(action.getByRole('button',{name:'Refresh catalog',exact:true}));
+ await failedAfterConfirmation;
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ if(await action.getByRole('alert').count())throw Error('late acknowledgement failure replaced a confirmed action result');
+ await page.unroute(actionURL);
+ await frame.locator('#value').getByText('Refreshed',{exact:true}).waitFor();await menu(table,'Reset');
  // Native required validation focuses the visible selector, not its hidden value.
  await form.getByLabel('Departure',{exact:true}).fill('2026-11-09');await form.getByLabel('Travelers',{exact:true}).fill('3');await form.getByLabel('Confirmed',{exact:true}).check();
  await form.getByRole('button',{name:'Send',exact:true}).click();await form.getByLabel('Travel mode',{exact:true}).and(page.locator('[aria-invalid=true]')).waitFor();

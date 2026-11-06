@@ -78,7 +78,7 @@ python3 tests/system/verify_intelligent_ui.py --binary bin/steward --evidence ev
 - `TestUIActionCannotApproveAnExternalEffect` 验证动作按钮仍需既有高风险审批，未审批时提供商未被调用；动作结果只能取实际匹配的 ToolInvocation。
 - `TestTypedFormValidationAndRestore` 验证日期、有限数字、范围、候选、多选去重/规范顺序、布尔确认与回答恢复。
 - `web/ui-interactions.test.mjs` 验证 CSV 公式处理，以及同一页面并发排空保存、写入期间继续编辑和上下文合并。
-- `verify_ui_interactions.py` 使用真实 Main、Code Mode、UI 工具、工具搜索与 Chromium，覆盖折线/散点、表格排序筛选、图表范围、typed form、原生无脚本多选提交、丢失动作回执、宿主确认的沙箱动作回传、真实 CSV/SVG/PNG 下载和浏览器错误检查。展开/弹窗/悬浮保持同一 iframe；刷新和 kill/restart 不重新生成 UI，恢复输入和已接纳表单。保留明暗/移动端截图，不注入产品表或投影。
+- `verify_ui_interactions.py` 使用真实 Main、Code Mode、UI 工具、工具搜索与 Chromium，覆盖折线/散点、表格排序筛选、图表范围、typed form、原生无脚本多选提交、丢失动作回执时强制同源重试、轮询确认成功后才注入迟到 POST 错误、宿主确认的沙箱动作回传、真实 CSV/SVG/PNG 下载和浏览器错误检查。展开/弹窗/悬浮保持同一 iframe；刷新和 kill/restart 不重新生成 UI，恢复输入和已接纳表单。保留明暗/移动端截图，不注入产品表或投影。
 
 ```sh
 python3 tests/system/verify_ui_interactions.py --binary bin/steward --evidence evidence/my-ui-interactions/report.json
