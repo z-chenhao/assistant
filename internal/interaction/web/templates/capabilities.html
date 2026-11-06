@@ -6,16 +6,16 @@
 <section class="workspace-page settings-page capabilities-page">
  {{with .Capability}}
  {{if .ParentMemory}}<a class="back-link" href="/settings/capabilities/memory">{{tr "← Memory"}}</a>{{else}}<a class="back-link" href="/settings/capabilities">{{tr "← All capabilities"}}</a>{{end}}
- <div class="page-heading"><div><h1>{{tr .Title}}</h1><p>{{tr .Description}}</p></div>{{template "capability-status" .}}</div>
+ <div class="page-heading"><div><h1 aria-label="{{tr .Title}}">{{tr .Title}}{{template "help" (help (printf "capability-%s-help" .ID) (tr .Title) (printf "%s %s" (tr .Description) (tr .Help)))}}</h1></div>{{template "capability-status" .}}</div>
  {{if and .PendingRestart (not .Candidate)}}<p class="feedback" role="status">{{tr "Changes saved. Restart Steward to apply."}}</p>{{end}}
  {{if and (eq .State "unavailable") .Message}}<p class="feedback error" role="status" data-capability-feedback>{{tr .Message}}</p>{{else if and .Verified (or .Candidate .Checked .Advanced (not .PendingRestart))}}<p class="feedback success" role="status" data-capability-feedback>{{tr "Connection available."}}</p>{{end}}
  {{if .Form.Available}}<h2 class="settings-section-title">{{tr "Configuration"}}</h2><section class="panel form-panel settings-group">{{template "capability-guided-form" .}}</section>{{end}}
  <details class="technical-details capability-advanced form-panel" {{if or .Advanced (not .Form.Available)}}open{{end}}><summary>{{tr "Advanced"}}</summary>
  {{if eq .ID "memory"}}<p><a href="/settings/capabilities/embedding">{{tr "Semantic search"}}</a></p>{{end}}
- <p class="field-help">{{tr .Help}}</p>
+
  <form class="capability-editor" action="/capability/configure" method="post" enctype="multipart/form-data" data-capability-form>
   <input type="hidden" name="editor" value="advanced"><input type="hidden" name="capability" value="{{.ID}}"><input type="hidden" name="revision" value="{{.Revision}}">
-  <div class="capability-import"><label for="capability-yaml-file">{{tr "Import YAML file"}}</label><p class="field-help" id="capability-import-help">{{tr "Choose a .yaml or .yml file for this capability. It is checked before saving. Use credential references, never passwords or tokens."}}</p><input id="capability-yaml-file" type="file" name="configuration_file" accept=".yaml,.yml,application/yaml,text/yaml" aria-describedby="capability-import-help" data-capability-import></div>
+  <div class="capability-import"><label for="capability-yaml-file"><span class="control-field-label">{{tr "Import YAML file"}}{{template "help" (help "capability-import-help" (tr "Import YAML file") (tr "Choose a .yaml or .yml file for this capability. It is checked before saving. Use credential references, never passwords or tokens."))}}</span></label><input id="capability-yaml-file" type="file" name="configuration_file" accept=".yaml,.yml,application/yaml,text/yaml" aria-describedby="capability-import-help" data-capability-import aria-label="{{tr "Import YAML file"}}"></div>
   <details class="capability-yaml-review" {{if .Advanced}}open{{end}}><summary>{{tr "Review or edit YAML"}}</summary><label for="capability-configuration" class="sr-only">{{tr "YAML configuration"}}</label><textarea id="capability-configuration" name="configuration" rows="6" maxlength="65536" spellcheck="false">{{.Text}}</textarea></details>
   <div class="actions"><button type="button" class="secondary" data-capability-example="{{.Example}}" data-client-pending>{{tr "Download example"}}</button><noscript><button name="action" value="apply" class="secondary">{{tr "Apply configuration"}}</button></noscript></div>
   <p class="capability-draft-status" role="status" data-capability-draft></p>

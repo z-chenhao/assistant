@@ -29,6 +29,7 @@ type shownProjection struct {
 	Spec, Fallback string
 }
 type page struct {
+	Apps                                              *appsView
 	Capabilities                                      []Capability
 	Capability                                        *Capability
 	Trace                                             *traceView
@@ -86,6 +87,10 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 		return p, err
 	}
 	switch p.View {
+	case "app-service":
+		err = s.loadAppService(ctx, &p)
+	case "apps":
+		err = s.loadApps(ctx, r, &p)
 	case "database":
 		p.Database, err = s.loadDatabase(ctx, r)
 	case "schedule":

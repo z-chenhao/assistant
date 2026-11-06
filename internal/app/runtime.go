@@ -19,6 +19,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 	"github.com/z-chenhao/assistant/internal/memory"
+	connectedapptools "github.com/z-chenhao/assistant/internal/plugin/connectedapps"
 	"github.com/z-chenhao/assistant/internal/plugin/webaccess"
 	"github.com/z-chenhao/assistant/internal/recall"
 	"github.com/z-chenhao/assistant/internal/recall/embedding"
@@ -32,6 +33,8 @@ import (
 )
 
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {
+	a.connectedAppsRegistryMu.Lock()
+	defer a.connectedAppsRegistryMu.Unlock()
 	// This is execution startup, including absent config. Read-only control
 	// composition must not revoke another running configuration's bindings.
 	if err := a.store.ConfigureGitHub(ctx, cfg.GitHub); err != nil {
@@ -110,6 +113,13 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 	defs, err := builtinDefinitions(cfg, secrets)
 	if err != nil {
 		return nil, err
+	}
+	if a.connectedApps != nil && fixture == "" {
+		more, e := connectedapptools.Definitions(ctx, a.connectedApps)
+		if e != nil {
+			return nil, e
+		}
+		defs = append(defs, more...)
 	}
 	// Legacy deterministic peers own fixed catalogs and small model windows.
 	// Keep new network capabilities out of those fixtures; Web Access has real

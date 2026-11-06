@@ -34,7 +34,7 @@
 
 **当前实现**：已有本地 MCP 与配置型 Guest 浏览器基础；GitHub 精确 PR 监听可从 SecretStore 解析 PAT，经 `/user` 验证身份后读取评审及当前提交的 CI。凭据失效、来源失效、限流与协议错误通过安全状态码诊断；替换同一 SecretStore 引用中的 PAT 后下轮重试，无需将密钥复制到状态库。
 
-**边界与剩余工作**：此接入只读 GitHub.com 的一个明确 PR，不提供 Agent 服务工具、远程 OAuth MCP、自动签发/刷新 PAT 或授权写动作；统一具名连接、多账户选择、健康／重连／断开入口与其他服务仍待实现。Web Access 目前复用配置中的实例地址／SecretStore 引用，不因拆出 Connection 类型就视为完成这些入口。真实账户权限、PAT 到期恢复及实际平台结果需 Live 验证。
+**边界与剩余工作**：原生 GitHub 监听只读一个明确 PR，不自动签发或刷新 PAT。Composio 应用的具名连接、多账户、托管认证、状态检查及断开入口见 [F-071](#f-071)，Agent 可经既有审批管线执行其工具；这不构成远程 OAuth MCP 或其他原生 Connector 的统一迁移。Web Access 仍复用配置中的实例地址／SecretStore 引用。各真实账户权限、认证恢复及平台结果需 Live 验证。
 
 **验收目标**：在明确服务上完成真实读取/授权动作/失效恢复；无凭据泄漏，审批及 unknown 语义保持一致。
 
@@ -54,7 +54,7 @@
 
 ## 如何使用
 
-F-069 已提供搜索与公开网页读取入口，F-067 提供其显式可选后备；其余新增 connector 与相关候选尚无可用入口。分类见[术语与登记边界](#术语与登记边界)。F-069 的配置及限制见下方独立条目；以下 MCP 与 GitHub 监听用法只适用于 F-024/F-025/F-042。接入顺序见[个人 Connector 优先级](../feature-map.md#personal-connector-priorities)。
+F-069 已提供搜索与公开网页读取入口，F-067 提供其显式可选后备；F-071 提供 Composio 应用账户与通用工具入口，其他原生 Connector 与相关候选按各自范围独立实施。分类见[术语与登记边界](#术语与登记边界)。F-069 的配置及限制见下方独立条目；以下 MCP 与 GitHub 监听用法只适用于 F-024/F-025/F-042。接入顺序见[个人 Connector 优先级](../feature-map.md#personal-connector-priorities)。
 
 当前在配置中指定本地 MCP 可执行文件、独立目录和允许的工具及权限。启动时纳入冻结注册表，Agent 通过同一工具发现和执行入口使用。
 
@@ -104,7 +104,7 @@ JSON
 
 使用实际 `github binding` 版本，不固定复用示例值。unbind、监听 stop、Task pause/cancel、用户显式 complete、Forget 和来源撤权会使待处理/正在推理的旧因果失效；恢复监听或普通重启不重新授权已停止的绑定。新用户输入优先建立自身的 Main，保留不可变接收回执，不被旧观察吞并。once Root 自然结束并非人工停止，原绑定可接续；人工 complete 则需要用户明确 append 进入新代次后再重新绑定。未知效果不会因为收到评审而重试。
 
-远程 OAuth MCP、邮件/日历等不能当成现成产品开关。真实账户权限及 GitHub 保留历史的补读范围仍需独立验证。
+远程 OAuth MCP 仍未接通；邮件／日历可经 F-071 配置 Composio 账户。真实账户权限、业务结果及 GitHub 保留历史的补读范围仍需独立验证。
 
 ## 个人 Connector 需求
 
@@ -112,19 +112,30 @@ JSON
 
 ### 术语与登记边界
 
-本规划中的 **connector 是面向明确外部系统的集成适配器**：将该系统的数据／资源和允许的业务操作接入 Agent，并适配该系统的认证、权限、错误及连接协议。具名账户／实例的连接状态、凭据引用与撤销由平台管理；适配器不拥有插件启停。按外部系统划分 connector，按具体操作划分 tool；只读系统和公共数据服务也可以有 connector，不要求每项都有 OAuth、写操作或后台同步。
+本节统一 Steward 的产品术语：**插件扩展能力，连接器接入外部服务，连接绑定具体账户或实例，技能提供工作方法，工具执行具体操作。** 术语用于与外部助手的能力扩展、应用连接和技能概念对应，不承诺安装包格式或运行时兼容。
 
-| 层次 | 示例 | 在本规划中的归属 |
+| 术语 | 产品定义与示例 | 当前归属与边界 |
 | --- | --- | --- |
-| 能力包 plugin | Web Access：组合搜索、读取、证据工具和研究配方 | F-069 内置能力；安装／启停等独立生命周期归 F-070 |
-| 连接实例 connection | 一个 SearXNG 实例、一个 Tavily 凭据引用、一个模型账户 | 平台配置与 SecretStore；统一连接管理归 F-025 |
-| 外部系统 connector | Gmail、GitHub、高德、飞书云文档、Jellyfin | 本节登记与排序；一个 connector 可暴露多个工具 |
-| 工具／执行通道 | 浏览器操作、文件读取、SSH 命令执行 | Agent 执行能力，不因可操作外部系统就各算一个业务 connector |
+| 插件 Plugin | 能力扩展包，可包含工具、技能、连接器及相关界面；可只包含一个技能或连接器，也可组合多种能力 | Web Access（F-069）及 Connected Apps（F-071）为内置插件；独立安装／启停等生命周期归 F-070，尚未实现 |
+| 连接器 Connector | 将明确外部应用／服务的数据、资源与允许操作接入 Steward 的集成能力，如 Tavily、Exa、SearXNG、Gmail、GitHub、高德 | 按外部系统登记与验收；服务协议适配器是工程实现，账户／实例的连接状态、凭据引用与撤销由平台管理 |
+| 连接 Connection | 某个连接器或模型接入使用的具体账户／服务实例及其授权状态，如具名 SearXNG 实例、绑定 Tavily 凭据的服务连接、模型账户 | 平台配置与 SecretStore 持有凭据引用；Composio 应用账户在 F-071 按别名管理，其他原生连接仍用各自配置；公共服务可以无需个人账户授权 |
+| 技能 Skill | 完成特定任务的可复用方法、指令与资源，如研究步骤或邮件整理方法 | 读取与经验管理见 [Skills](skills-experience.md)；加载技能不授予新的工具或连接权限；Web Access 的研究配方当前是代码组合，尚无独立可安装 Skill |
+| 工具 Tool | Agent 可调用的具体操作，如搜索、读取网页或续读证据 | 工具声明进入既有 Registry／Code Mode／Executor；实际调用受角色、冻结权限和具体动作审批约束 |
+
+插件可以组合多个连接器，也可以不依赖外部服务；同一连接器可供不同插件复用，并对应多个连接实例。F-071 提供 Composio 应用的多账户入口，尚无通用插件清单或跨插件连接选择器。安装插件、授权连接和批准具体动作分别处理；移除插件不隐式删除共享连接或凭据，断开连接也不等于卸载插件。
+
+连接器提供外部系统的业务操作，工具将具体操作暴露给 Agent，插件可组织工具与组合工作方法。只读系统和公共数据服务也可以有连接器，不要求每项都有 OAuth、写操作或后台同步。工程模块的实际依赖与职责见[集成设计](../designs/integrations.md#f-069--web-access-的最小组合方案)。
+
+以下类别另按自身能力边界管理：
+
+| 类别 | 示例 | 在本规划中的归属 |
+| --- | --- | --- |
+| 执行通道 | 浏览器操作、文件读取、SSH 命令执行 | Agent 执行能力，不因可操作外部系统就各算一个业务 connector |
 | 模型能力／供应商 | 图片生成、视觉理解、语音识别 | 模型能力接入；“图片生成”本身不是一个外部业务系统 |
 | 数据导入 | 聊天导出、会话 JSONL、健康 XML | 一次性迁移或文件读取，不等于连接了来源应用的账户／业务接口 |
 | 协议 | MCP | 可承载工具和资源的协议，不等于某个 connector，也不限定其业务边界 |
 
-例如 Gmail connector 可提供查邮件、读线程、保存草稿和发送工具；高德 connector 可提供地点、路线和天气工具。二者的业务边界由所连接系统和实际授权决定。MCP 的工具／资源划分见[官方服务端概念](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/2026-07-28/learn/server-concepts.mdx)，不把一个 MCP server 或一个 tool 机械等同于一个业务 connector。
+例如 Gmail 连接器的目标操作包括查邮件、读线程、保存草稿和发送，高德连接器的目标操作包括地点、路线和天气查询；这些操作的接通范围由各 feature 单独验收。MCP 的工具／资源划分见[官方服务端概念](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/2026-07-28/learn/server-concepts.mdx)，不把一个 MCP server 或一个 tool 机械等同于一个业务 connector。
 
 F-048–F-054 保留原 ID，但归为[相关能力候选](#相关能力候选非-connector)，不计入 connector 数量或顺序，也不因需求分析自动成为已确认开发任务。F-057 只有连接 HealthKit 的设备端集成可作为 connector 候选，XML 导入仅是文件能力。Tavily 是公共检索服务 connector，与连接用户个人业务资料的 Gmail 等应区分用途；不能仅从“经常查资料”推断必须采用 Tavily。
 
@@ -136,7 +147,7 @@ F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，�
 
 个人 connector 排序以 ChatGPT 日常问题为主要证据：公开资料查找与核验，餐厅／车站／路线／天气等现实情境解释，个人资料找回，生活数据回顾，以及工作材料整理。Codex 的代码交付与设备维护保留为独立工程需求，不因工程调用多就占据个人业务 connector 的首位。
 
-排序先看已明确且反复委托的任务，再看接入后是否能补足当前缺少的事实、减少手工截图／粘贴，以及现有搜索或浏览器能否覆盖；同时考虑实际接口、授权和维护成本。不按聊天条数机械计分，一次旅行内的连续追问不能直接视为全年频次。健康数据、邮件或工作材料的需求，不自动证明资料分别在 Apple Health、Gmail 或飞书；未确认来源的项目只列需求优先级，不能直接进入实施队列。
+排序先看已明确且反复委托的任务，再看接入后是否能补足当前缺少的事实、减少手工截图／粘贴，以及现有搜索或浏览器能否覆盖；同时考虑实际接口、授权和维护成本。不按聊天条数机械计分，一次旅行内的连续追问不能直接视为全年频次。健康数据、邮件或工作材料的需求，不自动证明资料分别在 Apple Health、Gmail 或飞书；原生未确认来源的项目仍需先核实；F-071 的目录与通用工具通道由本次用户授权预备，个人账户连接仍逐一按需进行。
 
 | 已观察的任务模式 | 所需接入或能力 | 判断边界 |
 | --- | --- | --- |
@@ -168,7 +179,7 @@ F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，�
 
 **需求与依据**：用户希望围绕明确仓库完成查 issue/PR、读取 diff/CI、准备及发布评审或 PR、在授权下完成合并。工程交付和 CI 跟进有明确重复委托。
 
-**当前实现**：F-025/F-042 已提供一个精确 PR 的只读 PAT 监听；尚无上述账户资源及协作工具入口。本项新增工具闭环未实现，不能用已有监听认定其部分接通。
+**当前实现**：F-025/F-042 已提供一个精确 PR 的只读 PAT 监听；F-071 提供 Composio GitHub 账户与通用操作通道。原生 GitHub 协作工具及上述领域闭环尚未独立验收，不能用目录可见或已有监听认定完成。
 
 **目标与边界**：先接明确仓库的读取和 PR/CI 证据，再接授权写动作；身份、仓库、head 和具体参数必须明确。采用 [GitHub 官方 API](https://docs.github.com/en/rest/pulls/pulls)；PAT、GitHub App 等认证方式在实现时按实际部署选择，不预先稳定通用账户协议。F-026 持有代码修改集／远端交付关系，F-042 持有事件监听，F-045 持有主动接续；本项持有 GitHub 服务操作，避免建立第二套监听或任务系统。发布、合并和分支删除仍服从既有审批与治理。
 
@@ -228,11 +239,11 @@ F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，�
 
 **需求与依据**：账户设置、订单解释及资料找回可受益于邮件；用户直接提出 Gmail，也观察到使用入口。但尚无足够的日常邮件处理样本，优先级低于已有重复委托，不推断邮箱使用频率。
 
-**当前实现**：未接通 Gmail/OAuth 邮件能力。
+**当前实现**：F-071 已提供 Gmail 的 Composio 托管授权与通用工具调用路径；尚无真实邮箱验收或原生 Gmail 协议适配器，下述邮件语义继续独立验证。
 
-**目标与边界**：先支持用户指定条件的邮件搜索、线程及附件读取，生成回复草稿作为本地 Artifact；之后才考虑远端草稿／发送。依据[官方 scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)，`gmail.readonly` 属受限权限，`gmail.compose` 同时含发送能力；保存草稿不能宣称拥有供应商级“不可发送”授权。应用过滤条件不等于 OAuth 服务端硬隔离。公开产品验证、安全评估适用条件和模型处理数据的边界需依据[官方验证说明](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)确认，不能把个人试用例外当作普遍豁免。
+**原生目标与边界**：先支持用户指定条件的邮件搜索、线程及附件读取，生成回复草稿作为本地 Artifact；之后才考虑远端草稿／发送。依据[官方 scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)，`gmail.readonly` 属受限权限，`gmail.compose` 同时含发送能力；保存草稿不能宣称拥有供应商级“不可发送”授权。应用过滤条件不等于 OAuth 服务端硬隔离。公开产品验证、安全评估适用条件和模型处理数据的边界需依据[官方验证说明](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)确认，不能把个人试用例外当作普遍豁免。
 
-**验收目标**：找到确切邮件／订单并区分正文、附件和引用；分页、token 到期／撤销、无匹配及不完整同步可诊断。草稿不发送；未来发送需冻结收件人、正文与附件，发送未知时不盲重发。
+**验收目标**：找到确切邮件／订单并区分正文、附件和引用；分页、token 到期／撤销、无匹配及不完整同步可诊断。草稿不自动发送；Composio 通道的批准发送及未来原生发送均需冻结收件人、正文与附件，发送未知时不盲重发。
 
 <a id="f-060"></a>
 
@@ -264,7 +275,7 @@ F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，�
 
 **需求与依据**：时间换算、计划和提醒有场景价值，但未确认用户以 Google Calendar 管理日程；保持待定义，不把日历当成所有 personal agent 的默认首接服务。
 
-**当前实现**：无 Google Calendar 接入；F-015 是 Steward 自身自动化，不是外部日历。
+**当前实现**：可经 F-071 预备 Composio 的 Google Calendar 账户与工具；真实日历权限和下述日程语义尚未验收。F-015 是 Steward 自身自动化，不是外部日历。
 
 **候选范围与前提**：先确认所用日历；首版考虑日程读取、忙闲及授权创建明确事件，依据 [freebusy](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query) 与 [events.insert](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert)。不默认发送邀请、修改所有日历或读取他人日程，不复制内部 Task 状态为新任务系统。
 
@@ -288,7 +299,7 @@ F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，�
 
 **需求与依据**：附件、文档与资料找回需求明确，但未证明这些资料存于 Drive；保持待定义，不从 Google 账户存在推断云盘使用。
 
-**当前实现**：无 Drive connector；本地 Artifact 不等于个人云盘访问。
+**当前实现**：可经 F-071 预备 Composio 的 Drive、Docs、Sheets、Slides 账户与工具；尚无原生 Drive 适配器或真实云盘范围／编辑验收，本地 Artifact 不等于个人云盘访问。
 
 **候选范围与前提**：先确认存储来源；首版考虑选择文件的读取、导出及保存交付物，不默认索引全盘。依[官方授权说明](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)，`drive.file` 面向用户与应用交互中明确提供的文件；不能用此 scope 宣称全盘搜索可用。Docs、Sheets、Slides 的原生编辑能力需分别定义，不因接通 Drive 文件发现就视为全部支持。
 
@@ -348,7 +359,7 @@ F-069 Web Access Plugin 是用户统一使用的搜索／网页访问接入，�
 
 **需求与消费者**：Main／Task Worker 用同一 Registry／Code Mode／Executor 完成公开研究、网页读取和证据续读。插件编排、connector 服务协议、工具契约及平台状态管理均由 Steward 自建，不安装外部 agent SDK、不复制插件实现或类型，也不接管其他助手的会话与凭据。
 
-**归属**：Web Access 是当前随程序装配的内置 plugin，不是一个新服务。Exa／SearXNG／Tavily 各自的 connector 只适配服务；实例／凭据绑定与当前模型连接由平台提供。本地内容处理不持有业务账户；研究配方可组合，尚未提供独立可安装 Skill。F-070 的安装／启停管理仍未实现。
+**归属**：按[统一术语](#术语与登记边界)，Web Access 是随程序装配的内置能力插件，组织搜索、读取、问答和证据工具。Exa／SearXNG／Tavily 是外部搜索服务连接器，各自的协议适配器实现服务调用；当前 Tavily 仅接 Search，Extract 尚未实现。实例／凭据绑定与当前模型连接由平台提供。原生搜索属于模型适配能力，本地解析属于内容处理能力；研究配方当前为代码组合，尚未提供独立可安装 Skill。F-070 的安装／启停管理仍未实现。
 
 **入口与行为**：`builtin__web_search` 支持单查询或最多八个查询、显式 provider、域名条件、时间偏好、来源正文及摘要工作流。`builtin__fetch_content` 支持最多八个公开 HTTP(S) URL 的 readable／raw／answer 模式：本地提取 HTML Markdown、文本、PDF 和图片；问答使用当前冻结模型，并保存原始提取证据。`builtin__get_search_content` 从返回的 `responseId` 续读或 exact／case-insensitive／fuzzy 查找；分页和片段坐标是 UTF-8 字节偏移，不拆分字符，fuzzy 按顺序匹配忽略空白的词组。`builtin__source_check` 收集来源、原文片段及哈希供人工判断；有来源为 `unclear`，无证据为 `missing-evidence`，不声称自动裁定支持或反驳。旧 `builtin__web_fetch` 继续提供原有公开 HTML／文本读取。
 
@@ -471,8 +482,28 @@ F-048–F-054 分别属于执行能力、历史资料导入或模型能力，保
 
 ### F-070 · Plugin 生命周期与连接分离
 
-**需求与消费者**：所有者能够启用、停用和移除能力包，并显式选择可复用的服务连接。一个 plugin 可以组合多个 connector，同一 connector 可以绑定不同账户／实例；移除 plugin 不隐式删除连接或凭据，断开连接也不等于卸载 plugin。
+**需求与消费者**：所有者能够启用、停用和移除插件，并显式选择可复用的服务连接。插件可只包含一个技能或连接器，也可组合多种能力；同一连接器可供多个插件复用，并绑定不同账户／实例。移除插件不隐式删除共享连接或凭据，断开连接也不等于卸载插件；安装与启用不替代账户授权或具体动作审批。
 
-**当前实现**：仅有随程序装配的 Web Access 内部模块，经现有 Registry／Code Mode／Executor 暴露工具；没有安装／启停／移除入口、插件清单协议或独立连接选择器，本项未实现。统一连接的认证与撤销归 F-025，各外部服务的范围仍由独立 feature 验收。
+**当前实现**：Web Access 与 Connected Apps 均为随程序装配的内部模块，经现有 Registry／Code Mode／Executor 暴露工具；F-071 有独立账户连接管理，但没有插件安装／启停／移除入口、插件清单协议或跨插件连接选择器，本项未实现。统一连接的认证与撤销归 F-025，各外部服务的范围仍由独立 feature 验收。
 
 **验收目标与范围**：使用已有冻结能力与 SecretStore 边界；启停不改变已冻结 Run 的权限，连接缺失／撤销可诊断；共享连接不随某个 plugin 移除而被误删。先用真实能力包和连接证明管理需求，再决定内部清单；当前不建立公共 SDK、第三方市场、动态加载或通用工作流引擎。
+
+<a id="f-071"></a>
+
+### F-071 · Composio 应用目录与账户连接
+
+**需求与消费者**：为日常生活和工作预备广泛的外部应用接入，用户按需连接账户。Composio 提供应用与工具目录、托管认证及执行协议；Steward 自建适配器，继续拥有账户绑定、工具权限、审批和恢复机制。
+
+**入口与使用**：使用者在 Settings → Apps 浏览应用、Connect 和管理账户；部署者在 Settings → Resources → App connection service 配置 Composio。Apps 只展示应用与账户操作，不展示项目初始化或服务设置入口；服务未就绪时，在具体账户连接操作处禁用 Connect 并以问号说明。部署者从 Resources 管理服务。分类选择后直接筛选，无脚本时保留提交按钮，不显示项目密钥表单。使用者可浏览邮件与沟通、日历与任务、文档与存储、开发、设计、商业和个人生活的推荐应用；推荐条目不代表该项目已验证支持。配置项目后可搜索／分类筛选并逐页浏览 Composio 的完整原生应用目录，不限于推荐名单。
+
+目录按用途分组（邮件沟通、日历任务、文档存储等），不提供“热门”榜单；采用双列列表（手机单列），每项含应用 logo、名称、一行用途及连接／管理入口。左侧“已连接的应用”列出账户绑定；点击应用打开详情，集中显示账户状态、额外账户、重连和断开，无 JavaScript 时使用原生详情页。推荐列表中的 65 个应用随包附带从 Composio 官方取得的品牌 SVG；实时目录保留 `meta.logo`，新应用图标经 Steward 同源缓存显示。未核实的推荐名称不作为已支持的应用展示，项目完整目录仍以实时结果为准。
+
+1. 创建 Composio 项目，将项目 API key 配置为 Steward 进程的 `COMPOSIO_API_KEY` 环境变量并重启。未显式配置项目引用时，服务通过 SecretStore 自动使用 `env:COMPOSIO_API_KEY`，无需进入设置页保存；变量缺失时仍可浏览内置目录。自定义 SecretStore／环境引用及认证覆盖仍在 Resources → App connection service 中 Verify and save，已有显式引用优先，凭据失效也不改用默认项目。自动读取不会连接应用或创建账户工具；只有用户 Connect 才记录绑定。
+2. 选择实时目录中的应用，点击 Connect，浏览器打开授权页面。首次连接自动使用账户别名；已有可用账户时，通过 Add account 填写 `work` 等独立别名。系统自动选择该应用已为 Tool Router 启用的最新自定义认证配置，否则使用 Composio 托管认证；部署者可以在服务设置中覆盖配置 ID，Apps 不接收该参数。授权页面及同意范围由 Composio／原服务展示。
+3. 在新标签页完成授权后，Apps 每五秒自动检查新账户，至多十分钟。只有确切账户、用户和应用匹配、未被禁用且状态 ACTIVE 的连接才启用；远端禁用后检查会将本地连接标为失效并撤下工具；Refresh status 保留为无脚本与网络异常时的手动入口。弹窗被拦截时使用 Open authorization page，未过期链接会复用，不重复创建账户；链接只保留在服务进程和页面内存中，重启或过期后需要显式 Reconnect。一个应用可以连接多个具名账户；公开免认证应用也需要用户显式启用。
+4. 新的 Main／Worker 能通过 Code Mode 搜索该账户的操作，再传入确切工具版本、描述指纹和 JSON 参数执行。当前所有远程业务操作均需要 Steward 逐次审批；不依据供应商的 read-only 提示自动放宽授权。新增连接只用于新建的冻结能力快照，旧 Run 不自动获得新账户。
+5. Disconnect 先持久关闭 Steward 的使用权限，再尝试 Composio 的上游撤权及记录删除。无法确认原服务已撤权时明确提示；迟到的授权结果不能复活旧绑定。失效或未完成的授权可使用 Reconnect 新建绑定，旧绑定保持断开；已正常工作的账户不能被重连动作替换。
+
+**凭据与费用**：本地仅保存项目凭据引用、安装独有 user ID 和账户标识／状态；OAuth token 由 Composio 托管。Composio 会处理所连接应用的数据及工具参数，需在创建项目、授予权限时了解其服务条款与用量。工具执行沿用现有审批与 Artifact 保存；网络中断或响应不确定时登记 unknown，重启也不自动重复远程动作。未启用 Composio instant、workbench、代理或批量执行能力。
+
+**当前限制**：尚无真实 Composio 项目，代码链路通过 HTTP 协议 peer、SQLite、Web 与 Code Mode 集成验证；不宣称所有应用、OAuth scope 或生产结果已经验收。特定服务、权限、付费计划和 auth configuration 的可用性以项目实时目录及授权结果为准。F-047／F-059／F-062／F-064 等领域目标继续独立验收；HealthKit、EventKit、本机资料及飞书等能力如不在项目支持范围内，不能据此视为接通。既有 Web Access、Tavily 和原生监听保留原配置与职责；F-070 插件生命周期不由本项代替。

@@ -12,6 +12,10 @@ import (
 )
 
 func (s *Server) get(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/apps/logo/") {
+		s.appLogo(w, r)
+		return
+	}
 	if legacyPageRedirect(w, r) {
 		return
 	}
@@ -24,6 +28,9 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		s.uiInteraction(w, r)
 	case "/ui/image":
 		s.uiImage(w, r)
+
+	case "/api/apps/detail":
+		s.appDetail(w, r)
 	case "/ui/widget":
 		s.widget(w, r)
 	case "/api/developer/database":
@@ -144,6 +151,10 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 		return s.setLanguage(w, r)
 	case "/capability/configure":
 		return s.capabilityAction(w, r)
+	case "/apps/configure":
+		return s.appAction(w, r)
+	case "/apps/service/configure":
+		return s.appServiceAction(w, r)
 	case "/approval":
 		if err := s.decideApproval(r); err != nil {
 			return err

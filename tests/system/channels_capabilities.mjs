@@ -74,10 +74,27 @@ export async function pageTransitions(page,context,url,evidence){
   measurements.fonts.push({path,...fonts});
  }
  const heading=await page.locator('.settings-page h1').boundingBox();
- for(const path of ['/settings/notifications','/settings/setup','/settings/capabilities']){
+ for(const path of ['/settings/notifications','/settings/setup','/settings/apps','/settings/capabilities']){
   await page.goto(url+path);const next=await page.locator('.settings-page h1').boundingBox();
-  if(!next||Math.abs(next.x-heading.x)>1||Math.abs(next.y-heading.y)>1||Math.abs(next.height-heading.height)>1)throw Error('same-level Settings titles changed alignment: '+path);
+  // Apps needs a wider catalogue; it keeps the shared title height/top while
+  // its horizontal position follows its own content padding.
+  const expectedX=path==='/settings/apps'?await page.locator('.apps-page').evaluate(node=>node.getBoundingClientRect().x+parseFloat(getComputedStyle(node).paddingLeft)):heading.x;
+  if(!next||Math.abs(next.x-expectedX)>1||Math.abs(next.y-heading.y)>1||Math.abs(next.height-heading.height)>1)throw Error('Settings title left its content bounds or shared vertical alignment: '+path);
  }
+ for(const language of ['en','zh-CN']){
+  await context.request.post(url+'/settings/language',{form:{language}});
+  for(const width of [1400,390,320]){
+   await page.setViewportSize({width,height:844});await page.goto(url+'/settings/apps');await settle();
+   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error(`Apps overflowed at ${width}px`);
+   if(await page.locator('.settings-navigation a[aria-current="page"]').count()!==1||!await page.locator('.settings-navigation a[href="/settings/apps"][aria-current="page"]').count())throw Error('Apps selection disagrees with Settings navigation');
+   if(!await page.getByText('Gmail',{exact:true}).count()||await page.locator('button[value="connect"]').count())throw Error('unconfigured directory lost suggestions or enabled connection actions');
+   await page.screenshot({path:`${evidence}/apps-${language}-${width}.png`});
+   await page.locator('#app-search').fill('Notion');await page.locator('#app-search').press('Enter');
+   if(!await page.getByText('Notion',{exact:true}).count()||await page.getByText('Gmail',{exact:true}).count())throw Error('Apps search did not filter the directory');
+  }
+ }
+ await context.request.post(url+'/settings/language',{form:{language:'en'}});
+ await page.setViewportSize({width:1400,height:980});await page.goto(url+'/settings/capabilities');
  // Collapse once, then cross every module and reload. The shared preference
  // must be respected even when the destination has two navigation rails.
  await page.locator('.brand-row [data-sidebar-toggle]').click();
@@ -97,7 +114,7 @@ export async function pageTransitions(page,context,url,evidence){
    await page.waitForFunction(()=>document.querySelector('link[rel=stylesheet]')?.sheet);await settle();
    if(await page.locator('[data-sidebar-toggle],[data-sidebar-close]').evaluateAll(buttons=>buttons.some(button=>!button.disabled)))throw Error('navigation became actionable before its event handlers loaded');
    const geometry=()=>{
-    const selectors=['.workspace-main','.page-heading','.settings-group','.settings-footer','[data-appearance-setting]','[data-avatar-setting]',...Array.from({length:4},(_,i)=>`.settings-navigation a:nth-child(${i+1})`)];
+    const selectors=['.workspace-main','.page-heading','.settings-group','.settings-footer','[data-appearance-setting]','[data-avatar-setting]',...Array.from({length:5},(_,i)=>`.settings-navigation a:nth-child(${i+1})`)];
     return {dark:document.documentElement.classList.contains('dark'),boxes:Object.fromEntries(selectors.map(selector=>{const node=document.querySelector(selector);return [selector,node?.getBoundingClientRect().toJSON()??null]}))};
    };
    const before=await page.evaluate(geometry);
@@ -221,7 +238,7 @@ export async function capabilityDefaults(page,context,url,evidence){
  const navSearch=page.getByRole('searchbox',{name:'搜索设置',exact:true});await navSearch.fill('通知');
  if(await page.locator('.settings-navigation a:visible').count()!==1)throw Error('settings navigation filter did not match');
  await navSearch.fill('zz-no-result');await page.getByText('未找到设置。',{exact:true}).waitFor();await navSearch.press('Escape');
- if(await page.locator('.settings-navigation a:visible').count()!==4)throw Error('settings filter did not reset');
+ if(await page.locator('.settings-navigation a:visible').count()!==5)throw Error('settings filter did not reset');
  await navigationViewports(page,evidence);
  await selectValue(page,page.locator('#interface-theme'),'dark');
  if(!await page.locator('html').evaluate(node=>node.classList.contains('dark')))throw Error('appearance did not apply');
@@ -336,7 +353,7 @@ export async function capabilitySetup(page,context,url,evidence){
 
 export async function settingsAccount(page,context,url,evidence){
  await page.goto(url+'/settings/setup');
- await page.locator('details.resource-account').first().locator('summary').click();
+ await page.locator('details.resource-account').first().locator(':scope > summary').click();
  let posts=0;page.on('request',request=>{if(new URL(request.url()).pathname==='/auth/logout'&&request.method()==='POST')posts++});
  const logout=page.getByRole('button',{name:'Sign out of provider',exact:true});
  await logout.click();

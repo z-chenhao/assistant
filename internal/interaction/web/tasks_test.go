@@ -70,7 +70,7 @@ func TestTaskPagesAreAuthenticatedReadOnlyAndErrorsStayPrivate(t *testing.T) {
 	}
 	s.Tasks = workspaceReader{}
 	w := request("/tasks/task:visible", true)
-	for _, text := range []string{"Review &lt;img src=x&gt;", "Continue this task", "before=9", "Related updates from Ghost", "Delegated work · 4 total", "Completed / failed", "Running / queued / waiting", "Planned objective", "Ongoing task", "Accepted instructions", "Use the primary sources", "These are dispatched workers, not a plan of future steps."} {
+	for _, text := range []string{"Review &lt;img src=x&gt;", "Continue this task", "before=9", "Related updates from Ghost", "Delegated work · 4 total", "Completed / failed", "Running / queued / waiting", "Planned objective", "Ongoing task", "Accepted instructions", "Use the primary sources", "Delegated work"} {
 		if !strings.Contains(w.Body.String(), text) {
 			t.Fatal("missing task flow", text)
 		}

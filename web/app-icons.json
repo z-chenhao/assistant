@@ -1,0 +1,655 @@
+{
+  "source": "https://logos.composio.dev/api/{toolkit_slug}",
+  "apps": [
+    {
+      "slug": "gmail",
+      "name": "Gmail",
+      "url": "https://logos.composio.dev/api/gmail",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1298,
+      "sha256": "3fb6577179fc89b5d939eb7772364766fb407bfcc16f55c827fc0ef6a092ecbd",
+      "bundled_sha256": "3fb6577179fc89b5d939eb7772364766fb407bfcc16f55c827fc0ef6a092ecbd"
+    },
+    {
+      "slug": "outlook",
+      "name": "Outlook",
+      "url": "https://logos.composio.dev/api/outlook",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 13141,
+      "sha256": "1f763338c1f8e692769e731fac9540d9cae82f934f12f3753aeb79118471a80c",
+      "bundled_sha256": "1f763338c1f8e692769e731fac9540d9cae82f934f12f3753aeb79118471a80c"
+    },
+    {
+      "slug": "slack",
+      "name": "Slack",
+      "url": "https://logos.composio.dev/api/slack",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2109,
+      "sha256": "e830e224a020d33dd2d70cb2234d1a0184fdb49ec1c01735f001396ece25f417",
+      "bundled_sha256": "e830e224a020d33dd2d70cb2234d1a0184fdb49ec1c01735f001396ece25f417"
+    },
+    {
+      "slug": "microsoft_teams",
+      "name": "Microsoft Teams",
+      "url": "https://logos.composio.dev/api/microsoft_teams",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4220,
+      "sha256": "3730f7d2951ad9e45924df8c58d2db2c5f62259edaea4ee823f5211899efdd85",
+      "bundled_sha256": "3730f7d2951ad9e45924df8c58d2db2c5f62259edaea4ee823f5211899efdd85"
+    },
+    {
+      "slug": "discord",
+      "name": "Discord",
+      "url": "https://logos.composio.dev/api/discord",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2394,
+      "sha256": "4c20518e5727daa79a04c351c3bf3e163754e02cbc00523b404512683cc5e23a",
+      "bundled_sha256": "4c20518e5727daa79a04c351c3bf3e163754e02cbc00523b404512683cc5e23a"
+    },
+    {
+      "slug": "telegram",
+      "name": "Telegram",
+      "url": "https://logos.composio.dev/api/telegram",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4040,
+      "sha256": "776401536106164c7673526f91df9ace38d32e7dceb80a94d1f3af0d3e295d3a",
+      "bundled_sha256": "776401536106164c7673526f91df9ace38d32e7dceb80a94d1f3af0d3e295d3a"
+    },
+    {
+      "slug": "whatsapp",
+      "name": "WhatsApp",
+      "url": "https://logos.composio.dev/api/whatsapp",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1826,
+      "sha256": "e4f48bfae01494a82c69abd17fffaea0df60dffc7cfd877bf9437f84ccecfdb6",
+      "bundled_sha256": "e4f48bfae01494a82c69abd17fffaea0df60dffc7cfd877bf9437f84ccecfdb6"
+    },
+    {
+      "slug": "zoom",
+      "name": "Zoom",
+      "url": "https://logos.composio.dev/api/zoom",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 12286,
+      "sha256": "1ed9a6d9596d7c94a83bcfe00c0bd94b52623eff512825f0c4806f62bc7fc2a5",
+      "bundled_sha256": "1ed9a6d9596d7c94a83bcfe00c0bd94b52623eff512825f0c4806f62bc7fc2a5"
+    },
+    {
+      "slug": "googlecalendar",
+      "name": "Google Calendar",
+      "url": "https://logos.composio.dev/api/googlecalendar",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 6693,
+      "sha256": "5f79aa99ca6e197bb27c76e6c74a1c8fbdd35207804879d5936aa057a7eb99b9",
+      "bundled_sha256": "5f79aa99ca6e197bb27c76e6c74a1c8fbdd35207804879d5936aa057a7eb99b9"
+    },
+    {
+      "slug": "googletasks",
+      "name": "Google Tasks",
+      "url": "https://logos.composio.dev/api/googletasks",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1410,
+      "sha256": "925b3d0acbf7a2c8efbef754d43966976556a990c078832cbff6e6474199b92f",
+      "bundled_sha256": "925b3d0acbf7a2c8efbef754d43966976556a990c078832cbff6e6474199b92f"
+    },
+    {
+      "slug": "notion",
+      "name": "Notion",
+      "url": "https://logos.composio.dev/api/notion",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2251,
+      "sha256": "23ae59b6190d947866e8832dd8c76b9d5c1aba97fd86224d83ada47f22ec195d",
+      "bundled_sha256": "23ae59b6190d947866e8832dd8c76b9d5c1aba97fd86224d83ada47f22ec195d"
+    },
+    {
+      "slug": "todoist",
+      "name": "Todoist",
+      "url": "https://logos.composio.dev/api/todoist",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 8716,
+      "sha256": "70d2efc3671ed3fd405df70ff248c7da9876b46056c2cd0a36beefe3c66887c9",
+      "bundled_sha256": "70d2efc3671ed3fd405df70ff248c7da9876b46056c2cd0a36beefe3c66887c9"
+    },
+    {
+      "slug": "ticktick",
+      "name": "TickTick",
+      "url": "https://logos.composio.dev/api/ticktick",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3173,
+      "sha256": "adea543efb8d698002475de768e01f67ca0893e6edb18f64353b538dbd62885c",
+      "bundled_sha256": "adea543efb8d698002475de768e01f67ca0893e6edb18f64353b538dbd62885c"
+    },
+    {
+      "slug": "asana",
+      "name": "Asana",
+      "url": "https://logos.composio.dev/api/asana",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1460,
+      "sha256": "362d6008aedace77f038781e14ecfce13fc0aa162cce5b296684f3237c06ad4a",
+      "bundled_sha256": "362d6008aedace77f038781e14ecfce13fc0aa162cce5b296684f3237c06ad4a"
+    },
+    {
+      "slug": "trello",
+      "name": "Trello",
+      "url": "https://logos.composio.dev/api/trello",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1398,
+      "sha256": "d646b92a8f428eda01b1f4436972f31ac3705e983d027996700fcaba2ec41f08",
+      "bundled_sha256": "d646b92a8f428eda01b1f4436972f31ac3705e983d027996700fcaba2ec41f08"
+    },
+    {
+      "slug": "clickup",
+      "name": "ClickUp",
+      "url": "https://logos.composio.dev/api/clickup",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1210,
+      "sha256": "42f85a933faea68aa231c0a4d1ff314d4bd6355b9a8883bf7e06023edfbe5a51",
+      "bundled_sha256": "42f85a933faea68aa231c0a4d1ff314d4bd6355b9a8883bf7e06023edfbe5a51"
+    },
+    {
+      "slug": "monday",
+      "name": "Monday.com",
+      "url": "https://logos.composio.dev/api/monday",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1240,
+      "sha256": "d60798bd663c08dd107828e06868cff9aa4b719e6244767a5a40c179398816d0",
+      "bundled_sha256": "d60798bd663c08dd107828e06868cff9aa4b719e6244767a5a40c179398816d0"
+    },
+    {
+      "slug": "airtable",
+      "name": "Airtable",
+      "url": "https://logos.composio.dev/api/airtable",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1262,
+      "sha256": "7352bef5df319ea547be30d4d89a46eee9113df0c7ac3aa55358a6ee73ae089f",
+      "bundled_sha256": "7352bef5df319ea547be30d4d89a46eee9113df0c7ac3aa55358a6ee73ae089f"
+    },
+    {
+      "slug": "calendly",
+      "name": "Calendly",
+      "url": "https://logos.composio.dev/api/calendly",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 5273,
+      "sha256": "8012e1e76bc85407969d1ea3eb9859a2379201b44c8bd1fe3f9631d30e41d471",
+      "bundled_sha256": "8012e1e76bc85407969d1ea3eb9859a2379201b44c8bd1fe3f9631d30e41d471"
+    },
+    {
+      "slug": "googledrive",
+      "name": "Google Drive",
+      "url": "https://logos.composio.dev/api/googledrive",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1516,
+      "sha256": "54a9341537bef548a09fd9402770564d7bc017b1bbcf6de5e3989fc81088cd14",
+      "bundled_sha256": "54a9341537bef548a09fd9402770564d7bc017b1bbcf6de5e3989fc81088cd14"
+    },
+    {
+      "slug": "googledocs",
+      "name": "Google Docs",
+      "url": "https://logos.composio.dev/api/googledocs",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2032,
+      "sha256": "d6832fc80c226e49c9340125b82664830c8ce3cb94357ad0d26bf2fad042ca25",
+      "bundled_sha256": "d6832fc80c226e49c9340125b82664830c8ce3cb94357ad0d26bf2fad042ca25"
+    },
+    {
+      "slug": "googlesheets",
+      "name": "Google Sheets",
+      "url": "https://logos.composio.dev/api/googlesheets",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1476,
+      "sha256": "095aeb63c674ac01348e6ba5f1c661f0d1c6a96dc096f9fe22876ac2e724cd8a",
+      "bundled_sha256": "095aeb63c674ac01348e6ba5f1c661f0d1c6a96dc096f9fe22876ac2e724cd8a"
+    },
+    {
+      "slug": "googleslides",
+      "name": "Google Slides",
+      "url": "https://logos.composio.dev/api/googleslides",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2622,
+      "sha256": "a25c4d01ee4f445708065c8e1a7cda77d09cf1f630a49af6232d7dc7f5bea7bc",
+      "bundled_sha256": "a25c4d01ee4f445708065c8e1a7cda77d09cf1f630a49af6232d7dc7f5bea7bc"
+    },
+    {
+      "slug": "one_drive",
+      "name": "OneDrive",
+      "url": "https://logos.composio.dev/api/one_drive",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1891,
+      "sha256": "0cba3a5380422d7102ac219546275c5b7cf2f1b5413b5c2e511630a0d4b2ba83",
+      "bundled_sha256": "0cba3a5380422d7102ac219546275c5b7cf2f1b5413b5c2e511630a0d4b2ba83"
+    },
+    {
+      "slug": "share_point",
+      "name": "SharePoint",
+      "url": "https://logos.composio.dev/api/share_point",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 716,
+      "sha256": "2f7fcb926b624aebd9e2b1db8fa808beffbc76bcd98d0df1a0ad01d1cf3eb8a0",
+      "bundled_sha256": "2f7fcb926b624aebd9e2b1db8fa808beffbc76bcd98d0df1a0ad01d1cf3eb8a0"
+    },
+    {
+      "slug": "dropbox",
+      "name": "Dropbox",
+      "url": "https://logos.composio.dev/api/dropbox",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3992,
+      "sha256": "6bf8698f9e8120eb1948cff340d2878dafcce85294f8941b2b511d6afbc4b77f",
+      "bundled_sha256": "6bf8698f9e8120eb1948cff340d2878dafcce85294f8941b2b511d6afbc4b77f"
+    },
+    {
+      "slug": "box",
+      "name": "Box",
+      "url": "https://logos.composio.dev/api/box",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 6288,
+      "sha256": "fa48594b8d67203dbd4bdf97f86136d3e55f37b7394db1a26c356fa62d778ef3",
+      "bundled_sha256": "fa48594b8d67203dbd4bdf97f86136d3e55f37b7394db1a26c356fa62d778ef3"
+    },
+    {
+      "slug": "confluence",
+      "name": "Confluence",
+      "url": "https://logos.composio.dev/api/confluence",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1231,
+      "sha256": "601eb8992c5323e9889bfa569c0c0752c7c71112ddec70554546f05fa3473613",
+      "bundled_sha256": "601eb8992c5323e9889bfa569c0c0752c7c71112ddec70554546f05fa3473613"
+    },
+    {
+      "slug": "github",
+      "name": "GitHub",
+      "url": "https://logos.composio.dev/api/github",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1535,
+      "sha256": "2c1726d5c67c36eb69bf3ce012ecc3846766df1405efa7a83c2c7158e4422a13",
+      "bundled_sha256": "2c1726d5c67c36eb69bf3ce012ecc3846766df1405efa7a83c2c7158e4422a13"
+    },
+    {
+      "slug": "gitlab",
+      "name": "GitLab",
+      "url": "https://logos.composio.dev/api/gitlab",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2159,
+      "sha256": "c11ce54eedc42bd2632fb38197bb1db8a2169161e31e4ee706d3be73193cfb0b",
+      "bundled_sha256": "c11ce54eedc42bd2632fb38197bb1db8a2169161e31e4ee706d3be73193cfb0b"
+    },
+    {
+      "slug": "bitbucket",
+      "name": "Bitbucket",
+      "url": "https://logos.composio.dev/api/bitbucket",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1372,
+      "sha256": "7b91cf37b14032e82d1c2365e9b70fe848951d5bc91870f9e9f5653926c0aa5e",
+      "bundled_sha256": "7b91cf37b14032e82d1c2365e9b70fe848951d5bc91870f9e9f5653926c0aa5e"
+    },
+    {
+      "slug": "linear",
+      "name": "Linear",
+      "url": "https://logos.composio.dev/api/linear",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 708,
+      "sha256": "219bea2ab65fbde25868bfd992a75096c6d438cb4163556b29078adf26bc341d",
+      "bundled_sha256": "219bea2ab65fbde25868bfd992a75096c6d438cb4163556b29078adf26bc341d"
+    },
+    {
+      "slug": "jira",
+      "name": "Jira",
+      "url": "https://logos.composio.dev/api/jira",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1050,
+      "sha256": "b27341d267876f455f3e8b78716d2595b36ef7d59a55979ae42a32fe6b5a619c",
+      "bundled_sha256": "b27341d267876f455f3e8b78716d2595b36ef7d59a55979ae42a32fe6b5a619c"
+    },
+    {
+      "slug": "sentry",
+      "name": "Sentry",
+      "url": "https://logos.composio.dev/api/sentry",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 11654,
+      "sha256": "b6606e3a33170230a4637d76484e30bc39192bf7c34c1183f9afdc76c931bcca",
+      "bundled_sha256": "b6606e3a33170230a4637d76484e30bc39192bf7c34c1183f9afdc76c931bcca"
+    },
+    {
+      "slug": "vercel",
+      "name": "Vercel",
+      "url": "https://logos.composio.dev/api/vercel",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1069,
+      "sha256": "8b2f2f20e4b2bf945481646ceea9300cf6d5a1713f705321c2251a84063897ff",
+      "bundled_sha256": "8b2f2f20e4b2bf945481646ceea9300cf6d5a1713f705321c2251a84063897ff"
+    },
+    {
+      "slug": "netlify",
+      "name": "Netlify",
+      "url": "https://logos.composio.dev/api/netlify",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 5932,
+      "sha256": "5922b95571d4d674bafbd9f04c455ca704a00b60f2a3965216ff4dcfa859fe8c",
+      "bundled_sha256": "5922b95571d4d674bafbd9f04c455ca704a00b60f2a3965216ff4dcfa859fe8c"
+    },
+    {
+      "slug": "supabase",
+      "name": "Supabase",
+      "url": "https://logos.composio.dev/api/supabase",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 6730,
+      "sha256": "77b0c3911790aae782da969a5d749b0721db43c3945efb232f679c22ccb06f74",
+      "bundled_sha256": "77b0c3911790aae782da969a5d749b0721db43c3945efb232f679c22ccb06f74"
+    },
+    {
+      "slug": "figma",
+      "name": "Figma",
+      "url": "https://logos.composio.dev/api/figma",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4852,
+      "sha256": "98fc179b3fd807b2c053d9df800fb58b4d8e5966e13768dc5fc9075b7129ca90",
+      "bundled_sha256": "98fc179b3fd807b2c053d9df800fb58b4d8e5966e13768dc5fc9075b7129ca90"
+    },
+    {
+      "slug": "canva",
+      "name": "Canva",
+      "url": "https://logos.composio.dev/api/canva",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4718,
+      "sha256": "30ff96d9cbf0b8c9e8ce996234b12f4845c6ee9b48bf536a2ed2246d2cf42ec0",
+      "bundled_sha256": "30ff96d9cbf0b8c9e8ce996234b12f4845c6ee9b48bf536a2ed2246d2cf42ec0"
+    },
+    {
+      "slug": "miro",
+      "name": "Miro",
+      "url": "https://logos.composio.dev/api/miro",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 980,
+      "sha256": "b204a117beaa68001a868041965c5333540509e014d61eb75424ec51d37009ec",
+      "bundled_sha256": "b204a117beaa68001a868041965c5333540509e014d61eb75424ec51d37009ec"
+    },
+    {
+      "slug": "webflow",
+      "name": "Webflow",
+      "url": "https://logos.composio.dev/api/webflow",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3226,
+      "sha256": "84fb762459efbe3e2b3945a6e612d55a8fddedee8b8a37de6c90255a4f75c9b6",
+      "bundled_sha256": "84fb762459efbe3e2b3945a6e612d55a8fddedee8b8a37de6c90255a4f75c9b6"
+    },
+    {
+      "slug": "wordpress",
+      "name": "WordPress",
+      "url": "https://logos.composio.dev/api/wordpress",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2956,
+      "sha256": "24c4c091d21a6526492421ed30348ff93ac3533a8cd9e89f81297c1bb9fe4b21",
+      "bundled_sha256": "24c4c091d21a6526492421ed30348ff93ac3533a8cd9e89f81297c1bb9fe4b21"
+    },
+    {
+      "slug": "hubspot",
+      "name": "HubSpot",
+      "url": "https://logos.composio.dev/api/hubspot",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4682,
+      "sha256": "14ecd8400dd658af99222112ad0c6e675c38dc249290e484a690a4dc35cd793d",
+      "bundled_sha256": "14ecd8400dd658af99222112ad0c6e675c38dc249290e484a690a4dc35cd793d"
+    },
+    {
+      "slug": "salesforce",
+      "name": "Salesforce",
+      "url": "https://logos.composio.dev/api/salesforce",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 12495,
+      "sha256": "b8d14f2b18d4984abeaec61a49b2bf4fbf63bbf39879d55035ce6f55d0c76c39",
+      "bundled_sha256": "b8d14f2b18d4984abeaec61a49b2bf4fbf63bbf39879d55035ce6f55d0c76c39"
+    },
+    {
+      "slug": "pipedrive",
+      "name": "Pipedrive",
+      "url": "https://logos.composio.dev/api/pipedrive",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3225,
+      "sha256": "7553aefc85296fb359b888566bfaa6250d098eba65fc0ddf373c1978488e1249",
+      "bundled_sha256": "7553aefc85296fb359b888566bfaa6250d098eba65fc0ddf373c1978488e1249"
+    },
+    {
+      "slug": "zendesk",
+      "name": "Zendesk",
+      "url": "https://logos.composio.dev/api/zendesk",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4447,
+      "sha256": "8b7061e008f84b7c6bb1aa1e88d20b65c1a8a1d7241c56820e6109baa9e2abc8",
+      "bundled_sha256": "8b7061e008f84b7c6bb1aa1e88d20b65c1a8a1d7241c56820e6109baa9e2abc8"
+    },
+    {
+      "slug": "intercom",
+      "name": "Intercom",
+      "url": "https://logos.composio.dev/api/intercom",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3894,
+      "sha256": "0bb278f014a634dc4ec316f755efbb1d469e156b5e9c4f8089e97512ecb914a1",
+      "bundled_sha256": "0bb278f014a634dc4ec316f755efbb1d469e156b5e9c4f8089e97512ecb914a1"
+    },
+    {
+      "slug": "mailchimp",
+      "name": "Mailchimp",
+      "url": "https://logos.composio.dev/api/mailchimp",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 13221,
+      "sha256": "e06abba45c05e39d1b6bafb0937a7064cd7a1ab06cb086b868fc8c73984a7893",
+      "bundled_sha256": "e06abba45c05e39d1b6bafb0937a7064cd7a1ab06cb086b868fc8c73984a7893"
+    },
+    {
+      "slug": "typeform",
+      "name": "Typeform",
+      "url": "https://logos.composio.dev/api/typeform",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3250,
+      "sha256": "4847ca40cbeeae1b6383907255b7e06184e1e367c0edb6c18fcb0c50b13226e4",
+      "bundled_sha256": "4847ca40cbeeae1b6383907255b7e06184e1e367c0edb6c18fcb0c50b13226e4"
+    },
+    {
+      "slug": "shopify",
+      "name": "Shopify",
+      "url": "https://logos.composio.dev/api/shopify",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 2226,
+      "sha256": "5742f66b2b0f0eb4d5bcaa958ce4517d569f8699196bc08639db1bc1c4980481",
+      "bundled_sha256": "5742f66b2b0f0eb4d5bcaa958ce4517d569f8699196bc08639db1bc1c4980481"
+    },
+    {
+      "slug": "stripe",
+      "name": "Stripe",
+      "url": "https://logos.composio.dev/api/stripe",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 411,
+      "sha256": "e99bd439967979d76c84cec77bdf02917b7a939be586eb1d5fe949a0cdc0ca76",
+      "bundled_sha256": "e99bd439967979d76c84cec77bdf02917b7a939be586eb1d5fe949a0cdc0ca76"
+    },
+    {
+      "slug": "quickbooks",
+      "name": "QuickBooks",
+      "url": "https://logos.composio.dev/api/quickbooks",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1043,
+      "sha256": "487a384962e391463e09e63675fca1c101d7c556fbce2a41a03f7a367f6147ef",
+      "bundled_sha256": "487a384962e391463e09e63675fca1c101d7c556fbce2a41a03f7a367f6147ef"
+    },
+    {
+      "slug": "xero",
+      "name": "Xero",
+      "url": "https://logos.composio.dev/api/xero",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 8998,
+      "sha256": "442d2f6894d445dc2393b0261f5fde4f0ad4ddf73867c84a79ac08fc87750871",
+      "bundled_sha256": "442d2f6894d445dc2393b0261f5fde4f0ad4ddf73867c84a79ac08fc87750871"
+    },
+    {
+      "slug": "youtube",
+      "name": "YouTube",
+      "url": "https://logos.composio.dev/api/youtube",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 874,
+      "sha256": "99e6e5fc80ec98ad5b3698213701247380ede5a4cd54df678e06c03ea1b94ea1",
+      "bundled_sha256": "99e6e5fc80ec98ad5b3698213701247380ede5a4cd54df678e06c03ea1b94ea1"
+    },
+    {
+      "slug": "spotify",
+      "name": "Spotify",
+      "url": "https://logos.composio.dev/api/spotify",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1384,
+      "sha256": "06a7b6d8dbcbce5cacb0314de24422e0f1765f28e8b390eb67b2e96a8a7164b1",
+      "bundled_sha256": "06a7b6d8dbcbce5cacb0314de24422e0f1765f28e8b390eb67b2e96a8a7164b1"
+    },
+    {
+      "slug": "reddit",
+      "name": "Reddit",
+      "url": "https://logos.composio.dev/api/reddit",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 8454,
+      "sha256": "271518463d9df9440dcdedfb1ecabe48d4da97d0ec1ac4556a704477a7b3a2a4",
+      "bundled_sha256": "271518463d9df9440dcdedfb1ecabe48d4da97d0ec1ac4556a704477a7b3a2a4"
+    },
+    {
+      "slug": "twitter",
+      "name": "X (Twitter)",
+      "url": "https://logos.composio.dev/api/twitter",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3384,
+      "sha256": "94bf401d8d243c6073975ebbcf10552121f61b29fa62ecb0a18aad36a3f126d8",
+      "bundled_sha256": "94bf401d8d243c6073975ebbcf10552121f61b29fa62ecb0a18aad36a3f126d8"
+    },
+    {
+      "slug": "linkedin",
+      "name": "LinkedIn",
+      "url": "https://logos.composio.dev/api/linkedin",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 5224,
+      "sha256": "8dea8f2583274f5561dcae4db69872b577189f7da8a98c75ed7c869ecae2e02f",
+      "bundled_sha256": "8dea8f2583274f5561dcae4db69872b577189f7da8a98c75ed7c869ecae2e02f"
+    },
+    {
+      "slug": "instagram",
+      "name": "Instagram",
+      "url": "https://logos.composio.dev/api/instagram",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4366,
+      "sha256": "bb059358c058ced15d7ffa6e4b2c60b29977b495e48735a8a3d7616ee74141b9",
+      "bundled_sha256": "bb059358c058ced15d7ffa6e4b2c60b29977b495e48735a8a3d7616ee74141b9"
+    },
+    {
+      "slug": "pinterest",
+      "name": "Pinterest",
+      "url": "https://logos.composio.dev/api/pinterest",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 1318,
+      "sha256": "04417ffd313e7ebbc2357cfbe11c82fd2cb409bd0c2098ef8a7f5ac45ea5d2b2",
+      "bundled_sha256": "04417ffd313e7ebbc2357cfbe11c82fd2cb409bd0c2098ef8a7f5ac45ea5d2b2"
+    },
+    {
+      "slug": "raindrop",
+      "name": "Raindrop.io",
+      "url": "https://logos.composio.dev/api/raindrop",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3070,
+      "sha256": "6947ddc4e54f3bcef5751e8af65e0eb740c9ab9a715d1baa71b38dd677372971",
+      "bundled_sha256": "6947ddc4e54f3bcef5751e8af65e0eb740c9ab9a715d1baa71b38dd677372971"
+    },
+    {
+      "slug": "strava",
+      "name": "Strava",
+      "url": "https://logos.composio.dev/api/strava",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 4230,
+      "sha256": "2e7664d200ceb5582b1d294298f9c211499e45992d927e48764e9c46fa9a5950",
+      "bundled_sha256": "2e7664d200ceb5582b1d294298f9c211499e45992d927e48764e9c46fa9a5950"
+    },
+    {
+      "slug": "fitbit",
+      "name": "Fitbit",
+      "url": "https://logos.composio.dev/api/fitbit",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3837,
+      "sha256": "454ecd19f1ba359a2051379a5be037bde0943276630d834d17d725113714f79f",
+      "bundled_sha256": "454ecd19f1ba359a2051379a5be037bde0943276630d834d17d725113714f79f"
+    },
+    {
+      "slug": "google_maps",
+      "name": "Google Maps",
+      "url": "https://logos.composio.dev/api/google_maps",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 799,
+      "sha256": "a7b8b7af7db36f285cc1bf33adec0dbc36469e473082ba005dc70e6bf8f05bf7",
+      "bundled_sha256": "0d32d5faa6b64e075778fc2d2ffceccfe0289a95a3227f83b3916d3392127ea8"
+    },
+    {
+      "slug": "weathermap",
+      "name": "OpenWeatherMap",
+      "url": "https://logos.composio.dev/api/weathermap",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 3030,
+      "sha256": "89d06978b3973ec4e13e003c9e3ba2fe91c69147178ee649d3d7699cf24c3928",
+      "bundled_sha256": "89d06978b3973ec4e13e003c9e3ba2fe91c69147178ee649d3d7699cf24c3928"
+    }
+  ]
+}

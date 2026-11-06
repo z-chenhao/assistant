@@ -1,6 +1,6 @@
 .workspace-page{max-width:1040px;margin:auto;padding:32px var(--workspace-gutter) 48px}
 .page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px var(--section-space);margin:0 0 var(--section-space);min-width:0}
-.page-heading>div{min-width:0}.page-heading h1{margin:0}.page-heading p{margin:4px 0 0;color:var(--muted-foreground);max-width:72ch}
+.page-heading>div{min-width:0}.page-heading h1{margin:0}.page-heading p,.page-heading .control-help-line{margin:4px 0 0;color:var(--muted-foreground);max-width:72ch}
 .page-heading>.button{flex-shrink:0}.page-heading .back-link{margin-bottom:12px}
 .section-tabs{display:flex;gap:22px;border-bottom:1px solid var(--border);margin:0 0 28px;overflow:auto;white-space:nowrap}
 .section-tabs>a{display:block;padding:10px 0 12px;font-size:var(--text-ui);text-decoration:none;color:var(--muted-foreground);border-bottom:2px solid transparent}
@@ -66,16 +66,11 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .preference-controls:has(.preference-save:not([hidden])){flex-basis:168px;max-width:220px}
 .preference-group :is(button,summary){outline-offset:2px}
 .preference-group .preference-save{min-height:36px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:7px;white-space:nowrap}
-.preference-help{display:inline-flex}
-.preference-help-trigger,.preference-help summary{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:36px;min-height:36px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;list-style:none}
-.preference-help summary::-webkit-details-marker{display:none}
-.preference-help-trigger:hover,.preference-help summary:hover,.preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
-/* Keep the trigger-to-tooltip path connected even when the form gains feedback or wraps. */
-.preference-tooltip{position:absolute;z-index:20;top:calc(100% - 1px);left:0;display:block;width:min(280px,calc(100vw - 66px));padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+.preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
 .preference-controls>.control-select{width:100%}
 .preference-feedback{padding:0 16px 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
 .preference-feedback :is(button,a){min-height:36px;padding:3px 6px;background:transparent;border:0;color:var(--foreground);font-size:13px;text-decoration:underline;text-underline-offset:3px}
-@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
+@media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}
 .list-heading{display:flex;align-items:center;gap:12px;margin:30px 0 14px}.list-heading h2{margin:0}.list-heading span{font-size:12px;color:var(--muted-foreground)}
 .object-list{border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;background:transparent}
 .object-list:has(>.empty-state){border:0}

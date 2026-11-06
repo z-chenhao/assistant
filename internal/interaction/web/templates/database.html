@@ -8,14 +8,14 @@
  <h1 class="sr-only">{{tr "Database"}}</h1>
  {{with .Database}}
  <nav class="section-tabs compact" aria-label="{{tr "Record collections"}}">{{range databaseCollections}}<a href="{{databaseURL . "" ""}}" {{if eq $.Database.Query.Collection .}}aria-current="page"{{end}}>{{tr (databaseLabel .)}}</a>{{end}}</nav>
- <form class="database-filter" method="get" action="/developer/database"><input type="hidden" name="collection" value="{{.Query.Collection}}"><label for="database-reference">{{tr "Exact record reference"}}<input id="database-reference" name="ref" value="{{.Query.Ref}}" maxlength="256" placeholder="{{tr "Leave blank to browse records"}}"></label><button>{{tr "Find record"}}</button><a href="{{databaseURL .Query.Collection "" ""}}">{{tr "Reset"}}</a></form>
- <p class="field-help">{{tr "Read-only metadata. Message and Memory contents, credentials and host paths stay hidden."}}</p>
+ <form class="database-filter" method="get" action="/developer/database"><input type="hidden" name="collection" value="{{.Query.Collection}}"><label for="database-reference">{{tr "Exact record reference"}}<input id="database-reference" name="ref" value="{{.Query.Ref}}" maxlength="256" placeholder="{{tr "Leave blank to browse records"}}"></label><button>{{tr "Find record"}}</button>{{template "help" (help "database-help" (tr "Database") (printf "%s %s" (tr "Read-only metadata. Message and Memory contents, credentials and host paths stay hidden.") (tr "Deleted and replaced records retain metadata for audit. Each record shows up to 16 stored source or attachment links; links open the current scoped record.")))}}<a href="{{databaseURL .Query.Collection "" ""}}">{{tr "Reset"}}</a></form>
+
  <div class="obs-table-scroll"><table class="database-table"><thead><tr><th>{{tr "Record"}}</th><th>{{tr "Status"}}</th><th>{{tr "Created time"}}</th><th>{{tr "Metadata and relationships"}}</th></tr></thead><tbody>
  {{range .Page.Items}}<tr data-record-ref="{{.Ref}}"><td><a class="database-record-ref" href="{{databaseLink .Ref}}">{{.Ref}}</a>{{with databaseTrace .Ref}}<a class="text-link" href="{{.}}">{{tr "Inspect execution →"}}</a>{{end}}</td><td><span class="status-pill">{{tr .Status}}</span></td><td><time datetime="{{.CreatedAt}}">{{observedTime .CreatedAt}}</time></td><td><details class="technical-details" {{if $.Database.Query.Ref}}open{{end}}><summary>{{tr "Metadata"}}</summary><dl class="database-fields">{{range .Fields}}<dt>{{tr .Name}}</dt><dd>{{.Value}}</dd>{{end}}</dl></details><ul class="database-links">{{range .Links}}<li><a href="{{databaseLink .Ref}}"><span>{{tr .Relation}}</span><code>{{.Ref}}</code></a></li>{{end}}</ul></td></tr>
- {{else}}<tr><td colspan="4"><div class="empty-state"><h2>{{tr "No stored records"}}</h2><p>{{tr "Records appear here after work is accepted and saved."}}</p></div></td></tr>{{end}}
+ {{else}}<tr><td colspan="4"><div class="empty-state"><h2>{{tr "No stored records"}}</h2></div></td></tr>{{end}}
  </tbody></table></div>
  {{if .Page.Next}}<a class="button secondary list-more" href="{{databaseURL .Query.Collection "" .Page.Next}}">{{tr "Older records →"}}</a>{{end}}
- <p class="field-help">{{tr "Deleted and replaced records retain metadata for audit. Each record shows up to 16 stored source or attachment links; links open the current scoped record."}}</p>
+
  {{end}}
 </section>
 {{end}}

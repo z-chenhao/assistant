@@ -2,30 +2,6 @@ import {t} from './i18n';
 import {confirmSettingsAction,enhanceSettingsControls} from './settings-controls';
 import {enhanceLanguagePreference} from './preferences';
 
-// The fallback is a native disclosure. Enhance only after the whole help is ready.
-function enhancePreferenceHelp(){
- for(const help of document.querySelectorAll<HTMLElement>('[data-preference-help]')){
-  const trigger=help.querySelector<HTMLButtonElement>('[data-help-trigger]');
-  const tooltip=help.querySelector<HTMLElement>('[data-help-tooltip]');
-  const fallback=help.querySelector<HTMLDetailsElement>('[data-help-fallback]');
-  if(!trigger||!tooltip||!fallback)continue;
-  let hovered=false,pinned=false,dismissed=false;
-  const render=()=>{tooltip.hidden=dismissed||!(hovered||pinned||document.activeElement===trigger);if(!tooltip.hidden)document.dispatchEvent(new Event('preference-help-open'))};
-  document.addEventListener('control-select-open',()=>{pinned=false;dismissed=true;render()});
-  help.addEventListener('pointerenter',event=>{if(event.pointerType==='touch')return;hovered=true;dismissed=false;render()});
-  help.addEventListener('pointerleave',()=>{hovered=false;render()});
-  trigger.addEventListener('focus',()=>{dismissed=false;render()});
-  trigger.addEventListener('blur',()=>{pinned=false;render()});
-  // Focus can reveal the tooltip before a touch/keyboard click. Toggle the
-  // explicit pin, not visibility, so that first activation never closes it.
-  trigger.addEventListener('click',()=>{pinned=!pinned;dismissed=!pinned;render()});
-  document.addEventListener('pointerdown',event=>{if(event.target instanceof Node&&!help.contains(event.target)){pinned=false;dismissed=true;render()}});
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!tooltip.hidden){pinned=false;dismissed=true;render()}});
-  window.addEventListener('pageshow',event=>{if(event.persisted){pinned=false;dismissed=true;render()}});
-  fallback.hidden=true;trigger.hidden=false;
- }
-}
-
 const signInOpenedHash='#auth-window-opened';
 
 async function openSignIn(popup:Window, form:HTMLFormElement){
@@ -65,7 +41,6 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
  document.querySelector<HTMLSelectElement>('[data-model-account]')?.addEventListener('change',event=>{(event.target as HTMLSelectElement).form?.requestSubmit()});
- enhancePreferenceHelp();
  try{enhanceLanguagePreference()}finally{document.querySelector('[data-language-preference]')?.setAttribute('data-language-ready','')}
  enhanceSettingsControls();
  if(location.hash===signInOpenedHash){
@@ -85,7 +60,7 @@ export function enhanceSettings(){
  const forms=document.querySelectorAll<HTMLFormElement>('.settings-page form');
  const reset=new Map<HTMLFormElement,()=>void>();
  for(const form of forms){form.addEventListener('submit',event=>{
-  if(event.defaultPrevented||form.dataset.autosaveReady)return;
+  if(event.defaultPrevented||form.dataset.autosaveReady||form.hasAttribute('data-app-action'))return;
   if(form.dataset.submitting){event.preventDefault();return}
   if(confirmSettingsAction(form,(event as SubmitEvent).submitter)){event.preventDefault();return}
   if(form.hasAttribute('data-open-signin')){

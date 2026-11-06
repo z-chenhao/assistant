@@ -10,6 +10,7 @@ import (
 	"io"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -111,7 +112,10 @@ type Definition struct {
 	Query        func(context.Context, Request) Evidence
 	ConflictKeys func(string) []string
 }
-type Registry struct{ definitions map[string]Definition }
+type Registry struct {
+	mu          sync.RWMutex
+	definitions map[string]Definition
+}
 
 func NewRegistry(definitions []Definition) (*Registry, error) {
 	r := &Registry{definitions: map[string]Definition{}}
@@ -200,6 +204,8 @@ func FixtureRegistry() *Registry {
 	return r
 }
 func (r *Registry) Describe() []Spec {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	// M1 has one Tool. Sorting keeps capability hashing stable as it grows.
 	out := make([]Spec, 0, len(r.definitions))
 	for _, d := range r.definitions {
@@ -209,9 +215,40 @@ func (r *Registry) Describe() []Spec {
 	return out
 }
 func (r *Registry) Resolve(name string) (Definition, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	d, ok := r.definitions[name]
 	d.Spec = copySpec(d.Spec)
 	return d, ok
+}
+
+// ReplaceGroup updates a locally owned capability namespace for future
+// snapshots. Existing selected registries remain frozen; provider closures must
+// independently check revocation before dispatching accepted invocations.
+func (r *Registry) ReplaceGroup(prefix string, definitions []Definition) error {
+	if prefix == "" {
+		return errors.New("empty tool group")
+	}
+	replacement, err := NewRegistry(definitions)
+	if err != nil {
+		return err
+	}
+	for name := range replacement.definitions {
+		if !strings.HasPrefix(name, prefix) {
+			return errors.New("tool outside replacement group")
+		}
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for name := range r.definitions {
+		if strings.HasPrefix(name, prefix) {
+			delete(r.definitions, name)
+		}
+	}
+	for name, d := range replacement.definitions {
+		r.definitions[name] = d
+	}
+	return nil
 }
 
 func copySpec(s Spec) Spec {

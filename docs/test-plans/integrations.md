@@ -18,7 +18,7 @@
 
 ## 个人 Connector 验收计划
 
-F-046–F-070 的[分类与范围](../features/integrations.md#术语与登记边界)、[接入顺序](../feature-map.md#personal-connector-priorities)和[待实现方案](../designs/integrations.md#个人-connector-待实现方案)是以下验收的依据。16 项外部系统／服务 connector、F-069 Web Access Plugin、F-070 插件生命周期与 7 项非 connector 能力候选分别验收，最后一类不构成已确认开发任务。除 F-069 及其 F-067 后备已有工具入口和专项测试外，其余条目仍为计划；各自的 Live 与实现证明分别记录。已有 MCP、Guest、Artifact、Memory 或精确 PR 测试不能证明新服务已可用；待定义项先确认数据来源、平台和行为范围，再固化场景。
+F-046–F-070 的[分类与范围](../features/integrations.md#术语与登记边界)、[接入顺序](../feature-map.md#personal-connector-priorities)和[待实现方案](../designs/integrations.md#个人-connector-待实现方案)是以下验收的依据。16 项外部系统／服务 connector、F-069 Web Access Plugin、F-070 插件生命周期与 7 项非 connector 能力候选分别验收，最后一类不构成已确认开发任务。F-069 及其 F-067 后备已有工具入口和专项测试，F-071 已提供 Composio 应用通道；原生条目与各服务领域验收仍按计划分别验证，不用目录可见代替真实业务证明。已有 MCP、Guest、Artifact、Memory 或精确 PR 测试不能证明新服务已可用；待定义项先确认数据来源、平台和行为范围，再固化场景。
 
 ### 分项场景矩阵
 
@@ -165,6 +165,8 @@ already frozen Run. Changing a configured scope fails old-Run selection closed.
 
 ### Plugin、Connector 与平台边界
 
+术语按[功能说明](../features/integrations.md#术语与登记边界)统一：内容审查核对能力插件、外部服务连接器、具体连接、技能与工具的区别，以及安装、连接授权和动作审批的独立性。Web Access 仍是内置插件；Exa／SearXNG／Tavily 的适配器证明对应服务协议，Tavily Search 不代表 Extract 已接通，研究配方测试不代表已有可安装 Skill。独立安装、共享连接和多账户选择继续按 F-025／F-070 的实际入口验收。
+
 `make test-web-access` 覆盖 `internal/plugin/webaccess`、三个服务 connector、`internal/webcontent` 与 SQLite Host 的 race 回归，CI 继续由必需的 `Ubuntu checks` 执行。
 
 | 场景 | 现有入口与证明范围 |
@@ -179,3 +181,42 @@ already frozen Run. Changing a configured scope fails old-Run selection closed.
 核心 channels 的 tracing 只读验收先等待完整因果链与终态轨迹，再比较一致快照，详见[可观测性测试方案](observability.md)。
 
 工具名、配置序列化和资源身份保持兼容；重构兼容检查比较旧版冻结定义与当前定义。真实账户／实例及模型质量继续按各服务 Live 的证明范围验收。
+
+
+## F-071 · Composio 应用连接验收
+
+聚焦入口：`go test ./internal/connector/composio ./internal/connectedapps ./internal/plugin/connectedapps ./internal/tool ./internal/interaction/web ./internal/app ./internal/agent/sqlite -run '(Client|Apps|ConnectedApps|RegistryGroup)' -count=1`；并对这些包运行 race。新的连接交互浏览器门禁由 `make test-browser` 执行：`STEWARD_TEST_APP_BROWSER=1 go test ./internal/interaction/web -run '^TestAppsBrowserConnectionLifecycle$' -count=1`。PR 的 `connected-apps` 软件分片执行 `make test-connected-apps`，覆盖全部 Composio／账户管理／图标／Registry 定向 race；浏览器生命周期随 `browser-infra` 强制运行。跨模块门禁为 `make test lint` 与 core E2E。
+
+| 场景 | 证明入口及可观察结果 | 边界 |
+| --- | --- | --- |
+| 默认项目引用 | `TestConnectedAppsDefaultEnvironmentKey` 与 `TestConnectedAppsExplicitReferenceOverridesEnvironmentDefault`：缺失环境变量保留离线目录，存在时无需设置保存即可查询目录和连接；读取不写库、不创建绑定，显式 Connect 保存引用；已有引用优先，凭据缺失时不退回默认项目 | 使用真实环境解析和受控 HTTP peer，不证明真实项目 key 有效 |
+| 项目与目录 | HTTP peer 核对项目 key header、目录查询／游标传递、托管 session 的关闭选项与认证链接主机；无项目显示待配置推荐，不能创建账户工具 | 不证明项目权限、供应商目录规模或特定应用受支持 |
+| Web 账户管理 | `TestAppsOfflineDirectoryAndOwnerConnectionFlow`：真实 Server→Service→SQLite→HTTP peer，验证配置、连接、检查、断开、双语呈现、HTML escaping、分页及同源／身份拒绝 | 不自动替用户在真实 OAuth 页面同意 |
+| 升级与禁用 | `TestConnectedAppsMigrationV45PreservesUIAndRollsBack` 验证 v45 升级、失败回滚、UI 数据保留和安装身份稳定；`TestConnectedAppsDisabledAccountWithdrawsTools` 验证禁用账户不执行、状态转失效且撤下工具 | 不证明供应商真实撤权时延 |
+| 持久化与撤权 | `TestConnectedAppsLifecyclePersistentIsolationAndRevocation`：同应用双账户、项目切换限制、CAS、身份核对、重开数据库、断开后迟到检查及上游撤权失败 | 本地关闭不代表已撤回远端的既有效果；记录删除不保证原服务撤权 |
+| 工具执行与恢复 | `TestConnectedAppsApprovedExecutionReplayAndUnknown`：真实 SQLite ToolInvocation／审批→HTTP 执行；未批准不调用，批准后固定账户／版本，成功重放不重复，502 持久 unknown；撤权、错误用户、描述漂移均拒绝 | 协议 peer 不证明 Gmail／日历等真实业务成功 |
+| 冻结与并发 | `TestRegistryGroupReplacementKeepsSnapshotsAndOtherGroups`、生产装配测试：新增工具不扩权旧快照，撤销不能被旧声明重新选择，不影响其他工具；并发读取／替换 race | 每个执行闭包仍需独立重检撤权状态 |
+| Code Mode | `TestConnectedAppsRealCodeModeDiscoveryApprovalAndFrozenConnection`：真实 JavaScript Sidecar 发现工具、挂起审批、恢复执行；新增第二账户不扩权旧 Root | 远端业务内容由 HTTP peer 提供 |
+| 公开应用 | `TestConnectedAppsPublicToolkitRequiresExplicitEnableAndNoAuthTool`：未启用无工具，显式启用后只调用免认证操作，禁止变成有账户操作 | 真实目录的 `no_auth` 标记仍需验证 |
+| 凭据与异常 | 客户端测试覆盖重定向拒绝、错误文本不泄漏密钥、账户私密字段不进入状态／页面、模糊 mutation 不重试、响应上限及取消 | 真实 Composio 托管凭据／令牌刷新由其服务持有，需要真实项目验证 |
+
+Live 缺口明确保留：创建项目后，用受控测试账户完成至少邮件／日历／文档各一次授权、读取和批准写动作；核对 scope、业务来源、实际结果与供应商用量，再验证 token 过期、重连与原服务撤权。授权 URL、密钥、token 和私人正文不进入测试日志或 PR。暂无项目时不把协议 peer 标为 Live 成功；F-071 维持部分完成。
+
+
+部署／使用分层与 OAuth 交互验证：`TestAppsBrowserConnectionLifecycle` 启动真实 Web Server、SQLite、Composio HTTP peer 与 Chromium，执行无环境凭据时离线浏览→供应默认凭据后无需保存即可出现 Connect→自定义服务设置保存→Apps 无技术配置表单→首次 Connect→复用授权链接→自动变为 Connected→额外账户必填别名→弹窗拦截后的手动继续→按账户断开→失效后显式 Reconnect。将早先 ACTIVE 轮询响应延迟到 Disconnect 之后，证明前端也不会复活已断开账户；检查链接未进入浏览器存储，并覆盖中英文与 1400／390／320px。该门禁不访问真实 Composio 或账户。
+
+`TestConnectedAppsAuthorizationReuseAndExplicitReconnect` 验证进程内链接复用、重启后无链接、重连生成新绑定及迟到授权拒绝；客户端 auth-config peer 验证分页、最新启用配置、明确覆盖、错误 toolkit 拒绝及 scoped key 的托管认证退路。配置与账户状态分开验证，轮询不对同一状态重复推进 CAS revision。
+
+
+Apps 图标与目录：`TestAppLogosBundledForEverySuggestedApp` 检查每个推荐应用的同源 SVG 响应、可解析形状与缓存头；`TestAppLogoNewProviderMetadataUsesAnonymousBoundedCache` 验证新应用采用官方元数据、匿名读取与缓存，拒绝任意主机、带凭据／端口／查询参数的来源和未登记名称。`TestAppLogoSanitizationRetainsBrandShapesAndRejectsActiveContent` 覆盖脚本、事件、嵌入页面、外链、多根／损坏 XML、过大响应和重定向，同时保留品牌渐变。客户端目录测试校验 `meta.logo` 投影。
+
+`TestAppsBrowserConnectionLifecycle` 另外验证 65 个推荐应用全部加载真实图片、中英文分组目录在 1400px 为双列、390／320px 为单列且无横向溢出，以及深色显示；账户详情弹窗可用 Escape 关闭，连接后侧栏显示品牌图标，断开后移除侧栏项。宽目录标题按自身内容边界对齐，保留 Settings 标题的纵向位置和字号。截图只含合成账户，浏览器门禁不访问外部账户或图标 CDN。
+
+
+目录呈现验收：发现页按用途分类，移除“热门”后原有推荐应用仍全部可见，并回归所属分类；Settings 的 Apps 四宫格图标与 Resources 服务器图标可直接区分。保留中英文、移动端、搜索、应用详情及连接流程检查。
+
+
+合入统一组件规范后的 Apps 浏览器场景复用真实 Base UI 分类选择器，验证取消筛选不提交；断开确认默认聚焦取消、Escape 保留账户、确认后仅断开目标。截图覆盖明暗主题的桌面／手机目录及账户详情，并检查 200% 缩放下弹窗及其内容留在可操作范围内。数据库迁移在已有 044／045 后追加 046，回滚夹具移除新表后按原有迁移路径重开。
+
+
+目录浏览器场景核对无项目初始化／服务配置入口和冗余筛选确认按钮，服务配置通过 Resources 进入；选择沟通类别会直接得到对应 8 项推荐，恢复全部类别回到 65 项，不创建账户授权。

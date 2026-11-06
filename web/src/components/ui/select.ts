@@ -16,7 +16,7 @@ export function enhanceSelect(select:HTMLSelectElement):SelectControl|undefined{
  const id=select.id?select.id+'-picker':'control-select-'+ ++nextID;
  const labels=[...select.labels??[]],previousFor=labels.map(label=>label.htmlFor);
  const originalLabel=select.getAttribute('aria-label');
- const label=originalLabel??labels.map(label=>{const copy=label.cloneNode(true) as HTMLElement;copy.querySelectorAll('select,input,textarea,button,.control-select').forEach(node=>node.remove());return copy.textContent?.trim()}).join(' ');
+ const label=originalLabel??labels.map(label=>{const copy=label.cloneNode(true) as HTMLElement;copy.querySelectorAll('select,input,textarea,button,.control-select,.control-help,.preference-help').forEach(node=>node.remove());return copy.textContent?.trim()}).join(' ');
  const host=document.createElement('span');host.className='control-select-mount';
  let wrapper=select.parentElement!;
  if(!wrapper.classList.contains('control-select')){wrapper=document.createElement('span');wrapper.className='control-select';select.before(wrapper);wrapper.append(select)}

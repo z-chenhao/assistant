@@ -72,6 +72,8 @@ type Models interface {
 	AddProfile(context.Context, llm.ProfileInput) (llm.Profile, error)
 }
 type Server struct {
+	appLogos        appLogoCache
+	Apps            AppConnections
 	Computer        ComputerReader
 	Capabilities    CapabilitySettings
 	Workers         WorkerReader

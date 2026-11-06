@@ -15,10 +15,12 @@
  <nav class="section-navigation settings-navigation" aria-label="{{tr "Settings sections"}}">
   <a href="/settings/preferences" {{if eq .Settings.Section "preferences"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Preferences"}}</span></a>
   <a href="/settings/notifications" {{if eq .Settings.Section "notifications"}}aria-current="page"{{end}}>{{template "icon-notification"}}<span>{{tr "Notifications"}}</span></a>
-  <a href="/settings/setup" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{template "icon-connection"}}<span>{{tr "Resources"}}</span></a>
+  <a href="/settings/setup" {{if and (ne .Settings.Section "notifications") (ne .Settings.Section "apps") (ne .Settings.Section "capabilities") (ne .Settings.Section "preferences")}}aria-current="page"{{end}}>{{template "icon-connection"}}<span>{{tr "Resources"}}</span></a>
+  <a href="/settings/apps" {{if eq .Settings.Section "apps"}}aria-current="page"{{end}}>{{template "icon-apps"}}<span>{{tr "Apps"}}</span></a>
   <a href="/settings/capabilities" {{if eq .Settings.Section "capabilities"}}aria-current="page"{{end}}>{{template "icon-computer"}}<span>{{tr "Capabilities"}}</span></a>
  </nav>
  <p class="settings-no-results" role="status" hidden>{{tr "No settings found."}}</p>
+ {{if eq .View "apps"}}<section id="apps-sidebar">{{template "app-sidebar" .}}</section>{{end}}
 
 {{end}}
 

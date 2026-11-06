@@ -26,7 +26,7 @@ export async function preferences(page,context,browser,url,evidence){
     throw Error('help disappeared along continuous pointer path: '+JSON.stringify({state,y,control,tooltip}));
    }
   }
-  await check(p.locator('[data-preference-help]').evaluate(n=>n.matches(':hover')),'tooltip did not retain hover');
+  await check(tip.evaluate(n=>n.matches(':hover')),'help surface did not retain hover');
   await p.screenshot({path:evidence+'/preferences-hover-'+state+'.png',fullPage:true});
   hoverPaths.push({state,viewport:p.viewportSize(),control,tooltip,gap:tooltip.y-control.y-control.height,trace});
   await p.mouse.move(p.viewportSize().width-2,p.viewportSize().height-2);
@@ -114,11 +114,14 @@ export async function preferences(page,context,browser,url,evidence){
  await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');
  await page.keyboard.press('End');await option(page,'zh-CN').and(page.locator('[data-highlighted]')).waitFor();
  await page.keyboard.press('Home');await option(page,'en').and(page.locator('[data-highlighted]')).waitFor();
- await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');await popup(page).waitFor({state:'hidden'});
  await trigger(page).click();await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('End');await page.keyboard.press('Tab');
  await popup(page).waitFor({state:'hidden'});
- await trigger(page).click();await option(page,'en').click();
- await trigger(page).click();await page.mouse.click(380,700);await popup(page).waitFor({state:'hidden'});
+ await trigger(page).click();await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await option(page,'en').click();await popup(page).waitFor({state:'hidden'});
+ // Wait for opening/focus before cancelling: otherwise the next Space can race
+ // an outstanding open and close it instead of starting the keyboard scenario.
+ await trigger(page).click();await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.mouse.click(380,700);await popup(page).waitFor({state:'hidden'});
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  if(posts!==0)throw Error('browsing/cancelling/current selection posted');
  await trigger(page).focus();await page.keyboard.press('Space');await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('End');await page.keyboard.press('Enter');
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();await ready(page);

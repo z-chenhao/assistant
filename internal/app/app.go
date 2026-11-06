@@ -17,6 +17,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/computer/macosvm"
 	"github.com/z-chenhao/assistant/internal/config"
 	configsetup "github.com/z-chenhao/assistant/internal/config/setup"
+	"github.com/z-chenhao/assistant/internal/connectedapps"
 	"github.com/z-chenhao/assistant/internal/conversation"
 	conversationsqlite "github.com/z-chenhao/assistant/internal/conversation/sqlite"
 	databasesqlite "github.com/z-chenhao/assistant/internal/database/sqlite"
@@ -47,39 +48,41 @@ import (
 )
 
 type App struct {
-	capabilitySettings  *configsetup.Manager
-	core                atomic.Pointer[runtimeCore]
-	prepareCore         func(context.Context) error
-	eventsRequired      atomic.Bool
-	eventsReady         atomic.Bool
-	runtimeWake         chan struct{}
-	runtimeDone         <-chan struct{}
-	rootLock            *os.File
-	feishu              *feishu.Client
-	github              *github.Service
-	computer            *macosvm.Provider
-	computerPreviewMu   sync.Mutex
-	memoryCurator       *memory.Curator
-	evidenceVault       *memory.Vault
-	memoryOnce          sync.Once
-	memoryCancel        context.CancelFunc
-	memoryDone          chan struct{}
-	skillConfig         *skill.Config
-	store               *sqlite.Store
-	artifacts           artifactStore
-	telemetry           *observability.Telemetry
-	provider            *bridge.Client
-	control             llm.Control
-	accounts            *account.Manager
-	history             *conversationsqlite.Store
-	memory              *memorysqlite.Store
-	databaseReader      *databasesqlite.Reader
-	terminalInbox       *deliveryterminal.Adapter
-	deliveryPolicy      delivery.Policy
-	deliveryFake        *deliveryfake.Adapter
-	testDelivery        string
-	testBoundary        func(string)
-	testAutomationClock *time.Time
+	connectedApps           *connectedapps.Service
+	connectedAppsRegistryMu sync.Mutex
+	capabilitySettings      *configsetup.Manager
+	core                    atomic.Pointer[runtimeCore]
+	prepareCore             func(context.Context) error
+	eventsRequired          atomic.Bool
+	eventsReady             atomic.Bool
+	runtimeWake             chan struct{}
+	runtimeDone             <-chan struct{}
+	rootLock                *os.File
+	feishu                  *feishu.Client
+	github                  *github.Service
+	computer                *macosvm.Provider
+	computerPreviewMu       sync.Mutex
+	memoryCurator           *memory.Curator
+	evidenceVault           *memory.Vault
+	memoryOnce              sync.Once
+	memoryCancel            context.CancelFunc
+	memoryDone              chan struct{}
+	skillConfig             *skill.Config
+	store                   *sqlite.Store
+	artifacts               artifactStore
+	telemetry               *observability.Telemetry
+	provider                *bridge.Client
+	control                 llm.Control
+	accounts                *account.Manager
+	history                 *conversationsqlite.Store
+	memory                  *memorysqlite.Store
+	databaseReader          *databasesqlite.Reader
+	terminalInbox           *deliveryterminal.Adapter
+	deliveryPolicy          delivery.Policy
+	deliveryFake            *deliveryfake.Adapter
+	testDelivery            string
+	testBoundary            func(string)
+	testAutomationClock     *time.Time
 }
 
 type runtimeCore struct {
@@ -221,6 +224,8 @@ func open(ctx context.Context, cfg config.Config, fixture string, secrets llm.Se
 		a.feishu = feishu.NewClient(*cfg.Feishu, secrets)
 	}
 	a.control = llm.Control{Store: store.Models(), Secrets: secrets}
+	a.connectedApps = &connectedapps.Service{Store: store, Secrets: secrets}
+	a.connectedApps.Changed = a.refreshConnectedApps
 	if cfg.GitHub != nil {
 		a.github = &github.Service{Config: *cfg.GitHub, Store: store, Client: github.Client{Secrets: secrets}}
 	}
