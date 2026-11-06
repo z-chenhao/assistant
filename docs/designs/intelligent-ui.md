@@ -49,7 +49,7 @@ CSP sandbox 与 iframe allow-scripts 保持 opaque origin；禁止父 DOM、宿�
 
 ## 交互状态与 Steward 扩展
 
-具体消费者为原生表格/图表/表单、卡片轮播和生成式沙箱。它们需要刷新恢复、向 Main 提供当前选择，以及使用现有工具结果更新视图。展示产物不可变、输入快照不可变、执行与审批继续归 Run/ToolInvocation 是不变量；组件目录、过滤规则、最近八份上下文与展示模式是当前私有策略。
+具体消费者为原生表格/图表/表单、卡片轮播和生成式沙箱。它们需要刷新恢复、向 Main 提供当前选择，以及使用现有工具结果更新视图。展示产物不可变、输入快照不可变、执行与审批继续归 Run/ToolInvocation 是不变量；组件目录、过滤规则、最近八份上下文与展示模式是当前私有策略。冻结的 `ui_state` 明确说明内容来自已保存组件，可能属于旧话题，不表示活动页面或当前请求主题；不从更新时间推断用户焦点。此说明只进入新接纳的输入快照，历史快照保持原文。
 
 保留六个上游名称和原始 props，新增五个显式前缀名称：`steward.lineChart`、`steward.scatterChart`、`steward.form`、`steward.cards`、`steward.action`。它们沿用 name/props 容器，不声称是上游原生组件。折线/散点图使用有界数据；表单字段为 text、textarea、number、date、email、select、multiselect、boolean；卡片图片只接受当前授权 Artifact，链接仅 HTTPS。完整逐字段校验在 UI 工具边界，类型/候选/范围也在回答接纳时复查。
 

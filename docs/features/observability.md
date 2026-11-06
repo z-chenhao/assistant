@@ -38,6 +38,8 @@
 
 **当前实现**：在 Generation 的 Context Tab 内按 step 顺序打开已接纳的模型轮次，查看有序 system/user/assistant/tool 消息、工具 Schema、模型响应、压缩来源/省略记录与冻结召回。消息有可读正文和完整存储 JSON 两种视图；JSON 保留工具调用 ID、参数、结果、图片引用及原始来源。相邻轮次可查看新增、移除、变化与移动项，并打开前后完整内容。
 
+新策略在同一逻辑输入内仅首次产生 Retrieve context；后续 Generation 的召回区通过 preparation 中的确切 `recall_step` 读取同一冻结记录。Prepare context 仍逐次记录预算检查和实际请求冻结，旧记录没有复用引用时保留原来的逐 step 查询，不推测缺失召回。
+
 **边界**：读取 Host 冻结记录，不重新组装 context，不冒充 Bridge/SDK 最终请求。来源 kind/ref、召回 hit、summary_request/working_set、省略引用和 history_artifact 按已存记录呈现；旧记录没有细粒度来源时明确未知，不解析文本猜测来源或自动开放私有压缩归档。Diff 按保存的 source ref / tool call ID 对齐，旧消息按位置、工具按名称、重复键按出现顺序；比较存储项，不做语义相似度匹配。每页最多 40 条，正文每段最多 8192 UTF-8 字节，链接可读完全部正文与 JSON；不静默截断。待完成或失败 generation 不伪造响应，已保存的 clipped 标记在响应 JSON 中保留。
 
 **验收目标**：UI 与被冻结的 Host 请求逐项一致，工具调用/结果对应正确，来源和省略可追溯，长文本可完整查看。

@@ -73,7 +73,7 @@ func contextSection(section string) string {
 	case "provenance":
 		return `coalesce((SELECT json_array(json(c.provenance_json)) FROM context_compaction c WHERE c.run_id=g.run_id AND c.step_index=g.step_index),'[]')`
 	case "recall":
-		return `coalesce((SELECT hits_json FROM run_recall c WHERE c.run_id=g.run_id AND c.step_index=g.step_index),'[]')`
+		return `coalesce((SELECT hits_json FROM run_recall c WHERE c.run_id=g.run_id AND c.step_index=coalesce((SELECT json_extract(p.provenance_json,'$.recall_step') FROM context_compaction p WHERE p.run_id=g.run_id AND p.step_index=g.step_index),g.step_index)),'[]')`
 	}
 	panic("validated context section")
 }
