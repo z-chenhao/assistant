@@ -172,7 +172,13 @@ func TestExaMCPContract(t *testing.T) {
 		case "tools/list":
 			result = map[string]any{"tools": []any{map[string]any{"name": "web_search_exa", "inputSchema": map[string]any{"properties": map[string]any{"query": map[string]string{"type": "string"}}}}}}
 		case "tools/call":
-			if !strings.Contains(string(request.Params), "only this query") {
+			var params struct {
+				Arguments struct {
+					Query      string `json:"query"`
+					NumResults int    `json:"numResults"`
+				} `json:"arguments"`
+			}
+			if json.Unmarshal(request.Params, &params) != nil || params.Arguments.NumResults != 2 || params.Arguments.Query != "only this query" {
 				t.Fatal(string(request.Params))
 			}
 			result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "Title: Example\nURL: https://example.com/\nText: Evidence"}}}
@@ -180,7 +186,7 @@ func TestExaMCPContract(t *testing.T) {
 		raw, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": result})
 		return response(r, 200, "text/event-stream", "event: message\ndata: "+string(raw)+"\n\n"), nil
 	})}
-	text, sources, e := exaSearch(context.Background(), "only this query", client)
+	text, sources, e := exaSearchWithLimit(context.Background(), "only this query", 2, client)
 	if e != nil || !strings.Contains(text, "Evidence") || len(sources) != 1 || len(methods) != 4 {
 		t.Fatal(text, sources, methods, e)
 	}

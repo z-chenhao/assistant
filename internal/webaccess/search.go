@@ -95,7 +95,7 @@ func searchQueryWith(ctx context.Context, c Config, q SearchQuery, hosted QueryS
 				err = errFiltersUnsupported
 				break
 			} // No pretending query hints are strict Exa filters.
-			out.Text, out.Sources, err = exaSearch(ctx, q.Query, client)
+			out.Text, out.Sources, err = exaSearchWithLimit(ctx, q.Query, q.NumResults, client)
 		case "searxng", "tavily":
 			out.Text, out.Sources, err = configuredSearch(ctx, c, q, source, secrets, client)
 		}
