@@ -44,7 +44,7 @@ const dependencyLicenses=[...dependencyDirs].sort().map(directory=>{
   return pkg.name+' '+pkg.version+'\n'+files.map(file=>readFileSync(join(path,file.name),'utf8')).join('\n');
 });
 const stewardLicenses=['LICENSE-Inter.txt','LICENSE-SourceSerif4.md','LICENSE-SourceHanSans.txt','LICENSE-JetBrainsMono.txt','LICENSE-Michroma.txt'].map(name=>readFileSync(root+'licenses/'+name,'utf8').replace(/[ \t]+$/gm,'')).join('\n\n');
-const licenses=[notices,stewardLicenses,readFileSync(root+'licenses/steward-artwork.md','utf8'),...dependencyLicenses].join('\n\n').replace(/\r\n/g,'\n').replace(/[ \t]+$/gm,'');
+const licenses=[notices,readFileSync(root+'licenses/app-icons.txt','utf8'),stewardLicenses,readFileSync(root+'licenses/steward-artwork.md','utf8'),...dependencyLicenses].join('\n\n').replace(/\r\n/g,'\n').replace(/[ \t]+$/gm,'');
 const lightTheme=THEME_CSS.match(/:root\s*\{([\s\S]*?)\}/)[1],darkTheme=THEME_CSS.match(/@media[^\{]+\{\s*:root\s*\{([\s\S]*?)\}/)[1];
 const widgetStyles=THEME_CSS+'\n'+SVG_CLASSES_CSS+'\n'+FORM_STYLES_CSS+'\n:root[data-widget-theme=light]{'+lightTheme+'}\n:root[data-widget-theme=dark]{'+darkTheme+'}';
 const frameTheme=readFileSync(root+'src/components/ui/controls.css','utf8').split('/* Intelligent UI sandbox theme:')[1];

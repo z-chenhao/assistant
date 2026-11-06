@@ -52,7 +52,7 @@ export function enhanceComputerView(){
     caption.textContent=t('Read-only desktop · updated')+' '+new Date().toLocaleTimeString(document.documentElement.lang,{hour:'2-digit',minute:'2-digit',second:'2-digit'});
    }else{
     screen.querySelector('img')?.remove();placeholder.hidden=false;placeholder.textContent=t(phaseLabels[value.phase]??'No desktop image is available.');
-    caption.textContent=t('Preview does not start or resume Computer.');
+    caption.textContent=t('Read only');
    }
   }catch{
    if(current===generation&&panel.open){say('Computer preview is unavailable. Retrying…');if(!screen.querySelector('img')){placeholder.hidden=false;placeholder.textContent=t('No desktop image is available.');}else{caption.textContent=t('Last received image · connection interrupted');}}

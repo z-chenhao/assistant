@@ -6,6 +6,14 @@ from runner import CORE
 
 
 class CIChecksTests(unittest.TestCase):
+    def test_connected_apps_and_browser_regressions_are_required_software_lanes(self):
+        lanes = {row['lane']: row for row in ci.plan('software')['include']}
+        self.assertEqual(ci.command('connected-apps'), 'make test-connected-apps')
+        self.assertIn('connected-apps', lanes)
+        self.assertIn('make test-browser', ci.command('browser-infra'))
+        self.assertEqual(lanes['browser-infra']['browser'], 'true')
+        self.assertEqual(lanes['browser-infra']['frontend'], 'true')
+
     def test_all_core_gates_run_once(self):
         gates = [gate for group in ci.SYSTEM.values() for gate in group]
         self.assertCountEqual(gates + ['channels'], CORE)

@@ -12,6 +12,7 @@ from verify_channels import CHANNEL_GROUPS
 # across isolated runners rather than rebuilding a shared, mutable worktree.
 SOFTWARE = {
     'go': 'make test-prompts test-go',
+    'connected-apps': 'make test-connected-apps',
     'provider': 'npm test --prefix provider-bridge',
     'frontend': 'npm run check --prefix web\nnpm test --prefix web\nnpm test --prefix runtime/javascript',
     'browser-infra': 'make test-browser test-infra',

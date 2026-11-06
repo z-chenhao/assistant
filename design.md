@@ -128,7 +128,7 @@ OpenIntelligentUI 的原生组件协议是基础，保留上游组件名称和�
 
 | 模块 | 当前二级分类 |
 | --- | --- |
-| Settings | Preferences、Notifications、Resources、Capabilities |
+| Settings | Preferences、Notifications、Resources、Apps、Capabilities |
 | Dev | Traces、Database |
 | Task | 当前没有独立分类，不展开空二级栏 |
 
@@ -142,7 +142,7 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 
 ## 尺寸与响应式
 
-桌面一级栏宽 224px、二级栏宽 216px，由共享变量控制；模块没有二级分类时，内容只避让一级栏。Settings 内容容器最大宽度为 680px，包含左右留白。两级栏共用折叠／展开行为，桌面折叠为 64px 图标栏，保留四个模块入口、选中态和展开按钮；同一浏览器的折叠偏好跨模块、分类和刷新保持一致，并在首屏样式前应用。
+桌面一级栏宽 224px、二级栏宽 216px，由共享变量控制；模块没有二级分类时，内容只避让一级栏。Settings 内容容器最大宽度为 680px，包含左右留白；Apps 沿用已确认的双列应用目录，最大宽度为 1048px，窄屏按单列展示。两级栏共用折叠／展开行为，桌面折叠为 64px 图标栏，保留四个模块入口、选中态和展开按钮；同一浏览器的折叠偏好跨模块、分类和刷新保持一致，并在首屏样式前应用。
 
 视口宽度不大于 760px 时，导航收进同一个抽屉。存在二级分类时，一级保持窄列，二级占据剩余宽度；两级入口和选中态同时可达。抽屉与内容不横向溢出。资源列表按自身可用宽度切换行布局，不能只根据视口宽度判断；桌面双侧栏留下的窄列也必须正常展示模型名与操作。操作页按钮、普通输入、选择器及折叠入口的触控高度至少 44px。
 
@@ -167,6 +167,15 @@ Task、Dev 或其他模块未来增加内部分类时复用同一结构。列表
 
 
 ## 文案、状态与动效
+
+### 功能优先与按需帮助
+
+整个 Web（Chat、Tasks、Developer、Settings、弹窗与动态视图）只常驻功能、操作、实际内容和必要状态。同一页面的同一操作只保留一个明确入口；目录筛选选择后直接生效，不再要求重复点击筛选按钮，无脚本时保留原生提交。筛选的只读导航与配置的保存语义分别遵循各自契约。删除不帮助当前选择或操作的宣传、页面介绍、重复提示、实现解释及泛泛的空状态建议；不把冗余说明全部改成问号。
+
+确实必要的操作指引、参数含义、行为边界与技术解读，收进对应字段、操作或标题旁的问号。统一复用 Preferences 的共享帮助组件，皮肤和定位归 `components/ui/`；不为各页面另写浮层。鼠标 hover、键盘聚焦可阅读，点击或触摸可展开／收起，Escape 或外部点击关闭；浮层在窄屏和缩放下保持可读，无 JavaScript 时保留原生 disclosure。动态更新后仍能使用帮助。
+
+应用用途、任务目标／结果和诊断数据属于实际内容。真实的未配置、等待、失败、权限受限、数据截断、未保存及结果未知等状态必须清楚表达；服务部署状态不在使用页面常驻展示，不重复堆叠状态标签和同义按钮；实际操作暂不可用时，在对应操作处说明。将长指引拆为必要状态／操作和按需帮助。授权范围、费用／数据外送同意及不可逆操作的确认信息在决定处完整呈现，不藏入提示。
+
 
 同级设置页保留可见的页面标题和一致的对齐线，Resources 的 Models 是标题下的区块。脚本加载前后应保持导航、设置分组及正文位置稳定；脚本专属设置预留位置，下载失败时恢复原生表单和导航。
 
@@ -220,3 +229,8 @@ Ghost 回复左对齐，使用主题中的灰色气泡；用户消息右对齐�
 Intelligent UI uses OpenIntelligentUI native component contracts, SVG helpers and form controls as the foundation, with Steward typography, neutral surfaces, restrained chart colors and compact spacing. Normal interactive answers do not repeat a Text version control; text fallback appears on failure or without JavaScript. Action groups use explicit gaps and wrap on narrow screens. Generated HTML/SVG diagrams, calculators and simulations follow generateSandboxedUi with compact answer layouts, explicit theme tokens and bounded content sizing. Native UI and the final written reply remain separate bubbles. Standard conversation Markdown is independent of this component contract.
 
 Intelligent UI operations live in a compact options menu. Native tables, charts, typed forms and cards share state and control styling; fullscreen, dialogs and pinned views preserve the same content instance. The page contains content, controls and necessary state only, with no feature introductions or implementation explanations.
+
+
+## 应用目录与账户连接
+
+Apps 展示应用目录与账户连接，不展示项目初始化、服务配置按钮或常驻部署提示；常规 Composio 部署自动读取默认环境凭据，无需重复填写引用；自定义项目配置集中在 Resources → App connection service，使用者的 Connect 流程不要求填写项目密钥或 auth-config ID。授权状态自动更新，手动刷新作为补充；额外账户才要求独立别名，重连只替换失效或未完成的绑定。目录按用途分类，不设置“热门”分组；采用较宽的双列列表，每项展示原始品牌 logo、名称、一行用途和“＋”连接／“…”管理入口；移动端为单列。标题沿用 Settings 的纵向位置与字号，横向跟随目录自身内容边界。左侧“已连接的应用”显示去重的账户应用与 logo；账户操作集中于应用详情对话框，关闭后恢复焦点，无 JavaScript 时进入原生详情页。Settings 中 Apps 使用四宫格应用图标，Resources 使用服务器图标，两个入口可直接区分。目录与账户视图共享侧栏选中态、原生表单回退及全局组件契约；搜索框、图标按钮与详情弹窗使用 controls.css 的具名共享变体，普通按钮和字段继承全局皮肤。断开连接复用共享确认对话框，默认聚焦取消，Escape 不提交。

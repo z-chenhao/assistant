@@ -57,7 +57,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-022](features/skills-experience.md#f-022) | 受版本控制的 Skill 读取 | Main 与 Worker 按名称或用途搜索冻结目录，按名称读取时由 Host 绑定版本，system 不预载 Skill 索引。 | 是 · 已完成 |
 | [F-023](features/skills-experience.md#f-023) | 执行后的自动经验闭环 | 用户纠正、恢复失败或重复成功能进入候选、验证和晋升流程。 | 否 · 部分完成 |
 | [F-024](features/integrations.md#f-024) | 受限本地 MCP 工具接入 | 操作员可接入允许的本地 stdio 工具；固定 Code Mode 调用、按工具或服务用途检索与 500 工具目录已接通，system 不预载 MCP Server 目录。 | 是 · 已完成 |
-| [F-025](features/integrations.md#f-025) | 可认证的真实服务接入 | GitHub 精确 PR 监听可经 SecretStore PAT 认证读取；通用连接、授权动作及凭据生命周期仍有缺口。 | 否 · 部分完成 |
+| [F-025](features/integrations.md#f-025) | 可认证的真实服务接入 | GitHub 精确 PR 监听可认证读取；F-071 提供 Composio 具名账户与审批动作，原生连接统一管理及真实账户验证仍有缺口。 | 否 · 部分完成 |
 | [F-026](features/coding.md#f-026) | 代码理解、修改与交付 | Linux/macOS 本地显式仓库源、Task 私有工作副本、修改集和历史验证 Artifact 已接通，可手工关联已观察的 PR head，远端发布与修订核对待补。 | 否 · 部分完成 |
 | [F-027](features/computer-use.md#f-027) | 配置型 macOS Computer Use | Agent 能在明确配置的隔离 Guest 中观察和操作应用与浏览器，并恢复逻辑 Computer。 | 是 · 已完成 |
 | [F-028](features/operations.md#f-028) | 本地诊断与加密恢复 | 健康检查、加密恢复与 macOS 显式后台服务/独立巡检；持久人工停机和有限恢复已接通，平台 Live 与主动渠道告警待补。 | 否 · 部分完成 |
@@ -73,7 +73,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证、隔离并行 CI 与可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |
 | [F-040](features/engineering.md#f-040) | Go 模块边界与可读性重构 | 领域持有适配器和接口类型；LLM 依赖方向与生产 Code Mode 装配有自动回归，目录规模及响应场景纳入 PR 门禁。 | 是 · 已完成 |
-| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存与可访问帮助；模型同意常驻、Trace 状态可读，跨页复用 Select／Switch、字号与窄屏触控规则，通过复用门禁、首屏／状态 UT 和跨页／Task 浏览器回归约束；折叠偏好与慢加载布局稳定，编辑后清除过期连接／保存反馈，保留真实执行与审批语义。 | 是 · 已完成 |
+| [F-041](features/branding.md#f-041) | Steward 个人助手品牌与工作空间 | Steward 字标、悬停尺寸稳定的黑白头像、统一中英文界面和跨页操作布局；偏好设置用分组语言列表、自动保存；全 Web 清理冗余介绍，必要指引用共享问号按需查看；模型同意常驻、Trace 状态可读，跨页复用 Select／Switch、字号与窄屏触控规则，通过复用门禁、首屏／状态 UT 和跨页／Task 浏览器回归约束；折叠偏好与慢加载布局稳定，编辑后清除过期连接／保存反馈，保留真实执行与审批语义。 | 是 · 已完成 |
 | [F-042](features/integrations.md#f-042) | 可靠的环境事件监听 | 精确 PR 评审/CI 持久接收，可显式关联原 Task 经 Main 接续；其他来源、平台历史与原话题交付边界保留。 | 否 · 部分完成 |
 | [F-045](features/automation.md#f-045) | 主动规则的观察与启用 | 确切 GitHub PR 可按事件类型或 CI 失败观察，再显式启用 Main 接续原 Task。其他来源与语义规则待验证。 | 否 · 部分完成 |
 | [F-046](features/integrations.md#f-046) | Tavily 搜索与网页正文 | 已有自建 Search API 适配；独立 Extract 及真实服务 Live 待验，不将摘要当全文。 | 否 · 部分完成 |
@@ -100,7 +100,8 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-067](features/integrations.md#f-067) | Exa MCP 搜索候选 | 验证免密钥的官方托管搜索、免费限流与来源结果；严格过滤不得静默降级，远端协议及质量待验证。 | 否 · 部分完成 |
 | [F-068](features/integrations.md#f-068) | SearXNG 自托管搜索候选 | 已有自建 JSON API 适配及协议回归；真实实例、部署及维护责任待确认。 | 否 · 部分完成 |
 | [F-069](features/integrations.md#f-069) | Web Access Plugin | 自建 native／Exa／SearXNG／Tavily 搜索、正文／PDF／图片、问答与来源证据；插件编排、服务适配及平台持久化已分离；更多服务／质量仍待验。 | 否 · 部分完成 |
-| [F-070](features/integrations.md#f-070) | Plugin 生命周期与连接分离 | 独立启停／安装能力包，复用平台管理的具名连接；当前仅有内置 Web Access 组合，尚无插件管理入口。 | 否 · 未实现 |
+| [F-070](features/integrations.md#f-070) | Plugin 生命周期与连接分离 | 独立安装／启停能力插件，复用平台管理的账户／实例连接；安装、连接授权与动作审批分别处理，当前尚无插件管理入口。 | 否 · 未实现 |
+| [F-071](features/integrations.md#f-071) | Composio 应用目录与账户连接 | 默认读取 COMPOSIO_API_KEY，Resources 保留自定义连接服务配置，Apps 提供带官方 logo 的按用途分类目录、账户详情、已连接侧栏、按需认证、多账户、自动状态检查、重连与断开；工具走既有 Code Mode／审批／unknown 恢复。项目与真实服务验收待配置。 | 否 · 部分完成 |
 
 ## 实施优先级与依赖
 
@@ -115,7 +116,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 ### 个人 Connector 优先级
 
-本规划按[明确外部系统的集成边界](features/integrations.md#术语与登记边界)登记 connector，按工具、模型能力或一次性导入登记的 F-048–F-054 不参与以下排序。当前共有 **16 个新增外部系统／服务 connector 条目**，另有 **7 个非 connector 能力候选**；**F-069 Web Access Plugin** 组合搜索与网页访问，不重复计为新的外部系统；F-070 独立登记插件生命周期，F-025 维护平台连接。既有飞书消息集成 F-020 不重复计数。
+按[统一术语](features/integrations.md#术语与登记边界)，Plugin 是能力扩展包，Connector 是外部服务集成能力，Connection 绑定具体账户／实例，Skill 提供工作方法，Tool 执行具体操作。本规划按外部系统登记 connector，按工具、模型能力或一次性导入登记的 F-048–F-054 不参与以下排序。当前共有 **16 个新增外部系统／服务 connector 条目**，另有 **7 个非 connector 能力候选**；**F-069 Web Access Plugin** 组合搜索与网页访问，不重复计为新的外部系统；F-070 独立登记插件生命周期，F-025 维护平台连接。既有飞书消息集成 F-020 不重复计数。
 
 以下顺序以 **ChatGPT 日常问题** 为主要依据，Codex 工程任务单独评估。优先已明确且重复委托、能补足实时／个人事实并减少截图与复制的接入，同时考虑已有工具覆盖和开发／授权成本。依据见[委托模式与证据边界](features/integrations.md#选择依据与证据边界)。这是定性建议，不是全量频次统计；旅途中连续提问不能直接视为全年频次，书签也不能证明资料来源。
 
@@ -144,7 +145,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 首批交付是 **F-069 Web Access Plugin＋高德＋Google Maps connectors**。Web Access 按当前冻结账户／端点的已验证搜索能力选路，使用已验证的 Steward ChatGPT 托管搜索链路，再用 F-067 Exa 提供一个显式允许的后备。F-068 SearXNG 与 F-046 Tavily 已有独立适配，真实实例／凭据及各自 Live 分别验收。既有主模型不会因搜索失败自动切换，原生能力也不凭模型名猜测。具体边界见[Web Access 方案](designs/integrations.md#f-069--web-access-的最小组合方案)和 [自主实现边界](designs/integrations.md#参考行为与自主实现边界)。第二批在确认真实资料来源后选择 Gmail、健康数据或飞书文档；GitHub 的工程优先级仍独立维护。
 
 
-F-020 继续维护既有飞书消息连接，机器人身份不代表已具备个人云文档或日历权限。F-025 持有认证集成共性缺口，F-042/F-045 持有事件和主动接续；新增 connector 独立验收，不把全部目录变成某个既有编号完成的附加门槛。
+F-071 已确认通过 Composio 广泛预备日常应用目录，用户按需授权，不受上述原生 Connector 实施排序限制；目录可见不代表账户已连接或领域目标已全部验收。F-020 继续维护既有飞书消息连接，机器人身份不代表已具备个人云文档或日历权限。F-025 持有认证集成共性缺口，F-042/F-045 持有事件和主动接续；新增 connector 独立验收，不把全部目录变成某个既有编号完成的附加门槛。
 
 本机、SSH、浏览器是执行能力；ChatGPT/Codex/Pi 选定历史属于导入；图片生成属于模型能力。F-048–F-054 仅保留为非 connector 的待定义候选，需结合原能力归属另行确认，不按本榜推动实现，也不把定性习惯分析直接扩成新开发任务。
 

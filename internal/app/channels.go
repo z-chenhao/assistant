@@ -103,7 +103,7 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 	return json.Marshal(spec)
 }
 func (a *App) ServeWeb(ctx context.Context, listener net.Listener, cfg web.Config) error {
-	s := web.Server{Workers: a.store.Inspector(), Computer: a, Capabilities: a.capabilitySettings, Config: cfg, Core: a, Tasks: a.store.TaskReader(), Feedbacks: a, Schedules: a, Inspector: a.store.Inspector(), Database: a, Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
+	s := web.Server{Apps: a.connectedApps, Workers: a.store.Inspector(), Computer: a, Capabilities: a.capabilitySettings, Config: cfg, Core: a, Tasks: a.store.TaskReader(), Feedbacks: a, Schedules: a, Inspector: a.store.Inspector(), Database: a, Contexts: a.store.Inspector(), Traces: a.store.Inspector(), Models: a.Models(), Control: a.control, Accounts: a.accounts, Secrets: a.control.Secrets, AccountCatalog: a.AccountCatalog}
 	if a.feishu != nil {
 		s.Callback = feishu.Handler{Client: *a.feishu, Core: a, Wake: func() {
 			if s.Wake != nil {

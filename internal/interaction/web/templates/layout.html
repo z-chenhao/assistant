@@ -5,10 +5,10 @@
 {{if .Login}}
 <main class="login">
  {{template "brand"}}
- <h1>{{tr "Open your workspace"}}</h1><p>{{tr "Enter the access token for this installation."}}</p>
+ <h1>{{tr "Open your workspace"}}</h1>
  {{if .Error}}<p class="feedback error" role="alert">{{tr .Error}}</p>{{end}}
- <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label>{{tr "Workspace access token"}}<input type="password" name="token" required autocomplete="off" autofocus></label><button>{{tr "Open workspace →"}}</button></form>
- <p class="muted">{{tr "Your workspace token is separate from your model provider account."}}</p>
+ <form action="/session" method="post"><input type="hidden" name="next" value="{{.Next}}"><label><span class="control-field-label">{{tr "Workspace access token"}}{{template "help" (help "workspace-token-help" (tr "Workspace access token") (tr "Your workspace token is separate from your model provider account."))}}</span><input type="password" name="token" required autocomplete="off" autofocus aria-label="{{tr "Workspace access token"}}"></label><button>{{tr "Open workspace →"}}</button></form>
+
 </main>
 {{else}}
 <button type="button" class="sidebar-backdrop" aria-label="{{tr "Close navigation"}}" data-sidebar-close disabled></button>
@@ -33,14 +33,16 @@
  {{if .Error}}{{if not (and .Settings (eq .Settings.Section "preferences"))}}<div class="page-feedback feedback error" role="alert">{{tr .Error}}</div>{{end}}{{end}}
  {{if and .Notice (ne .Notice "Language saved.")}}<div class="{{if and .Settings .Settings.TargetModel}}sr-only{{else}}page-feedback feedback success{{end}}" role="status">{{tr .Notice}}</div>{{end}}
  {{if .FormDraft}}<details class="page-feedback rich-answer-form" open><summary>{{tr "Your unsent answers"}}</summary>{{range .FormDraft}}<label>{{.Label}}<textarea readonly rows="2">{{.Value}}</textarea></label>{{end}}</details>{{end}}
- {{if eq .View "capabilities"}}{{template "capabilities-page" .}}
+ {{if eq .View "app-service"}}{{template "app-service-page" .}}
+ {{else if eq .View "apps"}}{{template "apps-page" .}}
+ {{else if eq .View "capabilities"}}{{template "capabilities-page" .}}
  {{else if eq .View "settings"}}{{template "settings-page" .}}
  {{else if eq .View "schedule"}}{{template "schedule-editor-page" .}}
  {{else if eq .View "tasks"}}{{template "tasks-page" .}}
  {{else if eq .View "task"}}{{template "task-page" .}}
  {{else if eq .View "database"}}{{template "database-page" .}}
  {{else if or (eq .View "traces") (eq .View "trace")}}{{template "observability-page" .}}
- {{else if eq .View "error"}}<section class="workspace-page"><h1>{{tr "We couldn't open this page"}}</h1><p>{{tr "Use the navigation to return to your workspace."}}</p><a class="button secondary" href="{{if .Path}}{{.Path}}{{else}}/{{end}}">{{tr "Try again"}}</a></section>
+ {{else if eq .View "error"}}<section class="workspace-page"><h1>{{tr "We couldn't open this page"}}</h1><a class="button secondary" href="{{if .Path}}{{.Path}}{{else}}/{{end}}">{{tr "Try again"}}</a></section>
  {{else}}{{template "conversation-page" .}}{{end}}
 </main>
 {{end}}

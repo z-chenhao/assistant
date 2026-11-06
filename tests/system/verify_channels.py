@@ -1695,7 +1695,10 @@ def account_presentation(binary, browser_evidence, report):
                 h.wait_state(lambda s:s['status']=='reauth_required', 'Resources reconnect cancels', lambda _:h.http('/api/auth'))
                 def account_credential_reads():
                     with server.lock:
-                        return sum(count for ref, count in server.credential_reads.items() if ref != 'credential:web-owner')
+                        # The owner token and default Composio project probe are
+                        # independent of the saved model account credential.
+                        return sum(count for ref, count in server.credential_reads.items()
+                                   if ref not in ('credential:web-owner', 'env:COMPOSIO_API_KEY'))
 
                 reads_before = account_credential_reads()
                 h.stop();h.start()

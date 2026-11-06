@@ -1,4 +1,6 @@
+import {enhanceContextHelp} from './components/ui/help';
 import {enhanceWorkers} from './workers';
+import {enhanceAppConnections} from './app-connections';
 import {enhanceComputerView} from './computer';
 import {enhanceShell} from './shell';
 import {enhanceBrandMotion} from './brand';
@@ -24,6 +26,8 @@ live?.start();
 
 enhanceObservability();
 
+enhanceAppConnections();
+enhanceContextHelp();
 enhanceSettings();
 enhanceSelectControls();
 enhanceCapabilityForms();

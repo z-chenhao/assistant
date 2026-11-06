@@ -227,6 +227,8 @@ locked npm/browser setup has 120-second stage boundaries with owned-child
 cleanup. Slow or unavailable downloads fail the lane and cannot count as tested
 coverage. Browser revision and installed-package verification remain unchanged.
 
+The dedicated `connected-apps` software lane runs `make test-connected-apps`: focused race checks for the Composio adapter, account lifecycle, migration, approval/replay and registry boundaries. `browser-infra` also runs the maintained Apps lifecycle and shared-help browser gate, retaining its screenshots with other lane evidence. Neither lane needs a live Composio key.
+
 The Go checks also exercise production tool composition, including a forged
 loaded-tool checkpoint and no native fallback without a JavaScript runtime.
 The model dependency test uses Go's transitive dependency graph: shared contracts

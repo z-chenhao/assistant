@@ -58,3 +58,6 @@ Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织单层�
 公共导航与设置控件规则以根目录 [design.md](../../design.md) 为准。一级侧栏保留 Chat、Tasks、Developer，Settings 固定左下；外观与头像动效统一在 Preferences 调整。
 
 favicon 使用现有 atlas 首帧导出的两份 PNG，首屏 appearance 脚本与后续主题 class 变化同步更新 link[rel=icon]；不重新绘制品牌资源。
+
+
+按需帮助复用 `web/src/components/ui/help.ts` 与 `templates/help.html`，样式归公共 `controls.css`。同一实现服务 Preferences、Settings、Tasks、Developer、审批及动态区域；保留原生 details 回退。增强浮层使用浏览器顶层 popover 避免被局部容器裁剪，保持 hover 路径、键盘聚焦、触摸固定与单个浮层；动态插入会补齐增强。表单字段保留独立可访问名称，帮助不改变字段值、保存或授权语义。设计规则只维护在 [design.md](../../design.md#功能优先与按需帮助)。

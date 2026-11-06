@@ -156,7 +156,7 @@ registry, frozen policy and invocation lifecycle.
 
 ## 个人 Connector 待实现方案
 
-F-046–F-070 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Plugin；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已在既有执行框架内自建多源搜索、正文／PDF／图片提取与证据续读，详见下方实现方案；其他服务仍是需求与实施约束，未新增其适配器、OAuth 或公开接口。已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
+F-046–F-070 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，原生接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Plugin；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已实现多源公开研究；F-071 通过下方 Composio 通道预备广泛应用，不逐项复制 OAuth 或外部 Agent SDK。原生 Connector 的领域要求、设备端集成和真实账户验收继续独立维护；已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
 
 ### 具体要求与现有消费者
 
@@ -204,7 +204,7 @@ F-046–F-070 的具体范围及分类见[术语与登记边界](../features/int
 
 **具体要求与现有消费者**：Main／Task Worker 需要批量和固定源搜索、公开文档提取、问答、摘要及可重读证据。用户要求自主实现；已有 Go 搜索／读取、模型控制面、SecretStore、Code Mode 和 Artifact 是实际依赖与下游契约。服务适配按公开协议自建；不安装外部 agent SDK、复制插件源码或建立另一套 agent 运行时。
 
-**机制与政策**：`internal/plugin/webaccess` 是内置能力包，持有工具声明、冻结来源顺序、批处理、问答／摘要／来源核查配方及证据预览。消费方定义的私有 `Host` 仅提供辅助模型调用与作用域内证据读取，不暴露数据库、事务或模型选择器。SQLite 实现 Host，负责 accepted invocation、冻结身份比对、模型 admission／预算／请求哈希、fencing、作用域读取和原子提交；App 仅装配。
+**机制与政策**：产品定义统一见[术语与登记边界](../features/integrations.md#术语与登记边界)：Plugin 是能力扩展包，Connector 是外部服务集成能力，Connection 绑定具体账户／实例，Skill 提供工作方法，Tool 暴露具体操作。工程上，`internal/plugin/webaccess` 实现内置 Web Access 插件，持有工具声明、冻结来源顺序、批处理、问答／摘要／来源核查配方及证据预览；`internal/connector/*` 实现各搜索服务的协议适配，复用平台提供的连接参数和 SecretStore。消费方定义的私有 `Host` 仅提供辅助模型调用与作用域内证据读取，不暴露数据库、事务或模型选择器。SQLite 实现 Host，负责 accepted invocation、冻结身份比对、模型 admission／预算／请求哈希、fencing、作用域读取和原子提交；App 仅装配。
 
 | 模块 | 必要职责 | 不持有的职责 |
 | --- | --- | --- |
@@ -289,4 +289,39 @@ flowchart LR
 
 ### F-070 · 独立插件生命周期（待实现）
 
-Plugin 是能力包边界，Connection 是平台管理的账户／服务实例边界。当前以一个内置 plugin 验证内部组合，使用既有 Registry 冻结工具，没有独立安装系统。待有真实安装／启停消费者时再定义最小内部清单和操作入口；连接认证／撤销继续复用 F-025，不在 plugin 内复制账户状态机。卸载与断连不能互相隐式执行，旧 Run 的冻结权限不被新插件状态扩大。公共 SDK、市场、动态加载、研究 Skill 发布与通用工作流引擎均不在当前重构内。
+Plugin 是能力扩展包边界，可包含单个技能或连接器，也可组合多种能力；Connection 是平台管理的具体账户／服务实例及授权边界。共享连接与插件分别管理，具体工具声明继续由 Registry／Executor 承接。当前仅以内置 Web Access 验证组合，使用既有 Registry 冻结工具，没有独立安装系统或跨插件连接管理入口。待有真实安装／启停消费者时再定义最小内部清单和操作入口；连接认证／撤销继续复用 F-025，不在 plugin 内复制账户状态机。安装插件不授予连接或动作权限，卸载与断连不能互相隐式执行，旧 Run 的冻结权限不被新插件状态扩大。公共 SDK、市场、动态加载、研究 Skill 发布与通用工作流引擎均不在当前重构内。
+
+
+## F-071 · Composio 托管应用通道
+
+`internal/connector/composio` 是 Steward 自建的 Go REST v3.1 客户端，生产目标固定为 `https://backend.composio.dev/api/v3.1`。`internal/connectedapps` 持有目录与显式账户绑定，`internal/plugin/connectedapps` 将每个活动绑定映射为搜索工具与执行工具；`internal/app` 只装配 Store、SecretStore、控制页与 Registry。没有引入 Composio Agent SDK、托管 MCP runtime 或第二条执行管线。协议依据为官方 [应用目录](https://docs.composio.dev/reference/api-reference/toolkits/getToolkits)、[托管连接链接](https://docs.composio.dev/reference/api-reference/tool-router/postToolRouterSessionBySessionIdLink)、[版本化工具](https://docs.composio.dev/reference/api-reference/tools/getToolsByToolSlug) 与[上游撤权](https://docs.composio.dev/reference/api-reference/connected-accounts/postConnectedAccountsByNanoidRevoke)。
+
+Migration 046 在既有 `state.db` 中增加 CAS 版本化的 `connected_apps` 配置，保存项目凭据引用、安装独有 user ID、认证配置 ID 覆盖表、账户 ID、应用、别名、状态及撤权确认。项目 API key 逐请求从 SecretStore 解析；未保存项目引用且默认环境凭据存在时，`Service.State` 只读补全 `env:COMPOSIO_API_KEY`，不写 CAS 状态、不联网或创建绑定，首次显式 Connect 才随绑定保存引用。已有显式引用始终优先，缺失／失效时不切换项目；账户响应仅投影身份／状态字段，不保存 provider data／state 或授权链接。项目引用在有未断开连接时不可切换。网络调用位于事务外；错误只使用安全代码，拒绝重定向并限制响应大小。
+
+目录 GET 是只读的分页请求；无项目时的内置列表只提供推荐，不能连接或代表项目可用性。Connect 是受 Web 身份、渠道及同源检查保护的显式 POST。普通应用创建限定 toolkit 的 session 和 hosted link，禁用 instant、workbench、proxy 和批量执行，允许显式多账户别名；只接受 Composio HTTPS 授权地址。Check 仅激活本流程记录的确切 account ID，核对 user ID、toolkit、禁用标记和 ACTIVE；已禁用账户投影为 expired 并刷新工具声明，身份不匹配则拒绝改变本地绑定。免认证应用需显式启用为 public 绑定，只可执行 `no_auth` 工具；不猜测或导入项目中的其他账户。
+
+每个活动绑定有独立 `mcp__apps__b__<binding>__search_tools`／`execute` 命名空间，这是现有业务工具的兼容命名，实际传输为 REST；前缀不能由合法的 MCP server／tool 名组成，刷新时不会移除用户自己配置的 `apps_*` server。搜索返回工具 schema、确切版本和规范化描述指纹；schema 不直接塞入本地有限的参数验证器，执行参数采用有界 JSON 对象字符串，外层契约仍严格验证，供应商再验证具体业务参数。每次执行在本地绑定、远端账户、确切版本及描述指纹全部匹配后才 POST，固定 user/account，不能由模型覆盖凭据、账户、端点或选择 instant fallback。业务工具全部按 high／external_effect／never 暴露，不信任供应商的只读标注来放宽权限；目录搜索本身是 read_only。长结果完整保存为 Artifact。
+
+Registry 的受锁分组替换只更新新建能力快照；原有已选 Registry 保留冻结声明，新增账户不扩权旧 Run。运行时装配与账户刷新用同一把装配锁，避免初始化期间丢失刚完成的连接。执行闭包每次重检持久状态；断开先提交本地关闭，再更新 Registry、尝试 upstream revoke 和 broker DELETE，未确认原服务撤权与本地禁止继续使用分别展示。迟到的 Check 不能重新激活已断开的 ID；重连必须新建绑定。服务进程中的生命周期变更与 dispatch 互斥，不同账户的 dispatch 可并行，Disconnect 不宣称撤回此前已经发出的操作。
+
+所有模型调用继续走既有角色裁剪、Code Mode、ToolInvocation、审批及 durable replay。供应商 POST 无自动重试；网络错误、5xx、不完整／超限成功响应为 ambiguous，沿用 unknown 恢复。正常终态重放不再次访问服务。原生 Web Access、Tavily、GitHub 监听的连接及冻结契约不迁移到本通道。尚无真实项目，协议 peer 不能证明 OAuth scope、每个 toolkit 的端到端业务语义或生产稳定性。
+
+
+### 部署设置与 Apps 交互
+
+常规部署只需为 Steward 进程设置 `COMPOSIO_API_KEY`；自定义引用和可选的 app→auth-config ID 映射由部署者通过 Resources → App connection service（`/settings/services/apps`）保存。Apps 只显示应用目录、账户和连接操作，服务不可用时在对应连接操作旁提供按需帮助。认证配置在后台通过受限 GET 投影读取，不接收 OAuth client secret 等字段，校验 toolkit／ENABLED／Tool Router 标记，自动选取最新可用自定义配置；部署者的覆盖必须验证成功。权限不足的 scoped key 可以继续使用托管认证，不隐式修改项目配置或扩大 OAuth scope。
+
+Connect 首次无需别名，额外账户要求具名；链接及十分钟有效期保留在进程内存，重复点击或 Continue 复用原链接，不续期。页面在点击时预留授权标签页，弹窗被拦截时提供链接。浏览器每五秒以受同源、身份保护的 POST 检查 pending 账户，最多十分钟；GET 不改变账户状态。不变的检查结果不写入 CAS 版本，避免另一窗口的轮询不断作废部署设置表单。授权页地址不写入 state.db、浏览器存储或导航查询。
+
+原生表单仍可连接、打开授权页、刷新状态和重连；脚本只增强交互，失败不自动重试创建链接。JSON 返回的账户区域由原生模板转义，包含本地连接 ID／状态及单调 revision，不含项目引用或 provider credentials。客户端同时用状态版本和操作代次拒绝迟到轮询，断开后的旧 ACTIVE 响应不能复活显示。重连是显式控制动作，先关闭非活动的旧绑定，再按原别名创建新绑定；已经工作的账户拒绝被替换，其他账户不受影响。
+
+
+Apps 目录与图标：目录页按用途分类，使用紧凑双列列表，不设置人为指定的热门分组，详情由 `/api/apps/detail?app=…` 提供服务器转义的 HTML，增强为原生 dialog；无脚本时 `/settings/apps?app=…` 展示同一账户控件。隐藏账户库存包含全部可管理绑定，轮询与显式动作沿用 revision／generation fence，再投影到详情及侧栏；已确认关闭的记录保留在数据库，不占用“已连接”列表。每个应用只有一个侧栏入口，多账户仍独立管理。Settings 的 Apps 入口使用四宫格图标，Resources 保留服务器图标。
+
+Composio Toolkit 元数据保留 `meta.logo`。推荐条目的官方 SVG 随包分发，来源 URL 与原始／打包 SHA-256 见 `web/app-icons.json`，商标说明进入 `/licenses.txt`。`/apps/logo/<slug>` 位于既有身份／渠道边界内；内置资源无需外网，新目录条目由服务器匿名读取官方 `logos.composio.dev`／`assets.composio.dev` HTTPS 来源，不携带项目 key、Cookie 或授权头，不跟随重定向。图标请求有 8 秒超时、512 KiB 上限、24 小时／128 项内存缓存；SVG 仅保留矢量、渐变、蒙版与局部引用，移除脚本、事件、外链及嵌入页面，PNG/JPEG 有像素上限。浏览器只访问同源图片，载入失败才回退首字母。HTTP 200 的 Composio 通用占位图不视为品牌核验；预置目录使用正式 toolkit 标识，项目支持仍须实时验证。
+
+
+Apps 复用全局组件契约：分类原生 select 由共享 Base UI 适配器增强；图标按钮、复合搜索框与原生详情 dialog 的皮肤归 `components/ui/controls.css`，页面 CSS 仅维护目录、侧栏和账户布局。断开使用 Settings 共享确认对话框，默认聚焦取消，原生表单仍显式提交。普通按钮使用统一 8px 圆角，详情容器使用 12px 圆角，窄屏操作区域至少 44px。
+
+
+Apps 不展示服务初始化入口或部署提示；服务统一从 Resources 管理。类别改变后提交只读 GET 筛选，搜索保留当前类别；无 JavaScript 时使用原生筛选按钮。服务未就绪时，详情中的 Connect 禁用并提供按需帮助，不引入项目配置入口。

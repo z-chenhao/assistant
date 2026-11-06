@@ -1,4 +1,4 @@
-.PHONY: help setup install run build test test-prompts test-web-access test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
+.PHONY: help setup install run build test test-prompts test-web-access test-connected-apps test-go test-node test-browser test-infra test-e2e test-full test-race lint lint-actions audit
 
 .DEFAULT_GOAL := setup
 
@@ -7,6 +7,7 @@ help:
 	@echo 'make build/run   Build / start Steward'
 	@echo 'make test lint   Run software tests and local quality checks'
 	@echo 'make test-prompts Check Agent prompt assembly and frozen Worker inheritance'
+	@echo 'make test-connected-apps Check app credentials, lifecycle, approvals and migrations with race detection'
 	@echo 'make test-e2e    Run core flows (set E2E_EVIDENCE to a fresh path)'
 	@echo 'make test-full   Run all deterministic system flows'
 	@echo 'make test-race   Run the complete Go race inventory'
@@ -40,6 +41,9 @@ test-go:
 test-web-access:
 	go test -race ./internal/plugin/webaccess ./internal/connector/... ./internal/webcontent ./internal/llm/bridge ./internal/llm/provider ./internal/agent ./internal/agent/sqlite -run '(WebAccess|WebSearch|HostedSearch|SearchCompletion|SearchPolicy|DefinitionsFreeze|ExaMCP|FetchAddresses)' -count=1
 
+test-connected-apps:
+	go test -race ./internal/connector/composio ./internal/connectedapps ./internal/plugin/connectedapps ./internal/interaction/web ./internal/tool ./internal/app ./internal/agent/sqlite -run '^Test(ConnectedApps|Apps|AppLogo|ToolDescriptor|RegistryGroup|Client)' -count=1
+
 test-node:
 	npm run check --prefix web
 	npm test --prefix web
@@ -47,6 +51,7 @@ test-node:
 	npm test --prefix runtime/javascript
 
 test-browser:
+	STEWARD_TEST_APP_BROWSER=1 STEWARD_APP_BROWSER_EVIDENCE="$${STEWARD_APP_BROWSER_EVIDENCE:-$(CURDIR)/evidence/apps-browser}" go test ./internal/interaction/web -run '^TestAppsBrowserConnectionLifecycle$$' -count=1
 	npm test --prefix guest-browser
 	node web/artwork/icons.mjs --check
 
@@ -77,6 +82,8 @@ lint: lint-actions
 	npm run lint --prefix runtime/javascript
 	npm run lint --prefix guest-browser
 	npm run lint --prefix web
+	node --check tests/system/apps_connections_browser.mjs
+	node --check tests/system/channels_help.mjs
 
 # Tool versions are explicit and do not alter the application's go.mod.
 lint-actions:

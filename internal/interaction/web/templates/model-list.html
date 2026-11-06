@@ -14,8 +14,8 @@
     <span class="status-pill" data-status="{{.Status}}">{{tr .Status}}</span>
    </summary>
    <div class="resource-body">
-    <p class="field-help">{{tr "Account changes affect every model that uses the account."}}</p>
-    <div class="actions provider-account-actions">
+
+    <div class="actions provider-account-actions">{{template "help" (help (printf "account-%s-help" .ConnectionID) (tr "Account") (tr "Account changes affect every model that uses the account."))}}
      <form method="post" action="/auth/login" data-open-signin><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="return_to" value="/settings/setup"><button class="secondary setting-action">{{tr "Reconnect account"}}</button></form>
      {{if ne .Status "logged_out"}}<form method="post" action="/auth/logout" data-settings-confirm="{{tr "Sign out of provider"}}" data-confirm-description="{{tr "Signing out disconnects all saved models using this account."}}"><input type="hidden" name="account" value="{{.ConnectionID}}"><input type="hidden" name="return_to" value="/settings/setup"><button class="secondary setting-action danger-text">{{tr "Sign out of provider"}}</button></form>{{end}}
     </div>
@@ -30,5 +30,6 @@
   {{range .}}{{template "model-resource" .}}{{end}}
  </section>
  {{end}}
+ <div class="setting-row"><div class="setting-copy"><h2>{{tr "App connection service"}}</h2></div><a class="button secondary" href="/settings/services/apps">{{tr "Configure service"}}</a></div>
 </section>
 {{end}}

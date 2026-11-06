@@ -49,7 +49,7 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const remote=[];page.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});
  await page.goto(url);
- await page.getByLabel('Workspace access token').fill(process.env.STEWARD_WEB_TEST_TOKEN);
+ await page.getByLabel('Workspace access token',{exact:true}).fill(process.env.STEWARD_WEB_TEST_TOKEN);
  await page.getByRole('button',{name:'Open workspace'}).click();
  await page.waitForURL(url+'/');
  await page.locator('#composer-root textarea').waitFor();
@@ -283,7 +283,7 @@ try{
   if(await page.locator('#conversation-attention a').count())throw Error('missing configuration became a work attention item');
   const setupCallout=page.locator('.setup-callout');
   const composer=page.locator('#composer-root .composer');
-  await setupCallout.getByRole('heading',{name:"Let's get Steward ready."}).waitFor();
+  await setupCallout.getByRole('heading',{name:"Setup required"}).waitFor();
   const setupBounds=await setupCallout.boundingBox();
   const composerBounds=await composer.boundingBox();
   if(!setupBounds||setupBounds.height>100||!composerBounds||composerBounds.height>130)throw Error('empty Chat setup or composer takes too much vertical space');
@@ -478,7 +478,9 @@ try{
   await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'Overview'}).waitFor();
   await page.goto(url+'/developer/observability?run='+encodeURIComponent(facts.root));
   await page.getByText('Execution facts & data coverage',{exact:true}).click();
-  await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Help: Root Worker',exact:true}).hover();
+  await page.getByRole('tooltip').filter({hasText:'Task root · no parent Worker.'}).waitFor();
+  await page.keyboard.press('Escape');
   await page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first().click();
   await page.locator('.obs-selected-name').filter({hasText:'Generate response'}).waitFor();
   await page.screenshot({path:evidence+'/trace-worker.png',fullPage:true});
@@ -543,7 +545,12 @@ try{
   }
   await page.setViewportSize({width:1400,height:980});
   await page.getByText('Execution facts & data coverage',{exact:true}).click();
-  await page.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Help: Root Worker',exact:true}).hover();
+  await page.getByRole('tooltip').filter({hasText:'Task root · no parent Worker.'}).waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Help: Input',exact:true}).hover();
+  await page.getByRole('tooltip').filter({hasText:'Saved input metadata / last accepted model result; not a delivery receipt'}).waitFor();
+  await page.keyboard.press('Escape');
   await page.screenshot({path:evidence+'/inspection-tree.png',fullPage:true});
   const compact=await context.newPage();
   try{
@@ -552,7 +559,13 @@ try{
    await compact.screenshot({path:evidence+'/inspection-tree-mobile.png',fullPage:true});
   }finally{await compact.close()}
   const plain=await browser.newContext({javaScriptEnabled:false});
-  try{await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());if(await fallback.locator('.run-node').count()!==3)throw new Error('inspector requires JavaScript')}finally{await plain.close()}
+  try{
+   await plain.addCookies(await context.cookies());const fallback=await plain.newPage();await fallback.goto(page.url());
+   if(await fallback.locator('.run-node').count()!==3)throw new Error('inspector requires JavaScript');
+   const guide=fallback.locator('[data-help-fallback]').filter({has:fallback.locator('summary[aria-label="Help: Root Worker"]')});
+   await guide.locator('summary').click();
+   await guide.getByText('Task root · no parent Worker. A Main-created Task is a causal link, not a parent/child Run relationship.',{exact:true}).waitFor();
+  }finally{await plain.close()}
   const generationLink=page.locator('.obs-tree .observation-node').filter({hasText:'Generate response'}).last().locator('a').first();
   const generationHref=await generationLink.getAttribute('href');
   await generationLink.focus();

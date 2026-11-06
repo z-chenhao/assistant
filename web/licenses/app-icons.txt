@@ -1,0 +1,7 @@
+App identity logos
+
+App logos are supplied by Composio through https://logos.composio.dev/api/{toolkit_slug}.
+Source URLs and hashes for the bundled originals are recorded in web/app-icons.json.
+Embedded scripts are removed; the server also sanitizes SVG before serving it.
+Logos and trademarks remain the property of their respective owners. They are used
+only to identify the services users can connect. No affiliation or endorsement is implied.

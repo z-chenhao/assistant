@@ -54,3 +54,6 @@ Preferences 的头像动效开关由 channels 的 `default_capability_settings` 
 跨页稳定性由 core channels 的 `page_transitions` 调用现有浏览器驱动：中英文、明暗主题、320／390／760／761／780／800／820／1024／1400px 检查模型名、操作、同级标题及无溢出；折叠后跨模块并刷新保持状态。拦住真实 app.js 下载，比较导航、设置组和正文增强前后几何；下载失败验证原生回退。通知编辑验证旧保存提示失效、草稿不自动落盘及显式提交持久化。证据写入 `page-transitions-ui/page-transitions.json` 和截图。`web/appearance.test.mjs` 验证明暗优先级、桌面／手机折叠、不可用存储和下载失败；这些检查沿用 `make test lint`／`make test-e2e` 及必需的 `Ubuntu checks`。
 
 channels 的 components 浏览器场景同时验证 dark/light 切换后的 favicon 路径；实际资源像素仍由 icons.mjs --check 验证。
+
+
+全 Web 文案与问号帮助：`tests/system/channels_help.mjs` 由维护中的 Apps 浏览器门禁执行，覆盖 Apps 无冗余副标题／部署入口、连接可用性在操作处表达、原有 Preferences 连续 hover 路径、通知选择器与定时开关的可访问名称、阅读帮助不修改表单、任务容器内浮层、动态替换、200% 缩放、触摸切换及无 JavaScript 回退。原 Preferences 完整矩阵继续由 channels 验证；Root 因果边界指引改为主动打开帮助后核对。实际错误、权限、截断、保存及授权确认仍按各功能验收。

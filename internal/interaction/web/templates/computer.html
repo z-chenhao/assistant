@@ -1,10 +1,10 @@
 {{define "computer-panel"}}
 <dialog class="computer-drawer workspace-panel" id="computer-panel" aria-labelledby="computer-title">
- <header><h2 id="computer-title">{{template "icon-computer"}}Steward Computer</h2><div><button type="button" class="plain-button" data-panel-expand aria-label="{{tr "Expand computer view"}}" aria-pressed="false">{{template "icon-expand"}}</button><button type="button" class="plain-button" data-panel-close aria-label="{{tr "Close computer view"}}">×</button></div></header>
+ <header><h2 id="computer-title">{{template "icon-computer"}}Steward Computer{{template "help" (help "computer-preview-help" (tr "Computer settings") (tr "Preview does not start or resume Computer."))}}</h2><div><button type="button" class="plain-button" data-panel-expand aria-label="{{tr "Expand computer view"}}" aria-pressed="false">{{template "icon-expand"}}</button><button type="button" class="plain-button" data-panel-close aria-label="{{tr "Close computer view"}}">×</button></div></header>
  <div class="computer-panel-body">
   <p class="computer-connection" role="status" data-computer-status>{{tr "Connecting to Computer…"}}</p>
   <div class="computer-screen" data-computer-screen><p data-computer-placeholder>{{tr "Waiting for a desktop image…"}}</p></div>
-  <p class="computer-caption" data-computer-caption>{{tr "Read-only desktop · updates while this view is open"}}</p>
+  <p class="computer-caption" data-computer-caption>{{tr "Read only"}}</p>
   <h3>{{tr "Operation progress"}}</h3><ol class="computer-activity" data-computer-activity></ol>
   <p class="muted"><a href="/settings/capabilities/computer">{{tr "Computer settings"}} →</a></p>
  </div>
