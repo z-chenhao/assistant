@@ -194,7 +194,7 @@ func (r *Runs) respondTaskFeedback(ctx context.Context, ref, answer string, inbo
 		}
 		inbound.Content = parts
 	}
-	return r.submit(ctx, "task-feedback:"+ref, parts, inbound, ref)
+	return r.submit(ctx, "task-feedback:"+ref, parts, inbound, ref, nil)
 }
 
 // requireCurrentFeedback joins ingress and later Main Task admission so a

@@ -173,7 +173,7 @@ tool/mcp
 - `memory`：长期记忆、召回与 Memory Curator。
 - `context`：为每次 Turn 组装、裁剪、冻结和压缩上下文，不拥有来源数据。
 - `llm`：管理 ModelProfile/ModelSnapshot、Provider Bridge、模型目录、能力 Probe 与固定主模型调用；一期不做动态模型路由。
-- `llm/secret`：封装 OS Credential Store；`llm/memory` 提供测试用内存实现。只返回受控 Credential，不把 Secret 暴露给领域存储或模型。
+- `llm/secret`：封装数据根下的私有文件 SecretStore 与显式环境变量引用；`llm/memory` 提供测试用内存实现。只返回受控 Credential，不把 Secret 暴露给领域存储或模型。
 - `skill`：Skill 的发现、读取、候选、审核和生命周期。
 - `tool`：工具注册、发现、ToolInvocation 与调用；包括 AgentToolExecutor、Computer Tool Executor、Code Mode 的内部 CodeExecutionState/CodeCall Ledger 和 Sidecar 桥接。
 - `tool` 与 `agent/sqlite` 共同落实副作用前的授权、冻结审批与执行权检查；当前没有独立的 `security` 包。
@@ -203,16 +203,15 @@ required status name is preserved. One checkout and dependency setup serve:
    single-message assembly, frozen shared-rule inheritance and Root progress.
 2. `make test lint`: Go unit/component checks, Node runtime contracts, frontend
    freshness/types, the real Chromium contract and retained infrastructure tests.
-3. `make test-e2e`: ten deterministic product flows through actual CLI/UI,
+3. `make test-e2e`: eleven deterministic product flows through actual CLI/UI,
    stores, brokers and runtimes. See the [coverage map](../test-plans/product.md#testing-system-coverage).
 4. Task coding isolation and publication recovery retain their dedicated checks.
 5. Code Mode discovery and Main responsiveness: the maintained capabilities
    scenarios check 500 MCP tools without native declarations, direct-call rejection,
    exact approval and a Main reply while a real MCP call remains held.
-6. Native Linux account credentials: the existing account harness uses a private
-   D-Bus and disposable password-protected GNOME Keyring, with real libsecret
-   storage and a controlled OAuth/Responses peer. An entrypoint wrapper unwinds
-   owned service processes on cancellation; no real account or user keyring is used.
+6. File account credentials: the maintained account harness uses private files
+   in a disposable data root and a controlled OAuth/Responses peer. Cross-process
+   refresh, cleanup and permission checks require no desktop credential service.
 
 The job has a 30-minute outer budget for setup and all checks. Individual test
 deadlines and assertions remain unchanged.
@@ -235,7 +234,7 @@ process owner forwards cancellation, allows fixture cleanup and kills remaining
 owned process groups. Results and failed logs are uploaded with source/run
 identity. Tests never need an online model account.
 
-The job has a 20-minute stop boundary. It is not a latency claim. This replaces
+The job has a 30-minute stop boundary. It is not a latency claim. This replaces
 38 job instances and their setup/build/upload/join overhead; GitHub-hosted queue
 time and wall-time improvements must be measured on the new workflow. Local
 results do not establish remote CI performance. There is no custom changed-file
@@ -247,7 +246,7 @@ selector, secondary required gate, benchmark comparator or cross-job build bundl
 
 [Extended regression](../../.github/workflows/regression.yml) runs weekly and via
 manual dispatch. It executes all retained deterministic system gates, then the
-complete Go race inventory. A separate macOS job checks native CLI/startup, the credential adapter and offline VM contracts; actual Keychain/Guest integration remains explicit live validation. It uploads failures as well as passing results and
+complete Go race inventory. A separate macOS job checks native CLI/startup, the credential adapter and offline VM contracts; actual Guest integration remains explicit live validation. It uploads failures as well as passing results and
 has a 60-minute outer limit. A failure remains a defect to investigate; it cannot
 be waived into a release pass. Run it before releases and broad protocol/state
 changes, or use the corresponding focused gates during development.

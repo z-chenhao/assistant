@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"strings"
 
 	"github.com/z-chenhao/assistant/internal/conversation"
@@ -13,6 +15,11 @@ func (s *Server) showMessage(ctx context.Context, m conversation.Message, approv
 	out := shownMessage{Role: m.Role, Sequence: m.Sequence}
 	if m.Source == "main" && m.Role == "assistant" && m.SourceEventID != "" && m.MessageID == "reply:"+m.SourceEventID {
 		out.ReplyKey = replyKey(m.SourceEventID)
+	}
+	if m.Source == "web" && m.Role == "user" && len(m.SourceEventID) == 32 {
+		if _, err := hex.DecodeString(m.SourceEventID); err == nil {
+			out.ClientSource = m.SourceEventID
+		}
 	}
 	// Match Host-authored notification identity, never strip arbitrary user text
 	// by regex or rewrite the durable Conversation/frozen delivery projection.
@@ -38,6 +45,18 @@ func (s *Server) showMessage(ctx context.Context, m conversation.Message, approv
 	raw, err := s.Core.WebProjection(ctx, m)
 	if err != nil {
 		return out, err
+	}
+	var grouped struct {
+		Bubbles []ui.Spec `json:"bubbles"`
+	}
+	if json.Unmarshal(raw, &grouped) == nil && len(grouped.Bubbles) > 0 {
+		for _, bubble := range grouped.Bubbles {
+			data, err := json.Marshal(bubble)
+			if err != nil {
+				return out, err
+			}
+			out.Bubbles = append(out.Bubbles, shownProjection{HTML: ui.HTML(data, bubble.Fallback), Spec: string(data), Fallback: bubble.Fallback})
+		}
 	}
 	out.Projection = shownProjection{HTML: ui.HTML(raw, fallback), Spec: string(raw), Fallback: fallback}
 	return out, nil

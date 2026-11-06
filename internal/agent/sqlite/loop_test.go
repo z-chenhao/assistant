@@ -209,7 +209,7 @@ func TestLoopConcurrentIngressOneMainAndIdempotentConversation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(messages) != 33 {
+	if len(messages) != 64 {
 		t.Fatal("semantic message count", len(messages))
 	}
 	for i, m := range messages {
@@ -220,7 +220,7 @@ func TestLoopConcurrentIngressOneMainAndIdempotentConversation(t *testing.T) {
 			t.Fatal("trace leaked into conversation")
 		}
 	}
-	if len(p.requests) != 2 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE status='succeeded'`) != 1 || scalar(t, s, `SELECT count(*) FROM delivery_request`) != 1 {
+	if len(p.requests) != 64 || scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE status='succeeded'`) != 32 || scalar(t, s, `SELECT count(*) FROM delivery_request`) != 32 {
 		t.Fatal("wrong provider/tool/delivery counts")
 	}
 	if scalar(t, s, `SELECT count(*) FROM run WHERE status='completed'`) != 1 {
@@ -249,6 +249,7 @@ func idAgent(t *testing.T, s *Store) string {
 func TestLoopSteeringAtBoundaryAndProfileSwitchOnlyNewRuns(t *testing.T) {
 	s, r, h, a, p := loopFixture(t)
 	first := mustSubmit(t, a, "first", "original")
+	legacyMainInputs(t, r, first.RunID)
 	entered, release := make(chan struct{}), make(chan struct{})
 	original := p.respond
 	once := sync.Once{}
@@ -523,6 +524,7 @@ func TestSteeringAfterCompactionBeforeGenerationAdmission(t *testing.T) {
 		return llm.GenerationResult{Text: "Reply to " + text}, nil
 	}
 	receipt := mustSubmit(t, a, "first", "original instruction")
+	legacyMainInputs(t, r, receipt.RunID)
 	// Compaction commits before generation admission. A crash/storage failure
 	// in this window must not let later steering rewrite that frozen step.
 	if _, err := s.db.Exec(`CREATE TRIGGER fail_admission BEFORE INSERT ON model_generation BEGIN SELECT RAISE(ABORT,'injected'); END`); err != nil {
@@ -568,7 +570,8 @@ func TestSteeringAfterCompactionBeforeGenerationAdmission(t *testing.T) {
 
 func TestLoopSteeringOvertakesFinalGenerationBeforeReplyCommit(t *testing.T) {
 	s, r, h, a, p := loopFixture(t)
-	mustSubmit(t, a, "one", "original")
+	first := mustSubmit(t, a, "one", "original")
+	legacyMainInputs(t, r, first.RunID)
 	entered, release := make(chan struct{}), make(chan struct{})
 	once := sync.Once{}
 	p.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {

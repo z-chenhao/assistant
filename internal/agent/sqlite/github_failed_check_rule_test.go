@@ -8,7 +8,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/observer/github"
 )
 
-const removeGitHubFailedCheckFixtureSchema = `DROP TABLE IF EXISTS ui_widget;
+const removeGitHubFailedCheckFixtureSchema = removeUIInteractionFixtureSchema + `DROP TABLE IF EXISTS ui_widget;
  ALTER TABLE github_rule_decision DROP COLUMN actual_check_conclusion;
  ALTER TABLE github_rule_decision DROP COLUMN expected_check_conclusion;
  ALTER TABLE github_task_binding DROP COLUMN rule_check_conclusion;

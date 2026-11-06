@@ -75,7 +75,7 @@ func (m *Manager) view(c config.Config, id, revision string) web.Capability {
 			v.State, v.Message = macosvm.ManagedState(m.active.App.DataRoot + ".desktop")
 		}
 		if id == "memory" && v.State == "unavailable" {
-			v.Message = "Unlock your system credential store and restart Steward to prepare Memory. Your existing key is never replaced."
+			v.Message = "The saved Memory key is unavailable in local credential files. Restore the original key before restarting. Existing keys are never replaced."
 		}
 	}
 	if v.Configured && !c.Automatic(id) {

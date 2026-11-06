@@ -22,21 +22,24 @@ type Field struct {
 	Value string `json:"value"`
 }
 type Component struct {
-	Title       string     `json:"title,omitempty"`
-	WidgetRef   string     `json:"widget_ref,omitempty"`
-	Type        string     `json:"type"`
-	Text        string     `json:"text,omitempty"`
-	ArtifactRef string     `json:"artifact_ref,omitempty"`
-	Columns     []string   `json:"columns,omitempty"`
-	Rows        [][]string `json:"rows,omitempty"`
-	Status      string     `json:"status,omitempty"`
-	ApprovalID  string     `json:"approval_id,omitempty"`
-	Hash        string     `json:"frozen_arguments_hash,omitempty"`
-	Fields      []Field    `json:"fields,omitempty"`
-	MessageID   string     `json:"message_id,omitempty"`
-	FormID      string     `json:"form_id,omitempty"`
-	Submitted   bool       `json:"submitted,omitempty"`
-	Disabled    bool       `json:"disabled,omitempty"`
+	Title       string          `json:"title,omitempty"`
+	WidgetRef   string          `json:"widget_ref,omitempty"`
+	Type        string          `json:"type,omitempty"`
+	Name        string          `json:"name,omitempty"`
+	Props       json.RawMessage `json:"props,omitempty"`
+	Response    string          `json:"response,omitempty"`
+	Text        string          `json:"text,omitempty"`
+	ArtifactRef string          `json:"artifact_ref,omitempty"`
+	Columns     []string        `json:"columns,omitempty"`
+	Rows        [][]string      `json:"rows,omitempty"`
+	Status      string          `json:"status,omitempty"`
+	ApprovalID  string          `json:"approval_id,omitempty"`
+	Hash        string          `json:"frozen_arguments_hash,omitempty"`
+	Fields      []Field         `json:"fields,omitempty"`
+	MessageID   string          `json:"message_id,omitempty"`
+	FormID      string          `json:"form_id,omitempty"`
+	Submitted   bool            `json:"submitted,omitempty"`
+	Disabled    bool            `json:"disabled,omitempty"`
 }
 type Spec struct {
 	SchemaVersion int         `json:"schema_version"`
@@ -81,6 +84,8 @@ func valid(c Component) bool {
 		return false
 	}
 	switch c.Type {
+	case "openintelligentui":
+		return validNative(c)
 	case "widget":
 		return strings.HasPrefix(c.WidgetRef, "ui:") && len(c.WidgetRef) < 256 && !strings.ContainsAny(c.WidgetRef, "/\\ \r\n") && c.ApprovalID == ""
 	case "markdown", "progress":
@@ -132,6 +137,10 @@ func HTML(raw json.RawMessage, fallback string) template.HTML {
 			out.WriteString(`<p class="semantic">` + template.HTMLEscapeString(fallback) + `</p>`)
 			continue
 		}
+		if c.Type == "openintelligentui" {
+			out.WriteString(nativeHTML(c))
+			continue
+		}
 		var b bytes.Buffer
 		renderer := component
 		if c.Type == "form" && c.FormID != "" {
@@ -161,7 +170,7 @@ func Card(s Spec) map[string]any {
 				continue
 			}
 			switch c.Type {
-			case "markdown", "progress":
+			case "markdown", "progress", "openintelligentui":
 				parts = append(parts, c.Text)
 			case "table":
 				parts = append(parts, strings.Join(c.Columns, " | "))

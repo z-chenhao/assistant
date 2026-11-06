@@ -4,6 +4,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,10 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
+	case "/api/ui/state", "/api/ui/action":
+		s.uiInteraction(w, r)
+	case "/ui/image":
+		s.uiImage(w, r)
 	case "/ui/widget":
 		s.widget(w, r)
 	case "/api/developer/database":
@@ -110,6 +115,9 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 	switch r.URL.Path {
+	case "/api/ui/state", "/api/ui/action":
+		s.uiInteraction(w, r)
+		return nil
 	case "/api/message":
 		return s.acceptJSONMessage(w, r)
 	case "/message":
@@ -119,7 +127,12 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 	case "/upload":
 		return s.uploadArtifact(w, r)
 	}
-	if e := r.ParseForm(); e != nil {
+	if r.URL.Path == "/capability/configure" && strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if err := r.ParseMultipartForm(64 << 10); err != nil {
+			return err
+		}
+		defer r.MultipartForm.RemoveAll()
+	} else if e := r.ParseForm(); e != nil {
 		return e
 	}
 	switch r.URL.Path {
@@ -146,11 +159,35 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) error {
 	case "/model/catalog":
 		return s.showAccountCatalog(w, r)
 	case "/model/add":
+		status, err := s.Core.WebStatus(r.Context())
+		if err != nil {
+			return err
+		}
 		p, err := s.addModel(r)
 		if err != nil {
 			return err
 		}
-		http.Redirect(w, r, resourceModelURL(p.ProfileID, "added"), http.StatusSeeOther)
+		notice := "added"
+		if activeProfile(status) == "" {
+			err = s.Control.SelectWithProbe(r.Context(), p.ProfileID, p.Version, status.ConfigVersion)
+			if err == nil {
+				err = s.Core.WaitForRuntime(r.Context())
+			}
+			if err != nil {
+				// The candidate was saved. Keep a failed first connection on that
+				// resource instead of offering to create the same model again.
+				next := r.Clone(r.Context())
+				u := *r.URL
+				u.Path = "/model/select"
+				next.URL = &u
+				next.PostForm = url.Values{"profile": {p.ProfileID}}
+				next.Form = next.PostForm
+				s.postFailure(w, next, err)
+				return nil
+			}
+			notice = "active"
+		}
+		http.Redirect(w, r, resourceModelURL(p.ProfileID, notice), http.StatusSeeOther)
 		return nil
 	case "/model/test":
 		if e := s.testModel(r); e != nil {

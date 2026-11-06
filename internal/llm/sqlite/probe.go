@@ -73,7 +73,16 @@ func (s *Store) InvalidateProbe(ctx context.Context, id string, version int64, s
 			return err
 		}
 		if n == 0 {
-			return nil
+			// Account readiness may come from authenticated catalog selection,
+			// without a Probe row. A failed check must still revoke that exact
+			// profile version; a concurrent edit remains fenced out.
+			var account int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM model_profile WHERE profile_id=? AND version=? AND provider_kind='openai_account'`, id, version).Scan(&account); err != nil {
+				return err
+			}
+			if account == 0 {
+				return nil
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE model_profile SET status=?,verified_at=NULL,version=version+1,updated_at=max(updated_at,?) WHERE profile_id=? AND version=?`, status, now().UnixMicro(), id, version); err != nil {
 			return err
@@ -153,24 +162,6 @@ func (s *Store) Select(ctx context.Context, id string, profileVersion, configVer
 		if _, err = tx.ExecContext(ctx, `UPDATE model_probe SET profile_version=profile_version+1 WHERE profile_id=?`, id); err != nil {
 			return err
 		}
-		r, err := tx.ExecContext(ctx, `UPDATE agent_config SET active_model_profile_id=?,setup_status='ready',config_version=config_version+1,updated_at=max(updated_at,?) WHERE singleton=1 AND config_version=?`, id, now().UnixMicro(), configVersion)
-		if err != nil {
-			return err
-		}
-		n, err := r.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n != 1 {
-			return llm.ErrConflict
-		}
-		if err := enqueue(ctx, tx, "model_profile.activated", id, profileVersion+1); err != nil {
-			return err
-		}
-		var agentID string
-		if err := tx.QueryRowContext(ctx, `SELECT agent_id FROM agent_config WHERE singleton=1`).Scan(&agentID); err != nil {
-			return err
-		}
-		return enqueue(ctx, tx, "agent.model_selected", agentID, configVersion+1)
+		return selectAgentModel(ctx, tx, id, profileVersion, configVersion)
 	})
 }

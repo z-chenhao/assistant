@@ -623,6 +623,17 @@ def feishu_artifact_reviews(binary, report):
             h.cleanup()
 
 
+def sending_feedback(binary,evidence,report):
+    with tempfile.TemporaryDirectory(prefix='steward-send-feedback-') as temp, Sandbox() as platform:
+        h=ChannelHarness(binary,Path(temp),platform)
+        try:
+            h.setup();h.start();h.browser(evidence.parent/'sending-ui','send-feedback')
+            h.wait(lambda state:len(state['inputs'])==2 and len(state['deliveries'])==2 and all(row['status']=='sent' for row in state['deliveries']),'two optimistic sends admitted once')
+            report['scenarios']['sending-feedback']=json.loads((evidence.parent/'sending-ui/sending.json').read_text())
+            report['checks'].append('Composer: immediate safe outgoing bubble, white-on-orange contrast, next draft/file retained, authoritative lost-ack reconciliation, exact retry identity and animation without visible loading text')
+        finally:h.cleanup()
+
+
 def live_updates(binary,evidence,report):
     """Drive the existing long-text UI scenario without summarizing its markers."""
     with tempfile.TemporaryDirectory(prefix='steward-channel-live-') as temp, Sandbox() as platform:
@@ -742,6 +753,7 @@ def run(binary,evidence):
             h.stop()
         finally:h.cleanup()
 
+    sending_feedback(binary,evidence,report)
     live_updates(binary,evidence,report)
     streaming_replies(binary,evidence,report)
 
@@ -804,7 +816,7 @@ def page_transitions(binary, evidence, report):
             output = evidence.parent / 'page-transitions-ui'
             h.browser(output, 'page-transitions')
             report['scenarios']['page-transitions'] = json.loads((output / 'page-transitions.json').read_text())
-            report['checks'].append('Page transitions: bilingual light/dark Resources sizing and titles, persisted collapse across modules, stable pre-bundle layout, failed-bundle native fallback and explicit notification save feedback')
+            report['checks'].append('Page transitions: cached critical fonts without fallback frames, bilingual light/dark Resources sizing, persisted collapse, stable pre-bundle layout, native fallback, explicit notification save and pointer/keyboard composer focus without an outer frame')
         finally:
             h.cleanup()
 
@@ -894,7 +906,7 @@ def database_inspection(binary, evidence, report):
                 require(len(items)==len({item['ref'] for item in items}), 'metadata continuation repeated a record')
                 for item in items:
                     exact = h.http('/api/developer/database?' + urlencode(dict(collection=collection, ref=item['ref'])))
-                    require(exact['items']==[item], 'exact metadata lookup changed the record')
+                    require(exact['items']==[item], 'exact metadata lookup changed the record: '+json.dumps(dict(collection=collection,listed=item,exact=exact['items'])))
                 pages[collection] = dict(items=items, first_next=first_next)
             require(len(pages['messages']['items'])>20 and len(pages['executions']['items'])>=3, 'real metadata fixtures did not exercise paging and execution relationships')
             require(any(item['links'] for item in pages['memories']['items']), 'encrypted Memory lost its real source relationship')
@@ -1292,14 +1304,15 @@ def rich_replies(binary, evidence, report):
                                   model_id='fixture-model', context_window=32768, max_output_tokens=4096,
                                   generation_defaults={}, compatibility=dict(tool_result_format='openai'),
                                   capabilities=dict(text_input=True)))
-            result = dict(title="Trip comparison",
-                          fallback='Compare A and B. A contains literal markup; B has value 42. Two sources reviewed. Which city and date? Add any travel notes.',
-                          components=[
-                              dict(type='table', columns=['Option', 'Result'], rows=[['A', '<img src=x onerror=alert(1)>'], ['B', '42']]),
-                              dict(type='progress', status='In progress', text='Two sources reviewed.'),
-                              dict(type='form', text='Where and when should we travel?', fields=[dict(name='city', label='Destination', value=''), dict(name='date', label='Travel date', value='')]),
-                              dict(type='form', text='What else should we know?', fields=[dict(name='notes', label='Travel notes', value='')]),
-                          ])
+            result = dict(title="Trip comparison", fallback='Compare A and B. A contains literal markup; B has value 42. Choose a review time.', components=[
+                dict(name='Table',props=dict(title='Trip comparison',columns=['Option','Result'],rows=[['A','<img src=x onerror=alert(1)>'],['B','42']],source='User-provided fixture values')),
+                dict(name='barChart',props=dict(title='Values',description='User-provided fixture values',data=[dict(label='A',value=10),dict(label='B',value=42)])),
+                dict(name='pieChart',props=dict(title='Shares',description='User-provided fixture values',data=[dict(label='A',value=10),dict(label='B',value=42)])),
+                dict(name='plan_visualization',props=dict(approach='Compare the supplied values.',technology='Native components',key_elements=['Table','Charts'])),
+                dict(name='scheduleTime',props=dict(reasonForScheduling='Review the comparison',meetingDuration=30,timeSlots=[dict(date='2026-12-01',time='10:00'),dict(date='2026-12-02',time='14:00')])),
+                dict(name='scheduleTime',props=dict(reasonForScheduling='Follow-up review',meetingDuration=15,timeSlots=[dict(date='2026-12-03',time='10:00'),dict(date='2026-12-04',time='14:00')])),
+            ])
+            result['components'].append(dict(name='generateSandboxedUi',props=dict(initialHeight=160,placeholderMessages=[],css='',html='<label>Scenario level <input id="level" type="range" min="0" max="100" value="20"></label><output id="level-value">20</output>',jsFunctions='function initialize(){document.querySelector("#level").addEventListener("input",e=>document.querySelector("#level-value").textContent=e.target.value)}',jsExpressions=['initialize()'])))
             server.widgets=[result];server.mode='intelligent-ui'
             h.start()
             h.wait_state(lambda status:status['readiness']=='ready','native UI runtime readiness',lambda _:h.http('/api/status'))
@@ -1311,8 +1324,8 @@ def rich_replies(binary, evidence, report):
             projection = json.loads(initial['projections'][0]['spec_json'])
             (evidence.parent / 'rich-generation.json').write_text(json.dumps(dict(history=history, projection=projection, failure_state=h.failure_state()), ensure_ascii=False, indent=2) + '\n')
             kinds = [c['type'] for c in projection['components']]
-            require([kind for kind in kinds if kind!='markdown'] == ['table', 'progress', 'form', 'form'], f'ordinary reply did not generate controlled components: {kinds!r}')
-            forms = [c for c in projection['components'] if c['type'] == 'form']
+            require([kind for kind in kinds if kind!='markdown'] == ['openintelligentui']*6+['widget'], f'ordinary reply did not generate controlled components: {kinds!r}')
+            forms = [c for c in projection['components'] if c.get('name') == 'scheduleTime']
             require(all(c['message_id'] == message['message_id'] and len(c['form_id']) == 64 for c in forms), 'forms not bound to the actual reply')
             h.browser(evidence.parent / 'channels-ui', 'rich-replies')
             settled = h.wait(lambda s: len(s['inputs']) == 3 and len(s['deliveries']) == 3 and
@@ -1321,17 +1334,17 @@ def rich_replies(binary, evidence, report):
             require(not settled['approvals'], 'answering a form created an approval')
             h.stop(kill=True); h.start()
             h.wait_state(lambda status:status['readiness']=='ready','restored UI runtime ready',lambda _:h.http('/api/status'))
-            data = dict(message_id=message['message_id'], form_id=forms[0]['form_id'], **{'field.city': '上海', 'field.date': '2026-12-01'})
+            data = dict(message_id=message['message_id'], form_id=forms[0]['form_id'], **{'field.choice':'0'})
             headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
             def retry(_):
                 return h.http('/ui/form', urlencode(data).encode(), headers=headers)
             with ThreadPoolExecutor(max_workers=6) as pool:
                 receipts = list(pool.map(retry, range(6)))
             require(len({v['message_id'] for v in receipts}) == 1, 'form retries created different inputs')
-            native_retry = dict(message_id=message['message_id'],form_id=forms[1]['form_id'],**{'field.notes':'Native browser answer\nSecond line'})
+            native_retry = dict(message_id=message['message_id'],form_id=forms[1]['form_id'],**{'field.choice':'decline'})
             native_receipt = h.http('/ui/form',urlencode(native_retry).encode(),headers=headers)
             require(native_receipt['accepted'], 'native multiline answer conflicted with a JavaScript-style retry')
-            changed = dict(data, **{'field.city': 'Changed after acceptance'})
+            changed = dict(data, **{'field.choice':'1'})
             h.http('/ui/form', urlencode(changed).encode(), headers=headers, expected=409)
             forged = dict(data, message_id=history[0]['message_id'])
             h.http('/ui/form', urlencode(forged).encode(), headers=headers, expected=409)
@@ -1346,7 +1359,7 @@ def rich_replies(binary, evidence, report):
             # GET recovers submitted values from ingress, without changing the
             # immutable delivery projection or manufacturing form acceptance.
             page = h.http('/')
-            require('data-submitted="true"' in page and '上海' in page and 'Native browser answer' in page, 'accepted answers were lost after restart')
+            require('data-submitted="true"' in page and 'Time preference saved.' in page, 'accepted answers were lost after restart')
             with Terminal(h.args('tui'), h.env, h.root) as terminal:
                 terminal.expect('Steward: idle'); terminal.send('/history')
                 terminal.expect('Compare A and B.')
@@ -1354,7 +1367,7 @@ def rich_replies(binary, evidence, report):
             report['scenarios']['rich-replies'] = dict(state=after, message_id=message['message_id'], projection=projection,
                                                        form_reply_id=receipts[0]['message_id'], concurrent_retries=6,
                                                        no_projection_injection=True, terminal_fallback=True)
-            report['checks'].append('F-021: Main uses Code Mode and intelligent_ui Skill/UI tool to generate tables/progress/forms; browser checks escaped cells, lost-response recovery and preserved sibling draft; native form works without JavaScript; restart/concurrent retries admit each answer once; forged fields/actions/access are rejected')
+            report['checks'].append('F-021: Main presents OpenIntelligentUI Table, barChart, pieChart, plan_visualization and scheduleTime; browser checks native charts, escaped cells, lost-response recovery and preserved conversation draft; native time selection works without JavaScript; restart/concurrent retries admit each answer once; forged fields/actions/access are rejected')
             h.stop()
         finally:
             h.cleanup();server.shutdown();server.server_close();thread.join()
@@ -1384,8 +1397,10 @@ def native_components(binary, evidence, report):
             h.callback('unknown-version','Keep the original text for an unknown version.')
             h.wait(lambda s:len(s['deliveries'])==5,'unknown version semantic reply')
             messages=[m for m in h.http('/api/conversation') if m['role']=='assistant']
+            artifact=h.command('artifact','save','markdown-test.html','text/html',text='<h1>Downloaded artifact</h1>')
+            markdown='**Markdown rendered**\n\n[Download game]('+artifact['artifact_ref']+')\n\n[Unsafe](javascript:alert(1))\n\n<img src=x onerror=alert(1)>\n\n```mermaid\nflowchart LR\n  A[Request] --> B[Worker]\n```'
             specs=[
-                dict(schema_version=1,fallback='Native table semantic fallback',components=[dict(type='table',columns=['Option','Result'],rows=[['A','<img src=x onerror=alert(1)>'],['B','Exact value: 42']])]),
+                dict(schema_version=1,fallback='Native table semantic fallback',components=[dict(type='openintelligentui',name='Table',props=dict(title='Native comparison',columns=['Option','Result'],rows=[['A','<img src=x onerror=alert(1)>'],['B','Exact value: 42']],source='User-provided fixture')),dict(type='markdown',text=markdown)]),
                 dict(schema_version=1,fallback='Unknown component semantic fallback',components=[dict(type='react',text='<script>alert(1)</script>')]),
                 dict(schema_version=1,fallback='Invalid table semantic fallback',components=[dict(type='table',columns=['One'],rows=[['too','many']])]),
                 dict(schema_version=1,fallback='Untrusted projection fallback',components=[]),
@@ -1649,9 +1664,9 @@ def account_presentation(binary, browser_evidence, report):
                 h.http('/model/add',urlencode(dict(account=aid,model='hidden-model')).encode(),headers=form,expected=409)
                 h.http('/model/add',urlencode(dict(account=aid,model='fixture-account-model')).encode(),headers=form)
                 profile=h.command('model','list')[0]
-                h.http('/model/test',urlencode(dict(profile=profile['profile_id'])).encode(),headers=form)
-                h.http('/model/select',urlencode(dict(profile=profile['profile_id'],profile_version=profile['version'],config_version=1,consent='yes')).encode(),headers=form)
                 require(h.http('/api/status')['readiness']=='ready','Web account profile unavailable')
+                with urlopen(endpoint+'/fixture/stats',timeout=10) as response:
+                    require(json.load(response)['generations']==0,'account connection sent unnecessary test generations')
                 detail = '/settings/models/' + profile['profile_id']
                 add_page = '/settings/models/new?provider=chatgpt'
                 require('Choose an account model' not in h.http(detail), 'add-model sign-in result appeared on existing model')
@@ -1697,18 +1712,19 @@ def account_presentation(binary, browser_evidence, report):
                     require(response.status == 200, 'OAuth reconnect callback rejected')
                 h.wait_state(lambda s: s.get('account_id') == aid and s['status'] == 'connected',
                              'Web account reconnect completes', lambda _: h.http('/api/auth'))
-                require('Test connection' in h.http(resources) and 'Use for new work' not in h.http(resources),
-                        'current model needs another selection after reconnect')
+                require('Test connection' not in h.http(resources) and 'Use model' in h.http(resources),
+                        'account reconnect requires an unnecessary connection test')
                 restored_profile = h.command('model','list')[0]
                 restore = dict(profile=profile['profile_id'], restore_current='yes',
                                profile_version=restored_profile['version'],
                                config_version=h.http('/api/status')['config_version'])
-                h.http('/model/test', urlencode(restore).encode(), headers=form)
+                restore['consent']='yes'
+                h.http('/model/select', urlencode(restore).encode(), headers=form)
                 restored = h.http('/api/status')
                 require(restored['readiness'] == 'ready' and restored['active_model_profile_id'] == profile['profile_id'],
-                        'testing did not restore the existing selection')
+                        'account selection did not restore the existing model')
                 restored_page = h.http(resources)
-                require('Connection verified' in restored_page and 'Test connection' not in restored_page and 'Use for new work' not in restored_page,
+                require('Current model' in restored_page and 'Test connection' not in restored_page and 'Use model' not in restored_page,
                         'restored model still exposes replaced actions')
                 h.browser(browser_evidence/'signout','settings-account')
                 with server.lock:
@@ -1716,7 +1732,7 @@ def account_presentation(binary, browser_evidence, report):
                 for path in (root/'data').rglob('*'):
                     if path.is_file():require(all(value not in path.read_bytes() for value in sensitive),'credential persisted outside SecretStore')
                 report['scenarios']['account-auth']=dict(status='connected_then_logged_out',abandoned_login_recovered=True,event_kinds=[e['kind'] for e in pending['events']],profile_id=profile['profile_id'],credential_scan='clean')
-                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; direct popup and manual fallback, cancel without callback, fresh authorization on retry, hidden-model rejection, actual Probe/Select, reconnect page and live update scoping, restart picker, sign-out confirmation and credential scan verified')
+                report['checks'].append('Web account login uses real Manager/Bridge against owned OAuth Fake; direct popup and manual fallback, cancel without callback, fresh authorization on retry, hidden-model rejection, first connection activation without test inference, reconnect page and live update scoping, restart picker, sign-out confirmation and credential scan verified')
                 h.stop()
             finally:
                 h.cleanup();server.shutdown();server.server_close();thread.join(timeout=10)
@@ -1755,6 +1771,7 @@ if __name__=='__main__':
         elif args.attention_only:
             attention_workspace(args.binary.resolve(),args.evidence.resolve(),report)
         elif args.ui_components_only:
+            sending_feedback(args.binary.resolve(),args.evidence.resolve(),report)
             early_composer(args.binary.resolve(),args.evidence.resolve(),report)
             native_components(args.binary.resolve(),args.evidence.resolve(),report)
             rich_replies(args.binary.resolve(),args.evidence.resolve(),report)

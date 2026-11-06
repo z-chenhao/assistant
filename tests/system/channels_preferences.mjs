@@ -1,3 +1,4 @@
+import {selectValue,selectParts} from './channels_controls.mjs';
 // Maintained channels scenario against the real Web server. Routes below inject
 // transport failures only; successful saves exercise the actual cookie handler.
 import {writeFile} from 'node:fs/promises';
@@ -11,7 +12,7 @@ export async function preferences(page,context,browser,url,evidence){
  const hoverPaths=[];
  const hoverHelp=async(p,state)=>{
   // Keep focus elsewhere: focus/pinning must not conceal a broken hover path.
-  await p.locator('#interface-theme').focus();
+  await p.locator('#interface-theme-picker').focus();
   await p.mouse.move(p.viewportSize().width-2,p.viewportSize().height-2);
   await help(p).hover();const tip=p.getByRole('tooltip');await tip.waitFor();
   const control=await help(p).boundingBox(),tooltip=await tip.boundingBox();
@@ -62,6 +63,7 @@ export async function preferences(page,context,browser,url,evidence){
   return result;
  };
  const popupBounds=async p=>{
+  await popup(p).waitFor({state:'visible'});
   const box=await popup(p).boundingBox(),control=await trigger(p).boundingBox();
   const viewport=p.viewportSize();
   if(!box||box.x<0||box.x+box.width>viewport.width+1||box.y<0||box.y+box.height>viewport.height+1||Math.abs(box.x+box.width-control.x-control.width)>1)throw Error('popup outside viewport or not right aligned: '+JSON.stringify({box,control}));
@@ -83,7 +85,7 @@ export async function preferences(page,context,browser,url,evidence){
    if(await page.locator('.preference-group').evaluate(n=>n.getBoundingClientRect().height)!==height)throw Error('popup shifted row');
    if(await popup(page).locator('[aria-selected=true]').getAttribute('data-language-option')!==language)throw Error('selected option lost');
    await page.screenshot({path:`${evidence}/preferences-${language}-${theme}-${width}-open.png`,fullPage:true});
-   await page.keyboard.press('Escape');await check(popup(page).isHidden(),'Escape did not close');
+   await page.keyboard.press('Escape');await popup(page).waitFor({state:'hidden'});
    matrix.push({language,theme,width,...geometry,popup:box});
    await hoverHelp(page,`${language}-${theme}-${width}`);
   }
@@ -96,15 +98,16 @@ export async function preferences(page,context,browser,url,evidence){
  await page.keyboard.press('Escape');await check(page.getByRole('tooltip').isHidden(),'help Escape failed');
  await trigger(page).focus();await page.keyboard.press('Enter');
  await check(page.getByRole('tooltip').isHidden(),'list and help both open');
- await page.keyboard.press('End');await check(trigger(page).getAttribute('aria-activedescendant').then(v=>v==='language-option-zh-CN'),'End did not browse');
- await page.keyboard.press('Home');await check(trigger(page).getAttribute('aria-activedescendant').then(v=>v==='language-option-en'),'Home did not browse');
+ await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));
+ await page.keyboard.press('End');await option(page,'zh-CN').and(page.locator('[data-highlighted]')).waitFor();
+ await page.keyboard.press('Home');await option(page,'en').and(page.locator('[data-highlighted]')).waitFor();
  await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');
- await trigger(page).click();await page.keyboard.press('End');await page.keyboard.press('Tab');
- await check(popup(page).isHidden(),'Tab did not cancel');
+ await trigger(page).click();await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));await page.keyboard.press('End');await page.keyboard.press('Tab');
+ await popup(page).waitFor({state:'hidden'});
  await trigger(page).click();await option(page,'en').click();
- await trigger(page).click();await page.mouse.click(380,700);await check(popup(page).isHidden(),'outside did not close');
+ await trigger(page).click();await page.mouse.click(380,700);await popup(page).waitFor({state:'hidden'});
  if(posts!==0)throw Error('browsing/cancelling/current selection posted');
- await trigger(page).focus();await page.keyboard.press('Space');await page.keyboard.press('End');await page.keyboard.press('Enter');
+ await trigger(page).focus();await page.keyboard.press('Space');await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));await page.keyboard.press('End');await page.keyboard.press('Enter');
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();await ready(page);
  await check(trigger(page).evaluate(n=>n===document.activeElement),'save did not restore focus');
  if(posts!==1)throw Error('keyboard confirmation did not save exactly once');
@@ -183,21 +186,20 @@ export async function preferences(page,context,browser,url,evidence){
   await touch.addCookies(await context.cookies());const mobile=await touch.newPage();await mobile.goto(url+'/settings/preferences');await ready(mobile);
   await help(mobile).tap();await mobile.getByRole('tooltip').waitFor();await trigger(mobile).tap();
   await check(mobile.getByRole('tooltip').isHidden(),'touch popup left help open');
-  await option(mobile,'en').tap();await check(popup(mobile).isHidden(),'touch current value failed');
+  await option(mobile,'en').tap();await popup(mobile).waitFor({state:'hidden'});
   await choose(mobile,'zh-CN');
  }finally{await touch.close()}
 
- // No JS, failed enhancement, and missing Popover API retain usable paths.
- for(const mode of ['no-script','initialization-failed','native-popup']){
+ // No JS and failed initialization retain the native form.
+ for(const mode of ['no-script','initialization-failed']){
   const fallbackContext=await browser.newContext({javaScriptEnabled:mode!=='no-script',viewport:{width:320,height:740}});
   try{
    await fallbackContext.addCookies(await context.cookies());
    if(mode==='initialization-failed')await fallbackContext.addInitScript(()=>{window.fetch=undefined});
-   if(mode==='native-popup')await fallbackContext.addInitScript(()=>{HTMLElement.prototype.showPopover=undefined});
    const fallback=await fallbackContext.newPage();await fallback.goto(url+'/settings/preferences');
    await fallback.locator('#interface-language').waitFor();
    await fallback.locator('#interface-language').selectOption('zh-CN');
-   if(mode!=='native-popup')await fallback.locator('.preference-save').click();
+   await fallback.locator('.preference-save').click();
    await fallback.waitForURL(u=>u.searchParams.get('notice')==='language-saved');await fallback.waitForLoadState();
    await check(fallback.locator('html').getAttribute('lang').then(v=>v==='zh-CN'),mode+' save did not persist');
    await fallback.screenshot({path:evidence+'/preferences-'+mode+'.png',fullPage:true});
@@ -223,9 +225,9 @@ export async function preferences(page,context,browser,url,evidence){
     await page.waitForURL(u=>u.pathname==='/settings/notifications'&&u.searchParams.get('notice')==='saved');
     await page.waitForLoadState();
    };
-   await page.locator('select[name=target]').selectOption('tui:');await save();await page.reload();
+   await selectValue(page,page.locator('select[name=target]'),'tui:');await save();await page.reload();
    await check(page.locator('select[name=target]').inputValue().then(v=>v==='tui:'),'neighbor submit guard regressed');
-   await page.locator('select[name=target]').selectOption('auto:');await save();
+   await selectValue(page,page.locator('select[name=target]'),'auto:');await save();
   }
  }
  await writeFile(evidence+'/preferences-browser.json',JSON.stringify({matrix,hoverPaths,keyboard:true,touch:true,autosave:true,singleFlight:true,rejectedRetry:true,unknownAppliedReadback:true,network:true,timeout:true,authRejection:true,mismatchedAck:true,blockedCookieReadback:true,bfcache:true,fallbacks:true,flipped:true,cssZoom:2,neighborSections:true},null,2));

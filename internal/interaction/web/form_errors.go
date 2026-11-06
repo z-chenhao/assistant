@@ -135,7 +135,6 @@ func (s *Server) postFailure(w http.ResponseWriter, r *http.Request, cause error
 	if p.Settings != nil && p.Settings.Section == "new" {
 		p.Settings.Model = r.FormValue("model")
 		p.Settings.Name = r.FormValue("name")
-		p.Settings.ImageInput = r.FormValue("image_input") == "yes"
 		if endpoint, err := url.Parse(r.FormValue("endpoint")); err == nil && endpoint.User == nil && endpoint.RawQuery == "" && endpoint.Fragment == "" {
 			p.Settings.Endpoint = endpoint.String()
 		}

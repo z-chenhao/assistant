@@ -135,17 +135,17 @@ func fence(ctx context.Context, tx *sql.Tx, c agent.RunClaim) error {
 }
 
 func (r *Runs) Submit(ctx context.Context, key string, parts []conversation.ContentPart) (agent.Receipt, error) {
-	return r.submit(ctx, key, parts, nil, "")
+	return r.submit(ctx, key, parts, nil, "", nil)
 }
 
 func (r *Runs) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
 	if err := e.Validate(); err != nil {
 		return agent.Receipt{}, err
 	}
-	return r.submit(ctx, "", e.Content, &e, "")
+	return r.submit(ctx, "", e.Content, &e, "", nil)
 }
 
-func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent, feedbackRef string) (agent.Receipt, error) {
+func (r *Runs) submit(ctx context.Context, key string, parts []conversation.ContentPart, inbound *interaction.InboundEvent, feedbackRef string, uiAction *uiActionInput) (agent.Receipt, error) {
 	parts, err := conversation.Normalize(parts)
 	if err != nil {
 		return agent.Receipt{}, err
@@ -193,6 +193,12 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 			var message conversation.Message
 			if json.Unmarshal([]byte(old), &message) != nil {
 				return agent.ErrStorage
+			}
+			if uiAction != nil {
+				var priorRef, priorSource, priorTool, priorDefinition string
+				if err := tx.QueryRowContext(ctx, `SELECT component_ref,source_id,tool_name,definition_hash FROM ui_action_request WHERE message_id=?`, receipt.MessageID).Scan(&priorRef, &priorSource, &priorTool, &priorDefinition); err != nil || priorRef != uiAction.Ref || priorSource != uiAction.Source || priorTool != uiAction.Action.Tool || priorDefinition != uiAction.DefinitionHash {
+					return conversation.ErrConflict
+				}
 			}
 			prior, _ := encoded(message.Content)
 			if prior != content {
@@ -246,6 +252,11 @@ func (r *Runs) submit(ctx context.Context, key string, parts []conversation.Cont
 		raw, _ := encoded(message)
 		if _, err = tx.ExecContext(ctx, `INSERT INTO main_input(agent_id,request_key,run_id,message_id,message_json) VALUES(?,?,?,?,?)`, agentID, key, receipt.RunID, receipt.MessageID, raw); err != nil {
 			return err
+		}
+		if inbound != nil && inbound.Channel == "web" {
+			if err = r.freezeUIInput(ctx, tx, receipt.MessageID, uiAction); err != nil {
+				return err
+			}
 		}
 		if _, err = tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, receipt.MessageID, raw); err != nil {
 			return err
@@ -550,6 +561,12 @@ func (r *Runs) Steering(ctx context.Context, c agent.RunClaim, after int64) ([]a
 	if run.Kind == "worker" {
 		return r.taskSteering(ctx, c, after)
 	}
+	// New Main Runs own one user turn until its reply/hand-off receipt commits.
+	// Reading an input is not completing it. Later requests stay in the durable
+	// inbox instead of replacing a request during tool discovery or delegation.
+	if run.Checkpoint.SerialInputs && after > run.Checkpoint.RepliedInputSequence {
+		return nil, nil
+	}
 	if err := r.Flush(ctx); err != nil {
 		return nil, err
 	}
@@ -571,7 +588,11 @@ func (r *Runs) Steering(ctx context.Context, c agent.RunClaim, after int64) ([]a
 		if frozen > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.message_json FROM main_input i JOIN conversation_intent c USING(message_id) WHERE i.run_id=? AND i.sequence>? AND c.flushed=1 ORDER BY i.sequence`, c.RunID(), after)
+		query := `SELECT i.sequence,i.message_json FROM main_input i JOIN conversation_intent c USING(message_id) WHERE i.run_id=? AND i.sequence>? AND c.flushed=1 ORDER BY i.sequence`
+		if run.Checkpoint.SerialInputs {
+			query += ` LIMIT 1`
+		}
+		rows, err := tx.QueryContext(ctx, query, c.RunID(), after)
 		if err != nil {
 			return err
 		}
@@ -589,6 +610,19 @@ func (r *Runs) Steering(ctx context.Context, c agent.RunClaim, after int64) ([]a
 		rows.Close()
 		if err != nil {
 			return err
+		}
+		for index := range inputs {
+			var contextJSON string
+			err := tx.QueryRowContext(ctx, `SELECT context_json FROM main_ui_context WHERE message_id=?`, inputs[index].Message.MessageID).Scan(&contextJSON)
+			if err != nil && err != sql.ErrNoRows {
+				return err
+			}
+			if err == nil && json.Unmarshal([]byte(contextJSON), &inputs[index].Context) != nil {
+				return agent.ErrStorage
+			}
+			if _, err = tx.ExecContext(ctx, `UPDATE ui_action_request SET step_floor=coalesce(step_floor,?) WHERE message_id=?`, run.Checkpoint.Step, inputs[index].Message.MessageID); err != nil {
+				return err
+			}
 		}
 		if len(inputs) > 0 {
 			var generations int

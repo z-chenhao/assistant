@@ -56,3 +56,5 @@ Preferences 使用局部 `.preference-group` 与 `.preference-row` 组织单层�
 
 
 公共导航与设置控件规则以根目录 [design.md](../../design.md) 为准。一级侧栏保留 Chat、Tasks、Developer，Settings 固定左下；外观与头像动效统一在 Preferences 调整。
+
+favicon 使用现有 atlas 首帧导出的两份 PNG，首屏 appearance 脚本与后续主题 class 变化同步更新 link[rel=icon]；不重新绘制品牌资源。

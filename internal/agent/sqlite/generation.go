@@ -245,7 +245,7 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM main_input WHERE run_id=? AND sequence>?`, run.ID, run.Checkpoint.InputSequence).Scan(&count); err != nil {
 			return err
 		}
-		if count > 0 {
+		if count > 0 && !run.Checkpoint.SerialInputs {
 			return nil
 		}
 		var version int64
@@ -293,6 +293,9 @@ func (r *Runs) PrepareReply(ctx context.Context, c agent.RunClaim, run agent.Run
 		}
 		raw, _ := encoded(message)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO main_reply VALUES(?,?,?,?)`, run.Checkpoint.ExchangeID, run.ID, messageID, deliveryID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE ui_action_request SET step_ceiling=?,reply_message_id=? WHERE message_id=(SELECT message_id FROM main_input WHERE run_id=? AND sequence=?)`, run.Checkpoint.Step, messageID, run.ID, run.Checkpoint.InputSequence); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO conversation_intent(message_id,message_json) VALUES(?,?)`, messageID, raw); err != nil {
@@ -351,6 +354,9 @@ func (r *Runs) DeliverReply(ctx context.Context, c agent.RunClaim, run agent.Run
 			return err
 		}
 		cp := run.Checkpoint
+		if cp.SerialInputs {
+			cp.RepliedInputSequence = cp.InputSequence
+		}
 		cp.Step++
 		cp.Phase = "settle"
 		cp.ExchangeID = ""

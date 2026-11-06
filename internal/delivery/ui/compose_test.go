@@ -20,10 +20,10 @@ func nativeSpec(t *testing.T, components []Component) Spec {
 	return Spec{SchemaVersion: Version, Fallback: w.Fallback, Components: WidgetComponents(w, "ui:fixture", "reply:one", 0)}
 }
 func TestUIWidgetValidatesNativeComponentsAndEscapesCells(t *testing.T) {
-	s := nativeSpec(t, []Component{{Type: "table", Columns: []string{"Option"}, Rows: [][]string{{"<script>safe text</script>"}}}, {Type: "form", Text: "Question", Fields: []Field{{Name: "city", Label: "City"}}}})
+	s := nativeSpec(t, []Component{{Name: "Table", Props: json.RawMessage(`{"title":"Test","columns":["Option"],"rows":[["<script>safe text</script>"]],"source":"User"}`)}})
 	raw, _ := json.Marshal(s)
 	html := string(HTML(raw, s.Fallback))
-	if !strings.Contains(html, "&lt;script&gt;safe text&lt;/script&gt;") || strings.Contains(html, "<script>") || !strings.Contains(html, `action="/ui/form"`) {
+	if !strings.Contains(html, "&lt;script&gt;safe text&lt;/script&gt;") || strings.Contains(html, "<script>") {
 		t.Fatal(html)
 	}
 	for _, c := range []Component{{Type: "confirmation", ApprovalID: "forged", Hash: strings.Repeat("a", 64)}, {Type: "artifact", ArtifactRef: "artifact:unknown"}, {Type: "table", Columns: []string{"A"}, Rows: [][]string{{"too", "many"}}}, {Type: "form", Text: "Q", MessageID: "forged", Fields: []Field{{Name: "a", Label: "A"}}}} {
@@ -51,7 +51,7 @@ func TestNativeAndCustomWidgetRoutesCannotMix(t *testing.T) {
 
 func TestFormAnswersBindToFieldsAndRestoreWithoutApprovingActions(t *testing.T) {
 	m := conversation.Message{MessageID: "reply:one", Role: "assistant"}
-	s := nativeSpec(t, []Component{{Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}, {Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}})
+	s := legacySpec(t, []Component{{Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}, {Type: "form", Text: "Choose a trip", Fields: []Field{{Name: "city", Label: "City"}, {Name: "date", Label: "Date"}}}})
 	if s.Components[0].FormID == s.Components[1].FormID {
 		t.Fatal("distinct forms share an admission key")
 	}
@@ -91,4 +91,11 @@ func TestFormAnswersBindToFieldsAndRestoreWithoutApprovingActions(t *testing.T) 
 	if !reflect.DeepEqual(s.Components[0].Fields[0].Value, "") {
 		t.Fatal("projection mutated while answering")
 	}
+}
+
+// Frozen historical forms remain replayable; the new tool cannot create them.
+func legacySpec(t *testing.T, components []Component) Spec {
+	t.Helper()
+	w := Widget{Title: "Legacy", Fallback: "Historical form", Components: components}
+	return Spec{SchemaVersion: Version, Fallback: w.Fallback, Components: WidgetComponents(w, "ui:fixture", "reply:one", 0)}
 }

@@ -18,7 +18,7 @@ Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果�
 
 **需求**：Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果。
 
-**当前实现**：Main 和 Worker 统一使用 Node/QuickJS Sidecar，支持嵌套调用、Store、固定源重放和等待释放；模型只声明 Code Mode，脚本权限仍由各角色冻结能力决定。
+**当前实现**：Main 和 Worker 统一使用 Node/QuickJS Sidecar，支持嵌套调用、Store、固定源重放和等待释放；模型直接声明 Code Mode 与少量高频发现、Skill、UI 和 Main 任务协调工具，其余工具经 Code Mode 调用；权限仍由各角色冻结能力决定。
 
 **边界与剩余工作**：运行时不提供任意网络、文件、凭据或不可重放时间随机源；不是通用 shell。
 

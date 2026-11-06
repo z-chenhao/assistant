@@ -136,6 +136,7 @@ func (l *agentLoop) modelTurn(r Run) (bool, error) {
 	}
 	if len(inputs) > 0 {
 		for _, input := range inputs {
+			cp.Messages = append(cp.Messages, input.Context...)
 			cp.Messages = append(cp.Messages, AgentMessage{MessageID: input.Message.MessageID, Type: "user", Content: input.Message.Content})
 			cp.InputSequence = input.Sequence
 		}

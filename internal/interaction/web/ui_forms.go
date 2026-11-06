@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -24,11 +25,23 @@ func (s *Server) respondUIForm(w http.ResponseWriter, r *http.Request) error {
 	}
 	values := map[string]string{}
 	for key, items := range r.PostForm {
-		if len(items) != 1 {
+		if len(items) != 1 && !strings.HasSuffix(key, "[]") {
 			return conversation.ErrInvalid
 		}
 		if name, ok := strings.CutPrefix(key, "field."); ok {
-			values[name] = items[0]
+			if strings.HasSuffix(name, "[]") {
+				name = strings.TrimSuffix(name, "[]")
+				if _, exists := values[name]; exists {
+					return conversation.ErrInvalid
+				}
+				raw, _ := json.Marshal(items)
+				values[name] = string(raw)
+			} else {
+				if _, exists := values[name]; exists {
+					return conversation.ErrInvalid
+				}
+				values[name] = items[0]
+			}
 		} else if key != "message_id" && key != "form_id" {
 			return conversation.ErrInvalid
 		}

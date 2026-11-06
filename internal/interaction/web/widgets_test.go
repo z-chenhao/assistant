@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -12,7 +13,8 @@ import (
 type widgetCore struct{ identityCore }
 
 func (widgetCore) WebWidget(context.Context, string) (ui.Widget, error) {
-	return ui.Widget{Title: "Visual", Fallback: "Preserved text.", HTML: "<p>Visual</p>", CSS: "</style><script>window.earlyRTC=window.RTCPeerConnection</script><style>"}, nil
+	props, _ := json.Marshal(ui.SandboxedUI{InitialHeight: 200, JSExpressions: []string{}, PlaceholderMessages: []string{}, HTML: "<p>Visual</p>", CSS: "</style><script>window.earlyRTC=window.RTCPeerConnection</script><style>"})
+	return ui.Widget{Title: "Visual", Fallback: "Preserved text.", Components: []ui.Component{{Name: "generateSandboxedUi", Props: props}}}, nil
 }
 
 func TestWidgetBootstrapPrecedesGeneratedCodeAndDirectNavigationUsesText(t *testing.T) {

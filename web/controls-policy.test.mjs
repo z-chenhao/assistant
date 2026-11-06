@@ -29,10 +29,10 @@ test('native values, switch consumers, comments and prose remain valid',()=>{
  assert.deepEqual(controlViolations(page,'// menu.showPopover();\nconst note="showPopover";\nconst form=<><select name="frequency"/><input type="checkbox" role="switch"/></>;'),[]);
  assert.deepEqual(controlViolations('internal/interaction/web/templates/schedule-editor.html','<select name="frequency"><option>Weekly</option></select><input type="checkbox" role="switch">'),[]);
 });
-test('new templates use native selects; the established language fallback is allowed',()=>{
+test('all server templates use native selects, including language fallback',()=>{
  const markup='<div role="listbox"><div role="option">English</div></div>';
  assert.equal(controlViolations('internal/interaction/web/templates/future.html',markup).length,2);
- assert.deepEqual(controlViolations('internal/interaction/web/templates/settings.html',markup),[]);
+ assert.equal(controlViolations('internal/interaction/web/templates/settings.html',markup).length,2);
 });
 for(const source of [
  'select { appearance:none }',

@@ -97,7 +97,7 @@ func responsesTools(tools []Tool) []any {
 		}
 	}
 	for _, name := range order {
-		out = append(out, map[string]any{"type": "namespace", "name": name, "description": "Steward tools", "tools": groups[name]})
+		out = append(out, map[string]any{"type": "namespace", "name": name, "description": "Tools in the " + name + " namespace.", "tools": groups[name]})
 	}
 	return out
 }

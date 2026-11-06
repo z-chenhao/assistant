@@ -99,7 +99,8 @@ func TestActivationLimitsDoNotRestrictDiagnosticMetadata(t *testing.T) {
 	}{
 		{"boundary", 1048576, 65536, true},
 		{"context", 1048577, 65536, false},
-		{"output", 1048576, 65537, false},
+		{"catalog-output", 272000, 128000, true},
+		{"full-context-output", 1048576, 1048576, true},
 		{"legacy", 2097152, 131072, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

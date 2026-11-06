@@ -10,7 +10,7 @@ F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让�
 
 F-031 提供 Developer → Observability 执行检查入口：按角色、状态和 UTC 时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；F-035/F-036 进一步统一为 Langfuse 式 Session/Trace/Observation 检查，支持真实 HTTP 尝试、恢复复用、输入输出、时间线和已有用量/费用。
 
-F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
+F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。Settings 复用版本化字体以避免切页闪跳；ChatGPT 目录模型不再要求连接测试，首个成功连接直接用于对话。Chat 点击发送立即出泡并保留后续草稿，Intelligent UI 与最终文字按顺序分泡；支持主题气泡、安全 Markdown、认证附件链接与 Mermaid；折叠导航保留图标，标签页 Ghost 跟随主题。能力配置自动校验保存，并提供 YAML 导入。全部长期密钥统一使用本地私有文件，移除系统钥匙串后端及配置入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
 
 F-041：产品品牌统一为 Steward，Agent 名为 Ghost。Web 使用非纯黑纯白的单色界面、Michroma 字标、Inter 操作字体和 Source Serif 4 回复正文；命令、配置、环境变量、存储与内部协议同步统一命名，不维护其他品牌的兼容入口。
 
@@ -34,12 +34,12 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | ID / 详情 | 需求 | 简要描述 | 是否完成 / 状态 |
 | --- | --- | --- | --- |
 | [F-001](features/model-connections.md#f-001) | 本地模型连接与选择 | 用户能连接 OpenAI-compatible 端点，测试后显式选择活动模型。模型协议由 Steward 内部 Go 适配层实现；生成分别限制等待响应头、响应流空闲和整轮耗时。 | 是 · 已完成 |
-| [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | ChatGPT 账户凭据默认保存在 Steward 私有文件中，可显式使用系统凭据库，支持登录、按需刷新、重新认证、退出和中断恢复，后台状态检查只读配置与账户元数据。 | 是 · 已完成 |
+| [F-002](features/model-connections.md#f-002) | ChatGPT 登录与跨平台凭据 | ChatGPT 账户凭据统一保存在 Steward 私有文件中，支持登录、按需刷新、重新认证、退出和中断恢复，后台状态检查只读配置与账户元数据。 | 是 · 已完成 |
 | [F-003](features/conversation.md#f-003) | 可恢复的 Main 对话 | 用户能连续对话、追问和纠正要求，慢操作期间仍可交代、查询和纠正工作。Main/Worker 系统提示统一按角色、安全、执行规则和能力指导拼为一条；Main 可通过 Code Mode 调用 MCP 和 Skill，复杂工作委派 Task Worker。 | 是 · 已完成 |
 | [F-004](features/tasks.md#f-004) | Task 生命周期与继续工作 | 支持显式 GitHub PR→已有 Task 关联，经 Main 有界接续并保留停止/隐私裁决；CLI/Web 与个人飞书具名问题、确切成果审阅接通，真实渠道与模型质量待验证。 | 否 · 部分完成 |
 | [F-005](features/tasks.md#f-005) | 执行中的有意义进度 | 用户主动查看时能了解当前阶段、摘要与子任务完成情况。 | 是 · 已完成 |
 | [F-006](features/delegation.md#f-006) | 可递归的 Child Worker | 复杂工作可由 Worker 拆成独立子任务，并由父级汇总。 | 是 · 已完成 |
-| [F-007](features/tools-approvals.md#f-007) | 工具、审批与未知副作用处理 | Main 与 Worker 统一 Code Mode 入口，脚本按角色冻结权限调用；MCP 不提供暴露模式，双方共用具体审批与恢复。 | 是 · 已完成 |
+| [F-007](features/tools-approvals.md#f-007) | 工具、审批与未知副作用处理 | Main 与 Worker 以 Code Mode 组合工具，直接声明少量高频工具，调用权限按角色冻结；MCP 不提供暴露模式，双方共用具体审批与恢复。 | 是 · 已完成 |
 | [F-008](features/codemode.md#f-008) | 可恢复的 JavaScript 编排 | Agent 能用标准 JavaScript 串联工具、处理并发并显式输出结果。 | 是 · 已完成 |
 | [F-009](features/memory-context.md#f-009) | 自动记忆形成与语义归并 | 后台从用户事实与反馈形成记忆，能处理纠正、重复和过时信息。 | 否 · 部分完成 |
 | [F-010](features/memory-context.md#f-010) | 按作用域召回记忆与对话 | Main/本机沿消息、Task、授权产物续读。本机另可精读当前 Memory、可见来源及 Task 已关联的确切 GitHub 观察。Main Memory 与更广外部导航待接通。 | 否 · 部分完成 |
@@ -53,7 +53,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-018](features/channels.md#f-018) | 基础 Web 工作台 | Steward 四入口本机工作台；默认免 token、对话、Worker 任务、审批提示、只读 Computer 预览与中英文界面；Enter 发送、Shift + Enter 换行及橙色发送按钮；Resources 按账户或直连来源分组，原位展开并切换模型，按需验证连接，工作待办定位问题、成果审阅、审批及任务故障。 | 是 · 已完成 |
 | [F-019](features/channels.md#f-019) | Web 实时状态与回复更新 | 模型生成时，Web 逐段显示 Main 回复；完成后展示正式消息。审批、状态更新和输入保留仍独立工作。 | 是 · 已完成 |
 | [F-020](features/channels.md#f-020) | 可维护的飞书交互与通知 | 个人原消息同步/Task 结果回复、具名问题及成果审阅卡、可选工作台成果链接与通知去重；显式 PR 接续复用原话题；真实平台验收仍待补，未知投递不盲目重发。 | 否 · 部分完成 |
-| [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | Main 经 Code Mode 的 intelligent_ui_show 与内建 Skill 生成原生组件和隔离 HTML 交互；持久回复、显式回传与文字替代共用原交付链路。 | 是 · 已完成 |
+| [F-021](features/intelligent-ui.md#f-021) | 富组件从生成到交互的闭环 | Main 经 intelligent_ui_show 与内建 Skill 复用 OpenIntelligentUI 原生组件，以 generateSandboxedUi 协议扩展 HTML/SVG、计算器和模拟；包含折线/散点、typed 表单、卡片和已声明动作扩展；状态 CAS、输入上下文快照、工具结果回传、筛选联动、导出与展开/弹窗/悬浮共用原交付链路，页面无功能介绍文案；组件以 shadcn 结构/Base UI 交互统一全局控件，保留 Steward 字体和页面布局。 | 是 · 已完成 |
 | [F-022](features/skills-experience.md#f-022) | 受版本控制的 Skill 读取 | Main 与 Worker 按名称或用途搜索冻结目录，按名称读取时由 Host 绑定版本，system 不预载 Skill 索引。 | 是 · 已完成 |
 | [F-023](features/skills-experience.md#f-023) | 执行后的自动经验闭环 | 用户纠正、恢复失败或重复成功能进入候选、验证和晋升流程。 | 否 · 部分完成 |
 | [F-024](features/integrations.md#f-024) | 受限本地 MCP 工具接入 | 操作员可接入允许的本地 stdio 工具；固定 Code Mode 调用、按工具或服务用途检索与 500 工具目录已接通，system 不预载 MCP Server 目录。 | 是 · 已完成 |
@@ -174,3 +174,5 @@ docs/test-plans/<feature>.md        验收场景、测试层级、已有入口�
 7. **保持边界**：跨功能契约维护在 designs 内，有效设计理由归所属技术方案，安装/操作/排障归入 features，统一测试与 CI 边界分别归入 test-plans/product 和 designs/engineering；不再保留独立 guides、ADR 或技术基线体系。真实模型效果评测仍遵循 [测试与评测边界](test-plans/product.md#testing-agent-evaluation)。
 
 复杂功能写独立场景矩阵；简单功能的测试方案可简短引用已有回归入口，无需为文档层级另建测试框架。
+
+Main 新建执行按输入逐条提交回复，Task Worker 独立运行；高频 Tool search、UI、Skill 与 Main Task 协调直接声明，其余工具保持按需 Code Mode 发现。旧冻结执行保持原有输入和工具面。

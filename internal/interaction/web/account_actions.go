@@ -8,7 +8,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
-const credentialStoreHelp = "The credential store is unavailable. Check your credential storage settings and try again."
+const credentialStoreHelp = "The credential files are unavailable. Check directory permissions and try again."
 
 func (s *Server) startLogin(r *http.Request) error {
 	if s.Accounts == nil {

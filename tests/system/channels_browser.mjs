@@ -1,5 +1,8 @@
+import {selectValue,selectParts} from './channels_controls.mjs';
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
+import {uiInteractions} from './channels_ui_interactions.mjs';
 import {capabilitySetup,capabilityDefaults,settingsAccount,pageTransitions} from './channels_capabilities.mjs';
+import {sendFeedback} from './channels_sending.mjs';
 import {databaseInspection} from './channels_database.mjs';
 import {preferences} from './channels_preferences.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
@@ -9,22 +12,22 @@ await mkdir(evidence,{recursive:true});
 const options={headless:true};
 if(process.env.STEWARD_BROWSER_EXECUTABLE)options.executablePath=process.env.STEWARD_BROWSER_EXECUTABLE;
 async function chooseSharedOption(page,control,label,value){
- const original=await control.inputValue();
- await control.click();
- const list=page.locator('[id="'+await control.getAttribute('aria-controls')+'"]');
- const popup=list.locator('xpath=..');
- await popup.getByRole('searchbox').fill('zz-no-result');
+ const{native,trigger}=await selectParts(control),original=await native.inputValue();
+ await trigger.click();
+ const list=page.getByRole('listbox',{name:'Options',exact:true}),popup=list.locator('xpath=..');
+ await popup.locator('input[type=search]').fill('zz-no-result');
  if(await list.getByRole('option').count()||!await popup.getByRole('status').isVisible())throw Error('shared select lost its empty result state');
- await page.keyboard.press('Escape');
- if(await control.inputValue()!==original||!await control.evaluate(node=>node===document.activeElement))throw Error('shared select cancellation changed the value or lost focus');
- await control.click();await popup.getByRole('searchbox').fill(label);
- await popup.getByRole('searchbox').press('ArrowDown');await page.keyboard.press('Enter');
- if(await control.inputValue()!==value||await popup.isVisible())throw Error('shared select did not confirm into the native form control');
+ await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});await trigger.and(page.locator(':focus')).waitFor();
+ if(await native.inputValue()!==original||!await trigger.evaluate(node=>node===document.activeElement))throw Error('shared select cancellation changed the value or lost focus');
+ await trigger.click();await popup.locator('input[type=search]').fill(label);
+ await popup.locator('input[type=search]').press('ArrowDown');await page.keyboard.press('Enter');
+ await popup.waitFor({state:'hidden'});
+ if(await native.inputValue()!==value||await popup.isVisible())throw Error('shared select did not confirm into the native form control');
 }
 const browser=await chromium.launch(options);
 let page;
 try{
- const context=await browser.newContext({viewport:{width:1400,height:980},deviceScaleFactor:1});
+ const context=await browser.newContext({viewport:{width:1400,height:980},deviceScaleFactor:1,reducedMotion:['rich-replies','intelligent-ui','ui-interactions','ui-interactions-restart'].includes(phase)?'reduce':'no-preference'});
  if(phase==='streaming'){
   await context.addInitScript(()=>{
    const NativeEventSource=window.EventSource;
@@ -72,7 +75,7 @@ try{
   }
  };
  await avatar.hover();
- await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.classList.contains('is-waving'));
+ if(await page.evaluate(()=>matchMedia('(prefers-reduced-motion: reduce)').matches)){if(await avatar.evaluate(node=>node.classList.contains('is-waving')))throw Error('reduced motion started a greeting animation')}else await page.waitForFunction(()=>document.querySelector('.steward-avatar')?.classList.contains('is-waving'));
  await assertAvatarSize('on hover');
  if(!await canvas.evaluate(node=>node.isConnected))throw Error('greeting replaced the complete-frame canvas');
  await page.getByRole('link',{name:'Steward home',exact:true}).hover();
@@ -87,12 +90,29 @@ try{
     :route.abort();
   });
   if(phase==='account-reconnect'){
+   for(const theme of ['light','dark']){
+    await page.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
+    await page.goto(url+'/settings/models/new?provider=chatgpt');
+    await page.getByRole('button',{name:'Load models',exact:true}).click();
+    await page.locator('[data-model-provider-panel="chatgpt"] .control-select-trigger').waitFor();
+    for(const width of [1400,320]){
+     await page.setViewportSize({width,height:980});await page.evaluate(()=>document.fonts.ready);
+     const layout=await page.evaluate(()=>{
+      const panel=document.querySelector('[data-model-provider-panel="chatgpt"]');
+      const buttons=[...panel.querySelectorAll('button:not([role=combobox])')].filter(node=>node.checkVisibility()).map(node=>node.getBoundingClientRect().toJSON());
+      return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,accounts:panel.querySelectorAll('.connected-account strong').length,buttons,unwanted:!!document.querySelector('[name=image_input],.settings-footer')||panel.textContent.includes('Selected account:')||panel.textContent.includes('Choose an account model')};
+     });
+     if(layout.scrollWidth>width||layout.accounts!==1||layout.unwanted||layout.buttons.length!==2||layout.buttons[0].bottom+16>layout.buttons[1].top||layout.buttons.some(box=>box.left<0||box.right>width+1))throw Error('account connection repeats content or stacks actions: '+JSON.stringify(layout));
+     await page.screenshot({path:`${evidence}/account-connect-${theme}-${width}.png`,fullPage:true});
+    }
+   }
+   await page.setViewportSize({width:1400,height:980});
    await page.goto(url+'/settings/setup');
    const account=page.getByRole('region',{name:/^ChatGPT/});
    const current=account.locator('.resource-model').filter({hasText:'fixture-account-model'});
    await current.getByText('Current model',{exact:true}).waitFor();
-   await current.getByText('Connection verified',{exact:true}).waitFor();
-   if(await current.getByRole('button',{name:/Test connection|Use for new work/}).count())throw Error('current verified model still exposes replaced actions');
+   await account.getByText('connected',{exact:true}).waitFor();
+   if(await current.getByRole('button',{name:/Test connection|Use model/}).count())throw Error('current verified model still exposes replaced actions');
    await account.locator('.resource-account > summary').click();
    if(await current.getByRole('button',{name:'Reconnect account',exact:true}).count())throw Error('account actions are repeated inside the model');
    await page.setViewportSize({width:320,height:740});
@@ -100,7 +120,7 @@ try{
    await page.setViewportSize({width:1400,height:980});
    if(await page.locator('#signin-status').innerText())throw Error('another page’s sign-in appeared in Resources');
    await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('link',{name:'Settings',exact:true}).click();
-   await page.locator('#interface-theme').selectOption('dark');
+   await selectValue(page,page.locator('#interface-theme'),'dark');
    await page.goto(url+'/settings/setup');
    await account.locator('.resource-account > summary').click();
    await page.waitForFunction(()=>document.documentElement.classList.contains('dark'));
@@ -210,7 +230,7 @@ try{
   if(!await original.evaluate(node=>node.isConnected&&node.value==='Keep my conversation draft.')||await page.locator('.composer input[type=file]').evaluate(node=>node.files?.[0]?.name)!=='kept.txt')throw Error('attention navigation lost original conversation draft/file');
   await writeFile(evidence+'/attention-browser.json',JSON.stringify({questionPosts:posts,keptDraft:true,keptAttachment:true,staleReviewRejected:true,keyboard:true,language:'zh-CN',width:390},null,2));
   await stale.close();await work.close();
- }else if(phase==='page-transitions'){await pageTransitions(page,context,url,evidence)}else if(phase==='capability-defaults'){await capabilityDefaults(page,context,url,evidence)}else if(phase==='settings-account'){await settingsAccount(page,context,url,evidence)}else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
+ }else if(phase==='send-feedback'){await sendFeedback(page,context,url,evidence)}else if(phase==='page-transitions'){await pageTransitions(page,context,url,evidence)}else if(phase==='capability-defaults'){await capabilityDefaults(page,context,url,evidence)}else if(phase==='settings-account'){await settingsAccount(page,context,url,evidence)}else if(phase==='capability-setup'){await capabilitySetup(page,context,url,evidence)}else{
  if(phase==='setup'){
   await page.evaluate(()=>document.fonts.ready);
   await page.setViewportSize({width:320,height:740});
@@ -271,7 +291,7 @@ try{
   if(await resourcesTab.getAttribute('aria-current')!=='page')throw Error('model connection left the Resources section');
   await page.getByRole('button',{name:'Sign in with ChatGPT',exact:false}).waitFor();
   const connectURL=page.url();
-  await page.getByLabel('Connection method').selectOption('compatible');
+  await selectValue(page,page.getByLabel('Connection method'),'compatible');
   await page.getByLabel('Endpoint URL').waitFor();
   if(page.url()!==connectURL||await page.getByRole('button',{name:'Sign in with ChatGPT',exact:false}).count())throw Error('provider selection did not switch fields in place');
   const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:320,height:740}});
@@ -284,20 +304,19 @@ try{
    await native.getByLabel('Endpoint URL').waitFor();
    if(await native.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('model connection overflows the narrow layout');
   }finally{await plain.close()}
-  if(await page.getByRole('switch',{name:'Enable image input (verified when tested)',exact:true}).isChecked())throw Error('vision declaration enabled implicitly');
+  if(await page.locator('[name=image_input]').count())throw Error('image capability still requires a user switch');
   await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
   await page.locator('input[name="model"]').fill('fixture-model');
   await page.getByRole('button',{name:'Add connection',exact:true}).click();
   const onResources=(notice)=>page.waitForURL(location=>location.pathname==='/settings/setup'&&location.searchParams.get('notice')===notice);
-  await onResources('added');
+  await onResources('active');
   const firstModel=page.locator('.resource-model').filter({has:page.locator('summary').getByText('fixture-model',{exact:true})});
-  await firstModel.getByRole('button',{name:'Test connection',exact:true}).waitFor();
-  const consent=firstModel.getByText('New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration.',{exact:true});
-  if(!await consent.isVisible()||await firstModel.locator('[role=tooltip]').count())throw Error('model consent is hidden before selection');
-  const useModel=firstModel.getByRole('button',{name:'Use for new work',exact:true});
-  if(await useModel.getAttribute('aria-describedby')!==await consent.getAttribute('id'))throw Error('model selection lost its accessible consent description');
+  await firstModel.getByText('Current model',{exact:true}).waitFor();
+  if(await firstModel.getByRole('button',{name:/Test connection|Use model/}).count())throw Error('first connected model was not selected automatically');
+  if(await page.locator('.model-consent,.settings-footer').count())throw Error('settings retained technical consent or notices footer');
   if(await firstModel.getByText(/^(Context \/ maximum output|Image handling)$/).count())throw Error('Resources shows read-only capability fields');
   const firstID=new URL(page.url()).searchParams.get('model');
+  await firstModel.locator('summary').click();
   await page.screenshot({path:evidence+'/model-detail-wide.png',fullPage:true});
   await page.setViewportSize({width:320,height:740});
   const mobileHeader=await page.locator('.workspace-topbar').evaluate(topbar=>{
@@ -306,24 +325,22 @@ try{
    return {overlap:crumb.right>status.left,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   if(mobileHeader.overlap||mobileHeader.overflow)throw Error('expanded model overlapped or overflowed the narrow layout');
-  if(!await consent.isVisible())throw Error('model consent disappeared on a narrow screen');
   await page.screenshot({path:evidence+'/model-detail-mobile.png',fullPage:true});
   await page.setViewportSize({width:1400,height:980});
   await firstModel.locator('summary').click();
-  await firstModel.getByRole('button',{name:'Use for new work',exact:true}).click();
-  await onResources('active');
   await firstModel.getByText('Current model',{exact:true}).waitFor();
   await firstModel.getByText('Connection verified',{exact:true}).waitFor();
-  if(await firstModel.getByRole('button',{name:/Test connection|Use for new work/}).count())throw Error('current verified model still exposes replaced actions');
+  if(await firstModel.getByRole('button',{name:/Test connection|Use model/}).count())throw Error('current verified model still exposes replaced actions');
 
   await models.getByRole('link',{name:'Connect a model',exact:true}).click();
-  await page.getByLabel('Connection method').selectOption('compatible');
+  await selectValue(page,page.getByLabel('Connection method'),'compatible');
   await page.locator('input[name="endpoint"]').fill('http://127.0.0.1:1/v1');
   await page.locator('input[name="name"]').fill('Backup model');
   await page.locator('input[name="model"]').fill('fixture-model');
   await page.getByRole('button',{name:'Add connection',exact:true}).click();
   await onResources('added');
   const backupModel=page.locator('.resource-model').filter({has:page.getByText('Backup model',{exact:true})});
+  await firstModel.getByText('Current model',{exact:true}).waitFor();
   await page.goto(url+'/settings/setup');
   if(await page.locator('.resource-model > details[open]').count())throw Error('Resources shows expanded model configurations by default');
   await firstModel.locator('summary').click();
@@ -334,7 +351,7 @@ try{
   await backupModel.getByText('Connection verified',{exact:true}).waitFor();
   if(await backupModel.getByRole('button',{name:'Test connection',exact:true}).count())throw Error('successful test did not replace the test action');
   await backupModel.locator('summary').click();
-  await backupModel.getByRole('button',{name:'Use for new work',exact:true}).click();
+  await backupModel.getByRole('button',{name:'Use model',exact:true}).click();
   await onResources('active');
   await backupModel.getByText('Current model',{exact:true}).waitFor();
   if(await firstModel.getByText('Current model',{exact:true}).count())throw Error('switching left both models current');
@@ -342,7 +359,7 @@ try{
   await page.goto(url+'/settings/models/'+encodeURIComponent(firstID));
   await page.waitForURL(location=>location.pathname==='/settings/setup'&&location.searchParams.get('model')===firstID);
   await firstModel.locator('details[open]').waitFor();
-  await firstModel.getByRole('button',{name:'Use for new work',exact:true}).waitFor();
+  await firstModel.getByRole('button',{name:'Use model',exact:true}).waitFor();
   await page.screenshot({path:evidence+'/model-ready.png',fullPage:true});
   // Deterministically type into usable server HTML before the local bundle is
   // released. Progressive enhancement must preserve this draft and its file.
@@ -376,7 +393,7 @@ try{
    window.keyboardSubmissions=0;
    input.form.addEventListener('submit',()=>window.keyboardSubmissions++);
   });
-  await editor.press('End');await editor.press('Shift+Enter');
+  await editor.evaluate(input=>input.setSelectionRange(input.value.length,input.value.length));await editor.press('Shift+Enter');
   if(await editor.inputValue()!=='Plan my day: finish the release risk note before noon.\n')throw Error('Shift+Enter did not insert a newline');
   await editor.evaluate(input=>{
    input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true}));
@@ -391,7 +408,7 @@ try{
    try{
     for(const dark of [false,true]){
      document.documentElement.classList.toggle('dark',dark);
-     if(getComputedStyle(button).backgroundColor!=='rgb(217, 119, 87)')throw Error('send button is not #D97757 in both themes');
+     if(getComputedStyle(button).backgroundColor!=='rgb(184, 79, 47)')throw Error('send button is not the shared dark orange in both themes');
     }
    }finally{document.documentElement.classList.toggle('dark',wasDark)}
   });
@@ -404,12 +421,12 @@ try{
   const native=await browser.newContext({javaScriptEnabled:false});
   try{
    await native.addCookies(await context.cookies());const settings=await native.newPage();
-   await settings.goto(url+'/settings/notifications');await settings.locator('select[name=target]').selectOption('tui:');
+   await settings.goto(url+'/settings/notifications');await selectValue(settings,settings.locator('select[name=target]'),'tui:');
    await settings.getByRole('button',{name:'Save notification channel',exact:true}).click();
    if(new URL(settings.url()).pathname!=='/settings/notifications'||await settings.locator('select[name=target]').inputValue()!=='tui:')throw Error('saving notifications lost its route or selected value');
    await settings.reload();if(await settings.locator('select[name=target]').inputValue()!=='tui:')throw Error('notification preference did not persist');
    await settings.screenshot({path:evidence+'/notifications.png',fullPage:true});
-   await settings.locator('select[name=target]').selectOption('auto:');await settings.getByRole('button',{name:'Save notification channel',exact:true}).click();
+   await selectValue(settings,settings.locator('select[name=target]'),'auto:');await settings.getByRole('button',{name:'Save notification channel',exact:true}).click();
    await settings.goto(url+'/settings/models');await settings.getByText('Current model',{exact:true}).waitFor();
    await settings.screenshot({path:evidence+'/models.png',fullPage:true});
    await settings.getByRole('link',{name:'Connect a model',exact:true}).click();await settings.screenshot({path:evidence+'/model-sources.png',fullPage:true});
@@ -421,11 +438,12 @@ try{
   await page.getByRole('link',{name:'Developer',exact:false}).click();
   await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
   await page.setViewportSize({width:720,height:980});
-  for(const control of await page.locator('.obs-filters select').all()){
+  await page.locator('.obs-filters button[role=combobox]').first().waitFor();
+  for(const control of await page.locator('.obs-filters button[role=combobox]').all()){
    if(!await control.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=16&&node.getBoundingClientRect().height>=44))throw Error('trace filters missed the compact input and touch rules');
   }
   await chooseSharedOption(page,page.getByLabel('Role',{exact:true}),'Root Worker','root');
-  await page.getByLabel('Role',{exact:true}).selectOption('');
+  await selectValue(page,page.getByLabel('Role',{exact:true}),'');
   await page.setViewportSize({width:1400,height:980});
   await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
   await page.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();
@@ -495,8 +513,8 @@ try{
   await page.locator('.creator-run').click();
   if(await page.locator('.run-node[data-role="root"],.run-node[data-role="child"]').count())throw new Error('Main page presented Task Roots as its Child Runs');
   await page.getByRole('link',{name:'Traces',exact:true}).first().click();
-  await page.getByLabel('Role',{exact:true}).selectOption('root');
-  await page.getByLabel('Status',{exact:true}).selectOption('completed');
+  await selectValue(page,page.getByLabel('Role',{exact:true}),'root');
+  await selectValue(page,page.getByLabel('Status',{exact:true}),'completed');
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
   if(await page.locator('[data-execution-id]').count()!==1||await page.locator('[data-execution-id]:not([data-role="root"])').count())throw new Error('execution filters ignored');
   await page.getByText('Created time',{exact:true}).click();
@@ -624,7 +642,7 @@ try{
   await release('second');
   const draftText=draft.locator('[data-draft-text]');
   await draftText.filter({hasText:second}).waitFor();
-  if(await draftText.textContent()!==first+'\n'+second)throw Error('reconnect lost, repeated or exposed streamed text');
+  if((await draftText.innerText()).trimEnd()!==first+'\n'+second)throw Error('reconnect lost, repeated or exposed streamed text');
   await page.screenshot({path:evidence+'/streaming-draft.png'});
   let resumeProjection;
   const projectionGate=new Promise(resolve=>{resumeProjection=resolve});
@@ -632,7 +650,7 @@ try{
   try{
    await release('finish');
    await draftText.filter({hasText:'Final tail.'}).waitFor();
-   if(await draftText.textContent()!==first+'\n'+second+'\nFinal tail.\n'||await committed.count())throw Error('commit lost or repeated text before the final projection');
+   if((await draftText.innerText()).trimEnd()!==first+'\n'+second+'\nFinal tail.'||await committed.count())throw Error('commit lost or repeated text before the final projection');
   }finally{resumeProjection()}
   await page.unroute('**/api/updates?**');
   await committed.filter({hasText:'Final tail.'}).waitFor();
@@ -663,7 +681,7 @@ try{
   await editor.fill('Keep this unsent draft exactly.');
   await page.getByLabel('Attach a file').setInputFiles({name:'pending.txt',mimeType:'text/plain',buffer:Buffer.from('Unsent attachment bytes.\n')});
   await editor.focus();await editor.press('ArrowLeft');
-  const source=await page.locator('input[name="source_id"]').inputValue();
+  let source=await page.locator('input[name="source_id"]').inputValue();
   const selection=await editor.evaluate(input=>[input.selectionStart,input.selectionEnd]);
   await page.evaluate(()=>{window.liveEditor=document.querySelector('textarea');window.liveFile=document.querySelector('input[type=file]');scrollTo(0,180)});
   const anchor=await page.locator('[data-live-key^="message:"]').first().evaluate(node=>({key:node.dataset.liveKey,top:node.getBoundingClientRect().top}));
@@ -700,9 +718,14 @@ try{
   const sending=page.waitForRequest(r=>r.url()===url+'/message'&&r.method()==='POST');
   await editor.press('Enter');await sending;
   await editor.press('Enter');await editor.press('Enter');
-  if(attemptedSends!==1||await editor.inputValue()!=='Keep this unsent draft exactly.')throw Error('pending Enter repeated submission or changed the draft');
+  if(attemptedSends!==1||await editor.inputValue()!==''||!(await page.locator('#conversation-outgoing').innerText()).includes('Keep this unsent draft exactly.'))throw Error('pending Enter repeated submission or changed the draft');
   releaseSend();
-  await page.locator('#composer-feedback').filter({hasText:'Send was not confirmed'}).waitFor();
+  await page.locator('#conversation-outgoing [data-send-state=uncertain]').waitFor();
+  await editor.fill('Keep this unsent draft exactly.');
+  await page.getByLabel('Attach a file').setInputFiles({name:'pending.txt',mimeType:'text/plain',buffer:Buffer.from('Unsent attachment bytes.\n')});
+  source=await page.locator('input[name="source_id"]').inputValue();
+  await editor.evaluate((input,range)=>input.setSelectionRange(...range),selection);
+  await page.locator('[data-live-key="'+anchor.key+'"]').evaluate((node,top)=>scrollBy(0,node.getBoundingClientRect().top-top),anchor.top);
   await checkDraft(false);if(attemptedSends!==1)throw Error('failed send was automatically repeated');
   await page.unroute('**/message');await editor.focus();await editor.evaluate((input,range)=>input.setSelectionRange(...range),selection);
   await echo('live-reply','LIVE_REPLY_WHILE_TYPING');
@@ -816,19 +839,19 @@ try{
   await page.setViewportSize({width:720,height:980});
   const frequency=page.getByLabel('Frequency',{exact:true});
   await chooseSharedOption(page,frequency,'Weekly','weekly');
-  const weekday=page.locator('select[name=weekday]');await weekday.waitFor({state:'visible'});
-  await frequency.click();await weekday.focus();await weekday.press('Enter');
+  const weekday=page.locator('select[name=weekday]'),weekdayTrigger=(await selectParts(weekday)).trigger;await weekdayTrigger.waitFor({state:'visible'});
+  await frequency.click();await weekdayTrigger.focus();await weekdayTrigger.press('Enter');
   if(await page.getByRole('listbox').count()!==1)throw Error('Task selectors left competing popups open');
   await page.keyboard.press('Escape');
   await chooseSharedOption(page,frequency,'Weekdays','weekdays');
-  if(await weekday.isVisible()||schedulePosts!==0)throw Error('choosing a frequency submitted or failed to hide dependent fields');
+  if(await weekdayTrigger.isVisible()||schedulePosts!==0)throw Error('choosing a frequency submitted or failed to hide dependent fields');
   await page.setViewportSize({width:1400,height:980});
   await page.getByLabel('Local time',{exact:true}).fill('07:40');
   await page.getByLabel('Time zone',{exact:true}).fill('Asia/Shanghai');
   const submitted=await editor.evaluate(form=>Object.fromEntries(new FormData(form)));
   await page.getByRole('button',{name:'Save schedule',exact:true}).click();
   await page.getByRole('heading',{name:'Edit schedule',exact:true}).waitFor();
-  if(await page.getByLabel('Frequency',{exact:true}).inputValue()!=='weekdays'||await page.getByLabel('Local time',{exact:true}).inputValue()!=='07:40'||await page.getByLabel('Time zone',{exact:true}).inputValue()!=='Asia/Shanghai')throw Error('schedule did not persist friendly fields');
+  if(await (await selectParts(page.getByLabel('Frequency',{exact:true}))).native.inputValue()!=='weekdays'||await page.getByLabel('Local time',{exact:true}).inputValue()!=='07:40'||await page.getByLabel('Time zone',{exact:true}).inputValue()!=='Asia/Shanghai')throw Error('schedule did not persist friendly fields');
   await page.screenshot({path:evidence+'/schedule-editor-wide.png',fullPage:true});
   const editURL=page.url();
   const replay=await context.request.post(url+'/schedule/configure',{form:submitted,maxRedirects:0});
@@ -862,7 +885,7 @@ try{
   await page.getByRole('heading',{name:'Scheduled work',exact:true}).waitFor();
   await page.getByRole('link',{name:'Create schedule',exact:true}).click();
   await page.getByLabel('Instructions',{exact:true}).fill('One-time future review.');
-  await page.getByLabel('Frequency',{exact:true}).selectOption('once');
+  await selectValue(page,page.getByLabel('Frequency',{exact:true}),'once');
   await page.getByLabel('Date',{exact:true}).fill('2027-03-14');
   await page.getByLabel('Local time',{exact:true}).fill('02:30');
   await page.getByLabel('Time zone',{exact:true}).fill('America/New_York');
@@ -886,16 +909,16 @@ try{
    await p.getByLabel('Frequency',{exact:true}).tap();await p.getByRole('listbox').getByRole('option',{name:'Once',exact:true}).tap();
    await p.getByLabel('Date',{exact:true}).waitFor({state:'visible'});
    await toggle.tap();if(await toggle.isChecked()===was)throw Error('touch did not toggle the shared switch');
-   await p.reload();if(await toggle.isChecked()!==was||await p.getByLabel('Frequency',{exact:true}).inputValue()!=='weekdays')throw Error('touch bypassed explicit Task saving');
+   await p.reload();if(await toggle.isChecked()!==was||await (await selectParts(p.getByLabel('Frequency',{exact:true}))).native.inputValue()!=='weekdays')throw Error('touch bypassed explicit Task saving');
   }finally{await touch.close()}
   const native=await browser.newContext({javaScriptEnabled:false,viewport:{width:320,height:740}});
   try{
    await native.addCookies(await context.cookies());const p=await native.newPage();await p.goto(editURL);
-   await p.getByLabel('Frequency',{exact:true}).selectOption('weekly');await p.locator('select[name=weekday]').waitFor({state:'visible'});
+   await selectValue(p,p.getByLabel('Frequency',{exact:true}),'weekly');await p.locator('select[name=weekday]').waitFor({state:'visible'});
    await p.getByRole('switch',{name:'Schedule enabled',exact:true}).uncheck();
    await Promise.all([p.waitForNavigation({waitUntil:'load'}),p.getByRole('button',{name:'Save schedule',exact:true}).click()]);
    await p.reload();
-   if(await p.getByLabel('Frequency',{exact:true}).inputValue()!=='weekly'||await p.getByRole('switch',{name:'Schedule enabled',exact:true}).isChecked())throw Error('native Task controls did not persist');
+   if(await (await selectParts(p.getByLabel('Frequency',{exact:true}))).native.inputValue()!=='weekly'||await p.getByRole('switch',{name:'Schedule enabled',exact:true}).isChecked())throw Error('native Task controls did not persist');
    await p.screenshot({path:evidence+'/schedule-native.png',fullPage:true});
   }finally{await native.close()}
   if((await (await context.request.get(url+'/api/progress')).json()).length!==taskCount)throw Error('control checks dispatched a Task');
@@ -904,7 +927,9 @@ try{
   await page.goto(url);
  }
 
+ if(phase==='ui-interactions'||phase==='ui-interactions-restart')await uiInteractions(page,context,browser,url,evidence,phase==='ui-interactions-restart');
  if(phase==='intelligent-ui'){
+  const activate=async button=>{await button.hover();await button.click()};
   await page.getByRole('columnheader',{name:'Option',exact:true}).waitFor();
   if(await page.locator('.message .intelligent-widget').count()!==2)throw Error('custom UI widgets missing');
   const widget=page.frameLocator('iframe[title="Calculator"]');
@@ -913,36 +938,46 @@ try{
   try{const response=await direct.goto(url+await page.locator('iframe[title="Calculator"]').getAttribute('src'));if(!response.headers()['content-type']?.startsWith('text/plain')||await direct.locator('script').count())throw Error('Standalone Widget URL executed generated code')}finally{await direct.close();await page.bringToFront()}
   await widget.locator('#n').fill('25');await widget.getByRole('button',{name:'Compute',exact:true}).click();
   await widget.locator('#answer').getByText('50',{exact:true}).waitFor();
+  await widget.locator('#amplitude').fill('35');if(await widget.locator('#wave').getAttribute('r')!=='35')throw Error('upstream sandbox controls did not update SVG');
+  const activity=JSON.parse(await widget.locator('#open-generative-ui-activity').textContent());if(activity.type!=='open-generative-ui'||activity.content.htmlComplete!==true||activity.content.jsExpressions[0]!=='initialize()')throw Error('upstream completed activity shape changed');
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
   await widget.locator('html[data-widget-theme="dark"]').waitFor();
   const calculator=page.locator('.intelligent-widget').filter({has:page.locator('iframe[title="Calculator"]')});
-  await calculator.getByRole('button',{name:'Expand',exact:true}).click();
-  await page.locator('.widget-expanded').waitFor();await calculator.getByRole('button',{name:'Close expanded view'}).click();
-  await page.getByText('The interactive view is unavailable. The text version is preserved.').waitFor();
+  await activate(calculator.getByRole('button',{name:'Options',exact:true}));await page.getByRole('menuitem',{name:'Expand',exact:true}).click();
+  await page.locator('.widget-expanded').waitFor();await page.keyboard.press('Escape');await page.locator('.widget-expanded').waitFor({state:'detached'});
+  await page.getByText('This interactive view could not be displayed.').waitFor();
+  if(await page.locator('.intelligent-widget summary').count())throw Error('interactive answers retained a Text version control');
+  if(await calculator.locator('.widget-fallback').count())throw Error('successful visual duplicated its fallback');
+  if(!await widget.locator('body').evaluate(()=>document.fonts.check('14px Inter')))throw Error('sandbox did not load the shared UI font');
+  const sandboxGap=await widget.locator('.actions button').evaluateAll(nodes=>{const [a,b]=nodes.map(node=>node.getBoundingClientRect());return b.left-a.right});if(sandboxGap<7)throw Error('sandbox actions touched or overlapped');
   const before=await page.locator('.message.user').count();
-  await widget.getByRole('button',{name:'Discuss this result'}).click();
+  await activate(widget.getByRole('button',{name:'Discuss this result'}));
   await calculator.getByRole('textbox',{name:'Message to Ghost'}).waitFor();
   if(await page.locator('.message.user').count()!==before)throw Error('widget auto-sent a message');
   if(await calculator.getByRole('textbox',{name:'Message to Ghost'}).inputValue()!=='Discuss the computed result: 50')throw Error('selected state missing from follow-up');
   await calculator.getByRole('textbox',{name:'Message to Ghost'}).fill('Draft written by user.');
-  await widget.getByRole('button',{name:'Discuss this result'}).click();
+  await activate(widget.getByRole('button',{name:'Discuss this result'}));
   if(await calculator.getByRole('textbox',{name:'Message to Ghost'}).inputValue()!=='Draft written by user.')throw Error('Widget replaced the Host-owned draft');
   await calculator.getByRole('textbox',{name:'Message to Ghost'}).fill('Discuss the computed result: 50');
+  const assertActionGap=async()=>{const boxes=await calculator.locator('.widget-followup-actions button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON()));if(boxes.length!==2)throw Error('missing action group');const [a,b]=boxes;if(Math.abs(a.top-b.top)<2?b.left-a.right<7:b.top-a.bottom<7)throw Error('widget actions touched or overlapped')};
+  await assertActionGap();await page.setViewportSize({width:390,height:844});await assertActionGap();if(await widget.getByRole('button',{name:'Compute',exact:true}).evaluate(node=>node.getBoundingClientRect().height)<44)throw Error('mobile sandbox action is too small');await page.setViewportSize({width:1400,height:980});
   let lost=false;const sources=[];
   await page.route('**/api/message',async route=>{
    const input=route.request().postDataJSON();
    if(input.source_id?.startsWith('ui-widget:')){sources.push(input.source_id);if(!lost){lost=true;await route.fetch();await route.abort('failed');return}}
    await route.continue();
   });
-  await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).click();
+  await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:evidence+'/before-widget-send.png'});
+  await activate(calculator.getByRole('button',{name:'Send to Ghost',exact:true}));
   await calculator.getByRole('alert').waitFor();
-  await widget.getByRole('button',{name:'Discuss this result'}).click();
-  await calculator.getByRole('button',{name:'Send to Ghost',exact:true}).click();
+  await activate(widget.getByRole('button',{name:'Discuss this result'}));
+  await activate(calculator.getByRole('button',{name:'Send to Ghost',exact:true}));
   await calculator.getByRole('textbox',{name:'Message to Ghost'}).waitFor({state:'detached'});
   if(sources.length!==2||sources[0]!==sources[1])throw Error('Widget retry changed its source identity');
   await page.unroute('**/api/message');
   await page.getByText('Discuss the computed result: 50',{exact:true}).waitFor();
-  await page.reload();await page.frameLocator('iframe[title="Calculator"]').locator('#answer').waitFor();
+  await page.reload();await page.frameLocator('iframe[title="Calculator"]').locator('#answer').getByText('50',{exact:true}).waitFor();if(await page.frameLocator('iframe[title="Calculator"]').locator('#n').inputValue()!=='25')throw Error('calculator control state was not restored');
   await page.setViewportSize({width:390,height:844});
   await calculator.evaluate(node=>node.scrollIntoView({block:'center'}));
   await page.screenshot({path:evidence+'/intelligent-ui-widget-mobile.png'});
@@ -953,50 +988,53 @@ try{
   const plain=await browser.newContext({javaScriptEnabled:false});try{await plain.addCookies(await context.cookies());const text=await plain.newPage();await text.goto(url);if(!await text.getByText('The calculator doubles its input. No network or Host access.',{exact:true}).count())throw Error('no-script text alternative missing')}finally{await plain.close()}
  }
  if(phase==='rich-replies'){
+  const grouped=page.locator('.message.assistant.message-split').first(),bubbles=grouped.locator(':scope > .message-bubble');
+  if(await bubbles.count()!==2||await bubbles.nth(0).locator('.answer-table').count()!==1||await bubbles.nth(1).locator('.answer-table').count())throw Error('Intelligent UI must occupy the first bubble before the final reply bubble');
+  const groupBox=await grouped.boundingBox(),uiBox=await bubbles.first().boundingBox();
+  if(uiBox.width<groupBox.width*.85)throw Error('Intelligent UI collapsed to its minimum content width');
   await page.locator('[data-renderer="native"] .answer-table').waitFor();
   if(await page.locator('.answer-table tbody tr').count()!==2||await page.locator('.answer-table img,.answer-table script').count())throw Error('generated table lost data or interpreted markup');
   if(!(await page.locator('.answer-table').innerText()).includes('<img src=x onerror='))throw Error('generated table changed literal cells');
-  const forms=page.locator('.message.assistant form[action="/ui/form"]');
-  if(await forms.count()!==2)throw Error('ordinary reply did not produce interactive forms');
-  const firstID=await forms.nth(0).getAttribute('data-form-id'),secondID=await forms.nth(1).getAttribute('data-form-id');
-  const first=page.locator(`form[data-form-id="${firstID}"]`),second=page.locator(`form[data-form-id="${secondID}"]`);
+  for(const name of ['Table','barChart','pieChart','plan_visualization','scheduleTime'])await page.locator('[data-openintelligentui="'+name+'"]').first().waitFor();
+  await page.locator('[data-openintelligentui=barChart] .recharts-bar-rectangle').first().waitFor();await page.locator('[data-openintelligentui=pieChart] .recharts-sector').first().waitFor();
+  if(await page.locator('[data-openintelligentui=barChart] .recharts-bar-rectangle').count()!==2||!await page.locator('[data-openintelligentui=pieChart] .recharts-sector').count())throw Error('upstream native chart data did not render');
+  const titleStyle=await page.locator('.native-chart .native-answer-title').first().evaluate(node=>({size:parseFloat(getComputedStyle(node).fontSize),font:getComputedStyle(node).fontFamily}));if(titleStyle.size>14||!titleStyle.font.includes('Inter'))throw Error('native answer typography diverged from Steward');
+  if((await page.locator('.native-time-picker').allTextContents()).some(text=>/[📅🗓🔄]/u.test(text)))throw Error('native answer retained decorative emoji');
+  if(await page.locator('.intelligent-widget summary').count())throw Error('native composition retained Text version');
+  const chartBox=await page.locator('[data-openintelligentui=barChart] svg.recharts-surface').boundingBox();if(chartBox.width<100||chartBox.height<100)throw Error('native chart SVG was clipped to zero size');
+  for(const theme of ['dark','light']){await page.evaluate(theme=>document.documentElement.classList.toggle('dark',theme==='dark'),theme);await page.screenshot({path:evidence+'/native-components-'+theme+'.png',fullPage:true})}
+  await page.setViewportSize({width:390,height:844});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('native component overflowed mobile');await page.screenshot({path:evidence+'/native-components-mobile.png',fullPage:true});await page.setViewportSize({width:1400,height:980});
+  const scenario=page.frameLocator('iframe[title="Trip comparison"]');await scenario.locator('#level').fill('42');
+  const pickers=page.locator('[data-openintelligentui=scheduleTime]');
+  const firstID=await pickers.nth(0).getAttribute('data-form-id'),secondID=await pickers.nth(1).getAttribute('data-form-id');
+  const first=page.locator('[data-openintelligentui=scheduleTime][data-form-id="'+firstID+'"]');
   await page.getByLabel('Message Ghost',{exact:true}).fill('Keep the ordinary conversation draft.');
-  await second.getByLabel('Travel notes',{exact:true}).fill('Keep this sibling draft.');
-  await first.getByLabel('Destination',{exact:true}).fill('中'.repeat(1400));
-  await first.getByLabel('Travel date',{exact:true}).fill('2026-12-01');
-  await first.getByRole('button',{name:'Send response',exact:true}).click();
-  if(!(await first.getByLabel('Destination',{exact:true}).evaluate(field=>field.validationMessage)).includes('too long'))throw Error('Unicode field byte limit was not enforced');
-  await first.getByLabel('Destination',{exact:true}).fill('上海');
-  let calls=0;
-  await page.route('**/ui/form',async route=>{calls++;if(calls>1)await route.fetch();await route.abort('failed')});
-  await first.getByRole('button',{name:'Send response',exact:true}).click();
-  await first.getByRole('status').filter({hasText:'not confirmed'}).waitFor();
-  if(await first.getByLabel('Destination',{exact:true}).inputValue()!=='上海'||await first.getByRole('button',{name:'Send response',exact:true}).isDisabled())throw Error('failed POST lost answers or cannot retry');
-  await first.getByRole('button',{name:'Send response',exact:true}).click();
-  await page.locator(`form[data-form-id="${firstID}"][data-submitted="true"]`).waitFor();
-  await page.unroute('**/ui/form');
-  if(calls!==2||await second.getByLabel('Travel notes',{exact:true}).inputValue()!=='Keep this sibling draft.')throw Error('saved form replacement lost sibling answers or duplicated POST');
-  if(await page.getByLabel('Message Ghost',{exact:true}).inputValue()!=='Keep the ordinary conversation draft.')throw Error('form interaction changed conversation draft');
-  await page.reload();
-  await page.locator(`form[data-form-id="${firstID}"][data-submitted="true"]`).waitFor();
-  if(await first.getByLabel('Destination',{exact:true}).inputValue()!=='上海'||!await first.getByLabel('Destination',{exact:true}).isDisabled())throw Error('reload did not recover accepted answers');
-  const native=await browser.newContext({javaScriptEnabled:false});
-  try{
-   await native.addCookies(await context.cookies());const plain=await native.newPage();await plain.goto(url);
-   const form=plain.locator(`form[data-form-id="${secondID}"]`);
-   await form.getByLabel('Travel notes',{exact:true}).fill('中'.repeat(1400));
-   await form.getByRole('button',{name:'Send response',exact:true}).click();
-   if(await plain.locator('details.rich-answer-form textarea[readonly]').inputValue()!=='中'.repeat(1400))throw Error('native validation failure lost the answer draft');
-   await form.getByLabel('Travel notes',{exact:true}).fill('Native browser answer\nSecond line');
-   await form.getByRole('button',{name:'Send response',exact:true}).click();
-   await plain.waitForURL('**/?notice=feedback-saved');
-   if(await plain.locator(`form[data-form-id="${secondID}"]`).getAttribute('data-submitted')!=='true')throw Error('native form acceptance not restored');
-   await plain.screenshot({path:evidence+'/rich-replies-no-script.png',fullPage:true});
-  }finally{await native.close()}
-  await page.reload();
-  await page.locator(`form[data-form-id="${secondID}"][data-submitted="true"]`).waitFor();
+  let calls=0;await page.route('**/ui/form',async route=>{calls++;if(calls>1)await route.fetch();await route.abort('failed')});
+  await first.getByRole('button',{name:/2026-12-01/}).click();await first.getByRole('alert').filter({hasText:'not confirmed'}).waitFor();
+  await first.getByRole('button',{name:/2026-12-01/}).click();await page.locator('[data-openintelligentui=scheduleTime][data-form-id="'+firstID+'"][data-response="0"]').waitFor();await page.unroute('**/ui/form');
+  if(calls!==2||await page.getByLabel('Message Ghost',{exact:true}).inputValue()!=='Keep the ordinary conversation draft.')throw Error('time response duplicated or replaced the draft');
+  if(await scenario.locator('#level').inputValue()!=='42')throw Error('native response refresh destroyed the adjacent interactive state');
+  await page.reload();await page.locator('[data-openintelligentui=scheduleTime][data-form-id="'+firstID+'"][data-response="0"]').waitFor();await first.getByText('Time Selected',{exact:true}).waitFor();
+  const native=await browser.newContext({javaScriptEnabled:false});try{await native.addCookies(await context.cookies());const plain=await native.newPage();await plain.goto(url);const form=plain.locator('.native-meeting-fallback[data-form-id="'+secondID+'"]');await form.getByRole('button',{name:'None of these work',exact:true}).click();await plain.waitForURL('**/?notice=feedback-saved');if(await plain.locator('.native-meeting-fallback[data-form-id="'+secondID+'"]').getAttribute('data-submitted')!=='true')throw Error('native selection was not restored');await plain.screenshot({path:evidence+'/rich-replies-no-script.png',fullPage:true})}finally{await native.close()}
+  await page.reload();await page.locator('[data-openintelligentui=scheduleTime][data-form-id="'+secondID+'"][data-response="decline"]').waitFor();
+
  }
  if(phase==='components'){
+  await page.locator('.markdown strong').getByText('Markdown rendered',{exact:true}).waitFor();
+  const download=page.getByRole('link',{name:'Download game',exact:true});
+  const downloaded=await context.request.get(new URL(await download.getAttribute('href'),url).href);
+  if(!downloaded.ok()||await downloaded.text()!=='<h1>Downloaded artifact</h1>'||!downloaded.headers()['content-disposition']?.includes('attachment'))throw Error('Markdown artifact did not download through the authenticated artifact route');
+  if(await page.locator('.markdown a[href^="javascript:"],.markdown script,.markdown img:not(.markdown-diagram)').count())throw Error('Markdown allowed executable markup');
+  await page.locator('.markdown-diagram').waitFor();
+  if(!await page.locator('.markdown-diagram').evaluate(img=>img.complete&&img.naturalWidth>0))throw Error('Mermaid image did not render');
+  for(const theme of ['dark','light']){
+   await page.evaluate(theme=>document.documentElement.classList.toggle('dark',theme==='dark'),theme);
+   await page.waitForFunction(theme=>document.querySelector('link[rel=icon]').getAttribute('href')==='/brand/ghost-'+(theme==='dark'?'ivory':'charcoal')+'.png',theme);
+   const actions=page.locator('.chat-topbar .topbar-actions');const before=await actions.boundingBox();
+   await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));await page.mouse.wheel(0,1000);
+   const after=await actions.boundingBox();if(Math.abs(after.y-before.y)>1)throw Error('Computer and Worker moved with the document');
+   await page.screenshot({path:evidence+'/markdown-'+theme+'.png',fullPage:true});
+  }
   await page.locator('[data-renderer="native"] .answer-table').waitFor();
   if(await page.locator('.answer-table tbody tr').count()!==2)throw new Error('native table lost rows');
   if(await page.locator('.answer-table img, .answer-table script').count())throw new Error('table interpreted executable markup');
@@ -1064,7 +1102,7 @@ try{
  if(remote.length)throw new Error('UI contacted an external service: '+remote.join(', '));
  if(errors.length)throw new Error(errors.join(';'));
 }catch(error){
- if(phase==='account-signin'||phase==='account-reconnect')throw Error('Browser did not complete the controlled account flow');
+ if(phase==='account-signin'||phase==='account-reconnect'){const frame=String(error?.stack??'').split('\n').find(line=>line.includes('channels_browser.mjs:')||line.includes('channels_controls.mjs:'));throw Error('Browser did not complete the controlled account flow'+(frame?' ('+frame.trim()+')':''))}
  if(page){await page.screenshot({path:evidence+'/'+phase+'-failure.png',fullPage:true});await writeFile(evidence+'/'+phase+'-failure.txt',await page.locator('body').innerText())}
  throw error;
 }finally{await browser.close()}

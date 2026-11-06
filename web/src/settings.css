@@ -37,8 +37,7 @@ html:not(.js) [data-client-pending]{display:none}
 .setting-row label,.setting-copy label{margin:0;color:var(--foreground);font-size:14px;font-weight:500}
 .setting-copy{min-width:0}.setting-copy p{font-size:12px;line-height:1.5;margin:2px 0 0;color:var(--muted-foreground)}
 .setting-row>select:not([multiple]):not([size]){flex-shrink:0;max-width:58%}
-.settings-page button,.settings-page .button{border-radius:999px;min-height:36px;padding:7px 14px;font-size:13px}
-.settings-page .secondary{background:var(--muted);border-color:transparent}.settings-page .secondary:hover{background:var(--hover)}
+.settings-page button,.settings-page .button{font-size:13px}
 .settings-page .danger-text{color:var(--danger);background:var(--danger-surface)}
 .settings-save{display:flex;justify-content:flex-end;padding:10px 0}
 .settings-group form:not(:last-child){border-bottom:1px solid var(--border)}
@@ -70,7 +69,7 @@ html:not(.js) [data-client-pending]{display:none}
 /* The native select stays usable without JS; the enhancement adds filtering. */
 .settings-confirm{margin:auto;max-height:calc(100dvh - 32px);overflow:auto;width:420px;max-width:calc(100vw - 32px);padding:24px;border:1px solid var(--border);border-radius:20px;background:var(--card);color:var(--foreground);box-shadow:0 16px 48px #0002}
 .settings-confirm::backdrop{background:var(--backdrop)}.settings-confirm h2{font-size:18px;margin:0 0 12px}.settings-confirm p{font-size:14px;color:var(--muted-foreground);margin:0 0 24px}.settings-confirm .actions{justify-content:flex-end}
-.settings-confirm button{border-radius:999px;font-size:13px;min-height:36px}.settings-confirm .danger-text{background:var(--danger);color:var(--card)}
+.settings-confirm button{font-size:13px;min-height:36px}.settings-confirm .danger-text{background:var(--danger);color:var(--card)}
 @media(max-width:760px){
  .settings-topbar{display:flex;height:56px;border-bottom:1px solid var(--border);padding:0 12px;font-size:14px}.settings-topbar>span{margin-right:auto}.settings-exit{font-size:24px;text-decoration:none;width:40px;text-align:center;color:var(--muted-foreground)}
 .settings-workspace .settings-page{padding:28px 20px 48px}.settings-page h1{font-size:22px}.settings-page .page-heading{margin-bottom:28px}

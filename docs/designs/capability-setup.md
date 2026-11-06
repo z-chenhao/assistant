@@ -8,7 +8,7 @@
 
 正常安装启动推导 `defaults: {memory: true, search: true, skills: true, computer: true}`；显式 `-config` 不自动加入该段。具体资源配置优先，带自定义路径、toolchain 或 repository source 的本地执行覆盖默认 Computer。Manager 在启动时准备有效资源，owner 文档保留自动模式，读取 Settings 和 doctor 不下载、不引导 Guest。
 
-Memory 使用跨进程锁分配随机 SecretStore 引用，确认 32 字节密钥可读后原子保存 `default-memory.json`。已有引用丢失或锁定时不重新生成；已有加密数据但无默认引用时要求恢复原密钥。原生凭据不可用时 Settings 显示需要处理，本地 Conversation 搜索仍可用。备份包含引用元数据，不包含系统凭据。
+Memory 使用跨进程锁分配随机 SecretStore 引用，确认 32 字节密钥可读后原子保存 `default-memory.json`。已有引用丢失或锁定时不重新生成；已有加密数据但无默认引用时要求恢复原密钥。本地凭据文件不可用时 Settings 显示需要处理，本地 Conversation 搜索仍可用。备份包含引用元数据，不包含凭据文件。
 
 本地搜索直接查询已有 SQLite 文本索引，支持中文子串；不调用 embedding 服务、不制造向量、不绑定向量空间。加密 Memory 的明文索引仍只在内存中。可在设置中接入自定义 embedding，既有向量身份变更仍要求离线迁移。Conversation-only 与包含 Memory 的默认搜索具有不同冻结资源身份。
 
@@ -71,3 +71,5 @@ Computer `Provider.Probe` 与实际执行的 lock 路径共用 checkHost，校�
 原 Manager 仍拥有完整校验、探测、候选证明、源文件版本、密钥／索引迁移边界与保存。普通 `apply` 动作将最终字段交给既有 Test/Save 链路，后台验证精确候选后才写入；失败与版本冲突保留草稿。高级 `save` 动作继续要求已有证明，编辑字段仍会使其失效。MCP 增删行是有界的本地候选重绘，不调用 provider 或保存配置；保留提交版本，避免并发文件变更时默默重基。没有新增通用表单引擎、公共字段 schema 或依赖。
 
 连接反馈通过候选字段编辑失效：普通表单和高级 YAML 的实际值发生修改后，客户端隐藏之前的检查反馈，显示未保存状态；高级保存按钮继续禁用。重新测试后的服务端页面提供新的反馈，服务端精确候选、源版本及有效期校验仍是保存边界。
+
+默认应用使用数据根 `secrets/` 的文件 SecretStore 准备 Memory 密钥，不请求系统钥匙串。已有密钥引用始终复用；文件丢失时保留原引用并显示不可用，迁移保留既有加密身份。账户文件继续使用独立 account-secrets 目录。

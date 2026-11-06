@@ -33,8 +33,8 @@ export function enhanceShell(){
  const sidebar=document.getElementById('workspace-navigation');
  const update=()=>{
   const open=mobile.matches?html.classList.contains('mobile-nav'):!html.classList.contains('sidebar-collapsed');
-  toggles.forEach(button=>button.setAttribute('aria-expanded',String(open)));
-  if(sidebar)sidebar.inert=!open;
+  toggles.forEach(button=>{button.setAttribute('aria-expanded',String(open));button.setAttribute('aria-label',t(open?'Close navigation':'Open navigation'))});
+  if(sidebar)sidebar.inert=mobile.matches&&!open;
   const main=document.getElementById('workspace-main');if(main)main.inert=mobile.matches&&open;
  };
  const close=()=>{html.classList.remove('mobile-nav');update()};
@@ -45,7 +45,7 @@ export function enhanceShell(){
   }else{
    html.classList.toggle('sidebar-collapsed');update();
    try{localStorage.setItem('steward-sidebar',html.classList.contains('sidebar-collapsed')?'collapsed':'open')}catch{}
-   document.querySelector<HTMLButtonElement>(html.classList.contains('sidebar-collapsed')?'.sidebar-open':'.brand-row .sidebar-toggle')?.focus();
+   document.querySelector<HTMLButtonElement>('.brand-row .sidebar-toggle')?.focus();
   }
  }));
  document.querySelector('[data-sidebar-close]')?.addEventListener('click',()=>{close();document.querySelector<HTMLButtonElement>('.sidebar-open')?.focus()});

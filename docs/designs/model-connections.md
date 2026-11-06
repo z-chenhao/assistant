@@ -22,15 +22,14 @@ flowchart TD
 新增连接或登录 → 能力测试 → 显式选择 → 新建 Run 冻结快照 → Bridge 发起推理。失败回到可修复设置，不自动切换账户或模型。
 
 - **F-001**：CLI/TUI/Web 有连接、Test、Select 入口，Run 冻结模型快照。 无活动模型时保持 setup_required；不隐式选取收费或 Fake 模型。
-- **F-002**：同一账户生命周期默认使用数据根下的私有文件。显式选择原生后端时，使用 macOS Keychain 或 Linux Secret Service。Linux 动态加载 libsecret，缺少可选库不阻止其他模型启动；库、会话或钥匙串不可用时原生凭据操作失败关闭。平台与 Live 验证边界见功能和测试方案。
+- **F-002**：同一账户生命周期默认使用数据根下的私有文件。Memory、API Key、渠道与基础设施凭据使用相同的文件机制；不提供系统钥匙串后端。平台与 Live 验证边界见功能和测试方案。
 
 ## 代码与依赖
 
 - [cmd/steward/models.go](../../cmd/steward/models.go)
 - [internal/llm/control.go](../../internal/llm/control.go)
 - [internal/llm/account/manager.go](../../internal/llm/account/manager.go)
-- [internal/llm/secret/service_linux.go](../../internal/llm/secret/service_linux.go) 与 [libsecret 适配](../../internal/llm/secret/service_linux.c)
-- [internal/llm/secret/unsupported.go](../../internal/llm/secret/unsupported.go)
+- [私有文件 SecretStore](../../internal/llm/secret/files.go) 与 [账户引用适配](../../internal/llm/secret/account_files.go)
 - [provider-bridge/bridge.mjs](../../provider-bridge/bridge.mjs)
 
 ## 验证与交付
@@ -169,8 +168,8 @@ auth_connection_id: null
 - Compatibility 不能仅因服务声称“OpenAI compatible”就推断。至少显式记录 `developer_role`、`reasoning_effort`、`parallel_tool_calls`、`stream_usage` 和 Tool Result 格式；未知项通过 Probe 或保守默认确定。
 - MVP 必须支持常见 Qwen/vLLM/SGLang/LM Studio 风格 Chat Completions；Responses API 只有在实际端点通过契约测试后才启用。
 - 可选 `temperature/top_p` 只在模型声明支持时发送；未设置时使用 Provider 默认值。Reasoning 模型拒绝的采样参数不得强行注入。
-- Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Steward 主模型。
-- 声明 `image_input:true` 时，Host 通过现有图像 resolver 与 Provider envelope 发送合成蓝色方块并验证颜色响应，成功后才保留并冻结图像输入能力。旧 Probe 中缺失图像证明不授予该能力；文本 Profile 的验证与引用回退不变。失败的图像重测同样撤销 readiness。
+- 对自定义兼容端点，Connection Test 检查 URL、TLS/连接、鉴权、模型存在性和一次最小流式生成；Agent Capability Probe 还必须验证 Tool Call、Tool Result continuation、取消和长输出裁剪。不能完成 Tool Call 的 Profile 可以保存用于诊断，但状态不是 `ready`，不能设为 Steward 主模型。
+- 自定义兼容端点声明 `image_input:true` 时，Host 通过现有图像 resolver 与 Provider envelope 发送合成蓝色方块并验证颜色响应，成功后才保留并冻结图像输入能力。旧 Probe 中缺失图像证明不授予该能力；文本 Profile 的验证与引用回退不变。失败的图像重测同样撤销 readiness。
 - URL、Header、响应 Body 和模型输出都按不可信外部输入处理；禁止跨 Origin 自动携带 Authorization，禁止把凭据或完整 Provider 响应写入日志。
 
 <a id="contract-54-openai--sign-in-with-chatgpt"></a>
@@ -350,12 +349,16 @@ No model-visible Tool was added, and model code cannot select profiles.
 
 ### Probe and activation
 
-The Host tests one streamed reply, an actual `probe_echo` Tool Call with valid
+ChatGPT account selection is a separate private policy used by the existing Web, CLI and TUI consumers: authenticated catalog membership authorizes selection without test inference. `Control.AccountCatalog` reads the current account catalog; `SelectAccount` commits the profile metadata, auth-version fence, Agent-config CAS and activation events in one transaction. It does not insert a synthetic `model_probe`. `verified_at` records selection validation for account models and behavioral verification for compatible endpoints. Schema 44 replaces only the activation trigger so authenticated OAuth registrations can activate without a Probe; custom endpoints retain their existing evidence requirement. Existing snapshots and approvals are unchanged.
+
+Account limits and image modalities prefer the server response, then the bundled Pi 1.5.0 OpenAI Responses chat entry (not the same-ID classifier). Unknown missing limits use 128,000/16,384 defaults; context is capped at 1,048,576 and output cannot exceed context. Account transport does not add `max_output_tokens` to subscription requests; the Host still uses model metadata for context/output accounting. Web first-connection auto-selection is current onboarding policy, guarded by the config version captured before adding the candidate. Later additions do not switch models; failed selection leaves the saved candidate available for repair. No startup fallback, public provider interface, arbitrary catalog trust for custom endpoints, or fabricated behavioral proof is introduced. Treating catalog claims as Probe observations was rejected because it misrepresents evidence.
+
+For custom OpenAI-compatible endpoints, the Host tests one streamed reply, an actual `probe_echo` Tool Call with valid
 arguments, a Tool Result continuation, acknowledged cancellation, and clipping
 of long output. This test Tool has no executor or external effect. Failure of any
 mandatory behavior prevents selection. The catalog and user claims cannot mark
 a profile ready. Probe, selection and readiness enforce context/output limits
-of 1,048,576/65,536 tokens. These are execution limits, not the persisted metadata
+with a 1,048,576-token context ceiling and output bounded by the model context. Catalog output limits such as 128,000 are retained. These are execution limits, not the persisted metadata
 format: valid v3 candidates above these limits still migrate, list and read back
 unchanged, alongside all other candidates. They cannot be probed or selected
 until replaced or edited within limits. No profile is silently clamped.
@@ -396,7 +399,7 @@ also cover these failures.
 
 ## 当前设计取舍
 
-模型使用单一活动配置与冻结快照，账户凭据由 SecretStore 持有；平台依赖不可用不能通过将 Token 写入配置或数据库绕过。图片输入须通过实际行为 Probe 与冻结 ModelSnapshot，不因配置勾选或 catalog 声明直接启用视觉。
+模型使用单一活动配置与冻结快照，账户凭据由 SecretStore 持有；平台依赖不可用不能通过将 Token 写入配置或数据库绕过。兼容端点的图片输入须通过行为 Probe；ChatGPT 账户按认证目录的图片能力选用。两条路径都冻结 ModelSnapshot。
 
 <a id="decision-001-adr-001-current-openai-account-authentication-and-deferred-device-flow"></a>
 
@@ -429,15 +432,11 @@ Protocol references:
 
 <a id="decision-001-boundary-and-invariants"></a>
 
-### 原生 Linux 凭据（F-002）
+### 本地文件凭据（F-002）
 
-Linux cgo 构建在 SecretStore 内动态加载系统 `libsecret-1.so.0`（0.20+），不新增 Go/npm 依赖，不调用外部命令传送凭据。libsecret 负责 Secret Service 会话、传输加密和系统解锁提示；Steward 不实现第二套 OAuth 或私有钥匙串协议。默认 collection 由登录会话提供，后端不自动创建服务进程或保存解锁密码。
+所有受支持平台共用文件 SecretStore。普通 credential 引用映射到固定 secrets 目录，OAuth 保留 account-secrets 的 UUID 契约。目录权限 0700、文件 0600；受控引用拒绝路径穿越，读取拒绝符号及硬链接，更新通过临时文件、原子重命名和 fsync 完成。跨进程刷新及默认 Memory 初始化沿用原锁。
 
-每项使用 `ai.steward.Credential` schema、`service=steward` 和原有 opaque credential ref 隔离。值保存为带版本前缀的 base64，以无损承载二进制字节；这只是系统钥匙串内的编码，不是自建加密存储。单项最多 256 KiB，引用禁止 NUL/换行和环境引用。读取与错误不暴露系统路径、服务诊断或值。
-
-同步调用使用 GCancellable，遵守调用者期限及 30 秒上限；取消监听退出后再释放原生对象。libsecret 的清理结果可能在取消解锁后没有错误，因此删除后额外进行包含锁定项的仅元数据搜索。只有确认原项不存在才成功；清理失败继续沿既有 `credential cleanup failed` 恢复路径处理，不能误报退出完成。
-
-动态符号与 schema 在进程内初始化一次。库缺失时普通本地模型可启动，`doctor` 只检查后端库，不触发解锁；修复库后重启。Web 异步登录和同步退出、CLI/TUI 显示固定的修复提示，底层错误不进入页面或 API。macOS Keychain、显式 `env:` API Key 和不支持平台的失败行为保留原路径。没有 SQLite 迁移、新的模型工具、账户路由或凭据文件导入。
+不再编译系统 Keychain/libsecret 适配，不动态加载凭据服务，不尝试隐式迁移或降级。旧系统账户重新连接后以相同账户身份保存文件凭据；已有加密数据必须保留原密钥。缺少密钥失败关闭，不生成替代密钥。旧 account_secret_store 配置字段不再接受。
 
 ### Boundary and invariants
 
@@ -481,7 +480,7 @@ Persist `refreshing` before rotation; persist the new SecretStore value before
 committing connected metadata. A crash between those writes requires re-login,
 even if rotation succeeded. Failed initial registration cleans the newly owned
 secret; a process death before metadata insertion can still leave an orphaned
-OS credential item, as with existing API-key registration. No automatic credential
+private credential file, as with existing API-key registration. No automatic credential
 enumeration or cross-account deletion is introduced.
 
 Provider network destinations are fixed. Only the local fixture substitutes
@@ -522,6 +521,25 @@ refresh, failure injection, secret scans and kill/restart. The account harness
 owns launch, doctor, drive, evidence and cleanup. `make test-e2e` includes the account gate; focused repetition uses the existing
 system runner's `--gate account --repeat N`. No online account is needed in CI.
 
-Unexecuted real login/Keychain/provider Live Shadow is **inconclusive**. Device
+Unexecuted real login/provider Live Shadow is **inconclusive**. Device
 Authorization is **deferred**, not passed. Main/Conversation coverage belongs to its own [test plan](../test-plans/conversation.md);
 account checks alone do not establish release readiness.
+
+默认应用注入 `secret.Files` 处理 Memory 与普通 credential/env 引用，账户 Manager 单独注入 AccountFiles；所有生产消费者使用文件后端。两份目录复用私有文件机制，引用、账户锁、刷新与退出协议不变。
+
+### 长期密钥的统一消费路径
+
+| 使用方 | 文件存储与消费边界 |
+| --- | --- |
+| ChatGPT OAuth | account-secrets，原账户 UUID、轮换锁和清理协议 |
+| 模型 API Key | secrets，App Control 的 SecretStore |
+| Memory、加密 Evidence | secrets，默认配置和 Vault |
+| Embedding API Key | secrets，运行时注入的 SecretStore |
+| Computer/SSH 密码 | secrets，托管 Guest 生成与 SSHGuest 读取 |
+| Web、飞书、GitHub | secrets，各适配器仅解析配置引用 |
+| NATS | secrets，WithEvents/OpenWithSecrets |
+| 离线备份恢复 | secrets，CLI 在进入维护流程前读取密钥 |
+
+所有长期凭据采用同一文件机制与权限约束；显式 env 引用仍由同一入口解析，不隐式读取用户主目录的凭据。MCP 当前没有认证配置与凭据存储接口，其受限子进程不继承宿主认证环境。会话 cookie、OAuth PKCE/nonce 等只在对应会话内有效的随机材料保持内存生命周期，不另存磁盘。公开 host-key 指纹、哈希与签名校验公钥不属于私有凭据。
+
+系统后端与配置开关已移除。旧配置中的 account_secret_store 须删除；已有系统账户重新连接以恢复文件凭据，已有加密 Memory 必须保留原密钥。没有隐式读取系统钥匙串、创建新密钥覆盖既有数据或把凭据写入 YAML 的迁移旁路。

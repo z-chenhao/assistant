@@ -54,10 +54,11 @@ export async function startFixture() {
       }
       const auth=req.headers.authorization?.replace(/^Bearer /,'');
       if(!accesses.has(auth) || mode==='auth-loss')return json({error:'unauthorized'},401);
-      if(req.url==='/v1/models'){stats.catalogs++;return json({models:[...models.map(slug=>({slug,visibility:'list',display_name:slug,context_window:8192,max_output_tokens:1024})),{slug:'hidden-model',visibility:'hide'}]});}
+      if(req.url==='/v1/models'){stats.catalogs++;return json({models:[...models.map(slug=>({slug,visibility:'list',display_name:slug,context_window:8192,max_output_tokens:1024,input_modalities:['text']})),{slug:'hidden-model',visibility:'hide'}]});}
       if(req.url!=='/v1/responses')return json({},404);
       stats.generations++;const b=JSON.parse(body);
-      stats.request_valid &&= b.stream===true && b.store===false && !('max_output_tokens' in b) && !('temperature' in b) && !('previous_response_id' in b) && (!b.tools?.length || b.tools.every(t=>t.type==='namespace'));
+      stats.request_valid &&= b.stream===true && b.store===false && !('max_output_tokens' in b) && !('temperature' in b) && !('previous_response_id' in b) && (!b.tools?.length || b.tools.every(t=>t.type==='namespace' && typeof t.description==='string' && t.description.length>0));
+      if(b.tools?.some(t=>t.type==='namespace' && !t.description))return json({error:{code:'missing_required_parameter',param:'tools[0].description'}},400);
       // Validate the actual replay wire, not just the declared Tool schema.
       if(b.input.some(i=>i.type==='function_call_output')) {
         const call=b.input.find(i=>i.type==='function_call');
@@ -72,7 +73,7 @@ export async function startFixture() {
       const hasResult=b.input.some(i=>i.type==='function_call_output');
       if(b.tools?.length && !hasResult){
         const names=b.tools[0].tools.map(t=>t.name);
-        const name=names.includes('builtin__artifact_search')?'builtin__artifact_search':names[0];
+        const name=names.includes('builtin__artifact_search')?'builtin__artifact_search':names.includes('builtin__codemode_execute')?'builtin__codemode_execute':names[0];
         const item={type:'function_call',id:'fc_owned',call_id:'call_owned',name,namespace:'steward',arguments:name==='builtin__codemode_execute'?JSON.stringify({source:'const value=await tools.builtin__artifact_search({});text(JSON.stringify(value));'}):name==='builtin__artifact_search'?'{}':'{"value":"OK"}'};
         emit('response.output_item.added',{output_index:0,item:{...item,arguments:''}});
         emit('response.function_call_arguments.delta',{output_index:0,item_id:item.id,delta:item.arguments});

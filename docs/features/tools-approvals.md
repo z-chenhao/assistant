@@ -101,3 +101,5 @@ Worker, so the call remains available for later authoritative reconciliation.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/tools-approvals.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/tools-approvals.md)。
+
+高频 Tool search、Intelligent UI、Skill list/view 与 Main 的 Task 协调直接提供给模型；其余授权工具通过 Tool search 发现后经 Code Mode 调用，审批与恢复仍走同一工具管线。旧冻结执行不切换工具面。

@@ -1,3 +1,4 @@
+import {selectValue,selectParts} from './channels_controls.mjs';
 import {writeFile} from 'node:fs/promises';
 
 // One scenario module for the maintained channels browser driver; no runner,
@@ -34,7 +35,17 @@ async function navigationViewports(page,evidence){
 // Real navigation, native form writes and delayed bundle delivery. Check
 // relationships before/after enhancement rather than platform-specific pixels.
 export async function pageTransitions(page,context,url,evidence){
- const measurements={resources:[],collapse:[],loading:[]};
+ const measurements={resources:[],collapse:[],loading:[],fonts:[],focus:[]};
+ await page.addInitScript(()=>{
+  window.navigationFontFrames=[];
+  if(!['/settings/preferences','/settings/notifications'].includes(location.pathname))return;
+  const sample=()=>{
+   const brand=document.querySelector('.brand');
+   if(brand)window.navigationFontFrames.push({brand:brand.getBoundingClientRect().width,ready:document.fonts.check('14px Inter')&&document.fonts.check('14px StewardWordmark')});
+   if(performance.now()<300)requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);
+ });
  const settle=async()=>{await page.evaluate(()=>document.fonts.ready);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))};
  for(const language of ['en','zh-CN']){
   await context.request.post(url+'/settings/language',{form:{language}});
@@ -54,6 +65,14 @@ export async function pageTransitions(page,context,url,evidence){
  }
  await context.request.post(url+'/settings/language',{form:{language:'en'}});
  await page.setViewportSize({width:1400,height:980});await page.goto(url+'/settings/preferences');
+ await settle();
+ // Real native clicks must reuse the critical fonts from the previous page.
+ for(const path of ['/settings/notifications','/settings/preferences','/settings/notifications']){
+  await page.locator(`.settings-navigation a[href="${path}"]`).click();await page.waitForURL(url+path);await settle();
+  const fonts=await page.evaluate(()=>({frames:window.navigationFontFrames,resources:performance.getEntriesByType('resource').filter(entry=>/\/(InterVariable\.woff2|Michroma-Regular\.ttf)\?/.test(entry.name)).map(entry=>({name:new URL(entry.name).pathname,bytes:entry.transferSize}))}));
+  if(!fonts.frames.length||fonts.frames.some(frame=>!frame.ready)||fonts.frames.some(frame=>Math.abs(frame.brand-fonts.frames[0].brand)>1)||fonts.resources.length!==2||fonts.resources.some(resource=>resource.bytes!==0))throw Error('Settings navigation flashed or downloaded critical fonts again: '+JSON.stringify(fonts));
+  measurements.fonts.push({path,...fonts});
+ }
  const heading=await page.locator('.settings-page h1').boundingBox();
  for(const path of ['/settings/notifications','/settings/setup','/settings/capabilities']){
   await page.goto(url+path);const next=await page.locator('.settings-page h1').boundingBox();
@@ -65,7 +84,7 @@ export async function pageTransitions(page,context,url,evidence){
  for(const path of ['/settings/preferences','/settings/setup','/developer/observability','/developer/database','/tasks','/']){
   await page.goto(url+path);await page.reload();
   const state=await page.evaluate(()=>({path:location.pathname,main:document.querySelector('main').getBoundingClientRect().x,sidebar:getComputedStyle(document.querySelector('.app-sidebar')).display}));
-  if(state.main!==0||state.sidebar!=='none'||!await page.locator('.sidebar-open').isVisible())throw Error('collapsed navigation reset: '+JSON.stringify(state));
+  if(state.main!==64||state.sidebar==='none'||!await page.locator('.brand-row [data-sidebar-toggle]').isVisible())throw Error('collapsed navigation reset: '+JSON.stringify(state));
   measurements.collapse.push(state);
  }
  for(const [width,path,collapsed,theme] of [[390,'/settings/preferences',false,'light'],[320,'/settings/preferences',false,'dark'],[1400,'/settings/preferences',false,'light'],[1400,'/',true,'dark'],[390,'/tasks',false,'dark']]){
@@ -81,7 +100,7 @@ export async function pageTransitions(page,context,url,evidence){
     return {dark:document.documentElement.classList.contains('dark'),boxes:Object.fromEntries(selectors.map(selector=>{const node=document.querySelector(selector);return [selector,node?.getBoundingClientRect().toJSON()??null]}))};
    };
    const before=await page.evaluate(geometry);
-   if(before.dark!==(theme==='dark')||before.boxes['.workspace-main'].y!==0||collapsed&&before.boxes['.workspace-main'].x!==0)throw Error('first paint used the wrong theme/navigation');
+   if(before.dark!==(theme==='dark')||before.boxes['.workspace-main'].y!==0||collapsed&&before.boxes['.workspace-main'].x!==64)throw Error('first paint used the wrong theme/navigation');
    await page.screenshot({path:`${evidence}/loading-${width}-${path.split('/').filter(Boolean).join('-')}-before.png`});
    release();await page.waitForLoadState('load');await settle();const after=await page.evaluate(geometry);
    for(const [selector,rect] of Object.entries(before.boxes))if(rect){
@@ -96,14 +115,32 @@ export async function pageTransitions(page,context,url,evidence){
  await page.route('**/app.js',route=>route.abort());await page.goto(url+'/settings/preferences');await page.unroute('**/app.js');
  if(!await page.locator('.app-sidebar').isVisible()||!await page.locator('.preference-save').isVisible()||!await page.locator('#interface-language').isVisible())throw Error('bundle failure left native navigation or form inaccessible');
  await page.setViewportSize({width:1400,height:980});await page.goto(url+'/settings/notifications');
- const target=page.locator('#notification-target');await target.selectOption('tui:');
+ const target=page.locator('#notification-target');await selectValue(page,target,'tui:');
  await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.getByRole('button',{name:'Save notification channel',exact:true}).click()]);
- await page.locator('.page-feedback.success').waitFor();await target.selectOption('auto:');
+ await page.locator('.page-feedback.success').waitFor();await selectValue(page,target,'auto:');
  if(!await page.locator('.page-feedback.success').isHidden()||!await page.locator('[data-notification-draft]').isVisible())throw Error('editing retained stale saved feedback');
  await page.reload();if(await target.inputValue()!=='tui:'||await page.locator('[data-notification-draft]').isVisible())throw Error('notification draft was saved without submission or persisted after reload');
- await target.selectOption('auto:');await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.getByRole('button',{name:'Save notification channel',exact:true}).click()]);
+ await selectValue(page,target,'auto:');await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.getByRole('button',{name:'Save notification channel',exact:true}).click()]);
  await page.reload();if(await target.inputValue()!=='auto:')throw Error('explicit notification save was lost');
  await page.screenshot({path:evidence+'/notifications-saved.png'});
+ for(const theme of ['light','dark']){
+  await page.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
+  await page.goto(url+'/');await settle();
+  for(const width of [1400,390]){
+   await page.setViewportSize({width,height:980});
+   const text=page.locator('.composer textarea');await text.click();
+   for(const input of ['pointer','keyboard']){
+    if(input==='keyboard'){await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab')}
+    const focus=await text.evaluate(node=>{
+     const composer=node.closest('.composer'),style=getComputedStyle(composer);
+     return {active:node===document.activeElement,outline:parseFloat(style.outlineWidth),border:style.borderColor,background:style.backgroundColor,shadow:style.boxShadow};
+    });
+    if(!focus.active||focus.outline!==0||focus.border===focus.background||focus.shadow==='none')throw Error('composer focus added an outer frame or lost its indicator: '+JSON.stringify(focus));
+    measurements.focus.push({theme,width,input,...focus});
+   }
+   await page.locator('.composer').screenshot({path:`${evidence}/composer-focus-${theme}-${width}.png`});
+  }
+ }
  await writeFile(evidence+'/page-transitions.json',JSON.stringify({...measurements,notificationDraft:true,bundleFailureFallback:true},null,2));
 }
 
@@ -158,19 +195,19 @@ export async function capabilityDefaults(page,context,url,evidence){
  // Preserve upstream language autosave while exercising searchable options.
  const language=page.locator('[data-language-trigger]');
  const languagePopup=page.locator('[data-language-popup]');
- await language.click();await languagePopup.getByRole('searchbox').fill('简体');
+ await language.click();await languagePopup.locator('input[type=search]').fill('简体');
  if(await languagePopup.getByRole('option').count()!==1)throw Error('language search did not filter');
  await page.screenshot({path:evidence+'/language-dropdown.png',fullPage:true});
- await languagePopup.getByRole('searchbox').press('ArrowDown');await page.keyboard.press('Enter');
+ await languagePopup.locator('input[type=search]').press('ArrowDown');await page.keyboard.press('Enter');
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();
  await page.goto(url+'/settings/preferences');await page.locator('[data-settings-search]:not([hidden])').waitFor();
  await page.screenshot({path:evidence+'/preferences.png',fullPage:true});
- await language.press('Enter');await languagePopup.getByRole('searchbox').fill('zz-no-result');
- await languagePopup.getByText('无结果。',{exact:true}).waitFor();await page.keyboard.press('Escape');
+ await language.press('Enter');await languagePopup.locator('input[type=search]').fill('zz-no-result');
+ await languagePopup.getByText('无结果。',{exact:true}).waitFor();await page.keyboard.press('Escape');await languagePopup.waitFor({state:'hidden'});await language.and(page.locator(':focus')).waitFor();
  if(!await language.evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Escape lost dropdown focus');
- await language.press('Enter');await language.press('Tab');
- if(!await page.locator('#interface-theme').evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Tab did not continue to the next setting');
- await language.click();await page.getByRole('heading',{level:1}).click();
+ await language.press('Enter');await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));await page.keyboard.press('Tab');await languagePopup.waitFor({state:'hidden'});
+ if(!await page.locator('#interface-theme-picker').evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Tab did not continue to the next setting');
+ await language.click();await page.getByRole('heading',{level:1}).click();await languagePopup.waitFor({state:'hidden'});
  if(await languagePopup.isVisible())throw Error('outside click kept dropdown open');
  const popup=page.locator('.control-select-menu:visible');
  const navSearch=page.getByRole('searchbox',{name:'搜索设置',exact:true});await navSearch.fill('通知');
@@ -178,12 +215,12 @@ export async function capabilityDefaults(page,context,url,evidence){
  await navSearch.fill('zz-no-result');await page.getByText('未找到设置。',{exact:true}).waitFor();await navSearch.press('Escape');
  if(await page.locator('.settings-navigation a:visible').count()!==4)throw Error('settings filter did not reset');
  await navigationViewports(page,evidence);
- await page.locator('#interface-theme').selectOption('dark');
+ await selectValue(page,page.locator('#interface-theme'),'dark');
  if(!await page.locator('html').evaluate(node=>node.classList.contains('dark')))throw Error('appearance did not apply');
- await page.reload();await page.locator('#interface-theme').waitFor();
+ await page.reload();await page.locator('#interface-theme-picker').waitFor();
  if(await page.locator('#interface-theme').inputValue()!=='dark')throw Error('appearance did not persist');
  await page.screenshot({path:evidence+'/preferences-dark.png',fullPage:true});
- await page.locator('#interface-theme').selectOption('light');
+ await selectValue(page,page.locator('#interface-theme'),'light');
  await page.goto(url+'/settings/notifications');await page.screenshot({path:evidence+'/notifications.png',fullPage:true});
  await page.goto(url+'/settings/models');await page.screenshot({path:evidence+'/models.png',fullPage:true});
  await page.goto(url+'/settings/models/new?provider=compatible');await page.screenshot({path:evidence+'/model-inputs.png',fullPage:true});
@@ -195,9 +232,9 @@ export async function capabilityDefaults(page,context,url,evidence){
  await memory.click();
  await page.getByText('已启用（默认）',{exact:true}).waitFor();
  if(!await page.locator('section.panel.form-panel').isVisible()||await page.locator('[data-capability-fields]').isVisible())throw Error('default mode exposed custom configuration');
- await page.locator('#capability-mode').click();await popup.getByRole('option',{name:'自定义',exact:true}).click();
+ await selectValue(page,page.locator('#capability-mode'),'custom');
  if(!await page.locator('[data-capability-fields]').isVisible())throw Error('custom dropdown did not reveal inputs');
- await page.locator('#capability-mode').selectOption('automatic');
+ await selectValue(page,page.locator('#capability-mode'),'automatic');
  await page.goto(url+'/settings/capabilities/memory');await page.locator('[data-capability-fields][hidden]').waitFor({state:'hidden'});
  await page.screenshot({path:evidence+'/memory-default.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
@@ -223,152 +260,70 @@ export async function capabilityDefaults(page,context,url,evidence){
 
 export async function capabilitySetup(page,context,url,evidence){
  const facts=JSON.parse(process.env.STEWARD_CAPABILITY_SETUP_FACTS);
- const advanced=async target=>{
-  const disclosure=target.locator('details.capability-advanced');
-  if(!await disclosure.evaluate(node=>node.open))await disclosure.locator('summary').first().click();
-  await target.locator('#capability-configuration').waitFor({state:'visible'});
- };
- const open=async id=>{await page.goto(url+'/settings/capabilities/'+id);await advanced(page)};
  const guided=()=>page.locator('form.capability-guided');
- const guidedTest=async()=>{
-  await guided().getByRole('button',{name:'Check connection',exact:true}).click();
-  await page.waitForURL(url+'/settings/capabilities/*');
-  if(new URL(page.url()).searchParams.has('editor'))throw Error('guided test switched to Advanced YAML');
+ const status=form=>form.locator('[data-capability-draft]');
+ const response=()=>page.waitForResponse(r=>new URL(r.url()).pathname==='/capability/configure'&&r.request().method()==='POST');
+ const open=async id=>{await page.goto(url+'/settings/capabilities/'+id);const disclosure=page.locator('.capability-advanced');await disclosure.locator('summary').first().click()};
+ const apply=async(value,error)=>{
+  const text=typeof value==='string'?value:JSON.stringify(value,null,2);
+  const form=page.locator('.capability-editor');
+  await Promise.all([response(),form.locator('[data-capability-import]').setInputFiles({name:'settings.yaml',mimeType:'application/yaml',buffer:Buffer.from(text)})]);
+  await status(form).filter({hasText:error??'Saved.'}).waitFor();
  };
- const sourcePath=()=>page.locator('details.technical-details').filter({has:page.getByText('Connection details',{exact:true})}).last().locator('code').textContent();
- const test=async text=>{
-  await advanced(page);
-  await page.locator('#capability-configuration').fill(typeof text==='string'?text:JSON.stringify(text,null,2));
-  await Promise.all([page.waitForURL(url+'/settings/capabilities/*'),page.getByRole('button',{name:'Test configuration',exact:true}).click()]);
-  if(!new URL(page.url()).pathname.startsWith('/settings/capabilities/')||new URL(page.url()).searchParams.get('editor')!=='advanced'||!await page.locator('details.capability-advanced').evaluate(node=>node.open))throw Error('advanced test lost its canonical editor route');
- };
- const save=async()=>{await page.getByRole('button',{name:'Save verified configuration',exact:true}).click();if(await page.getByText('Unsaved candidate.',{exact:false}).count())throw Error('candidate was not persisted')};
- await page.goto(url+'/settings/models');await page.getByRole('link',{name:'Capabilities',exact:true}).click();
- if(await page.locator('.object-row').count()!==5||await page.locator('.object-row[href="/settings/capabilities/embedding"]').count())throw Error('Memory search must not be a separate capability');
- await page.screenshot({path:evidence+'/capabilities-before.png',fullPage:true});
- // Default mode and an explicit opt-out survive the same public form/PRG path.
+ await page.goto(url+'/settings/capabilities');
+ if(await page.locator('.object-row').count()!==5||await page.locator('.settings-footer').count())throw Error('capability navigation or footer regressed');
  await page.goto(url+'/settings/capabilities/skills');
- await guided().getByLabel('Configuration mode',{exact:true}).selectOption('automatic');
- await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),guided().getByRole('button',{name:'Save',exact:true}).click()]);
- await page.reload();
- if(await guided().getByLabel('Configuration mode',{exact:true}).inputValue()!=='automatic')throw Error('automatic mode did not persist');
- await page.screenshot({path:evidence+'/skills-automatic.png',fullPage:true});
- await guided().getByLabel('Configuration mode',{exact:true}).selectOption('off');
- await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),guided().getByRole('button',{name:'Save',exact:true}).click()]);
- await page.reload();
- if(await guided().getByLabel('Configuration mode',{exact:true}).inputValue()!=='off')throw Error('explicit opt-out did not persist');
- // Start with the ordinary form: no YAML or provider protocol knowledge is
- // needed to enable Memory, repair a failed probe, retest edits and save.
+ if(await guided().getByRole('button',{name:'Save',exact:true}).count())throw Error('enhanced capability form still requires Save');
+ for(const mode of ['automatic','off']){
+  await Promise.all([response(),selectValue(page,guided().getByLabel('Configuration mode',{exact:true}),mode)]);
+  await status(guided()).getByText('Saved.',{exact:true}).waitFor();await page.reload();
+  if(await (await selectParts(guided().getByLabel('Configuration mode',{exact:true}))).native.inputValue()!==mode)throw Error('automatic mode/opt-out did not persist');
+ }
  await page.goto(url+'/settings/capabilities/memory');
- if(!await guided().isVisible()||await page.locator('details.capability-advanced').evaluate(node=>node.open))throw Error('Memory did not lead with its guided form');
- const initialRevision=await guided().locator('input[name="revision"]').inputValue(),initialPath=await sourcePath();
- await guided().getByLabel('Configuration mode',{exact:true}).selectOption('custom');
- await guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_MISSING_SETUP_KEY');
- await guided().getByRole('button',{name:'Save',exact:true}).click();
- await page.getByRole('status').filter({hasText:'Memory key unavailable'}).waitFor();
- if(await guided().getByLabel('Encryption key reference',{exact:true}).inputValue()!=='env:STEWARD_MISSING_SETUP_KEY'||await guided().locator('input[name="revision"]').inputValue()!==initialRevision||await sourcePath()!==initialPath)throw Error('failed save lost the exact draft or source revision');
+ if(await page.locator('.capability-advanced').evaluate(node=>node.open))throw Error('Memory did not lead with the compact form');
+ const revision=await guided().locator('[name=revision]').inputValue();
+ await selectValue(page,guided().getByLabel('Configuration mode',{exact:true}),'custom');
+ await Promise.all([response(),guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_MISSING_SETUP_KEY')]);
+ await status(guided()).filter({hasText:'Memory key unavailable'}).waitFor();
+ if(await guided().locator('[name=revision]').inputValue()!==revision)throw Error('failed automatic save changed the file revision');
  await page.screenshot({path:evidence+'/memory-guided-failed.png',fullPage:true});
- await guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_SETUP_MEMORY_KEY');
- await guidedTest();await page.getByRole('status').filter({hasText:'Connection available.'}).waitFor();
- await page.screenshot({path:evidence+'/memory-guided-tested.png',fullPage:true});
- await guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_MISSING_SETUP_KEY');
- if(await page.getByText('Connection available.',{exact:true}).isVisible()||!await guided().getByText('Unsaved changes.',{exact:true}).isVisible())throw Error('edited capability retained a stale connection proof');
- await page.screenshot({path:evidence+'/memory-guided-edited.png',fullPage:true});
- await guided().getByRole('button',{name:'Save',exact:true}).click();
- await page.getByRole('status').filter({hasText:'Memory key unavailable'}).waitFor();
- if(await guided().locator('input[name="revision"]').inputValue()!==initialRevision)throw Error('save reused a check for different fields');
- await guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_SETUP_MEMORY_KEY');
- await guided().getByRole('button',{name:'Save',exact:true}).click();
- await page.getByRole('status').filter({hasText:'Changes saved. Restart Steward to apply.'}).waitFor();
- if(new URL(page.url()).pathname!=='/settings/capabilities/memory'||await guided().getByLabel('Encryption key reference',{exact:true}).inputValue()!=='env:STEWARD_SETUP_MEMORY_KEY'||await guided().locator('input[name="revision"]').inputValue()===initialRevision||await sourcePath()!==initialPath)throw Error('save lost fields, source path or configuration revision');
+ await Promise.all([response(),guided().getByLabel('Encryption key reference',{exact:true}).fill('env:STEWARD_SETUP_MEMORY_KEY')]);
+ await status(guided()).filter({hasText:'Saved.'}).waitFor();
+ if(await guided().locator('[name=revision]').inputValue()===revision)throw Error('automatic save did not commit');
  await page.screenshot({path:evidence+'/memory-guided-saved.png',fullPage:true});
- // Keep the original Advanced YAML repair/probe/save coverage as well.
  await open('memory');
- await test('encryption_key_ref: env:STEWARD_MISSING_SETUP_KEY\n');
- await page.getByRole('status').filter({hasText:'Memory key unavailable'}).waitFor();
- if(!await page.getByRole('button',{name:'Save verified configuration',exact:true}).isDisabled())throw Error('failed candidate can be saved');
- await test('encryption_key_ref: env:STEWARD_SETUP_MEMORY_KEY\n');
- await page.getByRole('status').filter({hasText:'Connection available.'}).waitFor();
- await page.reload();if(!await page.locator('#capability-configuration').inputValue().then(v=>v.includes('STEWARD_SETUP_MEMORY_KEY')))throw Error('PRG lost tested draft');
- await page.locator('#capability-configuration').fill('encryption_key_ref: env:STEWARD_MISSING_SETUP_KEY\n');
- if(await page.getByText('Connection available.',{exact:true}).isVisible()||!await page.getByRole('button',{name:'Save verified configuration',exact:true}).isDisabled())throw Error('edited Advanced YAML retained proof or enabled Save');
- await test('encryption_key_ref: env:STEWARD_SETUP_MEMORY_KEY\n');await page.getByText('Connection available.',{exact:true}).waitFor();
- await save();await page.getByRole('status').filter({hasText:'Changes saved. Restart Steward to apply.'}).waitFor();
- await page.screenshot({path:evidence+'/memory-saved.png',fullPage:true});
- await open('embedding');
- await test({provider:'openai_compatible',endpoint:facts.embedding,model:'semantic-fixture-v1',dimensions:2});
- await page.getByRole('status').filter({hasText:'Embedding connection failed'}).waitFor();
- await test({provider:'openai_compatible',endpoint:facts.embedding,model:'semantic-fixture-v1',dimensions:5});
- await page.getByText('Connection available.',{exact:false}).waitFor();await save();
- await open('skills');await test({root:facts.skills+'/missing',scope:'agent'});await page.getByText('Skill catalog unavailable.',{exact:false}).waitFor();
- await test({root:facts.skills,scope:'agent'});await page.getByText('Connection available.',{exact:false}).waitFor();await save();
- // Repeated provider/tool controls use native form actions. Preserve the
- // supplied fixture paths and exact arguments through add/remove and Test/Save.
- await page.goto(url+'/settings/capabilities/mcp');
- await guided().getByRole('switch',{name:'Enable this capability',exact:true}).check();
- await guided().getByLabel('Provider name',{exact:true}).fill('owner_catalog');
- await guided().getByLabel('Executable path',{exact:true}).fill(facts.binary);
- await guided().getByLabel('Private state directory',{exact:true}).fill(facts.provider);
- await guided().getByLabel('Command arguments (optional)',{exact:false}).fill('-test-mcp-server\n'+facts.provider);
- await guided().getByLabel('Tool name',{exact:true}).fill('send');
- await guided().getByLabel('Permission',{exact:false}).selectOption('external_effect');
- const mcpRevision=await guided().locator('input[name="revision"]').inputValue();
- await guided().getByRole('button',{name:'Add allowed tool',exact:true}).click();
- await guided().getByLabel('Tool name',{exact:true}).nth(1).fill('read');
- await guided().getByRole('button',{name:'Add tool provider',exact:true}).click();
- if(await guided().locator('.capability-provider').count()!==2)throw Error('native provider add did not retain both rows');
- await guided().locator('.capability-provider').nth(1).getByRole('button',{name:'Remove provider',exact:true}).click();
- if(await guided().locator('.capability-provider').count()!==1||await guided().getByLabel('Provider name',{exact:true}).inputValue()!=='owner_catalog'||await guided().getByLabel('Executable path',{exact:true}).inputValue()!==facts.binary||await guided().getByLabel('Private state directory',{exact:true}).inputValue()!==facts.provider||await guided().getByLabel('Command arguments (optional)',{exact:false}).inputValue()!=='-test-mcp-server\n'+facts.provider||await guided().locator('input[name="revision"]').inputValue()!==mcpRevision)throw Error('native MCP row actions lost provider fields or revision');
- await guidedTest();await page.getByText('Connection available.',{exact:false}).waitFor();
- if(await guided().getByLabel('Tool name',{exact:true}).count()!==2||await guided().getByLabel('Tool name',{exact:true}).nth(0).inputValue()!=='send'||await guided().getByLabel('Tool name',{exact:true}).nth(1).inputValue()!=='read'||await guided().getByLabel('Permission',{exact:false}).nth(0).inputValue()!=='external_effect')throw Error('guided MCP test changed its allowlist or permissions');
- await guided().getByRole('button',{name:'Save',exact:true}).click();
- if(await page.getByText('Unsaved candidate.',{exact:false}).count()||await guided().getByLabel('Command arguments (optional)',{exact:false}).inputValue()!=='-test-mcp-server\n'+facts.provider)throw Error('guided MCP save failed exact-candidate verification');
- await page.screenshot({path:evidence+'/mcp-guided-saved.png',fullPage:true});
+ if(await page.locator('#capability-configuration').isVisible())throw Error('YAML textarea dominates the import flow');
+ const before=await page.locator('.capability-editor [name=revision]').inputValue();
+ await apply('encryption_key_ref: env:STEWARD_MISSING_SETUP_KEY\n','Memory key unavailable');
+ if(await page.locator('.capability-editor [name=revision]').inputValue()!==before)throw Error('invalid imported YAML persisted');
+ await apply('encryption_key_ref: env:STEWARD_SETUP_MEMORY_KEY # imported\n');
+ await page.screenshot({path:evidence+'/memory-yaml-import.png',fullPage:true});
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download example',exact:true}).click();if((await download).suggestedFilename()!=='memory.yaml')throw Error('example download lost its file type');
+ await open('embedding');await apply({provider:'openai_compatible',endpoint:facts.embedding,model:'semantic-fixture-v1',dimensions:2},'Embedding connection failed');
+ await apply({provider:'openai_compatible',endpoint:facts.embedding,model:'semantic-fixture-v1',dimensions:5});
+ await open('skills');await apply({root:facts.skills+'/missing',scope:'agent'},'Skill catalog unavailable');await apply({root:facts.skills,scope:'agent'});
  await open('mcp');
  const provider={name:'owner_catalog',command:facts.binary,args:['-test-mcp-server',facts.provider],directory:facts.provider,tools:{not_advertised:'read_only'}};
- await test([provider]);await page.getByText('MCP discovery failed.',{exact:false}).waitFor();
- provider.tools={read:'read_only',send:'external_effect'};await test([provider]);await page.getByText('Connection available.',{exact:false}).waitFor();await save();
- // Verify the native fallback before platform execution diagnostics, so an
- // unavailable kernel workspace does not hide form accessibility evidence.
+ await apply([provider],'MCP discovery failed');provider.tools={read:'read_only',send:'external_effect'};await apply([provider]);
+ await page.screenshot({path:evidence+'/mcp-imported.png',fullPage:true});
+ // Native forms and native file import still validate and save without JavaScript.
  const plain=await page.context().browser().newContext({javaScriptEnabled:false,viewport:{width:390,height:844}});
  try{
-  await plain.addCookies(await context.cookies());const p=await plain.newPage();
-  await p.goto(url+'/settings/capabilities/embedding');
-  const form=p.locator('form.capability-guided');
-  if(!await form.isVisible()||await p.locator('details.capability-advanced').evaluate(node=>node.open)||await form.getByLabel('Endpoint URL',{exact:true}).inputValue()!==facts.embedding||await form.getByLabel('Vector dimensions',{exact:true}).inputValue()!=='5')throw Error('no-JavaScript guided form lost saved fields');
-  await form.getByRole('button',{name:'Check connection',exact:true}).click();
-  await p.getByText('Connection available.',{exact:false}).waitFor();
-  await form.getByRole('button',{name:'Save',exact:true}).click();
-  if(await p.getByText('Unsaved candidate.',{exact:false}).count())throw Error('no-JavaScript guided settings were not saved');
-  await p.screenshot({path:evidence+'/capability-guided-no-script.png',fullPage:true});
-  await advanced(p);
-  await p.locator('#capability-configuration').fill('provider: openai_compatible\nendpoint: '+facts.embedding+'\nmodel: semantic-fixture-v1\ndimensions: 5\n');
-  await p.getByRole('button',{name:'Test configuration',exact:true}).click();
-  await p.getByText('Connection available.',{exact:false}).waitFor();
-  if(new URL(p.url()).searchParams.get('editor')!=='advanced'||!await p.locator('details.capability-advanced').evaluate(node=>node.open))throw Error('no-JavaScript advanced PRG lost its editor');
+  await plain.addCookies(await context.cookies());const p=await plain.newPage();await p.goto(url+'/settings/capabilities/embedding');
+  await p.locator('.capability-guided').getByRole('button',{name:'Save',exact:true}).click();
+  const advanced=p.locator('.capability-advanced');await advanced.locator('summary').first().click();
+  await advanced.locator('[data-capability-import]').setInputFiles({name:'embedding.yml',mimeType:'application/yaml',buffer:Buffer.from(JSON.stringify({provider:'openai_compatible',endpoint:facts.embedding,model:'semantic-fixture-v1',dimensions:5}))});
+  await advanced.getByRole('button',{name:'Apply configuration',exact:true}).click();
+  if(await p.locator('.feedback.error').count())throw Error('native YAML import failed');
   await p.screenshot({path:evidence+'/capability-no-script.png',fullPage:true});
  }finally{await plain.close()}
- await open('execution');
- await page.setViewportSize({width:720,height:980});
- const editorFont=await guided().locator('textarea').evaluate(node=>parseFloat(getComputedStyle(node).fontSize));
- if(editorFont<16)throw Error('guided textarea missed the compact input rule');
- if(!await guided().locator('textarea').evaluate(node=>{const probe=document.createElement('span');probe.style.color='var(--control-border)';node.after(probe);const color=getComputedStyle(probe).color;probe.remove();return getComputedStyle(node).borderTopColor===color}))throw Error('guided textarea uses a divider instead of the input boundary');
- if(await page.locator('#capability-configuration').evaluate(node=>parseFloat(getComputedStyle(node).fontSize))<16)throw Error('Advanced YAML missed the compact input rule');
- await page.setViewportSize({width:320,height:740});
- for(const summary of await page.locator('.capability-advanced>summary,details.technical-details>summary').all())if(await summary.evaluate(node=>node.getBoundingClientRect().height)<44)throw Error('capability disclosure lost its touch target');
- await page.setViewportSize({width:1400,height:980});
- await test({root:facts.workspace,toolchain_roots:[]});await page.getByText('Connection available.',{exact:false}).waitFor();await save();
- // Restore the implicit workspace so Computer can be the sole saved backend.
- await test('');await page.getByText('Connection available.',{exact:false}).waitFor();await save();
- await open('computer');await test(facts.computer);await page.getByText('Connection available.',{exact:false}).waitFor();
- await page.screenshot({path:evidence+'/computer-tested.png',fullPage:true});await save();
+ await open('execution');await apply({root:facts.workspace,toolchain_roots:[]});await apply('');
+ await open('computer');await apply(facts.computer);
  await page.goto(url+'/settings/capabilities');
- if(await page.getByText('Restart required',{exact:true}).count()!==5)throw Error('saved configuration changes are not distinguished from running state');
+ if(await page.getByText('Restart required',{exact:true}).count()!==5)throw Error('saved state was confused with active runtime');
  await page.screenshot({path:evidence+'/capabilities-configured.png',fullPage:true});
- await page.setViewportSize({width:320,height:740});
- if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('capabilities overflowed a compact viewport');
+ await page.setViewportSize({width:320,height:740});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('capabilities overflow compact viewport');
  await page.screenshot({path:evidence+'/capabilities-mobile.png',fullPage:true});
-
 }
 
 export async function settingsAccount(page,context,url,evidence){

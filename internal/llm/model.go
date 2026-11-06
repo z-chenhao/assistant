@@ -146,8 +146,8 @@ func (p ProfileInput) ValidateActivation() error {
 	if err := p.Validate(); err != nil {
 		return err
 	}
-	if p.ContextWindow > 1048576 || p.MaxOutputTokens > 65536 {
-		return errors.New("token limits exceed Host safety bounds (context 1048576, output 65536)")
+	if p.ContextWindow > 1048576 {
+		return errors.New("context window exceeds Host safety bound (1048576)")
 	}
 	return nil
 }

@@ -1,9 +1,22 @@
 package provider
 
 import (
+	"encoding/json"
 	"net/url"
 	"testing"
 )
+
+func TestResponsesNamespaceHasRequiredDescription(t *testing.T) {
+	wire, err := BuildRequest(Model{ID: "model", API: OpenAIResponses, BaseURL: "https://api.openai.com/v1"}, Context{Tools: []Tool{{Name: "echo", Namespace: "steward", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}}}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := wire.Body["tools"].([]any)
+	namespace := tools[0].(map[string]any)
+	if namespace["type"] != "namespace" || namespace["description"] == "" || namespace["description"] == nil {
+		t.Fatal("public Responses API rejects namespace tools without description", namespace)
+	}
+}
 
 func TestExplicitCloudEndpointsArePreserved(t *testing.T) {
 	for _, api := range []API{BedrockConverse, GoogleVertex, AzureResponses} {

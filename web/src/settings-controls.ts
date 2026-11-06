@@ -1,7 +1,6 @@
 import {t} from './i18n';
 
-// Keep the native select as the form control and no-script fallback. On desktop,
-// its popup adds search, checkmarks and keyboard navigation without copying values.
+// Business behavior consumes native form values; shared Base UI controls own UI.
 export function enhanceSettingsControls(){
  const page=document.querySelector('.settings-page');
  if(!page)return;
@@ -34,7 +33,7 @@ export function enhanceSettingsControls(){
  if(theme){
   const media=matchMedia('(prefers-color-scheme: dark)');
   const read=()=>{try{return localStorage.getItem('steward-theme')??'system'}catch{return 'system'}};
-  const sync=()=>{theme.value=read();document.documentElement.classList.toggle('dark',theme.value==='dark'||theme.value==='system'&&media.matches)};
+  const sync=()=>{theme.value=read();document.documentElement.classList.toggle('dark',theme.value==='dark'||theme.value==='system'&&media.matches);theme.dispatchEvent(new Event('control-value-sync'))};
   sync();theme.closest<HTMLElement>('[data-appearance-setting]')!.removeAttribute('data-client-pending');
   theme.addEventListener('change',()=>{try{if(theme.value==='system')localStorage.removeItem('steward-theme');else localStorage.setItem('steward-theme',theme.value)}catch{};document.documentElement.classList.toggle('dark',theme.value==='dark'||theme.value==='system'&&media.matches)});
   media.addEventListener('change',sync);window.addEventListener('storage',sync);

@@ -30,11 +30,13 @@ Web POST 分发只选择有名动作处理函数；消息/附件、模型、账�
 
 ### Web 信息架构与呈现职责（F-018）
 
+共享外壳预加载 Inter 和 Michroma 字体，CSS 与 preload 使用相同的内容 SHA-256 版本 URL。只有版本与内嵌字节匹配的字体允许私有长期缓存；页面、脚本、样式、未版本化字体和错误响应仍为 no-store。切换 Settings 子页保留原生导航，不再逐页重新下载字体并闪回系统字体。
+
 一级侧栏上方为 Chat、Tasks、Developer，Settings 固定左下；模块内部分类使用相邻二级侧栏，不替换一级入口；没有重复头像入口、静态绿色状态灯或未实现功能的空 Tab。共同的导航、面包屑、状态、按钮、面板和反馈使用一套中性样式。视觉主操作分别是发送、处理当前任务、配置下一步和选择观测节点。
 
 `routes.go` 维护认证后的路由分发，`navigation.go` 维护规范路径、旧地址跳转和本地返回地址校验；`page.go` 只组装共享框架与分派加载。`settings.go`、`tasks.go`、`conversation.go` 与 `approval_view.go` 拥有各自的查询/呈现。前端样式按 shell、workspace、conversation、observability 分开，共享设计变量；没有引入新框架或第二套状态管理。
 
-消息输入框的键盘增强保留原生节点：Enter 阻止默认换行并通过 `requestSubmit` 复用按钮的表单校验与提交流程；Shift + Enter 保留原生换行。输入法组合事件（含兼容性键码 229）不触发发送，按键自动重复、正在提交和按钮禁用时也不提交。发送按钮在 conversation 样式中使用固定 `#D97757` 背景与白色图标，不修改其他主操作的主题变量。
+消息输入框的键盘增强保留原生节点：Enter 阻止默认换行并通过 `requestSubmit` 复用按钮的表单校验与提交流程；Shift + Enter 保留原生换行。输入法组合事件（含兼容性键码 229）不触发发送，按键自动重复、正在提交和按钮禁用时也不提交。发送按钮在 conversation 样式中使用固定 `#B84F2F` 背景与白色图标，不修改其他主操作的主题变量。输入框聚焦使用既有边框与内侧 1px 描边，避免外环重复包裹输入容器；键盘焦点仍可见。
 
 Models 概览 → 来源选择 → 新模型表单 → 模型详情验证/选择；Notifications 单独子页。候选模型的 probe 成功不等于 profile 已激活：呈现检查已存 Probe 的 profile/auth version、BridgeIdentity 和能力，真正选择仍由原 Control.Select 校验权限、实时凭据和版本。表单失败留在对应流程，凭据和底层错误不反射到页面。选中模型只影响新 Run，已有冻结执行树保持原配置。通知选项绑定实际持久化值，不可用的旧绑定明确提示。
 
@@ -42,7 +44,7 @@ Tasks 的分页、详情、历史与 Main 交付由 `task/sqlite.Reader` 提供�
 
 Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时间投影状态，不执行恢复、落库或唤醒；CLI/运行时仍调用原 `Runs.Approvals` 恢复。卡片只识别 security 来源且身份匹配的 Host 通知，不按正则删改用户文本，也不改写持久化 Conversation/投递投影；精确参数、完整 Raw action 和冻结哈希保留。
 
-旧 `/settings` → Models、`/progress` → Tasks；旧 Trace query/冻结上下文链接保留全部选择参数并跳转到规范详情路径。已知子页未登录返回 401 登录表单，成功后仅返回校验过的本地页面；API 认证响应不变。共享认证、CSRF、binding、CSP 和 no-store 继续先于业务处理，无 schema 迁移。
+旧 `/settings` → Models、`/progress` → Tasks；旧 Trace query/冻结上下文链接保留全部选择参数并跳转到规范详情路径。已知子页未登录返回 401 登录表单，成功后仅返回校验过的本地页面；API 认证响应不变。共享认证、CSRF、binding、CSP 继续先于业务处理；业务页面/API 保持 no-store。账户激活的 schema 44 兼容变化见模型连接方案。
 
 ### Web 待办投影与反馈来源（F-018/F-004）
 
@@ -68,7 +70,7 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 已提交投影保留条件读取：周期性读回外部状态，也在掉线或进程重启后重新取得正式消息。单一调度链取消过时读取；单次 10 秒 deadline，网络失败最多退避到 30 秒。隐藏或离开页面时关闭流并取消读取，返回时恢复。401/403 保留用户输入，另页登录和显式重试不重建输入节点。
 
-前端职责拆分为：`main.tsx` 仅启动；`composer.ts` 增强原生表单、附件状态和单次发送，不替换 DOM，收到发送确认后换用新的请求身份；`projections.tsx` 负责受控 UISpec 和 React root 生命周期；`live-updates.ts` 负责读取、区域协调、阅读位置与连接状态。按稳定消息 sequence/TaskRef/审批 ID 复用不变的组件节点，只释放被移除的 React root。文件选择器不序列化到网络或本地存储，也不随刷新重挂载。读者锚点移出最新 100 条窗口时保留当前内容，用户点击新消息提示后才切换。
+前端职责拆分为：`main.tsx` 仅启动；`composer.ts` 增强原生表单、附件状态和单次发送，不替换 DOM，点击发送时冻结本次内容与请求身份、显示待发送气泡并清空输入区，新草稿使用新的请求身份；`projections.tsx` 负责受控 UISpec 和 React root 生命周期；`live-updates.ts` 负责读取、区域协调、阅读位置与连接状态。按稳定消息 sequence/TaskRef/审批 ID 复用不变的组件节点，只释放被移除的 React root。文件选择器不序列化到网络或本地存储，也不随刷新重挂载。读者锚点移出最新 100 条窗口时保留当前内容，用户点击新消息提示后才切换。
 
 审批仍使用 `POST /approval`；渐进增强请求通过 `Accept: application/json` 获取接受回执，原 HTML 表单继续使用 303。前端只提交用户所点表单的 ID、原冻结哈希和决定，每次交互发送一次。确认丢失或旧审批失效时读取当前投影，不自动重发决定、不把旧同意转给新审批，也不把回执当成外部动作完成。
 
@@ -301,14 +303,16 @@ the existing forms and semantic fallback remain usable without JavaScript.
 | Source | Revision | Reused code or asset | Local changes |
 | --- | --- | --- | --- |
 | [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Steward supplies layout, routes and content |
-| [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | `apps/app/src/components/generative-ui/table-catalog.tsx` native `DataTable` and Zod props | Remove the CopilotKit catalog registration/import; retain validation and accessible table; map the existing UISpec table through a private adapter |
+| [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | Native Table, BarChart, PieChart, PlanCard, MeetingTimePicker, ExportOverlay; shared theme/SVG/form styles | Preserve upstream names and props; adapt imports, reduced motion, safe exports and durable time selection; generateSandboxedUi uses the same upstream fields/activity/bridge with Steward delivery |
+| [shadcn/ui](https://github.com/shadcn-ui/ui) | `8a3536678a528cc012b9e62484290e79d0be410f` | Field/Input/Card 与 ChartContainer/Tooltip 的使用子集 | 保留原生表单语义，以 Steward 字体/主题和组件内布局适配；MIT 文本打包，无新增页面介绍文案 |
+| [Base UI](https://base-ui.com/react/overview/about) | `@base-ui/react@1.9.0` | Button、Combobox、Menu | 全局选择器和菜单共用无样式交互基础；保留原生值、无脚本路径及业务保存边界 |
 | Steward / Ghost | Owner-selected 2026-11-02 assets | Michroma wordmark and charcoal/ivory ghost PNGs and lossless WebP atlases | Self-hosted; complete-frame animation, static fallback and reduced-motion support; provenance in `web/licenses/steward-artwork.md` |
 | Open font projects | Included OFL notices | Inter, Source Serif 4, Source Han Sans SC, JetBrains Mono and Michroma | Self-hosted; Chinese unicode-range subsets; original sources and hashes in `web/licenses/` |
 
 Upstream licenses and artwork provenance are in `licenses/`. The binary embeds
 the required MIT/Apache-2.0 license texts and serves them at `/licenses.txt`.
-There are no paid frontend services. Pinned runtime dependencies are React,
-React DOM, Zod and the ad-agent component helpers. Tailwind and esbuild compile
+There are no paid frontend services. Pinned runtime dependencies include React,
+React DOM, Base UI, Recharts, Zod and the component helpers. Tailwind and esbuild compile
 checked-in local assets; they do not run as product services.
 
 OpenIntelligentUI's native component is integrated here. Its isolated-answer and validated bridge patterns inform Steward's own durable Widget renderer. The upstream Python agent, CopilotKit/AG-UI transport, model routing and browser-key flow are not integrated. Steward's frozen ModelSnapshot,
@@ -381,3 +385,25 @@ Settings 保留一级导航，在旁边展开二级侧栏，呈现 Preferences�
 公共规则维护在根目录 [design.md](../../design.md#两级导航)。共享 shell 使用 `workspace-navigation` 容纳一级栏与可选的 `section-sidebar`，`has-section-navigation` 负责内容占宽。Settings 与 Developer 的分类共用这一结构，Task 当前不创建空栏。导航使用原生链接，焦点约束与 inert 以整个容器为边界，没有新增运行时路由或数据查询。
 
 一级栏底部仅保留 Settings，外观和头像动效集中在 Preferences；不再渲染宣传语或重复的主题按钮。头像动效开关调用已有 `StewardGhost.pause`，继续使用原浏览器存储键；系统 reduced-motion 优先时禁用开关并显示原因，不改变既有动画帧与状态呈现。
+
+### Web 消息与配置增强
+
+消费方为当前会话 Web UI。Markdown 由固定版本 Marked 解析，原始 HTML 转义，再由 DOMPurify 白名单清理；链接仅接受 HTTP(S) 和明确的 artifact 引用，后者仍经过认证 ArtifactStore 下载。流式草稿复用同一清理器。Mermaid 代码块按需下载独立本地包，以 strict 模式生成 SVG 并通过 Blob 图像呈现；失败保留源码，不嵌入模型 HTML，也不开放脚本 CSP。输入上限、图边数及图片隔离是安全边界；气泡、处理点和字体是呈现政策。
+
+能力表单使用逐表单单飞自动提交和字段去抖；服务端 apply 对确切候选执行 Test + Save、版本 CAS 与密钥／索引身份保护。成功刷新各表单配置版本，失败保留草稿；不热更新冻结执行能力。YAML 文件限制 64 KiB，原生 multipart 与增强读取走相同验证。许可证保留在构建产物，设置页不展示页脚入口。
+
+桌面折叠保留可访问的图标模块入口；移动导航仍是抽屉。Computer/Worker 使用固定定位且聊天页禁止滚动链回弹。favicon 不继承 CSS，因此首屏脚本与主题 class 同步切换现有图集导出的黑／白 PNG。所有增强保持私有呈现实现，不新增公开 UI 执行协议或持久已读状态。
+
+### Web 待发送气泡与 UI 分组
+
+需求来自点击发送后的长时间输入滞留，以及原生 UI 和最终文字倒序合并。当前消费者是 Web composer/live updates 与已有 Main UI 投影。客户端提交前冻结 FormData、来源键和文件，随后腾出原生输入节点；独立 outgoing 区不被权威区域 patch 删除。仅为合法客户端来源键提供对账属性，不暴露内部消息 ID；权威消息抵达即去掉对应本地气泡，保持一个消息实例。网络不确定时仅允许原快照重试；明确校验拒绝可恢复草稿，较新的草稿受到保护。
+
+入口保留绑定、运行时与已配置状态检查，不在 HTTP 接纳前触发凭据刷新；原模型执行解析器仍负责实际认证、刷新和撤销 fencing。原子接纳与确切重试是领域机制，立即呈现和状态文案是 Web 政策。没有新增持久队列、模型发送工具或未经确认的“已读”状态。
+
+Web 读取绑定 UI artifact 的原调用顺序，并与冻结投影的组件逐项核对；只在精确匹配时生成私有 bubbles 视图。展示组件保留原 form IDs 和提交状态，UI 气泡在前，最终回复气泡在后。原 Conversation、跨渠道语义 fallback、交付投影和版本均不改写；未知投影继续原呈现，不猜测 Markdown 的来源。
+
+### 全局组件一致性
+
+当前消费者是服务端设置/任务/开发者表单和 React 会话富组件。全局组件皮肤保持 Steward 的字体、字号、导航、内容布局和品牌语义，统一按钮、输入框、选择器、菜单、卡片、复选框及开关。选择器与菜单的键盘、定位、取消和焦点交由 Base UI；原生值适配器仅连接表单值与业务事件，不再自建筛选/导航状态机。选择器在弹窗中把浮层放进相同 dialog，避免进入不可交互的背景；定位器消除根 CSS zoom 的坐标倍率、浮层恢复该倍率，保留放大后的文字与触控尺寸。原生必填校验把焦点交给可见控件，不尝试聚焦隐藏值。
+
+机制是原生表单值、服务端校验、版本和请求身份；当前控件结构与外观是可替换策略。适配器、皮肤和裁剪的上游组件保持仓库私有，不新增通用跨产品组件 SDK。采用组件源码与小型运行时依赖，拒绝整体搬入 Multica 页面、业务层或第二套主题；没有引入 ReUI 商业页面块。无脚本仍使用相同皮肤的原生表单。

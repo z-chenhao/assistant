@@ -58,7 +58,7 @@ F-069 已提供搜索与公开网页读取入口，F-067 提供其显式可选�
 
 当前在配置中指定本地 MCP 可执行文件、独立目录和允许的工具及权限。启动时纳入冻结注册表，Agent 通过同一工具发现和执行入口使用。
 
-GitHub 监听使用以下显式配置；不要把 PAT 字面量写入 YAML。PAT 需要所选仓库的 Pull requests 和 Checks 读取权限，并能通过 `/user` 返回当前用户身份；SecretStore 支持操作系统凭据引用或显式环境引用。配置示例同 [config.example.yaml](../../config.example.yaml)。
+GitHub 监听使用以下显式配置；不要把 PAT 字面量写入 YAML。PAT 需要所选仓库的 Pull requests 和 Checks 读取权限，并能通过 `/user` 返回当前用户身份；SecretStore 使用本地私有凭据文件，并兼容显式环境引用。配置示例同 [config.example.yaml](../../config.example.yaml)。
 
 ```yaml
 github:

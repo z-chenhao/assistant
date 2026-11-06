@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -62,6 +63,20 @@ func (s *Server) loadCapabilities(ctx context.Context, r *http.Request, p *page)
 	return err
 }
 func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error {
+	if r.MultipartForm != nil && len(r.MultipartForm.File["configuration_file"]) > 0 {
+		file, _, err := r.FormFile("configuration_file")
+		if err != nil {
+			return ErrCapabilityInvalid
+		}
+		defer file.Close()
+		body, err := io.ReadAll(io.LimitReader(file, 65537))
+		if err != nil || len(body) > 65536 {
+			http.Error(w, "configuration too large", http.StatusRequestEntityTooLarge)
+			return nil
+		}
+		r.PostForm.Set("configuration", string(body))
+		r.Form.Set("configuration", string(body))
+	}
 	if len(r.FormValue("configuration")) > 65536 {
 		http.Error(w, "configuration too large", http.StatusRequestEntityTooLarge)
 		return nil
@@ -108,10 +123,6 @@ func (s *Server) capabilityAction(w http.ResponseWriter, r *http.Request) error 
 	if err == nil {
 		switch r.FormValue("action") {
 		case "apply":
-			if guided == nil {
-				err = ErrCapabilityInvalid
-				break
-			}
 			var checked Capability
 			checked, err = s.Capabilities.Test(r.Context(), id, r.FormValue("revision"), text)
 			if err == nil && !checked.Verified {

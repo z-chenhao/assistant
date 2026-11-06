@@ -22,7 +22,7 @@
 
 **当前实现**：已有前台应用/worker、doctor/status/ops 健康诊断、日志轮转、加密备份、恢复验证和显式切换，以及持久执行恢复。macOS 新增显式安装、启停和卸载的用户级后台 Web 服务，以及独立的每分钟巡检；人工停止先持久保存，巡检只重启退出的进程，连续恢复有上限，未配置、凭据/供应商不可用和依赖失效分别可见。
 
-**边界与剩余工作**：后台服务首个平台限 macOS 的当前图形登录会话，退出登录后停止，重新登录时仅恢复仍启用的意图；不支持 Linux/Windows、系统级开机运行或云端部署。巡检的去重提示保存在 `service status`，尚无主动渠道告警。真实 launchd 登录/重启、系统升级和 Keychain 交互需在隔离账户进行平台验证；协议替身和 CLI 回归不能证明这些系统集成已经验收。复用既有恢复器，不重试 unknown 副作用，不进行语义 Watchdog 自治修改。备份不包含凭据、Guest 镜像或服务安装状态等外部资源，不能同时运行同身份的两个恢复副本。
+**边界与剩余工作**：后台服务首个平台限 macOS 的当前图形登录会话，退出登录后停止，重新登录时仅恢复仍启用的意图；不支持 Linux/Windows、系统级开机运行或云端部署。巡检的去重提示保存在 `service status`，尚无主动渠道告警。真实 launchd 登录/重启、系统升级与系统集成需在隔离账户进行平台验证；协议替身和 CLI 回归不能证明这些系统集成已经验收。复用既有恢复器，不重试 unknown 副作用，不进行语义 Watchdog 自治修改。备份不包含凭据、Guest 镜像或服务安装状态等外部资源，不能同时运行同身份的两个恢复副本。
 
 **验收目标**：备份认证、坏包拒绝、隔离恢复、兼容升级及激活 fencing 正确；关闭界面后后台任务继续，主服务退出时巡检仍独立工作并按故障类别处理；重启、升级、凭据失效和人工停机后行为正确，无双实例执行或通知风暴。
 
@@ -55,7 +55,7 @@ steward service stop
 steward service uninstall
 ```
 
-安装只写入两个用户 LaunchAgent，保持停止；`start` 才授权登录后持续运行。默认服务提供 `http://127.0.0.1:8787` 的既有 Web 工作台、托管本地 broker 和相同运行时；未选模型时保留设置界面，不自动选择模型。使用 `steward -config /absolute/config.yaml service install` 时，配置必须包含现有 `web` 与外部 broker 设置。自定义 data root 继续用 `STEWARD_DATA_ROOT`；安装不复制凭据或任意环境变量，仅保存配置路径、data root 和非秘密 PATH。使用 Keychain 中的凭据；shell 中临时设置的 `env:` 凭据不会自动进入 launchd。
+安装只写入两个用户 LaunchAgent，保持停止；`start` 才授权登录后持续运行。默认服务提供 `http://127.0.0.1:8787` 的既有 Web 工作台、托管本地 broker 和相同运行时；未选模型时保留设置界面，不自动选择模型。使用 `steward -config /absolute/config.yaml service install` 时，配置必须包含现有 `web` 与外部 broker 设置。自定义 data root 继续用 `STEWARD_DATA_ROOT`；安装不复制凭据或任意环境变量，仅保存配置路径、data root 和非秘密 PATH。使用本地私有文件中的凭据；shell 中临时设置的 `env:` 凭据不会自动进入 launchd。
 
 `service status` 分别返回安装、启用和实际进程锁状态。`setup_required` 表示尚未配置模型；`credential_or_provider_unavailable` 与 `dependency_unavailable` 表示仍存活的运行时需要修复，巡检不会反复重启。心跳过期返回 `health_stale`，不会假装健康或杀死仍持锁的进程。退出进程最多每分钟尝试一次恢复，连续三次且未观察到 ready 后转为 `restart_limit`；修复后显式 `service start` 重置次数。`configuration_error`/`startup_failed` 也需要修复后手动启动。去重 `notice` 与 `notice_sequence` 是本地诊断提示，不代表渠道消息已投递。
 
@@ -217,7 +217,7 @@ a consistent archive directly into encryption. No plaintext staging archive is
 created. Symlinks, hard links and special files in the snapshot are refused.
 
 Create/escrow a dedicated 32-byte encryption key in SecretStore first. A reference
-may use `env:NAME` for a controlled deployment, or the OS credential store. The
+uses the local private-file SecretStore, or an explicit `env:NAME` reference. The
 archive never contains key material, and is useless if its key is lost. The
 archive uses a fresh 256-bit salt, HMAC-SHA256 key derivation and AES-256-GCM
 records, with authenticated order/length and a final marker. Truncation, append,
@@ -228,7 +228,7 @@ not the shareable bug report.
 
 ```sh
 steward -config SOURCE_CONFIG ops backup /private/backups/steward.steward KEY_REF
-steward -config ISOLATED_CONFIG ops restore /private/backups/steward.steward KEY_REF
+steward -config SOURCE_CONFIG ops restore /private/backups/steward.steward KEY_REF /private/restored-data
 # Inspect/retire the source and reconcile post-backup external outcomes first.
 steward -config ISOLATED_CONFIG ops activate source-retired-and-outcomes-reconciled
 steward -config ISOLATED_CONFIG status
@@ -288,3 +288,7 @@ Computer compatibility.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/operations.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/operations.md)。
+
+离线备份密钥的 credential 引用默认从本地文件 SecretStore 读取；显式 env 引用保留。`secrets/` 与 `account-secrets/` 不进入数据备份白名单，解密所需密钥单独保管。
+
+文件密钥来自命令配置的数据根。恢复到新目录时，`ops restore ARCHIVE KEY_REF NEW_ROOT` 从源配置读取文件密钥，并将数据发布到尚不存在的 NEW_ROOT；不需要为了放密钥而预先创建恢复目标。原无 NEW_ROOT 形式继续适用于显式 env 密钥。

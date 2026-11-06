@@ -14,7 +14,6 @@ import (
 	"github.com/z-chenhao/assistant/internal/computer/environment"
 	"github.com/z-chenhao/assistant/internal/config"
 	"github.com/z-chenhao/assistant/internal/llm/bridge"
-	"github.com/z-chenhao/assistant/internal/llm/secret"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 )
 
@@ -104,15 +103,7 @@ func doctor(ctx context.Context, cfg config.Config, out io.Writer) error {
 	} else {
 		fmt.Fprintln(out, "SKIP image OCR: install Tesseract, eng/chi_sim/chi_tra language data and the kernel sandbox; see docs/features/artifacts-media.md")
 	}
-	if cfg.LLM.AccountSecretStore != "native" {
-		fmt.Fprintln(out, "OK   ChatGPT credential storage: private files under the Steward data root")
-	}
-	backend, available := secret.NativeBackend()
-	if available {
-		fmt.Fprintln(out, "OK   credential backend library:", backend, "(login keyring access is checked when used)")
-	} else {
-		fmt.Fprintln(out, "SKIP native credentials:", backend, "unavailable; on Linux install libsecret-1-0 and use a login session keyring; see docs/features/model-connections.md")
-	}
+	fmt.Fprintln(out, "OK credentials: private local files (0700 directories, 0600 files)")
 	if failed {
 		return errors.New("installation incomplete; check Node 24.21.0 and execution dependencies (Python 3, bash, bubblewrap on Linux), then rerun ./install.sh (see docs/features/installation.md)")
 	}

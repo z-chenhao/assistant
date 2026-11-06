@@ -535,3 +535,11 @@ by the maintained memory system gates, plus epoch/dispatch, migration, Curator, 
 regressions. The harness kills the owner before model dispatch and after Memory
 commit, then verifies stored state and fresh model requests. It does not establish
 semantic model quality or selective dependency tracking.
+
+### 默认文件 SecretStore
+
+当前消费者是自动 Memory、显式本地凭据、离线备份命令与现有 OAuth 文件后端。Memory 曾在默认应用组装中使用系统 SecretStore，使 macOS 重新编译后的钥匙串授权阻塞整个启动。默认应用与离线命令改为 Files；OAuth 继续使用既有 account-secrets 目录和 UUID 契约，所有生产密钥统一使用文件后端。
+
+两个文件目录复用私有 fileStore，限制固定目录、不可穿越的引用名、0700/0600 权限、普通单链接文件、禁止跟随符号链接，以及原子写入与 fsync。跨进程串行仍由 Memory defaults 锁和账户锁负责，不新增通用存储平台或公共文件路径接口。环境引用保持显式。文件存储依赖本地账户和目录访问控制，不再依赖操作系统钥匙串访问策略。
+
+密钥身份与已加密数据不可分离，旧引用缺文件时失败关闭，不自动回退系统服务或生成新密钥。已有加密记忆须先将原密钥保存到文件 SecretStore；空数据库可在离线核对后建立新默认密钥。凭据文件不进入现有数据备份白名单，须独立保留原密钥；不把密钥写进 owner YAML、日志或模型输入。

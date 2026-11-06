@@ -81,3 +81,19 @@
  html:not(.js) .has-section-navigation .app-sidebar{display:flex;flex:0 0 88px;width:88px;padding:12px 6px}
  html:not(.js) .has-section-navigation .section-sidebar{display:flex;position:static;flex:1;min-width:0;width:auto}
 }
+/* Keep quick access anchored even when the document reaches its scroll end. */
+html:has(body.chat-workspace),body.chat-workspace{overscroll-behavior-y:none}
+.chat-topbar .topbar-actions{position:fixed;top:14px;right:28px;z-index:12}
+@media(min-width:1280px){.workspace-panel-open:not(.workspace-panel-expanded) .chat-topbar .topbar-actions{right:488px}}
+@media(max-width:760px){.chat-topbar .topbar-actions{top:12px;right:12px}}
+@media(min-width:761px){
+ .sidebar-collapsed .app-sidebar{display:flex;width:64px;padding-inline:8px}
+ .sidebar-collapsed .brand-row{justify-content:center;padding:0}
+ .sidebar-collapsed .brand-row .brand{display:none}
+ .sidebar-collapsed .primary-navigation a{justify-content:center;min-height:44px;padding:10px}
+ .sidebar-collapsed .primary-navigation a>span{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .sidebar-collapsed .primary-navigation .icon{width:20px;height:20px;flex-shrink:0}
+ .sidebar-collapsed .workspace-main,.sidebar-collapsed .has-section-navigation .workspace-main{margin-left:64px}
+ .sidebar-collapsed .conversation-footer{left:64px}
+ .sidebar-collapsed .sidebar-open{display:none}
+}

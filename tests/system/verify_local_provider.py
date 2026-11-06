@@ -20,7 +20,7 @@ import threading
 import time
 from verify import STATE_SCHEMA_VERSION, require
 from provider_endpoint import Endpoint
-from codemode_peer import runtime_yaml
+from codemode_peer import runtime_yaml, MAIN_DIRECT, WORKER_DIRECT
 
 def verify(binary, script):
     require(shutil.which("node") is not None, "Node is missing")
@@ -69,14 +69,14 @@ def verify(binary, script):
             surface = next(r["body"]["tools"] for r in reversed(server.requests)
                            if any(t["function"]["name"] == "builtin__codemode_execute"
                                   for t in r.get("body", {}).get("tools", [])))
-            require([t["function"]["name"] for t in surface] == ["builtin__codemode_execute"],
-                    "production model has tools outside Code Mode")
+            require({t["function"]["name"] for t in surface} == MAIN_DIRECT,
+                    "production model differs from the frequent direct tool surface")
             with closing(sqlite3.connect(root / "data/state.db")) as db:
                 frozen = json.loads(db.execute("SELECT tools_json FROM capability_snapshot WHERE role='main' ORDER BY created_at LIMIT 1").fetchone()[0])
             names = {spec['name'] for spec in frozen}
             require({'builtin__artifact_search','builtin__artifact_manage','builtin__memory_search',
                      'builtin__memory_manage','builtin__image_ocr'} <= names, 'internal tool authority disappeared')
-            require(all(spec.get('codemode_only') for spec in frozen if spec['name'] != 'builtin__codemode_execute'),
+            require(all(spec.get('codemode_only') for spec in frozen if spec['name'] not in MAIN_DIRECT),
                     'production authority permits a direct tool bypass')
             report["production_surface"] = surface
 
@@ -143,7 +143,7 @@ def verify(binary, script):
             task_requests = [r["body"] for r in server.requests[task_start:] if r.get("body")]
             roots = [r for r in task_requests if any("general Worker executing" in str(m.get("content", "")) for m in r["messages"])]
             require(roots and all(not any(t["function"]["name"].startswith("builtin__task_") or t["function"]["name"] == "builtin__memory_manage" for t in r["tools"]) for r in roots), "Root Task or Memory control exposed on actual Pi wire")
-            require(all([t["function"]["name"] for t in r["tools"]] == ["builtin__codemode_execute"] for r in roots), "Root model bypasses Code Mode")
+            require(all({t["function"]["name"] for t in r["tools"]} == WORKER_DIRECT for r in roots), "Root model bypasses Code Mode")
             require(all("actual local conversation" not in json.dumps(r["messages"]) for r in roots), "Root inherited Main Conversation")
             require(any(any(m["role"] == "user" and "Runtime task update (untrusted Worker data" in str(m.get("content", "")) for m in r["messages"]) for r in task_requests), "runtime framing lost at actual Pi boundary")
             with closing(sqlite3.connect(root / "data/state.db")) as db:
@@ -232,7 +232,7 @@ def verify_screenshot_projection(binary, script):
                     with closing(sqlite3.connect(Path(h.env["STEWARD_DATA_ROOT"]) / "state.db")) as db:
                         requests = [json.loads(r[0]) for r in db.execute("SELECT g.request_json FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='worker' ORDER BY g.created_at")]
                         main_requests = [json.loads(r[0]) for r in db.execute("SELECT g.request_json FROM model_generation g JOIN run r USING(run_id) WHERE r.kind='main' ORDER BY g.created_at")]
-                        require(main_requests and all([t['name'] for t in r['tools']] == ['builtin__codemode_execute'] for r in main_requests), "Main model bypassed Code Mode")
+                        require(main_requests and all({t['name'] for t in r['tools']} == MAIN_DIRECT for r in main_requests), "Main model bypassed Code Mode")
                         main_frozen = [json.loads(row[0]) for row in db.execute("SELECT tools_json FROM capability_snapshot WHERE role='main'")]
                         require(all(not any(s['name'].startswith('builtin__computer_') or s['name'] in ['builtin__read','builtin__bash','builtin__edit','builtin__write'] for s in specs) for specs in main_frozen), "Main obtained screenshot execution authority")
                         require(len(requests) == 3, "screenshot Worker exchanges")

@@ -7,10 +7,12 @@ import (
 	"errors"
 	"github.com/z-chenhao/assistant/internal/app"
 	"github.com/z-chenhao/assistant/internal/config"
+	"github.com/z-chenhao/assistant/internal/llm/secret"
 	"github.com/z-chenhao/assistant/internal/maintenance"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -37,6 +39,9 @@ func TestEncryptedOfflineRoundtripAndFailClosed(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "default-memory.json"), []byte(`{"ref":"credential:default-memory"}`), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if err := (secret.Files{DataRoot: root}).Put(ctx, "credential:backup-excluded-key", bytes.Repeat([]byte{53}, 32)); err != nil {
+		t.Fatal(err)
+	}
 	max := app.SchemaVersions()
 	archive := filepath.Join(t.TempDir(), "backup.steward")
 	lock, e := maintenance.Lock(root, false)
@@ -50,6 +55,11 @@ func TestEncryptedOfflineRoundtripAndFailClosed(t *testing.T) {
 	manifest, e := maintenance.Backup(ctx, root, archive, key, max)
 	if e != nil {
 		t.Fatal(e)
+	}
+	for _, file := range manifest.Files {
+		if strings.HasPrefix(file.Path, "secrets/") || strings.HasPrefix(file.Path, "account-secrets/") {
+			t.Fatal("backup included credential files")
+		}
 	}
 	data, e := os.ReadFile(archive)
 	if e != nil {

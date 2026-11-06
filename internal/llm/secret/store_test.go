@@ -8,7 +8,7 @@ import (
 
 func TestExplicitEnvironmentSecretAndInvalidReference(t *testing.T) {
 	t.Setenv("STEWARD_SECRET_FIXTURE", "synthetic")
-	s := Store{}
+	s := Environment{}
 	value, err := s.Get(context.Background(), "env:STEWARD_SECRET_FIXTURE")
 	if err != nil || string(value) != "synthetic" {
 		t.Fatal("explicit reference failed")

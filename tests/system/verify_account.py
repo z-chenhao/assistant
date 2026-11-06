@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Launch/doctor/drive/evidence/cleanup for current OAuth through the real CLI.
 
-A disposable file store or private native Secret Service and a local OAuth/Responses
+A disposable private file store and a local OAuth/Responses
 server replace external dependencies; native Go protocols and SQLite remain real.
 No credentials or private authorization URLs are written to evidence.
 """
 import argparse
 import base64
 from collections.abc import MutableMapping
-from contextlib import contextmanager
 import json
 import os
-import re
 from pathlib import Path
 import select
 import shutil
@@ -20,7 +18,6 @@ import socketserver
 from contextlib import closing
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.request
@@ -30,152 +27,6 @@ from codemode_peer import runtime_yaml
 def require(ok, message):
     if not ok:
         raise RuntimeError(message)
-
-
-@contextmanager
-def native_secret_service():
-    """Own a private session bus and password-protected disposable GNOME keyring."""
-    require(sys.platform == 'linux', 'native Secret Service fixture requires Linux')
-    for command in ('dbus-daemon', 'gnome-keyring-daemon', 'secret-tool', 'gdbus'):
-        require(shutil.which(command), 'native Secret Service fixture dependency missing: ' + command)
-    with tempfile.TemporaryDirectory(prefix='steward-keyring-') as directory:
-        root = Path(directory)
-        runtime = root / 'runtime'
-        runtime.mkdir(mode=0o700)
-        env = dict(os.environ, XDG_DATA_HOME=str(root / 'data'), XDG_CONFIG_HOME=str(root / 'config'),
-                   XDG_CACHE_HOME=str(root / 'cache'), XDG_RUNTIME_DIR=str(runtime))
-        for key in ('DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS',
-                    'DBUS_STARTER_ADDRESS', 'DBUS_STARTER_BUS_TYPE', 'GNOME_KEYRING_CONTROL', 'SSH_AUTH_SOCK'):
-            env.pop(key, None)
-        children = []
-        try:
-            bus = subprocess.Popen(['dbus-daemon', '--session', '--nofork', '--nopidfile', '--print-address=1'],
-                                   env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
-            children.append(bus)
-            require(select.select([bus.stdout], [], [], 5)[0], 'private session bus launch timed out')
-            address = bus.stdout.readline().strip()
-            require(address.startswith('unix:'), 'private session bus unavailable')
-            env['DBUS_SESSION_BUS_ADDRESS'] = address
-            env['GNOME_KEYRING_CONTROL'] = str(root / 'control')
-            def start_keyring():
-                keyring = subprocess.Popen(['gnome-keyring-daemon', '--foreground', '--unlock', '--components=secrets',
-                                            '--control-directory=' + str(root / 'control')], env=env,
-                                           stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
-                children.append(keyring)
-                keyring.stdin.write(b'owned-synthetic-keyring-password')
-                keyring.stdin.close()
-                keyring.stdin = None
-                deadline = time.monotonic() + 10
-                while True:
-                    require(keyring.poll() is None, 'private keyring exited during startup')
-                    owner = subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.freedesktop.DBus',
-                                            '--object-path', '/org/freedesktop/DBus', '--method',
-                                            'org.freedesktop.DBus.NameHasOwner', 'org.freedesktop.secrets'],
-                                           env=env, capture_output=True, timeout=3)
-                    if owner.returncode == 0 and owner.stdout.strip() == b'(true,)':
-                        break
-                    require(time.monotonic() < deadline, 'private keyring startup timed out')
-                    time.sleep(.05)
-                return keyring
-
-            keyring = start_keyring()
-            env['STEWARD_TEST_SECRET_SERVICE_PID'] = str(keyring.pid)
-            def restart_keyring():
-                nonlocal keyring
-                os.killpg(keyring.pid, signal.SIGTERM)
-                keyring.communicate(timeout=5)
-                keyring = start_keyring()
-                env['STEWARD_TEST_SECRET_SERVICE_PID'] = str(keyring.pid)
-            yield env, restart_keyring
-        finally:
-            for child in reversed(children):
-                if child.poll() is None:
-                    os.killpg(child.pid, signal.SIGTERM)
-                try:
-                    child.communicate(timeout=1)
-                except subprocess.TimeoutExpired:
-                    os.killpg(child.pid, signal.SIGKILL)
-                    child.communicate(timeout=1)
-
-
-class NativeSecrets(MutableMapping):
-    """Independent libsecret CLI inspection of this fixture's owned native items.
-
-    The application's production SecretStore never uses this helper. Only test
-    expiry control and private assertions read/write the synthetic credentials.
-    """
-    def __init__(self, database, env, sensitive):
-        self.database, self.env, self.sensitive = database, env, sensitive
-
-    def __getitem__(self, ref):
-        result = subprocess.run(['secret-tool', 'lookup', 'xdg:schema', 'ai.steward.Credential',
-                                 'service', 'steward', 'credential', ref], env=self.env, capture_output=True, timeout=5)
-        if result.returncode == 1 and not result.stdout and not result.stderr:
-            raise KeyError(ref)
-        require(result.returncode == 0, 'owned native credential inspection failed')
-        data = result.stdout.removesuffix(b'\n')
-        require(data.startswith(b'steward-secret-v1:'), 'owned native credential format invalid')
-        value = data[len(b'steward-secret-v1:'):].decode('ascii')
-        credential = json.loads(base64.b64decode(value))
-        for name in ('access_token', 'refresh_token', 'id_token'):
-            if credential.get(name):
-                self.sensitive.add(credential[name].encode())
-        return value
-
-    def __setitem__(self, ref, value):
-        result = subprocess.run(['secret-tool', 'store', '--label=Steward fixture credential',
-                                 'xdg:schema', 'ai.steward.Credential', 'service', 'steward', 'credential', ref],
-                                env=self.env, input=b'steward-secret-v1:' + value.encode('ascii'), capture_output=True, timeout=5)
-        require(result.returncode == 0, 'owned native expiry control failed')
-
-    def __delitem__(self, ref):
-        result = subprocess.run(['secret-tool', 'clear', 'xdg:schema', 'ai.steward.Credential',
-                                 'service', 'steward', 'credential', ref], env=self.env, capture_output=True, timeout=5)
-        require(result.returncode == 0, 'owned native credential deletion failed')
-
-    def __iter__(self):
-        if not self.database.exists():
-            return
-        with closing(sqlite3.connect(self.database)) as db:
-            refs = [row[0] for row in db.execute('SELECT credential_ref FROM auth_connection')]
-        for ref in refs:
-            try:
-                self[ref]
-                yield ref
-            except KeyError:
-                pass
-
-    def __len__(self):
-        return sum(1 for _ in self)
-
-
-def verify_locked_keyring(env, source, restart):
-    # Only called inside native_secret_service(); never lock a user's session.
-    ref = 'credential:steward-native-locked'
-    original = b'steward-secret-v1:' + base64.b64encode(b'synthetic-locked-fixture')
-    attributes = ['xdg:schema', 'ai.steward.Credential', 'service', 'steward', 'credential', ref]
-    stored = subprocess.run(['secret-tool', 'store', '--label=Steward isolated fixture', *attributes],
-                            env=env, input=original, capture_output=True, timeout=5)
-    require(stored.returncode == 0, 'private locked-keyring fixture unavailable')
-    call = ['gdbus', 'call', '--session', '--dest', 'org.freedesktop.secrets',
-            '--object-path', '/org/freedesktop/secrets', '--method']
-    alias = subprocess.run([*call, 'org.freedesktop.Secret.Service.ReadAlias', 'default'],
-                           env=env, capture_output=True, text=True, timeout=5)
-    match = re.fullmatch(r"\(objectpath '(/org/freedesktop/secrets/collection/[A-Za-z0-9_]+)',\)\s*", alias.stdout)
-    require(alias.returncode == 0 and match, 'private collection alias unavailable')
-    locked = subprocess.run([*call, 'org.freedesktop.Secret.Service.Lock', "[objectpath '" + match[1] + "']"],
-                            env=env, capture_output=True, timeout=5)
-    require(locked.returncode == 0, 'private keyring lock failed')
-    tests = subprocess.run(['go', 'test', './internal/llm/secret', '-run', '^TestServiceLockedDenied$', '-count=1', '-timeout', '20s'],
-                           env=dict(env, STEWARD_TEST_SECRET_SERVICE_LOCKED='1'), cwd=source,
-                           capture_output=True, timeout=30)
-    require(tests.returncode == 0, 'locked-keyring operations did not fail closed')
-    # Restart the owned daemon with the original password. This also proves
-    # persistence across keyring processes, beyond separate Steward processes.
-    restart()
-    read = subprocess.run(['secret-tool', 'lookup', *attributes], env=env, capture_output=True, timeout=5)
-    require(read.returncode == 0 and read.stdout.removesuffix(b'\n') == original,
-            'locked-keyring operations changed the stored credential')
 
 
 class Secrets(socketserver.StreamRequestHandler):
@@ -233,21 +84,21 @@ class FileSecrets(MutableMapping):
         return sum(1 for _ in self)
 
 
-def account_config(root, bridge, endpoint, binary=None, secret_store="file"):
+def account_config(root, bridge, endpoint, binary=None):
     """Route the native Go bridge to the explicitly owned loopback peer."""
     binary = Path(binary or bridge.parent.parent / 'bin/steward').resolve()
     wrapper = root / "bridge.mjs"
     wrapper.write_text("import {spawn} from 'node:child_process';const child=spawn(" + json.dumps(str(binary)) + ",[\"-test-native-model-bridge\"," + json.dumps(endpoint) + "],{stdio:['pipe','pipe','inherit']});process.stdin.pipe(child.stdin);child.stdout.pipe(process.stdout);child.stdin.on('error',()=>{});for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{child.stdin.end();child.kill(signal)});child.on('error',()=>{process.exitCode=1});child.on('exit',code=>{process.exitCode=code??1});\n")
     cfg = root / "config.yaml"
-    cfg.write_text(f"version: 1\napp:\n  data_root: {root / 'data'}\nllm:\n  account_secret_store: {secret_store}\n  provider_bridge_command: node\n  provider_bridge_script: {wrapper}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
+    cfg.write_text(f"version: 1\napp:\n  data_root: {root / 'data'}\nllm:\n  provider_bridge_command: node\n  provider_bridge_script: {wrapper}\n  provider_bridge_version: pi-ai-1.3.0-v1\n")
     cfg.write_text(cfg.read_text()+runtime_yaml())
     return cfg
 
 
-def verify(binary, bridge, native_env=None):
+def verify(binary, bridge):
     require(shutil.which("node"), "Node is missing")
     report = {"protocol": "current-openai-account", "live_shadow": "inconclusive", "device_authorization": "deferred_by_approval", "checks": []}
-    report['credential_backend'] = 'native-linux-secret-service' if native_env is not None else 'private-file'
+    report['credential_backend'] = 'private-file'
     fixture = subprocess.Popen(["node", str(bridge.parent / "test/account-fixture.mjs")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     require(select.select([fixture.stdout], [], [], 10)[0], "fixture launch timed out")
     endpoint = fixture.stdout.readline().strip()
@@ -257,13 +108,10 @@ def verify(binary, bridge, native_env=None):
             root = Path(directory)
             sensitive = set()
             try:
-                cfg = account_config(root, bridge, endpoint, binary, "native" if native_env is not None else "file")
+                cfg = account_config(root, bridge, endpoint, binary)
                 env = {k: v for k, v in os.environ.items() if not k.startswith("STEWARD_")}
                 args = [str(binary), "-config", str(cfg)]
                 values = FileSecrets(root / 'data/account-secrets', sensitive)
-                if native_env is not None:
-                    env = {k: v for k, v in native_env.items() if not k.startswith('STEWARD_')}
-                    values = NativeSecrets(root / 'data/state.db', env, sensitive)
                 ordinary_output = []
 
                 def api(path, data=None):
@@ -422,13 +270,12 @@ def verify(binary, bridge, native_env=None):
                 again = login(aid)
                 require(again["connection_id"] == aid, "reauthorization changed identity")
                 require(readback("SELECT device_id FROM installation_auth")[0][0] == stable_device, "installation identity changed")
-                if native_env is None:
-                    del values[ref]
-                    require(run("model", "accounts")[0]["status"] == "reauth_required",
-                            "account without a local credential was not prompted to reconnect")
-                    require(login(aid)["connection_id"] == aid, "reconnect changed account identity")
-                    reactivate()
-                    report["checks"].append("default private store reconnects an account without a local credential")
+                del values[ref]
+                require(run("model", "accounts")[0]["status"] == "reauth_required",
+                        "account without a local credential was not prompted to reconnect")
+                require(login(aid)["connection_id"] == aid, "reconnect changed account identity")
+                reactivate()
+                report["checks"].append("default private store reconnects an account without a local credential")
                 run("model", "logout", aid)
                 require(not values, "logout left credentials")
                 require(run("model", "accounts")[0]["status"] == "logged_out", "logout state missing")
@@ -467,24 +314,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument('--native-secret-service', action='store_true',
-                        help='Linux: own an isolated D-Bus/keyring and use the production credential backend')
     options = parser.parse_args()
     bridge = Path(__file__).resolve().parents[2] / 'provider-bridge/bridge.mjs'
-    if options.native_secret_service:
-        with native_secret_service() as (env, restart):
-            test_env = dict(env, STEWARD_TEST_SECRET_SERVICE='1')
-            native = subprocess.run(['go', 'test', './internal/llm/secret', '-run', 'TestService', '-count=1', '-timeout', '30s'],
-                                    env=test_env, capture_output=True, text=True, timeout=60,
-                                    cwd=bridge.parent.parent)
-            require(native.returncode == 0, 'native credential component checks failed')
-            result = verify(options.binary.resolve(), bridge, env)
-            verify_locked_keyring(env, bridge.parent.parent, restart)
-            result['checks'].append('locked keyring rejects bounded read/write/delete without diagnostics or credential changes; explicit unlock restores access')
-            result['native_component_checks'] = 'passed'
-            result['native_fixture'] = 'private session bus and password-protected disposable GNOME keyring'
-    else:
-        result = verify(options.binary.resolve(), bridge)
+    result = verify(options.binary.resolve(), bridge)
     options.evidence.parent.mkdir(parents=True, exist_ok=True)
     options.evidence.write_text(json.dumps(result, indent=2) + "\n")
     print("Current OpenAI account CLI checks passed: " + str(len(result["checks"])))

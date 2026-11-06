@@ -37,7 +37,7 @@ func (r *Runs) createMain(ctx context.Context, tx *sql.Tx, agentID, profile stri
 	if _, err = tx.ExecContext(ctx, `INSERT INTO capability_snapshot(snapshot_id,agent_config_version,role,tool_specs_hash,skill_set_hash,data_scope,can_spawn_agents,tools_json,created_at,format_version) VALUES(?,?,'main',?,?,?,0,?,?,2)`, capID, configVersion, digest(specs), skill.SetHash(mainSpecs), agentID, specs, now); err != nil {
 		return "", err
 	}
-	cp, _ := encoded(agent.Checkpoint{ContextVersion: 2, Phase: "model", Messages: append(agent.InitialContext(agent.ContextOptions{Position: "main", Tools: mainSpecs}), updates...)})
+	cp, _ := encoded(agent.Checkpoint{ContextVersion: 2, SerialInputs: true, Phase: "model", Messages: append(agent.InitialContext(agent.ContextOptions{Position: "main", Tools: mainSpecs}), updates...)})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO run(run_id,agent_id,conversation_id,kind,status,capability_snapshot_id,model_snapshot_id,checkpoint_json,history_boundary,created_at,updated_at,version) VALUES(?,?,?,'main','queued',?,?,?,(SELECT coalesce(max(sequence),0) FROM conversation_intent),?,?,1)`, id, agentID, agentID, capID, snapshot.SnapshotID, cp, now, now); err != nil {
 		return "", err
 	}

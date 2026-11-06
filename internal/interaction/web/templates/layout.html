@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="{{if .Language}}{{.Language}}{{else}}en{{end}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Steward · {{if .Title}}{{tr .Title}}{{else}}{{tr "Workspace"}}{{end}}</title><link rel="icon" href="/brand/ghost-charcoal.png" type="image/png"><script src="/appearance.js"></script><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
-<body{{if eq .Tab "/settings"}} class="settings-workspace has-section-navigation"{{else if or (eq .Tab "/developer/observability") (eq .Tab "/developer/database")}} class="has-section-navigation"{{end}}>
+<html lang="{{if .Language}}{{.Language}}{{else}}en{{end}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Steward · {{if .Title}}{{tr .Title}}{{else}}{{tr "Workspace"}}{{end}}</title><link rel="icon" href="/brand/ghost-charcoal.png" type="image/png"><link rel="preload" href="{{fontURL "/brand/InterVariable.woff2"}}" as="font" type="font/woff2" crossorigin><link rel="preload" href="{{fontURL "/brand/Michroma-Regular.ttf"}}" as="font" type="font/ttf" crossorigin><script src="/appearance.js"></script><link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
+<body{{if eq .Tab "/"}} class="chat-workspace"{{else if eq .Tab "/settings"}} class="settings-workspace has-section-navigation"{{else if or (eq .Tab "/developer/observability") (eq .Tab "/developer/database")}} class="has-section-navigation"{{end}}>
 <a class="skip-link" href="#workspace-main">{{tr "Skip to content"}}</a>
 {{if .Login}}
 <main class="login">
@@ -17,11 +17,11 @@
   <div class="brand-row">{{template "brand"}}<button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="{{tr "Close navigation"}}" aria-controls="workspace-navigation" aria-expanded="true">{{template "icon-sidebar"}}</button></div>
   <nav class="primary-navigation" aria-label="{{tr "Workspace"}}">
    <div class="primary-navigation-top">
-    <a href="/" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>{{tr "Chat"}}</span></a>
-    <a href="/tasks" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>{{tr "Tasks"}}</span></a>
-    <a href="/developer/observability" {{if or (eq .Tab "/developer/observability") (eq .Tab "/developer/database")}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>{{tr "Developer"}}</span></a>
+    <a href="/" title="{{tr "Chat"}}" {{if eq .Tab "/"}}aria-current="page"{{end}}>{{template "icon-conversation"}}<span>{{tr "Chat"}}</span></a>
+    <a href="/tasks" title="{{tr "Tasks"}}" {{if eq .Tab "/tasks"}}aria-current="page"{{end}}>{{template "icon-tasks"}}<span>{{tr "Tasks"}}</span></a>
+    <a href="/developer/observability" title="{{tr "Developer"}}" {{if or (eq .Tab "/developer/observability") (eq .Tab "/developer/database")}}aria-current="page"{{end}}>{{template "icon-traces"}}<span>{{tr "Developer"}}</span></a>
    </div>
-   <a class="primary-settings" href="/settings/preferences" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Settings"}}</span></a>
+   <a class="primary-settings" href="/settings/preferences" title="{{tr "Settings"}}" {{if eq .Tab "/settings"}}aria-current="page"{{end}}>{{template "icon-settings"}}<span>{{tr "Settings"}}</span></a>
   </nav>
  </aside>
  {{if eq .Tab "/settings"}}<aside class="section-sidebar" aria-label="{{tr "Settings navigation"}}">{{template "settings-navigation" .}}</aside>

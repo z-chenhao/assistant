@@ -4,7 +4,6 @@ import {createScanner,SyntaxKind} from 'typescript/unstable/ast';
 
 const selectOwner='web/src/components/ui/select.ts';
 const styleOwner='web/src/components/ui/controls.css';
-const fallbackOwner='internal/interaction/web/templates/settings.html';
 const popupRoles=new Set(['listbox','option']);
 
 // This enforces ownership of public control behavior, not class names or pixels.
@@ -26,7 +25,7 @@ export function controlViolations(path,source){
    if(token.literal&&/role\s*=\s*["'](?:listbox|option)["']/.test(token.text))report(token.offset,useSelect);
   });
  }
- if(path.endsWith('.html')&&path!==fallbackOwner){
+ if(path.endsWith('.html')){
   const html=source.replace(/<!--[\s\S]*?-->|\{\{\/\*[\s\S]*?\*\/\}\}/g,match=>match.replace(/[^\n]/g,' '));
   for(const match of html.matchAll(/\brole\s*=\s*["'](?:listbox|option)["']/g))report(match.index,useSelect);
  }

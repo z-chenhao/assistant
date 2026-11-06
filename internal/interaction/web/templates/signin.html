@@ -4,7 +4,6 @@
  {{range .Auth.Events}}{{if .URL}}<a data-signin-fallback href="{{authURL .URL}}" target="_blank" rel="noreferrer">{{tr "Continue sign-in in your browser ↗"}}</a>{{end}}{{if .DeviceCode}}<span>{{tr "Device code:"}} <code>{{.DeviceCode}}</code></span>{{end}}{{end}}
  <form method="post" action="/auth/cancel">{{if .AuthOnResources}}<input type="hidden" name="return_to" value="/settings/setup">{{end}}<button class="secondary setting-action">{{tr "Cancel sign-in"}}</button></form>
 </div>
-{{else if and (eq .Auth.Status "connected") .AuthOnResources}}<span hidden data-account-reconnected></span>
-{{else if eq .Auth.Status "connected"}}<div class="signin-progress"><span role="status">{{tr "Account connected."}}</span><a href="/settings/models/new?provider=chatgpt&amp;account={{.AccountID}}">{{tr "Choose an account model →"}}</a></div>
+{{else if eq .Auth.Status "connected"}}<span hidden data-account-reconnected></span>
 {{else if eq .Auth.Status "reauth_required"}}<p class="feedback warning">{{if .AuthError}}{{tr .AuthError}}{{else}}{{tr "Sign-in was not completed. Reconnect when you are ready."}}{{end}}</p>{{end}}
 {{end}}

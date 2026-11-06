@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -60,7 +61,7 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 	fail := func(err error) { event("error", map[string]any{"error_code": provider.ErrorCode(err)}) }
 	snapshot := r.Snapshot
 	account := snapshot.ProviderKind == "openai_account"
-	if r.SessionID != r.RunID || r.RunID == "" || snapshot.SnapshotID == "" || snapshot.MaxOutputTokens < 1 || snapshot.MaxOutputTokens > 65536 || snapshot.ContextWindow < 1 || snapshot.ContextWindow > 1048576 || snapshot.MaxOutputTokens > snapshot.ContextWindow || snapshot.ReasoningEffort != "" || snapshot.GenerationDefaults.Temperature != nil || snapshot.GenerationDefaults.TopP != nil || snapshot.Compatibility.ToolResultFormat != "openai" || snapshot.Compatibility.DeveloperRole || snapshot.Compatibility.ReasoningEffort || snapshot.Compatibility.ParallelToolCalls || snapshot.Compatibility.StreamUsage {
+	if r.SessionID != r.RunID || r.RunID == "" || snapshot.SnapshotID == "" || snapshot.MaxOutputTokens < 1 || snapshot.ContextWindow < 1 || snapshot.ContextWindow > 1048576 || snapshot.MaxOutputTokens > snapshot.ContextWindow || snapshot.ReasoningEffort != "" || snapshot.GenerationDefaults.Temperature != nil || snapshot.GenerationDefaults.TopP != nil || snapshot.Compatibility.ToolResultFormat != "openai" || snapshot.Compatibility.DeveloperRole || snapshot.Compatibility.ReasoningEffort || snapshot.Compatibility.ParallelToolCalls || snapshot.Compatibility.StreamUsage {
 		fail(provider.ErrIncompatible)
 		return
 	}
@@ -303,10 +304,11 @@ func (s *Server) catalog(ctx context.Context, c llm.Connection) ([]llm.CatalogMo
 			ID string `json:"id"`
 		} `json:"data"`
 		Models []struct {
-			Slug            string `json:"slug"`
-			Visibility      string `json:"visibility"`
-			ContextWindow   int64  `json:"context_window"`
-			MaxOutputTokens int64  `json:"max_output_tokens"`
+			Slug            string   `json:"slug"`
+			Visibility      string   `json:"visibility"`
+			ContextWindow   int64    `json:"context_window"`
+			MaxOutputTokens int64    `json:"max_output_tokens"`
+			InputModalities []string `json:"input_modalities"`
 		} `json:"models"`
 	}
 	if json.Unmarshal(data, &body) != nil {
@@ -318,6 +320,12 @@ func (s *Server) catalog(ctx context.Context, c llm.Connection) ([]llm.CatalogMo
 			return nil, provider.ErrInvalidResponse
 		}
 		seen := map[string]bool{}
+		knownModels := make(map[string]provider.Model)
+		for _, model := range provider.Models("openai") {
+			if model.API == provider.OpenAIResponses {
+				knownModels[model.ID] = model
+			}
+		}
 		for _, m := range body.Models {
 			if m.Visibility != "list" {
 				continue
@@ -327,13 +335,28 @@ func (s *Server) catalog(ctx context.Context, c llm.Connection) ([]llm.CatalogMo
 			}
 			seen[m.Slug] = true
 			window, max := m.ContextWindow, m.MaxOutputTokens
+			image := m.InputModalities == nil || slices.Contains(m.InputModalities, "image")
+			// Account catalogs can omit limits and modalities. Resolve those
+			// fields from the bundled Pi chat catalog, never the classifier entry.
+			if known, ok := knownModels[m.Slug]; ok {
+				if window < 1 {
+					window = known.ContextWindow
+				}
+				if max < 1 {
+					max = known.MaxTokens
+				}
+				if m.InputModalities == nil {
+					image = slices.Contains(known.Input, "image")
+				}
+			}
 			if window < 1 {
-				window = 8192
+				window = 128000
 			}
 			if max < 1 {
-				max = 1024
+				max = 16384
 			}
-			out = append(out, llm.CatalogModel{ModelID: m.Slug, ContextWindow: min(window, 1048576), MaxOutputTokens: min(max, 65536)})
+			window = min(window, 1048576)
+			out = append(out, llm.CatalogModel{ModelID: m.Slug, ContextWindow: window, MaxOutputTokens: min(max, window), ImageInput: image})
 		}
 	} else {
 		if body.Data == nil || len(body.Data) > 4096 {

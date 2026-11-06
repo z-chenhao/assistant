@@ -147,9 +147,9 @@ CLI 与 Web 已提供具名问题和确切成果审阅。个人飞书支持具�
 - Worker 只维护独立执行上下文，不创建用户可见 Conversation。
 - 每个 Agent 同时最多只有一个活动 Main Run，但可并行存在多个 Task 的 Root Worker Run，以及受配额限制的 Child Run。
 - Main Run 忙碌时的新消息作为事件注入当前 Main Run，而不启动第二个 Main Run。
-- 活动 Main Run 在下一个稳定边界优先接收用户 Steering，不等待整个 Run 结束。
+- 新 Main Run 一次接纳一条用户输入，当前输入的最终回复提交后，再在稳定边界接纳下一条；不等待后台 Worker 完成。后到输入持久排队，不抢占已经执行的工具。
 - Root Worker 只在完成、失败、需要用户信息或外部副作用状态无法确认时生成 Main Follow-up；Child Run 的结果只返回直接 Parent，由 Root Worker 汇总后决定是否形成 Main Follow-up。Main Run 活动则排队到当前 Run 结束后，Main Run 空闲则触发新的 Main Run。
-- 多条用户 Steering 可以批量注入，多条 Worker Follow-up 也可以批量注入，但用户消息与 Worker 消息不进入同一批次；用户 Steering 优先于 Worker Follow-up。Worker Follow-up 默认一次 Drain 当前可用的全部更新，避免多个 Task 同时结束导致 Main 连续启动多轮。
+- 新 Main 的用户输入按持久顺序逐条接纳；旧冻结 Main 保留原批量 Steering 语义。多条 Worker Follow-up 仍可批量注入，用户消息与 Worker 消息不进入同一批次；用户 Steering 优先于 Worker Follow-up。Worker Follow-up 默认一次 Drain 当前可用的全部更新，避免多个 Task 同时结束导致 Main 连续启动多轮。
 - 同一批次保留为多条独立消息，不拼接原始文本；Steering 的处理优先级高于 Follow-up。
 - `AgentStatus` 不单独持久化，而是根据活动 Main Run、Worker Run 和 Task 动态推导为 `idle` 或 `busy`。
 
@@ -628,3 +628,9 @@ all rejected state classes, complete/append races, owner fencing, invocation rep
 and SIGKILL before/after the completion transaction, without synthetic follow-ups.
 These deterministic contracts remain covered by package tests and the Task
 system gate. Model-quality evaluation is maintained outside this repository.
+
+### Main 输入与回复提交边界
+
+连续请求曾在同一个 Main 的多轮工具发现期间批量进入上下文，后到输入又使较早的回复准备失效，导致首个请求没有交接回执。现有用户是 Web、TUI、飞书共享 Main，相关契约为单活动 Main、已接纳输入、Task 后台执行、原子交付与冻结恢复。新建 Main checkpoint 私有字段记录逐条接纳政策和已回复输入序号；当前输入经工具调用、Task 创建与最终回复提交后才能接纳下一条。机制不从自然语言推断 Task，也不替模型创建空 Worker。Worker 继续独立执行；需要后台工作时沿原 task_manage 管线创建 Task。
+
+顺序与原子提交属于领域必要复杂度；逐条用户输入是当前默认政策。checkpoint 字段保持私有，不新增公共排队 API、状态机或数据库表；旧冻结 Run 不热切换。拒绝以提示词要求模型记住被后到输入压过的任务，也不将全部工作串行到 Worker 完成。

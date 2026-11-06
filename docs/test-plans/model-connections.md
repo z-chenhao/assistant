@@ -31,7 +31,6 @@
 | [tests/system/verify_account.py](../../tests/system/verify_account.py) | 已有相关回归入口；具体断言以实现为准，不代表覆盖全部目标 |
 
 - **F-002 文件覆盖**：测试验证目录和文件权限、重新打开、轮换、删除和拒绝符号链接。
-- **F-002 原生覆盖**：Linux 使用独立会话 D-Bus、临时带密码 GNOME 钥匙串和真实 SecretStore；供应商仍是受控 OAuth/Responses peer。macOS 使用下文可选的所有者 Keychain 往返检查。真实 OpenAI 账号授权、桌面解锁交互及各发行版集成需单独 Live 验证。
 - **Web 登录未回调**：`verify_channels.py` 的 `account_presentation` 用浏览器验证单击直达受控授权页。自动打开后只显示一行等待状态和取消操作，弹窗被拦截时显示手动入口。未发送回调时验证页面可取消、没有写入账号、工作区仍需设置，随后重新发起并以受控 OAuth peer 完成授权与模型验证和选择。现有 `channels` CI 门禁还验证 Resources 默认收起模型，可展开连接标识，测试和切换完成后原位替换为对应状态。重新授权后测试可恢复既有当前模型。受控 SecretStore 验证重启、页面加载和轮询期间无模型凭据读取，显式加载模型目录时才读取。无有效 Probe 时先验证，已有 Probe 时可直接切换，账户模型按账户分组，重连与取消回到 Resources，登录状态只显示在发起页面。
 - **Google 登录 Live 验收**：用获准的测试账号从 Web 的 Connect a model 发起 ChatGPT 登录，选择 Google，验证授权页正常完成、返回 Steward 后可选择模型。若授权页报错且重试无效，记录阶段、时间、公开错误文案以及本地状态，并确认可回到 Steward 取消和重新发起。证据只保留脱敏内容。
 
@@ -57,34 +56,13 @@ to run these checks. The Node compatibility launcher remains covered by its
 package tests, whose pretest step builds the application binary.
 Security/cancellation contracts use the current Go/Node and system regression entry points.
 
-For optional owned native Keychain read/update/delete verification on macOS:
+### 私有文件账户回归
 
 ```sh
-STEWARD_TEST_KEYCHAIN=1 go test ./internal/llm/secret -run TestKeychainOwnedRoundTrip -v -timeout 30s
+python3 tests/system/verify_account.py --binary bin/steward --evidence evidence/file-account.json
 ```
 
-The ordinary account gate uses its owned in-memory SecretStore. Ubuntu checks
-also runs `verify_account.py --native-secret-service` with an isolated native
-Linux Secret Service; neither path requires a real model account. Real
-Qwen/vLLM/SGLang/LM Studio compatibility remains
-release-time Live Shadow evidence. Deterministic software conformance runs in the [system suite](product.md);
-provider contracts alone do not establish semantic product scores.
-
-### Linux 原生账户回归
-
-安装测试依赖 `libsecret-1-0 libsecret-tools gnome-keyring dbus libglib2.0-bin` 后运行：
-
-```sh
-python3 tests/system/verify_account.py --binary bin/steward --native-secret-service --evidence evidence/native-account.json
-```
-
-该入口自行创建私有 D-Bus 和临时 XDG 数据/运行目录，启动带合成密码的前台 GNOME Keyring，移除桌面显示环境；不连接、锁定或删除用户当前会话的钥匙串。`secret-tool` 只用于独立检查和测试过期时间控制，不是生产 SecretStore 依赖。临时密码和 OAuth 合成凭据只经 stdin/内存传输，结束后回收进程和私有文件。CI 通过既有可取消的 entrypoint/process_step 执行并保留同一证据格式。
-
-- 原生组件：二进制值跨进程读回、替换、删除及重复删除；无效输入、取消和不可用会话失败关闭；暂停私有钥匙串进程使请求在途等待，确认读操作按期限取消并可恢复；锁定后读、写、删除均有界失败且不暴露诊断；重启钥匙串并用原密码解锁后原值仍在。
-- 账户入口：真实 CLI → Go Manager → isolated Go Bridge → 受控 OAuth/Responses peer，经生产原生 SecretStore 登录、验证/选择、Main 对话和重启；并发刷新只旋转一次，401 失效、跨进程退出、SIGKILL 后清理和原账户重新认证保持既有语义。
-- 隔离/泄漏：不同账户分别保存；access/refresh/ID token 不进入 SQLite/WAL、日志、普通 CLI 输出或 trace。Web 异步存储失败给出中英文修复提示，重试不保留上次无关错误，也不展示原生诊断。
-
-此证据证明软件与原生存储链路；不证明真实 OpenAI 账户授权、供应商可用性或 macOS 当前机器的 Keychain 访问。Linux 禁用 cgo、不支持平台、缺库和无会话的部署不提供原生凭据写入；环境 API Key 不算 OAuth 写入回退。
+该入口使用隔离数据根、真实 CLI、文件 SecretStore 和受控 OAuth/Responses peer，覆盖跨进程轮换、并发刷新、401 失效、退出、SIGKILL 后清理与原账户重新连接；凭据不进入 SQLite/WAL、日志、普通输出或 Trace。文件组件另验权限、重新打开、轮换、删除、路径与链接拒绝。无需 D-Bus、钥匙串或凭据服务进程。真实供应商授权仍需独立 Live 验证。
 
 ## 执行与完成判定
 
@@ -119,3 +97,5 @@ transport and do not change production endpoints.
 `TestMistralNativeFieldsAndToolReplay` 使用受控 HTTP peer 检查 Mistral 原生字段、九位工具调用身份与结果关联、thinking 回放及输入不可变；`TestResponsesTokenLimitKeepsPartialOutput` 验证底层协议保留 Responses 的 max_output_tokens 截断文本和用量；Host 适配器因无法表达截断状态而拒绝其作为完成结果。`TestWebsocketDoesNotResumeIncompleteResponse` 防止截断响应复用不完整的缓存基线。真实供应商兼容性另行验证。
 
 `TestExplicitCloudEndpointsArePreserved` 验证 Bedrock、Vertex 和 Azure 的显式 HTTPS/HTTP 端点不会被区域或环境变量替换；默认端点仍按区域或 Azure 环境配置解析。
+
+账户目录选用回归：`TestAccountCatalogSelectionNeedsNoProbeAndFencesChanges` 验证目录选用不生成 Probe、保留 128,000 输出与图片能力，以及目录缺失、认证版本变化、配置竞争、事件写入失败均不部分激活；退出后不可用。`TestAccountCatalogUsesModelLimitsAndImageCapabilities` 验证缺失元数据补充自 Pi 聊天目录、明确服务端字段优先、隐藏模型不可选。自定义端点原有 Probe／取消／冻结测试继续运行。Schema 44 只更新激活触发器，已有历史迁移与新库门禁继续覆盖。

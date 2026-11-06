@@ -6,8 +6,8 @@ const script=buildSync({entryPoints:[new URL('src/appearance.ts',import.meta.url
 function boot({theme,sidebar,mobile=false,dark=false,storageBlocked=false}={}){
  const classes=new Set();let resourceError;
  class Script{getAttribute(){return '/app.js'}}
- const classList={add(...names){names.forEach(n=>classes.add(n))},remove(...names){names.forEach(n=>classes.delete(n))},toggle(name,on){on?classes.add(name):classes.delete(name)}};
- runInNewContext(script,{document:{documentElement:{classList}},window:{addEventListener(type,callback){if(type==='error')resourceError=callback}},HTMLScriptElement:Script,
+ const classList={contains:name=>classes.has(name),add(...names){names.forEach(n=>classes.add(n))},remove(...names){names.forEach(n=>classes.delete(n))},toggle(name,on){on?classes.add(name):classes.delete(name)}};
+ runInNewContext(script,{document:{documentElement:{classList},querySelector:()=>null},MutationObserver:class{observe(){}},window:{addEventListener(type,callback){if(type==='error')resourceError=callback}},HTMLScriptElement:Script,
   localStorage:{getItem(key){if(storageBlocked)throw Error('storage unavailable');return key==='steward-theme'?theme:sidebar}},
   matchMedia:query=>({matches:query.includes('color-scheme')?dark:!mobile})});
  return {classes,failBundle(){resourceError({target:new Script()})}};

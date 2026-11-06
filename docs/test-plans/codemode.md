@@ -102,3 +102,5 @@ F-008/F-039：现有真实 Sidecar、挂起/恢复、Child、事件落库失败�
 统一 Code Mode 与 500 工具目录的配置、Main/Worker 脚本发现、未声明调用拒绝及历史冻结面恢复覆盖，统一见[工具与审批测试方案](tools-approvals.md#渐进工具发现与-500-工具目录)。CLI capabilities 的 `tool-loading` 已纳入完整门禁，读取同一角色冻结目录。
 
 `TestCodeModeAcceptsLargeBoundedSource` 通过真实 Sidecar 执行超过 16 KiB 的合法脚本，验证模型结果接纳遵循 Code Mode 的 64 KiB 参数边界；其他工具继续使用 16 KiB 边界，总帧和上下文限制仍生效。
+
+生产直接声明名单与角色过滤由 `TestProductionToolSurfaceKeepsOnlyFrequentControlsDirect` 验证；Code Mode-only 测试保存显式冻结面的兼容覆盖，并非当前生产声明全集。

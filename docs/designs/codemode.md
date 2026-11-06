@@ -17,7 +17,7 @@ flowchart TD
     E <--> S["固定源 / Store / replay 记录"]
 ```
 
-Code Mode 是 Main 与 Worker 新生产 Run 的统一模型工具入口。普通工具只存在于各角色的冻结脚本目录中；脚本 `searchTools` 复用 BM25 发现，默认 8 个，不改变模型工具集。每个嵌套调用仍进入 Host 执行器、精确审批和持久恢复；Main 的脚本不取得 Worker 的文件、Computer 或 Child 权限。具体契约见[统一工具方案](tools-approvals.md#mcp-渐进暴露与动态声明)。
+Code Mode 承担 Main 与 Worker 的工具组合执行；新生产 Run 同时直接声明 Tool search、intelligent_ui_show、skill_list 与 skill_view，Main 额外声明 task_manage 与 task_search。其余工具仍只存在于角色冻结脚本目录；脚本 `searchTools` 复用 BM25 发现，默认 8 个，不动态扩张模型声明。每个嵌套调用仍进入 Host 执行器、精确审批和持久恢复；Main 的脚本不取得 Worker 的文件、Computer 或 Child 权限。具体契约见[统一工具方案](tools-approvals.md#mcp-渐进暴露与动态声明)。
 
 ### 执行协调边界（F-039）
 
@@ -388,4 +388,4 @@ and prove the disposed VM is not retained.
 
 ## Main 呈现能力
 
-Main 在同一 Code Mode 工具目录中发现 intelligent_ui_show，先读取 intelligent_ui Skill，再提交原生组件或交互片段。Code Mode 不执行 Widget 代码，也不访问浏览器 DOM；实际呈现与提问桥接属于 [Intelligent UI](intelligent-ui.md)。模型工具声明仍只有 Code Mode。
+Main 在同一 Code Mode 工具目录中发现 intelligent_ui_show，先读取 intelligent_ui Skill，再提交原生组件或交互片段。Code Mode 不执行 Widget 代码，也不访问浏览器 DOM；实际呈现与提问桥接属于 [Intelligent UI](intelligent-ui.md)。新 Run 的 UI 与 Skill 工具同时直接声明，仍进入同一执行与审计管线。

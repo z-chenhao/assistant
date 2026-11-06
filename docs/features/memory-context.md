@@ -6,7 +6,7 @@
 
 ## 开箱即用的本地记忆
 
-正常安装启动自动准备系统 SecretStore 密钥与本地搜索，无需先运行 embedding 服务。Settings 可选自动、自定义或关闭；默认全文搜索不承诺语义近义召回，自定义 embedding 保留语义检索路径。密钥锁定或丢失时不会替换原密钥；已有数据保留，本地对话仍可检索。中文子串搜索、隔离、遗忘和加密明文不落盘与自定义配置共用同一数据边界。
+正常安装启动自动准备本地文件 SecretStore 密钥与本地搜索，无需先运行 embedding 服务。Settings 可选自动、自定义或关闭；默认全文搜索不承诺语义近义召回，自定义 embedding 保留语义检索路径。密钥不可读或丢失时不会替换原密钥；已有数据保留，本地对话仍可检索。中文子串搜索、隔离、遗忘和加密明文不落盘与自定义配置共用同一数据边界。
 
 
 ## 功能说明
@@ -182,3 +182,7 @@ parameters conflicts. Memory writes never use Security Approval.
 ## 实现与验证依据
 
 代码入口、最新架构与取舍见 [技术方案](../designs/memory-context.md)；已有检查、未覆盖场景和验收方法见 [测试方案](../test-plans/memory-context.md)。
+
+### 默认密钥存储
+
+Memory 自动配置的 32 字节密钥使用 Steward 数据根下的 `secrets/` 私有文件存储，不依赖 macOS Keychain 或桌面登录会话；目录 0700、文件 0600。`default-memory.json` 仅保存引用，重启复用同一密钥。已发布的引用缺少密钥时保持不可用，不能自动生成替代密钥导致已有记忆无法解密。显式 env 引用继续可用。

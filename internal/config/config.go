@@ -108,7 +108,6 @@ type LLM struct {
 	ProviderBridgeCommand string `yaml:"provider_bridge_command"`
 	ProviderBridgeScript  string `yaml:"provider_bridge_script"`
 	ProviderBridgeVersion string `yaml:"provider_bridge_version"`
-	AccountSecretStore    string `yaml:"account_secret_store"`
 }
 
 type App struct {
@@ -209,11 +208,6 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	legacyBridge := filepath.IsAbs(cfg.LLM.ProviderBridgeScript) && cfg.LLM.ProviderBridgeVersion == "pi-ai-1.3.0-v1"
 	if (cfg.LLM.ProviderBridgeCommand == "") != (cfg.LLM.ProviderBridgeScript == "") || cfg.LLM.ProviderBridgeCommand != "" && !nativeBridge && !legacyBridge {
 		return Config{}, errors.New("llm requires a native steward-go-v1 bridge or a supported external RPC bridge")
-	}
-	switch cfg.LLM.AccountSecretStore {
-	case "", "file", "native":
-	default:
-		return Config{}, errors.New("llm.account_secret_store must be file or native")
 	}
 	if err := cfg.WebAccess.Validate(); err != nil {
 		return Config{}, err

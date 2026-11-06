@@ -15,11 +15,13 @@ import (
 )
 
 type shownMessage struct {
-	Role       string
-	Sequence   int64
-	ReplyKey   string
-	Projection shownProjection
-	Approval   *approvalView
+	Role         string
+	Sequence     int64
+	ReplyKey     string
+	ClientSource string
+	Bubbles      []shownProjection
+	Projection   shownProjection
+	Approval     *approvalView
 }
 type shownProjection struct {
 	Key            string

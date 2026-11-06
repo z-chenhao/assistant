@@ -172,11 +172,23 @@ func (a *App) runtimeRegistry(ctx context.Context, cfg config.Config, fixture st
 		d, _ := base.Resolve(spec.Name)
 		defs = append(defs, d)
 	}
-	// Production has one model-facing execution entry. Historical frozen specs
-	// and explicit test peers keep their recorded calling contracts.
+	// Keep coordination/discovery primitives directly available. Other tools
+	// remain behind Code Mode; historical snapshots keep their original surface.
 	if fixture == "" {
 		for i := range defs {
-			defs[i].Spec.CodeModeOnly = defs[i].Spec.Name != codemode.ToolName
+			s := &defs[i].Spec
+			switch s.Name {
+			case codemode.ToolName, tool.SearchName, "builtin__intelligent_ui_show", "builtin__skill_list", "builtin__skill_view", "builtin__task_manage", "builtin__task_search":
+				s.CodeModeOnly = false
+				if s.Exposure == tool.CodeMode || s.Exposure == tool.Deferred {
+					s.Exposure = tool.Direct
+				}
+			default:
+				s.CodeModeOnly = true
+				if s.Exposure == "" || s.Exposure == tool.Direct {
+					s.Exposure = tool.CodeMode
+				}
+			}
 		}
 	}
 	registry, err := tool.NewRegistry(defs)

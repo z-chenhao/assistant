@@ -1,5 +1,5 @@
 {{define "model-resource"}}
-<div class="resource-model" id="model-{{.ProfileID}}">
+<div class="resource-model" id="model-{{.ProfileID}}" {{if eq .ProviderKind "openai_account"}}data-account-model{{end}}>
  {{if or (ne .Name .ModelID) .Endpoint}}
  <details name="resource-model" {{if .Open}}open{{end}}>
   <summary class="resource-summary"><span class="resource-name">{{.Name}}</span></summary>
@@ -13,7 +13,7 @@
  {{else}}
  <div class="resource-model-label"><span class="resource-name">{{.Name}}</span></div>
  {{end}}
- <div class="model-connection">
+ {{if ne .ProviderKind "openai_account"}}<div class="model-connection">
   {{$restore := and .Current (ne .Status "ready")}}
   {{if and .Verified (not $restore)}}
    <span class="status-pill" data-status="ready">{{tr "Connection verified"}}</span>
@@ -31,19 +31,19 @@
   {{else}}
    <span class="status-pill warning">{{tr "Sign-in required"}}</span>
   {{end}}
- </div>
+ </div>{{end}}
  <div class="model-use">
-  {{if .Current}}
+  {{if and .Current (or (ne .ProviderKind "openai_account") .Verified)}}
    <span class="status-pill selected">{{tr "Current model"}}</span>
   {{else if .CanTest}}
-   <form class="model-selection" method="post" action="/model/select" {{if not .Verified}}data-model-verify{{end}}>
+   <form class="model-selection" method="post" action="/model/select" {{if and (not .Verified) (ne .ProviderKind "openai_account")}}data-model-verify{{end}}>
     <input name="profile" type="hidden" value="{{.ProfileID}}">
     <input name="profile_version" type="hidden" value="{{.Version}}">
     <input name="config_version" type="hidden" value="{{.ConfigVersion}}">
-    <button class="setting-action" name="consent" value="yes" aria-describedby="model-consent-{{.ProfileID}}">{{tr "Use for new work"}}</button>
+    <button class="secondary setting-action" name="consent" value="yes">{{tr "Use model"}}</button>
    </form>
+  {{else if eq .ProviderKind "openai_account"}}<span class="status-pill warning">{{tr "Sign-in required"}}</span>
   {{end}}
  </div>
- {{if and (not .Current) .CanTest}}<p class="field-help model-consent" id="model-consent-{{.ProfileID}}">{{tr "New requests and tool schemas will go to this provider. Existing work keeps its frozen configuration."}}</p>{{end}}
 </div>
 {{end}}

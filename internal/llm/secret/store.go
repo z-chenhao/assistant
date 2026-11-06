@@ -1,4 +1,4 @@
-// Package secret owns OS credentials and explicit environment references.
+// Package secret owns private credential files and explicit environment references.
 package secret
 
 import (
@@ -11,9 +11,10 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
-type Store struct{}
+// Environment resolves only explicitly named environment variables.
+type Environment struct{}
 
-func (Store) Get(ctx context.Context, ref string) ([]byte, error) {
+func (Environment) Get(ctx context.Context, ref string) ([]byte, error) {
 	if name, ok := strings.CutPrefix(ref, "env:"); ok {
 		if !ValidName(name) {
 			return nil, llm.ErrSecretStore
@@ -24,14 +25,16 @@ func (Store) Get(ctx context.Context, ref string) ([]byte, error) {
 		}
 		return []byte(value), nil
 	}
-	return get(ctx, ref)
+	return nil, llm.ErrSecretStore
 }
-func (Store) Put(ctx context.Context, ref string, value []byte) error { return put(ctx, ref, value) }
-func (Store) Delete(ctx context.Context, ref string) error {
-	if strings.HasPrefix(ref, "env:") {
+func (Environment) Put(ctx context.Context, ref string, value []byte) error {
+	return llm.ErrSecretStore
+}
+func (Environment) Delete(ctx context.Context, ref string) error {
+	if name, ok := strings.CutPrefix(ref, "env:"); ok && ValidName(name) {
 		return nil
 	}
-	return remove(ctx, ref)
+	return llm.ErrSecretStore
 }
 func ValidName(name string) bool {
 	if name == "" || len(name) > 128 {
@@ -50,7 +53,7 @@ func RegisterEnvironment(ctx context.Context, writer llm.AuthWriter, name string
 	if !ValidName(name) {
 		return llm.AuthConnection{}, llm.ErrSecretStore
 	}
-	value, err := (Store{}).Get(ctx, "env:"+name)
+	value, err := (Environment{}).Get(ctx, "env:"+name)
 	if err != nil {
 		return llm.AuthConnection{}, llm.ErrSecretStore
 	}

@@ -96,7 +96,10 @@ func TestRuntimeArchiveRejectsTraversalAndLinks(t *testing.T) {
 }
 
 func TestPinnedImageRejectsCorruptedAndIncompleteUnits(t *testing.T) {
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(root, 0700); err != nil {
 		t.Fatal(err)
 	}

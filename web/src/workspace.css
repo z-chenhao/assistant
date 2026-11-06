@@ -26,10 +26,19 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .resource-summary h2.resource-name{font-size:var(--text-section);line-height:1.5}
 .direct-models-heading{font-size:var(--text-section);line-height:1.5;padding:6px 8px;color:var(--muted-foreground)}
 .resource-model{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,9.75rem);column-gap:var(--control-gap);align-items:start;margin-inline-start:20px;scroll-margin-top:90px}
+.resource-model[data-account-model]{grid-template-columns:minmax(0,1fr) 9.75rem}
 .resource-model .resource-name{font-weight:500}
 .resource-model-label{display:flex;align-items:center;min-height:40px;padding:6px 8px 6px 32px}
 .model-connection,.model-use{display:flex;align-items:center;justify-content:center;min-height:40px}
 .model-connection form,.model-use form{margin:0}
+.model-provider-panel{display:grid;gap:20px}
+.model-provider-panel>form{margin:0;width:100%}
+.model-provider-panel>#signin-status:empty,.model-provider-panel>#signin-status:has(>[hidden]:only-child){display:none}
+.model-connect-form{display:grid;gap:20px}
+.model-connect-form>label{margin:0}
+.model-connect-form>button{justify-self:start}
+.connected-account{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.model-provider-panel>.account-connect-another{padding-top:16px;border-top:1px solid var(--border)}
 .resource-body{padding:4px 8px 14px 28px;min-width:0}
 .resource-body .facts{margin:0 0 12px;gap:8px}
 .model-consent{grid-column:1/-1;margin:4px 8px 12px 32px}
@@ -43,6 +52,8 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
  .resource-model>details,.resource-model-label{grid-column:1/-1}
  .model-connection,.model-use{min-height:44px}
  .model-connection button,.model-use button{max-width:100%}
+ .resource-model[data-account-model]{grid-template-columns:minmax(0,1fr) auto}
+ .resource-model[data-account-model]>.resource-model-label{grid-column:auto;padding-left:8px}
 }
 @media(max-width:760px){.setting-action{min-height:44px}}
 /* Preferences share the tab strip's density; other settings keep their forms. */
@@ -61,7 +72,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .preference-help-trigger:hover,.preference-help summary:hover,.preference-group .preference-save:hover{background:var(--hover);color:var(--foreground)}
 /* Keep the trigger-to-tooltip path connected even when the form gains feedback or wraps. */
 .preference-tooltip{position:absolute;z-index:20;top:calc(100% - 1px);left:0;display:block;width:min(280px,calc(100vw - 66px));padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
-.preference-group .preference-picker-trigger{width:100%}
+.preference-controls>.control-select{width:100%}
 .preference-feedback{padding:0 16px 12px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
 .preference-feedback :is(button,a){min-height:36px;padding:3px 6px;background:transparent;border:0;color:var(--foreground);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:760px){.preference-row{padding:12px;column-gap:12px}.preference-group .preference-save{min-height:44px}.preference-name{min-height:44px}.preference-help-trigger,.preference-help summary{width:44px;min-width:44px;height:44px;min-height:44px}.preference-feedback{padding-inline:12px}.preference-feedback :is(button,a){min-height:44px}}

@@ -247,3 +247,13 @@ channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 Secre
 `channels_capabilities.mjs` 的同一默认设置场景在 320、390、760、761、1024、1400px 运行导航检查：一级／二级的空间关系、正文避让、底部 Settings、两级选中态、侧栏仅有折叠控制、Escape 焦点和 inert 恢复。输出 `navigation-viewports.json`；失败消息包含当次宽度和几何信息，不以完整 HTML 或像素快照锁死实现。系统 reduced-motion 从开启到关闭反复切换后，用户保存的头像暂停选择仍需保留。
 
 [PR CI](../../.github/workflows/ci.yml) → `make test-e2e` → [core](../../tests/system/runner.py) → `channels` → `default_capability_settings` 是现有执行链；原有 `make test lint` 检查构建资源一致性。无需另建相同 job。公共规则与人工视觉评审边界见 [design.md](../../design.md#自动回归与评审分工)。
+
+Settings 切页回归复用 `page_transitions`：真实点击 Preferences／Notifications，逐帧检查字体就绪与字标宽度稳定，并读取 Resource Timing 确认关键字体来自缓存。连接页检查账户信息不重复、图片开关／技术性选用说明／许可证页脚不存在；桌面、320px、明暗主题检查按钮无重叠。`settings_account` 验证首个账户模型添加后 ready，OAuth peer 的生成请求计数仍为零，重新登录后直接选用而无需测试生成。
+
+Chat 输入框焦点回归在真实浏览器中检查鼠标点击和 Tab 导航：容器不出现向外扩张的 outline，焦点仍通过既有边界的颜色／内侧描边呈现，明暗主题和窄屏一致。
+
+组件场景通过真实交付投影验证 Markdown 加粗、危险协议／HTML 拒绝、认证 artifact 字节与下载头、Mermaid 图像实际可解码、明暗 favicon 与固定 Computer/Worker 几何。page-transitions 检查 64px 折叠图标栏和脚本前后布局；capability-setup 检查自动保存、失败草稿、YAML 导入／示例和原生无脚本提交。
+
+`send-feedback` 使用实际 HTTP/Actor，分别阻塞发送、丢失已提交回执和拒绝请求，检查立即出泡、输入区释放、附件／后续草稿保留、重试复用来源键和权威消息去重；明暗白字对比度与移动布局一并测量。rich-replies 检查原生 UI 在前、最终文字独立气泡，以及原表单身份、重试、重启和无脚本路线。`TestInboundAdmissionDoesNotWaitForCredentialIO` 检查接纳不读取模型凭据，执行就绪仍须认证；`TestMainUIWidgetUsesCodeModeAndDurableReply` 检查分组不修改冻结投影。
+
+全局组件回归使用可见 Base UI 控件选择，直接读取原生字段验证提交值。覆盖 Settings 语言搜索/键盘/取消/单次保存、主题立即应用、Task 依赖字段与显式保存、Dev 筛选和富组件弹窗内的选择器/菜单；无脚本与初始化失败继续操作原生表单。保持原有字体、导航和布局几何检查，不依赖组件库生成的内部 ID。

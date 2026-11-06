@@ -1,13 +1,20 @@
-# Compact interactive answers
+# OpenIntelligentUI answer design
 
-Choose one visible focal point and explain the conclusion in normal conversation. Show source, units and assumptions for data. Distinguish illustrative numbers from measurements.
+Use one visual focal point. Explain the conclusion in the normal reply. Source data, units, assumptions and illustrative values must remain clear.
 
-Native comparison: use `components:[{type:"table",columns:["Option","Cost"],rows:[["A","10"],["B","20"]]}]`. All rows must match the column count. Do not place conclusions or hidden commands in cells.
+Reuse Table, barChart, pieChart, plan_visualization and scheduleTime for supported tasks. Custom HTML/SVG follows generateSandboxedUi's ordered CSS/markup/functions/expressions contract. Keep styles widget-specific: upstream theme variables, SVG helpers and form controls are already injected.
 
-Local calculator: use labelled numeric inputs, a computation button and a reset control. Reject blank, non-finite and out-of-range inputs, show units, and never display NaN or Infinity. Render a useful initial state before interaction.
+SVG provides `.c-purple`, `.c-teal`, `.c-coral`, `.c-pink`, `.c-gray`, `.c-blue`, `.c-green`, `.c-amber`, `.c-red` and `.box`, `.node`, `.arr`, `.leader`, `.t`, `.ts`, `.th`. Use a responsive viewBox and reserve room for labels. Simplify crowded graphs rather than shrinking text or hiding content.
 
-Diagram: use a responsive SVG with a viewBox. Reserve room for labels and connectors before drawing. Group or simplify large graphs rather than hiding overflow or shrinking labels. Avoid animations unless they explain change; respect reduced motion.
+Calculators need labels, units, bounded finite inputs, an initial useful result and a reset control. Reject blank inputs and never display NaN/Infinity. Teaching tools and simulations should expose only meaningful controls, show how an input changes an outcome, and support pause/reset where time matters. Respect reduced motion.
 
-Keep visual density modest. Match foreground and surface tokens in both themes, provide keyboard-operable controls and visible focus, and use labels as well as colors. No remote fonts, CDNs or libraries are available. Do not attempt to bypass the sandbox.
+Use compact flex/grid layouts with one spacing rhythm. Do not duplicate the Host title, add a landing-page hero, nest decorative cards or build app navigation inside the answer. Support both themes through tokens, keyboard controls, visible focus, and labels in addition to colors.
 
-For a follow-up, a labelled button may call `steward.sendPrompt({text:"Compare these assumptions: ..."})`. The Host previews that exact text and requires the user to send it. Local sliders and filters remain local.
+Follow-ups use Websandbox.connection.remote.sendPrompt({text}); links use its openLink({url}). The Host's user-confirmed bridge preserves ordinary action authorization. Local slider state stays local; a follow-up explicitly names selected values.
+
+Steward supplies the native typography and control skin. Group adjacent actions in the provided `.actions`, `.controls` or `.button-group` flex wrapper; these wrap with a consistent gap. Do not add decorative outer cards, oversized headings, emoji ornaments, control scaling or a text-version toggle. The Host shows the text alternative on failure or without scripting.
+
+
+Steward extensions use the same compact styling. Sorting and filtering, graphic/data exports and display modes belong in the Host options menu. Use a real field label for each input and content titles where needed; do not put instructions, feature descriptions or technical implementation notes on the page. Keep errors factual and actionable. Keep source citations, data units and explicitly illustrative assumptions with the actual content.
+
+Stateful custom controls use stable IDs or `data-state-key`. The Host restores standard controls and outputs; preserve custom drawing state through getState/setState, and expose a small factual model context. `callTool({action})` only proposes an exact declared action; the Host button owns user intent. Never imitate an approval or automatically call actions during rendering. Keep native form fields and card content in their registered components rather than generating duplicate HTML versions.

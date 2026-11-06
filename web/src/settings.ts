@@ -64,6 +64,7 @@ async function openSignIn(popup:Window, form:HTMLFormElement){
 
 // Settings use native navigation; a submission has one explicit attempt.
 export function enhanceSettings(){
+ document.querySelector<HTMLSelectElement>('[data-model-account]')?.addEventListener('change',event=>{(event.target as HTMLSelectElement).form?.requestSubmit()});
  enhancePreferenceHelp();
  try{enhanceLanguagePreference()}finally{document.querySelector('[data-language-preference]')?.setAttribute('data-language-ready','')}
  enhanceSettingsControls();

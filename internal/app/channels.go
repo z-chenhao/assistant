@@ -28,16 +28,20 @@ func (a *App) CheckChannel(ctx context.Context, c, s, d string) error {
 	return a.store.CheckChannel(ctx, c, s, d)
 }
 func (a *App) AcceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
-	if e.Channel == "web" && (strings.HasPrefix(e.SourceID, "ui-form:") || strings.HasPrefix(e.EventID, "ui-form:")) {
+	if e.Channel == "web" && (strings.HasPrefix(e.SourceID, "ui-form:") || strings.HasPrefix(e.EventID, "ui-form:") || strings.HasPrefix(e.SourceID, "ui-action:") || strings.HasPrefix(e.EventID, "ui-action:")) {
 		return agent.Receipt{}, conversation.ErrInvalid
 	}
 	return a.acceptInbound(ctx, e)
 }
 func (a *App) acceptInbound(ctx context.Context, e interaction.InboundEvent) (agent.Receipt, error) {
-	if !a.Actor(nil).Ready(ctx) {
+	core := a.core.Load()
+	d, err := a.Diagnostics(ctx)
+	// Accept durable user intent from configured readiness. Token refresh belongs
+	// to the provider boundary and must not block the HTTP admission receipt.
+	if err != nil || !d.AgentIngressEnabled || core.registry == nil || a.core.Load() != core {
 		return agent.Receipt{}, agent.ErrSetup
 	}
-	return a.runtimeRuns().AcceptInbound(ctx, e)
+	return core.runs.AcceptInbound(ctx, e)
 }
 func (a *App) DecideInbound(ctx context.Context, e interaction.InboundEvent, id, hash, decision string) error {
 	return a.runtimeRuns().DecideInbound(ctx, e, id, hash, decision)
@@ -62,10 +66,14 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 	if json.Unmarshal(raw, &spec) != nil || spec.SchemaVersion != ui.Version {
 		return raw, nil
 	}
-	changed := false
+	bubbles, err := a.store.WebBubbles(ctx, m, spec)
+	if err != nil {
+		return nil, err
+	}
+	changed := len(bubbles) > 0
 	for i := range spec.Components {
 		c := &spec.Components[i]
-		if c.Type != "form" || c.FormID == "" || c.MessageID != m.MessageID {
+		if !ui.Respondable(*c) || c.FormID == "" || c.MessageID != m.MessageID {
 			continue
 		}
 		changed = true
@@ -85,6 +93,12 @@ func (a *App) WebProjection(ctx context.Context, m conversation.Message) (json.R
 	}
 	if !changed {
 		return raw, nil
+	}
+	if len(bubbles) > 0 {
+		return json.Marshal(struct {
+			ui.Spec
+			Bubbles []ui.Spec `json:"bubbles"`
+		}{spec, bubbles})
 	}
 	return json.Marshal(spec)
 }
