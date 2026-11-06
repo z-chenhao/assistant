@@ -5,7 +5,8 @@ import {t} from './i18n';
 // The server owns memory visibility and selection. Native links remain usable
 // without this enhancement; only pane widths are persisted in the browser.
 export function enhanceMemory() {
-  if (!document.querySelector('#memory-page')) return;
+  const page = document.querySelector<HTMLElement>('#memory-page');
+  if (!page) return;
   const listPage = !document.querySelector('#memory-workbench');
   let sheet: ReturnType<typeof createSideSheet> | null = null;
   let pending: AbortController | null = null;
@@ -72,4 +73,5 @@ export function enhanceMemory() {
   window.addEventListener('popstate', () => { if (listPage && !history.state?.memorySheetDepth) dismiss(); else if (location.pathname === '/developer/memory' && new URL(location.href).searchParams.has('ref')) void select(new URL(location.href), false); });
   window.addEventListener('pageshow', event => { if (event.persisted && listPage && history.state?.memorySheetDepth) void select(new URL(location.href), false); });
   window.addEventListener('pagehide', () => { dismiss(); compact.removeEventListener('change', fit); });
+  page.dataset.memoryReady = '';
 }

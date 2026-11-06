@@ -16,9 +16,20 @@ export async function memoryInspection({page,context,browser,url,evidence}) {
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await assertDeveloperList(page);
  await page.screenshot({path:evidence+'/memory-list-light-wide.png',fullPage:true});
+ // Exercise a delayed bundle explicitly: native links remain usable, while
+ // enhanced-sheet assertions wait for the actual feature initialization.
+ let release;const held=new Promise(resolve=>{release=resolve});
+ await page.route('**/app.js',async route=>{await held;await route.continue()});
+ try{
+  await page.goto(url+'/developer/memory',{waitUntil:'commit'});
+  await page.locator('a.memory-open').first().waitFor();
+  if(await page.locator('#memory-page[data-memory-ready]').count())throw Error('Memory reported ready before loading its handlers');
+  release();await page.locator('#memory-page[data-memory-ready]').waitFor();
+ }finally{release();await page.unroute('**/app.js')}
  await page.getByRole('searchbox',{name:'Search memories',exact:true}).fill('walking by the river');
  await page.getByRole('button',{name:'Search memories',exact:true}).click();
  if(await page.locator('[data-memory-ref]').count()!==1)throw Error('Memory content search failed');
+ await page.locator('#memory-page[data-memory-ready]').waitFor();
  await page.locator('a.memory-open').click();
  const dialog=page.getByRole('dialog',{name:'Memory details',exact:true});
  await dialog.waitFor();
@@ -46,6 +57,7 @@ export async function memoryInspection({page,context,browser,url,evidence}) {
  await page.screenshot({path:evidence+'/memory-list-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
  await page.goto(url+'/developer/memory?status=superseded');
+ await page.locator('#memory-page[data-memory-ready]').waitFor();
  await page.locator('a.memory-open').first().click();
  await page.locator('.memory-detail').waitFor();
  if(await page.locator('[data-memory-content]').count())throw Error('Superseded memory body was displayed');
