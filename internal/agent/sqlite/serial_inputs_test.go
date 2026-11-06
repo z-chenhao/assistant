@@ -89,10 +89,10 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 			}
 		}
 	}
-	var first, releaseFirst, releaseWorker sync.Once
+	var first, releaseFirst, releaseWorker, enterWorker sync.Once
 	p.respond = func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 		if isRoot(request) {
-			close(workerStarted)
+			enterWorker.Do(func() { close(workerStarted) })
 			<-workerRelease
 			return llm.GenerationResult{Text: "game delivered"}, nil
 		}
@@ -119,6 +119,7 @@ func TestMainQueuesSecondRequestUntilFirstTaskHandoffReply(t *testing.T) {
 	go func() { done <- a.Drain(ctx) }()
 	t.Cleanup(func() {
 		releaseFirst.Do(func() { close(firstRelease) })
+		enterWorker.Do(func() { close(workerStarted) })
 		releaseWorker.Do(func() { close(workerRelease) })
 		cancel()
 		select {
