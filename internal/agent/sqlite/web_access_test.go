@@ -1,10 +1,19 @@
 package sqlite
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	imagepkg "image"
+	"image/png"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -231,5 +240,143 @@ func TestWebAccessMainUsesRealCodeMode(t *testing.T) {
 	}
 	if scalar(t, s, `SELECT count(*) FROM artifact`) != 1 {
 		t.Fatal("no persisted page")
+	}
+}
+
+func TestWebAccessPiModelLedgerBudgetReplayAndQueryFence(t *testing.T) {
+	for _, blocked := range []bool{false, true} {
+		t.Run(fmt.Sprint(blocked), func(t *testing.T) {
+			ctx := context.Background()
+			calls := []llm.ToolCall{{ID: "search", Name: webaccess.SearchName, Arguments: `{"query":"public query"}`}}
+			s, r, c, executor, exchange := admitWebSearch(t, calls, blocked)
+			defer r.Release(ctx, c)
+			invs, err := executor.Store.Accept(ctx, exchange, calls, executor.Registry.Describe())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = executor.Store.Start(ctx, invs[0].ID); err != nil {
+				t.Fatal(err)
+			}
+			run, err := r.Load(ctx, c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			count := 0
+			r.ConfigureWebAccess(webaccess.Config{}, &loopProvider{store: s, respond: func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+				count++
+				if req.ToolGeneration == nil || req.ToolGeneration.Kind != "hosted_search" || req.Snapshot.ModelID != run.Snapshot.ModelID {
+					t.Error(req)
+				}
+				return llm.GenerationResult{Text: "evidence", WebSearch: &llm.WebSearchResult{Sources: []llm.WebSource{{URL: "https://example.com"}}}, Usage: &llm.TokenUsage{InputTokens: 7, OutputTokens: 2}}, nil
+			}})
+			body, _ := json.Marshal(map[string]any{"model": run.Snapshot.ModelID, "instructions": "Find sources", "input": []any{map[string]any{"content": []any{map[string]string{"text": "public query"}}}}})
+			request := webaccess.ModelRequest{Kind: "hosted_search", Body: body}
+			ts := executor.Store.(*tools)
+			first, err := ts.piModelGeneration(ctx, invs[0], run, "1", request)
+			if blocked {
+				if err == nil || err.Error() != "BUDGET_APPROVAL_REQUIRED" || count != 0 {
+					t.Fatal(first, err, count)
+				}
+				return
+			}
+			if err != nil || count != 1 {
+				t.Fatal(first, err, count)
+			}
+			again, err := ts.piModelGeneration(ctx, invs[0], run, "1", request)
+			if err != nil || again.Text != "evidence" || count != 1 {
+				t.Fatal(again, err, count)
+			}
+			if scalar(t, s, `SELECT count(*) FROM provider_usage WHERE generation_id IN (SELECT generation_id FROM model_generation WHERE run_id=? AND step_index<0)`, run.ID) != 1 {
+				t.Fatal("usage missing")
+			}
+			forged := request
+			forged.Body = bytes.ReplaceAll(body, []byte("public query"), []byte("unaccepted query"))
+			if _, err = ts.piModelGeneration(ctx, invs[0], run, "2", forged); err == nil {
+				t.Fatal("unaccepted query dispatched")
+			}
+			if err = r.Release(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = ts.piModelGeneration(ctx, invs[0], run, "1", request); err == nil {
+				t.Fatal("stale claim returned cached result")
+			}
+		})
+	}
+}
+
+func TestWebAccessPiMainCodeModePersistsImagesAndReplay(t *testing.T) {
+	var image bytes.Buffer
+	if err := png.Encode(&image, imagepkg.NewRGBA(imagepkg.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(image.Bytes())
+	}))
+	defer server.Close()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script, err := filepath.Abs("../../../runtime/javascript/src/web-access.mjs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := webaccess.Config{RuntimeCommand: node, RuntimeScript: script, OptionsJSON: `{"ssrf":{"allowRanges":["127.0.0.0/8"]}}`}
+	defs := append(webaccess.Definitions(cfg), codemode.Definition())
+	s, r, a, p := childFixture(t, defs...)
+	var production []tool.Definition
+	for _, spec := range a.Registry.Describe() {
+		d, _ := a.Registry.Resolve(spec.Name)
+		d.Spec.CodeModeOnly = spec.Name != codemode.ToolName
+		production = append(production, d)
+	}
+	registry, err := tool.NewRegistry(production)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.registry, a.Registry = registry, registry
+	r.ConfigureJavaScript(realCodeRuntime(t))
+	r.ConfigureWebAccess(cfg, p)
+	phase := 0
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		if req.Messages[len(req.Messages)-1].Role == "tool" {
+			if phase == 0 {
+				phase++
+				ref := regexp.MustCompile(`artifact:[a-zA-Z0-9_-]+#[a-zA-Z0-9]+`).FindString(req.Messages[len(req.Messages)-1].Text)
+				if ref == "" {
+					t.Fatal("responseId missing", req.Messages[len(req.Messages)-1].Text)
+				}
+				source := fmt.Sprintf(`return await tools.builtin__get_search_content({responseId:%q,urlIndex:0});`, ref)
+				args, _ := json.Marshal(map[string]string{"source": source})
+				return calls(codemode.ToolName, string(args)), nil
+			}
+			return llm.GenerationResult{Text: "image read completed"}, nil
+		}
+		source := fmt.Sprintf(`return await tools.builtin__fetch_content({url:%q});`, server.URL)
+		args, _ := json.Marshal(map[string]string{"source": source})
+		return calls(codemode.ToolName, string(args)), nil
+	}
+	mustSubmit(t, a, "web-access-pi-main", "Read the image")
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := a.Drain(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var raw string
+	if err := s.db.QueryRowContext(ctx, `SELECT result_json FROM tool_invocation WHERE tool_name=? AND status='succeeded'`, webaccess.ContentName).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var result tool.Result
+	if json.Unmarshal([]byte(raw), &result) != nil || len(result.ArtifactRefs) != 2 || len(result.ImageRefs) != 1 || requests != 1 {
+		t.Fatal(raw, requests)
+	}
+	if scalar(t, s, `SELECT count(*) FROM tool_invocation WHERE tool_name=? AND status='succeeded'`, webaccess.ReadName) != 1 {
+		t.Fatal("persistent state was not restored by the next invocation")
+	}
+	if scalar(t, s, `SELECT count(*) FROM artifact`) != 2 {
+		t.Fatal("media and state must commit together")
 	}
 }

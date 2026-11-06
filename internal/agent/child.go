@@ -54,7 +54,8 @@ func MainTools(specs []tool.Spec) []tool.Spec {
 			"builtin__automation_manage", "builtin__memory_manage",
 			"builtin__memory_search", "builtin__evidence_read",
 			"builtin__artifact_search", "builtin__artifact_manage",
-			"builtin__skill_list", "builtin__skill_view", "builtin__image_ocr", "builtin__web_search", "builtin__web_fetch":
+			"builtin__skill_list", "builtin__skill_view", "builtin__image_ocr", "builtin__web_search", "builtin__web_fetch",
+			"builtin__fetch_content", "builtin__get_search_content", "builtin__source_check":
 			out = append(out, s)
 		}
 	}

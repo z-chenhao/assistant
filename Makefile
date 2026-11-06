@@ -39,6 +39,7 @@ test-go:
 # Deterministic connector contracts; live network checks are explicitly opt-in.
 test-web-access:
 	go test -race ./internal/webaccess ./internal/llm/bridge ./internal/agent ./internal/agent/sqlite -run '(WebAccess|WebSearch|HostedSearch|SearchCompletion)' -count=1
+	node --test runtime/javascript/test/web-access.test.mjs
 
 test-node:
 	npm run check --prefix web

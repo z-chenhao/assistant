@@ -148,15 +148,15 @@ session's process group. The executor supplies timeout, audit, conflict, quota,
 result ordering and Artifact spillover semantics. A server-wide conflict key
 serializes calls to the same configured provider across Runs.
 
-HTTP/SSE, authenticated external MCP connections and production website access
-are not implemented. The local stdio adapter exercises real structured protocol
+The generic local MCP adapter does not implement HTTP/SSE or authenticated
+external MCP connections. Production Web Access uses its separate Host boundary. The local stdio adapter exercises real structured protocol
 calls against deterministic external-system Fakes without opening host network
 or credential access. Future Guest-connected adapters must retain the same
 registry, frozen policy and invocation lifecycle.
 
 ## 个人 Connector 待实现方案
 
-F-046–F-069 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Connector；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已在既有执行框架内增加公开读取、当前账户原生搜索和可选 Exa 后备，详见下方实现方案；其他服务仍是需求与实施约束，未新增其适配器、OAuth 或公开接口。已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
+F-046–F-069 的具体范围及分类见[术语与登记边界](../features/integrations.md#术语与登记边界)，接入顺序见[主索引](../feature-map.md#personal-connector-priorities)。其中 16 项面向明确外部系统／服务，F-069 是组合搜索与读取的 Web Access Connector；F-048–F-054 是执行、导入或模型能力候选，不计为 connector，也未确认为独立开发任务。F-069 已在既有执行框架内复用 Pi Web Access 核心，提供多源搜索、正文与证据续读，详见下方实现方案；Tavily、Exa、SearXNG 等搜索适配随核心复用；其他独立服务 connector 仍是需求与实施约束，未新增其 OAuth 或公开接口。已有受限本地 MCP、具名 GitHub PR 观察和 Guest 边界保持原契约。
 
 ### 具体要求与现有消费者
 
@@ -202,57 +202,34 @@ F-046–F-069 的具体范围及分类见[术语与登记边界](../features/int
 
 ### F-069 · Web Access 的最小组合方案
 
-**要求与消费者**：Main／Task Worker 经同一 Registry／Code Mode／Executor 搜索、读取公开网页、续读内容。现有模型控制面持有账户、快照、预算及取消，不能为了搜索再实现 OAuth 或悄悄换模型。当前原生路径限 Steward 自有 `openai_account` Responses；其他模型使用显式允许的 Exa。
+**具体要求与证据**：用户要求以已安装的 `pi-web-access@0.39.0` 插件增强 connector。Main／Task Worker 是现有消费者；既有 ToolSpec、Code Mode、模型快照、预算、Artifact、撤权和 durable replay 是下游契约。直接 vendoring 插件核心，比重新实现几十个供应商和正文处理器更可核对；来源与三个源码补丁由 [NOTICE](../../runtime/javascript/src/vendor/web-access/NOTICE.md) 和哈希清单维护。
 
-**机制与政策**：`internal/webaccess` 持有窄工具契约、公开读取、Exa 协议和有界选路；`internal/agent/sqlite/web_access.go` 持有被接受的调用、Run 作用域及模型交换 admission；`internal/llm/provider` 持有托管 `web_search` 的请求和真实来源事件。App 只组合。当前政策是原生优先、可选 Exa、最多两个源、不自动换账户／模型；`web_access.exa_fallback` 默认 false，其身份写入冻结 ToolSpec。源目录、公共插件 SDK、动态策略 DSL 和独立研究缓存均未引入。
+**机制与政策**：插件持有搜索／抓取路由、供应商协议、提取、摘要提示、内容查找和证据结构；`internal/webaccess` 与 Node host 持有私有 JSON 帧、短生命周期、受控凭据环境、媒体转换及状态传递；SQLite 适配器持有 accepted invocation、模型交换 admission、预算、作用域和终态提交。App 只组合。插件默认源顺序和 `searchRouting` 是当前可替换政策，不能写成 Steward 永久公共契约。
 
 ```mermaid
 flowchart TD
-    C["Code Mode：搜索／读取／续读"] --> E["Registry 与 Executor：冻结工具"]
-    E --> S["web_search：查询隔离、有界选路"]
-    S --> N["Steward 当前账户：Provider Bridge"]
-    S --> X["显式允许：Exa 托管 MCP"]
-    E --> F["web_fetch：公开 DNS 固定、本地提取"]
-    F --> A["Run 作用域 Artifact"]
-    E --> R["artifact_manage read：offset／limit"]
-    R --> A
+    C["Code Mode：四个插件核心工具"] --> E["Registry／Executor：冻结配置与源码身份"]
+    E --> P["每调用一个私有 Node host"]
+    P --> W["Pi 核心：路由、供应商、正文与证据"]
+    P --> M["当前模型回调：Steward Provider Bridge"]
+    M --> B["独立交换／预算／撤权／Run fence"]
+    P --> A["返回全文、状态和媒体附件"]
+    A --> S["Artifact 与工具终态原子提交"]
+    E --> R["get_search_content：作用域校验后恢复状态"]
+    R --> P
 ```
 
-**原生搜索的实际协议**：同一冻结 Snapshot，独立的两条 system/user 消息，只有本次查询，不带历史／附件／工具目录。Responses 使用 `tools: [{type: web_search}]`、`tool_choice: required`、`max_tool_calls: 1`、`include: [web_search_call.action.sources]`、`store: false`；无已完成的真实 `web_search_call` 则拒绝，来源从其 action 映射，不解析模型自己编写的链接作为搜索证明。能力以每次实际响应证明，不凭模型名或普通 Probe 猜测，状态查询不增加收费探测。协议依据 [OpenAI 官方说明](https://developers.openai.com/api/docs/guides/tools-web-search)；没有接入 Pi 的 ChatGPT 私有订阅端点，也不复制其认证文件。官方 API Key、Gemini grounding 和新增订阅路径需独立验证后再接入。
+**必须保留的复杂度**：私有 HOME／缓存／TMPDIR、显式 SecretStore 环境引用、DNS 连接固定、重定向校验、进程组取消、模型回调相关 ID、冻结身份、原子多附件与状态保存，分别源于隐私、SSRF、生命周期、计费和恢复约束。当前模型 token 不交给插件；其原始 Responses 搜索 payload 只允许当前冻结账户和 hosted-search 用途，仍验证真实搜索完成与来源，拒绝模型工具调用或截断回答。辅助交换用负 step 保持 Main 的既有 step 语义，重入检查参数哈希并复用已完成交换。
 
-**独立模型交换与预算**：辅助搜索复用 `model_generation`、`provider_usage`、`spend_reservation` 和既有账户 observer。普通 Agent turn 的 step 非负，搜索使用同一 Run 下递减的负 step 作为私有持久化通道，request 中保存 `web_search.invocation_id` 关联，原冻结 request hash 和接受时的 running invocation 再校验。不修改旧表、旧快照或公共协议稳定承诺。预算阻断先记录未发送的失败，再让既有后续 generation gate 展示审批；未知用量保留既有预算语义。token 定价不含未知 hosted-search 附加费，回执明确其未知，不能宣称总价已覆盖。搜索 `replay=never`，未完成交换不在恢复后重新发出。
+**内容与权限**：Host 从 Artifact 授权后将视频复制到私有调用目录；不把宿主路径开放给模型。插件 PDF 文件路径转为完整 Markdown 状态；GitHub 临时仓库转为有界归档附件；图片转为有界 JPEG，媒体引用与状态同事务提交。重新读取从 Artifact 恢复插件状态；不创建第二套持久化搜索数据库。媒体附件是内部真实消费者所需机制，不新增公共上传／存储模型。
 
-**Exa**：固定 `https://mcp.exa.ai/mcp`，免密钥，Streamable HTTP 初始化、工具目录与 `web_search_exa` 调用；不开放任意 MCP 地址或 stdio 沙箱网络，不转发 Steward 认证。每次 search 至多一次调用，五条结果、25 秒、256 KiB 协议响应和有界输出；不升级付费端点。来源字段来自服务返回的 Title／URL，正文仍标为服务提供的搜索证据，不能声称已读全文。免费额度与质量由服务控制。
-
-| 结果／错误 | 当前政策 |
-| --- | --- |
-| 真实搜索事件、零来源 | 正常完成，不换源 |
-| 明确不支持／临时不可用／429 | 只有冻结允许 Exa 时后备，最多两个源 |
-| 认证拒绝／预算审批／预算拒绝／取消 | 停止，不换源 |
-| 缺真实搜索事件／无效响应／输出超限 | 失败，不用另一源掩盖 |
-| live／cached 未知 | 明确未知，不当作实时证明 |
-| 严格日期／域名过滤、固定 provider | 首版未暴露，不能悄悄软化条件 |
-
-**公开读取与内容**：只读 HTTP(S)、80／443、UTF-8 HTML／纯文本／Markdown，最多五跳和解压后 2 MiB。自有 transport 不继承代理／cookie／账户头；每次 DNS 检查所有地址并直接拨号已验证 IP，保持 TLS 主机验证，防止 DNS rebinding。拒绝私有、保留、映射／转换 IP 和 metadata 地址。HTML 解析移除脚本、表单、导航等，无 JavaScript／PDF／登录支持；不冒充浏览器完整文章阅读。结果最多展示 4 KiB 前缀，完整文本通过 Executor 的 BinaryOutput 原子提交到 Artifact，沿已有 read 续读。外部文本始终是证据，不是授权。取消、Forget、Task epoch 及迟到接受服从既有 fence。
-
-**复杂性与开放范围**：地址限制、预算／账户 fence、来源证明、持久化交换与 Artifact 属于域内正确性要求；动态 provider 平台、通用认证网关、搜索模型挑选、浏览器自动升级和研究会话存储属于未验证需求，拒绝引入。全部适配与选路为 private；工具和配置为实验性产品契约，未新增公共稳定 SDK。选择已有 Artifact 和 generation ledger 是为了保持取消／隐私／计费原子性，代价是负 step 的内部约定，专项测试保护普通 step 与搜索记录互不替换。直接读取不支持将公网解析为保留地址的 fake-IP 代理；拒绝为其放宽 SSRF。真实账户 Live 与中文质量仍是明确缺口。
+**开放范围与稳定性**：核心和补丁可在仓库内理解、复用和升级；Go／Node host 协议及插件配置保持 private／experimental，ToolSpec 通过指纹冻结，未发布通用 connector SDK、公共内部模型或长期兼容承诺。旧 `web_fetch` 契约继续；旧 Run 不使用新身份。源码、依赖或凭据引用改变后重启，新 Run 获得新目录。
 
 ### Pi Web Access 的参考边界
 
-参考项目为 [pi-web-access](https://github.com/nicobailon/pi-web-access)，本方案核对的实现版本为 0.39.0；Pi 1.5.0 是宿主版本，不是搜索插件版本。公开仓库链接用于定位设计，实施时仍需固定实际依赖／参考版本。该包按 MIT 发布；如复制代码需保留相应版权与许可声明，引用设计不表示已经引入该依赖。
+直接复用核心，而不是让 Steward 执行 Pi 扩展入口。搜索链路、批量与固定源、过滤参数、Readability／Defuddle、PDF／GitHub／媒体、来源证据和全文查找均来自 pinned source。Steward 的当前模型注册表只暴露冻结模型，摘要与问答不使用 Pi 的任意廉价模型选择；独立供应商仅有显式配置的凭据环境。SIWC 仍走 `api.openai.com/v1`，不因用户说 Codex 就静默迁移到私有 Codex 端点；插件独立 Codex JWT 路径保留，但不读取 Codex CLI 凭据、不替用户完成另一套账户生命周期。
 
-可借鉴的窄机制：
-
-- **搜索与读取分开**：搜索返回来源列表，指定 URL 读取负责正文；长内容保存后按段／关键词续读。Steward 复用 Artifact 和来源引用，不复制 Pi 会话缓存或另建研究状态库。
-- **服务专属适配、统一窄结果**：保留标题、URL、摘要、实际 provider 和各步失败；首版只选一个主源及可选的明确后备，不搬入全部供应商、并发全源广播或自动付费切换。
-- **受控切换**：借鉴认证、限流、网络、不支持、响应无效和取消的区分，但从结构化协议取得错误类型，不依赖任意远端文本中的关键词。取消必须终止，撤权不能靠换源掩盖；切换不得扩大查询披露目的地或费用授权。
-- **本地正文提取优先**：参考 Readability／Defuddle 等提取再转 Markdown 的职责划分；将 URL 送往第三方正文服务是独立的数据处理目的地，不因搜索服务已配置就自动开放。
-
-不能原样继承的语义：插件 Exa 高级工具失败后可退到基础工具，将过滤要求放入查询文字；这降低了过滤保证，Steward 必须区分不支持、认证／额度失败及允许的降级条件，不能仍展示为严格过滤成功。插件中的 `source_check` 在取得证据后仍返回 `unclear`，并未实现自动语义支持／反驳判断；只能借鉴来源和片段组织，不能宣称自动事实核查已经完成。
-
-F-069 先验证当前 Steward 账户的原生托管搜索，再把 F-067 Exa 作为显式可选后备；F-068 已选自托管实例和 F-046 Tavily 保留后续候选，不要求同时实现。自动切换只服从 F-069 的冻结政策，不把默认验证顺序直接变成全源自动 fallback。DuckDuckGo HTML 可作后续实验，验证码／页面变化须显式失败，不作为正式稳定 API；degoog 可继续观察，其官方 MCP 文档仍标 beta，不进入首版必需范围。
-
-插件虽提供独立 stdio MCP 入口，也不能原样放进当前无网络／无继承凭据的 F-024 沙箱就宣称可用。应在 F-025 边界内选择最小服务适配或明确的远端传输，继续经现有 Registry／Executor；不开放整套插件网络、Pi 会话、浏览器 cookie 或订阅凭据。只做此处搜索任务，不为兼容插件引入新的工具激活机制、Curator UI、视频平台或订阅桥接。
+拒绝整套 Pi 会话／TUI／浏览器 profile 挂载，因为它会绕过现有权限、账户及交互边界。`summary-review` 采用待用户审核草稿，不把 Pi Curator 的批准语义伪造为已完成。没有凭空增加统一供应商能力保证：插件某些过滤是提示或本地筛选，Exa 降级可弱化过滤；`source_check` 是手工判断所需证据，非自动事实核查。旧版原生优先＋opt-in Exa 政策被插件默认路由替代，升级前可显式限制为 openai-only，操作配置见功能说明。
 
 ### 非 Connector 能力候选
 

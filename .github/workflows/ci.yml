@@ -56,7 +56,7 @@ jobs:
       - name: Core deterministic end-to-end flows
         if: steps.scope.outputs.docs_only != 'true'
         run: exec python3 tests/system/process_step.py --name e2e --phase test -- make test-e2e
-      - name: Web Access connector safety and durable execution
+      - name: Pi Web Access provenance, media, routing and durable execution
         if: steps.scope.outputs.docs_only != 'true'
         run: exec python3 tests/system/process_step.py --name web-access --phase test -- make test-web-access
       - name: Task coding isolation and recovery

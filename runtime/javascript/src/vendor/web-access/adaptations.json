@@ -1,0 +1,14 @@
+{
+  "utils.ts": {
+    "sha256": "a931fcf0596399cffceeb709b8da5abc08673477a89bdc0dece60ac694e96276",
+    "reason": "Route current-account requests through Steward fenced Provider Bridge without disclosing the account token."
+  },
+  "ssrf-protection.ts": {
+    "sha256": "c08f16670e6b08b537b490f2b0585ef080dce829896ea4fa154b713b54439f28",
+    "reason": "Pin actual public-page socket DNS via Steward transport in addition to upstream URL preflight."
+  },
+  "extract.ts": {
+    "sha256": "0237f8bb731c64f50a3605e45ef83cd1b16fc6f54815a21f9f99549bc6b85cd6",
+    "reason": "Use bounded Host image decoding; preserve full PDF Markdown in scoped Artifact state instead of ephemeral file paths."
+  }
+}

@@ -46,18 +46,19 @@ F-046–F-069 的[分类与范围](../features/integrations.md#术语与登记�
 
 ### F-069 的链路与失败矩阵
 
-专项入口为 `make test-web-access`，在 CI 的 Ubuntu checks 中对 connector／bridge／SQLite 的相关用例运行 race 检查，不依赖外网或生产凭据。完整回归继续执行 `make test lint`、`make test-prompts` 及 core E2E。
+专项入口为 `make test-web-access`，CI 的 Ubuntu checks 运行 Go race 和 Node host 专项测试；完整回归运行 `make test lint`、`make test-prompts` 及 core E2E。
 
-| 场景 | 已有证明入口 | 证明边界／缺口 |
+| 场景 | 证明入口 | 证明边界／缺口 |
 | --- | --- | --- |
-| 当前冻结账户／模型托管搜索 | [bridge 协议 peer](../../internal/llm/bridge/web_search_test.go)：真实 SSE、required hosted tool、来源、用量；无搜索事件拒绝 | 实际 Steward 账户 Live 另验；不证明 Pi 的私有订阅路径 |
-| 来源与后备政策 | [connector 单测](../../internal/webaccess/webaccess_test.go)：零命中成功，认证／预算／取消／无效响应不后备；Exa initialize/list/call、429 | 多源链路最多两源，严格过滤及固定源尚未提供 |
-| 独立交换、预算和生命周期 | [SQLite 集成](../../internal/agent/sqlite/web_access_test.go)：接受的调用、同快照、查询隔离、独立负 step、usage、预算不发请求、旧 claim 拒绝、重复不再发送 | 账户撤权、Task／Forget 的完整矩阵由既有账户／Run／Artifact fence 回归共同保护；专门的真实账户取消与重启 Live 仍需补 |
-| 网页安全与内容界限 | connector HTTP peer：私网／metadata／IP 转换、重定向、类型／编码／大小及脚本提取 | DNS 固定不接受 fake-IP 保留地址；没有带登录浏览器或 PDF |
-| 长文本保存与续读 | SQLite 真实 Executor BinaryOutput→Artifact，验证 UTF-8 前缀、完整存储、引用及重复复用 | Artifact 的跨范围／Forget／续读工具行为继续由既有 Artifact 回归覆盖 |
-| Exa 真实服务 | `STEWARD_WEB_ACCESS_LIVE=1 go test -v ./internal/webaccess -run TestLivePublicWebAccess -count=1` | 显式 opt-in 在线测试；免费限流／网络和中文质量不是确定性 CI 的承诺 |
+| pinned source 与补丁 | Node `web-access.test.mjs` 核对原始／适配哈希及连接 DNS、仓库归档作用域 | 更新来源版本仍需审查语义与许可证，哈希不证明远端可用 |
+| 路由与核心能力 | Go `internal/webaccess/runtime_test.go` 调用真实 Node 核心：批量原生请求、配置的 SearXNG 优先、raw／readable／answer、摘要与待审核草稿、来源哈希和 unclear、PDF、图片 | HTTP／模型 peer 不证明生产供应商或真实账户 |
+| 认证／取消／配置 | Runtime 回归：认证终止、取消等待模型与进程、任意本机路径拒绝、明文秘密／凭据命令／危险环境拒绝 | 撤权与 Forget 继续由既有账户、Run、Artifact fence 回归保护；真实账户取消另验 |
+| SQLite 与 Code Mode | `web_access_test.go`：插件模型回调预算、交换／usage、参数哈希／查询绑定、重复复用、旧 claim 拒绝；真实 Main Code Mode→图片和状态 Artifact 原子保存 | 生产外网、独立 Codex JWT 和媒体服务需要各自 Live |
+| 工具与 Artifact 提交 | Artifact 集成：多附件事务、配额／错误回滚、作用域、引用和续读 | 取消后不得提交部分媒体／状态；旧 byte offset 与插件字符 offset 分别验证 |
+| 原生 Responses 协议 | Bridge peer：真实 SSE、required hosted tool、来源、用量；SIWC 不发送不支持的 max_tool_calls | Steward 自有账户实际能力仍未以 peer 替代 |
+| 网络 Live | opt-in `STEWARD_WEB_ACCESS_LIVE=1 go test -v ./internal/webaccess -run TestLivePiWebAccess -count=1`，真实 Pi 核心免费 Exa／公开页面探测 | 不代表所有 vendored 供应商、中文质量、真实订阅搜索或付费处理可用 |
 
-首版尚未完成目标真实账户的托管搜索 Live，故 F-069 保持部分完成。不能把协议 peer、Exa 在线成功或 Pi 曾使用成功当作 Steward 自有账户验收。公开网页读取在 fake-IP 网络会被安全拒绝，此环境限制要与普通公网读取分开报告。服务语义忠实性、中文覆盖和时效另行评测；执行证据留在 PR／CI／忽略的 evidence/，不写入长期文档。
+F-069 保持部分完成：真实 Steward 账户、独立 Codex JWT、付费供应商及视频服务逐项验证后再提升状态。Pi TUI／Curator／浏览器 cookie 未接入；不能把源码存在等同于能力验收。执行证据留在 PR／CI／忽略的 evidence/，不写长期运行日志。
 
 ### 非 Connector 能力候选的验收方向
 

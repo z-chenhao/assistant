@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 )
 
@@ -73,6 +74,7 @@ type GenerationRequest struct {
 	Snapshot         Snapshot                              `json:"model_snapshot"`
 	Messages         []Message                             `json:"messages"`
 	Tools            []ToolSpec                            `json:"tools,omitempty"`
+	ToolGeneration   *ToolGeneration                       `json:"tool_generation,omitempty"`
 	WebSearch        *WebSearchRequest                     `json:"web_search,omitempty"`
 
 	// AuthEpoch is captured by the Host resolver and passed only to final
@@ -95,8 +97,15 @@ type TokenUsage struct {
 
 // WebSearch is a private hosted-tool request, never a replacement model profile.
 type WebSearchRequest struct {
+	InvocationID string          `json:"invocation_id"`
+	Query        string          `json:"query"`
+	Payload      json.RawMessage `json:"payload,omitempty"`
+}
+
+type ToolGeneration struct {
 	InvocationID string `json:"invocation_id"`
-	Query        string `json:"query"`
+	CallKey      string `json:"call_key"`
+	Kind         string `json:"kind"`
 }
 
 type WebSource struct {

@@ -259,3 +259,19 @@ func TestTaskCodeStorageRemainsOutsideExecutionAndSourceScopes(t *testing.T) {
 		})
 	}
 }
+
+func TestWebAccessRuntimeAndSecretBoundaries(t *testing.T) {
+	base := t.TempDir()
+	valid := fmt.Sprintf("version: 1\napp:\n  data_root: %s/data\nexecution:\n  root: %s/workspace\nweb_access:\n  runtime_command: /usr/bin/node\n  runtime_script: %s/trusted/runtime/src/web-access.mjs\n  options_json: '{\"tavilyApiKey\":\"$TAVILY_API_KEY\"}'\n  credential_refs: {TAVILY_API_KEY: 'env:TAVILY_API_KEY'}\n", base, base, base)
+	for name, body := range map[string]string{"valid": valid, "workspace": strings.Replace(valid, base+"/trusted", base+"/workspace", 1), "relative": strings.Replace(valid, "runtime_command: /usr/bin/node", "runtime_command: node", 1), "literal": strings.Replace(valid, "$TAVILY_API_KEY", "PRIVATE", 1), "process control": strings.Replace(valid, "credential_refs: {TAVILY_API_KEY:", "credential_refs: {LD_PRELOAD:", 1)} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Decode([]byte(body), noEnv)
+			if (err == nil) != (name == "valid") {
+				t.Fatal(err)
+			}
+			if err != nil && strings.Contains(err.Error(), "PRIVATE") {
+				t.Fatal("secret in validation error")
+			}
+		})
+	}
+}

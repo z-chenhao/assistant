@@ -181,8 +181,16 @@ func (b *requestBuilder) responses() {
 	if c.WebSearch {
 		p["tools"] = []any{map[string]any{"type": "web_search"}}
 		p["tool_choice"] = "required"
-		p["max_tool_calls"] = 1
+		if m.API != OpenAIResponses || m.Provider != "steward" {
+			p["max_tool_calls"] = 1
+		}
 		p["include"] = []string{"web_search_call.action.sources"}
+		if len(c.WebSearchPayload) > 0 {
+			var body map[string]any
+			if json.Unmarshal(c.WebSearchPayload, &body) == nil {
+				p = body
+			}
+		}
 	}
 
 	b.payload = p

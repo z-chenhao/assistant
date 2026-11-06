@@ -102,6 +102,47 @@ func (s *Server) generate(ctx context.Context, r generationRequest, j *job) {
 			return
 		}
 		in.WebSearch = true
+		if len(r.WebSearch.Payload) > 0 {
+			var fields map[string]json.RawMessage
+			if json.Unmarshal(r.WebSearch.Payload, &fields) != nil {
+				fail(provider.ErrInvalidResponse)
+				return
+			}
+			for key := range fields {
+				switch key {
+				case "model", "instructions", "input", "tools", "include", "store", "stream", "tool_choice", "parallel_tool_calls":
+				default:
+					fail(provider.ErrInvalidResponse)
+					return
+				}
+			}
+			if string(fields["store"]) != "false" {
+				fail(provider.ErrInvalidResponse)
+				return
+			}
+			var body struct {
+				Model        string `json:"model"`
+				Instructions string `json:"instructions"`
+				Store        bool   `json:"store"`
+				Stream       bool   `json:"stream"`
+				ToolChoice   string `json:"tool_choice"`
+				Tools        []struct {
+					Type string `json:"type"`
+				} `json:"tools"`
+				Input []struct {
+					Role    string `json:"role"`
+					Content []struct {
+						Type string `json:"type"`
+						Text string `json:"text"`
+					} `json:"content"`
+				} `json:"input"`
+			}
+			if len(r.WebSearch.Payload) > 65536 || json.Unmarshal(r.WebSearch.Payload, &body) != nil || body.Model != snapshot.ModelID || body.Instructions != r.Messages[0].Text || body.Store || !body.Stream || body.ToolChoice != "required" || len(body.Tools) != 1 || body.Tools[0].Type != "web_search" || len(body.Input) != 1 || body.Input[0].Role != "user" || len(body.Input[0].Content) != 1 || body.Input[0].Content[0].Type != "input_text" || body.Input[0].Content[0].Text != r.WebSearch.Query {
+				fail(provider.ErrInvalidResponse)
+				return
+			}
+			in.WebSearchPayload = r.WebSearch.Payload
+		}
 	}
 	pending := map[string]string{}
 	systemSeen := false

@@ -218,6 +218,12 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	if cfg.JavaScript != nil && (!filepath.IsAbs(cfg.JavaScript.Command) || !filepath.IsAbs(cfg.JavaScript.Script)) {
 		return Config{}, errors.New("javascript requires an absolute command and script")
 	}
+	if _, err := cfg.WebAccess.Options(); err != nil {
+		return Config{}, err
+	}
+	if (cfg.WebAccess.RuntimeCommand == "") != (cfg.WebAccess.RuntimeScript == "") || cfg.WebAccess.RuntimeScript != "" && (!filepath.IsAbs(cfg.WebAccess.RuntimeScript) || !filepath.IsAbs(cfg.WebAccess.RuntimeCommand)) {
+		return Config{}, errors.New("web_access runtime requires absolute command and script")
+	}
 	if cfg.Computer != nil && (cfg.JavaScript == nil || cfg.Computer.Validate() != nil) {
 		return Config{}, errors.New("computer requires JavaScript and an explicit private Lume configuration")
 	}
@@ -320,6 +326,21 @@ func Decode(raw []byte, lookupEnv func(string) (string, bool)) (Config, error) {
 	for _, server := range cfg.MCP {
 		if overlaps(codeStorage, server.Directory) || overlaps(codeStorage, server.Command) {
 			return Config{}, errors.New("task code storage cannot overlap MCP provider")
+		}
+	}
+	if cfg.WebAccess.RuntimeScript != "" {
+		trusted := filepath.Dir(filepath.Dir(cfg.WebAccess.RuntimeScript))
+		var writable []string
+		if cfg.Execution != nil {
+			writable = append(writable, cfg.Execution.Root, cfg.Execution.RepositorySource, codeStorage)
+		}
+		if cfg.Computer != nil {
+			writable = append(writable, cfg.Computer.Root)
+		}
+		for _, root := range writable {
+			if root != "" && (overlaps(root, trusted) || overlaps(root, cfg.WebAccess.RuntimeCommand)) {
+				return Config{}, errors.New("web access runtime must be separate from execution scopes")
+			}
 		}
 	}
 	if cfg.Execution != nil {
@@ -427,6 +448,9 @@ func (c Config) ValidateDefaults() error {
 	}
 	if c.JavaScript != nil {
 		roots = append(roots, c.JavaScript.Command, c.JavaScript.Script)
+	}
+	if c.WebAccess.RuntimeScript != "" {
+		roots = append(roots, c.WebAccess.RuntimeCommand, filepath.Dir(filepath.Dir(c.WebAccess.RuntimeScript)))
 	}
 	if c.LLM.ProviderBridgeScript != "" {
 		roots = append(roots, c.LLM.ProviderBridgeScript)

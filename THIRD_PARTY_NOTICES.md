@@ -11,6 +11,7 @@ replace the licenses of incorporated code, fonts or dependencies.
 | QuickJS-WASI dependencies | Their locked npm packages | Their original notices remain inside the installed `node_modules` trees |
 | Reference model catalog | Pi AI 1.5.0 (MIT); [license](internal/llm/provider/LICENSE) and [provenance](internal/llm/provider/catalog/NOTICE.md) | `licenses/model-catalog/` |
 | Vendored JavaScript VM/prelude | [MIT license](runtime/javascript/src/vendor/LICENSE) and [provenance](runtime/javascript/src/vendor/NOTICE.md) | The same files in `runtime/javascript/src/vendor/` |
+| Pi Web Access core and adapters | [MIT license](runtime/javascript/src/vendor/web-access/LICENSE) and [pinned provenance/adaptations](runtime/javascript/src/vendor/web-access/NOTICE.md) | The same files under `runtime/javascript/src/vendor/web-access/`; locked npm packages retain their notices |
 | Steward / Ghost artwork | [Current artwork and provenance](web/licenses/steward-artwork.md) | Included in `licenses/web.txt` |
 
 Source installation and native packaging retain `LICENSE`, `NOTICE`, this file

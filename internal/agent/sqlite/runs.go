@@ -36,6 +36,7 @@ import (
 type Runs struct {
 	webAccess             webaccess.Config
 	webProvider           llm.LLMProvider
+	webSecrets            llm.SecretStore
 	webFetch              func(context.Context, string) (webaccess.Page, error)
 	feishuReviewWorkspace string
 	imageOCR              ImageOCR

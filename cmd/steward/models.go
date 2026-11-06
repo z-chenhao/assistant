@@ -112,7 +112,7 @@ func runModel(ctx context.Context, application *app.App, flags *flag.FlagSet, in
 		return json.NewEncoder(out).Encode(r)
 	case "select":
 		if !fixture {
-			fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to the selected provider (OpenAI account requests use https://api.openai.com/v1) or your configured local endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Steward never switches providers automatically.")
+			fmt.Fprintln(errOut, "Privacy: model requests and tool schemas go only to the selected provider (OpenAI account requests use https://api.openai.com/v1) or your configured local endpoint. localhost resolves in the Go Host network namespace, not the Computer Guest. Credentials stay in SecretStore and transient Bridge memory. Steward keeps the selected generation provider. Web Access sends queries and requested content to its configured search/extraction services.")
 		}
 		pv, err := strconv.ParseInt(flags.Arg(3), 10, 64)
 		if err != nil || pv < 1 {

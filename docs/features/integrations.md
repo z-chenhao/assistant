@@ -154,7 +154,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：用户交给助手原文查找、技术调研、帖子核验和商品比较后，能得到带来源的可核查结论。需求明确且重复出现；本项保留为 Tavily 的独立接入，免费优先的 Exa MCP／SearXNG 候选分别见 F-067/F-068，不再将 Tavily 预定为唯一或首个默认服务。
 
-**当前实现**：没有该服务的生产适配器；已有 MCP/Code Mode 不代表联网搜索已接通。
+**当前实现**：F-069 已复用插件 Tavily 适配器，需显式 SecretStore 凭据；尚未接通独立 Extract 正文操作，也未完成用户账户的 Search／Extract Live 验证。
 
 **目标与边界**：首版支持搜索及指定公开 URL 正文提取，保留来源 URL、读取时间、可用的发布时间、截断与提取失败。区分原文、转载和搜索摘要；不自动登录受限站点，不将私有资料拼入公共查询。认证与用量走 SecretStore 及现有额度机制。[Tavily Search](https://docs.tavily.com/documentation/api-reference/endpoint/search) 与 [Extract](https://docs.tavily.com/documentation/api-reference/endpoint/extract) 是不同操作，搜索命中不表示正文已读。
 
@@ -310,7 +310,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：有视频服务使用入口和研究内容消费信号，但尚无充分的视频委托正文样本；保持待定义，不能按打开标签页推断处理需求。
 
-**当前实现**：无 YouTube connector。
+**当前实现**：F-069 已复用插件的公开视频／转录／分析路径，尚无面向 YouTube 账户、订阅和官方 Data API 的独立 connector。
 
 **候选范围与前提**：确认用户要委托的任务后，考虑视频元数据、可合法取得的字幕／用户提供的转录和时间戳引用。[官方字幕下载](https://developers.google.com/youtube/data/reference/rest/v3/captions/download)要求拥有编辑视频的权限，不能承诺凭普通只读账户下载任意视频字幕。缺转录时元数据只能证明标题等信息；语音转录处理归 F-014，不另造视频平台。
 
@@ -322,7 +322,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：为个人研究提供低设置成本的公开网络搜索，优先验证免密钥方案。Pi Web Access 的 Exa 适配器提供参考；[Exa 官方说明](https://exa.ai/blog/best-web-search-mcp-servers)确认其托管 MCP 可免密钥、按免费限流使用，不能推导为无限免费或长期服务保证。
 
-**当前实现**：F-069 内已实现免密钥 Exa 托管 MCP 搜索，经初始化和工具发现后调用 `web_search_exa`。仅在 `web_access.exa_fallback: true` 时启用；未提供独立固定源、付费凭据或严格过滤。当前为部分完成，真实中文质量与服务长期可用性仍待验证。
+**当前实现**：F-069 直接复用插件 Exa 适配器，提供免密钥托管 MCP、显式固定源和插件支持的凭据／过滤参数；旧 Go 路径保留 `exa_fallback`。新核心默认后备政策见 F-069。高级工具降级可能把过滤变成查询提示，不能宣称严格过滤；中文质量、额度及长期可用性仍待验证。
 
 **候选范围与边界**：先接固定官方服务的公开搜索、来源结果及服务实际返回的内容，不复制 Pi 的配置、会话或订阅认证。实际工具名称／schema 需在目标服务核实，不能依赖插件中硬编码的旧名称。高级过滤不支持时明确说明限制；只有显式允许时才可退为查询文字提示，并区分硬过滤、本地筛选与检索提示。带 API key 的付费／额度路径需独立授权和用量边界，不因免费限流自动切到付费调用。
 
@@ -334,7 +334,7 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 **需求与依据**：个人搜索可选择已有或自行部署的搜索服务，减少对单一商业 API 的依赖；借鉴 Pi Web Access 的独立 SearXNG 适配。SearXNG 是聚合搜索服务，软件开源不代表机器、维护或所有上游均无成本。
 
-**当前实现**：无 SearXNG connector，也未为用户部署实例；实例位置、上游、网络和维护责任尚待确认，保持待定义。
+**当前实现**：F-069 已复用插件 SearXNG JSON 适配器并有 HTTP peer 回归；未为用户选择或部署实例，实例位置、上游、网络和维护责任仍待确认。
 
 **候选范围与边界**：只连接所有者明确选择的实例，通过[官方 JSON 搜索接口](https://docs.searxng.org/dev/search_api.html)获得标题、URL、摘要和可用的时间信息。实例认证经 SecretStore 引用；受信搜索服务端点与任意网页 URL 的访问范围分别校验。不自动使用随机公共实例或部署服务；不少公共实例禁用 JSON，接口可达也不能证明所有上游正常。时间／域名能力按实际引擎验证，不把查询运算符当作统一硬过滤保证。
 
@@ -344,19 +344,26 @@ F-069 Web Access Connector 是用户统一使用的搜索／网页访问接入�
 
 ### F-069 · Web Access Connector
 
-**需求与消费者**：为 Main／Task Worker 提供搜索、公开网页读取和已存内容续读，减少手工复制资料。不同模型可使用不同搜索链路，主模型与账户保持原冻结快照。
+**需求与消费者**：Main／Task Worker 通过 Registry／Code Mode／Executor 完成研究、搜索、网页／PDF／媒体读取及证据续读。当前直接复用本机参考的 `pi-web-access@0.39.0` 核心与适配器，Steward 保留账户、预算、权限、持久化和取消边界；[来源与改动清单](../../runtime/javascript/src/vendor/web-access/NOTICE.md)可审查。
 
-**当前实现**：内置 `builtin__web_search`、`builtin__web_fetch`，通过现有 Registry／Code Mode／Executor 调用；续读复用 `builtin__artifact_manage` 的 `read`。搜索优先尝试当前 Steward `openai_account` 的 Responses 托管 `web_search`，要求实际返回已完成的搜索事件，普通回答不能冒充搜索。每次查询独立记录模型交换、预算预留和用量，并复用账户撤权与 Run fence。它使用 Steward 自己的账户连接；没有导入 Pi／Codex CLI 凭据，也没有新增 ChatGPT 私有订阅端点。
+**入口与能力**：`builtin__web_search` 支持批量查询、指定 provider／provider 数组／all、域名与时间条件、正文抓取和摘要工作流；`builtin__fetch_content` 支持 readable／raw／answer、Readability／Defuddle／Markdown、PDF、GitHub 仓库／issue／PR、图片和插件支持的 YouTube／视频处理；`builtin__get_search_content` 按返回的 `responseId` 续读或 exact／case-insensitive／fuzzy 查找；`builtin__source_check` 输出来源、精确片段、时间及内容哈希。`source_check` 有证据时仍为 `unclear`，缺证据为 `missing-evidence`，不自动裁定事实。旧 `builtin__web_fetch` 保留其公开 HTML／文本契约。
 
-**配置与选路**：默认不允许第三方后备。显式配置 `web_access: {exa_fallback: true}` 后，本地模型、兼容网关及其他非原生路径可使用 Exa 免密钥托管 MCP；原生明确不支持、临时不可用或限流时也可后备。最多两个源，不并发广播；每个源最多一次搜索请求。零命中是成功，认证拒绝、预算阻断、无效响应和取消不换源。配置随工具身份冻结，修改后重启，新配置不能替换旧 Run 的身份。
+**选路与配置**：使用插件原有默认顺序：已配置 SearXNG → 当前订阅模型的原生搜索 → Exa → 其他已配置且可用的源；明确指定源不擅自换源。可通过插件原生 `searchRouting`、provider 和 fetch 配置调整，默认可使用 Exa 免密钥服务。**升级改变了旧版默认禁用第三方后备的政策**：`exa_fallback` 仅保留给旧 Go 路径，新核心使用 `options_json`；如果不允许第三方查询，应显式限制 `webSearch.allowedProviders`，再选择 `searchRouting` 顺序和失败政策。完整工具配置、凭据引用及源码／依赖哈希进入冻结身份，已有 Run 不套用新配置。
 
-**结果与读取**：搜索回执包含实际 provider、尝试、URL／标题、供应商答案、读取时间和可得 token 用量；托管搜索 live／cached 不可确认时明确为未知，token 用量不代表已知搜索总费用。公开读取仅支持 HTTP(S) 的 UTF-8 HTML／纯文本／Markdown；逐次连接校验并固定公开 DNS 地址，重定向再次检查，不带登录 cookie 或账户认证。限制端口、30 秒、五跳和解压后 2 MiB。HTML 提取可见正文并移除脚本等元素，不执行 JavaScript；正文保存到当前 Run 的 Artifact，回执提供 UTF-8 安全的前 4 KiB、总字节数及引用，按既有 offset／limit 续读。
+```yaml
+web_access:
+  options_json: '{"webSearch":{"allowedProviders":["openai"]},"searchRouting":{"providers":["openai"],"useCurrentModel":true,"fallbackOn":["unsupported"]}}'
+```
 
-**权限与隐私**：只向搜索服务发送本次查询，不发聊天历史、附件或工具目录。搜索按 `never` 恢复策略处理，未知结果不在重启后自动重复计费；网页 GET 可安全重试。所有外部内容均为不可信证据，不能授予执行权限。Artifact 的可见性、发布、Forget 与工具接受继续由现有机制负责；Forget 是 Steward 内的隔离，不承诺撤回已经发给外部服务的查询。
+需要独立源时按插件配置，例如 `options_json: '{"provider":"tavily","tavilyApiKey":"$TAVILY_API_KEY"}'`，并通过 `credential_refs: {TAVILY_API_KEY: "已存在的 SecretStore 引用"}` 提供密钥；不把密钥、凭据命令或 URL userinfo 写进配置。不会继承宿主环境中的 API Key、Pi／Codex 登录缓存或浏览器 cookie。SearXNG 等自托管实例需明确配置，Steward 不选择公共实例或代部署。模型不能通过工具参数指定未冻结的代理；允许配置的代理或直连。fake-IP 需显式限定 `ssrf.allowRanges`，或按插件 `ssrf.trustEnvProxy` 配合受信代理，不能全局关闭保护。
 
-**当前缺口**：Steward 真实 OpenAI 账户的托管搜索仍需单独 Live 验证；免费 Exa 无无限额度或 SLA。固定 provider、严格日期／域名过滤、API Key 官方 OpenAI 原生搜索、Gemini grounding、额外搜索源、PDF／登录页面／浏览器升级均未实现。本机代理若把公网 DNS 替换成私有／保留虚拟地址，直接读取会拒绝连接；没有为适配代理关闭 SSRF 保护。中文质量与事实忠实性另行评测，因此当前登记为部分完成。
+**账户与费用**：当前模型为 Steward `openai_account` 时，复用 Sign in with ChatGPT 的 `api.openai.com/v1/responses` 路径；该地址本身不表示 API Key 计费。插件构造的请求经过 Provider Bridge，并要求真实完成的搜索事件；账户 token 不进入 Node。批量搜索、网页问答和模型摘要分别记录交换、预算、用量及撤权 fence；没有聊天历史／附件／工具目录混入搜索。网页问答和摘要仅使用当前冻结模型，其他 `answerModel`／`summaryModel` 不会静默切换账户。插件独立 OpenAI／Codex JWT、Gemini、Tavily 等适配器需要显式的独立凭据；其费用、搜索附加费和外部服务额度不计入 Steward 的模型 token 预算，也不宣称免费。
 
-**验收**：模型协议 peer 验证真实搜索事件、来源和查询隔离；SQLite 工具链验证冻结策略、独立交换、预算阻断、用量、拒绝旧 claim 和 Artifact 续读／重放；HTTP peer 验证地址／大小／格式。真实 Exa 和目标账户分别验证，不能互相替代。
+**内容和生命周期**：全文和检索状态保存为当前作用域 Artifact；`responseId` 是 `artifact:…#插件ID`，后续调用重建状态，不依赖进程内缓存。分页 offset 是插件的 JavaScript 字符偏移，不能与旧 `artifact_manage read` 的字节偏移混用。PDF 保存完整 Markdown，GitHub clone 导出至多 16 MiB 压缩快照（不含 `.git`），不返回已删除的临时路径；图片／视频帧保存为媒体 Artifact，最多八项附件，与工具终态原子提交。本机视频用 `artifactRef` 输入，最多 50 MiB，任意宿主路径拒绝；视频需要插件对应服务凭据和适用的 ffmpeg／yt-dlp。资源超限明确失败，不把不完整仓库称为完整快照。对外网络工作默认不在崩溃后自动重放，已完成结果复用；取消会回收整个进程组和模型回调。
+
+**Steward 适配差异**：不挂载 Pi TUI、交互 Curator、浏览器 profile 或任意本机文件。`summary-review` 返回明确待用户审核的草稿及 `reviewRequired`，不冒充已批准摘要。正文外送遵守插件的 fetch 路由配置；远端正文服务须显式开启。域名／时间条件保留插件的供应商差异：有的是服务端过滤，有的是查询提示或本地筛选，不能统一宣称严格过滤。网页内容均为不可信证据，不授予执行权限。
+
+**当前缺口与验收**：已有核心、模型／HTTP peer、Code Mode、SQLite／Artifact、取消和预算回归；它们不证明每个供应商和真实订阅账户可用。Steward 自有账户搜索、独立 Codex JWT、付费源、媒体服务及中文质量仍需各自的 Live 验证，因此 F-069 保持部分完成。浏览器 cookie 及 Pi Curator 的产品化接入未完成，不能因 vendored 文件存在宣称已接通。
 
 ## 相关能力候选（非 Connector）
 
