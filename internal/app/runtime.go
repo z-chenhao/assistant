@@ -19,6 +19,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/media/ocr"
 	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/plugin/webaccess"
 	"github.com/z-chenhao/assistant/internal/recall"
 	"github.com/z-chenhao/assistant/internal/recall/embedding"
 	"github.com/z-chenhao/assistant/internal/skill"
@@ -28,7 +29,6 @@ import (
 	codefixture "github.com/z-chenhao/assistant/internal/tool/codemode/fixture"
 	toolfake "github.com/z-chenhao/assistant/internal/tool/fake"
 	"github.com/z-chenhao/assistant/internal/tool/mcp"
-	"github.com/z-chenhao/assistant/internal/webaccess"
 )
 
 func (a *App) prepareRuntime(ctx context.Context, cfg config.Config, fixture string, secrets llm.SecretStore) error {

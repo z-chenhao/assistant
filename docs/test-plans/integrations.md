@@ -18,7 +18,7 @@
 
 ## 个人 Connector 验收计划
 
-F-046–F-069 的[分类与范围](../features/integrations.md#术语与登记边界)、[接入顺序](../feature-map.md#personal-connector-priorities)和[待实现方案](../designs/integrations.md#个人-connector-待实现方案)是以下验收的依据。16 项外部系统／服务 connector、F-069 Web Access 组合能力与 7 项非 connector 能力候选分别验收，最后一类不构成已确认开发任务。除 F-069 及其 F-067 后备已有工具入口和专项测试外，其余条目仍为计划；各自的 Live 与实现证明分别记录。已有 MCP、Guest、Artifact、Memory 或精确 PR 测试不能证明新服务已可用；待定义项先确认数据来源、平台和行为范围，再固化场景。
+F-046–F-070 的[分类与范围](../features/integrations.md#术语与登记边界)、[接入顺序](../feature-map.md#personal-connector-priorities)和[待实现方案](../designs/integrations.md#个人-connector-待实现方案)是以下验收的依据。16 项外部系统／服务 connector、F-069 Web Access Plugin、F-070 插件生命周期与 7 项非 connector 能力候选分别验收，最后一类不构成已确认开发任务。除 F-069 及其 F-067 后备已有工具入口和专项测试外，其余条目仍为计划；各自的 Live 与实现证明分别记录。已有 MCP、Guest、Artifact、Memory 或精确 PR 测试不能证明新服务已可用；待定义项先确认数据来源、平台和行为范围，再固化场景。
 
 ### 分项场景矩阵
 
@@ -40,7 +40,7 @@ F-046–F-069 的[分类与范围](../features/integrations.md#术语与登记�
 | [F-066 YouTube](../features/integrations.md#f-066) | 确认任务后区分元数据和已取得转录，以时间戳引用实际内容 | 无字幕、无编辑权限、语言不符、只凭标题生成完整视频摘要 | 先确认任务；协议＋系统、真实字幕权限／内容质量 Live，全部待补 |
 | [F-067 Exa MCP](../features/integrations.md#f-067) | 免密钥查询得到实际来源；正文有无明确，实际服务／工具可追溯 | 429、工具／schema 变化、缺正文、无效响应；严格过滤不能静默变成提示，取消后不换源 | 目标传输协议 peer＋产品系统，F-069 中已有协议 peer 和 opt-in 在线测试；长期限流／中文质量仍待验证 |
 | [F-068 SearXNG](../features/integrations.md#f-068) | 查询选定实例，展示来源及已知上游失败／部分结果 | JSON 未启用、缺结果字段、403／429、跨 origin 丢认证、域名筛选／时间保证变化 | HTTP peer＋产品系统；实际实例与上游质量需 Live，未部署，全部待补 |
-| [F-069 Web Access Connector](../features/integrations.md#f-069) | 按冻结的已验证账户能力搜索，读公开网页并续读 Artifact；原生及允许后备的真实来源可追溯 | 主模型／账户不切换，零命中不换源，取消／撤权终止；预算、过滤、来源／live 模式不能静默退化 | 已有模型／HTTP peer、SQLite 工具与 Artifact 集成；Steward 自有账户和内容质量仍需 Live |
+| [F-069 Web Access Plugin](../features/integrations.md#f-069) | 按冻结的已验证账户能力搜索，读公开网页并续读 Artifact；原生及允许后备的真实来源可追溯 | 主模型／账户不切换，零命中不换源，取消／撤权终止；预算、过滤、来源／live 模式不能静默退化 | 已有模型／HTTP peer、SQLite 工具与 Artifact 集成；Steward 自有账户和内容质量仍需 Live |
 
 搜索源比较使用同一批公开的中文原文查找、技术说法核验及英文资料查询，分开记录成功率、来源可核查性、时效、正文覆盖、延迟和实际费用。免密钥不代表无配额，代码支持不代表当前网络可用。Pi 插件的 `source_check` 返回证据不表示自动判真伪；若复用片段组织，只验证来源和引用正确，语义结论另行评测。实现过滤降级／后备源前，验证取消、认证拒绝及未授权目的地／费用不会触发自动切换。比较与执行证据留在 PR／CI 或忽略的 evidence/，不写入长期文档。
 
@@ -162,3 +162,18 @@ already frozen Run. Changing a configured scope fails old-Run selection closed.
 需求完成需要对应入口可用、正常与相关失败/恢复场景有证据、使用说明与技术方案一致。报告沿用现有 evidence/流程；不为本方案建立另一套测试平台或复制历史评测资产。
 
 渐进工具暴露与 500 工具目录的配置、Main 搜索加载、Worker 脚本发现、隐藏/未声明调用拒绝及恢复覆盖，统一见[工具与审批测试方案](tools-approvals.md#渐进工具发现与-500-工具目录)。CLI capabilities 的 `tool-loading` 已纳入完整门禁，读取同一角色冻结目录。
+
+### Plugin、Connector 与平台边界
+
+`make test-web-access` 覆盖 `internal/plugin/webaccess`、三个服务 connector、`internal/webcontent` 与 SQLite Host 的 race 回归，CI 继续由必需的 `Ubuntu checks` 执行。
+
+| 场景 | 现有入口与证明范围 |
+| --- | --- |
+| 依赖方向 | 插件的 `architecture_test.go` 检查实际 Go 传递依赖；connector 不依赖插件／工具／平台，内容处理不依赖服务／模型，插件不依赖 Agent／SQLite／App |
+| 插件研究配方独立于 SQLite | `plugin/webaccess/plugin_test.go`：受控 Host 驱动两次原生查询、去重读取、部分失败、摘要草稿、完整证据及预览，再从保存证据查找；预算／认证／取消终止后不再换源或生成 |
+| 各服务协议与来源政策分离 | Exa 所属包协议 peer；插件 `expanded_test.go` 经实际 SearXNG／Tavily adapter 验证认证、请求、限流换源和无效响应终止 |
+| 处理机制复用 | `webcontent` 所属测试验证公开 DNS 固定、地址／重定向拒绝、HTML／PDF／图片／编码和本地解析，不需要服务连接或 SQLite |
+| 平台安全语义 | SQLite 既有辅助交换测试验证冻结 Snapshot、预算、请求哈希／重放／过期 claim；Main→真实 Code Mode→Artifact 测试验证作用域续读，媒体／证据／终态原子提交与失败回滚 |
+| F-070 待实现 | 将来需经实际安装／启停／移除入口验证共享连接保留、断连与卸载独立、冻结权限不扩大；内部模块拆分不视为生命周期验收通过 |
+
+工具名、配置序列化和资源身份保持兼容；重构兼容检查比较旧版冻结定义与当前定义。真实账户／实例及模型质量继续按各服务 Live 的证明范围验收。

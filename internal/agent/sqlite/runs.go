@@ -24,11 +24,12 @@ import (
 	"github.com/z-chenhao/assistant/internal/interaction"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/memory"
+	"github.com/z-chenhao/assistant/internal/plugin/webaccess"
 	"github.com/z-chenhao/assistant/internal/recall"
 	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
-	"github.com/z-chenhao/assistant/internal/webaccess"
+	"github.com/z-chenhao/assistant/internal/webcontent"
 	sqlitedriver "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -37,7 +38,7 @@ type Runs struct {
 	webAccess             webaccess.Config
 	webSecrets            llm.SecretStore
 	webProvider           llm.LLMProvider
-	webContentFetch       func(context.Context, webaccess.Config, string, string) (webaccess.Page, error)
+	webContentFetch       func(context.Context, webcontent.Config, string, string) (webaccess.Page, error)
 	webFetch              func(context.Context, string) (webaccess.Page, error)
 	feishuReviewWorkspace string
 	imageOCR              ImageOCR

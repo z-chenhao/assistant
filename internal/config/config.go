@@ -23,10 +23,10 @@ import (
 	"github.com/z-chenhao/assistant/internal/interaction/web"
 	"github.com/z-chenhao/assistant/internal/memory"
 	"github.com/z-chenhao/assistant/internal/observer/github"
+	"github.com/z-chenhao/assistant/internal/plugin/webaccess"
 	"github.com/z-chenhao/assistant/internal/recall/embedding"
 	"github.com/z-chenhao/assistant/internal/skill"
 	"github.com/z-chenhao/assistant/internal/tool/mcp"
-	"github.com/z-chenhao/assistant/internal/webaccess"
 	"go.yaml.in/yaml/v3"
 )
 

@@ -38,7 +38,7 @@ test-go:
 
 # Deterministic connector contracts; live network checks are explicitly opt-in.
 test-web-access:
-	go test -race ./internal/webaccess ./internal/llm/bridge ./internal/llm/provider ./internal/agent ./internal/agent/sqlite -run '(WebAccess|WebSearch|HostedSearch|SearchCompletion)' -count=1
+	go test -race ./internal/plugin/webaccess ./internal/connector/... ./internal/webcontent ./internal/llm/bridge ./internal/llm/provider ./internal/agent ./internal/agent/sqlite -run '(WebAccess|WebSearch|HostedSearch|SearchCompletion|SearchPolicy|DefinitionsFreeze|ExaMCP|FetchAddresses)' -count=1
 
 test-node:
 	npm run check --prefix web

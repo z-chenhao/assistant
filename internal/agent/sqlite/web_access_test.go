@@ -13,85 +13,10 @@ import (
 	"github.com/z-chenhao/assistant/internal/artifact"
 	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/plugin/webaccess"
 	"github.com/z-chenhao/assistant/internal/tool"
 	"github.com/z-chenhao/assistant/internal/tool/codemode"
-	"github.com/z-chenhao/assistant/internal/webaccess"
 )
-
-func TestWebSearchDurableGenerationBudgetAndFences(t *testing.T) {
-	for _, blocked := range []bool{false, true} {
-		t.Run(map[bool]string{false: "persisted and never redispatched", true: "budget prevents dispatch"}[blocked], func(t *testing.T) {
-			ctx := context.Background()
-			calls := []llm.ToolCall{{ID: "search", Name: webaccess.SearchName, Arguments: `{"query":"public query"}`}}
-			s, r, c, executor, exchange := admitWebSearch(t, calls, blocked)
-			defer r.Release(ctx, c)
-			invs, e := executor.Store.Accept(ctx, exchange, calls, executor.Registry.Describe())
-			if e != nil {
-				t.Fatal(e)
-			}
-			if e = executor.Store.Start(ctx, invs[0].ID); e != nil {
-				t.Fatal(e)
-			}
-			run, e := r.Load(ctx, c)
-			if e != nil {
-				t.Fatal(e)
-			}
-			dispatched := 0
-			p := &loopProvider{store: s, respond: func(req llm.GenerationRequest) (llm.GenerationResult, error) {
-				dispatched++
-				before, _ := encoded(run.Snapshot)
-				after, _ := encoded(req.Snapshot)
-				if before != after || len(req.Messages) != 2 || req.Messages[1].Text != "public query" || req.WebSearch.InvocationID != invs[0].ID || len(req.Tools) != 0 {
-					t.Fatal(req)
-				}
-				for _, m := range req.Messages {
-					if strings.Contains(m.Text, "do the requested work") {
-						t.Fatal("history leaked")
-					}
-				}
-				return llm.GenerationResult{Text: "evidence", WebSearch: &llm.WebSearchResult{Sources: []llm.WebSource{{URL: "https://example.com/"}}}, Usage: &llm.TokenUsage{InputTokens: 7, OutputTokens: 2}}, nil
-			}}
-			r.ConfigureWebAccess(webaccess.Config{}, p)
-			ts := executor.Store.(*tools)
-			first, e := ts.hostedSearch(ctx, invs[0], run, "public query")
-			if blocked {
-				if e == nil || e.Error() != "BUDGET_APPROVAL_REQUIRED" || dispatched != 0 {
-					t.Fatal(first, e, dispatched)
-				}
-				return
-			}
-			if e != nil || first.WebSearch == nil || dispatched != 1 {
-				t.Fatal(first, e, dispatched)
-			}
-			again, e := ts.hostedSearch(ctx, invs[0], run, "public query")
-			if e != nil || again.Text != first.Text || dispatched != 1 {
-				t.Fatal(again, e, dispatched)
-			}
-			if e = r.write(ctx, func(tx *sql.Tx) error {
-				var taskID string
-				if e := tx.QueryRowContext(ctx, `SELECT task_id FROM run WHERE run_id=?`, run.ID).Scan(&taskID); e != nil {
-					return e
-				}
-				messages, e := r.taskHandoff(ctx, tx, taskID, 2)
-				if e == nil && len(messages) != 0 {
-					t.Fatal("search evidence became final task handoff", messages)
-				}
-				return e
-			}); e != nil {
-				t.Fatal(e)
-			}
-			if scalar(t, s, `SELECT count(*) FROM model_generation WHERE run_id=? AND step_index<0 AND status='completed'`, run.ID) != 1 || scalar(t, s, `SELECT count(*) FROM provider_usage WHERE generation_id IN (SELECT generation_id FROM model_generation WHERE run_id=? AND step_index<0)`, run.ID) != 1 {
-				t.Fatal("exchange or usage missing")
-			}
-			if e = r.Release(ctx, c); e != nil {
-				t.Fatal(e)
-			}
-			if _, e = ts.hostedSearch(ctx, invs[0], run, "public query"); e == nil {
-				t.Fatal("expired claim accepted")
-			}
-		})
-	}
-}
 
 func TestWebAccessUsesFrozenPolicyAndAcceptedArguments(t *testing.T) {
 	ctx := context.Background()

@@ -8,7 +8,11 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/z-chenhao/assistant/internal/webcontent"
 )
+
+type Page = webcontent.Page
 
 type Document struct {
 	Version  int            `json:"version"`
@@ -45,7 +49,7 @@ func (d *Document) Assess() {
 		if page.Text == "" {
 			continue
 		}
-		end := len(clipUTF8(page.Text, 1600))
+		end := len(webcontent.Preview(page.Text, 1600))
 		d.Passages = append(d.Passages, Passage{URL: page.URL, Text: page.Text[:end], Start: 0, End: end, ContentHash: Hash(page.Text[:end]), SourceHash: Hash(page.Text)})
 		d.Status = "unclear"
 	}
@@ -157,4 +161,4 @@ func findSpan(text, pattern, mode string) (int, int, error) {
 	return int(positions[start]), int(positions[cursor]), nil
 }
 
-func Preview(text string, limit int) string { return clipUTF8(text, limit) }
+func Preview(text string, limit int) string { return webcontent.Preview(text, limit) }

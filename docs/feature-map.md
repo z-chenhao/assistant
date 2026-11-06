@@ -27,7 +27,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 完成状态只属于本行需求，不自动扩展为整个模块、全部平台或所有业务场景完成。配置依赖、刻意限制、待实现内容和未验证项应分别说明。
 
-当前共 67 项需求，30 项已完成、14 项部分完成、9 项未实现、14 项待定义。此汇总随下表一起维护。
+当前共 68 项需求，30 项已完成、14 项部分完成、10 项未实现、14 项待定义。此汇总随下表一起维护。
 
 ## 需求索引
 
@@ -99,7 +99,8 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-066](features/integrations.md#f-066) | YouTube 视频资料候选 | 确认视频委托需求后定义元数据及可授权取得的字幕，不能把元数据读取称为已看完视频。 | 否 · 待定义 |
 | [F-067](features/integrations.md#f-067) | Exa MCP 搜索候选 | 验证免密钥的官方托管搜索、免费限流与来源结果；严格过滤不得静默降级，远端协议及质量待验证。 | 否 · 部分完成 |
 | [F-068](features/integrations.md#f-068) | SearXNG 自托管搜索候选 | 已有自建 JSON API 适配及协议回归；真实实例、部署及维护责任待确认。 | 否 · 部分完成 |
-| [F-069](features/integrations.md#f-069) | Web Access Connector | 自建 native／Exa／SearXNG／Tavily 搜索、正文／PDF／图片、问答与来源证据；真实账户 Main 链路已验，更多服务／质量仍待验。 | 否 · 部分完成 |
+| [F-069](features/integrations.md#f-069) | Web Access Plugin | 自建 native／Exa／SearXNG／Tavily 搜索、正文／PDF／图片、问答与来源证据；插件编排、服务适配及平台持久化已分离；更多服务／质量仍待验。 | 否 · 部分完成 |
+| [F-070](features/integrations.md#f-070) | Plugin 生命周期与连接分离 | 独立启停／安装能力包，复用平台管理的具名连接；当前仅有内置 Web Access 组合，尚无插件管理入口。 | 否 · 未实现 |
 
 ## 实施优先级与依赖
 
@@ -114,7 +115,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 ### 个人 Connector 优先级
 
-本规划按[明确外部系统的集成边界](features/integrations.md#术语与登记边界)登记 connector，按工具、模型能力或一次性导入登记的 F-048–F-054 不参与以下排序。当前共有 **16 个新增外部系统／服务 connector 条目**，另有 **7 个非 connector 能力候选**；**F-069 Web Access Connector** 组合搜索与网页访问，不重复计为新的外部系统。既有飞书消息集成 F-020 不重复计数。
+本规划按[明确外部系统的集成边界](features/integrations.md#术语与登记边界)登记 connector，按工具、模型能力或一次性导入登记的 F-048–F-054 不参与以下排序。当前共有 **16 个新增外部系统／服务 connector 条目**，另有 **7 个非 connector 能力候选**；**F-069 Web Access Plugin** 组合搜索与网页访问，不重复计为新的外部系统；F-070 独立登记插件生命周期，F-025 维护平台连接。既有飞书消息集成 F-020 不重复计数。
 
 以下顺序以 **ChatGPT 日常问题** 为主要依据，Codex 工程任务单独评估。优先已明确且重复委托、能补足实时／个人事实并减少截图与复制的接入，同时考虑已有工具覆盖和开发／授权成本。依据见[委托模式与证据边界](features/integrations.md#选择依据与证据边界)。这是定性建议，不是全量频次统计；旅途中连续提问不能直接视为全年频次，书签也不能证明资料来源。
 
@@ -122,7 +123,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 
 | 顺序 | 阶段 | 接入能力／外部系统 | 对应 ChatGPT 日常问题与接入收益 |
 | --- | --- | --- | --- |
-| 1 | P0 | [F-069 · Web Access Connector](features/integrations.md#f-069) | 统一入口先验证当前 Steward ChatGPT／Codex 账户原生搜索，再接一个允许的后备；保持主模型与冻结权限 |
+| 1 | P0 | [F-069 · Web Access Plugin](features/integrations.md#f-069) | 统一入口先验证当前 Steward ChatGPT／Codex 账户原生搜索，再接一个允许的后备；保持主模型与冻结权限 |
 | 2 | P0 后备候选 | [F-067 · Exa MCP](features/integrations.md#f-067) | 随 F-069 验证免密钥独立搜索，只有显式允许才参与后备；免费限流与过滤保证需核实 |
 | 3 | P0 | [F-056 · 高德](features/integrations.md#f-056) | 国内天气／穿衣／散步及地点路线；考虑平时国内生活先接，地域排序属于产品判断，不能当作已证明的使用频次 |
 | 4 | P0 | [F-055 · Google Maps](features/integrations.md#f-055) | 海外餐厅链接、车站入口、酒店／车站间路线有直接委托证据；补旅行时的地点事实 |
@@ -140,7 +141,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | 16 | P2 | [F-061 · AWS](features/integrations.md#f-061) | 云账户／费用任务主要见于 Codex，不能据此占据日常个人助手首批开发资源 |
 | 17 | P2 | [F-066 · YouTube 候选](features/integrations.md#f-066) | 只有消费入口信号，尚未证明经常委托视频分析及可取得字幕范围 |
 
-首批交付是 **F-069 Web Access Connector＋高德＋Google Maps**。Web Access 按当前冻结账户／端点的已验证搜索能力选路，使用已验证的 Steward ChatGPT 托管搜索链路，再用 F-067 Exa 提供一个显式允许的后备。F-068 SearXNG 与 F-046 Tavily 已有独立适配，真实实例／凭据及各自 Live 分别验收。既有主模型不会因搜索失败自动切换，原生能力也不凭模型名猜测。具体边界见[Web Access 方案](designs/integrations.md#f-069--web-access-的最小组合方案)和 [自主实现边界](designs/integrations.md#参考行为与自主实现边界)。第二批在确认真实资料来源后选择 Gmail、健康数据或飞书文档；GitHub 的工程优先级仍独立维护。
+首批交付是 **F-069 Web Access Plugin＋高德＋Google Maps connectors**。Web Access 按当前冻结账户／端点的已验证搜索能力选路，使用已验证的 Steward ChatGPT 托管搜索链路，再用 F-067 Exa 提供一个显式允许的后备。F-068 SearXNG 与 F-046 Tavily 已有独立适配，真实实例／凭据及各自 Live 分别验收。既有主模型不会因搜索失败自动切换，原生能力也不凭模型名猜测。具体边界见[Web Access 方案](designs/integrations.md#f-069--web-access-的最小组合方案)和 [自主实现边界](designs/integrations.md#参考行为与自主实现边界)。第二批在确认真实资料来源后选择 Gmail、健康数据或飞书文档；GitHub 的工程优先级仍独立维护。
 
 
 F-020 继续维护既有飞书消息连接，机器人身份不代表已具备个人云文档或日历权限。F-025 持有认证集成共性缺口，F-042/F-045 持有事件和主动接续；新增 connector 独立验收，不把全部目录变成某个既有编号完成的附加门槛。
