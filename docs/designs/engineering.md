@@ -220,6 +220,12 @@ minutes from workflow start to the aggregate result on a warm hosted runner;
 this is measured remotely, not asserted from local runtimes. Cold tool/cache
 installation and hosted queue delays may exceed that target.
 
+Hosted Ubuntu setup uses the official HTTPS archive instead of the image's
+Azure archive mirror. Package-manager phases have 90-second process boundaries;
+locked npm/browser setup has 120-second stage boundaries with owned-child
+cleanup. Slow or unavailable downloads fail the lane and cannot count as tested
+coverage. Browser revision and installed-package verification remain unchanged.
+
 The Go checks also exercise production tool composition, including a forged
 loaded-tool checkpoint and no native fallback without a JavaScript runtime.
 The model dependency test uses Go's transitive dependency graph: shared contracts
