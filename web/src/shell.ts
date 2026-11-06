@@ -48,7 +48,8 @@ export function enhanceShell(){
    document.querySelector<HTMLButtonElement>('.brand-row .sidebar-toggle')?.focus();
   }
  }));
- document.querySelector('[data-sidebar-close]')?.addEventListener('click',()=>{close();document.querySelector<HTMLButtonElement>('.sidebar-open')?.focus()});
+ const backdrop=document.querySelector<HTMLButtonElement>('[data-sidebar-close]');
+ backdrop?.addEventListener('click',()=>{close();document.querySelector<HTMLButtonElement>('.sidebar-open')?.focus()});
  document.addEventListener('keydown',event=>{
   if(!mobile.matches||!html.classList.contains('mobile-nav'))return;
   if(event.key==='Escape'){close();document.querySelector<HTMLButtonElement>('.sidebar-open')?.focus()}
@@ -59,6 +60,9 @@ export function enhanceShell(){
   }
  });
  mobile.addEventListener('change',close);update();
+ // Server-rendered buttons become actionable only after their handlers and
+ // current labels are ready, including while the deferred bundle is delayed.
+ toggles.forEach(button=>{button.disabled=false});if(backdrop)backdrop.disabled=false;
  revealCurrentTabs();
  void document.fonts.ready.then(()=>revealCurrentTabs());
  window.addEventListener('resize',()=>revealCurrentTabs());

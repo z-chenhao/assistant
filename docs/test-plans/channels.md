@@ -252,7 +252,7 @@ Settings 切页回归复用 `page_transitions`：真实点击 Preferences／Noti
 
 Chat 输入框焦点回归在真实浏览器中检查鼠标点击和 Tab 导航：容器不出现向外扩张的 outline，焦点仍通过既有边界的颜色／内侧描边呈现，明暗主题和窄屏一致。
 
-组件场景通过真实交付投影验证 Markdown 加粗、危险协议／HTML 拒绝、认证 artifact 字节与下载头、Mermaid 图像实际可解码、明暗 favicon 与固定 Computer/Worker 几何。page-transitions 检查 64px 折叠图标栏和脚本前后布局；capability-setup 检查自动保存、失败草稿、YAML 导入／示例和原生无脚本提交。
+组件场景通过真实交付投影验证 Markdown 加粗、危险协议／HTML 拒绝、认证 artifact 字节与下载头、Mermaid 图像实际可解码、明暗 favicon 与固定 Computer/Worker 几何。page-transitions 检查 64px 折叠图标栏和脚本前后布局；主动阻塞主脚本时，导航按钮须保持禁用，释放后桌面／手机都必须首次点击即可切换并恢复；capability-setup 检查自动保存、失败草稿、YAML 导入／示例和原生无脚本提交。
 
 `send-feedback` 使用实际 HTTP/Actor，分别阻塞发送、丢失已提交回执和拒绝请求，检查立即出泡、输入区释放、附件／后续草稿保留、重试复用来源键和权威消息去重；明暗白字对比度与移动布局一并测量。rich-replies 检查原生 UI 在前、最终文字独立气泡，以及原表单身份、重试、重启和无脚本路线。`TestInboundAdmissionDoesNotWaitForCredentialIO` 检查接纳不读取模型凭据，执行就绪仍须认证；`TestMainUIWidgetUsesCodeModeAndDurableReply` 检查分组不修改冻结投影。
 

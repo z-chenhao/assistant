@@ -95,6 +95,7 @@ export async function pageTransitions(page,context,url,evidence){
   try{
    await page.goto(url+path,{waitUntil:'commit'});await page.locator('main').waitFor();
    await page.waitForFunction(()=>document.querySelector('link[rel=stylesheet]')?.sheet);await settle();
+   if(await page.locator('[data-sidebar-toggle],[data-sidebar-close]').evaluateAll(buttons=>buttons.some(button=>!button.disabled)))throw Error('navigation became actionable before its event handlers loaded');
    const geometry=()=>{
     const selectors=['.workspace-main','.page-heading','.settings-group','.settings-footer','[data-appearance-setting]','[data-avatar-setting]',...Array.from({length:4},(_,i)=>`.settings-navigation a:nth-child(${i+1})`)];
     return {dark:document.documentElement.classList.contains('dark'),boxes:Object.fromEntries(selectors.map(selector=>{const node=document.querySelector(selector);return [selector,node?.getBoundingClientRect().toJSON()??null]}))};
@@ -107,6 +108,12 @@ export async function pageTransitions(page,context,url,evidence){
     const next=after.boxes[selector];
     if(!next||['x','y','width','height'].some(key=>Math.abs(rect[key]-next[key])>1))throw Error('bundle initialization moved '+selector+': '+JSON.stringify({width,path,before:rect,after:next}));
    }
+   if(await page.locator('[data-sidebar-toggle],[data-sidebar-close]').evaluateAll(buttons=>buttons.some(button=>button.disabled)))throw Error('initialized navigation remained disabled');
+   const toggle=page.locator(width<=760?'.sidebar-open':'.brand-row [data-sidebar-toggle]');
+   await toggle.click();
+   await page.waitForFunction(({mobile,collapsed})=>mobile?document.documentElement.classList.contains('mobile-nav'):document.documentElement.classList.contains('sidebar-collapsed')!==collapsed,{mobile:width<=760,collapsed});
+   await page.locator('.brand-row [data-sidebar-toggle]').click();
+   await page.waitForFunction(({mobile,collapsed})=>mobile?!document.documentElement.classList.contains('mobile-nav'):document.documentElement.classList.contains('sidebar-collapsed')===collapsed,{mobile:width<=760,collapsed});
    measurements.loading.push({width,path,theme,collapsed,before,after});
    await page.screenshot({path:`${evidence}/loading-${width}-${path.split('/').filter(Boolean).join('-')}-after.png`});
   }finally{release();await page.unroute('**/app.js')}
