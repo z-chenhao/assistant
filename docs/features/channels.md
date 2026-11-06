@@ -140,7 +140,7 @@ feishu:
 | --- | --- | --- |
 | Conversation | `/` 输入消息、添加/移除附件、确认具体审批；历史使用 Earlier messages | 后台工作在 Tasks 跟踪；缺少可用模型时进入设置 |
 | Tasks | `/tasks` 按 Open / Needs me / Finished / All tasks 筛选、搜索与翻页 | 点击任务查看目标、当前阶段、审批、Main 交付、附件与历史；返回原始请求或带任务上下文继续对话 |
-| Settings → Models | `/settings/models` 显示当前模型和其他已保存模型 | Connect model → 选择来源 → 保存 → 模型详情 Test connection → 勾选授权 → Select model → 开始对话 |
+| Settings → Models | `/settings/models` 分组管理账户与 API 连接 | 选择账户提供方并授权，或填写 API 连接并自动校验；在 Chat 输入区选择模型后开始对话 |
 | Settings → Notifications | `/settings/notifications` 显示已保存的通知目的地 | 选择后自动保存未来通知偏好；不迁移已冻结交付 |
 | Developer → Traces | `/developer/observability` 筛选执行列表 | 打开独立 Trace 详情，选择树/时间线节点，检查 Context、Requests 或相邻轮次 Compare |
 
