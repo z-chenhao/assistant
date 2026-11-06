@@ -70,7 +70,7 @@ Web 审批查询使用只读 `Runs.ApprovalView`，已过期授权按当前时�
 
 每次条件读取先执行已有认证与渠道绑定检查，再判断 `If-None-Match`；未变化返回 304。响应不含 composer、原始 Run/Tool trace 或模型凭据。历史页保留原游标，并用最新 sequence 提示新消息。各区域读取各自已提交投影，下次读取收敛；审批提交始终重新校验冻结哈希与权限。
 
-**流式文本**：Provider Bridge 逐片校验并发出 `text_delta`，同时累积完整结果。共享 Loop 按 generation 发出开始和增量；`message_end` 仅表示模型交换已保存。Web 前景 Actor 只将 Main 正常生成的文本送到本机 Web 的临时缓冲。执行上下文取消时立即撤下草稿，供应商连接随后完成清理。调用工具、失败、转入等待、被新输入取代或离开当前执行时也撤下草稿。`DeliverReply` 成功后才通知正式提交。上下文压缩无预览；Worker、工具、推理正文和原始供应商事件不转发。文本与草稿撤下/提交信号均不写入 RunTrace、Outbox 或 Conversation。
+**流式文本**：Provider Bridge 逐片校验并发出 `text_delta`，同时累积完整结果。共享 Loop 按 generation 发出开始和增量；`message_end` 仅表示模型交换已保存。Web 前景 Actor 只将 Main 正常生成的文本送到本机 Web 的临时缓冲。执行上下文取消时立即撤下草稿，供应商连接随后完成清理。调用工具、失败、转入等待、被新输入取代或离开当前执行时也撤下草稿。`DeliverReply` 成功后才通知正式提交。上下文压缩无预览；Worker、无关工具参数、推理正文和原始供应商事件不转发。Intelligent UI 通过同一连接的私有 `ui-preview` 事件发送受控快照，来源、禁用交互与正式交付衔接见 [Intelligent UI 方案](intelligent-ui.md#流式预览与正式交付)。文本与草稿撤下/提交信号均不写入 RunTrace、Outbox 或 Conversation。
 
 **传输与恢复**：最新 Conversation 通过同源 `GET /api/conversation/stream` 接收 SSE。连接复用已有会话与绑定校验，并每秒续查；丢失权限即结束流。当前预览最多 64 KiB，合并短时间内的增量；慢连接独立取后缀，写入超时结束连接。重连取得当前预览的前缀并继续接收增量，不重放已结束草稿。Web 以纯文本呈现预览，在可能的富结果标记前停止，最终沿既有 UISpec 入口验证和呈现。正式提交信号给仍在读取该草稿的连接补齐尚未发送的文本，并立即触发权威读取。浏览器用同一轮的匿名关联键在正式消息出现时移除草稿。
 

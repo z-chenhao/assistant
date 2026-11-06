@@ -36,7 +36,7 @@ Web 更新保留同一投影的 React 根和子组件，变化的响应元数据
 
 ## 扩展协议与沙箱
 
-generateSandboxedUi 保留上游六字段及 classic-script 函数/表达式语义。宿主产生完成态 `type:open-generative-ui` activity，content 使用 initialHeight、generating、css/cssComplete、html/htmlComplete、jsFunctions/jsFunctionsComplete、jsExpressions/jsExpressionsComplete；HTML 在 activity 中为片段数组。当前工具与回复提交后再交付，不实现上游参数流式预览，也不承诺跨调用 DOM 增量修改。
+generateSandboxedUi 保留上游六字段及 classic-script 函数/表达式语义。宿主产生完成态 `type:open-generative-ui` activity，content 使用 initialHeight、generating、css/cssComplete、html/htmlComplete、jsFunctions/jsFunctionsComplete、jsExpressions/jsExpressionsComplete；HTML 在 activity 中为片段数组。正式 activity 仍在工具与回复提交后交付；生成过程另有可撤销的受控预览，见下节。不承诺跨调用 DOM 增量修改。
 
 沙箱注入上游 THEME_CSS、SVG_CLASSES_CSS 与 FORM_STYLES_CSS，并复用宿主的字体与语义主题令牌。原生组件采用紧凑标题、中性表面与暖色图表，移除演示用装饰和重复外层卡片；共享控件皮肤限定在沙箱根类，不另建组件协议。Inter 字体从已有本地资源内嵌为 data 字体，CSP 仅额外允许 font-src data:，不开放字体网络访问。主题显式跟随宿主，生成 CSS 只补具体布局。ResizeObserver 报告实际 body 高度，宿主检查有限数值并限制在 50–4000px，避免过去 1000px 截断引起的嵌套滚动。跟随最新消息时，高度变化继续保持底部；正在操作组件时不抢滚动。展开仍属于宿主，可用 Escape 退出。正常渲染不显示 Text version 入口；失败时显示一次完整文字替代，无脚本渠道保留既有替代。宿主提问操作行使用可换行的 flex 布局与明确 gap，沙箱模板按共享 actions 组排列按钮。
 
@@ -44,8 +44,24 @@ generateSandboxedUi 保留上游六字段及 classic-script 函数/表达式语�
 
 CSP sandbox 与 iframe allow-scripts 保持 opaque origin；禁止父 DOM、宿主存储、外部网络、子框架、表单动作与媒体权限，初始化先禁用 Worker/WebRTC 构造器。直接导航仅返回文字替代。CDN importmap 与外部库不在本地适配器承诺内；需要的原生图表依赖固定打包。旧自定义 HTML 与旧组件只保留历史文字替代，不执行历史代码；不删除或重写数据库记录。
 
-选择保留现有执行/持久化而不整体引入 CopilotKit/LangGraph，以免产生双重调度、内存检查点或第二个模型入口。后续若需要流式预览，可在冻结最终交付之外加受控预览；本次不推测其持久协议。
+选择保留现有执行/持久化而不整体引入 CopilotKit/LangGraph，以免产生双重调度、内存检查点或第二个模型入口。流式预览位于冻结最终交付之外，不新增持久协议。
 
+
+## 流式预览与正式交付
+
+具体需求是让 Web 用户在模型生成 UI 时看到逐步到达的内容，覆盖 Main 直接调用与 Code Mode 嵌套调用。消费者仅为当前已授权的 Web 会话；非 Web 渠道、历史消息、审批和持久重放仍使用原有正式产物。预览是私有、可丢弃的适配器状态，不是工具完成回执、表单身份或稳定公共协议。
+
+直接调用时，Provider 为工具参数增量附带调用身份；Bridge 在客户端通过内部 RPC 参数显式启用 `ui_preview` 时，才将 `builtin__intelligent_ui_show` 的参数按大小/时间合并为 `ui_delta`（旧 v1 客户端不接收新事件；旧服务端可继续使用暂存后的预览；该选项不进入冻结 GenerationRequest），其他工具参数、Code Mode 源码、推理与 Worker 内容不进入浏览器。Loop 对 JSON 前缀做有界解析，仅采用完整的数组项；当前组件对象及 HTML/CSS 字符串可逐步展开。表格行、图表点和卡片仍由原 catalog 校验；缺失的标题、来源等元数据暂为空，不补造数据。表单/时间选择仅在完整参数通过校验后显示；所有预览控件均 inert，不可聚焦、提交、导出或触发动作。
+
+Code Mode 不解析或提前执行流式 JavaScript。既有沙箱实际调用 UI 工具、宿主验证并完成 staging 事务后，context 中的进程内观察者通知同一个预览通道，无需等待 Code Mode 返回或最后的文字回复。该通知不改变 ToolInvocation 终态提交顺序。恢复等待中的 Main 时，在当前 claim 下只读重新投影已成功且未绑定回复的 UI 产物，不重新执行工具。staging 成功而工具结果提交失败时，预览可撤销，恢复仍沿用原幂等产物。
+
+Web 复用 `/api/conversation/stream`，新增 `ui-preview` 快照事件。会话与绑定校验、定期撤权检查及写超时与文字流相同。关联键由宿主匿名化，浏览器收不到 Run/Invocation ID 或原始参数。当前预览最多 16 份、序列化快照至多 512 KiB；单份 JSON 前缀至多 128 KiB。大小、合并频率和默认高度是当前资源策略，不稳定化为模型输入或跨渠道契约。慢客户端直接读取最新快照，重连可重建当前预览，不积压事件队列。
+
+原生组件复用已有 React catalog 和主题。生成式 HTML/SVG 从同源只读 `/ui/preview` 读取当前匿名会话的内存快照；服务端用已有 HTML 解析器仅保留展示节点并清理脚本、事件属性、导航和嵌入内容，再放入 opaque origin、无 `allow-scripts` 的 iframe；预览响应独立 CSP 禁止脚本、外部网络、表单与 base 变更，仅允许共享内联主题和 data 字体；不放宽宿主 CSP，也不使用会继承宿主样式限制的 srcdoc。独立页面导航只得到文字标题，预览结束后的地址返回 404。JS 函数/表达式、动作声明及正式提交身份不会进入预览。正式交付后仍由现有沙箱安装 Websandbox、恢复状态并执行通过校验的完整脚本，既有宿主确认与审批保持不变。
+
+取消、失去执行权、失败、等待或退出执行时撤下预览；迟到事件不能复活已结束的会话。临时参数预览在生成结束时撤下，由实际 staging 的内容接续。`DeliverReply` 成功后发送提交关联键，前端等权威历史中的对应正式消息出现再移除预览，避免重复气泡。浏览历史且暂缓加载最新消息时撤下已提交预览，沿用原新消息提示。断线、隐藏页面与撤权清空本地临时视图；最终交付和已保存交互状态继续可恢复。所有预览增量与生命周期事件均不写 RunTrace、Checkpoint、Conversation、Delivery 或 Outbox。
+
+保留完整 JSON 校验、执行 fencing、资源边界与禁用交互属于正确性所需复杂性；拒绝第二套执行器、部分 JavaScript 执行、任意工具参数透传、持久化每个 token 和通用跨产品 UI patch 协议。当前只开放已有组件契约与受控展示观察点，不稳定化解析器、DOM 差量或预览存储格式。
 
 ## 交互状态与 Steward 扩展
 

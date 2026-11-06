@@ -87,3 +87,15 @@ python3 tests/system/verify_ui_interactions.py --binary bin/steward --evidence e
 真实模型是否选择合适组件、准确使用工具请求并生成优质交互仍属质量评测；脚本 Provider 只证明实际软件边界与恢复行为。
 
 组件呈现回归同时覆盖原生表单在 Host 弹窗顶层中的选择器与菜单操作，确认浮层可点、Escape 取消和原状态保留；必填选择器为空时校验聚焦可见控件并标明无效，选择后恢复；继续验证表单提交后不可编辑、无脚本回答和现有持久回放。明暗/窄屏截图核对组件内部留白、边框、数字列对齐、图表提示及焦点，不将截图生成本身作为视觉验收。
+
+## 流式预览
+
+- `internal/delivery/ui/preview_test.go`：JSON 任意字节截断、完整行/点边界、Unicode/转义、未完成 HTML 字符串、重复键、资源上限；预览不含 JS、动作或正式产物引用。
+- `internal/llm/bridge/ui_preview_test.go`：真实 HTTP/原生 Bridge 在工具调用结束前交付 UI 参数，完整工具结果不变；无关工具参数不进入预览，重复/漂移事件仍校验。
+- `TestMainDirectUIPreviewIsEphemeralAndWithdrawnOnFailure`、`TestMainUIWidgetUsesCodeModeAndDurableReply`、`TestMainUIPreviewKeepsDistinctInvocationsForRepeatedProviderCallID`：实际 Main 直接与真实 Code Mode 两条路径在回复前发出预览；失败撤下，最终只绑定一次；模型跨轮复用 call ID 不覆盖独立预览，预览不进 Trace。
+- `TestUIStagingRecoversAfterResultCommitFailure`：暂存与工具结果提交间失败，原产物幂等恢复；新 claim 可读取已成功暂存预览，旧 claim 被拒绝。
+- `internal/agent/ui_preview_test.go`：取消不等待工具/供应商清理即撤下预览，迟到观察不发布；每轮提交释放观察上下文与取消监听。
+- `internal/interaction/web/ui_preview_test.go`：匿名键、Worker/过期会话隔离、提交/丢弃/移除、迟到事件和重连快照。SSE 的身份与绑定撤权仍由 `reply_stream_test.go` 共用检查。
+- `verify_intelligent_ui.py`：真实 HTTP 模型输出停在未闭合 JSON/HTML，再由 Chromium 验证首行与静态 HTML 已显示；Code Mode 实际完成嵌套 UI 暂存而最后文字尚未产生时同样可见。检查 inert、scriptless sandbox、生成脚本未执行、刷新重连、正式交付后不重复预览且脚本才启用；保留两条链路明暗主题与桌面/手机截图，随后 kill/restart 核对产物未再生成。
+
+这些回归通过现有 PR CI 的 Go 软件分片、`startup-ui` 中的 `intelligent-ui` / `ui-interactions` 系统门禁，以及 `capabilities-race` 中的 Agent、SQLite、Web、Bridge 定向并发检查执行。`tests/harness/test_ci.py` 验证这些入口及浏览器依赖仍在必需分片中；保留原 `Ubuntu checks` 汇总，不新增执行状态机或独立测试平台。真实模型的参数输出顺序、组件选择和视觉质量仍需另行评测。

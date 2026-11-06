@@ -4,6 +4,7 @@
  <div id="conversation-messages">{{template "conversation" .}}</div>
  <div id="conversation-outgoing"></div>
  <div id="agent-processing" class="agent-processing" role="status" aria-label="{{tr "Ghost is working…"}}"><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>
+ <div id="conversation-ui-preview" hidden></div>
  <article id="conversation-draft" class="reply-draft" aria-label="{{tr "Draft reply from Ghost"}}" aria-busy="true" hidden><div class="reply-draft-label">{{tr "Draft reply"}}</div><div class="semantic" data-draft-text></div></article>
  <div id="conversation-approvals">{{template "approvals" .}}</div>
 </section>
