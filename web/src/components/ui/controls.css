@@ -26,9 +26,11 @@ select:not([multiple]):not([size]),.control-select-trigger{display:inline-flex;a
 .control-select-trigger[aria-disabled=true],select:disabled{cursor:default;opacity:.55}
 .control-select-trigger[aria-invalid=true]{border-color:var(--danger)}
 .control-select-positioner{z-index:1001;outline:0}
-.control-select-menu{zoom:var(--control-popup-zoom,1);min-width:max(168px,calc(var(--anchor-width) / var(--control-popup-zoom,1)));max-width:calc(var(--available-width) / var(--control-popup-zoom,1));max-height:calc(var(--available-height) / var(--control-popup-zoom,1));overflow:auto;overscroll-behavior:contain;margin:0;padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground);font:var(--text-ui)/1.6 var(--font-ui);outline:0;box-shadow:none}
+.control-select-menu{zoom:var(--control-popup-zoom,1);min-width:calc(var(--anchor-width) / var(--control-popup-zoom,1));width:max-content;max-width:calc(var(--available-width) / var(--control-popup-zoom,1));max-height:calc(var(--available-height) / var(--control-popup-zoom,1));overflow:auto;overscroll-behavior:contain;margin:0;padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--foreground);font:var(--text-ui)/1.6 var(--font-ui);outline:0;box-shadow:none}
 .control-select-menu .control-select-search{display:block;width:100%;min-height:36px;margin:0 0 4px;padding:8px 10px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;font:inherit;outline:none;box-shadow:none}
-.control-select-options{max-height:min(280px,calc(var(--available-height) / var(--control-popup-zoom,1) - 56px));overflow:auto;overscroll-behavior:contain}
+.control-select-menu:has(.control-select-search){min-width:max(168px,calc(var(--anchor-width) / var(--control-popup-zoom,1)))}
+.control-select-options{max-height:min(280px,calc(var(--available-height) / var(--control-popup-zoom,1) - 8px));overflow:auto;overscroll-behavior:contain}
+.control-select-menu:has(.control-select-search) .control-select-options{max-height:min(280px,calc(var(--available-height) / var(--control-popup-zoom,1) - 56px))}
 .control-select-option{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;padding:7px 10px;border-radius:6px;font-size:var(--text-ui);cursor:pointer;outline:0}
 .control-select-option>span:first-child{min-width:0;overflow-wrap:anywhere}.control-select-option>span:last-child:not(:first-child){display:flex;flex:none}
 .control-select-option[aria-selected=true]{background:var(--muted)}

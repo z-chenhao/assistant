@@ -12,7 +12,7 @@ npm test --prefix web
 npm run lint --prefix web
 ```
 
-Shared controls live in `src/components/ui/`. Base UI owns Button, searchable Combobox and Menu behavior; server forms and React components share these primitives and the same native-control skin. Native values and no-script forms remain available. The build/check command rejects page-owned popup implementations and control skins; `npm test` covers the ownership gate and pure selection state. Existing `make test` and the required CI job run both.
+Shared controls live in `src/components/ui/`. Base UI owns Button, Select, Combobox and Menu behavior; short lists use Select without search, while longer lists use Combobox according to the [global component contract](../design.md#全局组件契约); server forms and React components share these primitives and the same native-control skin. Native values and no-script forms remain available. The build/check command rejects page-owned popup implementations and control skins; `npm test` covers the ownership gate and durable interaction state. Existing `make test` and the required CI job run both.
 
 Edit sources, then commit the generated bundles with them. CI rejects stale
 outputs. `src/foundation.css` owns shared tokens/fonts; the other CSS modules own

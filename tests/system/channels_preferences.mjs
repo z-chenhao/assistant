@@ -82,6 +82,8 @@ export async function preferences(page,context,browser,url,evidence){
    await page.screenshot({path:`${evidence}/preferences-${language}-${theme}-${width}.png`,fullPage:true});
    const height=await page.locator('.preference-group').evaluate(n=>n.getBoundingClientRect().height);
    await trigger(page).click();const box=await popupBounds(page);
+   const rows=await popup(page).getByRole('option').evaluateAll(options=>options.map(option=>option.getBoundingClientRect().height));
+   if(await popup(page).locator('input').count()||rows.length!==2||box.height>rows.reduce((height,row)=>height+row,0)+12)throw Error('two-language Select is not compact or gained a search field');
    if(await page.locator('.preference-group').evaluate(n=>n.getBoundingClientRect().height)!==height)throw Error('popup shifted row');
    if(await popup(page).locator('[aria-selected=true]').getAttribute('data-language-option')!==language)throw Error('selected option lost');
    await page.screenshot({path:`${evidence}/preferences-${language}-${theme}-${width}-open.png`,fullPage:true});
@@ -98,16 +100,16 @@ export async function preferences(page,context,browser,url,evidence){
  await page.keyboard.press('Escape');await check(page.getByRole('tooltip').isHidden(),'help Escape failed');
  await trigger(page).focus();await page.keyboard.press('Enter');
  await check(page.getByRole('tooltip').isHidden(),'list and help both open');
- await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));
+ await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');
  await page.keyboard.press('End');await option(page,'zh-CN').and(page.locator('[data-highlighted]')).waitFor();
  await page.keyboard.press('Home');await option(page,'en').and(page.locator('[data-highlighted]')).waitFor();
  await page.keyboard.press('ArrowDown');await page.keyboard.press('Escape');
- await trigger(page).click();await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));await page.keyboard.press('End');await page.keyboard.press('Tab');
+ await trigger(page).click();await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('End');await page.keyboard.press('Tab');
  await popup(page).waitFor({state:'hidden'});
  await trigger(page).click();await option(page,'en').click();
  await trigger(page).click();await page.mouse.click(380,700);await popup(page).waitFor({state:'hidden'});
  if(posts!==0)throw Error('browsing/cancelling/current selection posted');
- await trigger(page).focus();await page.keyboard.press('Space');await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));await page.keyboard.press('End');await page.keyboard.press('Enter');
+ await trigger(page).focus();await page.keyboard.press('Space');await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('End');await page.keyboard.press('Enter');
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();await ready(page);
  await check(trigger(page).evaluate(n=>n===document.activeElement),'save did not restore focus');
  if(posts!==1)throw Error('keyboard confirmation did not save exactly once');

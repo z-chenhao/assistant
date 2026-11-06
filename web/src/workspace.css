@@ -62,7 +62,7 @@ details[open]>.resource-summary::before{transform:rotate(45deg)}
 .preference-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:12px 16px}
 .preference-name{position:relative;display:flex;align-items:center;gap:4px;min-height:36px;white-space:nowrap}
 .preference-name label{margin:0;font-size:14px;font-weight:550;color:var(--foreground)}
-.preference-controls{display:flex;flex:1 1 112px;align-items:center;gap:8px;max-width:168px;min-width:112px;margin-left:auto}
+.preference-controls{display:flex;flex:0 1 120px;align-items:center;gap:8px;max-width:168px;min-width:112px;margin-left:auto}
 .preference-controls:has(.preference-save:not([hidden])){flex-basis:168px;max-width:220px}
 .preference-group :is(button,summary){outline-offset:2px}
 .preference-group .preference-save{min-height:36px;min-width:44px;padding:5px 8px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:7px;white-space:nowrap}

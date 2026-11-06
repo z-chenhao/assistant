@@ -233,7 +233,7 @@ Chat / Worker：`workers_test.go` 验证认证与绑定撤销、只读字段和�
 
 ### 设置页视觉与控件回归
 
-channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 SecretStore 和 Chromium 验证分类搜索／空结果／Escape、语言下拉搜索／方向键／Enter、点击外部与 Escape 关闭、外观保存与刷新、默认 Memory 单入口、自动／自定义字段切换、390px 导航及无 JS 语言保存。输出偏好、下拉、通知、模型输入、能力和明暗／移动端截图。`account_presentation` 经原有真实 Manager/Bridge 和自有 OAuth fixture 验证账户退出确认：取消和 Escape 零 POST、取消焦点归还、确认一次 POST；原有凭据扫描与重启校验保留。
+channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 SecretStore 和 Chromium 验证分类搜索／空结果／Escape、两项语言下拉无搜索、紧凑尺寸、原生方向键／Enter、点击外部与 Escape 关闭、外观保存与刷新、默认 Memory 单入口、自动／自定义字段切换、390px 导航及无 JS 语言保存。输出偏好、下拉、通知、模型输入、能力和明暗／移动端截图。`account_presentation` 经原有真实 Manager/Bridge 和自有 OAuth fixture 验证账户退出确认：取消和 Escape 零 POST、取消焦点归还、确认一次 POST；原有凭据扫描与重启校验保留。
 
 
 两级导航回归复用 `default_capability_settings`：从 Chat 点击左下 Settings，断言一级入口次序／位置不变、二级栏位于一级与内容之间；切换 Dev → Database 复用同一二级栏，Tasks 不创建空分类；显式折叠后可原页展开。390px 抽屉同时保留两级选中态且不越界，Tab 在整个抽屉内循环，Escape 归还焦点；保留无 JS 表单验证。完整 channels gate 继续覆盖 Developer、数据库导航、320px 布局与聊天面板。
@@ -257,3 +257,5 @@ Chat 输入框焦点回归在真实浏览器中检查鼠标点击和 Tab 导航�
 `send-feedback` 使用实际 HTTP/Actor，分别阻塞发送、丢失已提交回执和拒绝请求，检查立即出泡、输入区释放、附件／后续草稿保留、重试复用来源键和权威消息去重；明暗白字对比度与移动布局一并测量。rich-replies 检查原生 UI 在前、最终文字独立气泡，以及原表单身份、重试、重启和无脚本路线。`TestInboundAdmissionDoesNotWaitForCredentialIO` 检查接纳不读取模型凭据，执行就绪仍须认证；`TestMainUIWidgetUsesCodeModeAndDurableReply` 检查分组不修改冻结投影。
 
 全局组件回归使用可见 Base UI 控件选择，直接读取原生字段验证提交值。覆盖 Settings 语言搜索/键盘/取消/单次保存、主题立即应用、Task 依赖字段与显式保存、Dev 筛选和富组件弹窗内的选择器/菜单；无脚本与初始化失败继续操作原生表单。保持原有字体、导航和布局几何检查，不依赖组件库生成的内部 ID。
+
+富组件交互 gate 用实际 Main 交付的 14 项表单选项验证原生 Combobox 搜索、空结果和弹窗内选择；短列表与语言选择保持原生 Select，无额外搜索区域。

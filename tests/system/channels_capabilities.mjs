@@ -199,22 +199,21 @@ export async function capabilityDefaults(page,context,url,evidence){
   await p.waitForFunction(()=>{const input=document.querySelector('[data-avatar-motion]');return !input.disabled&&!input.checked});
   if(await p.evaluate(()=>localStorage.getItem('steward-avatar-motion'))!=='paused')throw Error('system motion changes overwrote the saved user preference');
  }finally{await quiet.close()}
- // Preserve upstream language autosave while exercising searchable options.
+ // A two-option language list uses native Select without a search field.
  const language=page.locator('[data-language-trigger]');
  const languagePopup=page.locator('[data-language-popup]');
- await language.click();await languagePopup.locator('input[type=search]').fill('简体');
- if(await languagePopup.getByRole('option').count()!==1)throw Error('language search did not filter');
+ await language.click();await languagePopup.waitFor();
+ if(await languagePopup.locator('input').count()||await languagePopup.getByRole('option').count()!==2)throw Error('short language list gained search or lost an option');
  await page.screenshot({path:evidence+'/language-dropdown.png',fullPage:true});
- await languagePopup.locator('input[type=search]').press('ArrowDown');await page.keyboard.press('Enter');
+ await page.keyboard.press('End');await page.keyboard.press('Enter');
  await page.waitForURL(u=>u.searchParams.get('language')==='zh-CN');await page.waitForLoadState();
  await page.goto(url+'/settings/preferences');await page.locator('[data-settings-search]:not([hidden])').waitFor();
  await page.screenshot({path:evidence+'/preferences.png',fullPage:true});
- await language.press('Enter');await languagePopup.locator('input[type=search]').fill('zz-no-result');
- await languagePopup.getByText('无结果。',{exact:true}).waitFor();await page.keyboard.press('Escape');await languagePopup.waitFor({state:'hidden'});await language.and(page.locator(':focus')).waitFor();
+ await language.press('Enter');await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('ArrowUp');await page.keyboard.press('Escape');await languagePopup.waitFor({state:'hidden'});await language.and(page.locator(':focus')).waitFor();
  if(!await language.evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Escape lost dropdown focus');
- await language.press('Enter');await page.waitForFunction(()=>document.activeElement?.classList.contains('control-select-search'));await page.keyboard.press('Tab');await languagePopup.waitFor({state:'hidden'});
+ await language.press('Enter');await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='option');await page.keyboard.press('Tab');await languagePopup.waitFor({state:'hidden'});
  if(!await page.locator('#interface-theme-picker').evaluate(node=>node===document.activeElement)||await languagePopup.isVisible())throw Error('Tab did not continue to the next setting');
- await language.click();await page.getByRole('heading',{level:1}).click();await languagePopup.waitFor({state:'hidden'});
+ await language.click();const heading=await page.getByRole('heading',{level:1}).boundingBox();await page.mouse.click(heading.x+heading.width/2,heading.y+heading.height/2);await languagePopup.waitFor({state:'hidden'});
  if(await languagePopup.isVisible())throw Error('outside click kept dropdown open');
  const popup=page.locator('.control-select-menu:visible');
  const navSearch=page.getByRole('searchbox',{name:'搜索设置',exact:true});await navSearch.fill('通知');

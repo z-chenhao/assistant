@@ -15,12 +15,10 @@ async function chooseSharedOption(page,control,label,value){
  const{native,trigger}=await selectParts(control),original=await native.inputValue();
  await trigger.click();
  const list=page.getByRole('listbox',{name:'Options',exact:true}),popup=list.locator('xpath=..');
- await popup.locator('input[type=search]').fill('zz-no-result');
- if(await list.getByRole('option').count()||!await popup.getByRole('status').isVisible())throw Error('shared select lost its empty result state');
+ if(await popup.locator('input[type=search]').count())throw Error('short option list unexpectedly requires search');
  await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});await trigger.and(page.locator(':focus')).waitFor();
- if(await native.inputValue()!==original||!await trigger.evaluate(node=>node===document.activeElement))throw Error('shared select cancellation changed the value or lost focus');
- await trigger.click();await popup.locator('input[type=search]').fill(label);
- await popup.locator('input[type=search]').press('ArrowDown');await page.keyboard.press('Enter');
+ if(await native.inputValue()!==original)throw Error('shared select cancellation changed the value');
+ await trigger.click();await list.getByRole('option').and(page.locator(':focus')).waitFor();await page.getByRole('option',{name:label,exact:true}).focus();await page.keyboard.press('Enter');
  await popup.waitFor({state:'hidden'});
  if(await native.inputValue()!==value||await popup.isVisible())throw Error('shared select did not confirm into the native form control');
 }

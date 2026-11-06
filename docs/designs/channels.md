@@ -305,7 +305,7 @@ the existing forms and semantic fallback remain usable without JavaScript.
 | [ad-agent](https://github.com/z-chenhao/ad-agent) | `e43216ffa7bd686b496a15f1d8a99ac180857caa` | `web/src/components/ui/{button,card}.tsx`, `web/src/components/ui/styles.ts`, `web/src/lib/utils.ts`, neutral style tokens | Retain used card components, button variants/sizes and style tokens; Steward supplies layout, routes and content |
 | [OpenIntelligentUI](https://github.com/CopilotKit/OpenIntelligentUI) | `8391a94c1c3939c679e40ddd7bfc08a9ef690e70` | Native Table, BarChart, PieChart, PlanCard, MeetingTimePicker, ExportOverlay; shared theme/SVG/form styles | Preserve upstream names and props; adapt imports, reduced motion, safe exports and durable time selection; generateSandboxedUi uses the same upstream fields/activity/bridge with Steward delivery |
 | [shadcn/ui](https://github.com/shadcn-ui/ui) | `8a3536678a528cc012b9e62484290e79d0be410f` | Field/Input/Card 与 ChartContainer/Tooltip 的使用子集 | 保留原生表单语义，以 Steward 字体/主题和组件内布局适配；MIT 文本打包，无新增页面介绍文案 |
-| [Base UI](https://base-ui.com/react/overview/about) | `@base-ui/react@1.9.0` | Button、Combobox、Menu | 全局选择器和菜单共用无样式交互基础；保留原生值、无脚本路径及业务保存边界 |
+| [Base UI](https://base-ui.com/react/overview/about) | `@base-ui/react@1.9.0` | Button、Select、Combobox、Menu | 全局选择器和菜单共用无样式交互基础；保留原生值、无脚本路径及业务保存边界 |
 | Steward / Ghost | Owner-selected 2026-11-02 assets | Michroma wordmark and charcoal/ivory ghost PNGs and lossless WebP atlases | Self-hosted; complete-frame animation, static fallback and reduced-motion support; provenance in `web/licenses/steward-artwork.md` |
 | Open font projects | Included OFL notices | Inter, Source Serif 4, Source Han Sans SC, JetBrains Mono and Michroma | Self-hosted; Chinese unicode-range subsets; original sources and hashes in `web/licenses/` |
 
@@ -371,7 +371,7 @@ Settings 保留一级导航，在旁边展开二级侧栏，呈现 Preferences�
 |---|---|
 | ChatGPT 的分类导航、搜索、选中态 | 左侧分类筛选、空结果、Escape 清空、Enter 进入首项 |
 | ChatGPT 常规、数据管理、云电脑中的设置行 | 圆角分组、细分隔线、左侧名称／必要说明、右侧值或操作；详细诊断收进 Advanced |
-| ChatGPT 可搜索的语言下拉与选中标记 | 桌面增强原生 select：搜索、单选标记、方向键／Enter、Escape／点击外部关闭；窄屏和无 JS 保留原生控件 |
+| 紧凑语言下拉与选中标记 | 两项语言使用 Base UI Select，无搜索；原生方向键／Enter、Escape／点击外部关闭，保留无脚本表单；达到[全局规范](../../design.md#全局组件契约)中的长列表阈值才用 Combobox 搜索 |
 | Multica 偏好、通知、个人／工作区表单 | 同一设置行对齐输入、多行文本、开关和按钮；账户选择、模型声明及能力字段仍取实际配置 |
 | Multica 危险操作与两套参考的按钮层级 | 账户退出使用危险色和确认对话框，默认聚焦取消；取消与 Escape 不发送请求，确认仅提交一次 |
 

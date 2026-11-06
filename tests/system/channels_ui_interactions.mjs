@@ -50,7 +50,11 @@ export async function uiInteractions(page,context,browser,url,evidence,restart=f
  // Host controls remain interactive inside the browser's modal top layer.
  await menu(form,'Open dialog');await form.locator('.answer-surface[data-mode=modal]').waitFor();
  await activate(form.getByRole('button',{name:'Options',exact:true}));await page.getByRole('menuitem',{name:'Keep visible',exact:true}).waitFor();await page.keyboard.press('Escape');
- await form.getByLabel('Travel mode',{exact:true}).click();await page.getByRole('listbox',{name:'Options',exact:true}).getByRole('option',{name:'Train',exact:true}).click();
+ await form.getByLabel('Travel mode',{exact:true}).click();
+ const largeList=page.getByRole('listbox',{name:'Options',exact:true}),search=largeList.locator('xpath=..').locator('input[type=search]');
+ await search.fill('zz-no-result');await largeList.locator('xpath=..').getByRole('status').waitFor();
+ if(await largeList.getByRole('option').count())throw Error('large Select search lost its empty result');
+ await search.fill('Train');await largeList.getByRole('option',{name:'Train',exact:true}).click();
  await activate(form.getByRole('button',{name:'Close expanded view',exact:true}));
  // Draft values survive a full navigation; selection is submitted only once.
  await form.getByLabel('Departure',{exact:true}).fill('2026-11-09');await form.getByLabel('Travelers',{exact:true}).fill('3');

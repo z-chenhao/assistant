@@ -78,7 +78,7 @@ Chat 发送按钮是单色主操作的例外：明暗主题均使用 `#B84F2F` �
 
 - 基础控件采用 shadcn/ui 的可组合结构与 Base UI 行为，适配 Steward 自有主题。不直接引入组件库整套主题、字体或全局排版重置。
 - React 消费者使用 `web/src/components/ui/` 的封装；按钮归 [button.tsx](web/src/components/ui/button.tsx)，字段和结果卡片归 [answer-controls.tsx](web/src/components/ui/answer-controls.tsx)，图表基础归 [chart.tsx](web/src/components/ui/chart.tsx)。新增公共能力先补入所属共享组件，不在功能页复制实现。
-- 宿主下拉统一使用 [select-view.tsx](web/src/components/ui/select-view.tsx) 的 Base UI 选择器，菜单统一使用 [action-menu.tsx](web/src/components/ui/action-menu.tsx)。不得保留旧手写下拉状态机，也不得在页面直接拼装另一套浮层、选项导航和焦点管理。
+- 宿主下拉统一使用 [select-view.tsx](web/src/components/ui/select-view.tsx)：少量选项采用 Base UI Select，超过 12 个非空选项才采用带搜索的 Combobox。数量是当前可调整的产品默认值；两项语言选择不得出现搜索框或为搜索预留空白。弹层按触发器与内容紧凑定宽，不给短列表强加大面板。遵循 [Base UI 的原生选用准则](https://base-ui.com/react/components/select#usage-guidelines)，不自建筛选或键盘状态机。菜单统一使用 [action-menu.tsx](web/src/components/ui/action-menu.tsx)。不得保留旧手写下拉状态机，也不得在页面直接拼装另一套浮层、选项导航和焦点管理。
 - 服务端原生 select 经 [select.ts](web/src/components/ui/select.ts) 适配，React 表单经 [native-select.tsx](web/src/components/ui/native-select.tsx) 接入同一选择器。原生值、字段名、校验和无脚本回退属于表单契约，不构成第二套增强控件。
 - 基础控件皮肤统一归 [controls.css](web/src/components/ui/controls.css)，颜色和字体使用 [foundation.css](web/src/foundation.css) 的语义变量。页面不得通过局部 CSS 重定义下拉或开关皮肤；其他控件变化也应落在共享的命名变体，不能用页面覆盖产生外观分叉。
 - 保留采用源码和打包依赖的许可证；来源、版本及协议边界记录在所属设计方案，不添加到产品页面介绍文案中。
