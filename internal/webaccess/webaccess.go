@@ -123,9 +123,12 @@ func Search(ctx context.Context, c Config, query string, hosted HostedSearch) (S
 }
 
 func fallbackAllowed(err error) bool {
-	return errors.Is(err, llm.ModelIncompatible) || errors.Is(err, llm.ProviderUnavailable) || errors.Is(err, llm.RateLimited)
+	return errors.Is(err, errFiltersUnsupported) || errors.Is(err, llm.ModelIncompatible) || errors.Is(err, llm.ProviderUnavailable) || errors.Is(err, llm.RateLimited)
 }
 func errorCode(err error) string {
+	if errors.Is(err, errFiltersUnsupported) {
+		return errFiltersUnsupported.Error()
+	}
 	for _, e := range []llm.ProviderError{llm.ModelIncompatible, llm.ProviderUnavailable, llm.RateLimited, llm.AuthRequired, llm.GenerationCancelled, llm.InvalidProviderResponse} {
 		if errors.Is(err, e) {
 			return string(e)

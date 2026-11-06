@@ -172,6 +172,10 @@ func TestWebAccessConfiguredSourcesAndTerminalFailures(t *testing.T) {
 	if e == nil {
 		t.Fatal("disabled provider accepted")
 	}
+	_, e = SearchQueryWith(context.Background(), Config{SourceOrder: []string{"exa"}}, SearchQuery{Query: "q", DomainFilter: []string{"example.com"}}, nil, nil)
+	if e != errFiltersUnsupported {
+		t.Fatal("unsupported Exa filters silently degraded", e)
+	}
 }
 func TestWebAccessHasNoAgentSDKDependency(t *testing.T) {
 	raw, e := os.ReadFile("../../runtime/javascript/package.json")

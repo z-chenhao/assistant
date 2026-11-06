@@ -15,6 +15,8 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 )
 
+var errFiltersUnsupported = errors.New("WEB_FILTERS_UNSUPPORTED")
+
 type SearchQuery struct {
 	Query         string   `json:"query"`
 	Provider      string   `json:"provider,omitempty"`
@@ -90,7 +92,7 @@ func searchQueryWith(ctx context.Context, c Config, q SearchQuery, hosted QueryS
 			}
 		case "exa":
 			if len(q.DomainFilter) > 0 || q.RecencyFilter != "" {
-				err = llm.ModelIncompatible
+				err = errFiltersUnsupported
 				break
 			} // No pretending query hints are strict Exa filters.
 			out.Text, out.Sources, err = exaSearch(ctx, q.Query, client)
