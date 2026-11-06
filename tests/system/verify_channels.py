@@ -834,7 +834,7 @@ def task_control_components(binary, evidence, report):
             h.browser(output, 'schedule')
             require(not h.rows()['runs'], 'schedule control checks unexpectedly started a Run')
             report['scenarios']['task-controls'] = json.loads((output / 'schedule-browser.json').read_text())
-            report['checks'].append('Task shared Select/Switch: search and empty results, keyboard cancellation, dependent fields, single popup, manual save, persistence, stale drafts, touch, native fallback and no premature dispatch')
+            report['checks'].append('Task shared Select/Switch: native short-list selection, keyboard confirmation/cancellation, dependent fields, single popup, manual save, persistence, stale drafts, touch, native fallback and no premature dispatch')
         finally:
             h.cleanup()
 

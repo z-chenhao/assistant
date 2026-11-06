@@ -18,7 +18,11 @@ async function chooseSharedOption(page,control,label,value){
  if(await popup.locator('input[type=search]').count())throw Error('short option list unexpectedly requires search');
  await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});await trigger.and(page.locator(':focus')).waitFor();
  if(await native.inputValue()!==original)throw Error('shared select cancellation changed the value');
- await trigger.click();await list.getByRole('option').and(page.locator(':focus')).waitFor();await page.getByRole('option',{name:label,exact:true}).focus();await page.keyboard.press('Enter');
+ const values=await native.locator('option').evaluateAll(options=>options.filter(option=>!option.disabled).map(option=>option.value)),target=values.indexOf(value);
+ if(target<0)throw Error('missing enabled option: '+value);
+ await trigger.press('Enter');await list.getByRole('option').and(page.locator(':focus')).waitFor();await page.keyboard.press('Home');
+ for(let index=0;index<target;index++)await page.keyboard.press('ArrowDown');
+ await list.getByRole('option',{name:label,exact:true}).and(page.locator('[data-highlighted]')).waitFor();await page.keyboard.press('Enter');
  await popup.waitFor({state:'hidden'});
  if(await native.inputValue()!==value||await popup.isVisible())throw Error('shared select did not confirm into the native form control');
 }
