@@ -17,7 +17,7 @@ func recallReply(req llm.GenerationRequest) llm.GenerationResult {
 	for _, m := range req.Messages {
 		worker = worker || strings.Contains(m.Text, "general Worker executing")
 		root = root || strings.HasPrefix(m.Text, "Task anchor:")
-		followup = followup || strings.HasPrefix(m.Text, "Runtime task update")
+		followup = followup || strings.HasPrefix(m.Text, "Runtime task update") || contextSummary(m).TaskUpdate
 		for _, c := range m.ToolCalls {
 			prior = c
 		}

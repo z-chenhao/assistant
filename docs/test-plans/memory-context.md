@@ -8,6 +8,8 @@
 
 以功能文档中的需求为验收源；配置依赖、待实现分支、平台限制和未验证项单独报告。具体命令及 core/extended 编排以 [Testing](product.md) 和 [runner](../../tests/system/runner.py) 为准。
 
+Recall 系统夹具必须在真实上下文压缩后识别已完成的 Task 更新，不能因更新进入 working_state 而重复检索或创建 Task。`TestRecallFixtureKeepsTaskUpdateAcrossSummary` 通过真实摘要请求和 Provider 投影验证连续两次压缩，以及无关摘要不抑制检索；该 UT 随普通 Go CI 执行。`recall` 门禁继续验证实际 kill/restart、冻结召回与完整工作流，不增加重试或放宽原超时。
+
 ## 需求场景矩阵
 
 | 需求 | 需要验证的可观察行为 | 当前重点 |

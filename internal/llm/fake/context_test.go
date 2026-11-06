@@ -50,6 +50,42 @@ func TestDelegateKeepsTaskUpdateAcrossSummary(t *testing.T) {
 	testDelegateSummary(t, wire, "Observed Worker update:")
 }
 
+func TestRecallFixtureKeepsTaskUpdateAcrossSummary(t *testing.T) {
+	for _, taskUpdate := range []bool{false, true} {
+		sources := []llm.Message{{Role: "user", Text: "Historical tea preference"}}
+		if taskUpdate {
+			state := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "completed"})
+			var err error
+			sources, err = agent.ProviderMessages([]agent.AgentMessage{state}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		for round := 0; round < 2; round++ {
+			messages, _, err := contextbuilder.SummaryRequest(sources, nil, 6000, 2048)
+			if err != nil {
+				t.Fatal(err)
+			}
+			summary := contextReply(llm.GenerationRequest{Messages: messages})
+			state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
+				Summary string `json:"summary"`
+			}{summary.Text})
+			sources, err = agent.ProviderMessages([]agent.AgentMessage{state}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := recallReply(llm.GenerationRequest{Messages: sources})
+			if taskUpdate {
+				if len(result.ToolCalls) != 0 || result.Text != "Main follow-up: independent recall completed." {
+					t.Fatal("compacted Task update repeated recall/delegation", round, result)
+				}
+			} else if len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != "builtin__memory_search" {
+				t.Fatal("unrelated summary suppressed the recall fixture", round, result)
+			}
+		}
+	}
+}
+
 func TestDelegateKeepsUnknownEffectAcrossSummary(t *testing.T) {
 	state := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "needs_input", "text": "UNKNOWN_SIDE_EFFECT"})
 	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)

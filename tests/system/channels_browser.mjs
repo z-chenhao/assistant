@@ -133,6 +133,7 @@ try{
   }else{
    await page.goto(url+'/settings/models');
    await page.getByRole('link',{name:'Sign in with an account',exact:true}).click();
+   await page.waitForLoadState('load');
    const signIn=page.getByRole('button',{name:'Sign in with ChatGPT',exact:true});
    await page.evaluate(()=>{window.open=()=>null});
    await signIn.click();
@@ -144,6 +145,7 @@ try{
    await page.getByText('Sign-in was not completed. Reconnect when you are ready.').waitFor();
    await page.goto(url+'/settings/models');
    await page.getByRole('link',{name:'Sign in with an account',exact:true}).click();
+   await page.waitForLoadState('load');
    const popupOpened=context.waitForEvent('page');
    await signIn.click();
    const popup=await popupOpened;
@@ -564,7 +566,8 @@ try{
  if(phase==='image'){
   await page.locator('.app-sidebar').getByRole('link',{name:'Settings',exact:true}).click();
   await page.getByRole('navigation',{name:'Settings sections'}).getByRole('link',{name:'Models',exact:true}).click();
-  await page.locator('.model-connections').waitFor();
+  await page.getByRole('region',{name:'Accounts',exact:true}).waitFor();
+  await page.getByRole('region',{name:'API connections',exact:true}).waitFor();
   // The owner may open the native picker while the enhancement bundle loads.
   // Its input must survive that enhancement, including an unfinished selection.
   let release,requested;
