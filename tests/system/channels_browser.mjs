@@ -183,6 +183,23 @@ try{
   if((await work.locator('#tasks-attention').innerText()).includes('Artifact reference (content not loaded)'))throw Error('fixture leaked Host attachment framing into question');
   await work.evaluate(()=>{document.activeElement?.blur();scrollTo(0,0)});
   await work.screenshot({path:evidence+'/attention-wide.png',fullPage:true});
+  const attentionURL=work.url(),savedTheme=await work.evaluate(()=>localStorage.getItem('steward-theme'));
+  for(const theme of ['light','dark']){
+   await work.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
+   for(const width of [1400,390,320]){
+    await work.setViewportSize({width,height:980});await work.goto(url+'/tasks');await work.evaluate(()=>document.fonts.ready);
+    if(!await work.locator('.task-table .sr-only').count())throw Error('attention fixture has no pending execution marker');
+    if(await work.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('attention execution markers widened the page');
+    if(width<=390){
+     const region=work.locator('.task-table-scroll');await region.focus();await work.keyboard.press('ArrowRight');
+     await work.waitForFunction(()=>document.querySelector('.task-table-scroll').scrollLeft>0);
+    }
+    await work.screenshot({path:`${evidence}/attention-executions-${theme}-${width}.png`,fullPage:true});
+   }
+  }
+  await work.evaluate(value=>value===null?localStorage.removeItem('steward-theme'):localStorage.setItem('steward-theme',value),savedTheme);
+  await work.setViewportSize({width:1400,height:980});await work.goto(attentionURL);
+
   await work.locator('.attention-row').filter({hasText:'Which quarter should the report cover?'}).getByRole('link',{name:'Answer question',exact:true}).click();
   const answer=work.getByLabel('Your answer',{exact:true});await answer.fill('中'.repeat(6000));
   await work.getByRole('button',{name:'Send answer',exact:true}).click();
