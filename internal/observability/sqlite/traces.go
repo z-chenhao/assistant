@@ -57,6 +57,11 @@ func (s Inspector) Traces(ctx context.Context, q observability.TraceQuery) (obse
 	}
 	query := `SELECT ` + traceFields + traceFrom
 	args := []any{}
+	if q.Search != "" {
+		// Literal substring search over trace identity; never scan observation bodies.
+		query += ` AND (instr(lower(r.run_id),lower(?))>0 OR instr(lower(coalesce(t.title,'Main conversation')),lower(?))>0 OR instr(lower(m.model_id),lower(?))>0)`
+		args = append(args, q.Search, q.Search, q.Search)
+	}
 	if q.Session != "" {
 		query += ` AND r.conversation_id=?`
 		args = append(args, q.Session)
@@ -77,6 +82,8 @@ func (s Inspector) Traces(ctx context.Context, q observability.TraceQuery) (obse
 		query += ` AND r.created_at<?`
 		args = append(args, q.Until.UnixMicro())
 	}
+	filtered := strings.TrimPrefix(query, `SELECT `+traceFields)
+	filterArgs := append([]any(nil), args...)
 	if c.ID != "" {
 		query += ` AND (r.created_at,r.run_id)<(?,?)`
 		args = append(args, c.At, c.ID)
@@ -89,6 +96,45 @@ func (s Inspector) Traces(ctx context.Context, q observability.TraceQuery) (obse
 		return out, err
 	}
 	defer tx.Rollback()
+	var first, last sql.NullInt64
+	if err = tx.QueryRowContext(ctx, `SELECT count(*),min(r.created_at),max(r.created_at)`+filtered, filterArgs...).Scan(&out.Total, &first, &last); err != nil {
+		return out, err
+	}
+	if first.Valid {
+		start, end := first.Int64, last.Int64+1
+		if !q.Since.IsZero() {
+			start = q.Since.UnixMicro()
+		}
+		if !q.Until.IsZero() {
+			end = q.Until.UnixMicro()
+		}
+		step := max(int64(1), (end-start+47)/48)
+		out.Activity = make([]observability.TraceBucket, 48)
+		for i := range out.Activity {
+			out.Activity[i].At = stamp(start + int64(i)*step)
+		}
+		bucketArgs := append([]any{start, step}, filterArgs...)
+		buckets, e := tx.QueryContext(ctx, `SELECT (r.created_at-?)/?,count(*)`+filtered+` GROUP BY 1`, bucketArgs...)
+		if e != nil {
+			return out, e
+		}
+		for buckets.Next() {
+			var bucket int
+			var count int64
+			if e = buckets.Scan(&bucket, &count); e != nil {
+				buckets.Close()
+				return out, e
+			}
+			if bucket >= 0 && bucket < len(out.Activity) {
+				out.Activity[bucket].Count = count
+			}
+		}
+		err = buckets.Err()
+		buckets.Close()
+		if err != nil {
+			return out, err
+		}
+	}
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return out, err

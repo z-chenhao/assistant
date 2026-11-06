@@ -66,17 +66,18 @@
 
 **验收目标**：受控中断恢复后，UI 不把复用结果显示成新外部调用；未知结果、缺失 usage 和未 dispatch 等待如实展示。
 
-Developer 的 Database 页面提供独立的[只读元数据检查](database.md)，可从执行记录跳转本页的 Observability；两者沿用同一工作台权限。
+Developer 的 [Memory 页面](memory.md)展示真实记忆正文与来源；记忆来源中的实际 memory_manage 调用可跳转到 Trace，两者沿用同一工作台权限。
 
 ## 如何使用
 
 登录现有 Web，点击侧栏 **Developer · Traces**。页面与 API 沿用工作区 token/session 和 Web binding 授权；不需要另行配置开发者服务或选定模型。
 
-1. 按角色、状态和 UTC 创建时间筛选 Trace；起点包含、终点不包含。点击 Session 查看同一 Conversation 的相关 Trace。
-2. 点击 Main 或 Root，进入独立 `/developer/observability/{run}` 详情。左侧 **Trace tree** 的每个节点与时间线条对齐，右侧为 **Observation details**；返回 Traces 保留列表条件。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
-3. Generation 的 Overview 展示有界消息、响应和模型请求时间线。时间线显示响应头、首段响应数据、首段可见文本或首个工具调用、响应流终止事件，并区分等待响应头超时、响应流空闲和整轮超时。**Context** 是完整 messages / tools / response / provenance / recall 的阅读器，支持 JSON、来源与长正文连续读取。**Requests** 查看最终 HTTP 请求。存在前一轮时显示 **Compare**。HTTP 节点提供 Overview / Requests。
-4. 选择 Tool、Retriever、等待或 HTTP 节点，核对各自保存的数据和时间语义。API/Page 不提供重试、重放、审批或取消动作；无 JavaScript 时原生导航、筛选和分页仍然可用。
-5. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Tasks 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
+1. 列表页顶部提供名称、Trace ID 或模型的字面子串搜索（ASCII 大小写不敏感），全局顶栏为独立时间范围与 Refresh。角色/状态按分组单选呈现，筛选侧栏可收起（手机默认收起），按角色、状态和 UTC 创建时间组合查询；起点包含、终点不包含，支持最近 24 小时／7 天／30 天及自定义边界。条件与分页写入 URL，可逐项清除；修改条件与刷新从第一页读取。点击 Session 查看同一 Conversation 的相关 Trace。
+2. 图表显示完整筛选范围的真实 Trace 时间计数；表格按创建时间、类型、名称、Input、Output、wall time、模型、Token 与已结算费用紧凑分列，ID 独立且默认隐藏，列显隐在当前浏览器保留。缺失指标保持未知，已知记录不足时标注 Partial；页脚报告完整筛选计数及当前页条数。
+3. 点击名称在默认半屏的右侧非模态面板展开详情，保留底下列表的筛选与滚动位置；关闭及浏览器后退恢复列表，支持前后 Trace、全屏展开，Open full page 打开独立 `/developer/observability/{run}`。直接书签和无 JavaScript 时仍使用完整详情页。左侧 **Trace tree** 以类型颜色、真实层级连接线、分支折叠和实际耗时呈现，搜索保留匹配祖先；面板外边缘与树/正文分栏支持鼠标和键盘调宽，偏好只在当前浏览器保留，右侧为 **Observation details**；返回 Traces 保留列表条件。选择节点时保留树/时间线滚动位置；浏览器前后退恢复 URL 中的选择。Refresh 读取新提交状态，不自动轮询。
+4. 节点 Preview 将类型、UTC 时间、耗时、状态及 Session/Run 放在顶部，正文依次为 Input、Output；支持 Formatted/JSON 切换、结构化 JSON 折叠与复制。部分片段或无法精确表示的数字保留原始 JSON 阅读。Generation 的 Preview 展示有界消息与接受响应，模型请求时间线折叠在下方。时间线显示响应头、首段响应数据、首段可见文本或首个工具调用、响应流终止事件，并区分等待响应头超时、响应流空闲和整轮超时。**Context** 是完整 messages / tools / response / provenance / recall 的阅读器，支持 JSON、来源与长正文连续读取。**Requests** 查看最终 HTTP 请求。存在前一轮时显示 **Compare**。HTTP 节点提供 Overview / Requests。
+5. 选择 Tool、Retriever、等待或 HTTP 节点，核对各自保存的数据和时间语义。API/Page 不提供重试、重放、审批或取消动作；无 JavaScript 时原生导航、筛选和分页仍然可用。
+6. 沿 Task 因果链接或 Parent 导航核对角色关系；Conversation 和 Tasks 返回日常工作入口。长时间 Task 的继续会创建新的 epoch/trace。
 
 旧 `/developer/context` 与带 `?run=` 的书签自动转向规范 Trace 详情，保留 step、section、item、format 与正文偏移；原 API 不变。
 

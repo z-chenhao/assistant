@@ -8,7 +8,7 @@
 
 F-013 已接通用户图片到视觉模型的输入，并增强本地 OCR，让纯文本模型可显式读取图片文字；F-005 提供阶段进度；F-019 流式呈现 Main 回复草稿并在提交后切换到正式消息。软件回归与模型语义质量的证明范围分别见对应测试方案。
 
-F-031 提供 Developer → Observability 执行检查入口：按角色、状态和 UTC 时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；F-035/F-036 进一步统一为 Langfuse 式 Session/Trace/Observation 检查，支持真实 HTTP 尝试、恢复复用、输入输出、时间线和已有用量/费用。
+F-031 提供 Developer → Observability 执行检查入口：按角色、状态和 UTC 时间查找执行，从已提交回执追溯 Main 与 Task 的因果关联，并检查实际 Root/Child 树。F-034 已接通逐轮冻结上下文、来源与相邻轮次 Diff；F-035/F-036 进一步统一为 Langfuse 式 Session/Trace/Observation 检查，支持真实 HTTP 尝试、恢复复用、输入输出、时间线和已有用量/费用。Trace 列表提供元数据搜索、组合筛选、顶栏时间范围、完整查询计数直方图、单行列显隐和半屏非模态详情预览（可拖拽分栏、彩色层级树、结构化 Input/Output 与原始 JSON），完整页面及原生回退继续可用。
 
 F-018/F-019 将 Conversation、Tasks、Settings 和 Developer 按用户任务拆分；模型来源/配置/验证/选择、通知、任务详情和 Trace 详情拥有各自入口。Settings 复用版本化字体以避免切页闪跳；ChatGPT 目录模型不再要求连接测试，首个成功连接直接用于对话。Chat 点击发送立即出泡并保留后续草稿，Intelligent UI 与最终文字按顺序分泡；支持主题气泡、安全 Markdown、认证附件链接与 Mermaid；折叠导航保留图标，标签页 Ghost 跟随主题。能力配置自动校验保存，并提供 YAML 导入。全部长期密钥统一使用本地私有文件，移除系统钥匙串后端及配置入口。完整 Context 并入 Generation，旧地址跳转保留；独立任务只读模块与纯审批投影不增加运行时状态或新控制管线。
 
@@ -68,7 +68,7 @@ F-020：飞书自建应用通过 SecretStore 引用自动获取/刷新 tenant ac
 | [F-035](features/observability.md#f-035) | 供应商最终请求观测 | 开发者能区分 Host 冻结请求与 Bridge/SDK 转换后实际发送的请求。 | 是 · 已完成 |
 | [F-036](features/observability.md#f-036) | 调用、等待、恢复与用量时间线 | 开发者能检查执行、等待、恢复、用量和模型流时间点，并区分各阶段超时。 | 是 · 已完成 |
 | [F-032](features/evals.md#f-032) | Web Evals 入口 | 后续可从 Developer 查看评测结果，并关联对应执行。 | 否 · 待定义 |
-| [F-033](features/database.md#f-033) | Web Database 检查入口 | Developer 中只读浏览执行、消息、记忆与文件元数据，支持分页、确切引用、作用域内关联和审计状态。 | 是 · 已完成 |
+| [F-033](features/memory.md#f-033) | Web Memory 记忆浏览 | Developer 中查看真实记忆正文、层级、形成方式与可见来源，支持搜索、筛选、分页、展开详情和维护回执。 | 是 · 已完成 |
 | [F-037](features/installation.md#f-037) | 安装、首次启动与显式部署 | 安装、检查、前台启动及自定义部署，并保持持久数据。 | 是 · 已完成 |
 | [F-038](features/engineering.md#f-038) | 标准开发与显式发布流程 | 固定依赖、构建、风险分层验证、隔离并行 CI 与可审查交付。 | 是 · 已完成 |
 | [F-039](features/engineering.md#f-039) | 运行时工程基础重构 | 故障隔离、短事务、只读分页、加密召回复用、明确模块与工具分发边界。 | 是 · 已完成 |

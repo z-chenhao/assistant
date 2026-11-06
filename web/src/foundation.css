@@ -16,6 +16,8 @@
  --background:#f9f9f9;--sidebar:#f3f3f3;--card:#fcfcfc;--foreground:#212121;
  --muted:#eee;--muted-foreground:#666;--border:#dfdfdf;--hover:#e9e9e9;
  --accent:#212121;--accent-ink:#f9f9f9;--focus:#767676;--control-border:#858585;
+ --trace-agent:#2965a2;--trace-generation:#7845a6;--trace-tool:#9a571b;--trace-http:#226f75;--trace-retriever:#33734d;
+ --syntax-key:#245db8;--syntax-string:#27734a;--syntax-number:#8c4b0b;--syntax-literal:#914796;
  --status-ready:#2f7d53;--status-working:#3a70a5;--status-attention:#9b6b21;
  --success:#414141;--success-surface:#eee;--warning:#505050;--warning-surface:#eee;
  --danger:#8e3838;--danger-surface:#f6eded;--backdrop:#21212166;
@@ -29,6 +31,8 @@
  color-scheme:dark;--background:#212121;--sidebar:#181818;--card:#282828;--foreground:#ededed;
  --muted:#303030;--muted-foreground:#afafaf;--border:#3e3e3e;--hover:#303030;
  --accent:#ededed;--accent-ink:#212121;--focus:#9f9f9f;--control-border:#777;
+ --trace-agent:#88b7e5;--trace-generation:#c6a2f2;--trace-tool:#e9b579;--trace-http:#81c7ce;--trace-retriever:#8fc6a1;
+ --syntax-key:#8eb8f7;--syntax-string:#8bd3aa;--syntax-number:#e9b066;--syntax-literal:#df9ce6;
  --status-ready:#72b78b;--status-working:#7ea9d3;--status-attention:#d5ad61;
  --success:#d2d2d2;--success-surface:#303030;--warning:#c9c9c9;--warning-surface:#303030;
  --danger:#edb3b3;--danger-surface:#362727;--backdrop:#10101099;

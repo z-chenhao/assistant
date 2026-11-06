@@ -87,7 +87,7 @@ export async function pageTransitions(page,context,url,evidence){
    await page.setViewportSize({width,height:844});await page.goto(url+'/settings/apps');await settle();
    if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error(`Apps overflowed at ${width}px`);
    if(await page.locator('.settings-navigation a[aria-current="page"]').count()!==1||!await page.locator('.settings-navigation a[href="/settings/apps"][aria-current="page"]').count())throw Error('Apps selection disagrees with Settings navigation');
-   if(!await page.getByText('Gmail',{exact:true}).count()||await page.locator('button[value="connect"]').count())throw Error('unconfigured directory lost suggestions or enabled connection actions');
+   if(!await page.getByText('Gmail',{exact:true}).count()||await page.locator('button[value="connect"]').count())throw Error('unconfigured directory lost suggestions or enabled connection actions: '+JSON.stringify({language,width,url:page.url(),tiles:await page.locator('[data-app-tile]').count()}));
    await page.screenshot({path:`${evidence}/apps-${language}-${width}.png`});
    await page.locator('#app-search').fill('Notion');await page.locator('#app-search').press('Enter');
    if(!await page.getByText('Notion',{exact:true}).count()||await page.getByText('Gmail',{exact:true}).count())throw Error('Apps search did not filter the directory');
@@ -98,7 +98,7 @@ export async function pageTransitions(page,context,url,evidence){
  // Collapse once, then cross every module and reload. The shared preference
  // must be respected even when the destination has two navigation rails.
  await page.locator('.brand-row [data-sidebar-toggle]').click();
- for(const path of ['/settings/preferences','/settings/setup','/developer/observability','/developer/database','/tasks','/']){
+ for(const path of ['/settings/preferences','/settings/setup','/developer/observability','/developer/memory','/tasks','/']){
   await page.goto(url+path);await page.reload();
   const state=await page.evaluate(()=>({path:location.pathname,main:document.querySelector('main').getBoundingClientRect().x,sidebar:getComputedStyle(document.querySelector('.app-sidebar')).display}));
   if(state.main!==64||state.sidebar==='none'||!await page.locator('.brand-row [data-sidebar-toggle]').isVisible())throw Error('collapsed navigation reset: '+JSON.stringify(state));

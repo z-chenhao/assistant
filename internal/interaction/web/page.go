@@ -33,7 +33,7 @@ type page struct {
 	Capabilities                                      []Capability
 	Capability                                        *Capability
 	Trace                                             *traceView
-	Database                                          *databaseView
+	Memory                                            *memoryView
 	Tasks                                             *taskView
 	Attention                                         *attentionView
 	FeedbackDraft                                     string
@@ -91,8 +91,8 @@ func (s *Server) page(ctx context.Context, r *http.Request) (page, error) {
 		err = s.loadAppService(ctx, &p)
 	case "apps":
 		err = s.loadApps(ctx, r, &p)
-	case "database":
-		p.Database, err = s.loadDatabase(ctx, r)
+	case "memory":
+		p.Memory, err = s.loadMemory(ctx, r)
 	case "schedule":
 		err = s.loadSchedule(ctx, r, &p)
 	case "capabilities":

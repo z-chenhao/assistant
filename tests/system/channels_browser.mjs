@@ -3,8 +3,9 @@ import {selectValue,selectParts} from './channels_controls.mjs';
 import {uiInteractions} from './channels_ui_interactions.mjs';
 import {capabilitySetup,capabilityDefaults,settingsAccount,pageTransitions} from './channels_capabilities.mjs';
 import {sendFeedback} from './channels_sending.mjs';
-import {databaseInspection} from './channels_database.mjs';
+import {memoryInspection} from './channels_memory.mjs';
 import {preferences} from './channels_preferences.mjs';
+import {traceList} from './channels_traces.mjs';
 import {chromium} from '../../guest-browser/node_modules/playwright-core/index.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 const [url,evidence,phase='conversation']=process.argv.slice(2);
@@ -171,8 +172,8 @@ try{
    });
    if(!await pending.getByRole('button',{name:'Cancel sign-in',exact:true}).isVisible())throw Error('pending sign-in has no cancellation action');
   }
- }else if(phase==='database'){
-  await databaseInspection(page,context,browser,url,evidence);
+ }else if(phase==='memory'){
+  await memoryInspection({page,context,browser,url,evidence});
  }else if(phase==='attention'){
   const composer=page.locator('#composer-root textarea');
   await composer.fill('Keep my conversation draft.');
@@ -446,16 +447,15 @@ try{
  if(phase==='native-trace'){
   const facts=JSON.parse(process.env.STEWARD_NATIVE_TRACE_FACTS);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
-  await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Tracing',exact:true}).waitFor();
+  await traceList(page,context,browser,url,evidence,facts);
   await page.setViewportSize({width:720,height:980});
-  await page.locator('.obs-filters button[role=combobox]').first().waitFor();
-  for(const control of await page.locator('.obs-filters button[role=combobox]').all()){
-   if(!await control.evaluate(node=>parseFloat(getComputedStyle(node).fontSize)>=16&&node.getBoundingClientRect().height>=44))throw Error('trace filters missed the compact input and touch rules');
-  }
-  await chooseSharedOption(page,page.getByLabel('Role',{exact:true}),'Root Worker','root');
-  await selectValue(page,page.getByLabel('Role',{exact:true}),'');
+  await page.waitForFunction(()=>document.querySelector('.obs-filter-rail')?.open===false);
+  await page.locator('.obs-filter-rail>summary').click();
+  await page.getByRole('radio',{name:'Root Worker',exact:true}).check();
+  await page.getByRole('radio',{name:'All agents',exact:true}).check();
   await page.setViewportSize({width:1400,height:980});
-  await page.locator('[data-execution-id="'+facts.main+'"] td').first().getByRole('link',{name:'Main',exact:true}).click();
+  await page.locator('[data-execution-id="'+facts.main+'"]').locator('a.trace-open').click();
   await page.getByRole('heading',{name:'Trace tree',exact:true}).waitFor();
   for(const status of await page.locator('.obs-tree .obs-node-status').all()){
    if((await status.innerText()).replace('●','').trim()!==await status.getAttribute('data-status'))throw Error('trace tree does not expose each status as readable text');
@@ -466,7 +466,7 @@ try{
   await page.getByRole('link',{name:'Context',exact:true}).click();
   if(!await page.locator('.frozen-content').innerText().then(text=>text.length>40))throw Error('system prompt missing from unified context');
   await page.screenshot({path:evidence+'/trace-prompt.png',fullPage:true});
-  await page.getByRole('link',{name:'Overview',exact:true}).click();
+  await page.getByRole('link',{name:'Preview',exact:true}).click();
   await page.screenshot({path:evidence+'/trace-overview.png',fullPage:true});
   await page.locator('#observability-workbench').screenshot({path:evidence+'/trace-workbench.png'});
   const treeScroll=await page.locator('.obs-tree-pane').evaluate(node=>{node.scrollTop=60;return node.scrollTop});
@@ -475,7 +475,7 @@ try{
   if(await page.locator('.obs-tree-pane').evaluate(node=>node.scrollTop)!==treeScroll)throw new Error('node selection lost tree position');
   if(!await page.locator('.wire-body').innerText().then(text=>text.includes('"messages"')&&text.includes('"attempt"')))throw new Error('final request view missing');
   await page.screenshot({path:evidence+'/trace-wire.png',fullPage:true});
-  await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'Overview'}).waitFor();
+  await page.goBack();await page.locator('.obs-detail-tabs a[aria-current="page"]').filter({hasText:'Preview'}).waitFor();
   await page.goto(url+'/developer/observability?run='+encodeURIComponent(facts.root));
   await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.getByRole('button',{name:'Help: Root Worker',exact:true}).hover();
@@ -503,9 +503,9 @@ try{
   const facts=JSON.parse(process.env.STEWARD_INSPECTION_FACTS);
   const main=facts.main,root=facts.runs.find(r=>r.role==='root'),child=facts.runs.find(r=>r.role==='child'&&r.parent!==root.id);
   await page.getByRole('link',{name:'Developer',exact:false}).click();
-  await page.getByRole('heading',{name:'Traces',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Tracing',exact:true}).waitFor();
   const row=page.locator('[data-execution-id="'+main+'"]');
-  await row.getByRole('link',{name:'Main',exact:true}).click();
+  await row.locator('a.trace-open').click();
   await page.getByText('Execution facts & data coverage',{exact:true}).click();
   await page.locator('.task-timeline .inspect-task').click();
   await page.locator('.obs-task-epochs .object-row').first().click();
@@ -525,16 +525,16 @@ try{
   await page.locator('.creator-run').click();
   if(await page.locator('.run-node[data-role="root"],.run-node[data-role="child"]').count())throw new Error('Main page presented Task Roots as its Child Runs');
   await page.getByRole('link',{name:'Traces',exact:true}).first().click();
-  await selectValue(page,page.getByLabel('Role',{exact:true}),'root');
-  await selectValue(page,page.getByLabel('Status',{exact:true}),'completed');
+  await page.getByRole('radio',{name:'Root Worker',exact:true}).check();
+  await page.getByRole('radio',{name:'completed',exact:true}).check();
   await page.getByRole('button',{name:'Apply filters',exact:true}).click();
   if(await page.locator('[data-execution-id]').count()!==1||await page.locator('[data-execution-id]:not([data-role="root"])').count())throw new Error('execution filters ignored');
-  await page.getByText('Created time',{exact:true}).click();
+  await page.getByRole('button',{name:'All time',exact:true}).click();
   await page.getByLabel('Created before (UTC)').fill('2000-01-01T00:00');
-  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
-  await page.getByRole('heading',{name:'No matching executions',exact:true}).waitFor();
-  await page.getByRole('link',{name:'Reset',exact:true}).click();
-  await page.locator('[data-execution-id="'+root.id+'"] td').first().getByRole('link').click();
+  await page.getByRole('button',{name:'Apply range',exact:true}).click();
+  await page.getByRole('heading',{name:'No matching traces',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Clear all',exact:true}).first().click();
+  await page.locator('[data-execution-id="'+root.id+'"]').locator('a.trace-open').click();
   for(const width of [851,900]){
    await page.setViewportSize({width,height:900});
    const workbench=await page.locator('.obs-workbench').evaluate(node=>{

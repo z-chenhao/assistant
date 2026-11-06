@@ -40,6 +40,8 @@ type traceRow struct {
 	observability.Observation
 	Depth         int
 	ParentOutside bool
+	HasChildren   bool
+	Guides        []bool
 	X, Width      float64
 }
 

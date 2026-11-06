@@ -39,6 +39,9 @@ class ChannelHarness(MainHarness):
         self.production_events = False
         self.platform = platform
         super().__init__(binary, root, fixture)
+        # Deterministic channel fixtures must not inherit a deployment's live
+        # app broker credential. Tests opt into their own explicit protocol peer.
+        self.env.pop('COMPOSIO_API_KEY', None)
         self.config = root / 'config.yaml'
         self.config.write_text('version: 1\nweb:\n  listen: "127.0.0.1:0"\n  token_ref: env:STEWARD_WEB_TEST_TOKEN\nfeishu:\n  app_id: sandbox-app\n  tenant_key: sandbox-tenant\n  verification_token_ref: env:STEWARD_FEISHU_VERIFY\n  encrypt_key_ref: env:STEWARD_FEISHU_ENCRYPT\n  access_token_ref: env:STEWARD_FEISHU_ACCESS\n  api_base: ' + platform.url + '\n')
         if not fixture:
@@ -788,7 +791,7 @@ def transport_channels(binary, evidence, report):
 
 
 def web_channels(binary, evidence, report):
-    database_inspection(binary,evidence,report)
+    memory_inspection(binary,evidence,report)
     attention_workspace(binary,evidence,report)
     sending_feedback(binary,evidence,report)
     live_updates(binary,evidence,report)
@@ -851,98 +854,80 @@ def task_control_components(binary, evidence, report):
             h.cleanup()
 
 
-def database_inspection(binary, evidence, report):
-    """Real accepted records, encrypted Memory and read-only metadata navigation."""
+def memory_inspection(binary, evidence, report):
+    """Real encrypted automatic/tool/local memories, scoped owner reads and provenance."""
     def plan(calls):
         return 'Capabilities: ' + json.dumps(calls)
-    with tempfile.TemporaryDirectory(prefix='steward-database-') as temp, Sandbox() as platform:
+    with tempfile.TemporaryDirectory(prefix='steward-memory-ui-') as temp, Sandbox() as platform:
         h = ChannelHarness(binary, Path(temp), platform, 'capabilities')
         try:
-            base = h.config.read_text()
-            h.env['STEWARD_DATABASE_MEMORY_KEY'] = 'M' * 32
-            h.config.write_text(base + 'memory:\n  encryption_key_ref: env:STEWARD_DATABASE_MEMORY_KEY\n')
-            h.setup(metadata=dict(name='Database pagination workload', provider_kind='openai_compatible',
+            h.env['STEWARD_MEMORY_UI_KEY'] = 'M' * 32
+            h.config.write_text(h.config.read_text() + 'memory:\n  encryption_key_ref: env:STEWARD_MEMORY_UI_KEY\n')
+            h.setup(metadata=dict(name='Memory inspection workload', provider_kind='openai_compatible',
                 endpoint='http://127.0.0.1:1/v1', wire_api='openai_completions', model_id='fixture-model',
                 context_window=32768, max_output_tokens=1024, compatibility=dict(tool_result_format='openai'), capabilities=dict(text_input=True)))
-            private_fact = 'I prefer lentil soup as PRIVATE_DATABASE_MEMORY_FACT.'
-            h.send('database-memory', plan([dict(name='builtin__memory_manage', arguments=dict(operation='remember', content=private_fact))]))
+            explicit = 'I prefer jasmine tea. <img src=x onerror="unsafe()"> 真实记忆正文'
+            h.send('memory-tool', plan([dict(name='builtin__memory_manage', arguments=dict(operation='remember', content=explicit))]))
             h.command('chat', 'work')
-            h.command('memory', 'work')
-            with closing(sqlite3.connect(h.root/'data/memory.db')) as db:
-                sealed = db.execute('SELECT memory_id,content FROM memory_record WHERE deleted_at IS NULL').fetchall()
-            require(sealed and all(row[1].startswith('sealed:v1:') for row in sealed), 'real Memory control did not encrypt its accepted records')
-            # Metadata inspection must not require the Memory decryption key or
-            # embedding service. Keep the sealed record, remove both dependencies.
-            h.config.write_text(base)
-            h.env.pop('STEWARD_DATABASE_MEMORY_KEY')
-            artifact = h.command('artifact', 'save', 'metadata-<img src=x onerror=unsafe()>.txt', 'text/plain', text='PRIVATE_DATABASE_FILE_BYTES')
+            h.send('memory-automatic', 'Capabilities: []\nI prefer walking by the river every morning')
+            h.command('chat', 'work')
             for index in range(23):
-                h.send('database-page-' + str(index), 'Capabilities: []\nPRIVATE_DATABASE_MESSAGE_' + str(index))
-            child = plan([])
-            root = plan([dict(name='builtin__agent_run', arguments=dict(task=child))])
-            h.send('database-tree', plan([dict(name='builtin__task_manage', arguments=dict(operation='create', task=root))]))
-            h.command('chat', 'send-parts', 'database-attachment', text=json.dumps([
-                dict(type='text', text=plan([])), dict(type='file', artifact_ref=artifact['artifact_ref'])]))
-            # The latest explicit plan creates the tree; earlier accepted input
-            # records and their attachment remain original semantic history.
-            h.send('database-tree-final', plan([dict(name='builtin__task_manage', arguments=dict(operation='create', task=root))]))
+                h.command('memory', 'manage', 'memory-list-' + str(index), text=json.dumps(dict(operation='remember', content='I prefer local memory item %02d' % index)))
+            h.command('memory', 'work')
             h.start()
-            h.wait(lambda state:any(row['worker_position']=='child' for row in state['runs']) and
-                   all(row['status'] in ('completed','failed','cancelled') for row in state['runs']) and
-                   all(row['status']=='sent' for row in state['deliveries']), 'saved metadata execution tree')
-            def durable_fingerprint():
+            h.wait(lambda state: all(row['status'] in ('completed','failed','cancelled') for row in state['runs']), 'completed memory fixture')
+            def fingerprint():
                 result = {}
-                for name, tables in {'state.db': ('run','task','main_input','main_reply','tool_invocation','model_generation','artifact','artifact_reference'),
-                                     'conversation.db': ('conversation_message',), 'memory.db': ('memory_record',)}.items():
+                for name, tables in {'state.db': ('run','tool_invocation','memory_mutation','memory_privacy'),
+                                     'conversation.db': ('conversation_message',), 'memory.db': ('memory_record','memory_receipt','memory_fact','memory_evidence')}.items():
                     with closing(sqlite3.connect(h.root/'data'/name)) as db:
                         db.execute('BEGIN')
                         for table in tables:
-                            rows = db.execute('SELECT * FROM ' + table + ' ORDER BY 1').fetchall()
-                            result[name + ':' + table] = hashlib.sha256(json.dumps(rows, sort_keys=True, default=str).encode()).hexdigest()
+                            result[name+':'+table] = hashlib.sha256(json.dumps(db.execute('SELECT * FROM '+table+' ORDER BY 1').fetchall(), default=str).encode()).hexdigest()
                 return result
-            before = durable_fingerprint()
-            pages = {}
-            for collection in ('executions','messages','memories','artifacts'):
-                items, cursor, first_next = [], '', ''
-                for _ in range(100):
-                    value = h.http('/api/developer/database?' + urlencode(dict(collection=collection, limit=2, cursor=cursor)))
-                    require(value['collection']==collection and len(value['items'])<=2, 'unbounded database page')
-                    items += value['items']
-                    cursor = value.get('next','')
-                    if not first_next:
-                        first_next = cursor
-                    if not cursor:
-                        break
-                else:
-                    raise RuntimeError('metadata continuation did not terminate')
-                require(len(items)==len({item['ref'] for item in items}), 'metadata continuation repeated a record')
-                for item in items:
-                    exact = h.http('/api/developer/database?' + urlencode(dict(collection=collection, ref=item['ref'])))
-                    require(exact['items']==[item], 'exact metadata lookup changed the record: '+json.dumps(dict(collection=collection,listed=item,exact=exact['items'])))
-                pages[collection] = dict(items=items, first_next=first_next)
-            require(len(pages['messages']['items'])>20 and len(pages['executions']['items'])>=3, 'real metadata fixtures did not exercise paging and execution relationships')
-            require(any(item['links'] for item in pages['memories']['items']), 'encrypted Memory lost its real source relationship')
-            require(any(link['ref']==artifact['artifact_ref'] for item in pages['messages']['items'] for link in item['links']), 'accepted attachment has no metadata relationship')
-            require(any(link['relation']=='Attached to message' for item in pages['artifacts']['items'] if item['ref']==artifact['artifact_ref'] for link in item['links']), 'artifact metadata lost its actual message holder')
-            raw = json.dumps(pages)
-            for forbidden in ('PRIVATE_DATABASE_MESSAGE_', 'PRIVATE_DATABASE_MEMORY_FACT', 'PRIVATE_DATABASE_FILE_BYTES', 'sealed:v1:', 'storage_key', 'credential_ref', str(h.root)):
-                require(forbidden not in raw, 'private value appeared in metadata: ' + forbidden)
-            h.http('/api/developer/database', auth=False, expected=401)
-            h.http('/api/developer/database?sql=SELECT+1', expected=400)
-            h.http('/api/developer/database?collection=auth_connection', expected=400)
-            h.http('/api/developer/database?agent=other', expected=400)
-            h.http('/api/developer/database?collection=messages&collection=memories', expected=400)
-            h.http('/api/developer/database?' + urlencode(dict(collection='artifacts', cursor=pages['messages']['first_next'])), expected=400)
-            h.http('/api/developer/database?ref=run:missing', expected=404)
-            h.http('/api/developer/database', data=b'x', method='POST', expected=404)
-            h.browser(evidence.parent/'database-ui', 'database')
-            require(durable_fingerprint()==before, 'metadata browsing changed domain records or started execution')
-            h.stop();h.start()
-            restored = h.http('/api/developer/database?collection=memories')
-            require({item['ref'] for item in restored['items']}=={'memory:'+row[0] for row in sealed}, 'restart lost encrypted metadata access')
-            report['scenarios']['database'] = dict(collection_counts={key:len(value['items']) for key,value in pages.items()}, read_only=True,
-                encrypted_without_key=True, restart=True, browser=str(evidence.parent/'database-ui'))
-            report['checks'].append('Developer Database: real Main/Task/Child/attachment/Memory records, keyless encrypted metadata, complete keyset pagination, exact links, auth/query/write rejection, real browser and no domain changes')
+            items, cursor = [], ''
+            for _ in range(100):
+                page = h.http('/api/developer/memory?' + urlencode(dict(limit=2, cursor=cursor)))
+                require(len(page['items'])<=2, 'unbounded Memory page')
+                items += page['items']; cursor = page.get('next','')
+                if not cursor:
+                    break
+            else:
+                raise RuntimeError('Memory pagination did not terminate')
+            require(len(items)>=25 and len(items)==len({item['ref'] for item in items}), 'Memory pagination repeated or lost records')
+            require(any(item['origin']=='automatic' for item in items), 'automatic memory missing')
+            target = next(item for item in items if item.get('content')==explicit)
+            require(target['origin']=='explicit' and any(source.get('run_id') for source in target['sources']), 'tool memory lost its actual invocation source')
+            automatic = next(item for item in items if item['origin']=='automatic')
+            source = next(source for source in automatic['sources'] if source['kind']=='conversation')
+            source_page = h.http('/api/developer/memory?' + urlencode(dict(ref=automatic['ref'], source=source['ref'])))
+            require(any('I prefer walking' in value.get('text','') for value in source_page['items'][0]['sources']), 'original Memory source content missing')
+            h.http('/api/developer/memory?' + urlencode(dict(ref=target['ref'], source=source['ref'])), expected=404)
+            search = h.http('/api/developer/memory?' + urlencode(dict(search='真实记忆')))
+            require(len(search['items'])==1 and search['items'][0]['ref']==target['ref'], 'decrypted literal Unicode search failed')
+            replacement = 'I prefer oolong tea after the correction'
+            h.command('memory', 'manage', 'memory-correction', text=json.dumps(dict(operation='remember', content=replacement, supersedes=target['ref'])))
+            h.command('memory', 'work')
+            retired = h.http('/api/developer/memory?' + urlencode(dict(ref=target['ref'])))['items'][0]
+            require(retired['status']=='superseded' and not retired.get('content') and retired.get('replaced_by'), 'retired memory leaked body or lost lineage')
+            for suffix, code in [('',401), ('?agent=other',400), ('?sql=SELECT+1',400), ('?tier=unknown',400), ('?limit=0',400), ('?limit=51',400), ('?search=a&search=b',400), ('?ref=memory:missing',404)]:
+                h.http('/api/developer/memory'+suffix, auth=code!=401, expected=code)
+            h.http('/api/developer/database', expected=404)
+            h.http('/developer/database', expected=404)
+            h.http('/api/developer/memory', data=b'x', method='POST', expected=404)
+            first = h.http('/api/developer/memory?limit=2')
+            h.http('/api/developer/memory?' + urlencode(dict(tier='core', cursor=first['next'])), expected=400)
+            before = fingerprint()
+            h.browser(evidence.parent/'memory-ui', 'memory')
+            require(fingerprint()==before, 'Memory browsing changed archived domain records')
+            h.stop(); h.start()
+            require(h.http('/api/developer/memory')['total']==len(items), 'Memory restart lost current entries')
+            h.command('memory', 'manage', 'memory-forget', text=json.dumps(dict(operation='forget', memory_ref=automatic['ref'])))
+            h.http('/api/developer/memory?' + urlencode(dict(ref=automatic['ref'])), expected=404)
+            h.command('memory', 'work')
+            require('walking by the river' not in json.dumps(h.http('/api/developer/memory?status=all')), 'Forget resurrected old memory content')
+            report['scenarios']['memory'] = dict(records=len(items), encrypted=True, read_only=True, source_content=True, restart=True, forget=True)
+            report['checks'].append('Memory: real encrypted automatic/tool/local records, Unicode content search, source evidence and Trace links, keyset pagination, retired metadata, owner auth, native/mobile/theme browser flows, read-only restart and Forget')
             h.stop()
         finally:
             h.cleanup()
@@ -1763,7 +1748,7 @@ if __name__=='__main__':
     action.add_argument('--delivery-lease-only',action='store_true')
     action.add_argument('--ui-components-only',action='store_true')
     action.add_argument('--rich-replies-only',action='store_true')
-    action.add_argument('--database-only',action='store_true')
+    action.add_argument('--memory-only',action='store_true')
     action.add_argument('--attention-only',action='store_true')
     action.add_argument('--feishu-questions-only',action='store_true')
     action.add_argument('--feishu-reviews-only',action='store_true')
@@ -1773,13 +1758,13 @@ if __name__=='__main__':
     def verify(_):
         if args.group:
             return run(args.binary.resolve(), args.evidence.resolve(), args.group)
-        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.database_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only and not args.preferences_only:
+        if not args.delivery_lease_only and not args.ui_components_only and not args.rich_replies_only and not args.memory_only and not args.attention_only and not args.feishu_questions_only and not args.feishu_reviews_only and not args.preferences_only:
             return run(args.binary.resolve(),args.evidence.resolve())
         report = dict(checks=[], scenarios={})
         if args.preferences_only:
             preference_settings(args.binary.resolve(),args.evidence.resolve(),report)
-        elif args.database_only:
-            database_inspection(args.binary.resolve(),args.evidence.resolve(),report)
+        elif args.memory_only:
+            memory_inspection(args.binary.resolve(),args.evidence.resolve(),report)
         elif args.rich_replies_only:
             rich_replies(args.binary.resolve(),args.evidence.resolve(),report)
         elif args.feishu_reviews_only:

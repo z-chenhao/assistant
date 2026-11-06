@@ -5,9 +5,11 @@ import {enhanceComputerView} from './computer';
 import {enhanceShell} from './shell';
 import {enhanceBrandMotion} from './brand';
 import {enhanceSettings} from './settings';
+import {enhanceFormDisclosures} from './components/ui/disclosure';
 import {enhanceSelectControls} from './components/ui/select';
 import {enhanceCapabilityForms} from './capability-forms';
 import {enhanceObservability} from './observability';
+import {enhanceMemory} from './memory';
 import {enhanceComposer} from './composer';
 import {enhanceProjections} from './projections';
 import {startLiveUpdates} from './live-updates';
@@ -25,10 +27,12 @@ enhanceComposer(live?.messageAccepted);
 live?.start();
 
 enhanceObservability();
+enhanceMemory();
 
 enhanceAppConnections();
 enhanceContextHelp();
 enhanceSettings();
+enhanceFormDisclosures();
 enhanceSelectControls();
 enhanceCapabilityForms();
 

@@ -55,8 +55,9 @@ F-031 复用真实 Actor/store 和现有 Web。测试用显式 scripted provider
 | [context_inspection_test.go](../../internal/agent/sqlite/context_inspection_test.go) / [context_test.go](../../internal/agent/sqlite/context_test.go) | 真实 Main/Root/递归 Child、语义摘要恢复各轮的完整 messages/tools/response 与冻结记录逐项一致；原请求/效果与归档隐私不变 |
 | [observability/sqlite/context_test.go](../../internal/observability/sqlite/context_test.go) | 长中文/emoji/NUL、8192 字节续读、40 项分页、来源隔离、重复键 Diff、增加/移除/改变/移动、未知响应与压缩/召回原记录、独立并发读取 |
 | [web/context_test.go](../../internal/interaction/web/context_test.go) | 同一授权边界、参数/偏移校验、完整模板含 step 0 的前后链接、安全转义、无 POST、no-store 与 CSP |
-| [traces_test.go](../../internal/agent/sqlite/traces_test.go) | 真实 Main/Root/递归 Child 的统一查询、输入输出、角色与 Agent/trace 隔离、缺失网络证据不猜测、同时间 100 节点分页及跨 trace 游标拒绝 |
-| [web/traces_test.go](../../internal/interaction/web/traces_test.go) | 树/时间线与详情模板、授权/绑定、参数验证、转义、真实 parent 分支、页外 parent 与几何上限 |
+| [traces_test.go](../../internal/agent/sqlite/traces_test.go) | 真实 Main/Root/递归 Child 的统一查询、输入输出、角色与 Agent/trace 隔离、缺失网络证据不猜测、同时间 100 节点分页及跨 trace 游标拒绝；元数据搜索与 Session/角色/状态/时间交集、字面特殊字符及搜索分页；完整查询计数/时间桶总和与分页隔离 |
+| [channels_traces.mjs](../../tests/system/channels_traces.mjs)（沿用 native-trace 浏览器场景） | 搜索/角色/时间组合、预设时间、列显隐持久化、半屏非模态预览、关闭/history/前后 Trace/展开/全页、共享紧凑尺寸、内外分栏的键盘/指针调宽、节点/JSON 分支折叠、Formatted/JSON 原文保持、类型语义色、无 JS 搜索；桌面/手机、明暗主题截图和日期面板边界 |
+| [web/traces_test.go](../../internal/interaction/web/traces_test.go) | 树/时间线与详情模板、授权/绑定、参数验证、转义、真实 parent 分支、页外 parent 与几何上限；搜索条件往返详情 URL、清除条件/时间预设重置游标；真实父子连接线/分支标记及归档大整数/小数的展示精度 |
 | [bridge/observations_test.go](../../internal/llm/bridge/observations_test.go) / [images_test.go](../../internal/llm/bridge/images_test.go) | 可选诊断不改变 generation.event 序号；跨 registration 丢弃、上限、凭据、异常 sink；实际 Pi 收到图片而观测仅含安全引用/hash |
 | [Node capture tests](../../provider-bridge/test/observability.test.mjs) | Node 侧 opt-in、凭据/像素替换、尺寸/hash、超限标记与 callback 故障隔离 |
 | [verify_channels.py](../../tests/system/verify_channels.py) 的 native_trace_inspection | 生产 Bridge + 独立 HTTP peer；实际重试、最终 JSON 比对、usage/cost 缺失、完成后重启不重发；桌面/移动/无 JS、详情滚动/history、只读账本；计数前等待 Task 的后续 Main、全部投递及终态后的 agent_end，前后计数使用一致读事务；随现有 channels gate 运行，截图为受控 peer 下的真实产品页面 |
@@ -79,3 +80,5 @@ HTTP 诊断写入以真实 SQLite 锁验证：短业务写锁释放后保存记�
 ## 页面重构验收
 
 真实 channels 浏览器 action 从列表进入独立 Trace 详情，验证树/时间线对齐导航、节点类型 Tab、折叠 metadata、完整 Context/JSON/来源与相邻 Compare 前后内容，返回列表和旧 deep link 保留参数；长 UTF-8 正文、桌面/移动端、无 JavaScript 与原 API 的读取边界继续覆盖。`TestTraceDetailDoesNotDependOnGlobalList` 明确让全局列表失败而详情成功，防止拆页后仍耦合列表查询。沿用同一 SQLite/HTTP peer 证据，不引入第二套执行或评测系统。
+
+列表共享规范见 [design.md](../../design.md#数据列表页契约)。`npm test --prefix web` 覆盖共享调宽与 JSON 无损回退；现有 native trace 浏览器场景调用公共列表几何断言，并进入 channels-web CI。
