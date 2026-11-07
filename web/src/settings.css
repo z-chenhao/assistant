@@ -1,15 +1,15 @@
-/* Settings share the module navigation shell and use a compact content column. */
-.settings-workspace{--settings-width:680px;--settings-action-width:12.5rem;background:var(--card)}
+/* Every Settings route shares one content frame and value-column size. */
+.settings-workspace{--settings-width:1048px;--settings-gutter:36px;--settings-value-width:12.5rem;--settings-action-width:12.5rem;background:var(--card)}
 .settings-workspace .workspace-main{background:var(--card)}
 /* Reserve client-only rows before enhancement. No-script pages retain their
    native forms and omit settings that require local browser scripting. */
 html:not(.js) [data-client-pending]{display:none}
 .js [data-client-pending]{visibility:hidden}
-.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden;flex-basis:112px;max-width:120px}
+.js [data-language-preference]:not([data-language-ready]) .preference-controls{visibility:hidden}
 .js [data-language-preference]:not([data-language-ready]) .preference-save{display:none}
 .settings-nav-heading{font-size:12px;color:var(--muted-foreground);margin:0 8px 6px}
 .settings-topbar{display:none}
-.settings-workspace .settings-page{max-width:var(--settings-width);padding:40px 24px 64px;margin:0 auto}
+.settings-workspace .settings-page{max-width:var(--settings-width);padding:40px var(--settings-gutter) 64px;margin:0 auto}
 .settings-page h1{font-size:var(--text-page);font-weight:600;line-height:1.4;margin:0}
 .settings-page .page-heading{margin-bottom:36px;gap:16px;align-items:flex-start}
 .settings-page .page-heading p{font-size:13px;line-height:1.6;margin-top:6px}
@@ -70,6 +70,7 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-confirm h2{font-size:18px;margin:0 0 12px}.settings-confirm p{font-size:14px;color:var(--muted-foreground);margin:0 0 24px}.settings-confirm .actions{justify-content:flex-end}
 
 @media(max-width:760px){
+ .settings-workspace{--settings-gutter:20px}
  .settings-topbar{display:flex;height:56px;border-bottom:1px solid var(--border);padding:0 12px;font-size:14px}.settings-topbar>span{margin-right:auto}.settings-exit{font-size:24px;text-decoration:none;width:40px;text-align:center;color:var(--muted-foreground)}
 .settings-workspace .settings-page{padding:28px 20px 48px}.settings-page h1{font-size:22px}.settings-page .page-heading{margin-bottom:28px}
  .settings-page .object-row{gap:12px}.settings-page .object-row .row-badges{max-width:40%}.settings-page .row-badges .status-pill{font-size:11px}
@@ -78,16 +79,16 @@ html:not(.js) [data-client-pending]{display:none}
  .settings-page form>label:not(.check),.settings-page fieldset>label:not(.check){display:block;font-size:13px}.settings-page form>label>input,.settings-page fieldset>label>input,.settings-page form>label>textarea,.settings-page fieldset>label>textarea{margin-top:7px;font-size:16px}.settings-page form>label>select,.settings-page fieldset>label>select{display:block;margin-top:7px}
  .settings-page .capability-submit{align-items:center;flex-direction:row-reverse;flex-wrap:wrap}.settings-page .capability-submit button{min-height:40px}
  .settings-page :is(.model-connect-form,.capability-guided) label:not(.check):has(>input,>textarea,>select,>.control-select){gap:8px 12px}
- .settings-workspace .page-feedback{margin:16px 20px 0}
+ .settings-workspace .page-feedback{margin:16px auto 0}
 }
 
 .settings-row-controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;min-width:0}
 .settings-row-controls button{flex-shrink:0}
 .setting-row>.control-select{max-width:58%;flex-shrink:0}
 .settings-page .panel form>button{display:flex;margin-left:auto}
-.settings-workspace .page-feedback{max-width:632px;margin:20px auto 0}
-.settings-workspace .page-feedback.success{position:fixed;right:24px;bottom:24px;z-index:50;margin:0;max-width:360px;box-shadow:0 4px 16px #0001}
-@media(max-width:760px){.settings-row-controls{flex-wrap:wrap}.settings-workspace .page-feedback{margin:16px 20px 0}.settings-workspace .page-feedback.success{margin:0;right:16px;bottom:16px;max-width:calc(100vw - 32px)}}
+.settings-workspace .page-feedback{width:calc(100% - 2 * var(--settings-gutter));max-width:calc(var(--settings-width) - 2 * var(--settings-gutter));margin:20px auto 0}
+.settings-workspace .page-feedback.success{width:auto;position:fixed;right:24px;bottom:24px;z-index:50;margin:0;max-width:360px;box-shadow:0 4px 16px #0001}
+@media(max-width:760px){.settings-row-controls{flex-wrap:wrap}.settings-workspace .page-feedback{margin:16px auto 0}.settings-workspace .page-feedback.success{margin:0;right:16px;bottom:16px;max-width:calc(100vw - 32px)}}
 
 .sidebar-collapsed .settings-topbar{display:flex;height:56px;padding:0 24px}
 .sidebar-collapsed .settings-topbar>span{margin-right:auto}
@@ -99,7 +100,6 @@ html:not(.js) [data-client-pending]{display:none}
 /* Configuration keys, values and footer commands keep their own alignment. */
 .settings-page .setting-row>.setting-controls{margin-inline-start:auto;justify-content:flex-end}
 .settings-page .setting-row>label{flex:1 1 0;font-size:14px;font-weight:500;color:var(--foreground)}
-.settings-page .notification-preference .setting-controls{flex:0 1 16rem}
 .settings-page .notification-preference .control-select{width:100%}
 .settings-page .notification-preference .setting-row>label{flex-basis:12rem}
 .settings-actions,.settings-page .capability-guided .actions{display:flex;justify-content:flex-end;align-items:center;flex-direction:row;flex-wrap:wrap;gap:var(--control-gap);margin-top:16px}
@@ -109,7 +109,6 @@ html:not(.js) [data-client-pending]{display:none}
 @media(max-width:760px){
  .settings-page .notification-preference .setting-row{flex-wrap:nowrap}
  .settings-page .notification-preference .setting-row>label{flex-basis:0}
- .settings-page .notification-preference .setting-controls{flex-basis:112px;max-width:48%}
 }
 
 .settings-page form.setting-row>label,.settings-page .setting-row>label{display:block;min-width:0;margin:0}
@@ -118,10 +117,13 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-page .models-heading>form{min-width:0;max-width:100%}
 .settings-page .resource-body{padding-inline-end:0}
 
-.settings-page .settings-group{--settings-value-width:120px}
-.settings-page .settings-group .preference-controls{flex:1 1 112px;min-width:112px;max-width:var(--settings-value-width)}
-.settings-page .settings-group .setting-row>:is(select,.control-select){width:var(--settings-value-width);max-width:48%;flex:0 0 var(--settings-value-width)}
-.settings-page .settings-group [data-language-ready] .preference-controls:has(.preference-save:not([hidden])){flex-basis:220px;max-width:220px}
+/* Native values and enhanced Selects occupy the same trailing column.
+   Wrappers share the size too, so language hydration cannot move the field. */
+.settings-page :is(.preference-controls,.notification-preference .setting-controls),
+.settings-page .setting-row>:is(select,.control-select){width:var(--settings-value-width);max-width:48%;flex:0 0 min(var(--settings-value-width),48%);min-width:0}
+.settings-page .preference-controls>select{width:100%;min-width:0}
+.settings-page .preference-controls:has(.preference-save:not([hidden])){flex-wrap:wrap;justify-content:flex-end}
+.settings-page .preference-controls .preference-save{margin-inline-start:auto}
 .settings-page .resource-section{margin-bottom:28px}
 .settings-page .resource-section-title{font-size:14px;font-weight:600;margin:0 0 8px}
 .settings-page .resource-section .setting-copy h3{font-size:14px;font-weight:500;margin:0}
@@ -166,7 +168,6 @@ html:not(.js) [data-client-pending]{display:none}
 .settings-page .signin-progress .setting-copy [role=status]{font-size:12px;color:var(--muted-foreground)}
 
 .model-resources:has([data-signin-pending]) .account-add{display:none}
-.settings-page .capability-guided>.setting-row>.control-select{width:12.5rem;flex-basis:12.5rem}
 
 .settings-page .service-advanced fieldset{min-width:0;border:0;border-top:1px solid var(--border);padding:16px 0;margin:16px 0}
 .settings-page .service-configuration .service-advanced fieldset>label{display:grid;grid-template-columns:minmax(0,1fr) minmax(112px,1.3fr);align-items:center;gap:12px 18px}

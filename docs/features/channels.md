@@ -352,6 +352,6 @@ Web 页面遵循[功能优先与按需帮助](../../design.md#功能优先与按
 
 Settings 单值配置按左侧标签／右侧控件同行排列，同级命令统一宽度并右对齐；Apps 目录与详情保留原布局。Chat 的组合输入框仅保留外层焦点边界。输入区模型选择器展示已连接账户的可用目录与已验证直连模型；切换保留草稿、附件及现有工作的冻结配置，失败可重试。ChatGPT 登录、重连与退出统一在 Models，无逐模型添加步骤。
 
-通知目的地选择后自动保存，携带版本并更新确认版本；冲突／写入结果未知不自动重发，刷新读取实际状态。无脚本保留原生提交。Preferences 同组短值选择器等宽，Models 按 Models 归组两类模型连接，App service 使用键值行和右对齐同宽操作；Apps 目录布局不变。相关回归由 settings_test、channels_preferences 和 page-transitions 覆盖。
+通知目的地选择后自动保存，携带版本并更新确认版本；冲突／写入结果未知不自动重发，刷新读取实际状态。无脚本保留原生提交。Settings 五个分类及详情共用内容宽度、标题起点与留白，配置行的单值选择器跨页等宽，Models 按 Models 归组两类模型连接，App service 使用键值行和右对齐同宽操作；Apps 目录在公共容器内保留双列／单列布局。相关回归由 settings_test、channels_preferences、page-transitions 和 apps_connections_browser 覆盖。
 
 Models 为 Settings 的独立分类，包含「Sign in with an account」和「Connect with an API key」。账户目录自动进入聊天模型选择器；API 连接使用现有私有文件 SecretStore，凭据与首个模型元数据一次事务保存，失败清理新文件。连接后自动验证；首次无当前模型自动选用，后续连接不覆盖选择。连接操作复用共享菜单和原生表单，断开采用模型及凭据双版本确认并撤销后续使用，保留历史冻结配置。Apps 工具栏 App settings 进入服务配置；原 Models/Resources 服务入口移除，旧 setup 与 services/apps 深链接保留重定向。浏览器回归覆盖实际 HTTP provider 的 API key、聊天模型切换、断开及明暗／窄屏布局。

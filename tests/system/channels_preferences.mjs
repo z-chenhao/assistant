@@ -80,11 +80,12 @@ export async function preferences(page,context,browser,url,evidence){
    const geometry=await layout(page);
    if(width===320){
     // Exercise the shrink boundary independently of platform font metrics:
-    // enough space for the 112px minimum, less than the 120px desktop cap.
+    // below the shared desktop width; retain the 240px content space available
+    // just before the mobile navigation breakpoint, in either language.
     const row=page.locator('.preference-row').first();
     await row.evaluate(node=>{
      const style=getComputedStyle(node),name=node.querySelector('.preference-name');
-     node.style.inlineSize=`${name.getBoundingClientRect().width+parseFloat(style.columnGap)+116+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)}px`;
+     node.style.inlineSize=`${Math.max(240,name.getBoundingClientRect().width+parseFloat(style.columnGap)+118+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight))}px`;
     });
     await layout(page);
     await row.evaluate(node=>node.style.removeProperty('inline-size'));

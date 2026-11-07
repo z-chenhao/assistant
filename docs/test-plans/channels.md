@@ -244,6 +244,8 @@ channels gate 的 `default_capability_settings` 使用真实 HTTP、受控 Secre
 侧栏清理与个人偏好：默认设置场景验证一级栏没有宣传语或重复偏好按钮；在 Preferences 开关头像动效，验证返回 Chat、刷新后的持久化和系统 reduced-motion 优先。原头像完整帧与问候检查继续在维护中的浏览器驱动运行。公共设计规范入口为 [design.md](../../design.md)。
 
 
+`make test-browser` 的 Apps 真实服务场景同时调用 `channels_capabilities.mjs` 的 `settingsLayout`，覆盖五个 Settings 分类及 Memory 详情：2048、1400、1024、761、760、390、320px，中英文、明暗主题，逐页比较内容左右边界、标题起点和 Language／Appearance／通知／能力模式的选择器宽度、高度与尾部对齐，并检查溢出。另检查折叠导航、无脚本原生选择器及语言提交入口；输出几何数据及桌面／移动截图。使用临时数据根目录，不接触实际账户配置；沿用 required browser CI，无需新增重复 job。
+
 ### 设计规范的自动回归
 
 `channels_capabilities.mjs` 的同一默认设置场景在 320、390、760、761、1024、1400px 运行导航检查：一级／二级的空间关系、正文避让、底部 Settings、两级选中态、侧栏仅有折叠控制、Escape 焦点和 inert 恢复。输出 `navigation-viewports.json`；失败消息包含当次宽度和几何信息，不以完整 HTML 或像素快照锁死实现。系统 reduced-motion 从开启到关闭反复切换后，用户保存的头像暂停选择仍需保留。

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {settingsLayout} from './channels_capabilities.mjs';
 import {contextHelp} from './channels_help.mjs';
 import {selectValue} from './channels_controls.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -14,6 +15,7 @@ try{
  const page=await context.newPage();
  await page.goto(url+'/settings/apps');
  await page.locator('[data-apps-ready]').waitFor();
+ await settingsLayout(page,context,browser,url,evidence);
  await contextHelp(page,context,browser,url,evidence);
  await page.goto(url+'/settings/apps');await page.locator('[data-apps-ready]').waitFor();
  assert.equal(await page.locator('#composio-key-ref').count(),0);
