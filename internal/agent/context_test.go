@@ -27,9 +27,9 @@ func TestContextPromptBytes(t *testing.T) {
 		{Name: "builtin__computer_observe", Internal: true},
 		{Name: "mcp__calendar__lookup", Provider: "mcp:calendar", NamespaceDescription: "Find calendar events", Exposure: tool.CodeMode, CodeModeOnly: true},
 	}
-	for _, tc := range []struct{ position, hash string }{{"main", "0497f281884ae2a016b9c815cf6287e1909d17f23f1c2340cbb4140e5ca7fe2a"}, {"root", "b54fb61aae5c0218e08fb34800df93717a7882c4c74c5ca68d27d1279376cdad"}, {"child", "82b6bf0711efec7748cf715ae1f82df5b77413ec4d04bdfca3f1367dbf823bc6"}} {
+	for _, tc := range []struct{ position, hash string }{{"main", "0497f281884ae2a016b9c815cf6287e1909d17f23f1c2340cbb4140e5ca7fe2a"}, {"root", "08da6374cd929e66b969a1c6f23ed9a5d8fd9225e859601d39ebbc94b87dcc99"}, {"child", "fd1fd68937191e1b920fc33101a89e139ecc2d575392aeba7744dc39c31b6a11"}} {
 		t.Run(tc.position, func(t *testing.T) {
-			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}), false)
+			messages, err := ProviderMessages(InitialContext(ContextOptions{Position: tc.position, Tools: specs, Title: "Review", Task: "Keep constraints", ArtifactRefs: []string{"artifact:input"}}), false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -50,7 +50,7 @@ func TestContextRolesAndFrozenResources(t *testing.T) {
 	}
 	root := InitialContext(ContextOptions{Position: "root", Tools: specs, Title: "request", Task: "Keep the exact constraints", ArtifactRefs: []string{"artifact:input"}})
 	last := root[len(root)-1]
-	if last.Source == nil || !last.Source.Protected || last.Source.Kind != "task" || !strings.Contains(messageText(last), "artifact:input") {
+	if last.Source == nil || !last.Source.Protected || last.Source.Kind != "task" || !strings.Contains(messageText(last), `Explicit artifact IDs: ["input"]`) || strings.Contains(messageText(last), "artifact:") {
 		t.Fatal("task and references are not one protected input", last)
 	}
 	for i := range root[0].SystemSections {

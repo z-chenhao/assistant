@@ -12,6 +12,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/memory"
 	"github.com/z-chenhao/assistant/internal/recall"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func (r *Runs) ConfigureSemanticMemory(provider llm.LLMProvider) { r.memoryProvider = provider }
@@ -25,6 +26,24 @@ type semanticWriter interface {
 type curationWork struct {
 	Input   memory.CurationInput
 	Request llm.GenerationRequest
+}
+
+func curationModelText(in memory.CurationInput) string {
+	// Private event/source keys authorize Host maintenance, not model reasoning.
+	input := struct {
+		Observation struct {
+			Author string    `json:"author"`
+			Text   string    `json:"text"`
+			At     time.Time `json:"occurred_at"`
+		} `json:"observation"`
+		Existing []memory.Fact `json:"existing"`
+	}{Existing: append([]memory.Fact{}, in.Existing...)}
+	input.Observation.Author, input.Observation.Text, input.Observation.At = in.Observation.Author, in.Observation.Text, in.Observation.At
+	for i := range input.Existing {
+		input.Existing[i].Ref = tool.ObjectID(input.Existing[i].Ref)
+	}
+	raw, _ := json.Marshal(input)
+	return string(raw)
 }
 
 func (r *Runs) memoryGuard(ctx context.Context, req llm.GenerationRequest, token string) (func(), error) {
@@ -73,8 +92,7 @@ func (r *Runs) prepareCuration(ctx context.Context, scope recall.Scope, in memor
 			}
 			if status == "failed" {
 				work.Input = in
-				body, _ := json.Marshal(in)
-				work.Request.Messages = []llm.Message{{Role: "system", Text: memory.CurationInstruction}, {Role: "user", Text: string(body)}}
+				work.Request.Messages = []llm.Message{{Role: "system", Text: memory.CurationInstruction}, {Role: "user", Text: curationModelText(in)}}
 			}
 		} else if err != sql.ErrNoRows {
 			return agent.ErrStorage
@@ -91,8 +109,7 @@ func (r *Runs) prepareCuration(ctx context.Context, scope recall.Scope, in memor
 			if e = r.freezeSpend(ctx, tx, snapshot); e != nil {
 				return e
 			}
-			body, _ := json.Marshal(in)
-			work = curationWork{Input: in, Request: llm.GenerationRequest{RunID: "memory:" + in.Observation.EventID, SessionID: "memory:" + in.Observation.EventID, Snapshot: snapshot, OutputLimitBytes: 32 << 10, Messages: []llm.Message{{Role: "system", Text: memory.CurationInstruction}, {Role: "user", Text: string(body)}}}}
+			work = curationWork{Input: in, Request: llm.GenerationRequest{RunID: "memory:" + in.Observation.EventID, SessionID: "memory:" + in.Observation.EventID, Snapshot: snapshot, OutputLimitBytes: 32 << 10, Messages: []llm.Message{{Role: "system", Text: memory.CurationInstruction}, {Role: "user", Text: curationModelText(in)}}}}
 		}
 		// Private maintenance has the same model-window admission boundary as
 		// user work. Refuse before journaling or contacting the provider.

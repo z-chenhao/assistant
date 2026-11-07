@@ -53,6 +53,7 @@ func Parse(raw string) (Request, error) {
 	if !tool.Validate(Schema, raw) || json.Unmarshal([]byte(raw), &q) != nil {
 		return q, ErrInvalid
 	}
+	q.Ref = tool.ObjectRef("automation", q.Ref)
 	if q.Operation == "list" {
 		if q.Ref != "" || q.Version != 0 || q.Instruction != "" || q.Type != "" || q.Spec != "" || q.Timezone != "" || q.Below != nil {
 			return q, ErrInvalid

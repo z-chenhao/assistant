@@ -3,6 +3,7 @@ package sqliteindex
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"math"
 	"sort"
 	"strings"
@@ -32,7 +33,8 @@ func SearchLocal(ctx context.Context, db *sql.DB, scope recall.Scope, q recall.Q
 		return out, nil
 	}
 	conditions := []string{}
-	args := []any{scope.UserID, scope.AgentID, start, end}
+	excluded, _ := json.Marshal(append([]string{}, q.ExcludeRefs...))
+	args := []any{scope.UserID, scope.AgentID, start, end, string(excluded)}
 	for _, term := range terms {
 		conditions = append(conditions, "instr(lower(d.content),?)>0")
 		args = append(args, term)
@@ -41,6 +43,7 @@ func SearchLocal(ctx context.Context, db *sql.DB, scope recall.Scope, q recall.Q
 	// coverage before Core/recency, rather than recency of a common OR term.
 	rows, err := db.QueryContext(ctx, `SELECT d.ref,d.content,d.occurred_at,d.author_role,d.core FROM recall_document d
 WHERE d.user_id=? AND (d.agent_id='' OR d.agent_id=?) AND d.active=1 AND d.occurred_at>=? AND d.occurred_at<=?
+AND d.ref NOT IN (SELECT value FROM json_each(?))
 AND (`+strings.Join(conditions, " OR ")+`)`, args...)
 	if err != nil {
 		return nil, recall.ErrUnavailable

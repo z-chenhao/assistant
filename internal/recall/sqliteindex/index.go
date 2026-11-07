@@ -75,11 +75,11 @@ func Bind(ctx context.Context, db *sql.DB, e recall.Embedding) error {
 // Indexing is recoverable derived work: immutable originals commit first. A
 // failed embedding leaves NULL vectors and fails the complete search closed.
 // Only authorized records are ever sent to the configured embedding endpoint.
-func catchUp(ctx context.Context, db *sql.DB, s recall.Scope, e recall.Embedding, start, end int64) error {
+func catchUp(ctx context.Context, db *sql.DB, s recall.Scope, e recall.Embedding, start, end int64, excluded string) error {
 	if err := Bind(ctx, db, e); err != nil {
 		return err
 	}
-	rows, err := db.QueryContext(ctx, `SELECT ref,content FROM recall_document WHERE user_id=? AND (agent_id='' OR agent_id=?) AND active=1 AND vector_json IS NULL AND occurred_at>=? AND occurred_at<=? ORDER BY ref`, s.UserID, s.AgentID, start, end)
+	rows, err := db.QueryContext(ctx, `SELECT ref,content FROM recall_document WHERE user_id=? AND (agent_id='' OR agent_id=?) AND active=1 AND vector_json IS NULL AND occurred_at>=? AND occurred_at<=? AND ref NOT IN (SELECT value FROM json_each(?)) ORDER BY ref`, s.UserID, s.AgentID, start, end, excluded)
 	if err != nil {
 		return recall.ErrUnavailable
 	}
@@ -149,7 +149,8 @@ func Search(ctx context.Context, db *sql.DB, s recall.Scope, q recall.Query, e r
 			end = q.TimeRange.End.UnixMicro()
 		}
 	}
-	if err := catchUp(ctx, db, s, e, start, end); err != nil {
+	excluded, _ := json.Marshal(append([]string{}, q.ExcludeRefs...))
+	if err := catchUp(ctx, db, s, e, start, end, string(excluded)); err != nil {
 		return nil, err
 	}
 	vector, err := e.Embed(ctx, q.Query)
@@ -162,7 +163,7 @@ func Search(ctx context.Context, db *sql.DB, s recall.Scope, q recall.Query, e r
 		return nil, recall.ErrUnavailable
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT ref,content,occurred_at,author_role,core,vector_json,embedding_id FROM recall_document WHERE user_id=? AND (agent_id='' OR agent_id=?) AND active=1 AND occurred_at>=? AND occurred_at<=? ORDER BY ref`, s.UserID, s.AgentID, start, end)
+	rows, err := tx.QueryContext(ctx, `SELECT ref,content,occurred_at,author_role,core,vector_json,embedding_id FROM recall_document WHERE user_id=? AND (agent_id='' OR agent_id=?) AND active=1 AND occurred_at>=? AND occurred_at<=? AND ref NOT IN (SELECT value FROM json_each(?)) ORDER BY ref`, s.UserID, s.AgentID, start, end, string(excluded))
 	if err != nil {
 		return nil, recall.ErrUnavailable
 	}
@@ -190,7 +191,7 @@ func Search(ctx context.Context, db *sql.DB, s recall.Scope, q recall.Query, e r
 		var result ranks
 		term := words(q.Query)
 		if term != "" {
-			rows, err := tx.QueryContext(ctx, `SELECT d.ref FROM recall_fts JOIN recall_document d ON d.rowid=recall_fts.rowid WHERE recall_fts MATCH ? AND d.user_id=? AND (d.agent_id='' OR d.agent_id=?) AND d.active=1 AND d.occurred_at>=? AND d.occurred_at<=? ORDER BY bm25(recall_fts),d.ref LIMIT 200`, term, s.UserID, s.AgentID, start, end)
+			rows, err := tx.QueryContext(ctx, `SELECT d.ref FROM recall_fts JOIN recall_document d ON d.rowid=recall_fts.rowid WHERE recall_fts MATCH ? AND d.user_id=? AND (d.agent_id='' OR d.agent_id=?) AND d.active=1 AND d.occurred_at>=? AND d.occurred_at<=? AND d.ref NOT IN (SELECT value FROM json_each(?)) ORDER BY bm25(recall_fts),d.ref LIMIT 200`, term, s.UserID, s.AgentID, start, end, string(excluded))
 			if err != nil {
 				result.err = err
 			} else {

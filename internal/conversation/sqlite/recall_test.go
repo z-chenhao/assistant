@@ -26,6 +26,48 @@ type appendDuringQuery struct {
 	err    error
 }
 
+func TestRecallExcludesWorkingMessagesBeforeCandidateLimit(t *testing.T) {
+	for _, local := range []bool{true, false} {
+		t.Run(fmt.Sprint("local=", local), func(t *testing.T) {
+			ctx := context.Background()
+			s, err := Open(ctx, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			scope := recall.Scope{UserID: "local", AgentID: "one"}
+			if err = s.BindConversation(ctx, "one", scope); err != nil {
+				t.Fatal(err)
+			}
+			messages := []conversation.Message{{MessageID: "older", ConversationID: "one", Role: "user", Content: conversation.Text("tea older missing evidence"), Source: "main", CreatedAt: time.Unix(1, 0)}}
+			q := recall.Query{Query: "tea", Limit: 1}
+			for i := 0; i < 210; i++ {
+				id := fmt.Sprintf("visible-%03d", i)
+				messages = append(messages, conversation.Message{MessageID: id, ConversationID: "one", Role: "user", Content: conversation.Text("tea"), Source: "main", CreatedAt: time.Unix(100+int64(i), 0)})
+				q.ExcludeRefs = append(q.ExcludeRefs, "conversation:"+id)
+			}
+			if err = s.Append(ctx, messages); err != nil {
+				t.Fatal(err)
+			}
+			if local {
+				s.ConfigureLocal()
+			} else if err = s.Configure(ctx, fake.Embedding{}); err != nil {
+				t.Fatal(err)
+			}
+			hits, err := s.Search(ctx, scope, q)
+			if err != nil || len(hits) != 1 || hits[0].SourceRef != "conversation:older" {
+				t.Fatal("visible history starved missing evidence", hits, err)
+			}
+			if !local {
+				var pending int
+				if err = s.db.QueryRow(`SELECT count(*) FROM recall_document WHERE vector_json IS NULL`).Scan(&pending); err != nil || pending != 210 {
+					t.Fatal("working messages were needlessly embedded", pending, err)
+				}
+			}
+		})
+	}
+}
+
 func (*appendDuringQuery) Identity() string { return "append-during-query" }
 func (e *appendDuringQuery) Embed(_ context.Context, text string) ([]float64, error) {
 	if text == "query-boundary" && e.append != nil {

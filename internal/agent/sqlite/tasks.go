@@ -373,7 +373,7 @@ func (r *Runs) taskSteering(ctx context.Context, c agent.RunClaim, after int64) 
 		if frozen > 0 {
 			return nil
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.instruction,i.artifact_refs FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch WHERE r.run_id=? AND r.worker_position='root' AND i.sequence>? ORDER BY i.sequence`, c.RunID(), after)
+		rows, err := tx.QueryContext(ctx, `SELECT i.sequence,i.instruction,i.artifact_refs,coalesce(json_extract(p.policy_json,'$.input_recall'),0) FROM task_instruction i JOIN run r ON r.task_id=i.task_id AND r.task_epoch=i.task_epoch LEFT JOIN run_context_policy p USING(run_id) WHERE r.run_id=? AND r.worker_position='root' AND i.sequence>? ORDER BY i.sequence`, c.RunID(), after)
 		if err != nil {
 			return err
 		}
@@ -381,10 +381,20 @@ func (r *Runs) taskSteering(ctx context.Context, c agent.RunClaim, after int64) 
 		for rows.Next() {
 			var i agent.Input
 			var text, refs string
-			if err = rows.Scan(&i.Sequence, &text, &refs); err != nil {
+			var plainIDs bool
+			if err = rows.Scan(&i.Sequence, &text, &refs, &plainIDs); err != nil {
 				return err
 			}
-			i.Message.Content = conversation.Text("Task instruction: " + text + "\nArtifact references: " + refs)
+			label := "Artifact references: "
+			if plainIDs {
+				var ids []string
+				if json.Unmarshal([]byte(refs), &ids) != nil {
+					return agent.ErrStorage
+				}
+				refs, _ = encoded(tool.ObjectIDs(ids))
+				label = "Artifact IDs: "
+			}
+			i.Message.Content = conversation.Text("Task instruction: " + text + "\n" + label + refs)
 			inputs = append(inputs, i)
 		}
 		return rows.Err()

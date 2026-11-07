@@ -15,10 +15,13 @@ type Policy struct {
 	UserImages bool `yaml:"-" json:"user_images,omitempty"`
 	DOCXText   bool `yaml:"-" json:"docx_text,omitempty"`
 	// Missing on older policies preserves their query, evidence and placement.
-	ContextualRecall bool    `yaml:"-" json:"contextual_recall,omitempty"`
-	Threshold        float64 `yaml:"threshold_percentage" json:"threshold_percentage"`
-	Recent           int     `yaml:"recent_messages" json:"recent_messages"`
-	SummaryBytes     int     `yaml:"summary_bytes" json:"summary_bytes"`
+	ContextualRecall bool `yaml:"-" json:"contextual_recall,omitempty"`
+	// New Runs attach timestamped recall to the current input and expose plain
+	// object IDs. Older policies retain their accepted message representation.
+	InputRecall  bool    `yaml:"-" json:"input_recall,omitempty"`
+	Threshold    float64 `yaml:"threshold_percentage" json:"threshold_percentage"`
+	Recent       int     `yaml:"recent_messages" json:"recent_messages"`
+	SummaryBytes int     `yaml:"summary_bytes" json:"summary_bytes"`
 }
 
 func DefaultPolicy() Policy { return Policy{Threshold: .75, Recent: 6, SummaryBytes: 2048} }

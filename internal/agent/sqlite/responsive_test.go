@@ -346,7 +346,7 @@ func TestLegacyMainDeferredToolRecoveryRetainsOutcomeAndAuthority(t *testing.T) 
 			// A fresh owner reconstructs pending delivery from durable records.
 			p := &loopProvider{store: s, respond: func(request llm.GenerationRequest) (llm.GenerationResult, error) {
 				last := request.Messages[len(request.Messages)-1]
-				if last.Origin != "runtime" || !strings.Contains(last.Text, "operation:0:0") || unknown && !strings.Contains(last.Text, "UNKNOWN_SIDE_EFFECT") || !unknown && !strings.Contains(last.Text, "durable result") {
+				if last.Origin != "runtime" || !strings.Contains(last.Text, `"operation_ref":"0-0"`) || unknown && !strings.Contains(last.Text, "UNKNOWN_SIDE_EFFECT") || !unknown && !strings.Contains(last.Text, "durable result") {
 					t.Logf("unexpected recovery input: %+v", last)
 					return llm.GenerationResult{}, llm.InvalidProviderResponse
 				}

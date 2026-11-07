@@ -355,6 +355,19 @@ func (t *tools) finish(ctx, outputCtx context.Context, id string, result tool.Re
 		if err = t.fence(ctx, tx); err != nil {
 			return err
 		}
+		// Presentation is frozen with the receipt, independently of live policy.
+		var plainIDs bool
+		var toolName string
+		if err := tx.QueryRowContext(ctx, `SELECT coalesce(json_extract(p.policy_json,'$.input_recall'),0),i.tool_name FROM run_context_policy p JOIN tool_invocation i USING(run_id) WHERE i.invocation_id=? AND i.run_id=?`, id, t.claim.RunID()).Scan(&plainIDs, &toolName); err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		result.ObjectIDs = ""
+		if plainIDs && result.Error == nil {
+			result.ObjectIDs = "artifacts"
+			if definition, ok := t.runs.registry.Resolve(toolName); ok && definition.Host {
+				result.ObjectIDs = "host"
+			}
+		}
 		if out != nil {
 			*out = result
 		}

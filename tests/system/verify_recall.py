@@ -261,6 +261,21 @@ def verify_complete_workflow(value):
     for generation in value['generations']:
         if (generation['run_id'], generation['step_index']) not in summaries:
             business.append(generation)
+            request = json.loads(generation['request_json'])
+            messages = request['messages']
+            recalled = [m for m in messages if '<recall_memory>' in m.get('text', '')]
+            require(all(m['role'] == 'user' and m.get('origin') != 'runtime' and
+                        m['text'].count('<recall_memory>') == 1 and
+                        m['text'].endswith('</recall_memory>') for m in recalled),
+                    'recall became a synthetic turn or escaped the current input')
+            require(len(recalled) <= 1 and not any(
+                m.get('origin') == 'runtime' and m.get('text', '').startswith('Retrieved durable context')
+                for m in messages), 'recall displaced chronological messages')
+            for message in messages:
+                if message['role'] == 'tool':
+                    require(not any(prefix in message.get('text', '') for prefix in
+                                    ('conversation:', 'artifact:', 'memory:', 'task:')),
+                            'model received qualified storage keys')
             continue
         request = json.loads(generation['request_json'])
         result = json.loads(generation['result_json'])

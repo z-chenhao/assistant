@@ -13,7 +13,7 @@ import (
 
 // Automatic recall uses real input, not the generated Task instruction block.
 // Exclusions are Host provenance, never model-supplied authority or a text guess.
-func (r *Runs) automaticRecallQuery(ctx context.Context, run agent.Run, messages []llm.Message) (recall.Query, error) {
+func (r *Runs) automaticRecallQuery(ctx context.Context, run agent.Run, messages []llm.Message, inputRecall bool) (recall.Query, error) {
 	q := recall.Query{}
 	for i := len(messages) - 1; i >= 0; i-- {
 		if messages[i].Role == "user" && messages[i].Origin != "runtime" {
@@ -26,17 +26,22 @@ func (r *Runs) automaticRecallQuery(ctx context.Context, run agent.Run, messages
 			q.ExcludeRefs = append(q.ExcludeRefs, m.Source.Ref)
 		}
 	}
-	rows, e := r.host.db.QueryContext(ctx, `SELECT message_id,message_json FROM main_input WHERE run_id=? ORDER BY sequence`, run.ID)
+	rows, e := r.host.db.QueryContext(ctx, `SELECT message_id,sequence FROM main_input WHERE run_id=? ORDER BY sequence`, run.ID)
 	if e != nil {
 		return q, agent.ErrStorage
 	}
 	for rows.Next() {
-		var id, raw string
-		if rows.Scan(&id, &raw) != nil {
+		var id string
+		var sequence int64
+		if rows.Scan(&id, &sequence) != nil {
 			rows.Close()
 			return q, agent.ErrStorage
 		}
-		q.ExcludeRefs = append(q.ExcludeRefs, "conversation:"+id)
+		// Consumed history that has left the working set can be recalled again.
+		// Accepted future input remains excluded until it becomes current input.
+		if !inputRecall || sequence >= run.Checkpoint.InputSequence {
+			q.ExcludeRefs = append(q.ExcludeRefs, "conversation:"+id)
+		}
 	}
 	e = rows.Err()
 	rows.Close()

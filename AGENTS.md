@@ -31,7 +31,7 @@ Use disposable `STEWARD_DATA_ROOT` directories. Close Python SQLite connections 
 
 ## Agent Context Changes
 
-Follow the [context contract](docs/designs/memory-context.md#recall-ranking-budget-and-recovery). For new policies, order the first request as system → history → recall → current user input. Freeze automatic recall by logical input identity, not model step; tool continuations preserve the exact message prefix and append exchanges unless compaction is required. Per-generation budget checks and request freezing remain necessary.
+Follow the [context contract](docs/designs/memory-context.md#recall-ranking-budget-and-recovery). For new policies, order the first request as system → history → current user input, with timestamped historical evidence attached inside that input’s `<recall_memory>` block. Freeze automatic recall by logical input identity, not model step; tool continuations preserve the exact message prefix and append exchanges unless compaction is required. Per-generation budget checks and request freezing remain necessary.
 
 Context changes must verify message order, byte-stable continuation prefixes, recall reuse despite corpus/provider changes, refresh on a new input identity, and frozen replay. Keep UI state and retrieved history scoped as evidence. Run `make test-prompts` and the owning store/observability regressions; new regression tests must remain included in the required CI checks.
 

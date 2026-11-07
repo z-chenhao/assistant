@@ -62,7 +62,11 @@ func artifactsReply(r llm.GenerationRequest) llm.GenerationResult {
 	}
 	user, _, _ = strings.Cut(user, "\nExplicit artifact references: ")
 	// Decode the plan, not the Host's human-readable media hint suffix.
-	_ = json.NewDecoder(strings.NewReader(user)).Decode(&request)
+	var plan json.RawMessage
+	if json.NewDecoder(strings.NewReader(user)).Decode(&plan) == nil {
+		_ = json.Unmarshal(plan, &request)
+		user = string(plan)
+	}
 	if request.Operation == "read" {
 		for _, message := range r.Messages {
 			for _, id := range contextReceipts(message) {

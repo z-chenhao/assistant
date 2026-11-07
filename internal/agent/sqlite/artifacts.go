@@ -57,6 +57,10 @@ func (t *tools) executeArtifact(ctx context.Context, tx *sql.Tx, name, args stri
 	if json.Unmarshal([]byte(args), &v) != nil {
 		return tool.Failure("INVALID_ARGUMENT"), nil
 	}
+	v.Ref = tool.ObjectRef("artifact", v.Ref)
+	for i, ref := range v.Refs {
+		v.Refs[i] = tool.ObjectRef("artifact", ref)
+	}
 	store := t.runs.host.Artifacts()
 	operation := v.Operation
 	if name == artifacttools.Search {
@@ -436,6 +440,7 @@ func (t *tools) readArtifact(ctx context.Context, args string) (tool.Result, err
 	if json.Unmarshal([]byte(args), &v) != nil {
 		return tool.Failure("INVALID_ARGUMENT"), nil
 	}
+	v.Ref = tool.ObjectRef("artifact", v.Ref)
 
 	f, d, e := t.runs.openArtifact(ctx, v.Ref, func(tx *sql.Tx) (artifact.Scope, error) {
 		if err := t.fence(ctx, tx); err != nil {

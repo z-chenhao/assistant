@@ -6,17 +6,33 @@ import (
 
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 func approvalReply(r llm.GenerationRequest) llm.GenerationResult {
 	last := r.Messages[len(r.Messages)-1]
 	root, followup := false, false
 	user := ""
+	inputRef := ""
 	for _, m := range r.Messages {
 		root = root || strings.Contains(m.Text, "general Worker executing")
-		followup = followup || m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update")
+		followup = followup || contextSummary(m).TaskUpdate || m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update")
 		if m.Role == "user" && m.Origin == "" {
-			user = m.Text
+			user, _, _ = strings.Cut(m.Text, "\n\n<recall_memory>")
+			if m.Source != nil {
+				inputRef = tool.ObjectID(m.Source.Ref)
+			}
+		}
+	}
+	if !root && inputRef != "" {
+		for _, m := range r.Messages {
+			if summary := contextSummary(m); summary.InputRef == inputRef {
+				for _, id := range summary.Completed {
+					if id == "effect" {
+						return llm.GenerationResult{Text: "Observed effect result: accepted Task receipt retained in working context."}
+					}
+				}
+			}
 		}
 	}
 	if followup && !hasAppendedUser(r.Messages) {
@@ -64,6 +80,12 @@ func approvalReply(r llm.GenerationRequest) llm.GenerationResult {
 		}
 		if at := strings.LastIndex(args, marker); at >= 0 {
 			args = args[at+len(marker):]
+		}
+		// Execute the scripted JSON plan, not inline recalled evidence or Host
+		// attachment hints following the current instruction.
+		var plan json.RawMessage
+		if json.NewDecoder(strings.NewReader(args)).Decode(&plan) == nil {
+			args = string(plan)
 		}
 		if last.Role == "tool" {
 			previous := ""

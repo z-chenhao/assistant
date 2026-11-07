@@ -22,7 +22,7 @@
 
 **需求**：用户能上传、保存、搜索、下载交付物，引用具有访问边界。
 
-**当前实现**：Artifact 存储、哈希校验、发布选择、Task 引用与渠道文件入口已实现。
+**当前实现**：Artifact 存储、哈希校验、发布选择、Task 引用与渠道文件入口已实现。新 Run 的工具结果、附件提示与 Code Mode 使用普通文件对象 ID；读取、OCR、发布和委派按所属操作解析 ID，内部授权及旧冻结回执不变。
 
 **边界与剩余工作**：保存文件不等于理解内容；发布仅选择当前 Run 最终输出，不授予外部发送权限。
 
@@ -46,7 +46,7 @@
 
 **需求**：用户交付音视频或文档后，Agent 能获取适合任务的内容和来源。
 
-**当前实现**：上传普通 DOCX 并随消息提交原文件引用后，Main 可显式调用 `builtin__evidence_read({ref,offset,limit})`。正文段落与表格单元格按文件顺序返回。每页保留原 Artifact ref，原文件可继续打开。页面的 `representation: "docx_text"` 表示偏移与总长度按提取后的 UTF-8 文本字节计；用 `next_offset` 继续。
+**当前实现**：上传普通 DOCX 并随消息提交原文件引用后，Main 可显式调用 `builtin__evidence_read({kind:"artifact",ref,offset,limit})`。正文段落与表格单元格按文件顺序返回。每页保留原 Artifact ref，原文件可继续打开。页面的 `representation: "docx_text"` 表示偏移与总长度按提取后的 UTF-8 文本字节计；用 `next_offset` 继续。
 
 **边界与剩余工作**：仅接受标准 DOCX MIME 和指向标准主文档部件的包。损坏或不支持的包返回 `INVALID_ARGUMENT`，超出预算返回 `RESOURCE_LIMIT`。正文读取无须 Office 或网络。音视频转写、其他文档格式、复杂版面与嵌入内容仍待验证或实现。
 

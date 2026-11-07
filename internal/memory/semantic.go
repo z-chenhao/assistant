@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // These types are private Curator inputs and proposals. A proposal cannot mutate
@@ -112,6 +114,15 @@ func ParseProposal(text string, in CurationInput) (Proposal, error) {
 	}
 	seen := map[string]bool{}
 	for i, c := range p.Facts {
+		if _, ok := existing[c.Target]; !ok && c.Target != "" {
+			for ref := range existing {
+				if tool.ObjectID(ref) == c.Target {
+					c.Target = ref
+					break
+				}
+			}
+		}
+		p.Facts[i].Target = c.Target
 		flag, ok := wire.Facts[i]["tentative"]
 		if !ok || string(flag) != "true" && string(flag) != "false" {
 			return p, ErrProposal

@@ -30,7 +30,7 @@ func TestAutomaticRecallUsesTaskOriginalRatherThanExpandedAnchor(t *testing.T) {
 	if e := json.Unmarshal([]byte(checkpoint), &run.Checkpoint); e != nil {
 		t.Fatal(e)
 	}
-	q, e := r.automaticRecallQuery(context.Background(), run, []llm.Message{{Role: "user", Text: "Task anchor: Expanded harness instruction"}})
+	q, e := r.automaticRecallQuery(context.Background(), run, []llm.Message{{Role: "user", Text: "Task anchor: Expanded harness instruction"}}, true)
 	if e != nil || strings.TrimSpace(q.Query) != original || len(q.ExcludeRefs) == 0 {
 		t.Fatal(q, e)
 	}
@@ -49,7 +49,7 @@ func TestAutomaticRecallExcludesCurrentAndUnconsumedMainInput(t *testing.T) {
 	ctx := context.Background()
 	first := mustSubmit(t, a, "first", "grokbot roadmap")
 	mustSubmit(t, a, "second", "later accepted input")
-	q, e := r.automaticRecallQuery(ctx, agent.Run{ID: first.RunID}, []llm.Message{{Role: "user", Text: "grokbot roadmap"}})
+	q, e := r.automaticRecallQuery(ctx, agent.Run{ID: first.RunID}, []llm.Message{{Role: "user", Text: "grokbot roadmap"}}, true)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -75,5 +75,27 @@ func TestAutomaticRecallExcludesCurrentAndUnconsumedMainInput(t *testing.T) {
 	}
 	if n != 2 || q.TimeRange == nil || q.TimeRange.End == nil {
 		t.Fatal("missing accepted input/future fence", n, q)
+	}
+}
+
+func TestAutomaticRecallCanRecoverConsumedInputOutsideWorkingSet(t *testing.T) {
+	s, r, _, a, _ := loopFixture(t)
+	first := mustSubmit(t, a, "old", "old tea decision")
+	mustSubmit(t, a, "new", "current tea question")
+	var id string
+	var sequence int64
+	if err := s.db.QueryRow(`SELECT message_id,sequence FROM main_input WHERE run_id=? ORDER BY sequence LIMIT 1`, first.RunID).Scan(&id, &sequence); err != nil {
+		t.Fatal(err)
+	}
+	run := agent.Run{ID: first.RunID}
+	run.Checkpoint.InputSequence = sequence + 1
+	q, err := r.automaticRecallQuery(context.Background(), run, []llm.Message{{Role: "user", Text: "current tea question"}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range q.ExcludeRefs {
+		if ref == "conversation:"+id {
+			t.Fatal("compacted original cannot be recovered", q)
+		}
 	}
 }

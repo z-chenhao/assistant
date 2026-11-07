@@ -39,7 +39,7 @@ flowchart TD
 需求是让当前单用户在 Main 的慢工具执行期间继续交代和查询工作，保持已有 Main/Worker、原生工具关联、冻结审批与 Durable Replay 契约。阻塞点是 Loop 在 ToolsPhase 同步等待整批结果；实现见 [responsive.go](../../internal/agent/responsive.go)，持久输入检查见 [SQLite port](../../internal/agent/sqlite/responsive.go)。
 
 1. 工具仍经唯一 ToolExecutor 接纳并执行。默认等待 200 ms 后，如有尚未消费的新输入，则将原 exchange、调用及 step 保存到 checkpoint 的 pending_tools，与模型可见的 pending ToolResult 一起提交；它不更新 ToolInvocation 终态。
-2. pending 回执带 operation_ref，格式为 operation:<step>:<batch-index>，不暴露 Run/Invocation ID，不作为权限或控制句柄。调用—ToolResult 的原生配对完整，随后再注入用户消息；模型可先对新输入回复。
+2. pending 回执带 operation_ref，使用普通 ID `<step>-<batch-index>`；恢复中的旧 pending 回执继续使用已保存的关联 ID，不暴露 Run/Invocation ID，不作为权限或控制句柄。调用—ToolResult 的原生配对完整，随后再注入用户消息；模型可先对新输入回复。
 3. 原调用继续使用同一 Run claim、冻结能力与审批。最终结果只在未冻结的 model/settle 边界加入带来源的 runtime tool_results；operation_ref 关联原回执，文本、产物、图片和错误保留原语义。已接受请求和压缩帧不被后台结果改写。
 4. 最终结果注入与移除 pending_tools 在一个 checkpoint 提交。故障后从原 exchange 与 ToolInvocation 重建交付：完成结果复用，未完成调用遵循 safe/query_before_retry/never，unknown 仅核实、不重发。待交付结果未清空时，Main 不得完成。
 5. 有实际调用运行时保留 Main 所有权；仅有审批/资源等待时释放 claim，由原调度器唤醒。模型费用审批等待前，先让已接纳的调用保存结果，再撤销运行态写入权限；费用拒绝不取消这些已接纳的调用。新输入可唤醒使用新协议的等待 Main；等待期间没有未持久化的回复意图。退出时加入已接纳的工作，正常关闭不作为用户取消；遗忘或所有权撤销仍由原 fencing 阻止迟到写入。
