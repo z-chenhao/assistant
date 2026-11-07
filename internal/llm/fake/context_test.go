@@ -5,9 +5,20 @@ import (
 	"testing"
 
 	"github.com/z-chenhao/assistant/internal/agent"
+	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
 	contextbuilder "github.com/z-chenhao/assistant/internal/context"
 	"github.com/z-chenhao/assistant/internal/llm"
 )
+
+func TestChildFixtureReadsOrdinaryArtifactIDs(t *testing.T) {
+	result, err := childrenReply(llm.GenerationRequest{Messages: []llm.Message{
+		{Role: "system", Text: "general Worker executing"},
+		{Role: "user", Text: "Read child artifact\nExplicit artifact IDs: [\"input\"]"},
+	}})
+	if err != nil || len(result.ToolCalls) != 1 || result.ToolCalls[0].Name != artifacttools.Manage || !strings.Contains(result.ToolCalls[0].Arguments, `"artifactRef":"input"`) {
+		t.Fatal("Child fixture did not consume the model-visible artifact ID", result, err)
+	}
+}
 
 func TestMainFixtureContextDoesNotRepeatCompletedCalls(t *testing.T) {
 	input := llm.Message{Role: "user", Text: "Continue the plan"}

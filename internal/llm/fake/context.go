@@ -141,10 +141,12 @@ func explicitTaskRefs(messages []llm.Message) []string {
 		if ref, ok := strings.CutPrefix(m.Text, "Explicit artifact reference: "); ok {
 			refs = append(refs, ref)
 		}
-		if _, raw, ok := strings.Cut(m.Text, "\nExplicit artifact references: "); ok {
-			var listed []string
-			if json.Unmarshal([]byte(raw), &listed) == nil {
-				refs = append(refs, listed...)
+		for _, label := range []string{"\nExplicit artifact references: ", "\nExplicit artifact IDs: "} {
+			if _, raw, ok := strings.Cut(m.Text, label); ok {
+				var listed []string
+				if json.Unmarshal([]byte(raw), &listed) == nil {
+					refs = append(refs, listed...)
+				}
 			}
 		}
 	}
