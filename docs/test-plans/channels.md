@@ -2,6 +2,8 @@
 
 [功能与验收目标](../features/channels.md) · [技术方案](../designs/channels.md) · [主索引](../feature-map.md) · [统一测试入口](product.md)
 
+通知选择器检查 Auto／自动标签、`auto:` 值及明暗主题桌面／手机显示；沿用 `settings_test.go` 的版本冲突、保存和失效渠道场景，以及 `channels_preferences.mjs` 的通知自动保存场景。
+
 ## 范围与证据
 
 本方案回答如何证明需求完成，不是测试执行报告。已有入口只表示测试存在，不能推导特定版本已通过或真实模型效果已达标。

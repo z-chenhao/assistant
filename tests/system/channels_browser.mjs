@@ -1,7 +1,7 @@
 import {selectValue,selectParts} from './channels_controls.mjs';
 // Maintained Web UI driver: one real browser, no app-specific mock DOM.
 import {uiInteractions} from './channels_ui_interactions.mjs';
-import {modelConnections} from './channels_models.mjs';
+import {modelConnections,composerModelLoading} from './channels_models.mjs';
 import {capabilitySetup,capabilityDefaults,settingsAccount,pageTransitions,taskNavigation,settingsConsistency} from './channels_capabilities.mjs';
 import {sendFeedback} from './channels_sending.mjs';
 import {memoryInspection} from './channels_memory.mjs';
@@ -85,7 +85,9 @@ try{
  if(!await canvas.evaluate(node=>node.isConnected))throw Error('greeting replaced the complete-frame canvas');
  await page.getByRole('link',{name:'Steward home',exact:true}).hover();
  await assertAvatarSize('after hover');
- if(phase==='preferences'){
+ if(phase==='composer-models'){
+  await composerModelLoading(page,context,url,evidence);
+ }else if(phase==='preferences'){
   await preferences(page,context,browser,url,evidence);
  }else if(phase==='account-signin'||phase==='account-reconnect'){
   await context.route(requestURL=>requestURL.origin!==new URL(url).origin,route=>{

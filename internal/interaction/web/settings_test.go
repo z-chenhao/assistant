@@ -64,7 +64,7 @@ func TestNotificationSaveStaysInItsPageAndReflectsCanonicalSelection(t *testing.
 	page = httptest.NewRecorder()
 	s.ServeHTTP(page, read)
 	if !strings.Contains(page.Body.String(), "Your saved destination is no longer available") || !strings.Contains(page.Body.String(), `value="" selected`) {
-		t.Fatal("unavailable binding silently selected Automatic", page.Body.String())
+		t.Fatal("unavailable binding silently selected Auto", page.Body.String())
 	}
 }
 

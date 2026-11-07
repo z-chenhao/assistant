@@ -18,8 +18,19 @@ try{
  await page.goto(url+'/settings/apps');await page.locator('[data-apps-ready]').waitFor();
  assert.equal(await page.locator('#composio-key-ref').count(),0);
  assert.equal(await page.locator('[name=auth_config]').count(),0);
- // The offline directory ships every official logo; browser requests stay on our origin.
+ // Editorial discovery stays bounded; the full catalogue retains every app.
+ const featured=['gmail','googledrive','googlecalendar','github','slack','notion'];
+ assert.deepEqual(await page.locator('.apps-group').first().locator('[data-app-tile]').evaluateAll(nodes=>nodes.map(n=>n.dataset.appTile)),featured);
+ assert((await page.locator('.apps-group').evaluateAll(groups=>groups.map(g=>g.querySelectorAll('[data-app-tile]').length))).every(count=>count<=6));
+ const homeSlugs=await page.locator('[data-app-tile]').evaluateAll(nodes=>nodes.map(n=>n.dataset.appTile));assert.equal(new Set(homeSlugs).size,homeSlugs.length);
+ await page.locator('.apps-group').nth(1).getByRole('link',{name:'View all: Communication and calendars',exact:true}).click();
+ await page.waitForURL(next=>next.searchParams.get('collection')==='communication');
+ assert.equal(await page.locator('[data-app-tile]').count(),10);
+ const names=await page.locator('.app-copy strong').allTextContents();assert.deepEqual(names,[...names].sort((a,b)=>a.toLowerCase()<b.toLowerCase()?-1:1));
+ await page.getByRole('link',{name:'Back to apps',exact:true}).click();
+ await page.locator('.apps-tabs').getByRole('link',{name:'All apps',exact:true}).click();
  assert.equal(await page.locator('[data-app-tile]').count(),65);
+ await page.locator('#app-category-picker').waitFor();
  await page.getByRole('combobox',{name:'Category',exact:true}).click();await page.getByRole('listbox').waitFor();
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await page.keyboard.press('Escape');await page.getByRole('listbox').waitFor({state:'hidden'});
@@ -30,21 +41,27 @@ try{
  await selectValue(page,page.locator('#app-category'),'');await page.waitForURL(next=>next.searchParams.get('category')==='');
  assert.equal(await page.locator('[data-app-tile]').count(),65);
 
+ await page.locator('.app-tile img').evaluateAll(images=>images.forEach(img=>img.loading='eager'));
+ await page.waitForFunction(()=>Array.from(document.querySelectorAll('.app-tile img')).every(img=>img.complete&&img.naturalWidth>0));
+ await page.goto(url+'/settings/apps');
  for(const language of ['en','zh-CN']){
   await context.request.post(url+'/settings/language',{form:{language}});await page.reload();
   await page.locator('[data-apps-ready]').waitFor();
   await page.locator('.app-tile img').evaluateAll(images=>images.forEach(img=>img.loading='eager'));
   await page.waitForFunction(()=>Array.from(document.querySelectorAll('.app-tile img')).every(img=>img.complete&&img.naturalWidth>0));
   for(const width of [1400,390,320]){
-   await page.setViewportSize({width,height:980});
+   await page.setViewportSize({width,height:980});await page.reload();await page.locator('[data-apps-ready]').waitFor();
+   await page.locator('.app-tile img').evaluateAll(images=>images.forEach(img=>img.loading='eager'));
+   await page.waitForFunction(()=>Array.from(document.querySelectorAll('.app-tile img')).every(img=>img.complete&&img.naturalWidth>0));
+   await page.evaluate(()=>document.fonts.ready);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Directory overflow');
    const columns=await page.locator('.apps-grid').first().evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
    assert.equal(columns,width===1400?2:1);
-   await page.screenshot({path:`${evidence}/directory-${language}-${width}.png`,fullPage:true});
+   await page.screenshot({path:`${evidence}/directory-${language}-${width}.png`,fullPage:width>760});
   }
  }
  await page.evaluate(()=>localStorage.setItem('steward-theme','dark'));
- for(const width of [1400,320]){await page.setViewportSize({width,height:980});await page.reload();await page.screenshot({path:`${evidence}/directory-dark-${width}.png`,fullPage:true})}
+ for(const width of [1400,320]){await page.setViewportSize({width,height:980});await page.reload();await page.locator('[data-apps-ready]').waitFor();await page.locator('.app-tile img').evaluateAll(images=>images.forEach(img=>img.loading='eager'));await page.waitForFunction(()=>Array.from(document.querySelectorAll('.app-tile img')).every(img=>img.complete&&img.naturalWidth>0));await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:`${evidence}/directory-dark-${width}.png`,fullPage:width>760})}
  await page.evaluate(()=>localStorage.setItem('steward-theme','light'));
  await context.request.post(url+'/settings/language',{form:{language:'en'}});await page.setViewportSize({width:1400,height:980});await page.reload();
  await context.request.post(broker+'/test/configure-project');
@@ -172,10 +189,15 @@ try{
  await context.request.post(url+'/settings/language',{form:{language:'en'}});
  await page.goto(url+'/settings/apps');await page.reload();assert.equal(await count(),3);
  const native=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:980}});await native.addCookies(await context.cookies());
- const nativePage=await native.newPage();await nativePage.goto(url+'/settings/apps?app=gmail');
+ const nativePage=await native.newPage();await nativePage.goto(url+'/settings/apps');
+ await nativePage.locator('.apps-group').nth(1).getByRole('link',{name:'View all: Communication and calendars',exact:true}).click();
+ assert.equal(await nativePage.locator('[data-app-tile]').count(),10);
+ await nativePage.locator('.apps-tabs').getByRole('link',{name:'All apps',exact:true}).click();
+ assert.equal(await nativePage.locator('[data-app-tile]').count(),1,'Native full directory must use live results');
+ await nativePage.goto(url+'/settings/apps?app=gmail');
  await nativePage.getByRole('heading',{name:'Gmail',exact:true}).waitFor();await nativePage.getByRole('button',{name:'Connect',exact:true}).waitFor();
  await nativePage.screenshot({path:`${evidence}/native-detail-390.png`,fullPage:true});await native.close();
 
  await writeFile(evidence+'/design-review.json',JSON.stringify(designReview,null,2));
- await writeFile(evidence+'/checks.json',JSON.stringify({nativeFallback:true,sharedControls:true,disconnectConfirmation:true,officialLogos:65,groupedDirectory:true,detailsDialog:true,connectedSidebar:true,projectSeparated:true,connect:true,popupFallback:true,reopenReusesLink:true,automaticStatus:true,multiAccount:true,reconnect:true,latePollFenced:true,created:await count(),noBrowserStorage:true,languages:['en','zh-CN'],widths:[1400,390,320]},null,2));
+ await writeFile(evidence+'/checks.json',JSON.stringify({nativeFallback:true,sharedControls:true,disconnectConfirmation:true,officialLogos:65,groupedDirectory:true,featuredOrder:true,boundedPreviews:true,allApps:true,collectionNavigation:true,detailsDialog:true,connectedSidebar:true,projectSeparated:true,connect:true,popupFallback:true,reopenReusesLink:true,automaticStatus:true,multiAccount:true,reconnect:true,latePollFenced:true,created:await count(),noBrowserStorage:true,languages:['en','zh-CN'],widths:[1400,390,320]},null,2));
 }finally{await browser.close()}

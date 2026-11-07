@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,7 +88,7 @@ func TestAppsOfflineDirectoryAndOwnerConnectionFlow(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	w = httptest.NewRecorder()
-	s.ServeHTTP(w, languageRequest("GET", "/settings/apps", "en", ""))
+	s.ServeHTTP(w, languageRequest("GET", "/settings/apps?view=all", "en", ""))
 	if strings.Contains(w.Body.String(), "<script>injection</script>") || !strings.Contains(w.Body.String(), "page%2b2%3d%26") || strings.Contains(w.Body.String(), "env:COMPOSIO_API_KEY") {
 		t.Fatal(w.Body.String())
 	}
@@ -239,5 +240,67 @@ func TestAppServiceUsesFieldsAndPreservesInvalidDraft(t *testing.T) {
 	stale := send(values)
 	if stale.Code != 422 || f.calls != 1 {
 		t.Fatal("stale revision changed service", stale.Code, f.calls)
+	}
+}
+
+func TestAppsDiscoveryPreviewsAndCollectionsKeepEveryAppReachable(t *testing.T) {
+	s := languageServer()
+	state := connectedapps.State{KeyRef: "env:COMPOSIO_API_KEY", Connections: []connectedapps.Connection{{ID: "saved-gmail", Toolkit: "gmail", Name: "Gmail", Status: "active"}}}
+	home, err := s.loadAppDiscovery(state, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var featured []string
+	for _, item := range home.Groups[0].Items {
+		featured = append(featured, item.Slug)
+	}
+	if !slices.Equal(featured, []string{"gmail", "googledrive", "googlecalendar", "github", "slack", "notion"}) {
+		t.Fatal("featured order", featured)
+	}
+	if !home.Groups[0].Items[0].Managed || !home.Groups[0].Items[0].Connected || home.Suggested {
+		t.Fatal("saved connection status was lost")
+	}
+	seen := map[string]bool{}
+	reachable := map[string]bool{}
+	for _, group := range home.Groups {
+		if len(group.Items) > 6 {
+			t.Fatal("unbounded preview", group.Title)
+		}
+		for _, item := range group.Items {
+			if seen[item.Slug] {
+				t.Fatal("duplicate home app", item.Slug)
+			}
+			seen[item.Slug] = true
+		}
+		if group.URL == "" {
+			continue
+		}
+		link, err := url.Parse(group.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		collection, err := s.loadAppDiscovery(state, link.Query().Get("collection"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(collection.Groups) != 1 || collection.Groups[0].Title != group.Title {
+			t.Fatal("collection changed groups", group.Title)
+		}
+		var names []string
+		for _, item := range collection.Items {
+			reachable[item.Slug] = true
+			names = append(names, strings.ToLower(item.Name))
+		}
+		if !slices.IsSorted(names) {
+			t.Fatal("collection order", names)
+		}
+	}
+	for _, item := range connectedapps.Suggestions("", "") {
+		if !reachable[item.Slug] {
+			t.Fatal("app lost behind preview", item.Slug)
+		}
+	}
+	if _, err := s.loadAppDiscovery(state, "unknown"); err != connectedapps.ErrInvalid {
+		t.Fatal("unknown collection", err)
 	}
 }

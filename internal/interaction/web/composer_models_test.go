@@ -3,7 +3,12 @@ package web
 import (
 	"context"
 	"errors"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/llm/account"
@@ -104,5 +109,35 @@ func TestComposerModelsSortDescendingWithoutAccountNames(t *testing.T) {
 		if !catalog && reads != 0 {
 			t.Fatal("initial picker read account credentials")
 		}
+	}
+}
+
+// Use the existing required browser lane; ordinary control-plane tests stay fast.
+func TestComposerModelsBrowserLoadingAndRefresh(t *testing.T) {
+	if os.Getenv("STEWARD_TEST_APP_BROWSER") != "1" {
+		t.Skip("run by make test-browser")
+	}
+	s := languageServer()
+	s.Models = pickerModels{profiles: []llm.Profile{
+		{ProfileID: "one", Version: 1, ProfileInput: llm.ProfileInput{ProviderKind: "openai_account", AuthConnectionID: "owned", ModelID: "gpt-5.6-luna"}},
+		{ProfileID: "two", Version: 1, ProfileInput: llm.ProfileInput{ProviderKind: "openai_account", AuthConnectionID: "owned", ModelID: "gpt-6-luna"}},
+	}}
+	s.Accounts = &account.Manager{Store: pickerAccounts{}}
+	server := httptest.NewServer(s)
+	defer server.Close()
+	script, err := filepath.Abs("../../../tests/system/channels_browser.mjs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence := os.Getenv("STEWARD_APP_BROWSER_EVIDENCE")
+	if evidence == "" {
+		evidence = t.TempDir()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 70*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "node", script, server.URL, filepath.Join(evidence, "composer-models"), "composer-models")
+	cmd.Env = append(os.Environ(), "STEWARD_WEB_TEST_TOKEN=private-token-at-least-24-bytes")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("browser flow: %v\n%s", err, output)
 	}
 }
