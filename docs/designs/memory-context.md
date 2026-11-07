@@ -124,13 +124,13 @@ context_tokens > context_window * threshold_percentage
 
 #### 10.3 召回与 Prompt Cache
 
-- 每一轮同时执行 `Memory 召回` 与 `Conversation 召回`。
+- 每个新逻辑输入并行执行 `Memory 召回` 与 `Conversation 召回`；工具续轮、摘要、重试和重启复用首次结果。
 - 两路召回并行、分别排序，再在统一上下文预算下合并。
 - 本轮召回结果冻结，避免 Agent Loop 中途改变上下文。
 - Forget 覆盖未完成 Run。可靠接受 Forget 时提交隐私 epoch，撤销旧上下文的后续 dispatch、模型结果接受及重放；旧快照仅保留作审计，不原地改写。首版保守停止同 Agent 作用域全部未完成 Run，新的自动上下文不导入撤销点之前的证据。详见 ADR 003 与 `docs/features/memory-context.md`。
 - 撤销点之后接受的新输入归属新的排队 Main，保留不可变回执；旧 Main owner join 或租约失效并完成 stop settlement 后，才允许调度或 Claim 后继 Run。同内容的新显式 remember 保留独立的新来源与时间戳，不能因去重而继续指向撤销点之前的证据。
 - System Prompt、人格、规则和 Core Memory 尽量保持静态。
-- 动态召回内容放在 Prompt 后部，以减少对 Prompt Cache 的破坏。
+- 新 Run 将带原始时间戳的召回附在当前 user message 的 `<recall_memory>` 区块中；不插入额外消息或在工具交换后追加历史证据。
 
 <a id="contract-11-memory-与-conversation"></a>
 
@@ -382,26 +382,25 @@ budgets and freezes its actual prepared request. With unchanged input and tools,
 and no compaction, the message prefix stays exact while tool exchanges append.
 Only a new explicit input queries the current corpus. Execution
 cancellation interrupts pending recall and admits no partial/frozen model turn.
-New policies remove hits whose source reference or trimmed exact text already
-appears in the working context, and deduplicate remaining hits by those same keys
-before freezing. This is private automatic-recall policy; explicit memory search
-retains its original results. Filtering after bounded retrieval can return fewer
-hits; no new ranking interface or semantic topic classifier is introduced.
-Evidence is untrusted runtime data. New policies place it immediately before the
-latest explicit input, with a historical-evidence warning; tool exchanges remain
-intact and the static system/identity prefix is preserved. It never becomes a
-user-authored Conversation message. The first request is ordered as system →
-history → recall → current user input; tool continuations append exchanges to that
-exact prefix until a new input or required compaction changes the working set.
+New policies exclude working-context Conversation IDs and their derived Memory before index candidate limits, including both lexical and vector selection. Consumed originals outside the working set remain eligible; unconsumed accepted inputs remain excluded. The service and final projection also remove matching source identities or exact text and deduplicate before freezing. This is private automatic-recall policy; explicit memory search
+retains its original results. Final exact-text filtering after bounded retrieval can still return fewer hits; no semantic topic classifier is introduced.
+Evidence is untrusted runtime data. With the Host-frozen `input_recall` policy,
+recall is attached after the current user's text inside one `<recall_memory>`
+block. Hits are ordered by original timestamp and quote their original author;
+XML escaping prevents stored text from closing the block. Source keys are not
+included in the model-facing evidence. The original Conversation message is
+unchanged. The first request is system → history → current user input containing
+recall; tool continuations append exchanges to that exact prefix until a new
+input or required compaction changes the working set. The final rendered block,
+including escaping and framing, must fit its evidence budget.
 Evidence uses at
 most one quarter of the remaining conservative byte budget, capped at 16 KiB;
 hierarchical compaction and the final model-window check also apply; see maintenance operations.
 
-`contextual_recall` is a Host-only frozen policy opt-in for logical-input reuse,
-contextual Main query expansion and placement. Accepted historical requests and
+`contextual_recall` freezes logical-input reuse and Main query expansion. The newer Host-only `input_recall` policy freezes the inline evidence and ordinary-object-ID projection. Missing flags preserve historical query and placement bytes. New Children inherit the Parent policy. Accepted historical requests and
 recall rows remain immutable. Unfrozen lookups use Host source exclusions and
 current corpus visibility; a policy flag never restores forgotten or retired
-Memory. New Children inherit their Parent context policy.
+Memory.
 
 Automatic observations use a separate structured semantic generation, not
 literal first-person sentence copying. Main/Worker prompts are unchanged. The
@@ -599,7 +598,7 @@ memory schema 3 保存密封 facet、到期、退役与不可变归并 receipt�
 
 **召回。** 自动查询来自真实用户消息/Task 来源，不采用展开后的 Task anchor 指令。
 排除当前上下文及当前 Main 输入（含已接受的后续输入）及其派生 Memory，过滤未来来源。
-两路结果按精确 ref、规范文本与 Memory→Conversation provenance 去重，然后受数量和字节预算约束。
+两路索引在候选限额前排除工作集来源及其派生 Memory；合并后再按内部身份、规范文本与 Memory→Conversation provenance 去重。模型只收到普通对象 ID；自动召回正文仅包含来源类型/作者、原始时间与证据文本，受最终渲染字节和数量预算约束。
 默认本地搜索采用中英文分词/中文二元词、主题覆盖优先于 Core/时间；仅共同的请求词不应召回无关 UI 对话。
 最多保留 400 个工作候选并收敛到最佳 200 个，扫描受请求 context 时限约束。
 本地文本路径不承诺跨语言语义搜索；自定义 embedding 路径继续负责向量近义检索。
@@ -620,7 +619,7 @@ These are enforced engineering contracts, not model instructions:
 - Only Host-owned identity and original provenance authorize writes. A Curator may suggest operations; code validates exact evidence, scope, category, current target, uncertainty and version before committing. A structured response alone does not prove semantic correctness.
 - Equivalent facts share one current lineage; corrections and withdrawals preserve immutable audit. Replays and Worker repetitions of one source never count as independent evidence. Forget, opt-out, retirement, expiry and supersession apply to search, exact reads and owner inspection alike.
 - Dispatch, acceptance and cross-database retry must retain privacy epochs, leases, durable result reuse and usage/cost accounting. Maintenance never manufactures user Tasks or deliveries, and never falls back to literal extraction when its model fails.
-- Automatic Recall queries the original input/Task source, excludes evidence already in the working input, deduplicates Memory/Conversation echoes by provenance, and applies authorization/time/byte/count limits. Local lexical matching must not treat shared request words as topic relevance.
+- Automatic Recall queries the original input/Task source, excludes working evidence before candidate limits while allowing compacted originals, deduplicates Memory/Conversation echoes by provenance, and applies authorization/time/byte/count limits. Local lexical matching must not treat shared request words as topic relevance.
 - Empty or ordinary maintenance must not close an index used by another query. Publish updates through the store's synchronized incremental index; privacy revocation keeps its explicit invalidation/fail-closed behavior.
 - Unit and system tests must assert these behaviors and their failure paths. CI must execute them on every code PR; a regression existing only in optional/nightly jobs is insufficient. Fakes verify transport and state contracts, while semantic-model quality requires separate real-model evidence.
 

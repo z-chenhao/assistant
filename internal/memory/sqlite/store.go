@@ -130,6 +130,32 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 func (s *Store) Search(ctx context.Context, scope recall.Scope, q recall.Query) ([]recall.Hit, error) {
+	// Exclude facts derived from the working input before either index selects
+	// candidates, so echoes cannot consume the bounded retrieval slots.
+	if len(q.ExcludeRefs) > 0 {
+		excluded, _ := json.Marshal(q.ExcludeRefs)
+		rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT 'memory:'||m.memory_id FROM memory_record m,json_each(m.source_refs) source
+WHERE m.user_id=? AND ((m.scope_type='user' AND m.scope_id=?) OR (m.scope_type='agent' AND m.scope_id=?))
+AND json_extract(source.value,'$.source_ref') IN (SELECT value FROM json_each(?))`, scope.UserID, scope.UserID, scope.AgentID, string(excluded))
+		if err != nil {
+			return nil, recall.ErrUnavailable
+		}
+		refs := append([]string(nil), q.ExcludeRefs...)
+		for rows.Next() {
+			var ref string
+			if rows.Scan(&ref) != nil {
+				rows.Close()
+				return nil, recall.ErrUnavailable
+			}
+			refs = append(refs, ref)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, recall.ErrUnavailable
+		}
+		q.ExcludeRefs = refs
+	}
 	hits, err := s.search(ctx, scope, q)
 	if err != nil {
 		return nil, err

@@ -304,7 +304,7 @@ func (b *codeBridge) Handle(ctx context.Context, method string, m codemode.Messa
 		if err != nil {
 			return empty, err
 		}
-		r := accepted.Result
+		r := accepted.Result.ForModel()
 		if accepted.Status == "unknown" {
 			r = tool.Failure("UNKNOWN_SIDE_EFFECT")
 		}

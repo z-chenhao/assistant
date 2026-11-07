@@ -65,6 +65,13 @@ func validToken(v string) bool {
 func validRef(v string) bool {
 	return strings.HasPrefix(v, "artifact:") && validToken(strings.TrimPrefix(v, "artifact:"))
 }
+
+func storedRef(id string) string {
+	if !strings.Contains(id, ":") {
+		return "artifact:" + id
+	}
+	return id
+}
 func validInput(in artifact.Input) bool {
 	_, _, err := mime.ParseMediaType(in.MediaType)
 	return err == nil && len(in.MediaType) <= 128 && in.Name != "" && in.Name != "." && in.Name != ".." && len(in.Name) <= 255 && !strings.ContainsAny(in.Name, "/\\") && !strings.ContainsFunc(in.Name, unicode.IsControl)
@@ -112,6 +119,7 @@ func (s *Store) scope(ctx context.Context, tx *sql.Tx, a artifact.Scope) error {
 	return nil
 }
 func (s *Store) DescribeTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref string, live bool) (artifact.Descriptor, error) {
+	ref = storedRef(ref)
 	var d artifact.Descriptor
 	if !validRef(ref) {
 		return d, artifact.ErrNotFound
@@ -257,6 +265,7 @@ func (o *Opened) Verify(ctx context.Context) (io.ReadCloser, error) {
 	return o.file, nil
 }
 func (s *Store) OpenFileTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref string) (*Opened, error) {
+	ref = storedRef(ref)
 	descriptor, err := s.DescribeTx(ctx, tx, a, ref, true)
 	if err != nil {
 		return nil, err
@@ -288,6 +297,7 @@ func (s *Store) Open(ctx context.Context, a artifact.Scope, ref string) (io.Read
 }
 
 func (s *Store) PinTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, ref, kind, id string) error {
+	ref = storedRef(ref)
 	if _, err := s.DescribeTx(ctx, tx, a, ref, true); err != nil {
 		return err
 	}
@@ -417,6 +427,7 @@ func (s *Store) SearchTx(ctx context.Context, tx *sql.Tx, a artifact.Scope, quer
 	return out, nil
 }
 func (s *Store) Delete(ctx context.Context, a artifact.Scope, ref string, version int64) error {
+	ref = storedRef(ref)
 	return s.transaction(ctx, func(tx *sql.Tx) error {
 		d, err := s.DescribeTx(ctx, tx, a, ref, false)
 		if err != nil {
@@ -463,6 +474,10 @@ type Publication struct {
 }
 
 func (s *Store) PreparePublication(ctx context.Context, scope artifact.Scope, refs []string) (*Publication, error) {
+	refs = append([]string{}, refs...)
+	for i, ref := range refs {
+		refs[i] = storedRef(ref)
+	}
 	if scope.RunID == "" {
 		return nil, artifact.ErrInvalid
 	}

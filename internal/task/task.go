@@ -114,6 +114,11 @@ func ParseManage(raw string) (ManageRequest, error) {
 	if err != nil || json.Unmarshal([]byte(raw), &r) != nil {
 		return r, ErrInvalid
 	}
+	r.TaskRef = tool.ObjectRef("task", r.TaskRef)
+	r.FeedbackRef = tool.ObjectRef("feedback", r.FeedbackRef)
+	for i, ref := range r.ArtifactRefs {
+		r.ArtifactRefs[i] = tool.ObjectRef("artifact", ref)
+	}
 	allowed := map[string]bool{"operation": true, "taskRef": true}
 	switch r.Operation {
 	case "create":

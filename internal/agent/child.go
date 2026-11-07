@@ -31,6 +31,9 @@ func ParseAgentRun(args string) (AgentRunRequest, error) {
 	if !tool.Validate(RunToolSchema, args) || json.Unmarshal([]byte(args), &req) != nil || strings.TrimSpace(req.Task) == "" {
 		return req, task.ErrInvalid
 	}
+	for i, ref := range req.ArtifactRefs {
+		req.ArtifactRefs[i] = tool.ObjectRef("artifact", ref)
+	}
 	return req, nil
 }
 

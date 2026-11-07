@@ -25,6 +25,8 @@ type Error struct {
 }
 
 type Result struct {
+	// Frozen presentation for new results; old durable receipts omit it.
+	ObjectIDs string `json:"object_ids,omitempty"`
 	// HostFence is an opaque, process-local completion receipt. It is never model
 	// output; only the owning Host store can construct and validate its type.
 	HostFence    any                `json:"-"`
@@ -62,7 +64,20 @@ type OutputStore interface {
 func Failure(code string) Result {
 	return Result{Error: &Error{Code: code, Message: code, Retryable: code == "PROVIDER_UNAVAILABLE"}}
 }
+func (r Result) ForModel() Result {
+	if r.ObjectIDs != "" {
+		if r.ObjectIDs == "host" {
+			r.Text = ModelObjectIDs(r.Text)
+		}
+		r.ObjectIDs = ""
+		r.ArtifactRefs = ObjectIDs(r.ArtifactRefs)
+		r.ImageRefs = ObjectIDs(r.ImageRefs)
+	}
+	return r
+}
+
 func (r Result) ModelText() string {
+	r = r.ForModel()
 	if r.Error == nil {
 		if len(r.ArtifactRefs) > 0 {
 			b, _ := json.Marshal(r)

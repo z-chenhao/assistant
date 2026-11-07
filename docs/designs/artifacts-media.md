@@ -101,7 +101,7 @@ sequenceDiagram
 
 #### 4.3 Artifact 协议
 
-- 核心协议统一使用 `artifact_ref` 引用文件、图片、视频等产物。
+- 持久记录用 `artifact_ref` 关联文件、图片、视频等产物；新 Run 的模型投影只呈现普通对象 ID，操作所属领域负责解析，内部键与授权关系不变。
 - 模型不得直接输出 `MEDIA:/绝对路径`。
 - Artifact 的真实位置、生命周期和访问方式由 Artifact/Computer 层解析。
 - Artifact 二进制内容不内联写入可重放的 Conversation 或 Run 历史，避免长会话因 Base64 媒体持续膨胀。

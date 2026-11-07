@@ -71,6 +71,16 @@ class CIChecksTests(unittest.TestCase):
         self.assertNotIn('|| true', command)
         self.assertNotIn('continue-on-error', command)
 
+    def test_required_memory_lane_covers_identity_and_candidate_boundaries(self):
+        makefile = (Path(__file__).resolve().parents[2] / 'Makefile').read_text()
+        commands = makefile.split('\ntest-memory:\n', 1)[1].split('\n\n', 1)[0]
+        self.assertIn('memory-context', {lane['lane'] for lane in ci.plan('system')['include']})
+        self.assertEqual(commands.count('go test -race '), 2)
+        for package in ('memory/...', 'recall/...', 'conversation/...', 'tool'):
+            self.assertIn('./internal/' + package + ' ', commands)
+        for regression in ('Recall', 'Forget', 'Evidence', 'ObjectIDs'):
+            self.assertIn(regression, commands)
+
     def test_required_check_rejects_missing_failed_and_cancelled_work(self):
         for docs in ('true', 'false'):
             selected = 'skipped' if docs == 'true' else 'success'

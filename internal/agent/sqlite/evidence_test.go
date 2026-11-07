@@ -44,6 +44,15 @@ func hasEvidenceLink(page evidence.Page, ref string) bool {
 	return false
 }
 
+func TestEvidenceOwnerResolvesOrdinaryObjectID(t *testing.T) {
+	s, r, _, _ := evidenceFixture(t)
+	ref := putArtifact(t, s, artifactOwner(t, s), "exact original file")
+	page, err := r.ReadEvidence(context.Background(), evidence.Request{Kind: "artifact", Ref: tool.ObjectID(ref)})
+	if err != nil || page.Text != "exact original file" {
+		t.Fatal("ordinary ID was validated but not resolved", page, err)
+	}
+}
+
 func TestEvidenceExplicitMessageTaskArtifactChainAndRestart(t *testing.T) {
 	ctx := context.Background()
 	s, r, a, p := evidenceFixture(t)
@@ -66,15 +75,21 @@ func TestEvidenceExplicitMessageTaskArtifactChainAndRestart(t *testing.T) {
 		if mainStage == 1 {
 			return calls(evidence.ToolName, `{"ref":"current"}`), nil
 		}
-		if mainStage > 2 {
+		if mainStage > 3 {
 			return llm.GenerationResult{Text: "delegated"}, nil
 		}
 		last := request.Messages[len(request.Messages)-1]
 		var current evidence.Page
-		if json.Unmarshal([]byte(last.Text), &current) != nil || current.Text != "Use this original file." || !hasEvidenceLink(current, attachment) {
+		if mainStage == 3 {
+			if json.Unmarshal([]byte(last.Text), &current) != nil || current.Kind != "artifact" || current.Ref != tool.ObjectID(attachment) || !strings.HasPrefix(current.Text, "原始证据🧭") {
+				t.Error("ordinary artifact ID could not reopen its exact content", last.Text)
+			}
+			return calls(task.ManageName, `{"operation":"create","task":"Check this specific attached evidence.","artifactRefs":["`+tool.ObjectID(attachment)+`"]}`), nil
+		}
+		if json.Unmarshal([]byte(last.Text), &current) != nil || current.Text != "Use this original file." || !hasEvidenceLink(current, tool.ObjectID(attachment)) || strings.Contains(last.Text, "artifact:") || strings.Contains(last.Text, "conversation:") {
 			t.Fatal("Main current-input Tool did not navigate the authorized original", last.Text)
 		}
-		return calls(task.ManageName, `{"operation":"create","task":"Check this specific attached evidence.","artifactRefs":["`+attachment+`"]}`), nil
+		return calls(evidence.ToolName, `{"kind":"artifact","ref":"`+tool.ObjectID(attachment)+`"}`), nil
 	}
 	receipt, err := r.Submit(ctx, "chain", []conversation.ContentPart{{Type: "text", Text: "Use this original file."}, {Type: "file", ArtifactRef: attachment}})
 	if err != nil {

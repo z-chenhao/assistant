@@ -12,6 +12,7 @@ import (
 	"github.com/z-chenhao/assistant/internal/artifact"
 	contextbuilder "github.com/z-chenhao/assistant/internal/context"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 type workingPreparation struct {
@@ -19,8 +20,8 @@ type workingPreparation struct {
 	Compaction *agent.Compaction `json:"compaction,omitempty"`
 }
 
-func (r *Runs) workingMessages(run agent.Run, userImages bool) ([]llm.Message, map[string]int, error) {
-	all, e := agent.ProviderMessages(run.Checkpoint.Messages, userImages)
+func (r *Runs) workingMessages(run agent.Run, userImages, plainIDs bool) ([]llm.Message, map[string]int, error) {
+	all, e := agent.ProviderMessages(run.Checkpoint.Messages, userImages, plainIDs)
 	if e != nil {
 		return nil, nil, e
 	}
@@ -50,7 +51,7 @@ func (r *Runs) workingMessages(run agent.Run, userImages bool) ([]llm.Message, m
 			continue
 		}
 		if state != nil && i == state.Through {
-			out = append(out, workingStateMessage(state))
+			out = append(out, workingStateMessage(state, plainIDs))
 		}
 		if m.Source == nil {
 			kind := m.Role
@@ -69,17 +70,17 @@ func (r *Runs) workingMessages(run agent.Run, userImages bool) ([]llm.Message, m
 		out = append(out, m)
 	}
 	if state != nil && state.Through == len(all) {
-		out = append(out, workingStateMessage(state))
+		out = append(out, workingStateMessage(state, plainIDs))
 	}
 	return out, positions, nil
 }
 
-func workingStateMessage(s *agent.WorkingState) llm.Message {
+func workingStateMessage(s *agent.WorkingState, plainIDs bool) llm.Message {
 	m := agent.RuntimeContext("working_state", s.ArchiveRef, false, struct {
 		Summary string `json:"summary"`
 		History string `json:"history_artifact"`
 	}{s.Text, s.ArchiveRef})
-	out, _ := agent.ProviderMessages([]agent.AgentMessage{m}, false)
+	out, _ := agent.ProviderMessages([]agent.AgentMessage{m}, false, plainIDs)
 	return out[0]
 }
 
@@ -95,7 +96,7 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 	if json.Unmarshal([]byte(policy), &p) != nil || !p.Valid() {
 		return workingPreparation{}, llm.ModelIncompatible
 	}
-	in, positions, e := r.workingMessages(run, p.UserImages)
+	in, positions, e := r.workingMessages(run, p.UserImages, p.InputRecall)
 	if e != nil {
 		return workingPreparation{}, e
 	}
@@ -109,7 +110,7 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 	}
 	remaining := min(budget.ModelBytes-contextbuilder.ModelSize(required), budget.FrameBytes-contextbuilder.Size(required))
 	recallBudget := max(0, min(16<<10, remaining/4))
-	in, e = r.recallMessages(ctx, c, run, in, recallBudget, p.ContextualRecall)
+	in, e = r.recallMessages(ctx, c, run, in, recallBudget, p.ContextualRecall, p.InputRecall)
 	if e != nil {
 		return workingPreparation{}, e
 	}
@@ -148,7 +149,11 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 		// unchanged, including monetary admission and usage accounting.
 		summaryLimits := contextbuilder.BudgetFor(run.Snapshot.ContextWindow, run.Snapshot.MaxOutputTokens, 0, p, run.Checkpoint.ContextRetries > 0)
 		summaryBudget := min(summaryLimits.ModelBytes, summaryLimits.FrameBytes) - 1024
-		messages, count, err := contextbuilder.SummaryRequest(selection.Sources, anchors, summaryBudget, p.SummaryBytes)
+		sources := selection.Sources
+		if p.InputRecall {
+			sources, anchors = summaryObjectIDs(sources), summaryObjectIDs(anchors)
+		}
+		messages, count, err := contextbuilder.SummaryRequest(sources, anchors, summaryBudget, p.SummaryBytes)
 		if err != nil {
 			return workingPreparation{}, err
 		}
@@ -203,7 +208,11 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 		if err != nil {
 			return workingPreparation{}, err
 		}
-		messages[1].Text += "\nHistory Artifact: " + plan.ArchiveRef
+		id := plan.ArchiveRef
+		if p.InputRecall {
+			id = tool.ObjectID(id)
+		}
+		messages[1].Text += "\nHistory Artifact: " + id
 		prepared = workingPreparation{Messages: messages, Compaction: plan}
 	}
 	raw, _ = encoded(prepared.Messages)
@@ -251,4 +260,17 @@ func (r *Runs) prepareWorkingContext(ctx context.Context, c agent.RunClaim, run 
 		r.host.boundary("after_compaction_commit")
 	}
 	return prepared, e
+}
+
+func summaryObjectIDs(in []llm.Message) []llm.Message {
+	out := append([]llm.Message(nil), in...)
+	for i := range out {
+		if out[i].Source != nil {
+			source := *out[i].Source
+			source.Ref = tool.ObjectID(source.Ref)
+			out[i].Source = &source
+		}
+		out[i].ImageRefs = tool.ObjectIDs(out[i].ImageRefs)
+	}
+	return out
 }

@@ -13,10 +13,66 @@ import (
 	"time"
 
 	"github.com/z-chenhao/assistant/internal/agent"
+	"github.com/z-chenhao/assistant/internal/conversation"
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
 	"github.com/z-chenhao/assistant/internal/tool"
 )
+
+func TestTaskInstructionUsesPlainObjectIDs(t *testing.T) {
+	s, r, a, p := taskFixture(t)
+	ref := putArtifact(t, s, artifactOwner(t, s), "instruction attachment")
+	p.respond = func(req llm.GenerationRequest) (llm.GenerationResult, error) {
+		last := req.Messages[len(req.Messages)-1]
+		if last.Role == "tool" {
+			return llm.GenerationResult{Text: "accepted"}, nil
+		}
+		if strings.HasPrefix(last.Text, "append") {
+			var id string
+			if err := s.db.QueryRow(`SELECT task_ref FROM task`).Scan(&id); err != nil {
+				return llm.GenerationResult{}, err
+			}
+			raw, _ := json.Marshal(task.ManageRequest{Operation: "append", TaskRef: tool.ObjectID(id), Instruction: "read the attached file", ArtifactRefs: []string{tool.ObjectID(ref)}})
+			return calls(task.ManageName, string(raw)), nil
+		}
+		return calls(task.ManageName, `{"operation":"create","task":"review evidence"}`), nil
+	}
+	ctx := context.Background()
+	for i := 0; i < 2; i++ {
+		parts := conversation.Text("create")
+		if i == 1 {
+			parts = append(conversation.Text("append attachment"), conversation.ContentPart{Type: "file", ArtifactRef: ref})
+		}
+		receipt, err := r.Submit(ctx, fmt.Sprint("plain-task-", i), parts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		claim, err := r.Claim(ctx, receipt.RunID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = executeTaskRun(t, a, r, ctx, claim); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var id string
+	if err := s.db.QueryRow(`SELECT run_id FROM run WHERE kind='worker'`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	claim, err := r.Claim(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Release(ctx, claim)
+	inputs, err := r.Steering(ctx, claim, 0)
+	if err != nil || len(inputs) != 1 {
+		t.Fatal(inputs, err)
+	}
+	text := inputs[0].Message.Content[0].Text
+	if strings.Contains(text, "artifact:") || !strings.Contains(text, `Artifact IDs: ["`+tool.ObjectID(ref)+`"]`) {
+		t.Fatal("Task steering leaked a storage key", text)
+	}
+}
 
 func taskFixtureRegistry(t *testing.T) *tool.Registry {
 	t.Helper()
@@ -323,14 +379,14 @@ func TestTaskCustomMessageConversionFailsClosed(t *testing.T) {
 	m.Origin = "runtime"
 	m.CreatedAt = &at
 	m.Details = &task.UpdateDetails{TaskRef: "opaque", Kind: "completed"}
-	wire, err := agent.ProviderMessages([]agent.AgentMessage{m}, false)
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{m}, false, false)
 	if err != nil || len(wire) != 1 || wire[0].Role == "system" || wire[0].Origin != "runtime" || !strings.Contains(wire[0].Text, "untrusted Worker data") {
 		t.Fatal(wire, err)
 	}
 	for _, mutate := range []func(*agent.AgentMessage){func(m *agent.AgentMessage) { m.Origin = "user" }, func(m *agent.AgentMessage) { m.CustomType = "unknown" }, func(m *agent.AgentMessage) { m.Details = nil }, func(m *agent.AgentMessage) { m.CreatedAt = nil }, func(m *agent.AgentMessage) { m.Details = &task.UpdateDetails{Kind: "completed"} }, func(m *agent.AgentMessage) { m.CreatedAt = &time.Time{} }} {
 		bad := m
 		mutate(&bad)
-		if _, err = agent.ProviderMessages([]agent.AgentMessage{bad}, false); !errors.Is(err, llm.ModelIncompatible) {
+		if _, err = agent.ProviderMessages([]agent.AgentMessage{bad}, false, false); !errors.Is(err, llm.ModelIncompatible) {
 			t.Fatal("accepted malformed runtime update", err)
 		}
 	}

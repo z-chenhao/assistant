@@ -131,8 +131,9 @@ func outcomeResult(outcome Outcome) tool.Result {
 				MimeType string
 			}
 			if json.Unmarshal(raw, &item) == nil && item.Type == "image" && item.MimeType == "application/x-steward-artifact" {
-				result.ImageRefs = append(result.ImageRefs, item.Data)
-				result.ArtifactRefs = append(result.ArtifactRefs, item.Data)
+				ref := tool.ObjectRef("artifact", item.Data)
+				result.ImageRefs = append(result.ImageRefs, ref)
+				result.ArtifactRefs = append(result.ArtifactRefs, ref)
 			}
 		}
 		return result

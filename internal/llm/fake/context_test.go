@@ -24,7 +24,7 @@ func TestMainFixtureContextDoesNotRepeatCompletedCalls(t *testing.T) {
 	state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 		Summary string `json:"summary"`
 	}{summary.Text})
-	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestDelegateKeepsCompletedReceiptAcrossSummary(t *testing.T) {
 
 func TestDelegateKeepsTaskUpdateAcrossSummary(t *testing.T) {
 	state := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "completed"})
-	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestRecallFixtureKeepsTaskUpdateAcrossSummary(t *testing.T) {
 		if taskUpdate {
 			state := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "completed"})
 			var err error
-			sources, err = agent.ProviderMessages([]agent.AgentMessage{state}, false)
+			sources, err = agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -70,7 +70,7 @@ func TestRecallFixtureKeepsTaskUpdateAcrossSummary(t *testing.T) {
 			state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 				Summary string `json:"summary"`
 			}{summary.Text})
-			sources, err = agent.ProviderMessages([]agent.AgentMessage{state}, false)
+			sources, err = agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -88,7 +88,7 @@ func TestRecallFixtureKeepsTaskUpdateAcrossSummary(t *testing.T) {
 
 func TestDelegateKeepsUnknownEffectAcrossSummary(t *testing.T) {
 	state := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "needs_input", "text": "UNKNOWN_SIDE_EFFECT"})
-	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func testDelegateSummary(t *testing.T, sources []llm.Message, observed string) {
 		state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 			Summary string `json:"summary"`
 		}{summary.Text})
-		wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+		wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -138,7 +138,7 @@ func TestToolFreeSummaryRetainsFixtureReceiptProgress(t *testing.T) {
 	state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 		Summary string `json:"summary"`
 	}{summary.Text})
-	wire, e := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	wire, e := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -158,7 +158,7 @@ func TestArtifactReadKeepsCompletedReceiptAcrossSummary(t *testing.T) {
 	state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 		Summary string `json:"summary"`
 	}{summary.Text})
-	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestArtifactReadKeepsCompletedReceiptAcrossSummary(t *testing.T) {
 
 func TestAutomaticDelegationKeepsTaskUpdateAcrossSummary(t *testing.T) {
 	update := agent.RuntimeContext("task_update", "task:accepted", false, map[string]string{"status": "completed"})
-	sources, err := agent.ProviderMessages([]agent.AgentMessage{update}, false)
+	sources, err := agent.ProviderMessages([]agent.AgentMessage{update}, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestAutomaticDelegationKeepsTaskUpdateAcrossSummary(t *testing.T) {
 		state := agent.RuntimeContext("working_state", "artifact:history", false, struct {
 			Summary string `json:"summary"`
 		}{summary.Text})
-		wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false)
+		wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
