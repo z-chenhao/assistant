@@ -47,6 +47,7 @@ try{
    };
   });
  }
+ if(phase==='send-feedback')await context.addInitScript(()=>Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true}));
  page=await context.newPage();
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const remote=[];page.on('request',r=>{if(new URL(r.url()).origin!==new URL(url).origin)remote.push(r.url())});

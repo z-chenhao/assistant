@@ -1,6 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 
 export async function sendFeedback(page,context,url,evidence){
+ if(await page.evaluate(()=>typeof crypto.randomUUID)!=='undefined')throw Error('HTTP UUID fallback was not exercised');
  const editor=page.getByLabel('Message Ghost',{exact:true}),picker=page.getByLabel('Attach a file');
  let releaseRequest,releaseReply,committed;
  const requestGate=new Promise(resolve=>{releaseRequest=resolve}),replyGate=new Promise(resolve=>{releaseReply=resolve}),commit=new Promise(resolve=>{committed=resolve});
@@ -63,6 +64,6 @@ export async function sendFeedback(page,context,url,evidence){
  await page.setViewportSize({width:390,height:844});
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('outgoing message layout overflowed mobile');
  await page.screenshot({path:evidence+'/sending-mobile.png'});
- await writeFile(evidence+'/sending.json',JSON.stringify({requests:requests.length,contrast,immediateBubble:true,composerReleased:true,lostAcknowledgementReconciled:true,retryIdentityPreserved:true,followingDraftPreserved:true},null,2));
+ await writeFile(evidence+'/sending.json',JSON.stringify({requests:requests.length,contrast,immediateBubble:true,composerReleased:true,lostAcknowledgementReconciled:true,retryIdentityPreserved:true,httpUUIDFallback:true,followingDraftPreserved:true},null,2));
  await page.unroute('**/message');
 }

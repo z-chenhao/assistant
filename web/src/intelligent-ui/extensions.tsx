@@ -1,3 +1,4 @@
+import {randomUUID} from '../lib/random-id';
 import {t} from '../i18n';
 import {useEffect,useRef,useState} from 'react';
 import {z} from 'zod';
@@ -59,7 +60,7 @@ export function ToolActionButton({props,reference}:{props:z.infer<typeof actionS
  async function run(){
   if(active.current||busy)return;
   active.current=true;setProposed(false);setBusy(true);setError('');
-  const source=state.source&&status!=='succeeded'&&status!=='failed'?state.source:crypto.randomUUID();update({source});
+  const source=state.source&&status!=='succeeded'&&status!=='failed'?state.source:randomUUID();update({source});
   try{await startAction(reference,source);if(observed.current?.source!==source)setStatus('pending')}
   catch{if(observed.current?.source!==source){setBusy(false);setError('Action not confirmed. Retry.')}}
   finally{active.current=false;setAttempt(n=>n+1)}
