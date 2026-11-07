@@ -56,7 +56,7 @@ test-node:
 	npm test --prefix runtime/javascript
 
 test-browser:
-	STEWARD_TEST_APP_BROWSER=1 STEWARD_APP_BROWSER_EVIDENCE="$${STEWARD_APP_BROWSER_EVIDENCE:-$(CURDIR)/evidence/apps-browser}" go test ./internal/interaction/web -run '^TestAppsBrowserConnectionLifecycle$$' -count=1
+	STEWARD_TEST_APP_BROWSER=1 STEWARD_APP_BROWSER_EVIDENCE="$${STEWARD_APP_BROWSER_EVIDENCE:-$(CURDIR)/evidence/apps-browser}" go test ./internal/interaction/web -run '^Test(AppsBrowserConnectionLifecycle|ComposerModelsBrowserLoadingAndRefresh)$$' -count=1
 	npm test --prefix guest-browser
 	node web/artwork/icons.mjs --check
 

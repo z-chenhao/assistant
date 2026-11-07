@@ -1,5 +1,5 @@
 {{define "capability-status"}}
-<span class="status-pill" data-status="{{.State}}">{{if and .PendingRestart (not .Candidate)}}{{tr "Restart required"}}{{else if eq .State "preparing"}}{{tr "Preparing"}}{{else if eq .State "unsupported"}}{{tr "Unavailable on this device"}}{{else if eq .State "unavailable"}}{{tr "Needs attention"}}{{else if .Configured}}{{if .Automatic}}{{tr "Enabled (default)"}}{{else}}{{tr "Enabled"}}{{end}}{{else}}{{tr "Off"}}{{end}}</span>
+<span class="status-pill" data-status="{{.State}}">{{if and .PendingRestart (not .Candidate)}}{{tr "Restart required"}}{{else if eq .State "preparing"}}{{tr "Preparing"}}{{else if eq .State "unsupported"}}{{tr "Unavailable on this device"}}{{else if eq .State "unavailable"}}{{tr "Needs attention"}}{{else if .Configured}}{{tr "Enabled"}}{{else}}{{tr "Off"}}{{end}}</span>
 {{end}}
 
 {{define "capabilities-page"}}
@@ -23,7 +23,7 @@
  {{with .Form}}
  {{if .Error}}<p class="feedback error" role="alert" data-capability-feedback>{{tr .Error}}</p>{{end}}
  {{if or (eq $.ID "memory") (eq $.ID "embedding") (eq $.ID "skills") (eq $.ID "computer")}}
- <div class="setting-row"><label for="capability-mode">{{tr "Configuration mode"}}</label><select id="capability-mode" name="mode" data-capability-mode><option value="automatic" {{if eq .Mode "automatic"}}selected{{end}}>{{tr "Automatic (recommended)"}}</option><option value="custom" {{if eq .Mode "custom"}}selected{{end}}>{{tr "Custom"}}</option>{{if ne $.ID "embedding"}}<option value="off" {{if eq .Mode "off"}}selected{{end}}>{{tr "Off"}}</option>{{end}}</select></div>
+ <div class="setting-row"><label for="capability-mode">{{tr "Configuration mode"}}</label><select id="capability-mode" name="mode" data-capability-mode><option value="automatic" {{if eq .Mode "automatic"}}selected{{end}}>{{tr "Auto"}}</option><option value="custom" {{if eq .Mode "custom"}}selected{{end}}>{{tr "Custom"}}</option>{{if ne $.ID "embedding"}}<option value="off" {{if eq .Mode "off"}}selected{{end}}>{{tr "Off"}}</option>{{end}}</select></div>
  {{else}}
  <div class="setting-row"><label for="capability-enabled">{{if eq $.ID "execution"}}{{tr "Use a custom local workspace"}}{{else}}{{tr "Enabled"}}{{end}}</label><input id="capability-enabled" type="checkbox" role="switch" name="enabled" value="yes" {{if .Enabled}}checked{{end}}></div>
  {{end}}

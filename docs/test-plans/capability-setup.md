@@ -5,6 +5,7 @@
 ## 自动默认资源验收
 
 - `internal/config/setup/defaults_test.go`：并发启动复用同一密钥；密钥缺失不替换；自动、关闭、重新启用跨重启保存；自定义错误密钥不能覆盖默认加密身份。
+- `internal/interaction/web/capability_status_test.go`：自动与自定义均显示 Enabled／已启用，异常、准备和重启状态独立；`tests/system/channels_capabilities.mjs` 验证模式切换与保存。人工检查 Auto／自动选中态、短标签无截断及明暗主题桌面／窄屏截图。
 - `internal/interaction/web/capability_forms_test.go`：四类自动能力的普通表单往返与关闭；原高级字段保留用例继续运行。
 - `internal/memory/sqlite/local_test.go`：无 embedding 服务的中文加密记忆搜索、重启、scope、明文不落盘和遗忘。
 - 原生 SecretStore 的实际解锁与 macOS 首次下载/启动需使用真实登录会话验收；Linux 的内存凭据 fixture 不能替代这项证据。

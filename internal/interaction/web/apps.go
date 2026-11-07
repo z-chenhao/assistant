@@ -35,6 +35,7 @@ type appCard struct {
 }
 type appGroup struct {
 	Title string
+	URL   string
 	Items []appCard
 }
 type appAuthConfigRow struct {
@@ -45,6 +46,8 @@ type appsView struct {
 	connectedapps.View
 	Items                    []appCard
 	ConnectedOnly            bool
+	Collection               string
+	Directory                bool
 	ConnectURL, ConnectionID string
 	AuthConfigRows           []appAuthConfigRow
 	ExpiresAt                int64
@@ -113,43 +116,12 @@ func (s *Server) managedApps(state connectedapps.State) []appCard {
 	sort.Slice(result, func(i, j int) bool { return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name) })
 	return result
 }
-func groupApps(items []appCard, filtered bool) []appGroup {
+func groupApps(items []appCard, title string) []appGroup {
 	if len(items) == 0 {
 		return nil
 	}
-	if filtered {
-		return []appGroup{{Title: "Apps", Items: items}}
-	}
-	order := []string{"Communication", "Productivity", "Documents and storage", "Development", "Design", "Business", "Personal life", "More apps"}
-	groups := map[string][]appCard{}
-	for _, item := range items {
-		name := "More apps"
-		if len(item.Meta.Categories) > 0 {
-			name = item.Meta.Categories[0].Name
-			if name == "" {
-				name = "More apps"
-			}
-		}
-		if _, ok := groups[name]; !ok {
-			known := false
-			for _, category := range order {
-				if category == name {
-					known = true
-				}
-			}
-			if !known {
-				order = append(order, name)
-			}
-		}
-		groups[name] = append(groups[name], item)
-	}
-	var result []appGroup
-	for _, name := range order {
-		if len(groups[name]) > 0 {
-			result = append(result, appGroup{Title: name, Items: groups[name]})
-		}
-	}
-	return result
+	sortApps(items)
+	return []appGroup{{Title: title, Items: items}}
 }
 
 func (s *Server) loadAppService(ctx context.Context, p *page) error {
@@ -194,16 +166,24 @@ func (s *Server) loadApps(ctx context.Context, r *http.Request, p *page) error {
 		state, err := s.Apps.State(ctx)
 		p.Apps = &appsView{View: connectedapps.View{State: state, Suggested: state.KeyRef == ""}, ConnectedOnly: true, Managed: s.managedApps(state)}
 		p.Apps.Items = p.Apps.Managed
-		p.Apps.Groups = groupApps(p.Apps.Items, true)
+		p.Apps.Groups = groupApps(p.Apps.Items, "Your apps")
+		return err
+	}
+	if r.URL.Query().Get("search") == "" && r.URL.Query().Get("category") == "" && r.URL.Query().Get("cursor") == "" && r.URL.Query().Get("view") != "all" {
+		state, err := s.Apps.State(ctx)
+		if err != nil {
+			return err
+		}
+		p.Apps, err = s.loadAppDiscovery(state, r.URL.Query().Get("collection"))
 		return err
 	}
 	v, err := s.Apps.View(ctx, r.URL.Query().Get("search"), r.URL.Query().Get("category"), r.URL.Query().Get("cursor"))
-	p.Apps = &appsView{View: v, Managed: s.managedApps(v.State)}
+	p.Apps = &appsView{View: v, Directory: true, Managed: s.managedApps(v.State)}
 	for _, item := range v.Catalog.Items {
 		card := s.cardFor(item, v.State)
 		p.Apps.Items = append(p.Apps.Items, card)
 	}
-	p.Apps.Groups = groupApps(p.Apps.Items, v.Search != "" || v.Category != "" || r.URL.Query().Get("cursor") != "")
+	p.Apps.Groups = groupApps(p.Apps.Items, "All apps")
 	return err
 }
 
